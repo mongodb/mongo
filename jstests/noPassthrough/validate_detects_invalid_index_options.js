@@ -29,6 +29,9 @@ fp.off();
 let validateRes = assert.commandWorked(db.runCommand({validate: collName}));
 assert(!validateRes.valid);
 
+// Ensure that $collStats info gets logged when validation fails.
+checkLog.containsJson(conn, 7463200);
+
 validateRes = assert.commandWorked(db.runCommand({validate: collName, background: true}));
 assert(!validateRes.valid);
 
