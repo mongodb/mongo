@@ -245,86 +245,107 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
               opCtx, StorageEngine::CheckpointLock::Mode::kShared)
         : nullptr;
 
-    StringSet readyDurableIndexes;
-    try {
-        _traverseRecordStoreCursor = std::make_unique<SeekableRecordThrottleCursor>(
-            opCtx, _collection->getRecordStore(), &_dataThrottle);
-        _seekRecordStoreCursor = std::make_unique<SeekableRecordThrottleCursor>(
-            opCtx, _collection->getRecordStore(), &_dataThrottle);
-        DurableCatalog::get(opCtx)->getReadyIndexes(
-            opCtx, _collection->getCatalogId(), &readyDurableIndexes);
-    } catch (const ExceptionFor<ErrorCodes::CursorNotFound>& ex) {
-        invariant(isBackground());
-        // End the validation if we can't open a checkpoint cursor on the collection.
-        LOGV2(6868900,
-              "Skipping background validation because the collection is not yet in a checkpoint",
-              "nss"_attr = _nss,
-              "ex"_attr = ex);
-        throw;
-    }
-
-    const IndexCatalog* indexCatalog = _collection->getIndexCatalog();
-    // The index iterator for ready indexes is timestamp-aware and will only return indexes that
-    // are visible at our read time.
-    const auto it = indexCatalog->getIndexIterator(opCtx, IndexCatalog::InclusionPolicy::kReady);
-    while (it->more()) {
-        const IndexCatalogEntry* entry = it->next();
-        const IndexDescriptor* desc = entry->descriptor();
-
-        // Filter out any in-memory index in the collection that is not in our PIT view of the
-        // MDB catalog. This is only important when background:true because we are then reading
-        // from the checkpoint's view of the MDB catalog and data.
-        if (isBackground() &&
-            readyDurableIndexes.find(desc->indexName()) == readyDurableIndexes.end()) {
-            LOGV2(6868901,
-                  "Skipping background validation on the index because the index is not yet in a "
-                  "checkpoint.",
-                  "desc_indexName"_attr = desc->indexName(),
-                  "nss"_attr = _nss);
-            _skippedIndexes.emplace(desc->indexName());
-            continue;
+    // For background validation, keep retrying if any table's cursor is opened on a different
+    // checkpoint due to the background system-wide checkpoint happens during opening the cursors.
+    // The retry should happen at most once since the checkpoint happens every 60 seconds.
+    uint64_t checkpointId = 0;
+    uint64_t currCheckpointId = 0;
+    do {
+        _indexCursors.clear();
+        _indexes.clear();
+        StringSet readyDurableIndexes;
+        try {
+            _traverseRecordStoreCursor = std::make_unique<SeekableRecordThrottleCursor>(
+                opCtx, _collection->getRecordStore(), &_dataThrottle);
+            _seekRecordStoreCursor = std::make_unique<SeekableRecordThrottleCursor>(
+                opCtx, _collection->getRecordStore(), &_dataThrottle);
+            DurableCatalog::get(opCtx)->getReadyIndexes(
+                opCtx, _collection->getCatalogId(), &readyDurableIndexes);
+            checkpointId = _traverseRecordStoreCursor->getCheckpointId();
+            currCheckpointId = _seekRecordStoreCursor->getCheckpointId();
+        } catch (const ExceptionFor<ErrorCodes::CursorNotFound>& ex) {
+            invariant(isBackground());
+            // End the validation if we can't open a checkpoint cursor on the collection.
+            LOGV2(
+                6868900,
+                "Skipping background validation because the collection is not yet in a checkpoint",
+                "nss"_attr = _nss,
+                "ex"_attr = ex);
+            throw;
         }
 
-        // Read the index's ident from disk (the checkpoint if background:true). If it does not
-        // match the in-memory ident saved in the IndexCatalogEntry, then our PIT view of the
-        // index is old and the index has been dropped and recreated. In this case we will skip
-        // it since there is no utility in checking a dropped index (we also cannot currently
-        // access it because its in-memory representation is gone).
-        auto diskIndexIdent =
-            opCtx->getServiceContext()->getStorageEngine()->getCatalog()->getIndexIdent(
-                opCtx, _collection->getCatalogId(), desc->indexName());
-        if (entry->getIdent() != diskIndexIdent) {
-            LOGV2(6868902,
-                  "Skipping validation on the index because the index was recreated and is not "
-                  "yet in a checkpoint.",
-                  "desc_indexName"_attr = desc->indexName(),
-                  "nss"_attr = _nss);
-            _skippedIndexes.emplace(desc->indexName());
-            continue;
-        }
+        const IndexCatalog* indexCatalog = _collection->getIndexCatalog();
+        // The index iterator for ready indexes is timestamp-aware and will only return indexes that
+        // are visible at our read time.
+        const auto it =
+            indexCatalog->getIndexIterator(opCtx, IndexCatalog::InclusionPolicy::kReady);
+        while (it->more() && checkpointId == currCheckpointId) {
+            const IndexCatalogEntry* entry = it->next();
+            const IndexDescriptor* desc = entry->descriptor();
 
-        if (entry->descriptor()->getAccessMethodName() == IndexNames::COLUMN) {
-            const auto iam = entry->accessMethod();
-            _columnStoreIndexCursors.emplace(
-                desc->indexName(),
-                static_cast<ColumnStoreAccessMethod*>(iam)->storage()->newCursor(opCtx));
-        } else {
-            const auto iam = entry->accessMethod()->asSortedData();
-            if (!iam) {
-                LOGV2(6325100,
-                      "[Debugging] skipping index {index_name} because it isn't SortedData",
-                      "index_name"_attr = desc->indexName());
+            // Filter out any in-memory index in the collection that is not in our PIT view of the
+            // MDB catalog. This is only important when background:true because we are then reading
+            // from the checkpoint's view of the MDB catalog and data.
+            if (isBackground() &&
+                readyDurableIndexes.find(desc->indexName()) == readyDurableIndexes.end()) {
+                LOGV2(
+                    6868901,
+                    "Skipping background validation on the index because the index is not yet in a "
+                    "checkpoint.",
+                    "desc_indexName"_attr = desc->indexName(),
+                    "nss"_attr = _nss);
                 _skippedIndexes.emplace(desc->indexName());
                 continue;
             }
 
-            _indexCursors.emplace(
-                desc->indexName(),
-                std::make_unique<SortedDataInterfaceThrottleCursor>(opCtx, iam, &_dataThrottle));
-        }
+            // Read the index's ident from disk (the checkpoint if background:true). If it does not
+            // match the in-memory ident saved in the IndexCatalogEntry, then our PIT view of the
+            // index is old and the index has been dropped and recreated. In this case we will skip
+            // it since there is no utility in checking a dropped index (we also cannot currently
+            // access it because its in-memory representation is gone).
+            auto diskIndexIdent =
+                opCtx->getServiceContext()->getStorageEngine()->getCatalog()->getIndexIdent(
+                    opCtx, _collection->getCatalogId(), desc->indexName());
+            if (entry->getIdent() != diskIndexIdent) {
+                LOGV2(6868902,
+                      "Skipping validation on the index because the index was recreated and is not "
+                      "yet in a checkpoint.",
+                      "desc_indexName"_attr = desc->indexName(),
+                      "nss"_attr = _nss);
+                _skippedIndexes.emplace(desc->indexName());
+                continue;
+            }
 
-        _indexes.push_back(indexCatalog->getEntryShared(desc));
-    }
+            if (entry->descriptor()->getAccessMethodName() == IndexNames::COLUMN) {
+                const auto iam = entry->accessMethod();
+                auto indexCursor =
+                    static_cast<ColumnStoreAccessMethod*>(iam)->storage()->newCursor(opCtx);
+                currCheckpointId = indexCursor->getCheckpointId();
+                _columnStoreIndexCursors.emplace(desc->indexName(), std::move(indexCursor));
+            } else {
+                const auto iam = entry->accessMethod()->asSortedData();
+                if (!iam) {
+                    LOGV2(6325100,
+                          "[Debugging] skipping index {index_name} because it isn't SortedData",
+                          "index_name"_attr = desc->indexName());
+                    _skippedIndexes.emplace(desc->indexName());
+                    continue;
+                }
+
+                auto indexCursor =
+                    std::make_unique<SortedDataInterfaceThrottleCursor>(opCtx, iam, &_dataThrottle);
+                currCheckpointId = indexCursor->getCheckpointId();
+                _indexCursors.emplace(desc->indexName(), std::move(indexCursor));
+            }
+
+            _indexes.push_back(indexCatalog->getEntryShared(desc));
+        }
+        // For foreground validation which doesn't use checkpoint cursors, the checkpoint id will
+        // always be zero.
+        if (!isBackground()) {
+            invariant(!checkpointId && !currCheckpointId);
+        }
+    } while (checkpointId != currCheckpointId);
 
     if (rs != RecoveryUnit::ReadSource::kNoTimestamp) {
         invariant(rs == RecoveryUnit::ReadSource::kCheckpoint);

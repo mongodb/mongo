@@ -923,6 +923,48 @@ TEST_F(WiredTigerRecoveryUnitTestFixture, CheckpointCursorNotChanged) {
     ASSERT(!originalCheckpointCursor->seekExact(rid2));
 }
 
+TEST_F(WiredTigerRecoveryUnitTestFixture, CheckpointCursorGetId) {
+    auto opCtx1 = clientAndCtx1.second.get();
+    auto opCtx2 = clientAndCtx2.second.get();
+
+    // Hold the global lock throughout the test to avoid having the global lock destructor
+    // prematurely abandon snapshots.
+    Lock::GlobalLock globalLock(opCtx1, MODE_IX);
+    Lock::GlobalLock globalLock2(opCtx2, MODE_IX);
+    auto ru = WiredTigerRecoveryUnit::get(opCtx1);
+    auto ru2 = WiredTigerRecoveryUnit::get(opCtx2);
+
+    std::unique_ptr<RecordStore> rs(harnessHelper->createRecordStore(opCtx1, "test.checkpoint_id"));
+
+    WiredTigerKVEngine* engine = harnessHelper->getEngine();
+
+    // Force a checkpoint.
+    engine->flushAllFiles(opCtx1, /*callerHoldsReadLock*/ false);
+
+    // Open a checkpoint cursor and check its id.
+    ru2->setTimestampReadSource(WiredTigerRecoveryUnit::ReadSource::kCheckpoint);
+    auto originalCheckpointCursor = rs->getCursor(opCtx2, true);
+    auto firstCheckpointId = originalCheckpointCursor->getCheckpointId();
+    ASSERT(firstCheckpointId > 0);
+
+    // Insert a record and force a checkpoint.
+    RecordId rid1;
+    {
+        WriteUnitOfWork wuow(opCtx1);
+        StatusWith<RecordId> s1 = rs->insertRecord(opCtx1, "data", 4, Timestamp());
+        ASSERT_TRUE(s1.isOK());
+        ASSERT_EQUALS(1, rs->numRecords(opCtx1));
+        rid1 = s1.getValue();
+        wuow.commit();
+    }
+    engine->flushAllFiles(opCtx1, /*callerHoldsReadLock*/ false);
+
+    // Open another checkpoint cursor and check its new id.
+    ru->setTimestampReadSource(WiredTigerRecoveryUnit::ReadSource::kCheckpoint);
+    auto newCheckpointCursor = rs->getCursor(opCtx1, true);
+    ASSERT(newCheckpointCursor->getCheckpointId() > firstCheckpointId);
+}
+
 TEST_F(WiredTigerRecoveryUnitTestFixture, CommitWithDurableTimestamp) {
     auto opCtx = clientAndCtx1.second.get();
     Timestamp ts1(3, 3);

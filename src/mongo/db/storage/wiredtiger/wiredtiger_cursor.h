@@ -73,6 +73,13 @@ public:
         _ru->assertInActiveTxn();
     }
 
+    /**
+     *  Returns the checkpoint ID for checkpoint cursors, otherwise 0.
+     */
+    uint64_t getCheckpointId() const {
+        return _cursor->checkpoint_id(_cursor);
+    }
+
 protected:
     uint64_t _tableID;
     WiredTigerRecoveryUnit* _ru;

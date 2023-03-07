@@ -408,6 +408,13 @@ public:
         _saveStorageCursorOnDetachFromOperationContext = saveCursor;
     }
 
+    /**
+     *  Returns the checkpoint ID for checkpoint cursors, otherwise 0.
+     */
+    uint64_t getCheckpointId() const override {
+        return _cursor->getCheckpointId();
+    }
+
 protected:
     virtual RecordId getKey(WT_CURSOR* cursor) const = 0;
 

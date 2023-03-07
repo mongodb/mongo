@@ -400,6 +400,11 @@ public:
 
         virtual void detachFromOperationContext() = 0;
         virtual void reattachToOperationContext(OperationContext* opCtx) = 0;
+
+        virtual uint64_t getCheckpointId() const {
+            uasserted(ErrorCodes::CommandNotSupported,
+                      "The current storage engine does not support checkpoint ids");
+        }
     };
 
     std::shared_ptr<Ident> _ident;

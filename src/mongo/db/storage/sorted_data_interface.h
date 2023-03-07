@@ -375,6 +375,11 @@ public:
          * old format due to rolling upgrades.
          */
         virtual bool isRecordIdAtEndOfKeyString() const = 0;
+
+        virtual uint64_t getCheckpointId() const {
+            uasserted(ErrorCodes::CommandNotSupported,
+                      "The current storage engine does not support checkpoint ids");
+        }
     };
 
     /**
