@@ -94,7 +94,7 @@ void RuntimeEnvironment::resetSlot(value::SlotId slot,
         return;
     }
 
-    uasserted(4946300, str::stream() << "undefined slot accessor:" << slot);
+    tasserted(4946300, str::stream() << "undefined slot accessor:" << slot);
 }
 
 RuntimeEnvironment::Accessor* RuntimeEnvironment::getAccessor(value::SlotId slot) {
@@ -102,7 +102,7 @@ RuntimeEnvironment::Accessor* RuntimeEnvironment::getAccessor(value::SlotId slot
         return &it->second;
     }
 
-    uasserted(4946301, str::stream() << "undefined slot accessor:" << slot);
+    tasserted(4946301, str::stream() << "undefined slot accessor:" << slot);
 }
 
 const RuntimeEnvironment::Accessor* RuntimeEnvironment::getAccessor(value::SlotId slot) const {
@@ -110,7 +110,7 @@ const RuntimeEnvironment::Accessor* RuntimeEnvironment::getAccessor(value::SlotI
         return &it->second;
     }
 
-    uasserted(4946303, str::stream() << "undefined slot accessor:" << slot);
+    tasserted(4946303, str::stream() << "undefined slot accessor:" << slot);
 }
 
 std::unique_ptr<RuntimeEnvironment> RuntimeEnvironment::makeCopy() const {
