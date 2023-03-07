@@ -696,6 +696,13 @@ tasks:
         vars:
           test_control: "tpcc"
 
+  - name: tpcc_majority
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "tpcc_majority"
+
   - name: industry_benchmarks
     priority: 5
     commands:
@@ -2713,6 +2720,7 @@ buildvariants:
       - name: industry_benchmarks
       - name: ycsb_60GB
       - name: tpcc
+      - name: tpcc_majority
       - name: linkbench
       - name: linkbench2
 
@@ -2748,6 +2756,7 @@ buildvariants:
       - name: industry_benchmarks
       - name: ycsb_60GB
       - name: tpcc
+      - name: tpcc_majority
       - name: linkbench
       - name: linkbench2
 
@@ -2800,6 +2809,7 @@ buildvariants:
       - name: bestbuy_agg_merge_wordcount
       - name: bestbuy_query
       - name: tpcc
+      - name: tpcc_majority
       - name: tpch_1_normalized
       - name: tpch_1_denormalized
       - name: tpch_10_normalized
@@ -2841,6 +2851,7 @@ buildvariants:
       - name: cursor_manager
       - name: map_reduce_workloads
       - name: tpcc
+      - name: tpcc_majority
       - name: tpch_1_normalized
       - name: tpch_1_denormalized
       - name: tpch_10_normalized
@@ -2884,6 +2895,7 @@ buildvariants:
       - name: cursor_manager
       - name: map_reduce_workloads
       - name: tpcc
+      - name: tpcc_majority
       - name: tpch_1_normalized
       - name: tpch_1_denormalized
       - name: tpch_10_normalized
@@ -3059,6 +3071,7 @@ buildvariants:
       - name: tsbs_query_finance
       - name: tsbs_query_manual_bucketing
       - name: tpcc
+      - name: tpcc_majority
       - name: tpch_1_normalized
       - name: tpch_1_denormalized
       - name: tpch_10_normalized
@@ -3559,6 +3572,7 @@ buildvariants:
       - name: snapshot_reads
       - name: secondary_reads
       - name: tpcc
+      - name: tpcc_majority
       - name: tpch_1_normalized
       - name: tpch_1_denormalized
       # TODO: Enable in SERVER-66572.
@@ -3646,6 +3660,7 @@ buildvariants:
       - name: snapshot_reads
       - name: secondary_reads
       - name: tpcc
+      - name: tpcc_majority
       - name: tpch_1_normalized
       - name: tpch_1_denormalized
       # TODO: Enable in SERVER-66572.
@@ -3704,6 +3719,7 @@ buildvariants:
       - name: snapshot_reads
       - name: secondary_reads
       - name: tpcc
+      - name: tpcc_majority
       - name: tpch_1_normalized
       - name: tpch_1_denormalized
       # TODO: Enable in SERVER-66572.
@@ -3764,6 +3780,7 @@ buildvariants:
       - name: snapshot_reads
       - name: secondary_reads
       - name: tpcc
+      - name: tpcc_majority
       - name: tpch_1_normalized
       - name: tpch_1_denormalized
       # TODO: Enable in SERVER-66572.
