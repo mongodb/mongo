@@ -1053,17 +1053,15 @@ optimization phases:
 Root [{scan_0}]
 Sargable [Complete]
 |   |   |   |   requirements: 
-|   |   |   |       {
-|   |   |   |           {
-|   |   |   |               {refProjection: scan_0, path: 'PathGet [a] PathIdentity []', intervals: {{{[Const [[]], Const [BinData(0, )])}}}}
-|   |   |   |            ^ 
-|   |   |   |               {refProjection: scan_0, path: 'PathGet [a] PathTraverse [1] PathIdentity []', intervals: {{{[Const [5], Const [6]]}}}}
-|   |   |   |            ^ 
-|   |   |   |               {refProjection: scan_0, path: 'PathGet [b] PathIdentity []', intervals: {{{[Const [[]], Const [BinData(0, )])}}}}
-|   |   |   |            ^ 
-|   |   |   |               {refProjection: scan_0, path: 'PathGet [b] PathTraverse [1] PathIdentity []', intervals: {{{[Const [1], Const [3]]}}}}
-|   |   |   |           }
-|   |   |   |       }
+|   |   |   |       {{
+|   |   |   |           {refProjection: scan_0, path: 'PathGet [a] PathIdentity []', intervals: {{{[Const [[]], Const [BinData(0, )])}}}}
+|   |   |   |        ^ 
+|   |   |   |           {refProjection: scan_0, path: 'PathGet [a] PathTraverse [1] PathIdentity []', intervals: {{{[Const [5], Const [6]]}}}}
+|   |   |   |        ^ 
+|   |   |   |           {refProjection: scan_0, path: 'PathGet [b] PathIdentity []', intervals: {{{[Const [[]], Const [BinData(0, )])}}}}
+|   |   |   |        ^ 
+|   |   |   |           {refProjection: scan_0, path: 'PathGet [b] PathTraverse [1] PathIdentity []', intervals: {{{[Const [1], Const [3]]}}}}
+|   |   |   |       }}
 |   |   |   candidateIndexes: 
 |   |   scanParams: 
 |   |       {'a': evalTemp_7, 'b': evalTemp_8}

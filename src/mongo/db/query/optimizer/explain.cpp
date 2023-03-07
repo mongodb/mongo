@@ -1072,105 +1072,121 @@ public:
     }
 
     template <class T>
-    using PrinterFn = std::function<void(ExplainPrinter& printer, const T& t)>;
-
-    template <class T>
     ExplainPrinter printIntervalExpr(const typename BoolExpr<T>::Node& intervalExpr) {
-        PrinterFn<T> intervalPrinter = [&](ExplainPrinter& printer, const T& interval) {
+        const auto printFn = [this](ExplainPrinter& printer, const T& interval) {
             printInterval(printer, interval);
         };
 
-        BoolExprPrinter<T> exprPrinter(intervalPrinter);
-        return exprPrinter.print(intervalExpr);
+        ExplainPrinter printer;
+        BoolExprPrinter<T>{printFn}.print(printer, intervalExpr);
+        return printer;
     }
 
     ExplainPrinter printPartialSchemaRequirements(
         const typename BoolExpr<PartialSchemaEntry>::Node& reqs) {
-        PrinterFn<PartialSchemaEntry> printer = [&](ExplainPrinter& printer,
-                                                    const PartialSchemaEntry& entry) {
+        const auto printFn = [this](ExplainPrinter& printer, const PartialSchemaEntry& entry) {
             printPartialSchemaEntry(printer, entry);
         };
 
-        BoolExprPrinter<PartialSchemaEntry> exprPrinter(printer);
-        return exprPrinter.print(reqs);
+        ExplainPrinter printer;
+        BoolExprPrinter<PartialSchemaEntry>{printFn}.print(printer, reqs);
+        return printer;
     }
 
     template <class T>
     class BoolExprPrinter {
     public:
-        BoolExprPrinter(PrinterFn<T>& tPrinter) : _tPrinter(tPrinter) {}
+        using PrinterFn = std::function<void(ExplainPrinter& printer, const T& t)>;
 
-        ExplainPrinter transport(const typename BoolExpr<T>::Atom& node, const bool, const bool) {
-            ExplainPrinter printer;
-            printer.separator("{");
+        BoolExprPrinter(const PrinterFn& tPrinter) : _tPrinter(tPrinter) {}
+
+        void operator()(const typename BoolExpr<T>::Node& n,
+                        const typename BoolExpr<T>::Atom& node,
+                        ExplainPrinter& printer,
+                        const size_t extraBraceCount) {
+            for (size_t i = 0; i <= extraBraceCount; i++) {
+                printer.separator("{");
+            }
             _tPrinter(printer, node.getExpr());
-            printer.separator("}");
-            return printer;
+            for (size_t i = 0; i <= extraBraceCount; i++) {
+                printer.separator("}");
+            }
         }
 
-        template <bool isConjunction>
-        ExplainPrinter print(std::vector<ExplainPrinter> childResults, const bool inlineChildren) {
+        template <bool isConjunction, class NodeType>
+        void print(const NodeType& node, ExplainPrinter& printer, const size_t extraBraceCount) {
+            const auto& children = node.nodes();
+
             if constexpr (version < ExplainVersion::V3) {
-                ExplainPrinter printer;
-                printer.separator("{");
+                if (children.empty()) {
+                    return;
+                }
+                if (children.size() == 1) {
+                    children.front().visit(*this, printer, extraBraceCount + 1);
+                    return;
+                }
+
+                for (size_t i = 0; i <= extraBraceCount; i++) {
+                    printer.separator("{");
+                }
 
                 bool first = true;
-                for (ExplainPrinter& child : childResults) {
+                for (const auto& child : children) {
                     if (first) {
                         first = false;
                     } else if constexpr (isConjunction) {
-                        printer.print(" ^ ");
+                        printer.separator(" ^ ");
                     } else {
-                        printer.print(" U ");
+                        printer.separator(" U ");
                     }
 
-                    if (inlineChildren) {
-                        printer.printSingleLevel(child);
-                    } else {
-                        printer.print(child);
-                    }
+                    ExplainPrinter local;
+                    child.visit(*this, local, 0 /*extraBraceCount*/);
+                    printer.print(local);
                 }
-                printer.separator("}");
 
-                return printer;
+                for (size_t i = 0; i <= extraBraceCount; i++) {
+                    printer.separator("}");
+                }
             } else if constexpr (version == ExplainVersion::V3) {
-                ExplainPrinter printer;
+                std::vector<ExplainPrinter> childResults;
+                for (const auto& child : children) {
+                    ExplainPrinter local;
+                    child.visit(*this, local, 0 /*extraBraceCount*/);
+                    childResults.push_back(std::move(local));
+                }
+
                 if constexpr (isConjunction) {
                     printer.fieldName("conjunction");
                 } else {
                     printer.fieldName("disjunction");
                 }
                 printer.print(childResults);
-                return printer;
             } else {
                 MONGO_UNREACHABLE;
             }
         }
 
-        ExplainPrinter transport(const typename BoolExpr<T>::Conjunction& node,
-                                 const bool hasOneAtom,
-                                 const bool isCNF,
-                                 std::vector<ExplainPrinter> childResults) {
-            bool inlineChildren = hasOneAtom || (childResults.size() == 1 && !isCNF);
-            return print<true /*isConjunction*/>(std::move(childResults), inlineChildren);
+        void operator()(const typename BoolExpr<T>::Node& n,
+                        const typename BoolExpr<T>::Conjunction& node,
+                        ExplainPrinter& printer,
+                        const size_t extraBraceCount) {
+            print<true /*isConjunction*/>(node, printer, extraBraceCount);
         }
 
-        ExplainPrinter transport(const typename BoolExpr<T>::Disjunction& node,
-                                 const bool hasOneAtom,
-                                 const bool isCNF,
-                                 std::vector<ExplainPrinter> childResults) {
-            bool inlineChildren = hasOneAtom || (childResults.size() == 1 && isCNF);
-            return print<false /*isConjunction*/>(std::move(childResults), inlineChildren);
+        void operator()(const typename BoolExpr<T>::Node& n,
+                        const typename BoolExpr<T>::Disjunction& node,
+                        ExplainPrinter& printer,
+                        const size_t extraBraceCount) {
+            print<false /*isConjunction*/>(node, printer, extraBraceCount);
         }
 
-        ExplainPrinter print(const typename BoolExpr<T>::Node& expr) {
-            bool hasOneAtom = BoolExpr<T>::numLeaves(expr) == 1;
-            bool isCNF = expr.template is<typename BoolExpr<T>::Conjunction>();
-            return algebra::transport<false>(expr, *this, hasOneAtom, isCNF);
+        void print(ExplainPrinter& printer, const typename BoolExpr<T>::Node& expr) {
+            expr.visit(*this, printer, 0 /*extraBraceCount*/);
         }
 
     private:
-        PrinterFn<T>& _tPrinter;
+        const PrinterFn& _tPrinter;
     };
 
     ExplainPrinter transport(const ABT& n, const IndexScanNode& node, ExplainPrinter bindResult) {
