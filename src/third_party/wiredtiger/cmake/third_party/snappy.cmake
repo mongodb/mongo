@@ -14,6 +14,7 @@ endif()
 add_library(wt::snappy SHARED IMPORTED GLOBAL)
 set_target_properties(wt::snappy PROPERTIES
     IMPORTED_LOCATION ${HAVE_LIBSNAPPY}
+    IMPORTED_IMPLIB ${HAVE_LIBSNAPPY}
 )
 if (HAVE_LIBSNAPPY_INCLUDES)
     set_target_properties(wt::snappy PROPERTIES
