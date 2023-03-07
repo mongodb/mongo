@@ -66,7 +66,10 @@ class LLDBDumper:
 
         output = None
         if (output_file):
-            output = open(output_file, "w")
+            try:
+                output = open(output_file, "w")
+            except OSError as e :
+                raise e
         subprocess.run([self.dbg, "--batch"] + [exe_path, "-c", core_path] +
                        list(itertools.chain.from_iterable([['-o', b] for b in cmds])),
                        check=True, stdout=output)
@@ -100,7 +103,10 @@ class GDBDumper:
 
         output = None
         if (output_file):
-            output = open(output_file, "w")
+            try:
+                output = open(output_file, "w")
+            except OSError as e :
+                raise e
         subprocess.run([self.dbg, "--batch", "--quiet"] +
                        list(itertools.chain.from_iterable([['-ex', b] for b in cmds])) +
                        [exe_path, core_path],
