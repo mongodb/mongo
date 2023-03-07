@@ -70,6 +70,17 @@ TEST(SystemTickSourceTest, TicksPerSecond) {
 TEST(SystemTickSourceTest, GetTicks) {
     using namespace fmt::literals;
     using namespace std::chrono_literals;
+#ifdef _WIN32
+    // Error upper bound increased for Windows systems because sleep_for is known to possibly
+    // sleep longer than the duration specified with high margin of error.
+    const static double kMaxError = 5.0;
+#else
+    const static double kMaxError = 0.1;
+#endif
+    // Because sleep_for guarantees blocking for at least sleep duration, the error lower
+    // bound only needs to account for the potential time difference between the intervals
+    // of getTicks and sleep_for.
+    const static double kMinError = -0.01;
     auto ts = makeSystemTickSource();
     auto tTick = 1.0s / ts->getTicksPerSecond();
     for (int i = 0; i != 5; ++i) {
@@ -78,9 +89,9 @@ TEST(SystemTickSourceTest, GetTicks) {
         stdx::this_thread::sleep_for(delay);
         auto n1 = ts->getTicks();
         auto dt = (n1 - n0) * tTick;
-        double err = std::abs((dt - delay) / delay);
-        ASSERT_LT(err, 0.1) << " n0={}, n1={}, tTick={}, delay={}, dt={}"_format(
-            n0, n1, tTick, delay, dt);
+        double err = (dt - delay) / delay;
+        ASSERT_THAT(err, m::AllOf(m::Ge(kMinError), m::Le(kMaxError)))
+            << " n0={}, n1={}, tTick={}, delay={}, dt={}"_format(n0, n1, tTick, delay, dt);
     }
 }
 
