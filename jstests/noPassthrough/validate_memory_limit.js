@@ -37,6 +37,11 @@ function checkValidate(maxMemoryUsage, {minMissingKeys, maxMissingKeys}) {
     assert.lte(res.missingIndexEntries.length, maxMissingKeys, tojson(res));
 }
 
+function checkValidateLogs() {
+    assert(checkLog.checkContainsOnceJson(
+        conn, 7463100, {"spec": {"v": 2, "key": {"_id": 1}, "name": "_id_"}}));
+}
+
 function checkValidateRepair() {
     const res = coll.validate({repair: true});
     assert.commandWorked(res);
@@ -50,6 +55,7 @@ const indexKey = "a".repeat(kIndexKeyLength);
 assert.commandWorked(coll.insert({_id: indexKey}));
 corruptIndex();
 checkValidate(1, {minMissingKeys: 1, maxMissingKeys: 1});
+checkValidateLogs();
 
 // Can't repair successfully if there aren't any index inconsistencies reported.
 checkValidateRepair();
@@ -69,6 +75,7 @@ corruptIndex();
 // each key is counted twice, so realistically we only expect to track 2 of them. However, there's
 // a small chance we could get hash collisions that would lead to us reporting only 1.
 checkValidate(1, {minMissingKeys: 1, maxMissingKeys: 2});
+checkValidateLogs();
 
 // Repair, but incompletely if only some inconsistencies are reported.
 checkValidateRepair();

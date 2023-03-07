@@ -244,6 +244,20 @@ void _validateIndexKeyCount(OperationContext* opCtx,
     }
 }
 
+void _printIndexSpec(const ValidateState* validateState, StringData indexName) {
+    auto& indexes = validateState->getIndexes();
+    auto indexEntry =
+        std::find_if(indexes.begin(),
+                     indexes.end(),
+                     [&](const std::shared_ptr<const IndexCatalogEntry> indexEntry) -> bool {
+                         return indexEntry->descriptor()->indexName() == indexName;
+                     });
+    if (indexEntry != indexes.end()) {
+        auto indexSpec = (*indexEntry)->descriptor()->infoObj();
+        LOGV2_ERROR(7463100, "Index failed validation", "spec"_attr = indexSpec);
+    }
+}
+
 void _reportValidationResults(OperationContext* opCtx,
                               ValidateState* validateState,
                               ValidateResults* results,
@@ -264,6 +278,7 @@ void _reportValidationResults(OperationContext* opCtx,
     for (const auto& [indexName, vr] : results->indexResultsMap) {
         if (!vr.valid) {
             results->valid = false;
+            _printIndexSpec(validateState, indexName);
         }
 
         if (validateState->getSkippedIndexes().contains(indexName)) {
