@@ -1080,18 +1080,18 @@ ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
         const auto oldestTimestampSupportedForHistory =
             getOldestTimestampSupportedForSnapshotHistory(opCtx);
         const auto chunksBelongingToShard =
-            uassertStatusOK(
-                _localConfigShard->exhaustiveFindOnConfig(
-                    opCtx,
-                    ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                    repl::ReadConcernLevel::kLocalReadConcern,
-                    ChunkType::ConfigNS,
-                    BSON(ChunkType::collectionUUID
-                         << collUuid << ChunkType::shard(shardId.toString()) << ChunkType::jumbo
-                         << BSON("$ne" << true) << ChunkType::onCurrentShardSince
-                         << BSON("$lt" << oldestTimestampSupportedForHistory)),
-                    BSON(ChunkType::min << 1) /* sort */,
-                    boost::none /* limit */))
+            uassertStatusOK(_localConfigShard->exhaustiveFindOnConfig(
+                                opCtx,
+                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                repl::ReadConcernLevel::kLocalReadConcern,
+                                ChunkType::ConfigNS,
+                                BSON(ChunkType::collectionUUID
+                                     << collUuid << ChunkType::shard(shardId.toString())
+                                     << ChunkType::onCurrentShardSince
+                                     << BSON("$lt" << oldestTimestampSupportedForHistory)
+                                     << ChunkType::jumbo << BSON("$ne" << true)),
+                                BSON(ChunkType::min << 1) /* sort */,
+                                boost::none /* limit */))
                 .docs;
 
         // 3. Prepare the data for the merge.

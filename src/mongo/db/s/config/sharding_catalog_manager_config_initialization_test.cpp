@@ -275,7 +275,10 @@ TEST_F(ConfigInitializationTest, BuildsNecessaryIndexes) {
                  << "unique" << true),
         BSON("v" << 2 << "key" << BSON("uuid" << 1 << "lastmod" << 1) << "name"
                  << "uuid_1_lastmod_1"
-                 << "unique" << true)};
+                 << "unique" << true),
+        BSON("v" << 2 << "key" << BSON("uuid" << 1 << "shard" << 1 << "onCurrentShardSince" << 1)
+                 << "name"
+                 << "uuid_1_shard_1_onCurrentShardSince_1")};
 
     auto expectedShardsIndexes = std::vector<BSONObj>{
         BSON("v" << 2 << "key" << BSON("_id" << 1) << "name"
