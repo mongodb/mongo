@@ -32,6 +32,7 @@
 #include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/unittest/assert.h"
+#include "mongo/unittest/inline_auto_update.h"
 
 /**
  * BSON comparison utility macro. Do not use directly.
@@ -90,5 +91,13 @@ DECLARE_BSON_CMP_FUNC(BSONElement, GTE);
 DECLARE_BSON_CMP_FUNC(BSONElement, NE);
 #undef DECLARE_BSON_CMP_FUNC
 
+/**
+ * Given a BSONObj, return a string that wraps the json form of the BSONObj with
+ * `fromjson(R"(<>)")`.
+ */
+std::string makeJsonStr(const BSONObj& obj);
+
+#define ASSERT_BSONOBJ_EQ_AUTO(expected, actual) \
+    ASSERT(AUTO_UPDATE_HELPER(makeJsonStr(expected), makeJsonStr(actual), false))
 }  // namespace unittest
 }  // namespace mongo

@@ -30,6 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/inline_auto_update.h"
 
 namespace mongo {
 namespace unittest {
@@ -82,6 +83,15 @@ GENERATE_BSON_CMP_FUNC(BSONElement, LTE, SimpleBSONElementComparator::kInstance,
 GENERATE_BSON_CMP_FUNC(BSONElement, GT, SimpleBSONElementComparator::kInstance, >);
 GENERATE_BSON_CMP_FUNC(BSONElement, GTE, SimpleBSONElementComparator::kInstance, >=);
 GENERATE_BSON_CMP_FUNC(BSONElement, NE, SimpleBSONElementComparator::kInstance, !=);
+
+std::string makeJsonStr(const BSONObj& obj) {
+    const static JsonStringFormat format = JsonStringFormat::ExtendedRelaxedV2_0_0;
+    std::string str = obj.jsonString(format);
+    if (str.size() > kAutoUpdateMaxLineLength) {
+        str = obj.jsonString(format, 1);
+    }
+    return str::stream() << "fromjson(R\"(" << str << ")\")";
+}
 
 }  // namespace unittest
 }  // namespace mongo

@@ -127,6 +127,7 @@ env.CppUnitTest(
         'thread_assertion_monitor_test.cpp',
         'assert_that_test.cpp',
         'inline_auto_update_test.cpp',
+        'bson_test_util_test.cpp',
     ],
 )
 

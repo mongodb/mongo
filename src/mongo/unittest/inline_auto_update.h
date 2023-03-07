@@ -49,6 +49,9 @@ bool handleAutoUpdate(const std::string& expected,
                       size_t lineNumber,
                       bool needsEscaping);
 
+// Account for maximum line length after linting. We need to indent, add quotes, etc.
+static constexpr size_t kAutoUpdateMaxLineLength = 88;
+
 /**
  * Auto update result back in the source file if the assert fails.
  * The expected result must be a multi-line string in the following form:

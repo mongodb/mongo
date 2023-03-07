@@ -58,9 +58,6 @@ std::vector<std::string> formatStr(const std::string& str, const bool needsEscap
     std::vector<std::string> replacementLines;
     const bool endsWithNewline = str.back() == '\n';
 
-    // Account for maximum line length after linting. We need to indent, add quotes, etc.
-    static constexpr size_t kEscapedLength = 88;
-
     std::vector<std::string> inputLines;
     std::istringstream inputStream(str);
     std::string line;
@@ -75,15 +72,15 @@ std::vector<std::string> formatStr(const std::string& str, const bool needsEscap
         for (;;) {
             // If the line is estimated to exceed the maximum length allowed by the linter, break it
             // up and make sure to insert '\n' only at the end of the last segment.
-            const bool breakupLine = needsEscaping && escaped.size() > kEscapedLength;
+            const bool breakupLine = needsEscaping && escaped.size() > kAutoUpdateMaxLineLength;
 
-            size_t lineLength = kEscapedLength;
+            size_t lineLength = needsEscaping ? kAutoUpdateMaxLineLength : escaped.size();
             if (breakupLine) {
                 // Attempt to break the line at the last space.
                 lineLength = escaped.find_last_of(' ', lineLength);
                 if (lineLength == std::string::npos) {
                     // Line does not have any spaces.
-                    lineLength = kEscapedLength;
+                    lineLength = kAutoUpdateMaxLineLength;
                 } else {
                     lineLength++;
                 }
@@ -119,12 +116,6 @@ std::vector<std::string> formatStr(const std::string& str, const bool needsEscap
         // Account for the fact that we need an extra comma after the string constant in the macro.
         auto& lastLine = replacementLines.back();
         lastLine.insert(lastLine.size() - 1, ",");
-
-        if (replacementLines.size() == 1) {
-            // For single lines, add a 'nolint' comment to prevent the linter from inlining the
-            // single line with the macro itself.
-            lastLine.insert(lastLine.size() - 1, "  // NOLINT (test auto-update)");
-        }
     }
 
     return replacementLines;
