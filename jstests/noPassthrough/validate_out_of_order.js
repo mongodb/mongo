@@ -27,6 +27,9 @@ assert(!res.valid);
 assert.commandWorked(
     primary.adminCommand({configureFailPoint: "WTRecordStoreUassertOutOfOrder", mode: "off"}));
 
+// Ensure that $collStats info gets logged when validation fails.
+checkLog.containsJson(primary, 7463200);
+
 // Test index entry out-of-order detection.
 assert.commandWorked(
     primary.adminCommand({configureFailPoint: "failIndexKeyOrdering", mode: "alwaysOn"}));
