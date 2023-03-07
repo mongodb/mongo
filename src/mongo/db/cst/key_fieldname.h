@@ -82,6 +82,7 @@ namespace mongo {
     ENUMIFY(existsExpr)          \
     ENUMIFY(exponent)            \
     ENUMIFY(expr)                \
+    ENUMIFY(field)               \
     ENUMIFY(findArg)             \
     ENUMIFY(filter)              \
     ENUMIFY(first)               \
@@ -106,6 +107,7 @@ namespace mongo {
     ENUMIFY(isoWeekArg)          \
     ENUMIFY(isoWeekYear)         \
     ENUMIFY(isoWeekYearArg)      \
+    ENUMIFY(k)                   \
     ENUMIFY(language)            \
     ENUMIFY(limit)               \
     ENUMIFY(literal)             \
@@ -149,6 +151,7 @@ namespace mongo {
     ENUMIFY(rtrim)               \
     ENUMIFY(sample)              \
     ENUMIFY(search)              \
+    ENUMIFY(searchVector)        \
     ENUMIFY(second)              \
     ENUMIFY(secondArg)           \
     ENUMIFY(setDifference)       \
@@ -189,6 +192,7 @@ namespace mongo {
     ENUMIFY(trunc)               \
     ENUMIFY(type)                \
     ENUMIFY(unionWith)           \
+    ENUMIFY(vector)              \
     ENUMIFY(week)                \
     ENUMIFY(where)               \
     ENUMIFY(year)                \

@@ -465,6 +465,8 @@ void DocumentStorage::loadLazyMetadata() const {
                 _metadataFields.setSearchScoreDetails(elem.Obj());
             } else if (fieldName == Document::metaFieldSearchSortValues) {
                 _metadataFields.setSearchSortValues(elem.Obj());
+            } else if (fieldName == Document::metaFieldVectorSimilarityKey) {
+                _metadataFields.setVectorSimilarity(elem.Double());
             }
         }
     }

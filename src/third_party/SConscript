@@ -228,6 +228,12 @@ elif use_vendored_libunwind:
         'SYSLIBDEPS_PRIVATE': [env['LIBDEPS_LZMA_SYSLIBDEP']],
     }
 
+if not use_system_version_of_library('libfaiss'):
+    thirdPartyEnvironmentModifications['libfaiss'] = {
+        'CPPPATH': ['#/src/third_party/libfaiss/include'],
+        'LIBS': ['libfaiss'],
+        'LIBPATH': ['#/src/third_party/libfaiss'],
+    }
 
 def injectThirdParty(thisEnv, libraries=[], parts=[]):
     libraries = thisEnv.Flatten([libraries])
@@ -659,3 +665,18 @@ else:
     ])
 
 mcEnv.ShimLibrary(name="libmongocrypt", )
+
+faissEnv = env.Clone()
+if use_system_version_of_library("libfaiss"):
+    faissEnv = mcEnv.Clone(SYSLIBDEPS=[
+        env['LIBDEPS_LIBFAISS_SYSLIBDEP'],
+    ])
+else:
+    faissEnv = faissEnv.Clone()
+    faissEnv.InjectThirdParty(libraries=['libfaiss'])
+    faissEnv.SConscript('faiss/SConscript', exports={'env': faissEnv})
+    faissEnv = faissEnv.Clone(LIBDEPS_INTERFACE=[
+        'libfaiss/libfaiss',
+    ])
+
+faissEnv.ShimLibrary(name="libfaiss", )

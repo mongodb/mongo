@@ -102,6 +102,7 @@ public:
     static constexpr StringData metaFieldSearchScoreDetails = "$searchScoreDetails"_sd;
     static constexpr StringData metaFieldSearchSortValues = "$searchSortValues"_sd;
     static constexpr StringData metaFieldIndexKey = "$indexKey"_sd;
+    static constexpr StringData metaFieldVectorSimilarityKey = "$vectorSimilarity"_sd;
 
     static const StringDataSet allMetadataFieldNames;
 

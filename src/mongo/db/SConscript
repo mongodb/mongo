@@ -1694,6 +1694,7 @@ env.Library(
     target='index_commands_idl',
     source=[
         'create_indexes.idl',
+        'create_vector_index.idl',
         'drop_indexes.idl',
     ],
     LIBDEPS_PRIVATE=[

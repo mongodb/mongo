@@ -465,6 +465,7 @@ for pack in [
         'ASIO',
     ),
     ('boost', ),
+    ('libfaiss', ),
     ('fmt', ),
     ('google-benchmark', 'Google benchmark'),
     ('icu', 'ICU'),
@@ -5021,6 +5022,9 @@ def doConfigure(myenv):
 
     if use_system_version_of_library("stemmer"):
         conf.FindSysLibDep("stemmer", ["stemmer"])
+
+    if use_system_version_of_library("libfaiss"):
+        conf.FindSysLibDep("libfaiss", ["libfaiss"])
 
     if use_system_version_of_library("yaml"):
         conf.FindSysLibDep("yaml", ["yaml-cpp"])
