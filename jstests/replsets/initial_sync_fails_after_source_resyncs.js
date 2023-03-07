@@ -73,13 +73,16 @@ const res = assert.commandWorked(initialSyncNode.adminCommand({replSetGetStatus:
 
 // The initial sync should have failed.
 assert.eq(res.initialSyncStatus.failedInitialSyncAttempts, 1);
-beforeFinishFailPoint.off();
 
 // Release the initial sync source and sync node oplog fetcher so the test completes.
 assert.commandWorked(initialSyncNodeDb.adminCommand(
     {configureFailPoint: "hangBeforeStartingOplogFetcher", mode: "off"}));
 assert.commandWorked(initialSyncSource.getDB("admin").adminCommand(
     {configureFailPoint: "initialSyncHangBeforeFinish", mode: "off"}));
+
+// We need to turn off the above failpoints before this one, otherwise the server may already have
+// shutdown before we turn the failpoints off, causing the above commands to fail.
+beforeFinishFailPoint.off();
 
 // We want to ensure the initialSyncNode encounters the InitialSyncFailure error and shuts down.
 assert.soon(() => {
