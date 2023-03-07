@@ -76,6 +76,8 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep)
         __wt_page_modify_clear(session, page);
 
     WT_ASSERT_ALWAYS(session, !__wt_page_is_modified(page), "Attempting to discard dirty page");
+    WT_ASSERT_ALWAYS(
+      session, !__wt_page_is_reconciling(page), "Attempting to discard page being reconciled");
     WT_ASSERT_ALWAYS(session, !F_ISSET_ATOMIC_16(page, WT_PAGE_EVICT_LRU),
       "Attempting to discard page queued for eviction");
 
@@ -289,6 +291,8 @@ __wt_free_ref(WT_SESSION_IMPL *session, WT_REF *ref, int page_type, bool free_pa
      * clean explicitly.)
      */
     if (free_pages && ref->page != NULL) {
+        WT_ASSERT_ALWAYS(session, !__wt_page_is_reconciling(ref->page),
+          "Attempting to discard ref to a page being reconciled");
         __wt_page_modify_clear(session, ref->page);
         __wt_page_out(session, &ref->page);
     }
@@ -345,6 +349,9 @@ __wt_free_ref_index(WT_SESSION_IMPL *session, WT_PAGE *page, WT_PAGE_INDEX *pind
 
     if (pindex == NULL)
         return;
+
+    WT_ASSERT_ALWAYS(session, !__wt_page_is_reconciling(page),
+      "Attempting to discard ref to a page being reconciled");
 
     for (i = 0; i < pindex->entries; ++i) {
         ref = pindex->index[i];
