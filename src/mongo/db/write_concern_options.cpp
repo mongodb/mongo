@@ -174,6 +174,7 @@ StatusWith<WriteConcernOptions> WriteConcernOptions::extractWCFromCommand(const 
 
 WriteConcernW deserializeWriteConcernW(BSONElement wEl) {
     if (wEl.isNumber()) {
+        uassert(ErrorCodes::FailedToParse, "w cannot be NaN", !wEl.isNaN());
         auto wNum = wEl.safeNumberLong();
         if (wNum < 0 || wNum > static_cast<long long>(repl::ReplSetConfig::kMaxMembers)) {
             uasserted(ErrorCodes::FailedToParse,

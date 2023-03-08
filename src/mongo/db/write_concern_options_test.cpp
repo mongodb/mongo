@@ -211,5 +211,13 @@ TEST(WriteConcernOptionsTest, ParseWithTags) {
     ASSERT(wc != wc5);
 }
 
+TEST(WriteConcernOptionsTest, ParseWithWNan) {
+    auto sw = WriteConcernOptions::parse(BSON("w" << std::nan("1")));
+    auto status = sw.getStatus();
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(ErrorCodes::FailedToParse, status.code());
+    ASSERT_STRING_CONTAINS(status.reason(), "w cannot be NaN");
+}
+
 }  // namespace
 }  // namespace mongo
