@@ -703,26 +703,30 @@ void padCompoundIntervalsDNF(CompoundIntervalReqExpr::Node& targetIntervals,
 
         for (const auto& targetConjunct :
              targetConjunction.cast<CompoundIntervalReqExpr::Conjunction>()->nodes()) {
-            const auto& targetInterval =
-                targetConjunct.cast<CompoundIntervalReqExpr::Atom>()->getExpr();
+            auto targetInterval = targetConjunct.cast<CompoundIntervalReqExpr::Atom>()->getExpr();
 
-            IntervalRequirement sourceInterval;
-            if (!targetInterval.getLowBound().isInclusive()) {
-                sourceInterval.getLowBound() = {false /*inclusive*/, Constant::maxKey()};
-            }
-            if (!targetInterval.getHighBound().isInclusive()) {
-                sourceInterval.getHighBound() = {false /*inclusive*/, Constant::minKey()};
-            }
+            // For the low bound, if we are inclusive and not reversed, then we append MinKey key in
+            // order to include all the values for the previously constrained fields. For example,
+            // for a compound index on (a, b) if we constrain a >= 1 then we need to construct a
+            // compound bound [{1, MinKey}, ...). Conversely on the upper side if we are inclusive
+            // we need to append a MaxKey in order to include the previously constrained values. If
+            // we are not inclusive, then we do not want to include any of the values for the
+            // previously constrained fields, and thus append MaxKey for the lower side. On the same
+            // compound index (a, b), we encode the condition a > 1 as {(1, MaxKey), ...}.
+            // Conversely of the upper side we append MinKey. If we are reversing, the lower and
+            // upper bounds effectively switch sides, and we append MinKey where we would have
+            // appended MaxKey, and vice versa.
+            const bool lowInclusive = targetInterval.getLowBound().isInclusive();
+            BoundRequirement lowBound{lowInclusive,
+                                      (lowInclusive == reverseSource) ? Constant::maxKey()
+                                                                      : Constant::minKey()};
+            const bool highInclusive = targetInterval.getHighBound().isInclusive();
+            BoundRequirement highBound{highInclusive,
+                                       (highInclusive == reverseSource) ? Constant::minKey()
+                                                                        : Constant::maxKey()};
 
-            auto newInterval = targetInterval;
-            if (reverseSource) {
-                auto newSource = sourceInterval;
-                newSource.reverse();
-                newInterval.push_back(std::move(newSource));
-            } else {
-                newInterval.push_back(sourceInterval);
-            }
-            builder.atom(std::move(newInterval));
+            targetInterval.push_back({std::move(lowBound), std::move(highBound)});
+            builder.atom(std::move(targetInterval));
         }
 
         builder.pop();

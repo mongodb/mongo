@@ -968,28 +968,27 @@ static bool extendCompoundInterval(PrefixId& prefixId,
             padCompoundInterval(indexCollationSpec, eqPrefixes.back()._interval, i + indexField);
         }
 
-        if (eqPrefixes.size() < maxIndexEqPrefixes) {
-            // Begin new equality prefix.
-            eqPrefixes.emplace_back(indexField);
-            // Pad new prefix with index fields processed so far.
-
-            for (size_t i = 0; i < indexField; i++) {
-                // Obtain existing bound projection or get a temporary one for the
-                // previous fields.
-                const ProjectionName& tempProjName = getExistingOrTempProjForFieldName(
-                    prefixId, FieldNameType{encodeIndexKeyName(i)}, fieldProjMap);
-                correlatedProjNames.emplace_back(tempProjName);
-
-                // Create point bounds using the projections.
-                const BoundRequirement eqBound{true /*inclusive*/, make<Variable>(tempProjName)};
-                extendCompoundInterval(indexCollationSpec,
-                                       eqPrefixes.back()._interval,
-                                       i,
-                                       IntervalReqExpr::makeSingularDNF(eqBound, eqBound));
-            }
-        } else {
+        if (eqPrefixes.size() >= maxIndexEqPrefixes) {
             // Too many equality prefixes.
             return false;
+        }
+        // Begin new equality prefix.
+        eqPrefixes.emplace_back(indexField);
+
+        // Pad new prefix with index fields processed so far.
+        for (size_t i = 0; i < indexField; i++) {
+            // Obtain existing bound projection or get a temporary one for the
+            // previous fields.
+            const ProjectionName& tempProjName = getExistingOrTempProjForFieldName(
+                prefixId, FieldNameType{encodeIndexKeyName(i)}, fieldProjMap);
+            correlatedProjNames.emplace_back(tempProjName);
+
+            // Create point bounds using the projections.
+            const BoundRequirement eqBound{true /*inclusive*/, make<Variable>(tempProjName)};
+            extendCompoundInterval(indexCollationSpec,
+                                   eqPrefixes.back()._interval,
+                                   i,
+                                   IntervalReqExpr::makeSingularDNF(eqBound, eqBound));
         }
     }
 
@@ -1009,11 +1008,6 @@ static bool computeCandidateIndexEntry(PrefixId& prefixId,
     auto& eqPrefixes = entry._eqPrefixes;
     auto& correlatedProjNames = entry._correlatedProjNames;
     auto& predTypes = entry._predTypes;
-
-    // Don't allow more than one Traverse predicate to fuse with the same Traverse in the index. For
-    // each field of the index, track whether we are still allowed to fuse a Traverse predicate with
-    // it.
-    std::vector<bool> allowFuseTraverse(indexCollationSpec.size(), true);
 
     // Add open interval for the first equality prefix.
     eqPrefixes.emplace_back(0);
@@ -1041,6 +1035,10 @@ static bool computeCandidateIndexEntry(PrefixId& prefixId,
                 if (!success) {
                     // Too many equality prefixes. Attempt to satisfy remaining predicates as
                     // residual.
+                    while (predTypes.size() < indexCollationSpec.size()) {
+                        // Pad remaining index key as "unbound".
+                        predTypes.push_back(IndexFieldPredType::Unbound);
+                    }
                     break;
                 }
                 if (eqPrefixes.size() > 1 && entry._intervalPrefixSize == 0) {
@@ -1050,9 +1048,6 @@ static bool computeCandidateIndexEntry(PrefixId& prefixId,
 
                 foundSuitableField = true;
                 unsatisfiedKeys.erase(indexKey);
-                if (checkPathContainsTraverse(indexKey._path)) {
-                    allowFuseTraverse[indexField] = false;
-                }
                 entry._intervalPrefixSize++;
 
                 eqPrefixes.back()._predPosSet.insert(queryPredPos);
@@ -1093,11 +1088,7 @@ static bool computeCandidateIndexEntry(PrefixId& prefixId,
         for (size_t indexField = 0; indexField < indexCollationSpec.size(); indexField++) {
             if (const auto fusedPath =
                     fuseIndexPath(queryKey._path, indexCollationSpec.at(indexField)._path);
-                fusedPath._suffix &&
-                (allowFuseTraverse[indexField] || fusedPath._numTraversesFused == 0)) {
-                if (fusedPath._numTraversesFused > 0) {
-                    allowFuseTraverse[indexField] = false;
-                }
+                fusedPath._suffix) {
                 auto result = reqMap.findFirstConjunct(queryKey);
                 tassert(6624158, "QueryKey must exist in the requirements map", result);
                 const auto& [index, req] = *result;
@@ -1147,6 +1138,22 @@ static bool computeCandidateIndexEntry(PrefixId& prefixId,
     return true;
 }
 
+static bool checkCanFuse(const MultikeynessTrie& tree1, const MultikeynessTrie& tree2) {
+    if (tree1.isMultiKey && tree2.isMultiKey) {
+        return false;
+    }
+
+    for (const auto& [key, child] : tree2.children) {
+        if (const auto it = tree1.children.find(key); it != tree1.children.cend()) {
+            if (!checkCanFuse(it->second, child)) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
 CandidateIndexes computeCandidateIndexes(PrefixId& prefixId,
                                          const ProjectionName& scanProjectionName,
                                          const PartialSchemaRequirements& reqMap,
@@ -1155,6 +1162,16 @@ CandidateIndexes computeCandidateIndexes(PrefixId& prefixId,
                                          const ConstFoldFn& constFold) {
     // Contains one instance for each unmatched key.
     PartialSchemaKeySet unsatisfiedKeysInitial;
+
+    // Tree of containing the current set of index paths. Used to check if we can encode a query
+    // predicate into index bounds or as residual. For example, if we have a query with two multikey
+    // paths which share a multikey component: Get "a" Traverse Get "b" Traverse Id and Get "a"
+    // Traverse Get "c" Traverse Id we would not admit both to be satisfied via an index scan. By
+    // contrast, if they shared a non-multikey component (Get "a" only) or they did not share any
+    // component (e.g. Get "a" Traverse Get "b" Id and Get "c" Traverse Get "d" Id) then the two
+    // paths may be satisfied via the same index scan.
+    MultikeynessTrie indexPathTrie;
+
     for (const auto& [key, req] : reqMap.conjuncts()) {
         if (req.getIsPerfOnly()) {
             // Perf only do not need to be necessarily satisfied.
@@ -1171,6 +1188,12 @@ CandidateIndexes computeCandidateIndexes(PrefixId& prefixId,
             // bounds.
             return {};
         }
+
+        const auto currentTrie = MultikeynessTrie::fromIndexPath(key._path);
+        if (!checkCanFuse(indexPathTrie, currentTrie)) {
+            return {};
+        }
+        indexPathTrie.merge(currentTrie);
     }
 
     CandidateIndexes result;
@@ -1478,12 +1501,12 @@ void lowerPartialSchemaRequirement(const PartialSchemaKey& key,
     ABT path = transport.lower(req.getIntervals());
     const bool pathIsId = path.is<PathIdentity>();
 
+    ABT inputVar = make<Variable>(*key._projectionName);
     if (const auto& boundProjName = req.getBoundProjectionName()) {
-        builder.make<EvaluationNode>(
-            residualCE,
-            *boundProjName,
-            make<EvalPath>(key._path, make<Variable>(*key._projectionName)),
-            std::move(builder._node));
+        builder.make<EvaluationNode>(residualCE,
+                                     *boundProjName,
+                                     make<EvalPath>(key._path, std::move(inputVar)),
+                                     std::move(builder._node));
 
         if (!pathIsId) {
             builder.make<FilterNode>(
@@ -1492,15 +1515,15 @@ void lowerPartialSchemaRequirement(const PartialSchemaKey& key,
                 std::move(builder._node));
         }
     } else {
-        uassert(
-            6624162, "If we do not have a bound projection, then we have a proper path", !pathIsId);
+        uassert(6624162,
+                "If we do not have a bound projection, then we should have a proper path",
+                !pathIsId);
 
         path = PathAppender::append(key._path, std::move(path));
 
-        builder.make<FilterNode>(
-            residualCE,
-            make<EvalFilter>(std::move(path), make<Variable>(*key._projectionName)),
-            std::move(builder._node));
+        builder.make<FilterNode>(residualCE,
+                                 make<EvalFilter>(std::move(path), std::move(inputVar)),
+                                 std::move(builder._node));
     }
 }
 

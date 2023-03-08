@@ -7,7 +7,7 @@ if (!checkCascadesOptimizerEnabled(db)) {
     return;
 }
 
-const t = db.cqf_basic_unwind1;
+const t = db.cqf_sort;
 t.drop();
 
 assert.commandWorked(t.insert({_id: 1}));

@@ -1150,6 +1150,19 @@ template <class Type>
 struct ExploreConvert {
     void operator()(ABT::reference_type nodeRef, RewriteContext& ctx) = delete;
 };
+
+/**
+ * Used to pre-compute properties of a PSR.
+ */
+struct RequirementProps {
+    bool _isFullyOpen;
+    bool _mayReturnNull;
+};
+
+/**
+ * Holds result of splitting requirements into left and right sides to support index+fetch and index
+ * intersection.
+ */
 struct SplitRequirementsResult {
     PSRExprBuilder _leftReqsBuilder;
     PSRExprBuilder _rightReqsBuilder;
@@ -1171,8 +1184,7 @@ static SplitRequirementsResult splitRequirements(
     const size_t mask,
     const bool isIndex,
     const QueryHints& hints,
-    const std::vector<bool>& isFullyOpen,
-    const std::vector<bool>& mayReturnNull,
+    const std::vector<RequirementProps>& reqProps,
     const boost::optional<FieldNameSet>& indexFieldPrefixMapForScanDef,
     const PartialSchemaRequirements& reqMap) {
     SplitRequirementsResult result;
@@ -1180,7 +1192,7 @@ static SplitRequirementsResult splitRequirements(
     result._leftReqsBuilder.pushDisj().pushConj();
     result._rightReqsBuilder.pushDisj().pushConj();
 
-    const auto addRequirement = [&](bool left,
+    const auto addRequirement = [&](const bool left,
                                     PartialSchemaKey key,
                                     boost::optional<ProjectionName> boundProjectionName,
                                     IntervalReqExpr::Node intervals) {
@@ -1194,60 +1206,59 @@ static SplitRequirementsResult splitRequirements(
 
     size_t index = 0;
     for (const auto& [key, req] : reqMap.conjuncts()) {
+        const auto& intervals = req.getIntervals();
+        const auto& outputBinding = req.getBoundProjectionName();
+        const bool perfOnly = req.getIsPerfOnly();
+        const auto& reqProp = reqProps.at(index);
 
-        if (((1ull << index) & mask) != 0) {
-            bool addedToLeft = false;
-            if (isIndex || hints._fastIndexNullHandling || !mayReturnNull.at(index)) {
-                // We can never return Null values from the requirement.
-                if (isIndex || hints._disableYieldingTolerantPlans || req.getIsPerfOnly()) {
-                    // Insert into left side unchanged.
-                    addRequirement(
-                        true /*left*/, key, req.getBoundProjectionName(), req.getIntervals());
-                } else {
-                    // Insert a requirement on the right side too, left side is non-binding.
-                    addRequirement(true /*left*/,
-                                   key,
-                                   boost::none /*boundProjectionName*/,
-                                   req.getIntervals());
-                    addRequirement(
-                        false /*left*/, key, req.getBoundProjectionName(), req.getIntervals());
-                }
-                addedToLeft = true;
+        if (((1ull << index) & mask) == 0) {
+            // Predicate should go on the right side.
+            if (isIndex || !perfOnly) {
+                addRequirement(false /*left*/, key, outputBinding, intervals);
+            }
+            index++;
+            continue;
+        }
+
+        // Predicate should go on the left side.
+        bool addedToLeft = false;
+        if (isIndex || hints._fastIndexNullHandling || !reqProp._mayReturnNull) {
+            // We can never return Null values from the requirement.
+            if (isIndex || hints._disableYieldingTolerantPlans || perfOnly) {
+                // Insert into left side unchanged.
+                addRequirement(true /*left*/, key, outputBinding, intervals);
             } else {
-                // At this point we should not be seeing perf-only predicates.
-                invariant(!req.getIsPerfOnly());
-
-                // We cannot return index values if our interval can possibly contain Null. Instead,
-                // we remove the output binding for the left side, and return the value from the
-                // right (seek) side.
-                if (!isFullyOpen.at(index)) {
-                    addRequirement(true /*left*/,
-                                   key,
-                                   boost::none /*boundProjectionName*/,
-                                   req.getIntervals());
-                    addedToLeft = true;
-                }
-                addRequirement(false /*left*/,
-                               key,
-                               req.getBoundProjectionName(),
-                               hints._disableYieldingTolerantPlans
-                                   ? IntervalReqExpr::makeSingularDNF()
-                                   : req.getIntervals());
+                // Insert a requirement on the right side too, left side is non-binding.
+                addRequirement(true /*left*/, key, boost::none /*boundProjectionName*/, intervals);
+                addRequirement(false /*left*/, key, outputBinding, intervals);
             }
+            addedToLeft = true;
+        } else {
+            // At this point we should not be seeing perf-only predicates.
+            invariant(!perfOnly);
 
-            if (addedToLeft) {
-                if (indexFieldPrefixMapForScanDef) {
-                    if (auto pathPtr = key._path.cast<PathGet>(); pathPtr != nullptr &&
-                        indexFieldPrefixMapForScanDef->count(pathPtr->name()) == 0) {
-                        // We have found a left requirement which cannot be covered with an
-                        // index.
-                        result._hasFieldCoverage = false;
-                        break;
-                    }
-                }
+            // We cannot return index values if our interval can possibly contain Null. Instead,
+            // we remove the output binding for the left side, and return the value from the
+            // right (seek) side.
+            if (!reqProp._isFullyOpen) {
+                addRequirement(true /*left*/, key, boost::none /*boundProjectionName*/, intervals);
+                addedToLeft = true;
             }
-        } else if (isIndex || !req.getIsPerfOnly()) {
-            addRequirement(false /*left*/, key, req.getBoundProjectionName(), req.getIntervals());
+            addRequirement(false /*left*/,
+                           key,
+                           outputBinding,
+                           hints._disableYieldingTolerantPlans ? IntervalReqExpr::makeSingularDNF()
+                                                               : intervals);
+        }
+
+        if (addedToLeft && indexFieldPrefixMapForScanDef) {
+            if (auto pathPtr = key._path.cast<PathGet>();
+                pathPtr != nullptr && indexFieldPrefixMapForScanDef->count(pathPtr->name()) == 0) {
+                // We have found a left requirement which cannot be covered with an
+                // index.
+                result._hasFieldCoverage = false;
+                break;
+            }
         }
         index++;
     }
@@ -1309,23 +1320,18 @@ struct ExploreConvert<SargableNode> {
         const auto& reqMap = sargableNode.getReqMap();
         const auto& hints = ctx.getHints();
 
-        std::vector<bool> isFullyOpen;
-        std::vector<bool> mayReturnNull;
-        {
+        // Pre-computed properties of the requirements.
+        std::vector<RequirementProps> reqProps;
+        for (const auto& [key, req] : reqMap.conjuncts()) {
             // Pre-compute if a requirement's interval is fully open.
-            isFullyOpen.reserve(reqMap.numLeaves());
-            for (const auto& [key, req] : reqMap.conjuncts()) {
-                isFullyOpen.push_back(isIntervalReqFullyOpenDNF(req.getIntervals()));
-            }
+            const bool fullyOpen = isIntervalReqFullyOpenDNF(req.getIntervals());
 
-            if (!hints._fastIndexNullHandling && !isIndex) {
-                // Pre-compute if a requirement's interval may contain nulls, and also has an output
-                // binding.
-                mayReturnNull.reserve(reqMap.numLeaves());
-                for (const auto& [key, req] : reqMap.conjuncts()) {
-                    mayReturnNull.push_back(req.mayReturnNull(ctx.getConstFold()));
-                }
-            }
+            // Pre-compute if a requirement's interval may contain nulls, and also has an output
+            // binding. Do use constant folding if we do not have to.
+            const bool mayReturnNull =
+                !hints._fastIndexNullHandling && !isIndex && req.mayReturnNull(ctx.getConstFold());
+
+            reqProps.push_back({fullyOpen, mayReturnNull});
         }
 
         // We iterate over the possible ways to split N predicates into 2^N subsets, one goes to the
@@ -1336,13 +1342,8 @@ struct ExploreConvert<SargableNode> {
         const size_t reqSize = reqMap.numConjuncts();
         const size_t highMask = isIndex ? (1ull << (reqSize - 1)) : (1ull << reqSize);
         for (size_t mask = 1; mask < highMask; mask++) {
-            SplitRequirementsResult splitResult = splitRequirements(mask,
-                                                                    isIndex,
-                                                                    hints,
-                                                                    isFullyOpen,
-                                                                    mayReturnNull,
-                                                                    indexFieldPrefixMapForScanDef,
-                                                                    reqMap);
+            SplitRequirementsResult splitResult = splitRequirements(
+                mask, isIndex, hints, reqProps, indexFieldPrefixMapForScanDef, reqMap);
 
             auto leftReqs = splitResult._leftReqsBuilder.finish();
             auto rightReqs = splitResult._rightReqsBuilder.finish();

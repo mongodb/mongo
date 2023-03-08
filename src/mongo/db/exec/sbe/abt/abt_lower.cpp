@@ -1106,6 +1106,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(
 std::unique_ptr<sbe::EExpression> SBENodeLowering::convertBoundsToExpr(
     SlotVarMap& slotMap,
     const bool isLower,
+    const bool reversed,
     const IndexDefinition& indexDef,
     const CompoundBoundRequirement& bound) {
     std::vector<std::unique_ptr<sbe::EExpression>> ksFnArgs;
@@ -1128,9 +1129,19 @@ std::unique_ptr<sbe::EExpression> SBENodeLowering::convertBoundsToExpr(
         return nullptr;
     };
 
-    const auto discriminator = (isLower == bound.isInclusive())
-        ? KeyString::Discriminator::kExclusiveBefore
-        : KeyString::Discriminator::kExclusiveAfter;
+    KeyString::Discriminator discriminator;
+    // For a reverse scan, we start from the high bound and iterate until the low bound.
+    if (isLower != reversed) {
+        // For the start point, we want to seek ExclusiveBefore iff the bound is inclusive,
+        // so that values equal to the seek value are included.
+        discriminator = bound.isInclusive() ? KeyString::Discriminator::kExclusiveBefore
+                                            : KeyString::Discriminator::kExclusiveAfter;
+    } else {
+        // For the end point we want the opposite.
+        discriminator = bound.isInclusive() ? KeyString::Discriminator::kExclusiveAfter
+                                            : KeyString::Discriminator::kExclusiveBefore;
+    }
+
     ksFnArgs.emplace_back(sbe::makeE<sbe::EConstant>(
         sbe::value::TypeTags::NumberInt64,
         sbe::value::bitcastFrom<int64_t>(static_cast<int64_t>(discriminator))));
@@ -1182,8 +1193,10 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const IndexScanNode& n,
         std::swap(lowBoundPtr, highBoundPtr);
     }
 
-    auto lowerBoundExpr = convertBoundsToExpr(slotMap, true /*isLower*/, indexDef, *lowBoundPtr);
-    auto upperBoundExpr = convertBoundsToExpr(slotMap, false /*isLower*/, indexDef, *highBoundPtr);
+    auto lowerBoundExpr =
+        convertBoundsToExpr(slotMap, true /*isLower*/, reverse, indexDef, *lowBoundPtr);
+    auto upperBoundExpr =
+        convertBoundsToExpr(slotMap, false /*isLower*/, reverse, indexDef, *highBoundPtr);
     tassert(6624234,
             "Invalid bounds combination",
             lowerBoundExpr != nullptr || upperBoundExpr == nullptr);

@@ -3654,9 +3654,9 @@ TEST(PhysRewriter, ObjectElemMatchResidual) {
         "Unique [{rid_0}]\n"
         "Filter []\n"
         "|   EvalFilter []\n"
-        "|   |   Variable [evalTemp_8]\n"
+        "|   |   Variable [evalTemp_7]\n"
         "|   PathGet [c] PathTraverse [1] PathCompare [Eq] Const [1]\n"
-        "IndexScan [{'<indexKey> 1': evalTemp_8, '<rid>': rid_0}, scanDefName: c1, indexDefName: "
+        "IndexScan [{'<indexKey> 1': evalTemp_7, '<rid>': rid_0}, scanDefName: c1, indexDefName: "
         "index1, interval: {<fully open>}]\n",
         optimized);
 }
@@ -5795,21 +5795,21 @@ TEST(PhysRewriter, ConjunctionTraverseMultikey1) {
         "|   |   Const [true]\n"
         "|   Filter []\n"
         "|   |   EvalFilter []\n"
-        "|   |   |   Variable [evalTemp_11]\n"
+        "|   |   |   Variable [evalTemp_10]\n"
         "|   |   PathTraverse [1]\n"
         "|   |   PathGet [x]\n"
         "|   |   PathCompare [Eq]\n"
         "|   |   Const [1]\n"
         "|   LimitSkip [limit: 1, skip: 0]\n"
-        "|   Seek [ridProjection: rid_0, {'<root>': root, 'a': evalTemp_11}, c1]\n"
+        "|   Seek [ridProjection: rid_0, {'<root>': root, 'a': evalTemp_10}, c1]\n"
         "Unique [{rid_0}]\n"
         "Filter []\n"
         "|   EvalFilter []\n"
-        "|   |   Variable [evalTemp_9]\n"
+        "|   |   Variable [evalTemp_8]\n"
         "|   PathGet [y]\n"
         "|   PathCompare [Eq]\n"
         "|   Const [1]\n"
-        "IndexScan [{'<indexKey> 0': evalTemp_9, '<rid>': rid_0}, scanDefName: c1, indexDefName: "
+        "IndexScan [{'<indexKey> 0': evalTemp_8, '<rid>': rid_0}, scanDefName: c1, indexDefName: "
         "index1, interval: {<fully open>}]\n",
         optimized);
 }

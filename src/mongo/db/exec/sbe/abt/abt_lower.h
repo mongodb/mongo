@@ -277,6 +277,7 @@ private:
 
     std::unique_ptr<sbe::EExpression> convertBoundsToExpr(SlotVarMap& slotMap,
                                                           bool isLower,
+                                                          bool reversed,
                                                           const IndexDefinition& indexDef,
                                                           const CompoundBoundRequirement& bound);
 

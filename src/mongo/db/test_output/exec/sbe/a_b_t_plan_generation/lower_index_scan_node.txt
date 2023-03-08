@@ -19,11 +19,11 @@ IndexScan [{'<indexKey> 0': proj0}, scanDefName: collName, indexDefName: index0,
 IndexScan [{'<rid>': rid}, scanDefName: collName, indexDefName: index0, interval: {[Const [27], Const [135])}, reversed]
 
 -- OUTPUT:
-[0] ixseek ks(2ll, 0, 135L, 2ll) ks(2ll, 0, 27L, 2ll) none s1 none [] @"<collUUID>" @"<collUUID>" false 
+[0] ixseek ks(2ll, 0, 135L, 1ll) ks(2ll, 0, 27L, 1ll) none s1 none [] @"<collUUID>" @"<collUUID>" false 
 
 ==== VARIATION: Covering reverse index scan with one field ====
 -- INPUT:
 IndexScan [{'<indexKey> 0': proj0}, scanDefName: collName, indexDefName: index0, interval: {[Const [29], Const [47]]}, reversed]
 
 -- OUTPUT:
-[0] ixseek ks(2ll, 0, 47L, 1ll) ks(2ll, 0, 29L, 2ll) none none none [s1 = 0] @"<collUUID>" @"<collUUID>" false 
+[0] ixseek ks(2ll, 0, 47L, 2ll) ks(2ll, 0, 29L, 1ll) none none none [s1 = 0] @"<collUUID>" @"<collUUID>" false 
