@@ -86,10 +86,13 @@ public:
                 repl::ReadConcernLevel::kMajorityReadConcern,
                 BSON(CollectionType::kNssFieldName << 1) /*sort*/);
 
-            // Get the list of local collections sorted by namespace
-            Lock::DBLock dbLock(opCtx, nss.db(), MODE_S);
-            auto localNssCollections =
-                collectionCatalog->getAllCollectionNamesFromDb(opCtx, nss.db());
+            std::vector<NamespaceString> localNssCollections;
+            {
+                // Get the list of local collections sorted by namespace
+                Lock::DBLock dbLock{opCtx, nss.db(), MODE_S};
+                localNssCollections =
+                    collectionCatalog->getAllCollectionNamesFromDb(opCtx, nss.db());
+            }
             std::sort(localNssCollections.begin(), localNssCollections.end());
             std::vector<CollectionPtr> localCollection;
             for (const auto& localNss : localNssCollections) {
