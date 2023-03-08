@@ -2578,6 +2578,25 @@ tasks:
               ${test_env_vars|} ./test_fops
             fi
 
+  - name: bench-tiered-push-pull-s3
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          <<: *configure_flags_tiered_storage_s3
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/cmake_build/bench/tiered"
+          shell: bash
+          include_expansions_in_env:
+            - aws_sdk_s3_ext_access_key
+            - aws_sdk_s3_ext_secret_key
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} ./test_push_pull -PT -Po s3_store
+
   - name: bench-tiered-push-pull
     depends_on:
     - name: compile
@@ -2589,7 +2608,9 @@ tasks:
           script: |
             set -o errexit
             set -o verbose
-            ${test_env_vars|} ./test_push_pull
+
+            # By default the test_push_pull uses dir_store as a storage source.
+            ${test_env_vars|} ./test_push_pull -PT
 
   - name: compatibility-test-for-newer-releases
     commands:
@@ -4992,6 +5013,7 @@ buildvariants:
     - name: ".tiered_unittest"
     - name: azure-tiered-test-small
     - name: gcp-tiered-test-small
+    - name: bench-tiered-push-pull-s3
 
 - name: ubuntu2004-asan
   display_name: "! Ubuntu 20.04 ASAN"
