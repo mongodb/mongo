@@ -48,7 +48,10 @@ public:
                  const QueryPlannerParams& qpp,
                  PlanCachingMode cachingMode,
                  PlanYieldPolicySBE* yieldPolicy)
-        : BaseRuntimePlanner{opCtx, collections, cq, qpp, yieldPolicy}, _cachingMode{cachingMode} {}
+        : BaseRuntimePlanner{opCtx, collections, cq, qpp, yieldPolicy},
+          _cachingMode{cachingMode},
+          _maxNumResults{0},
+          _maxNumReads{0} {}
 
     CandidatePlans plan(
         std::vector<std::unique_ptr<QuerySolution>> solutions,
