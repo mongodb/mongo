@@ -377,7 +377,8 @@ void KeyStringIndexConsistency::addDocumentMultikeyPaths(IndexInfo* indexInfo,
 void KeyStringIndexConsistency::addDocKey(OperationContext* opCtx,
                                           const KeyString::Value& ks,
                                           IndexInfo* indexInfo,
-                                          const RecordId& recordId) {
+                                          const RecordId& recordId,
+                                          ValidateResults* results) {
     auto rawHash = ks.hash(indexInfo->indexNameHash);
     auto hashLower = rawHash % kNumHashBuckets;
     auto hashUpper = (rawHash / kNumHashBuckets) % kNumHashBuckets;
@@ -426,7 +427,7 @@ void KeyStringIndexConsistency::addDocKey(OperationContext* opCtx,
 
         // Prints the collection document's and index entry's metadata.
         _validateState->getCollection()->getRecordStore()->printRecordMetadata(
-            opCtx, recordId, /*recordTimestamps=*/nullptr);
+            opCtx, recordId, &(results->recordTimestamps));
         indexInfo->accessMethod->asSortedData()->getSortedDataInterface()->printIndexEntryMetadata(
             opCtx, ks);
     }
@@ -504,7 +505,7 @@ void KeyStringIndexConsistency::addIndexKey(OperationContext* opCtx,
 
                 // Prints the collection document's and index entry's metadata.
                 _validateState->getCollection()->getRecordStore()->printRecordMetadata(
-                    opCtx, recordId, /*recordTimestamps=*/nullptr);
+                    opCtx, recordId, &(results->recordTimestamps));
                 indexInfo->accessMethod->asSortedData()
                     ->getSortedDataInterface()
                     ->printIndexEntryMetadata(opCtx, ks);
@@ -1013,7 +1014,7 @@ void KeyStringIndexConsistency::traverseRecord(OperationContext* opCtx,
 
     for (const auto& keyString : *documentKeySet) {
         _totalIndexKeys++;
-        this->addDocKey(opCtx, keyString, &indexInfo, recordId);
+        this->addDocKey(opCtx, keyString, &indexInfo, recordId, results);
     }
 }
 
