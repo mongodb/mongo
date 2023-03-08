@@ -575,9 +575,19 @@ __wt_session_get_btree_ckpt(WT_SESSION_IMPL *session, const char *uri, const cha
              */
 
             if (first_snapshot_time != snapshot_time || ds_time > snapshot_time ||
-              hs_time > snapshot_time || stable_time > snapshot_time || oldest_time > snapshot_time)
-                ret = __wt_set_return(session, EBUSY);
-            else {
+              hs_time > snapshot_time || stable_time > snapshot_time ||
+              oldest_time > snapshot_time) {
+                /*
+                 * When a system wide checkpoint is not running, we can hang here. This situation
+                 * can occur when a checkpoint on a single file has been performed by a bulk
+                 * operation and no system wide checkpoint has been done since then.
+                 */
+                if (!S2C(session)->txn_global.checkpoint_running) {
+                    ret = __wt_set_return(session, WT_NOTFOUND);
+                    goto err;
+                } else
+                    ret = __wt_set_return(session, EBUSY);
+            } else {
                 /* Crosscheck that we didn't somehow get an older timestamp. */
                 WT_ASSERT(session, stable_time == snapshot_time || stable_time == 0);
                 WT_ASSERT(session, oldest_time == snapshot_time || oldest_time == 0);
@@ -640,6 +650,9 @@ __wt_session_get_btree_ckpt(WT_SESSION_IMPL *session, const char *uri, const cha
 
     } while (is_unnamed_ckpt && (ret == WT_NOTFOUND || ret == EBUSY));
 
+err:
+    __wt_free(session, checkpoint);
+    __wt_free(session, hs_checkpoint);
     return (ret);
 }
 
