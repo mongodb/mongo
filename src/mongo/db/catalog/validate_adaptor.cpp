@@ -199,7 +199,7 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
         for (const auto& keyString : *documentKeySet) {
             try {
                 _totalIndexKeys++;
-                _indexConsistency->addDocKey(opCtx, keyString, &indexInfo, recordId);
+                _indexConsistency->addDocKey(opCtx, keyString, &indexInfo, recordId, results);
             } catch (...) {
                 return exceptionToStatus();
             }
