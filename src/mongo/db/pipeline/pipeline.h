@@ -269,6 +269,11 @@ public:
     bool needsShard() const;
 
     /**
+     * Returns 'true' if any stage in the pipeline requires being run on all shards.
+     */
+    bool needsAllShardServers() const;
+
+    /**
      * Returns true if the pipeline can run on mongoS, but is not obliged to; that is, it can run
      * either on mongoS or on a shard.
      */

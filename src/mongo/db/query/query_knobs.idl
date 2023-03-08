@@ -1118,6 +1118,24 @@ server_parameters:
     cpp_vartype: AtomicWord<bool>
     default: false
 
+  internalQueryAggMulticastTimeoutMS:
+    description: "Timeout in MS for requests to shard servers when aggregations are sent to all shard servers"
+    set_at: [ startup ]
+    cpp_vartype: int
+    cpp_varname: internalQueryAggMulticastTimeoutMS
+    default: 60000
+    validator:
+      gte: 0
+  
+  internalQueryAggMulticastMaxConcurrency:
+    description: "Max number of concurrent requests when aggregations are sent to all shard servers"
+    set_at: startup
+    cpp_vartype: int
+    cpp_varname: internalQueryAggMulticastMaxConcurrency
+    default: 100
+    validator:
+      gte: 1
+
   enableAccessToUserRoles:
     description: "Enables access to $$USER_ROLES in queries."
     set_at: [ startup, runtime ]

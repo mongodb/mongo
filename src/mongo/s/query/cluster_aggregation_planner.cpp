@@ -603,12 +603,13 @@ AggregationTargeter AggregationTargeter::make(
     }();
 
     // Determine whether this aggregation must be dispatched to all shards in the cluster.
-    const bool mustRunOnAll =
-        sharded_agg_helpers::mustRunOnAllShards(executionNss, hasChangeStream, startsWithDocuments);
+    const bool mustRunOnAllShards = sharded_agg_helpers::checkIfMustRunOnAllShards(
+        executionNss, hasChangeStream, startsWithDocuments);
 
     // If we don't have a routing table, then this is either a $changeStream which must run on all
     // shards or a $documents stage which must not.
-    invariant(cm || (mustRunOnAll && hasChangeStream) || (startsWithDocuments && !mustRunOnAll));
+    invariant(cm || (mustRunOnAllShards && hasChangeStream) ||
+              (startsWithDocuments && !mustRunOnAllShards));
 
     // A pipeline is allowed to passthrough to the primary shard iff the following conditions are
     // met:
@@ -620,7 +621,7 @@ AggregationTargeter AggregationTargeter::make(
     //    $currentOp.
     // 4. Doesn't need transformation via DocumentSource::serialize(). For example, list sessions
     //    needs to include information about users that can only be deduced on mongos.
-    if (cm && !cm->isSharded() && !mustRunOnAll && allowedToPassthrough &&
+    if (cm && !cm->isSharded() && !mustRunOnAllShards && allowedToPassthrough &&
         !involvesShardedCollections) {
         return AggregationTargeter{TargetingPolicy::kPassthrough, nullptr, cm};
     } else {

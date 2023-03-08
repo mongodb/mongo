@@ -73,6 +73,26 @@ std::vector<RemoteCursor> establishCursors(
     Shard::RetryPolicy retryPolicy = Shard::RetryPolicy::kIdempotent);
 
 /**
+ * Establishes cursors on every host in the remote shards by issuing requests in parallel with the
+ * AsyncMulticaster.
+ *
+ * If any of the cursors fail to be established, this function performs cleanup by sending
+ * killCursors to any cursors that were established, then throws the error. If the namespace
+ * represents a view, an exception containing a ResolvedView is thrown.
+ *
+ * On success, the ownership of the cursors is transferred to the caller. This means the caller is
+ * now responsible for either exhausting the cursors or sending killCursors to them.
+ */
+std::vector<RemoteCursor> establishCursorsOnAllHosts(
+    OperationContext* opCtx,
+    std::shared_ptr<executor::TaskExecutor> executor,
+    const NamespaceString& nss,
+    const std::set<ShardId>& shardIds,
+    BSONObj cmdObj,
+    bool allowPartialResults,
+    Shard::RetryPolicy retryPolicy = Shard::RetryPolicy::kIdempotent);
+
+/**
  * Schedules a remote killCursor command for 'cursor'.
  *
  * Note that this method is optimistic and does not check the return status for the killCursors

@@ -293,6 +293,11 @@ void Pipeline::validateCommon(bool alreadyOptimized) const {
                 str::stream() << stage->getSourceName() << " can only be used once in the pipeline",
                 !(constraints.canAppearOnlyOnceInPipeline &&
                   !singleUseStages.insert(stage->getSourceName()).second));
+
+        tassert(7355707,
+                "If a stage is broadcast to all shard servers then it must be a data source.",
+                constraints.hostRequirement != HostTypeRequirement::kAllShardServers ||
+                    !constraints.requiresInputDocSource);
     }
 }
 
@@ -436,11 +441,19 @@ bool Pipeline::needsMongosMerger() const {
     });
 }
 
+bool Pipeline::needsAllShardServers() const {
+    return std::any_of(_sources.begin(), _sources.end(), [&](const auto& stage) {
+        return stage->constraints().resolvedHostTypeRequirement(pCtx) ==
+            HostTypeRequirement::kAllShardServers;
+    });
+}
+
 bool Pipeline::needsShard() const {
     return std::any_of(_sources.begin(), _sources.end(), [&](const auto& stage) {
         auto hostType = stage->constraints().resolvedHostTypeRequirement(pCtx);
         return (hostType == HostTypeRequirement::kAnyShard ||
-                hostType == HostTypeRequirement::kPrimaryShard);
+                hostType == HostTypeRequirement::kPrimaryShard ||
+                hostType == HostTypeRequirement::kAllShardServers);
     });
 }
 
@@ -645,7 +658,8 @@ Status Pipeline::_pipelineCanRunOnMongoS() const {
         auto hostRequirement = constraints.resolvedHostTypeRequirement(pCtx);
 
         const bool needsShard = (hostRequirement == HostTypeRequirement::kAnyShard ||
-                                 hostRequirement == HostTypeRequirement::kPrimaryShard);
+                                 hostRequirement == HostTypeRequirement::kPrimaryShard ||
+                                 hostRequirement == HostTypeRequirement::kAllShardServers);
 
         const bool mustWriteToDisk =
             (constraints.diskRequirement == DiskUseRequirement::kWritesPersistentData);
