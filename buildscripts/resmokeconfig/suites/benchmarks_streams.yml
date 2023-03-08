@@ -1,0 +1,14 @@
+# This benchmark measures the performance of basic stream execution.
+test_kind: benchmark_test
+
+selector:
+  root: build/benchmarks.txt
+  include_files:
+  # The trailing asterisk is for handling the .exe extension on Windows.
+  - build/**/system_resource_canary_bm*
+  - build/install/bin/streams_operator_dag_bm*
+
+executor:
+  config: {}
+  hooks:
+  - class: CombineBenchmarkResults
