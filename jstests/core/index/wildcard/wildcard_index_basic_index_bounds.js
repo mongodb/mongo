@@ -108,13 +108,6 @@ const operationListCompound = [
         expectedKeyPattern: {'a': 1, '$_path': 1, 'b.c': 1, 'c': 1}
     },
     {
-        query: {'a': 3, 'b.c': {$exists: true}, 'c': {$lt: 3}},
-        bounds: {'a': ['[3.0, 3.0]'], 'b.c': ['[MinKey, MaxKey]'], 'c': ['[-inf.0, 3.0)']},
-        path: 'b.c',
-        subpathBounds: true,
-        expectedKeyPattern: {'a': 1, '$_path': 1, 'b.c': 1, 'c': 1}
-    },
-    {
         query: {'a': 3, 'b.c': {$in: [1, 2]}},
         bounds:
             {'a': ['[3.0, 3.0]'], 'b.c': ['[1.0, 1.0]', '[2.0, 2.0]'], 'c': ['[MinKey, MaxKey]']},
@@ -122,22 +115,11 @@ const operationListCompound = [
         subpathBounds: false,
         expectedKeyPattern: {'a': 1, '$_path': 1, 'b.c': 1, 'c': 1}
     },
-    {
-        query: {'a': 3, 'b.c': {$in: [null, 1, 2]}},
-        bounds: {'a': ['[3.0, 3.0]'], 'b.c': ['[MinKey, MaxKey]'], 'c': ['[MinKey, MaxKey]']},
-        path: 'b.c',
-        subpathBounds: true,
-        expectedKeyPattern: {'a': 1, '$_path': 1, 'b.c': 1, 'c': 1}
-    },
-    {
-        query: {'a': {$gt: 3}, 'b.c': {$eq: {abc: 1}}},
-        bounds: {'a': ['(3.0, inf.0]'], 'b.c': ['[MinKey, MaxKey]'], 'c': ['[MinKey, MaxKey]']},
-        path: 'b.c',
-        subpathBounds: true,  // Object query is not supported, so we will check all sub paths.
-        expectedKeyPattern: {'a': 1, '$_path': 1, 'b.c': 1, 'c': 1}
-    },
 
     // Queries cannot use the compound wildcard index.
+    {query: {'a': 3, 'b.c': {$exists: true}, 'c': {$lt: 3}}, bounds: null},
+    {query: {'a': 3, 'b.c': {$in: [null, 1, 2]}}, bounds: null},
+    {query: {'a': {$gt: 3}, 'b.c': {$eq: {abc: 1}}}, bounds: null},
     {query: {'b.c': {$gt: 3}}, bounds: null},
     {query: {'abc': {$gt: 3}}, bounds: null},
     {query: {'b.c': {$gt: 3}, 'abc': 10}, bounds: null},

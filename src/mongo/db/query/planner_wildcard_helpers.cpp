@@ -550,6 +550,25 @@ void expandWildcardIndexEntry(const IndexEntry& wildcardIndex,
     }
 }
 
+bool canOnlyAnswerWildcardPrefixQuery(const IndexEntry& index, const IndexBounds& bounds) {
+    tassert(7444000, "Expected a wildcard index.", index.type == INDEX_WILDCARD);
+    tassert(7444001,
+            "A wildcard index should always have a virtual $_path field at wildcardFieldPos - 1.",
+            bounds.fields[index.wildcardFieldPos - 1].name == "$_path"_sd);
+
+    if (index.wildcardFieldPos == 1) {
+        // This is either a single-field wildcard index, or a compound wildcard index without a
+        // prefix.
+        return false;
+    }
+
+    // If the index entry was not expanded to include a second $_path field, we cannot answer a
+    // query on a wildcard field with an IXSCAN + FETCH if the predicate itself is, for e.g. an
+    // ineligible $not query, because we won't retrieve documents where the wildcard field is
+    // missing from the IXSCAN.
+    return bounds.fields[index.wildcardFieldPos].name != "$_path"_sd;
+}
+
 BoundsTightness translateWildcardIndexBoundsAndTightness(
     const IndexEntry& index,
     BoundsTightness tightnessIn,

@@ -1446,6 +1446,22 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedAnd(
 
     // Short-circuit: an AND of one child is just the child.
     if (ixscanNodes.size() == 1) {
+        if (feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabled(
+                serverGlobalParams.featureCompatibility) &&
+            ixscanNodes[0]->getType() == StageType::STAGE_IXSCAN && root->numChildren() > 0) {
+            const auto* ixScanNode = static_cast<IndexScanNode*>(ixscanNodes[0].get());
+            const auto& index = ixScanNode->index;
+            if (index.type == INDEX_WILDCARD &&
+                wildcard_planning::canOnlyAnswerWildcardPrefixQuery(index, ixScanNode->bounds)) {
+                // If we get here, we have a compound wildcard index which can answer one or more of
+                // the predicates in the $and, but we also have at least one additional node
+                // attached to the filter. Normally, we would be able to satisfy this case using a
+                // FETCH + FILTER + IXSCAN; however, in the case of a $not query which is not
+                // supported by the index, the index entry will be expanded in such a way that we
+                // won't be able to satisfy the query.
+                return nullptr;
+            }
+        }
         andResult = std::move(ixscanNodes[0]);
     } else {
         // $** indexes are prohibited from participating in either AND_SORTED or AND_HASH.
