@@ -35,6 +35,7 @@ class OpType(Enum):
     HS_RESTORE_TOMBSTONE = 26
     FILE_SKIP = 27
     SKIP_DAMAGE = 28
+    HS_TRUNCATED = 29
 
 class Operation:
     def __init__(self, line):
@@ -457,3 +458,10 @@ class Operation:
         self.type = OpType.SKIP_DAMAGE
         self.file = self.__extract_file(line)
         self.corrupted = "corrupt" in line
+
+    def __init_hs_truncated(self, line):
+        self.type = OpType.HS_TRUNCATED
+        self.file = self.__extract_file(line)
+
+        matches = re.search('btree=(\d+)', line)
+        self.btree_id = int(matches.group(1))

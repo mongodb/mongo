@@ -82,7 +82,7 @@ class Checker:
 
         if not(operation.txnid_not_visible or
                operation.stable_lt_durable or
-               operation.prepare_state == PrepareState.PREPARE_INPROGRESS):
+               operation.prepare_state == PrepareState.WT_PREPARE_INPROGRESS):
             raise Exception(f"aborted update with txnid={operation.txnid} for no reason")
 
         if operation.stable_lt_durable and not operation.stable < operation.durable:
@@ -209,5 +209,9 @@ class Checker:
         pass
 
     def __apply_check_skip_damage(self, operation):
+        # TODO expand this out
+        pass
+
+    def __apply_check_hs_truncated(self, operation):
         # TODO expand this out
         pass
