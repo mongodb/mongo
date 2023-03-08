@@ -425,7 +425,8 @@ void KeyStringIndexConsistency::addDocKey(OperationContext* opCtx,
             std::make_pair(key, IndexEntryInfo(*indexInfo, recordId, idKeyBuilder.obj(), ks)));
 
         // Prints the collection document's and index entry's metadata.
-        _validateState->getCollection()->getRecordStore()->printRecordMetadata(opCtx, recordId);
+        _validateState->getCollection()->getRecordStore()->printRecordMetadata(
+            opCtx, recordId, /*recordTimestamps=*/nullptr);
         indexInfo->accessMethod->asSortedData()->getSortedDataInterface()->printIndexEntryMetadata(
             opCtx, ks);
     }
@@ -502,8 +503,8 @@ void KeyStringIndexConsistency::addIndexKey(OperationContext* opCtx,
                 _extraIndexEntries.insert(std::make_pair(key, infoSet));
 
                 // Prints the collection document's and index entry's metadata.
-                _validateState->getCollection()->getRecordStore()->printRecordMetadata(opCtx,
-                                                                                       recordId);
+                _validateState->getCollection()->getRecordStore()->printRecordMetadata(
+                    opCtx, recordId, /*recordTimestamps=*/nullptr);
                 indexInfo->accessMethod->asSortedData()
                     ->getSortedDataInterface()
                     ->printIndexEntryMetadata(opCtx, ks);
