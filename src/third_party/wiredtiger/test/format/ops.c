@@ -522,12 +522,6 @@ begin_transaction_ts(TINFO *tinfo)
             return;
         }
 
-        /*
-         * It should not be possible for a timestamp to age out of the system with predictable
-         * replay. If a begin transaction were to fail, we'd need to begin the transaction again
-         * with the same replay timestamp; we can never give up on a timestamp.
-         */
-        testutil_assert(!GV(RUNS_PREDICTABLE_REPLAY));
         testutil_assert(ret == EINVAL);
         testutil_check(session->rollback_transaction(session, NULL));
     }

@@ -111,6 +111,14 @@ timestamp_once(WT_SESSION *session, bool allow_lag, bool final)
 
     if (GV(RUNS_PREDICTABLE_REPLAY)) {
         /*
+         * For predictable replay, our end state is to have the stable timestamp represent a precise
+         * number of operations.
+         */
+        WT_ORDERED_READ(stop_timestamp, g.stop_timestamp);
+        if (stable_timestamp > stop_timestamp && stop_timestamp != 0)
+            stable_timestamp = stop_timestamp;
+
+        /*
          * For predictable replay, we need the oldest timestamp to lag when the process exits. That
          * allows two runs that finish with stable timestamps in the same ballpark to be compared.
          */
@@ -118,14 +126,6 @@ timestamp_once(WT_SESSION *session, bool allow_lag, bool final)
             oldest_timestamp = stable_timestamp - 10 * WT_THOUSAND;
         else
             oldest_timestamp = stable_timestamp / 2;
-
-        /*
-         * For predictable replay, our end state is to have the stable timestamp represent a precise
-         * number of operations.
-         */
-        WT_ORDERED_READ(stop_timestamp, g.stop_timestamp);
-        if (stable_timestamp > stop_timestamp && stop_timestamp != 0)
-            stable_timestamp = stop_timestamp;
     } else if (!final) {
         /*
          * If lag is permitted, update the oldest timestamp halfway to the largest timestamp that's
