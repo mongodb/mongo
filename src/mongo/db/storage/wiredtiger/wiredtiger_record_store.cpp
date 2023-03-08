@@ -1698,6 +1698,20 @@ void WiredTigerRecordStore::printRecordMetadata(OperationContext* opCtx,
               "location"_attr = location,
               "value"_attr = redact(recordData.toBson()));
 
+        // Save all relevant timestamps that we just printed.
+        if (recordTimestamps) {
+            auto saveRecordTimestampIfValid = [recordTimestamps](Timestamp ts) {
+                if (ts.isNull() || ts == Timestamp::max() || ts == Timestamp::min()) {
+                    return;
+                }
+                (void)recordTimestamps->emplace(ts);
+            };
+            saveRecordTimestampIfValid(Timestamp(startTs));
+            saveRecordTimestampIfValid(Timestamp(startDurableTs));
+            saveRecordTimestampIfValid(Timestamp(stopTs));
+            saveRecordTimestampIfValid(Timestamp(stopDurableTs));
+        }
+
         ret = cursor->next(cursor);
     }
 }
