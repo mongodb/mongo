@@ -29,11 +29,39 @@ assert.commandWorked(coll.createIndex({a: 1, b: 1}));
 // entry (thanks to the "skipUnindexingDocumentWhenDeleted" failpoint).
 function createDanglingIndexEntry(doc) {
     assert.commandWorked(coll.insert(doc));
+    const docId = coll.findOne(doc)._id;
     assert.commandWorked(coll.remove(doc));
 
     // Validation should now fail.
     const validateRes = assert.commandWorked(coll.validate());
     assert.eq(false, validateRes.valid);
+
+    // Server logs for failed validation command should contain oplog entries related to corrupted
+    // index entry.
+    let foundInsert = false;
+    let foundDelete = false;
+    // Look for log message "Oplog entry found for corrupted collection and index entry" (msg id
+    // 7462402).
+    checkLog.containsJson(db.getMongo(), 7464202, {
+        oplogEntryDoc: (oplogDoc) => {
+            let oplogDocId;
+            try {
+                oplogDocId = ObjectId(oplogDoc.o._id.$oid);
+            } catch (ex) {
+                return false;
+            }
+            if (!oplogDocId.equals(docId)) {
+                return false;
+            }
+            jsTestLog('Found oplog entry for corrupted index entry: ' + tojson(oplogDoc));
+            if (oplogDoc.op === 'd') {
+                foundDelete = true;
+            } else if (oplogDoc.op === 'i') {
+                foundInsert = true;
+            }
+            return foundDelete && foundInsert;
+        }
+    });
 
     // A query that accesses the now dangling index entry should fail with a
     // "DataCorruptionDetected" error. Most reads will not detect this problem because they ignore
