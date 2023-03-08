@@ -250,7 +250,8 @@ private:
     void addDocKey(OperationContext* opCtx,
                    const KeyString::Value& ks,
                    IndexInfo* indexInfo,
-                   const RecordId& recordId);
+                   const RecordId& recordId,
+                   ValidateResults* results);
 
     /**
      * During the first phase of validation, given the index entry's KeyString, decrement the
