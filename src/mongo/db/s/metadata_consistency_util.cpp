@@ -38,11 +38,15 @@
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/plan_executor_factory.h"
+#include "mongo/db/s/shard_key_index_util.h"
+
 
 namespace mongo {
 namespace metadata_consistency_util {
 
 namespace {
+constexpr StringData kDescriptionFieldName = "description"_sd;
+
 void _appendHiddenUnshardedCollectionInconsistency(
     const ShardId& shardId,
     const NamespaceString& localNss,
@@ -52,7 +56,7 @@ void _appendHiddenUnshardedCollectionInconsistency(
     val.setNs(localNss);
     val.setType(MetadataInconsistencyTypeEnum::kHiddenUnshardedCollection);
     val.setShard(shardId);
-    val.setInfo(BSON("description"
+    val.setInfo(BSON(kDescriptionFieldName
                      << "Unsharded collection found on shard differnt from db primary shard"
                      << "localUUID" << localUUID));
     inconsistencies.emplace_back(std::move(val));
@@ -68,11 +72,40 @@ void _appendUUIDMismatchInconsistency(const ShardId& shardId,
     val.setNs(localNss);
     val.setType(MetadataInconsistencyTypeEnum::kUUIDMismatch);
     val.setShard(shardId);
-    val.setInfo(BSON("description"
+    val.setInfo(BSON(kDescriptionFieldName
                      << "Found collection on non primary shard with mismatching UUID"
                      << "localUUID" << localUUID << "UUID" << UUID
                      << "shardThinkCollectionIsSharded" << isLocalCollectionSharded));
     inconsistencies.emplace_back(std::move(val));
+}
+
+void _appendMissingShardKeyIndexInconsistency(
+    const ShardId& shardId,
+    const NamespaceString& localNss,
+    const BSONObj& shardKey,
+    std::vector<MetadataInconsistencyItem>& inconsistencies) {
+    MetadataInconsistencyItem val;
+    val.setNs(localNss);
+    val.setType(MetadataInconsistencyTypeEnum::kMissingShardKeyIndex);
+    val.setShard(shardId);
+    val.setInfo(BSON(kDescriptionFieldName << "Found sharded collection without a shard key index"
+                                           << "shardKey" << shardKey));
+    inconsistencies.emplace_back(val);
+}
+
+void _appendShardKeyIndexMultiKeyInconsistency(
+    const ShardId& shardId,
+    const NamespaceString& localNss,
+    const BSONObj& shardKey,
+    std::vector<MetadataInconsistencyItem>& inconsistencies) {
+    MetadataInconsistencyItem val;
+    val.setNs(localNss);
+    val.setType(MetadataInconsistencyTypeEnum::kLastShardKeyIndexMultiKey);
+    val.setShard(shardId);
+    val.setInfo(BSON(kDescriptionFieldName
+                     << "The only remaining index compatible with shard key is multikey"
+                     << "shardKey" << shardKey));
+    inconsistencies.emplace_back(val);
 }
 }  // namespace
 
@@ -169,7 +202,7 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataInconsistencies(
     auto itCatalogCollections = catalogClientCollections.begin();
     while (itLocalCollections != localCollections.end() &&
            itCatalogCollections != catalogClientCollections.end()) {
-        const auto& localColl = itLocalCollections->get();
+        const auto& localColl = *itLocalCollections;
         const auto& localUUID = localColl->uuid();
         const auto& localNss = localColl->ns();
         const auto& nss = itCatalogCollections->getNss();
@@ -182,15 +215,33 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataInconsistencies(
         } else if (cmp == 0) {
             // Case where we have found same collection in the catalog client than in the local
             // catalog.
+
+            // Check that local collection has the same UUID as the one in the catalog client.
             const auto& UUID = itCatalogCollections->getUuid();
             if (UUID != localUUID) {
-                _appendUUIDMismatchInconsistency(shardId,
-                                                 localNss,
-                                                 localUUID,
-                                                 UUID,
-                                                 itLocalCollections->isSharded(),
-                                                 inconsistencies);
+                _appendUUIDMismatchInconsistency(
+                    shardId, localNss, localUUID, UUID, localColl.isSharded(), inconsistencies);
             }
+
+            // Check that the collection has an index that supports the shard key. If so, check that
+            // exists an index that supports the shard key and is not multikey.
+            const auto& shardKey = itCatalogCollections->getKeyPattern().toBSON();
+            if (!findShardKeyPrefixedIndex(opCtx,
+                                           localColl,
+                                           localColl->getIndexCatalog(),
+                                           shardKey,
+                                           false /*requireSingleKey*/)) {
+                _appendMissingShardKeyIndexInconsistency(
+                    shardId, localColl->ns(), shardKey, inconsistencies);
+            } else if (!findShardKeyPrefixedIndex(opCtx,
+                                                  localColl,
+                                                  localColl->getIndexCatalog(),
+                                                  shardKey,
+                                                  true /*requireSingleKey*/)) {
+                _appendShardKeyIndexMultiKeyInconsistency(
+                    shardId, localColl->ns(), shardKey, inconsistencies);
+            }
+
             itLocalCollections++;
             itCatalogCollections++;
         } else {

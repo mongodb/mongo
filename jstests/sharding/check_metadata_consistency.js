@@ -120,6 +120,55 @@ function getNewDb() {
     db.dropDatabase();
 })();
 
+(function testMissingShardKeyInconsistency() {
+    const db = getNewDb();
+    const kSourceCollName = "coll";
+
+    st.shardColl(
+        kSourceCollName, {skey: 1}, {skey: 0}, {skey: 1}, db.getName(), true /* waitForDelete */);
+
+    // Connect directly to shards to bypass the mongos checks for dropping shard key indexes
+    assert.commandWorked(st.shard0.getDB(db.getName()).coll.dropIndex({skey: 1}));
+    assert.commandWorked(st.shard1.getDB(db.getName()).coll.dropIndex({skey: 1}));
+
+    // Database level mode command
+    const inconsistencies = db.checkMetadataConsistency().toArray();
+    assert.eq(2, inconsistencies.length);
+    assert.eq("MissingShardKeyIndex", inconsistencies[0].type);
+    assert.eq("MissingShardKeyIndex", inconsistencies[1].type);
+
+    // Clean up the database to pass the hooks that detect inconsistencies
+    db.dropDatabase();
+})();
+
+(function testLastShardKeyIndexMultiKeyInconsistency() {
+    const db = getNewDb();
+    const kSourceCollName = "coll";
+
+    // Create a multikey index compatible with the shard key
+    assert.commandWorked(mongos.getDB(db.getName()).coll.insert({skey: 1, a: [1, 2]}));
+    assert.commandWorked(mongos.getDB(db.getName()).coll.createIndex({skey: 1, a: 1}));
+
+    // Create an index compatible the shard key
+    assert.commandWorked(mongos.getDB(db.getName()).coll.createIndex({skey: 1}));
+
+    st.shardColl(
+        kSourceCollName, {skey: 1}, {skey: 0}, {skey: 1}, db.getName(), true /* waitForDelete */);
+
+    // Connect directly to shards to bypass the mongos checks for dropping the non-multikey index
+    assert.commandWorked(st.shard0.getDB(db.getName()).coll.dropIndex({skey: 1}));
+    assert.commandWorked(st.shard1.getDB(db.getName()).coll.dropIndex({skey: 1}));
+
+    // Database level mode command
+    const inconsistencies = db.checkMetadataConsistency().toArray();
+    assert.eq(2, inconsistencies.length);
+    assert.eq("LastShardKeyIndexMultiKey", inconsistencies[0].type);
+    assert.eq("LastShardKeyIndexMultiKey", inconsistencies[1].type);
+
+    // Clean up the database to pass the hooks that detect inconsistencies
+    db.dropDatabase();
+})();
+
 (function testClusterLevelMode() {
     const db_HiddenUnshardedCollection1 = getNewDb();
     const db_HiddenUnshardedCollection2 = getNewDb();
