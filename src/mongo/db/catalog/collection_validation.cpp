@@ -258,6 +258,67 @@ void _printIndexSpec(const ValidateState* validateState, StringData indexName) {
     }
 }
 
+/**
+ * Logs oplog entries related to corrupted records/indexes in validation results.
+ */
+void _logOplogEntriesForInvalidResults(OperationContext* opCtx, ValidateResults* results) {
+    if (results->recordTimestamps.empty()) {
+        return;
+    }
+
+    LOGV2(
+        7464200,
+        "Validation failed: oplog timestamps referenced by corrupted collection and index entries",
+        "numTimestamps"_attr = results->recordTimestamps.size());
+
+    // Set up read on oplog collection.
+    try {
+        AutoGetOplog oplogRead(opCtx, OplogAccessMode::kRead);
+        const auto& oplogCollection = oplogRead.getCollection();
+
+        // Log oplog entries in reverse from most recent timestamp to oldest.
+        // Due to oplog truncation, if we fail to find any oplog entry for a particular timestamp,
+        // we can stop searching for oplog entries with earlier timestamps.
+        auto recordStore = oplogCollection->getRecordStore();
+        uassert(ErrorCodes::InternalError,
+                "Validation failed: Unable to get oplog record store for corrupted collection and "
+                "index entries",
+                recordStore);
+
+        auto cursor = recordStore->getCursor(opCtx, /*forward=*/false);
+        uassert(ErrorCodes::CursorNotFound,
+                "Validation failed: Unable to get cursor to oplog collection.",
+                cursor);
+
+        for (auto it = results->recordTimestamps.rbegin(); it != results->recordTimestamps.rend();
+             it++) {
+            const auto& timestamp = *it;
+
+            // A record id in the oplog collection is equivalent to the document's timestamp field.
+            RecordId recordId(timestamp.asULL());
+            auto record = cursor->seekExact(recordId);
+            if (!record) {
+                LOGV2(7464201,
+                      "    Validation failed: Stopping oplog entry search for corrupted collection "
+                      "and index entries.",
+                      "timestamp"_attr = timestamp);
+                break;
+            }
+
+            LOGV2(
+                7464202,
+                "    Validation failed: Oplog entry found for corrupted collection and index entry",
+                "timestamp"_attr = timestamp,
+                "oplogEntryDoc"_attr = redact(record->data.toBson()));
+        }
+    } catch (DBException& ex) {
+        LOGV2_ERROR(7464203,
+                    "Validation failed: Unable to fetch entries from oplog collection for "
+                    "corrupted collection and index entries",
+                    "ex"_attr = ex);
+    }
+}
+
 void _reportValidationResults(OperationContext* opCtx,
                               ValidateState* validateState,
                               ValidateResults* results,
@@ -317,6 +378,7 @@ void _reportInvalidResults(OperationContext* opCtx,
                            ValidateResults* results,
                            BSONObjBuilder* output) {
     _reportValidationResults(opCtx, validateState, results, output);
+    _logOplogEntriesForInvalidResults(opCtx, results);
     LOGV2_OPTIONS(20302,
                   {LogComponent::kIndex},
                   "Validation complete -- Corruption found",
