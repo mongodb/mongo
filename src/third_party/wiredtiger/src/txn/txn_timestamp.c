@@ -743,7 +743,7 @@ __wt_txn_set_prepare_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t prepare_
          * (There is a slight extra wrinkle at the moment, because it is possible for a transaction
          * to prepare and commit and be interacted with before it becomes durable. Currently such
          * transactions _must_ be replayed identically by the application to avoid inconsistency,
-         * or avoided. FIXME-WT-8747: remove this note when WT-8747 fixes this.)
+         * or avoided.
          *
          * Under other circumstances, that is, not during application-level recovery when ordinary
          * operations are excluded, use of "roundup=prepared" (for replaying transactions or

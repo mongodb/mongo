@@ -73,12 +73,6 @@ class test_schema02(TieredConfigMixin, wttest.WiredTigerTestCase):
         if self.is_tiered_scenario() and self.type == 'lsm':
             self.skipTest('Tiered storage does not support LSM URIs.')
 
-        # We skip testing the tiered storage scenarios as we fail to create
-        # column groups in tiered storage scenarios. We should fix this issue
-        # and then remove the condition to skip tests. FIXME: WT-9048
-        if self.is_tiered_scenario():
-            self.skipTest('Tiered storage does not work with column groups.')
-
         # too many columns
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda:self.session.create("table:main", "key_format=S,"

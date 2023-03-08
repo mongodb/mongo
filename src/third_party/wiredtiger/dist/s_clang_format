@@ -7,7 +7,7 @@ trap 'rm -rf $t' 0 1 2 3 13 15
 
 download_clang_format() {
     version=$1
-    # FIXME-WT-10583
+    # FIXME-WT-10619
     arch=$(uname -m)
     if [ ! "$arch" = "x86_64" ]; then
         echo "$0: unsupported architecture $arch to run clang_format"

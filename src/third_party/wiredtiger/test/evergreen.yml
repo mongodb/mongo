@@ -2533,10 +2533,8 @@ tasks:
     # Run the script with "-r" option to remove no-longer-needed words in s_string.ok
     # This task only needs to be scheduled every a few months. A failure can remind us
     # to keep the s_string.ok word list up-to-date.
-    depends_on:
-    - name: compile
     commands:
-      - func: "fetch artifacts"
+      - func: "get project"
       - command: shell.exec
         params:
           working_dir: "wiredtiger/dist"
@@ -2544,6 +2542,20 @@ tasks:
             set -o errexit
             set -o verbose
             sh s_string -r 2>&1
+
+  - name: s-outdated-fixmes
+    # Detect any FIXME comments in the codebase tied to closed Jira tickets. 
+    # This will send a GET request to JIRA for each FIXME ticket so we don't 
+    # want to run it too frequently. 
+    commands:
+      - func: "get project"
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/dist"
+          script: |
+            set -o errexit
+            set -o verbose
+            ${python_binary|python3} s_outdated_fixmes.py 2>&1
 
   - name: conf-dump-test
     tags: ["pull_request", "python"]
@@ -5006,10 +5018,6 @@ buildvariants:
       distros: ubuntu2004-large
     - name: ".data-validation-stress-test-nonstandalone"
     - name: unittest-assertions
-    - name: memory-model-test
-      batchtime: 40320 # 28 days
-    - name: s-string
-      batchtime: 129600 # 90 days
     - name: ".tiered_unittest"
     - name: azure-tiered-test-small
     - name: gcp-tiered-test-small
@@ -5189,9 +5197,6 @@ buildvariants:
     CMAKE_PREFIX_PATH: -DCMAKE_PREFIX_PATH="$(pwd)/TCMALLOC_LIB"
     python_binary: '/opt/mongodbtoolchain/v4/bin/python3'
   tasks:
-  # FIXME-WT-8947: For now run the whole stress test suite like we do on the x86 platform. But later
-  # find a smaller set of tests that give an optimal test coverage while being mindful of machine
-  # costs and availability.
     - name: ".stress-test-1"
     - name: ".stress-test-2"
     - name: ".stress-test-3"
@@ -5556,3 +5561,26 @@ buildvariants:
     - name: unit-test-nonstandalone
     - name: unit-test-long-nonstandalone
       distros: amazon2-arm64-large
+
+- name: infrequent-checks
+  display_name: "~ Infrequent checks"
+  run_on:
+  - ubuntu2004-test
+  expansions:
+    test_env_vars:
+      WT_TOPDIR=$(git rev-parse --show-toplevel)
+      WT_BUILDDIR=$WT_TOPDIR/cmake_build
+      LD_LIBRARY_PATH=$WT_BUILDDIR:$WT_TOPDIR/TCMALLOC_LIB/lib
+      LD_PRELOAD=$WT_TOPDIR/TCMALLOC_LIB/lib/libtcmalloc.so
+    CMAKE_PREFIX_PATH: -DCMAKE_PREFIX_PATH="$(pwd)/TCMALLOC_LIB"
+    python_binary: '/opt/mongodbtoolchain/v4/bin/python3'
+    smp_command: -j $(echo "`grep -c ^processor /proc/cpuinfo` * 2" | bc)
+    cmake_generator: Ninja
+    make_command: ninja
+  tasks:
+    - name: memory-model-test
+      batchtime: 40320 # 28 days
+    - name: s-outdated-fixmes
+      batchtime: 10080 # 7 days
+    - name: s-string
+      batchtime: 129600 # 90 days

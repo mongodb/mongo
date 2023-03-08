@@ -698,12 +698,9 @@ Accept a flag argument that sets \c WT_READ_TRUNCATE.}
 The cursor-level truncate code lives here.}
 
 @row{bt_debug.c, Hook, in \c __debug_cell_int,
-There should be a hook to print the deletion information for \c WT_CELL_ADDR_DEL cells\,
-but as of this writing it is missing.}
-@row{bt_debug.c, Hook, in \c __debug_ref or possibly \c __debug_ref_state,
-There should be a hook to print the deletion information for deleted and instantiated
-pages\, but as of this writing it is missing.}
-<!-- FIXME-WT-9860: WT-9860 is the ticket about these hooks being missing. -->
+Prints the deletion information for \c WT_CELL_ADDR_DEL cells.}
+@row{bt_debug.c, Hook, in \c __debug_ref,
+Prints the deletion information for deleted and instantiated pages.}
 
 @row{bt_delete.c, Function, \c __wt_delete_page,
 The implementation of fast-truncate itself.}

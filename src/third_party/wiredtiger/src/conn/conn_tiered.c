@@ -64,11 +64,6 @@ __tier_storage_remove_local(WT_SESSION_IMPL *session)
               session, WT_VERB_TIERED, "REMOVE_LOCAL: %s in USE, queue again", object);
             WT_STAT_CONN_INCR(session, local_objects_inuse);
             /*
-             * FIXME-WT-7470: If the object we want to remove is in use this is the place to call
-             * object sweep to clean up block->ofh file handles. Another alternative would be to try
-             * to sweep and then try the remove call below rather than pushing it back on the work
-             * queue. NOTE: Remove 'ofh' from s_string.ok when removing this comment.
-             *
              * Update the time on the entry before pushing it back on the queue so that we don't get
              * into an infinite loop trying to drop an open file that may be in use a while.
              */
