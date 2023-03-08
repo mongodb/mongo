@@ -1663,7 +1663,8 @@ StatusWith<RecordData> WiredTigerRecordStore::doUpdateWithDamages(
 }
 
 void WiredTigerRecordStore::printRecordMetadata(OperationContext* opCtx,
-                                                const RecordId& recordId) const {
+                                                const RecordId& recordId,
+                                                std::set<Timestamp>* recordTimestamps) const {
     // Printing the record metadata requires a new session. We cannot open other cursors when there
     // are open history store cursors in the session.
     WiredTigerSession session(_kvEngine->getConnection());
