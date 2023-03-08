@@ -1104,8 +1104,9 @@ Status TenantOplogApplier::_applyOplogBatchPerWorker(std::vector<ApplierOperatio
             mode = OplogApplication::Mode::kInitialSync;
             break;
         case MigrationProtocolEnum::kShardMerge:
-            // Since shard merge protocol uses backup cursor for database cloning, it ensures that
-            // oplog entries are applied on a consistent copy of donor data.
+            // Since shard merge protocol uses backup cursor for database cloning and tenant oplog
+            // catchup phase is not resumable on failovers, the oplog entries will be applied on a
+            // consistent copy of donor data.
             isDataConsistent = true;
             mode = OplogApplication::Mode::kSecondary;
             break;
