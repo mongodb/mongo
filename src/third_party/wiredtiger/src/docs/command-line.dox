@@ -3,7 +3,7 @@
 WiredTiger includes a command line utility, \c wt.
 
 @section util_global_synopsis SYNOPSIS
-`wt [-BLRrVv] [-C config] [-E secretkey ] [-h directory] command [command-specific arguments]`
+`wt [-BLmRrSVv] [-C config] [-E secretkey ] [-h directory] command [command-specific arguments]`
 
 @section util_global_description DESCRIPTION
 The \c wt tool is a command-line utility that provides access to
