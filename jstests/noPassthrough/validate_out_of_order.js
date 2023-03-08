@@ -1,6 +1,8 @@
 /**
  * Tests that out-of-order keys are detected by validation during both the collection and index scan
  * phases.
+ *
+ * @tags: [requires_wiredtiger]
  */
 (function() {
 "use strict";
