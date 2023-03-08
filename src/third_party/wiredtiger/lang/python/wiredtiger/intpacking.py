@@ -61,7 +61,6 @@ NEG_2BYTE_MIN = -2**13 + NEG_1BYTE_MIN
 POS_1BYTE_MAX = 2**6 - 1
 POS_2BYTE_MAX = 2**13 + POS_1BYTE_MAX
 
-MINUS_BIT = -1 << 64
 UINT64_MASK = 0xffffffffffffffff
 
 def getbits(x, start, end=0):
