@@ -360,7 +360,8 @@ void IndexConsistency::addDocumentMultikeyPaths(IndexInfo* indexInfo,
 void IndexConsistency::addDocKey(OperationContext* opCtx,
                                  const KeyString::Value& ks,
                                  IndexInfo* indexInfo,
-                                 RecordId recordId) {
+                                 RecordId recordId,
+                                 ValidateResults* results) {
     auto rawHash = ks.hash(indexInfo->indexNameHash);
     auto hashLower = rawHash % kNumHashBuckets;
     auto hashUpper = (rawHash / kNumHashBuckets) % kNumHashBuckets;
@@ -409,7 +410,7 @@ void IndexConsistency::addDocKey(OperationContext* opCtx,
 
         // Prints the collection document's and index entry's metadata.
         _validateState->getCollection()->getRecordStore()->printRecordMetadata(
-            opCtx, recordId, /*recordTimestamps=*/nullptr);
+            opCtx, recordId, &(results->recordTimestamps));
         indexInfo->accessMethod->asSortedData()->getSortedDataInterface()->printIndexEntryMetadata(
             opCtx, ks);
     }
@@ -486,7 +487,7 @@ void IndexConsistency::addIndexKey(OperationContext* opCtx,
 
                 // Prints the collection document's and index entry's metadata.
                 _validateState->getCollection()->getRecordStore()->printRecordMetadata(
-                    opCtx, recordId, /*recordTimestamps=*/nullptr);
+                    opCtx, recordId, &(results->recordTimestamps));
                 indexInfo->accessMethod->asSortedData()
                     ->getSortedDataInterface()
                     ->printIndexEntryMetadata(opCtx, ks);
