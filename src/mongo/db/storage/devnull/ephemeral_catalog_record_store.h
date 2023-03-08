@@ -83,7 +83,9 @@ public:
                                                      const char* damageSource,
                                                      const mutablebson::DamageVector& damages);
 
-    virtual void printRecordMetadata(OperationContext* opCtx, const RecordId& recordId) const {}
+    virtual void printRecordMetadata(OperationContext* opCtx,
+                                     const RecordId& recordId,
+                                     std::set<Timestamp>* recordTimestamps) const {}
 
     std::unique_ptr<SeekableRecordCursor> getCursor(OperationContext* opCtx,
                                                     bool forward) const final;

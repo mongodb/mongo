@@ -30,6 +30,8 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <functional>
+#include <set>
 
 #include "mongo/base/owned_pointer_vector.h"
 #include "mongo/bson/mutable/damage_vector.h"
@@ -409,8 +411,13 @@ public:
 
     /**
      * Prints any storage engine provided metadata for the record with 'recordId'.
+     *
+     * If provided, saves any valid timestamps (startTs, startDurableTs, stopTs, stopDurableTs)
+     * related to this record in 'recordTimestamps'.
      */
-    virtual void printRecordMetadata(OperationContext* opCtx, const RecordId& recordId) const = 0;
+    virtual void printRecordMetadata(OperationContext* opCtx,
+                                     const RecordId& recordId,
+                                     std::set<Timestamp>* recordTimestamps) const = 0;
 
     /**
      * Returns a new cursor over this record store.

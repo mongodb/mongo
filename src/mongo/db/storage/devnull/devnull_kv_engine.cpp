@@ -129,7 +129,9 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    virtual void printRecordMetadata(OperationContext* opCtx, const RecordId& recordId) const {
+    virtual void printRecordMetadata(OperationContext* opCtx,
+                                     const RecordId& recordId,
+                                     std::set<Timestamp>* recordTimestamps) const {
         MONGO_UNREACHABLE;
     }
 
