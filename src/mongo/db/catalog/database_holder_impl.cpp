@@ -252,9 +252,6 @@ void DatabaseHolderImpl::close(OperationContext* opCtx, const DatabaseName& dbNa
     db = nullptr;
 
     _dbs.erase(it);
-
-    auto* const storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    storageEngine->closeDatabase(opCtx, dbName).transitional_ignore();
 }
 
 void DatabaseHolderImpl::closeAll(OperationContext* opCtx) {

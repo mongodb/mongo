@@ -57,9 +57,6 @@ public:
                      boost::optional<Timestamp> stableTs,
                      LastShutdownState lastShutdownState) final {}
     void closeCatalog(OperationContext* opCtx) final {}
-    Status closeDatabase(OperationContext* opCtx, const DatabaseName& dbName) final {
-        return Status::OK();
-    }
     Status dropDatabase(OperationContext* opCtx, const DatabaseName& dbName) final {
         return Status::OK();
     }

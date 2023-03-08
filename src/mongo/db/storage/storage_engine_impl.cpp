@@ -909,11 +909,6 @@ std::vector<DatabaseName> StorageEngineImpl::listDatabases(
     return res;
 }
 
-Status StorageEngineImpl::closeDatabase(OperationContext* opCtx, const DatabaseName& dbName) {
-    // This is ok to be a no-op as there is no database layer in kv.
-    return Status::OK();
-}
-
 Status StorageEngineImpl::dropDatabase(OperationContext* opCtx, const DatabaseName& dbName) {
     auto catalog = CollectionCatalog::get(opCtx);
     {

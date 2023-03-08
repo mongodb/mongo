@@ -80,8 +80,6 @@ public:
         return _supportsCappedCollections;
     }
 
-    virtual Status closeDatabase(OperationContext* opCtx, const DatabaseName& dbName) override;
-
     virtual Status dropDatabase(OperationContext* opCtx, const DatabaseName& dbName) override;
 
     virtual void flushAllFiles(OperationContext* opCtx, bool callerHoldsReadLock) override;

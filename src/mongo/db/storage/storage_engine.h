@@ -255,11 +255,6 @@ public:
     virtual void closeCatalog(OperationContext* opCtx) = 0;
 
     /**
-     * Closes all file handles associated with a database.
-     */
-    virtual Status closeDatabase(OperationContext* opCtx, const DatabaseName& dbName) = 0;
-
-    /**
      * Deletes all data and metadata for a database.
      */
     virtual Status dropDatabase(OperationContext* opCtx, const DatabaseName& dbName) = 0;
