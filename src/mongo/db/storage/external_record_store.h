@@ -76,7 +76,9 @@ public:
         return false;
     }
 
-    void printRecordMetadata(OperationContext*, const RecordId&) const final {
+    void printRecordMetadata(OperationContext*,
+                             const RecordId&,
+                             std::set<Timestamp>* recordTimestamps) const final {
         unimplementedTasserted();
     }
 
