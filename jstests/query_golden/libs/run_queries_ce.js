@@ -7,18 +7,51 @@ function indexedStrategy(strategyName) {
     return strategyName + "Idx";
 }
 
+function timedExplain(coll, pipeline) {
+    const t0 = Date.now();
+    explain = coll.explain().aggregate(pipeline);
+    const t1 = Date.now();
+    const duration = t1 - t0;
+    return {explain, duration};
+}
+
+function getCE(pipeline, explain) {
+    try {
+        return round2(getRootCE(explain));
+    } catch (e) {
+        print(`Unable to retrieve root CE\nQuery: ${tojsononeline(pipeline)}`);
+        printjson(explain);
+        throw e;
+    }
+}
+
 /**
  * Run the query specified in the 'testcase' document with the CE 'strategy'.
  */
 function runAggregationWithCE(coll, testcase, strategy) {
     let explain = {};
+    let duration = -1;
     if (testcase["nReturned"] == null) {
-        explain = coll.explain("executionStats").aggregate(testcase.pipeline);
+        try {
+            explain = coll.explain("executionStats").aggregate(testcase.pipeline);
+        } catch (error) {
+            print(`runAggregationWithCE(coll=${coll}, testcase=${tojson(testcase)}, strategy=${
+                strategy})`);
+        }
         testcase["nReturned"] = explain.executionStats.nReturned;
+        // Run explain without execution to measure optimization time. Ignore the explain.
+        timedRes = timedExplain(coll, testcase.pipeline);
+        duration = timedRes.duration;
     } else {
-        explain = coll.explain().aggregate(testcase.pipeline);
+        timedRes = timedExplain(coll, testcase.pipeline);
+        explain = timedRes.explain;
+        duration = timedRes.duration;
     }
-    testcase[strategy] = round2(getRootCE(explain));
+    assert.neq(duration, -1);
+    assert.neq(explain, {});
+    assert.gte(testcase["nReturned"], 0);
+    testcase[strategy] = getCE(testcase.pipeline, explain);
+    testcase['duration_' + strategy] = duration;
 }
 
 /**
@@ -48,8 +81,9 @@ function runComplexPredicates(coll, testCases, ceStrategies, ceDebugFlag) {
             forceCE(strategy);
             for (let i = start; i < end; i++) {
                 let testcase = testCases[i];
-                const explain = coll.explain().aggregate(testcase.pipeline);
-                testcase[indexedStrategy(strategy)] = round2(getRootCE(explain));
+                const {explain, duration} = timedExplain(coll, testcase.pipeline);
+                testcase[indexedStrategy(strategy)] = getCE(testcase.pipeline, explain);
+                testcase['duration_' + indexedStrategy(strategy)] = duration;
                 if (ceDebugFlag == true && strategy == "histogram") {
                     print(`\nQuery plan for #${testcase._id}: ${tojsononeline(testcase.pipeline)}`);
                     printjson(getPlanSkeleton(navigateToRootNode(explain),
@@ -70,13 +104,13 @@ function runComplexPredicates(coll, testCases, ceStrategies, ceDebugFlag) {
  * If 'fields' is empty, execute queries with complex predicates in batches.
  */
 function runQueries(coll, testCases, ceStrategies, fields, ceDebugFlag) {
-    // Run queries without indexing.
+    print("Run queries without indexing.\n");
     ceStrategies.forEach(function(strategy) {
         forceCE(strategy);
         testCases.forEach(testCase => runAggregationWithCE(coll, testCase, strategy));
     });
 
-    // Run queries with indexed fields.
+    print("Run queries with indexed fields.\n");
     if (fields.length > 0) {
         ceStrategies.forEach(function(strategy) {
             forceCE(strategy);
@@ -84,8 +118,9 @@ function runQueries(coll, testCases, ceStrategies, fields, ceDebugFlag) {
                 assert.commandWorked(coll.createIndex({[field]: 1}));
                 for (let testcase of testCases) {
                     if (testcase.fieldName === field) {
-                        const explain = coll.explain().aggregate(testcase.pipeline);
-                        testcase[indexedStrategy(strategy)] = round2(getRootCE(explain));
+                        const {explain, duration} = timedExplain(coll, testcase.pipeline);
+                        testcase[indexedStrategy(strategy)] = getCE(testcase.pipeline, explain);
+                        testcase['duration_' + indexedStrategy(strategy)] = duration;
                     }
                 }
                 assert.commandWorked(coll.dropIndex({[field]: 1}));
@@ -94,6 +129,66 @@ function runQueries(coll, testCases, ceStrategies, fields, ceDebugFlag) {
     } else {
         runComplexPredicates(coll, testCases, ceStrategies, ceDebugFlag);
     }
+}
+
+function printSimpleQueryStats(errorColl, strategies, queries, debugFlag) {
+    jsTestLog("Aggregate errors for all simple predicate queries");
+
+    // Aggregate errors for all CE strategies per query category.
+    aggregateErrorsPerCategory(errorColl, ["qtype"], strategies);
+    aggregateErrorsPerCategory(errorColl, ["qtype", "dtype"], strategies);
+
+    // Aggregate errors for all CE strategies per data type and distribution.
+    aggregateErrorsPerCategory(errorColl, ["dtype"], strategies);
+    aggregateErrorsPerCategory(errorColl, ["distr", "dtype"], strategies);
+
+    // Aggregate scalar and array fields query errors per strategy.
+    aggregateErrorsPerStrategy(errorColl, strategies, {"dtype": {$ne: "array"}});
+    aggregateErrorsPerStrategy(errorColl, strategies, {"dtype": "array"});
+    aggregateErrorsPerStrategy(
+        errorColl, strategies, {$and: [{"elemMatch": true}, {"dtype": "array"}]});
+    aggregateErrorsPerStrategy(
+        errorColl, strategies, {$and: [{"elemMatch": false}, {"dtype": "array"}]});
+
+    // Aggregate errors per strategy.
+    aggregateErrorsPerStrategy(errorColl, strategies);
+
+    printQueriesWithBadAccuracy(errorColl, queries, "histogram", "relError");
+    printQueriesWithBadAccuracy(errorColl, queries, indexedStrategy("histogram"), "relError");
+    printQueriesWithBadAccuracy(errorColl, queries, "histogram", "qError");
+    printQueriesWithBadAccuracy(errorColl, queries, indexedStrategy("histogram"), "qError");
+    if (debugFlag) {
+        printQueriesWithBadAccuracy(errorColl, queries, "sampling", "relError");
+        printQueriesWithBadAccuracy(errorColl, queries, indexedStrategy("sampling"), "relError");
+        printQueriesWithBadAccuracy(errorColl, queries, "sampling", "qError");
+        printQueriesWithBadAccuracy(errorColl, queries, indexedStrategy("sampling"), "qError");
+    }
+}
+
+function printComplexQueryStats(errorColl, strategies, queries, debugFlag) {
+    jsTestLog("Aggregate errors for all complex predicate queries");
+    // Aggregate errors for all CE strategies per query category.
+    aggregateErrorsPerCategory(errorColl, ["qtype"], strategies);
+    aggregateErrorsPerCategory(errorColl, ["qtype", "numberOfTerms"], strategies);
+    aggregateErrorsPerCategory(errorColl, ["numberOfTerms"], strategies);
+
+    aggregateErrorsPerStrategy(errorColl, strategies);
+
+    printQueriesWithBadAccuracy(errorColl, queries, indexedStrategy("histogram"), "relError");
+    printQueriesWithBadAccuracy(errorColl, queries, indexedStrategy("histogram"), "qError");
+    if (debugFlag) {
+        printQueriesWithBadAccuracy(errorColl, queries, indexedStrategy("sampling"), "relError");
+        printQueriesWithBadAccuracy(errorColl, queries, indexedStrategy("sampling"), "qError");
+    }
+}
+
+function printAllQueryStats(testDB, errorColl1, errorColl2, strategies) {
+    jsTestLog("Aggregate errors for all queries (simple and complex predicates)");
+    let allErrorsColl = testDB.ce_all_errors;
+    allErrorsColl.drop();
+    allErrorsColl.insertMany(errorColl1.find({}, {_id: 0}).toArray());
+    allErrorsColl.insertMany(errorColl2.find({}, {_id: 0}).toArray());
+    aggregateErrorsPerStrategy(allErrorsColl, strategies);
 }
 
 /**
@@ -133,6 +228,7 @@ function runCETestForCollection(testDB, collMeta, sampleSize = 6, ceDebugFlag = 
     }
 
     // Query generation for a given collection.
+    print("Begin query generation");
     // Select values to be used in queries from collection sample, min/max, and histogram bucket
     // boundaries.
     const samplePos = selectSamplePos(collSize, sampleSize);
@@ -141,17 +237,24 @@ function runCETestForCollection(testDB, collMeta, sampleSize = 6, ceDebugFlag = 
     // Queries are defined as documents. Example:
     // {_id: 1, pipeline: [{$match: {a: {$gt: 16}}}], "dtype": "int", "qtype" : "$gt"}.
     let testCases = generateQueries(fields, fieldTypes, queryValues);
+    let testCasesColl = testDB['testCases'];
+    testCasesColl.drop();
+    testCasesColl.insertMany(testCases);  // Store them for future use.
     print(`Running ${testCases.length} simple predicate queries over ${fields.length} fields.\n`);
     runQueries(coll, testCases, ceStrategies, fields, ceDebugFlag);
 
     // Complex predicates
+    jsTestLog("Running queries with complex predicates");
     let complexPred = generateComplexPredicates(testCases, fields, fieldTypes, queryValues);
+    let complexPredColl = testDB['complexPred'];
+    complexPredColl.drop();
+    complexPredColl.insertMany(complexPred);  // Store them for future use.
     print(`Running ${complexPred.length} queries with complex predicates.\n`);
     runQueries(coll, complexPred, ceStrategies, [], ceDebugFlag);
 
     // Switch to 'tryBonsai' for accuracy analysis.
     assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"}));
+        testDB.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"}));
 
     let allStrategies = [];
     for (let strategy of ceStrategies) {
@@ -161,72 +264,44 @@ function runCETestForCollection(testDB, collMeta, sampleSize = 6, ceDebugFlag = 
 
     // Compute CE errors per strategy for individual queries in 'testCases' and populate the error
     // collection 'errorColl'.
-    const errorColl = testDB.ce_errors;
+    let errorColl = testDB.ce_errors;
     errorColl.drop();
     populateErrorCollection(errorColl, testCases, allStrategies, collSize, false);
     assert.eq(testCases.length, errorColl.find().itcount());
 
     // Compute CE errors per strategy for individual queries in 'complexPred' and populate the error
     // collection 'errorCollComplexPred'.
-    const errorCollComplexPred = testDB.ce_errors_complex_pred;
+    let errorCollComplexPred = testDB.ce_errors_complex_pred;
     errorCollComplexPred.drop();
     populateErrorCollection(errorCollComplexPred, complexPred, allStrategies, collSize, true);
     assert.eq(complexPred.length, errorCollComplexPred.find().itcount());
 
-    jsTestLog("Aggregate errors for all simple predicate queries");
-    // Aggregate errors for all CE strategies per query category.
-    aggregateErrorsPerCategory(errorColl, ["qtype"], allStrategies);
-    aggregateErrorsPerCategory(errorColl, ["qtype", "dtype"], allStrategies);
+    // Print all collected statistics about estimation errors.
+    printSimpleQueryStats(errorColl, allStrategies, testCases, ceDebugFlag);
+    printComplexQueryStats(errorCollComplexPred, allStrategies, complexPred, ceDebugFlag);
+    printAllQueryStats(testDB, errorColl, errorCollComplexPred, allStrategies);
 
-    // Aggregate errors for all CE strategies per data type and distribution.
-    aggregateErrorsPerCategory(errorColl, ["dtype"], allStrategies);
-    aggregateErrorsPerCategory(errorColl, ["distr", "dtype"], allStrategies);
+    // Print all collected statistics about estimation errors excluding queries with empty result.
+    print('===============================================================================');
+    print('Errors excluding empty queries.');
+    testDB.createView(
+        'ce_errors_not_empty', 'ce_errors', [{$match: {$expr: {$gt: ["$nReturned", 0]}}}]);
+    testDB.createView('ce_errors_complex_pred_not_empty',
+                      'ce_errors_complex_pred',
+                      [{$match: {$expr: {$gt: ["$nReturned", 0]}}}]);
+    errorCollNonEmpty = testDB.ce_errors_not_empty;
+    errorCollComplexPredNonEmpty = testDB.ce_errors_complex_pred_not_empty;
+    print(`Non-empty simple error entries: ${
+        errorCollNonEmpty.find().itcount()}; complex error entries: ${
+        errorCollComplexPredNonEmpty.find().itcount()}`);
+    printSimpleQueryStats(errorCollNonEmpty, allStrategies, testCases, ceDebugFlag);
+    printComplexQueryStats(errorCollComplexPredNonEmpty, allStrategies, complexPred, ceDebugFlag);
+    printAllQueryStats(testDB, errorCollNonEmpty, errorCollComplexPredNonEmpty, allStrategies);
 
-    // Aggregate scalar and array fields query errors per strategy.
-    aggregateErrorsPerStrategy(errorColl, allStrategies, {"dtype": {$ne: "array"}});
-    aggregateErrorsPerStrategy(errorColl, allStrategies, {"dtype": "array"});
-    aggregateErrorsPerStrategy(
-        errorColl, allStrategies, {$and: [{"elemMatch": true}, {"dtype": "array"}]});
-    aggregateErrorsPerStrategy(
-        errorColl, allStrategies, {$and: [{"elemMatch": false}, {"dtype": "array"}]});
-
-    // Aggregate errors per strategy.
-    aggregateErrorsPerStrategy(errorColl, allStrategies);
-
-    printQueriesWithBadAccuracy(errorColl, testCases, "histogram", "relError");
-    printQueriesWithBadAccuracy(errorColl, testCases, indexedStrategy("histogram"), "relError");
-    printQueriesWithBadAccuracy(errorColl, testCases, "histogram", "qError");
-    printQueriesWithBadAccuracy(errorColl, testCases, indexedStrategy("histogram"), "qError");
     if (ceDebugFlag) {
-        printQueriesWithBadAccuracy(errorColl, testCases, "sampling", "relError");
-        printQueriesWithBadAccuracy(errorColl, testCases, indexedStrategy("sampling"), "relError");
-        printQueriesWithBadAccuracy(errorColl, testCases, "sampling", "qError");
-        printQueriesWithBadAccuracy(errorColl, testCases, indexedStrategy("sampling"), "qError");
+        jsTestLog("Optimization times for simple predicates:");
+        aggegateOptimizationTimesPerStrategy(errorColl, allStrategies);
+        jsTestLog("Optimization times for simple complex predicates:");
+        aggegateOptimizationTimesPerStrategy(errorCollComplexPred, allStrategies);
     }
-
-    jsTestLog("Aggregate errors for all complex predicate queries");
-    // Aggregate errors for all CE strategies per query category.
-    aggregateErrorsPerCategory(errorCollComplexPred, ["qtype"], allStrategies);
-    aggregateErrorsPerCategory(errorCollComplexPred, ["qtype", "numberOfTerms"], allStrategies);
-    aggregateErrorsPerCategory(errorCollComplexPred, ["numberOfTerms"], allStrategies);
-
-    aggregateErrorsPerStrategy(errorCollComplexPred, allStrategies);
-
-    printQueriesWithBadAccuracy(
-        errorCollComplexPred, complexPred, indexedStrategy("histogram"), "relError");
-    printQueriesWithBadAccuracy(
-        errorCollComplexPred, complexPred, indexedStrategy("histogram"), "qError");
-    if (ceDebugFlag) {
-        printQueriesWithBadAccuracy(
-            errorCollComplexPred, complexPred, indexedStrategy("sampling"), "relError");
-        printQueriesWithBadAccuracy(
-            errorCollComplexPred, complexPred, indexedStrategy("sampling"), "qError");
-    }
-
-    jsTestLog("Aggregate errors for all queries");
-    let allErrorsColl = testDB.ce_all_errors;
-    allErrorsColl.drop();
-    allErrorsColl.insertMany(errorColl.find({}, {_id: 0}).toArray());
-    allErrorsColl.insertMany(errorCollComplexPred.find({}, {_id: 0}).toArray());
-    aggregateErrorsPerStrategy(allErrorsColl, allStrategies);
 }

@@ -74,20 +74,32 @@ function nextChar(thisChar, distance) {
  * distance: "small", "middle", "large".
  */
 function nextStr(str, distance) {
+    var res = 'nextStrUndefined';
     const spec = {"small": 3, "medium": 2, "large": 1};
     if (str.length == 0) {
         const nextCharCode = min_char_code + 4 - spec[distance];
-        return String.fromCodePoint(nextCharCode);
-    }
-    let pos = spec[distance] - 1;
-    if (pos >= str.length) {
-        pos = str.length - 1;
-    }
+        res = String.fromCodePoint(nextCharCode);
+        assert(res.indexOf("NaN") == -1,
+               `Found NaN with inputs: str=${str}, res=${res}, distance=${
+                   distance}; min_char_code=${min_char_code}`);
+    } else {
+        let pos = spec[distance] - 1;
+        if (pos >= str.length) {
+            pos = str.length - 1;
+        }
 
-    let newStr = str.slice(0, pos);
-    newStr = newStr + nextChar(str[pos], 4 - spec[distance] /*char distance*/);
-    newStr = newStr + str.slice(pos + 1, str.length);
-    return newStr;
+        let newStr0 = str.slice(0, pos);
+        let nextCh = nextChar(str[pos], 4 - spec[distance] /*char distance*/);
+        newStr1 = newStr0 + nextCh;
+        newStr = newStr1 + str.slice(pos + 1, str.length);
+        assert(newStr.indexOf("NaN") == -1,
+               `Found NaN with inputs: newStr=${newStr}, str=${str}, distance=${distance}; pos=${
+                   pos}, nextCh=${nextCh}, newStr0=${newStr0}, newStr1=${newStr1}`);
+        res = newStr;
+    }
+    assert(res !== undefined,
+           `Found undefined with inputs: str=${str}, res=${res}, distance=${distance}`);
+    return res;
 }
 
 /**
@@ -106,7 +118,16 @@ function generateRanges(values, fieldType, rangeSize) {
         }
     } else if (fieldType == 'string') {
         for (const val of values) {
-            ranges.push([val, nextStr(val, rangeSize)]);
+            nanPos = val.indexOf("NaN");
+            assert(nanPos == -1, `Found NaN in values: ${values}, ${val}, ${nanPos}`);
+            var nextVar = nextStr(val, rangeSize);
+            assert(nextVar != 'nextStrUndefined',
+                   `Found nextStrUndefined in values: ${values}, nextVar: ${nextVar}, val=${
+                       val}, rangeSize=${rangeSize}`);
+            assert(nextVar !== undefined,
+                   `Found undefined in values: ${values}, nextVar: ${nextVar}, val=${
+                       val}, rangeSize=${rangeSize}`);
+            ranges.push([val, nextVar]);
         }
     } else if (fieldType == 'date') {
         for (const val of values) {
@@ -118,7 +139,11 @@ function generateRanges(values, fieldType, rangeSize) {
         let i = 0;
         const step = rangeSize;
         while (i + step < values.length) {
-            ranges.push([values[i], values[i + step]]);
+            let highBound = values[i + step];
+            assert(highBound !== undefined,
+                   `Undefined value, inputs: (values=${values}, fieldType=${fieldType}, rangeSize=${
+                       rangeSize})`);
+            ranges.push([values[i], highBound]);
             i++;
         }
     }
@@ -152,17 +177,23 @@ function splitValuesPerType(values) {
 }
 
 function getTypeFromFieldName(fieldName) {
-    const fieldMeta = new Set(fieldName.split("_"));
+    const fieldMeta = fieldName.split("_");
     let elemType = undefined;
-    if (fieldMeta.has("int")) {
-        elemType = "integer";
-    } else if (fieldMeta.has("dbl")) {
-        elemType = "double";
-    } else if (fieldMeta.has("str")) {
-        elemType = "string";
-    } else if (fieldMeta.has("dt")) {
-        elemType = "date";
+    for (fieldPart of fieldMeta) {
+        if (fieldPart == "int") {
+            elemType = "integer";
+        } else if (fieldPart == "dbl") {
+            elemType = "double";
+        } else if (fieldPart == "str") {
+            elemType = "string";
+        } else if (fieldPart == "dt") {
+            elemType = "date";
+        }
+        if (elemType !== undefined) {
+            return elemType;
+        }
     }
+    assert(false, `getTypeFromFieldName didn't find a field type in ${fieldName}`);
     return elemType;
 }
 
@@ -186,8 +217,8 @@ function generateRangePredicates(field, queryValues, fieldType) {
     for (const qSize in querySpecs) {
         let ranges = [];
         if (elemType == 'integer' || elemType == 'double') {
-            const rangeSize =
-                Math.round((queryValues["max"] - queryValues["min"]) * querySpecs[qSize]);
+            var valueDiff = (queryValues["max"] - queryValues["min"]);
+            const rangeSize = Math.round(valueDiff * querySpecs[qSize]);
             if (rangeSize < 2 && elemType == 'integer') {
                 continue;
             }
@@ -419,12 +450,12 @@ function selectQueryValues(coll, fields, fieldTypes, samplePos, statsColl) {
         }
 
         const minMaxDoc = getMinMax(coll, "$" + field);
-        v.push(minMaxDoc["min"]);
-        v.push(minMaxDoc["max"]);
+        // v.push(minMaxDoc["min"]);
+        // v.push(minMaxDoc["max"]);
 
         // Using min/ max values extract out-of-range values.
-        const outOfRange = selectOutOfRangeValues(minMaxDoc, fieldType);
-        v = v.concat(outOfRange);
+        // const outOfRange = selectOutOfRangeValues(minMaxDoc, fieldType);
+        // v = v.concat(outOfRange);
 
         const histValues = selectHistogramBounds(statsColl, field, fieldType);
         v = v.concat(histValues);

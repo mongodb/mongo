@@ -37,6 +37,8 @@ function computeAndPrintErrors(testcase, ceStrategies, collSize, isComplex) {
         errorDoc["fieldName"] = testcase.fieldName;
         errorDoc["elemMatch"] = testcase.elemMatch;
     }
+    assert(testcase.nReturned >= 0, `testcase: ${tojson(testcase)}`);
+    errorDoc["nReturned"] = testcase.nReturned;
 
     ceStrategies.forEach(function(strategy) {
         const errors = computeStrategyErrors(testcase, strategy, collSize);
@@ -44,6 +46,8 @@ function computeAndPrintErrors(testcase, ceStrategies, collSize, isComplex) {
         print(`${strategy}: ${testcase[strategy]} `);
         print(`QError: ${errors["qError"]}, RelError: ${errors["relError"]}, SelError: ${
             errors["selError"]}%\n`);
+        duration = 'duration_' + strategy;
+        errorDoc[duration] = testcase[duration];
     });
     return errorDoc;
 }
@@ -168,6 +172,33 @@ function aggregateErrorsPerStrategy(errorColl, ceStrategies, predicate = {}) {
                             "RMSRelError":
                                 {$round: [{$sqrt: {$divide: ["$cumRelError2", "$sz"]}}, 3]},
                             "meanSelError": {$round: [{$divide: ["$cumSelError", "$sz"]}, 3]}
+                        }
+                    }
+                ])
+                .toArray();
+
+        print(`${strategy}: `);
+        for (const doc of res) {
+            print(`${tojsononeline(doc)}\n`);
+        }
+    }
+}
+
+function aggegateOptimizationTimesPerStrategy(errorColl, ceStrategies) {
+    print("Average optimization time per strategy:");
+    for (const strategy of ceStrategies) {
+        const strategyDuration = "$" +
+            "duration_" + strategy;
+        const res =
+            errorColl
+                .aggregate([
+                    {$project: {dur: strategyDuration}},
+                    {$group: {_id: null, durationSum: {$sum: "$dur"}, sz: {$count: {}}}},
+                    {
+                        $project: {
+                            _id: 0,
+                            "totalDuration": "$durationSum",
+                            "averageDuration": {$round: [{$divide: ["$durationSum", "$sz"]}, 3]},
                         }
                     }
                 ])

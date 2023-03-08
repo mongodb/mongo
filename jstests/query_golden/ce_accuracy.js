@@ -25,7 +25,7 @@ runHistogramsTest(function() {
         "fields": [
             {"fieldName": "a", "dataType": "integer", "indexed": true},
             {"fieldName": "b", "dataType": "string", "indexed": true},
-            {"fieldName": "c", "dataType": "array", "indexed": true},
+            {"fieldName": "c_int", "dataType": "array", "indexed": true},
             {"fieldName": "mixed", "dataType": "mixed", "indexed": true},
         ],
         "compound_indexes": [],

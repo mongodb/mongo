@@ -33,7 +33,7 @@ function getCEDocs() {
     return Array.from(
         {length: 10},
         (_, i) =>
-            ({_id: i, a: i + 10, b: genRandomString(i), c: genRandomArray(i), mixed: i * 11}));
+            ({_id: i, a: i + 10, b: genRandomString(i), c_int: genRandomArray(i), mixed: i * 11}));
 }
 
 function getCEDocs1() {
@@ -41,7 +41,7 @@ function getCEDocs1() {
                                         _id: i + 10,
                                         a: i + 25,
                                         b: genRandomString(i + 25),
-                                        c: genRandomArray(i + 25),
+                                        c_int: genRandomArray(i + 25),
                                         mixed: genRandomString(i + 3)
                                     }));
 }
