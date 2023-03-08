@@ -102,25 +102,29 @@ void _finishDropDatabase(OperationContext* opCtx,
     }
 
     writeConflictRetry(opCtx, "dropDatabase_database", dbName.toString(), [&] {
+        // We need to replicate the dropDatabase oplog entry and clear the collection catalog in the
+        // same transaction. This is to prevent stepdown from interrupting between these two
+        // operations and leaving this node in an inconsistent state.
         WriteUnitOfWork wunit(opCtx);
         opCtx->getServiceContext()->getOpObserver()->onDropDatabase(opCtx, dbName);
+
+        if (MONGO_unlikely(dropDatabaseHangBeforeInMemoryDrop.shouldFail())) {
+            LOGV2(20334, "dropDatabase - fail point dropDatabaseHangBeforeInMemoryDrop enabled");
+            dropDatabaseHangBeforeInMemoryDrop.pauseWhileSet(opCtx);
+        }
+
+        auto databaseHolder = DatabaseHolder::get(opCtx);
+        databaseHolder->dropDb(opCtx, db);
+        dropPendingGuard.dismiss();
+
         wunit.commit();
+
+        LOGV2(20336,
+              "dropDatabase {dbName} - finished, dropped {numCollections} collection(s)",
+              "dropDatabase",
+              "db"_attr = dbName,
+              "numCollectionsDropped"_attr = numCollections);
     });
-
-    if (MONGO_unlikely(dropDatabaseHangBeforeInMemoryDrop.shouldFail())) {
-        LOGV2(20334, "dropDatabase - fail point dropDatabaseHangBeforeInMemoryDrop enabled");
-        dropDatabaseHangBeforeInMemoryDrop.pauseWhileSet();
-    }
-
-    auto databaseHolder = DatabaseHolder::get(opCtx);
-    databaseHolder->dropDb(opCtx, db);
-    dropPendingGuard.dismiss();
-
-    LOGV2(20336,
-          "dropDatabase {dbName} - finished, dropped {numCollections} collection(s)",
-          "dropDatabase",
-          "db"_attr = dbName,
-          "numCollectionsDropped"_attr = numCollections);
 }
 
 Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool abortIndexBuilds) {

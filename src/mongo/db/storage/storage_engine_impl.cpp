@@ -919,43 +919,17 @@ Status StorageEngineImpl::dropDatabase(OperationContext* opCtx, const DatabaseNa
     }
 
     std::vector<UUID> toDrop = catalog->getAllCollectionUUIDsFromDb(dbName);
-
-    // Do not timestamp any of the following writes. This will remove entries from the catalog as
-    // well as drop any underlying tables. It's not expected for dropping tables to be reversible
-    // on crash/recoverToStableTimestamp.
-    return _dropCollectionsNoTimestamp(opCtx, toDrop);
+    return _dropCollections(opCtx, toDrop);
 }
 
 /**
  * Returns the first `dropCollection` error that this method encounters. This method will attempt
  * to drop all collections, regardless of the error status.
  */
-Status StorageEngineImpl::_dropCollectionsNoTimestamp(OperationContext* opCtx,
-                                                      const std::vector<UUID>& toDrop) {
-    // On primaries, this method will be called outside of any `TimestampBlock` state meaning the
-    // "commit timestamp" will not be set. For this case, this method needs no special logic to
-    // avoid timestamping the upcoming writes.
-    //
-    // On secondaries, there will be a wrapping `TimestampBlock` and the "commit timestamp" will
-    // be set. Carefully save that to the side so the following writes can go through without that
-    // context.
-    const Timestamp commitTs = opCtx->recoveryUnit()->getCommitTimestamp();
-    if (!commitTs.isNull()) {
-        opCtx->recoveryUnit()->clearCommitTimestamp();
-    }
-
-    // Ensure the method exits with the same "commit timestamp" state that it was called with.
-    ScopeGuard addCommitTimestamp([&opCtx, commitTs] {
-        if (!commitTs.isNull()) {
-            opCtx->recoveryUnit()->setCommitTimestamp(commitTs);
-        }
-    });
-
-    // This code makes untimestamped writes to the _mdb_catalog.
-    opCtx->recoveryUnit()->allowUntimestampedWrite();
-
+Status StorageEngineImpl::_dropCollections(OperationContext* opCtx,
+                                           const std::vector<UUID>& toDrop) {
     Status firstError = Status::OK();
-    WriteUnitOfWork untimestampedDropWuow(opCtx);
+    WriteUnitOfWork wuow(opCtx);
     auto collectionCatalog = CollectionCatalog::get(opCtx);
     for (auto& uuid : toDrop) {
         auto coll = collectionCatalog->lookupCollectionByUUIDForMetadataWrite(opCtx, uuid);
@@ -991,7 +965,7 @@ Status StorageEngineImpl::_dropCollectionsNoTimestamp(OperationContext* opCtx,
             opCtx, coll, opCtx->getServiceContext()->getStorageEngine()->supportsPendingDrops());
     }
 
-    untimestampedDropWuow.commit();
+    wuow.commit();
     return firstError;
 }
 

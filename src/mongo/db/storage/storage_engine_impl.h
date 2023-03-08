@@ -385,7 +385,7 @@ private:
                          Timestamp minVisibleTs,
                          Timestamp minValidTs);
 
-    Status _dropCollectionsNoTimestamp(OperationContext* opCtx, const std::vector<UUID>& toDrop);
+    Status _dropCollections(OperationContext* opCtx, const std::vector<UUID>& toDrop);
 
     /**
      * When called in a repair context (_options.forRepair=true), attempts to recover a collection
