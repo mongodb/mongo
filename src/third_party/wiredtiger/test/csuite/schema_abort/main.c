@@ -57,7 +57,7 @@ static char home[1024]; /* Program working dir */
 #define INVALID_KEY UINT64_MAX
 #define MAX_CKPT_INVL 4 /* Maximum interval between checkpoints */
 /* Set large, some slow I/O systems take tens of seconds to fsync. */
-#define MAX_STARTUP 30 /* Seconds to start up and set stable */
+#define MAX_STARTUP 60 /* Seconds to start up and set stable */
 #define MAX_TH 12
 #define MAX_TIME 40
 #define MAX_VAL 1024
@@ -716,6 +716,10 @@ thread_run(void *arg)
     printf("Thread %" PRIu32 " starts at %" PRIu64 "\n", td->info, td->start);
     stable_ts = 0;
     for (i = td->start, iter = 0;; ++i, ++iter) {
+        /* Give other threads a chance to run and move their timestamps forward. */
+        if (use_ts && !stable_set && (iter + 1) % 100 == 0)
+            __wt_sleep(2, 0);
+
         /*
          * Extract a unique timestamp value based on the thread number and the iteration count. This
          * unique number is also used to generate the names if required for the schema operations.
