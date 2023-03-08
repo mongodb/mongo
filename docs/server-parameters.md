@@ -129,6 +129,10 @@ no provided setting evaluates to `false`, the server parameter will be registere
 is enabled. `min_fcv` is a string of the form `X.Y`, representing the minimum FCV version for which
 this parameter should be enabled. `feature_flag` is the name of a feature flag variable upon which
 this server parameter depends -- if the feature flag is disabled, this parameter will be disabled.
+`feature_flag` should be removed when all other instances of that feature flag are deleted, which
+typically is done after the next LTS version of the server is branched. `min_fcv` should be removed
+after it is no longer possible to downgrade to a FCV lower than that version - this occurs when the
+next LTS version of the server is branched.
 
 * `validator`: Zero or many validation rules to impose on the setting. All specified rules must pass 
 to consider the new setting valid. `lt`, `gt`, `lte`, `gte` fields provide for simple numeric limits 

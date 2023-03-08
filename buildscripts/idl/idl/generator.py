@@ -2705,7 +2705,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                                                     (param_no, param.condition.feature_flag))
                         if param.condition.min_fcv:
                             self._writer.write_line(
-                                'scp_%d->setMinFCV(FeatureCompatibilityVersionParser::parseVersion("%s"));'
+                                'scp_%d->setMinFCV(FeatureCompatibilityVersionParser::parseVersionForFeatureFlags("%s"));'
                                 % (param_no, param.condition.min_fcv))
 
                     self._gen_server_parameter_deprecated_aliases(param_no, param)
