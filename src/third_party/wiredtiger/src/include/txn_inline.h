@@ -1395,9 +1395,7 @@ __wt_txn_search_check(WT_SESSION_IMPL *session)
 #ifdef HAVE_DIAGNOSTIC
         __wt_abort(session);
 #endif
-#ifdef WT_STANDALONE_BUILD
         return (EINVAL);
-#endif
     }
 
     if (LF_ISSET(WT_DHANDLE_TS_ASSERT_READ_NEVER) && F_ISSET(txn, WT_TXN_SHARED_TS_READ)) {
@@ -1406,9 +1404,7 @@ __wt_txn_search_check(WT_SESSION_IMPL *session)
 #ifdef HAVE_DIAGNOSTIC
         __wt_abort(session);
 #endif
-#ifdef WT_STANDALONE_BUILD
         return (EINVAL);
-#endif
     }
     return (0);
 }

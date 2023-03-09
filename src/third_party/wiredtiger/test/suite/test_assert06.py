@@ -119,6 +119,8 @@ class test_assert06(wttest.WiredTigerTestCase, suite_subprocess):
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.commit_transaction(), self.msg_usage)
 
+        self.ignoreStdoutPatternIfExists(self.msg_usage)
+
     def test_timestamp_usage(self):
         if wiredtiger.diagnostic_build():
             self.skipTest('requires a non-diagnostic build')
@@ -221,6 +223,8 @@ class test_assert06(wttest.WiredTigerTestCase, suite_subprocess):
         c[key] = ds.value(17)
         self.session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(30))
         self.session.rollback_transaction()
+
+        self.ignoreStdoutPatternIfExists('/unexpected timestamp usage/')
 
 if __name__ == '__main__':
     wttest.run()

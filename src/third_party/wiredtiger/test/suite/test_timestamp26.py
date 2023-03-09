@@ -340,6 +340,7 @@ class test_timestamp26_inconsistent_update(wttest.WiredTigerTestCase):
         msg = '/before the previous update/'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.commit_transaction(), msg)
+        self.ignoreStdoutPatternIfExists(msg)
 
     # Try to update a key previously used with timestamps without one. We should get the
     # inconsistent usage error/message.
@@ -371,6 +372,8 @@ class test_timestamp26_inconsistent_update(wttest.WiredTigerTestCase):
         msg ='/configured to always use timestamps once they are first used/'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
             lambda: self.session.commit_transaction(), msg)
+
+        self.ignoreStdoutPatternIfExists(msg)
 
     # Smoke test setting the timestamp at various points in the transaction.
     def test_timestamp_ts_order(self):
@@ -544,5 +547,7 @@ class test_timestamp26_in_memory_ts(wttest.WiredTigerTestCase):
             self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
                 lambda: self.session.commit_transaction(), msg)
 
+        self.ignoreStdoutPatternIfExists('/unexpected timestamp usage/')
+        self.ignoreStdoutPatternIfExists('/no timestamp provided/')
 if __name__ == '__main__':
     wttest.run()

@@ -859,9 +859,7 @@ __txn_timestamp_usage_check(WT_SESSION_IMPL *session, WT_TXN_OP *op, WT_UPDATE *
 #ifdef HAVE_DIAGNOSTIC
         __wt_abort(session);
 #endif
-#ifdef WT_STANDALONE_BUILD
         return (EINVAL);
-#endif
     }
 
     prev_op_durable_ts = upd->prev_durable_ts;
@@ -880,9 +878,7 @@ __txn_timestamp_usage_check(WT_SESSION_IMPL *session, WT_TXN_OP *op, WT_UPDATE *
 #ifdef HAVE_DIAGNOSTIC
         __wt_abort(session);
 #endif
-#ifdef WT_STANDALONE_BUILD
         return (EINVAL);
-#endif
     }
 
     /* Ordered consistency requires all updates be in timestamp order. */
@@ -895,9 +891,7 @@ __txn_timestamp_usage_check(WT_SESSION_IMPL *session, WT_TXN_OP *op, WT_UPDATE *
 #ifdef HAVE_DIAGNOSTIC
         __wt_abort(session);
 #endif
-#ifdef WT_STANDALONE_BUILD
         return (EINVAL);
-#endif
     }
 
     return (0);
