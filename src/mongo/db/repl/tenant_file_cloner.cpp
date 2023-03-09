@@ -207,13 +207,12 @@ void TenantFileCloner::runQuery() {
 
 void TenantFileCloner::handleNextBatch(DBClientCursor& cursor) {
     LOGV2_DEBUG(6113307,
-                3,
+                4,
                 "TenantFileCloner handleNextBatch",
                 "source"_attr = getSource(),
                 "backupId"_attr = _backupId,
                 "remoteFile"_attr = _remoteFileName,
-                "fileOffset"_attr = getFileOffset(),
-                "moreInCurrentBatch"_attr = cursor.moreInCurrentBatch());
+                "fileOffset"_attr = getFileOffset());
     {
         stdx::lock_guard<TenantMigrationSharedData> lk(*getSharedData());
         if (!getSharedData()->getStatus(lk).isOK()) {
@@ -223,7 +222,7 @@ void TenantFileCloner::handleNextBatch(DBClientCursor& cursor) {
                       str::stream() << message << ": " << getSharedData()->getStatus(lk));
         }
     }
-    while (cursor.moreInCurrentBatch()) {
+    {
         stdx::lock_guard<Latch> lk(_mutex);
         _stats.receivedBatches++;
         while (cursor.moreInCurrentBatch()) {
@@ -264,7 +263,7 @@ void TenantFileCloner::handleNextBatch(DBClientCursor& cursor) {
 void TenantFileCloner::writeDataToFilesystemCallback(
     const executor::TaskExecutor::CallbackArgs& cbd) {
     LOGV2_DEBUG(6113309,
-                3,
+                4,
                 "TenantFileCloner writeDataToFilesystemCallback",
                 "backupId"_attr = _backupId,
                 "remoteFile"_attr = _remoteFileName,

@@ -1085,6 +1085,9 @@ env.Library(
         'tenant_collection_cloner.cpp',
         'tenant_database_cloner.cpp',
         'tenant_base_cloner.cpp',
+        'tenant_file_cloner.cpp',
+        'tenant_file_importer_service.cpp',
+        'tenant_migration_shard_merge_util.cpp',
     ],
     LIBDEPS=[
         'base_cloner',
@@ -1097,13 +1100,19 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/collection_catalog',
         '$BUILD_DIR/mongo/db/catalog/document_validation',
         '$BUILD_DIR/mongo/db/commands/list_collections_filter',
+        '$BUILD_DIR/mongo/db/concurrency/exception_util',
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/ops/write_ops_exec',
         '$BUILD_DIR/mongo/db/shard_role_api',
+        '$BUILD_DIR/mongo/db/storage/wiredtiger/storage_wiredtiger_import',
         '$BUILD_DIR/mongo/rpc/metadata',
         '$BUILD_DIR/mongo/util/progress_meter',
         'oplog',
+        'oplog_application_interface',
         'repl_server_parameters',
+        'replica_set_aware_service',
+        'replication_auth',
+        'tenant_migration_state_machine_idl',
     ],
 )
 
@@ -1410,11 +1419,8 @@ env.Library(
 env.Library(
     target='tenant_migration_recipient_service',
     source=[
-        'tenant_file_cloner.cpp',
-        'tenant_file_importer_service.cpp',
         'tenant_migration_recipient_op_observer.cpp',
         'tenant_migration_recipient_service.cpp',
-        'tenant_migration_shard_merge_util.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/fetcher',
@@ -1430,17 +1436,13 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/collection_crud',
         '$BUILD_DIR/mongo/db/catalog/local_oplog_info',
         '$BUILD_DIR/mongo/db/concurrency/exception_util',
-        '$BUILD_DIR/mongo/db/multitenancy',
         '$BUILD_DIR/mongo/db/ops/write_ops_exec',
         '$BUILD_DIR/mongo/db/pipeline/process_interface/mongo_process_interface',
         '$BUILD_DIR/mongo/db/serverless/serverless_lock',
         '$BUILD_DIR/mongo/db/session/session_catalog_mongod',
-        '$BUILD_DIR/mongo/db/storage/wiredtiger/storage_wiredtiger_import',
         '$BUILD_DIR/mongo/db/transaction/transaction',
-        '$BUILD_DIR/mongo/executor/scoped_task_executor',
         'cloner_utils',
         'oplog',
-        'oplog_application_interface',
         'oplog_buffer_collection',
         'oplog_entry',
         'oplog_fetcher',
@@ -1892,6 +1894,7 @@ env.CppUnitTest(
         'tenant_all_database_cloner_test.cpp',
         'tenant_collection_cloner_test.cpp',
         'tenant_database_cloner_test.cpp',
+        'tenant_file_cloner_test.cpp',
     ],
     LIBDEPS=[
         # Required for service context test fixture
