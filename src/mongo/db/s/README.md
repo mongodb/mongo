@@ -9,6 +9,12 @@ of horizontal scaling or "sharding", the
 and the concept of a
 [**shard key in MongoDB**](https://docs.mongodb.com/manual/sharding/#shard-keys).
 
+## Sharding acronyms
+
+* CSRS: **C**onfig **S**erver as a **R**eplica **S**et. This is a fancy name for the [Config server](https://www.mongodb.com/docs/manual/core/sharded-cluster-config-servers/). Comes from the times of version 3.2 and earlier, when there was a legacy type of Config server called [SCCC](https://www.mongodb.com/docs/manual/release-notes/3.4-compatibility/#removal-of-support-for-sccc-config-servers).
+* Config Shard: Same as CSRS.
+* ConfigData: The set of collections residing on the CSRS, which contain state about the cluster.
+
 ---
 
 # Routing
@@ -42,6 +48,8 @@ copy of the routing table cache exists on each router and shard.
 Operations consult the routing table cache in order to route requests to shards that hold data for
 a collection.
 
+This [section](README_routing_info_cache_consistency_model.md#consistency-model-of-the-routing-table-cache) describes the conceptual consistency model of the routing table cache.
+
 ### How the routing table cache refreshes
 
 The authoritative routing information exists persisted to disk on the config server. Certain node
@@ -63,17 +71,17 @@ will update its in-memory state with its corresponding source.
 
 ### When the routing table cache will refresh
 
-The routing table cache is “lazy.” It does not refresh from its source unless necessary. The cache
+The routing table cache is "lazy." It does not refresh from its source unless necessary. The cache
 will refresh in two scenarios:
 
 1. A request sent to a shard returns an error indicating that the shard’s known routing information for that request doesn't match the sender's routing information.
 2. The cache attempts to access information for a collection that has been locally marked as having out-of-date routing information (stale).
 
 Operations that change a collection’s routing information (for example, a moveChunk command that
-updates a chunk’s location) will mark the local node’s routing table cache as “stale” for affected
+updates a chunk’s location) will mark the local node’s routing table cache as "stale" for affected
 shards. Subsequent attempts to access routing information for affected shards will block on a
 routing table cache refresh. Some operations, such as dropCollection, will affect all shards. In
-this case, the entire collection will be marked as “stale.” Accordingly, subsequent attempts to
+this case, the entire collection will be marked as "stale." Accordingly, subsequent attempts to
 access any routing information for the collection will block on a routing table cache refresh.
 
 ### Types of refreshes
@@ -145,7 +153,7 @@ The database versioning protocol tracks the placement of databases for unsharded
 
 ### Versioning updates
 
-Nodes that track chunk/database versions “lazily” load versioning information. A router or shard
+Nodes that track chunk/database versions "lazily" load versioning information. A router or shard
 will only find out that its internally-stored versioning information is stale via receiving changed
 version information from another node.
 
@@ -259,7 +267,7 @@ A chunk is moved from one shard to another by the moveChunk command. This comman
 1. **Start the migration** - The ActiveMigrationsRegistry is [updated on the donor side](https://github.com/mongodb/mongo/blob/3f849d508692c038afb643b1acb99b8a8cb98d38/src/mongo/db/s/move_chunk_command.cpp#L138) to reflect that a specific chunk is being moved. This prevents any other chunk migrations from happening on this shard until the migration is completed. If an existing incoming or outgoing migration is in flight then the registration will fail and the migration will be aborted. If the inflight operation is for the same chunk then the the registration call will return an object that the moveChunk command can use to join the current operation.
 1. **Start cloning the chunk** - After validating the migration parameters, the donor starts the migration process by sending the _recvChunkStart message to the recipient. This causes the recipient to then [initiate the transfer of documents](https://github.com/mongodb/mongo/blob/5c72483523561c0331769abc3250cf623817883f/src/mongo/db/s/migration_destination_manager.cpp#L955) from the donor. The initial transfer of documents is done by [repeatedly sending the _migrateClone command to the donor](https://github.com/mongodb/mongo/blob/5c72483523561c0331769abc3250cf623817883f/src/mongo/db/s/migration_destination_manager.cpp#L1042) and inserting the fetched documents on the recipient.
 1. **Transfer queued modifications** - Once the initial batch of documents are copied, the recipient then needs to retrieve any modifications that have been queued up on the donor. This is done by  [repeatedly sending the _transferMods command to the donor](https://github.com/mongodb/mongo/blob/5c72483523561c0331769abc3250cf623817883f/src/mongo/db/s/migration_destination_manager.cpp#L1060-L1111). These are [inserts, updates and deletes](https://github.com/mongodb/mongo/blob/11eddfac181ff6ff9faf3e1d55c050373bc6fc24/src/mongo/db/s/migration_chunk_cloner_source_legacy.cpp#L534-L550) that occurred on the donor while the initial batch was being transferred.
-1. **Wait for recipient to clone documents** - The donor [polls the recipient](https://github.com/mongodb/mongo/blob/3f849d508692c038afb643b1acb99b8a8cb98d38/src/mongo/db/s/migration_chunk_cloner_source_legacy.cpp#L984) to see when the transfer of documents has been completed or the timeout has been exceeded. This is indicated when the recipient returns a state of “steady” as a result of the _recvChunkStatus command.
+1. **Wait for recipient to clone documents** - The donor [polls the recipient](https://github.com/mongodb/mongo/blob/3f849d508692c038afb643b1acb99b8a8cb98d38/src/mongo/db/s/migration_chunk_cloner_source_legacy.cpp#L984) to see when the transfer of documents has been completed or the timeout has been exceeded. This is indicated when the recipient returns a state of "steady" as a result of the _recvChunkStatus command.
 1. **Enter the critical section** - Once the recipient has cloned the initial documents, the donor then [declares that it is in a critical section](https://github.com/mongodb/mongo/blob/3f849d508692c038afb643b1acb99b8a8cb98d38/src/mongo/db/s/migration_source_manager.cpp#L344). This indicates that the next operations must not be interrupted and will require recovery actions if they are interrupted. Writes to the donor shard will be suspended while the critical section is in effect. The mechanism to implement the critical section writes the ShardingStateRecovery document to store the minimum optime of the sharding config metadata. If this document exists on stepup it is used to update the optime so that the correct metadata is used.
 1. **Commit on the recipient** - While in the critical section, the [_recvChunkCommit](https://github.com/mongodb/mongo/blob/3f849d508692c038afb643b1acb99b8a8cb98d38/src/mongo/db/s/migration_chunk_cloner_source_legacy.cpp#L360) command is sent to the recipient directing it to fetch any remaining documents for this chunk. The recipient responds by sending _transferMods to fetch the remaining documents while writes are blocked on the donor. Once the documents are transferred successfully, the _recvChunkCommit command returns its status to unblock the donor.
 1. **Commit on the config server** - The donor sends the _configsvrCommitChunkMigration command to the config server. Before the command is sent, [reads are also suspended](https://github.com/mongodb/mongo/blob/3f849d508692c038afb643b1acb99b8a8cb98d38/src/mongo/db/s/migration_source_manager.cpp#L436) on the donor shard.
@@ -795,7 +803,7 @@ thirty (30) minutes out by default, but is user-configurable. This means that if
 in that use a session for thirty minutes, the TTL index will remove the session from the sessions
 collection. When the logical session cache performs its periodic refresh (defined below), it will
 find all sessions that currently exist in the cache that no longer exist in the sessions
-collection. This is the set of sessions that we consider “expired.” The expired sessions are then
+collection. This is the set of sessions that we consider "expired". The expired sessions are then
 removed from the in-memory cache.
 
 ### How a session gets placed into the logical session cache
