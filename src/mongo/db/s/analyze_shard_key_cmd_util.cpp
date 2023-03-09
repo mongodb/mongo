@@ -521,8 +521,8 @@ MonotonicityMetrics calculateMonotonicity(OperationContext* opCtx,
 }
 
 struct CollStatsMetrics {
-    int64_t numDocs;
-    int64_t avgDocSizeBytes;
+    int64_t numDocs = 0;
+    int64_t avgDocSizeBytes = 0;
     boost::optional<int64_t> numOrphanDocs;
 };
 
