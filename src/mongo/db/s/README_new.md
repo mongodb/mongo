@@ -20,9 +20,9 @@ This section visualises the architecture of the MongoDB Sharding system along wi
 C4Component
 
 Container_Boundary(Sharding, "Sharding", $link="README_new.md") {
-  Container_Boundary(ShardingCatalogAPI, "Sharding Catalog API") {
-    Component(RouterRole, "Router Role")
-    Component(ShardRole, "Shard Role")
+  Container_Boundary(ShardingCatalogAPI, "Sharding Catalog API", $link="README_sharding_catalog.md") {
+    Component(RouterRole, "Router Role", $link="README_sharding_catalog.md#router-role")
+    Component(ShardRole, "Shard Role", $link="README_sharding_catalog.md#shard-role")
   }
 
   Container_Boundary(ShardingCatalogRuntime, "Sharding Catalog Runtime") {
