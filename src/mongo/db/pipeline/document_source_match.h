@@ -129,6 +129,10 @@ public:
     Value serialize(
         boost::optional<ExplainOptions::Verbosity> explain = boost::none) const override;
 
+    Value serialize(SerializationOptions opts) const override {
+        MONGO_UNIMPLEMENTED;
+    }
+
     /**
      * Attempts to combine with any subsequent $match stages, joining the query objects with a
      * $and and flattening top-level $and's in the process.

@@ -63,6 +63,9 @@ public:
 
     boost::intrusive_ptr<DocumentSource> optimize() final;
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
+    Value serialize(SerializationOptions opts) const final override {
+        MONGO_UNIMPLEMENTED;
+    }
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
     void addVariableRefs(std::set<Variables::Id>* refs) const final;
     GetModPathsReturn getModifiedPaths() const final;

@@ -119,6 +119,11 @@ public:
         std::vector<Value>& array,
         boost::optional<ExplainOptions::Verbosity> explain = boost::none) const override;
 
+    void serializeToArray(std::vector<Value>& array,
+                          SerializationOptions opts) const final override {
+        MONGO_UNIMPLEMENTED;
+    };
+
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
 private:
@@ -129,6 +134,10 @@ private:
     Value serialize(
         boost::optional<ExplainOptions::Verbosity> explain = boost::none) const override {
         MONGO_UNREACHABLE;  // Should call serializeToArray instead.
+    }
+
+    Value serialize(SerializationOptions opts) const final override {
+        MONGO_UNIMPLEMENTED;
     }
 
     // If running through mongos in a sharded cluster, stores the shard name so that it can be

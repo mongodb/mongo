@@ -105,6 +105,10 @@ public:
         return Value(Document{{getSourceName(), _spec.toBSON()}});
     }
 
+    Value serialize(SerializationOptions opts) const final override {
+        MONGO_UNIMPLEMENTED;
+    }
+
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         StageConstraints constraints(StreamType::kStreaming,
                                      PositionRequirement::kFirst,

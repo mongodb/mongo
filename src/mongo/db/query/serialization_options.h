@@ -29,6 +29,7 @@
 
 #pragma once
 #include "mongo/base/string_data.h"
+#include "mongo/db/query/explain_options.h"
 #include "mongo/util/assert_util.h"
 #include <boost/optional.hpp>
 #include <string>
@@ -94,6 +95,7 @@ struct SerializationOptions {
 
     // For aggregation indicate whether we should use the more verbose serialization format.
     bool explain = false;
+    boost::optional<ExplainOptions::Verbosity> verbosity = boost::none;
 };
 
 }  // namespace mongo

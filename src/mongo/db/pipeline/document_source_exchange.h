@@ -223,6 +223,10 @@ public:
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
+    Value serialize(SerializationOptions opts) const final override {
+        MONGO_UNIMPLEMENTED;
+    }
+
     /**
      * DocumentSourceExchange does not have a direct source (it is reading through the shared
      * Exchange pipeline).

@@ -57,6 +57,10 @@ public:
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const;
 
+    Value serialize(SerializationOptions opts) const final override {
+        MONGO_UNIMPLEMENTED;
+    }
+
     StageConstraints constraints(Pipeline::SplitState pipeState) const final;
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final {

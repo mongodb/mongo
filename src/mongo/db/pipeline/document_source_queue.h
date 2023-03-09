@@ -57,6 +57,10 @@ public:
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const override;
 
+    Value serialize(SerializationOptions opts) const override {
+        MONGO_UNIMPLEMENTED;
+    }
+
     StageConstraints constraints(Pipeline::SplitState pipeState) const override {
         StageConstraints constraints{StreamType::kStreaming,
                                      PositionRequirement::kFirst,

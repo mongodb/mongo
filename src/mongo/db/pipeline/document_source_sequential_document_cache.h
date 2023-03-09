@@ -110,6 +110,10 @@ private:
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
+    Value serialize(SerializationOptions opts) const final override {
+        MONGO_UNIMPLEMENTED;
+    }
+
     SequentialDocumentCache* _cache;
 
     // This flag is set to prevent the cache stage from immediately serving from the cache after it

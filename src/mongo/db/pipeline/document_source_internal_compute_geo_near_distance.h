@@ -89,6 +89,10 @@ private:
     Value serialize(
         boost::optional<ExplainOptions::Verbosity> explain = boost::none) const override;
 
+    Value serialize(SerializationOptions opts) const final override {
+        MONGO_UNIMPLEMENTED;
+    }
+
     GetNextResult doGetNext() override;
 
     std::string _key;

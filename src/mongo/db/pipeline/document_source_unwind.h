@@ -45,6 +45,10 @@ public:
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
+    Value serialize(SerializationOptions opts) const final override {
+        MONGO_UNIMPLEMENTED;
+    }
+
     /**
      * Returns the unwound path, and the 'includeArrayIndex' path, if specified.
      */

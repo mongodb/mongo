@@ -76,6 +76,9 @@ private:
     virtual Value serialize(boost::optional<ExplainOptions::Verbosity>) const override {
         MONGO_UNREACHABLE;
     }
+    Value serialize(SerializationOptions opts) const final override {
+        MONGO_UNIMPLEMENTED;
+    }
 };
 
 }  // namespace mongo

@@ -56,6 +56,10 @@ public:
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final;
 
+    Value serialize(SerializationOptions opts) const final override {
+        MONGO_UNIMPLEMENTED;
+    }
+
 private:
     /**
      * Use the create static method to create a DocumentSourceChangeStreamEnsureResumeTokenPresent.

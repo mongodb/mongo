@@ -186,6 +186,10 @@ public:
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const;
 
+    Value serialize(SerializationOptions opts) const final override {
+        MONGO_UNIMPLEMENTED;
+    }
+
     DocumentSource::GetNextResult doGetNext();
 
     void setSource(DocumentSource* source) final {

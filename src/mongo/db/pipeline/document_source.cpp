@@ -282,6 +282,13 @@ void DocumentSource::serializeToArray(vector<Value>& array,
     }
 }
 
+void DocumentSource::serializeToArray(vector<Value>& array, SerializationOptions opts) const {
+    Value entry = serialize(opts);
+    if (!entry.missing()) {
+        array.push_back(entry);
+    }
+}
+
 namespace {
 std::list<boost::intrusive_ptr<DocumentSource>> throwOnParse(
     BSONElement spec, const boost::intrusive_ptr<ExpressionContext>& expCtx) {

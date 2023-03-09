@@ -81,6 +81,10 @@ public:
         return Value(Document{{getSourceName(), Document()}});
     }
 
+    Value serialize(SerializationOptions opts) const final override {
+        MONGO_UNIMPLEMENTED;
+    }
+
     const char* getSourceName() const override;
 
     size_t size() const;

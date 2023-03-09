@@ -95,6 +95,10 @@ public:
     Value serialize(
         boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final override;
 
+    Value serialize(SerializationOptions opts) const final override {
+        MONGO_UNIMPLEMENTED;
+    }
+
     /**
      * Creates a new $out stage from the given arguments.
      */

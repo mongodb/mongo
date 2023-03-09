@@ -85,6 +85,10 @@ public:
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
+    Value serialize(SerializationOptions opts) const final override {
+        MONGO_UNIMPLEMENTED;
+    }
+
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         StageConstraints constraints(StreamType::kStreaming,
                                      PositionRequirement::kFirst,
@@ -113,6 +117,11 @@ public:
     void serializeToArray(
         std::vector<Value>& array,
         boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
+
+    void serializeToArray(std::vector<Value>& array,
+                          SerializationOptions opts) const final override {
+        MONGO_UNIMPLEMENTED;
+    };
 
 private:
     GetNextResult doGetNext() final;

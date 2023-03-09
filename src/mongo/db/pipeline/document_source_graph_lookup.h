@@ -102,6 +102,11 @@ public:
         std::vector<Value>& array,
         boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
+    void serializeToArray(std::vector<Value>& array,
+                          SerializationOptions opts) const final override {
+        MONGO_UNIMPLEMENTED;
+    };
+
     /**
      * Returns the 'as' path, and possibly the fields modified by an absorbed $unwind.
      */
@@ -177,6 +182,10 @@ private:
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final {
         // Should not be called; use serializeToArray instead.
         MONGO_UNREACHABLE;
+    }
+
+    Value serialize(SerializationOptions opts) const final override {
+        MONGO_UNIMPLEMENTED;
     }
 
     /**

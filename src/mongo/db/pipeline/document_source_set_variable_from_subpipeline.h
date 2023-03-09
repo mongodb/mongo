@@ -113,6 +113,9 @@ protected:
 private:
     GetNextResult doGetNext() final;
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
+    Value serialize(SerializationOptions opts) const final override {
+        MONGO_UNIMPLEMENTED;
+    }
     std::unique_ptr<Pipeline, PipelineDeleter> _subPipeline;
     Variables::Id _variableID;
     // $setVariableFromSubPipeline sets the value of $$SEARCH_META only on the first call to

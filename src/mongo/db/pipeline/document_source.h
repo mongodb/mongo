@@ -444,10 +444,20 @@ public:
      *
      * The 'explain' parameter indicates the explain verbosity mode, or is equal boost::none if no
      * explain is requested.
+     *
+     * TODO: Remove this once all concrete types have implemented serialize(SerializationOptions).
      */
     virtual void serializeToArray(
         std::vector<Value>& array,
         boost::optional<ExplainOptions::Verbosity> explain = boost::none) const;
+
+    /**
+     * In the default case, serializes the DocumentSource and adds it to the std::vector<Value>.
+     *
+     * A subclass may choose to overwrite this, rather than serialize, if it should output multiple
+     * stages (eg, $sort sometimes also outputs a $limit).
+     */
+    virtual void serializeToArray(std::vector<Value>& array, SerializationOptions opts) const;
 
     /**
      * Shortcut method to get a BSONObj for debugging. Often useful in log messages, but is not
@@ -805,9 +815,20 @@ private:
      *
      * The 'explain' parameter indicates the explain verbosity mode, or is equal boost::none if no
      * explain is requested.
+     *
+     * TODO: Remove this once all concrete types have implemented serialize(SerializationOptions).
      */
     virtual Value serialize(
         boost::optional<ExplainOptions::Verbosity> explain = boost::none) const = 0;
+
+    /**
+     * Create a Value that represents the document source.
+     *
+     * This is used by the default implementation of serializeToArray() to add this object
+     * to a pipeline being serialized. Returning a missing() Value results in no entry
+     * being added to the array for this stage (DocumentSource).
+     */
+    virtual Value serialize(SerializationOptions opts) const = 0;
 };
 
 /**

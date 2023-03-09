@@ -192,6 +192,10 @@ private:
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
+    Value serialize(SerializationOptions opts) const final override {
+        MONGO_UNIMPLEMENTED;
+    }
+
     void addViewDefinition(NamespaceString nss, std::vector<BSONObj> viewPipeline);
 
     void logStartingSubPipeline(const std::vector<BSONObj>& serializedPipeline);

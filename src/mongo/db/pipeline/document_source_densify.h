@@ -385,6 +385,10 @@ public:
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
 
+    Value serialize(SerializationOptions opts) const final override {
+        MONGO_UNIMPLEMENTED;
+    }
+
     DepsTracker::State getDependencies(DepsTracker* deps) const final {
         deps->fields.insert(_field.fullPath());
         // We don't need to traverse _partitionExpr because it was generated from _partitions.
