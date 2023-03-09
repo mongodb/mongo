@@ -110,3 +110,7 @@ feature_flags:
     cpp_varname: feature_flags::gAllowMigrationsRefreshToAll
     default: true
     version: 7.0
+  featureFlagCheckForDirectShardOperations:
+    description: "Feature flag for checking for direct shard operations."
+    cpp_varname: feature_flags::gCheckForDirectShardOperations
+    default: false
