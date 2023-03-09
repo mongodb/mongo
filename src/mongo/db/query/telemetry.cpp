@@ -49,7 +49,6 @@
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/md5.hpp"
-#include "mongo/util/processinfo.h"
 #include "mongo/util/system_clock_source.h"
 #include <array>
 #include <optional>
@@ -438,9 +437,8 @@ ServiceContext::ConstructorActionRegisterer telemetryStoreManagerRegisterer{
             std::make_unique<TelemetryOnParamChangeUpdaterImpl>();
         size_t size = getTelemetryStoreSize();
         auto&& globalTelemetryStoreManager = telemetryStoreDecoration(serviceCtx);
-        // The plan cache and telemetry store should use the same number of partitions.
-        // That is, the number of cpu cores.
-        size_t numPartitions = ProcessInfo::getNumCores();
+        // Many partitions reduces lock contention on both reading and write telemetry data.
+        size_t numPartitions = 1024;
         size_t partitionBytes = size / numPartitions;
         size_t metricsSize = sizeof(TelemetryMetrics);
         if (partitionBytes < metricsSize * 10) {
