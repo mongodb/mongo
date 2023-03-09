@@ -47,13 +47,9 @@ public:
 
     BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override {
-        if (!supportsSamplingQueries()) {
-            return {};
-        }
-
-        BSONObjBuilder builder;
-        QueryAnalysisSampler::get(opCtx).appendInfoForServerStatus(&builder);
-        return builder.obj();
+        return supportsSamplingQueries()
+            ? QueryAnalysisSampleCounters::get(opCtx).reportForServerStatus()
+            : BSONObj();
     }
 
 } queryAnalysisServerStatus;

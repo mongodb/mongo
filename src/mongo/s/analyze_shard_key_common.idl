@@ -81,3 +81,63 @@ structs:
       sampleRate:
         type: double
         description: "The maximum number of queries to sample per second."
+
+  CollectionSampleCountersCurrentOp:
+    description: "The per-collection report on number and size of sampled queries for the currentOp
+                  command."
+    strict: false
+    fields:
+      desc:
+        type: string
+        description: "The string identifier for the query sampling currentOp document."
+        default: '"query analyzer"'
+      ns:
+        type: namespacestring
+        description: "The namespace of the collection."
+      collUuid:
+        type: uuid
+        description: "The UUID of the collection."
+        optional: true
+      sampleRate:
+        type: double
+        description: "The maximum number of queries to sample per second. Only reported by mongos."
+        optional: true
+      sampledReadsCount:
+        type: long
+        description: "The number of read queries sampled."
+      sampledReadsBytes:
+        type: long
+        description: "The number of bytes stored for sampled read queries. Only reported by mongod."
+        optional: true
+      sampledWritesCount:
+        type: long
+        description: "The number of write queries sampled."
+      sampledWritesBytes:
+        type: long
+        description: "The number of bytes stored for sampled write queries. Only reported by mongod."
+        optional: true
+  QueryAnalysisServerStatus:
+    description: "The server-wide report on the number of sampled queries for the serverStatus
+                  command."
+    strict: false
+    fields:
+      activeCollections:
+        type: long
+        description: "The number of collections that are actively being sampled."
+      totalCollections:
+        type: long
+        description: "The total number of collections that have been sampled."
+      totalSampledReadsCount:
+        type: long
+        description: "The total number of sampled read queries."
+      totalSampledWritesCount:
+        type: long
+        description: "The total number of sampled write queries."
+      totalSampledReadsBytes:
+        type: long
+        description: "The total number of bytes stored for sampled read queries."
+        optional: true
+      totalSampledWritesBytes:
+        type: long
+        description: "The total number of bytes stored for sampled write queries."
+        optional: true

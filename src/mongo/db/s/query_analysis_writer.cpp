@@ -540,8 +540,8 @@ ExecutorFuture<void> QueryAnalysisWriter::_addReadQuery(const UUID& sampleId,
 
             stdx::lock_guard<Latch> lk(_mutex);
             if (_queries.add(doc)) {
-                auto counters = _getOrCreateSampleCounters(nss, *collUuid);
-                counters->incrementReads(doc.objsize());
+                QueryAnalysisSampleCounters::get(opCtx).incrementReads(
+                    nss, *collUuid, doc.objsize());
             }
         })
         .then([this] {
@@ -590,8 +590,8 @@ ExecutorFuture<void> QueryAnalysisWriter::addUpdateQuery(
 
             stdx::lock_guard<Latch> lk(_mutex);
             if (_queries.add(doc)) {
-                auto counters = _getOrCreateSampleCounters(sampledUpdateCmd.nss, *collUuid);
-                counters->incrementWrites(doc.objsize());
+                QueryAnalysisSampleCounters::get(opCtx).incrementWrites(
+                    sampledUpdateCmd.nss, *collUuid, doc.objsize());
             }
         })
         .then([this] {
@@ -640,8 +640,8 @@ ExecutorFuture<void> QueryAnalysisWriter::addDeleteQuery(
 
             stdx::lock_guard<Latch> lk(_mutex);
             if (_queries.add(doc)) {
-                auto counters = _getOrCreateSampleCounters(sampledDeleteCmd.nss, *collUuid);
-                counters->incrementWrites(doc.objsize());
+                QueryAnalysisSampleCounters::get(opCtx).incrementWrites(
+                    sampledDeleteCmd.nss, *collUuid, doc.objsize());
             }
         })
         .then([this] {
@@ -692,8 +692,8 @@ ExecutorFuture<void> QueryAnalysisWriter::addFindAndModifyQuery(
 
             stdx::lock_guard<Latch> lk(_mutex);
             if (_queries.add(doc)) {
-                auto counters = _getOrCreateSampleCounters(sampledFindAndModifyCmd.nss, *collUuid);
-                counters->incrementWrites(doc.objsize());
+                QueryAnalysisSampleCounters::get(opCtx).incrementWrites(
+                    sampledFindAndModifyCmd.nss, *collUuid, doc.objsize());
             }
         })
         .then([this] {
@@ -753,27 +753,6 @@ ExecutorFuture<void> QueryAnalysisWriter::addDiff(const UUID& sampleId,
                   "namespace"_attr = nss,
                   "error"_attr = redact(status));
         });
-}
-
-void QueryAnalysisWriter::reportForCurrentOp(std::vector<BSONObj>* ops) const {
-    for (auto it = _sampleCountersMap.begin(); it != _sampleCountersMap.end(); ++it) {
-        ops->push_back(it->second->reportCurrentOp());
-    }
-}
-
-std::shared_ptr<SampleCounters> QueryAnalysisWriter::_getOrCreateSampleCounters(
-    const NamespaceString& nss, const UUID& collUuid) {
-    auto it = _sampleCountersMap.find(collUuid);
-    if (it == _sampleCountersMap.end()) {
-        it = _sampleCountersMap.emplace(collUuid, std::make_shared<SampleCounters>(nss, collUuid))
-                 .first;
-    } else {
-        if (nss != it->second->getNss()) {
-            // TODO SERVER-73990 Make sure collection renames are handled correctly, and test.
-            it->second->setNss(nss);
-        }
-    }
-    return it->second;
 }
 
 }  // namespace analyze_shard_key

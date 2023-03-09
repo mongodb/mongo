@@ -35,6 +35,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/is_mongos.h"
+#include "mongo/s/query_analysis_sample_counters.h"
 #include "mongo/s/refresh_query_analyzer_configuration_cmd_gen.h"
 #include "mongo/util/net/socket_utils.h"
 
@@ -46,6 +47,7 @@ namespace analyze_shard_key {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(disableQueryAnalysisSampler);
+MONGO_FAIL_POINT_DEFINE(overwriteQueryAnalysisSamplerAvgLastCountToZero);
 
 const auto getQueryAnalysisSampler = ServiceContext::declareDecoration<QueryAnalysisSampler>();
 
@@ -150,6 +152,10 @@ double QueryAnalysisSampler::SampleRateLimiter::_getBurstCapacity(double numToke
 
 void QueryAnalysisSampler::SampleRateLimiter::_refill(double numTokensPerSecond,
                                                       double burstCapacity) {
+    if (numTokensPerSecond == 0.0) {
+        return;
+    }
+
     auto currTicks = _serviceContext->getTickSource()->getTicks();
     double numSecondsElapsed = _serviceContext->getTickSource()
                                    ->ticksTo<Nanoseconds>(currTicks - _lastRefillTimeTicks)
@@ -220,7 +226,9 @@ void QueryAnalysisSampler::_refreshConfigurations(OperationContext* opCtx) {
     boost::optional<double> lastAvgCount;
     {
         stdx::lock_guard<Latch> lk(_mutex);
-        lastAvgCount = _queryStats.getLastAvgCount();
+        lastAvgCount = (MONGO_unlikely(overwriteQueryAnalysisSamplerAvgLastCountToZero.shouldFail())
+                            ? 0
+                            : _queryStats.getLastAvgCount());
     }
 
     if (!lastAvgCount) {
@@ -267,6 +275,8 @@ void QueryAnalysisSampler::_refreshConfigurations(OperationContext* opCtx) {
               "response"_attr = response);
     }
 
+    QueryAnalysisSampleCounters::get(opCtx).refreshConfigurations(response.getConfigurations());
+
     stdx::lock_guard<Latch> lk(_mutex);
     std::map<NamespaceString, SampleRateLimiter> sampleRateLimiters;
 
@@ -295,31 +305,25 @@ void QueryAnalysisSampler::_refreshConfigurations(OperationContext* opCtx) {
     _sampleRateLimiters = std::move(sampleRateLimiters);
 }
 
-void QueryAnalysisSampler::SampleRateLimiter::incrementCounters(
-    const SampledCommandNameEnum cmdName) {
+void QueryAnalysisSampler::_incrementCounters(OperationContext* opCtx,
+                                              const NamespaceString& nss,
+                                              const SampledCommandNameEnum cmdName) {
     switch (cmdName) {
         case SampledCommandNameEnum::kFind:
         case SampledCommandNameEnum::kAggregate:
         case SampledCommandNameEnum::kCount:
         case SampledCommandNameEnum::kDistinct:
-            _counters.incrementReads(boost::none);
+            QueryAnalysisSampleCounters::get(opCtx).incrementReads(nss);
             break;
         case SampledCommandNameEnum::kInsert:
         case SampledCommandNameEnum::kUpdate:
         case SampledCommandNameEnum::kDelete:
         case SampledCommandNameEnum::kFindAndModify:
-            _counters.incrementWrites(boost::none);
+            QueryAnalysisSampleCounters::get(opCtx).incrementWrites(nss);
             break;
         default:
             MONGO_UNREACHABLE;
     }
-}
-
-BSONObj QueryAnalysisSampler::SampleRateLimiter::reportForCurrentOp() const {
-    BSONObjBuilder bob = _counters.reportCurrentOp();
-    bob.append(SampleCounters::kSampleRateFieldName, _numTokensPerSecond);
-    BSONObj obj = bob.obj();
-    return obj;
 }
 
 boost::optional<UUID> QueryAnalysisSampler::tryGenerateSampleId(OperationContext* opCtx,
@@ -340,7 +344,7 @@ boost::optional<UUID> QueryAnalysisSampler::tryGenerateSampleId(OperationContext
 
     auto& rateLimiter = it->second;
     if (rateLimiter.tryConsume()) {
-        rateLimiter.incrementCounters(cmdName);
+        _incrementCounters(opCtx, nss, cmdName);
         return UUID::gen();
     }
     return boost::none;
@@ -349,12 +353,6 @@ boost::optional<UUID> QueryAnalysisSampler::tryGenerateSampleId(OperationContext
 void QueryAnalysisSampler::appendInfoForServerStatus(BSONObjBuilder* bob) const {
     stdx::lock_guard<Latch> lk(_mutex);
     bob->append(kActiveCollectionsFieldName, static_cast<int>(_sampleRateLimiters.size()));
-}
-
-void QueryAnalysisSampler::reportForCurrentOp(std::vector<BSONObj>* ops) const {
-    for (auto it = _sampleRateLimiters.begin(); it != _sampleRateLimiters.end(); ++it) {
-        ops->push_back(it->second.reportForCurrentOp());
-    }
 }
 
 }  // namespace analyze_shard_key

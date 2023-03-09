@@ -30,6 +30,12 @@
 #pragma once
 
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/logv2/log.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/s/analyze_shard_key_common_gen.h"
+#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/uuid.h"
 
 #include <boost/optional.hpp>
@@ -39,83 +45,136 @@
 namespace mongo {
 namespace analyze_shard_key {
 
-class SampleCounters {
+/**
+ * Maintains read and write counters of queries being sampled for shard key analysis. This includes
+ * server-wide counters and per-collection counters for the collections that have query sampling
+ * enabled. Instances of this object on mongod will also count the number of bytes being
+ * written to the sample collection.
+ */
+class QueryAnalysisSampleCounters {
 public:
-    static const std::string kDescriptionFieldName;
-    static const std::string kDescriptionFieldValue;
-    static const std::string kNamespaceStringFieldName;
-    static const std::string kCollUuidFieldName;
-    static const std::string kSampledReadsCountFieldName;
-    static const std::string kSampledWritesCountFieldName;
-    static const std::string kSampledReadsBytesFieldName;
-    static const std::string kSampledWritesBytesFieldName;
-    static const std::string kSampleRateFieldName;
+    class CollectionSampleCounters {
+    public:
+        CollectionSampleCounters(const NamespaceString& nss,
+                                 const UUID& collUuid,
+                                 double sampleRate = 0.0)
+            : _nss(nss), _collUuid(collUuid), _sampleRate(sampleRate){};
 
-    SampleCounters(const NamespaceString& nss, const UUID& collUuid)
-        : _nss(nss),
-          _collUuid(collUuid),
-          _sampledReadsCount(0LL),
-          _sampledReadsBytes(0LL),
-          _sampledWritesCount(0LL),
-          _sampledWritesBytes(0LL){};
+        NamespaceString getNs() const {
+            return _nss;
+        }
 
-    NamespaceString getNss() const {
-        return _nss;
-    }
+        UUID getCollUuid() const {
+            return _collUuid;
+        }
 
-    void setNss(const NamespaceString& nss) {
-        _nss = nss;
-    }
+        double getSampleRate() const {
+            return _sampleRate;
+        }
 
-    UUID getCollUUID() const {
-        return _collUuid;
-    }
+        void setSampleRate(double sampleRate) {
+            _sampleRate = sampleRate;
+        }
 
-    size_t getSampledReadsCount() const {
-        return _sampledReadsCount;
-    }
+        int64_t getSampledReadsCount() const {
+            return _sampledReadsCount;
+        }
 
-    size_t getSampledReadsBytes() const {
-        return _sampledReadsBytes;
-    }
+        int64_t getSampledReadsBytes() const {
+            return _sampledReadsBytes;
+        }
 
-    size_t getSampledWritesCount() const {
-        return _sampledWritesCount;
-    }
+        int64_t getSampledWritesCount() const {
+            return _sampledWritesCount;
+        }
 
-    size_t getSampledWritesBytes() const {
-        return _sampledWritesBytes;
-    }
+        int64_t getSampledWritesBytes() const {
+            return _sampledWritesBytes;
+        }
+
+        /**
+         * Increments the read counter and adds <size> to the read bytes counter.
+         */
+        void incrementReads(boost::optional<int64_t> size = boost::none) {
+            ++_sampledReadsCount;
+            if (size) {
+                _sampledReadsBytes += *size;
+            }
+        }
+
+        /**
+         * Increments the write counter and adds <size> to the write bytes counter.
+         */
+        void incrementWrites(boost::optional<int64_t> size = boost::none) {
+            ++_sampledWritesCount;
+            if (size) {
+                _sampledWritesBytes += *size;
+            }
+        }
+
+        BSONObj reportForCurrentOp() const;
+
+    private:
+        NamespaceString _nss;
+        UUID _collUuid;
+        int64_t _sampledReadsCount = 0;
+        int64_t _sampledReadsBytes = 0;
+        int64_t _sampledWritesCount = 0;
+        int64_t _sampledWritesBytes = 0;
+        double _sampleRate = 0.0;
+    };
+
+    QueryAnalysisSampleCounters() {}
 
     /**
-     * Increments the read counter and adds <size> to the read bytes counter.
+     * Returns a reference to the service-wide QueryAnalysisSampleCounters instance.
      */
-    void incrementReads(boost::optional<long long> size) {
-        ++_sampledReadsCount;
-        if (size) {
-            _sampledReadsBytes += *size;
-        }
-    }
+    static QueryAnalysisSampleCounters& get(OperationContext* opCtx);
+    static QueryAnalysisSampleCounters& get(ServiceContext* serviceContext);
+
+    void refreshConfigurations(
+        const std::vector<CollectionQueryAnalyzerConfiguration>& configurations);
 
     /**
-     * Increments the write counter and adds <size> to the write bytes counter.
+     * Retrieves the collection's sample counters given the namespace string and the collection
+     * UUID. If the collection's sample counters do not exist, new counters are created for the
+     * collection and returned.
      */
-    void incrementWrites(boost::optional<long long> size) {
-        ++_sampledWritesCount;
-        if (size) {
-            _sampledWritesBytes += *size;
-        }
-    }
+    void incrementReads(const NamespaceString& nss,
+                        const boost::optional<UUID>& collUuid = boost::none,
+                        boost::optional<int64_t> size = boost::none);
+    void incrementWrites(const NamespaceString& nss,
+                         const boost::optional<UUID>& collUuid = boost::none,
+                         boost::optional<int64_t> size = boost::none);
 
-    BSONObj reportCurrentOp() const;
+    /**
+     * Reports sample counters for each collection, inserting one BSONObj per collection.
+     */
+    void reportForCurrentOp(std::vector<BSONObj>* ops) const;
+
+    /**
+     * Reports number of queries sampled over the lifetime of the server.
+     */
+    BSONObj reportForServerStatus() const;
 
 private:
-    NamespaceString _nss;
-    const UUID _collUuid;
-    long long _sampledReadsCount;
-    long long _sampledReadsBytes;
-    long long _sampledWritesCount;
-    long long _sampledWritesBytes;
+    std::shared_ptr<CollectionSampleCounters> _getOrCreateCollectionSampleCounters(
+        WithLock, const NamespaceString& nss, const boost::optional<UUID>& collUuid);
+
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("QueryAnalysisSampleCounters::_mutex");
+
+    int64_t _totalSampledReadsCount = 0;
+    int64_t _totalSampledWritesCount = 0;
+    int64_t _totalSampledReadsBytes = 0;
+    int64_t _totalSampledWritesBytes = 0;
+
+    // Per-collection sample counters. When sampling for a collection is turned off,
+    // its counters will be removed from this map.
+    std::map<NamespaceString, std::shared_ptr<CollectionSampleCounters>> _sampleCounters;
+
+    // Set of collections that have been sampled, for maintaining the total count of
+    // collections sampled, reported in server status.
+    std::set<NamespaceString> _sampledNamespaces;
 };
 
 }  // namespace analyze_shard_key

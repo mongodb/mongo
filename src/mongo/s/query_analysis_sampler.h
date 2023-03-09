@@ -104,9 +104,8 @@ public:
             : _serviceContext(serviceContext),
               _nss(nss),
               _collUuid(collUuid),
-              _numTokensPerSecond(numTokensPerSecond),
-              _counters(nss, collUuid) {
-            invariant(_numTokensPerSecond > 0);
+              _numTokensPerSecond(numTokensPerSecond) {
+            invariant(_numTokensPerSecond >= 0);
             _lastRefillTimeTicks = _serviceContext->getTickSource()->getTicks();
         };
 
@@ -144,10 +143,6 @@ public:
          */
         void refreshRate(double numTokensPerSecond);
 
-        void incrementCounters(SampledCommandNameEnum cmdName);
-
-        BSONObj reportForCurrentOp() const;
-
     private:
         /**
          * Returns the maximum of number of tokens that a bucket with given rate can store at any
@@ -169,8 +164,6 @@ public:
         // The bucket is only refilled when there is a consume request or a rate refresh.
         TickSource::Tick _lastRefillTimeTicks;
         double _lastNumTokens = 0;
-
-        SampleCounters _counters;
     };
 
     QueryAnalysisSampler() = default;
@@ -202,8 +195,6 @@ public:
 
     void appendInfoForServerStatus(BSONObjBuilder* bob) const;
 
-    void reportForCurrentOp(std::vector<BSONObj>* ops) const;
-
     void refreshQueryStatsForTest() {
         _refreshQueryStats();
     }
@@ -228,6 +219,10 @@ private:
     void _refreshQueryStats();
 
     void _refreshConfigurations(OperationContext* opCtx);
+
+    void _incrementCounters(OperationContext* opCtx,
+                            const NamespaceString& nss,
+                            SampledCommandNameEnum cmdName);
 
     mutable Mutex _mutex = MONGO_MAKE_LATCH("QueryAnalysisSampler::_mutex");
 

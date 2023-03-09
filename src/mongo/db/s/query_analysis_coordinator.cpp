@@ -261,10 +261,6 @@ QueryAnalysisCoordinator::getNewConfigurationsForSampler(OperationContext* opCtx
         ? (1.0 / numActiveSamplers)
         : (weight / totalWeight);
 
-    if (sampleRateRatio == 0) {
-        return {};
-    }
-
     // Populate the query analyzer configurations for all collections.
     std::vector<CollectionQueryAnalyzerConfiguration> configurations;
     for (const auto& [_, configuration] : _configurations) {

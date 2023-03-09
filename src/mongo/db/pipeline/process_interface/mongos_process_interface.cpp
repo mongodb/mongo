@@ -40,6 +40,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/redaction.h"
+#include "mongo/s/analyze_shard_key_role.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
@@ -47,7 +48,7 @@
 #include "mongo/s/query/document_source_merge_cursors.h"
 #include "mongo/s/query/establish_cursors.h"
 #include "mongo/s/query/router_exec_stage.h"
-#include "mongo/s/query_analysis_sampler.h"
+#include "mongo/s/query_analysis_sample_counters.h"
 #include "mongo/s/stale_shard_version_helpers.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/fail_point.h"
@@ -293,7 +294,7 @@ void MongosProcessInterface::_reportCurrentOpsForPrimaryOnlyServices(
 void MongosProcessInterface::_reportCurrentOpsForQueryAnalysis(OperationContext* opCtx,
                                                                std::vector<BSONObj>* ops) const {
     if (analyze_shard_key::supportsSamplingQueries()) {
-        analyze_shard_key::QueryAnalysisSampler::get(opCtx).reportForCurrentOp(ops);
+        analyze_shard_key::QueryAnalysisSampleCounters::get(opCtx).reportForCurrentOp(ops);
     }
 }
 

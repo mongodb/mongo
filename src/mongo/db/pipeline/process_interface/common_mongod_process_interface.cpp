@@ -75,6 +75,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/query/document_source_merge_cursors.h"
+#include "mongo/s/query_analysis_sample_counters.h"
 #include "mongo/s/query_analysis_sampler_util.h"
 #include "mongo/util/database_name_util.h"
 #include "mongo/util/namespace_string_util.h"
@@ -699,7 +700,7 @@ void CommonMongodProcessInterface::_reportCurrentOpsForIdleSessions(
 void CommonMongodProcessInterface::_reportCurrentOpsForQueryAnalysis(
     OperationContext* opCtx, std::vector<BSONObj>* ops) const {
     if (analyze_shard_key::supportsPersistingSampledQueries()) {
-        analyze_shard_key::QueryAnalysisWriter::get(opCtx)->reportForCurrentOp(ops);
+        analyze_shard_key::QueryAnalysisSampleCounters::get(opCtx).reportForCurrentOp(ops);
     }
 }
 

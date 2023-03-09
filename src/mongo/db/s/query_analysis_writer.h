@@ -194,8 +194,6 @@ public:
         _flushDiffs(opCtx);
     }
 
-    void reportForCurrentOp(std::vector<BSONObj>* ops) const;
-
 private:
     bool shouldRegisterReplicaSetAwareService() const override final;
 
@@ -239,14 +237,6 @@ private:
      */
     bool _exceedsMaxSizeBytes();
 
-    /**
-     * Retrieve the collection's sample counters given the namespace string and the
-     * collection UUID. If the collection's sample counters are not found, a new set of
-     * counters is created for the collection and returned.
-     */
-    std::shared_ptr<SampleCounters> _getOrCreateSampleCounters(const NamespaceString& nss,
-                                                               const UUID& collUuid);
-
     mutable Mutex _mutex = MONGO_MAKE_LATCH("QueryAnalysisWriter::_mutex");
 
     PeriodicJobAnchor _periodicQueryWriter;
@@ -254,8 +244,6 @@ private:
 
     PeriodicJobAnchor _periodicDiffWriter;
     Buffer _diffs{NamespaceString::kConfigSampledQueriesDiffNamespace};
-
-    std::map<UUID, std::shared_ptr<SampleCounters>> _sampleCountersMap;
 
     // Initialized on startup and joined on shutdown.
     std::shared_ptr<executor::TaskExecutor> _executor;

@@ -27,13 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/db/namespace_string.h"
-#include "mongo/logv2/log.h"
 #include "mongo/s/query_analysis_sample_counters.h"
+
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/service_context_test_fixture.h"
+#include "mongo/logv2/log.h"
+#include "mongo/s/analyze_shard_key_common_gen.h"
+#include "mongo/s/is_mongos.h"
+#include "mongo/s/sharding_router_test_fixture.h"
+#include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/uuid.h"
 
 #include <boost/none.hpp>
+#include <boost/optional.hpp>
 #include <cstddef>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -44,38 +52,308 @@ namespace {
 
 const NamespaceString nss0 = NamespaceString::createNamespaceString_forTest("testDb", "testColl0");
 
-TEST(QueryAnalysisSampleCounters, CountAndReportCurrentOp) {
-    auto collUuid = UUID::gen();
-    auto counters = SampleCounters(nss0, collUuid);
-    ASSERT_EQ(nss0, counters.getNss());
-    ASSERT_EQ(collUuid, counters.getCollUUID());
-    ASSERT_EQ(0, counters.getSampledReadsCount());
-    ASSERT_EQ(0, counters.getSampledReadsBytes());
-    ASSERT_EQ(0, counters.getSampledWritesCount());
-    ASSERT_EQ(0, counters.getSampledWritesBytes());
+static const std::string kCurrentOpDescFieldValue{"query analyzer"};
 
-    long long size = 100LL;
+class QueryAnalysisSampleCountersTest : public ServiceContextTest {
+public:
+    /**
+     * Run through sample counters refreshConfiguration and increment functions depending on
+     * whether process is mongod or mongos.
+     */
+    void testRefreshConfigIncrementAndReport(bool isMongos);
 
-    counters.incrementReads(size);
-    counters.incrementReads(boost::none);
-    ASSERT_EQ(2, counters.getSampledReadsCount());
-    ASSERT_EQ(size, counters.getSampledReadsBytes());
+protected:
+    const NamespaceString nss0 =
+        NamespaceString::createNamespaceString_forTest("testDb", "testColl0");
+    const NamespaceString nss1 =
+        NamespaceString::createNamespaceString_forTest("testDb", "testColl1");
+    const UUID collUuid0 = UUID::gen();
+    const UUID collUuid1 = UUID::gen();
 
-    counters.incrementWrites(size);
-    counters.incrementWrites(boost::none);
-    ASSERT_EQ(2, counters.getSampledWritesCount());
-    ASSERT_EQ(size, counters.getSampledWritesBytes());
+private:
+    bool _originalIsMongos;
+};
 
-    BSONObj report = counters.reportCurrentOp();
+void QueryAnalysisSampleCountersTest::testRefreshConfigIncrementAndReport(const bool testMongos) {
+    bool originalIsMongos = isMongos();
+    setMongos(testMongos);
+    ON_BLOCK_EXIT([&] { setMongos(originalIsMongos); });
 
-    ASSERT_EQ(report.getField(SampleCounters::kDescriptionFieldName).String(),
-              SampleCounters::kDescriptionFieldValue);
-    ASSERT_EQ(report.getField(SampleCounters::kNamespaceStringFieldName).String(), nss0.toString());
-    ASSERT_EQ(UUID::parse(report.getField(SampleCounters::kCollUuidFieldName)), collUuid);
-    ASSERT_EQ(report.getField(SampleCounters::kSampledReadsCountFieldName).Long(), 2);
-    ASSERT_EQ(report.getField(SampleCounters::kSampledWritesCountFieldName).Long(), 2);
-    ASSERT_EQ(report.getField(SampleCounters::kSampledReadsBytesFieldName).Long(), size);
-    ASSERT_EQ(report.getField(SampleCounters::kSampledWritesBytesFieldName).Long(), size);
+    const bool testMongod = !testMongos;
+
+    const double sampleRate0 = 0.0;
+    const double sampleRate1Before = 0.0000000001;
+    const double sampleRate1After = 222.2;
+
+    // The mock size for each sampled read or write query, in bytes.
+    const int64_t sampledQueryDocSizeBytes = 10;
+
+    auto svcCtx = getServiceContext();
+    QueryAnalysisSampleCounters& sampleCounters = QueryAnalysisSampleCounters::get(svcCtx);
+
+    // Add first configuration and refresh.
+    std::vector<CollectionQueryAnalyzerConfiguration> configurationsV1;
+    configurationsV1.emplace_back(nss0, collUuid0, sampleRate0);
+    sampleCounters.refreshConfigurations(configurationsV1);
+
+    // Verify currentOp, one configuration.
+    std::vector<BSONObj> ops;
+    sampleCounters.reportForCurrentOp(&ops);
+    ASSERT_EQ(1, ops.size());
+    auto parsedOp = CollectionSampleCountersCurrentOp::parse(
+        IDLParserContext("QueryAnalysisSampleCountersTest.RefreshConfigIncrementAndReport_TEST"),
+        ops[0]);
+    ASSERT_EQ(parsedOp.getDesc(), kCurrentOpDescFieldValue);
+    ASSERT_EQ(parsedOp.getNs(), nss0);
+    ASSERT_EQ(parsedOp.getCollUuid(), collUuid0);
+    if (testMongos) {
+        ASSERT_EQ(parsedOp.getSampleRate(), sampleRate0);
+    }
+    ASSERT_EQ(parsedOp.getSampledReadsCount(), 0);
+    ASSERT_EQ(parsedOp.getSampledWritesCount(), 0);
+    if (testMongod) {
+        ASSERT_EQ(*(parsedOp.getSampledReadsBytes()), 0L);
+        ASSERT_EQ(*(parsedOp.getSampledWritesBytes()), 0L);
+    }
+
+    // Verify server status, one configuration.
+    BSONObj serverStatus;
+    serverStatus = sampleCounters.reportForServerStatus();
+    auto parsedServerStatus = QueryAnalysisServerStatus::parse(
+        IDLParserContext("QueryAnalysisSampleCountersTest.RefreshConfigIncrementAndReport_TEST"),
+        serverStatus);
+    ASSERT_EQ(parsedServerStatus.getActiveCollections(), 1);
+    ASSERT_EQ(parsedServerStatus.getTotalCollections(), 1);
+    ASSERT_EQ(parsedServerStatus.getTotalSampledReadsCount(), 0);
+    ASSERT_EQ(parsedServerStatus.getTotalSampledWritesCount(), 0);
+    if (testMongod) {
+        ASSERT_EQ(*parsedServerStatus.getTotalSampledReadsBytes(), 0L);
+        ASSERT_EQ(*parsedServerStatus.getTotalSampledWritesBytes(), 0L);
+    }
+
+    // Add second configuration and refresh.
+    std::vector<CollectionQueryAnalyzerConfiguration> configurationsV2;
+    configurationsV2.emplace_back(nss0, collUuid0, sampleRate0);
+    configurationsV2.emplace_back(nss1, collUuid1, sampleRate1Before);
+    sampleCounters.refreshConfigurations(configurationsV2);
+
+    // Verify currentOp, two configurations.
+    ops.clear();
+    sampleCounters.reportForCurrentOp(&ops);
+    ASSERT_EQ(2, ops.size());
+    parsedOp = CollectionSampleCountersCurrentOp::parse(
+        IDLParserContext("QueryAnalysisSampleCountersTest.RefreshConfigIncrementAndReport_TEST"),
+        ops[0]);
+    ASSERT_EQ(parsedOp.getDesc(), kCurrentOpDescFieldValue);
+    ASSERT_EQ(parsedOp.getNs(), nss0);
+    ASSERT_EQ(parsedOp.getCollUuid(), collUuid0);
+    if (testMongos) {
+        ASSERT_EQ(parsedOp.getSampleRate(), sampleRate0);
+    }
+    ASSERT_EQ(parsedOp.getSampledReadsCount(), 0);
+    ASSERT_EQ(parsedOp.getSampledWritesCount(), 0);
+    if (testMongod) {
+        ASSERT_EQ(*(parsedOp.getSampledReadsBytes()), 0L);
+        ASSERT_EQ(*(parsedOp.getSampledWritesBytes()), 0L);
+    }
+    parsedOp = CollectionSampleCountersCurrentOp::parse(
+        IDLParserContext("QueryAnalysisSampleCountersTest.RefreshConfigIncrementAndReport_TEST"),
+        ops[1]);
+    ASSERT_EQ(parsedOp.getNs(), nss1);
+    ASSERT_EQ(parsedOp.getCollUuid(), collUuid1);
+    if (testMongos) {
+        ASSERT_EQ(parsedOp.getSampleRate(), sampleRate1Before);
+    }
+    ASSERT_EQ(parsedOp.getSampledReadsCount(), 0);
+    ASSERT_EQ(parsedOp.getSampledWritesCount(), 0);
+    if (testMongod) {
+        ASSERT_EQ(*(parsedOp.getSampledReadsBytes()), 0L);
+        ASSERT_EQ(*(parsedOp.getSampledWritesBytes()), 0L);
+    }
+
+    // Verify server status, two configurations.
+    serverStatus = sampleCounters.reportForServerStatus();
+    parsedServerStatus = QueryAnalysisServerStatus::parse(
+        IDLParserContext("QueryAnalysisSampleCountersTest.RefreshConfigIncrementAndReport_TEST"),
+        serverStatus);
+    ASSERT_EQ(parsedServerStatus.getActiveCollections(), 2);
+    ASSERT_EQ(parsedServerStatus.getTotalCollections(), 2);
+    ASSERT_EQ(parsedServerStatus.getTotalSampledReadsCount(), 0);
+    ASSERT_EQ(parsedServerStatus.getTotalSampledWritesCount(), 0);
+    if (testMongod) {
+        ASSERT_EQ(*parsedServerStatus.getTotalSampledReadsBytes(), 0L);
+        ASSERT_EQ(*parsedServerStatus.getTotalSampledWritesBytes(), 0L);
+    }
+
+    // Modify second configuration and refresh.
+    std::vector<CollectionQueryAnalyzerConfiguration> configurationsV3;
+    configurationsV3.emplace_back(nss0, collUuid0, sampleRate0);
+    configurationsV3.emplace_back(nss1, collUuid1, sampleRate1After);
+    sampleCounters.refreshConfigurations(configurationsV3);
+
+    // Increment read and write counters.
+    if (testMongos) {
+        sampleCounters.incrementReads(nss0, collUuid0);
+        sampleCounters.incrementWrites(nss0, collUuid0);
+        sampleCounters.incrementReads(nss1, collUuid1);
+        sampleCounters.incrementReads(nss1, collUuid1);
+        sampleCounters.incrementWrites(nss1, collUuid1);
+    }
+    if (testMongod) {
+        sampleCounters.incrementReads(nss0, collUuid0, sampledQueryDocSizeBytes);
+        sampleCounters.incrementWrites(nss0, collUuid0, sampledQueryDocSizeBytes);
+        sampleCounters.incrementReads(nss1, collUuid1, sampledQueryDocSizeBytes);
+        sampleCounters.incrementReads(nss1, collUuid1, sampledQueryDocSizeBytes);
+        sampleCounters.incrementWrites(nss1, collUuid1, sampledQueryDocSizeBytes);
+    }
+
+    // Verify currentOp, two configurations, updated sample rate.
+    ops.clear();
+    sampleCounters.reportForCurrentOp(&ops);
+    ASSERT_EQ(2, ops.size());
+    parsedOp = CollectionSampleCountersCurrentOp::parse(
+        IDLParserContext("QueryAnalysisSampleCountersTest.RefreshConfigIncrementAndReport_TEST"),
+        ops[0]);
+    ASSERT_EQ(parsedOp.getNs(), nss0);
+    ASSERT_EQ(parsedOp.getCollUuid(), collUuid0);
+    if (testMongos) {
+        ASSERT_EQ(parsedOp.getSampleRate(), sampleRate0);
+    }
+    ASSERT_EQ(parsedOp.getSampledReadsCount(), 1);
+    ASSERT_EQ(parsedOp.getSampledWritesCount(), 1);
+    if (testMongod) {
+        ASSERT_EQ(*(parsedOp.getSampledReadsBytes()), sampledQueryDocSizeBytes);
+        ASSERT_EQ(*(parsedOp.getSampledWritesBytes()), sampledQueryDocSizeBytes);
+    }
+    parsedOp = CollectionSampleCountersCurrentOp::parse(
+        IDLParserContext("QueryAnalysisSampleCountersTest.RefreshConfigIncrementAndReport_TEST"),
+        ops[1]);
+    ASSERT_EQ(parsedOp.getNs(), nss1);
+    ASSERT_EQ(parsedOp.getCollUuid(), collUuid1);
+    if (testMongos) {
+        ASSERT_EQ(parsedOp.getSampleRate(), sampleRate1After);
+    }
+    ASSERT_EQ(parsedOp.getSampledReadsCount(), 2);
+    ASSERT_EQ(parsedOp.getSampledWritesCount(), 1);
+    if (testMongod) {
+        ASSERT_EQ(*(parsedOp.getSampledReadsBytes()), 2 * sampledQueryDocSizeBytes);
+        ASSERT_EQ(*(parsedOp.getSampledWritesBytes()), sampledQueryDocSizeBytes);
+    }
+
+    // Verify server status, two configurations.
+    serverStatus = sampleCounters.reportForServerStatus();
+    parsedServerStatus = QueryAnalysisServerStatus::parse(
+        IDLParserContext("QueryAnalysisSampleCountersTest.RefreshConfigIncrementAndReport_TEST"),
+        serverStatus);
+    ASSERT_EQ(parsedServerStatus.getActiveCollections(), 2);
+    ASSERT_EQ(parsedServerStatus.getTotalCollections(), 2);
+    ASSERT_EQ(parsedServerStatus.getTotalSampledReadsCount(), 3);
+    ASSERT_EQ(parsedServerStatus.getTotalSampledWritesCount(), 2);
+    if (testMongod) {
+        ASSERT_EQ(*parsedServerStatus.getTotalSampledReadsBytes(), 3 * sampledQueryDocSizeBytes);
+        ASSERT_EQ(*parsedServerStatus.getTotalSampledWritesBytes(), 2 * sampledQueryDocSizeBytes);
+    }
+
+    // Second configuration becomes inactive.
+    std::vector<CollectionQueryAnalyzerConfiguration> configurationsV4;
+    configurationsV4.emplace_back(nss0, collUuid0, sampleRate0);
+    sampleCounters.refreshConfigurations(configurationsV4);
+
+    // Verify currentOp, one remaining configuration.
+    ops.clear();
+    sampleCounters.reportForCurrentOp(&ops);
+    ASSERT_EQ(1, ops.size());
+    parsedOp = CollectionSampleCountersCurrentOp::parse(
+        IDLParserContext("QueryAnalysisSampleCountersTest.RefreshConfigIncrementAndReport_TEST"),
+        ops[0]);
+    ASSERT_EQ(parsedOp.getNs(), nss0);
+    ASSERT_EQ(parsedOp.getCollUuid(), collUuid0);
+    if (testMongos) {
+        ASSERT_EQ(parsedOp.getSampleRate(), sampleRate0);
+    }
+    ASSERT_EQ(parsedOp.getSampledReadsCount(), 1);
+    ASSERT_EQ(parsedOp.getSampledWritesCount(), 1);
+    if (testMongod) {
+        ASSERT_EQ(*(parsedOp.getSampledReadsBytes()), sampledQueryDocSizeBytes);
+        ASSERT_EQ(*(parsedOp.getSampledWritesBytes()), sampledQueryDocSizeBytes);
+    }
+
+    // Verify server status, one remaining configuration.
+    serverStatus = sampleCounters.reportForServerStatus();
+    parsedServerStatus = QueryAnalysisServerStatus::parse(
+        IDLParserContext("QueryAnalysisSampleCountersTest.RefreshConfigIncrementAndReport_TEST"),
+        serverStatus);
+    ASSERT_EQ(parsedServerStatus.getActiveCollections(), 1);
+    ASSERT_EQ(parsedServerStatus.getTotalCollections(), 2);
+    ASSERT_EQ(parsedServerStatus.getTotalSampledReadsCount(), 3);
+    ASSERT_EQ(parsedServerStatus.getTotalSampledWritesCount(), 2);
+    if (testMongod) {
+        ASSERT_EQ(*parsedServerStatus.getTotalSampledReadsBytes(), 3 * sampledQueryDocSizeBytes);
+        ASSERT_EQ(*parsedServerStatus.getTotalSampledWritesBytes(), 2 * sampledQueryDocSizeBytes);
+    }
+
+    // Second configuration becomes active again
+    std::vector<CollectionQueryAnalyzerConfiguration> configurationsV5;
+    configurationsV5.emplace_back(nss0, collUuid0, sampleRate0);
+    configurationsV5.emplace_back(nss1, collUuid1, sampleRate1After);
+    sampleCounters.refreshConfigurations(configurationsV5);
+
+    // Verify currentOp, two configurations, updated sample rate.
+    ops.clear();
+    sampleCounters.reportForCurrentOp(&ops);
+    ASSERT_EQ(2, ops.size());
+    parsedOp = CollectionSampleCountersCurrentOp::parse(
+        IDLParserContext("QueryAnalysisSampleCountersTest.RefreshConfigIncrementAndReport_TEST"),
+        ops[0]);
+    ASSERT_EQ(parsedOp.getDesc(), kCurrentOpDescFieldValue);
+    ASSERT_EQ(parsedOp.getNs(), nss0);
+    ASSERT_EQ(parsedOp.getCollUuid(), collUuid0);
+    if (testMongos) {
+        ASSERT_EQ(parsedOp.getSampleRate(), sampleRate0);
+    }
+    ASSERT_EQ(parsedOp.getSampledReadsCount(), 1);
+    ASSERT_EQ(parsedOp.getSampledWritesCount(), 1);
+    if (testMongod) {
+        ASSERT_EQ(parsedOp.getSampledReadsBytes(), sampledQueryDocSizeBytes);
+        ASSERT_EQ(parsedOp.getSampledWritesBytes(), sampledQueryDocSizeBytes);
+    }
+    parsedOp = CollectionSampleCountersCurrentOp::parse(
+        IDLParserContext("QueryAnalysisSampleCountersTest.RefreshConfigIncrementAndReport_TEST"),
+        ops[1]);
+    ASSERT_EQ(parsedOp.getDesc(), kCurrentOpDescFieldValue);
+    ASSERT_EQ(parsedOp.getNs(), nss1);
+    ASSERT_EQ(parsedOp.getCollUuid(), collUuid1);
+    if (testMongos) {
+        ASSERT_EQ(parsedOp.getSampleRate(), sampleRate1After);
+    }
+    ASSERT_EQ(parsedOp.getSampledReadsCount(), 0);
+    ASSERT_EQ(parsedOp.getSampledWritesCount(), 0);
+    if (testMongod) {
+        ASSERT_EQ(*(parsedOp.getSampledReadsBytes()), 0L);
+        ASSERT_EQ(*(parsedOp.getSampledWritesBytes()), 0L);
+    }
+
+    // Verify server status, two configurations.
+    serverStatus = sampleCounters.reportForServerStatus();
+    parsedServerStatus = QueryAnalysisServerStatus::parse(
+        IDLParserContext("QueryAnalysisSampleCountersTest.RefreshConfigIncrementAndReport_TEST"),
+        serverStatus);
+    ASSERT_EQ(parsedServerStatus.getActiveCollections(), 2);
+    ASSERT_EQ(parsedServerStatus.getTotalCollections(), 2);
+    ASSERT_EQ(parsedServerStatus.getTotalSampledReadsCount(), 3);
+    ASSERT_EQ(parsedServerStatus.getTotalSampledWritesCount(), 2);
+    if (testMongod) {
+        ASSERT_EQ(*parsedServerStatus.getTotalSampledReadsBytes(), 3 * sampledQueryDocSizeBytes);
+        ASSERT_EQ(*parsedServerStatus.getTotalSampledWritesBytes(), 2 * sampledQueryDocSizeBytes);
+    }
+}
+
+TEST_F(QueryAnalysisSampleCountersTest, RefreshConfigIncrementAndReportMongos) {
+    testRefreshConfigIncrementAndReport(true);
+}
+
+TEST_F(QueryAnalysisSampleCountersTest, RefreshConfigIncrementAndReportMongod) {
+    testRefreshConfigIncrementAndReport(false);
 }
 
 }  // namespace

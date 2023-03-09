@@ -724,8 +724,8 @@ TEST_F(QueryAnalysisCoordinatorTest, GetNewConfigurationsMultipleSamplersBasic) 
     // Query distribution after: [1.5, 0].
     configurations1 =
         coordinator->getNewConfigurationsForSampler(operationContext(), mongosName1, 0);
-    // The weight for this mongos is 0 so no configurations should be returned.
-    ASSERT(configurations1.empty());
+    assertContainsConfiguration(
+        configurations1, analyzerDoc0.getNs(), analyzerDoc0.getCollectionUuid(), 0.0);
 
     // Query distribution after: [0, 0].
     configurations0 =

@@ -148,7 +148,11 @@ const collUuid1 = getCollectionUuid(collName1);
             name: st.s1.host,
             numQueriesExecutedPerSecond: 0
         }));
-        assert.eq(res1.configurations.length, 0);
+        assert.eq(res1.configurations.length, 2);
+        assert.sameMembers(res1.configurations, [
+            {ns: ns0, collectionUuid: collUuid0, sampleRate: 0},
+            {ns: ns1, collectionUuid: collUuid1, sampleRate: 0},
+        ]);
 
         assert.commandWorked(st.s0.adminCommand({configureQueryAnalyzer: ns1, mode: "off"}));
 
