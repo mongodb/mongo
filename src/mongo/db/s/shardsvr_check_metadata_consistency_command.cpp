@@ -31,8 +31,10 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/ddl_lock_manager.h"
 #include "mongo/db/s/metadata_consistency_util.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
@@ -40,7 +42,7 @@
 #include "mongo/s/query/establish_cursors.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 
 namespace mongo {
@@ -118,12 +120,24 @@ public:
             // primary db shard directly from configsvr.
             for (const auto& db : databases) {
                 if (db.getPrimary() == shardId) {
-                    auto dbCursors = _establishCursorOnParticipants(
-                        opCtx, NamespaceString(db.getName(), nss.coll()));
-
-                    cursors.insert(cursors.end(),
-                                   std::make_move_iterator(dbCursors.begin()),
-                                   std::make_move_iterator(dbCursors.end()));
+                    const NamespaceString dbNss{db.getName(), nss.coll()};
+                    ScopedSetShardRole scopedSetShardRole(opCtx,
+                                                          dbNss,
+                                                          boost::none /* shardVersion */,
+                                                          db.getVersion() /* databaseVersion */);
+                    try {
+                        auto dbCursors = _establishCursorOnParticipants(opCtx, dbNss);
+                        cursors.insert(cursors.end(),
+                                       std::make_move_iterator(dbCursors.begin()),
+                                       std::make_move_iterator(dbCursors.end()));
+                    } catch (const ExceptionFor<ErrorCodes::StaleDbVersion>& ex) {
+                        LOGV2_DEBUG(7328700,
+                                    1,
+                                    "Skipping database metadata check since the database is "
+                                    "currently being migrated",
+                                    logAttrs(dbNss.dbName()),
+                                    "error"_attr = redact(ex));
+                    }
                 }
             }
 
@@ -162,10 +176,12 @@ public:
             requests.emplace_back(ShardId::kConfigServerId, configRequest.toBSON({}));
 
             // Take a DDL lock on the database
-            static constexpr StringData lockReason{"checkMetadataConsistency"_sd};
+            static constexpr StringData kLockReason{"checkMetadataConsistency"_sd};
             auto ddlLockManager = DDLLockManager::get(opCtx);
             const auto dbDDLLock = ddlLockManager->lock(
-                opCtx, nss.db(), lockReason, DDLLockManager::kDefaultLockTimeout);
+                opCtx, nss.db(), kLockReason, DDLLockManager::kDefaultLockTimeout);
+
+            DatabaseShardingState::assertIsPrimaryShardForDb(opCtx, nss.dbName());
 
             return establishCursors(opCtx,
                                     Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),

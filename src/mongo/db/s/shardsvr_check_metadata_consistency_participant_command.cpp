@@ -96,6 +96,9 @@ public:
             std::sort(localNssCollections.begin(), localNssCollections.end());
             std::vector<CollectionPtr> localCollection;
             for (const auto& localNss : localNssCollections) {
+                if (!localNss.isNormalCollection()) {
+                    continue;
+                }
                 localCollection.push_back(
                     CollectionPtr(collectionCatalog->lookupCollectionByNamespace(opCtx, localNss)));
             }

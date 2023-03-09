@@ -89,7 +89,7 @@ public:
                 case MetadataConsistencyCommandLevelEnum::kDatabaseLevel:
                     return _runDatabaseLevel(opCtx, nss);
                 case MetadataConsistencyCommandLevelEnum::kCollectionLevel:
-                    return _runCollectionLevel(nss);
+                    return _runCollectionLevel(opCtx, nss);
                 default:
                     MONGO_UNREACHABLE;
             }
@@ -107,34 +107,15 @@ public:
             // corresponding primary databases.
             const auto databases =
                 catalogClient->getAllDBs(opCtx, repl::ReadConcernLevel::kMajorityReadConcern);
-            return _sendCommandToDbPrimaries(opCtx, nss, databases);
-        }
-
-        Response _runDatabaseLevel(OperationContext* opCtx, const NamespaceString& nss) {
-            const auto catalogClient = Grid::get(opCtx)->catalogClient();
-            const auto dbInfo = catalogClient->getDatabase(
-                opCtx, nss.db(), repl::ReadConcernLevel::kMajorityReadConcern);
-            return _sendCommandToDbPrimaries(opCtx, nss, {dbInfo});
-        }
-
-        Response _runCollectionLevel(const NamespaceString& nss) {
-            uasserted(ErrorCodes::NotImplemented,
-                      "collection level mode command is not implemented");
-        }
-
-        Response _sendCommandToDbPrimaries(OperationContext* opCtx,
-                                           const NamespaceString& nss,
-                                           const std::vector<DatabaseType>& dbs) {
-            const auto& cursorOpts = request().getCursor();
 
             std::vector<std::pair<ShardId, BSONObj>> requests;
             ShardsvrCheckMetadataConsistency shardsvrRequest{nss};
             shardsvrRequest.setDbName(nss.db());
-            shardsvrRequest.setCursor(cursorOpts);
+            shardsvrRequest.setCursor(request().getCursor());
 
             // Send a unique request per shard that is a primary shard for, at least, one database.
             std::set<ShardId> shardIds;
-            for (const auto& db : dbs) {
+            for (const auto& db : databases) {
                 const auto insertionRes = shardIds.insert(db.getPrimary());
                 if (insertionRes.second) {
                     // The shard was not in the set, so we need to send a request to it.
@@ -143,12 +124,45 @@ public:
             }
 
             // Send a request to the configsvr to check cluster metadata consistency.
-            if (getCommandLevel(nss) == MetadataConsistencyCommandLevelEnum::kClusterLevel) {
-                ConfigsvrCheckClusterMetadataConsistency configsvrRequest(nss);
-                configsvrRequest.setDbName(nss.db());
-                configsvrRequest.setCursor(cursorOpts);
-                requests.emplace_back(ShardId::kConfigServerId, configsvrRequest.toBSON({}));
-            }
+            ConfigsvrCheckClusterMetadataConsistency configsvrRequest{nss};
+            configsvrRequest.setDbName(nss.db());
+            configsvrRequest.setCursor(request().getCursor());
+            requests.emplace_back(ShardId::kConfigServerId, configsvrRequest.toBSON({}));
+
+            auto ccc = _establishCursors(opCtx, nss, requests);
+            return _createInitialCursorReply(opCtx, nss, std::move(ccc));
+        }
+
+        Response _runDatabaseLevel(OperationContext* opCtx, const NamespaceString& nss) {
+            auto ccc = _establishCursorOnDbPrimary(opCtx, nss);
+            return _createInitialCursorReply(opCtx, nss, std::move(ccc));
+        }
+
+        Response _runCollectionLevel(OperationContext* opCtx, const NamespaceString& nss) {
+            auto ccc = _establishCursorOnDbPrimary(opCtx, nss);
+            return _createInitialCursorReply(opCtx, nss, std::move(ccc));
+        }
+
+        ClusterClientCursorGuard _establishCursorOnDbPrimary(OperationContext* opCtx,
+                                                             const NamespaceString& nss) {
+            const CachedDatabaseInfo dbInfo =
+                uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(
+                    opCtx, nss.dbName().toStringWithTenantId()));
+
+            ShardsvrCheckMetadataConsistency shardsvrRequest{nss};
+            shardsvrRequest.setDbName(nss.dbName());
+            shardsvrRequest.setCursor(request().getCursor());
+            // Attach db and shard version;
+            auto cmdObj = appendDbVersionIfPresent(shardsvrRequest.toBSON({}), dbInfo);
+            if (!dbInfo->getVersion().isFixed())
+                cmdObj = appendShardVersion(std::move(cmdObj), ShardVersion::UNSHARDED());
+            return _establishCursors(opCtx, nss, {{dbInfo->getPrimary(), std::move(cmdObj)}});
+        }
+
+        ClusterClientCursorGuard _establishCursors(
+            OperationContext* opCtx,
+            const NamespaceString& nss,
+            const std::vector<std::pair<ShardId, BSONObj>>& requests) {
 
             ClusterClientCursorParams params(
                 nss,
@@ -164,21 +178,20 @@ public:
                 requests,
                 false /*allowPartialResults*/);
 
-            // Determine whether the cursor we may eventually register will be single- or
-            // multi-target.
-            const auto cursorType = params.remotes.size() > 1
-                ? ClusterCursorManager::CursorType::MultiTarget
-                : ClusterCursorManager::CursorType::SingleTarget;
-
             // Transfer the established cursors to a ClusterClientCursor.
-            auto ccc = ClusterClientCursorImpl::make(
+            return ClusterClientCursorImpl::make(
                 opCtx,
                 Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
                 std::move(params));
+        }
 
+        Response _createInitialCursorReply(OperationContext* opCtx,
+                                           const NamespaceString& nss,
+                                           ClusterClientCursorGuard&& ccc) {
             auto cursorState = ClusterCursorManager::CursorState::NotExhausted;
             size_t bytesBuffered = 0;
             std::vector<BSONObj> firstBatch;
+            const auto& cursorOpts = request().getCursor();
             const auto batchSize = [&] {
                 if (cursorOpts && cursorOpts->getBatchSize()) {
                     return (long long)*cursorOpts->getBatchSize();
@@ -224,6 +237,12 @@ public:
 
             auto authUser =
                 AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserName();
+
+            // Determine whether the cursor we may eventually register will be single- or
+            // multi-target.
+            const auto cursorType = ccc->getNumRemotes() > 1
+                ? ClusterCursorManager::CursorType::MultiTarget
+                : ClusterCursorManager::CursorType::SingleTarget;
 
             // Register the cursor with the cursor manager for subsequent getMore's.
             auto clusterCursorId =
