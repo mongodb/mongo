@@ -161,6 +161,11 @@ private:
     virtual ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                           const CancellationToken& token) noexcept = 0;
 
+    virtual ExecutorFuture<void> _cleanupOnAbort(
+        std::shared_ptr<executor::ScopedTaskExecutor> executor,
+        const CancellationToken& token,
+        const Status& status) noexcept;
+
     void interrupt(Status status) override final;
 
     bool _removeDocument(OperationContext* opCtx);
@@ -173,6 +178,8 @@ private:
                                            StringData resource);
     ExecutorFuture<void> _translateTimeseriesNss(
         std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token);
+
+    virtual boost::optional<Status> getAbortReason() const;
 
     Mutex _mutex = MONGO_MAKE_LATCH("ShardingDDLCoordinator::_mutex");
     SharedPromise<void> _constructionCompletionPromise;
@@ -400,6 +407,37 @@ protected:
         osi.setSessionId(optSession->getLsid());
         osi.setTxnNumber(optSession->getTxnNumber());
         return osi;
+    }
+
+    virtual boost::optional<Status> getAbortReason() const override {
+        const auto& status = _doc.getAbortReason();
+        invariant(!status || !status->isOK(), "when persisted, status must be an error");
+        return status;
+    }
+
+    /**
+     * Persists the abort reason and throws it as an exception. This causes the coordinator to fail,
+     * and triggers the cleanup future chain since there is a the persisted reason.
+     */
+    void triggerCleanup(OperationContext* opCtx, const Status& status) {
+        LOGV2_INFO(7418502,
+                   "Coordinator failed, persisting abort reason",
+                   "coordinatorId"_attr = _doc.getId(),
+                   "phase"_attr = serializePhase(_doc.getPhase()),
+                   "reason"_attr = redact(status));
+
+        auto newDoc = [&] {
+            stdx::lock_guard lk{_docMutex};
+            return _doc;
+        }();
+
+        auto coordinatorMetadata = newDoc.getShardingDDLCoordinatorMetadata();
+        coordinatorMetadata.setAbortReason(status);
+        newDoc.setShardingDDLCoordinatorMetadata(std::move(coordinatorMetadata));
+
+        _updateStateDocument(opCtx, std::move(newDoc));
+
+        uassertStatusOK(status);
     }
 };
 

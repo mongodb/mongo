@@ -226,6 +226,17 @@ ExecutorFuture<void> ShardingDDLCoordinator::_acquireLockAsync(
         .on(**executor, token);
 }
 
+ExecutorFuture<void> ShardingDDLCoordinator::_cleanupOnAbort(
+    std::shared_ptr<executor::ScopedTaskExecutor> executor,
+    const CancellationToken& token,
+    const Status& status) noexcept {
+    return ExecutorFuture<void>(**executor);
+}
+
+boost::optional<Status> ShardingDDLCoordinator::getAbortReason() const {
+    return boost::none;
+}
+
 void ShardingDDLCoordinator::interrupt(Status status) {
     LOGV2_DEBUG(5390535,
                 1,
@@ -348,17 +359,25 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
             return status;
         })
         .then([this, executor, token, anchor = shared_from_this()] {
-            return AsyncTry([this, executor, token] { return _runImpl(executor, token); })
+            return AsyncTry([this, executor, token] {
+                       if (const auto& status = getAbortReason()) {
+                           return _cleanupOnAbort(executor, token, *status);
+                       }
+
+                       return _runImpl(executor, token);
+                   })
                 .until([this, token](Status status) {
                     // Retry until either:
                     //  - The coordinator succeed
                     //  - The coordinator failed with non-retryable error determined by the
                     //  coordinator, or an already known retryable error
+                    //  - Cleanup is not planned
                     //
                     //  If the token is not cancelled we retry because it could have been generated
                     //  by a remote node.
                     if (!status.isOK() && !_completeOnError &&
-                        (_mustAlwaysMakeProgress() || _isRetriableErrorForDDLCoordinator(status)) &&
+                        (getAbortReason() || _mustAlwaysMakeProgress() ||
+                         _isRetriableErrorForDDLCoordinator(status)) &&
                         !token.isCanceled()) {
                         LOGV2_INFO(5656000,
                                    "Re-executing sharding DDL coordinator",
@@ -383,7 +402,8 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
                       status.isA<ErrorCategory::ShutdownError>()) ||
                     token.isCanceled() || _completeOnError);
 
-            auto completionStatus = status;
+            auto completionStatus =
+                !status.isOK() ? status : getAbortReason().get_value_or(Status::OK());
 
             bool isSteppingDown = token.isCanceled();
 

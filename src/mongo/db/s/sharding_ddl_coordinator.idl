@@ -32,6 +32,7 @@ global:
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/db/s/forwardable_operation_metadata.h"
+        - "mongo/db/s/sharding_ddl_util.h"
         - "mongo/s/database_version.h"
 
 imports:
@@ -75,12 +76,20 @@ types:
         bson_serialization_type: object
         serializer: "mongo::ForwardableOperationMetadata::toBSON"
         deserializer: "mongo::ForwardableOperationMetadata"
+
     DatabaseVersion:
         description: ""
         cpp_type: DatabaseVersion
         bson_serialization_type: object
         serializer: "mongo::DatabaseVersion::toBSON"
         deserializer: "mongo::DatabaseVersion"
+
+    ErrorStatus:
+        bson_serialization_type: any
+        description: "Status representing an error state"
+        cpp_type: "::mongo::Status"
+        serializer: "::mongo::sharding_ddl_util_serializeErrorStatusToBSON"
+        deserializer: "::mongo::sharding_ddl_util_deserializeErrorStatusFromBSON"
 
 structs:
     ShardingDDLCoordinatorId:
@@ -128,4 +137,8 @@ structs:
             bucketNss:
                 description: "In case of sharded timeseries this variable will hold the underlying bucket namespace"
                 type: namespacestring
+                optional: true
+            abortReason:
+                description: "Error triggering the cleanup pipeline"
+                type: ErrorStatus
                 optional: true

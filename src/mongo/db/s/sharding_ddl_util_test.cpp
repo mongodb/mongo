@@ -103,6 +103,98 @@ void findN(DBClientBase& client,
     }
 }
 
+TEST_F(ShardingDDLUtilTest, SerializeDeserializeErrorStatusWithoutExtraInfo) {
+    const Status sample{ErrorCodes::ForTestingOptionalErrorExtraInfo, "Dummy reason"};
+
+    BSONObjBuilder bsonBuilder;
+    sharding_ddl_util_serializeErrorStatusToBSON(sample, "status", &bsonBuilder);
+    const auto serialized = bsonBuilder.done();
+
+    const auto deserialized =
+        sharding_ddl_util_deserializeErrorStatusFromBSON(serialized.firstElement());
+
+    ASSERT_EQ(sample.code(), deserialized.code());
+    ASSERT_EQ(sample.reason(), deserialized.reason());
+    ASSERT(!deserialized.extraInfo());
+}
+
+TEST_F(ShardingDDLUtilTest, SerializeDeserializeErrorStatusWithExtraInfo) {
+    OptionalErrorExtraInfoExample::EnableParserForTest whenInScope;
+
+    const Status sample{
+        ErrorCodes::ForTestingOptionalErrorExtraInfo, "Dummy reason", fromjson("{data: 123}")};
+
+    BSONObjBuilder bsonBuilder;
+    sharding_ddl_util_serializeErrorStatusToBSON(sample, "status", &bsonBuilder);
+    const auto serialized = bsonBuilder.done();
+
+    const auto deserialized =
+        sharding_ddl_util_deserializeErrorStatusFromBSON(serialized.firstElement());
+
+    ASSERT_EQ(sample.code(), deserialized.code());
+    ASSERT_EQ(sample.reason(), deserialized.reason());
+    ASSERT(deserialized.extraInfo());
+    ASSERT(deserialized.extraInfo<OptionalErrorExtraInfoExample>());
+    ASSERT_EQ(deserialized.extraInfo<OptionalErrorExtraInfoExample>()->data, 123);
+}
+
+TEST_F(ShardingDDLUtilTest, SerializeDeserializeErrorStatusInvalid) {
+    BSONObjBuilder bsonBuilder;
+    ASSERT_THROWS_CODE(
+        sharding_ddl_util_serializeErrorStatusToBSON(Status::OK(), "status", &bsonBuilder),
+        DBException,
+        7418500);
+
+    const auto okStatusBSON =
+        BSON("status" << BSON("code" << ErrorCodes::OK << "codeName"
+                                     << ErrorCodes::errorString(ErrorCodes::OK)));
+    ASSERT_THROWS_CODE(
+        sharding_ddl_util_deserializeErrorStatusFromBSON(okStatusBSON.firstElement()),
+        DBException,
+        7418501);
+}
+
+TEST_F(ShardingDDLUtilTest, SerializeErrorStatusTooBig) {
+    const std::string longReason(1024 * 3, 'x');
+    const Status sample{ErrorCodes::ForTestingOptionalErrorExtraInfo, longReason};
+
+    BSONObjBuilder bsonBuilder;
+    sharding_ddl_util_serializeErrorStatusToBSON(sample, "status", &bsonBuilder);
+    const auto serialized = bsonBuilder.done();
+
+    const auto deserialized =
+        sharding_ddl_util_deserializeErrorStatusFromBSON(serialized.firstElement());
+
+    ASSERT_EQ(ErrorCodes::TruncatedSerialization, deserialized.code());
+    ASSERT_EQ(
+        "ForTestingOptionalErrorExtraInfo: "
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        deserialized.reason());
+    ASSERT(!deserialized.extraInfo());
+}
+
 // Test that config.collection document and config.chunks documents are properly updated from source
 // to destination collection metadata
 TEST_F(ShardingDDLUtilTest, ShardedRenameMetadata) {

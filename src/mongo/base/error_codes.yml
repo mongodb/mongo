@@ -506,7 +506,7 @@ error_codes:
     - {code: 386, name: DuplicateKeyId}
 
     - {code: 387, name: EncounteredFLEPayloadWhileRedacting}
-    
+
     - {code: 388, name: TransactionTooLargeForCache}
     - {code: 389, name: LibmongocryptError}
 
@@ -516,6 +516,9 @@ error_codes:
     - {code: 393, name: InvalidTenantId}
 
     - {code: 394, name: MovePrimaryRecipientDocNotFound, categories: [InternalOnly]}
+
+    - {code: 395, name: TruncatedSerialization}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)

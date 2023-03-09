@@ -40,6 +40,14 @@
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 
 namespace mongo {
+
+// TODO (SERVER-74481): Define these functions in the nested `sharding_ddl_util` namespace when the
+// IDL compiler will support the use case.
+void sharding_ddl_util_serializeErrorStatusToBSON(const Status& status,
+                                                  StringData fieldName,
+                                                  BSONObjBuilder* bsonBuilder);
+Status sharding_ddl_util_deserializeErrorStatusFromBSON(const BSONElement& bsonElem);
+
 namespace sharding_ddl_util {
 
 /**

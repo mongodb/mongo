@@ -30,6 +30,7 @@
 
 #include "mongo/db/s/sharding_ddl_util.h"
 
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/cluster_transaction_api.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
@@ -66,6 +67,44 @@
 
 
 namespace mongo {
+
+static const size_t kSerializedErrorStatusMaxSize = 1024 * 2;
+
+void sharding_ddl_util_serializeErrorStatusToBSON(const Status& status,
+                                                  StringData fieldName,
+                                                  BSONObjBuilder* bsonBuilder) {
+    uassert(7418500, "Status must be an error", !status.isOK());
+
+    BSONObjBuilder tmpBuilder;
+    status.serialize(&tmpBuilder);
+
+    if (status != ErrorCodes::TruncatedSerialization &&
+        (size_t)tmpBuilder.asTempObj().objsize() > kSerializedErrorStatusMaxSize) {
+        const auto statusStr = status.toString();
+        const auto truncatedStatusStr =
+            str::UTF8SafeTruncation(statusStr, kSerializedErrorStatusMaxSize);
+        const Status truncatedStatus{ErrorCodes::TruncatedSerialization, truncatedStatusStr};
+
+        tmpBuilder.resetToEmpty();
+        truncatedStatus.serializeErrorToBSON(&tmpBuilder);
+    }
+
+    bsonBuilder->append(fieldName, tmpBuilder.obj());
+}
+
+Status sharding_ddl_util_deserializeErrorStatusFromBSON(const BSONElement& bsonElem) {
+    const auto& bsonObj = bsonElem.Obj();
+
+    long long code;
+    uassertStatusOK(bsonExtractIntegerField(bsonObj, "code", &code));
+    uassert(7418501, "Status must be an error", code != ErrorCodes::OK);
+
+    std::string errmsg;
+    uassertStatusOK(bsonExtractStringField(bsonObj, "errmsg", &errmsg));
+
+    return {ErrorCodes::Error(code), errmsg, bsonObj};
+}
+
 namespace sharding_ddl_util {
 namespace {
 
@@ -872,5 +911,6 @@ BSONObj getCriticalSectionReasonForRename(const NamespaceString& from, const Nam
                 << "rename"
                 << "from" << from.toString() << "to" << to.toString());
 }
+
 }  // namespace sharding_ddl_util
 }  // namespace mongo
