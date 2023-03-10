@@ -729,6 +729,9 @@ public:
                 collectTelemetryMongod(opCtx, pinnedCursor);
             } else {
                 endQueryOp(opCtx, collection, *exec, numResults, cursorId);
+                // We want to destroy executor as soon as possible to release any resources locks it
+                // may hold.
+                exec.reset();
                 collectTelemetryMongod(opCtx);
             }
 
