@@ -877,7 +877,7 @@ public:
     ESCDerivedFromDataTokenAndContentionFactorToken esc;
 };
 
-
+// TODO: SERVER-73303 delete when v2 is enabled by default
 struct ECOCCompactionDocument {
 
     bool operator==(const ECOCCompactionDocument& other) const {
@@ -895,13 +895,27 @@ struct ECOCCompactionDocument {
     ECCDerivedFromDataTokenAndContentionFactorToken ecc;
 };
 
+struct ECOCCompactionDocumentV2 {
+    bool operator==(const ECOCCompactionDocumentV2& other) const {
+        return (fieldName == other.fieldName) && (esc == other.esc);
+    }
+
+    template <typename H>
+    friend H AbslHashValue(H h, const ECOCCompactionDocumentV2& doc) {
+        return H::combine(std::move(h), doc.fieldName, doc.esc);
+    }
+
+    // Id is not included as it unimportant
+    std::string fieldName;
+    ESCDerivedFromDataTokenAndContentionFactorToken esc;
+};
+
 /**
  * ECOC Collection schema
  * {
  *    _id : ObjectId() -- omitted so MongoDB can auto choose it
  *    fieldName : String,S
- *    value : Encrypt(ECOCToken, ESCDerivedFromDataTokenAndContentionFactorToken ||
- * ECCDerivedFromDataTokenAndContentionFactorToken)
+ *    value : Encrypt(ECOCToken, ESCDerivedFromDataTokenAndContentionFactorToken)
  * }
  *
  * where
@@ -915,7 +929,10 @@ class ECOCCollection {
 public:
     static BSONObj generateDocument(StringData fieldName, ConstDataRange payload);
 
+    // TODO: SERVER-73303 delete when v2 is enabled by default
     static ECOCCompactionDocument parseAndDecrypt(const BSONObj& doc, ECOCToken token);
+
+    static ECOCCompactionDocumentV2 parseAndDecryptV2(const BSONObj& doc, ECOCToken token);
 };
 
 

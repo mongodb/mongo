@@ -2312,6 +2312,28 @@ TEST(FLE_EDC, DuplicateSafeContent_IncompatibleType) {
     ASSERT_THROWS_CODE(encryptDocument(builder.obj(), &keyVault), DBException, 6373510);
 }
 
+TEST(FLE_ECOC, EncryptedTokensRoundTrip) {
+    std::vector<uint8_t> value(4);
+
+    auto collectionToken = FLELevel1TokenGenerator::generateCollectionsLevel1Token(getIndexKey());
+    auto escToken = FLECollectionTokenGenerator::generateESCToken(collectionToken);
+    auto ecocToken = FLECollectionTokenGenerator::generateECOCToken(collectionToken);
+    auto escDataToken =
+        FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(escToken, value);
+    auto escContentionToken = FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
+        generateESCDerivedFromDataTokenAndContentionFactorToken(escDataToken, 1);
+
+    EncryptedStateCollectionTokensV2 encryptor{escContentionToken};
+    auto swEncryptedTokens = encryptor.serialize(ecocToken);
+    ASSERT_OK(swEncryptedTokens.getStatus());
+
+    auto rawEcocDoc = ECOCCollection::generateDocument("foo", swEncryptedTokens.getValue());
+
+    auto ecocDoc = ECOCCollection::parseAndDecryptV2(rawEcocDoc, ecocToken);
+    ASSERT_EQ(ecocDoc.fieldName, "foo");
+    ASSERT_EQ(ecocDoc.esc, escContentionToken);
+}
+
 template <typename T, typename Func>
 bool vectorContains(const std::vector<T>& vec, Func func) {
     return std::find_if(vec.begin(), vec.end(), func) != vec.end();

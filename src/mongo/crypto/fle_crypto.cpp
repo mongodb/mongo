@@ -3530,6 +3530,20 @@ ECOCCompactionDocument ECOCCollection::parseAndDecrypt(const BSONObj& doc, ECOCT
     return ret;
 }
 
+ECOCCompactionDocumentV2 ECOCCollection::parseAndDecryptV2(const BSONObj& doc, ECOCToken token) {
+    IDLParserContext ctx("root");
+    auto ecocDoc = EcocDocument::parse(ctx, doc);
+
+    auto swTokens = EncryptedStateCollectionTokensV2::decryptAndParse(token, ecocDoc.getValue());
+    uassertStatusOK(swTokens);
+    auto& keys = swTokens.getValue();
+
+    ECOCCompactionDocumentV2 ret;
+    ret.fieldName = ecocDoc.getFieldName().toString();
+    ret.esc = keys.esc;
+    return ret;
+}
+
 FLE2IndexedEqualityEncryptedValue::FLE2IndexedEqualityEncryptedValue(
     FLE2InsertUpdatePayload payload, uint64_t counter)
     : edc(FLETokenFromCDR<FLETokenType::EDCDerivedFromDataTokenAndContentionFactorToken>(
