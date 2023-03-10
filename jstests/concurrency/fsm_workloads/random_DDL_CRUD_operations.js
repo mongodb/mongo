@@ -17,7 +17,9 @@
  *  ]
  */
 
+load("jstests/concurrency/fsm_workload_helpers/state_transition_utils.js");
 load("jstests/libs/uuid_util.js");
+load('jstests/libs/feature_flag_util.js');
 
 var $config = (function() {
     function threadCollectionName(prefix, tid) {
@@ -153,6 +155,14 @@ var $config = (function() {
                 jsTestLog('rename state finished');
             }
         },
+        checkDatabaseMetadataConsistency: function(db, collName, connCache) {
+            if (this.skipMetadataChecks) {
+                return;
+            }
+            jsTestLog('Check database metadata state');
+            const inconsistencies = db.checkMetadataConsistency().toArray();
+            assertAlways.eq(0, inconsistencies.length, tojson(inconsistencies));
+        },
         CRUD: function(db, collName, connCache) {
             let tid = this.tid;
             // Pick a tid at random until we pick one that doesn't target this thread's collection.
@@ -219,7 +229,15 @@ var $config = (function() {
         }
     };
 
-    let setup = function(db, collName, connCache) {
+    let setup = function(db, collName, cluster) {
+        this.skipMetadataChecks =
+            // TODO SERVER-70396: remove this flag
+            !FeatureFlagUtil.isEnabled(db.getMongo(), 'CheckMetadataConsistency') ||
+            // TODO SERVER-74445: re-enable metadata checks on catalog shard deployments
+            cluster.hasCatalogShard() ||
+            // TODO SERVER-74721: re-enable metadata checks in stepdown suites
+            cluster.isSteppingDownShards();
+
         for (let tid = 0; tid < this.threadCount; ++tid) {
             db[data.CRUDMutex].insert({tid: tid, mutex: 0});
         }
@@ -227,20 +245,12 @@ var $config = (function() {
 
     let teardown = function(db, collName, cluster) {};
 
-    let transitions = {
-        init: {create: 0.25, CRUD: 0.25, drop: 0.25, rename: 0.25},
-        create: {create: 0.25, CRUD: 0.25, drop: 0.25, rename: 0.25},
-        CRUD: {create: 0.25, CRUD: 0.25, drop: 0.25, rename: 0.25},
-        drop: {create: 0.25, CRUD: 0.25, drop: 0.25, rename: 0.25},
-        rename: {create: 0.25, CRUD: 0.25, drop: 0.25, rename: 0.25}
-    };
-
     return {
         threadCount: 12,
         iterations: 64,
         startState: 'init',
         states: states,
-        transitions: transitions,
+        transitions: uniformDistTransitions(states),
         data: data,
         setup: setup,
         teardown: teardown,

@@ -10,6 +10,8 @@
  *  ]
  */
 
+load('jstests/libs/feature_flag_util.js');
+
 const $config = (function() {
     const kCollNamePrefix = 'unsharded_coll_';
     const kInitialCollSize = 100;
@@ -168,6 +170,14 @@ const $config = (function() {
                     7120202
                 ]);
         },
+        checkDatabaseMetadataConsistency: function(db, collName, connCache) {
+            if (this.skipMetadataChecks) {
+                return;
+            }
+            jsTestLog('Executing checkMetadataConsistency state for database: ' + db.getName());
+            const inconsistencies = db.checkMetadataConsistency().toArray();
+            assert.eq(0, inconsistencies.length, tojson(inconsistencies));
+        },
         verifyDocuments: function(db, collName, connCache) {
             // Verify the correctness of the collection data by checking that each document matches
             // its copy in memory.
@@ -196,8 +206,24 @@ const $config = (function() {
         }
     };
 
-    const standardTransition =
-        {insert: 0.22, update: 0.22, delete: 0.22, movePrimary: 0.12, verifyDocuments: 0.22};
+    let setup = function(db, collName, cluster) {
+        this.skipMetadataChecks =
+            // TODO SERVER-70396: remove this flag
+            !FeatureFlagUtil.isEnabled(db.getMongo(), 'CheckMetadataConsistency') ||
+            // TODO SERVER-74445: re-enable metadata checks on catalog shard deployments
+            cluster.hasCatalogShard() ||
+            // TODO SERVER-74721: re-enable metadata checks in stepdown suites
+            cluster.isSteppingDownShards();
+    };
+
+    const standardTransition = {
+        insert: 0.20,
+        update: 0.20,
+        delete: 0.20,
+        movePrimary: 0.12,
+        checkDatabaseMetadataConsistency: 0.08,
+        verifyDocuments: 0.20,
+    };
 
     const transitions = {
         init: standardTransition,
@@ -205,6 +231,7 @@ const $config = (function() {
         update: standardTransition,
         delete: standardTransition,
         movePrimary: standardTransition,
+        checkDatabaseMetadataConsistency: standardTransition,
         verifyDocuments: standardTransition
     };
 
@@ -214,6 +241,7 @@ const $config = (function() {
         states: states,
         transitions: transitions,
         data: data,
+        setup: setup,
         passConnectionCache: true
     };
 })();

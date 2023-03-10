@@ -606,6 +606,22 @@ var Cluster = function(options) {
         return this.isSharded() && (typeof options.sharded.stepdownOptions !== 'undefined');
     };
 
+    /*
+     * Returns true if this cluster has a catalog shard.
+     * Catalog shard always have shard ID equal to "config".
+     */
+    this.hasCatalogShard = function hasCatalogShard() {
+        if (!this.isSharded()) {
+            return false;
+        }
+        let i = 0;
+        while (st.shard(i)) {
+            if (st.shard(i++).shardName === "config")
+                return true;
+        }
+        return false;
+    };
+
     this.isSteppingDownConfigServers = function isSteppingDownConfigServers() {
         return this.shouldPerformContinuousStepdowns() &&
             options.sharded.stepdownOptions.configStepdown;

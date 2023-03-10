@@ -10,6 +10,7 @@
  *  ]
  */
 
+load("jstests/concurrency/fsm_workload_helpers/state_transition_utils.js");
 load('jstests/libs/feature_flag_util.js');
 
 const dbPrefix = jsTestName() + '_DB_';
@@ -88,13 +89,29 @@ var $config = (function() {
             assertAlways.commandWorkedOrFailedWithCode(
                 db.runCommand({collMod: coll.getName(), validator: {a: {$gt: 0}}}),
                 [ErrorCodes.NamespaceNotFound, ErrorCodes.ConflictingOperationInProgress]);
+        },
+        checkDatabaseMetadataConsistency: function(db, collName, connCache) {
+            if (this.skipMetadataChecks) {
+                return;
+            }
+            db = getRandomDb(db);
+            jsTestLog('Executing checkMetadataConsistency state for database: ' + db.getName());
+            const inconsistencies = db.checkMetadataConsistency().toArray();
+            assert.eq(0, inconsistencies.length, tojson(inconsistencies));
         }
     };
 
-    let setup = function(db, collName, connCache) {
+    let setup = function(db, collName, cluster) {
         // TODO (SERVER-71309): Remove once 7.0 becomes last LTS. Prevent non-resilient movePrimary
         // operations from being executed in multiversion suites.
         this.skipMovePrimary = !FeatureFlagUtil.isEnabled(db.getMongo(), 'ResilientMovePrimary');
+        this.skipMetadataChecks =
+            // TODO SERVER-70396: remove this flag
+            !FeatureFlagUtil.isEnabled(db.getMongo(), 'CheckMetadataConsistency') ||
+            // TODO SERVER-74445: re-enable metadata checks on catalog shard deployments
+            cluster.hasCatalogShard() ||
+            // TODO SERVER-74721: re-enable metadata checks in stepdown suites
+            cluster.isSteppingDownShards();
 
         for (var i = 0; i < dbCount; i++) {
             const dbName = dbPrefix + i;
@@ -108,19 +125,12 @@ var $config = (function() {
         assertAlways(configDB.collections.countDocuments({allowMigrations: {$exists: true}}) == 0);
     };
 
-    let transitions = {
-        create: {create: 0.25, drop: 0.25, rename: 0.25, movePrimary: 0.25},
-        drop: {create: 0.25, drop: 0.25, rename: 0.25, movePrimary: 0.25},
-        rename: {create: 0.25, drop: 0.25, rename: 0.25, movePrimary: 0.25},
-        movePrimary: {create: 0.25, drop: 0.25, rename: 0.25, movePrimary: 0.25}
-    };
-
     return {
         threadCount: 12,
         iterations: 64,
         startState: 'create',
         states: states,
-        transitions: transitions,
+        transitions: uniformDistTransitions(states),
         setup: setup,
         teardown: teardown,
         passConnectionCache: true
