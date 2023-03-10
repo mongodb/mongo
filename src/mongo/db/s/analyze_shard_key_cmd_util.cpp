@@ -445,11 +445,10 @@ MonotonicityMetrics calculateMonotonicity(OperationContext* opCtx,
         return metrics;
     }
 
-    auto index = findShardKeyPrefixedIndex(opCtx,
-                                           collection,
-                                           collection->getIndexCatalog(),
-                                           shardKey,
-                                           /*requireSingleKey=*/true);
+    const auto index = findShardKeyPrefixedIndex(opCtx,
+                                                 collection,
+                                                 shardKey,
+                                                 /*requireSingleKey=*/true);
 
     if (!index) {
         metrics.setType(MonotonicityTypeEnum::kUnknown);

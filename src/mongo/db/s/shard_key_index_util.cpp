@@ -185,29 +185,36 @@ bool isCompatibleWithShardKey(OperationContext* opCtx,
 
 bool isLastNonHiddenShardKeyIndex(OperationContext* opCtx,
                                   const CollectionPtr& collection,
-                                  const IndexCatalog* indexCatalog,
                                   const std::string& indexName,
                                   const BSONObj& shardKey) {
-    const auto index = indexCatalog->findIndexByName(opCtx, indexName);
+    const auto index = collection->getIndexCatalog()->findIndexByName(opCtx, indexName);
     if (!index ||
         !isCompatibleWithShardKey(
             opCtx, collection, index->getEntry(), shardKey, false /* requireSingleKey */)) {
         return false;
     }
 
-    return !_findShardKeyPrefixedIndex(
-                opCtx, collection, indexCatalog, indexName, shardKey, true /* requireSingleKey */)
+    return !_findShardKeyPrefixedIndex(opCtx,
+                                       collection,
+                                       collection->getIndexCatalog(),
+                                       indexName,
+                                       shardKey,
+                                       true /* requireSingleKey */)
                 .has_value();
 }
 
 boost::optional<ShardKeyIndex> findShardKeyPrefixedIndex(OperationContext* opCtx,
                                                          const CollectionPtr& collection,
-                                                         const IndexCatalog* indexCatalog,
                                                          const BSONObj& shardKey,
                                                          bool requireSingleKey,
                                                          std::string* errMsg) {
-    return _findShardKeyPrefixedIndex(
-        opCtx, collection, indexCatalog, boost::none, shardKey, requireSingleKey, errMsg);
+    return _findShardKeyPrefixedIndex(opCtx,
+                                      collection,
+                                      collection->getIndexCatalog(),
+                                      boost::none,
+                                      shardKey,
+                                      requireSingleKey,
+                                      errMsg);
 }
 
 }  // namespace mongo

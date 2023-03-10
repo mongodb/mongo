@@ -401,7 +401,6 @@ void ValidationBehaviorsLocalRefineShardKey::verifyUsefulNonMultiKeyIndex(
             tmpErrMsg,
             findShardKeyPrefixedIndex(_opCtx,
                                       _coll,
-                                      _coll->getIndexCatalog(),
                                       proposedKey,
                                       /*requireSingleKey=*/true,
                                       &tmpErrMsg));

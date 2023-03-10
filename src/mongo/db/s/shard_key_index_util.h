@@ -92,7 +92,6 @@ bool isCompatibleWithShardKey(OperationContext* opCtx,
  */
 boost::optional<ShardKeyIndex> findShardKeyPrefixedIndex(OperationContext* opCtx,
                                                          const CollectionPtr& collection,
-                                                         const IndexCatalog* indexCatalog,
                                                          const BSONObj& shardKey,
                                                          bool requireSingleKey,
                                                          std::string* errMsg = nullptr);
@@ -103,7 +102,6 @@ boost::optional<ShardKeyIndex> findShardKeyPrefixedIndex(OperationContext* opCtx
  */
 bool isLastNonHiddenShardKeyIndex(OperationContext* opCtx,
                                   const CollectionPtr& collection,
-                                  const IndexCatalog* indexCatalog,
                                   const std::string& indexName,
                                   const BSONObj& shardKey);
 

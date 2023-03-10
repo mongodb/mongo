@@ -137,11 +137,10 @@ std::pair<std::vector<BSONObj>, bool> autoSplitVector(OperationContext* opCtx,
 
         // Allow multiKey based on the invariant that shard keys must be single-valued. Therefore,
         // any multi-key index prefixed by shard key cannot be multikey over the shard key fields.
-        auto shardKeyIdx = findShardKeyPrefixedIndex(opCtx,
-                                                     *collection,
-                                                     collection->getIndexCatalog(),
-                                                     keyPattern,
-                                                     /*requireSingleKey=*/false);
+        const auto shardKeyIdx = findShardKeyPrefixedIndex(opCtx,
+                                                           *collection,
+                                                           keyPattern,
+                                                           /*requireSingleKey=*/false);
         uassert(ErrorCodes::IndexNotFound,
                 str::stream() << "couldn't find index over splitting key "
                               << keyPattern.clientReadable().toString(),

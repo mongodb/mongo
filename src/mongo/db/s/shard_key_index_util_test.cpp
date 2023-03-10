@@ -92,8 +92,8 @@ TEST_F(ShardKeyIndexUtilTest, SimpleKeyPattern) {
                            << "x"
                            << "v" << kIndexVersion));
 
-    auto index = findShardKeyPrefixedIndex(
-        opCtx(), coll(), coll()->getIndexCatalog(), BSON("x" << 1), true /* requireSingleKey */);
+    const auto index =
+        findShardKeyPrefixedIndex(opCtx(), coll(), BSON("x" << 1), true /* requireSingleKey */);
 
     ASSERT_TRUE(index);
     ASSERT_EQ("x", index->descriptor()->indexName());
@@ -112,12 +112,11 @@ TEST_F(ShardKeyIndexUtilTest, HashedKeyPattern) {
                            << "xhashed"
                            << "v" << kIndexVersion));
 
-    auto index = findShardKeyPrefixedIndex(opCtx(),
-                                           coll(),
-                                           coll()->getIndexCatalog(),
-                                           BSON("x"
-                                                << "hashed"),
-                                           true /* requireSingleKey */);
+    const auto index = findShardKeyPrefixedIndex(opCtx(),
+                                                 coll(),
+                                                 BSON("x"
+                                                      << "hashed"),
+                                                 true /* requireSingleKey */);
 
     ASSERT_TRUE(index);
     ASSERT_EQ("xhashed", index->descriptor()->indexName());
@@ -131,11 +130,8 @@ TEST_F(ShardKeyIndexUtilTest, PrefixKeyPattern) {
                            << "xyz"
                            << "v" << kIndexVersion));
 
-    auto index = findShardKeyPrefixedIndex(opCtx(),
-                                           coll(),
-                                           coll()->getIndexCatalog(),
-                                           BSON("x" << 1 << "y" << 1),
-                                           true /* requireSingleKey */);
+    const auto index = findShardKeyPrefixedIndex(
+        opCtx(), coll(), BSON("x" << 1 << "y" << 1), true /* requireSingleKey */);
 
     ASSERT_TRUE(index);
     ASSERT_EQ("xyz", index->descriptor()->indexName());
@@ -160,8 +156,8 @@ TEST_F(ShardKeyIndexUtilTest, ExcludesIncompatibleIndexes) {
                            << "v" << kIndexVersion));
 
 
-    auto index = findShardKeyPrefixedIndex(
-        opCtx(), coll(), coll()->getIndexCatalog(), BSON("x" << 1), true /* requireSingleKey */);
+    const auto index =
+        findShardKeyPrefixedIndex(opCtx(), coll(), BSON("x" << 1), true /* requireSingleKey */);
 
     ASSERT_TRUE(index);
     ASSERT_EQ("x", index->descriptor()->indexName());
@@ -175,8 +171,8 @@ TEST_F(ShardKeyIndexUtilTest, ExcludesMultiKeyIfRequiresSingleKey) {
     DBDirectClient client(opCtx());
     client.insert(nss(), BSON("x" << BSON_ARRAY(1 << 2)));
 
-    auto index = findShardKeyPrefixedIndex(
-        opCtx(), coll(), coll()->getIndexCatalog(), BSON("x" << 1), true /* requireSingleKey */);
+    const auto index =
+        findShardKeyPrefixedIndex(opCtx(), coll(), BSON("x" << 1), true /* requireSingleKey */);
 
     ASSERT_FALSE(index);
 }
@@ -189,8 +185,8 @@ TEST_F(ShardKeyIndexUtilTest, IncludesMultiKeyIfSingleKeyNotRequired) {
     DBDirectClient client(opCtx());
     client.insert(nss(), BSON("x" << BSON_ARRAY(1 << 2)));
 
-    auto index = findShardKeyPrefixedIndex(
-        opCtx(), coll(), coll()->getIndexCatalog(), BSON("x" << 1), false /* requireSingleKey */);
+    const auto index =
+        findShardKeyPrefixedIndex(opCtx(), coll(), BSON("x" << 1), false /* requireSingleKey */);
 
     ASSERT_TRUE(index);
     ASSERT_EQ("x", index->descriptor()->indexName());
@@ -207,8 +203,7 @@ TEST_F(ShardKeyIndexUtilTest, LastShardIndexWithSingleCandidate) {
                            << "xy"
                            << "v" << kIndexVersion << "hidden" << true));
 
-    ASSERT_TRUE(isLastNonHiddenShardKeyIndex(
-        opCtx(), coll(), coll()->getIndexCatalog(), "x", BSON("x" << 1)));
+    ASSERT_TRUE(isLastNonHiddenShardKeyIndex(opCtx(), coll(), "x", BSON("x" << 1)));
 }
 
 TEST_F(ShardKeyIndexUtilTest, LastShardIndexWithMultipleCandidates) {
@@ -222,8 +217,7 @@ TEST_F(ShardKeyIndexUtilTest, LastShardIndexWithMultipleCandidates) {
                            << "xy"
                            << "v" << kIndexVersion));
 
-    ASSERT_FALSE(isLastNonHiddenShardKeyIndex(
-        opCtx(), coll(), coll()->getIndexCatalog(), "x", BSON("x" << 1)));
+    ASSERT_FALSE(isLastNonHiddenShardKeyIndex(opCtx(), coll(), "x", BSON("x" << 1)));
 }
 
 TEST_F(ShardKeyIndexUtilTest, LastShardIndexWithIncompatibleIndex) {
@@ -234,8 +228,7 @@ TEST_F(ShardKeyIndexUtilTest, LastShardIndexWithIncompatibleIndex) {
                            << "x"
                            << "v" << kIndexVersion));
 
-    ASSERT_FALSE(isLastNonHiddenShardKeyIndex(
-        opCtx(), coll(), coll()->getIndexCatalog(), "y", BSON("x" << 1)));
+    ASSERT_FALSE(isLastNonHiddenShardKeyIndex(opCtx(), coll(), "y", BSON("x" << 1)));
 }
 
 TEST_F(ShardKeyIndexUtilTest, LastShardIndexWithNonExistingIndex) {
@@ -243,8 +236,7 @@ TEST_F(ShardKeyIndexUtilTest, LastShardIndexWithNonExistingIndex) {
                            << "x"
                            << "v" << kIndexVersion));
 
-    ASSERT_FALSE(isLastNonHiddenShardKeyIndex(
-        opCtx(), coll(), coll()->getIndexCatalog(), "y", BSON("x" << 1)));
+    ASSERT_FALSE(isLastNonHiddenShardKeyIndex(opCtx(), coll(), "y", BSON("x" << 1)));
 }
 
 }  // namespace

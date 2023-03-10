@@ -342,11 +342,10 @@ public:
                     keyPattern = Helpers::inferKeyPattern(min);
                 }
 
-                auto shardKeyIdx = findShardKeyPrefixedIndex(opCtx,
-                                                             collection,
-                                                             collection->getIndexCatalog(),
-                                                             keyPattern,
-                                                             /*requireSingleKey=*/true);
+                const auto shardKeyIdx = findShardKeyPrefixedIndex(opCtx,
+                                                                   collection,
+                                                                   keyPattern,
+                                                                   /*requireSingleKey=*/true);
 
                 uassert(ErrorCodes::OperationFailed,
                         "Couldn't find valid index containing key pattern",

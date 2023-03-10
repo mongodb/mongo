@@ -343,13 +343,11 @@ void dropReadyIndexes(OperationContext* opCtx,
 
     for (const auto& indexName : indexNames) {
         if (collDescription.isSharded()) {
-            uassert(ErrorCodes::CannotDropShardKeyIndex,
-                    "Cannot drop the only compatible index for this collection's shard key",
-                    !isLastNonHiddenShardKeyIndex(opCtx,
-                                                  CollectionPtr(collection),
-                                                  indexCatalog,
-                                                  indexName,
-                                                  collDescription.getKeyPattern()));
+            uassert(
+                ErrorCodes::CannotDropShardKeyIndex,
+                "Cannot drop the only compatible index for this collection's shard key",
+                !isLastNonHiddenShardKeyIndex(
+                    opCtx, CollectionPtr(collection), indexName, collDescription.getKeyPattern()));
         }
 
         auto desc = indexCatalog->findIndexByName(opCtx,
@@ -523,7 +521,6 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
                             "Cannot drop the only compatible index for this collection's shard key",
                             !isLastNonHiddenShardKeyIndex(opCtx,
                                                           collection->getCollection(),
-                                                          indexCatalog,
                                                           indexName,
                                                           collDesc.getKeyPattern()));
                 }

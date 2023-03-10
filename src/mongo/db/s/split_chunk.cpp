@@ -205,11 +205,8 @@ StatusWith<boost::optional<ChunkRange>> splitChunk(
         // Allow multiKey based on the invariant that shard keys must be single-valued.
         // Therefore, any multi-key index prefixed by shard key cannot be multikey over the
         // shard key fields.
-        auto shardKeyIdx = findShardKeyPrefixedIndex(opCtx,
-                                                     *collection,
-                                                     collection->getIndexCatalog(),
-                                                     keyPatternObj,
-                                                     false /* requireSingleKey */);
+        const auto shardKeyIdx = findShardKeyPrefixedIndex(
+            opCtx, *collection, keyPatternObj, false /* requireSingleKey */);
         if (!shardKeyIdx) {
             return boost::optional<ChunkRange>(boost::none);
         }

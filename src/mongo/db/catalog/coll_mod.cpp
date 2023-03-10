@@ -363,7 +363,6 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(Operati
 
                         if (isLastNonHiddenShardKeyIndex(opCtx,
                                                          coll,
-                                                         coll->getIndexCatalog(),
                                                          cmrIndex->idx->indexName(),
                                                          shardedColl.getKeyPattern().toBSON())) {
                             return {ErrorCodes::InvalidOptions,

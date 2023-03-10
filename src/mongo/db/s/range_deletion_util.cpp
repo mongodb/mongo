@@ -91,8 +91,8 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
 
     // The IndexChunk has a keyPattern that may apply to more than one index - we need to
     // select the index and get the full index keyPattern here.
-    auto shardKeyIdx = findShardKeyPrefixedIndex(
-        opCtx, collection, collection->getIndexCatalog(), keyPattern, /*requireSingleKey=*/false);
+    const auto shardKeyIdx =
+        findShardKeyPrefixedIndex(opCtx, collection, keyPattern, /*requireSingleKey=*/false);
     if (!shardKeyIdx) {
         LOGV2_ERROR(23765,
                     "Unable to find shard key index",
