@@ -63,7 +63,7 @@ public:
     /**
      * Computes a KeyString that can be used as the sort key for this object.
      */
-    KeyString::Value computeSortKeyString(const BSONObj& bson) const;
+    KeyString::Value computeSortKeyString(const BSONObj& bson);
 
     /**
      * Determines all of the portions of the sort key for the given document and populates the
@@ -213,9 +213,11 @@ private:
 
     // Fast path for reading a BSON obj and computing the sort key. Returns true on success, false
     // when an array is encountered and the slow path needs to be used instead.
-    bool fastFillOutSortKeyParts(const BSONObj& bson,
-                                 const SortKeyGenerator::SortKeyTreeNode& tree,
-                                 std::vector<BSONElement>* out);
+    bool fastFillOutSortKeyParts(const BSONObj& bson, std::vector<BSONElement>* out) const;
+    bool fastFillOutSortKeyPartsHelper(const BSONObj& bson,
+                                       const SortKeyGenerator::SortKeyTreeNode& tree,
+                                       std::vector<BSONElement>* out) const;
+
 
     const CollatorInterface* _collator = nullptr;
 
@@ -236,6 +238,9 @@ private:
     // Used for fastFillOutSortKeyParts()/extractSortKeyParts().
     SortKeyTreeNode _sortKeyTreeRoot;
     BSONObj _localObjStorage;
+
+    // Used when generating KeyStrings.
+    std::vector<BSONElement> _localEltStorage;
 };
 
 }  // namespace mongo

@@ -37,6 +37,9 @@
 
 namespace mongo {
 namespace {
+const BSONObj kBsonWithNull = BSON("" << NullLabeler{});
+const BSONElement kNullElement = kBsonWithNull.firstElement();
+
 BSONObj createSortSpecWithoutMeta(const SortPattern& sortPattern) {
     BSONObjBuilder btreeBob;
     for (auto&& part : sortPattern) {
@@ -89,6 +92,7 @@ SortKeyGenerator::SortKeyGenerator(SortPattern sortPattern, const CollatorInterf
             _sortKeyTreeRoot.addSortPatternPart(&keyPart, 0, i++);
         }
     }
+    _localEltStorage.resize(_sortPattern.size());
 }
 
 Value SortKeyGenerator::computeSortKey(const WorkingSetMember& wsm) const {
@@ -99,8 +103,16 @@ Value SortKeyGenerator::computeSortKey(const WorkingSetMember& wsm) const {
     return computeSortKeyFromIndexKey(wsm);
 }
 
-KeyString::Value SortKeyGenerator::computeSortKeyString(const BSONObj& obj) const {
-    // This function could be optimized to have a fast path for the non-array case.
+KeyString::Value SortKeyGenerator::computeSortKeyString(const BSONObj& obj) {
+    const bool fastPathSucceeded = fastFillOutSortKeyParts(obj, &_localEltStorage);
+    if (fastPathSucceeded) {
+        KeyString::HeapBuilder builder(KeyString::Version::kLatestVersion, _ordering);
+        for (auto elt : _localEltStorage) {
+            builder.appendBSONElement(elt);
+        }
+
+        return builder.release();
+    }
 
     KeyStringSet keySet;
     SharedBufferFragmentBuilder allocator(KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
@@ -344,10 +356,16 @@ Value SortKeyGenerator::computeSortKeyFromDocument(const Document& doc,
                                                       extractKeyWithArray(doc, metadata));
 }
 
-
 bool SortKeyGenerator::fastFillOutSortKeyParts(const BSONObj& bson,
-                                               const SortKeyGenerator::SortKeyTreeNode& tree,
-                                               std::vector<BSONElement>* out) {
+                                               std::vector<BSONElement>* out) const {
+    // In MQL missing sort keys are substituted with JS null.
+    std::fill(out->begin(), out->end(), kNullElement);
+    return fastFillOutSortKeyPartsHelper(bson, _sortKeyTreeRoot, out);
+}
+
+bool SortKeyGenerator::fastFillOutSortKeyPartsHelper(const BSONObj& bson,
+                                                     const SortKeyGenerator::SortKeyTreeNode& tree,
+                                                     std::vector<BSONElement>* out) const {
     // Walk the BSON once and fill out the sort key parts.
     // Returns false if array is encountered and fallback is needed.
     BSONObjIterator it(bson);
@@ -380,7 +398,7 @@ bool SortKeyGenerator::fastFillOutSortKeyParts(const BSONObj& bson,
             }
 
             if (elt.type() == BSONType::Object && !childNode->children.empty()) {
-                if (!fastFillOutSortKeyParts(elt.embeddedObject(), *childNode, out)) {
+                if (!fastFillOutSortKeyPartsHelper(elt.embeddedObject(), *childNode, out)) {
                     return false;
                 }
             }
@@ -400,15 +418,8 @@ void SortKeyGenerator::generateSortKeyComponentVector(const BSONObj& bson,
     tassert(7103704, "Sort cannot have meta", !_sortHasMeta);
     tassert(7103701, "Sort cannot have repeat keys", !_sortHasRepeatKey);
     tassert(7103702, "Cannot pass null as eltsOut", eltsOut);
-    const static BSONObj kBsonWithNull = BSON("" << NullLabeler{});
-    const static BSONElement kNullElement = kBsonWithNull.firstElement();
 
-    for (size_t i = 0; i < eltsOut->size(); ++i) {
-        // In MQL missing sort keys are substituted with JS null.
-        (*eltsOut)[i] = kNullElement;
-    }
-
-    const bool fastPathSucceeded = fastFillOutSortKeyParts(bson, _sortKeyTreeRoot, eltsOut);
+    const bool fastPathSucceeded = fastFillOutSortKeyParts(bson, eltsOut);
 
     if (fastPathSucceeded) {
         if (_collator) {
