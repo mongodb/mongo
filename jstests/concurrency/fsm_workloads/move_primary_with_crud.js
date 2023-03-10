@@ -211,9 +211,7 @@ const $config = (function() {
             // TODO SERVER-70396: remove this flag
             !FeatureFlagUtil.isEnabled(db.getMongo(), 'CheckMetadataConsistency') ||
             // TODO SERVER-74445: re-enable metadata checks on catalog shard deployments
-            cluster.hasCatalogShard() ||
-            // TODO SERVER-74721: re-enable metadata checks in stepdown suites
-            cluster.isSteppingDownShards();
+            cluster.hasCatalogShard();
     };
 
     const standardTransition = {

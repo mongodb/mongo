@@ -88,11 +88,12 @@ public:
                 return true;
             }});
 
+    void waitForRecoveryCompletion(OperationContext* opCtx) const;
+
 private:
     ExecutorFuture<void> _rebuildService(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                          const CancellationToken& token) override;
 
-    void _waitForRecoveryCompletion(OperationContext* opCtx) const;
     void _afterStepDown() override;
     size_t _countCoordinatorDocs(OperationContext* opCtx);
 

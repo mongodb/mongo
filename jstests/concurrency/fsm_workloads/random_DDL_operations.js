@@ -109,9 +109,7 @@ var $config = (function() {
             // TODO SERVER-70396: remove this flag
             !FeatureFlagUtil.isEnabled(db.getMongo(), 'CheckMetadataConsistency') ||
             // TODO SERVER-74445: re-enable metadata checks on catalog shard deployments
-            cluster.hasCatalogShard() ||
-            // TODO SERVER-74721: re-enable metadata checks in stepdown suites
-            cluster.isSteppingDownShards();
+            cluster.hasCatalogShard();
 
         for (var i = 0; i < dbCount; i++) {
             const dbName = dbPrefix + i;
