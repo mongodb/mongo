@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/pipeline/accumulator_percentile.h"
+#include "mongo/idl/idl_parser.h"
 
 namespace mongo {
 
@@ -37,24 +38,21 @@ REGISTER_ACCUMULATOR_WITH_FEATURE_FLAG(percentile,
                                        AccumulatorPercentile::parseArgs,
                                        feature_flags::gFeatureFlagApproxPercentiles);
 
-namespace {
-// Checks that 'pv' is an array of valid percentile specifications.
-std::vector<double> validatePercentileArg(const Value& pv) {
-    const auto msg = "'p' must be an array of numeric values from [0.0, 1.0] range, but found "_sd;
-    uassert(7429700, str::stream() << msg << pv.toString(), pv.isArray());
-
-    std::vector<double> ps;
-    for (const Value& p : pv.getArray()) {
-        uassert(7429701, str::stream() << msg << pv.toString(), p.numeric());
-        auto pd = p.coerceToDouble();
-        uassert(7429702, str::stream() << msg << pv.toString(), pd >= 0 && pd <= 1);
-        ps.push_back(pd);
+Status AccumulatorPercentile::validatePercentileArg(const std::vector<double>& pv) {
+    if (pv.empty()) {
+        return {ErrorCodes::BadValue, "'p' cannot be an empty array"};
     }
-    return ps;
+    for (const double& p : pv) {
+        if (p < 0 || p > 1) {
+            return {ErrorCodes::BadValue,
+                    str::stream() << "'p' must be an array of numeric values from [0.0, 1.0] "
+                                     "range, but received incorrect value: "
+                                  << p};
+        }
+    }
+    return Status::OK();
 }
-}  // namespace
 
-// TODO SERVER-74556: Move parsing of the args into IDL.
 AccumulationExpression AccumulatorPercentile::parseArgs(ExpressionContext* const expCtx,
                                                         BSONElement elem,
                                                         VariablesParseState vps) {
@@ -63,37 +61,11 @@ AccumulationExpression AccumulatorPercentile::parseArgs(ExpressionContext* const
     uassert(7429703,
             str::stream() << "specification must be an object; found " << elem,
             elem.type() == BSONType::Object);
-    BSONObj obj = elem.embeddedObject();
 
-    boost::intrusive_ptr<Expression> input;
-    std::vector<double> ps;
-    std::string algo = "";
-    for (auto&& element : obj) {
-        auto fieldName = element.fieldNameStringData();
-        if (fieldName == kFieldNameInput) {
-            input = Expression::parseOperand(expCtx, element, vps);
-        } else if (fieldName == kFieldNameP) {
-            auto pv = Value(element);
-            ps = validatePercentileArg(pv);
-        } else if (fieldName == kFieldNameAlgo) {
-            if (element.type() == BSONType::String) {
-                algo = element.String();
-            }
-            // More types of percentiles will be supported in the future: PM-1883
-            uassert(7429704,
-                    str::stream()
-                        << "the valid specifications for 'algorithm' are: 'approximate'; found "
-                        << element,
-                    algo == "approximate");
-        } else {
-            uasserted(7429705,
-                      str::stream() << "Unknown argument for 'percentile' operator: " << fieldName);
-        }
-    }
-    uassert(7429706, str::stream() << "Missing value for '" << kFieldNameP << "'", !ps.empty());
-    uassert(7429707, str::stream() << "Missing value for '" << kFieldNameInput << "'", input);
-    uassert(
-        7429708, str::stream() << "Missing value for '" << kFieldNameAlgo << "'", !algo.empty());
+    auto spec = AccumulatorPercentileSpec::parse(IDLParserContext(kName), elem.Obj());
+    boost::intrusive_ptr<Expression> input =
+        Expression::parseOperand(expCtx, spec.getInput().getElement(), vps);
+    std::vector<double> ps = spec.getP();
 
     auto factory = [expCtx, ps] {
         // Temporary implementation! To be replaced based on the user's choice of algorithm.

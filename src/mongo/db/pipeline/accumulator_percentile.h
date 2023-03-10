@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/pipeline/accumulation_statement.h"
+#include "mongo/db/pipeline/accumulator_percentile_gen.h"
 #include "mongo/db/pipeline/percentile_algo.h"
 
 namespace mongo {
@@ -38,15 +39,15 @@ namespace mongo {
  */
 class AccumulatorPercentile : public AccumulatorState {
 public:
-    // {$percentile: {input: <Numeric>, p: <Array Expression>, algorithm: <String>}
-    static constexpr auto kFieldNameInput = "input"_sd;
-    static constexpr auto kFieldNameP = "p"_sd;
-    static constexpr auto kFieldNameAlgo = "algorithm"_sd;
-
     static constexpr auto kName = "$percentile"_sd;
     const char* getOpName() const final {
         return kName.rawData();
     }
+
+    /**
+     * Checks that 'pv' is an array of valid percentile specifications. Called by the IDL file.
+     */
+    static Status validatePercentileArg(const std::vector<double>& pv);
 
     /**
      * Parsing and creating the accumulator. A separate accumulator object is created per group.

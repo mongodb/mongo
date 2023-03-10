@@ -117,6 +117,7 @@ env.Library(
         'accumulator_min_max.cpp',
         'accumulator_multi.cpp',
         'accumulator_percentile.cpp',
+        'accumulator_percentile.idl',
         'accumulator_push.cpp',
         'accumulator_rank.cpp',
         'accumulator_std_dev.cpp',
