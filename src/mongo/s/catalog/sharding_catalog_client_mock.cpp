@@ -77,7 +77,10 @@ std::vector<CollectionType> ShardingCatalogClientMock::getCollections(
 }
 
 std::vector<NamespaceString> ShardingCatalogClientMock::getAllShardedCollectionsForDb(
-    OperationContext* opCtx, StringData dbName, repl::ReadConcernLevel readConcern) {
+    OperationContext* opCtx,
+    StringData dbName,
+    repl::ReadConcernLevel readConcern,
+    const BSONObj& sort) {
     return {};
 }
 

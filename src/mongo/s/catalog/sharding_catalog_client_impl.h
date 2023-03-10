@@ -85,8 +85,10 @@ public:
                                                repl::ReadConcernLevel readConcernLevel,
                                                const BSONObj& sort) override;
 
-    std::vector<NamespaceString> getAllShardedCollectionsForDb(
-        OperationContext* opCtx, StringData dbName, repl::ReadConcernLevel readConcern) override;
+    std::vector<NamespaceString> getAllShardedCollectionsForDb(OperationContext* opCtx,
+                                                               StringData dbName,
+                                                               repl::ReadConcernLevel readConcern,
+                                                               const BSONObj& sort) override;
 
     StatusWith<std::vector<std::string>> getDatabasesForShard(OperationContext* opCtx,
                                                               const ShardId& shardName) override;

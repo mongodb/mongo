@@ -577,8 +577,11 @@ std::vector<CollectionType> ShardingCatalogClientImpl::getCollections(
 }
 
 std::vector<NamespaceString> ShardingCatalogClientImpl::getAllShardedCollectionsForDb(
-    OperationContext* opCtx, StringData dbName, repl::ReadConcernLevel readConcern) {
-    auto collectionsOnConfig = getCollections(opCtx, dbName, readConcern, BSONObj());
+    OperationContext* opCtx,
+    StringData dbName,
+    repl::ReadConcernLevel readConcern,
+    const BSONObj& sort) {
+    auto collectionsOnConfig = getCollections(opCtx, dbName, readConcern, sort);
 
     std::vector<NamespaceString> collectionsToReturn;
     collectionsToReturn.reserve(collectionsOnConfig.size());

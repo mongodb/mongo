@@ -31,6 +31,8 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/util/future.h"
 
 namespace mongo {
 
@@ -40,6 +42,14 @@ inline Status validateTimestampNotNull(const Timestamp& ts) {
     return (!ts.isNull())
         ? Status::OK()
         : Status(ErrorCodes::BadValue, str::stream() << "Timestamp can't be null");
+}
+
+template <class T>
+void ensureFulfilledPromise(WithLock lk, SharedPromise<T>& sp) {
+    auto future = sp.getFuture();
+    if (!future.isReady()) {
+        sp.emplaceValue();
+    }
 }
 
 }  // namespace move_primary_util

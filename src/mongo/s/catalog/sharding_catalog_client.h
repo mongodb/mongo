@@ -150,7 +150,10 @@ public:
      * Throws exception on errors.
      */
     virtual std::vector<NamespaceString> getAllShardedCollectionsForDb(
-        OperationContext* opCtx, StringData dbName, repl::ReadConcernLevel readConcern) = 0;
+        OperationContext* opCtx,
+        StringData dbName,
+        repl::ReadConcernLevel readConcern,
+        const BSONObj& sort = BSONObj()) = 0;
 
     /**
      * Retrieves all databases for a shard.

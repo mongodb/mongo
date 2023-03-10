@@ -54,11 +54,12 @@ enums:
         type: int
         values:
             kUninitialized: 0
-            kStarted: 1
-            kConsistent: 2
+            kCloning: 1
+            kApplying: 2
             kBlocking: 3
-            kAborted: 4
-            kDone: 5
+            kPrepared: 4
+            kAborted: 5
+            kDone: 6
 
 structs:
     MovePrimaryDonorMetadata:

@@ -43,11 +43,12 @@ const auto kReportedStateFieldNamesMap = [] {
         {MovePrimaryDonorState::kBlockingWrites, "countInstancesInDonorState4BlockingWrites"},
         {MovePrimaryDonorState::kPrepared, "countInstancesInDonorState5Prepared"},
         {MovePrimaryDonorState::kAborted, "countInstancesInDonorState6Aborted"},
-        {MovePrimaryRecipientState::kStarted, "countInstancesInRecipientState1Initializing"},
-        {MovePrimaryRecipientState::kConsistent, "countInstancesInRecipientState2Consistent"},
+        {MovePrimaryRecipientState::kCloning, "countInstancesInRecipientState1Cloning"},
+        {MovePrimaryRecipientState::kApplying, "countInstancesInRecipientState2Applying"},
         {MovePrimaryRecipientState::kBlocking, "countInstancesInRecipientState3Blocking"},
-        {MovePrimaryRecipientState::kAborted, "countInstancesInRecipientState4Aborted"},
-        {MovePrimaryRecipientState::kDone, "countInstancesInRecipientState5Done"}};
+        {MovePrimaryRecipientState::kPrepared, "countInstancesInRecipientState4Prepared"},
+        {MovePrimaryRecipientState::kAborted, "countInstancesInRecipientState5Aborted"},
+        {MovePrimaryRecipientState::kDone, "countInstancesInRecipientState6Done"}};
 }();
 
 }  // namespace
