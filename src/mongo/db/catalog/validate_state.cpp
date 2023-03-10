@@ -309,26 +309,38 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
                 continue;
             }
 
-            if (entry->descriptor()->getAccessMethodName() == IndexNames::COLUMN) {
-                const auto iam = entry->accessMethod();
-                auto indexCursor =
-                    static_cast<ColumnStoreAccessMethod*>(iam)->storage()->newCursor(opCtx);
-                currCheckpointId = indexCursor->getCheckpointId();
-                _columnStoreIndexCursors.emplace(desc->indexName(), std::move(indexCursor));
-            } else {
-                const auto iam = entry->accessMethod()->asSortedData();
-                if (!iam) {
-                    LOGV2(6325100,
-                          "[Debugging] skipping index {index_name} because it isn't SortedData",
-                          "index_name"_attr = desc->indexName());
-                    _skippedIndexes.emplace(desc->indexName());
-                    continue;
-                }
+            try {
+                if (entry->descriptor()->getAccessMethodName() == IndexNames::COLUMN) {
+                    const auto iam = entry->accessMethod();
+                    auto indexCursor =
+                        static_cast<ColumnStoreAccessMethod*>(iam)->storage()->newCursor(opCtx);
+                    currCheckpointId = indexCursor->getCheckpointId();
+                    _columnStoreIndexCursors.emplace(desc->indexName(), std::move(indexCursor));
+                } else {
+                    const auto iam = entry->accessMethod()->asSortedData();
+                    if (!iam) {
+                        LOGV2(6325100,
+                              "[Debugging] skipping index {index_name} because it isn't SortedData",
+                              "index_name"_attr = desc->indexName());
+                        _skippedIndexes.emplace(desc->indexName());
+                        continue;
+                    }
 
-                auto indexCursor =
-                    std::make_unique<SortedDataInterfaceThrottleCursor>(opCtx, iam, &_dataThrottle);
-                currCheckpointId = indexCursor->getCheckpointId();
-                _indexCursors.emplace(desc->indexName(), std::move(indexCursor));
+                    auto indexCursor = std::make_unique<SortedDataInterfaceThrottleCursor>(
+                        opCtx, iam, &_dataThrottle);
+                    currCheckpointId = indexCursor->getCheckpointId();
+                    _indexCursors.emplace(desc->indexName(), std::move(indexCursor));
+                }
+            } catch (const ExceptionFor<ErrorCodes::CursorNotFound>& ex) {
+                invariant(isBackground());
+                LOGV2(7359900,
+                      "Skipping validation on the index because the index's checkpoint is not "
+                      "consistent with the system-wide checkpoint.",
+                      "indexName"_attr = desc->indexName(),
+                      "nss"_attr = _nss,
+                      "ex"_attr = ex);
+                _skippedIndexes.emplace(desc->indexName());
+                continue;
             }
 
             _indexes.push_back(indexCatalog->getEntryShared(desc));
