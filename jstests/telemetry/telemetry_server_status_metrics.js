@@ -29,13 +29,9 @@ function runTestWithMongodOptions(mongodOptions, test, testOptions) {
 function evictionTest(conn, testDB, coll, testOptions) {
     const evictedBefore = testDB.serverStatus().metrics.telemetry.numEvicted;
     assert.eq(evictedBefore, 0);
-    for (var i = 0; i < 100; i++) {
+    for (var i = 0; i < 4000; i++) {
         let query = {};
-        for (var j = 0; j < 25; ++j) {
-            query["foo.field.xyz." + i + "." + j] = 1;
-            query["bar.field.xyz." + i + "." + j] = 2;
-            query["baz.field.xyz." + i + "." + j] = 3;
-        }
+        query["foo" + i] = "bar";
         coll.aggregate([{$match: query}]).itcount();
     }
     if (!testOptions.resetCacheSize) {
@@ -47,7 +43,7 @@ function evictionTest(conn, testDB, coll, testOptions) {
     // least recently used entries to meet the new, smaller size requirement.
     assert.eq(testDB.serverStatus().metrics.telemetry.numEvicted, 0);
     assert.commandWorked(
-        testDB.adminCommand({setParameter: 1, internalQueryConfigureTelemetryCacheSize: "2MB"}));
+        testDB.adminCommand({setParameter: 1, internalQueryConfigureTelemetryCacheSize: "1MB"}));
     const evictedAfter = testDB.serverStatus().metrics.telemetry.numEvicted;
     assert.gt(evictedAfter, 0);
 }
@@ -89,28 +85,23 @@ function countRateLimitedRequestsTest(conn, testDB, coll, testOptions) {
 }
 
 /**
- * In this configuration, every query is sampled. Each query has a key(~2200 - 2300 bytes) and
- * value(208 bytes). With a cache size of 3MB, there are 1024 partitions, each of max size ~ 3072
- * bytes. Each partition will only be able to fit one entry, eg a partition with one entry will be
- * considered full. When a second query shape/key falls into an already full partition, it will have
- * to evict the original entry.
+ * In this configuration, we insert enough entries into the telemetry store to trigger LRU eviction.
  *
  * */
 runTestWithMongodOptions({
     setParameter: {
-        internalQueryConfigureTelemetryCacheSize: "3MB",
+        internalQueryConfigureTelemetryCacheSize: "1MB",
         internalQueryConfigureTelemetrySamplingRate: 2147483647
     },
 },
                          evictionTest,
                          {resetCacheSize: false});
 /**
- * In this configuration, every query is sampled. Due to the large initial cache size, entries
- * should only be evicted once the cache is reset after telemetry metric collecting, is finished.
+ * In this configuration, eviction is triggered only when the telemetry store size is reset.
  * */
 runTestWithMongodOptions({
     setParameter: {
-        internalQueryConfigureTelemetryCacheSize: "10MB",
+        internalQueryConfigureTelemetryCacheSize: "2MB",
         internalQueryConfigureTelemetrySamplingRate: 2147483647
     },
 },
