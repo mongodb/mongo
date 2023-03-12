@@ -461,7 +461,6 @@ class Operation:
 
     def __init_hs_truncated(self, line):
         self.type = OpType.HS_TRUNCATED
-        self.file = self.__extract_file(line)
 
         matches = re.search('btree=(\d+)', line)
         self.btree_id = int(matches.group(1))
