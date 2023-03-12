@@ -170,10 +170,14 @@ WorkgenFrozenClass(WorkloadOptions)
     def wiredtiger_open_config(self, config):
         return config
 
-    def wiredtiger_open(self, config = None):
+    def wiredtiger_open(self, config = None, post_initialize_function = None):
         if config == None:
             config = self.default_config
         self.initialize()
+
+        if post_initialize_function != None:
+            post_initialize_function(self.args.home)
+
         return wiredtiger.wiredtiger_open(self.args.home, self.wiredtiger_open_config(config))
 
     def initialize(self):
