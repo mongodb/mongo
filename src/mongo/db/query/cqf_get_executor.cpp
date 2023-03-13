@@ -753,13 +753,14 @@ boost::optional<ExecParams> getSBEExecutorViaCascadesOptimizer(
                             "physMemoChecks"_attr = memoStats._physMemoCheckCount);
     }
 
-    {
-        const std::string explain = ExplainGenerator::explainV2Compact(
+    const auto explainMemoFn = [&phaseManager]() {
+        // Explain the memo only if required by the logging level.
+        return ExplainGenerator::explainV2Compact(
             make<MemoPhysicalDelegatorNode>(phaseManager.getPhysicalNodeId()),
             true /*displayPhysicalProperties*/,
             &phaseManager.getMemo());
-        OPTIMIZER_DEBUG_LOG(6264801, 5, "Optimized ABT", "explain"_attr = explain);
-    }
+    };
+    OPTIMIZER_DEBUG_LOG(6264801, 5, "Optimized ABT", "explain"_attr = explainMemoFn());
 
     OPTIMIZER_DEBUG_LOG(6264802,
                         5,
