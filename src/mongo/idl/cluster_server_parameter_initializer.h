@@ -52,33 +52,6 @@ public:
     static ClusterServerParameterInitializer* get(OperationContext* opCtx);
     static ClusterServerParameterInitializer* get(ServiceContext* serviceContext);
 
-    static void updateParameter(OperationContext* opCtx,
-                                BSONObj doc,
-                                StringData mode,
-                                const boost::optional<TenantId>& tenantId);
-    static void clearParameter(OperationContext* opCtx,
-                               ServerParameter* sp,
-                               const boost::optional<TenantId>& tenantId);
-    static void clearParameter(OperationContext* opCtx,
-                               StringData id,
-                               const boost::optional<TenantId>& tenantId);
-    static void clearAllTenantParameters(OperationContext* opCtx,
-                                         const boost::optional<TenantId>& tenantId);
-
-    /**
-     * Used to initialize in-memory cluster parameter state based on the on-disk contents after
-     * startup recovery or initial sync is complete.
-     */
-    static void initializeAllTenantParametersFromDisk(OperationContext* opCtx,
-                                                      const boost::optional<TenantId>& tenantId);
-
-    /**
-     * Used on rollback and rename with drop.
-     * Updates settings which are present and clears settings which are not.
-     */
-    static void resynchronizeAllTenantParametersFromDisk(OperationContext* opCtx,
-                                                         const boost::optional<TenantId>& tenantId);
-
     // Virtual methods coming from the ReplicaSetAwareService
     void onStartup(OperationContext* opCtx) override final {}
 
@@ -95,49 +68,6 @@ public:
     void onStepUpComplete(OperationContext* opCtx, long long term) override final {}
     void onStepDown() override final {}
     void onBecomeArbiter() override final {}
-
-private:
-    template <typename OnEntry>
-    static void doLoadAllTenantParametersFromDisk(OperationContext* opCtx,
-                                                  StringData mode,
-                                                  OnEntry onEntry,
-                                                  const boost::optional<TenantId>& tenantId) try {
-
-        // If the RecoveryUnit already had an open snapshot, keep the snapshot open. Otherwise
-        // abandon the snapshot when exiting the function.
-        ScopeGuard scopeGuard([&] { opCtx->recoveryUnit()->abandonSnapshot(); });
-        if (opCtx->recoveryUnit()->isActive()) {
-            scopeGuard.dismiss();
-        }
-
-        AutoGetCollectionForRead coll(opCtx, NamespaceString::makeClusterParametersNSS(tenantId));
-        if (!coll) {
-            return;
-        }
-
-        std::vector<Status> failures;
-
-        auto cursor = coll->getCursor(opCtx);
-        for (auto doc = cursor->next(); doc; doc = cursor->next()) {
-            try {
-                onEntry(opCtx, doc.get().data.toBson(), mode, tenantId);
-            } catch (const DBException& ex) {
-                failures.push_back(ex.toStatus());
-            }
-        }
-
-        if (!failures.empty()) {
-            StringBuilder msg;
-            for (const auto& failure : failures) {
-                msg << failure.toString() << ", ";
-            }
-            msg.reset(msg.len() - 2);
-            uasserted(ErrorCodes::OperationFailed, msg.str());
-        }
-    } catch (const DBException& ex) {
-        uassertStatusOK(ex.toStatus().withContext(
-            str::stream() << "Failed " << mode << " cluster server parameters from disk"));
-    }
 };
 
 }  // namespace mongo

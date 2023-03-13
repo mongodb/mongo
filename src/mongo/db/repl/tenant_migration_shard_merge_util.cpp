@@ -49,6 +49,7 @@
 #include "mongo/db/repl/tenant_file_cloner.h"
 #include "mongo/db/repl/tenant_migration_shared_data.h"
 #include "mongo/db/storage/durable_catalog.h"
+#include "mongo/idl/cluster_parameter_synchronization_helpers.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/future_util.h"
 
@@ -266,6 +267,11 @@ void wiredTigerImportFromBackupCursor(OperationContext* opCtx,
                                                                             /*dryRun=*/false);
 
             wunit.commit();
+
+            if (metadata.numRecords > 0) {
+                cluster_parameters::maybeUpdateClusterParametersPostImportCollectionCommit(opCtx,
+                                                                                           nss);
+            }
 
             LOGV2(6114300,
                   "Imported donor collection",

@@ -62,19 +62,24 @@ public:
         }
     }
 
-    void doInserts(const NamespaceString& nss, std::initializer_list<BSONObj> docs) {
+    void doInserts(const NamespaceString& nss,
+                   std::initializer_list<BSONObj> docs,
+                   bool commit = true) {
         std::vector<InsertStatement> stmts;
         std::transform(docs.begin(), docs.end(), std::back_inserter(stmts), [](auto doc) {
             return InsertStatement(doc);
         });
         auto opCtx = cc().makeOperationContext();
+        WriteUnitOfWork wuow(opCtx.get());
 
         AutoGetCollection autoColl(opCtx.get(), nss, MODE_IX);
         observer.onInserts(
             opCtx.get(), *autoColl, stmts.cbegin(), stmts.cend(), false /* fromMigrate */);
+        if (commit)
+            wuow.commit();
     }
 
-    void doUpdate(const NamespaceString& nss, BSONObj updatedDoc) {
+    void doUpdate(const NamespaceString& nss, BSONObj updatedDoc, bool commit = true) {
         // Actual UUID doesn't matter, just use any...
         const auto criteria = updatedDoc["_id"].wrap();
         const auto preImageDoc = criteria;
@@ -83,45 +88,35 @@ public:
         updateArgs.update = BSON("$set" << updatedDoc);
         updateArgs.updatedDoc = updatedDoc;
         auto opCtx = cc().makeOperationContext();
+        WriteUnitOfWork wuow(opCtx.get());
         AutoGetCollection autoColl(opCtx.get(), nss, MODE_IX);
         OplogUpdateEntryArgs entryArgs(&updateArgs, *autoColl);
         observer.onUpdate(opCtx.get(), entryArgs);
+        if (commit)
+            wuow.commit();
     }
 
-    void doDelete(const NamespaceString& nss, BSONObj deletedDoc, bool includeDeletedDoc = true) {
+    void doDelete(const NamespaceString& nss,
+                  BSONObj deletedDoc,
+                  bool includeDeletedDoc = true,
+                  bool commit = true) {
         auto opCtx = cc().makeOperationContext();
+        WriteUnitOfWork wuow(opCtx.get());
         AutoGetCollection autoColl(opCtx.get(), nss, MODE_IX);
         observer.aboutToDelete(opCtx.get(), *autoColl, deletedDoc);
         OplogDeleteEntryArgs args;
         args.deletedDoc = includeDeletedDoc ? &deletedDoc : nullptr;
         observer.onDelete(opCtx.get(), *autoColl, 1 /* StmtId */, args);
+        if (commit)
+            wuow.commit();
     }
 
-    void doDropDatabase(const DatabaseName& dbname) {
+    void doDropDatabase(const DatabaseName& dbname, bool commit = true) {
         auto opCtx = cc().makeOperationContext();
+        WriteUnitOfWork wuow(opCtx.get());
         observer.onDropDatabase(opCtx.get(), dbname);
-    }
-
-    void doRenameCollection(const NamespaceString& fromColl, const NamespaceString& toColl) {
-        auto opCtx = cc().makeOperationContext();
-        observer.postRenameCollection(opCtx.get(),
-                                      fromColl,
-                                      toColl,
-                                      UUID::gen(),
-                                      boost::none /* targetUUID */,
-                                      false /* stayTemp */);
-    }
-
-    void doImportCollection(const NamespaceString& nss) {
-        auto opCtx = cc().makeOperationContext();
-        observer.onImportCollection(opCtx.get(),
-                                    UUID::gen(),
-                                    nss,
-                                    10 /* num records */,
-                                    1 << 20 /* data size */,
-                                    BSONObj() /* catalogEntry */,
-                                    BSONObj() /* storageMetadata */,
-                                    false /* isDryRun */);
+        if (commit)
+            wuow.commit();
     }
 
     void doReplicationRollback(const std::vector<NamespaceString>& namespaces) {
@@ -426,89 +421,6 @@ TEST_F(ClusterServerParameterOpObserverTest, onDropDatabase) {
     ASSERT_PARAMETER_STATE(kTenantId, kDefaultIntValue, kDefaultStrValue);
 }
 
-TEST_F(ClusterServerParameterOpObserverTest, onRenameCollection) {
-    initializeState();
-
-    const NamespaceString kTestFoo = NamespaceString::createNamespaceString_forTest("test", "foo");
-    // Rename ignorable collections.
-    assertIgnoredOtherNamespaces([&](const auto& nss) { doRenameCollection(nss, kTestFoo); },
-                                 boost::none);
-    assertIgnoredOtherNamespaces([&](const auto& nss) { doRenameCollection(kTestFoo, nss); },
-                                 boost::none);
-
-    auto* sp = ServerParameterSet::getClusterParameterSet()->get<ClusterTestParameter>(kCSPTest);
-    ASSERT(sp != nullptr);
-
-    // These renames "work" despite not mutating durable state
-    // since the rename away doesn't require a rescan.
-
-    // Upsert a doc for other tenant to make sure it doesn't get rescanned.
-    auto doc = makeClusterParametersDoc(LogicalTime(Timestamp(time(nullptr))), 111, "rename");
-    upsert(doc, kTenantId);
-    // Rename away (and reset that tenant to default)
-    doRenameCollection(NamespaceString::kClusterParametersNamespace, kTestFoo);
-
-    ASSERT_PARAMETER_STATE(boost::none, kDefaultIntValue, kDefaultStrValue);
-    ASSERT_PARAMETER_STATE(kTenantId, kInitialTenantIntValue, kInitialTenantStrValue);
-
-    // Rename in (and restore that tenant to initialized state)
-    doRenameCollection(kTestFoo, NamespaceString::kClusterParametersNamespace);
-
-    ASSERT_PARAMETER_STATE(boost::none, kInitialIntValue, kInitialStrValue);
-    ASSERT_PARAMETER_STATE(kTenantId, kInitialTenantIntValue, kInitialTenantStrValue);
-
-    // Repeat with other tenant
-    doRenameCollection(NamespaceString::makeClusterParametersNSS(kTenantId), kTestFoo);
-
-    ASSERT_PARAMETER_STATE(boost::none, kInitialIntValue, kInitialStrValue);
-    ASSERT_PARAMETER_STATE(kTenantId, kDefaultIntValue, kDefaultStrValue);
-
-    // Rename in (and restore to initialized state)
-    doRenameCollection(kTestFoo, NamespaceString::makeClusterParametersNSS(kTenantId));
-
-    ASSERT_PARAMETER_STATE(boost::none, kInitialIntValue, kInitialStrValue);
-    ASSERT_PARAMETER_STATE(kTenantId, 111, "rename");
-
-    doc = makeClusterParametersDoc(LogicalTime(Timestamp(time(nullptr))), 222, "rename2");
-    upsert(doc, kTenantId);
-    // Rename from one tenant to another -- should clear from-collection and reload to-collection
-    doRenameCollection(NamespaceString::makeClusterParametersNSS(boost::none),
-                       NamespaceString::makeClusterParametersNSS(kTenantId));
-
-    ASSERT_PARAMETER_STATE(boost::none, kDefaultIntValue, kDefaultStrValue);
-    ASSERT_PARAMETER_STATE(kTenantId, 222, "rename2");
-}
-
-TEST_F(ClusterServerParameterOpObserverTest, onImportCollection) {
-    initializeState();
-
-    const NamespaceString kTestFoo = NamespaceString::createNamespaceString_forTest("test", "foo");
-    // Import ignorable collections.
-    assertIgnoredOtherNamespaces([&](const auto& nss) { doImportCollection(nss); }, boost::none);
-
-    auto* sp = ServerParameterSet::getClusterParameterSet()->get<ClusterTestParameter>(kCSPTest);
-    ASSERT(sp != nullptr);
-
-    auto doc =
-        makeClusterParametersDoc(LogicalTime(Timestamp(time(nullptr))), 333, "onImportCollection");
-    upsert(doc, boost::none);
-    doc = makeClusterParametersDoc(
-        LogicalTime(Timestamp(time(nullptr))), 444, "onImportCollection.tenant");
-    upsert(doc, kTenantId);
-    // Import the collection -- should rescan only that tenant's cluster parameters.
-    doImportCollection(NamespaceString::kClusterParametersNamespace);
-
-    ASSERT_PARAMETER_STATE(boost::none, 333, "onImportCollection");
-    ASSERT_PARAMETER_STATE(kTenantId, kInitialTenantIntValue, kInitialTenantStrValue);
-
-    remove(boost::none);
-    // Import the other tenant collection -- should rescan only other tenant's parameters.
-    doImportCollection(NamespaceString::makeClusterParametersNSS(kTenantId));
-
-    ASSERT_PARAMETER_STATE(boost::none, 333, "onImportCollection");
-    ASSERT_PARAMETER_STATE(kTenantId, 444, "onImportCollection.tenant");
-}
-
 TEST_F(ClusterServerParameterOpObserverTest, onReplicationRollback) {
     initializeState();
 
@@ -541,6 +453,52 @@ TEST_F(ClusterServerParameterOpObserverTest, onReplicationRollback) {
 
     ASSERT_PARAMETER_STATE(boost::none, kDefaultIntValue, kDefaultStrValue);
     ASSERT_PARAMETER_STATE(kTenantId, kDefaultIntValue, kDefaultStrValue);
+}
+
+TEST_F(ClusterServerParameterOpObserverTest, abortsAfterObservation) {
+
+    const auto [initialDocB, initialDocT] = initializeState();
+    // Structured bindings cannot be captured, move to variable.
+    const auto initialDoc = std::move(initialDocB);
+    const auto initialDocTenant = std::move(initialDocT);
+
+    doInserts(NamespaceString::kClusterParametersNamespace,
+              {makeClusterParametersDoc(LogicalTime(Timestamp(12345678)), 123, "abc")},
+              false /* commit */);
+    doInserts(NamespaceString::makeClusterParametersNSS(kTenantId),
+              {makeClusterParametersDoc(LogicalTime(Timestamp(23456789)), 456, "def")},
+              false /* commit */);
+
+    ASSERT_PARAMETER_STATE(boost::none, kInitialIntValue, kInitialStrValue);
+    ASSERT_PARAMETER_STATE(kTenantId, kInitialTenantIntValue, kInitialTenantStrValue);
+
+    doUpdate(NamespaceString::kClusterParametersNamespace,
+             {makeClusterParametersDoc(LogicalTime(Timestamp(87654321)), 321, "cba")},
+             false /* commit */);
+    doUpdate(NamespaceString::makeClusterParametersNSS(kTenantId),
+             {makeClusterParametersDoc(LogicalTime(Timestamp(98765432)), 654, "fed")},
+             false /* commit */);
+
+    ASSERT_PARAMETER_STATE(boost::none, kInitialIntValue, kInitialStrValue);
+    ASSERT_PARAMETER_STATE(kTenantId, kInitialTenantIntValue, kInitialTenantStrValue);
+
+    doDelete(NamespaceString::kClusterParametersNamespace,
+             initialDoc,
+             true /* includeDeletedDoc */,
+             false /* commit */);
+    doDelete(NamespaceString::makeClusterParametersNSS(kTenantId),
+             initialDocTenant,
+             true /* includeDeletedDoc */,
+             false /* commit */);
+
+    ASSERT_PARAMETER_STATE(boost::none, kInitialIntValue, kInitialStrValue);
+    ASSERT_PARAMETER_STATE(kTenantId, kInitialTenantIntValue, kInitialTenantStrValue);
+
+    doDropDatabase(DatabaseName(boost::none, kConfigDB), false /* commit */);
+    doDropDatabase(DatabaseName(kTenantId, kConfigDB), false /* commit */);
+
+    ASSERT_PARAMETER_STATE(boost::none, kInitialIntValue, kInitialStrValue);
+    ASSERT_PARAMETER_STATE(kTenantId, kInitialTenantIntValue, kInitialTenantStrValue);
 }
 
 #undef ASSERT_PARAMETER_STATE

@@ -77,12 +77,18 @@ public:
                                   const UUID& uuid,
                                   std::uint64_t numRecords,
                                   CollectionDropType dropType) final;
+
+private:
+    void _onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo) final;
+
+public:
+    // Remainder of operations are ignorable.
     void postRenameCollection(OperationContext* opCtx,
                               const NamespaceString& fromCollection,
                               const NamespaceString& toCollection,
                               const UUID& uuid,
                               const boost::optional<UUID>& dropTargetUUID,
-                              bool stayTemp) final;
+                              bool stayTemp) final {}
     void onImportCollection(OperationContext* opCtx,
                             const UUID& importUUID,
                             const NamespaceString& nss,
@@ -90,12 +96,8 @@ public:
                             long long dataSize,
                             const BSONObj& catalogEntry,
                             const BSONObj& storageMetadata,
-                            bool isDryRun) final;
+                            bool isDryRun) final {}
 
-    void _onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo) final;
-
-public:
-    // Remainder of operations are ignorable.
     void onCreateGlobalIndex(OperationContext* opCtx,
                              const NamespaceString& globalIndexNss,
                              const UUID& globalIndexUUID) final{};

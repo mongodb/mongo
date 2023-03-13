@@ -30,11 +30,10 @@
 #include "mongo/idl/cluster_server_parameter_initializer.h"
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/audit.h"
 #include "mongo/db/catalog_raii.h"
-#include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/service_context.h"
+#include "mongo/idl/cluster_parameter_synchronization_helpers.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
@@ -61,135 +60,9 @@ ClusterServerParameterInitializer* ClusterServerParameterInitializer::get(
     return &getInstance(serviceContext);
 }
 
-void ClusterServerParameterInitializer::updateParameter(OperationContext* opCtx,
-                                                        BSONObj doc,
-                                                        StringData mode,
-                                                        const boost::optional<TenantId>& tenantId) {
-    auto nameElem = doc[kIdField];
-    if (nameElem.type() != String) {
-        LOGV2_DEBUG(6226301,
-                    1,
-                    "Update with invalid cluster server parameter name",
-                    "mode"_attr = mode,
-                    "tenantId"_attr = tenantId,
-                    "_id"_attr = nameElem);
-        return;
-    }
-
-    auto name = nameElem.valueStringData();
-    auto* sp = ServerParameterSet::getClusterParameterSet()->getIfExists(name);
-    if (!sp) {
-        LOGV2_DEBUG(6226300,
-                    3,
-                    "Update to unknown cluster server parameter",
-                    "mode"_attr = mode,
-                    "tenantId"_attr = tenantId,
-                    "name"_attr = name);
-        return;
-    }
-
-    auto cptElem = doc[kCPTField];
-    if ((cptElem.type() != mongo::Date) && (cptElem.type() != bsonTimestamp)) {
-        LOGV2_DEBUG(6226302,
-                    1,
-                    "Update to cluster server parameter has invalid clusterParameterTime",
-                    "mode"_attr = mode,
-                    "tenantId"_attr = tenantId,
-                    "name"_attr = name,
-                    "clusterParameterTime"_attr = cptElem);
-        return;
-    }
-
-    BSONObjBuilder oldValueBob;
-    sp->append(opCtx, &oldValueBob, name.toString(), tenantId);
-    audit::logUpdateCachedClusterParameter(opCtx->getClient(), oldValueBob.obj(), doc, tenantId);
-
-    uassertStatusOK(sp->set(doc, tenantId));
-}
-
-void ClusterServerParameterInitializer::clearParameter(OperationContext* opCtx,
-                                                       ServerParameter* sp,
-                                                       const boost::optional<TenantId>& tenantId) {
-    if (sp->getClusterParameterTime(tenantId) == LogicalTime::kUninitialized) {
-        // Nothing to clear.
-        return;
-    }
-
-    BSONObjBuilder oldValueBob;
-    sp->append(opCtx, &oldValueBob, sp->name(), tenantId);
-
-    uassertStatusOK(sp->reset(tenantId));
-
-    BSONObjBuilder newValueBob;
-    sp->append(opCtx, &newValueBob, sp->name(), tenantId);
-
-    audit::logUpdateCachedClusterParameter(
-        opCtx->getClient(), oldValueBob.obj(), newValueBob.obj(), tenantId);
-}
-
-void ClusterServerParameterInitializer::clearParameter(OperationContext* opCtx,
-                                                       StringData id,
-                                                       const boost::optional<TenantId>& tenantId) {
-    auto* sp = ServerParameterSet::getClusterParameterSet()->getIfExists(id);
-    if (!sp) {
-        LOGV2_DEBUG(6226303,
-                    5,
-                    "oplog event deletion of unknown cluster server parameter",
-                    "name"_attr = id,
-                    "tenantId"_attr = tenantId);
-        return;
-    }
-
-    clearParameter(opCtx, sp, tenantId);
-}
-
-void ClusterServerParameterInitializer::clearAllTenantParameters(
-    OperationContext* opCtx, const boost::optional<TenantId>& tenantId) {
-    const auto& params = ServerParameterSet::getClusterParameterSet()->getMap();
-    for (const auto& it : params) {
-        clearParameter(opCtx, it.second, tenantId);
-    }
-}
-
-void ClusterServerParameterInitializer::initializeAllTenantParametersFromDisk(
-    OperationContext* opCtx, const boost::optional<TenantId>& tenantId) {
-    doLoadAllTenantParametersFromDisk(
-        opCtx,
-        "initializing"_sd,
-        [&](OperationContext* opCtx,
-            const BSONObj& doc,
-            StringData mode,
-            const boost::optional<TenantId>& tenantId) {
-            updateParameter(opCtx, doc, mode, tenantId);
-        },
-        tenantId);
-}
-
-void ClusterServerParameterInitializer::resynchronizeAllTenantParametersFromDisk(
-    OperationContext* opCtx, const boost::optional<TenantId>& tenantId) {
-    const auto& allParams = ServerParameterSet::getClusterParameterSet()->getMap();
-    std::set<std::string> unsetSettings;
-    for (const auto& it : allParams) {
-        unsetSettings.insert(it.second->name());
-    }
-
-    doLoadAllTenantParametersFromDisk(
-        opCtx,
-        "resynchronizing"_sd,
-        [&](OperationContext* opCtx,
-            const BSONObj& doc,
-            StringData mode,
-            const boost::optional<TenantId>& tenantId) {
-            unsetSettings.erase(doc[kIdField].str());
-            updateParameter(opCtx, doc, mode, tenantId);
-        },
-        tenantId);
-
-    // For all known settings which were not present in this resync,
-    // explicitly clear any value which may be present in-memory.
-    for (const auto& setting : unsetSettings) {
-        clearParameter(opCtx, setting, tenantId);
-    }
+void ClusterServerParameterInitializer::onInitialDataAvailable(OperationContext* opCtx,
+                                                               bool isMajorityDataAvailable) {
+    synchronizeAllParametersFromDisk(opCtx);
 }
 
 void ClusterServerParameterInitializer::synchronizeAllParametersFromDisk(OperationContext* opCtx) {
@@ -203,15 +76,10 @@ void ClusterServerParameterInitializer::synchronizeAllParametersFromDisk(Operati
         }
 
         for (const auto& tenantId : tenantIds) {
-            initializeAllTenantParametersFromDisk(opCtx, tenantId);
+            cluster_parameters::initializeAllTenantParametersFromDisk(opCtx, tenantId);
         }
     }
-    initializeAllTenantParametersFromDisk(opCtx, boost::none);
-}
-
-void ClusterServerParameterInitializer::onInitialDataAvailable(OperationContext* opCtx,
-                                                               bool isMajorityDataAvailable) {
-    synchronizeAllParametersFromDisk(opCtx);
+    cluster_parameters::initializeAllTenantParametersFromDisk(opCtx, boost::none);
 }
 
 }  // namespace mongo

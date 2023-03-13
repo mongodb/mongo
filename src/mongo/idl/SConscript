@@ -31,10 +31,21 @@ env.Library(
         'cluster_server_parameter_initializer.cpp',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog/collection_catalog',
+        '$BUILD_DIR/mongo/db/repl/replica_set_aware_service',
+        '$BUILD_DIR/mongo/db/server_base',
+        'cluster_parameter_synchronization_helpers',
+    ],
+)
+
+env.Library(
+    target='cluster_parameter_synchronization_helpers',
+    source=[
+        'cluster_parameter_synchronization_helpers.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/audit',
         '$BUILD_DIR/mongo/db/catalog/collection_catalog',
-        '$BUILD_DIR/mongo/db/dbdirectclient',
-        '$BUILD_DIR/mongo/db/repl/replica_set_aware_service',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/shard_role',
     ],
@@ -49,6 +60,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/op_observer/op_observer',
         '$BUILD_DIR/mongo/db/server_base',
+        'cluster_parameter_synchronization_helpers',
         'cluster_server_parameter_initializer',
     ],
 )
@@ -104,6 +116,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/s/sharding_runtime_d',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
         '$BUILD_DIR/mongo/util/signal_handlers',
+        'cluster_parameter_synchronization_helpers',
         'cluster_server_parameter',
         'cluster_server_parameter_common',
         'cluster_server_parameter_initializer',

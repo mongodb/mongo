@@ -34,6 +34,7 @@
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/idl/cluster_parameter_synchronization_helpers.h"
 #include "mongo/idl/cluster_server_parameter_initializer.h"
 #include "mongo/idl/cluster_server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
@@ -77,8 +78,8 @@ public:
         remove(boost::none);
         remove(kTenantId);
         auto opCtx = cc().makeOperationContext();
-        _initializer.resynchronizeAllTenantParametersFromDisk(opCtx.get(), boost::none);
-        _initializer.resynchronizeAllTenantParametersFromDisk(opCtx.get(), kTenantId);
+        cluster_parameters::resynchronizeAllTenantParametersFromDisk(opCtx.get(), boost::none);
+        cluster_parameters::resynchronizeAllTenantParametersFromDisk(opCtx.get(), kTenantId);
     }
     /**
      * Simulates the call to the ClusterServerParameterInitializer at the end of initial sync, when
