@@ -310,6 +310,11 @@ void uassertShardKeyValueNotContainArrays(const BSONObj& value) {
     }
 }
 
+BSONObj extractReadConcern(OperationContext* opCtx) {
+    return repl::ReadConcernArgs::get(opCtx).toBSONInner().removeField(
+        ReadWriteConcernProvenanceBase::kSourceFieldName);
+}
+
 double round(double val, int n) {
     const double multiplier = std::pow(10.0, n);
     return std::ceil(val * multiplier) / multiplier;

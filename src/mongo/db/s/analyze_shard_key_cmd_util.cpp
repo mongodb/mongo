@@ -349,6 +349,7 @@ CardinalityFrequencyMetrics calculateCardinalityAndFrequencyUnique(OperationCont
     pipeline.push_back(BSON("$match" << BSONObj()));
     pipeline.push_back(BSON("$limit" << numMostCommonValues));
     AggregateCommandRequest aggRequest(nss, pipeline);
+    aggRequest.setReadConcern(extractReadConcern(opCtx));
 
     runAggregate(opCtx, aggRequest, [&](const BSONObj& doc) {
         auto value = dotted_path_support::extractElementsBasedOnTemplate(doc.getOwned(), shardKey);
@@ -544,6 +545,7 @@ CollStatsMetrics calculateCollStats(OperationContext* opCtx, const NamespaceStri
                                                    << BSON("$sum"
                                                            << "$storageStats.numOrphanDocs"))));
     AggregateCommandRequest aggRequest(nss, pipeline);
+    aggRequest.setReadConcern(extractReadConcern(opCtx));
 
     runAggregate(opCtx, aggRequest, [&](const BSONObj& doc) {
         metrics.numDocs = doc.getField(kNumDocsFieldName).exactNumberLong();
@@ -694,10 +696,19 @@ KeyCharacteristicsMetrics calculateKeyCharacteristicsMetrics(OperationContext* o
         // Performs best-effort validation that the shard key does not contain an array field by
         // extracting the shard key value from a random document in the collection and asserting
         // that it does not contain an array field.
+
+        // Save the original readConcern since the one on the opCtx will get overwritten as part
+        // running a command via DBDirectClient below, and it is illegal to specify readConcern
+        // to DBDirectClient::find().
+        auto originalReadConcernArgs = repl::ReadConcernArgs::get(opCtx);
+
         DBDirectClient client(opCtx);
         auto doc = client.findOne(nss, {});
         auto value = dotted_path_support::extractElementsBasedOnTemplate(doc, shardKeyBson);
         uassertShardKeyValueNotContainArrays(value);
+
+        // Restore the original readConcern.
+        repl::ReadConcernArgs::get(opCtx) = originalReadConcernArgs;
 
         auto indexSpec = findCompatiblePrefixedIndex(
             opCtx, *collection, collection->getIndexCatalog(), shardKeyBson);
@@ -759,6 +770,7 @@ std::pair<ReadDistributionMetrics, WriteDistributionMetrics> calculateReadWriteD
     pipeline.push_back(
         BSON(DocumentSourceAnalyzeShardKeyReadWriteDistribution::kStageName << spec.toBSON()));
     AggregateCommandRequest aggRequest(nss, pipeline);
+    aggRequest.setReadConcern(extractReadConcern(opCtx));
 
     runAggregate(opCtx, aggRequest, [&](const BSONObj& doc) {
         const auto response = DocumentSourceAnalyzeShardKeyReadWriteDistributionResponse::parse(

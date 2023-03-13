@@ -180,6 +180,17 @@ function analyzeShardKey(ns, shardKey, indexKey) {
                    `index has been dropped: ${tojsononeline(res)}`);
         return res;
     }
+    if (res.code == 640570) {
+        jsTest.log(`Failed to analyze the shard key because the collection has been dropped and ` +
+                   `that got detected through the shard version check ${tojsononeline(res)}`);
+        return res;
+    }
+    if (res.code == 640571) {
+        jsTest.log(`Failed to analyze the shard key because the collection has been dropped and ` +
+                   `that got detected through the the database version check ` +
+                   `${tojsononeline(res)}`);
+        return res;
+    }
     if (res.code == ErrorCodes.CollectionUUIDMismatch) {
         jsTest.log(`Failed to analyze the shard key because the collection has been recreated: ${
             tojsononeline(res)}`);

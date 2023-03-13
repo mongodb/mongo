@@ -85,6 +85,15 @@ Status validateIndexKey(const BSONObj& indexKey);
  */
 void uassertShardKeyValueNotContainArrays(const BSONObj& value);
 
+/**
+ * If the operation has a readConcern, returns a BSON object of the following form:
+ * { level: "...",
+ *   afterClusterTime: Timestamp(...) }
+ *
+ * Otherwise, returns an empty BSON object.
+ */
+BSONObj extractReadConcern(OperationContext* opCtx);
+
 //
 // Other helpers.
 
