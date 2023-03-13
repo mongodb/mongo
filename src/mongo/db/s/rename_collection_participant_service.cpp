@@ -40,6 +40,7 @@
 #include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_recovery_service.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/grid.h"
@@ -55,8 +56,10 @@ const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 /*
  * Drop the collection locally and clear stale metadata from cache collections.
  */
-void dropCollectionLocally(OperationContext* opCtx, const NamespaceString& nss) {
-    DropCollectionCoordinator::dropCollectionLocally(opCtx, nss, false /* fromMigrate */);
+void dropCollectionLocally(OperationContext* opCtx,
+                           const NamespaceString& nss,
+                           bool markFromMigrate) {
+    DropCollectionCoordinator::dropCollectionLocally(opCtx, nss, markFromMigrate);
     LOGV2_DEBUG(5515100,
                 1,
                 "Dropped target collection locally on renameCollection participant.",
@@ -109,7 +112,7 @@ void renameOrDropTarget(OperationContext* opCtx,
                     1,
                     "Source namespace not found while trying to rename collection on participant",
                     "namespace"_attr = fromNss);
-        dropCollectionLocally(opCtx, toNss);
+        dropCollectionLocally(opCtx, toNss, options.markFromMigrate);
         deleteRangeDeletionTasksForRename(opCtx, fromNss, toNss);
     }
 }
@@ -330,9 +333,22 @@ SemiFuture<void> RenameParticipantInstance::_runImpl(
                 auto* opCtx = opCtxHolder.get();
                 _doc.getForwardableOpMetadata().setOn(opCtx);
 
+                // TODO SERVER-74719 replace with a query to config.system.sharding_ddl_coordinators
+                const auto primaryShardId =
+                    Grid::get(opCtx)
+                        ->catalogClient()
+                        ->getDatabase(opCtx,
+                                      fromNss().dbName().db(),
+                                      repl::ReadConcernLevel::kMajorityReadConcern)
+                        .getPrimary();
+                const auto thisShardId = ShardingState::get(opCtx)->shardId();
+
                 RenameCollectionOptions options;
                 options.dropTarget = _doc.getDropTarget();
                 options.stayTemp = _doc.getStayTemp();
+                // Use the "markFromMigrate" option so that change streams capturing events about
+                // fromNss/toNss won't receive duplicate drop notifications.
+                options.markFromMigrate = (thisShardId != primaryShardId);
 
                 renameOrDropTarget(
                     opCtx, fromNss(), toNss(), options, _doc.getSourceUUID(), _doc.getTargetUUID());
