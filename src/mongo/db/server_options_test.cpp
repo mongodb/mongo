@@ -37,6 +37,7 @@
 #include <unistd.h>
 #endif
 #ifndef _WIN32
+#include <cstdlib>
 #include <sys/types.h>
 #include <sys/wait.h>
 #endif
@@ -45,6 +46,7 @@
 #include <TargetConditionals.h>
 #endif
 
+#include <boost/algorithm/string/join.hpp>
 #include <boost/filesystem.hpp>
 
 #include "mongo/base/init.h"
@@ -60,6 +62,7 @@
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/options_parser/options_parser.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
 
 
 namespace {
@@ -71,6 +74,7 @@ using mongo::unittest::getMinimumLogSeverity;
 using mongo::unittest::hasMinimumLogSeverity;
 
 namespace moe = mongo::optionenvironment;
+using namespace fmt::literals;
 
 MONGO_INITIALIZER(ServerLogRedirection)(mongo::InitializerContext*) {
     // ssl_options_server.cpp has an initializer which depends on logging.
@@ -103,6 +107,89 @@ class Verbosity : public mongo::unittest::Test {
     /** Reset the log level before we test */
     mongo::unittest::MinimumLoggedSeverityGuard _severityGuard{mongo::logv2::LogComponent::kDefault,
                                                                mongo::logv2::LogSeverity::Info()};
+};
+
+class SetupOptionsTestConfig {
+public:
+    SetupOptionsTestConfig() : binaryArgs_{}, configFileName_{}, configOpts_{}, envVars_{} {}
+
+    SetupOptionsTestConfig(std::vector<std::string> binaryArgs,
+                           std::string configFileName,
+                           std::vector<std::pair<std::string, std::string>> configOpts,
+                           std::vector<std::pair<std::string, std::string>> envVars)
+        : binaryArgs_{binaryArgs},
+          configFileName_{configFileName},
+          configOpts_{configOpts},
+          envVars_{envVars} {}
+
+    std::vector<std::string> binaryArgs() const {
+        std::vector<std::string> args = {"binaryname"};
+        args.insert(args.end(), binaryArgs_.cbegin(), binaryArgs_.cend());
+
+        if (!configFileName_.empty()) {
+            args.push_back("--config");
+            args.push_back(configFileName_);
+        }
+
+        return args;
+    }
+
+    std::vector<std::pair<std::string, std::string>> envVars() const {
+        return envVars_;
+    }
+
+    bool hasEnvVars() const {
+        return !envVars_.empty();
+    }
+
+    std::string configFileName() const {
+        return configFileName_;
+    }
+
+    bool hasConfigFile() const {
+        return !configFileName_.empty();
+    }
+
+    std::string configFileContents() const {
+        std::string fileContents;
+        for (auto&& [key, value] : configOpts_) {
+            std::vector<std::string> splitKeys;
+            mongo::str::splitStringDelim(key, &splitKeys, '.');
+
+            // Split up the configuration key by '.' into separate sections.
+            int indent = 0;
+            for (auto&& splitKey : splitKeys) {
+                if (indent > 0) {
+                    fileContents += "\n";
+                }
+                fileContents += std::string(indent, ' ') + splitKey + ":";
+                indent += 4;
+            }
+            fileContents += " " + value + "\n";
+        }
+        return fileContents;
+    }
+
+    std::string toString() const {
+        std::string str = "argv=[{}],"_format(boost::algorithm::join(binaryArgs(), ", "));
+        if (hasConfigFile()) {
+            str += "confFile=[\n{}],"_format(configFileContents());
+        }
+        if (hasEnvVars()) {
+            std::vector<std::string> envs;
+            for (auto&& [k, v] : envVars_) {
+                envs.push_back("{}={}"_format(k, v));
+            }
+            str += "env=[{}],"_format(boost::algorithm::join(envs, ", "));
+        }
+        return "SetupOptionsTestConfig({})"_format(str);
+    }
+
+private:
+    std::vector<std::string> binaryArgs_;
+    std::string configFileName_;
+    std::vector<std::pair<std::string, std::string>> configOpts_;
+    std::vector<std::pair<std::string, std::string>> envVars_;
 };
 
 TEST_F(Verbosity, Default) {
@@ -704,6 +791,147 @@ TEST(SetupOptions, NonNumericSampleRateYAMLConfigOptionFailsToParse) {
 
     ASSERT_NOT_OK(parser.run(options, argv, &environment));
 }
+
+#ifndef _WIN32
+class ForkTestSpec {
+public:
+    enum Value {
+        NO_OPTIONS,
+        COMMANDLINE_ONLY,
+        CONFIG_ONLY,
+        BOTH,
+        COMMANDLINE_WITH_ENV,
+        CONFIG_WITH_ENV,
+        BOTH_WITH_ENV,
+    };
+
+    ForkTestSpec() = default;
+    constexpr operator Value() const {
+        return value_;
+    }
+    explicit operator bool() = delete;
+
+    ForkTestSpec(Value value) : value_{value} {
+        std::vector<std::string> args = {"--fork", "--syslog"};
+        std::vector<std::pair<std::string, std::string>> envVars{
+            {"MONGODB_CONFIG_OVERRIDE_NOFORK", "1"}};
+        std::string confFileName = "config.yaml";
+        std::vector<std::pair<std::string, std::string>> opts = {
+            {"systemLog.destination", "syslog"}, {"processManagement.fork", "true"}};
+
+        switch (value) {
+            case NO_OPTIONS: {
+                config_ = SetupOptionsTestConfig();
+                name_ = "NO_OPTIONS";
+                break;
+            }
+            case COMMANDLINE_ONLY: {
+                config_ = SetupOptionsTestConfig(args, "", {}, {});
+                name_ = "COMMANDLINE_ONLY";
+                break;
+            }
+            case CONFIG_ONLY: {
+                config_ = SetupOptionsTestConfig({}, confFileName, opts, {});
+                name_ = "CONFIG_ONLY";
+                break;
+            }
+            case BOTH: {
+                config_ = SetupOptionsTestConfig(args, confFileName, opts, {});
+                name_ = "BOTH";
+                break;
+            }
+            case COMMANDLINE_WITH_ENV: {
+                config_ = SetupOptionsTestConfig(args, "", {}, envVars);
+                name_ = "COMMANDLINE_WITH_ENV";
+                break;
+            }
+            case CONFIG_WITH_ENV: {
+                config_ = SetupOptionsTestConfig({}, confFileName, opts, envVars);
+                name_ = "CONFIG_WITH_ENV";
+                break;
+            }
+            case BOTH_WITH_ENV: {
+                config_ = SetupOptionsTestConfig(args, confFileName, opts, envVars);
+                name_ = "BOTH_WITH_ENV";
+                break;
+            }
+        }
+    }
+
+    SetupOptionsTestConfig config() const {
+        return config_;
+    }
+
+    std::string toString() const {
+        return "SetupOptionsTestConfig(specName={}, config={})"_format(name_, config_.toString());
+    }
+
+private:
+    Value value_;
+    std::string name_;
+    SetupOptionsTestConfig config_;
+};
+
+class ForkTest {
+public:
+    ForkTest(const ForkTestSpec spec, bool doForkValue)
+        : spec_{spec}, doForkValue_{doForkValue}, parser_{}, environment_{}, options_{} {
+        ASSERT_OK(::mongo::addGeneralServerOptions(&options_));
+        ASSERT_OK(::mongo::addNonGeneralServerOptions(&options_));
+
+        if (spec.config().hasConfigFile()) {
+            parser_.setConfig(spec.config().configFileName(), spec.config().configFileContents());
+        }
+    }
+
+    void run() {
+        auto&& argv = spec_.config().binaryArgs();
+
+        for (auto&& [envKey, envValue] : spec_.config().envVars()) {
+            setenv(envKey.c_str(), envValue.c_str(), 1);
+        }
+
+        auto sg = ::mongo::ScopeGuard<std::function<void()>>([&] {
+            ::mongo::serverGlobalParams.doFork = false;
+            for (auto&& [envKey, envValue] : spec_.config().envVars()) {
+                unsetenv(envKey.c_str());
+            }
+        });
+
+        ASSERT_OK(parser_.run(options_, argv, &environment_)) << spec_.toString();
+
+        ASSERT_OK(::mongo::validateServerOptions(environment_)) << spec_.toString();
+        ASSERT_OK(::mongo::canonicalizeServerOptions(&environment_)) << spec_.toString();
+        ASSERT_OK(::mongo::setupServerOptions(argv)) << spec_.toString();
+        ASSERT_OK(::mongo::storeServerOptions(environment_)) << spec_.toString();
+
+        ASSERT_EQ(::mongo::serverGlobalParams.doFork, doForkValue_) << spec_.toString();
+    }
+
+private:
+    ForkTestSpec spec_;
+    bool doForkValue_;
+    OptionsParserTester parser_;
+    moe::Environment environment_;
+    moe::OptionSection options_;
+};
+
+TEST(SetupOptions, ForkCommandLineParamParsesSuccessfully) {
+    ForkTest{ForkTestSpec::NO_OPTIONS, false}.run();
+    ForkTest{ForkTestSpec::COMMANDLINE_ONLY, true}.run();
+}
+
+TEST(SetupOptions, ForkYAMLConfigOptionParsesSuccessfully) {
+    ForkTest{ForkTestSpec::NO_OPTIONS, false}.run();
+    ForkTest{ForkTestSpec::CONFIG_ONLY, true}.run();
+}
+
+TEST(SetupOptions, ForkOptionAlwaysFalseWithNoforkEnvVar) {
+    ForkTest{ForkTestSpec::COMMANDLINE_WITH_ENV, false}.run();
+    ForkTest{ForkTestSpec::CONFIG_WITH_ENV, false}.run();
+    ForkTest{ForkTestSpec::BOTH_WITH_ENV, false}.run();
+}
+#endif
 
 #if !defined(_WIN32) && !(defined(__APPLE__) && TARGET_OS_TV)
 
