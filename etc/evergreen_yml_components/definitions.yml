@@ -6477,27 +6477,6 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
 
-- <<: *task_template
-  name: analyze_shard_key_stepdown_jscore_passthrough
-  tags: ["sharding"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: analyze_shard_key_kill_primary_jscore_passthrough
-  tags: ["sharding"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: analyze_shard_key_terminate_primary_jscore_passthrough
-  tags: ["sharding"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
 - <<: *gen_task_template
   name: ssl_gen
   tags: ["encrypt", "ssl", "patch_build"]
