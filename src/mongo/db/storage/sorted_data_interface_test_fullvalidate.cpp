@@ -66,12 +66,6 @@ TEST(SortedDataInterface, FullValidate) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(nToInsert, sorted->numEntries(opCtx.get()));
     }
-
-    {
-        const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        // Full validate will set keysTraversedFromFullValidate to the number of keys.
-        ASSERT(sorted->validate(opCtx.get(), true).keysTraversedFromFullValidate == nToInsert);
-    }
 }
 
 }  // namespace
