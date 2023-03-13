@@ -35,7 +35,6 @@
 #include "mongo/client/remote_command_retry_scheduler.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/commands/txn_two_phase_commit_cmds_gen.h"
-#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/ops/write_ops.h"
@@ -445,8 +444,8 @@ Future<repl::OpTime> persistDecision(txn::AsyncWorkScheduler& scheduler,
                     // Do not acquire a storage ticket in order to avoid unnecessary serialization
                     // with other prepared transactions that are holding a storage ticket
                     // themselves; see SERVER-60682.
-                    SetAdmissionPriorityForLock setTicketAquisition(
-                        opCtx, AdmissionContext::Priority::kImmediate);
+                    ScopedAdmissionPriorityForLock setTicketAquisition(
+                        opCtx->lockState(), AdmissionContext::Priority::kImmediate);
                     getTransactionCoordinatorWorkerCurOpRepository()->set(
                         opCtx, lsid, txnNumberAndRetryCounter, CoordinatorAction::kWritingDecision);
                     return persistDecisionBlocking(

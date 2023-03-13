@@ -41,7 +41,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands/fsync_locked.h"
 #include "mongo/db/commands/server_status_metric.h"
-#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/delete_stage.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -454,7 +453,7 @@ bool TTLMonitor::_doTTLSubPass(
             // 'AdmissionContext::Priority::kNormal' for one index means the priority will be
             // 'normal' for all indexes.
             AdmissionContext::Priority priority = getTTLPriority(uuid, ttlPriorityMap);
-            SetAdmissionPriorityForLock priorityGuard(opCtx, priority);
+            ScopedAdmissionPriorityForLock priorityGuard(opCtx->lockState(), priority);
 
             for (const auto& info : infos) {
                 bool moreToDelete = _doTTLIndexDelete(opCtx, &ttlCollectionCache, uuid, info);

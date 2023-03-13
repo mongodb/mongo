@@ -35,7 +35,6 @@
 #include <functional>
 #include <memory>
 
-#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/repl/hello_response.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
@@ -443,7 +442,8 @@ void ReplCoordTest::simulateSuccessfulV1ElectionAt(Date_t electionTime) {
 void ReplCoordTest::signalDrainComplete(OperationContext* opCtx) noexcept {
     // Writes that occur in code paths that call signalDrainComplete are expected to have Immediate
     // priority.
-    SetAdmissionPriorityForLock priority(opCtx, AdmissionContext::Priority::kImmediate);
+    ScopedAdmissionPriorityForLock priority(opCtx->lockState(),
+                                            AdmissionContext::Priority::kImmediate);
     getExternalState()->setFirstOpTimeOfMyTerm(OpTime(Timestamp(1, 1), getReplCoord()->getTerm()));
     getReplCoord()->signalDrainComplete(opCtx, getReplCoord()->getTerm());
 }

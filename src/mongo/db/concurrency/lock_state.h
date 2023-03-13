@@ -422,34 +422,6 @@ public:
 };
 
 /**
- * RAII-style class to set the priority for the ticket admission mechanism when acquiring a global
- * lock.
- */
-class SetAdmissionPriorityForLock {
-public:
-    SetAdmissionPriorityForLock(const SetAdmissionPriorityForLock&) = delete;
-    SetAdmissionPriorityForLock& operator=(const SetAdmissionPriorityForLock&) = delete;
-    explicit SetAdmissionPriorityForLock(OperationContext* opCtx,
-                                         AdmissionContext::Priority priority)
-        : _opCtx(opCtx), _originalPriority(opCtx->lockState()->getAdmissionPriority()) {
-        uassert(ErrorCodes::IllegalOperation,
-                "It is illegal for an operation to demote a high priority to a lower priority "
-                "operation",
-                _originalPriority != AdmissionContext::Priority::kImmediate ||
-                    priority == AdmissionContext::Priority::kImmediate);
-        _opCtx->lockState()->setAdmissionPriority(priority);
-    }
-
-    ~SetAdmissionPriorityForLock() {
-        _opCtx->lockState()->setAdmissionPriority(_originalPriority);
-    }
-
-private:
-    OperationContext* _opCtx;
-    AdmissionContext::Priority _originalPriority;
-};
-
-/**
  * Retrieves the global lock manager instance.
  * Legacy global lock manager accessor for internal lock implementation * and debugger scripts
  * such as gdb/mongo_lock.py.

@@ -41,7 +41,6 @@
 #include "mongo/db/catalog/index_build_entry_gen.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
@@ -2861,7 +2860,7 @@ void IndexBuildsCoordinator::_scanCollectionAndInsertSortedKeysIntoIndex(
     // impact on user operations. Other steps of the index builds such as the draining phase have
     // normal priority because index builds are required to eventually catch-up with concurrent
     // writers. Otherwise we risk never finishing the index build.
-    SetAdmissionPriorityForLock priority(opCtx, AdmissionContext::Priority::kLow);
+    ScopedAdmissionPriorityForLock priority(opCtx->lockState(), AdmissionContext::Priority::kLow);
     {
         indexBuildsSSS.scanCollection.addAndFetch(1);
 
@@ -2896,7 +2895,7 @@ void IndexBuildsCoordinator::_insertSortedKeysIntoIndexForResume(
     // impact on user operations. Other steps of the index builds such as the draining phase have
     // normal priority because index builds are required to eventually catch-up with concurrent
     // writers. Otherwise we risk never finishing the index build.
-    SetAdmissionPriorityForLock priority(opCtx, AdmissionContext::Priority::kLow);
+    ScopedAdmissionPriorityForLock priority(opCtx->lockState(), AdmissionContext::Priority::kLow);
     {
         Lock::DBLock autoDb(opCtx, replState->dbName, MODE_IX);
         const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);

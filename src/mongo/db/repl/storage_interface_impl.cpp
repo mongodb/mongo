@@ -51,7 +51,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
@@ -1427,7 +1426,8 @@ void StorageInterfaceImpl::waitForAllEarlierOplogWritesToBeVisible(OperationCont
                                                                    bool primaryOnly) {
     // Waiting for oplog writes to be visible in the oplog does not use any storage engine resources
     // and must not wait for ticket acquisition to avoid deadlocks with updating oplog visibility.
-    SetAdmissionPriorityForLock setTicketAquisition(opCtx, AdmissionContext::Priority::kImmediate);
+    ScopedAdmissionPriorityForLock setTicketAquisition(opCtx->lockState(),
+                                                       AdmissionContext::Priority::kImmediate);
 
     AutoGetOplog oplogRead(opCtx, OplogAccessMode::kRead);
     if (primaryOnly &&
@@ -1443,7 +1443,8 @@ void StorageInterfaceImpl::oplogDiskLocRegister(OperationContext* opCtx,
                                                 bool orderedCommit) {
     // Setting the oplog visibility does not use any storage engine resources and must skip ticket
     // acquisition to avoid deadlocks with updating oplog visibility.
-    SetAdmissionPriorityForLock setTicketAquisition(opCtx, AdmissionContext::Priority::kImmediate);
+    ScopedAdmissionPriorityForLock setTicketAquisition(opCtx->lockState(),
+                                                       AdmissionContext::Priority::kImmediate);
 
     AutoGetOplog oplogRead(opCtx, OplogAccessMode::kRead);
     fassert(28557,

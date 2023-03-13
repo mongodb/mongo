@@ -735,4 +735,32 @@ private:
     bool _originalValue;
 };
 
+/**
+ * RAII-style class to set the priority for the ticket admission mechanism when acquiring a global
+ * lock.
+ */
+class ScopedAdmissionPriorityForLock {
+public:
+    ScopedAdmissionPriorityForLock(Locker* lockState, AdmissionContext::Priority priority)
+        : _lockState(lockState), _originalPriority(_lockState->getAdmissionPriority()) {
+        uassert(ErrorCodes::IllegalOperation,
+                "It is illegal for an operation to demote a high priority to a lower priority "
+                "operation",
+                _originalPriority != AdmissionContext::Priority::kImmediate ||
+                    priority == AdmissionContext::Priority::kImmediate);
+        _lockState->setAdmissionPriority(priority);
+    }
+
+    ScopedAdmissionPriorityForLock(const ScopedAdmissionPriorityForLock&) = delete;
+    ScopedAdmissionPriorityForLock& operator=(const ScopedAdmissionPriorityForLock&) = delete;
+
+    ~ScopedAdmissionPriorityForLock() {
+        _lockState->setAdmissionPriority(_originalPriority);
+    }
+
+private:
+    Locker* _lockState;
+    AdmissionContext::Priority _originalPriority;
+};
+
 }  // namespace mongo

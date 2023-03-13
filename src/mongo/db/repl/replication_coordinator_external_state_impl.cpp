@@ -53,7 +53,6 @@
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
@@ -864,7 +863,8 @@ void ReplicationCoordinatorExternalStateImpl::_stopAsyncUpdatesOfAndClearOplogTr
     // As opCtx does not expose a method to allow skipping flow control on purpose we mark the
     // operation as having Immediate priority. This will skip flow control and ticket acquisition.
     // It is fine to do this since the system is essentially shutting down at this point.
-    SetAdmissionPriorityForLock priority(opCtx, AdmissionContext::Priority::kImmediate);
+    ScopedAdmissionPriorityForLock priority(opCtx->lockState(),
+                                            AdmissionContext::Priority::kImmediate);
 
     // Tell the system to stop updating the oplogTruncateAfterPoint asynchronously and to go
     // back to using last applied to update repl's durable timestamp instead of the truncate

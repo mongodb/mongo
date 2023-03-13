@@ -1322,8 +1322,8 @@ TEST_F(LockerImplTest, SetTicketAcquisitionForLockRAIIType) {
     ASSERT_TRUE(opCtx->lockState()->shouldWaitForTicket());
 
     {
-        SetAdmissionPriorityForLock setTicketAquisition(opCtx.get(),
-                                                        AdmissionContext::Priority::kImmediate);
+        ScopedAdmissionPriorityForLock setTicketAquisition(opCtx->lockState(),
+                                                           AdmissionContext::Priority::kImmediate);
         ASSERT_FALSE(opCtx->lockState()->shouldWaitForTicket());
     }
 
@@ -1333,8 +1333,8 @@ TEST_F(LockerImplTest, SetTicketAcquisitionForLockRAIIType) {
     ASSERT_FALSE(opCtx->lockState()->shouldWaitForTicket());
 
     {
-        SetAdmissionPriorityForLock setTicketAquisition(opCtx.get(),
-                                                        AdmissionContext::Priority::kImmediate);
+        ScopedAdmissionPriorityForLock setTicketAquisition(opCtx->lockState(),
+                                                           AdmissionContext::Priority::kImmediate);
         ASSERT_FALSE(opCtx->lockState()->shouldWaitForTicket());
     }
 

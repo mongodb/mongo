@@ -35,7 +35,6 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/storage_interface.h"
@@ -422,7 +421,8 @@ ReplicationConsistencyMarkersImpl::refreshOplogTruncateAfterPointIfPrimary(
     // waiting for durability. SERVER-60682 is an example with more pending prepared transactions
     // than storage tickets; the transaction coordinator could not persist the decision and had to
     // unnecessarily wait for prepared transactions to expire to make forward progress.
-    SetAdmissionPriorityForLock setTicketAquisition(opCtx, AdmissionContext::Priority::kImmediate);
+    ScopedAdmissionPriorityForLock setTicketAquisition(opCtx->lockState(),
+                                                       AdmissionContext::Priority::kImmediate);
 
     // The locks necessary to write to the oplog truncate after point's collection and read from the
     // oplog collection must be taken up front so that the mutex can also be taken around both
