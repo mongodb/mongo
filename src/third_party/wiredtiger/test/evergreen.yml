@@ -677,6 +677,22 @@ variables:
         vars:
           format_test_script_args: -e "SEGFAULT_SIGNALS=all" -b "catchsegv ./t" -t 360
 
+  - &format-stress-sanitizer-ppc-test
+    exec_timeout_secs: 25200
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          posix_configure_flags: --enable-lz4 --enable-snappy --enable-zlib
+      - func: "format test script"
+        vars:
+          # Always disable mmap for PPC due to issues on variant setup.
+          # See https://bugzilla.redhat.com/show_bug.cgi?id=1686261#c10 for the potential cause.
+          format_test_script_args: -t 360 -- -C "mmap=false,mmap_all=false"
+          test_env_vars:
+            ASAN_OPTIONS="detect_leaks=1:abort_on_error=1:disable_coredump=0:unmap_shadow_on_exit=1"
+            ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer
+
   - &format-stress-sanitizer-test
     exec_timeout_secs: 25200
     commands:
@@ -2804,9 +2820,8 @@ tasks:
             set -o verbose
             for i in {1..10}; do ${test_env_vars|} ${python_binary|python3} split_stress.py; done
 
-  # The task name is ppc-zseries because this task will be used in both buildVariants
-  - name: format-stress-ppc-zseries-test
-    tags: ["stress-test-ppc-1", "stress-test-zseries-1"]
+  - name: format-stress-zseries-test
+    tags: ["stress-test-zseries-1"]
     # Set 2.5 hours timeout (60 * 60 * 2.5)
     exec_timeout_secs: 9000
     commands:
@@ -2841,9 +2856,10 @@ tasks:
           test_env_vars:
             ASAN_OPTIONS="detect_leaks=1:abort_on_error=1:disable_coredump=0"
             ASAN_SYMBOLIZER_PATH=/usr/lib/llvm-6.0/bin/llvm-symbolizer
-          # Run for 2 hours (2 * 60 = 120 minutes), don't stop at failed tests, use default config
-          format_test_script_args: -t 120
-
+          # Run for 2 hours ( 2 * 60 = 120 minutes), use default config
+          # Always disable mmap for PPC due to issues on variant setup.
+          # See https://bugzilla.redhat.com/show_bug.cgi?id=1686261#c10 for the potential cause.
+          format_test_script_args: -e "SEGFAULT_SIGNALS=all" -b "catchsegv ./t" -t 120 -- -C "mmap=false,mmap_all=false"
 
   - <<: *format-stress-test
     name: format-stress-test-1
@@ -2857,12 +2873,18 @@ tasks:
   - <<: *format-stress-test
     name: format-stress-test-4
     tags: ["stress-test-4"]
+  - <<: *format-stress-sanitizer-ppc-test
+    name: format-stress-sanitizer-ppc-test-1
+    tags: ["stress-test-ppc-1"]
+  - <<: *format-stress-sanitizer-ppc-test
+    name: format-stress-sanitizer-ppc-test-2
+    tags: ["stress-test-ppc-2"]
   - <<: *format-stress-sanitizer-test
     name: format-stress-sanitizer-test-1
-    tags: ["stress-test-1"]
+    tags: ["stress-test-sanitizer-1"]
   - <<: *format-stress-sanitizer-test
     name: format-stress-sanitizer-test-2
-    tags: ["stress-test-2"]
+    tags: ["stress-test-sanitizer-2"]
   - <<: *format-stress-sanitizer-test
     name: format-stress-sanitizer-test-3
     tags: ["stress-test-3"]
@@ -4122,14 +4144,15 @@ buildvariants:
   - name: verify-datafile-big-endian
   - name: verify-datafile-from-little-endian
 
-- name: ubuntu1804-ppc
-  display_name: "~ Ubuntu 18.04 PPC"
+- name: rhel8-ppc
+  display_name: "~ RHEL8 PPC"
   run_on:
-  - ubuntu1804-power8-test
+  - rhel81-power8-small
   batchtime: 120 # 2 hours
   expansions:
     format_test_setting: ulimit -c unlimited
-    smp_command: -j $(grep -c ^processor /proc/cpuinfo)
+    # Use quarter of the vCPUs to avoid OOM kill failure and disk issues on this variant.
+    smp_command: -j $(echo $(grep -c ^processor /proc/cpuinfo) / 4 | bc)
     make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
     test_env_vars:
       PATH=/opt/mongodbtoolchain/v3/bin:$PATH
@@ -4153,6 +4176,7 @@ buildvariants:
   - name: format-asan-smoke-ppc-test
   - name: format-wtperf-test
   - name: ".stress-test-ppc-1"
+  - name: ".stress-test-ppc-2"
 
 - name: ubuntu1804-ppc-cmake
   display_name: "* Ubuntu 18.04 PPC CMake"

@@ -382,6 +382,7 @@ STAILQ
 STEC
 STR
 STRUCT
+SYSCALL
 Scalability
 Scalable
 Sedgewick
