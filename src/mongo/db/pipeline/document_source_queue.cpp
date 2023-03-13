@@ -44,7 +44,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceQueue::createFromBson(
             arrayElem.type() == BSONType::Array);
     auto queue = DocumentSourceQueue::create(expCtx);
     // arrayElem is an Array and can be iterated through by using .Obj() method
-    for (auto elem : arrayElem.Obj()) {
+    for (const auto& elem : arrayElem.Obj()) {
         uassert(5858202,
                 "literal documents specification must be an array of objects",
                 elem.type() == BSONType::Object);
