@@ -116,7 +116,7 @@ TEST_F(TelemetryStoreTest, EvictEntries) {
  * A default redaction strategy that generates easy to check results for testing purposes.
  */
 std::string redactFieldNameForTest(StringData s) {
-    return str::stream() << "HASH(" << s << ")";
+    return str::stream() << "HASH<" << s << ">";
 }
 TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
     auto expCtx = make_intrusive<ExpressionContextForTest>();
@@ -129,27 +129,50 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
 
     auto redacted = telemetry::redactFindRequest(fcr, opts, expCtx);
 
-    ASSERT_STR_EQ_AUTO(
-        "{ find: \"HASH(testColl)\", filter: { HASH(a): { $eq: \"?\" } } }",  // NOLINT (test
-                                                                              // auto-update)
-        redacted.toString());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({"find":"HASH<testColl>","filter":{"HASH<a>":{"$eq":"?"}}})",
+        redacted);
 
     // Add sort.
     fcr.setSort(BSON("sortVal" << 1 << "otherSort" << -1));
     redacted = telemetry::redactFindRequest(fcr, opts, expCtx);
-    ASSERT_STR_EQ_AUTO(
-        "{ find: \"HASH(testColl)\", filter: { HASH(a): { $eq: \"?\" } }, sort: { HASH(sortVal): "
-        "1, HASH(otherSort): -1 } }",
-        redacted.toString());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "find": "HASH<testColl>",
+            "filter": {
+                "HASH<a>": {
+                    "$eq": "?"
+                }
+            },
+            "sort": {
+                "HASH<sortVal>": 1,
+                "HASH<otherSort>": -1
+            }
+        })",
+        redacted);
 
     // Add inclusion projection.
     fcr.setProjection(BSON("e" << true << "f" << true));
     redacted = telemetry::redactFindRequest(fcr, opts, expCtx);
-    ASSERT_STR_EQ_AUTO(
-        "{ find: \"HASH(testColl)\", filter: { HASH(a): { $eq: \"?\" } }, projection: { HASH(e): "
-        "true, HASH(f): true, HASH(_id): true }, sort: { HASH(sortVal): 1, HASH(otherSort): -1 } "
-        "}",
-        redacted.toString());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "find": "HASH<testColl>",
+            "filter": {
+                "HASH<a>": {
+                    "$eq": "?"
+                }
+            },
+            "projection": {
+                "HASH<e>": true,
+                "HASH<f>": true,
+                "HASH<_id>": true
+            },
+            "sort": {
+                "HASH<sortVal>": 1,
+                "HASH<otherSort>": -1
+            }
+        })",
+        redacted);
 
     // Add let.
     fcr.setLet(BSON("var1"
@@ -157,23 +180,72 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                     << "var2"
                     << "const1"));
     redacted = telemetry::redactFindRequest(fcr, opts, expCtx);
-    ASSERT_STR_EQ_AUTO(
-        "{ find: \"HASH(testColl)\", filter: { HASH(a): { $eq: \"?\" } }, let: { HASH(var1): "
-        "\"$HASH(a)\", HASH(var2): { $const: \"?\" } }, projection: { HASH(e): true, HASH(f): "
-        "true, HASH(_id): true }, sort: { HASH(sortVal): 1, HASH(otherSort): -1 } }",
-        redacted.toString());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "find": "HASH<testColl>",
+            "filter": {
+                "HASH<a>": {
+                    "$eq": "?"
+                }
+            },
+            "let": {
+                "HASH<var1>": "$HASH<a>",
+                "HASH<var2>": {
+                    "$const": "?"
+                }
+            },
+            "projection": {
+                "HASH<e>": true,
+                "HASH<f>": true,
+                "HASH<_id>": true
+            },
+            "sort": {
+                "HASH<sortVal>": 1,
+                "HASH<otherSort>": -1
+            }
+        })",
+        redacted);
 
     // Add hinting fields.
     fcr.setHint(BSON("z" << 1 << "c" << 1));
     fcr.setMax(BSON("z" << 25));
     fcr.setMin(BSON("z" << 80));
     redacted = telemetry::redactFindRequest(fcr, opts, expCtx);
-    ASSERT_STR_EQ_AUTO(
-        "{ find: \"HASH(testColl)\", filter: { HASH(a): { $eq: \"?\" } }, let: { HASH(var1): "
-        "\"$HASH(a)\", HASH(var2): { $const: \"?\" } }, projection: { HASH(e): true, HASH(f): "
-        "true, HASH(_id): true }, hint: { HASH(z): 1, HASH(c): 1 }, max: { HASH(z): \"?\" }, min: "
-        "{ HASH(z): \"?\" }, sort: { HASH(sortVal): 1, HASH(otherSort): -1 } }",
-        redacted.toString());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "find": "HASH<testColl>",
+            "filter": {
+                "HASH<a>": {
+                    "$eq": "?"
+                }
+            },
+            "let": {
+                "HASH<var1>": "$HASH<a>",
+                "HASH<var2>": {
+                    "$const": "?"
+                }
+            },
+            "projection": {
+                "HASH<e>": true,
+                "HASH<f>": true,
+                "HASH<_id>": true
+            },
+            "hint": {
+                "HASH<z>": 1,
+                "HASH<c>": 1
+            },
+            "max": {
+                "HASH<z>": "?"
+            },
+            "min": {
+                "HASH<z>": "?"
+            },
+            "sort": {
+                "HASH<sortVal>": 1,
+                "HASH<otherSort>": -1
+            }
+        })",
+        redacted);
 
     // Add the literal redaction fields.
     fcr.setLimit(5);
@@ -183,13 +255,45 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
     fcr.setNoCursorTimeout(false);
 
     redacted = telemetry::redactFindRequest(fcr, opts, expCtx);
-    ASSERT_STR_EQ_AUTO(
-        "{ find: \"HASH(testColl)\", filter: { HASH(a): { $eq: \"?\" } }, let: { HASH(var1): "
-        "\"$HASH(a)\", HASH(var2): { $const: \"?\" } }, projection: { HASH(e): true, HASH(f): "
-        "true, HASH(_id): true }, hint: { HASH(z): 1, HASH(c): 1 }, max: { HASH(z): \"?\" }, min: "
-        "{ HASH(z): \"?\" }, sort: { HASH(sortVal): 1, HASH(otherSort): -1 }, limit: \"?\", skip: "
-        "\"?\", batchSize: \"?\", maxTimeMS: \"?\" }",
-        redacted.toString());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "find": "HASH<testColl>",
+            "filter": {
+                "HASH<a>": {
+                    "$eq": "?"
+                }
+            },
+            "let": {
+                "HASH<var1>": "$HASH<a>",
+                "HASH<var2>": {
+                    "$const": "?"
+                }
+            },
+            "projection": {
+                "HASH<e>": true,
+                "HASH<f>": true,
+                "HASH<_id>": true
+            },
+            "hint": {
+                "HASH<z>": 1,
+                "HASH<c>": 1
+            },
+            "max": {
+                "HASH<z>": "?"
+            },
+            "min": {
+                "HASH<z>": "?"
+            },
+            "sort": {
+                "HASH<sortVal>": 1,
+                "HASH<otherSort>": -1
+            },
+            "limit": "?",
+            "skip": "?",
+            "batchSize": "?",
+            "maxTimeMS": "?"
+        })",
+        redacted);
 
     // Add the fields that shouldn't be redacted.
     fcr.setSingleBatch(true);
@@ -199,13 +303,45 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
     fcr.setShowRecordId(true);
     fcr.setAwaitData(false);
     fcr.setMirrored(true);
-    ASSERT_STR_EQ_AUTO(
-        "{ find: \"HASH(testColl)\", filter: { HASH(a): { $eq: \"?\" } }, let: { HASH(var1): "
-        "\"$HASH(a)\", HASH(var2): { $const: \"?\" } }, projection: { HASH(e): true, HASH(f): "
-        "true, HASH(_id): true }, hint: { HASH(z): 1, HASH(c): 1 }, max: { HASH(z): \"?\" }, min: "
-        "{ HASH(z): \"?\" }, sort: { HASH(sortVal): 1, HASH(otherSort): -1 }, limit: \"?\", skip: "
-        "\"?\", batchSize: \"?\", maxTimeMS: \"?\" }",
-        redacted.toString());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "find": "HASH<testColl>",
+            "filter": {
+                "HASH<a>": {
+                    "$eq": "?"
+                }
+            },
+            "let": {
+                "HASH<var1>": "$HASH<a>",
+                "HASH<var2>": {
+                    "$const": "?"
+                }
+            },
+            "projection": {
+                "HASH<e>": true,
+                "HASH<f>": true,
+                "HASH<_id>": true
+            },
+            "hint": {
+                "HASH<z>": 1,
+                "HASH<c>": 1
+            },
+            "max": {
+                "HASH<z>": "?"
+            },
+            "min": {
+                "HASH<z>": "?"
+            },
+            "sort": {
+                "HASH<sortVal>": 1,
+                "HASH<otherSort>": -1
+            },
+            "limit": "?",
+            "skip": "?",
+            "batchSize": "?",
+            "maxTimeMS": "?"
+        })",
+        redacted);
 }
 TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestEmptyFields) {
     auto expCtx = make_intrusive<ExpressionContextForTest>();
@@ -219,8 +355,9 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestEmptyFields) {
     opts.redactFieldNamesStrategy = redactFieldNameForTest;
 
     auto redacted = telemetry::redactFindRequest(fcr, opts, expCtx);
-    ASSERT_STR_EQ_AUTO("{ find: \"HASH(testColl)\" }",
-                       redacted.toString());  // NOLINT (test auto-update)
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({"find":"HASH<testColl>"})",
+        redacted);  // NOLINT (test auto-update)
 }
 
 TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
@@ -235,51 +372,144 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
 
     auto redacted = telemetry::redactFindRequest(fcr, opts, expCtx);
 
-    ASSERT_STR_EQ_AUTO(
-        "{ find: \"testColl\", filter: { b: { $eq: \"?\" } }, hint: { z: 1, c: 1 }, max: { z: "
-        "\"?\" }, min: { z: \"?\" } }",
-        redacted.toString());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "find": "testColl",
+            "filter": {
+                "b": {
+                    "$eq": "?"
+                }
+            },
+            "hint": {
+                "z": 1,
+                "c": 1
+            },
+            "max": {
+                "z": "?"
+            },
+            "min": {
+                "z": "?"
+            }
+        })",
+        redacted);
     // Test with a string hint. Note that this is the internal representation of the string hint
     // generated at parse time.
     fcr.setHint(BSON("$hint"
                      << "z"));
 
     redacted = telemetry::redactFindRequest(fcr, opts, expCtx);
-    ASSERT_STR_EQ_AUTO(
-        "{ find: \"testColl\", filter: { b: { $eq: \"?\" } }, hint: { $hint: \"z\" }, max: { z: "
-        "\"?\" }, min: { z: \"?\" } }",
-        redacted.toString());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "find": "testColl",
+            "filter": {
+                "b": {
+                    "$eq": "?"
+                }
+            },
+            "hint": {
+                "$hint": "z"
+            },
+            "max": {
+                "z": "?"
+            },
+            "min": {
+                "z": "?"
+            }
+        })",
+        redacted);
 
     fcr.setHint(BSON("z" << 1 << "c" << 1));
     opts.redactFieldNamesStrategy = redactFieldNameForTest;
     opts.redactFieldNames = true;
     opts.replacementForLiteralArgs = boost::none;
     redacted = telemetry::redactFindRequest(fcr, opts, expCtx);
-
-    ASSERT_STR_EQ_AUTO(
-        "{ find: \"HASH(testColl)\", filter: { HASH(b): { $eq: 1 } }, hint: { HASH(z): 1, "
-        "HASH(c): 1 }, max: { HASH(z): 25 }, min: { HASH(z): 80 } }",
-        redacted.toString());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "find": "HASH<testColl>",
+            "filter": {
+                "HASH<b>": {
+                    "$eq": 1
+                }
+            },
+            "hint": {
+                "HASH<z>": 1,
+                "HASH<c>": 1
+            },
+            "max": {
+                "HASH<z>": 25
+            },
+            "min": {
+                "HASH<z>": 80
+            }
+        })",
+        redacted);
 
     redacted = telemetry::redactFindRequest(fcr, opts, expCtx);
-    ASSERT_STR_EQ_AUTO(
-        "{ find: \"HASH(testColl)\", filter: { HASH(b): { $eq: 1 } }, hint: { HASH(z): 1, "
-        "HASH(c): 1 }, max: { HASH(z): 25 }, min: { HASH(z): 80 } }",
-        redacted.toString());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "find": "HASH<testColl>",
+            "filter": {
+                "HASH<b>": {
+                    "$eq": 1
+                }
+            },
+            "hint": {
+                "HASH<z>": 1,
+                "HASH<c>": 1
+            },
+            "max": {
+                "HASH<z>": 25
+            },
+            "min": {
+                "HASH<z>": 80
+            }
+        })",
+        redacted);
 
     opts.replacementForLiteralArgs = "?";
     redacted = telemetry::redactFindRequest(fcr, opts, expCtx);
-
-    ASSERT_STR_EQ_AUTO(
-        "{ find: \"HASH(testColl)\", filter: { HASH(b): { $eq: \"?\" } }, hint: { HASH(z): 1, "
-        "HASH(c): 1 }, max: { HASH(z): \"?\" }, min: { HASH(z): \"?\" } }",
-        redacted.toString());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "find": "HASH<testColl>",
+            "filter": {
+                "HASH<b>": {
+                    "$eq": "?"
+                }
+            },
+            "hint": {
+                "HASH<z>": 1,
+                "HASH<c>": 1
+            },
+            "max": {
+                "HASH<z>": "?"
+            },
+            "min": {
+                "HASH<z>": "?"
+            }
+        })",
+        redacted);
 
     redacted = telemetry::redactFindRequest(fcr, opts, expCtx);
-    ASSERT_STR_EQ_AUTO(
-        "{ find: \"HASH(testColl)\", filter: { HASH(b): { $eq: \"?\" } }, hint: { HASH(z): 1, "
-        "HASH(c): 1 }, max: { HASH(z): \"?\" }, min: { HASH(z): \"?\" } }",
-        redacted.toString());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "find": "HASH<testColl>",
+            "filter": {
+                "HASH<b>": {
+                    "$eq": "?"
+                }
+            },
+            "hint": {
+                "HASH<z>": 1,
+                "HASH<c>": 1
+            },
+            "max": {
+                "HASH<z>": "?"
+            },
+            "min": {
+                "HASH<z>": "?"
+            }
+        })",
+        redacted);
 }
 
 }  // namespace mongo::telemetry

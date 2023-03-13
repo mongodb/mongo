@@ -804,7 +804,7 @@ DEATH_TEST_REGEX(ExprMatchTest, GetChildFailsIndexGreaterThanZero, "Tripwire ass
  * A default redaction strategy that generates easy to check results for testing purposes.
  */
 std::string redactFieldNameForTest(StringData s) {
-    return str::stream() << "HASH(" << s << ")";
+    return str::stream() << "HASH<" << s << ">";
 }
 
 TEST_F(ExprMatchTest, ExprRedactsCorrectly) {
@@ -816,97 +816,218 @@ TEST_F(ExprMatchTest, ExprRedactsCorrectly) {
     opts.redactFieldNames = true;
     opts.replacementForLiteralArgs = "?";
 
-    ASSERT_STR_EQ_AUTO(
-        "{ $expr: { $sum: [ \"$HASH(a)\", \"$HASH(b)\" ] } }",  // NOLINT (test auto-update)
-        serialize(opts).toString());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({"$expr":{"$sum":["$HASH<a>","$HASH<b>"]}})",
+        serialize(opts));
 
     createMatcher(fromjson("{$expr: {$sum: [\"$a\", \"b\"]}}"));
-    ASSERT_STR_EQ_AUTO(
-        "{ $expr: { $sum: [ \"$HASH(a)\", { $const: \"?\" } ] } }",  // NOLINT (test auto-update)
-        serialize(opts).toString());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({"$expr":{"$sum":["$HASH<a>",{"$const":"?"}]}})",
+        serialize(opts));
 
     createMatcher(fromjson("{$expr: {$sum: [\"$a.b\", \"$b\"]}}"));
-    ASSERT_STR_EQ_AUTO(
-        "{ $expr: { $sum: [ \"$HASH(a).HASH(b)\", \"$HASH(b)\" ] } }",  // NOLINT (test auto-update)
-                                                                        // auto-update)
-                                                                        // auto-update)
-                                                                        // auto-update)
-        serialize(opts).toString());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({"$expr":{"$sum":["$HASH<a>.HASH<b>","$HASH<b>"]}})",
+        serialize(opts));
 
     createMatcher(fromjson("{$expr: {$eq: [\"$a\", \"$$NOW\"]}}"));
-    ASSERT_STR_EQ_AUTO(
-        "{ $and: [ { HASH(a): { $_internalExprEq: \"?\" } }, { $expr: { $eq: [ \"$HASH(a)\", { "
-        "$const: \"?\" } ] } } ] }",
-        serialize(opts).toString());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$and": [
+                {
+                    "HASH<a>": {
+                        "$_internalExprEq": "?"
+                    }
+                },
+                {
+                    "$expr": {
+                        "$eq": [
+                            "$HASH<a>",
+                            {
+                                "$const": "?"
+                            }
+                        ]
+                    }
+                }
+            ]
+        })",
+        serialize(opts));
 
     createMatcher(fromjson("{$expr: {$eq: [\"$a\", \"$$NOW\"]}}"));
-    ASSERT_STR_EQ_AUTO(
-        "{ $and: [ { HASH(a): { $_internalExprEq: \"?\" } }, { $expr: { $eq: [ \"$HASH(a)\", { "
-        "$const: \"?\" } ] } } ] }",
-        serialize(opts).toString());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$and": [
+                {
+                    "HASH<a>": {
+                        "$_internalExprEq": "?"
+                    }
+                },
+                {
+                    "$expr": {
+                        "$eq": [
+                            "$HASH<a>",
+                            {
+                                "$const": "?"
+                            }
+                        ]
+                    }
+                }
+            ]
+        })",
+        serialize(opts));
 
     createMatcher(fromjson("{$expr: {$getField: {field: \"b\", input: {a: 1, b: 2}}}}"));
-    ASSERT_STR_EQ_AUTO(
-        "{ $expr: { $getField: { field: \"HASH(b)\", input: { $const: \"?\" } } } }",  // NOLINT
-                                                                                       // (test
-                                                                                       // auto-update)
-        serialize(opts).toString());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({"$expr":{"$getField":{"field":"HASH<b>","input":{"$const":"?"}}}})",
+        serialize(opts));
 
     createMatcher(fromjson("{$expr: {$getField: {field: \"b\", input: \"$a\"}}}"));
-    ASSERT_STR_EQ_AUTO(
-        "{ $expr: { $getField: { field: \"HASH(b)\", input: \"$HASH(a)\" } } }",  // NOLINT (test
-                                                                                  // auto-update)
-        serialize(opts).toString());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({"$expr":{"$getField":{"field":"HASH<b>","input":"$HASH<a>"}}})",
+        serialize(opts));
 
     createMatcher(fromjson("{$expr: {$getField: {field: \"b\", input: {a: 1, b: \"$c\"}}}}"));
-    ASSERT_STR_EQ_AUTO(
-        "{ $expr: { $getField: { field: \"HASH(b)\", input: { HASH(a): { $const: \"?\" }, "
-        "HASH(b): \"$HASH(c)\" } } } }",
-        serialize(opts).toString());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$expr": {
+                "$getField": {
+                    "field": "HASH<b>",
+                    "input": {
+                        "HASH<a>": {
+                            "$const": "?"
+                        },
+                        "HASH<b>": "$HASH<c>"
+                    }
+                }
+            }
+        })",
+        serialize(opts));
 
     createMatcher(fromjson("{$expr: {$getField: {field: \"b.c\", input: {a: 1, b: \"$c\"}}}}"));
-    ASSERT_STR_EQ_AUTO(
-        "{ $expr: { $getField: { field: \"HASH(b).HASH(c)\", input: { HASH(a): { $const: \"?\" }, "
-        "HASH(b): \"$HASH(c)\" } } } }",
-        serialize(opts).toString());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$expr": {
+                "$getField": {
+                    "field": "HASH<b>.HASH<c>",
+                    "input": {
+                        "HASH<a>": {
+                            "$const": "?"
+                        },
+                        "HASH<b>": "$HASH<c>"
+                    }
+                }
+            }
+        })",
+        serialize(opts));
 
     createMatcher(
         fromjson("{$expr: {$setField: {field: \"b\", input: {a: 1, b: \"$c\"}, value: 5}}}"));
-    ASSERT_STR_EQ_AUTO(
-        "{ $expr: { $setField: { field: \"HASH(b)\", input: { HASH(a): { $const: \"?\" }, "
-        "HASH(b): \"$HASH(c)\" }, value: { $const: \"?\" } } } }",
-        serialize(opts).toString());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$expr": {
+                "$setField": {
+                    "field": "HASH<b>",
+                    "input": {
+                        "HASH<a>": {
+                            "$const": "?"
+                        },
+                        "HASH<b>": "$HASH<c>"
+                    },
+                    "value": {
+                        "$const": "?"
+                    }
+                }
+            }
+        })",
+        serialize(opts));
 
     createMatcher(fromjson(
         "{$expr: {$setField: {field: \"b.c\", input: {a: 1, b: \"$c\"}, value: \"$d\"}}}"));
-    ASSERT_STR_EQ_AUTO(
-        "{ $expr: { $setField: { field: \"HASH(b).HASH(c)\", input: { HASH(a): { $const: \"?\" }, "
-        "HASH(b): \"$HASH(c)\" }, value: \"$HASH(d)\" } } }",
-        serialize(opts).toString());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$expr": {
+                "$setField": {
+                    "field": "HASH<b>.HASH<c>",
+                    "input": {
+                        "HASH<a>": {
+                            "$const": "?"
+                        },
+                        "HASH<b>": "$HASH<c>"
+                    },
+                    "value": "$HASH<d>"
+                }
+            }
+        })",
+        serialize(opts));
 
     createMatcher(fromjson(
         "{$expr: {$setField: {field: \"b.c\", input: {a: 1, b: \"$c\"}, value: \"$d.e\"}}}"));
-    ASSERT_STR_EQ_AUTO(
-        "{ $expr: { $setField: { field: \"HASH(b).HASH(c)\", input: { HASH(a): { $const: \"?\" }, "
-        "HASH(b): \"$HASH(c)\" }, value: \"$HASH(d).HASH(e)\" } } }",
-        serialize(opts).toString());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$expr": {
+                "$setField": {
+                    "field": "HASH<b>.HASH<c>",
+                    "input": {
+                        "HASH<a>": {
+                            "$const": "?"
+                        },
+                        "HASH<b>": "$HASH<c>"
+                    },
+                    "value": "$HASH<d>.HASH<e>"
+                }
+            }
+        })",
+        serialize(opts));
 
     createMatcher(
         fromjson("{$expr: {$setField: {field: \"b\", input: {a: 1, b: \"$c\"}, value: {a: 1, b: 2, "
                  "c: 3}}}}"));
-    ASSERT_STR_EQ_AUTO(
-        "{ $expr: { $setField: { field: \"HASH(b)\", input: { HASH(a): { $const: \"?\" }, "
-        "HASH(b): \"$HASH(c)\" }, value: { $const: \"?\" } } } }",
-        serialize(opts).toString());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$expr": {
+                "$setField": {
+                    "field": "HASH<b>",
+                    "input": {
+                        "HASH<a>": {
+                            "$const": "?"
+                        },
+                        "HASH<b>": "$HASH<c>"
+                    },
+                    "value": {
+                        "$const": "?"
+                    }
+                }
+            }
+        })",
+        serialize(opts));
 
     createMatcher(
         fromjson("{$expr: {$setField: {field: \"b\", input: {a: 1, b: \"$c\"}, value: {a: 1, b: 2, "
                  "c: \"$d\"}}}}"));
-    ASSERT_STR_EQ_AUTO(
-        "{ $expr: { $setField: { field: \"HASH(b)\", input: { HASH(a): { $const: \"?\" }, "
-        "HASH(b): \"$HASH(c)\" }, value: { HASH(a): { $const: \"?\" }, HASH(b): { $const: \"?\" "
-        "}, HASH(c): \"$HASH(d)\" } } } }",
-        serialize(opts).toString());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$expr": {
+                "$setField": {
+                    "field": "HASH<b>",
+                    "input": {
+                        "HASH<a>": {
+                            "$const": "?"
+                        },
+                        "HASH<b>": "$HASH<c>"
+                    },
+                    "value": {
+                        "HASH<a>": {
+                            "$const": "?"
+                        },
+                        "HASH<b>": {
+                            "$const": "?"
+                        },
+                        "HASH<c>": "$HASH<d>"
+                    }
+                }
+            }
+        })",
+        serialize(opts));
 }
 }  // namespace
 }  // namespace mongo

@@ -62,7 +62,7 @@ Document fromBson(BSONObj obj) {
 }
 
 std::string redactFieldNameForTest(StringData s) {
-    return str::stream() << "HASH(" << s << ")";
+    return str::stream() << "HASH<" << s << ">";
 }
 
 namespace FieldPath {
@@ -213,14 +213,14 @@ TEST(FieldPath, SerializeWithRedaction) {
     intrusive_ptr<Expression> expression =
         ExpressionFieldPath::createPathFromString(&expCtx, "bar", expCtx.variablesParseState);
     ASSERT_VALUE_EQ_AUTO(  // NOLINT
-        "\"$HASH(bar)\"",  // NOLINT (test auto-update)
+        "\"$HASH<bar>\"",
         expression->serialize(options));
 
     // Repeat with a dotted path.
     expression =
         ExpressionFieldPath::createPathFromString(&expCtx, "a.b.c", expCtx.variablesParseState);
-    ASSERT_VALUE_EQ_AUTO(                // NOLINT
-        "\"$HASH(a).HASH(b).HASH(c)\"",  // NOLINT (test auto-update)
+    ASSERT_VALUE_EQ_AUTO(  // NOLINT
+        "\"$HASH<a>.HASH<b>.HASH<c>\"",
         expression->serialize(options));
 
     auto expr = [&](const std::string& json) {
@@ -229,29 +229,48 @@ TEST(FieldPath, SerializeWithRedaction) {
 
     // Expression with multiple field paths.
     expression = expr(R"({$and: [{$gt: ["$foo", 5]}, {$lt: ["$foo", 10]}]})");
-    ASSERT_VALUE_EQ_AUTO(  // NOLINT
-        "{$and: [{$gt: [\"$HASH(foo)\", {$const: 5}]}, {$lt: [\"$HASH(foo)\", {$const: 10}]}]}",  // NOLINT (test auto-update)
-        expression->serialize(options));
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({
+            "$and": [
+                {
+                    "$gt": [
+                        "$HASH<foo>",
+                        {
+                            "$const": 5
+                        }
+                    ]
+                },
+                {
+                    "$lt": [
+                        "$HASH<foo>",
+                        {
+                            "$const": 10
+                        }
+                    ]
+                }
+            ]
+        })",
+        expression->serialize(options).getDocument());
 
     // Test that a variable followed by user fields is properly hashed.
     std::string replacementChar = "?";
     options.replacementForLiteralArgs = replacementChar;
 
     expression = expr(R"({$gt: ["$$ROOT.a.b", 5]})");
-    ASSERT_VALUE_EQ_AUTO(                                        // NOLINT
-        "{$gt: [\"$$ROOT.HASH(a).HASH(b)\", {$const: \"?\"}]}",  // NOLINT (test auto-update)
-        expression->serialize(options));
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"$gt":["$$ROOT.HASH<a>.HASH<b>",{"$const":"?"}]})",
+        expression->serialize(options).getDocument());
 
     expression = expr(R"({$gt: ["$foo", "$$NOW"]})");
-    ASSERT_VALUE_EQ_AUTO(                      // NOLINT
-        "{$gt: [\"$HASH(foo)\", \"$$NOW\"]}",  // NOLINT (test auto-update)
-        expression->serialize(options));
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"$gt":["$HASH<foo>","$$NOW"]})",
+        expression->serialize(options).getDocument());
 
     // Repeat the above test with a dotted path.
     expression = expr(R"({$gt: ["$foo.a.b", "$$NOW"]})");
-    ASSERT_VALUE_EQ_AUTO(                                      // NOLINT
-        "{$gt: [\"$HASH(foo).HASH(a).HASH(b)\", \"$$NOW\"]}",  // NOLINT (test auto-update)
-        expression->serialize(options));
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"$gt":["$HASH<foo>.HASH<a>.HASH<b>","$$NOW"]})",
+        expression->serialize(options).getDocument());
 }
 
 /** The field path itself is a dependency. */

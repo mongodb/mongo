@@ -41,7 +41,7 @@ namespace {
  * A default redaction strategy that generates easy to check results for testing purposes.
  */
 std::string redactFieldNameForTest(StringData s) {
-    return str::stream() << "HASH(" << s << ")";
+    return str::stream() << "HASH<" << s << ">";
 }
 
 
@@ -60,10 +60,9 @@ TEST(ExpressionFunction, SerializeAndRedactArgs) {
                                          << "js"));
     VariablesParseState vps = expCtx.variablesParseState;
     auto exprFunc = ExpressionFunction::parse(&expCtx, expr.firstElement(), vps);
-    ASSERT_VALUE_EQ_AUTO(                                                    // NOLINT
-        "{$function: {body: \"?\", args: [\"$HASH(age)\"], lang: \"js\"}}",  // NOLINT (test
-                                                                             // auto-update)
-        exprFunc->serialize(options));
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"$function":{"body":"?","args":["$HASH<age>"],"lang":"js"}})",
+        exprFunc->serialize(options).getDocument());
 }
 }  // namespace
 }  // namespace mongo

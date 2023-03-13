@@ -39,7 +39,7 @@ namespace ExpressionTests {
 namespace {
 
 std::string redactFieldNameForTest(StringData s) {
-    return str::stream() << "HASH(" << s << ")";
+    return str::stream() << "HASH<" << s << ">";
 }
 
 TEST(RedactionTest, ExpressionLet) {
@@ -54,9 +54,25 @@ TEST(RedactionTest, ExpressionLet) {
         {$let: {vars: {foo: 35}, in: {$gt: ["$$foo", 23]}}}
     )"),
                                                   expCtx.variablesParseState);
-    ASSERT_VALUE_EQ_AUTO(  // NOLINT
-        "{$let: {vars: {HASH(foo): {$const: 35}}, in: {$gt: [\"$$HASH(foo)\", {$const: 23}]}}}",  // NOLINT (test auto-update)
-        expression->serialize(options));
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({
+            "$let": {
+                "vars": {
+                    "HASH<foo>": {
+                        "$const": 35
+                    }
+                },
+                "in": {
+                    "$gt": [
+                        "$$HASH<foo>",
+                        {
+                            "$const": 23
+                        }
+                    ]
+                }
+            }
+        })",
+        expression->serialize(options).getDocument());
 
     expression = Expression::parseExpression(&expCtx,
                                              fromjson(R"(
@@ -64,10 +80,29 @@ TEST(RedactionTest, ExpressionLet) {
     )"),
                                              expCtx.variablesParseState);
 
-    ASSERT_VALUE_EQ_AUTO(  // NOLINT
-        "{$let: {vars: {HASH(foo): {$const: 35}, HASH(myNow): \"$$NOW\", HASH(obj): {HASH(hello): "
-        "{$const: 23}}}, in: {$gt: [\"$$HASH(myNow)\", \"$$HASH(obj).HASH(hello)\"]}}}",
-        expression->serialize(options));
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({
+            "$let": {
+                "vars": {
+                    "HASH<foo>": {
+                        "$const": 35
+                    },
+                    "HASH<myNow>": "$$NOW",
+                    "HASH<obj>": {
+                        "HASH<hello>": {
+                            "$const": 23
+                        }
+                    }
+                },
+                "in": {
+                    "$gt": [
+                        "$$HASH<myNow>",
+                        "$$HASH<obj>.HASH<hello>"
+                    ]
+                }
+            }
+        })",
+        expression->serialize(options).getDocument());
 }
 }  // namespace
 }  // namespace ExpressionTests

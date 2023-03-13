@@ -95,9 +95,11 @@ DECLARE_BSON_CMP_FUNC(BSONElement, NE);
  * Given a BSONObj, return a string that wraps the json form of the BSONObj with
  * `fromjson(R"(<>)")`.
  */
-std::string makeJsonStr(const BSONObj& obj);
+std::string formatJsonStr(const std::string& obj);
 
-#define ASSERT_BSONOBJ_EQ_AUTO(expected, actual) \
-    ASSERT(AUTO_UPDATE_HELPER(makeJsonStr(expected), makeJsonStr(actual), false))
+#define ASSERT_BSONOBJ_EQ_AUTO(expected, actual)                                     \
+    ASSERT(AUTO_UPDATE_HELPER(::mongo::unittest::formatJsonStr(expected),            \
+                              ::mongo::unittest::formatJsonStr(actual.jsonString()), \
+                              false))
 }  // namespace unittest
 }  // namespace mongo

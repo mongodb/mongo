@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "document_value/document_value_test_util.h"
 #include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/exec/projection_executor_builder.h"
 #include "mongo/db/matcher/expression_parser.h"
@@ -58,11 +59,8 @@ std::unique_ptr<projection_executor::ProjectionExecutor> compileProjection(BSONO
     return exec;
 }
 std::string redactFieldNameForTest(StringData s) {
-    return str::stream() << "HASH(" << s << ")";
+    return str::stream() << "HASH<" << s << ">";
 }
-
-#define ASSERT_DOCUMENT_EQ_AUTO(expected, actual) \
-    ASSERT_STR_EQ_AUTO(expected, actual.toBson().toString());
 
 TEST(Redaction, ProjectionTest) {
     SerializationOptions options;
@@ -78,42 +76,49 @@ TEST(Redaction, ProjectionTest) {
 
     // Simple single inclusion
     auto actual = redactProj("{a: 1}");
-    ASSERT_DOCUMENT_EQ_AUTO(                   //
-        "{ HASH(_id): true, HASH(a): true }",  // NOLINT (test auto-update)
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"HASH<_id>":true,"HASH<a>":true})",
         actual);
 
     actual = redactProj("{a: true}");
-    ASSERT_DOCUMENT_EQ_AUTO(                   //
-        "{ HASH(_id): true, HASH(a): true }",  // NOLINT (test auto-update)
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"HASH<_id>":true,"HASH<a>":true})",
         actual);
 
     // Dotted path
     actual = redactProj("{\"a.b\": 1}");
-    ASSERT_DOCUMENT_EQ_AUTO(                                //
-        "{ HASH(_id): true, HASH(a): { HASH(b): true } }",  // NOLINT (test auto-update)
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"HASH<_id>":true,"HASH<a>":{"HASH<b>":true}})",
         actual);
 
     // Two fields
     actual = redactProj("{a: 1, b: 1}");
-    ASSERT_DOCUMENT_EQ_AUTO(                                  //
-        "{ HASH(_id): true, HASH(a): true, HASH(b): true }",  // NOLINT (test auto-update)
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"HASH<_id>":true,"HASH<a>":true,"HASH<b>":true})",
         actual);
 
     // Explicit _id: 1
     actual = redactProj("{b: 1, _id: 1}");
-    ASSERT_DOCUMENT_EQ_AUTO(                   //
-        "{ HASH(_id): true, HASH(b): true }",  // NOLINT (test auto-update)
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"HASH<_id>":true,"HASH<b>":true})",
         actual);
 
     // Two nested fields
     actual = redactProj("{\"b.d\": 1, \"b.c\": 1}");
-    ASSERT_DOCUMENT_EQ_AUTO(                                               //
-        "{ HASH(_id): true, HASH(b): { HASH(d): true, HASH(c): true } }",  // NOLINT
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"HASH<_id>":true,"HASH<b>":{"HASH<d>":true,"HASH<c>":true}})",
         actual);
 
     actual = redactProj("{\"b.d\": 1, a: 1, \"b.c\": 1}");
-    ASSERT_DOCUMENT_EQ_AUTO(  //
-        "{ HASH(_id): true, HASH(a): true, HASH(b): { HASH(d): true, HASH(c): true } }",
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({
+            "HASH<_id>": true,
+            "HASH<a>": true,
+            "HASH<b>": {
+                "HASH<d>": true,
+                "HASH<c>": true
+            }
+        })",
         actual);
 
 
@@ -121,79 +126,107 @@ TEST(Redaction, ProjectionTest) {
 
     // Simple single exclusion
     actual = redactProj("{a: 0}");
-    ASSERT_DOCUMENT_EQ_AUTO(                    //
-        "{ HASH(a): false, HASH(_id): true }",  // NOLINT (test auto-update)
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"HASH<a>":false,"HASH<_id>":true})",
         actual);
 
     // Dotted path
     actual = redactProj("{\"a.b\": 0}");
-    ASSERT_DOCUMENT_EQ_AUTO(                                 //
-        "{ HASH(a): { HASH(b): false }, HASH(_id): true }",  // NOLINT (test auto-update)
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"HASH<a>":{"HASH<b>":false},"HASH<_id>":true})",
         actual);
 
     // Two fields
     actual = redactProj("{a: 0, b: 0}");
-    ASSERT_DOCUMENT_EQ_AUTO(                                    //
-        "{ HASH(a): false, HASH(b): false, HASH(_id): true }",  // NOLINT (test auto-update)
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"HASH<a>":false,"HASH<b>":false,"HASH<_id>":true})",
         actual);
 
     // Explicit _id: 0
     actual = redactProj("{b: 0, _id: 0}");
-    ASSERT_DOCUMENT_EQ_AUTO(                     //
-        "{ HASH(_id): false, HASH(b): false }",  // NOLINT (test auto-update)
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"HASH<_id>":false,"HASH<b>":false})",
         actual);
 
     // Two nested fields
     actual = redactProj("{\"b.d\": 0, \"b.c\": 0}");
-    ASSERT_DOCUMENT_EQ_AUTO(                                                 //
-        "{ HASH(b): { HASH(d): false, HASH(c): false }, HASH(_id): true }",  // NOLINT (test
-                                                                             // auto-update)
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"HASH<b>":{"HASH<d>":false,"HASH<c>":false},"HASH<_id>":true})",
         actual);
 
     actual = redactProj("{\"b.d\": 0, a: 0, \"b.c\": 0}");
-    ASSERT_DOCUMENT_EQ_AUTO(                                                                 //
-        "{ HASH(a): false, HASH(b): { HASH(d): false, HASH(c): false }, HASH(_id): true }",  // NOLINT
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({
+            "HASH<a>": false,
+            "HASH<b>": {
+                "HASH<d>": false,
+                "HASH<c>": false
+            },
+            "HASH<_id>": true
+        })",
         actual);
 
     /// Add fields projection
     actual = redactProj("{a: \"hi\"}");
-    ASSERT_DOCUMENT_EQ_AUTO(                                //
-        "{ HASH(_id): true, HASH(a): { $const: \"?\" } }",  // NOLINT (test auto-update)
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"HASH<_id>":true,"HASH<a>":{"$const":"?"}})",
         actual);
 
     actual = redactProj("{a: '$field'}");
-    ASSERT_DOCUMENT_EQ_AUTO(                               //
-        "{ HASH(_id): true, HASH(a): \"$HASH(field)\" }",  // NOLINT (test auto-update)
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"HASH<_id>":true,"HASH<a>":"$HASH<field>"})",
         actual);
 
     // Dotted path
     actual = redactProj("{\"a.b\": \"hi\"}");
-    ASSERT_DOCUMENT_EQ_AUTO(                                             //
-        "{ HASH(_id): true, HASH(a): { HASH(b): { $const: \"?\" } } }",  // NOLINT
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"HASH<_id>":true,"HASH<a>":{"HASH<b>":{"$const":"?"}}})",
         actual);
 
     // Two fields
     actual = redactProj("{a: \"hi\", b: \"hello\"}");
-    ASSERT_DOCUMENT_EQ_AUTO(  //
-        "{ HASH(_id): true, HASH(a): { $const: \"?\" }, HASH(b): { $const: \"?\" } }",
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"HASH<_id>":true,"HASH<a>":{"$const":"?"},"HASH<b>":{"$const":"?"}})",
         actual);
 
     // Explicit _id: 0
     actual = redactProj("{b: \"hi\", _id: \"hey\"}");
-    ASSERT_DOCUMENT_EQ_AUTO(  //
-        "{ HASH(b): { $const: \"?\" }, HASH(_id): { $const: \"?\" } }",
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"HASH<b>":{"$const":"?"},"HASH<_id>":{"$const":"?"}})",
         actual);
 
     // Two nested fields
     actual = redactProj("{\"b.d\": \"hello\", \"b.c\": \"world\"}");
-    ASSERT_DOCUMENT_EQ_AUTO(  //
-        "{ HASH(_id): true, HASH(b): { HASH(d): { $const: \"?\" }, HASH(c): { $const: \"?\" } } }",
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({
+            "HASH<_id>": true,
+            "HASH<b>": {
+                "HASH<d>": {
+                    "$const": "?"
+                },
+                "HASH<c>": {
+                    "$const": "?"
+                }
+            }
+        })",
         actual);
 
     actual = redactProj("{\"b.d\": \"hello\", a: \"world\", \"b.c\": \"mongodb\"}");
-    ASSERT_DOCUMENT_EQ_AUTO(  //
-        "{ HASH(_id): true, HASH(b): { HASH(d): { $const: \"?\" }, HASH(c): { $const: \"?\" } }, "
-        "HASH(a): { $const: \"?\" } }",
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({
+            "HASH<_id>": true,
+            "HASH<b>": {
+                "HASH<d>": {
+                    "$const": "?"
+                },
+                "HASH<c>": {
+                    "$const": "?"
+                }
+            },
+            "HASH<a>": {
+                "$const": "?"
+            }
+        })",
         actual);
 }
 

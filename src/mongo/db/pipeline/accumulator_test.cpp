@@ -1737,7 +1737,7 @@ TEST(Accumulators, CovarianceWithRandomVariables) {
 }
 // Test serialization with redaction
 std::string redactFieldNameForTest(StringData s) {
-    return str::stream() << "HASH(" << s << ")";
+    return str::stream() << "HASH<" << s << ">";
 }
 
 Value parseAndSerializeAccumExpr(
@@ -1772,7 +1772,6 @@ Document parseAndSerializeAccum(
 }
 
 TEST(Accumulators, SerializeWithRedaction) {
-
     auto jsReduce =
         BSON("$accumulator" << BSON("init"
                                     << "function() {}"
@@ -1785,95 +1784,183 @@ TEST(Accumulators, SerializeWithRedaction) {
                                     << "function(s1, s2) {return s1 || s2;}"
                                     << "lang"
                                     << "js"));
-    ASSERT_VALUE_EQ_AUTO(  // NOLINT
-        "{$accumulator: {init: \"?\", initArgs: {$const: \"?\"}, accumulate: \"?\", "
-        "accumulateArgs: [\"$HASH(a)\", \"$HASH(b)\"], merge: \"?\", lang: \"js\"}}",  // NOLINT
-                                                                                       // (test
-                                                                                       // auto-update)
-        parseAndSerializeAccum(jsReduce.firstElement(), &AccumulatorJs::parse));
+    auto actual = parseAndSerializeAccum(jsReduce.firstElement(), &AccumulatorJs::parse);
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({
+            "$accumulator": {
+                "init": "?",
+                "initArgs": {
+                    "$const": "?"
+                },
+                "accumulate": "?",
+                "accumulateArgs": [
+                    "$HASH<a>",
+                    "$HASH<b>"
+                ],
+                "merge": "?",
+                "lang": "js"
+            }
+        })",
+        actual);
 
     auto topN = BSON("$topN" << BSON("n" << 3 << "output"
                                          << "$output"
                                          << "sortBy" << BSON("sortKey" << 1)));
-    ASSERT_VALUE_EQ_AUTO(  // NOLINT
-        "{$topN: {n: {$const: \"?\"}, output: {HASH(output): \"$HASH(output)\", HASH(sortFields): "
-        "[\"$HASH(sortKey)\"]}, sortBy: {HASH(sortKey): 1}}}",  // NOLINT (test auto-update)
-        parseAndSerializeAccum(
-            topN.firstElement(),
-            &AccumulatorTopBottomN<TopBottomSense::kTop, false>::parseTopBottomN));
+    actual = parseAndSerializeAccum(
+        topN.firstElement(), &AccumulatorTopBottomN<TopBottomSense::kTop, false>::parseTopBottomN);
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({
+            "$topN": {
+                "n": {
+                    "$const": "?"
+                },
+                "output": {
+                    "HASH<output>": "$HASH<output>",
+                    "HASH<sortFields>": [
+                        "$HASH<sortKey>"
+                    ]
+                },
+                "sortBy": {
+                    "HASH<sortKey>": 1
+                }
+            }
+        })",
+        actual);
 
     auto addToSet = BSON("$addToSet" << BSON("a" << 5));
-    ASSERT_VALUE_EQ_AUTO(
-        "{$addToSet: {$const: \"?\"}}",
-        parseAndSerializeAccum(addToSet.firstElement(),
-                               &genericParseSingleExpressionAccumulator<AccumulatorAddToSet>));
+    actual = parseAndSerializeAccum(addToSet.firstElement(),
+                                    &genericParseSingleExpressionAccumulator<AccumulatorAddToSet>);
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"$addToSet":{"$const":"?"}})",
+        actual);
 
     auto sum = BSON("$sum" << BSON_ARRAY("$a" << 5 << 3 << BSON("$sum" << BSON_ARRAY(4 << 6))));
-    ASSERT_VALUE_EQ_AUTO(  // NOLINT
-        "{$sum: [\"$HASH(a)\", {$const: \"?\"}, {$const: \"?\"}, {$sum: [{$const: \"?\"}, {$const: "
-        "\"?\"}]}]}",  // NOLINT (test auto-update)
-        parseAndSerializeAccum(sum.firstElement(),
-                               &genericParseSingleExpressionAccumulator<AccumulatorSum>));
+    actual = parseAndSerializeAccum(sum.firstElement(),
+                                    &genericParseSingleExpressionAccumulator<AccumulatorSum>);
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({
+            "$sum": [
+                "$HASH<a>",
+                {
+                    "$const": "?"
+                },
+                {
+                    "$const": "?"
+                },
+                {
+                    "$sum": [
+                        {
+                            "$const": "?"
+                        },
+                        {
+                            "$const": "?"
+                        }
+                    ]
+                }
+            ]
+        })",
+        actual);
 
     auto mergeObjs = BSON("$mergeObjects" << BSON_ARRAY("$a" << BSON("b"
                                                                      << "null")));
-    ASSERT_VALUE_EQ_AUTO(                                    // NOLINT
-        "{$mergeObjects: [\"$HASH(a)\", {$const: \"?\"}]}",  // NOLINT (test auto-update)
+    actual =
         parseAndSerializeAccum(mergeObjs.firstElement(),
-                               &genericParseSingleExpressionAccumulator<AccumulatorMergeObjects>));
+                               &genericParseSingleExpressionAccumulator<AccumulatorMergeObjects>);
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"$mergeObjects":["$HASH<a>",{"$const":"?"}]})",
+        actual);
 
     auto push = BSON("$push" << BSON("$eq" << BSON_ARRAY("$str"
                                                          << "str2")));
-    ASSERT_VALUE_EQ_AUTO(
-        "{$push: {$eq: [\"$HASH(str)\", {$const: \"?\"}]}}",
-        parseAndSerializeAccum(push.firstElement(),
-                               &genericParseSingleExpressionAccumulator<AccumulatorPush>));
+    actual = parseAndSerializeAccum(push.firstElement(),
+                                    &genericParseSingleExpressionAccumulator<AccumulatorPush>);
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"$push":{"$eq":["$HASH<str>",{"$const":"?"}]}})",
+        actual);
 
     auto top = BSON("$top" << BSON("output"
                                    << "$b"
                                    << "sortBy" << BSON("sales" << 1)));
-    ASSERT_VALUE_EQ_AUTO(  // NOLINT
-        "{$top: {output: {HASH(output): \"$HASH(b)\", HASH(sortFields): [\"$HASH(sales)\"]}, "
-        "sortBy: {HASH(sales): 1}}}",  // NOLINT (test auto-update)
-        parseAndSerializeAccum(
-            top.firstElement(),
-            &AccumulatorTopBottomN<TopBottomSense::kTop, true>::parseTopBottomN));
+    actual = parseAndSerializeAccum(
+        top.firstElement(), &AccumulatorTopBottomN<TopBottomSense::kTop, true>::parseTopBottomN);
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({
+            "$top": {
+                "output": {
+                    "HASH<output>": "$HASH<b>",
+                    "HASH<sortFields>": [
+                        "$HASH<sales>"
+                    ]
+                },
+                "sortBy": {
+                    "HASH<sales>": 1
+                }
+            }
+        })",
+        actual);
 
     auto max = BSON("$max" << BSON_ARRAY(
                         "$a" << 2 << 3 << BSON("$max" << BSON_ARRAY(BSON_ARRAY("$b" << 4 << 5)))));
-    ASSERT_VALUE_EQ_AUTO(  // NOLINT
-        "{$max: [\"$HASH(a)\", {$const: \"?\"}, {$const: \"?\"}, {$max: [[\"$HASH(b)\", {$const: "
-        "\"?\"}, {$const: \"?\"}]]}]}",  // NOLINT (test auto-update)
-        parseAndSerializeAccum(max.firstElement(),
-                               &genericParseSingleExpressionAccumulator<AccumulatorMax>));
+    actual = parseAndSerializeAccum(max.firstElement(),
+                                    &genericParseSingleExpressionAccumulator<AccumulatorMax>);
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({
+            "$max": [
+                "$HASH<a>",
+                {
+                    "$const": "?"
+                },
+                {
+                    "$const": "?"
+                },
+                {
+                    "$max": [
+                        [
+                            "$HASH<b>",
+                            {
+                                "$const": "?"
+                            },
+                            {
+                                "$const": "?"
+                            }
+                        ]
+                    ]
+                }
+            ]
+        })",
+        actual);
 
     auto internalJsReduce = BSON(
         "$_internalJsReduce" << BSON("data"
                                      << "$emits"
                                      << "eval"
                                      << "function(key, values) {\n return Array.sum(values);\n"));
-    ASSERT_VALUE_EQ_AUTO(  // NOLINT
-        "{$_internalJsReduce: {data: \"$HASH(emits)\", eval: \"?\"}}",
-        parseAndSerializeAccum(internalJsReduce.firstElement(),
-                               &AccumulatorInternalJsReduce::parseInternalJsReduce));
+    actual = parseAndSerializeAccum(internalJsReduce.firstElement(),
+                                    &AccumulatorInternalJsReduce::parseInternalJsReduce);
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"$_internalJsReduce":{"data":"$HASH<emits>","eval":"?"}})",
+        actual);
 }
 
 TEST(AccumulatorsToExpression, SerializeWithRedaction) {
     auto maxN = BSON("$maxN" << BSON("n" << 3 << "input" << BSON_ARRAY(19 << 7 << 28 << 3 << 5)));
     using Sense = AccumulatorMinMax::Sense;
-    ASSERT_VALUE_EQ_AUTO(                                         // NOLINT
-        "{$maxN: {n: {$const: \"?\"}, input: {$const: \"?\"}}}",  // NOLINT (test auto-update)
-        parseAndSerializeAccumExpr(maxN, &AccumulatorMinMaxN::parseExpression<Sense::kMax>));
+    auto actual =
+        parseAndSerializeAccumExpr(maxN, &AccumulatorMinMaxN::parseExpression<Sense::kMax>);
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"$maxN":{"n":{"$const":"?"},"input":{"$const":"?"}}})",
+        actual.getDocument());
 
     auto firstN = BSON("$firstN" << BSON("input"
                                          << "$sales"
                                          << "n"
                                          << "\'string\'"));
     using FirstLastSense = AccumulatorFirstLastN::Sense;
-    ASSERT_VALUE_EQ_AUTO(                                            // NOLINT
-        "{$firstN: {n: {$const: \"?\"}, input: \"$HASH(sales)\"}}",  // NOLINT (test auto-update)
-        parseAndSerializeAccumExpr(
-            firstN, &AccumulatorFirstLastN::parseExpression<FirstLastSense::kFirst>));
+    actual = parseAndSerializeAccumExpr(
+        firstN, &AccumulatorFirstLastN::parseExpression<FirstLastSense::kFirst>);
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"$firstN":{"n":{"$const":"?"},"input":"$HASH<sales>"}})",
+        actual.getDocument());
 }
 
 /* ------------------------- AccumulatorMergeObjects -------------------------- */

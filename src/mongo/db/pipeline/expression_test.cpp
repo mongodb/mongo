@@ -179,7 +179,7 @@ void parseAndVerifyResults(
  * A default redaction strategy that generates easy to check results for testing purposes.
  */
 std::string redactFieldNameForTest(StringData s) {
-    return str::stream() << "HASH(" << s << ")";
+    return str::stream() << "HASH<" << s << ">";
 }
 
 /* ------------------------- ExpressionArrayToObject -------------------------- */
@@ -827,21 +827,37 @@ TEST(ExpressionConstantTest, ConstantRedaction) {
     // Test that a constant is replaced.
     auto expCtx = ExpressionContextForTest{};
     intrusive_ptr<Expression> expression = ExpressionConstant::create(&expCtx, Value("my_ssn"_sd));
-    ASSERT_BSONOBJ_BINARY_EQ(BSON("field" << BSON("$const" << replacementChar)),
-                             BSON("field" << expression->serialize(options)));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({"field":{"$const":"?"}})",
+        BSON("field" << expression->serialize(options)));
 
-    // Test an expression with multiple ExpressionConst children.
-    // {$and: [{$gt: ["$foo", 5]}, {$lt: [$foo, 10]}]} => {$and: [{$gt: ["$foo", "?"]}, {$lt: [$foo,
-    // "?"]}]}
     auto expressionBSON = BSON("$and" << BSON_ARRAY(BSON("$gt" << BSON_ARRAY("$foo" << 5))
                                                     << BSON("$lt" << BSON_ARRAY("$foo" << 10))));
     expression = Expression::parseExpression(&expCtx, expressionBSON, expCtx.variablesParseState);
-    auto redactedBSON =
-        BSON("$and" << BSON_ARRAY(
-                 BSON("$gt" << BSON_ARRAY("$foo" << BSON("$const" << replacementChar)))
-                 << BSON("$lt" << BSON_ARRAY("$foo" << BSON("$const" << replacementChar)))));
-    ASSERT_BSONOBJ_BINARY_EQ(BSON("field" << redactedBSON),
-                             BSON("field" << expression->serialize(options)));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "field": {
+                "$and": [
+                    {
+                        "$gt": [
+                            "$foo",
+                            {
+                                "$const": "?"
+                            }
+                        ]
+                    },
+                    {
+                        "$lt": [
+                            "$foo",
+                            {
+                                "$const": "?"
+                            }
+                        ]
+                    }
+                ]
+            }
+        })",
+        BSON("field" << expression->serialize(options)));
 }
 
 }  // namespace Constant
@@ -3725,36 +3741,34 @@ TEST(ExpressionGetFieldTest, GetFieldSerializesAndRedactsCorrectly) {
                                                       << "$b"));
 
     auto expression = ExpressionGetField::parse(&expCtx, expressionBSON.firstElement(), vps);
-    auto redactedBSON = BSON("$getField" << BSON("field"
-                                                 << "HASH(a)"
-                                                 << "input"
-                                                 << "$HASH(b)"));
-    ASSERT_BSONOBJ_EQ(BSON("field" << expression->serialize(options)),
-                      BSON("field" << redactedBSON));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({"field":{"$getField":{"field":"HASH<a>","input":"$HASH<b>"}}})",
+        BSON("field" << expression->serialize(options)));
 
     // Test the shorthand syntax.
     expressionBSON = BSON("$getField"
                           << "a");
 
     expression = ExpressionGetField::parse(&expCtx, expressionBSON.firstElement(), vps);
-    redactedBSON = BSON("$getField" << BSON("field"
-                                            << "HASH(a)"
-                                            << "input"
-                                            << "$$CURRENT"));
-    ASSERT_BSONOBJ_EQ(BSON("field" << expression->serialize(options)),
-                      BSON("field" << redactedBSON));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({"field":{"$getField":{"field":"HASH<a>","input":"$$CURRENT"}}})",
+        BSON("field" << expression->serialize(options)));
 
     // Test a field with '.' characters.
     expressionBSON = BSON("$getField"
                           << "a.b.c");
 
     expression = ExpressionGetField::parse(&expCtx, expressionBSON.firstElement(), vps);
-    redactedBSON = BSON("$getField" << BSON("field"
-                                            << "HASH(a).HASH(b).HASH(c)"
-                                            << "input"
-                                            << "$$CURRENT"));
-    ASSERT_BSONOBJ_EQ(BSON("field" << expression->serialize(options)),
-                      BSON("field" << redactedBSON));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "field": {
+                "$getField": {
+                    "field": "HASH<a>.HASH<b>.HASH<c>",
+                    "input": "$$CURRENT"
+                }
+            }
+        })",
+        BSON("field" << expression->serialize(options)));
 }
 
 TEST(ExpressionSetFieldTest, SetFieldRedactsCorrectly) {
@@ -3774,30 +3788,38 @@ TEST(ExpressionSetFieldTest, SetFieldRedactsCorrectly) {
                                                       << "value"
                                                       << "$c"));
     auto expression = ExpressionSetField::parse(&expCtx, expressionBSON.firstElement(), vps);
-    auto redactedBSON = BSON("$setField" << BSON("field"
-                                                 << "HASH(a)"
-                                                 << "input"
-                                                 << "$HASH(b)"
-                                                 << "value"
-                                                 << "$HASH(c)"));
-    ASSERT_BSONOBJ_EQ(BSON("field" << expression->serialize(options)),
-                      BSON("field" << redactedBSON));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "field": {
+                "$setField": {
+                    "field": "HASH<a>",
+                    "input": "$HASH<b>",
+                    "value": "$HASH<c>"
+                }
+            }
+        })",
+        BSON("field" << expression->serialize(options)));
 
     // Object as input.
     expressionBSON = BSON("$setField" << BSON("field"
                                               << "a"
                                               << "input" << BSON("a" << true) << "value" << 10));
     expression = ExpressionSetField::parse(&expCtx, expressionBSON.firstElement(), vps);
-    redactedBSON = BSON("$setField" << BSON("field"
-                                            << "HASH(a)"
-                                            << "input"
-                                            << BSON("$const"
-                                                    << "?")
-                                            << "value"
-                                            << BSON("$const"
-                                                    << "?")));
-    ASSERT_BSONOBJ_EQ(BSON("field" << expression->serialize(options)),
-                      BSON("field" << redactedBSON));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "field": {
+                "$setField": {
+                    "field": "HASH<a>",
+                    "input": {
+                        "$const": "?"
+                    },
+                    "value": {
+                        "$const": "?"
+                    }
+                }
+            }
+        })",
+        BSON("field" << expression->serialize(options)));
 
     // Nested object as input.
     expressionBSON =
@@ -3805,16 +3827,21 @@ TEST(ExpressionSetFieldTest, SetFieldRedactsCorrectly) {
                                  << "a"
                                  << "input" << BSON("a" << BSON("b" << 5)) << "value" << 10));
     expression = ExpressionSetField::parse(&expCtx, expressionBSON.firstElement(), vps);
-    redactedBSON = BSON("$setField" << BSON("field"
-                                            << "HASH(a)"
-                                            << "input"
-                                            << BSON("$const"
-                                                    << "?")
-                                            << "value"
-                                            << BSON("$const"
-                                                    << "?")));
-    ASSERT_BSONOBJ_EQ(BSON("field" << expression->serialize(options)),
-                      BSON("field" << redactedBSON));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "field": {
+                "$setField": {
+                    "field": "HASH<a>",
+                    "input": {
+                        "$const": "?"
+                    },
+                    "value": {
+                        "$const": "?"
+                    }
+                }
+            }
+        })",
+        BSON("field" << expression->serialize(options)));
 
     // Object with field path in input.
     expressionBSON = BSON("$setField" << BSON("field"
@@ -3824,16 +3851,21 @@ TEST(ExpressionSetFieldTest, SetFieldRedactsCorrectly) {
                                                       << "$field")
                                               << "value" << 10));
     expression = ExpressionSetField::parse(&expCtx, expressionBSON.firstElement(), vps);
-    redactedBSON = BSON("$setField" << BSON("field"
-                                            << "HASH(a)"
-                                            << "input"
-                                            << BSON("HASH(a)"
-                                                    << "$HASH(field)")
-                                            << "value"
-                                            << BSON("$const"
-                                                    << "?")));
-    ASSERT_BSONOBJ_EQ(BSON("field" << expression->serialize(options)),
-                      BSON("field" << redactedBSON));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "field": {
+                "$setField": {
+                    "field": "HASH<a>",
+                    "input": {
+                        "HASH<a>": "$HASH<field>"
+                    },
+                    "value": {
+                        "$const": "?"
+                    }
+                }
+            }
+        })",
+        BSON("field" << expression->serialize(options)));
 
     // Object with field path in value.
     expressionBSON = BSON("$setField" << BSON("field"
@@ -3845,16 +3877,21 @@ TEST(ExpressionSetFieldTest, SetFieldRedactsCorrectly) {
                                               << BSON("c"
                                                       << "$d")));
     expression = ExpressionSetField::parse(&expCtx, expressionBSON.firstElement(), vps);
-    redactedBSON = BSON("$setField" << BSON("field"
-                                            << "HASH(a)"
-                                            << "input"
-                                            << BSON("$const"
-                                                    << "?")
-                                            << "value"
-                                            << BSON("HASH(c)"
-                                                    << "$HASH(d)")));
-    ASSERT_BSONOBJ_EQ(BSON("field" << expression->serialize(options)),
-                      BSON("field" << redactedBSON));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "field": {
+                "$setField": {
+                    "field": "HASH<a>",
+                    "input": {
+                        "$const": "?"
+                    },
+                    "value": {
+                        "HASH<c>": "$HASH<d>"
+                    }
+                }
+            }
+        })",
+        BSON("field" << expression->serialize(options)));
 
     // Array as input.
     expressionBSON = BSON("$setField" << BSON("field"
@@ -3862,16 +3899,21 @@ TEST(ExpressionSetFieldTest, SetFieldRedactsCorrectly) {
                                               << "input" << BSON("a" << BSON_ARRAY(3 << 4 << 5))
                                               << "value" << 10));
     expression = ExpressionSetField::parse(&expCtx, expressionBSON.firstElement(), vps);
-    redactedBSON = BSON("$setField" << BSON("field"
-                                            << "HASH(a)"
-                                            << "input"
-                                            << BSON("$const"
-                                                    << "?")
-                                            << "value"
-                                            << BSON("$const"
-                                                    << "?")));
-    ASSERT_BSONOBJ_EQ(BSON("field" << expression->serialize(options)),
-                      BSON("field" << redactedBSON));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "field": {
+                "$setField": {
+                    "field": "HASH<a>",
+                    "input": {
+                        "$const": "?"
+                    },
+                    "value": {
+                        "$const": "?"
+                    }
+                }
+            }
+        })",
+        BSON("field" << expression->serialize(options)));
 }
 
 TEST(ExpressionSetFieldTest, SetFieldSerializesCorrectly) {

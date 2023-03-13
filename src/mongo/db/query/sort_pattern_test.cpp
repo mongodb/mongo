@@ -37,7 +37,7 @@ namespace mongo {
 namespace {
 
 std::string redactFieldNameForTest(StringData s) {
-    return str::stream() << "HASH(" << s << ")";
+    return str::stream() << "HASH<" << s << ">";
 }
 
 auto getExpCtx() {
@@ -53,33 +53,33 @@ TEST(SerializeSortPatternTest, SerializeAndRedactFieldName) {
     opts.redactFieldNamesStrategy = redactFieldNameForTest;
 
     // Most basic sort pattern, confirm that field name gets redacted.
-    ASSERT_DOCUMENT_EQ(
-        sortPattern.serialize(SortPattern::SortKeySerialization::kForPipelineSerialization, opts),
-        Document(fromjson("{\"HASH(val)\": 1}")));
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"HASH<val>":1})",
+        sortPattern.serialize(SortPattern::SortKeySerialization::kForPipelineSerialization, opts));
 
     // Confirm that multiple sort fields get redacted.
     sortPattern = SortPattern(fromjson("{val: 1, test: -1, third: -1}"), expCtx);
-    ASSERT_DOCUMENT_EQ(
-        sortPattern.serialize(SortPattern::SortKeySerialization::kForPipelineSerialization, opts),
-        Document(fromjson("{\"HASH(val)\": 1, \"HASH(test)\": -1, \"HASH(third)\": -1}")));
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"HASH<val>":1,"HASH<test>":-1,"HASH<third>":-1})",
+        sortPattern.serialize(SortPattern::SortKeySerialization::kForPipelineSerialization, opts));
 
     // Test sort pattern that contains an expression.
     sortPattern = SortPattern(fromjson("{val: 1, test: {$meta: \"randVal\"}}"), expCtx);
-    ASSERT_DOCUMENT_EQ(
-        sortPattern.serialize(SortPattern::SortKeySerialization::kForPipelineSerialization, opts),
-        Document(fromjson("{\"HASH(val)\": 1, $computed1: {$meta: \"randVal\"}}")));
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"HASH<val>":1,"$computed1":{"$meta":"randVal"}})",
+        sortPattern.serialize(SortPattern::SortKeySerialization::kForPipelineSerialization, opts));
 
     // Sorting by only an expression results in a made up field name in serialization and therefore
     // doesn't get redacted.
     sortPattern = SortPattern(fromjson("{val: {$meta: \"textScore\"}}"), expCtx);
-    ASSERT_DOCUMENT_EQ(
-        sortPattern.serialize(SortPattern::SortKeySerialization::kForPipelineSerialization, opts),
-        Document(fromjson("{$computed0: {$meta: \"textScore\"}}")));
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"$computed0":{"$meta":"textScore"}})",
+        sortPattern.serialize(SortPattern::SortKeySerialization::kForPipelineSerialization, opts));
 
     sortPattern = SortPattern(fromjson("{'a.b.c': 1}"), expCtx);
-    ASSERT_DOCUMENT_EQ(
-        sortPattern.serialize(SortPattern::SortKeySerialization::kForPipelineSerialization, opts),
-        Document(fromjson("{\"HASH(a).HASH(b).HASH(c)\": 1}")));
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"HASH<a>.HASH<b>.HASH<c>":1})",
+        sortPattern.serialize(SortPattern::SortKeySerialization::kForPipelineSerialization, opts));
 }
 
 TEST(SerializeSortPatternTest, SerializeNoRedaction) {
@@ -87,14 +87,14 @@ TEST(SerializeSortPatternTest, SerializeNoRedaction) {
     auto sortPattern = SortPattern(fromjson("{val: 1}"), expCtx);
     SerializationOptions opts = {};
     opts.redactFieldNames = false;
-    ASSERT_DOCUMENT_EQ(
-        sortPattern.serialize(SortPattern::SortKeySerialization::kForPipelineSerialization, opts),
-        Document(fromjson("{val: 1}")));
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"val":1})",
+        sortPattern.serialize(SortPattern::SortKeySerialization::kForPipelineSerialization, opts));
 
     // Call serialize() with no options.
-    ASSERT_DOCUMENT_EQ(
-        sortPattern.serialize(SortPattern::SortKeySerialization::kForPipelineSerialization),
-        Document(fromjson("{val: 1}")));
+    ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
+        R"({"val":1})",
+        sortPattern.serialize(SortPattern::SortKeySerialization::kForPipelineSerialization));
 }
 
 }  // namespace

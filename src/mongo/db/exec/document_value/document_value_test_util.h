@@ -61,6 +61,7 @@
     ::mongo::unittest::assertComparison_##NAME(__FILE__, __LINE__, #a, #b, a, b)
 
 #define ASSERT_VALUE_EQ_AUTO(expected, val) ASSERT_STR_EQ_AUTO(expected, val.toString())
+#define ASSERT_DOCUMENT_EQ_AUTO(expected, actual) ASSERT_BSONOBJ_EQ_AUTO(expected, actual.toBson())
 namespace mongo {
 namespace unittest {
 
