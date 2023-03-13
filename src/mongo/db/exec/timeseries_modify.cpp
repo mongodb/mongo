@@ -29,6 +29,7 @@
 
 #include "mongo/db/exec/timeseries_modify.h"
 
+#include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/timeseries/timeseries_write_util.h"
 
 namespace mongo {
@@ -49,7 +50,8 @@ TimeseriesModifyStage::TimeseriesModifyStage(ExpressionContext* expCtx,
 }
 
 bool TimeseriesModifyStage::isEOF() {
-    return !_bucketUnpacker.hasNext() && child()->isEOF();
+    return !_bucketUnpacker.hasNext() && child()->isEOF() &&
+        _retryFetchBucketId == WorkingSet::INVALID_ID;
 }
 
 std::unique_ptr<PlanStageStats> TimeseriesModifyStage::getStats() {
@@ -102,6 +104,47 @@ void TimeseriesModifyStage::_writeToTimeseriesBuckets() {
     }
 }
 
+PlanStage::StageState TimeseriesModifyStage::_fetchBucket(WorkingSetID id) {
+    return handlePlanStageYield(
+        expCtx(),
+        "TimeseriesModifyStage::_fetchBucket",
+        collection()->ns().ns(),
+        [&] {
+            auto cursor = collection()->getCursor(opCtx());
+            if (!WorkingSetCommon::fetch(
+                    opCtx(), _ws, id, cursor.get(), collection(), collection()->ns())) {
+                return PlanStage::NEED_TIME;
+            }
+            return PlanStage::ADVANCED;
+        },
+        [&] { _retryFetchBucketId = id; });
+}
+
+PlanStage::StageState TimeseriesModifyStage::_getNextBucket(WorkingSetID& id) {
+    if (_retryFetchBucketId == WorkingSet::INVALID_ID) {
+        auto status = child()->work(&id);
+        if (status != PlanStage::ADVANCED) {
+            return status;
+        }
+
+        auto member = _ws->get(id);
+        // TODO SERVER-73142 remove this assert, we may not have an object if we have a spool child.
+        tassert(7443600, "Child should have provided the whole document", member->hasObj());
+        if (member->hasObj()) {
+            // We already got the whole document from our child, no need to fetch.
+            return PlanStage::ADVANCED;
+        }
+    } else {
+        // We have a bucket that we need to fetch before we can unpack it.
+        id = _retryFetchBucketId;
+        _retryFetchBucketId = WorkingSet::INVALID_ID;
+    }
+
+    // The result returned from our child had only a RecordId, no document, so we need to fetch it.
+    // This is the case when we have a spool child.
+    return _fetchBucket(id);
+}
+
 PlanStage::StageState TimeseriesModifyStage::doWork(WorkingSetID* out) {
     if (isEOF()) {
         return PlanStage::IS_EOF;
@@ -113,7 +156,7 @@ PlanStage::StageState TimeseriesModifyStage::doWork(WorkingSetID* out) {
         _writeToTimeseriesBuckets();
 
         auto id = WorkingSet::INVALID_ID;
-        auto status = child()->work(&id);
+        auto status = _getNextBucket(id);
 
         if (PlanStage::ADVANCED == status) {
             auto member = _ws->get(id);

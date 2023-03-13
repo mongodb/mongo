@@ -78,6 +78,16 @@ private:
      */
     void _writeToTimeseriesBuckets();
 
+    /**
+     * Fetches the document for the bucket pointed to by this WSM.
+     */
+    PlanStage::StageState _fetchBucket(WorkingSetID id);
+
+    /**
+     * Gets the next bucket to process.
+     */
+    PlanStage::StageState _getNextBucket(WorkingSetID& id);
+
     WorkingSet* _ws;
 
     //
@@ -92,6 +102,11 @@ private:
 
     // The RecordId (also "_id" for the clustered collection) value of the current bucket.
     RecordId _currentBucketRid = RecordId{};
+
+    // The WS id of the next bucket to unpack. This is populated in cases where we successfully read
+    // the RecordId of the next bucket, but receive NEED_YIELD when attempting to fetch the full
+    // document.
+    WorkingSetID _retryFetchBucketId = WorkingSet::INVALID_ID;
 
     std::vector<BSONObj> _unchangedMeasurements;
     std::vector<BSONObj> _deletedMeasurements;

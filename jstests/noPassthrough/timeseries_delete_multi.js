@@ -170,5 +170,27 @@ const doc7_c_f106 = {
     });
 })();
 
+// Query on meta results in scanning records that don't match the filter.
+(function testMultiBucketDeleteComplexBucketFilter() {
+    testDelete({
+        initialDocList: [
+            doc1_a_nofields,
+            doc2_a_f101,
+            doc3_a_f102,
+            doc4_b_f103,
+            doc5_b_f104,
+            doc6_c_f105,
+            doc7_c_f106
+        ],
+        deleteList: [
+            {
+                q: {f: {$in: [101, 102, 104, 105]}, [metaFieldName]: {$in: ["A", "C"]}},
+                limit: 0,
+            },
+        ],
+        resultDocList: [doc1_a_nofields, doc4_b_f103, doc5_b_f104, doc7_c_f106],
+        nDeleted: 3,
+    });
+})();
 rst.stopSet();
 })();

@@ -96,7 +96,7 @@ PlanStage::StageState SpoolStage::doWork(WorkingSetID* out) {
     member->recordId = std::move(_buffer[_nextIndex]);
     // Only store the record id, not any index information or full objects. This is to
     // reduce memory and disk usage - it is the responsibility of our caller to fetch the records.
-    member->transitionToRecordIdAndObj();
+    _ws->transitionToRecordIdAndIdx(*out);
     return PlanStage::ADVANCED;
 }
 }  // namespace mongo
