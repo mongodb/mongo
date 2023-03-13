@@ -83,6 +83,13 @@ class IndexStatsReader {
             if (conn) {
                 const remoteDB = conn.getDB(collection.getDB().getName());
 
+                // Check if this mongod has the collection - in same cases it may not, e.g. for
+                // non-sharded collections in sharded clusters.
+                if (!remoteDB.runCommand({listCollections: 1})
+                         .cursor.firstBatch.find(c => c.name.startsWith(collection.getName()))) {
+                    continue;
+                }
+
                 // Wait until the index is done building and all its data is synced to disk.
                 IndexStatsReader.assertIndexReadySoon(remoteDB, collection.getName(), indexName);
                 assert.commandWorked(db.adminCommand({fsync: 1}));
