@@ -110,7 +110,7 @@ public:
 
     virtual bool equivalent(const MatchExpression* other) const;
 
-    virtual std::unique_ptr<MatchExpression> shallowClone() const;
+    virtual std::unique_ptr<MatchExpression> clone() const;
 
     void setCanSkipValidation(bool val) {
         _canSkipValidation = val;
@@ -214,7 +214,7 @@ public:
 
     virtual bool equivalent(const MatchExpression* other) const;
 
-    virtual std::unique_ptr<MatchExpression> shallowClone() const;
+    virtual std::unique_ptr<MatchExpression> clone() const;
 
     const GeoNearExpression& getData() const {
         return *_query;
@@ -284,7 +284,7 @@ public:
         return false;
     }
 
-    std::unique_ptr<MatchExpression> shallowClone() const final {
+    std::unique_ptr<MatchExpression> clone() const final {
         MONGO_UNREACHABLE;
         return nullptr;
     }

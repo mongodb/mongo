@@ -133,7 +133,7 @@ void attachNode(MatchExpression* node,
                 OrMatchExpression* targetParent,
                 size_t targetPosition,
                 std::unique_ptr<MatchExpression::TagData> tagData) {
-    auto clone = node->shallowClone();
+    auto clone = node->clone();
     if (clone->matchType() == MatchExpression::NOT) {
         IndexTag* indexTag = checked_cast<IndexTag*>(tagData.get());
         clone->setTag(new IndexTag(indexTag->index));

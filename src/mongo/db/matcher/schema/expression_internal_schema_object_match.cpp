@@ -79,9 +79,9 @@ bool InternalSchemaObjectMatchExpression::equivalent(const MatchExpression* othe
     return _sub->equivalent(other->getChild(0));
 }
 
-std::unique_ptr<MatchExpression> InternalSchemaObjectMatchExpression::shallowClone() const {
+std::unique_ptr<MatchExpression> InternalSchemaObjectMatchExpression::clone() const {
     auto clone = std::make_unique<InternalSchemaObjectMatchExpression>(
-        path(), _sub->shallowClone(), _errorAnnotation);
+        path(), _sub->clone(), _errorAnnotation);
     if (getTag()) {
         clone->setTag(getTag()->clone());
     }

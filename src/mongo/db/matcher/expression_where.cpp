@@ -61,7 +61,7 @@ bool WhereMatchExpression::matches(const MatchableDocument* doc, MatchDetails* d
     return _jsFunction->runAsPredicate(doc->toBSON());
 }
 
-unique_ptr<MatchExpression> WhereMatchExpression::shallowClone() const {
+unique_ptr<MatchExpression> WhereMatchExpression::clone() const {
     validateState();
 
     WhereParams params;

@@ -115,7 +115,7 @@ public:
         return kName;
     }
 
-    std::unique_ptr<MatchExpression> shallowClone() const final {
+    std::unique_ptr<MatchExpression> clone() const final {
         return std::make_unique<AlwaysFalseMatchExpression>(_errorAnnotation);
     }
 
@@ -143,7 +143,7 @@ public:
         return kName;
     }
 
-    std::unique_ptr<MatchExpression> shallowClone() const final {
+    std::unique_ptr<MatchExpression> clone() const final {
         return std::make_unique<AlwaysTrueMatchExpression>(_errorAnnotation);
     }
 

@@ -296,7 +296,7 @@ TEST(InternalExprEqMatchExpression, EquivalentToClone) {
     relevantTag->notFirst.push_back(1u);
     eq.getMatchExpression()->setTag(relevantTag.release());
 
-    auto clone = eq.getMatchExpression()->shallowClone();
+    auto clone = eq.getMatchExpression()->clone();
     ASSERT_TRUE(eq.getMatchExpression()->equivalent(clone.get()));
 }
 

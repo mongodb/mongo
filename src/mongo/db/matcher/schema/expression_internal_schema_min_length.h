@@ -52,7 +52,7 @@ public:
         };
     }
 
-    std::unique_ptr<MatchExpression> shallowClone() const final {
+    std::unique_ptr<MatchExpression> clone() const final {
         std::unique_ptr<InternalSchemaMinLengthMatchExpression> minLen =
             std::make_unique<InternalSchemaMinLengthMatchExpression>(
                 path(), strLen(), _errorAnnotation);

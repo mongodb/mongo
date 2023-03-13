@@ -467,7 +467,7 @@ bool GeoMatchExpression::equivalent(const MatchExpression* other) const {
     return SimpleBSONObjComparator::kInstance.evaluate(_rawObj == realOther->_rawObj);
 }
 
-std::unique_ptr<MatchExpression> GeoMatchExpression::shallowClone() const {
+std::unique_ptr<MatchExpression> GeoMatchExpression::clone() const {
     std::unique_ptr<GeoMatchExpression> next =
         std::make_unique<GeoMatchExpression>(path(), _query, _rawObj, _errorAnnotation);
     next->_canSkipValidation = _canSkipValidation;
@@ -527,7 +527,7 @@ bool GeoNearMatchExpression::equivalent(const MatchExpression* other) const {
     return SimpleBSONObjComparator::kInstance.evaluate(_rawObj == realOther->_rawObj);
 }
 
-std::unique_ptr<MatchExpression> GeoNearMatchExpression::shallowClone() const {
+std::unique_ptr<MatchExpression> GeoNearMatchExpression::clone() const {
     std::unique_ptr<GeoNearMatchExpression> next =
         std::make_unique<GeoNearMatchExpression>(path(), _query, _rawObj);
     if (getTag()) {

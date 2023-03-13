@@ -111,7 +111,7 @@ TEST(InternalSchemaRootDocEqMatchExpression, EquivalentToClone) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     Matcher rootDocEq(std::move(query), expCtx);
 
-    auto clone = rootDocEq.getMatchExpression()->shallowClone();
+    auto clone = rootDocEq.getMatchExpression()->clone();
     ASSERT_TRUE(rootDocEq.getMatchExpression()->equivalent(clone.get()));
 }
 

@@ -213,7 +213,7 @@ void InternalBucketGeoWithinMatchExpression::serialize(BSONObjBuilder* builder,
     bob.doneFast();
 }
 
-std::unique_ptr<MatchExpression> InternalBucketGeoWithinMatchExpression::shallowClone() const {
+std::unique_ptr<MatchExpression> InternalBucketGeoWithinMatchExpression::clone() const {
     std::unique_ptr<InternalBucketGeoWithinMatchExpression> next =
         std::make_unique<InternalBucketGeoWithinMatchExpression>(_geoContainer, _field);
     if (getTag()) {

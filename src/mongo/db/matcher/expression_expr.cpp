@@ -111,7 +111,7 @@ void ExprMatchExpression::_doSetCollator(const CollatorInterface* collator) {
 }
 
 
-std::unique_ptr<MatchExpression> ExprMatchExpression::shallowClone() const {
+std::unique_ptr<MatchExpression> ExprMatchExpression::clone() const {
     // TODO SERVER-31003: Replace Expression clone via serialization with Expression::clone().
     BSONObjBuilder bob;
     bob << "" << _expression->serialize(false);

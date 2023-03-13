@@ -124,11 +124,11 @@ public:
 
     bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
-    virtual std::unique_ptr<MatchExpression> shallowClone() const {
+    virtual std::unique_ptr<MatchExpression> clone() const {
         std::unique_ptr<AndMatchExpression> self =
             std::make_unique<AndMatchExpression>(_errorAnnotation);
         for (size_t i = 0; i < numChildren(); ++i) {
-            self->add(getChild(i)->shallowClone());
+            self->add(getChild(i)->clone());
         }
         if (getTag()) {
             self->setTag(getTag()->clone());
@@ -168,11 +168,11 @@ public:
 
     bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
-    virtual std::unique_ptr<MatchExpression> shallowClone() const {
+    virtual std::unique_ptr<MatchExpression> clone() const {
         std::unique_ptr<OrMatchExpression> self =
             std::make_unique<OrMatchExpression>(_errorAnnotation);
         for (size_t i = 0; i < numChildren(); ++i) {
-            self->add(getChild(i)->shallowClone());
+            self->add(getChild(i)->clone());
         }
         if (getTag()) {
             self->setTag(getTag()->clone());
@@ -212,11 +212,11 @@ public:
 
     bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
-    virtual std::unique_ptr<MatchExpression> shallowClone() const {
+    virtual std::unique_ptr<MatchExpression> clone() const {
         std::unique_ptr<NorMatchExpression> self =
             std::make_unique<NorMatchExpression>(_errorAnnotation);
         for (size_t i = 0; i < numChildren(); ++i) {
-            self->add(getChild(i)->shallowClone());
+            self->add(getChild(i)->clone());
         }
         if (getTag()) {
             self->setTag(getTag()->clone());
@@ -248,9 +248,9 @@ public:
                                 clonable_ptr<ErrorAnnotation> annotation = nullptr)
         : MatchExpression(NOT, std::move(annotation)), _exp(std::move(expr)) {}
 
-    virtual std::unique_ptr<MatchExpression> shallowClone() const {
+    virtual std::unique_ptr<MatchExpression> clone() const {
         std::unique_ptr<NotMatchExpression> self =
-            std::make_unique<NotMatchExpression>(_exp->shallowClone(), _errorAnnotation);
+            std::make_unique<NotMatchExpression>(_exp->clone(), _errorAnnotation);
         if (getTag()) {
             self->setTag(getTag()->clone());
         }

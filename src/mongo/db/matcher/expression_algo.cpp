@@ -477,9 +477,9 @@ std::unique_ptr<MatchExpression> tryAddExpr(StringData path,
                                             const MatchExpression* me,
                                             StringMap<std::unique_ptr<MatchExpression>>& out) {
     if (FieldRef(path).hasNumericPathComponents())
-        return me->shallowClone();
+        return me->clone();
 
-    addExpr(path, me->shallowClone(), out);
+    addExpr(path, me->clone(), out);
     return nullptr;
 }
 
@@ -539,14 +539,14 @@ std::unique_ptr<MatchExpression> splitMatchExpressionForColumns(
         case MatchExpression::GTE: {
             auto sub = checked_cast<const ComparisonMatchExpressionBase*>(me);
             if (!canCompareWith(sub->getData(), me->matchType() == MatchExpression::EQ))
-                return me->shallowClone();
+                return me->clone();
             return tryAddExpr(sub->path(), me, out);
         }
 
         case MatchExpression::MATCH_IN: {
             auto sub = checked_cast<const InMatchExpression*>(me);
             if (sub->hasNonScalarOrNonEmptyValues()) {
-                return me->shallowClone();
+                return me->clone();
             }
             return tryAddExpr(sub->path(), me, out);
         }
@@ -581,13 +581,13 @@ std::unique_ptr<MatchExpression> splitMatchExpressionForColumns(
             // would manifest as non-null residual.
             auto sub = checked_cast<const NotMatchExpression*>(me)->getChild(0);
             if (sub->matchType() == MatchExpression::AND) {
-                return me->shallowClone();
+                return me->clone();
             }
             StringMap<std::unique_ptr<MatchExpression>> outSub;
             StringMap<std::unique_ptr<MatchExpression>> pendingSub;
             auto residual = splitMatchExpressionForColumns(sub, outSub, pendingSub);
             if (residual || !pendingSub.empty()) {
-                return me->shallowClone();
+                return me->clone();
             }
             uassert(7040600, "Should have exactly one path under $not", outSub.size() == 1);
             return tryAddExpr(outSub.begin()->first /* path */, me, pending);
@@ -633,7 +633,7 @@ std::unique_ptr<MatchExpression> splitMatchExpressionForColumns(
         case MatchExpression::SIZE:
         case MatchExpression::TEXT:
         case MatchExpression::WHERE:
-            return me->shallowClone();
+            return me->clone();
     }
     MONGO_UNREACHABLE;
 }
@@ -900,7 +900,7 @@ std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitMatchEx
     const OrderedPathSet& fields,
     const StringMap<std::string>& renames,
     ShouldSplitExprFunc func /*= isIndependentOf */) {
-    auto splitExpr = splitMatchExpressionByFunction(expr->shallowClone(), fields, func);
+    auto splitExpr = splitMatchExpressionByFunction(expr->clone(), fields, func);
     if (splitExpr.first) {
         // If we get attemptedButFailedRenames == true, then it means we could not apply renames
         // though there's sub-path match. In such a case, returns the original expression as the

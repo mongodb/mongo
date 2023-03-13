@@ -111,7 +111,7 @@ TEST(InternalSchemaAllowedPropertiesMatchExpression, EquivalentToClone) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto expr = MatchExpressionParser::parse(filter, expCtx);
     ASSERT_OK(expr.getStatus());
-    auto clone = expr.getValue()->shallowClone();
+    auto clone = expr.getValue()->clone();
     ASSERT_TRUE(expr.getValue()->equivalent(clone.get()));
 
     filter = fromjson(
@@ -119,7 +119,7 @@ TEST(InternalSchemaAllowedPropertiesMatchExpression, EquivalentToClone) {
         "patternProperties: [], otherwise: {}}}");
     expr = MatchExpressionParser::parse(filter, expCtx);
     ASSERT_OK(expr.getStatus());
-    clone = expr.getValue()->shallowClone();
+    clone = expr.getValue()->clone();
     ASSERT_TRUE(expr.getValue()->equivalent(clone.get()));
 }
 

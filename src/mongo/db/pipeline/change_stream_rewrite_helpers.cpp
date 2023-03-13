@@ -56,7 +56,7 @@ namespace {
 std::unique_ptr<PathMatchExpression> cloneWithSubstitution(
     const PathMatchExpression* predicate, const StringMap<std::string>& renameList) {
     auto clonedPred = std::unique_ptr<PathMatchExpression>(
-        static_cast<PathMatchExpression*>(predicate->shallowClone().release()));
+        static_cast<PathMatchExpression*>(predicate->clone().release()));
     clonedPred->applyRename(renameList);
     return clonedPred;
 }

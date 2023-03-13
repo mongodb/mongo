@@ -359,7 +359,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
     // Make the (only) node, a collection scan.
     auto csn = std::make_unique<CollectionScanNode>();
     csn->name = query.ns();
-    csn->filter = query.root()->shallowClone();
+    csn->filter = query.root()->clone();
     csn->tailable = tailable;
     csn->shouldTrackLatestOplogTimestamp =
         params.options & QueryPlannerParams::TRACK_LATEST_OPLOG_TS;
@@ -773,7 +773,7 @@ void buildTextSubPlan(TextMatchNode* tn) {
         // If we will be adding a TEXT_OR or OR stage, then it is responsible for applying the
         // filter. Otherwise, the index scan applies the filter.
         if (!needOrStage && tn->filter) {
-            ixscan->filter = tn->filter->shallowClone();
+            ixscan->filter = tn->filter->clone();
         }
 
         indexScanList.push_back(std::move(ixscan));
@@ -1424,7 +1424,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedAnd(
     // match expression to be sure that the FETCH stage will recheck the entire predicate. It is not
     // correct to trim predicates for index intersection plans, as this can lead to spurious matches
     // (see SERVER-16750).
-    auto clonedRoot = root->shallowClone();
+    auto clonedRoot = root->clone();
 
     std::vector<std::unique_ptr<QuerySolutionNode>> ixscanNodes;
     const bool inArrayOperator = !ownedRoot;
@@ -1767,7 +1767,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::scanWholeIndex(
         isn->direction = -1;
     }
 
-    unique_ptr<MatchExpression> filter = query.root()->shallowClone();
+    unique_ptr<MatchExpression> filter = query.root()->clone();
 
     // If it's find({}) remove the no-op root.
     if (MatchExpression::AND == filter->matchType() && (0 == filter->numChildren())) {
@@ -1805,7 +1805,7 @@ void QueryPlannerAccess::addFilterToSolutionNode(QuerySolutionNode* node,
             verify(MatchExpression::OR == type);
             listFilter = std::make_unique<OrMatchExpression>();
         }
-        unique_ptr<MatchExpression> oldFilter = node->filter->shallowClone();
+        unique_ptr<MatchExpression> oldFilter = node->filter->clone();
         listFilter->add(std::move(oldFilter));
         listFilter->add(std::move(match));
         node->filter = std::move(listFilter);
@@ -1897,7 +1897,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeIndexScan(
     isn->bounds.boundInclusion = BoundInclusion::kIncludeStartKeyOnly;
     isn->queryCollator = query.getCollator();
 
-    unique_ptr<MatchExpression> filter = query.root()->shallowClone();
+    unique_ptr<MatchExpression> filter = query.root()->clone();
 
     // If it's find({}) remove the no-op root.
     if (MatchExpression::AND == filter->matchType() && (0 == filter->numChildren())) {

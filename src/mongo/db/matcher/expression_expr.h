@@ -68,7 +68,7 @@ public:
      */
     Value evaluateExpression(const MatchableDocument* doc) const;
 
-    std::unique_ptr<MatchExpression> shallowClone() const final;
+    std::unique_ptr<MatchExpression> clone() const final;
 
     void debugString(StringBuilder& debug, int indentationLevel = 0) const final {
         _debugAddSpace(debug, indentationLevel);

@@ -268,7 +268,7 @@ void explodeNode(const QuerySolutionNode* node,
 
         // Copy the filter, if there is one.
         if (isn->filter.get()) {
-            child->filter = isn->filter->shallowClone();
+            child->filter = isn->filter->clone();
         }
 
         // Create child bounds.
@@ -288,7 +288,7 @@ void explodeNode(const QuerySolutionNode* node,
 
             // Copy the FETCH's filter, if it exists.
             if (origFetchNode->filter.get()) {
-                newFetchNode->filter = origFetchNode->filter->shallowClone();
+                newFetchNode->filter = origFetchNode->filter->clone();
             }
 
             // Add the 'child' IXSCAN under the FETCH stage, and the FETCH stage to the result set.

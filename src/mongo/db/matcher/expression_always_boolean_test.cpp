@@ -49,7 +49,7 @@ TEST(AlwaysFalseMatchExpression, RejectsAllObjects) {
 TEST(AlwaysFalseMatchExpression, EquivalentReturnsCorrectResults) {
     auto falseExpr = std::make_unique<AlwaysFalseMatchExpression>();
     ASSERT_TRUE(falseExpr->equivalent(falseExpr.get()));
-    ASSERT_TRUE(falseExpr->equivalent(falseExpr->shallowClone().get()));
+    ASSERT_TRUE(falseExpr->equivalent(falseExpr->clone().get()));
 
     AlwaysTrueMatchExpression trueExpr;
     ASSERT_FALSE(falseExpr->equivalent(&trueExpr));
@@ -68,7 +68,7 @@ TEST(AlwaysTrueMatchExpression, AcceptsAllObjects) {
 TEST(AlwaysTrueMatchExpression, EquivalentReturnsCorrectResults) {
     auto trueExpr = std::make_unique<AlwaysTrueMatchExpression>();
     ASSERT_TRUE(trueExpr->equivalent(trueExpr.get()));
-    ASSERT_TRUE(trueExpr->equivalent(trueExpr->shallowClone().get()));
+    ASSERT_TRUE(trueExpr->equivalent(trueExpr->clone().get()));
 
     AlwaysFalseMatchExpression falseExpr;
     ASSERT_FALSE(trueExpr->equivalent(&falseExpr));

@@ -67,7 +67,7 @@ BSONObj InternalSchemaUniqueItemsMatchExpression::getSerializedRightHandSide(
     return bob.obj();
 }
 
-std::unique_ptr<MatchExpression> InternalSchemaUniqueItemsMatchExpression::shallowClone() const {
+std::unique_ptr<MatchExpression> InternalSchemaUniqueItemsMatchExpression::clone() const {
     auto clone =
         std::make_unique<InternalSchemaUniqueItemsMatchExpression>(path(), _errorAnnotation);
     if (getTag()) {

@@ -138,7 +138,7 @@ public:
 
     void serialize(BSONObjBuilder* builder, SerializationOptions opts) const final;
 
-    std::unique_ptr<MatchExpression> shallowClone() const final;
+    std::unique_ptr<MatchExpression> clone() const final;
 
     std::vector<std::unique_ptr<MatchExpression>>* getChildVector() final {
         return nullptr;

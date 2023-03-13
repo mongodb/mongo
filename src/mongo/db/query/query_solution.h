@@ -293,7 +293,7 @@ protected:
             other->children.push_back(this->children[i]->clone());
         }
         if (nullptr != this->filter) {
-            other->filter = this->filter->shallowClone();
+            other->filter = this->filter->clone();
         }
     }
 
@@ -543,14 +543,14 @@ struct ColumnIndexScanNode : public QuerySolutionNode {
     std::unique_ptr<QuerySolutionNode> clone() const final {
         StringMap<std::unique_ptr<MatchExpression>> clonedFiltersByPath;
         for (auto&& [path, filter] : filtersByPath) {
-            clonedFiltersByPath[path] = filter->shallowClone();
+            clonedFiltersByPath[path] = filter->clone();
         }
         return std::make_unique<ColumnIndexScanNode>(indexEntry,
                                                      outputFields,
                                                      matchFields,
                                                      allFields,
                                                      std::move(clonedFiltersByPath),
-                                                     postAssemblyFilter->shallowClone(),
+                                                     postAssemblyFilter->clone(),
                                                      extraFieldsPermitted);
     }
 

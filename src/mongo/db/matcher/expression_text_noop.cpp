@@ -45,7 +45,7 @@ TextNoOpMatchExpression::TextNoOpMatchExpression(TextParams params)
     invariant(_ftsQuery.parse(fts::TEXT_INDEX_VERSION_INVALID));
 }
 
-std::unique_ptr<MatchExpression> TextNoOpMatchExpression::shallowClone() const {
+std::unique_ptr<MatchExpression> TextNoOpMatchExpression::clone() const {
     TextParams params;
     params.query = _ftsQuery.getQuery();
     params.language = _ftsQuery.getLanguage();

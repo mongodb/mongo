@@ -157,20 +157,19 @@ void InternalSchemaAllowedPropertiesMatchExpression::serialize(BSONObjBuilder* b
     expressionBuilder.doneFast();
 }
 
-std::unique_ptr<MatchExpression> InternalSchemaAllowedPropertiesMatchExpression::shallowClone()
-    const {
+std::unique_ptr<MatchExpression> InternalSchemaAllowedPropertiesMatchExpression::clone() const {
     std::vector<PatternSchema> clonedPatternProperties;
     clonedPatternProperties.reserve(_patternProperties.size());
     for (auto&& constraint : _patternProperties) {
         clonedPatternProperties.emplace_back(Pattern(constraint.first.rawRegex),
-                                             constraint.second->shallowClone());
+                                             constraint.second->clone());
     }
 
     auto clone = std::make_unique<InternalSchemaAllowedPropertiesMatchExpression>(
         _properties,
         _namePlaceholder,
         std::move(clonedPatternProperties),
-        _otherwise->shallowClone(),
+        _otherwise->clone(),
         _errorAnnotation);
     return {std::move(clone)};
 }

@@ -139,7 +139,7 @@ public:
         return kName;
     }
 
-    std::unique_ptr<MatchExpression> shallowClone() const final {
+    std::unique_ptr<MatchExpression> clone() const final {
         auto expr = std::make_unique<TypeMatchExpression>(path(), typeSet(), _errorAnnotation);
         if (getTag()) {
             expr->setTag(getTag()->clone());
@@ -193,7 +193,7 @@ public:
         return kName;
     }
 
-    std::unique_ptr<MatchExpression> shallowClone() const final {
+    std::unique_ptr<MatchExpression> clone() const final {
         auto expr =
             std::make_unique<InternalSchemaTypeExpression>(path(), typeSet(), _errorAnnotation);
         if (getTag()) {
@@ -234,7 +234,7 @@ public:
         return elem.type() == BSONType::BinData && elem.binDataType() == _binDataSubType;
     }
 
-    std::unique_ptr<MatchExpression> shallowClone() const final {
+    std::unique_ptr<MatchExpression> clone() const final {
         auto expr = std::make_unique<InternalSchemaBinDataSubTypeExpression>(
             path(), _binDataSubType, _errorAnnotation);
         if (getTag()) {
@@ -316,7 +316,7 @@ public:
         return kName;
     }
 
-    std::unique_ptr<MatchExpression> shallowClone() const final {
+    std::unique_ptr<MatchExpression> clone() const final {
         auto expr = std::make_unique<InternalSchemaBinDataEncryptedTypeExpression>(
             path(), typeSet(), _errorAnnotation);
         if (getTag()) {
@@ -387,7 +387,7 @@ public:
         return kName;
     }
 
-    std::unique_ptr<MatchExpression> shallowClone() const final {
+    std::unique_ptr<MatchExpression> clone() const final {
         auto expr = std::make_unique<InternalSchemaBinDataFLE2EncryptedTypeExpression>(
             path(), typeSet(), _errorAnnotation);
         if (getTag()) {

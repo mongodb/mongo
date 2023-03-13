@@ -278,7 +278,7 @@ public:
         return kName;
     }
 
-    std::unique_ptr<MatchExpression> shallowClone() const final {
+    std::unique_ptr<MatchExpression> clone() const final {
         std::unique_ptr<ComparisonMatchExpression> e =
             std::make_unique<EqualityMatchExpression>(path(), Value(getData()), _errorAnnotation);
         if (getTag()) {
@@ -317,7 +317,7 @@ public:
         return kName;
     }
 
-    std::unique_ptr<MatchExpression> shallowClone() const final {
+    std::unique_ptr<MatchExpression> clone() const final {
         std::unique_ptr<ComparisonMatchExpression> e =
             std::make_unique<LTEMatchExpression>(path(), _rhs, _errorAnnotation);
         if (getTag()) {
@@ -356,7 +356,7 @@ public:
         return kName;
     }
 
-    std::unique_ptr<MatchExpression> shallowClone() const final {
+    std::unique_ptr<MatchExpression> clone() const final {
         std::unique_ptr<ComparisonMatchExpression> e =
             std::make_unique<LTMatchExpression>(path(), _rhs, _errorAnnotation);
         if (getTag()) {
@@ -400,7 +400,7 @@ public:
         return kName;
     }
 
-    std::unique_ptr<MatchExpression> shallowClone() const final {
+    std::unique_ptr<MatchExpression> clone() const final {
         std::unique_ptr<ComparisonMatchExpression> e =
             std::make_unique<GTMatchExpression>(path(), _rhs, _errorAnnotation);
         if (getTag()) {
@@ -443,7 +443,7 @@ public:
         return kName;
     }
 
-    std::unique_ptr<MatchExpression> shallowClone() const final {
+    std::unique_ptr<MatchExpression> clone() const final {
         std::unique_ptr<ComparisonMatchExpression> e =
             std::make_unique<GTEMatchExpression>(path(), _rhs, _errorAnnotation);
         if (getTag()) {
@@ -489,7 +489,7 @@ public:
 
     ~RegexMatchExpression();
 
-    std::unique_ptr<MatchExpression> shallowClone() const final {
+    std::unique_ptr<MatchExpression> clone() const final {
         std::unique_ptr<RegexMatchExpression> e =
             std::make_unique<RegexMatchExpression>(path(), _regex, _flags, _errorAnnotation);
         if (getTag()) {
@@ -571,7 +571,7 @@ public:
                        long long remainder,
                        clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
-    std::unique_ptr<MatchExpression> shallowClone() const final {
+    std::unique_ptr<MatchExpression> clone() const final {
         std::unique_ptr<ModMatchExpression> m =
             std::make_unique<ModMatchExpression>(path(), _divisor, _remainder, _errorAnnotation);
         if (getTag()) {
@@ -644,7 +644,7 @@ public:
     explicit ExistsMatchExpression(boost::optional<StringData> path,
                                    clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
-    virtual std::unique_ptr<MatchExpression> shallowClone() const {
+    virtual std::unique_ptr<MatchExpression> clone() const {
         std::unique_ptr<ExistsMatchExpression> e =
             std::make_unique<ExistsMatchExpression>(path(), _errorAnnotation);
         if (getTag()) {
@@ -685,7 +685,7 @@ public:
     explicit InMatchExpression(boost::optional<StringData> path,
                                clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
-    std::unique_ptr<MatchExpression> shallowClone() const final;
+    std::unique_ptr<MatchExpression> clone() const final;
 
     bool matchesSingleElement(const BSONElement&, MatchDetails* details = nullptr) const final;
 
@@ -928,7 +928,7 @@ public:
         : BitTestMatchExpression(
               BITS_ALL_SET, path, bitMaskBinary, bitMaskLen, std::move(annotation)) {}
 
-    std::unique_ptr<MatchExpression> shallowClone() const final {
+    std::unique_ptr<MatchExpression> clone() const final {
         std::unique_ptr<BitTestMatchExpression> bitTestMatchExpression =
             std::make_unique<BitsAllSetMatchExpression>(
                 path(), getBitPositions(), _errorAnnotation);
@@ -972,7 +972,7 @@ public:
         : BitTestMatchExpression(
               BITS_ALL_CLEAR, path, bitMaskBinary, bitMaskLen, std::move(annotation)) {}
 
-    std::unique_ptr<MatchExpression> shallowClone() const final {
+    std::unique_ptr<MatchExpression> clone() const final {
         std::unique_ptr<BitTestMatchExpression> bitTestMatchExpression =
             std::make_unique<BitsAllClearMatchExpression>(
                 path(), getBitPositions(), _errorAnnotation);
@@ -1016,7 +1016,7 @@ public:
         : BitTestMatchExpression(
               BITS_ANY_SET, path, bitMaskBinary, bitMaskLen, std::move(annotation)) {}
 
-    std::unique_ptr<MatchExpression> shallowClone() const final {
+    std::unique_ptr<MatchExpression> clone() const final {
         std::unique_ptr<BitTestMatchExpression> bitTestMatchExpression =
             std::make_unique<BitsAnySetMatchExpression>(
                 path(), getBitPositions(), _errorAnnotation);
@@ -1060,7 +1060,7 @@ public:
         : BitTestMatchExpression(
               BITS_ANY_CLEAR, path, bitMaskBinary, bitMaskLen, std::move(annotation)) {}
 
-    std::unique_ptr<MatchExpression> shallowClone() const final {
+    std::unique_ptr<MatchExpression> clone() const final {
         std::unique_ptr<BitTestMatchExpression> bitTestMatchExpression =
             std::make_unique<BitsAnyClearMatchExpression>(
                 path(), getBitPositions(), _errorAnnotation);

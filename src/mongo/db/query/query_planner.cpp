@@ -932,7 +932,7 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::planFromCache(
     // cases, and we proceed by using the PlanCacheIndexTree to tag the query tree.
 
     // Create a copy of the expression tree.  We use cachedSoln to annotate this with indices.
-    unique_ptr<MatchExpression> clone = query.root()->shallowClone();
+    unique_ptr<MatchExpression> clone = query.root()->clone();
 
     LOGV2_DEBUG(20963,
                 5,
@@ -1359,7 +1359,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
             // Store the plan cache index tree before calling prepareForAccessingPlanning(), so
             // that the PlanCacheIndexTree has the same sort as the MatchExpression used to
             // generate the plan cache key.
-            std::unique_ptr<MatchExpression> clone(nextTaggedTree->shallowClone());
+            std::unique_ptr<MatchExpression> clone(nextTaggedTree->clone());
             std::unique_ptr<PlanCacheIndexTree> cacheData;
             auto statusWithCacheData = cacheDataFromTaggedTree(clone.get(), relevantIndices);
             if (!statusWithCacheData.isOK()) {
@@ -1810,7 +1810,7 @@ StatusWith<QueryPlanner::SubqueriesPlanningResult> QueryPlanner::planSubqueries(
     invariant(query.root()->matchType() == MatchExpression::OR);
     invariant(query.root()->numChildren(), "Cannot plan subqueries for an $or with no children");
 
-    SubqueriesPlanningResult planningResult{query.root()->shallowClone()};
+    SubqueriesPlanningResult planningResult{query.root()->clone()};
     for (size_t i = 0; i < params.indices.size(); ++i) {
         const IndexEntry& ie = params.indices[i];
         const auto insertionRes = planningResult.indexMap.insert(std::make_pair(ie.identifier, i));

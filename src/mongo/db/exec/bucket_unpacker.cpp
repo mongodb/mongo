@@ -691,11 +691,11 @@ BucketSpec::BucketPredicate BucketSpec::createPredicatesOnBucketLevelField(
             return handleIneligible(policy, matchExpr, "cannot handle an excluded meta field");
 
         if (expression::hasOnlyRenameableMatchExpressionChildren(*matchExpr)) {
-            auto looseResult = matchExpr->shallowClone();
+            auto looseResult = matchExpr->clone();
             expression::applyRenamesToExpression(
                 looseResult.get(),
                 {{bucketSpec.metaField().value(), timeseries::kBucketMetaFieldName.toString()}});
-            auto tightResult = looseResult->shallowClone();
+            auto tightResult = looseResult->clone();
             return {std::move(looseResult), std::move(tightResult)};
         } else {
             return {nullptr, nullptr};

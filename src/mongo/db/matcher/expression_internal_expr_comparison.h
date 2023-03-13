@@ -98,7 +98,7 @@ public:
         }
     };
 
-    std::unique_ptr<MatchExpression> shallowClone() const final {
+    std::unique_ptr<MatchExpression> clone() const final {
         auto clone = std::make_unique<T>(path(), _rhs);
         clone->setCollator(_collator);
         if (getTag()) {

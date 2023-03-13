@@ -86,7 +86,7 @@ bool InternalSchemaEqMatchExpression::equivalent(const MatchExpression* other) c
     return path() == realOther->path() && _eltCmp.evaluate(_rhsElem == realOther->_rhsElem);
 }
 
-std::unique_ptr<MatchExpression> InternalSchemaEqMatchExpression::shallowClone() const {
+std::unique_ptr<MatchExpression> InternalSchemaEqMatchExpression::clone() const {
     auto clone =
         std::make_unique<InternalSchemaEqMatchExpression>(path(), _rhsElem, _errorAnnotation);
     if (getTag()) {

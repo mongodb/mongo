@@ -53,7 +53,7 @@ public:
                                     BSONElement rhs,
                                     clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
-    std::unique_ptr<MatchExpression> shallowClone() const final;
+    std::unique_ptr<MatchExpression> clone() const final;
 
     bool matchesSingleElement(const BSONElement&, MatchDetails*) const final;
 

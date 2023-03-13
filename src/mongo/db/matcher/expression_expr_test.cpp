@@ -705,7 +705,7 @@ TEST(ExprMatchTest, OptimizingAnAlreadyOptimizedCloneIsANoop) {
 
     // Clone the match expression and optimize it again. We expect the twice-optimized match
     // expression to be equivalent to the once-optimized one.
-    std::unique_ptr<MatchExpression> doublyOptimized = singlyOptimized->shallowClone();
+    std::unique_ptr<MatchExpression> doublyOptimized = singlyOptimized->clone();
     doublyOptimized = MatchExpression::optimize(std::move(doublyOptimized));
     ASSERT_TRUE(doublyOptimized->equivalent(singlyOptimized.get()));
 }
@@ -715,8 +715,8 @@ TEST(ExprMatchTest, ShallowClonedExpressionIsEquivalentToOriginal) {
 
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     ExprMatchExpression pipelineExpr(expression.firstElement(), std::move(expCtx));
-    auto shallowClone = pipelineExpr.shallowClone();
-    ASSERT_TRUE(pipelineExpr.equivalent(shallowClone.get()));
+    auto clone = pipelineExpr.clone();
+    ASSERT_TRUE(pipelineExpr.equivalent(clone.get()));
 }
 
 TEST(ExprMatchTest, OptimizingExprAbsorbsAndOfAnd) {

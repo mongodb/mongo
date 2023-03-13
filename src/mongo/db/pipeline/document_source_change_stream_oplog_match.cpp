@@ -51,7 +51,7 @@ namespace change_stream_filter {
  * entries that would definitely be filtered out by the 'userMatch' filter.
  *
  * NB: When passing a non-NULL 'userMatch' expression, the resulting expression is built using a
- * "shallow clone" of the 'userMatch' (i.e., the result of 'MatchExpression::shallowClone()') and
+ * "shallow clone" of the 'userMatch' (i.e., the result of 'MatchExpression::clone()') and
  * can contain references to strings in the BSONObj that 'userMatch' originated from. Callers that
  * keep the new filter long-term should serialize and re-parse it to guard against the possibility
  * of stale string references.

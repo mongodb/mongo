@@ -377,7 +377,7 @@ unique_ptr<MatchExpression> PlanEnumerator::getNext() {
     // Tag with our first solution.
     tagMemo(memoIDForNode(_root));
 
-    unique_ptr<MatchExpression> tree(_root->shallowClone());
+    unique_ptr<MatchExpression> tree(_root->clone());
     tagForSort(tree.get());
 
     _root->resetTag();

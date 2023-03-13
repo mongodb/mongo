@@ -390,11 +390,11 @@ TEST(NorOp, Equivalent) {
     auto sub2 = EqualityMatchExpression{"b"_sd, baseOperand2["b"]};
 
     auto e1 = NorMatchExpression{};
-    e1.add(sub1.shallowClone());
-    e1.add(sub2.shallowClone());
+    e1.add(sub1.clone());
+    e1.add(sub2.clone());
 
     auto e2 = NorMatchExpression{};
-    e2.add(sub1.shallowClone());
+    e2.add(sub1.clone());
 
     ASSERT(e1.equivalent(&e1));
     ASSERT(!e1.equivalent(&e2));

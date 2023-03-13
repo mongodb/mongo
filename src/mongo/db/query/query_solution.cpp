@@ -1256,7 +1256,7 @@ void ProjectionNode::computeProperties() {
 void ProjectionNode::cloneProjectionData(ProjectionNode* copy) const {
     // ProjectionNode should not populate filter. This should be a no-op.
     if (this->filter)
-        copy->filter = this->filter->shallowClone();
+        copy->filter = this->filter->clone();
 
     copy->sortSet = this->sortSet;
 }

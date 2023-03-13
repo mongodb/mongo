@@ -90,10 +90,9 @@ BSONObj InternalSchemaMatchArrayIndexMatchExpression::getSerializedRightHandSide
     return objBuilder.obj();
 }
 
-std::unique_ptr<MatchExpression> InternalSchemaMatchArrayIndexMatchExpression::shallowClone()
-    const {
+std::unique_ptr<MatchExpression> InternalSchemaMatchArrayIndexMatchExpression::clone() const {
     auto clone = std::make_unique<InternalSchemaMatchArrayIndexMatchExpression>(
-        path(), _index, _expression->shallowClone(), _errorAnnotation);
+        path(), _index, _expression->clone(), _errorAnnotation);
     if (getTag()) {
         clone->setTag(getTag()->clone());
     }

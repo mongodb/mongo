@@ -67,7 +67,7 @@ Status filterMatches(const BSONObj& testFilter,
     if (!trueFilter) {
         return {ErrorCodes::Error{6298503}, "actual (true) filter was null"};
     }
-    std::unique_ptr<MatchExpression> trueFilterClone(trueFilter->shallowClone());
+    std::unique_ptr<MatchExpression> trueFilterClone(trueFilter->clone());
     MatchExpression::sortTree(trueFilterClone.get());
 
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());

@@ -154,7 +154,7 @@ TEST(InternalSchemaCondMatchExpressionTest, EquivalentToClone) {
     auto elseQuery = BSON("interests"
                           << "dogs");
     auto cond = createCondMatchExpression(conditionQuery, thenQuery, elseQuery);
-    auto clone = cond->shallowClone();
+    auto clone = cond->clone();
     ASSERT_TRUE(cond->equivalent(clone.get()));
 }
 }  // namespace

@@ -425,7 +425,7 @@ void parseInclusion(ParseContext* ctx,
 
         // Copy the original match expression, which makes sure to preserve any input parameter ids
         // attached to the tree.
-        CopyableMatchExpression matcher{ctx->queryObj, ctx->query->shallowClone()};
+        CopyableMatchExpression matcher{ctx->queryObj, ctx->query->clone()};
 
         invariant(ctx->query);
         addNodeAtPath(parent,

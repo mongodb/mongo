@@ -88,7 +88,7 @@ public:
 
     BSONObj getSerializedRightHandSide(SerializationOptions opts) const final;
 
-    std::unique_ptr<MatchExpression> shallowClone() const final;
+    std::unique_ptr<MatchExpression> clone() const final;
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
         visitor->visit(this);

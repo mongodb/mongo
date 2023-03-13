@@ -135,7 +135,7 @@ TEST(InternalSchemaEqMatchExpression, EquivalentToClone) {
     auto query = fromjson("{a: {$_internalSchemaEq: {a:1, b: {c: 1, d: [1]}}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     Matcher rootDocEq(query, expCtx);
-    auto clone = rootDocEq.getMatchExpression()->shallowClone();
+    auto clone = rootDocEq.getMatchExpression()->clone();
     ASSERT_TRUE(rootDocEq.getMatchExpression()->equivalent(clone.get()));
 }
 

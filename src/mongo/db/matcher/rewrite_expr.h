@@ -60,7 +60,7 @@ public:
         }
 
         RewriteResult clone() const {
-            auto clonedMatch = _matchExpression ? _matchExpression->shallowClone() : nullptr;
+            auto clonedMatch = _matchExpression ? _matchExpression->clone() : nullptr;
             return {std::move(clonedMatch), _matchExprElemStorage};
         }
 

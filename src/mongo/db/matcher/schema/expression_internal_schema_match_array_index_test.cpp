@@ -112,7 +112,7 @@ TEST(InternalSchemaMatchArrayIndexMatchExpression, EquivalentToClone) {
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     auto expr = MatchExpressionParser::parse(filter, expCtx);
     ASSERT_OK(expr.getStatus());
-    auto clone = expr.getValue()->shallowClone();
+    auto clone = expr.getValue()->clone();
     ASSERT_TRUE(expr.getValue()->equivalent(clone.get()));
 }
 

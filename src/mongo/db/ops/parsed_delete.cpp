@@ -124,7 +124,7 @@ Status ParsedDelete::splitOutBucketMatchExpression(const ExtensionsCallback& ext
         auto metaField = optMetaField->toString();
         std::tie(details->_bucketMatchExpr, details->_residualExpr) =
             expression::splitMatchExpressionBy(
-                swMatchExpr.getValue()->shallowClone(),
+                swMatchExpr.getValue()->clone(),
                 {metaField},
                 {{metaField, timeseries::kBucketMetaFieldName.toString()}},
                 expression::isOnlyDependentOn);

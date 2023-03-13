@@ -434,7 +434,7 @@ InMatchExpression::InMatchExpression(boost::optional<StringData> path,
     : LeafMatchExpression(MATCH_IN, path, std::move(annotation)),
       _eltCmp(BSONElementComparator::FieldNamesMode::kIgnore, _collator) {}
 
-std::unique_ptr<MatchExpression> InMatchExpression::shallowClone() const {
+std::unique_ptr<MatchExpression> InMatchExpression::clone() const {
     auto next = std::make_unique<InMatchExpression>(path(), _errorAnnotation);
     next->setCollator(_collator);
     if (getTag()) {
@@ -449,7 +449,7 @@ std::unique_ptr<MatchExpression> InMatchExpression::shallowClone() const {
     next->_equalityStorage = _equalityStorage;
     for (auto&& regex : _regexes) {
         std::unique_ptr<RegexMatchExpression> clonedRegex(
-            static_cast<RegexMatchExpression*>(regex->shallowClone().release()));
+            static_cast<RegexMatchExpression*>(regex->clone().release()));
         next->_regexes.push_back(std::move(clonedRegex));
     }
     if (getInputParamId()) {

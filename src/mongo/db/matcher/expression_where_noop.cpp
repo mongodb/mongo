@@ -43,7 +43,7 @@ bool WhereNoOpMatchExpression::matches(const MatchableDocument* doc, MatchDetail
     MONGO_UNREACHABLE;
 }
 
-std::unique_ptr<MatchExpression> WhereNoOpMatchExpression::shallowClone() const {
+std::unique_ptr<MatchExpression> WhereNoOpMatchExpression::clone() const {
     WhereParams params;
     params.code = getCode();
     std::unique_ptr<WhereNoOpMatchExpression> e =

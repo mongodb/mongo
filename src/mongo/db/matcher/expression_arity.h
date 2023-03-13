@@ -121,14 +121,13 @@ public:
     /**
      * Clones this MatchExpression by recursively cloning each sub-expression.
      */
-    std::unique_ptr<MatchExpression> shallowClone() const final {
+    std::unique_ptr<MatchExpression> clone() const final {
         std::array<std::unique_ptr<MatchExpression>, nargs> clonedExpressions;
         std::transform(_expressions.begin(),
                        _expressions.end(),
                        clonedExpressions.begin(),
                        [](const auto& orig) {
-                           return orig ? orig->shallowClone()
-                                       : std::unique_ptr<MatchExpression>(nullptr);
+                           return orig ? orig->clone() : std::unique_ptr<MatchExpression>(nullptr);
                        });
         std::unique_ptr<T> clone =
             std::make_unique<T>(std::move(clonedExpressions), _errorAnnotation);

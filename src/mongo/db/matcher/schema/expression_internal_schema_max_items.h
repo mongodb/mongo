@@ -53,7 +53,7 @@ public:
         return (anArray.nFields() <= numItems());
     }
 
-    std::unique_ptr<MatchExpression> shallowClone() const final {
+    std::unique_ptr<MatchExpression> clone() const final {
         std::unique_ptr<InternalSchemaMaxItemsMatchExpression> maxItems =
             std::make_unique<InternalSchemaMaxItemsMatchExpression>(
                 path(), numItems(), _errorAnnotation);

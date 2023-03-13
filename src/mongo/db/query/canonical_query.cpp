@@ -169,7 +169,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
                                  baseQuery.getExpCtx(),
                                  std::move(findCommand),
                                  baseQuery.canHaveNoopMatchNodes(),
-                                 root->shallowClone(),
+                                 root->clone(),
                                  ProjectionPolicies::findProjectionPolicies(),
                                  {} /* an empty pipeline */,
                                  baseQuery.isCountLike());

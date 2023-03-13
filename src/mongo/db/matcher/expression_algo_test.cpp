@@ -1821,7 +1821,7 @@ TEST(SplitMatchExpression, ShouldSplitOutAndRenameJsonSchemaPatternByIsOnlyDepen
     ParsedMatchExpressionForTest matcher(
         R"({$jsonSchema: {properties: {a: {pattern: "[0-9]*"}}}})");
     auto originalExpr = matcher.release();
-    auto originalExprCopy = originalExpr->shallowClone();
+    auto originalExprCopy = originalExpr->clone();
 
     // $jsonSchema expression will be split out by the meta field "a" and the meta field "a" will be
     // renamed to "meta".

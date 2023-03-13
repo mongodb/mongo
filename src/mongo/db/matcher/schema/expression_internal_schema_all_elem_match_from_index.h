@@ -53,7 +53,7 @@ public:
         std::unique_ptr<ExpressionWithPlaceholder> expression,
         clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
-    std::unique_ptr<MatchExpression> shallowClone() const final;
+    std::unique_ptr<MatchExpression> clone() const final;
 
     bool matchesArray(const BSONObj& array, MatchDetails* details) const final {
         return !findFirstMismatchInArray(array, details);

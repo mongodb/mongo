@@ -78,10 +78,10 @@ public:
 
     bool matchesArray(const BSONObj& anArray, MatchDetails* details) const;
 
-    virtual std::unique_ptr<MatchExpression> shallowClone() const {
+    virtual std::unique_ptr<MatchExpression> clone() const {
         std::unique_ptr<ElemMatchObjectMatchExpression> e =
             std::make_unique<ElemMatchObjectMatchExpression>(
-                path(), _sub->shallowClone(), _errorAnnotation);
+                path(), _sub->clone(), _errorAnnotation);
         if (getTag()) {
             e->setTag(getTag()->clone());
         }
@@ -144,11 +144,11 @@ public:
 
     bool matchesArray(const BSONObj& anArray, MatchDetails* details) const;
 
-    virtual std::unique_ptr<MatchExpression> shallowClone() const {
+    virtual std::unique_ptr<MatchExpression> clone() const {
         std::unique_ptr<ElemMatchValueMatchExpression> e =
             std::make_unique<ElemMatchValueMatchExpression>(path(), _errorAnnotation);
         for (size_t i = 0; i < _subs.size(); ++i) {
-            e->add(_subs[i]->shallowClone());
+            e->add(_subs[i]->clone());
         }
         if (getTag()) {
             e->setTag(getTag()->clone());
@@ -200,7 +200,7 @@ public:
                         int size,
                         clonable_ptr<ErrorAnnotation> annotation = nullptr);
 
-    std::unique_ptr<MatchExpression> shallowClone() const final {
+    std::unique_ptr<MatchExpression> clone() const final {
         std::unique_ptr<SizeMatchExpression> e =
             std::make_unique<SizeMatchExpression>(path(), _size, _errorAnnotation);
         if (getTag()) {
