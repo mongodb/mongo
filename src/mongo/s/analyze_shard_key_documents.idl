@@ -110,5 +110,9 @@ structs:
                   analyzeShardKey command."
     strict: false
     fields:
+      _id:
+        type: uuid
+        description: "The unique id for the split point."
+        cpp_name: id
       splitPoint:
         type: object

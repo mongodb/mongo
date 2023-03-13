@@ -635,7 +635,18 @@ std::pair<NamespaceString, Timestamp> generateSplitPoints(OperationContext* opCt
             uasserted(ErrorCodes::FailedToParse, errMsg);
         }
 
-        uassertStatusOK(res.toStatus());
+        if (res.isErrDetailsSet() && res.sizeErrDetails() > 0) {
+            for (const auto& err : res.getErrDetails()) {
+                if (err.getStatus() == ErrorCodes::DuplicateKey) {
+                    LOGV2(7433800, "Ignoring insert error", "error"_attr = redact(err.getStatus()));
+                    continue;
+                }
+                uassertStatusOK(err.getStatus());
+            }
+        } else {
+            uassertStatusOK(res.toStatus());
+        }
+
         splitPointsAfterClusterTime = LogicalTime::fromOperationTime(resObj).asTimestamp();
     };
 
@@ -653,6 +664,7 @@ std::pair<NamespaceString, Timestamp> generateSplitPoints(OperationContext* opCt
             splitPointsToInsert.clear();
         }
         AnalyzeShardKeySplitPointDocument doc;
+        doc.setId(UUID::gen());
         doc.setSplitPoint(splitPoint);
         splitPointsToInsert.push_back(doc.toBSON());
         objSize += splitPoint.objsize();

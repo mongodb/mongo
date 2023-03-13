@@ -75,7 +75,7 @@ function makeAnalyzeShardKeyAggregateCmdObj(st, collName, key, splitPointsShardI
             makeAnalyzeShardKeyAggregateCmdObj(st, validationTest.collName, {b: 1}, st.shard0.name);
         const splitPointsColl = shard0Primary.getCollection(
             aggCmdObj.pipeline[0]["$_analyzeShardKeyReadWriteDistribution"].splitPointsNss);
-        assert.commandWorked(splitPointsColl.insert({splitPoint: {b: [0, 0]}}));
+        assert.commandWorked(splitPointsColl.insert({_id: UUID(), splitPoint: {b: [0, 0]}}));
         assert.commandFailedWithCode(
             shard0Primary.getDB(validationTest.dbName).runCommand(aggCmdObj), ErrorCodes.BadValue);
         splitPointsColl.drop();
@@ -88,7 +88,7 @@ function makeAnalyzeShardKeyAggregateCmdObj(st, collName, key, splitPointsShardI
             makeAnalyzeShardKeyAggregateCmdObj(st, validationTest.collName, {a: 1}, st.shard0.name);
         const splitPointsColl = shard0Primary.getCollection(
             aggCmdObj.pipeline[0]["$_analyzeShardKeyReadWriteDistribution"].splitPointsNss);
-        assert.commandWorked(splitPointsColl.insert({splitPoint: {_id: 1}}));
+        assert.commandWorked(splitPointsColl.insert({_id: UUID(), splitPoint: {_id: 1}}));
         assert.commandFailedWithCode(
             shard0Primary.getDB(validationTest.dbName).runCommand(aggCmdObj), ErrorCodes.BadValue);
         splitPointsColl.drop();
