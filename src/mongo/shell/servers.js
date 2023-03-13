@@ -710,6 +710,19 @@ MongoRunner.mongodOptions = function(opts = {}) {
 
     opts.pathOpts = Object.merge(opts.pathOpts, {dbpath: opts.dbpath});
 
+    // TODO (SERVER-74847): Remove this transition once we remove testing around
+    // downgrading from latest to last continuous.
+    opts.setParameter = opts.setParameter || {};
+    if (jsTestOptions().enableTestCommands && typeof opts.setParameter !== "string") {
+        if (jsTestOptions().setParameters &&
+            jsTestOptions().setParameters.disableTransitionFromLatestToLastContinuous) {
+            opts.setParameter["disableTransitionFromLatestToLastContinuous"] =
+                jsTestOptions().setParameters.disableTransitionFromLatestToLastContinuous;
+        } else {
+            opts.setParameter["disableTransitionFromLatestToLastContinuous"] = false;
+        }
+    }
+
     _removeSetParameterIfBeforeVersion(opts, "writePeriodicNoops", "3.3.12");
     _removeSetParameterIfBeforeVersion(opts, "numInitialSyncAttempts", "3.3.12");
     _removeSetParameterIfBeforeVersion(opts, "numInitialSyncConnectAttempts", "3.3.12");
@@ -724,6 +737,8 @@ MongoRunner.mongodOptions = function(opts = {}) {
     _removeSetParameterIfBeforeVersion(opts, "allowMultipleArbiters", "5.3.0");
     _removeSetParameterIfBeforeVersion(
         opts, "internalQueryDisableExclusionProjectionFastPath", "6.2.0");
+    _removeSetParameterIfBeforeVersion(
+        opts, "disableTransitionFromLatestToLastContinuous", "7.0.0");
 
     if (!opts.logFile && opts.useLogFiles) {
         opts.logFile = opts.dbpath + "/mongod.log";

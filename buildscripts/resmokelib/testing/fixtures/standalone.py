@@ -375,3 +375,4 @@ def _add_testing_set_parameters(suite_set_parameters):
     # Set it to true for now as a placeholder that will error if no further processing is done.
     # The placeholder is needed so older versions don't have this option won't have this value set.
     suite_set_parameters.setdefault("backtraceLogFile", True)
+    suite_set_parameters.setdefault("disableTransitionFromLatestToLastContinuous", False)

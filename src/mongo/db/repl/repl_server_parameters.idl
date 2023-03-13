@@ -739,6 +739,17 @@ server_parameters:
         validator:
             gte: 0
 
+    # TODO (SERVER-74847): Remove this server parameter.
+    disableTransitionFromLatestToLastContinuous:
+        description: >-
+            Prohibits downgrading from latest FCV to last continuous FCV. Disabled by default.
+            Test-only.
+        test_only: true
+        set_at: startup
+        cpp_vartype: bool
+        cpp_varname: disableTransitionFromLatestToLastContinuous
+        default: true
+
 feature_flags:
     featureFlagRetryableFindAndModify:
         description: >-

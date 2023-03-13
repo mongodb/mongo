@@ -10,13 +10,21 @@ requireSSLProvider(['openssl', 'windows'], function() {
 
     var testUnrevoked = new SSLTest(
         // Server option overrides
-        {sslMode: "requireSSL", sslCRLFile: "jstests/libs/crl.pem"});
+        {
+            sslMode: "requireSSL",
+            sslCRLFile: "jstests/libs/crl.pem",
+            setParameter: {enableTestCommands: 1}
+        });
 
     assert(testUnrevoked.connectWorked());
 
     var testRevoked = new SSLTest(
         // Server option overrides
-        {sslMode: "requireSSL", sslCRLFile: "jstests/libs/crl_expired.pem"});
+        {
+            sslMode: "requireSSL",
+            sslCRLFile: "jstests/libs/crl_expired.pem",
+            setParameter: {enableTestCommands: 1}
+        });
 
     assert(!testRevoked.connectWorked());
 });

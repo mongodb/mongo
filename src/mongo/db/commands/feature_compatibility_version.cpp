@@ -126,21 +126,18 @@ public:
                 GenericFCV::kLastLTS /* effective */, GenericFCV::kLastContinuous /* target */);
         }
 
-        for (auto [downgrading, to] :
-             std::vector{std::make_tuple(GenericFCV::kDowngradingFromLatestToLastContinuous,
-                                         GenericFCV::kLastContinuous),
-                         std::make_tuple(GenericFCV::kDowngradingFromLatestToLastLTS,
-                                         GenericFCV::kLastLTS)}) {
-            for (auto&& isFromConfigServer : {false, true}) {
-                // Start or complete downgrade from latest.  If this release's lastContinuous ==
-                // lastLTS then the second loop iteration just overwrites the first.
-                _transitions[{GenericFCV::kLatest, to, isFromConfigServer}] = downgrading;
-                _transitions[{downgrading, to, isFromConfigServer}] = to;
-            }
-            _fcvDocuments[downgrading] =
-                makeFCVDoc(to /* effective */, to /* target */, GenericFCV::kLatest /* previous */
-                );
+        for (auto&& isFromConfigServer : {false, true}) {
+            _transitions[{GenericFCV::kLatest, GenericFCV::kLastLTS, isFromConfigServer}] =
+                GenericFCV::kDowngradingFromLatestToLastLTS;
+            _transitions[{GenericFCV::kDowngradingFromLatestToLastLTS,
+                          GenericFCV::kLastLTS,
+                          isFromConfigServer}] = GenericFCV::kLastLTS;
         }
+        _fcvDocuments[GenericFCV::kDowngradingFromLatestToLastLTS] =
+            makeFCVDoc(GenericFCV::kLastLTS /* effective */,
+                       GenericFCV::kLastLTS /* target */,
+                       GenericFCV::kLatest /* previous */
+            );
     }
 
     /**
@@ -155,6 +152,25 @@ public:
                               isFromConfigServer}] = GenericFCV::kUpgradingFromLastLTSToLatest;
             }
         }
+    }
+
+    // TODO (SERVER-74847): Remove this transition once we remove testing around
+    // downgrading from latest to last continuous.
+    void addTransitionFromLatestToLastContinuous() {
+        for (auto&& isFromConfigServer : {false, true}) {
+            _transitions[{GenericFCV::kLatest, GenericFCV::kLastContinuous, isFromConfigServer}] =
+                GenericFCV::kDowngradingFromLatestToLastContinuous;
+            _transitions[{GenericFCV::kDowngradingFromLatestToLastContinuous,
+                          GenericFCV::kLastContinuous,
+                          isFromConfigServer}] = GenericFCV::kLastContinuous;
+        }
+
+        FeatureCompatibilityVersionDocument fcvDoc;
+        fcvDoc.setVersion(GenericFCV::kLastContinuous);
+        fcvDoc.setTargetVersion(GenericFCV::kLastContinuous);
+        fcvDoc.setPreviousVersion(GenericFCV::kLatest);
+
+        _fcvDocuments[GenericFCV::kDowngradingFromLatestToLastContinuous] = fcvDoc;
     }
 
     /**
@@ -574,6 +590,10 @@ void FeatureCompatibilityVersion::fassertInitializedAfterStartup(OperationContex
     if (isWriteableStorageEngine && (!usingReplication || nonLocalDatabases)) {
         invariant(serverGlobalParams.featureCompatibility.isVersionInitialized());
     }
+}
+
+void FeatureCompatibilityVersion::addTransitionFromLatestToLastContinuous() {
+    fcvTransitions.addTransitionFromLatestToLastContinuous();
 }
 
 Lock::ExclusiveLock FeatureCompatibilityVersion::enterFCVChangeRegion(OperationContext* opCtx) {
