@@ -476,6 +476,7 @@ env.Library(
         'local_oplog_info.cpp',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/db/logical_time',
         '$BUILD_DIR/mongo/db/repl/optime',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',

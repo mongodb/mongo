@@ -31,6 +31,7 @@
 
 #include "mongo/db/catalog/local_oplog_info.h"
 
+#include "mongo/db/curop.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/storage/flow_control.h"
@@ -38,6 +39,7 @@
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 namespace {
@@ -111,6 +113,8 @@ std::vector<OplogSlot> LocalOplogInfo::getNextOpTimes(OperationContext* opCtx, s
         invariant(_oplog);
         fassert(28560, _oplog->getRecordStore()->oplogDiskLocRegister(opCtx, ts, orderedCommit));
     }
+
+    Timer oplogSlotDurationTimer;
     std::vector<OplogSlot> oplogSlots(count);
     for (std::size_t i = 0; i < count; i++) {
         oplogSlots[i] = {Timestamp(ts.asULL() + i), term};
@@ -119,8 +123,25 @@ std::vector<OplogSlot> LocalOplogInfo::getNextOpTimes(OperationContext* opCtx, s
     // If we abort a transaction that has reserved an optime, we should make sure to update the
     // stable timestamp if necessary, since this oplog hole may have been holding back the stable
     // timestamp.
-    opCtx->recoveryUnit()->onRollback(
-        [replCoord]() { replCoord->attemptToAdvanceStableTimestamp(); });
+    opCtx->recoveryUnit()->onRollback([replCoord, oplogSlotDurationTimer]() {
+        replCoord->attemptToAdvanceStableTimestamp();
+
+        // Transactions can commit on a different thread with a different client and opCtx.
+        if (auto opCtx = cc().getOperationContext()) {
+            // Sum the oplog slot durations. An operation may participate in multiple transactions.
+            CurOp::get(opCtx)->debug().totalOplogSlotDurationMicros +=
+                Microseconds(oplogSlotDurationTimer.elapsed());
+        }
+    });
+
+    opCtx->recoveryUnit()->onCommit([oplogSlotDurationTimer](boost::optional<Timestamp>) {
+        // Transactions can commit on a different thread with a different Client and opCtx.
+        if (auto opCtx = cc().getOperationContext()) {
+            // Sum the oplog slot durations. An operation may participate in multiple transactions.
+            CurOp::get(opCtx)->debug().totalOplogSlotDurationMicros +=
+                Microseconds(oplogSlotDurationTimer.elapsed());
+        }
+    });
 
     return oplogSlots;
 }
