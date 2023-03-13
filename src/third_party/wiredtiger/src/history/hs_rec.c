@@ -410,6 +410,14 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_MULTI *mult
           (WT_STREQ(btree->value_format, "S") || WT_STREQ(btree->value_format, "u"));
 
         /*
+         * If there exists an on page tombstone without a timestamp, consider it as a no timestamp
+         * update to clear the timestamps of all the updates that are inserted into the history
+         * store.
+         */
+        if (list->onpage_tombstone != NULL && list->onpage_tombstone->start_ts == WT_TS_NONE)
+            no_ts_upd = list->onpage_tombstone;
+
+        /*
          * The algorithm assumes the oldest update on the update chain in memory is either a full
          * update or a tombstone.
          *
