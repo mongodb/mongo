@@ -403,8 +403,7 @@ function testConfigurableAutoMergerIntervalSecs(st, testDB) {
         assert.soon(
             () =>
                 findChunksUtil.findChunksByNs(st.config, coll.getFullName()).toArray().length == 1,
-            "Automerger unexpectly didn't merge back chunks within a reasonable time",
-            5000 /* timeout */);
+            "Automerger unexpectly didn't merge back chunks within a reasonable time");
     }
 }
 
