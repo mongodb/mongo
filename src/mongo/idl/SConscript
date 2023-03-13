@@ -74,7 +74,23 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/repl/replica_set_aware_service',
-    ]
+        'cluster_parameter_synchronization_helpers',
+    ],
+)
+
+env.Library(
+    target='cluster_parameter_synchronization_helpers',
+    source=[
+        'cluster_parameter_synchronization_helpers.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/audit',
+        '$BUILD_DIR/mongo/db/db_raii',
+        '$BUILD_DIR/mongo/db/logical_time',
+    ],
 )
 
 env.Library(
@@ -88,6 +104,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/op_observer',
+        'cluster_parameter_synchronization_helpers',
         'cluster_server_parameter_initializer',
     ],
 )
@@ -136,6 +153,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/repl/storage_interface_impl',
         '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
         '$BUILD_DIR/mongo/util/signal_handlers',
+        'cluster_parameter_synchronization_helpers',
         'cluster_server_parameter_initializer',
         'cluster_server_parameter_test_parameter',
     ],

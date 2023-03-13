@@ -34,7 +34,7 @@
 #include <memory>
 
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/idl/cluster_server_parameter_initializer.h"
+#include "mongo/idl/cluster_parameter_synchronization_helpers.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
@@ -67,7 +67,9 @@ void ClusterServerParameterOpObserver::onInserts(OperationContext* opCtx,
     }
 
     for (auto it = first; it != last; ++it) {
-        ClusterServerParameterInitializer::get(opCtx)->updateParameter(it->doc, kOplog);
+        opCtx->recoveryUnit()->onCommit([doc = it->doc](boost::optional<Timestamp>) {
+            cluster_parameters::updateParameter(doc, kOplog);
+        });
     }
 }
 
@@ -78,7 +80,9 @@ void ClusterServerParameterOpObserver::onUpdate(OperationContext* opCtx,
         return;
     }
 
-    ClusterServerParameterInitializer::get(opCtx)->updateParameter(updatedDoc, kOplog);
+    opCtx->recoveryUnit()->onCommit([updatedDoc](boost::optional<Timestamp>) {
+        cluster_parameters::updateParameter(updatedDoc, kOplog);
+    });
 }
 
 void ClusterServerParameterOpObserver::aboutToDelete(OperationContext* opCtx,
@@ -115,7 +119,8 @@ void ClusterServerParameterOpObserver::onDelete(OperationContext* opCtx,
                                                 const OplogDeleteEntryArgs& args) {
     const auto& docName = aboutToDeleteDoc(opCtx);
     if (!docName.empty()) {
-        ClusterServerParameterInitializer::get(opCtx)->clearParameter(docName);
+        opCtx->recoveryUnit()->onCommit(
+            [docName](boost::optional<Timestamp>) { cluster_parameters::clearParameter(docName); });
     }
 }
 
@@ -123,7 +128,8 @@ void ClusterServerParameterOpObserver::onDropDatabase(OperationContext* opCtx,
                                                       const std::string& dbName) {
     if (dbName == NamespaceString::kConfigDb) {
         // Entire config DB deleted, reset to default state.
-        ClusterServerParameterInitializer::get(opCtx)->clearAllParameters();
+        opCtx->recoveryUnit()->onCommit(
+            [](boost::optional<Timestamp>) { cluster_parameters::clearAllParameters(); });
     }
 }
 
@@ -135,50 +141,11 @@ repl::OpTime ClusterServerParameterOpObserver::onDropCollection(
     CollectionDropType dropType) {
     if (isConfigNamespace(collectionName)) {
         // Entire collection deleted, reset to default state.
-        ClusterServerParameterInitializer::get(opCtx)->clearAllParameters();
+        opCtx->recoveryUnit()->onCommit(
+            [](boost::optional<Timestamp>) { cluster_parameters::clearAllParameters(); });
     }
 
     return {};
-}
-
-void ClusterServerParameterOpObserver::postRenameCollection(
-    OperationContext* opCtx,
-    const NamespaceString& fromCollection,
-    const NamespaceString& toCollection,
-    const UUID& uuid,
-    const boost::optional<UUID>& dropTargetUUID,
-    bool stayTemp) {
-    if (isConfigNamespace(fromCollection)) {
-        // Same as collection dropped from a config point of view.
-        ClusterServerParameterInitializer::get(opCtx)->clearAllParameters();
-    }
-
-    if (isConfigNamespace(toCollection)) {
-        // Potentially many documents now set, perform full scan.
-        if (dropTargetUUID) {
-            // Possibly lost configurations in overwrite.
-            ClusterServerParameterInitializer::get(opCtx)->resynchronizeAllParametersFromDisk(
-                opCtx);
-        } else {
-            // Collection did not exist prior to rename.
-            ClusterServerParameterInitializer::get(opCtx)->initializeAllParametersFromDisk(opCtx);
-        }
-    }
-}
-
-void ClusterServerParameterOpObserver::onImportCollection(OperationContext* opCtx,
-                                                          const UUID& importUUID,
-                                                          const NamespaceString& nss,
-                                                          long long numRecords,
-                                                          long long dataSize,
-                                                          const BSONObj& catalogEntry,
-                                                          const BSONObj& storageMetadata,
-                                                          bool isDryRun) {
-    if (!isDryRun && (numRecords > 0) && isConfigNamespace(nss)) {
-        // Something was imported, do a full collection scan to sync up.
-        // No need to apply rollback rules since nothing will have been deleted.
-        ClusterServerParameterInitializer::get(opCtx)->initializeAllParametersFromDisk(opCtx);
-    }
 }
 
 void ClusterServerParameterOpObserver::_onReplicationRollback(OperationContext* opCtx,
@@ -186,7 +153,9 @@ void ClusterServerParameterOpObserver::_onReplicationRollback(OperationContext* 
     if (rbInfo.rollbackNamespaces.count(NamespaceString::kClusterParametersNamespace)) {
         // Some kind of rollback happend in the settings collection.
         // Just reload from disk to be safe.
-        ClusterServerParameterInitializer::get(opCtx)->resynchronizeAllParametersFromDisk(opCtx);
+        // We can call resynchronize directly because onReplicationRollback is guaranteed to be
+        // called from a state with no active WUOW and no database locks.
+        cluster_parameters::resynchronizeAllParametersFromDisk(opCtx);
     }
 }
 

@@ -34,6 +34,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/service_context.h"
+#include "mongo/idl/cluster_parameter_synchronization_helpers.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
@@ -58,102 +59,10 @@ ClusterServerParameterInitializer* ClusterServerParameterInitializer::get(
     return &getInstance(serviceContext);
 }
 
-void ClusterServerParameterInitializer::updateParameter(BSONObj doc, StringData mode) {
-    auto nameElem = doc[kIdField];
-    if (nameElem.type() != String) {
-        LOGV2_DEBUG(6226301,
-                    1,
-                    "Update with invalid cluster server parameter name",
-                    "mode"_attr = mode,
-                    "_id"_attr = nameElem);
-        return;
-    }
-
-    auto name = nameElem.valueStringData();
-    auto* sp = ServerParameterSet::getClusterParameterSet()->getIfExists(name);
-    if (!sp) {
-        LOGV2_DEBUG(6226300,
-                    3,
-                    "Update to unknown cluster server parameter",
-                    "mode"_attr = mode,
-                    "name"_attr = name);
-        return;
-    }
-
-    auto cptElem = doc[kCPTField];
-    if ((cptElem.type() != mongo::Date) && (cptElem.type() != bsonTimestamp)) {
-        LOGV2_DEBUG(6226302,
-                    1,
-                    "Update to cluster server parameter has invalid clusterParameterTime",
-                    "mode"_attr = mode,
-                    "name"_attr = name,
-                    "clusterParameterTime"_attr = cptElem);
-        return;
-    }
-
-    uassertStatusOK(sp->set(doc));
-}
-
-void ClusterServerParameterInitializer::clearParameter(ServerParameter* sp) {
-    if (sp->getClusterParameterTime() == LogicalTime::kUninitialized) {
-        // Nothing to clear.
-        return;
-    }
-
-    uassertStatusOK(sp->reset());
-}
-
-void ClusterServerParameterInitializer::clearParameter(StringData id) {
-    auto* sp = ServerParameterSet::getClusterParameterSet()->getIfExists(id);
-    if (!sp) {
-        LOGV2_DEBUG(6226303,
-                    5,
-                    "oplog event deletion of unknown cluster server parameter",
-                    "name"_attr = id);
-        return;
-    }
-
-    clearParameter(sp);
-}
-
-void ClusterServerParameterInitializer::clearAllParameters() {
-    const auto& params = ServerParameterSet::getClusterParameterSet()->getMap();
-    for (const auto& it : params) {
-        clearParameter(it.second);
-    }
-}
-
-void ClusterServerParameterInitializer::initializeAllParametersFromDisk(OperationContext* opCtx) {
-    doLoadAllParametersFromDisk(opCtx, "initializing"_sd, [this](BSONObj doc, StringData mode) {
-        updateParameter(doc, mode);
-    });
-}
-
-void ClusterServerParameterInitializer::resynchronizeAllParametersFromDisk(
-    OperationContext* opCtx) {
-    const auto& allParams = ServerParameterSet::getClusterParameterSet()->getMap();
-    std::set<std::string> unsetSettings;
-    for (const auto& it : allParams) {
-        unsetSettings.insert(it.second->name());
-    }
-
-    doLoadAllParametersFromDisk(
-        opCtx, "resynchronizing"_sd, [this, &unsetSettings](BSONObj doc, StringData mode) {
-            unsetSettings.erase(doc[kIdField].str());
-            updateParameter(doc, mode);
-        });
-
-    // For all known settings which were not present in this resync,
-    // explicitly clear any value which may be present in-memory.
-    for (const auto& setting : unsetSettings) {
-        clearParameter(setting);
-    }
-}
-
 void ClusterServerParameterInitializer::onInitialDataAvailable(OperationContext* opCtx,
                                                                bool isMajorityDataAvailable) {
     LOGV2_INFO(6608200, "Initializing cluster server parameters from disk");
-    initializeAllParametersFromDisk(opCtx);
+    cluster_parameters::initializeAllParametersFromDisk(opCtx);
 }
 
 }  // namespace mongo

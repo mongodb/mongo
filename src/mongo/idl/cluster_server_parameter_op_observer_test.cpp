@@ -31,9 +31,9 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/idl/cluster_server_parameter_test_util.h"
-
+#include "mongo/db/catalog_raii.h"
 #include "mongo/idl/cluster_server_parameter_op_observer.h"
+#include "mongo/idl/cluster_server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {
@@ -47,60 +47,58 @@ const std::vector<NamespaceString> kIgnoredNamespaces = {
 
 class ClusterServerParameterOpObserverTest : public ClusterServerParameterTestBase {
 public:
-    void doInserts(const NamespaceString& nss, std::initializer_list<BSONObj> docs) {
+    void doInserts(const NamespaceString& nss,
+                   std::initializer_list<BSONObj> docs,
+                   bool commit = true) {
         std::vector<InsertStatement> stmts;
         std::transform(docs.begin(), docs.end(), std::back_inserter(stmts), [](auto doc) {
             return InsertStatement(doc);
         });
         auto opCtx = cc().makeOperationContext();
+        WriteUnitOfWork wuow(opCtx.get());
+
+        AutoGetCollection autoColl(opCtx.get(), nss, MODE_IX);
         observer.onInserts(
             opCtx.get(), nss, UUID::gen(), stmts.cbegin(), stmts.cend(), false /* fromMigrate */);
+        if (commit)
+            wuow.commit();
     }
 
-    void doUpdate(const NamespaceString& nss, BSONObj updatedDoc) {
+    void doUpdate(const NamespaceString& nss, BSONObj updatedDoc, bool commit = true) {
         // Actual UUID doesn't matter, just use any...
         CollectionUpdateArgs updateArgs;
         updateArgs.update = BSON("$set" << updatedDoc);
         updateArgs.updatedDoc = updatedDoc;
         OplogUpdateEntryArgs entryArgs(&updateArgs, nss, UUID::gen());
         auto opCtx = cc().makeOperationContext();
+        WriteUnitOfWork wuow(opCtx.get());
+        AutoGetCollection autoColl(opCtx.get(), nss, MODE_IX);
         observer.onUpdate(opCtx.get(), entryArgs);
+        if (commit)
+            wuow.commit();
     }
 
-    void doDelete(const NamespaceString& nss, BSONObj deletedDoc, bool includeDeletedDoc = true) {
+    void doDelete(const NamespaceString& nss,
+                  BSONObj deletedDoc,
+                  bool includeDeletedDoc = true,
+                  bool commit = true) {
         auto opCtx = cc().makeOperationContext();
-        auto uuid = UUID::gen();
-        observer.aboutToDelete(opCtx.get(), nss, uuid, deletedDoc);
+        WriteUnitOfWork wuow(opCtx.get());
+        AutoGetCollection autoColl(opCtx.get(), nss, MODE_IX);
+        observer.aboutToDelete(opCtx.get(), nss, UUID::gen(), deletedDoc);
         OplogDeleteEntryArgs args;
         args.deletedDoc = includeDeletedDoc ? &deletedDoc : nullptr;
-        observer.onDelete(opCtx.get(), nss, uuid, 1 /* StmtId */, args);
+        observer.onDelete(opCtx.get(), nss, UUID::gen(), 1 /* StmtId */, args);
+        if (commit)
+            wuow.commit();
     }
 
-    void doDropDatabase(StringData dbname) {
+    void doDropDatabase(const std::string& dbname, bool commit = true) {
         auto opCtx = cc().makeOperationContext();
-        observer.onDropDatabase(opCtx.get(), dbname.toString());
-    }
-
-    void doRenameCollection(const NamespaceString& fromColl, const NamespaceString& toColl) {
-        auto opCtx = cc().makeOperationContext();
-        observer.postRenameCollection(opCtx.get(),
-                                      fromColl,
-                                      toColl,
-                                      UUID::gen(),
-                                      boost::none /* targetUUID */,
-                                      false /* stayTemp */);
-    }
-
-    void doImportCollection(const NamespaceString& nss) {
-        auto opCtx = cc().makeOperationContext();
-        observer.onImportCollection(opCtx.get(),
-                                    UUID::gen(),
-                                    nss,
-                                    10 /* num records */,
-                                    1 << 20 /* data size */,
-                                    BSONObj() /* catalogEntry */,
-                                    BSONObj() /* storageMetadata */,
-                                    false /* isDryRun */);
+        WriteUnitOfWork wuow(opCtx.get());
+        observer.onDropDatabase(opCtx.get(), dbname);
+        if (commit)
+            wuow.commit();
     }
 
     void doReplicationRollback(const std::vector<NamespaceString>& namespaces) {
@@ -163,6 +161,28 @@ public:
     void assertIgnoredAlways(F fn) {
         assertIgnoredOtherNamespaces(fn);
         assertIgnored(NamespaceString::kClusterParametersNamespace, fn);
+    }
+
+    void assertParameterState(int line,
+                              int intVal,
+                              StringData strVal,
+                              boost::optional<LogicalTime> cpt = boost::none) {
+        auto* sp = ServerParameterSet::getClusterParameterSet()
+                       ->get<IDLServerParameterWithStorage<ServerParameterType::kClusterWide,
+                                                           ClusterServerParameterTest>>(kCSPTest);
+        ;
+        try {
+            if (cpt) {
+                ASSERT_EQ(sp->getClusterParameterTime(), *cpt);
+            }
+
+            ClusterServerParameterTest cspTest = sp->getValue();
+            ASSERT_EQ(cspTest.getIntValue(), intVal);
+            ASSERT_EQ(cspTest.getStrValue(), strVal);
+        } catch (...) {
+            LOGV2_ERROR(6887700, "ASSERT_PARAMETER_STATE failed", "line"_attr = line);
+            throw;
+        }
     }
 
 protected:
@@ -308,12 +328,12 @@ TEST_F(ClusterServerParameterOpObserverTest, onDropDatabase) {
     assertIgnoredOtherNamespaces([this](const auto& nss) {
         const auto dbname = nss.db();
         if (dbname != kConfigDB) {
-            doDropDatabase(dbname);
+            doDropDatabase(dbname.toString());
         }
     });
 
     // Actually drop the config DB.
-    doDropDatabase(kConfigDB);
+    doDropDatabase(kConfigDB.toString());
 
     auto* sp = ServerParameterSet::getClusterParameterSet()
                    ->get<IDLServerParameterWithStorage<ServerParameterType::kClusterWide,
@@ -323,57 +343,6 @@ TEST_F(ClusterServerParameterOpObserverTest, onDropDatabase) {
     ClusterServerParameterTest cspTest = sp->getValue();
     ASSERT_EQ(cspTest.getIntValue(), kDefaultIntValue);
     ASSERT_EQ(cspTest.getStrValue(), kDefaultStrValue);
-}
-
-TEST_F(ClusterServerParameterOpObserverTest, onRenameCollection) {
-    initializeState();
-
-    const NamespaceString kTestFoo("test", "foo");
-    // Rename ignorable collections.
-    assertIgnoredOtherNamespaces([&](const auto& nss) { doRenameCollection(nss, kTestFoo); });
-    assertIgnoredOtherNamespaces([&](const auto& nss) { doRenameCollection(kTestFoo, nss); });
-
-    auto* sp = ServerParameterSet::getClusterParameterSet()
-                   ->get<IDLServerParameterWithStorage<ServerParameterType::kClusterWide,
-                                                       ClusterServerParameterTest>>(kCSPTest);
-    ASSERT(sp != nullptr);
-
-    // These renames "work" despite not mutating durable state
-    // since the rename away doesn't require a rescan.
-
-    // Rename away (and reset to default)
-    doRenameCollection(NamespaceString::kClusterParametersNamespace, kTestFoo);
-    ClusterServerParameterTest cspTest = sp->getValue();
-    ASSERT_EQ(cspTest.getIntValue(), kDefaultIntValue);
-    ASSERT_EQ(cspTest.getStrValue(), kDefaultStrValue);
-
-    // Rename in (and restore to initialized state)
-    doRenameCollection(kTestFoo, NamespaceString::kClusterParametersNamespace);
-    cspTest = sp->getValue();
-    ASSERT_EQ(cspTest.getIntValue(), kInitialIntValue);
-    ASSERT_EQ(cspTest.getStrValue(), kInitialStrValue);
-}
-
-TEST_F(ClusterServerParameterOpObserverTest, onImportCollection) {
-    initializeState();
-
-    const NamespaceString kTestFoo("test", "foo");
-    // Import ignorable collections.
-    assertIgnoredOtherNamespaces([&](const auto& nss) { doImportCollection(nss); });
-
-    auto* sp = ServerParameterSet::getClusterParameterSet()
-                   ->get<IDLServerParameterWithStorage<ServerParameterType::kClusterWide,
-                                                       ClusterServerParameterTest>>(kCSPTest);
-    ASSERT(sp != nullptr);
-
-    // Import the collection (rescan).
-    auto doc =
-        makeClusterParametersDoc(LogicalTime(Timestamp(time(nullptr))), 333, "onImportCollection");
-    upsert(doc);
-    doImportCollection(NamespaceString::kClusterParametersNamespace);
-    ClusterServerParameterTest cspTest = sp->getValue();
-    ASSERT_EQ(cspTest.getIntValue(), 333);
-    ASSERT_EQ(cspTest.getStrValue(), "onImportCollection");
 }
 
 TEST_F(ClusterServerParameterOpObserverTest, onReplicationRollback) {
@@ -381,7 +350,7 @@ TEST_F(ClusterServerParameterOpObserverTest, onReplicationRollback) {
 
     const NamespaceString kTestFoo("test", "foo");
     // Import ignorable collections.
-    assertIgnoredOtherNamespaces([&](const auto& nss) { doImportCollection(nss); });
+    assertIgnoredOtherNamespaces([&](const auto& nss) { doReplicationRollback({nss}); });
 
     auto* sp = ServerParameterSet::getClusterParameterSet()
                    ->get<IDLServerParameterWithStorage<ServerParameterType::kClusterWide,
@@ -411,6 +380,38 @@ TEST_F(ClusterServerParameterOpObserverTest, onReplicationRollback) {
     ASSERT_EQ(cspTest.getIntValue(), kDefaultIntValue);
     ASSERT_EQ(cspTest.getStrValue(), kDefaultStrValue);
 }
+
+#define ASSERT_PARAMETER_STATE(...) assertParameterState(__LINE__, __VA_ARGS__)
+
+TEST_F(ClusterServerParameterOpObserverTest, abortsAfterObservation) {
+
+    const auto initialDoc = initializeState();
+
+    doInserts(NamespaceString::kClusterParametersNamespace,
+              {makeClusterParametersDoc(LogicalTime(Timestamp(12345678)), 123, "abc")},
+              false /* commit */);
+
+    ASSERT_PARAMETER_STATE(kInitialIntValue, kInitialStrValue);
+
+    doUpdate(NamespaceString::kClusterParametersNamespace,
+             {makeClusterParametersDoc(LogicalTime(Timestamp(87654321)), 321, "cba")},
+             false /* commit */);
+
+    ASSERT_PARAMETER_STATE(kInitialIntValue, kInitialStrValue);
+
+    doDelete(NamespaceString::kClusterParametersNamespace,
+             initialDoc,
+             true /* includeDeletedDoc */,
+             false /* commit */);
+
+    ASSERT_PARAMETER_STATE(kInitialIntValue, kInitialStrValue);
+
+    doDropDatabase(kConfigDB.toString(), false /* commit */);
+
+    ASSERT_PARAMETER_STATE(kInitialIntValue, kInitialStrValue);
+}
+
+#undef ASSERT_PARAMETER_STATE
 
 }  // namespace
 }  // namespace mongo

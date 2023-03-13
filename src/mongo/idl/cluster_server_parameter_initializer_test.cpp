@@ -38,6 +38,7 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/idl/cluster_parameter_synchronization_helpers.h"
 #include "mongo/idl/cluster_server_parameter_gen.h"
 #include "mongo/idl/cluster_server_parameter_initializer.h"
 #include "mongo/idl/cluster_server_parameter_test_gen.h"
@@ -68,7 +69,7 @@ public:
         // Delete all cluster server parameter documents written and refresh in-memory state.
         remove();
         auto opCtx = cc().makeOperationContext();
-        _initializer.resynchronizeAllParametersFromDisk(opCtx.get());
+        cluster_parameters::resynchronizeAllParametersFromDisk(opCtx.get());
     }
     /**
      * Simulates the call to the ClusterServerParameterInitializer at the end of initial sync, when
