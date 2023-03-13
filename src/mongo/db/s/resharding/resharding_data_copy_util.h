@@ -39,6 +39,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/session/logical_session_id.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/resharding/common_types_gen.h"
 #include "mongo/util/functional.h"
 
@@ -169,12 +170,27 @@ auto withOneStaleConfigRetry(OperationContext* opCtx, Callable&& callable) {
         return callable();
     } catch (const ExceptionForCat<ErrorCategory::StaleShardVersionError>& ex) {
         if (auto sce = ex.extraInfo<StaleConfigInfo>()) {
-            const auto refreshed =
-                onCollectionPlacementVersionMismatchNoExcept(
-                    opCtx, sce->getNss(), sce->getVersionReceived().placementVersion())
-                    .isOK();
+            // Cause a catalog cache refresh in case the index information is stale. Invalidate even
+            // if the shard metadata was unknown so that we require only one stale config retry.
+            Grid::get(opCtx)
+                ->catalogCache()
+                ->invalidateShardOrEntireCollectionEntryForShardedCollection(
+                    sce->getNss(), sce->getVersionWanted(), sce->getShardId());
 
-            if (refreshed) {
+            // Recover the sharding metadata if there was no wanted version in the staleConfigInfo
+            bool shardRefreshSucceeded;
+            if (!sce->getVersionWanted()) {
+                shardRefreshSucceeded =
+                    onCollectionPlacementVersionMismatchNoExcept(
+                        opCtx, sce->getNss(), sce->getVersionReceived().placementVersion())
+                        .isOK();
+            }
+
+            // If a wanted version was returned, the metadata is already known, so we care about the
+            // advancement of the catalog cache rather than the shard refresh. If the wanted version
+            // is not set, then we only want to retry if we succeeded in recovering the collection
+            // metadata.
+            if (sce->getVersionWanted() || shardRefreshSucceeded) {
                 return callable();
             }
         }

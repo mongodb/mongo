@@ -77,6 +77,13 @@ boost::optional<ShardVersion> getOperationReceivedVersion(OperationContext* opCt
     return boost::none;
 }
 
+// This shard version is used as the received version in StaleConfigInfo since we do not have
+// information about the received version of the operation.
+ShardVersion ShardVersionPlacementIgnoredNoIndexes() {
+    return ShardVersionFactory::make(ChunkVersion::IGNORED(),
+                                     boost::optional<CollectionIndexes>(boost::none));
+}
+
 }  // namespace
 
 CollectionShardingRuntime::ScopedSharedCollectionShardingRuntime::
@@ -141,7 +148,7 @@ ScopedCollectionFilter CollectionShardingRuntime::getOwnershipFilter(
         tassert(7032301,
                 "For sharded collections getOwnershipFilter cannot be relied on without a valid "
                 "shard version",
-                !ShardVersion::isIgnoredVersion(*optReceivedShardVersion) ||
+                !ShardVersion::isPlacementVersionIgnored(*optReceivedShardVersion) ||
                     !metadata->get().allowMigrations() || !metadata->get().isSharded());
     }
 
@@ -179,7 +186,8 @@ ScopedCollectionDescription CollectionShardingRuntime::getCollectionDescription(
     const auto receivedShardVersion{oss.getShardVersion(_nss)};
     uassert(
         StaleConfigInfo(_nss,
-                        receivedShardVersion ? *receivedShardVersion : ShardVersion::IGNORED(),
+                        receivedShardVersion ? *receivedShardVersion
+                                             : ShardVersionPlacementIgnoredNoIndexes(),
                         boost::none /* wantedVersion */,
                         ShardingState::get(_serviceContext)->shardId()),
         str::stream() << "sharding status of collection " << _nss.ns()
@@ -450,8 +458,9 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
         return kUnshardedCollection;
 
     // Assume that the received shard version was IGNORED if the current operation wasn't versioned
-    const auto& receivedShardVersion =
-        optReceivedShardVersion ? *optReceivedShardVersion : ShardVersion::IGNORED();
+    const auto& receivedShardVersion = optReceivedShardVersion
+        ? *optReceivedShardVersion
+        : ShardVersionPlacementIgnoredNoIndexes();
 
     {
         auto criticalSectionSignal = _critSec.getSignal(
@@ -494,11 +503,15 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
         ShardVersionFactory::make(currentMetadata, wantedCollectionIndexes);
 
     const ChunkVersion receivedPlacementVersion = receivedShardVersion.placementVersion();
+    const bool isPlacementVersionIgnored =
+        ShardVersion::isPlacementVersionIgnored(receivedShardVersion);
     const boost::optional<Timestamp> receivedIndexVersion = receivedShardVersion.indexVersion();
 
     if ((wantedPlacementVersion.isWriteCompatibleWith(receivedPlacementVersion) &&
          (!indexFeatureFlag || receivedIndexVersion == wantedIndexVersion)) ||
-        receivedShardVersion == ShardVersion::IGNORED())
+        (isPlacementVersionIgnored &&
+         (!wantedPlacementVersion.isSet() || !indexFeatureFlag ||
+          receivedIndexVersion == wantedIndexVersion)))
         return optCurrentMetadata;
 
     StaleConfigInfo sci(
@@ -506,21 +519,25 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
 
     uassert(std::move(sci),
             str::stream() << "timestamp mismatch detected for " << _nss.ns(),
-            wantedPlacementVersion.isSameCollection(receivedPlacementVersion));
+            isPlacementVersionIgnored ||
+                wantedPlacementVersion.isSameCollection(receivedPlacementVersion));
 
-    if (!wantedPlacementVersion.isSet() && receivedPlacementVersion.isSet()) {
+    if (isPlacementVersionIgnored ||
+        (!wantedPlacementVersion.isSet() && receivedPlacementVersion.isSet())) {
         uasserted(std::move(sci),
                   str::stream() << "this shard no longer contains chunks for " << _nss.ns() << ", "
                                 << "the collection may have been dropped");
     }
 
-    if (wantedPlacementVersion.isSet() && !receivedPlacementVersion.isSet()) {
+    if (isPlacementVersionIgnored ||
+        (wantedPlacementVersion.isSet() && !receivedPlacementVersion.isSet())) {
         uasserted(std::move(sci),
                   str::stream() << "this shard contains chunks for " << _nss.ns() << ", "
                                 << "but the client expects unsharded collection");
     }
 
-    if (wantedPlacementVersion.majorVersion() != receivedPlacementVersion.majorVersion()) {
+    if (isPlacementVersionIgnored ||
+        (wantedPlacementVersion.majorVersion() != receivedPlacementVersion.majorVersion())) {
         // Could be > or < - wanted is > if this is the source of a migration, wanted < if this is
         // the target of a migration
         uasserted(std::move(sci),
@@ -736,8 +753,9 @@ void CollectionShardingRuntime::_checkCritSecForIndexMetadata(OperationContext* 
 
     // Assume that the received shard version was IGNORED if the current operation wasn't
     // versioned
-    const auto& receivedShardVersion =
-        optReceivedShardVersion ? *optReceivedShardVersion : ShardVersion::IGNORED();
+    const auto& receivedShardVersion = optReceivedShardVersion
+        ? *optReceivedShardVersion
+        : ShardVersionPlacementIgnoredNoIndexes();
     auto criticalSectionSignal = _critSec.getSignal(opCtx->lockState()->isWriteLocked()
                                                         ? ShardingMigrationCriticalSection::kWrite
                                                         : ShardingMigrationCriticalSection::kRead);

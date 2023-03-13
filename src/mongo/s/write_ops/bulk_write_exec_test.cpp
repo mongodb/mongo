@@ -128,7 +128,8 @@ protected:
 TEST_F(BulkWriteOpTest, TargetSingleOp) {
     ShardId shardId("shard");
     NamespaceString nss("foo.bar");
-    ShardEndpoint endpoint(shardId, ShardVersion::IGNORED(), boost::none);
+    ShardEndpoint endpoint(
+        shardId, ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none), boost::none);
 
     std::vector<std::unique_ptr<NSTargeter>> targeters;
     targeters.push_back(initTargeterFullRange(nss, endpoint));
@@ -150,7 +151,9 @@ TEST_F(BulkWriteOpTest, TargetSingleOp) {
 // Test targeting a single op with target error.
 TEST_F(BulkWriteOpTest, TargetSingleOpError) {
     NamespaceString nss("foo.bar");
-    ShardEndpoint endpoint(ShardId("shard"), ShardVersion::IGNORED(), boost::none);
+    ShardEndpoint endpoint(ShardId("shard"),
+                           ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none),
+                           boost::none);
 
     std::vector<std::unique_ptr<NSTargeter>> targeters;
     // Initialize the targeter so that x >= 0 values are untargetable so target call will encounter
@@ -181,7 +184,8 @@ TEST_F(BulkWriteOpTest, TargetMultiOpsOrdered_SameShard) {
     NamespaceString nss0("foo.bar");
     NamespaceString nss1("bar.foo");
     // Two different endpoints targeting the same shard for the two namespaces.
-    ShardEndpoint endpoint0(shardId, ShardVersion::IGNORED(), boost::none);
+    ShardEndpoint endpoint0(
+        shardId, ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none), boost::none);
     ShardEndpoint endpoint1(
         shardId,
         ShardVersionFactory::make(ChunkVersion({OID::gen(), Timestamp(2)}, {10, 11}),
@@ -216,7 +220,8 @@ TEST_F(BulkWriteOpTest, TargetMultiOpsOrdered_RecordTargetErrors) {
     ShardId shardId("shard");
     NamespaceString nss0("foo.bar");
     NamespaceString nss1("bar.foo");
-    ShardEndpoint endpoint0(shardId, ShardVersion::IGNORED(), boost::none);
+    ShardEndpoint endpoint0(
+        shardId, ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none), boost::none);
     ShardEndpoint endpoint1(
         shardId,
         ShardVersionFactory::make(ChunkVersion({OID::gen(), Timestamp(2)}, {10, 11}),
@@ -267,8 +272,10 @@ TEST_F(BulkWriteOpTest, TargetMultiOpsOrdered_DifferentShard) {
     ShardId shardIdB("shardB");
     NamespaceString nss0("foo.bar");
     NamespaceString nss1("bar.foo");
-    ShardEndpoint endpointA0(shardIdA, ShardVersion::IGNORED(), boost::none);
-    ShardEndpoint endpointB0(shardIdB, ShardVersion::IGNORED(), boost::none);
+    ShardEndpoint endpointA0(
+        shardIdA, ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none), boost::none);
+    ShardEndpoint endpointB0(
+        shardIdB, ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none), boost::none);
     ShardEndpoint endpointA1(
         shardIdA,
         ShardVersionFactory::make(ChunkVersion({OID::gen(), Timestamp(2)}, {10, 11}),
@@ -339,8 +346,10 @@ TEST_F(BulkWriteOpTest, TargetMultiOpsUnordered) {
     ShardId shardIdB("shardB");
     NamespaceString nss0("foo.bar");
     NamespaceString nss1("bar.foo");
-    ShardEndpoint endpointA0(shardIdA, ShardVersion::IGNORED(), boost::none);
-    ShardEndpoint endpointB0(shardIdB, ShardVersion::IGNORED(), boost::none);
+    ShardEndpoint endpointA0(
+        shardIdA, ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none), boost::none);
+    ShardEndpoint endpointB0(
+        shardIdB, ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none), boost::none);
     ShardEndpoint endpointA1(
         shardIdA,
         ShardVersionFactory::make(ChunkVersion({OID::gen(), Timestamp(2)}, {10, 11}),
@@ -389,7 +398,8 @@ TEST_F(BulkWriteOpTest, TargetMultiOpsUnordered_RecordTargetErrors) {
     ShardId shardId("shard");
     NamespaceString nss0("foo.bar");
     NamespaceString nss1("bar.foo");
-    ShardEndpoint endpoint0(shardId, ShardVersion::IGNORED(), boost::none);
+    ShardEndpoint endpoint0(
+        shardId, ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none), boost::none);
     ShardEndpoint endpoint1(
         shardId,
         ShardVersionFactory::make(ChunkVersion({OID::gen(), Timestamp(2)}, {10, 11}),
@@ -444,7 +454,8 @@ TEST_F(BulkWriteExecTest, RefreshTargetersOnTargetErrors) {
     ShardId shardIdB("shardB");
     NamespaceString nss0("foo.bar");
     NamespaceString nss1("bar.foo");
-    ShardEndpoint endpoint0(shardIdA, ShardVersion::IGNORED(), boost::none);
+    ShardEndpoint endpoint0(
+        shardIdA, ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none), boost::none);
     ShardEndpoint endpoint1(
         shardIdB,
         ShardVersionFactory::make(ChunkVersion({OID::gen(), Timestamp(2)}, {10, 11}),
@@ -490,7 +501,8 @@ TEST_F(BulkWriteExecTest, RefreshTargetersOnTargetErrors) {
 TEST_F(BulkWriteExecTest, CollectionDroppedBeforeRefreshingTargeters) {
     ShardId shardId("shardA");
     NamespaceString nss("foo.bar");
-    ShardEndpoint endpoint(shardId, ShardVersion::IGNORED(), boost::none);
+    ShardEndpoint endpoint(
+        shardId, ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none), boost::none);
 
     // Mock targeter that throws StaleEpoch on refresh to mimic the collection being dropped.
     class StaleEpochMockNSTargeter : public MockNSTargeter {

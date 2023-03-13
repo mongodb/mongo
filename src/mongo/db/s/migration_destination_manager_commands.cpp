@@ -43,12 +43,20 @@
 #include "mongo/db/s/start_chunk_clone_request.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/request_types/migration_secondary_throttle_options.h"
+#include "mongo/s/shard_version_factory.h"
 #include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
 namespace {
+
+// This shard version is used as the received version in StaleConfigInfo since we do not have
+// information about the received version of the operation.
+ShardVersion ShardVersionPlacementIgnoredNoIndexes() {
+    return ShardVersionFactory::make(ChunkVersion::IGNORED(),
+                                     boost::optional<CollectionIndexes>(boost::none));
+}
 
 class RecvChunkStartCommand : public ErrmsgCommandDeprecated {
 public:
@@ -138,7 +146,7 @@ public:
                 CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
             auto optMetadata = scopedCsr->getCurrentMetadataIfKnown();
             uassert(StaleConfigInfo(nss,
-                                    ShardVersion::IGNORED() /* receivedVersion */,
+                                    ShardVersionPlacementIgnoredNoIndexes() /* receivedVersion */,
                                     boost::none /* wantedVersion */,
                                     shardId,
                                     boost::none),

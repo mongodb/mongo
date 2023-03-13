@@ -48,6 +48,8 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/shard_version_factory.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
@@ -61,6 +63,7 @@ Date_t getDeadline(OperationContext* opCtx) {
 
 void runWithTransaction(OperationContext* opCtx,
                         const NamespaceString& nss,
+                        const boost::optional<ShardingIndexesCatalogCache>& sii,
                         unique_function<void(OperationContext*)> func) {
     AlternativeSessionRegion asr(opCtx);
     auto* const client = asr.opCtx()->getClient();
@@ -76,13 +79,16 @@ void runWithTransaction(OperationContext* opCtx,
     asr.opCtx()->setInMultiDocumentTransaction();
 
     // ReshardingOpObserver depends on the collection metadata being known when processing writes to
-    // the temporary resharding collection. We attach shard version IGNORED to the write operations
-    // and leave it to ReshardingOplogBatchApplier::applyBatch() to retry on a StaleConfig exception
-    // to allow the collection metadata information to be recovered.
-    ScopedSetShardRole scopedSetShardRole(asr.opCtx(),
-                                          nss,
-                                          ShardVersion::IGNORED() /* shardVersion */,
-                                          boost::none /* databaseVersion */);
+    // the temporary resharding collection. We attach placement version IGNORED to the write
+    // operations and leave it to ReshardingOplogBatchApplier::applyBatch() to retry on a
+    // StaleConfig exception to allow the collection metadata information to be recovered.
+    ScopedSetShardRole scopedSetShardRole(
+        asr.opCtx(),
+        nss,
+        ShardVersionFactory::make(ChunkVersion::IGNORED(),
+                                  sii ? boost::make_optional(sii->getCollectionIndexes())
+                                      : boost::none) /* shardVersion */,
+        boost::none /* databaseVersion */);
 
     auto mongoDSessionCatalog = MongoDSessionCatalog::get(asr.opCtx());
     auto ocs = mongoDSessionCatalog->checkOutSession(asr.opCtx());
@@ -134,8 +140,10 @@ ReshardingOplogApplicationRules::ReshardingOplogApplicationRules(
       _sourceChunkMgr(std::move(sourceChunkMgr)),
       _applierMetrics(applierMetrics) {}
 
-Status ReshardingOplogApplicationRules::applyOperation(OperationContext* opCtx,
-                                                       const repl::OplogEntry& op) const {
+Status ReshardingOplogApplicationRules::applyOperation(
+    OperationContext* opCtx,
+    const boost::optional<ShardingIndexesCatalogCache>& sii,
+    const repl::OplogEntry& op) const {
     LOGV2_DEBUG(49901, 3, "Applying op for resharding", "op"_attr = redact(op.toBSONForLogging()));
 
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());
@@ -182,7 +190,7 @@ Status ReshardingOplogApplicationRules::applyOperation(OperationContext* opCtx,
                     break;
                 case repl::OpTypeEnum::kDelete:
                     _applyDelete_inlock(
-                        opCtx, autoCollOutput.getDb(), *autoCollOutput, *autoCollStash, op);
+                        opCtx, autoCollOutput.getDb(), *autoCollOutput, *autoCollStash, sii, op);
                     _applierMetrics->onDeleteApplied();
                     break;
                 default:
@@ -400,11 +408,13 @@ void ReshardingOplogApplicationRules::_applyUpdate_inlock(OperationContext* opCt
     invariant(ur.numMatched != 0);
 }
 
-void ReshardingOplogApplicationRules::_applyDelete_inlock(OperationContext* opCtx,
-                                                          Database* db,
-                                                          const CollectionPtr& outputColl,
-                                                          const CollectionPtr& stashColl,
-                                                          const repl::OplogEntry& op) const {
+void ReshardingOplogApplicationRules::_applyDelete_inlock(
+    OperationContext* opCtx,
+    Database* db,
+    const CollectionPtr& outputColl,
+    const CollectionPtr& stashColl,
+    const boost::optional<ShardingIndexesCatalogCache>& sii,
+    const repl::OplogEntry& op) const {
     /**
      * The rules to apply ordinary delete operations are as follows:
      *
@@ -450,7 +460,7 @@ void ReshardingOplogApplicationRules::_applyDelete_inlock(OperationContext* opCt
     // We must run 'findByIdAndNoopUpdate' in the same storage transaction as the ops run in the
     // single replica set transaction that is executed if we apply rule #4, so we therefore must run
     // 'findByIdAndNoopUpdate' as a part of the single replica set transaction.
-    runWithTransaction(opCtx, _outputNss, [this, idQuery](OperationContext* opCtx) {
+    runWithTransaction(opCtx, _outputNss, sii, [this, idQuery](OperationContext* opCtx) {
         AutoGetCollection autoCollOutput(
             opCtx, _outputNss, MODE_IX, AutoGetCollection::Options{}.deadline(getDeadline(opCtx)));
         uassert(ErrorCodes::NamespaceNotFound,

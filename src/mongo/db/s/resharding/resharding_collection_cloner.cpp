@@ -57,6 +57,7 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/shard_version_factory.h"
 #include "mongo/s/stale_shard_version_helpers.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
@@ -279,18 +280,23 @@ bool ReshardingCollectionCloner::doOneBatch(OperationContext* opCtx, Pipeline& p
         return false;
     }
 
-    // ReshardingOpObserver depends on the collection metadata being known when processing writes to
-    // the temporary resharding collection. We attach shard version IGNORED to the insert operations
-    // and retry once on a StaleConfig exception to allow the collection metadata information to be
-    // recovered.
-    ScopedSetShardRole scopedSetShardRole(opCtx,
-                                          _outputNss,
-                                          ShardVersion::IGNORED() /* shardVersion */,
-                                          boost::none /* databaseVersion */);
-
     Timer batchInsertTimer;
-    int bytesInserted = resharding::data_copy::withOneStaleConfigRetry(
-        opCtx, [&] { return resharding::data_copy::insertBatch(opCtx, _outputNss, batch); });
+    int bytesInserted = resharding::data_copy::withOneStaleConfigRetry(opCtx, [&] {
+        // ReshardingOpObserver depends on the collection metadata being known when processing
+        // writes to the temporary resharding collection. We attach shard version IGNORED to the
+        // insert operations and retry once on a StaleConfig exception to allow the collection
+        // metadata information to be recovered.
+        auto [_, sii] = uassertStatusOK(
+            Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, _outputNss));
+        ScopedSetShardRole scopedSetShardRole(
+            opCtx,
+            _outputNss,
+            ShardVersionFactory::make(ChunkVersion::IGNORED(),
+                                      sii ? boost::make_optional(sii->getCollectionIndexes())
+                                          : boost::none) /* shardVersion */,
+            boost::none /* databaseVersion */);
+        return resharding::data_copy::insertBatch(opCtx, _outputNss, batch);
+    });
 
     _metrics->onDocumentsProcessed(
         batch.size(), bytesInserted, Milliseconds(batchInsertTimer.millis()));

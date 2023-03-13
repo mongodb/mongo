@@ -51,18 +51,13 @@ public:
 
     ShardVersion() : _chunkVersion(ChunkVersion()), _indexVersion(boost::none) {}
 
-    static ShardVersion IGNORED() {
-        return ShardVersion(ChunkVersion::IGNORED(),
-                            boost::optional<CollectionIndexes>(boost::none));
-    }
-
     static ShardVersion UNSHARDED() {
         return ShardVersion(ChunkVersion::UNSHARDED(),
                             boost::optional<CollectionIndexes>(boost::none));
     }
 
-    static bool isIgnoredVersion(const ShardVersion& version) {
-        return version == ShardVersion::IGNORED();
+    static bool isPlacementVersionIgnored(const ShardVersion& version) {
+        return version.placementVersion() == ChunkVersion::IGNORED();
     }
 
     ChunkVersion placementVersion() const {
@@ -71,6 +66,10 @@ public:
 
     boost::optional<Timestamp> indexVersion() const {
         return _indexVersion;
+    }
+
+    void setPlacementVersionIgnored() {
+        _chunkVersion = ChunkVersion::IGNORED();
     }
 
     bool operator==(const ShardVersion& otherVersion) const {

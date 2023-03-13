@@ -166,9 +166,9 @@ bool runAggregationMapReduce(OperationContext* opCtx,
         involvedNamespaces.insert(resolvedOutNss);
     }
 
-    auto [cm, _] = uassertStatusOK(
+    auto cri = uassertStatusOK(
         sharded_agg_helpers::getExecutionNsRoutingInfo(opCtx, parsedMr.getNamespace()));
-    auto expCtx = makeExpressionContext(opCtx, parsedMr, cm, verbosity);
+    auto expCtx = makeExpressionContext(opCtx, parsedMr, cri.cm, verbosity);
 
     const auto pipelineBuilder = [&]() {
         return map_reduce_common::translateFromMR(parsedMr, expCtx);
@@ -188,7 +188,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
         cluster_aggregation_planner::AggregationTargeter::make(opCtx,
                                                                parsedMr.getNamespace(),
                                                                pipelineBuilder,
-                                                               cm,
+                                                               cri,
                                                                involvedNamespaces,
                                                                false,   // hasChangeStream
                                                                false,   // startsWithDocuments
@@ -204,7 +204,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
                 uassertStatusOK(cluster_aggregation_planner::runPipelineOnPrimaryShard(
                     expCtx,
                     namespaces,
-                    *targeter.cm,
+                    targeter.cri->cm,
                     verbosity,
                     std::move(serialized),
                     privileges,

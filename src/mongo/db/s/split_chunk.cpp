@@ -56,6 +56,13 @@ namespace {
 
 const ReadPreferenceSetting kPrimaryOnlyReadPreference{ReadPreference::PrimaryOnly};
 
+// This shard version is used as the received version in StaleConfigInfo since we do not have
+// information about the received version of the operation.
+ShardVersion ShardVersionPlacementIgnoredNoIndexes() {
+    return ShardVersionFactory::make(ChunkVersion::IGNORED(),
+                                     boost::optional<CollectionIndexes>(boost::none));
+}
+
 bool checkIfSingleDoc(OperationContext* opCtx,
                       const CollectionPtr& collection,
                       const ShardKeyIndex& idx,
@@ -108,13 +115,13 @@ bool checkMetadataForSuccessfulSplitChunk(OperationContext* opCtx,
     ShardId shardId = ShardingState::get(opCtx)->shardId();
 
     uassert(StaleConfigInfo(nss,
-                            ShardVersion::IGNORED() /* receivedVersion */,
+                            ShardVersionPlacementIgnoredNoIndexes() /* receivedVersion */,
                             boost::none /* wantedVersion */,
                             shardId),
             str::stream() << "Collection " << nss.ns() << " needs to be recovered",
             metadataAfterSplit);
     uassert(StaleConfigInfo(nss,
-                            ShardVersion::IGNORED() /* receivedVersion */,
+                            ShardVersionPlacementIgnoredNoIndexes() /* receivedVersion */,
                             ShardVersion::UNSHARDED() /* wantedVersion */,
                             shardId),
             str::stream() << "Collection " << nss.ns() << " is not sharded",
@@ -122,7 +129,7 @@ bool checkMetadataForSuccessfulSplitChunk(OperationContext* opCtx,
     const auto placementVersion = metadataAfterSplit->getShardPlacementVersion();
     const auto epoch = placementVersion.epoch();
     uassert(StaleConfigInfo(nss,
-                            ShardVersion::IGNORED() /* receivedVersion */,
+                            ShardVersionPlacementIgnoredNoIndexes() /* receivedVersion */,
                             ShardVersionFactory::make(
                                 *metadataAfterSplit,
                                 scopedCSR->getCollectionIndexes(opCtx)) /* wantedVersion */,

@@ -43,6 +43,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier_metrics.h"
 #include "mongo/s/chunk_manager.h"
+#include "mongo/s/sharding_index_catalog_cache.h"
 
 namespace mongo {
 class Collection;
@@ -70,7 +71,9 @@ public:
      * Wraps the op application in a writeConflictRetry loop and is responsible for creating and
      * committing the WUOW.
      */
-    Status applyOperation(OperationContext* opCtx, const repl::OplogEntry& op) const;
+    Status applyOperation(OperationContext* opCtx,
+                          const boost::optional<ShardingIndexesCatalogCache>& gii,
+                          const repl::OplogEntry& op) const;
 
 private:
     // Applies an insert operation
@@ -92,6 +95,7 @@ private:
                              Database* db,
                              const CollectionPtr& outputColl,
                              const CollectionPtr& stashColl,
+                             const boost::optional<ShardingIndexesCatalogCache>& gii,
                              const repl::OplogEntry& op) const;
 
     // Queries '_stashNss' using 'idQuery'.

@@ -76,7 +76,8 @@ ScopedOperationCompletionShardingActions::~ScopedOperationCompletionShardingActi
         bool inCriticalSection = staleInfo->getCriticalSectionSignal().has_value();
         bool stableLocalVersion = !inCriticalSection && staleInfo->getVersionWanted();
 
-        if (stableLocalVersion && ShardVersion::isIgnoredVersion(staleInfo->getVersionReceived())) {
+        if (stableLocalVersion &&
+            ShardVersion::isPlacementVersionIgnored(staleInfo->getVersionReceived())) {
             // Shard is recovered, but the router didn't sent a shard version, therefore we just
             // need to tell the router how much it needs to advance to (getVersionWanted).
             return;

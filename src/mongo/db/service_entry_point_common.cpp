@@ -1832,7 +1832,7 @@ Future<void> ExecCommandDatabase::_commandExec() {
                     bool stableLocalVersion = !inCriticalSection && sce->getVersionWanted();
 
                     if (stableLocalVersion &&
-                        ShardVersion::isIgnoredVersion(sce->getVersionReceived())) {
+                        ShardVersion::isPlacementVersionIgnored(sce->getVersionReceived())) {
                         // Shard is recovered, but the router didn't sent a shard version, therefore
                         // we just need to tell the router how much it needs to advance to
                         // (getVersionWanted).

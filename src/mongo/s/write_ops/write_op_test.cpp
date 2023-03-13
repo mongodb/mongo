@@ -60,6 +60,13 @@ void sortByEndpoint(std::vector<std::unique_ptr<TargetedWrite>>* writes) {
     std::sort(writes->begin(), writes->end(), EndpointComp());
 }
 
+// This shard version is used as the received version in StaleConfigInfo since we do not have
+// information about the received version of the operation.
+ShardVersion ShardVersionPlacementIgnoredNoIndexes() {
+    return ShardVersionFactory::make(ChunkVersion::IGNORED(),
+                                     boost::optional<CollectionIndexes>(boost::none));
+}
+
 class WriteOpTest : public ServiceContextTest {
 protected:
     static Status getMockRetriableError(CollectionGeneration& gen) {
@@ -122,11 +129,13 @@ protected:
         sortByEndpoint(&targeted);
         ASSERT_EQUALS(targeted[0]->endpoint.shardName, endpointA.shardName);
         if (!isTransactional) {
-            ASSERT(ShardVersion::isIgnoredVersion(*targeted[0]->endpoint.shardVersion));
+            ASSERT(ShardVersion::ShardVersion::isPlacementVersionIgnored(
+                *targeted[0]->endpoint.shardVersion));
         }
         ASSERT_EQUALS(targeted[1]->endpoint.shardName, endpointB.shardName);
         if (!isTransactional) {
-            ASSERT(ShardVersion::isIgnoredVersion(*targeted[1]->endpoint.shardVersion));
+            ASSERT(ShardVersion::ShardVersion::isPlacementVersionIgnored(
+                *targeted[1]->endpoint.shardVersion));
         }
 
         return writeOp;
@@ -162,7 +171,9 @@ TEST_F(WriteOpTest, BasicError) {
 }
 
 TEST_F(WriteOpTest, TargetSingle) {
-    ShardEndpoint endpoint(ShardId("shard"), ShardVersion::IGNORED(), boost::none);
+    ShardEndpoint endpoint(ShardId("shard"),
+                           ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none),
+                           boost::none);
 
     BatchedCommandRequest request([&] {
         write_ops::InsertCommandRequest insertOp(kNss);
@@ -272,11 +283,14 @@ TEST_F(WriteOpTest, TargetMultiAllShards) {
     ASSERT_EQUALS(targeted.size(), 3u);
     sortByEndpoint(&targeted);
     ASSERT_EQUALS(targeted[0]->endpoint.shardName, endpointA.shardName);
-    ASSERT(ShardVersion::isIgnoredVersion(*targeted[0]->endpoint.shardVersion));
+    ASSERT(
+        ShardVersion::ShardVersion::isPlacementVersionIgnored(*targeted[0]->endpoint.shardVersion));
     ASSERT_EQUALS(targeted[1]->endpoint.shardName, endpointB.shardName);
-    ASSERT(ShardVersion::isIgnoredVersion(*targeted[1]->endpoint.shardVersion));
+    ASSERT(
+        ShardVersion::ShardVersion::isPlacementVersionIgnored(*targeted[1]->endpoint.shardVersion));
     ASSERT_EQUALS(targeted[2]->endpoint.shardName, endpointC.shardName);
-    ASSERT(ShardVersion::isIgnoredVersion(*targeted[2]->endpoint.shardVersion));
+    ASSERT(
+        ShardVersion::ShardVersion::isPlacementVersionIgnored(*targeted[2]->endpoint.shardVersion));
 
     writeOp.noteWriteComplete(*targeted[0]);
     writeOp.noteWriteComplete(*targeted[1]);
@@ -351,7 +365,9 @@ TEST_F(WriteOpTest, TargetMultiAllShardsAndErrorMultipleChildOp3) {
 
 // Single error after targeting test
 TEST_F(WriteOpTest, ErrorSingle) {
-    ShardEndpoint endpoint(ShardId("shard"), ShardVersion::IGNORED(), boost::none);
+    ShardEndpoint endpoint(ShardId("shard"),
+                           ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none),
+                           boost::none);
 
     BatchedCommandRequest request([&] {
         write_ops::InsertCommandRequest insertOp(kNss);
@@ -380,7 +396,9 @@ TEST_F(WriteOpTest, ErrorSingle) {
 
 // Cancel single targeting test
 TEST_F(WriteOpTest, CancelSingle) {
-    ShardEndpoint endpoint(ShardId("shard"), ShardVersion::IGNORED(), boost::none);
+    ShardEndpoint endpoint(ShardId("shard"),
+                           ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none),
+                           boost::none);
 
     BatchedCommandRequest request([&] {
         write_ops::InsertCommandRequest insertOp(kNss);
@@ -411,7 +429,9 @@ TEST_F(WriteOpTest, CancelSingle) {
 
 // Retry single targeting test
 TEST_F(WriteOpTest, RetrySingleOp) {
-    ShardEndpoint endpoint(ShardId("shard"), ShardVersion::IGNORED(), boost::none);
+    ShardEndpoint endpoint(ShardId("shard"),
+                           ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none),
+                           boost::none);
 
     BatchedCommandRequest request([&] {
         write_ops::InsertCommandRequest insertOp(kNss);
@@ -435,7 +455,8 @@ TEST_F(WriteOpTest, RetrySingleOp) {
     // Stale exception
     write_ops::WriteError error(
         0,
-        {StaleConfigInfo(kNss, ShardVersion::IGNORED(), boost::none, ShardId("shard")),
+        {StaleConfigInfo(
+             kNss, ShardVersionPlacementIgnoredNoIndexes(), boost::none, ShardId("shard")),
          "some message"});
     writeOp.noteWriteError(*targeted.front(), error);
 

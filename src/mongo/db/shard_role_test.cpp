@@ -899,7 +899,8 @@ TEST_F(ShardRoleTest, RestoreWithShardVersionIgnored) {
     const auto nss = nssShardedCollection1;
 
     AcquisitionPrerequisites::PlacementConcern placementConcern =
-        AcquisitionPrerequisites::PlacementConcern{{}, ShardVersion::IGNORED()};
+        AcquisitionPrerequisites::PlacementConcern{
+            {}, ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none)};
     const auto acquisition = acquireCollection(opCtx(),
                                                {
                                                    nss,
@@ -919,8 +920,7 @@ TEST_F(ShardRoleTest, RestoreWithShardVersionIgnored) {
     const auto newShardVersion = [&]() {
         auto newPlacementVersion = shardVersionShardedCollection1.placementVersion();
         newPlacementVersion.incMajor();
-        return ShardVersionFactory::make(newPlacementVersion,
-                                         boost::optional<CollectionIndexes>(boost::none));
+        return ShardVersionFactory::make(newPlacementVersion, boost::none);
     }();
 
     const auto uuid = getCollectionUUID(opCtx(), nss);

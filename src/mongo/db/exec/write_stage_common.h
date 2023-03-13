@@ -116,11 +116,11 @@ public:
             }
             return {{}, action == Action::kWriteAsFromMigrate};
         } catch (const ExceptionFor<ErrorCodes::StaleConfig>& ex) {
-            // If ShardVersion is IGNORED and we encountered a critical section, then yield,
-            // wait for the critical section to finish and then we'll resume the write from the
-            // point we had left. We do this to prevent large multi-writes from repeatedly
+            // If the placement version is IGNORED and we encountered a critical section, then
+            // yield, wait for the critical section to finish and then we'll resume the write from
+            // the point we had left. We do this to prevent large multi-writes from repeatedly
             // failing due to StaleConfig and exhausting the mongos retry attempts.
-            if (ex->getVersionReceived() == ShardVersion::IGNORED() &&
+            if (ShardVersion::isPlacementVersionIgnored(ex->getVersionReceived()) &&
                 ex->getCriticalSectionSignal()) {
                 yieldHandler(ex);
                 return {PlanStage::NEED_YIELD, false};

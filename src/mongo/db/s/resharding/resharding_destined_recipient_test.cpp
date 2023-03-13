@@ -408,7 +408,11 @@ TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnMultiUpdates)
 
     auto env = setupReshardingEnv(opCtx, true);
 
-    OperationShardingState::setShardRole(opCtx, kNss, ShardVersion::IGNORED(), env.dbVersion);
+    OperationShardingState::setShardRole(
+        opCtx,
+        kNss,
+        ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none),
+        env.dbVersion);
     client.update(
         kNss, BSON("x" << 0), BSON("$set" << BSON("z" << 5)), false /*upsert*/, true /*multi*/);
 

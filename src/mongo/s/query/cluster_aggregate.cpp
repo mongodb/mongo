@@ -303,7 +303,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                                       AggregateCommandRequest& request,
                                       const LiteParsedPipeline& liteParsedPipeline,
                                       const PrivilegeVector& privileges,
-                                      boost::optional<ChunkManager> cm,
+                                      boost::optional<CollectionRoutingInfo> cri,
                                       BSONObjBuilder* result) {
     // Perform some validations on the LiteParsedPipeline and request before continuing with the
     // aggregation command.
@@ -338,7 +338,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     }
 
     // If the routing table is not already taken by the higher level, fill it now.
-    if (!cm) {
+    if (!cri) {
         // If the routing table is valid, we obtain a reference to it. If the table is not valid,
         // then either the database does not exist, or there are no shards in the cluster. In the
         // latter case, we always return an empty cursor. In the former case, if the requested
@@ -365,7 +365,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         }
 
         if (executionNsRoutingInfoStatus.isOK()) {
-            cm = executionNsRoutingInfoStatus.getValue().cm;
+            cri = executionNsRoutingInfoStatus.getValue();
         } else if (!((hasChangeStream || startsWithDocuments) &&
                      executionNsRoutingInfoStatus == ErrorCodes::NamespaceNotFound)) {
             appendEmptyResultSetWithStatus(
@@ -388,7 +388,10 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             }
 
             return cluster_aggregation_planner::getCollationAndUUID(
-                opCtx, cm, namespaces.executionNss, request.getCollation().value_or(BSONObj()));
+                opCtx,
+                cri ? boost::make_optional(cri->cm) : boost::none,
+                namespaces.executionNss,
+                request.getCollation().value_or(BSONObj()));
         }();
 
         // Build an ExpressionContext for the pipeline. This instantiates an appropriate collator,
@@ -432,7 +435,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         opCtx,
         namespaces.executionNss,
         pipelineBuilder,
-        cm,
+        cri,
         involvedNamespaces,
         hasChangeStream,
         startsWithDocuments,
@@ -473,7 +476,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                 return cluster_aggregation_planner::runPipelineOnPrimaryShard(
                     expCtx,
                     namespaces,
-                    *targeter.cm,
+                    targeter.cri->cm,
                     request.getExplain(),
                     aggregation_request_helper::serializeToCommandDoc(request),
                     privileges,
@@ -562,7 +565,10 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
     }();
 
     if (status.isOK()) {
-        updateHostsTargetedMetrics(opCtx, namespaces.executionNss, cm, involvedNamespaces);
+        updateHostsTargetedMetrics(opCtx,
+                                   namespaces.executionNss,
+                                   cri ? boost::make_optional(cri->cm) : boost::none,
+                                   involvedNamespaces);
         // Report usage statistics for each stage in the pipeline.
         liteParsedPipeline.tickGlobalStageCounters();
         // Add 'command' object to explain output.
@@ -606,25 +612,25 @@ Status ClusterAggregate::retryOnViewError(OperationContext* opCtx,
     // bucketMaxSpanSeconds value. We need to make sure we use the bucketMaxSpanSeconds of the same
     // version as the routing table, instead of the one attached in the view error. This way the
     // shard versioning check can correctly catch stale routing information.
-    boost::optional<ChunkManager> snapshotCm;
+    boost::optional<CollectionRoutingInfo> snapshotCri;
     if (nsStruct.executionNss.isTimeseriesBucketsCollection()) {
         auto executionNsRoutingInfoStatus =
             sharded_agg_helpers::getExecutionNsRoutingInfo(opCtx, nsStruct.executionNss);
         if (executionNsRoutingInfoStatus.isOK()) {
-            const auto& [cm, _] = executionNsRoutingInfoStatus.getValue();
-            if (cm.isSharded() && cm.getTimeseriesFields()) {
+            const auto& cri = executionNsRoutingInfoStatus.getValue();
+            if (cri.cm.isSharded() && cri.cm.getTimeseriesFields()) {
                 const auto patchedPipeline = rebuildPipelineWithTimeSeriesGranularity(
                     resolvedAggRequest.getPipeline(),
-                    cm.getTimeseriesFields()->getGranularity(),
-                    cm.getTimeseriesFields()->getBucketMaxSpanSeconds());
+                    cri.cm.getTimeseriesFields()->getGranularity(),
+                    cri.cm.getTimeseriesFields()->getBucketMaxSpanSeconds());
                 resolvedAggRequest.setPipeline(patchedPipeline);
-                snapshotCm = cm;
+                snapshotCri = cri;
             }
         }
     }
 
     auto status = ClusterAggregate::runAggregate(
-        opCtx, nsStruct, resolvedAggRequest, {resolvedAggRequest}, privileges, snapshotCm, result);
+        opCtx, nsStruct, resolvedAggRequest, {resolvedAggRequest}, privileges, snapshotCri, result);
 
     // If the underlying namespace was changed to a view during retry, then re-run the aggregation
     // on the new resolved namespace.

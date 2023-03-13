@@ -35,6 +35,17 @@
 
 namespace mongo {
 
+namespace {
+
+// This shard version is used as the received version in StaleConfigInfo since we do not have
+// information about the received version of the operation.
+ShardVersion ShardVersionPlacementIgnoredNoIndexes() {
+    return ShardVersionFactory::make(ChunkVersion::IGNORED(),
+                                     boost::optional<CollectionIndexes>(boost::none));
+}
+
+}  // namespace
+
 CollectionPlacementAndIndexInfo checkCollectionIdentity(
     OperationContext* opCtx,
     const NamespaceString& nss,
@@ -49,7 +60,7 @@ CollectionPlacementAndIndexInfo checkCollectionIdentity(
     auto optShardingIndexCatalogInfo = scopedCsr->getIndexes(opCtx);
 
     uassert(StaleConfigInfo(nss,
-                            ShardVersion::IGNORED() /* receivedVersion */,
+                            ShardVersionPlacementIgnoredNoIndexes() /* receivedVersion */,
                             boost::none /* wantedVersion */,
                             shardId),
             str::stream() << "Collection " << nss.ns() << " needs to be recovered",
@@ -58,7 +69,7 @@ CollectionPlacementAndIndexInfo checkCollectionIdentity(
     auto metadata = *optMetadata;
 
     uassert(StaleConfigInfo(nss,
-                            ShardVersion::IGNORED() /* receivedVersion */,
+                            ShardVersionPlacementIgnoredNoIndexes() /* receivedVersion */,
                             ShardVersion::UNSHARDED() /* wantedVersion */,
                             shardId),
             str::stream() << "Collection " << nss.ns() << " is not sharded",
@@ -73,7 +84,7 @@ CollectionPlacementAndIndexInfo checkCollectionIdentity(
         ShardVersionFactory::make(metadata, scopedCsr->getCollectionIndexes(opCtx));
 
     uassert(StaleConfigInfo(nss,
-                            ShardVersion::IGNORED() /* receivedVersion */,
+                            ShardVersionPlacementIgnoredNoIndexes() /* receivedVersion */,
                             shardVersion /* wantedVersion */,
                             shardId),
             str::stream() << "Collection " << nss.ns()
@@ -83,7 +94,7 @@ CollectionPlacementAndIndexInfo checkCollectionIdentity(
                 (!expectedTimestamp || expectedTimestamp == placementVersion.getTimestamp()));
 
     uassert(StaleConfigInfo(nss,
-                            ShardVersion::IGNORED() /* receivedVersion */,
+                            ShardVersionPlacementIgnoredNoIndexes() /* receivedVersion */,
                             shardVersion /* wantedVersion */,
                             shardId),
             str::stream() << "Shard does not contain any chunks for collection.",
@@ -105,7 +116,7 @@ void checkShardKeyPattern(OperationContext* opCtx,
                             : boost::none);
 
     uassert(StaleConfigInfo(nss,
-                            ShardVersion::IGNORED() /* receivedVersion */,
+                            ShardVersionPlacementIgnoredNoIndexes() /* receivedVersion */,
                             shardVersion /* wantedVersion */,
                             shardId),
             str::stream() << "The range " << chunkRange.toString()
@@ -127,7 +138,7 @@ void checkChunkMatchesRange(OperationContext* opCtx,
 
     ChunkType existingChunk;
     uassert(StaleConfigInfo(nss,
-                            ShardVersion::IGNORED() /* receivedVersion */,
+                            ShardVersionPlacementIgnoredNoIndexes() /* receivedVersion */,
                             shardVersion /* wantedVersion */,
                             shardId),
             str::stream() << "Range with bounds " << chunkRange.toString()
@@ -136,7 +147,7 @@ void checkChunkMatchesRange(OperationContext* opCtx,
                 existingChunk.getMin().woCompare(chunkRange.getMin()) == 0);
 
     uassert(StaleConfigInfo(nss,
-                            ShardVersion::IGNORED() /* receivedVersion */,
+                            ShardVersionPlacementIgnoredNoIndexes() /* receivedVersion */,
                             shardVersion /* wantedVersion */,
                             shardId),
             str::stream() << "Chunk bounds " << chunkRange.toString() << " do not exist.",
@@ -156,7 +167,7 @@ void checkRangeWithinChunk(OperationContext* opCtx,
 
     ChunkType existingChunk;
     uassert(StaleConfigInfo(nss,
-                            ShardVersion::IGNORED() /* receivedVersion */,
+                            ShardVersionPlacementIgnoredNoIndexes() /* receivedVersion */,
                             shardVersion /* wantedVersion */,
                             shardId),
             str::stream() << "Range with bounds " << chunkRange.toString()
@@ -180,7 +191,7 @@ void checkRangeOwnership(OperationContext* opCtx,
     BSONObj minKey = chunkRange.getMin();
     do {
         uassert(StaleConfigInfo(nss,
-                                ShardVersion::IGNORED() /* receivedVersion */,
+                                ShardVersionPlacementIgnoredNoIndexes() /* receivedVersion */,
                                 shardVersion /* wantedVersion */,
                                 shardId),
                 str::stream() << "Range with bounds " << chunkRange.toString()
@@ -191,7 +202,7 @@ void checkRangeOwnership(OperationContext* opCtx,
     } while (existingChunk.getMax().woCompare(chunkRange.getMax()) < 0);
     uassert(
         StaleConfigInfo(nss,
-                        ShardVersion::IGNORED() /* receivedVersion */,
+                        ShardVersionPlacementIgnoredNoIndexes() /* receivedVersion */,
                         shardVersion /* wantedVersion */,
                         shardId),
         str::stream() << "Shard does not contain a sequence of chunks that exactly fills the range "

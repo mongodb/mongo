@@ -61,6 +61,7 @@
 #include "mongo/db/ttl_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/shard_version_factory.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
@@ -505,8 +506,18 @@ bool TTLMonitor::_doTTLIndexDelete(OperationContext* opCtx,
     try {
         uassertStatusOK(userAllowedWriteNS(opCtx, *nss));
 
-        // Attach IGNORED shard version to skip orphans (the range deleter will clear them up)
-        auto scopedRole = ScopedSetShardRole(opCtx, *nss, ShardVersion::IGNORED(), boost::none);
+        auto catalogCache = Grid::get(opCtx)->catalogCache();
+        auto sii = catalogCache
+            ? uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, *nss)).sii
+            : boost::none;
+        // Attach IGNORED placement version to skip orphans (the range deleter will clear them up)
+        auto scopedRole = ScopedSetShardRole(
+            opCtx,
+            *nss,
+            ShardVersionFactory::make(ChunkVersion::IGNORED(),
+                                      sii ? boost::make_optional(sii->getCollectionIndexes())
+                                          : boost::none),
+            boost::none);
         AutoGetCollection coll(opCtx, *nss, MODE_IX);
         // The collection with `uuid` might be renamed before the lock and the wrong namespace would
         // be locked and looked up so we double check here.
@@ -554,12 +565,13 @@ bool TTLMonitor::_doTTLIndexDelete(OperationContext* opCtx,
     } catch (const ExceptionForCat<ErrorCategory::StaleShardVersionError>& ex) {
         // The TTL index tried to delete some information from a sharded collection
         // through a direct operation against the shard but the filtering metadata was
-        // not available.
+        // not available or the index version in the cache was stale.
         //
         // The current TTL task cannot be completed. However, if the critical section is
         // not held the code below will fire an asynchronous refresh, hoping that the
         // next time this task is re-executed the filtering information is already
-        // present.
+        // present. It will also invalidate the cache, causing the index information to be refreshed
+        // on the next attempt.
         if (auto staleInfo = ex.extraInfo<StaleConfigInfo>();
             staleInfo && !staleInfo->getCriticalSectionSignal()) {
             auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
@@ -573,6 +585,14 @@ bool TTLMonitor::_doTTLIndexDelete(OperationContext* opCtx,
 
                     auto uniqueOpCtx = tc->makeOperationContext();
                     auto opCtx = uniqueOpCtx.get();
+
+                    // Invalidate cache in case index version is stale
+                    if (staleInfo->getVersionWanted()) {
+                        Grid::get(opCtx)
+                            ->catalogCache()
+                            ->invalidateShardOrEntireCollectionEntryForShardedCollection(
+                                *nss, staleInfo->getVersionWanted(), staleInfo->getShardId());
+                    }
 
                     onCollectionPlacementVersionMismatchNoExcept(
                         opCtx,
