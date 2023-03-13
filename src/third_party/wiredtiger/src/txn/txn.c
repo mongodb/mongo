@@ -2173,8 +2173,9 @@ __wt_txn_init_checkpoint_cursor(
      */
     snapinfo->snapshot_txns = NULL;
 
-    /* Set the read and oldest timestamps.  */
+    /* Set the read, stable and oldest timestamps.  */
     txn->checkpoint_read_timestamp = snapinfo->stable_ts;
+    txn->checkpoint_stable_timestamp = snapinfo->stable_ts;
     txn->checkpoint_oldest_timestamp = snapinfo->oldest_ts;
 
     /* Set the flag that indicates if we have a timestamp. */

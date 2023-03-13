@@ -2315,6 +2315,7 @@ __checkpoint_presync(WT_SESSION_IMPL *session, const char *cfg[])
 static int
 __checkpoint_tree_helper(WT_SESSION_IMPL *session, const char *cfg[])
 {
+    struct timespec tsp;
     WT_BTREE *btree;
     WT_DECL_RET;
     WT_TXN *txn;
@@ -2322,6 +2323,11 @@ __checkpoint_tree_helper(WT_SESSION_IMPL *session, const char *cfg[])
 
     btree = S2BT(session);
     txn = session->txn;
+
+    /* Add a two seconds wait to simulate checkpoint slowness for every handle. */
+    tsp.tv_sec = 2;
+    tsp.tv_nsec = 0;
+    __checkpoint_timing_stress(session, WT_TIMING_STRESS_CHECKPOINT_HANDLE, &tsp);
 
     /* Are we using a read timestamp for this checkpoint transaction? */
     with_timestamp = F_ISSET(txn, WT_TXN_SHARED_TS_READ);
