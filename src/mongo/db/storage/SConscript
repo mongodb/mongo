@@ -222,6 +222,18 @@ env.Library(
     ],
 )
 
+env.CppUnitTest(
+    target='throughput_probing_test',
+    source=['execution_control/throughput_probing_test.cpp'],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/unittest/unittest',
+        '$BUILD_DIR/mongo/util/concurrency/ticketholder',
+        '$BUILD_DIR/mongo/util/periodic_runner',
+        'storage_engine_parameters',
+    ],
+)
+
 env.Library(
     target='storage_engine_feature_flags',
     source=[

@@ -183,4 +183,26 @@ void TicketHolderWithQueueingStats::_appendCommonQueueImplStats(BSONObjBuilder& 
     b.append("totalTimeQueuedMicros", stats.totalTimeQueuedMicros.loadRelaxed());
 }
 
+boost::optional<Ticket> MockTicketHolder::tryAcquire(AdmissionContext*) {
+    return {};
+}
+
+Ticket MockTicketHolder::waitForTicket(OperationContext*, AdmissionContext*, WaitMode) {
+    return {nullptr, nullptr};
+}
+
+boost::optional<Ticket> MockTicketHolder::waitForTicketUntil(OperationContext*,
+                                                             AdmissionContext*,
+                                                             Date_t,
+                                                             WaitMode) {
+    return {};
+}
+
+void MockTicketHolder::setUsed(int32_t used) {
+    _used = used;
+    if (_used > _peakUsed) {
+        _peakUsed = _used;
+    }
+}
+
 }  // namespace mongo

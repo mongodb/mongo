@@ -247,6 +247,63 @@ protected:
     ServiceContext* _serviceContext;
 };
 
+class MockTicketHolder : public TicketHolder {
+public:
+    explicit MockTicketHolder(int32_t outof) : _outof(outof) {}
+
+    void resize(OperationContext*, int32_t newSize) noexcept override {
+        _outof = newSize;
+    }
+
+    boost::optional<Ticket> tryAcquire(AdmissionContext*) override;
+
+    Ticket waitForTicket(OperationContext*, AdmissionContext*, WaitMode) override;
+
+    boost::optional<Ticket> waitForTicketUntil(OperationContext*,
+                                               AdmissionContext*,
+                                               Date_t,
+                                               WaitMode) override;
+
+    void appendStats(BSONObjBuilder&) const override {}
+
+    void reportImmediatePriorityAdmission() override {}
+
+    int32_t available() const override {
+        return _outof - _used;
+    }
+
+    int32_t used() const override {
+        return _used;
+    }
+    void setUsed(int32_t used);
+
+    int32_t getAndResetPeakUsed() override {
+        return std::exchange(_peakUsed, 0);
+    }
+
+    int32_t outof() const override {
+        return _outof;
+    }
+    void setOutof(int32_t outof) {
+        _outof = outof;
+    }
+
+    int64_t numFinishedProcessing() const override {
+        return _numFinishedProcessing;
+    }
+    void setNumFinishedProcessing(int32_t numFinishedProcessing) {
+        _numFinishedProcessing = numFinishedProcessing;
+    }
+
+private:
+    void _releaseToTicketPool(AdmissionContext*) noexcept override {}
+
+    int32_t _used = 0;
+    int32_t _peakUsed = 0;
+    int32_t _outof;
+    int32_t _numFinishedProcessing = 0;
+};
+
 /**
  * RAII-style movable token that gets generated when a ticket is acquired and is automatically
  * released when going out of scope.
@@ -256,6 +313,7 @@ class Ticket {
     friend class TicketHolderWithQueueingStats;
     friend class SemaphoreTicketHolder;
     friend class PriorityTicketHolder;
+    friend class MockTicketHolder;
 
 public:
     Ticket(Ticket&& t) : _ticketholder(t._ticketholder), _admissionContext(t._admissionContext) {
