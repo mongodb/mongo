@@ -460,6 +460,7 @@ MonotonicityMetrics calculateMonotonicity(OperationContext* opCtx,
 
     std::vector<int64_t> recordIds;
     BSONObj prevKey;
+    int64_t numKeys = 0;
 
     KeyPattern indexKeyPattern(index->keyPattern());
     auto exec = InternalPlanner::indexScan(opCtx,
@@ -473,13 +474,13 @@ MonotonicityMetrics calculateMonotonicity(OperationContext* opCtx,
         RecordId recordId;
         BSONObj recordVal;
         while (PlanExecutor::ADVANCED == exec->getNext(&recordVal, &recordId)) {
+            recordIds.push_back(recordId.getLong());
             auto currentKey = dotted_path_support::extractElementsBasedOnTemplate(
                 recordVal.replaceFieldNames(shardKey), shardKey);
-            if (SimpleBSONObjComparator::kInstance.evaluate(prevKey == currentKey)) {
-                continue;
+            if (SimpleBSONObjComparator::kInstance.evaluate(prevKey != currentKey)) {
+                prevKey = currentKey;
+                numKeys++;
             }
-            prevKey = currentKey;
-            recordIds.push_back(recordId.getLong());
         }
     } catch (DBException& ex) {
         LOGV2_WARNING(6875301, "Internal error while reading", "ns"_attr = collection->ns());
@@ -491,7 +492,7 @@ MonotonicityMetrics calculateMonotonicity(OperationContext* opCtx,
             "Cannot analyze the monotonicity of a shard key for an empty collection",
             recordIds.size() > 0);
 
-    if (recordIds.size() == 1) {
+    if (numKeys == 1) {
         metrics.setType(MonotonicityTypeEnum::kNotMonotonic);
         metrics.setRecordIdCorrelationCoefficient(0);
         return metrics;
