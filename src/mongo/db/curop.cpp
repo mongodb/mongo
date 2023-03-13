@@ -886,6 +886,10 @@ void OpDebug::report(OperationContext* opCtx,
         pAttrs->add("placementVersionRefreshDuration", placementVersionRefreshMillis);
     }
 
+    if (totalOplogSlotDurationMicros > Microseconds::zero()) {
+        pAttrs->add("totalOplogSlotDuration", totalOplogSlotDurationMicros);
+    }
+
     if (dataThroughputLastSecond) {
         pAttrs->add("dataThroughputLastSecondMBperSec", *dataThroughputLastSecond);
     }
@@ -1226,6 +1230,11 @@ void OpDebug::append(OperationContext* opCtx,
         b.appendNumber("planningTimeMicros", durationCount<Microseconds>(planningTime));
     }
 
+    if (totalOplogSlotDurationMicros > Microseconds::zero()) {
+        b.appendNumber("totalOplogSlotDurationMicros",
+                       durationCount<Microseconds>(totalOplogSlotDurationMicros));
+    }
+
     if (!execStats.isEmpty()) {
         b.append("execStats", std::move(execStats));
     }
@@ -1545,6 +1554,13 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
 
     addIfNeeded("planningTimeMicros", [](auto field, auto args, auto& b) {
         b.appendNumber(field, durationCount<Microseconds>(args.op.planningTime));
+    });
+
+    addIfNeeded("totalOplogSlotDurationMicros", [](auto field, auto args, auto& b) {
+        if (args.op.totalOplogSlotDurationMicros > Nanoseconds::zero()) {
+            b.appendNumber(field,
+                           durationCount<Microseconds>(args.op.totalOplogSlotDurationMicros));
+        }
     });
 
     addIfNeeded("execStats", [](auto field, auto args, auto& b) {
