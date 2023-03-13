@@ -945,6 +945,10 @@ void OpDebug::report(OperationContext* opCtx,
         pAttrs->add("prepareConflictDuration", prepareConflictDurationMillis);
     }
 
+    if (totalOplogSlotDurationMicros > Microseconds::zero()) {
+        pAttrs->add("totalOplogSlotDuration", totalOplogSlotDurationMicros);
+    }
+
     if (dataThroughputLastSecond) {
         pAttrs->add("dataThroughputLastSecondMBperSec", *dataThroughputLastSecond);
     }
@@ -1168,6 +1172,11 @@ void OpDebug::append(OperationContext* opCtx,
 
     if (!curop.getPlanSummary().empty()) {
         b.append("planSummary", curop.getPlanSummary());
+    }
+
+    if (totalOplogSlotDurationMicros > Microseconds::zero()) {
+        b.appendNumber("totalOplogSlotDurationMicros",
+                       durationCount<Microseconds>(totalOplogSlotDurationMicros));
     }
 
     if (!execStats.isEmpty()) {
@@ -1450,6 +1459,13 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
     addIfNeeded("planSummary", [](auto field, auto args, auto& b) {
         if (!args.curop.getPlanSummary().empty()) {
             b.append(field, args.curop.getPlanSummary());
+        }
+    });
+
+    addIfNeeded("totalOplogSlotDurationMicros", [](auto field, auto args, auto& b) {
+        if (args.op.totalOplogSlotDurationMicros > Nanoseconds::zero()) {
+            b.appendNumber(field,
+                           durationCount<Microseconds>(args.op.totalOplogSlotDurationMicros));
         }
     });
 

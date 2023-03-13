@@ -23,6 +23,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         'optime',
         'repl_coordinator_interface',
+        '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/db/logical_clock',
         '$BUILD_DIR/mongo/db/logical_time',
         '$BUILD_DIR/mongo/db/mongod_options',
