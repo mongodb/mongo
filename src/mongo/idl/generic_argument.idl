@@ -195,6 +195,9 @@ structs:
             readOnly:
                 type: IDLAnyType
                 forward_from_shards: false
+            additionalParticipants:
+                type: IDLAnyType
+                forward_from_shards: false
             $configTime:
                 type: IDLAnyType
                 cpp_name: "dollarConfigTime"

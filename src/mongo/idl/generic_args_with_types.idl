@@ -258,6 +258,10 @@ structs:
                 type: bool
                 forward_from_shards: false
                 optional: true
+            additionalParticipants:
+                type: array<object> 
+                forward_from_shards: false
+                optional: true
             $configTime:
                 type: timestamp
                 cpp_name: "dollarConfigTime"

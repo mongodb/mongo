@@ -565,14 +565,14 @@ void TransactionRouter::Router::processParticipantResponse(OperationContext* opC
         }
     }
 
-    const std::string extraParticipants = "additionalParticipants";
-    if (responseObj.hasField(extraParticipants)) {
-        BSONForEach(e, responseObj.getField(extraParticipants).Array()) {
-            mongo::ShardId addingparticipant = ShardId(
-                std::string(e.Obj().getField(StringData{"shardId"}).checkAndGetStringData()));
-            auto txnPart = _createParticipant(opCtx, addingparticipant);
+    if (txnResponseMetadata.getAdditionalParticipants()) {
+        auto additionalParticipants = *txnResponseMetadata.getAdditionalParticipants();
+        for (auto&& participantElem : additionalParticipants) {
+            mongo::ShardId addingParticipant = ShardId(std::string(
+                participantElem.getField(StringData{"shardId"}).checkAndGetStringData()));
+            _createParticipant(opCtx, addingParticipant);
             _setReadOnlyForParticipant(
-                opCtx, addingparticipant, Participant::ReadOnly::kNotReadOnly);
+                opCtx, addingParticipant, Participant::ReadOnly::kNotReadOnly);
 
             if (!p().isRecoveringCommit) {
                 // Don't update participant stats during recovery since the participant list isn't

@@ -42,6 +42,10 @@ structs:
                 description: "True if the shard has the transaction in progress but has not done a
                               write for it"
                 type: bool
+            additionalParticipants:
+                description: "Additional participants in the transaction"
+                optional: true
+                type: array<object>
 
     TxnRecoveryToken:
         description: "Contains info for retrying the commit of a sharded transaction"

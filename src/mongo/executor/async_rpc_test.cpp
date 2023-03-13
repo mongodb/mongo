@@ -824,7 +824,8 @@ TEST_F(AsyncRPCTxnTestFixture, MultipleSendTxnCommand) {
         // in ownership of the underlying data, so it will participate in
         // owning the data in the cursor response.
         return CursorResponse(nss, 0LL, {BSON("x" << 1)})
-            .toBSON(CursorResponse::ResponseType::InitialResponse);
+            .toBSON(CursorResponse::ResponseType::InitialResponse)
+            .addFields(BSON("readOnly" << true));
     });
 
     CursorInitialReply res = std::move(resultFuture).get().response;
@@ -846,13 +847,140 @@ TEST_F(AsyncRPCTxnTestFixture, MultipleSendTxnCommand) {
         ASSERT(!request.cmdObj["autocommit"].Bool());
         ASSERT_EQUALS(request.cmdObj["txnNumber"].numberLong(), 3LL);
         return CursorResponse(nss, 0LL, {BSON("x" << 2)})
-            .toBSON(CursorResponse::ResponseType::InitialResponse);
+            .toBSON(CursorResponse::ResponseType::InitialResponse)
+            .addFields(BSON("readOnly" << false));
     });
 
     CursorInitialReply secondRes = std::move(secondResultFuture).get().response;
     ASSERT_BSONOBJ_EQ(secondRes.getCursor()->getFirstBatch()[0], BSON("x" << 2));
 }
 
+// We test side-effects of calling `processParticipantResponse` with different values for `readOnly`
+// in the response to ensure it is being invoked correctly by the sendTxnCommand wrapper.
+TEST_F(AsyncRPCTxnTestFixture, EnsureProcessParticipantCalledCorrectlyOnSuccess) {
+    ShardId shardId("shard");
+    ReadPreferenceSetting readPref;
+    std::vector<HostAndPort> testHost = {kTestShardHosts[0]};
+    // Use a mock ShardIdTargeter to avoid calling into the ShardRegistry to get a target shard.
+    auto targeter = std::make_unique<ShardIdTargeterForTest>(
+        shardId, getOpCtx(), readPref, getExecutorPtr(), testHost);
+    DatabaseName testDbName = DatabaseName("testdb", boost::none);
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(testDbName);
+
+    // Set up the transaction metadata.
+    TxnNumber txnNum{3};
+    getOpCtx()->setTxnNumber(txnNum);
+    auto txnRouter = TransactionRouter::get(getOpCtx());
+    txnRouter.beginOrContinueTxn(getOpCtx(), txnNum, TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(getOpCtx());
+
+    FindCommandRequest findCmd(nss);
+    auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
+        findCmd, getExecutorPtr(), _cancellationToken);
+
+    // There should be no recovery shard to start with.
+    ASSERT(!txnRouter.getRecoveryShardId());
+    auto resultFuture = sendTxnCommand(options, getOpCtx(), std::move(targeter));
+
+    // Set "readOnly: true" in the reply.
+    onCommand([&](const auto& request) {
+        return CursorResponse(nss, 0LL, {BSON("x" << 1)})
+            .toBSON(CursorResponse::ResponseType::InitialResponse)
+            .addFields(BSON("readOnly" << true));
+    });
+
+    CursorInitialReply res = std::move(resultFuture).get().response;
+    ASSERT_BSONOBJ_EQ(res.getCursor()->getFirstBatch()[0], BSON("x" << 1));
+    // First statement was read-only. If processed correctly by the router, we shouldn't have set a
+    // recovery shard.
+    ASSERT_FALSE(txnRouter.getRecoveryShardId());
+
+    // // Issue a follow-up find command in the same transaction.
+    FindCommandRequest secondFindCmd(nss);
+    auto secondCmdOptions = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
+        secondFindCmd, getExecutorPtr(), _cancellationToken);
+    auto secondTargeter = std::make_unique<ShardIdTargeterForTest>(
+        shardId, getOpCtx(), readPref, getExecutorPtr(), testHost);
+    auto secondResultFuture =
+        sendTxnCommand(secondCmdOptions, getOpCtx(), std::move(secondTargeter));
+
+    // Set "readOnly: false" in this response. If processed correctly by the router, we _will_ set a
+    // recovery shard.
+    onCommand([&](const auto& request) {
+        return CursorResponse(nss, 0LL, {BSON("x" << 2)})
+            .toBSON(CursorResponse::ResponseType::InitialResponse)
+            .addFields(BSON("readOnly" << false));
+    });
+
+    CursorInitialReply secondRes = std::move(secondResultFuture).get().response;
+    ASSERT_BSONOBJ_EQ(secondRes.getCursor()->getFirstBatch()[0], BSON("x" << 2));
+
+    // We should have set a recovery shard, if `TxnRouter::processParticipantResponse` was invoked
+    // correctly.
+    ASSERT(txnRouter.getRecoveryShardId());
+    ASSERT_EQ(*txnRouter.getRecoveryShardId(), shardId);
+}
+TEST_F(AsyncRPCTxnTestFixture, EnsureProcessParticipantCalledCorrectlyOnRemoteError) {
+    ShardId shardId("shard");
+    ReadPreferenceSetting readPref;
+    std::vector<HostAndPort> testHost = {kTestShardHosts[0]};
+    // Use a mock ShardIdTargeter to avoid calling into the ShardRegistry to get a target shard.
+    auto targeter = std::make_unique<ShardIdTargeterForTest>(
+        shardId, getOpCtx(), readPref, getExecutorPtr(), testHost);
+    DatabaseName testDbName = DatabaseName("testdb", boost::none);
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(testDbName);
+
+    // Set up the transaction metadata.
+    TxnNumber txnNum{3};
+    getOpCtx()->setTxnNumber(txnNum);
+    auto txnRouter = TransactionRouter::get(getOpCtx());
+    txnRouter.beginOrContinueTxn(getOpCtx(), txnNum, TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(getOpCtx());
+
+    FindCommandRequest findCmd(nss);
+    auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
+        findCmd, getExecutorPtr(), _cancellationToken);
+
+    // There should be no recovery shard to start with.
+    ASSERT(!txnRouter.getRecoveryShardId());
+    auto resultFuture = sendTxnCommand(options, getOpCtx(), std::move(targeter));
+
+    // Set "readOnly: false" in the reply.
+    onCommand([&](const auto& request) {
+        return createErrorResponse({ErrorCodes::BadValue, "test"})
+            .addFields(BSON("readOnly" << false));
+    });
+    // Because the router ignores error-responses that aren't "ErrorCodes::WouldChangeOwningShard",
+    // expect no change to the TransactionRouter state.
+    std::move(resultFuture).getNoThrow().getStatus().ignore();
+    ASSERT_FALSE(txnRouter.getRecoveryShardId());
+
+    // // Issue a follow-up find command in the same transaction.
+    FindCommandRequest secondFindCmd(nss);
+    auto secondCmdOptions = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
+        secondFindCmd, getExecutorPtr(), _cancellationToken);
+    auto secondTargeter = std::make_unique<ShardIdTargeterForTest>(
+        shardId, getOpCtx(), readPref, getExecutorPtr(), testHost);
+    auto secondResultFuture =
+        sendTxnCommand(secondCmdOptions, getOpCtx(), std::move(secondTargeter));
+
+    // Use WouldChangeOwningShard error this time.
+    onCommand([&](const auto& request) -> BSONObj {
+        auto code = ErrorCodes::WouldChangeOwningShard;
+        auto err = BSON("ok" << false << "code" << code << "codeName"
+                             << ErrorCodes::errorString(code) << "errmsg"
+                             << "test"
+                             << "preImage" << BSON("x" << 1) << "postImage" << BSON("x" << 2)
+                             << "shouldUpsert" << true);
+        return err.addFields(BSON("readOnly" << false));
+    });
+
+    std::move(secondResultFuture).getNoThrow().getStatus().ignore();
+    // We should have set a recovery shard, if `TxnRouter::processParticipantResponse` was invoked
+    // correctly.
+    ASSERT(txnRouter.getRecoveryShardId());
+    ASSERT_EQ(*txnRouter.getRecoveryShardId(), shardId);
+}
 
 TEST_F(AsyncRPCTxnTestFixture, SendTxnCommandWithGenericArgs) {
     ShardId shardId("shard");
@@ -912,7 +1040,8 @@ TEST_F(AsyncRPCTxnTestFixture, SendTxnCommandWithGenericArgs) {
         // in ownership of the underlying data, so it will participate in
         // owning the data in the cursor response.
         return CursorResponse(nss, 0LL, {BSON("x" << 1)})
-            .toBSON(CursorResponse::ResponseType::InitialResponse);
+            .toBSON(CursorResponse::ResponseType::InitialResponse)
+            .addFields(BSON("readOnly" << false));
     });
 
     CursorInitialReply res = std::move(resultFuture).get().response;

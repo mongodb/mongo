@@ -69,10 +69,19 @@ ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendTxnCommand(
                 return swResponse;
             }
             if (swResponse.isOK()) {
-                // TODO (SERVER-72082): Make sure TxnResponseMetadata is appended to the BSON
-                // that we are passing into 'processParticipantResponse'.
-                txnRouter.processParticipantResponse(
-                    opCtx, shardId, swResponse.getValue().response.toBSON());
+                ReplyType reply = swResponse.getValue();
+                GenericReplyFields gens = reply.genericReplyFields;
+                // The TransactionRouter expects a raw-BSON command-response
+                // in its API for processing transaction metadata. The async_rpc API
+                // doesn't expose the raw-BSON of the response in the case of command-success,
+                // so we construct a fake one for now to appease the TxnRouter API.
+                auto fakeResponseObj = [&] {
+                    BSONObjBuilder bob;
+                    gens.stable.serialize(&bob);
+                    gens.unstable.serialize(&bob);
+                    return bob.obj();
+                }();
+                txnRouter.processParticipantResponse(opCtx, shardId, fakeResponseObj);
             } else {
                 auto extraInfo = swResponse.getStatus().template extraInfo<AsyncRPCErrorInfo>();
                 if (extraInfo->isRemote()) {
