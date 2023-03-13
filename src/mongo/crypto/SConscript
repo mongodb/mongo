@@ -199,3 +199,14 @@ if ssl_provider == 'openssl':
             'jwt',
         ],
     )
+
+env.Benchmark(
+    target='crypto_bm',
+    source=[
+        'crypto_bm.cpp',
+    ],
+    LIBDEPS=[
+        'fle_crypto',
+        'sha_block_${MONGO_CRYPTO}',
+    ],
+)

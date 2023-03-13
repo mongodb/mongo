@@ -1820,8 +1820,26 @@ std::vector<std::string> minCoverDecimal128(Decimal128 lowerBound,
                                             boost::optional<Decimal128> min,
                                             boost::optional<Decimal128> max,
                                             boost::optional<uint32_t> precision,
-
                                             int sparsity);
+
+class FLEUtil {
+public:
+    static PrfBlock blockToArray(const SHA256Block& block);
+
+    /**
+     * Compute HMAC-SHA-256
+     */
+    static PrfBlock prf(ConstDataRange key, ConstDataRange cdr);
+
+    static PrfBlock prf(ConstDataRange key, uint64_t value);
+
+    /**
+     * Decrypt AES-256-CTR encrypted data. Exposed for benchmarking purposes.
+     */
+    static StatusWith<std::vector<uint8_t>> decryptData(ConstDataRange key,
+                                                        ConstDataRange cipherText);
+};
+
 /**
  * Utility functions manipulating buffers.
  */

@@ -385,32 +385,12 @@ using UUIDBuf = std::array<uint8_t, UUID::kNumBytes>;
 
 static_assert(sizeof(PrfBlock) == SHA256Block::kHashLength);
 
-PrfBlock blockToArray(const SHA256Block& block) {
-    PrfBlock data;
-    memcpy(data.data(), block.data(), sizeof(PrfBlock));
-    return data;
-}
-
 ConstDataRange hmacKey(const KeyMaterial& keyMaterial) {
     static_assert(kHmacKeyOffset + crypto::sym256KeySize <= crypto::kFieldLevelEncryptionKeySize);
     invariant(crypto::kFieldLevelEncryptionKeySize == keyMaterial->size());
     return {keyMaterial->data() + kHmacKeyOffset, crypto::sym256KeySize};
 }
 
-PrfBlock prf(ConstDataRange key, ConstDataRange cdr) {
-    uassert(6378002, "Invalid key length", key.length() == crypto::sym256KeySize);
-
-    SHA256Block block;
-    SHA256Block::computeHmac(key.data<uint8_t>(), key.length(), {cdr}, &block);
-    return blockToArray(block);
-}
-
-PrfBlock prf(ConstDataRange key, uint64_t value) {
-    std::array<char, sizeof(uint64_t)> bufValue;
-    DataView(bufValue.data()).write<LittleEndian<uint64_t>>(value);
-
-    return prf(key, bufValue);
-}
 
 PrfBlock prf(ConstDataRange key, uint64_t value, int64_t value2) {
     uassert(6378003, "Invalid key length", key.length() == crypto::sym256KeySize);
@@ -431,7 +411,7 @@ PrfBlock prf(ConstDataRange key, uint64_t value, int64_t value2) {
                                  ConstDataRange{bufValue2},
                              },
                              &block);
-    return blockToArray(block);
+    return FLEUtil::blockToArray(block);
 }
 
 
@@ -587,21 +567,6 @@ StatusWith<std::vector<uint8_t>> decryptDataWithAssociatedData(ConstDataRange ke
     return out;
 }
 
-StatusWith<std::vector<uint8_t>> decryptData(ConstDataRange key, ConstDataRange cipherText) {
-    auto plainTextLength = fle2GetPlainTextLength(cipherText.length());
-    if (!plainTextLength.isOK()) {
-        return plainTextLength.getStatus();
-    }
-
-    std::vector<uint8_t> out(static_cast<size_t>(plainTextLength.getValue()));
-
-    auto status = crypto::fle2Decrypt(key, cipherText, out);
-    if (!status.isOK()) {
-        return status.getStatus();
-    }
-
-    return {out};
-}
 
 template <typename T>
 struct FLEStoragePackTypeHelper;
@@ -643,7 +608,7 @@ StatusWith<std::vector<uint8_t>> packAndEncrypt(std::tuple<T1, T2> tuple, FLETok
 
 template <typename T1, typename T2, FLETokenType TokenT>
 StatusWith<std::tuple<T1, T2>> decryptAndUnpack(ConstDataRange cdr, FLEToken<TokenT> token) {
-    auto swVec = decryptData(token.toCDR(), cdr);
+    auto swVec = FLEUtil::decryptData(token.toCDR(), cdr);
     if (!swVec.isOK()) {
         return swVec.getStatus();
     }
@@ -2438,114 +2403,114 @@ PrfBlock PrfBlockfromCDR(const ConstDataRange& block) {
 
 CollectionsLevel1Token FLELevel1TokenGenerator::generateCollectionsLevel1Token(
     FLEIndexKey indexKey) {
-    return prf(hmacKey(indexKey.data), kLevel1Collection);
+    return FLEUtil::prf(hmacKey(indexKey.data), kLevel1Collection);
 }
 
 ServerTokenDerivationLevel1Token FLELevel1TokenGenerator::generateServerTokenDerivationLevel1Token(
     FLEIndexKey indexKey) {
-    return prf(hmacKey(indexKey.data), kLevel1ServerTokenDerivation);
+    return FLEUtil::prf(hmacKey(indexKey.data), kLevel1ServerTokenDerivation);
 }
 
 ServerDataEncryptionLevel1Token FLELevel1TokenGenerator::generateServerDataEncryptionLevel1Token(
     FLEIndexKey indexKey) {
-    return prf(hmacKey(indexKey.data), kLevelServerDataEncryption);
+    return FLEUtil::prf(hmacKey(indexKey.data), kLevelServerDataEncryption);
 }
 
 
 EDCToken FLECollectionTokenGenerator::generateEDCToken(CollectionsLevel1Token token) {
-    return prf(token.data, kEDC);
+    return FLEUtil::prf(token.data, kEDC);
 }
 
 ESCToken FLECollectionTokenGenerator::generateESCToken(CollectionsLevel1Token token) {
-    return prf(token.data, kESC);
+    return FLEUtil::prf(token.data, kESC);
 }
 
 ECCToken FLECollectionTokenGenerator::generateECCToken(CollectionsLevel1Token token) {
-    return prf(token.data, kECC);
+    return FLEUtil::prf(token.data, kECC);
 }
 
 ECOCToken FLECollectionTokenGenerator::generateECOCToken(CollectionsLevel1Token token) {
-    return prf(token.data, kECOC);
+    return FLEUtil::prf(token.data, kECOC);
 }
 
 
 EDCDerivedFromDataToken FLEDerivedFromDataTokenGenerator::generateEDCDerivedFromDataToken(
     EDCToken token, ConstDataRange value) {
-    return prf(token.data, value);
+    return FLEUtil::prf(token.data, value);
 }
 
 ESCDerivedFromDataToken FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(
     ESCToken token, ConstDataRange value) {
-    return prf(token.data, value);
+    return FLEUtil::prf(token.data, value);
 }
 
 ECCDerivedFromDataToken FLEDerivedFromDataTokenGenerator::generateECCDerivedFromDataToken(
     ECCToken token, ConstDataRange value) {
-    return prf(token.data, value);
+    return FLEUtil::prf(token.data, value);
 }
 
 ServerDerivedFromDataToken FLEDerivedFromDataTokenGenerator::generateServerDerivedFromDataToken(
     ServerTokenDerivationLevel1Token token, ConstDataRange value) {
-    return prf(token.data, value);
+    return FLEUtil::prf(token.data, value);
 }
 
 EDCDerivedFromDataTokenAndContentionFactorToken
 FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
     generateEDCDerivedFromDataTokenAndContentionFactorToken(EDCDerivedFromDataToken token,
                                                             FLECounter counter) {
-    return prf(token.data, counter);
+    return FLEUtil::prf(token.data, counter);
 }
 
 ESCDerivedFromDataTokenAndContentionFactorToken
 FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
     generateESCDerivedFromDataTokenAndContentionFactorToken(ESCDerivedFromDataToken token,
                                                             FLECounter counter) {
-    return prf(token.data, counter);
+    return FLEUtil::prf(token.data, counter);
 }
 
 ECCDerivedFromDataTokenAndContentionFactorToken
 FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
     generateECCDerivedFromDataTokenAndContentionFactorToken(ECCDerivedFromDataToken token,
                                                             FLECounter counter) {
-    return prf(token.data, counter);
+    return FLEUtil::prf(token.data, counter);
 }
 
 
 EDCTwiceDerivedToken FLETwiceDerivedTokenGenerator::generateEDCTwiceDerivedToken(
     EDCDerivedFromDataTokenAndContentionFactorToken token) {
-    return prf(token.data, kTwiceDerivedTokenFromEDC);
+    return FLEUtil::prf(token.data, kTwiceDerivedTokenFromEDC);
 }
 
 ESCTwiceDerivedTagToken FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedTagToken(
     ESCDerivedFromDataTokenAndContentionFactorToken token) {
-    return prf(token.data, kTwiceDerivedTokenFromESCTag);
+    return FLEUtil::prf(token.data, kTwiceDerivedTokenFromESCTag);
 }
 
 ESCTwiceDerivedValueToken FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedValueToken(
     ESCDerivedFromDataTokenAndContentionFactorToken token) {
-    return prf(token.data, kTwiceDerivedTokenFromESCValue);
+    return FLEUtil::prf(token.data, kTwiceDerivedTokenFromESCValue);
 }
 
 ECCTwiceDerivedTagToken FLETwiceDerivedTokenGenerator::generateECCTwiceDerivedTagToken(
     ECCDerivedFromDataTokenAndContentionFactorToken token) {
-    return prf(token.data, kTwiceDerivedTokenFromECCTag);
+    return FLEUtil::prf(token.data, kTwiceDerivedTokenFromECCTag);
 }
 
 ECCTwiceDerivedValueToken FLETwiceDerivedTokenGenerator::generateECCTwiceDerivedValueToken(
     ECCDerivedFromDataTokenAndContentionFactorToken token) {
-    return prf(token.data, kTwiceDerivedTokenFromECCValue);
+    return FLEUtil::prf(token.data, kTwiceDerivedTokenFromECCValue);
 }
 
 ServerCountAndContentionFactorEncryptionToken
 FLEServerMetadataEncryptionTokenGenerator::generateServerCountAndContentionFactorEncryptionToken(
     ServerDerivedFromDataToken token) {
-    return prf(token.data, kServerCountAndContentionFactorEncryption);
+    return FLEUtil::prf(token.data, kServerCountAndContentionFactorEncryption);
 }
 
 ServerZerosEncryptionToken
 FLEServerMetadataEncryptionTokenGenerator::generateServerZerosEncryptionToken(
     ServerDerivedFromDataToken token) {
-    return prf(token.data, kServerZerosEncryption);
+    return FLEUtil::prf(token.data, kServerZerosEncryption);
 }
 
 StatusWith<EncryptedStateCollectionTokens> EncryptedStateCollectionTokens::decryptAndParse(
@@ -2570,7 +2535,7 @@ StatusWith<std::vector<uint8_t>> EncryptedStateCollectionTokens::serialize(ECOCT
 StatusWith<EncryptedStateCollectionTokensV2> EncryptedStateCollectionTokensV2::decryptAndParse(
     ECOCToken token, ConstDataRange cdr) {
 
-    auto swVec = decryptData(token.toCDR(), cdr);
+    auto swVec = FLEUtil::decryptData(token.toCDR(), cdr);
     if (!swVec.isOK()) {
         return swVec.getStatus();
     }
@@ -2849,7 +2814,7 @@ PrfBlock ESCCollection::generateId(ESCTwiceDerivedTagToken tagToken,
 
 PrfBlock ESCCollection::generateNonAnchorId(const ESCTwiceDerivedTagToken& tagToken,
                                             uint64_t cpos) {
-    return prf(tagToken.data, cpos);
+    return FLEUtil::prf(tagToken.data, cpos);
 }
 
 PrfBlock ESCCollection::generateAnchorId(const ESCTwiceDerivedTagToken& tagToken, uint64_t apos) {
@@ -3611,7 +3576,7 @@ StatusWith<FLE2IndexedEqualityEncryptedValue> FLE2IndexedEqualityEncryptedValue:
 
     auto type = static_cast<BSONType>(swBsonType.getValue());
 
-    auto swVec = decryptData(token.toCDR(), serializedServerCdrc);
+    auto swVec = FLEUtil::decryptData(token.toCDR(), serializedServerCdrc);
     if (!swVec.isOK()) {
         return swVec.getStatus();
     }
@@ -3825,7 +3790,7 @@ FLE2TagAndEncryptedMetadataBlock::decryptZerosBlob(ServerDerivedFromDataToken to
         FLEServerMetadataEncryptionTokenGenerator::generateServerZerosEncryptionToken(token);
 
     auto swDecryptedZeros =
-        decryptData(zerosEncryptionToken.toCDR(), ConstDataRange(swZerosBlob.getValue()));
+        FLEUtil::decryptData(zerosEncryptionToken.toCDR(), ConstDataRange(swZerosBlob.getValue()));
     if (!swDecryptedZeros.isOK()) {
         return swDecryptedZeros.getStatus();
     }
@@ -3928,7 +3893,7 @@ StatusWith<std::vector<uint8_t>> FLE2IndexedEqualityEncryptedValueV2::parseAndDe
     if (!swFields.isOK()) {
         return swFields.getStatus();
     }
-    return decryptData(serverEncryptionToken.toCDR(), swFields.getValue().ciphertext);
+    return FLEUtil::decryptData(serverEncryptionToken.toCDR(), swFields.getValue().ciphertext);
 }
 
 StatusWith<FLE2TagAndEncryptedMetadataBlock>
@@ -4146,7 +4111,7 @@ StatusWith<FLE2IndexedRangeEncryptedValue> FLE2IndexedRangeEncryptedValue::decry
 
     auto type = static_cast<BSONType>(swBsonType.getValue());
 
-    auto swVec = decryptData(token.toCDR(), serializedServerCdrc);
+    auto swVec = FLEUtil::decryptData(token.toCDR(), serializedServerCdrc);
     if (!swVec.isOK()) {
         return swVec.getStatus();
     }
@@ -4500,7 +4465,7 @@ StatusWith<std::vector<uint8_t>> FLE2IndexedRangeEncryptedValueV2::parseAndDecry
     if (!swFields.isOK()) {
         return swFields.getStatus();
     }
-    return decryptData(serverEncryptionToken.toCDR(), swFields.getValue().ciphertext);
+    return FLEUtil::decryptData(serverEncryptionToken.toCDR(), swFields.getValue().ciphertext);
 }
 
 StatusWith<std::vector<FLE2TagAndEncryptedMetadataBlock>>
@@ -4707,7 +4672,7 @@ std::vector<EDCServerPayloadInfo> EDCServerCollection::getEncryptedFieldInfo(BSO
 }
 
 PrfBlock EDCServerCollection::generateTag(EDCTwiceDerivedToken edcTwiceDerived, FLECounter count) {
-    return prf(edcTwiceDerived.toCDR(), count);
+    return FLEUtil::prf(edcTwiceDerived.toCDR(), count);
 }
 
 PrfBlock EDCServerCollection::generateTag(const EDCServerPayloadInfo& payload) {
@@ -6148,5 +6113,43 @@ std::vector<std::string> minCoverDecimal128(Decimal128 lowerBound,
         return {};
     }
     return minCover(a.value, b.value, a.min, a.max, sparsity);
+}
+
+PrfBlock FLEUtil::blockToArray(const SHA256Block& block) {
+    PrfBlock data;
+    memcpy(data.data(), block.data(), sizeof(PrfBlock));
+    return data;
+}
+
+PrfBlock FLEUtil::prf(ConstDataRange key, ConstDataRange cdr) {
+    uassert(6378002, "Invalid key length", key.length() == crypto::sym256KeySize);
+
+    SHA256Block block;
+    SHA256Block::computeHmac(key.data<uint8_t>(), key.length(), {cdr}, &block);
+    return blockToArray(block);
+}
+
+PrfBlock FLEUtil::prf(ConstDataRange key, uint64_t value) {
+    std::array<char, sizeof(uint64_t)> bufValue;
+    DataView(bufValue.data()).write<LittleEndian<uint64_t>>(value);
+
+    return prf(key, bufValue);
+}
+
+StatusWith<std::vector<uint8_t>> FLEUtil::decryptData(ConstDataRange key,
+                                                      ConstDataRange cipherText) {
+    auto plainTextLength = fle2GetPlainTextLength(cipherText.length());
+    if (!plainTextLength.isOK()) {
+        return plainTextLength.getStatus();
+    }
+
+    std::vector<uint8_t> out(static_cast<size_t>(plainTextLength.getValue()));
+
+    auto status = crypto::fle2Decrypt(key, cipherText, out);
+    if (!status.isOK()) {
+        return status.getStatus();
+    }
+
+    return {out};
 }
 }  // namespace mongo
