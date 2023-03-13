@@ -133,33 +133,6 @@ void _validateIndexes(OperationContext* opCtx,
         auto& curIndexResults = (results->indexResultsMap)[descriptor->indexName()];
         curIndexResults.keysTraversed = numTraversedKeys;
 
-        // If we are performing a full index validation, we have information on the number of index
-        // keys validated in _validateIndexesInternalStructure (when we validated the internal
-        // structure of the index). Check if this is consistent with 'numTraversedKeys' from
-        // traverseIndex above.
-        if (validateState->isFullIndexValidation()) {
-            invariant(opCtx->lockState()->isCollectionLockedForMode(validateState->nss(), MODE_X));
-
-            // The number of keys counted in _validateIndexesInternalStructure, when checking the
-            // internal structure of the index.
-            const int64_t numIndexKeys = curIndexResults.keysTraversedFromFullValidate;
-
-            // Check if currIndexResults is valid to ensure that this index is not corrupted or
-            // comprised (which was set in _validateIndexesInternalStructure). If the index is
-            // corrupted, there is no use in checking if the traversal yielded the same key count.
-            if (curIndexResults.valid) {
-                if (numIndexKeys != numTraversedKeys) {
-                    curIndexResults.valid = false;
-                    string msg = str::stream()
-                        << "number of traversed index entries (" << numTraversedKeys
-                        << ") does not match the number of expected index entries (" << numIndexKeys
-                        << ")";
-                    results->errors.push_back(msg);
-                    results->valid = false;
-                }
-            }
-        }
-
         if (!curIndexResults.valid) {
             results->valid = false;
         }

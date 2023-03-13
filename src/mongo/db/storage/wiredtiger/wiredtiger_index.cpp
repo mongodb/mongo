@@ -323,9 +323,6 @@ IndexValidateResults WiredTigerIndex::validate(OperationContext* opCtx, bool ful
     }
 
     WiredTigerIndexUtil::validateStructure(opCtx, _uri, results);
-    if (results.valid) {
-        results.keysTraversedFromFullValidate = numEntries(opCtx);
-    }
 
     return results;
 }
