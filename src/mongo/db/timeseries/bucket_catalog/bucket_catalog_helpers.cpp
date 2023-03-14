@@ -328,19 +328,19 @@ void handleDirectWrite(OperationContext* opCtx, const NamespaceString& ns, const
     // First notify the BucketCatalog that we intend to start a direct write, so we can conflict
     // with any already-prepared operation, and also block bucket reopening if it's enabled.
     auto& bucketCatalog = BucketCatalog::get(opCtx);
-    bucketCatalog.directWriteStart(resolvedNs, bucketId);
+    directWriteStart(bucketCatalog.bucketStateRegistry, resolvedNs, bucketId);
 
     // Then register callbacks so we can let the BucketCatalog know that we are done with our direct
     // write after the actual write takes place (or is abandoned), and allow reopening.
     opCtx->recoveryUnit()->onCommit([svcCtx = opCtx->getServiceContext(), resolvedNs, bucketId](
                                         OperationContext*, boost::optional<Timestamp>) {
         auto& bucketCatalog = BucketCatalog::get(svcCtx);
-        bucketCatalog.directWriteFinish(resolvedNs, bucketId);
+        directWriteFinish(bucketCatalog.bucketStateRegistry, resolvedNs, bucketId);
     });
     opCtx->recoveryUnit()->onRollback(
         [svcCtx = opCtx->getServiceContext(), resolvedNs, bucketId](OperationContext*) {
             auto& bucketCatalog = BucketCatalog::get(svcCtx);
-            bucketCatalog.directWriteFinish(resolvedNs, bucketId);
+            directWriteFinish(bucketCatalog.bucketStateRegistry, resolvedNs, bucketId);
         });
 }
 

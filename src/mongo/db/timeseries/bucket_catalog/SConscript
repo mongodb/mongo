@@ -9,7 +9,9 @@ env.Library(
     source=[
         'bucket.cpp',
         'bucket_catalog.cpp',
+        'bucket_catalog_internal.cpp',
         'bucket_catalog_helpers.cpp',
+        'bucket_catalog_server_status.cpp',
         'bucket_identifiers.cpp',
         'bucket_metadata.cpp',
         'bucket_state.cpp',

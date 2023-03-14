@@ -67,6 +67,11 @@ public:
 
     ~Bucket();
 
+    Bucket(const Bucket&) = delete;
+    Bucket(Bucket&&) = delete;
+    Bucket& operator=(const Bucket&) = delete;
+    Bucket& operator=(Bucket&&) = delete;
+
     // The bucket ID for the underlying document
     const BucketId bucketId;
 

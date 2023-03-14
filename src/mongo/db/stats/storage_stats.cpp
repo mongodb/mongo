@@ -101,8 +101,9 @@ void _appendRecordStats(OperationContext* opCtx,
         if (numRecords) {
             bob.append("avgBucketSize", collection->averageObjectSize(opCtx));
         }
-        timeseries::bucket_catalog::BucketCatalog::get(opCtx).appendExecutionStats(
-            collNss.getTimeseriesViewNamespace(), &bob);
+        auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
+        timeseries::bucket_catalog::appendExecutionStats(
+            bucketCatalog, collNss.getTimeseriesViewNamespace(), bob);
         TimeseriesStats::get(collection.get()).append(&bob);
     } else {
         result->appendNumber("count", numRecords);

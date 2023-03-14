@@ -29,6 +29,8 @@
 
 #include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
 
+#include "mongo/db/storage/storage_parameters_gen.h"
+
 namespace mongo::timeseries::bucket_catalog {
 
 void ExecutionStatsController::incNumBucketInserts(long long increment) {
@@ -150,5 +152,54 @@ void ExecutionStatsController::incNumDuplicateBucketsReopened(long long incremen
     _collectionStats->numDuplicateBucketsReopened.fetchAndAddRelaxed(increment);
     _globalStats.numDuplicateBucketsReopened.fetchAndAddRelaxed(increment);
 }
+
+void appendExecutionStatsToBuilder(const ExecutionStats& stats, BSONObjBuilder& builder) {
+    builder.appendNumber("numBucketInserts", stats.numBucketInserts.load());
+    builder.appendNumber("numBucketUpdates", stats.numBucketUpdates.load());
+    builder.appendNumber("numBucketsOpenedDueToMetadata",
+                         stats.numBucketsOpenedDueToMetadata.load());
+    builder.appendNumber("numBucketsClosedDueToCount", stats.numBucketsClosedDueToCount.load());
+    builder.appendNumber("numBucketsClosedDueToSchemaChange",
+                         stats.numBucketsClosedDueToSchemaChange.load());
+    builder.appendNumber("numBucketsClosedDueToSize", stats.numBucketsClosedDueToSize.load());
+    builder.appendNumber("numBucketsClosedDueToTimeForward",
+                         stats.numBucketsClosedDueToTimeForward.load());
+    builder.appendNumber("numBucketsClosedDueToTimeBackward",
+                         stats.numBucketsClosedDueToTimeBackward.load());
+    builder.appendNumber("numBucketsClosedDueToMemoryThreshold",
+                         stats.numBucketsClosedDueToMemoryThreshold.load());
+
+    auto commits = stats.numCommits.load();
+    builder.appendNumber("numCommits", commits);
+    builder.appendNumber("numWaits", stats.numWaits.load());
+    auto measurementsCommitted = stats.numMeasurementsCommitted.load();
+    builder.appendNumber("numMeasurementsCommitted", measurementsCommitted);
+    if (commits) {
+        builder.appendNumber("avgNumMeasurementsPerCommit", measurementsCommitted / commits);
+    }
+
+    if (feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        builder.appendNumber("numBucketsClosedDueToReopening",
+                             stats.numBucketsClosedDueToReopening.load());
+        builder.appendNumber("numBucketsArchivedDueToMemoryThreshold",
+                             stats.numBucketsArchivedDueToMemoryThreshold.load());
+        builder.appendNumber("numBucketsArchivedDueToTimeBackward",
+                             stats.numBucketsArchivedDueToTimeBackward.load());
+        builder.appendNumber("numBucketsReopened", stats.numBucketsReopened.load());
+        builder.appendNumber("numBucketsKeptOpenDueToLargeMeasurements",
+                             stats.numBucketsKeptOpenDueToLargeMeasurements.load());
+        builder.appendNumber("numBucketsClosedDueToCachePressure",
+                             stats.numBucketsClosedDueToCachePressure.load());
+        builder.appendNumber("numBucketsFetched", stats.numBucketsFetched.load());
+        builder.appendNumber("numBucketsQueried", stats.numBucketsQueried.load());
+        builder.appendNumber("numBucketFetchesFailed", stats.numBucketFetchesFailed.load());
+        builder.appendNumber("numBucketQueriesFailed", stats.numBucketQueriesFailed.load());
+        builder.appendNumber("numBucketReopeningsFailed", stats.numBucketReopeningsFailed.load());
+        builder.appendNumber("numDuplicateBucketsReopened",
+                             stats.numDuplicateBucketsReopened.load());
+    }
+}
+
 
 }  // namespace mongo::timeseries::bucket_catalog

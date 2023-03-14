@@ -52,14 +52,12 @@ struct BucketStateRegistry {
     using StateChangeFn =
         std::function<boost::optional<BucketState>(boost::optional<BucketState>, Era)>;
 
-    explicit BucketStateRegistry(Mutex& catalogMutex);
-
-    // Pointer to 'BucketCatalog::_mutex'.
-    Mutex& catalogMutex;
+    mutable Mutex mutex =
+        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "BucketStateRegistry::mutex");
 
     // Global number tracking the current number of eras that have passed. Incremented each time
     // a bucket is cleared.
-    Era currentEra;
+    Era currentEra = 0;
 
     // Mapping of era to counts of how many buckets are associated with that era.
     std::map<Era, uint64_t> bucketsPerEra;
@@ -133,6 +131,6 @@ boost::optional<BucketState> changeBucketState(BucketStateRegistry& registry,
 /**
  * Appends statistics for observability.
  */
-void appendStats(const BucketStateRegistry& registry, BSONObjBuilder* builder);
+void appendStats(const BucketStateRegistry& registry, BSONObjBuilder& builder);
 
 }  // namespace mongo::timeseries::bucket_catalog

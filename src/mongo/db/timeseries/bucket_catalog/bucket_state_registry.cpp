@@ -70,7 +70,7 @@ void incrementEraCountHelper(BucketStateRegistry& registry, BucketStateRegistry:
     }
 }
 
-bool isMemberOfClearedSet(BucketStateRegistry& registry, WithLock catalogLock, Bucket* bucket) {
+bool isMemberOfClearedSet(BucketStateRegistry& registry, WithLock lock, Bucket* bucket) {
     for (auto it = registry.clearedSets.lower_bound(bucket->lastChecked + 1);
          it != registry.clearedSets.end();
          ++it) {
@@ -89,7 +89,7 @@ bool isMemberOfClearedSet(BucketStateRegistry& registry, WithLock catalogLock, B
 
 boost::optional<BucketState> changeBucketStateHelper(
     BucketStateRegistry& registry,
-    WithLock catalogLock,
+    WithLock lock,
     const BucketId& bucketId,
     const BucketStateRegistry::StateChangeFn& change) {
     auto it = registry.bucketStates.find(bucketId);
@@ -138,11 +138,11 @@ boost::optional<BucketState> changeBucketStateHelper(
 }
 
 boost::optional<BucketState> markIndividualBucketCleared(BucketStateRegistry& registry,
-                                                         WithLock catalogLock,
+                                                         WithLock lock,
                                                          const BucketId& bucketId) {
     return changeBucketStateHelper(
         registry,
-        catalogLock,
+        lock,
         bucketId,
         [](boost::optional<BucketState> input, std::uint64_t) -> boost::optional<BucketState> {
             if (!input.has_value()) {
@@ -153,27 +153,25 @@ boost::optional<BucketState> markIndividualBucketCleared(BucketStateRegistry& re
 }
 }  // namespace
 
-BucketStateRegistry::BucketStateRegistry(Mutex& m) : catalogMutex(m), currentEra(0) {}
-
 BucketStateRegistry::Era getCurrentEra(const BucketStateRegistry& registry) {
-    stdx::lock_guard lk{registry.catalogMutex};
+    stdx::lock_guard lk{registry.mutex};
     return registry.currentEra;
 }
 
 BucketStateRegistry::Era getCurrentEraAndIncrementBucketCount(BucketStateRegistry& registry) {
-    stdx::lock_guard lk{registry.catalogMutex};
+    stdx::lock_guard lk{registry.mutex};
     incrementEraCountHelper(registry, registry.currentEra);
     return registry.currentEra;
 }
 
 void decrementBucketCountForEra(BucketStateRegistry& registry, BucketStateRegistry::Era value) {
-    stdx::lock_guard lk{registry.catalogMutex};
+    stdx::lock_guard lk{registry.mutex};
     decrementEraCountHelper(registry, value);
 }
 
 BucketStateRegistry::Era getBucketCountForEra(BucketStateRegistry& registry,
                                               BucketStateRegistry::Era value) {
-    stdx::lock_guard lk{registry.catalogMutex};
+    stdx::lock_guard lk{registry.mutex};
     auto it = registry.bucketsPerEra.find(value);
     if (it == registry.bucketsPerEra.end()) {
         return 0;
@@ -184,17 +182,17 @@ BucketStateRegistry::Era getBucketCountForEra(BucketStateRegistry& registry,
 
 void clearSetOfBuckets(BucketStateRegistry& registry,
                        BucketStateRegistry::ShouldClearFn&& shouldClear) {
-    stdx::lock_guard lk{registry.catalogMutex};
+    stdx::lock_guard lk{registry.mutex};
     registry.clearedSets[++registry.currentEra] = std::move(shouldClear);
 }
 
 std::uint64_t getClearedSetsCount(const BucketStateRegistry& registry) {
-    stdx::lock_guard lk{registry.catalogMutex};
+    stdx::lock_guard lk{registry.mutex};
     return registry.clearedSets.size();
 }
 
 boost::optional<BucketState> getBucketState(BucketStateRegistry& registry, Bucket* bucket) {
-    stdx::lock_guard catalogLock{registry.catalogMutex};
+    stdx::lock_guard catalogLock{registry.mutex};
     // If the bucket has been cleared, we will set the bucket state accordingly to reflect that.
     if (isMemberOfClearedSet(registry, catalogLock, bucket)) {
         return markIndividualBucketCleared(registry, catalogLock, bucket->bucketId);
@@ -205,7 +203,7 @@ boost::optional<BucketState> getBucketState(BucketStateRegistry& registry, Bucke
 
 boost::optional<BucketState> getBucketState(const BucketStateRegistry& registry,
                                             const BucketId& bucketId) {
-    stdx::lock_guard catalogLock{registry.catalogMutex};
+    stdx::lock_guard catalogLock{registry.mutex};
     auto it = registry.bucketStates.find(bucketId);
     return it != registry.bucketStates.end() ? boost::make_optional(it->second) : boost::none;
 }
@@ -213,7 +211,7 @@ boost::optional<BucketState> getBucketState(const BucketStateRegistry& registry,
 boost::optional<BucketState> changeBucketState(BucketStateRegistry& registry,
                                                Bucket* bucket,
                                                const BucketStateRegistry::StateChangeFn& change) {
-    stdx::lock_guard catalogLock{registry.catalogMutex};
+    stdx::lock_guard catalogLock{registry.mutex};
     if (isMemberOfClearedSet(registry, catalogLock, bucket)) {
         return markIndividualBucketCleared(registry, catalogLock, bucket->bucketId);
     }
@@ -224,14 +222,14 @@ boost::optional<BucketState> changeBucketState(BucketStateRegistry& registry,
 boost::optional<BucketState> changeBucketState(BucketStateRegistry& registry,
                                                const BucketId& bucketId,
                                                const BucketStateRegistry::StateChangeFn& change) {
-    stdx::lock_guard catalogLock{registry.catalogMutex};
+    stdx::lock_guard catalogLock{registry.mutex};
     return changeBucketStateHelper(registry, catalogLock, bucketId, change);
 }
 
-void appendStats(const BucketStateRegistry& registry, BSONObjBuilder* base) {
-    stdx::lock_guard catalogLock{registry.catalogMutex};
+void appendStats(const BucketStateRegistry& registry, BSONObjBuilder& base) {
+    stdx::lock_guard catalogLock{registry.mutex};
 
-    BSONObjBuilder builder{base->subobjStart("stateManagement")};
+    BSONObjBuilder builder{base.subobjStart("stateManagement")};
 
     builder.appendNumber("bucketsManaged", static_cast<long long>(registry.bucketStates.size()));
     builder.appendNumber("currentEra", static_cast<long long>(registry.currentEra));

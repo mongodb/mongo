@@ -1905,12 +1905,12 @@ boost::optional<std::pair<Status, bool>> checkFailUnorderedTimeseriesInsertFailP
     return boost::none;
 }
 
-timeseries::bucket_catalog::BucketCatalog::CombineWithInsertsFromOtherClients
+timeseries::bucket_catalog::CombineWithInsertsFromOtherClients
 canCombineTimeseriesInsertWithOtherClients(OperationContext* opCtx,
                                            const write_ops::InsertCommandRequest& request) {
     return isTimeseriesWriteRetryable(opCtx) || request.getOrdered()
-        ? timeseries::bucket_catalog::BucketCatalog::CombineWithInsertsFromOtherClients::kDisallow
-        : timeseries::bucket_catalog::BucketCatalog::CombineWithInsertsFromOtherClients::kAllow;
+        ? timeseries::bucket_catalog::CombineWithInsertsFromOtherClients::kDisallow
+        : timeseries::bucket_catalog::CombineWithInsertsFromOtherClients::kAllow;
 }
 
 TimeseriesSingleWriteResult getTimeseriesSingleWriteResult(
@@ -2132,8 +2132,8 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
                             const write_ops::InsertCommandRequest& request) try {
     auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
 
-    auto metadata = bucketCatalog.getMetadata(batch->bucketHandle);
-    auto status = bucketCatalog.prepareCommit(batch);
+    auto metadata = getMetadata(bucketCatalog, batch->bucketHandle);
+    auto status = prepareCommit(bucketCatalog, batch);
     if (!status.isOK()) {
         invariant(timeseries::bucket_catalog::isWriteBatchFinished(*batch));
         docsToRetry->push_back(index);
@@ -2150,7 +2150,7 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
         if (auto error = write_ops_exec::generateError(
                 opCtx, output.result.getStatus(), start + index, errors->size())) {
             errors->emplace_back(std::move(*error));
-            bucketCatalog.abort(batch, output.result.getStatus());
+            abort(bucketCatalog, batch, output.result.getStatus());
             return output.canContinue;
         }
 
@@ -2166,18 +2166,18 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
 
         if ((output.result.isOK() && output.result.getValue().getNModified() != 1) ||
             output.result.getStatus().code() == ErrorCodes::WriteConflict) {
-            bucketCatalog.abort(
-                batch,
-                output.result.isOK()
-                    ? Status{ErrorCodes::WriteConflict, "Could not update non-existent bucket"}
-                    : output.result.getStatus());
+            abort(bucketCatalog,
+                  batch,
+                  output.result.isOK()
+                      ? Status{ErrorCodes::WriteConflict, "Could not update non-existent bucket"}
+                      : output.result.getStatus());
             docsToRetry->push_back(index);
             opCtx->recoveryUnit()->abandonSnapshot();
             return true;
         } else if (auto error = write_ops_exec::generateError(
                        opCtx, output.result.getStatus(), start + index, errors->size())) {
             errors->emplace_back(std::move(*error));
-            bucketCatalog.abort(batch, output.result.getStatus());
+            abort(bucketCatalog, batch, output.result.getStatus());
             return output.canContinue;
         }
     }
@@ -2185,7 +2185,7 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
     getOpTimeAndElectionId(opCtx, opTime, electionId);
 
     auto closedBucket =
-        bucketCatalog.finish(batch, timeseries::bucket_catalog::CommitInfo{*opTime, *electionId});
+        finish(bucketCatalog, batch, timeseries::bucket_catalog::CommitInfo{*opTime, *electionId});
 
     if (closedBucket) {
         // If this write closed a bucket, compress the bucket
@@ -2198,7 +2198,8 @@ bool commitTimeseriesBucket(OperationContext* opCtx,
     }
     return true;
 } catch (const DBException& ex) {
-    timeseries::bucket_catalog::BucketCatalog::get(opCtx).abort(batch, ex.toStatus());
+    auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
+    abort(bucketCatalog, batch, ex.toStatus());
     throw;
 }
 
@@ -2234,7 +2235,7 @@ TimeseriesAtomicWriteResult commitTimeseriesBucketsAtomically(
     ScopeGuard batchGuard{[&] {
         for (auto batch : batchesToCommit) {
             if (batch.get()) {
-                bucketCatalog.abort(batch, abortStatus);
+                abort(bucketCatalog, batch, abortStatus);
             }
         }
     }};
@@ -2244,8 +2245,8 @@ TimeseriesAtomicWriteResult commitTimeseriesBucketsAtomically(
         std::vector<write_ops::UpdateCommandRequest> updateOps;
 
         for (auto batch : batchesToCommit) {
-            auto metadata = bucketCatalog.getMetadata(batch.get()->bucketHandle);
-            auto prepareCommitStatus = bucketCatalog.prepareCommit(batch);
+            auto metadata = getMetadata(bucketCatalog, batch.get()->bucketHandle);
+            auto prepareCommitStatus = prepareCommit(bucketCatalog, batch);
             if (!prepareCommitStatus.isOK()) {
                 abortStatus = prepareCommitStatus;
                 return TimeseriesAtomicWriteResult::kContinuableError;
@@ -2288,8 +2289,8 @@ TimeseriesAtomicWriteResult commitTimeseriesBucketsAtomically(
 
         bool compressClosedBuckets = true;
         for (auto batch : batchesToCommit) {
-            auto closedBucket = bucketCatalog.finish(
-                batch, timeseries::bucket_catalog::CommitInfo{*opTime, *electionId});
+            auto closedBucket = finish(
+                bucketCatalog, batch, timeseries::bucket_catalog::CommitInfo{*opTime, *electionId});
             batch.get().reset();
 
             if (!closedBucket || !compressClosedBuckets) {
@@ -2436,13 +2437,14 @@ insertIntoBucketCatalog(OperationContext* opCtx,
             : ns(request);
         auto& measurementDoc = request.getDocuments()[start + index];
 
-        StatusWith<timeseries::bucket_catalog::BucketCatalog::InsertResult> swResult =
+        StatusWith<timeseries::bucket_catalog::InsertResult> swResult =
             Status{ErrorCodes::BadValue, "Uninitialized InsertResult"};
         do {
             if (feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
                     serverGlobalParams.featureCompatibility)) {
-                swResult = bucketCatalog.tryInsert(
+                swResult = timeseries::bucket_catalog::tryInsert(
                     opCtx,
+                    bucketCatalog,
                     viewNs,
                     bucketsColl->getDefaultCollator(),
                     timeSeriesOptions,
@@ -2506,8 +2508,9 @@ insertIntoBucketCatalog(OperationContext* opCtx,
                             bucketFindResult.bucketToReopen = std::move(bucketToReopen);
                         }
 
-                        swResult = bucketCatalog.insert(
+                        swResult = timeseries::bucket_catalog::insert(
                             opCtx,
+                            bucketCatalog,
                             viewNs,
                             bucketsColl->getDefaultCollator(),
                             timeSeriesOptions,
@@ -2518,14 +2521,15 @@ insertIntoBucketCatalog(OperationContext* opCtx,
                 }
             } else {
                 timeseries::bucket_catalog::BucketFindResult bucketFindResult;
-                swResult =
-                    bucketCatalog.insert(opCtx,
-                                         viewNs,
-                                         bucketsColl->getDefaultCollator(),
-                                         timeSeriesOptions,
-                                         measurementDoc,
-                                         canCombineTimeseriesInsertWithOtherClients(opCtx, request),
-                                         bucketFindResult);
+                swResult = timeseries::bucket_catalog::insert(
+                    opCtx,
+                    bucketCatalog,
+                    viewNs,
+                    bucketsColl->getDefaultCollator(),
+                    timeSeriesOptions,
+                    measurementDoc,
+                    canCombineTimeseriesInsertWithOtherClients(opCtx, request),
+                    bucketFindResult);
             }
 
             // If there is an era offset (between the bucket we want to reopen and the
@@ -2608,8 +2612,8 @@ void getTimeseriesBatchResults(OperationContext* opCtx,
         // error.
         if (itr > indexOfLastProcessedBatch &&
             timeseries::bucket_catalog::claimWriteBatchCommitRights(*batch)) {
-            timeseries::bucket_catalog::BucketCatalog::get(opCtx).abort(batch,
-                                                                        lastError->getStatus());
+            auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
+            abort(bucketCatalog, batch, lastError->getStatus());
             errors->emplace_back(start + index, lastError->getStatus());
             continue;
         }

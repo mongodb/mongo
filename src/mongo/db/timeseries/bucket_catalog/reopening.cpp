@@ -29,9 +29,21 @@
 
 #include "mongo/db/timeseries/bucket_catalog/reopening.h"
 
+#include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
+
 namespace mongo::timeseries::bucket_catalog {
 
 ArchivedBucket::ArchivedBucket(const BucketId& b, const std::string& t)
     : bucketId{b}, timeField{t} {}
+
+long long marginalMemoryUsageForArchivedBucket(const ArchivedBucket& bucket,
+                                               bool onlyEntryForMatchingMetaHash) {
+    return sizeof(Date_t) +        // key in set of archived buckets for meta hash
+        sizeof(ArchivedBucket) +   // main data for archived bucket
+        bucket.timeField.size() +  // allocated space for timeField string, ignoring SSO
+        (onlyEntryForMatchingMetaHash ? sizeof(std::size_t) +           // key in set (meta hash)
+                 sizeof(decltype(Stripe::archivedBuckets)::value_type)  // set container
+                                      : 0);
+}
 
 }  // namespace mongo::timeseries::bucket_catalog

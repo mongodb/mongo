@@ -31,6 +31,7 @@
 
 #include <memory>
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/platform/atomic_word.h"
 
 namespace mongo::timeseries::bucket_catalog {
@@ -99,5 +100,7 @@ private:
     std::shared_ptr<ExecutionStats> _collectionStats;
     ExecutionStats& _globalStats;
 };
+
+void appendExecutionStatsToBuilder(const ExecutionStats& stats, BSONObjBuilder& builder);
 
 }  // namespace mongo::timeseries::bucket_catalog

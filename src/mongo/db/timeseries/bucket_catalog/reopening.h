@@ -79,4 +79,14 @@ struct ArchivedBucket {
     std::string timeField;
 };
 
+/**
+ * Calculates the marginal memory usage for an archived bucket. The 'onlyEntryForMatchingMetaHash'
+ * parameter indicates that the bucket will be (if inserting) or was (if removing) the only bucket
+ * associated with it's meta hash value. If true, then the returned value will attempt to account
+ * for the overhead of the map data structure for the meta hash value.
+ */
+long long marginalMemoryUsageForArchivedBucket(const ArchivedBucket& bucket,
+                                               bool onlyEntryForMatchingMetaHash);
+
+
 }  // namespace mongo::timeseries::bucket_catalog

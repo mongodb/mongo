@@ -1319,7 +1319,8 @@ void OpObserverImpl::onDropDatabase(OperationContext* opCtx, const DatabaseName&
         mongoDSessionCatalog->invalidateAllSessions(opCtx);
     }
 
-    timeseries::bucket_catalog::BucketCatalog::get(opCtx).clear(dbName.db());
+    auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
+    clear(bucketCatalog, dbName.db());
 }
 
 repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
@@ -1388,8 +1389,8 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
     } else if (collectionName == NamespaceString::kConfigSettingsNamespace) {
         ReadWriteConcernDefaults::get(opCtx).invalidate();
     } else if (collectionName.isTimeseriesBucketsCollection()) {
-        timeseries::bucket_catalog::BucketCatalog::get(opCtx).clear(
-            collectionName.getTimeseriesViewNamespace());
+        auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
+        clear(bucketCatalog, collectionName.getTimeseriesViewNamespace());
     } else if (collectionName.isSystemDotJavascript()) {
         // Inform the JavaScript engine of the change to system.js.
         Scope::storedFuncMod(opCtx);
@@ -2270,10 +2271,10 @@ void OpObserverImpl::_onReplicationRollback(OperationContext* opCtx,
             timeseriesNamespaces.insert(ns.getTimeseriesViewNamespace());
         }
     }
-    timeseries::bucket_catalog::BucketCatalog::get(opCtx).clear(
-        [timeseriesNamespaces = std::move(timeseriesNamespaces)](const NamespaceString& bucketNs) {
-            return timeseriesNamespaces.contains(bucketNs);
-        });
+    auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
+    clear(bucketCatalog,
+          [timeseriesNamespaces = std::move(timeseriesNamespaces)](
+              const NamespaceString& bucketNs) { return timeseriesNamespaces.contains(bucketNs); });
 }
 
 }  // namespace mongo
