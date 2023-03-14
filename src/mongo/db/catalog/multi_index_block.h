@@ -78,6 +78,8 @@ class MultiIndexBlock {
     MultiIndexBlock& operator=(const MultiIndexBlock&) = delete;
 
 public:
+    using RetrySkippedRecordMode = IndexBuildInterceptor::RetrySkippedRecordMode;
+
     MultiIndexBlock() = default;
     ~MultiIndexBlock();
 
@@ -207,16 +209,22 @@ public:
 
 
     /**
-     * Retries key generation and insertion for all records skipped during the collection scanning
-     * phase.
+     * By default, retries key generation and insertion for all records skipped during the
+     * collection scanning phase.
      *
      * Index builds ignore key generation errors on secondaries. In steady-state replication, all
      * writes from the primary are eventually applied, so an index build should always succeed when
      * the primary commits. In two-phase index builds, a secondary may become primary in the middle
      * of an index build, so it must ensure that before it finishes, it has indexed all documents in
      * a collection, requiring a call to this function upon completion.
+     *
+     * When featureFlagIndexBuildsGracefulErrorHandling is enagled, the function is also called to
+     * preemptively abort index builds on step-up if the skipped records remain invalid.
      */
-    Status retrySkippedRecords(OperationContext* opCtx, const CollectionPtr& collection);
+    Status retrySkippedRecords(
+        OperationContext* opCtx,
+        const CollectionPtr& collection,
+        RetrySkippedRecordMode mode = RetrySkippedRecordMode::kKeyGenerationAndInsertion);
 
     /**
      * Check any constraits that may have been temporarily violated during the index build for

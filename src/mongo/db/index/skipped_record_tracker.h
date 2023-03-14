@@ -46,6 +46,14 @@ class SkippedRecordTracker {
     SkippedRecordTracker(const SkippedRecordTracker&) = delete;
 
 public:
+    enum class RetrySkippedRecordMode {
+        // Retry key generation but do not update the index or remove the records from the tracker.
+        kKeyGeneration,
+        // Retry key generation and update the index with the new keys, removing the retried records
+        // from the tracker.
+        kKeyGenerationAndInsertion
+    };
+
     explicit SkippedRecordTracker(const IndexCatalogEntry* indexCatalogEntry);
     SkippedRecordTracker(OperationContext* opCtx,
                          const IndexCatalogEntry* indexCatalogEntry,
@@ -70,10 +78,15 @@ public:
     bool areAllRecordsApplied(OperationContext* opCtx) const;
 
     /**
-     * Attempts to generates keys for each skipped record and insert into the index. Returns OK if
-     * all records were either indexed or no longer exist.
+     * By default, attempts to generate keys for each skipped record and insert into the index.
+     * Returns OK if all records were either indexed or no longer exist.
+     *
+     * The behaviour can be modified by specifying a RetrySkippedRecordMode.
      */
-    Status retrySkippedRecords(OperationContext* opCtx, const CollectionPtr& collection);
+    Status retrySkippedRecords(
+        OperationContext* opCtx,
+        const CollectionPtr& collection,
+        RetrySkippedRecordMode mode = RetrySkippedRecordMode::kKeyGenerationAndInsertion);
 
     boost::optional<std::string> getTableIdent() const {
         return _skippedRecordsTable ? boost::make_optional(_skippedRecordsTable->rs()->getIdent())

@@ -936,14 +936,15 @@ Status MultiIndexBlock::drainBackgroundWrites(
 }
 
 Status MultiIndexBlock::retrySkippedRecords(OperationContext* opCtx,
-                                            const CollectionPtr& collection) {
+                                            const CollectionPtr& collection,
+                                            RetrySkippedRecordMode mode) {
     invariant(!_buildIsCleanedUp);
     for (auto&& index : _indexes) {
         auto interceptor = index.block->getEntry(opCtx, collection)->indexBuildInterceptor();
         if (!interceptor)
             continue;
 
-        auto status = interceptor->retrySkippedRecords(opCtx, collection);
+        auto status = interceptor->retrySkippedRecords(opCtx, collection, mode);
         if (!status.isOK()) {
             return status;
         }

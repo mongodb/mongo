@@ -50,6 +50,8 @@ class OperationContext;
 
 class IndexBuildInterceptor {
 public:
+    using RetrySkippedRecordMode = SkippedRecordTracker::RetrySkippedRecordMode;
+
     /**
      * Determines if we will yield locks while draining the side tables.
      */
@@ -153,11 +155,16 @@ public:
     }
 
     /**
-     * Tries to index previously skipped records. For each record, if the new indexing attempt is
-     * successful, keys are written directly to the index. Unsuccessful key generation or writes
-     * will return errors.
+     * By default, tries to generate keys and insert previously skipped records in the index. For
+     * each record, if the new indexing attempt is successful, keys are written directly to the
+     * index. Unsuccessful key generation or writes will return errors.
+     *
+     * The behaviour can be modified by specifying a RetrySkippedRecordMode.
      */
-    Status retrySkippedRecords(OperationContext* opCtx, const CollectionPtr& collection);
+    Status retrySkippedRecords(
+        OperationContext* opCtx,
+        const CollectionPtr& collection,
+        RetrySkippedRecordMode mode = RetrySkippedRecordMode::kKeyGenerationAndInsertion);
 
     /**
      * Returns whether there are no visible records remaining to be applied from the side writes

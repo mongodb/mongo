@@ -541,8 +541,9 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
 }
 
 Status IndexBuildInterceptor::retrySkippedRecords(OperationContext* opCtx,
-                                                  const CollectionPtr& collection) {
-    return _skippedRecordTracker.retrySkippedRecords(opCtx, collection);
+                                                  const CollectionPtr& collection,
+                                                  RetrySkippedRecordMode mode) {
+    return _skippedRecordTracker.retrySkippedRecords(opCtx, collection, mode);
 }
 
 void IndexBuildInterceptor::_checkDrainPhaseFailPoint(OperationContext* opCtx,

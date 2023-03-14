@@ -29,6 +29,8 @@
 
 #include "mongo/db/index_builds_coordinator.h"
 
+#include "mongo/db/catalog/index_builds_manager.h"
+#include "mongo/util/future.h"
 #include <boost/filesystem/operations.hpp>
 #include <boost/iterator/transform_iterator.hpp>
 #include <fmt/format.h>
@@ -1617,6 +1619,86 @@ void IndexBuildsCoordinator::onStepUp(OperationContext* opCtx) {
         }
     };
     forEachIndexBuild(indexBuilds, "IndexBuildsCoordinator::onStepUp"_sd, onIndexBuild);
+
+    if (_stepUpThread.joinable()) {
+        // Under normal circumstances this should not result in a wait. The thread's opCtx should
+        // be interrupted on replication state change, or finish while being primary. If this
+        // results in a wait, it means the thread which started in the previous stepUp did not yet
+        // exit. It should eventually exit.
+        _stepUpThread.join();
+    }
+
+    PromiseAndFuture<void> promiseAndFuture;
+    _stepUpThread = stdx::thread([this, &promiseAndFuture] {
+        Client::initThread("IndexBuildsCoordinator-StepUp");
+
+        auto threadCtx = Client::getCurrent()->makeOperationContext();
+        threadCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+        promiseAndFuture.promise.emplaceValue();
+
+        _onStepUpAsyncTaskFn(threadCtx.get());
+        return;
+    });
+
+    // Wait until the async thread has started and marked its opCtx to always be interrupted at
+    // step-down. We ensure the RSTL is taken and no interrupts are lost.
+    promiseAndFuture.future.wait(opCtx);
+}
+
+void IndexBuildsCoordinator::_onStepUpAsyncTaskFn(OperationContext* opCtx) {
+    auto indexBuilds = _getIndexBuilds();
+    const auto retrySkippedRecords = [this, opCtx](
+                                         const std::shared_ptr<ReplIndexBuildState>& replState) {
+        if (replState->protocol == IndexBuildProtocol::kTwoPhase) {
+            try {
+                // We don't need to check if we are primary because the opCtx is interrupted at
+                // stepdown, so it is guaranteed that if taking the locks succeeds, we are primary.
+                // Take an intent lock, the actual index build should keep running in parallel.
+                const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
+                AutoGetCollection autoColl(opCtx, dbAndUUID, MODE_IX);
+
+                // The index build might have committed or aborted while looping and not holding the
+                // collection lock. Re-check it is still active after taking locks.
+                auto indexBuilds = activeIndexBuilds.filterIndexBuilds(
+                    [&replState](const ReplIndexBuildState& filterState) {
+                        return filterState.buildUUID == replState->buildUUID;
+                    });
+
+                if (indexBuilds.empty()) {
+                    return;
+                }
+
+                // Only checks if key generation is valid, does not actually insert.
+                uassertStatusOK(_indexBuildsManager.retrySkippedRecords(
+                    opCtx,
+                    replState->buildUUID,
+                    autoColl.getCollection(),
+                    IndexBuildsManager::RetrySkippedRecordMode::kKeyGeneration));
+
+            } catch (const DBException& ex) {
+                // Shutdown or replication state change might happen while iterating the index
+                // builds. In both cases, the opCtx is interrupted, in which case we want to stop
+                // the verification process and exit. This might also be the case for a killOp.
+                opCtx->checkForInterrupt();
+
+                // All other errors must be due to key generation. We can abort the build early as
+                // it would eventually fail anyways during the commit phase retry.
+                auto status = ex.toStatus().withContext("Skipped records retry failed on step-up");
+                abortIndexBuildByBuildUUID(
+                    opCtx, replState->buildUUID, IndexBuildAction::kPrimaryAbort, status.reason());
+            }
+        }
+    };
+
+    try {
+        forEachIndexBuild(
+            indexBuilds, "IndexBuildsCoordinator::_onStepUpAsyncTaskFn"_sd, retrySkippedRecords);
+    } catch (const DBException& ex) {
+        LOGV2_DEBUG(7333100,
+                    1,
+                    "Step-up retry of skipped records for all index builds interrupted",
+                    "exception"_attr = ex);
+    }
 }
 
 IndexBuilds IndexBuildsCoordinator::stopIndexBuildsForRollback(OperationContext* opCtx) {

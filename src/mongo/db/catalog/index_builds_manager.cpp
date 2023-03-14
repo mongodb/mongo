@@ -311,9 +311,10 @@ Status IndexBuildsManager::drainBackgroundWrites(
 
 Status IndexBuildsManager::retrySkippedRecords(OperationContext* opCtx,
                                                const UUID& buildUUID,
-                                               const CollectionPtr& collection) {
+                                               const CollectionPtr& collection,
+                                               RetrySkippedRecordMode mode) {
     auto builder = invariant(_getBuilder(buildUUID));
-    return builder->retrySkippedRecords(opCtx, collection);
+    return builder->retrySkippedRecords(opCtx, collection, mode);
 }
 
 Status IndexBuildsManager::checkIndexConstraintViolations(OperationContext* opCtx,

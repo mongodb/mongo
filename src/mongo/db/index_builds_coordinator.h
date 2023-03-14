@@ -890,6 +890,12 @@ protected:
                                                     const Timestamp& commitIndexBuildTimestamp);
 
     /**
+     * Function to be run in the asynchronous task launched onStepUp to check if there are any index
+     * builds that can be aborted because it has skipped records.
+     */
+    void _onStepUpAsyncTaskFn(OperationContext* opCtx);
+
+    /**
      * Runs the index build.
      * Rebuilding an index in recovery mode verifies each document to ensure that it is a valid
      * BSON object. If repair is kYes, it will remove any documents with invalid BSON.
@@ -925,6 +931,9 @@ protected:
     // Maintains data structures relating to activeIndexBuilds. Thread safe, unless a specific
     // function specifies otherwise.
     ActiveIndexBuilds activeIndexBuilds;
+
+    // The thread spawned during step-up to verify the builds.
+    stdx::thread _stepUpThread;
 };
 
 // These fail points are used to control index build progress. Declared here to be shared

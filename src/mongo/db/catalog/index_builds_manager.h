@@ -60,6 +60,8 @@ class IndexBuildsManager {
     IndexBuildsManager& operator=(const IndexBuildsManager&) = delete;
 
 public:
+    using RetrySkippedRecordMode = MultiIndexBlock::RetrySkippedRecordMode;
+
     /**
      * Indicates whether or not to ignore indexing constraints.
      */
@@ -131,12 +133,14 @@ public:
                                  IndexBuildInterceptor::DrainYieldPolicy drainYieldPolicy);
 
     /**
-     * Retries the key generation and insertion of records that were skipped during the scanning
-     * phase due to error suppression.
+     * By default, retries the key generation and insertion of records that were skipped during the
+     * scanning phase due to error suppression.
      */
-    Status retrySkippedRecords(OperationContext* opCtx,
-                               const UUID& buildUUID,
-                               const CollectionPtr& collection);
+    Status retrySkippedRecords(
+        OperationContext* opCtx,
+        const UUID& buildUUID,
+        const CollectionPtr& collection,
+        RetrySkippedRecordMode mode = RetrySkippedRecordMode::kKeyGenerationAndInsertion);
 
     /**
      * Runs the index constraint violation checking phase of the index build..
