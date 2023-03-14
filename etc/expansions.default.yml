@@ -35,7 +35,7 @@ ext: tgz
 compiling_for_test: "false"
 install_directory: /data/mongo-install-directory
 num_scons_link_jobs_available: "0.25"
-num_scons_unit_cc_jobs_available: "0.5"
+num_scons_unit_cc_jobs_available: "0.75"
 scons_cache_mode: nolinked
 show_scons_timings: "true"
 separate_debug: "on"

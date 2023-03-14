@@ -52,7 +52,7 @@ else
   extra_args="$extra_args --release"
 fi
 
-extra_args="$extra_args SPLIT_DWARF=0 GDB_INDEX=0"
+extra_args="$extra_args SPLIT_DWARF=0 GDB_INDEX=0 ENABLE_OOM_RETRY=1"
 
 if [ "${generating_for_ninja}" = "true" ] && [ "Windows_NT" = "$OS" ]; then
   vcvars="$(vswhere -latest -property installationPath | tr '\\' '/' | dos2unix.exe)/VC/Auxiliary/Build/"

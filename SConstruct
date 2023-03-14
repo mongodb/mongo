@@ -1424,6 +1424,14 @@ env_vars.Add(
 )
 
 env_vars.Add(
+    'ENABLE_OOM_RETRY',
+    help=
+    'Set the boolean (auto, on/off true/false 1/0) to enable retrying a compile or link commands from "out of memory" failures.',
+    converter=functools.partial(bool_var_converter, var='ENABLE_OOM_RETRY'),
+    default="False",
+)
+
+env_vars.Add(
     'TAPI',
     help="Configures the path to the 'tapi' (an Xcode) utility",
 )
@@ -1968,6 +1976,30 @@ env.AddMethod(is_toolchain, 'ToolchainIs')
 releaseBuild = has_option("release")
 debugBuild = get_option('dbg') == "on"
 optBuild = mongo_generators.get_opt_options(env)
+
+if env.get('ENABLE_OOM_RETRY'):
+    if get_option('ninja') != 'disabled':
+        print('ENABLE_OOM_RETRY not compatible with ninja, disabling ENABLE_OOM_RETRY.')
+    else:
+        env['OOM_RETRY_ATTEMPTS'] = 10
+        env['OOM_RETRY_MAX_DELAY_SECONDS'] = 120
+
+        if env.ToolchainIs('clang', 'gcc'):
+            env['OOM_RETRY_MESSAGES'] = [
+                ': out of memory',
+                'virtual memory exhausted: Cannot allocate memory',
+                ': fatal error: Killed signal terminated program cc1',
+            ]
+        elif env.ToolchainIs('msvc'):
+            env['OOM_RETRY_MESSAGES'] = [
+                'LNK1102: out of memory',
+                'C1060: compiler is out of heap space',
+                'LNK1171: unable to load mspdbcore.dll',
+                "LNK1201: error writing to program database ''",
+            ]
+            env['OOM_RETRY_RETURNCODES'] = [1102]
+
+        env.Tool('oom_auto_retry')
 
 if env.ToolchainIs('clang'):
     # LLVM utilizes the stack extensively without optimization enabled, which
