@@ -294,6 +294,15 @@ public:
             // On destruction, we must always handle freeing the underlying raw WT_CURSOR pointer.
             _saveStorageCursorOnDetachFromOperationContext = false;
 
+            // Shutdown does not wait for any threads running queries to be interrupted and exit.
+            // In addition, the RandomCursor destructor doesn't hold any global lock so we need to
+            // check if the server is shutting down to avoid calling into the storage engine, whose
+            // connection may have already been closed.
+            Status interruptStatus = _opCtx->checkForInterruptNoAssert();
+            if (interruptStatus.code() == ErrorCodes::InterruptedAtShutdown) {
+                return;
+            }
+
             detachFromOperationContext();
         }
     }
