@@ -99,6 +99,7 @@ executor:
     hooks:
       - CheckReplDBHashInBackground
       - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
       - ValidateCollections
     tests: true
   config:
@@ -111,6 +112,7 @@ executor:
   hooks:
   - class: CheckReplDBHashInBackground
   - class: CheckReplDBHash
+  - class: CheckMetadataConsistencyInBackground
   - class: CheckOrphansDeleted
   - class: CheckRoutingTableConsistency
   - class: CheckShardFilteringMetadata

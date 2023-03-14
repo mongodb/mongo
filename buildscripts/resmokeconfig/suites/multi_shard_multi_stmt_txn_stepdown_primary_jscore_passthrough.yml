@@ -347,6 +347,8 @@ executor:
     hooks:
       - CheckReplDBHash
       - CheckReplOplogs
+      # TODO (SERVER-74721): Enable when this will work with kill primary and stepdown suites.
+      # - CheckMetadataConsistencyInBackground
       - ValidateCollections
   config:
     shell_options:
@@ -390,6 +392,8 @@ executor:
   # validating the entire contents of the collection.
   - class: CheckReplOplogs
   - class: CheckReplDBHash
+  # TODO (SERVER-74721): Enable when this will work with kill primary and stepdown suites.
+  # - class: CheckMetadataConsistencyInBackground
   - class: ValidateCollections
   - class: CleanEveryN
     n: 20

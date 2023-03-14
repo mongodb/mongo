@@ -211,6 +211,7 @@ executor:
   archive:
     hooks:
       - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
       - ValidateCollections
     tests: true
   config:
@@ -234,6 +235,7 @@ executor:
     use_action_permitted_file: true
     sync_interval_secs: 15
   - class: CheckReplDBHash
+  - class: CheckMetadataConsistencyInBackground
   - class: CheckOrphansDeleted
   - class: CheckRoutingTableConsistency
   - class: CheckShardFilteringMetadata

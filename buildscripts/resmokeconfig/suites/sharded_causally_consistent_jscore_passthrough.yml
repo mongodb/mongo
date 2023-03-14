@@ -79,6 +79,7 @@ executor:
     hooks:
       - CheckReplDBHashInBackground
       - CheckReplDBHash
+      - CheckMetadataConsistencyInBackground
       - ValidateCollections
   config:
     shell_options:
@@ -88,6 +89,7 @@ executor:
   hooks:
   - class: CheckReplDBHashInBackground
   - class: CheckReplDBHash
+  - class: CheckMetadataConsistencyInBackground
   - class: ValidateCollections
   - class: CleanEveryN
     n: 20

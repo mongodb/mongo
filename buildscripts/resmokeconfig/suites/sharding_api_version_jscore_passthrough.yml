@@ -82,6 +82,8 @@ executor:
     hooks:
       - CheckReplOplogs
       - CheckReplDBHash
+      # TODO (SERVER-74667): Enable when this will be lock-free.
+      # - CheckMetadataConsistencyInBackground
       - ValidateCollections
   config:
     shell_options:
@@ -94,6 +96,8 @@ executor:
   # validating the entire contents of the collection.
   - class: CheckReplOplogs
   - class: CheckReplDBHash
+  # TODO (SERVER-74667): Enable when this will be lock-free.
+  # - class: CheckMetadataConsistencyInBackground
   - class: ValidateCollections
   - class: CleanEveryN
     n: 20

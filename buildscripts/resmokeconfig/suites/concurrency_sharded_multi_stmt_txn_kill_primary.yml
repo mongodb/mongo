@@ -223,6 +223,8 @@ executor:
   archive:
     hooks:
       - CheckReplDBHash
+      # TODO (SERVER-74721): Enable when this will work with kill primary and stepdown suites.
+      # - CheckMetadataConsistencyInBackground
       - ValidateCollections
     tests: true
   config:
@@ -248,6 +250,8 @@ executor:
     stepdown_interval_ms: 15000
     use_action_permitted_file: true
   - class: CheckReplDBHash
+  # TODO (SERVER-74721): Enable when this will work with kill primary and stepdown suites.
+  # - class: CheckMetadataConsistencyInBackground
   - class: CheckOrphansDeleted
   - class: CheckRoutingTableConsistency
   - class: CheckShardFilteringMetadata
