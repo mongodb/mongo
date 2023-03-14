@@ -302,8 +302,8 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
                     Value(Document{{"collectionOptions", o2Field.getField("collectionOptions_old")},
                                    {"indexOptions", o2Field.getField("indexOptions_old")}});
             } else {
-                // All other commands will invalidate the stream.
-                operationType = DocumentSourceChangeStream::kInvalidateOpType;
+                // We should never see an unknown command.
+                MONGO_UNREACHABLE_TASSERT(6654400);
             }
 
             // Make sure the result doesn't have a document key.
