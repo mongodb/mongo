@@ -1,16 +1,13 @@
 /**
  * Test that the telemetry metrics are aggregated properly by distinct query shape over getMore
  * calls.
+ * @tags: [featureFlagTelemetry]
  */
 load("jstests/libs/feature_flag_util.js");  // For FeatureFlagUtil.
 load("jstests/libs/telemetry_utils.js");    // For verifyMetrics.
 
 (function() {
 "use strict";
-
-if (!FeatureFlagUtil.isEnabled(db, "Telemetry")) {
-    return;
-}
 
 // Turn on the collecting of telemetry metrics.
 let options = {

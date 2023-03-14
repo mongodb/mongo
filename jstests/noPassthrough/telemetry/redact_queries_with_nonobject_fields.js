@@ -1,15 +1,12 @@
 /**
  * Test that telemetry key generation works for queries with non-object fields.
+ * @tags: [featureFlagTelemetry]
  */
 load('jstests/libs/analyze_plan.js');
 load("jstests/libs/feature_flag_util.js");
 
 (function() {
 "use strict";
-
-if (!FeatureFlagUtil.isEnabled(db, "Telemetry")) {
-    return;
-}
 
 // Turn on the collecting of telemetry metrics.
 let options = {
@@ -19,7 +16,7 @@ let options = {
 const conn = MongoRunner.runMongod(options);
 const testDB = conn.getDB('test');
 var collA = testDB[jsTestName()];
-var collB = db[jsTestName() + 'Two'];
+var collB = testDB[jsTestName() + 'Two'];
 collA.drop();
 collB.drop();
 

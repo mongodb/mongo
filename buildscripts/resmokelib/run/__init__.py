@@ -282,7 +282,8 @@ class TestRunner(Subcommand):
 
         suite = self._get_suites()[0]
         if suite.get_description():
-            self._resmoke_logger.info(suite.get_description())
+            self._resmoke_logger.info("'%s' suite description:\n\n%s\n", suite.get_name(),
+                                      suite.get_description())
 
         if suite.is_matrix_suite():
             self._resmoke_logger.info(

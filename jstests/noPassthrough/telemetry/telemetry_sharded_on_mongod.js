@@ -1,6 +1,6 @@
 // Tests that queries from mongos to mongod record telemetry correctly on mongod.
 // Does not test any mongos logic on the telemetry read path.
-// @tags: [requires_sharding, requires_fcv_63]
+// @tags: [featureFlagTelemetry, requires_sharding, requires_fcv_63]
 //
 load('jstests/libs/analyze_plan.js');
 load("jstests/libs/feature_flag_util.js");
@@ -14,12 +14,6 @@ let options = {
 
 const conn = MongoRunner.runMongod(options);
 let db = conn.getDB(jsTestName());
-if (!FeatureFlagUtil.isEnabled(db, "Telemetry")) {
-    jsTestLog("Skipping test as featureFlagTelemetry is not enabled");
-    MongoRunner.stopMongod(conn);
-    return;
-}
-
 let coll = db[jsTestName()];
 coll.drop();
 

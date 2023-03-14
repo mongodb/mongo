@@ -8,20 +8,27 @@ load("jstests/libs/feature_flag_util.js");
 "use strict";
 
 // This test specifically tests error handling when the feature flag is not on.
-if (FeatureFlagUtil.isEnabled(db, "Telemetry")) {
+// TODO SERVER-65800 this test can be removed when the feature flag is removed.
+const conn = MongoRunner.runMongod();
+const testDB = conn.getDB('test');
+if (FeatureFlagUtil.isEnabled(testDB, "Telemetry")) {
+    jsTestLog("Skipping test since telemetry is enabled.");
+    MongoRunner.stopMongod(conn);
     return;
 }
 
 // Pipeline to read telemetry store should fail without feature flag turned on.
 assert.commandFailedWithCode(
-    db.adminCommand({aggregate: 1, pipeline: [{$telemetry: {}}], cursor: {}}),
+    testDB.adminCommand({aggregate: 1, pipeline: [{$telemetry: {}}], cursor: {}}),
     ErrorCodes.QueryFeatureNotAllowed);
 
 // Pipeline, with a filter, to read telemetry store fails without feature flag turned on.
-assert.commandFailedWithCode(db.adminCommand({
+assert.commandFailedWithCode(testDB.adminCommand({
     aggregate: 1,
     pipeline: [{$telemetry: {}}, {$match: {"key.find.find": {$eq: "###"}}}],
     cursor: {}
 }),
                              ErrorCodes.QueryFeatureNotAllowed);
+
+MongoRunner.stopMongod(conn);
 }());

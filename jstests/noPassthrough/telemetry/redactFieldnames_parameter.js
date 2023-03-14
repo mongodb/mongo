@@ -1,16 +1,13 @@
 /**
  * Test that the $telemetry.redactionFieldNames parameter correctly sets the redaction stratgey for
  * telemetry store keys.
+ * @tags: [featureFlagTelemetry]
  */
-load("jstests/libs/feature_flag_util.js");    // For FeatureFlagUtil.
-load("jstests/aggregation/extras/utils.js");  // For assertAdminDBErrCodeAndErrMsgContains.
-
 (function() {
 "use strict";
 
-if (!FeatureFlagUtil.isEnabled(db, "Telemetry")) {
-    return;
-}
+load("jstests/libs/feature_flag_util.js");    // For FeatureFlagUtil.
+load("jstests/aggregation/extras/utils.js");  // For assertAdminDBErrCodeAndErrMsgContains.
 
 // Turn on the collecting of telemetry metrics.
 let options = {

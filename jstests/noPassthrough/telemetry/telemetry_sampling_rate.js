@@ -1,16 +1,13 @@
 /**
  * Test that calls to read from telemetry store fail when sampling rate is not greater than 0 even
  * if feature flag is on.
+ * @tags: [featureFlagTelemetry]
  */
 load('jstests/libs/analyze_plan.js');
 load("jstests/libs/feature_flag_util.js");
 
 (function() {
 "use strict";
-
-if (!FeatureFlagUtil.isEnabled(db, "Telemetry")) {
-    return;
-}
 
 let options = {
     setParameter: {internalQueryConfigureTelemetrySamplingRate: 0},

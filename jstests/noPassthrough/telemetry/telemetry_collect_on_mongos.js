@@ -1,7 +1,7 @@
 /**
- * Test that mongos is collecting metrics.
+ * Test that mongos is collecting telemetry metrics.
+ * @tags: [featureFlagTelemetry]
  */
-
 (function() {
 "use strict";
 
@@ -17,7 +17,6 @@ const setup = () => {
         mongosOptions: {
             setParameter: {
                 internalQueryConfigureTelemetrySamplingRate: 2147483647,
-                featureFlagTelemetry: true,
             }
         },
     });

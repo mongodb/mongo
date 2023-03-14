@@ -1,15 +1,12 @@
 /**
  * Test the telemetry related serverStatus metrics.
+ * @tags: [featureFlagTelemetry]
  */
 load('jstests/libs/analyze_plan.js');
 load("jstests/libs/feature_flag_util.js");
 
 (function() {
 "use strict";
-
-if (!FeatureFlagUtil.isEnabled(db, "Telemetry")) {
-    return;
-}
 
 function runTestWithMongodOptions(mongodOptions, test, testOptions) {
     const conn = MongoRunner.runMongod(mongodOptions);

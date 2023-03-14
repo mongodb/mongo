@@ -1,11 +1,18 @@
-load('jstests/libs/analyze_plan.js');
-load("jstests/libs/profiler.js");  // For getLatestProfilerEntry.
-
+/**
+ * Tests that the query planning time is captured in the profiler.
+ */
 (function() {
 "use strict";
 
-var coll = db[jsTestName()];
-var collTwo = db[jsTestName() + 'Two'];
+load('jstests/libs/analyze_plan.js');
+load("jstests/libs/profiler.js");  // For getLatestProfilerEntry.
+
+const conn = MongoRunner.runMongod();
+const testDB = conn.getDB('test');
+var coll = testDB[jsTestName()];
+
+var coll = testDB[jsTestName()];
+var collTwo = testDB[jsTestName() + 'Two'];
 coll.drop();
 
 for (var i = 0; i < 100; i++) {
@@ -13,12 +20,12 @@ for (var i = 0; i < 100; i++) {
     coll.insert({foo: 1});
     collTwo.insert({foo: Math.random(0, 1), bar: Math.random(0, 1)});
 }
-assert.commandWorked(db.setProfilingLevel(2));
-var commandProfilerFilter = {op: "command", ns: "test.query_planning_time_metric"};
-var findProfilerFilter = {op: "query", ns: "test.query_planning_time_metric"};
+assert.commandWorked(testDB.setProfilingLevel(2));
+var commandProfilerFilter = {op: "command", ns: "test.profile_query_planning_time_metric"};
+var findProfilerFilter = {op: "query", ns: "test.profile_query_planning_time_metric"};
 
 function verifyProfilerLog(profilerFilter) {
-    let profileObj = getLatestProfilerEntry(db, profilerFilter);
+    let profileObj = getLatestProfilerEntry(testDB, profilerFilter);
     assert.gt(profileObj.planningTimeMicros, 0);
 }
 
@@ -59,4 +66,5 @@ verifyProfilerLog(commandProfilerFilter);
 
 coll.findOne({});
 verifyProfilerLog(findProfilerFilter);
+MongoRunner.stopMongod(conn);
 }());

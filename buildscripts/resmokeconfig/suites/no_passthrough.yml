@@ -1,8 +1,14 @@
 test_kind: js_test
+description: |
+  "Passthrough" means running a test against different runtime Cluster
+  configurations, including topology, runtime flags, fault injections, and other
+  parameters. Most tests by default are able to run in "passthrough" suites.
+  NoPassthrough is an exception, where tests here only run in the exact
+  configuration predefined in the tests themselves.
 
 selector:
   roots:
-  - jstests/noPassthrough/*.js
+  - jstests/noPassthrough/**/*.js
   - src/mongo/db/modules/*/jstests/hot_backups/*.js
   - src/mongo/db/modules/*/jstests/live_import/*.js
   - src/mongo/db/modules/*/jstests/no_passthrough/*.js
@@ -10,6 +16,7 @@ selector:
   # Self-tests for the Concurrency testing framework are run as part of this test suite.
   - jstests/concurrency/*.js
   exclude_files:
+  - jstests/noPassthrough/libs/*.js
   # Disable inmem_full as per SERVER-27014
   - jstests/noPassthrough/inmem_full.js
   exclude_with_any_tags:
