@@ -49,7 +49,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/update.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/s/chunk_splitter.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/periodic_balancer_config_refresher.h"
 #include "mongo/db/s/read_only_catalog_cache_loader.h"
@@ -728,8 +727,6 @@ void ShardingInitializationMongoD::_initializeShardingEnvironmentOnShardServer(
             opCtx, isReplSet && isStandaloneOrPrimary);
     }
 
-    // These only exist on a shard, so always set them up whether we're a config server or not.
-    ChunkSplitter::get(opCtx).onShardingInitialization(isStandaloneOrPrimary);
     PeriodicBalancerConfigRefresher::get(opCtx).onShardingInitialization(service,
                                                                          isStandaloneOrPrimary);
 

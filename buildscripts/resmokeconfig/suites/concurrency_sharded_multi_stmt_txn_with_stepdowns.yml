@@ -209,7 +209,6 @@ executor:
       global_vars:
         TestData:
           runInsideTransaction: true
-          runningWithAutoSplit: false
           runningWithBalancer: false
           runningWithConfigStepdowns: true
           runningWithSessions: true
@@ -232,7 +231,6 @@ executor:
   fixture:
     class: ShardedClusterFixture
     enable_balancer: false
-    enable_autosplit: false
     mongos_options:
       set_parameters:
         enableTestCommands: 1

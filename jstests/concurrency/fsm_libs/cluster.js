@@ -40,7 +40,6 @@ var Cluster = function(options) {
             'sameDB',
             'setupFunctions',
             'sharded.enabled',
-            'sharded.enableAutoSplit',
             'sharded.enableBalancer',
             'sharded.numMongos',
             'sharded.numShards',
@@ -82,14 +81,6 @@ var Cluster = function(options) {
 
         options.sharded.enabled = options.sharded.enabled || false;
         assert.eq('boolean', typeof options.sharded.enabled);
-
-        if (typeof options.sharded.enableAutoSplit !== 'undefined') {
-            assert(options.sharded.enabled,
-                   "Must have sharded.enabled be true if 'sharded.enableAutoSplit' is specified");
-        }
-
-        options.sharded.enableAutoSplit = options.sharded.enableAutoSplit || false;
-        assert.eq('boolean', typeof options.sharded.enableAutoSplit);
 
         if (typeof options.sharded.enableBalancer !== 'undefined') {
             assert(options.sharded.enabled,
@@ -470,10 +461,6 @@ var Cluster = function(options) {
 
     this.isBalancerEnabled = function isBalancerEnabled() {
         return this.isSharded() && options.sharded.enableBalancer;
-    };
-
-    this.isAutoSplitEnabled = function isAutoSplitEnabled() {
-        return this.isSharded() && options.sharded.enableAutoSplit;
     };
 
     this.validateAllCollections = function validateAllCollections(phase) {

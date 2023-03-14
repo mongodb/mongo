@@ -48,7 +48,7 @@ function findHighestChunkBounds(chunkBounds) {
     return highestBounds;
 }
 
-const st = new ShardingTest({shards: 3, other: {chunkSize: 1, enableAutoSplitter: false}});
+const st = new ShardingTest({shards: 3, other: {chunkSize: 1}});
 let primaryShard = st.shard0;
 let dbName = "test";
 let testDB = st.s.getDB(dbName);

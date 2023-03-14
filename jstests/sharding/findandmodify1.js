@@ -28,7 +28,7 @@ var db = s.getDB('test');
 
 var numObjs = 20;
 
-// Pre-split the collection so to avoid interference from auto-split
+// Pre-split the collection
 assert.commandWorked(s.s0.adminCommand({split: "test.sharded_coll", middle: {_id: numObjs / 2}}));
 assert.commandWorked(s.s0.adminCommand(
     {movechunk: "test.sharded_coll", find: {_id: numObjs / 2}, to: s.shard0.shardName}));

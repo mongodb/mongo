@@ -223,7 +223,6 @@ executor:
       global_vars:
         TestData:
           defaultReadPreference: {mode: "secondaryPreferred", tags: [{tag: "INIT_SYNC"}, {}]}
-          runningWithAutoSplit: true
           runningWithBalancer: true
           # Will prompt the FSM workers to use 'network_error_and_txn_override.js'
           # and generally retry operations.
@@ -249,7 +248,6 @@ executor:
   fixture:
     class: ShardedClusterFixture
     enable_balancer: true
-    enable_autosplit: true
     mongos_options:
       set_parameters:
         enableTestCommands: 1

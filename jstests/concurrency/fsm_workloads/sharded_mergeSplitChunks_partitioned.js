@@ -12,6 +12,7 @@
 load('jstests/concurrency/fsm_libs/extend_workload.js');                       // for extendWorkload
 load('jstests/concurrency/fsm_workloads/sharded_mergeChunks_partitioned.js');  // for $config
 load("jstests/sharding/libs/find_chunks_util.js");
+load("jstests/concurrency/fsm_workload_helpers/state_transition_utils.js");
 
 var $config = extendWorkload($config, function($config, $super) {
     $config.iterations = 6;
@@ -23,22 +24,12 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.data.bigString = new Array(1024 * 128).join('x');
 
     $config.setup = function(db, collName, cluster) {
-        this.isAutoSplitEnabled = cluster.isAutoSplitEnabled();
-        if (this.isAutoSplitEnabled) {
-            let configDB = cluster.getDB('config');
-            configDB.settings.save({_id: "chunksize", value: /*<sizeInMB>*/ 1});
-        }
-
         // Overridden methods should usually call the corresponding
         // method on $super.
         $super.setup.apply(this, arguments);
     };
 
     $config.teardown = function(db, collName, cluster) {
-        if (cluster.isAutoSplitEnabled()) {
-            jsTestLog('setting prevChunkSize: ' + this.prevChunkSize);
-            cluster.getDB('config').settings.save({_id: "chunksize", value: this.prevChunkSize});
-        }
         // $super.setup.teardown(this, arguments);
     };
 
@@ -55,7 +46,7 @@ var $config = extendWorkload($config, function($config, $super) {
     // Split a random chunk in this thread's partition, and verify that each node
     // in the cluster affected by the splitChunk operation sees the appropriate
     // after-state regardless of whether the operation succeeded or failed.
-    function doSplitChunk(db, collName, connCache, isAutoSplit) {
+    function doSplitChunk(db, collName, connCache) {
         var ns = db[collName].getFullName();
         var config = ChunkHelper.getPrimary(connCache.config);
 
@@ -78,33 +69,7 @@ var $config = extendWorkload($config, function($config, $super) {
         assertAlways(typeof chunk.min._id, 'number');
 
         let splitChunkRes;
-        if (isAutoSplit) {
-            // assertAlways.eq(this.bigString.length, 1024 * 64);
-
-            // try to insert
-            let ret = db[collName].update(
-                {_id: {$gte: chunk.min._id, $lt: chunk.max._id}, s: {$exists: false}},
-                {$set: {s: this.bigString}});
-            if (ret.modifiedCount == 0) {
-                jsTestLog("Was not able to update any document in chunk " + tojson(chunk));
-                splitChunkRes = {ok: false};
-            } else {
-                jsTestLog("Modified docs in chunk: " + tojson(chunk));
-
-                let shardPrimary = ChunkHelper.getPrimary(connCache.shards[chunk.shard]);
-                ret = shardPrimary.getDB("admin").runCommand({waitForOngoingChunkSplits: 1});
-                if (!ret.hasOwnProperty("ok") && ret.ok) {
-                    jsTestLog("Command waitForOngoingChunkSplits failed");
-                }
-
-                let numChunksAfter = ChunkHelper.getNumChunks(
-                    config, ns, this.partition.chunkLower, this.partition.chunkUpper);
-                splitChunkRes = {ok: numChunksAfter > numChunksBefore};
-                jsTestLog("Autosplit happened: " + splitChunkRes.ok);
-                print(db[collName].getShardDistribution());
-            }
-
-        } else if (chunk.min._id + 1 >= chunk.max._id || numDocsBefore <= 1) {
+        if (chunk.min._id + 1 >= chunk.max._id || numDocsBefore <= 1) {
             jsTestLog("Chunk is not divisible " + tojson(chunk));
             splitChunkRes = {ok: false};
         } else {
@@ -222,22 +187,10 @@ var $config = extendWorkload($config, function($config, $super) {
 
     $config.states.splitChunk = function(db, collName, connCache) {
         jsTestLog('Running splitChunk');
-        doSplitChunk.apply(this, [db, collName, connCache, /*isAutoSplit*/ false]);
+        doSplitChunk.apply(this, [db, collName, connCache]);
     };
 
-    $config.states.splitChunkAuto = function(db, collName, connCache) {
-        jsTestLog('Running splitChunkAuto');
-        jsTestLog('isAutoSplitEnabled: ' + this.isAutoSplitEnabled);
-        if (this.isAutoSplitEnabled) {
-            doSplitChunk.apply(this, [db, collName, connCache, /*isAutoSplit*/ true]);
-        }
-    };
+    $config.transitions = uniformDistTransitions($config.states);
 
-    $config.transitions = {
-        init: {mergeChunks: 0.5, splitChunk: 0.3, splitChunkAuto: 0.2},
-        mergeChunks: {mergeChunks: 0.5, splitChunk: 0.4, splitChunkAuto: 0.1},
-        splitChunk: {mergeChunks: 0.5, splitChunk: 0.4, splitChunkAuto: 0.1},
-        splitChunkAuto: {mergeChunks: 0.5, splitChunk: 0.5},
-    };
     return $config;
 });

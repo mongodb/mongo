@@ -118,9 +118,6 @@ sh.help = function() {
     print("\tsh.status()                               prints a general overview of the cluster");
     print(
         "\tsh.stopBalancer()                         stops the balancer so chunks are not balanced automatically");
-    print("\tsh.disableAutoSplit()                   disable autoSplit on one collection");
-    print("\tsh.enableAutoSplit()                    re-enable autoSplit on one collection");
-    print("\tsh.getShouldAutoSplit()                 returns whether autosplit is enabled");
     print("\tsh.disableAutoMerge()                   disable autoMerge on one collection");
     print("\tsh.enableAutoMerge()                    re-enable autoMerge on one collection");
     print("\tsh.shouldAutoMerge()                    returns whether autoMerge is enabled");
@@ -203,7 +200,7 @@ sh.getBalancerState = function(configDB, balancerStatus) {
         balancerStatus = assert.commandWorked(configDB.adminCommand({balancerStatus: 1}));
     }
 
-    return balancerStatus.mode !== "off" && balancerStatus.mode !== "autoSplitOnly";
+    return balancerStatus.mode !== "off";
 };
 
 sh.isBalancerRunning = function(configDB) {
@@ -226,34 +223,6 @@ sh.startBalancer = function(timeoutMs, interval) {
 
     var result = globalThis.db.adminCommand({balancerStart: 1, maxTimeMS: timeoutMs});
     return assert.commandWorked(result);
-};
-
-sh.enableAutoSplit = function(configDB) {
-    if (configDB === undefined)
-        configDB = sh._getConfigDB();
-    return assert.commandWorked(
-        configDB.settings.update({_id: 'autosplit'},
-                                 {$set: {enabled: true}},
-                                 {upsert: true, writeConcern: {w: 'majority', wtimeout: 30000}}));
-};
-
-sh.disableAutoSplit = function(configDB) {
-    if (configDB === undefined)
-        configDB = sh._getConfigDB();
-    return assert.commandWorked(
-        configDB.settings.update({_id: 'autosplit'},
-                                 {$set: {enabled: false}},
-                                 {upsert: true, writeConcern: {w: 'majority', wtimeout: 30000}}));
-};
-
-sh.getShouldAutoSplit = function(configDB) {
-    if (configDB === undefined)
-        configDB = sh._getConfigDB();
-    var autosplit = configDB.settings.findOne({_id: 'autosplit'});
-    if (autosplit == null) {
-        return true;
-    }
-    return autosplit.enabled;
 };
 
 sh.enableAutoMerge = function(configDB) {
@@ -820,11 +789,6 @@ function printShardingStatus(configDB, verbose) {
                 });
         }
     }
-
-    output(1, "autosplit:");
-
-    // Is autosplit currently enabled
-    output(2, "Currently enabled: " + (sh.getShouldAutoSplit(configDB) ? "yes" : "no"));
 
     output(1, "automerge:");
 

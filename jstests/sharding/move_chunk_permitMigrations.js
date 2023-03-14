@@ -15,7 +15,7 @@ load('jstests/libs/parallel_shell_helpers.js');
 load("jstests/sharding/libs/find_chunks_util.js");
 load("jstests/sharding/libs/shard_versioning_util.js");
 
-const st = new ShardingTest({shards: 2, other: {chunkSize: 1, enableAutoSplit: false}});
+const st = new ShardingTest({shards: 2, other: {chunkSize: 1}});
 const configDB = st.s.getDB("config");
 const dbName = 'AllowMigrations';
 

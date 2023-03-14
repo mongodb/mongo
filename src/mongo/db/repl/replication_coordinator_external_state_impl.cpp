@@ -79,7 +79,6 @@
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/s/balancer/balancer.h"
-#include "mongo/db/s/chunk_splitter.h"
 #include "mongo/db/s/config/index_on_config.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/migration_util.h"
@@ -838,7 +837,6 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnStepDownHook() {
         TransactionCoordinatorService::get(_service)->onStepDown();
     }
     if (ShardingState::get(_service)->enabled()) {
-        ChunkSplitter::get(_service).onStepDown();
         PeriodicBalancerConfigRefresher::get(_service).onStepDown();
         CatalogCacheLoader::get(_service).onStepDown();
 
@@ -967,7 +965,6 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
             }
             fassert(40107, status);
 
-            ChunkSplitter::get(_service).onStepUp();
             PeriodicBalancerConfigRefresher::get(_service).onStepUp(_service);
             CatalogCacheLoader::get(_service).onStepUp();
 

@@ -5,7 +5,7 @@
 
 load("jstests/sharding/libs/find_chunks_util.js");
 
-const st = new ShardingTest({shards: 3, mongos: 1, other: {chunkSize: 1, enableAutoSplit: false}});
+const st = new ShardingTest({shards: 3, mongos: 1, other: {chunkSize: 1}});
 const dbName = 'test';
 const collName = 'foo';
 const ns = dbName + '.' + collName;

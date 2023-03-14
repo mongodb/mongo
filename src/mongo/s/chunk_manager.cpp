@@ -33,7 +33,6 @@
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/chunk_writes_tracker.h"
 #include "mongo/s/mongod_and_mongos_server_parameters_gen.h"
 #include "mongo/s/shard_invalidated_for_targeting_exception.h"
 
@@ -239,11 +238,6 @@ ChunkMap ChunkMap::createMerged(
 
         if (overlap) {
             auto& changedChunk = changedChunks[changedChunkIndex++];
-            auto& chunkInfo = _chunkMap[chunkMapIndex];
-
-            auto bytesInReplacedChunk = chunkInfo->getWritesTracker()->getBytesWritten();
-            changedChunk->getWritesTracker()->addBytesWritten(bytesInReplacedChunk);
-
             validateChunkIsNotOlderThan(changedChunk, getVersion());
             updatedChunkMap.appendChunk(changedChunk);
         } else {

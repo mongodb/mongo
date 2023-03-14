@@ -22,9 +22,9 @@ class ShardedClusterFixture(interface.Fixture):
     def __init__(self, logger, job_num, fixturelib, mongos_executable=None, mongos_options=None,
                  mongod_executable=None, mongod_options=None, dbpath_prefix=None,
                  preserve_dbpath=False, num_shards=1, num_rs_nodes_per_shard=1, num_mongos=1,
-                 enable_sharding=None, enable_balancer=True, enable_autosplit=True,
-                 auth_options=None, configsvr_options=None, shard_options=None,
-                 cluster_logging_prefix=None, catalog_shard=None):
+                 enable_sharding=None, enable_balancer=True, auth_options=None,
+                 configsvr_options=None, shard_options=None, cluster_logging_prefix=None,
+                 catalog_shard=None):
         """Initialize ShardedClusterFixture with different options for the cluster processes."""
 
         interface.Fixture.__init__(self, logger, job_num, fixturelib, dbpath_prefix=dbpath_prefix)
@@ -49,7 +49,6 @@ class ShardedClusterFixture(interface.Fixture):
         self.num_mongos = num_mongos
         self.enable_sharding = self.fixturelib.default_if_none(enable_sharding, [])
         self.enable_balancer = enable_balancer
-        self.enable_autosplit = enable_autosplit
         self.auth_options = auth_options
         self.configsvr_options = self.fixturelib.make_historic(
             self.fixturelib.default_if_none(configsvr_options, {}))
@@ -141,12 +140,6 @@ class ShardedClusterFixture(interface.Fixture):
         # Turn off the balancer if it is not meant to be enabled.
         if not self.enable_balancer:
             self.stop_balancer()
-
-        # Turn off autosplit if it is not meant to be enabled.
-        if not self.enable_autosplit:
-            wc = pymongo.WriteConcern(w="majority", wtimeout=30000)
-            coll = client.config.get_collection("settings", write_concern=wc)
-            coll.update_one({"_id": "autosplit"}, {"$set": {"enabled": False}}, upsert=True)
 
         # Inform mongos about each of the shards
         for idx, shard in enumerate(self.shards):

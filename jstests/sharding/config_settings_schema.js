@@ -26,9 +26,8 @@ assert.commandFailed(
 assert.commandFailed(coll.update({_id: "notARealSetting"}, {$set: {value: 10}}, {upsert: true}));
 
 // Updates that match the schema are accepted
-// No schema is enforced for balancer, autosplit, automerge, and ReadWriteConcernDefaults
+// No schema is enforced for balancer, automerge, and ReadWriteConcernDefaults
 assert.commandWorked(coll.update({_id: "balancer"}, {$set: {anything: true}}, {upsert: true}));
-assert.commandWorked(coll.update({_id: "autosplit"}, {$set: {anything: true}}, {upsert: true}));
 if (FeatureFlagUtil.isEnabled(st.config, "AutoMerger")) {
     assert.commandWorked(coll.update({_id: "automerge"}, {$set: {anything: true}}, {upsert: true}));
 }

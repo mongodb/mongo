@@ -54,32 +54,6 @@ using unittest::assertGet;
 
 class ShardCollectionTestBase : public ConfigServerTestFixture {
 protected:
-    void expectSplitVector(const HostAndPort& shardHost,
-                           const ShardKeyPattern& keyPattern,
-                           const BSONArray& splitPoints) {
-        onCommand([&](const RemoteCommandRequest& request) {
-            ASSERT_EQUALS(shardHost, request.target);
-            std::string cmdName = request.cmdObj.firstElement().fieldName();
-            ASSERT_EQUALS("autoSplitVector", cmdName);
-            // autoSplitVector concatenates the collection name to the command's db
-            const auto receivedNs =
-                request.dbname + '.' + request.cmdObj["autoSplitVector"].String();
-            ASSERT_EQUALS(kNamespace.ns(), receivedNs);
-
-            ASSERT_BSONOBJ_EQ(keyPattern.toBSON(), request.cmdObj["keyPattern"].Obj());
-            ASSERT_BSONOBJ_EQ(keyPattern.getKeyPattern().globalMin(), request.cmdObj["min"].Obj());
-            ASSERT_BSONOBJ_EQ(keyPattern.getKeyPattern().globalMax(), request.cmdObj["max"].Obj());
-            ASSERT_EQUALS(ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes,
-                          static_cast<uint64_t>(request.cmdObj["maxChunkSizeBytes"].numberLong()));
-
-            ASSERT_BSONOBJ_EQ(
-                ReadPreferenceSetting(ReadPreference::PrimaryPreferred).toContainingBSON(),
-                rpc::TrackingMetadata::removeTrackingData(request.metadata));
-
-            return BSON("ok" << 1 << "splitKeys" << splitPoints << "continuation" << false);
-        });
-    }
-
     const ShardId testPrimaryShard{"shard0"};
     const NamespaceString kNamespace = NamespaceString::createNamespaceString_forTest("db1.foo");
 
@@ -96,7 +70,7 @@ protected:
     const ShardKeyPattern kShardKeyPattern{BSON("x" << 1)};
 };
 
-TEST_F(CreateFirstChunksTest, NonEmptyCollection_SplitPoints_FromSplitVector_ManyChunksToPrimary) {
+TEST_F(CreateFirstChunksTest, NonEmptyCollection_NoZones_OneChunkToPrimary) {
     const std::vector<ShardType> kShards{ShardType("shard0", "rs0/shard0:123"),
                                          ShardType("shard1", "rs1/shard1:123"),
                                          ShardType("shard2", "rs2/shard2:123")};
@@ -138,17 +112,13 @@ TEST_F(CreateFirstChunksTest, NonEmptyCollection_SplitPoints_FromSplitVector_Man
             {}, /* tags */
             3 /* numShards */,
             false /* collectionIsEmpty */);
-        ASSERT(!optimization->isOptimized());
         return optimization->createFirstChunks(
             opCtx.get(), kShardKeyPattern, {uuid, ShardId("shard1")});
     });
 
-    expectSplitVector(connStr.getServers()[0], kShardKeyPattern, BSON_ARRAY(BSON("x" << 0)));
-
     const auto& firstChunks = future.default_timed_get();
-    ASSERT_EQ(2U, firstChunks.chunks.size());
+    ASSERT_EQ(1U, firstChunks.chunks.size());
     ASSERT_EQ(kShards[1].getName(), firstChunks.chunks[0].getShard());
-    ASSERT_EQ(kShards[1].getName(), firstChunks.chunks[1].getShard());
 }
 
 TEST_F(CreateFirstChunksTest, NonEmptyCollection_WithZones_OneChunkToPrimary) {

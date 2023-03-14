@@ -40,10 +40,9 @@ assert.commandFailed(configDB.adminCommand({split: 'test.user', find: {x: 100}})
 assert.commandFailed(
     configDB.adminCommand({split: 'test.user', bounds: [{x: MinKey}, {x: MaxKey}]}));
 
-// Insert documents large enough to fill up a chunk, but do it directly in the shard in order
-// to bypass the auto-split logic.
+// Insert documents large enough to fill up a chunk
 var kiloDoc = new Array(1024).join('x');
-var testDB = st.rs0.getPrimary().getDB('test');
+var testDB = st.s.getDB('test');
 var bulk = testDB.user.initializeUnorderedBulkOp();
 for (var x = -1200; x < 1200; x++) {
     bulk.insert({_id: x, val: kiloDoc});

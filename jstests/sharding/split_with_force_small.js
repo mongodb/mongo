@@ -1,5 +1,5 @@
 //
-// Tests autosplit locations with force : true, for small collections
+// Tests splitVector locations with force : true, for small collections
 //
 (function() {
 'use strict';

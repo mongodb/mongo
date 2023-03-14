@@ -868,12 +868,6 @@ MongoRunner.mongosOptions = function(opts) {
     _removeSetParameterIfBeforeVersion(
         opts, "mongosShutdownTimeoutMillisForSignaledShutdown", "4.5.0", true);
 
-    // If the mongos is being restarted with a newer version, make sure we remove any options
-    // that no longer exist in the newer version.
-    if (opts.restart && MongoRunner.areBinVersionsTheSame('latest', opts.binVersion)) {
-        delete opts.noAutoSplit;
-    }
-
     return opts;
 };
 

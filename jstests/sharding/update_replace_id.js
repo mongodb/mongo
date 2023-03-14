@@ -203,7 +203,7 @@ st.shardColl(mongosColl, {_id: 1, a: 1}, {_id: 0, a: 0}, {_id: 1, a: 1}, mongosD
 // Run the replacement behaviour tests that are relevant to a compound key that includes _id.
 runReplacementUpdateTestsForCompoundShardKey();
 
-// Drop and reshard the collection on {_id: "hashed"}, which will autosplit across both shards.
+// Drop and reshard the collection on {_id: "hashed"}, which will spread chunks across both shards.
 assert(mongosColl.drop());
 mongosDB.adminCommand({shardCollection: mongosColl.getFullName(), key: {_id: "hashed"}});
 

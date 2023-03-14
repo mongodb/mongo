@@ -115,15 +115,9 @@ function testShardedLookup(shardingTest) {
 function mixedShardTest(options1, options2, shouldSucceed) {
     let authSucceeded = false;
     try {
+        // TODO SERVER-14017 is fixed the "enableBalancer" line can be removed.
         // Start ShardingTest with enableBalancer because ShardingTest attempts to turn
         // off the balancer otherwise, which it will not be authorized to do if auth is enabled.
-        //
-        // Also, the autosplitter will be turned on automatically with 'enableBalancer: true'. We
-        // then want to disable the autosplitter, but cannot do so here with 'enableAutoSplit:
-        // false' because ShardingTest will attempt to call disableAutoSplit(), which it will not be
-        // authorized to do if auth is enabled.
-        //
-        // Once SERVER-14017 is fixed the "enableBalancer" line can be removed.
 
         // The mongo shell cannot authenticate as the internal __system user in tests that use x509
         // for cluster authentication. Choosing the default value for wcMajorityJournalDefault in
@@ -155,7 +149,6 @@ function mixedShardTest(options1, options2, shouldSucceed) {
         authSucceeded = true;
 
         st.stopBalancer();
-        st.disableAutoSplit();
 
         // Test that $lookup works because it causes outgoing connections to be opened
         testShardedLookup(st);

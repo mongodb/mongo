@@ -34,7 +34,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk_manager.h"
-#include "mongo/s/chunk_writes_tracker.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -108,43 +107,6 @@ ChunkInfo* getChunkToSplit(const RoutingTableHistory& rt, const BSONObj& min, co
 }
 
 /**
- * Helper function for testing the results of a chunk split.
- *
- * Finds the chunks in a routing table resulting from a split on the range [minSplitBoundary,
- * maxSplitBoundary). Checks that the correct number of chunks are in the routing table for the
- * corresponding range. To check that the bytes written have been correctly propagated from the
- * chunk being split to the chunks resulting from the split, we check:
- *
- *      For each chunk:
- *          If the chunk was a result of the split:
- *              Make sure it has expectedBytesInChunksFromSplit bytes in its writes tracker
- *          Else:
- *              Make sure its bytes written have not been changed due to the split (e.g. it has
- *              expectedBytesInChunksNotSplit in its writes tracker)
- */
-void assertCorrectBytesWritten(const RoutingTableHistory& rt,
-                               const BSONObj& minSplitBoundary,
-                               const BSONObj& maxSplitBoundary,
-                               size_t expectedNumChunksFromSplit,
-                               uint64_t expectedBytesInChunksFromSplit,
-                               uint64_t expectedBytesInChunksNotSplit) {
-    auto chunksFromSplit = getChunksInRange(rt, minSplitBoundary, maxSplitBoundary);
-    ASSERT_EQ(chunksFromSplit.size(), expectedNumChunksFromSplit);
-
-    rt.forEachChunk([&](const auto& chunkInfo) {
-        auto writesTracker = chunkInfo->getWritesTracker();
-        auto bytesWritten = writesTracker->getBytesWritten();
-        if (chunksFromSplit.count(chunkInfo.get()) > 0) {
-            ASSERT_EQ(bytesWritten, expectedBytesInChunksFromSplit);
-        } else {
-            ASSERT_EQ(bytesWritten, expectedBytesInChunksNotSplit);
-        }
-
-        return true;
-    });
-}
-
-/**
  * Test fixture for tests that need to start with a fresh routing table with
  * only a single chunk in it, with bytes already written to that chunk object.
  */
@@ -175,21 +137,10 @@ public:
                                                  true,
                                                  {initChunk}));
         ASSERT_EQ(_rt->numChunks(), 1ull);
-
-        // Should only be one
-        _rt->forEachChunk([&](const auto& chunkInfo) {
-            auto writesTracker = chunkInfo->getWritesTracker();
-            writesTracker->addBytesWritten(_bytesInOriginalChunk);
-            return true;
-        });
     }
 
     const KeyPattern& getShardKeyPattern() const {
         return _shardKeyPattern;
-    }
-
-    uint64_t getBytesInOriginalChunk() const {
-        return _bytesInOriginalChunk;
     }
 
     const RoutingTableHistory& getInitialRoutingTable() const {
@@ -197,8 +148,6 @@ public:
     }
 
 private:
-    uint64_t _bytesInOriginalChunk{4ull};
-
     boost::optional<RoutingTableHistory> _rt;
 
     KeyPattern _shardKeyPattern{BSON("a" << 1)};
@@ -234,99 +183,6 @@ private:
 
     std::vector<BSONObj> _initialChunkBoundaryPoints;
 };
-
-TEST_F(RoutingTableHistoryTest, SplittingOnlyChunkCopiesBytesWrittenToAllSubchunks) {
-    auto minKey = BSON("a" << 10);
-    auto maxKey = BSON("a" << 20);
-    auto newChunkBoundaryPoints = {
-        getShardKeyPattern().globalMin(), minKey, maxKey, getShardKeyPattern().globalMax()};
-
-    auto rt = splitChunk(getInitialRoutingTable(), newChunkBoundaryPoints);
-    ASSERT_EQ(rt.numChunks(), 3ull);
-
-    rt.forEachChunk([&](const auto& chunkInfo) {
-        auto writesTracker = chunkInfo->getWritesTracker();
-        auto bytesWritten = writesTracker->getBytesWritten();
-        ASSERT_EQ(bytesWritten, getBytesInOriginalChunk());
-        return true;
-    });
-}
-
-TEST_F(RoutingTableHistoryTestThreeInitialChunks,
-       SplittingFirstChunkOfSeveralCopiesBytesWrittenToAllSubchunks) {
-    auto minKey = getInitialChunkBoundaryPoints()[0];
-    auto maxKey = getInitialChunkBoundaryPoints()[1];
-    std::vector<BSONObj> newChunkBoundaryPoints = {minKey, BSON("a" << 5), maxKey};
-
-    auto chunkToSplit = getChunkToSplit(getInitialRoutingTable(), minKey, maxKey);
-    auto bytesToWrite = 5ull;
-    chunkToSplit->getWritesTracker()->addBytesWritten(bytesToWrite);
-
-    // Split first chunk into two
-    auto rt = splitChunk(getInitialRoutingTable(), newChunkBoundaryPoints);
-
-    auto expectedNumChunksFromSplit = 2;
-    auto expectedBytesInChunksFromSplit = getBytesInOriginalChunk() + bytesToWrite;
-    auto expectedBytesInChunksNotSplit = getBytesInOriginalChunk();
-    ASSERT_EQ(rt.numChunks(), 4ull);
-    assertCorrectBytesWritten(rt,
-                              minKey,
-                              maxKey,
-                              expectedNumChunksFromSplit,
-                              expectedBytesInChunksFromSplit,
-                              expectedBytesInChunksNotSplit);
-}
-
-
-TEST_F(RoutingTableHistoryTestThreeInitialChunks,
-       SplittingMiddleChunkOfSeveralCopiesBytesWrittenToAllSubchunks) {
-    auto minKey = getInitialChunkBoundaryPoints()[1];
-    auto maxKey = getInitialChunkBoundaryPoints()[2];
-    auto newChunkBoundaryPoints = {minKey, BSON("a" << 16), BSON("a" << 17), maxKey};
-
-    auto chunkToSplit = getChunkToSplit(getInitialRoutingTable(), minKey, maxKey);
-    auto bytesToWrite = 5ull;
-    chunkToSplit->getWritesTracker()->addBytesWritten(bytesToWrite);
-
-    // Split middle chunk into three
-    auto rt = splitChunk(getInitialRoutingTable(), newChunkBoundaryPoints);
-
-    auto expectedNumChunksFromSplit = 3;
-    auto expectedBytesInChunksFromSplit = getBytesInOriginalChunk() + bytesToWrite;
-    auto expectedBytesInChunksNotSplit = getBytesInOriginalChunk();
-    ASSERT_EQ(rt.numChunks(), 5ull);
-    assertCorrectBytesWritten(rt,
-                              minKey,
-                              maxKey,
-                              expectedNumChunksFromSplit,
-                              expectedBytesInChunksFromSplit,
-                              expectedBytesInChunksNotSplit);
-}
-
-TEST_F(RoutingTableHistoryTestThreeInitialChunks,
-       SplittingLastChunkOfSeveralCopiesBytesWrittenToAllSubchunks) {
-    auto minKey = getInitialChunkBoundaryPoints()[2];
-    auto maxKey = getInitialChunkBoundaryPoints()[3];
-    auto newChunkBoundaryPoints = {minKey, BSON("a" << 25), maxKey};
-
-    auto chunkToSplit = getChunkToSplit(getInitialRoutingTable(), minKey, maxKey);
-    auto bytesToWrite = 5ull;
-    chunkToSplit->getWritesTracker()->addBytesWritten(bytesToWrite);
-
-    // Split last chunk into two
-    auto rt = splitChunk(getInitialRoutingTable(), newChunkBoundaryPoints);
-
-    auto expectedNumChunksFromSplit = 2;
-    auto expectedBytesInChunksFromSplit = getBytesInOriginalChunk() + bytesToWrite;
-    auto expectedBytesInChunksNotSplit = getBytesInOriginalChunk();
-    ASSERT_EQ(rt.numChunks(), 4ull);
-    assertCorrectBytesWritten(rt,
-                              minKey,
-                              maxKey,
-                              expectedNumChunksFromSplit,
-                              expectedBytesInChunksFromSplit,
-                              expectedBytesInChunksNotSplit);
-}
 
 TEST_F(RoutingTableHistoryTest, TestSplits) {
     const UUID uuid = UUID::gen();

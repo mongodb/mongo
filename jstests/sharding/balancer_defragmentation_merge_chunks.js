@@ -16,7 +16,6 @@ TestData.skipCheckShardFilteringMetadata = true;
 'use strict';
 
 load("jstests/libs/fail_point_util.js");
-load('jstests/sharding/autosplit_include.js');
 load("jstests/sharding/libs/find_chunks_util.js");
 load("jstests/sharding/libs/defragmentation_util.js");
 

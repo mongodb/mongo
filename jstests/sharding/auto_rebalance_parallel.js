@@ -7,7 +7,7 @@
 
 load("jstests/sharding/libs/find_chunks_util.js");
 
-const st = new ShardingTest({shards: 4, other: {chunkSize: 1, enableAutoSplitter: false}});
+const st = new ShardingTest({shards: 4, other: {chunkSize: 1}});
 var config = st.s0.getDB('config');
 
 assert.commandWorked(st.s0.adminCommand({enableSharding: 'TestDB'}));

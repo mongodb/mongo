@@ -1,5 +1,5 @@
 //
-// Tests autosplit locations with force : true
+// Tests split vector locations with force : true
 //
 
 var options = {

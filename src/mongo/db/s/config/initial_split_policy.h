@@ -52,11 +52,6 @@ public:
     /**
      * Returns the optimization strategy for building initial chunks based on the input parameters
      * and the collection state.
-     *
-     * The 'useAutoSplitter' flag indicates to the initial split strategy selected that in case the
-     * collection contains data, it should use the auto splitter to chop that data into chunks
-     * respective to the configured chunk size. If set to false, the policy will create as large of
-     * chunks as possible.
      */
     static std::unique_ptr<InitialSplitPolicy> calculateOptimizationStrategy(
         OperationContext* opCtx,
@@ -65,8 +60,7 @@ public:
         bool presplitHashedZones,
         const std::vector<TagsType>& tags,
         size_t numShards,
-        bool collectionIsEmpty,
-        bool useAutoSplitter = true /* Controlled by FCV, see the comment */);
+        bool collectionIsEmpty);
 
     virtual ~InitialSplitPolicy() {}
 
@@ -138,21 +132,6 @@ public:
     ShardCollectionConfig createFirstChunks(OperationContext* opCtx,
                                             const ShardKeyPattern& shardKeyPattern,
                                             const SplitPolicyParams& params) override;
-};
-
-/**
- * Split point building strategy to be used when no optimizations are available. We send a
- * splitVector command to the primary shard in order to calculate the appropriate split points.
- */
-class AutoSplitInChunksOnPrimaryPolicy : public InitialSplitPolicy {
-public:
-    ShardCollectionConfig createFirstChunks(OperationContext* opCtx,
-                                            const ShardKeyPattern& shardKeyPattern,
-                                            const SplitPolicyParams& params) override;
-
-    bool isOptimized() override {
-        return false;
-    }
 };
 
 /**

@@ -107,7 +107,6 @@ executor:
       global_vars:
         TestData:
           runningWithCausalConsistency: true
-          runningWithAutoSplit: false
           runningWithBalancer: false
   hooks:
   - class: CheckReplDBHashInBackground
@@ -121,7 +120,6 @@ executor:
   fixture:
     class: ShardedClusterFixture
     enable_balancer: false
-    enable_autosplit: false
     mongos_options:
       set_parameters:
         enableTestCommands: 1

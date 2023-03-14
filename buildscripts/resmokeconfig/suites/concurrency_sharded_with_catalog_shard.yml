@@ -117,7 +117,6 @@ executor:
     shell_options:
       global_vars:
         TestData:
-          runningWithAutoSplit: false
           runningWithBalancer: false
   hooks:
   # TODO (SERVER-63855): remove 'RunDBCheckInBackground' or put it back.
@@ -135,7 +134,6 @@ executor:
     class: ShardedClusterFixture
     catalog_shard: "any"
     enable_balancer: false
-    enable_autosplit: false
     mongos_options:
       set_parameters:
         enableTestCommands: 1

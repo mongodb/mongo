@@ -1156,8 +1156,7 @@ void CreateCollectionCoordinator::_createPolicy(OperationContext* opCtx,
         _request.getPresplitHashedZones() ? *_request.getPresplitHashedZones() : false,
         getTagsAndValidate(opCtx, nss(), shardKeyPattern.toBSON()),
         getNumShards(opCtx),
-        *_collectionEmpty,
-        !feature_flags::gNoMoreAutoSplitter.isEnabled(serverGlobalParams.featureCompatibility));
+        *_collectionEmpty);
 }
 
 void CreateCollectionCoordinator::_createChunks(OperationContext* opCtx,

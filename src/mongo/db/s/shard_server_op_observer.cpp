@@ -33,8 +33,6 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/s/balancer_stats_registry.h"
-#include "mongo/db/s/chunk_split_state_driver.h"
-#include "mongo/db/s/chunk_splitter.h"
 #include "mongo/db/s/collection_critical_section_document_gen.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/database_sharding_state.h"
@@ -162,58 +160,6 @@ void onConfigDeleteInvalidateCachedCollectionMetadataAndNotify(OperationContext*
 }
 
 /**
- * If the collection is sharded, finds the chunk that contains the specified document and increments
- * the size tracked for that chunk by the specified amount of data written, in bytes. Returns the
- * number of total bytes on that chunk after the data is written.
- */
-void incrementChunkOnInsertOrUpdate(OperationContext* opCtx,
-                                    const NamespaceString& nss,
-                                    const ChunkManager& chunkManager,
-                                    const BSONObj& document,
-                                    long dataWritten,
-                                    bool fromMigrate) {
-    const auto& shardKeyPattern = chunkManager.getShardKeyPattern();
-    BSONObj shardKey = shardKeyPattern.extractShardKeyFromDocThrows(document);
-
-    // Use the shard key to locate the chunk into which the document was updated, and increment the
-    // number of bytes tracked for the chunk.
-    //
-    // Note that we can assume the simple collation, because shard keys do not support non-simple
-    // collations.
-    auto chunk = chunkManager.findIntersectingChunkWithSimpleCollation(shardKey);
-    auto chunkWritesTracker = chunk.getWritesTracker();
-    chunkWritesTracker->addBytesWritten(dataWritten);
-    // Don't trigger chunk splits from inserts happening due to migration since
-    // we don't necessarily own that chunk yet
-    if (!fromMigrate) {
-        const auto balancerConfig = Grid::get(opCtx)->getBalancerConfiguration();
-
-        const uint64_t maxChunkSizeBytes = [&] {
-            const boost::optional<uint64_t> csb = chunkManager.maxChunkSizeBytes();
-            if (csb) {
-                return *csb;
-            }
-            return balancerConfig->getMaxChunkSizeBytes();
-        }();
-
-        if (!feature_flags::gNoMoreAutoSplitter.isEnabled(
-                serverGlobalParams.featureCompatibility) &&
-            balancerConfig->getShouldAutoSplit() && chunkManager.allowAutoSplit() &&
-            chunkWritesTracker->shouldSplit(maxChunkSizeBytes)) {
-            auto chunkSplitStateDriver =
-                ChunkSplitStateDriver::tryInitiateSplit(chunkWritesTracker);
-            if (chunkSplitStateDriver) {
-                ChunkSplitter::get(opCtx).trySplitting(std::move(chunkSplitStateDriver),
-                                                       nss,
-                                                       chunk.getMin(),
-                                                       chunk.getMax(),
-                                                       dataWritten);
-            }
-        }
-    }
-}
-
-/**
  * Aborts any ongoing migration for the given namespace. Should only be called when observing
  * index operations.
  */
@@ -321,22 +267,6 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
                         scopedCsr->enterCriticalSectionCatchUpPhase(reason);
                     }
                 });
-        }
-
-        if (!nss.isNamespaceAlwaysUnsharded() &&
-            !feature_flags::gNoMoreAutoSplitter.isEnabled(
-                serverGlobalParams.featureCompatibility)) {
-            auto metadata =
-                CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss)
-                    ->getCurrentMetadataIfKnown();
-            if (metadata && metadata->isSharded()) {
-                incrementChunkOnInsertOrUpdate(opCtx,
-                                               nss,
-                                               *metadata->getChunkManager(),
-                                               insertedDoc,
-                                               insertedDoc.objsize(),
-                                               fromMigrate);
-            }
         }
     }
 }
@@ -499,22 +429,6 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
                     scopedCsr->enterCriticalSectionCommitPhase(reason);
                 }
             });
-    }
-
-    if (!args.coll->ns().isNamespaceAlwaysUnsharded() &&
-        !feature_flags::gNoMoreAutoSplitter.isEnabled(serverGlobalParams.featureCompatibility)) {
-        auto metadata = CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(
-                            opCtx, args.coll->ns())
-                            ->getCurrentMetadataIfKnown();
-        if (metadata && metadata->isSharded()) {
-            incrementChunkOnInsertOrUpdate(opCtx,
-                                           args.coll->ns(),
-                                           *metadata->getChunkManager(),
-                                           args.updateArgs->updatedDoc,
-                                           args.updateArgs->updatedDoc.objsize(),
-                                           args.updateArgs->source ==
-                                               OperationSource::kFromMigrate);
-        }
     }
 
     const auto& nss = args.coll->ns();

@@ -31,7 +31,6 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/commands.h"
-#include "mongo/db/s/chunk_splitter.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -59,8 +58,7 @@ public:
     }
 
     std::string help() const override {
-        return "block until all autosplit chunk splits have completed on a shard. Test command "
-               "only.";
+        return "Noop test-only command. Kept for multiversion compatibility";
     }
 
     bool requiresAuth() const override {
@@ -78,8 +76,7 @@ public:
              const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        ChunkSplitter::get(opCtx).waitForIdle();
-
+        // TODO SERVER-73491 get rid of this command once v7.0 branches out
         return true;
     }
 };

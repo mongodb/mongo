@@ -45,7 +45,7 @@ var HourAndMinute = function(hour, minutes) {
     };
 };
 
-const st = new ShardingTest({shards: 2, other: {chunkSize: 1, enableAutoSplit: false}});
+const st = new ShardingTest({shards: 2, other: {chunkSize: 1}});
 const dbName = 'test';
 const collName = 'user';
 const ns = dbName + '.' + collName;

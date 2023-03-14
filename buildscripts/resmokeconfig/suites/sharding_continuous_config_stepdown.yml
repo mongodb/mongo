@@ -28,16 +28,13 @@ selector:
   # Count/write/aggregate commands against the config shard do not support retries yet
   - jstests/sharding/addshard1.js
   - jstests/sharding/addshard2.js
-  - jstests/sharding/autosplit.js
   - jstests/sharding/basic_merge.js
   - jstests/sharding/count1.js
   - jstests/sharding/count2.js
   - jstests/sharding/query/current_op_with_drop_shard.js
   - jstests/sharding/cursor1.js
   - jstests/sharding/diffservers1.js
-  - jstests/sharding/disable_autosplit.js
   - jstests/sharding/findandmodify1.js
-  - jstests/sharding/findandmodify_autosplit.js
   - jstests/sharding/query/geo_near_sharded.js
   - jstests/sharding/hash_basic.js
   - jstests/sharding/hash_shard1.js
@@ -62,7 +59,6 @@ selector:
   - jstests/sharding/shard3.js
   - jstests/sharding/shard_collection_basic.js
   - jstests/sharding/tag_range.js
-  - jstests/sharding/top_chunk_autosplit.js
   - jstests/sharding/count_config_servers.js
   - jstests/sharding/split_large_key.js
   - jstests/sharding/balancer_window.js

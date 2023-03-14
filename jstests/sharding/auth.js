@@ -53,7 +53,7 @@ var s = new ShardingTest({
     name: "auth",
     mongos: 1,
     shards: TestData.catalogShard ? 1 : 0,
-    other: {keyFile: "jstests/libs/key1", chunkSize: 1, enableAutoSplit: false},
+    other: {keyFile: "jstests/libs/key1", chunkSize: 1},
 });
 
 if (s.getDB('admin').runCommand('buildInfo').bits < 64) {

@@ -3,8 +3,7 @@
 
 load("jstests/libs/feature_flag_util.js");
 
-var s = new ShardingTest(
-    {name: "migrateBig", shards: 2, other: {chunkSize: 1, enableAutoSplit: false}});
+var s = new ShardingTest({name: "migrateBig", shards: 2, other: {chunkSize: 1}});
 
 assert.commandWorked(
     s.config.settings.update({_id: "balancer"}, {$set: {_waitForDelete: true}}, true));

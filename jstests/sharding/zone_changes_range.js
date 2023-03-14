@@ -7,7 +7,7 @@
 load("jstests/sharding/libs/zone_changes_util.js");
 load("jstests/sharding/libs/find_chunks_util.js");
 
-const st = new ShardingTest({shards: 3, other: {chunkSize: 1, enableAutoSplitter: false}});
+const st = new ShardingTest({shards: 3, other: {chunkSize: 1}});
 let primaryShard = st.shard0;
 let dbName = "test";
 let testDB = st.s.getDB(dbName);

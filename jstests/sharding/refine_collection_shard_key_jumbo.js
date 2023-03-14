@@ -10,7 +10,7 @@ TestData.skipCheckShardFilteringMetadata = true;
 
 load("jstests/sharding/libs/find_chunks_util.js");
 
-const st = new ShardingTest({mongos: 1, shards: 2, other: {chunkSize: 1, enableAutoSplit: true}});
+const st = new ShardingTest({mongos: 1, shards: 2, other: {chunkSize: 1}});
 const primaryShard = st.shard0.shardName;
 const secondaryShard = st.shard1.shardName;
 const kDbName = 'test';

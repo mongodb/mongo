@@ -179,7 +179,6 @@ executor:
         TestData:
           runningWithConfigStepdowns: true
           runningWithShardStepdowns: true
-          runningWithAutoSplit: false
           runningWithBalancer: false
           useActionPermittedFile: true
   hooks:
@@ -198,7 +197,6 @@ executor:
   fixture:
     class: ShardedClusterFixture
     enable_balancer: false
-    enable_autosplit: false
     mongos_options:
       set_parameters:
         enableTestCommands: 1

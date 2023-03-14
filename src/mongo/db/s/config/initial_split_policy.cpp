@@ -31,7 +31,6 @@
 
 #include "mongo/client/read_preference.h"
 #include "mongo/db/bson/dotted_path_support.h"
-#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
@@ -44,7 +43,6 @@
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/shard_util.h"
 #include "mongo/stdx/unordered_map.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -255,8 +253,7 @@ std::unique_ptr<InitialSplitPolicy> InitialSplitPolicy::calculateOptimizationStr
     const bool presplitHashedZones,
     const std::vector<TagsType>& tags,
     size_t numShards,
-    bool collectionIsEmpty,
-    bool useAutoSplitter) {
+    bool collectionIsEmpty) {
     uassert(ErrorCodes::InvalidOptions,
             str::stream() << "numInitialChunks is only supported when the collection is empty "
                              "and has a hashed field in the shard key pattern",
@@ -292,10 +289,6 @@ std::unique_ptr<InitialSplitPolicy> InitialSplitPolicy::calculateOptimizationStr
         return std::make_unique<SingleChunkOnPrimarySplitPolicy>();
     }
 
-    if (useAutoSplitter) {
-        return std::make_unique<AutoSplitInChunksOnPrimaryPolicy>();
-    }
-
     return std::make_unique<SingleChunkOnPrimarySplitPolicy>();
 }
 
@@ -317,38 +310,6 @@ InitialSplitPolicy::ShardCollectionConfig SingleChunkOnPrimarySplitPolicy::creat
                 &chunks);
 
     return {std::move(chunks)};
-}
-
-InitialSplitPolicy::ShardCollectionConfig AutoSplitInChunksOnPrimaryPolicy::createFirstChunks(
-    OperationContext* opCtx,
-    const ShardKeyPattern& shardKeyPattern,
-    const SplitPolicyParams& params) {
-    // Under this policy, chunks are only placed on the primary shard.
-    std::vector<ShardId> shardIds{params.primaryShardId};
-
-    // Refresh the balancer settings to ensure the chunk size setting, which is sent as part of
-    // the splitVector command and affects the number of chunks returned, has been loaded.
-    const auto balancerConfig = Grid::get(opCtx)->getBalancerConfiguration();
-    uassertStatusOK(balancerConfig->refreshAndCheck(opCtx));
-    auto optNss = CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, params.collectionUUID);
-    invariant(optNss);
-    const auto shardSelectedSplitPoints = uassertStatusOK(
-        shardutil::selectChunkSplitPoints(opCtx,
-                                          params.primaryShardId,
-                                          *optNss,
-                                          shardKeyPattern,
-                                          ChunkRange(shardKeyPattern.getKeyPattern().globalMin(),
-                                                     shardKeyPattern.getKeyPattern().globalMax()),
-                                          balancerConfig->getMaxChunkSizeBytes()));
-
-    const auto currentTime = VectorClock::get(opCtx)->getTime();
-    return generateShardCollectionInitialChunks(params,
-                                                shardKeyPattern,
-                                                currentTime.clusterTime().asTimestamp(),
-                                                shardSelectedSplitPoints,
-                                                shardIds,
-                                                1  // numContiguousChunksPerShard
-    );
 }
 
 InitialSplitPolicy::ShardCollectionConfig SplitPointsBasedSplitPolicy::createFirstChunks(

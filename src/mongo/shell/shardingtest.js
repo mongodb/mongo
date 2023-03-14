@@ -62,7 +62,6 @@
  *       mongosOptions {Object}: same as the mongos property above.
  *          Can be used to specify options that are common all mongos.
  *       enableBalancer {boolean} : if true, enable the balancer
- *       enableAutoSplit {boolean} : if true, enable autosplitting; else, default to the
  *          enableBalancer setting
  *       manualAddShard {boolean}: shards will not be added if true.
  *
@@ -191,13 +190,6 @@ var ShardingTest = function(params) {
     function _configureCluster() {
         if (!otherParams.enableBalancer) {
             self.stopBalancer();
-        }
-
-        if (!otherParams.enableAutoSplit) {
-            self.disableAutoSplit();
-        } else if (!otherParams.enableBalancer) {
-            // Turn on autoSplit since disabling balancer also turns auto split off.
-            self.enableAutoSplit();
         }
     }
 
@@ -976,12 +968,6 @@ var ShardingTest = function(params) {
 
         if (opts.restart) {
             opts = Object.merge(mongos.fullOptions, opts);
-
-            // If the mongos is being restarted with a newer version, make sure we remove any
-            // options that no longer exist in the newer version.
-            if (MongoRunner.areBinVersionsTheSame('latest', opts.binVersion)) {
-                delete opts.noAutoSplit;
-            }
         }
 
         var newConn = MongoRunner.runMongos(opts);
@@ -1197,11 +1183,6 @@ var ShardingTest = function(params) {
     // Default enableBalancer to false.
     otherParams.enableBalancer =
         ("enableBalancer" in otherParams) && (otherParams.enableBalancer === true);
-
-    // Let autosplit behavior match that of the balancer if autosplit is not explicitly set.
-    if (!("enableAutoSplit" in otherParams)) {
-        otherParams.enableAutoSplit = otherParams.enableBalancer;
-    }
 
     // Allow specifying mixed-type options like this:
     // { mongos : [ { bind_ip : "localhost" } ],

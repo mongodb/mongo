@@ -13,7 +13,7 @@
 load('jstests/sharding/libs/find_chunks_util.js');
 load('jstests/sharding/libs/chunk_bounds_util.js');
 
-var st = new ShardingTest({mongos: 1, shards: 2, chunkSize: 1, enableAutoSplit: false});
+var st = new ShardingTest({mongos: 1, shards: 2, chunkSize: 1});
 var kDbName = 'db';
 
 var mongos = st.s0;

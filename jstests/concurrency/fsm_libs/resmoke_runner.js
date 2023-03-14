@@ -234,8 +234,6 @@ if (TestData.discoverTopology !== false) {
     } else if (topology.type === Topology.kShardedCluster) {
         clusterOptions.replication.enabled = true;
         clusterOptions.sharded.enabled = true;
-        clusterOptions.sharded.enableAutoSplit =
-            TestData.hasOwnProperty('runningWithAutoSplit') ? TestData.runningWithAutoSplit : true;
         clusterOptions.sharded.enableBalancer =
             TestData.hasOwnProperty('runningWithBalancer') ? TestData.runningWithBalancer : true;
         clusterOptions.sharded.numMongos = topology.mongos.nodes.length;

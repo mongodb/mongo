@@ -7,7 +7,7 @@
 load("jstests/sharding/libs/find_chunks_util.js");
 load("jstests/libs/feature_flag_util.js");
 
-const st = new ShardingTest({shards: 2, mongos: 1, other: {chunkSize: 1, enableAutoSplit: false}});
+const st = new ShardingTest({shards: 2, mongos: 1, other: {chunkSize: 1}});
 
 // First, test that shell helpers require an argument
 assert.throws(sh.disableBalancing, [], "sh.disableBalancing requires a collection");

@@ -99,22 +99,6 @@ var defragmentationUtil = (function() {
         assert.commandWorked(bulk.execute());
     };
 
-    let checkForMergeableChunkSiblings = function(
-        coll, leftChunk, rightChunk, shardKey, avgObjSize, oversizedChunkThreshold) {
-        let combinedDataSize =
-            coll.countDocuments(
-                {[shardKey]: {$gte: leftChunk.min[shardKey], $lt: rightChunk.max[shardKey]}}) *
-            avgObjSize;
-        // The autosplitter should not split chunks whose combined size is < 133% of
-        // maxChunkSize but this threshold may be off by a few documents depending on
-        // rounding of avgObjSize.
-        const autosplitRoundingTolerance = 3 * avgObjSize;
-        assert.gte(combinedDataSize,
-                   oversizedChunkThreshold - autosplitRoundingTolerance,
-                   `Chunks ${tojson(leftChunk)} and ${
-                       tojson(rightChunk)} are mergeable with combined size ${combinedDataSize}`);
-    };
-
     let checkPostDefragmentationState = function(configSvr, mongos, ns, maxChunkSizeMB, shardKey) {
         const oversizedChunkThreshold = maxChunkSizeMB * 1024 * 1024 * 4 / 3;
         const chunks = findChunksUtil.findChunksByNs(mongos.getDB('config'), ns)

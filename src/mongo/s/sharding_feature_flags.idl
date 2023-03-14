@@ -32,11 +32,6 @@ global:
     cpp_namespace: "mongo"
 
 feature_flags:
-  featureFlagNoMoreAutoSplitter:
-    description: "Guarding code for the no more auto-splitter project"
-    cpp_varname: feature_flags::gNoMoreAutoSplitter
-    default: true
-    version: 6.0 # Starting from v6.0.3
   featureFlagGlobalIndexesShardingCatalog:
     description: "Feature flag for enabling sharding catalog features for global indexes"
     cpp_varname: feature_flags::gGlobalIndexesShardingCatalog
