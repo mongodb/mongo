@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/bin/bash
 
 [ -z $BASH_VERSION ] && {
 	echo "$0 is a bash script: \$BASH_VERSION not set, exiting"
@@ -53,7 +53,7 @@ usage() {
 	echo "    -j parallel  jobs to execute in parallel (defaults to 8)"
 	echo "    -n total     total jobs to execute (defaults to no limit)"
 	echo "    -R           add configuration for randomized split stress (defaults to none)"
-	echo "    -r binary    record with UndoDB binary (defaults to no recording)"
+	echo "    -r binary    record with the given binary (defaults to no recording)"
 	echo "    -S           run smoke-test configurations (defaults to off)"
 	echo "    -T           turn on format tracing (defaults to off)"
 	echo "    -t minutes   minutes to run (defaults to no limit)"
@@ -165,7 +165,9 @@ while :; do
 		live_record_binary="$2"
 		if [ ! $(command -v "$live_record_binary") ]; then
 			msg "-r option argument \"${live_record_binary}\" does not exist in path"
-			msg "usage and setup instructions can be found at: https://wiki.corp.mongodb.com/display/KERNEL/UndoDB+Usage"
+			msg "usage and setup instructions can be found at:"
+			msg "  https://wiki.corp.mongodb.com/display/KERNEL/UndoDB+Usage"
+			msg "  https://wiki.corp.mongodb.com/display/WT/Using+Record+Replay+for+Debugging"
 			exit 1
 		fi
 		shift; shift ;;
@@ -407,12 +409,19 @@ wait_for_process()
 resolve()
 {
 	running=0
+
 	list=$(ls $home | grep '^RUNDIR.[0-9]*.log')
 	for i in $list; do
 		check_timer
 		# Note the directory may not yet exist, only the log file.
 		dir="$home/${i%.*}"
 		log="$home/$i"
+		rec_dir=""
+
+		if [[ ! -z $live_record_binary ]]; then
+			[[ "$i" =~ ^.+\.([0-9]+)\..+$ ]]
+			rec_dir="$home/rec.${BASH_REMATCH[1]}"
+		fi
 
 		# Skip failures we've already reported.
 		[[ -f "$dir/$status" ]] && continue
@@ -443,14 +452,20 @@ resolve()
 			kill -KILL $pid
 			wait_for_process $pid
 
+			# give the parent recording binary a chance to complete if we are using it
+			[[ ! -z $live_record_binary ]] && sleep 2
+
 			msg "job in $dir killed"
 
 			# Remove jobs we killed, they count as neither success or failure.
-			rm -rf $dir $log
+			rm -rf $dir $log $rec_dir
 			continue
 		}
 		wait_for_process $pid
 		eret=$?
+
+		# give the parent recording binary a chance to complete if we are using it
+		[[ ! -z $live_record_binary ]] && sleep 2
 
 		# Check for Sanitizer failures, have to do this prior to success because both can be reported.
 		grep -E -i 'Sanitizer' $log > /dev/null && {
@@ -460,7 +475,7 @@ resolve()
 
 		# Remove successful jobs.
 		grep 'successful run completed' $log > /dev/null && {
-			rm -rf $dir $log
+			rm -rf $dir $log $rec_dir
 			success=$(($success + 1))
 			msg "job in $dir successfully completed"
 			continue
@@ -468,7 +483,7 @@ resolve()
 
 		# Check for Evergreen running out of disk space, and forcibly quit.
 		grep -E -i 'no space left on device' $log > /dev/null && {
-			rm -rf $dir $log
+			rm -rf $dir $log $rec_dir
 			force_quit_reason "job in $dir ran out of disk space"
 			continue
 		}
@@ -483,7 +498,7 @@ resolve()
 			 echo) >> $log
 
 			if $format_binary -Rqv -h $dir $trace > $log 2>&1; then
-			    rm -rf $dir $dir.RECOVER $log
+			    rm -rf $dir $dir.RECOVER $log $rec_dir
 			    success=$(($success + 1))
 			    msg "job in $dir successfully completed"
 			else
@@ -583,12 +598,16 @@ format()
 	args+=" $format_args"
 	msg "starting job in $dir ($(date))"
 
-	# If we're using UndoDB, append our default arguments.
+	# If we're using recording, append our default arguments.
 	#
 	# This script is typically left running until a failure is hit. To avoid filling up the
 	# disk, we should avoid keeping recordings from successful runs.
 	if [[ ! -z $live_record_binary ]]; then
-		live_record_command="$live_record_binary --save-on error"
+		if [[ $live_record_binary =~ ^rr.*$ ]]; then
+			live_record_command="$live_record_binary -E record -o $home/rec.$count_jobs -h"
+		else
+			live_record_command="$live_record_binary --save-on error"
+		fi
 	fi
 
 	cmd="$live_record_command $format_binary -c "$config" -h "$dir" $trace $args quiet=1"
