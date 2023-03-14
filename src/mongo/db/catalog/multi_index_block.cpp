@@ -92,6 +92,64 @@ size_t getEachIndexBuildMaxMemoryUsageBytes(size_t numIndexSpecs) {
     return result;
 }
 
+auto makeOnSuppressedErrorFn(const std::function<void()>& saveCursorBeforeWrite,
+                             const std::function<void()>& restoreCursorAfterWrite) {
+
+    return [&](OperationContext* opCtx,
+               const IndexCatalogEntry* entry,
+               Status status,
+               const BSONObj& obj,
+               const boost::optional<RecordId>& loc) {
+        invariant(loc.has_value());
+
+        // If a key generation error was suppressed, record the document as "skipped" so the
+        // index builder can retry at a point when data is consistent.
+        auto interceptor = entry->indexBuildInterceptor();
+        if (interceptor && interceptor->getSkippedRecordTracker()) {
+            LOGV2_DEBUG(20684,
+                        1,
+                        "Recording suppressed key generation error to retry later"
+                        "{error} on {loc}: {obj}",
+                        "error"_attr = status,
+                        "loc"_attr = loc.value(),
+                        "obj"_attr = redact(obj));
+
+            // Save and restore the cursor around the write in case it throws a WCE
+            // internally and causes the cursor to be unpositioned.
+
+            saveCursorBeforeWrite();
+            interceptor->getSkippedRecordTracker()->record(opCtx, loc.value());
+            restoreCursorAfterWrite();
+        }
+    };
+}
+
+bool shouldRelaxConstraints(OperationContext* opCtx, const CollectionPtr& collection) {
+    if (!feature_flags::gIndexBuildGracefulErrorHandling.isEnabledAndIgnoreFCV()) {
+        // Always suppress.
+        return true;
+    }
+    invariant(opCtx->lockState()->isRSTLLocked());
+    const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    bool isPrimary = replCoord->canAcceptWritesFor(opCtx, collection->ns());
+
+    // When graceful index build cancellation in enabled, primaries do not need
+    // to suppress key generation errors other than duplicate key. The error
+    // should be surfaced and cause immediate abort of the index build.
+
+    // This is true because primaries are guaranteed to have a consistent view of data. To receive a
+    // transient error on a primary node, the user would have to correct any poorly-formed documents
+    // while the index build is in progress. As this requires good timing and would likely not be
+    // intentional by the user, we try to fail early.
+
+    // Initial syncing nodes, however, can experience false-positive transient errors, so they must
+    // suppress errors. Secondaries, on the other hand, rely on the primary's decision to commit or
+    // abort the index build, so we suppress errors there as well, but it is not required. If a
+    // secondary ever becomes primary, it must retry any previously-skipped documents before
+    // committing.
+    return !isPrimary;
+}
+
 }  // namespace
 
 MultiIndexBlock::~MultiIndexBlock() {
@@ -183,7 +241,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(OperationContext* opCtx,
                                                        const BSONObj& spec,
                                                        OnInitFn onInit) {
     const auto indexes = std::vector<BSONObj>(1, spec);
-    return init(opCtx, collection, indexes, onInit, /*forRecovery=*/false, boost::none);
+    return init(opCtx, collection, indexes, onInit, InitMode::SteadyState, boost::none);
 }
 
 StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
@@ -191,7 +249,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
     CollectionWriter& collection,
     const std::vector<BSONObj>& indexSpecs,
     OnInitFn onInit,
-    bool forRecovery,
+    InitMode initMode,
     const boost::optional<ResumeIndexInfo>& resumeInfo) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_X),
               str::stream() << "Collection " << collection->ns() << " with UUID "
@@ -206,6 +264,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
         _phase = resumeInfo->getPhase();
     }
 
+    bool forRecovery = initMode == InitMode::Recovery;
     // Guarantees that exceptions cannot be returned from index builder initialization except for
     // WriteConflictExceptions, which should be dealt with by the caller.
     try {
@@ -325,13 +384,13 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
 
             const IndexDescriptor* descriptor = indexCatalogEntry->descriptor();
 
-            collection->getIndexCatalog()->prepareInsertDeleteOptions(
-                opCtx, collection->ns(), descriptor, &index.options);
-
+            // ConstraintEnforcement is checked dynamically via callback (shouldRelaxContraints) on
+            // steady state replication. On other modes, constraints are always relaxed.
+            index.options.getKeysMode = initMode == InitMode::SteadyState
+                ? InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsCallback
+                : InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraints;
             // Foreground index builds have to check for duplicates. Other index builds can relax
             // constraints and check for violations at commit-time.
-            index.options.getKeysMode =
-                InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraints;
             index.options.dupsAllowed = _method == IndexBuildMethod::kForeground
                 ? !descriptor->unique() || _ignoreUnique
                 : true;
@@ -612,6 +671,27 @@ void MultiIndexBlock::_doCollectionScan(OperationContext* opCtx,
     _phase = IndexBuildPhaseEnum::kCollectionScan;
 
     BSONObj objToIndex;
+    // If a key constraint violation is found, it may be suppressed and written to the constraint
+    // violations side table. The plan executor must be passed down to save and restore the
+    // cursor around the side table write in case any write conflict exception occurs that would
+    // otherwise reposition the cursor unexpectedly.
+    std::function<void()> saveCursorBeforeWrite = [&exec, &objToIndex] {
+        // Update objToIndex so that it continues to point to valid data when the
+        // cursor is closed. A WCE may occur during a write to index A, and
+        // objToIndex must still be used when the write is retried or for a write to
+        // another index (if creating multiple indexes at once)
+        objToIndex = objToIndex.getOwned();
+        exec->saveState();
+    };
+    std::function<void()> restoreCursorAfterWrite = [&] {
+        exec->restoreState(&collection);
+    };
+    // Callback to handle writing to the side table in case an error is suppressed, it is
+    // constructed using the above callbacks to ensure the cursor is well positioned after the
+    // write.
+    const auto onSuppressedError =
+        makeOnSuppressedErrorFn(saveCursorBeforeWrite, restoreCursorAfterWrite);
+
     RecordId loc;
     PlanExecutor::ExecState state;
     while (PlanExecutor::ADVANCED == (state = exec->getNext(&objToIndex, &loc)) ||
@@ -635,28 +715,15 @@ void MultiIndexBlock::_doCollectionScan(OperationContext* opCtx,
                                       progress->get(WithLock::withoutLock())->hits()));
 
         // The external sorter is not part of the storage engine and therefore does not need
-        // a WriteUnitOfWork to write keys.
-        //
-        // However, if a key constraint violation is found, it will be written to the constraint
-        // violations side table. The plan executor must be passed down to save and restore the
-        // cursor around the side table write in case any write conflict exception occurs that would
-        // otherwise reposition the cursor unexpectedly. All WUOW and write conflict exception
+        // a WriteUnitOfWork to write keys. In case there are constraint violations being
+        // suppressed, resulting in a write to the side table, all WUOW and write conflict exception
         // handling for the side table write is handled internally.
-        uassertStatusOK(_insert(
-            opCtx,
-            collection,
-            objToIndex,
-            loc,
-            /*saveCursorBeforeWrite*/
-            [&exec, &objToIndex] {
-                // Update objToIndex so that it continues to point to valid data when the
-                // cursor is closed. A WCE may occur during a write to index A, and
-                // objToIndex must still be used when the write is retried or for a write to
-                // another index (if creating multiple indexes at once)
-                objToIndex = objToIndex.getOwned();
-                exec->saveState();
-            },
-            /*restoreCursorAfterWrite*/ [&] { exec->restoreState(&collection); }));
+
+        // If kRelaxConstraints, shouldRelaxConstraints will simply be ignored and all errors
+        // suppressed. If kRelaxContraintsCallback, shouldRelaxConstraints is used to determine
+        // whether the error is suppressed or an exception is thrown.
+        uassertStatusOK(
+            _insert(opCtx, collection, objToIndex, loc, onSuppressedError, shouldRelaxConstraints));
 
         _failPointHangDuringBuild(opCtx,
                                   &hangIndexBuildDuringCollectionScanPhaseAfterInsertion,
@@ -680,15 +747,18 @@ Status MultiIndexBlock::insertSingleDocumentForInitialSyncOrRecovery(
     const RecordId& loc,
     const std::function<void()>& saveCursorBeforeWrite,
     const std::function<void()>& restoreCursorAfterWrite) {
-    return _insert(opCtx, collection, doc, loc, saveCursorBeforeWrite, restoreCursorAfterWrite);
+    const auto onSuppressedError =
+        makeOnSuppressedErrorFn(saveCursorBeforeWrite, restoreCursorAfterWrite);
+    return _insert(opCtx, collection, doc, loc, onSuppressedError);
 }
 
-Status MultiIndexBlock::_insert(OperationContext* opCtx,
-                                const CollectionPtr& collection,
-                                const BSONObj& doc,
-                                const RecordId& loc,
-                                const std::function<void()>& saveCursorBeforeWrite,
-                                const std::function<void()>& restoreCursorAfterWrite) {
+Status MultiIndexBlock::_insert(
+    OperationContext* opCtx,
+    const CollectionPtr& collection,
+    const BSONObj& doc,
+    const RecordId& loc,
+    const IndexAccessMethod::OnSuppressedErrorFn& onSuppressedError,
+    const IndexAccessMethod::ShouldRelaxConstraintsFn& shouldRelaxConstraints) {
     invariant(!_buildIsCleanedUp);
 
     // The detection of mixed-schema data needs to be done before applying the partial filter
@@ -726,8 +796,8 @@ Status MultiIndexBlock::_insert(OperationContext* opCtx,
                                                  doc,
                                                  loc,
                                                  _indexes[i].options,
-                                                 saveCursorBeforeWrite,
-                                                 restoreCursorAfterWrite);
+                                                 onSuppressedError,
+                                                 shouldRelaxConstraints);
         } catch (...) {
             return exceptionToStatus();
         }

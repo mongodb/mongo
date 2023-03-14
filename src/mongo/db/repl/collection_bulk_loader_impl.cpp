@@ -101,7 +101,7 @@ Status CollectionBulkLoaderImpl::init(const std::vector<BSONObj>& secondaryIndex
                                              collWriter,
                                              specs,
                                              MultiIndexBlock::kNoopOnInitFn,
-                                             /*forRecovery=*/false)
+                                             MultiIndexBlock::InitMode::InitialSync)
                                       .getStatus();
                     if (!status.isOK()) {
                         return status;

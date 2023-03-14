@@ -2628,9 +2628,11 @@ void IndexBuildsCoordinator::_runIndexBuildInner(
         }
     }
 
-    // If the index build has already been cleaned-up because it encountered an error at
-    // commit-time, there is no work to do. This is the most routine case, since index
-    // constraint checking happens at commit-time for index builds.
+    // If the index build has already been cleaned-up because it encountered an error, there is no
+    // work to do. If feature flag IndexBuildGracefulErrorHandling is not enabled, the most routine
+    // case is for this to be due to a self-abort caused by constraint checking during the commit
+    // phase. When the flag is enabled, constraint violations cause the index build to abort
+    // immediately on primaries, and an async external abort is requested.
     if (replState->isAborted()) {
         if (ErrorCodes::isTenantMigrationError(replState->getAbortStatus()))
             uassertStatusOK(replState->getAbortStatus());
@@ -2660,9 +2662,9 @@ void IndexBuildsCoordinator::_runIndexBuildInner(
 
     // If IndexBuildGracefulErrorHandling is not enabled, crash on unexpected build errors. When the
     // feature flag is enabled, two-phase builds can handle unexpected errors by requesting an abort
-    // to the primary node.
-    if (!feature_flags::gIndexBuildGracefulErrorHandling.isEnabledAndIgnoreFCV() ||
-        IndexBuildProtocol::kSinglePhase == replState->protocol) {
+    // to the primary node. Single-phase builds can also abort immediately, as the primary or
+    // standalone is the only node aware of the build.
+    if (!feature_flags::gIndexBuildGracefulErrorHandling.isEnabledAndIgnoreFCV()) {
         // Index builds only check index constraints when committing. If an error occurs at that
         // point, then the build is cleaned up while still holding the appropriate locks. The only
         // errors that we cannot anticipate are user interrupts and shutdown errors.

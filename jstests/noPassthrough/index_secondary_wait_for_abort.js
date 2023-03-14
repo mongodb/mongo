@@ -74,7 +74,8 @@ const exitCode = createIdx({checkExitSuccess: false});
 assert.neq(0, exitCode, 'expected shell to exit abnormally due to index build failing');
 
 // Confirm that the index build on the secondary failed because of the invalid document.
-checkLog.contains(secondary, 'Location16746: Ambiguous field name found in array');
+// "Ambiguous field name found in array ..."
+checkLog.checkContainsOnceJsonStringMatch(secondary, 20649, "error", "\"code\":16746");
 
 // Check indexes on primary.
 rst.awaitReplication();

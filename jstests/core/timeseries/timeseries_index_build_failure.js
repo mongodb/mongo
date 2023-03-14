@@ -1,6 +1,9 @@
 /**
- * Checks that the skipped record tracker records keys that have violated index key constraints
- * for time-series collections.
+ * Checks that violations of key constraints cause an index build to fail on time-series
+ * collections:
+ *  - featureFlagIndexBuildGracefulErrorHandling (off): the skipped record tracker records these
+ * keys and fails while retrying in the commit phase.
+ *  - featureFlagIndexBuildGracefulErrorHandling (on): the build terminates immediately.
  *
  * @tags: [
  *   # We need a timeseries collection.

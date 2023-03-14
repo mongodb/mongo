@@ -56,7 +56,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/timestamp_block.h"
 #include "mongo/db/storage/execution_context.h"
 #include "mongo/db/storage/kv/kv_engine.h"
@@ -814,8 +813,8 @@ public:
                   const BSONObj& obj,
                   const RecordId& loc,
                   const InsertDeleteOptions& options,
-                  const std::function<void()>& saveCursorBeforeWrite,
-                  const std::function<void()>& restoreCursorAfterWrite) final;
+                  const OnSuppressedErrorFn& onSuppressedError = nullptr,
+                  const ShouldRelaxConstraintsFn& shouldRelaxConstraints = nullptr) final;
 
     const MultikeyPaths& getMultikeyPaths() const final;
 
@@ -911,8 +910,8 @@ Status SortedDataIndexAccessMethod::BulkBuilderImpl::insert(
     const BSONObj& obj,
     const RecordId& loc,
     const InsertDeleteOptions& options,
-    const std::function<void()>& saveCursorBeforeWrite,
-    const std::function<void()>& restoreCursorAfterWrite) {
+    const OnSuppressedErrorFn& onSuppressedError,
+    const ShouldRelaxConstraintsFn& shouldRelaxConstraints) {
     auto& executionCtx = StorageExecutionContext::get(opCtx);
 
     auto keys = executionCtx.keys();
@@ -929,28 +928,8 @@ Status SortedDataIndexAccessMethod::BulkBuilderImpl::insert(
                       &_multikeyMetadataKeys,
                       multikeyPaths.get(),
                       loc,
-                      [&](Status status, const BSONObj&, const boost::optional<RecordId>&) {
-                          // If a key generation error was suppressed, record the document as
-                          // "skipped" so the index builder can retry at a point when data is
-                          // consistent.
-                          auto interceptor = _iam->_indexCatalogEntry->indexBuildInterceptor();
-                          if (interceptor && interceptor->getSkippedRecordTracker()) {
-                              LOGV2_DEBUG(
-                                  20684,
-                                  1,
-                                  "Recording suppressed key generation error to retry later: "
-                                  "{error} on {loc}: {obj}",
-                                  "error"_attr = status,
-                                  "loc"_attr = loc,
-                                  "obj"_attr = redact(obj));
-
-                              // Save and restore the cursor around the write in case it throws a
-                              // WCE internally and causes the cursor to be unpositioned.
-                              saveCursorBeforeWrite();
-                              interceptor->getSkippedRecordTracker()->record(opCtx, loc);
-                              restoreCursorAfterWrite();
-                          }
-                      });
+                      onSuppressedError,
+                      shouldRelaxConstraints);
     } catch (...) {
         return exceptionToStatus();
     }
@@ -1097,17 +1076,19 @@ Status SortedDataIndexAccessMethod::BulkBuilderImpl::keyCommitted(
     return Status::OK();
 }
 
-void SortedDataIndexAccessMethod::getKeys(OperationContext* opCtx,
-                                          const CollectionPtr& collection,
-                                          SharedBufferFragmentBuilder& pooledBufferBuilder,
-                                          const BSONObj& obj,
-                                          InsertDeleteOptions::ConstraintEnforcementMode mode,
-                                          GetKeysContext context,
-                                          KeyStringSet* keys,
-                                          KeyStringSet* multikeyMetadataKeys,
-                                          MultikeyPaths* multikeyPaths,
-                                          const boost::optional<RecordId>& id,
-                                          OnSuppressedErrorFn&& onSuppressedError) const {
+void SortedDataIndexAccessMethod::getKeys(
+    OperationContext* opCtx,
+    const CollectionPtr& collection,
+    SharedBufferFragmentBuilder& pooledBufferBuilder,
+    const BSONObj& obj,
+    InsertDeleteOptions::ConstraintEnforcementMode mode,
+    GetKeysContext context,
+    KeyStringSet* keys,
+    KeyStringSet* multikeyMetadataKeys,
+    MultikeyPaths* multikeyPaths,
+    const boost::optional<RecordId>& id,
+    const OnSuppressedErrorFn& onSuppressedErrorFn,
+    const ShouldRelaxConstraintsFn& shouldRelaxConstraints) const {
     invariant(!id || _newInterface->rsKeyFormat() != KeyFormat::String || id->isStr(),
               fmt::format("RecordId is not in the same string format as its RecordStore; id: {}",
                           id->toString()));
@@ -1151,8 +1132,15 @@ void SortedDataIndexAccessMethod::getKeys(OperationContext* opCtx,
             throw;
         }
 
-        if (onSuppressedError) {
-            onSuppressedError(ex.toStatus(), obj, id);
+        if (mode == InsertDeleteOptions::ConstraintEnforcementMode::kRelaxConstraintsCallback) {
+            invariant(shouldRelaxConstraints);
+            if (!shouldRelaxConstraints(opCtx, collection)) {
+                throw;
+            }
+        }
+
+        if (onSuppressedErrorFn) {
+            onSuppressedErrorFn(opCtx, _indexCatalogEntry, ex.toStatus(), obj, id);
         } else {
             LOGV2_DEBUG(20686,
                         1,

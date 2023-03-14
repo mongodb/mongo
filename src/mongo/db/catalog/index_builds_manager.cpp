@@ -28,6 +28,7 @@
  */
 
 
+#include "mongo/db/catalog/multi_index_block.h"
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/catalog/index_builds_manager.h"
@@ -115,8 +116,11 @@ Status IndexBuildsManager::setUpIndexBuild(OperationContext* opCtx,
     std::vector<BSONObj> indexes;
     try {
         indexes = writeConflictRetry(opCtx, "IndexBuildsManager::setUpIndexBuild", nss.ns(), [&]() {
+            MultiIndexBlock::InitMode mode = options.forRecovery
+                ? MultiIndexBlock::InitMode::Recovery
+                : MultiIndexBlock::InitMode::SteadyState;
             return uassertStatusOK(
-                builder->init(opCtx, collection, specs, onInit, options.forRecovery, resumeInfo));
+                builder->init(opCtx, collection, specs, onInit, mode, resumeInfo));
         });
     } catch (const DBException& ex) {
         return ex.toStatus();

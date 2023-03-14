@@ -68,6 +68,13 @@ class IndexAccessMethod {
     IndexAccessMethod& operator=(const IndexAccessMethod&) = delete;
 
 public:
+    using ShouldRelaxConstraintsFn =
+        std::function<bool(OperationContext* opCtx, const CollectionPtr& collection)>;
+    using OnSuppressedErrorFn = std::function<void(OperationContext* opCtx,
+                                                   const IndexCatalogEntry* entry,
+                                                   Status status,
+                                                   const BSONObj& obj,
+                                                   const boost::optional<RecordId>& loc)>;
     using KeyHandlerFn = std::function<Status(const KeyString::Value&)>;
     using RecordIdHandlerFn = std::function<Status(const RecordId&)>;
 
@@ -202,22 +209,14 @@ public:
 
         /**
          * Insert into the BulkBuilder as-if inserting into an IndexAccessMethod.
-         *
-         * 'saveCursorBeforeWrite' and 'restoreCursorAfterWrite' will be used to save and restore
-         * the cursor around any constraint violation side table write that may occur, in case a WCE
-         * occurs internally that would otherwise unposition the cursor.
-         *
-         * Note: we pass the cursor down into this insert function so we can limit cursor
-         * save/restore to around constraints violation side table writes only. Otherwise, we would
-         * have to save/restore around each insert() call just in case there is a side table write.
          */
         virtual Status insert(OperationContext* opCtx,
                               const CollectionPtr& collection,
                               const BSONObj& obj,
                               const RecordId& loc,
                               const InsertDeleteOptions& options,
-                              const std::function<void()>& saveCursorBeforeWrite,
-                              const std::function<void()>& restoreCursorAfterWrite) = 0;
+                              const OnSuppressedErrorFn& onSuppressedError = nullptr,
+                              const ShouldRelaxConstraintsFn& shouldRelaxConstraints = nullptr) = 0;
 
         /**
          * Call this when you are ready to finish your bulk work.
@@ -325,6 +324,8 @@ struct InsertDeleteOptions {
     enum class ConstraintEnforcementMode {
         // Relax all constraints.
         kRelaxConstraints,
+        // Relax constraints only if shouldRelaxConstraintsFn callback returns true.
+        kRelaxConstraintsCallback,
         // Relax all constraints on documents that don't apply to a partial index.
         kRelaxConstraintsUnfiltered,
         // Enforce all constraints.
@@ -389,11 +390,11 @@ public:
      * keys are not associated with the document itself, but instead represent multi-key path
      * information that must be stored in a reserved keyspace within the index.
      *
-     * If any key generation errors are encountered and suppressed due to the provided GetKeysMode,
-     * 'onSuppressedErrorFn' is called.
+     * If any key generation errors which should be suppressed due to the provided GetKeysMode are
+     * encountered, 'onSuppressedErrorFn' is called if provided. The 'onSuppressedErrorFn'
+     * return value indicates whether the error should finally suppressed. If not provided, it is as
+     * if it returned true, and all suppressible errors are suppressed.
      */
-    using OnSuppressedErrorFn = std::function<void(
-        Status status, const BSONObj& obj, const boost::optional<RecordId>& loc)>;
     void getKeys(OperationContext* opCtx,
                  const CollectionPtr& collection,
                  SharedBufferFragmentBuilder& pooledBufferBuilder,
@@ -404,7 +405,8 @@ public:
                  KeyStringSet* multikeyMetadataKeys,
                  MultikeyPaths* multikeyPaths,
                  const boost::optional<RecordId>& id,
-                 OnSuppressedErrorFn&& onSuppressedError = nullptr) const;
+                 const OnSuppressedErrorFn& onSuppressedError = nullptr,
+                 const ShouldRelaxConstraintsFn& shouldRelaxConstraints = nullptr) const;
 
     /**
      * Inserts the specified keys into the index. Does not attempt to determine whether the

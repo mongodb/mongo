@@ -96,6 +96,9 @@ public:
         _buildUUID = indexBuildUUID;
     }
 
+    using OnInitFn = std::function<Status(std::vector<BSONObj>& specs)>;
+    enum class InitMode { SteadyState, InitialSync, Recovery };
+
     /**
      * Prepares the index(es) for building and returns the canonicalized form of the requested index
      * specifications.
@@ -108,23 +111,17 @@ public:
      *
      * Requires holding an exclusive lock on the collection.
      */
-    using OnInitFn = std::function<Status(std::vector<BSONObj>& specs)>;
     StatusWith<std::vector<BSONObj>> init(
         OperationContext* opCtx,
         CollectionWriter& collection,
         const std::vector<BSONObj>& specs,
         OnInitFn onInit,
-        bool forRecovery,
+        InitMode initMode = InitMode::SteadyState,
         const boost::optional<ResumeIndexInfo>& resumeInfo = boost::none);
     StatusWith<std::vector<BSONObj>> init(OperationContext* opCtx,
                                           CollectionWriter& collection,
                                           const BSONObj& spec,
                                           OnInitFn onInit);
-    StatusWith<std::vector<BSONObj>> initForResume(OperationContext* opCtx,
-                                                   const CollectionPtr& collection,
-                                                   const std::vector<BSONObj>& specs,
-                                                   const ResumeIndexInfo& resumeInfo);
-
     /**
      * Not all index initializations need an OnInitFn, in particular index builds that do not need
      * to timestamp catalog writes. This is a no-op.
@@ -332,12 +329,13 @@ private:
                                      const BSONObj& doc,
                                      unsigned long long iteration) const;
 
-    Status _insert(OperationContext* opCtx,
-                   const CollectionPtr& collection,
-                   const BSONObj& wholeDocument,
-                   const RecordId& loc,
-                   const std::function<void()>& saveCursorBeforeWrite,
-                   const std::function<void()>& restoreCursorAfterWrite);
+    Status _insert(
+        OperationContext* opCtx,
+        const CollectionPtr& collection,
+        const BSONObj& wholeDocument,
+        const RecordId& loc,
+        const IndexAccessMethod::OnSuppressedErrorFn& onSuppressedError,
+        const IndexAccessMethod::ShouldRelaxConstraintsFn& shouldRelaxConstraints = nullptr);
 
     /**
      * Performs a collection scan on the given collection and inserts the relevant index keys into

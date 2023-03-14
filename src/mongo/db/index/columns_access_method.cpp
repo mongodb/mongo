@@ -89,8 +89,8 @@ public:
                   const BSONObj& obj,
                   const RecordId& rid,
                   const InsertDeleteOptions& options,
-                  const std::function<void()>& saveCursorBeforeWrite,
-                  const std::function<void()>& restoreCursorAfterWrite) final;
+                  const OnSuppressedErrorFn& onSuppressedError,
+                  const ShouldRelaxConstraintsFn& shouldRelaxConstraints) final;
 
     const MultikeyPaths& getMultikeyPaths() const final;
 
@@ -160,8 +160,8 @@ Status ColumnStoreAccessMethod::BulkBuilder::insert(
     const BSONObj& obj,
     const RecordId& rid,
     const InsertDeleteOptions& options,
-    const std::function<void()>& saveCursorBeforeWrite,
-    const std::function<void()>& restoreCursorAfterWrite) {
+    const OnSuppressedErrorFn& onSuppressedError,
+    const ShouldRelaxConstraintsFn& shouldRelaxConstraints) {
     _columnsAccess->_keyGen.visitCellsForInsert(
         obj, [&](PathView path, const column_keygen::UnencodedCellView& cell) {
             _cellBuilder.reset();

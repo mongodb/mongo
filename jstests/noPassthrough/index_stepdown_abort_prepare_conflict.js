@@ -5,11 +5,11 @@
  * This tests the following scenario:
  * 1) Starts and index build.
  * 2) Prepares a transaction which holds the collection lock in IX mode.
- * 3) Waits for the index build to attempt to acquire the collection lock in X mode to commit, but
+ * 3) Waits for the index build to attempt to acquire the collection lock in X mode to abort, but
  *    blocks behind the prepared transaction due to a collection lock conflict.
  * 4) Steps down the primary, which enqueues the RSTL in X mode.
  * 5) Ensures the index build has released its RSTL lock before taking the X lock, and does not
- *    block stepDown. Since commit must acquire the RSTL to write its oplog entry, ensures that the
+ *    block stepDown. Since abort must acquire the RSTL to write its oplog entry, ensures that the
  *    index build is able to retry after failing once due to a stepDown.
  * 6) Steps up a new primary. Ensure that the blocked index build on the secondary does not prevent
  *    step-up from ocurring.
@@ -43,8 +43,21 @@ const primaryColl = primaryDB[collName];
 assert.commandWorked(
     primaryColl.insert({_id: 1, x: [1, 2], y: [1, 2]}, {"writeConcern": {"w": 1}}));
 
-// Enable fail point which makes hybrid index build to hang.
-const failPoint = "hangAfterIndexBuildSecondDrain";
+// Enable fail point which makes hybrid index build to hang before it aborts.
+var failPoint;
+if (TestData.setParameters.featureFlagIndexBuildGracefulErrorHandling) {
+    // If this feature flag is enabled, index builds fail immediately instead of suppressing errors
+    // until the commit phase, and always signal the primary for abort (even if it is itself). Abort
+    // is only ever performed in the command thread, which is interrupted by replication state
+    // transitions and retried. Abort in this case is not susceptible to the deadlock.
+    // To test this, we block the index build before it starts scanning. When unblocked, it will try
+    // to abort the build after the prepared transaction is holding the lock.
+    failPoint = "hangAfterInitializingIndexBuild";
+} else {
+    // Whe the feature flag is off, the build is aborted while retrying the skipped record during
+    // commit phase.
+    failPoint = "hangAfterIndexBuildSecondDrain";
+}
 let res =
     assert.commandWorked(primary.adminCommand({configureFailPoint: failPoint, mode: "alwaysOn"}));
 let timesEntered = res.count;

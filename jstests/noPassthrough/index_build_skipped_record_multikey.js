@@ -14,7 +14,18 @@
 load('jstests/libs/fail_point_util.js');
 load('jstests/libs/parallel_shell_helpers.js');
 
-const replTest = new ReplSetTest({nodes: 1});
+const replTest = new ReplSetTest({
+    nodes: [
+        {},
+        {
+            // Disallow elections on secondary.
+            rsConfig: {
+                priority: 0,
+            },
+        },
+    ],
+    nodeOptions: {setParameter: {logComponentVerbosity: tojson({index: 2})}}
+});
 replTest.startSet();
 replTest.initiate();
 
@@ -44,27 +55,40 @@ assert.commandWorked(coll.insert([
     }
 ]));
 
-const fp = configureFailPoint(primary, 'hangAfterIndexBuildFirstDrain');
-const awaitCreateIndex = startParallelShell(
-    funWithArgs(function(collName) {
-        assert.commandWorked(db[collName].createIndex({'a.loc': '2dsphere', 'a.num': 1}));
-    }, coll.getName()), primary.port);
-fp.wait();
+const secondary = replTest.getSecondary();
+const fpSecondaryDrain = configureFailPoint(secondary, 'hangAfterIndexBuildFirstDrain');
+
+// We don't want the primary to observe a non-conforming document, as that would abort the build.
+// Hang before collection scan starts.
+const fpPrimarySetup = configureFailPoint(primary, 'hangAfterInitializingIndexBuild');
+
+const indexKeyPattern = {
+    'a.loc': '2dsphere',
+    'a.num': 1
+};
+const awaitCreateIndex =
+    startParallelShell(funWithArgs(function(collName, keyPattern) {
+                           assert.commandWorked(db[collName].createIndex(keyPattern));
+                       }, coll.getName(), indexKeyPattern), primary.port);
+fpSecondaryDrain.wait();
 
 // Two documents are scanned but only one key is inserted.
-checkLog.containsJson(primary, 20391, {namespace: coll.getFullName(), totalRecords: 2});
-checkLog.containsJson(primary, 20685, {namespace: coll.getFullName(), keysInserted: 1});
+checkLog.containsJson(secondary, 20391, {namespace: coll.getFullName(), totalRecords: 2});
+checkLog.containsJson(secondary, 20685, {namespace: coll.getFullName(), keysInserted: 1});
 
 // Allows 'a.loc' to be indexed as a 2dsphere and flips the index to multikey.
 assert.commandWorked(coll.update({_id: 1}, {
     a: {loc: {type: 'Point', coordinates: [-73.88, 40.78]}, num: [1, 1]},
 }));
 
-fp.off();
+fpSecondaryDrain.off();
+fpPrimarySetup.off();
 awaitCreateIndex();
 
-// The skipped document is resolved before the index is committed.
-checkLog.containsJson(primary, 23883, {index: 'a.loc_2dsphere_a.num_1', numResolved: 1});
+// The skipped document is resolved, and causes the index to flip to multikey.
+// "Index set to multi key ..."
+checkLog.containsJson(
+    secondary, 4718705, {namespace: coll.getFullName(), keyPattern: indexKeyPattern});
 
 replTest.stopSet();
 })();

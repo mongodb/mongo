@@ -94,7 +94,7 @@ TEST_F(MultiIndexBlockTest, CommitWithoutInsertingDocuments) {
                                                    coll,
                                                    std::vector<BSONObj>(),
                                                    MultiIndexBlock::kNoopOnInitFn,
-                                                   /*forRecovery=*/false));
+                                                   MultiIndexBlock::InitMode::SteadyState));
     ASSERT_EQUALS(0U, specs.size());
 
     ASSERT_OK(indexer->dumpInsertsFromBulk(operationContext(), coll.get()));
@@ -120,7 +120,7 @@ TEST_F(MultiIndexBlockTest, CommitAfterInsertingSingleDocument) {
                                                    coll,
                                                    std::vector<BSONObj>(),
                                                    MultiIndexBlock::kNoopOnInitFn,
-                                                   /*forRecovery=*/false));
+                                                   MultiIndexBlock::InitMode::InitialSync));
     ASSERT_EQUALS(0U, specs.size());
 
     ASSERT_OK(indexer->insertSingleDocumentForInitialSyncOrRecovery(
@@ -156,7 +156,7 @@ TEST_F(MultiIndexBlockTest, AbortWithoutCleanupAfterInsertingSingleDocument) {
                                                    coll,
                                                    std::vector<BSONObj>(),
                                                    MultiIndexBlock::kNoopOnInitFn,
-                                                   /*forRecovery=*/false));
+                                                   MultiIndexBlock::InitMode::InitialSync));
     ASSERT_EQUALS(0U, specs.size());
     ASSERT_OK(indexer->insertSingleDocumentForInitialSyncOrRecovery(
         operationContext(),
