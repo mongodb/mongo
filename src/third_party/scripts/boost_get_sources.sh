@@ -43,7 +43,7 @@ cd $SRC
 ./b2 tools/bcp
 
 test -d $DEST_DIR || mkdir $DEST_DIR
-$SRC/dist/bin/bcp --boost=$SRC/ algorithm align array asio bind iostreams config container date_time filesystem function integer intrusive log math/statistics multi_index noncopyable optional program_options property_tree random smart_ptr static_assert unordered utility vmd $DEST_DIR
+$SRC/dist/bin/bcp --boost=$SRC/ algorithm align array asio bind iostreams config container date_time filesystem function integer intrusive log math/statistics multi_index noncopyable optional program_options property_tree random smart_ptr sort static_assert unordered utility vmd $DEST_DIR
 
 # Trim files
 cd $DEST_DIR
@@ -77,6 +77,7 @@ find libs -name "*.gif" -print0 | xargs -0 rm -f
 rm -rf libs/algorithm
 rm -rf libs/config
 rm -rf libs/static_assert
+rm -rf libs/sort/benchmark
 
 # Trim the include directory for the stuff bcp dragged in and we do not need
 # since they are 1+ MB each
