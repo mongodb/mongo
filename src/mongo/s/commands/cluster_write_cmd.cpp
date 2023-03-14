@@ -511,13 +511,7 @@ bool ClusterWriteCmd::InvocationBase::runImpl(OperationContext* opCtx,
     // The batched request will only have WC if it was supplied by the client. Otherwise, the
     // batched request should use the WC from the opCtx.
     if (!batchedRequest.hasWriteConcern()) {
-        if (opCtx->getWriteConcern().usedDefaultConstructedWC) {
-            // Pass writeConcern: {}, rather than {w: 1, wtimeout: 0}, so as to not override the
-            // configsvr w:majority upconvert.
-            batchedRequest.setWriteConcern(BSONObj());
-        } else {
-            batchedRequest.setWriteConcern(opCtx->getWriteConcern().toBSON());
-        }
+        batchedRequest.setWriteConcern(opCtx->getWriteConcern().toBSON());
     }
 
     // Write ops are never allowed to have writeConcern inside transactions. Normally
