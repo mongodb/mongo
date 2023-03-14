@@ -210,8 +210,7 @@ function analyzeShardKey(ns, shardKey, indexKey) {
     }
     // The response should contain a "readDistribution" field and a "writeDistribution" field
     // whether or not there are sampled queries.
-    assert(res.hasOwnProperty("readDistribution"), res);
-    assert(res.hasOwnProperty("writeDistribution"), res);
+    AnalyzeShardKeyUtil.assertContainReadWriteDistributionMetrics(res);
 
     return res;
 }

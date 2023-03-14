@@ -156,25 +156,56 @@ var AnalyzeShardKeyUtil = (function() {
         return assert.lte(Math.abs(actual - expected), epsilon, {actual, expected, msg});
     }
 
-    function assertNotContainKeyCharacteristicsMetrics(actual) {
-        assert(!actual.hasOwnProperty("numDocs"), actual);
-        assert(!actual.hasOwnProperty("isUnique"), actual);
-        assert(!actual.hasOwnProperty("numDistinctValues"), actual);
-        assert(!actual.hasOwnProperty("mostCommonValues"), actual);
-        assert(!actual.hasOwnProperty("monotonicity"), actual);
-        assert(!actual.hasOwnProperty("avgDocSizeBytes"), actual);
+    function validateKeyCharacteristicsMetrics(metrics) {
+        assert.gte(metrics.numDocs, metrics.numDistinctValues, metrics);
+        assert.gte(metrics.numDistinctValues, metrics.mostCommonValues.length, metrics);
+
+        let totalFrequency = 0;
+        let prevFrequency = Number.MAX_VALUE;
+        for (let {value, frequency} of metrics.mostCommonValues) {
+            assert.lte(frequency, prevFrequency, metrics);
+            if (metrics.isUnique) {
+                assert.eq(frequency, 1, metrics);
+            }
+            totalFrequency += frequency;
+            prevFrequency = frequency;
+        }
+        assert.gte(metrics.numDocs, totalFrequency, metrics);
+
+        if (metrics.monotonicity.type == "unknown") {
+            assert(!metrics.monotonicity.hasOwnProperty("recordIdCorrelationCoefficient"), metrics);
+        } else {
+            assert(metrics.monotonicity.hasOwnProperty("recordIdCorrelationCoefficient"), metrics);
+            const coefficient = metrics.monotonicity.recordIdCorrelationCoefficient;
+            assert.gte(Math.abs(coefficient), 0, metrics);
+            assert.lte(Math.abs(coefficient), 1, metrics);
+        }
+
+        assert.gt(metrics.avgDocSizeBytes, 0);
     }
 
-    function assertContainKeyCharacteristicsMetrics(actual) {
-        assert(actual.hasOwnProperty("numDocs"), actual);
-        assert(actual.hasOwnProperty("isUnique"), actual);
-        assert(actual.hasOwnProperty("numDistinctValues"), actual);
-        assert(actual.hasOwnProperty("mostCommonValues"), actual);
-        assert(actual.hasOwnProperty("monotonicity"), actual);
-        assert(actual.hasOwnProperty("avgDocSizeBytes"), actual);
+    function assertNotContainKeyCharacteristicsMetrics(metrics) {
+        assert(!metrics.hasOwnProperty("numDocs"), metrics);
+        assert(!metrics.hasOwnProperty("isUnique"), metrics);
+        assert(!metrics.hasOwnProperty("numDistinctValues"), metrics);
+        assert(!metrics.hasOwnProperty("mostCommonValues"), metrics);
+        assert(!metrics.hasOwnProperty("monotonicity"), metrics);
+        assert(!metrics.hasOwnProperty("avgDocSizeBytes"), metrics);
+    }
+
+    function assertContainKeyCharacteristicsMetrics(metrics) {
+        assert(metrics.hasOwnProperty("numDocs"), metrics);
+        assert(metrics.hasOwnProperty("isUnique"), metrics);
+        assert(metrics.hasOwnProperty("numDistinctValues"), metrics);
+        assert(metrics.hasOwnProperty("mostCommonValues"), metrics);
+        assert(metrics.hasOwnProperty("monotonicity"), metrics);
+        assert(metrics.hasOwnProperty("avgDocSizeBytes"), metrics);
+        validateKeyCharacteristicsMetrics(metrics);
     }
 
     function assertKeyCharacteristicsMetrics(actual, expected) {
+        assertContainKeyCharacteristicsMetrics(actual);
+
         assert.eq(actual.numDocs, expected.numDocs, {actual, expected});
         assert.eq(actual.isUnique, expected.isUnique, {actual, expected});
         assert.eq(actual.numDistinctValues, expected.numDistinctValues, {actual, expected});
@@ -206,6 +237,87 @@ var AnalyzeShardKeyUtil = (function() {
         assert(actual.hasOwnProperty("avgDocSizeBytes"), {actual, expected});
     }
 
+    function validateReadDistributionMetrics(metrics) {
+        if (metrics.sampleSize.total == 0) {
+            assert.eq(bsonWoCompare(
+                          metrics,
+                          {sampleSize: {total: 0, find: 0, aggregate: 0, count: 0, distinct: 0}}),
+                      0,
+                      metrics);
+        } else {
+            assert.eq(metrics.sampleSize.find + metrics.sampleSize.aggregate +
+                          metrics.sampleSize.count + metrics.sampleSize.distinct,
+                      metrics.sampleSize.total,
+                      metrics.sampleSize);
+
+            assert(metrics.hasOwnProperty("percentageOfSingleShardReads"));
+            assert(metrics.hasOwnProperty("percentageOfMultiShardReads"));
+            assert(metrics.hasOwnProperty("percentageOfScatterGatherReads"));
+            assert(metrics.hasOwnProperty("numReadsByRange"));
+
+            for (let fieldName in metrics) {
+                if (fieldName.startsWith("percentage")) {
+                    assert.gte(metrics[fieldName], 0);
+                    assert.lte(metrics[fieldName], 100);
+                }
+            }
+            assertApprox(metrics.percentageOfSingleShardReads +
+                             metrics.percentageOfMultiShardReads +
+                             metrics.percentageOfScatterGatherReads,
+                         100,
+                         metrics);
+            assert.gt(metrics.numReadsByRange.length, 0);
+        }
+    }
+
+    function validateWriteDistributionMetrics(metrics) {
+        if (metrics.sampleSize.total == 0) {
+            assert.eq(
+                bsonWoCompare(metrics,
+                              {sampleSize: {total: 0, update: 0, delete: 0, findAndModify: 0}}),
+                0,
+                metrics);
+        } else {
+            assert.eq(metrics.sampleSize.update + metrics.sampleSize.delete +
+                          metrics.sampleSize.findAndModify,
+                      metrics.sampleSize.total,
+                      metrics.sampleSize);
+
+            assert(metrics.hasOwnProperty("percentageOfSingleShardWrites"));
+            assert(metrics.hasOwnProperty("percentageOfMultiShardWrites"));
+            assert(metrics.hasOwnProperty("percentageOfScatterGatherWrites"));
+            assert(metrics.hasOwnProperty("percentageOfShardKeyUpdates"));
+            assert(metrics.hasOwnProperty("percentageOfSingleWritesWithoutShardKey"));
+            assert(metrics.hasOwnProperty("percentageOfMultiWritesWithoutShardKey"));
+            assert(metrics.hasOwnProperty("numWritesByRange"));
+
+            for (let fieldName in metrics) {
+                if (fieldName.startsWith("percentage")) {
+                    assert.gte(metrics[fieldName], 0);
+                    assert.lte(metrics[fieldName], 100);
+                }
+            }
+            assertApprox(metrics.percentageOfSingleShardWrites +
+                             metrics.percentageOfMultiShardWrites +
+                             metrics.percentageOfScatterGatherWrites,
+                         100,
+                         metrics);
+            assert.gt(metrics.numWritesByRange.length, 0);
+        }
+    }
+
+    function assertNotContainReadWriteDistributionMetrics(metrics) {
+        assert(!metrics.hasOwnProperty("readDistribution"));
+        assert(!metrics.hasOwnProperty("writeDistribution"));
+    }
+
+    function assertContainReadWriteDistributionMetrics(metrics) {
+        assert(metrics.hasOwnProperty("readDistribution"));
+        assert(metrics.hasOwnProperty("writeDistribution"));
+        validateReadDistributionMetrics(metrics.readDistribution);
+        validateWriteDistributionMetrics(metrics.writeDistribution);
+    }
+
     return {
         isHashedKeyPattern,
         isIdKeyPattern,
@@ -222,6 +334,8 @@ var AnalyzeShardKeyUtil = (function() {
         assertApprox,
         assertNotContainKeyCharacteristicsMetrics,
         assertContainKeyCharacteristicsMetrics,
-        assertKeyCharacteristicsMetrics
+        assertKeyCharacteristicsMetrics,
+        assertNotContainReadWriteDistributionMetrics,
+        assertContainReadWriteDistributionMetrics
     };
 })();

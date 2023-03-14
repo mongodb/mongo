@@ -103,11 +103,13 @@ function assertWriteMetricsNonEmptySampleSize(actual, expected, isHashed) {
 }
 
 function assertMetricsEmptySampleSize(actual) {
+    AnalyzeShardKeyUtil.assertContainReadWriteDistributionMetrics(actual);
     assertReadMetricsEmptySampleSize(actual.readDistribution);
     assertWriteMetricsEmptySampleSize(actual.writeDistribution);
 }
 
 function assertMetricsNonEmptySampleSize(actual, expected, isHashed) {
+    AnalyzeShardKeyUtil.assertContainReadWriteDistributionMetrics(actual);
     assertReadMetricsNonEmptySampleSize(
         actual.readDistribution, expected.readDistribution, isHashed);
     assertWriteMetricsNonEmptySampleSize(
@@ -115,8 +117,7 @@ function assertMetricsNonEmptySampleSize(actual, expected, isHashed) {
 }
 
 function assertNoMetrics(actual) {
-    assert(!actual.hasOwnProperty("readDistribution"));
-    assert(!actual.hasOwnProperty("writeDistribution"));
+    AnalyzeShardKeyUtil.assertNotContainReadWriteDistributionMetrics(actual);
 }
 
 function getRandomCount() {

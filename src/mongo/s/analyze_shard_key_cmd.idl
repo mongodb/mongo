@@ -55,7 +55,7 @@ structs:
         type: object_owned
       frequency:
         type: long
-        validator: { gte: 0 }
+        validator: { gt: 0 }
 
   MonotonicityMetrics:
     description: "The metrics about the monotonicity of a shard key, i.e. whether its value is
@@ -118,18 +118,23 @@ structs:
     fields:
       total:
         type: long
+        validator: { gte: 0 }
         default: 0
       find:
         type: long
+        validator: { gte: 0 }
         default: 0
       aggregate:
         type: long
+        validator: { gte: 0 }
         default: 0
       count:
         type: long
+        validator: { gte: 0 }
         default: 0
       distinct:
         type: long
+        validator: { gte: 0 }
         default: 0
 
   WriteSampleSize:
@@ -138,15 +143,19 @@ structs:
     fields:
       total:
         type: long
+        validator: { gte: 0 }
         default: 0
       update:
         type: long
+        validator: { gte: 0 }
         default: 0
       delete:
         type: long
+        validator: { gte: 0 }
         default: 0
       findAndModify:
         type: long
+        validator: { gte: 0 }
         default: 0
 
   ReadDistributionMetrics:
