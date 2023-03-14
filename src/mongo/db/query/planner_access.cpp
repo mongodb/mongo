@@ -1446,8 +1446,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedAnd(
 
     // Short-circuit: an AND of one child is just the child.
     if (ixscanNodes.size() == 1) {
-        if (feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabled(
-                serverGlobalParams.featureCompatibility) &&
+        if (feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabledAndIgnoreFCV() &&
             ixscanNodes[0]->getType() == StageType::STAGE_IXSCAN && root->numChildren() > 0) {
             const auto* ixScanNode = static_cast<IndexScanNode*>(ixscanNodes[0].get());
             const auto& index = ixScanNode->index;

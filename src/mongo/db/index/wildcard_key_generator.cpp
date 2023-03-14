@@ -263,8 +263,7 @@ WildcardProjection WildcardKeyGenerator::createProjectionExecutor(BSONObj keyPat
                                                                   BSONObj pathProjection) {
     // TODO SERVER-68303: Remove the invariant after we remove the compound wilcard indexes feature
     // flag.
-    if (!feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+    if (!feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabledAndIgnoreFCV()) {
         // We should never have a key pattern that contains more than a single element.
         invariant(keyPattern.nFields() == 1);
     }

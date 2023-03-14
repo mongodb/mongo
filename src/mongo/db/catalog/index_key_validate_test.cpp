@@ -38,6 +38,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -238,17 +239,28 @@ TEST(IndexKeyValidateTest, KeyElementNameWildcardSucceeds) {
     ASSERT_OK(validateKeyPattern(BSON("$**" << 1), IndexVersion::kV2));
 }
 
-TEST(IndexKeyValidateTest, WildcardIndexNumericKeyElementValueFailsIfNotPositive) {
+TEST(IndexKeyValidateTest, WildcardIndexNumericKeyElementValueFailsIfZero) {
     ASSERT_EQ(ErrorCodes::CannotCreateIndex,
               validateKeyPattern(BSON("$**" << 0.0), IndexVersion::kV2));
     ASSERT_EQ(ErrorCodes::CannotCreateIndex,
               validateKeyPattern(BSON("$**" << -0.0), IndexVersion::kV2));
+}
+
+TEST(IndexKeyValidateTest, WildcardIndexNumericKeyElementValueFailsIfNotPositive) {
+    RAIIServerParameterControllerForTest controller("featureFlagCompoundWildcardIndexes", false);
     ASSERT_EQ(ErrorCodes::CannotCreateIndex,
               validateKeyPattern(BSON("$**" << -0.1), IndexVersion::kV2));
     ASSERT_EQ(ErrorCodes::CannotCreateIndex,
               validateKeyPattern(BSON("$**" << -1), IndexVersion::kV2));
     ASSERT_EQ(ErrorCodes::CannotCreateIndex,
               validateKeyPattern(BSON("$**" << INT_MIN), IndexVersion::kV2));
+}
+
+TEST(IndexKeyValidateTest, WildcardIndexNumericKeyElementValueSucceedsIfNotPositive) {
+    RAIIServerParameterControllerForTest controller("featureFlagCompoundWildcardIndexes", true);
+    ASSERT_OK(validateKeyPattern(BSON("$**" << -0.1), IndexVersion::kV2));
+    ASSERT_OK(validateKeyPattern(BSON("$**" << -1), IndexVersion::kV2));
+    ASSERT_OK(validateKeyPattern(BSON("$**" << INT_MIN), IndexVersion::kV2));
 }
 
 TEST(IndexKeyValidateTest, KeyElementNameWildcardFailsOnRepeat) {
@@ -264,9 +276,17 @@ TEST(IndexKeyValidateTest, KeyElementNameWildcardFailsOnSubPathRepeat) {
 }
 
 TEST(IndexKeyValidateTest, KeyElementNameWildcardFailsOnCompound) {
+    RAIIServerParameterControllerForTest controller("featureFlagCompoundWildcardIndexes", false);
     auto status = validateKeyPattern(BSON("$**" << 1 << "a" << 1), IndexVersion::kV2);
     ASSERT_NOT_OK(status);
     ASSERT_EQ(status, ErrorCodes::CannotCreateIndex);
+}
+
+TEST(IndexKeyValidateTest, KeyElementNameWildcardSucceedsOnCompound) {
+    RAIIServerParameterControllerForTest controller("featureFlagCompoundWildcardIndexes", true);
+    ASSERT_OK(validateKeyPattern(BSON("$**" << 1 << "a" << 1), IndexVersion::kV2));
+    ASSERT_OK(validateKeyPattern(BSON("a" << 1 << "$**" << 1), IndexVersion::kV2));
+    ASSERT_OK(validateKeyPattern(BSON("a" << 1 << "$**" << -1 << "b" << 1), IndexVersion::kV2));
 }
 
 TEST(IndexKeyValidateTest, KeyElementNameWildcardFailsOnIncorrectValue) {
@@ -276,6 +296,7 @@ TEST(IndexKeyValidateTest, KeyElementNameWildcardFailsOnIncorrectValue) {
 }
 
 TEST(IndexKeyValidateTest, KeyElementNameWildcardFailsWhenValueIsPluginNameWithInvalidKeyName) {
+    RAIIServerParameterControllerForTest controller("featureFlagCompoundWildcardIndexes", false);
     auto status = validateKeyPattern(BSON("a"
                                           << "wildcard"),
                                      IndexVersion::kV2);

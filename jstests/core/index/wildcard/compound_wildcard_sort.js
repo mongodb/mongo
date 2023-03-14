@@ -7,6 +7,7 @@
  *   assumes_read_concern_local,
  *   does_not_support_stepdowns,
  *   featureFlagCompoundWildcardIndexes,
+ *   requires_fcv_70,
  * ]
  */
 (function() {

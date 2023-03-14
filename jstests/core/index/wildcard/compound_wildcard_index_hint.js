@@ -3,6 +3,7 @@
  * @tags: [
  *   assumes_read_concern_local,
  *   featureFlagCompoundWildcardIndexes,
+ *   requires_fcv_70,
  * ]
  */
 

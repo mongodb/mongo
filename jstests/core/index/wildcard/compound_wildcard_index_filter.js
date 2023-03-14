@@ -6,6 +6,7 @@
  *   not_allowed_with_security_token,
  *   does_not_support_stepdowns,
  *   featureFlagCompoundWildcardIndexes,
+ *   requires_fcv_70,
  * ]
  */
 

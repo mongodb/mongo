@@ -11,6 +11,7 @@
  *   # "Explain for the aggregate command cannot run within a multi-document transaction"
  *   does_not_support_transactions,
  *   featureFlagCompoundWildcardIndexes,
+ *   requires_fcv_70,
  * ]
  */
 

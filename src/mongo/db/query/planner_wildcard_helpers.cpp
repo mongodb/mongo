@@ -474,8 +474,7 @@ void expandWildcardIndexEntry(const IndexEntry& wildcardIndex,
             "expandWildcardIndexEntry expected only WildcardIndexes",
             wildcardIndex.type == INDEX_WILDCARD);
 
-    if (!feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+    if (!feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabledAndIgnoreFCV()) {
         // Should only have one field of the form {"path.$**" : 1}.
         tassert(7246511,
                 "Wildcard Index's key pattern must always have length 1 for non-compound Wildcard "
@@ -523,8 +522,7 @@ void expandWildcardIndexEntry(const IndexEntry& wildcardIndex,
     // should also check whether the regular fields is able to answer the query or not. That is - if
     // any field of the regular fields in a compound wildcard index is in 'fields', then we should
     // also generate an expanded wildcard 'IndexEntry' for later index analysis.
-    if (feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabled(
-            serverGlobalParams.featureCompatibility) &&
+    if (feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabledAndIgnoreFCV() &&
         !wildcardIndexUsed) {
 
         bool shouldExpand = false;
@@ -720,8 +718,7 @@ bool isWildcardObjectSubpathScan(const IndexScanNode* node) {
     }
 
     // We expect consistent arguments, representing a $** index which has already been finalized.
-    if (!feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+    if (!feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabledAndIgnoreFCV()) {
         invariant(node->index.keyPattern.nFields() == 2);
         invariant(node->index.multikeyPaths.size() == 2);
         invariant(node->bounds.fields.size() == 2);

@@ -152,9 +152,15 @@ Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion inde
             return Status(code, str::stream() << "Unknown index plugin '" << pluginName << '\'');
     }
 
-    if (pluginName == IndexNames::WILDCARD &&
-        feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
+    auto compoundWildcardIndexesAllowed =
+        feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabledAndIgnoreFCV();
+    if (serverGlobalParams.featureCompatibility.isVersionInitialized()) {
+        compoundWildcardIndexesAllowed =
+            feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabled(
+                serverGlobalParams.featureCompatibility);
+    }
+
+    if (pluginName == IndexNames::WILDCARD && compoundWildcardIndexesAllowed) {
         auto status = validateWildcardIndex(key);
         if (!status.isOK()) {
             return status;
@@ -184,8 +190,7 @@ Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion inde
                     } else if (value == 0.0) {
                         return {code, "Values in the index key pattern cannot be 0."};
                     } else if (value < 0.0 && pluginName == IndexNames::WILDCARD &&
-                               !feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabled(
-                                   serverGlobalParams.featureCompatibility)) {
+                               !compoundWildcardIndexesAllowed) {
                         return {code,
                                 "A numeric value in a $** index key pattern must be positive."};
                     }
@@ -214,12 +219,10 @@ Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion inde
         StringData fieldName(keyElement.fieldNameStringData());
 
         // TODO SERVER-68303: Remove the CompoundWildcardIndexes feature flag.
-        if ((pluginName == IndexNames::WILDCARD &&
-             !feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabled(
-                 serverGlobalParams.featureCompatibility)) ||
+        if ((pluginName == IndexNames::WILDCARD && !compoundWildcardIndexesAllowed) ||
             pluginName == IndexNames::COLUMN) {
             if (key.nFields() != 1) {
-                // Columnstore indexes do not support compound indexes.
+                // Columnstore and wildcard indexes do not support compound indexes.
                 return Status(code,
                               str::stream() << pluginName << " indexes do not allow compounding");
             } else if (!WildcardNames::isWildcardFieldName(fieldName)) {

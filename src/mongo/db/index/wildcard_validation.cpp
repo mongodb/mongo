@@ -58,7 +58,7 @@ Status validateOverlappingFieldsInWildcardProjectionOnly(
  * Parse wildcard index's keyPattern.
  * It performs basic validation and returns error if the validation fails.
  */
-Status getWildcardIndexKeyFeilds(const BSONObj& keyPattern,
+Status getWildcardIndexKeyFields(const BSONObj& keyPattern,
                                  FieldRef& wildcardField,
                                  std::vector<FieldRef>& indexFields) {
     for (const auto& keyElement : keyPattern) {
@@ -86,7 +86,7 @@ Status getWildcardIndexKeyFeilds(const BSONObj& keyPattern,
 Status validateWildcardIndex(const BSONObj& keyPattern) {
     FieldRef wildcardRef{};
     std::vector<FieldRef> indexFields;
-    auto status = getWildcardIndexKeyFeilds(keyPattern, wildcardRef, indexFields);
+    auto status = getWildcardIndexKeyFields(keyPattern, wildcardRef, indexFields);
     if (!status.isOK()) {
         return status;
     }
@@ -116,7 +116,7 @@ Status validateWildcardProjection(const BSONObj& keyPattern, const BSONObj& path
     // Prepare data for validation.
     FieldRef wildcardField{};
     std::vector<FieldRef> indexFields;
-    auto status = getWildcardIndexKeyFeilds(keyPattern, wildcardField, indexFields);
+    auto status = getWildcardIndexKeyFields(keyPattern, wildcardField, indexFields);
     if (!status.isOK()) {
         return status;
     }
