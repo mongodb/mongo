@@ -131,12 +131,6 @@ Status validateWildcardProjection(const BSONObj& keyPattern, const BSONObj& path
     std::vector<FieldRef> projectionIncludedFields;
     std::vector<FieldRef> projectionExcludedFields;
     for (const auto& projectionElement : pathProjection) {
-        if (!projectionElement.isNumber() && !projectionElement.isBoolean()) {
-            return {ErrorCodes::Error{7246207},
-                    str::stream() << "Fields in wildcardProjection must be numbers, however '"
-                                  << projectionElement << "' is a " << projectionElement.type()
-                                  << "."};
-        }
         if (projectionElement.trueValue()) {
             projectionIncludedFields.emplace_back(projectionElement.fieldNameStringData());
         } else {
@@ -181,8 +175,12 @@ Status validateWildcardProjection(const BSONObj& keyPattern, const BSONObj& path
         }
     }
 
+    const FieldRef idFieldRef{idFieldName};
+    const bool idOnlyExclusion =
+        projectionExcludedFields.size() == 1 && projectionExcludedFields.front() == idFieldRef;
+
     // test test wildcard projects exclude all regular index fields
-    if (!projectionExcludedFields.empty()) {
+    if (!projectionExcludedFields.empty() && !idOnlyExclusion) {
         auto indexPos = indexFields.begin();
         auto projectionPos = projectionExcludedFields.begin();
         while (indexPos != indexFields.end() && projectionPos != projectionExcludedFields.end()) {
@@ -213,11 +211,9 @@ Status validateWildcardProjection(const BSONObj& keyPattern, const BSONObj& path
     // With the exception of explicitly including _id field, you cannot combine inclusion and
     // exclusion statements in the wildcardProjection document.
     if (!projectionIncludedFields.empty() && !projectionExcludedFields.empty()) {
-        const FieldRef idFieldRef{idFieldName};
-        const bool idIsSingleField = (projectionIncludedFields.size() == 1 &&
-                                      projectionIncludedFields.front() == idFieldRef) ||
-            (projectionExcludedFields.size() == 1 &&
-             projectionExcludedFields.front() == idFieldRef);
+        const bool idOnlyInclusion =
+            projectionIncludedFields.size() == 1 && projectionIncludedFields.front() == idFieldRef;
+        const bool idIsSingleField = idOnlyExclusion || idOnlyInclusion;
         if (!idIsSingleField) {
             return {
                 ErrorCodes::Error{7246211},

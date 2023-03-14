@@ -96,4 +96,18 @@ TEST(WildcardProjectionValidation, OverlappingFields_InclusionAndExclusion) {
     ASSERT_NOT_OK(validateWildcardProjection(
         BSON("$**" << 1), BSON("_id" << 1 << "a.b" << 0 << "e" << 1 << "d" << 0 << "a.b.c" << 0)));
 }
+
+TEST(WildcardProjectionValidation, ProjectionWithNestedDocuments) {
+    ASSERT_OK(validateWildcardProjection(BSON("$**" << 1 << "d" << 1),
+                                         BSON("a" << BSON("b" << 1 << "c" << 1))));
+    ASSERT_OK(
+        validateWildcardProjection(BSON("$**" << 1), BSON("a" << BSON("b" << 1 << "c" << 1))));
+}
+
+TEST(WildcardProjectionValidation, IdField) {
+    ASSERT_OK(
+        validateWildcardProjection(BSON("$**" << 1 << "other" << 1), BSON("_id" << 0 << "a" << 1)));
+    ASSERT_OK(validateWildcardProjection(BSON("$**" << 1 << "other" << 1),
+                                         BSON("_id" << 1 << "a" << 0 << "other" << 0)));
+}
 }  // namespace mongo

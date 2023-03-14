@@ -28,6 +28,17 @@ assert.commandWorked(coll.createIndex({"$**": 1, a: 1}, {"wildcardProjection": {
 assert.commandWorked(
     coll.createIndex({a: 1, "$**": -1, b: 1}, {"wildcardProjection": {a: 0, b: 0}}));
 
+// Tests that _id can be excluded in an inclusion projection statement.
+assert.commandWorked(
+    coll.createIndex({"$**": 1, "other": 1}, {"wildcardProjection": {"_id": 0, "a": 1}}));
+// Tests that _id can be inccluded in an exclusion projection statement.
+assert.commandWorked(coll.createIndex({"$**": 1, "another": 1},
+                                      {"wildcardProjection": {"_id": 1, "a": 0, "another": 0}}));
+
+// Tests we wildcard projections allow nested objects.
+assert.commandWorked(
+    coll.createIndex({"$**": 1, "d": 1}, {"wildcardProjection": {"a": {"b": 1, "c": 1}}}));
+
 //
 // Invalid CWI specification.
 //
@@ -54,6 +65,10 @@ assert.commandFailedWithCode(coll.createIndex({"a.$**": 1, b: 1}, {expireAfterSe
 // Tests that createIndex creating a compound wildcard index on all fields failed if
 // 'wildcardProjection' is not specified.
 assert.commandFailedWithCode(coll.createIndex({a: 1, "$**": 1}), 67);
+
+// Tests that wildcard projections accept only numeric values.
+assert.commandFailedWithCode(
+    coll.createIndex({"st": 1, "$**": 1}, {wildcardProjection: {"a": "something"}}), 51271);
 
 // Tests that all compound wildcard indexes in the catalog can be validated by running validate()
 // command.
