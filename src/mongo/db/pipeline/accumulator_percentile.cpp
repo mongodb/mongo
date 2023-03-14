@@ -38,6 +38,11 @@ REGISTER_ACCUMULATOR_WITH_FEATURE_FLAG(percentile,
                                        AccumulatorPercentile::parseArgs,
                                        feature_flags::gFeatureFlagApproxPercentiles);
 
+
+REGISTER_ACCUMULATOR_WITH_FEATURE_FLAG(median,
+                                       AccumulatorMedian::parseArgs,
+                                       feature_flags::gFeatureFlagApproxPercentiles);
+
 Status AccumulatorPercentile::validatePercentileArg(const std::vector<double>& pv) {
     if (pv.empty()) {
         return {ErrorCodes::BadValue, "'p' cannot be an empty array"};
@@ -142,5 +147,55 @@ intrusive_ptr<AccumulatorState> AccumulatorPercentile::create(
     const std::vector<double>& ps,
     std::unique_ptr<PercentileAlgorithm> algo) {
     return new AccumulatorPercentile(expCtx, ps, std::move(algo));
+}
+
+AccumulationExpression AccumulatorMedian::parseArgs(ExpressionContext* const expCtx,
+                                                    BSONElement elem,
+                                                    VariablesParseState vps) {
+    expCtx->sbeGroupCompatible = false;
+
+    uassert(7436100,
+            str::stream() << "specification must be an object; found " << elem,
+            elem.type() == BSONType::Object);
+
+    auto spec = AccumulatorMedianSpec::parse(IDLParserContext(kName), elem.Obj());
+    boost::intrusive_ptr<Expression> input =
+        Expression::parseOperand(expCtx, spec.getInput().getElement(), vps);
+
+    auto factory = [expCtx] {
+        // Temporary implementation! To be replaced based on the user's choice of algorithm.
+        auto algo = PercentileAlgorithm::createDiscreteSortAndRank();
+
+        return AccumulatorMedian::create(expCtx, std::move(algo));
+    };
+
+    return {ExpressionConstant::create(expCtx, Value(BSONNULL)) /*initializer*/,
+            std::move(input) /*argument*/,
+            std::move(factory),
+            "$ median"_sd /*name*/};
+}
+
+AccumulatorMedian::AccumulatorMedian(ExpressionContext* expCtx,
+                                     std::unique_ptr<PercentileAlgorithm> algo)
+    : AccumulatorPercentile(expCtx, {0.5} /* ps */, std::move(algo)){};
+
+intrusive_ptr<AccumulatorState> AccumulatorMedian::create(
+    ExpressionContext* expCtx, std::unique_ptr<PercentileAlgorithm> algo) {
+    return new AccumulatorMedian(expCtx, std::move(algo));
+}
+
+Value AccumulatorMedian::getValue(bool toBeMerged) {
+    // Modify the base-class implementation to return a single value rather than a single-element
+    // array.
+    auto result = AccumulatorPercentile::getValue(toBeMerged);
+    if (result.getType() == jstNULL) {
+        return result;
+    }
+
+    tassert(7436101,
+            "the percentile algorithm for median must return a single result.",
+            result.getArrayLength() == 1);
+
+    return Value(result.getArray().front());
 }
 }  // namespace mongo

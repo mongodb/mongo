@@ -40,7 +40,7 @@ namespace mongo {
 class AccumulatorPercentile : public AccumulatorState {
 public:
     static constexpr auto kName = "$percentile"_sd;
-    const char* getOpName() const final {
+    const char* getOpName() const {
         return kName.rawData();
     }
 
@@ -68,7 +68,7 @@ public:
      * Ingressing values and computing the requested percentiles.
      */
     void processInternal(const Value& input, bool merging) final;
-    Value getValue(bool toBeMerged) final;
+    Value getValue(bool toBeMerged);
 
     /**
      * Other infra for the accumulators.
@@ -78,6 +78,32 @@ public:
 private:
     std::vector<double> _percentiles;
     std::unique_ptr<PercentileAlgorithm> _algo;
+};
+
+/*
+ * Accumulator for computing $median. $median has the same semantics as $percentile with the 'p'
+ * field set to [0.5].
+ */
+class AccumulatorMedian : public AccumulatorPercentile {
+public:
+    static constexpr auto kName = "$median"_sd;
+    const char* getOpName() const final {
+        return kName.rawData();
+    }
+
+    /**
+     * Parsing and creating the accumulator.
+     */
+    static AccumulationExpression parseArgs(ExpressionContext* expCtx,
+                                            BSONElement elem,
+                                            VariablesParseState vps);
+
+    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx,
+                                                         std::unique_ptr<PercentileAlgorithm> algo);
+
+    AccumulatorMedian(ExpressionContext* expCtx, std::unique_ptr<PercentileAlgorithm> algo);
+
+    Value getValue(bool toBeMerged) final;
 };
 
 }  // namespace mongo

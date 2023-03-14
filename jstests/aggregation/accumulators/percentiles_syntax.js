@@ -62,6 +62,22 @@ assertInvalidSyntax({$percentile: {p: [0.5, 0.7], input: "$x", algorithm: "fancy
                     "Should fail if 'algorithm' isn't one of _predefined_ strings");
 
 /**
+ * Tests for $median. $median desugars to $percentile with the field p:[0.5] added, and therefore
+ * has similar syntax to $percentile.
+ */
+
+assertInvalidSyntax({$median: {p: [0.5], input: "$x", algorithm: "approximate"}},
+                    "Should fail if 'p' is defined");
+
+assertInvalidSyntax({$median: {algorithm: "approximate"}},
+                    "Should fail if $median is missing 'input' field");
+
+assertInvalidSyntax({$median: {input: "$x"}},
+                    "Should fail if $median is missing 'algorithm' field");
+
+assertInvalidSyntax({$median: {input: "$x", algorithm: "approximate", extras: 42}},
+                    "Should fail if $median contains an unexpected field");
+/**
  * Test that valid $percentile specifications are accepted. The results, i.e. semantics, are tested
  * elsewhere and would cover all of the cases below, we are providing them here nonetheless for
  * completeness.
@@ -83,6 +99,13 @@ assertValidSyntax(
 
 assertValidSyntax({$percentile: {p: [0.5, 0.9], input: "x", algorithm: "approximate"}},
                   "Non-numeric inputs should be gracefully ignored");
+
+/**
+ * Tests for $median. $median desugars to $percentile with the field p:[0.5] added.
+ */
+
+assertValidSyntax({$median: {input: "$x", algorithm: "approximate"}},
+                  "Simple base case for $median.");
 
 /**
  * Test that the "arrayness" of the result matches the "arrayness" of the specification.

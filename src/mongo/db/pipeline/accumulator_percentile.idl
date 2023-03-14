@@ -58,3 +58,15 @@ structs:
                 description: "The type of algorithm we will use to find the percentile."
                 type: PercentileAlgorithmType
                 optional: false
+    AccumulatorMedianSpec:
+        description: "Specification for the $median accumulator."
+        strict: true
+        fields:
+            input:
+                description: "The expression to find the percentiles of."
+                type: IDLAnyType
+                optional: false
+            algorithm:
+                description: "The type of algorithm we will use to find the percentile."
+                type: PercentileAlgorithmType
+                optional: false
