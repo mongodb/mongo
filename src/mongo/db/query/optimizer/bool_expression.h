@@ -146,6 +146,10 @@ struct BoolExpr {
         return {};
     }
 
+    static bool isSingularDNF(const Node& n) {
+        return getSingularDNF(n).has_value();
+    }
+
     using ChildVisitor = std::function<void(Node& child, const size_t childIndex)>;
     using ChildVisitorConst = std::function<void(const Node& child, const size_t childIndex)>;
     using AtomVisitor = std::function<void(T& expr)>;

@@ -123,11 +123,6 @@ public:
 
     PartialSchemaRequirements(PSRExpr::Node requirements);
 
-    // TODO SERVER-74539: remove these contructors.
-    PartialSchemaRequirements(std::vector<Entry>);
-    PartialSchemaRequirements(std::initializer_list<Entry> entries)
-        : PartialSchemaRequirements(std::vector<Entry>(entries)) {}
-
     bool operator==(const PartialSchemaRequirements& other) const;
 
     /**
@@ -135,17 +130,6 @@ public:
      * fully-open predicate with no projections.
      */
     bool isNoop() const;
-
-    /**
-     * Return the number of PartialSchemaEntries.
-     */
-    size_t numLeaves() const;
-
-    /**
-     * Return the number of Disjunctions under a top-level Conjunction.
-     * TODO SERVER-69026 Remove or clarify this method.
-     */
-    size_t numConjuncts() const;
 
     /**
      * Return the bound projection name corresponding to the first conjunct matching the given key.
@@ -187,8 +171,14 @@ public:
     }
 
     /**
-     * Add an entry to the first AND under a top-level OR. Asserts on non-DNF requirements.
-     * TODO SERVER-74539, remove or clarify this method.
+     * Conjunctively combine 'this' with another PartialSchemaRequirement.
+     * Asserts that 'this' is in DNF.
+     *
+     * For now, we assert that we have only one disjunct. This means we avoid applying
+     * the distributive law, which would duplicate the new requirement into each disjunct.
+     *
+     * TODO SERVER-69026 Consider applying the distributive law to allow contained-OR in
+     * SargableNode.
      */
     void add(PartialSchemaKey, PartialSchemaRequirement);
 

@@ -130,6 +130,7 @@ env.CppUnitTest(
     target='optimizer_test',
     source=[
         "bool_expression_test.cpp",
+        "index_union_optimizer_test.cpp",
         "logical_rewriter_optimizer_test.cpp",
         "optimizer_test.cpp",
         "physical_rewriter_optimizer_test.cpp",

@@ -64,26 +64,12 @@ private:
     }
 };
 
-// Make a BoolExpr representing a conjunction of the entries. It will be an OR of a single AND.
-PSRExpr::Node makePSRExpr(std::vector<PartialSchemaEntry> entries) {
-    PSRExpr::Builder b;
-    b.pushDisj().pushConj();
-    for (auto& entry : entries) {
-        b.atom(std::move(entry));
-    }
-
-    auto res = b.finish();
-    tassert(7016402, "PartialSchemaRequirements could not be constructed", res.has_value());
-    return res.get();
-}
-
 // A no-op entry has a default key and a requirement that is fully open and does not bind.
 PartialSchemaEntry makeNoopPartialSchemaEntry() {
     return {PartialSchemaKey(),
             PartialSchemaRequirement(
                 boost::none /*boundProjectionName*/,
-                IntervalReqExpr::makeSingularDNF(IntervalRequirement(
-                    BoundRequirement::makeMinusInf(), BoundRequirement::makePlusInf())),
+                IntervalReqExpr::makeSingularDNF(IntervalRequirement{/*fully open*/}),
                 false /*isPerfOnly*/)};
 }
 }  // namespace
@@ -91,9 +77,6 @@ PartialSchemaEntry makeNoopPartialSchemaEntry() {
 void PartialSchemaRequirements::normalize() {
     PSRNormalizeTransporter{}.normalize(_expr);
 }
-
-PartialSchemaRequirements::PartialSchemaRequirements(std::vector<Entry> entries)
-    : PartialSchemaRequirements(makePSRExpr(entries)) {}
 
 PartialSchemaRequirements::PartialSchemaRequirements(PSRExpr::Node requirements)
     : _expr(std::move(requirements)) {
@@ -113,7 +96,7 @@ bool PartialSchemaRequirements::operator==(const PartialSchemaRequirements& othe
 
 bool PartialSchemaRequirements::isNoop() const {
     // A PartialSchemaRequirements is a no-op if it has exactly zero predicates/projections...
-    auto numPreds = numLeaves();
+    const size_t numPreds = PSRExpr::numLeaves(getRoot());
     if (numPreds == 0) {
         return true;
     } else if (numPreds > 1) {
@@ -133,14 +116,6 @@ bool PartialSchemaRequirements::isNoop() const {
     }
 
     return reqIsNoop;
-}
-
-size_t PartialSchemaRequirements::numLeaves() const {
-    return PSRExpr::numLeaves(_expr);
-}
-
-size_t PartialSchemaRequirements::numConjuncts() const {
-    return numLeaves();
 }
 
 boost::optional<ProjectionName> PartialSchemaRequirements::findProjection(
@@ -177,6 +152,8 @@ PartialSchemaRequirements::findFirstConjunct(const PartialSchemaKey& key) const 
 
 void PartialSchemaRequirements::add(PartialSchemaKey key, PartialSchemaRequirement req) {
     tassert(7016406, "Expected a PartialSchemaRequirements in DNF form", PSRExpr::isDNF(_expr));
+    // TODO SERVER-69026 Consider applying the distributive law.
+    tassert(7453912, "Expected a singleton disjunction", PSRExpr::isSingletonDisjunction(_expr));
 
     // Add an entry to the first conjunction
     PSRExpr::visitDisjuncts(_expr, [&](PSRExpr::Node& disjunct, const size_t i) {

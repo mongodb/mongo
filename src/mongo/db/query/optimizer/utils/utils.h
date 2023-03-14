@@ -307,6 +307,9 @@ bool isSubsetOfPartialSchemaReq(const PartialSchemaRequirements& lhs,
 bool intersectPartialSchemaReq(PartialSchemaRequirements& target,
                                const PartialSchemaRequirements& source);
 
+PartialSchemaRequirements unionPartialSchemaReq(PartialSchemaRequirements&& left,
+                                                PartialSchemaRequirements&& right);
+
 
 /**
  * Encode an index of an index field as a field name in order to use with a FieldProjectionMap.

@@ -38,6 +38,7 @@
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
 #include "mongo/unittest/unittest.h"
 
+using namespace mongo::optimizer::unit_test_abt_literals;
 
 namespace mongo::optimizer {
 namespace {
@@ -1555,7 +1556,6 @@ TEST(LogicalRewriter, NotPushdownUnderLambdaKeepOuterTraverse) {
 }
 
 TEST(LogicalRewriter, NotPushdownUnderLambdaFailsWithFreeVar) {
-    using namespace mongo::optimizer::unit_test_abt_literals;
     // When we eliminate a Not, we can't eliminate the Lambda [x] if it would leave free
     // occurrences of 'x'.
 
@@ -2027,61 +2027,5 @@ TEST(LogicalRewriter, EmptyArrayIndexBounds) {
         rootNode);
 }
 
-TEST(LogicalRewriter, MakeSargableNodeWithTopLevelDisjunction) {
-    using namespace unit_test_abt_literals;
-
-    // Hand-build SargableNode with top-level disjunction.
-    auto req = PartialSchemaRequirement(
-        boost::none, _disj(_conj(_interval(_incl("1"_cint32), _incl("1"_cint32)))), false);
-
-    auto makeKey = [](std::string pathName) {
-        return PartialSchemaKey("ptest",
-                                make<PathGet>(FieldNameType{pathName}, make<PathIdentity>()));
-    };
-    PSRExpr::Builder builder;
-    builder.pushDisj()
-        .pushConj()
-        .atom({makeKey("a"), req})
-        .atom({makeKey("b"), req})
-        .pop()
-        .pushConj()
-        .atom({makeKey("c"), req})
-        .atom({makeKey("d"), req})
-        .pop();
-    auto reqs = PartialSchemaRequirements(builder.finish().get());
-
-    ABT scanNode = make<ScanNode>("ptest", "test");
-    ABT sargableNode = make<SargableNode>(
-        reqs, CandidateIndexes(), boost::none, IndexReqTarget::Index, std::move(scanNode));
-    ABT rootNode = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"ptest"}},
-                                  std::move(sargableNode));
-    ASSERT_EXPLAIN_V2_AUTO(
-        "Root [{ptest}]\n"
-        "Sargable [Index]\n"
-        "|   |   |   requirements: \n"
-        "|   |   |       {\n"
-        "|   |   |           {\n"
-        "|   |   |               {refProjection: ptest, path: 'PathGet [a] PathIdentity []', "
-        "intervals: {{{=Const [1]}}}}\n"
-        "|   |   |            ^ \n"
-        "|   |   |               {refProjection: ptest, path: 'PathGet [b] PathIdentity []', "
-        "intervals: {{{=Const [1]}}}}\n"
-        "|   |   |           }\n"
-        "|   |   |        U \n"
-        "|   |   |           {\n"
-        "|   |   |               {refProjection: ptest, path: 'PathGet [c] PathIdentity []', "
-        "intervals: {{{=Const [1]}}}}\n"
-        "|   |   |            ^ \n"
-        "|   |   |               {refProjection: ptest, path: 'PathGet [d] PathIdentity []', "
-        "intervals: {{{=Const [1]}}}}\n"
-        "|   |   |           }\n"
-        "|   |   |       }\n"
-        "|   |   candidateIndexes: \n"
-        "Scan [test, {ptest}]\n",
-        rootNode);
-
-    // Show that hashing a top-level disjunction doesn't throw.
-    ABTHashGenerator::generate(rootNode);
-}
 }  // namespace
 }  // namespace mongo::optimizer

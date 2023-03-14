@@ -566,7 +566,7 @@ static boost::optional<ABT> mergeSargableNodes(
         return createEmptyValueScanNode(ctx);
     }
 
-    if (mergedReqs.numLeaves() > SargableNode::kMaxPartialSchemaReqs) {
+    if (PSRExpr::numLeaves(mergedReqs.getRoot()) > SargableNode::kMaxPartialSchemaReqs) {
         return {};
     }
 
@@ -678,7 +678,7 @@ static void convertFilterToSargableNode(ABT::reference_type node,
         addEmptyValueScanNode(ctx);
         return;
     }
-    if (conversion->_reqMap.numLeaves() > SargableNode::kMaxPartialSchemaReqs) {
+    if (PSRExpr::numLeaves(conversion->_reqMap.getRoot()) > SargableNode::kMaxPartialSchemaReqs) {
         // Too many requirements.
         return;
     }
@@ -1089,7 +1089,7 @@ struct SubstituteConvert<EvaluationNode> {
         uassert(6624165,
                 "Should not be getting retainPredicate set for EvalNodes",
                 !conversion->_retainPredicate);
-        if (conversion->_reqMap.numLeaves() != 1) {
+        if (PSRExpr::numLeaves(conversion->_reqMap.getRoot()) != 1) {
             // For evaluation nodes we expect to create a single entry.
             return;
         }
@@ -1344,7 +1344,7 @@ struct ExploreConvert<SargableNode> {
         // try having at least one predicate on the left (mask = 1), and we try all possible
         // subsets. For index intersection however (isIndex = true), we try symmetric partitioning
         // (thus the high bound is 2^(N-1)).
-        const size_t reqSize = reqMap.numConjuncts();
+        const size_t reqSize = PSRExpr::numLeaves(reqMap.getRoot());  // assumes singular DNF
         const size_t highMask = isIndex ? (1ull << (reqSize - 1)) : (1ull << reqSize);
         for (size_t mask = 1; mask < highMask; mask++) {
             SplitRequirementsResult splitResult = splitRequirements(

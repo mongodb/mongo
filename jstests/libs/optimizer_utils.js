@@ -286,7 +286,7 @@ function removeUUIDsFromExplain(db, explain) {
 
     for (let entry of listCollsRes) {
         const uuidStr = entry.info.uuid.toString().slice(6).slice(0, -2);
-        plan = plan.replace(uuidStr, "");
+        plan = plan.replaceAll(uuidStr, "");
     }
     return plan;
 }

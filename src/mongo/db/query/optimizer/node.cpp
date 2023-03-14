@@ -405,9 +405,12 @@ SargableNode::SargableNode(PartialSchemaRequirements reqMap,
     tassert(6624085, "SargableNode requires at least one predicate", !_reqMap.isNoop());
     tassert(
         7447500, "SargableNode requirements should be in DNF", PSRExpr::isDNF(_reqMap.getRoot()));
-    tassert(6624086,
-            str::stream() << "SargableNode has too many predicates: " << _reqMap.numLeaves(),
-            _reqMap.numLeaves() <= kMaxPartialSchemaReqs);
+    if (const size_t numLeaves = PSRExpr::numLeaves(_reqMap.getRoot());
+        numLeaves > kMaxPartialSchemaReqs) {
+        tasserted(6624086,
+                  str::stream() << "SargableNode has too many predicates: " << numLeaves
+                                << ". We allow at most " << kMaxPartialSchemaReqs);
+    }
 
     auto bindings = createSargableBindings(_reqMap);
     tassert(7410100,
