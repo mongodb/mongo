@@ -136,7 +136,6 @@ public:
 
     Document serialize(boost::intrusive_ptr<Expression> initializer,
                        boost::intrusive_ptr<Expression> argument,
-                       bool explain,
                        SerializationOptions options = {}) const final;
 
     void reset() final;
@@ -208,7 +207,6 @@ public:
 
     Document serialize(boost::intrusive_ptr<Expression> initializer,
                        boost::intrusive_ptr<Expression> argument,
-                       bool explain,
                        SerializationOptions options = {}) const final;
 
     void reset() final;
@@ -324,7 +322,6 @@ public:
 
     Document serialize(boost::intrusive_ptr<Expression> initializer,
                        boost::intrusive_ptr<Expression> argument,
-                       bool explain,
                        SerializationOptions options = {}) const final;
 
     void reset() final;

@@ -185,11 +185,16 @@ DocumentSource::GetNextResult DocumentSourceFacet::doGetNext() {
     return resultDoc.freeze();
 }
 
-Value DocumentSourceFacet::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceFacet::serialize(SerializationOptions opts) const {
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        MONGO_UNIMPLEMENTED_TASSERT(7484347);
+    }
+
     MutableDocument serialized;
     for (auto&& facet : _facets) {
-        serialized[facet.name] = Value(explain ? facet.pipeline->writeExplainOps(*explain)
-                                               : facet.pipeline->serialize());
+        serialized[facet.name] =
+            Value(opts.verbosity ? facet.pipeline->writeExplainOps(*opts.verbosity)
+                                 : facet.pipeline->serialize());
     }
     return Value(Document{{"$facet", serialized.freezeToValue()}});
 }

@@ -134,11 +134,7 @@ public:
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement spec, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
-
-    Value serialize(SerializationOptions opts) const final override {
-        MONGO_UNIMPLEMENTED;
-    }
+    Value serialize(SerializationOptions opts = SerializationOptions()) const final override;
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 

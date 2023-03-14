@@ -281,8 +281,13 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceSort::clone(
                   _sortExecutor->getMaxMemoryBytes());
 }
 
-void DocumentSourceSort::serializeToArray(
-    std::vector<Value>& array, boost::optional<ExplainOptions::Verbosity> explain) const {
+void DocumentSourceSort::serializeToArray(std::vector<Value>& array,
+                                          SerializationOptions opts) const {
+    auto explain = opts.verbosity;
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        MONGO_UNIMPLEMENTED_TASSERT(7484310);
+    }
+
     if (_timeSorter) {
         tassert(6369900,
                 "$_internalBoundedSort should not absorb a $limit",

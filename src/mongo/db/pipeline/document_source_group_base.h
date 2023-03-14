@@ -54,10 +54,7 @@ public:
     using Accumulators = std::vector<boost::intrusive_ptr<AccumulatorState>>;
     using GroupsMap = ValueUnorderedMap<Accumulators>;
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
-    Value serialize(SerializationOptions opts) const final override {
-        MONGO_UNIMPLEMENTED;
-    }
+    Value serialize(SerializationOptions opts = SerializationOptions()) const final override;
     boost::intrusive_ptr<DocumentSource> optimize() final;
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
     void addVariableRefs(std::set<Variables::Id>* refs) const final;

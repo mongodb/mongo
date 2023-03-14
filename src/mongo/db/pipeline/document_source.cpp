@@ -274,14 +274,6 @@ Pipeline::SourceContainer::iterator DocumentSource::optimizeAt(
     return doOptimizeAt(itr, container);
 }
 
-void DocumentSource::serializeToArray(vector<Value>& array,
-                                      boost::optional<ExplainOptions::Verbosity> explain) const {
-    Value entry = serialize(explain);
-    if (!entry.missing()) {
-        array.push_back(entry);
-    }
-}
-
 void DocumentSource::serializeToArray(vector<Value>& array, SerializationOptions opts) const {
     Value entry = serialize(opts);
     if (!entry.missing()) {

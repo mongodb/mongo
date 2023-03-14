@@ -145,8 +145,10 @@ DocumentSource::GetNextResult DocumentSourceSampleFromRandomCursor::getNextNonDu
                                "sporadic failure, please try again.");
 }
 
-Value DocumentSourceSampleFromRandomCursor::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceSampleFromRandomCursor::serialize(SerializationOptions opts) const {
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        MONGO_UNIMPLEMENTED_TASSERT(7484316);
+    }
     return Value(DOC(getSourceName() << DOC("size" << _size)));
 }
 

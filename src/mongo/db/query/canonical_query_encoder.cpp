@@ -409,7 +409,7 @@ void encodePipeline(const std::vector<std::unique_ptr<InnerPipelineStageInterfac
     for (auto& stage : pipeline) {
         std::vector<Value> serializedArray;
         if (auto lookupStage = dynamic_cast<DocumentSourceLookUp*>(stage->documentSource())) {
-            lookupStage->serializeToArray(serializedArray, boost::none);
+            lookupStage->serializeToArray(serializedArray);
             tassert(6443201,
                     "$lookup stage isn't serialized to a single bson object",
                     serializedArray.size() == 1 && serializedArray[0].getType() == Object);

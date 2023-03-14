@@ -83,12 +83,7 @@ private:
         : DocumentSource(kStageName, expCtx), _mergeType(mergeType) {}
 
     GetNextResult doGetNext() final;
-
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
-
-    Value serialize(SerializationOptions opts) const final override {
-        MONGO_UNIMPLEMENTED;
-    }
+    Value serialize(SerializationOptions opts = SerializationOptions()) const final override;
     HostTypeRequirement _mergeType = HostTypeRequirement::kNone;
 };
 

@@ -60,7 +60,11 @@ REGISTER_DOCUMENT_SOURCE(geoNear,
                          DocumentSourceGeoNear::createFromBson,
                          AllowedWithApiStrict::kAlways);
 
-Value DocumentSourceGeoNear::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceGeoNear::serialize(SerializationOptions opts) const {
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        MONGO_UNIMPLEMENTED_TASSERT(7484345);
+    }
+
     MutableDocument result;
 
     if (keyFieldPath) {
@@ -72,7 +76,7 @@ Value DocumentSourceGeoNear::serialize(boost::optional<ExplainOptions::Verbosity
             constGeometry) {
             return constGeometry->getValue();
         } else {
-            return _nearGeometry->serialize(static_cast<bool>(explain));
+            return _nearGeometry->serialize(opts);
         }
     }();
     result.setField("near", nearValue);

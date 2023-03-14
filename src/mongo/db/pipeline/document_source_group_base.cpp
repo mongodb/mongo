@@ -87,19 +87,23 @@ DocumentSourceGroupBase::~DocumentSourceGroupBase() {
         _stats.spills, _stats.spilledDataStorageSize, _stats.spilledRecords);
 }
 
-Value DocumentSourceGroupBase::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceGroupBase::serialize(SerializationOptions opts) const {
+    auto explain = opts.verbosity;
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        MONGO_UNIMPLEMENTED_TASSERT(7484343);
+    }
     MutableDocument insides;
 
     // Add the _id.
     if (_idFieldNames.empty()) {
         invariant(_idExpressions.size() == 1);
-        insides["_id"] = _idExpressions[0]->serialize(static_cast<bool>(explain));
+        insides["_id"] = _idExpressions[0]->serialize(explain);
     } else {
         // Decomposed document case.
         invariant(_idExpressions.size() == _idFieldNames.size());
         MutableDocument md;
         for (size_t i = 0; i < _idExpressions.size(); i++) {
-            md[_idFieldNames[i]] = _idExpressions[i]->serialize(static_cast<bool>(explain));
+            md[_idFieldNames[i]] = _idExpressions[i]->serialize(explain);
         }
         insides["_id"] = md.freezeToValue();
     }
@@ -107,10 +111,8 @@ Value DocumentSourceGroupBase::serialize(boost::optional<ExplainOptions::Verbosi
     // Add the remaining fields.
     for (auto&& accumulatedField : _accumulatedFields) {
         intrusive_ptr<AccumulatorState> accum = accumulatedField.makeAccumulator();
-        insides[accumulatedField.fieldName] =
-            Value(accum->serialize(accumulatedField.expr.initializer,
-                                   accumulatedField.expr.argument,
-                                   static_cast<bool>(explain)));
+        insides[accumulatedField.fieldName] = Value(accum->serialize(
+            accumulatedField.expr.initializer, accumulatedField.expr.argument, explain));
     }
 
     if (_doingMerge) {

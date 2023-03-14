@@ -72,7 +72,11 @@ DocumentSource::GetNextResult DocumentSourceSkip::doGetNext() {
     return pSource->getNext();
 }
 
-Value DocumentSourceSkip::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceSkip::serialize(SerializationOptions opts) const {
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        MONGO_UNIMPLEMENTED_TASSERT(7484311);
+    }
+
     return Value(DOC(getSourceName() << _nToSkip));
 }
 

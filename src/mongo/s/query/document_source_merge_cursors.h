@@ -80,11 +80,7 @@ public:
     /**
      * Serializes this stage to be sent to perform the merging on a different host.
      */
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
-
-    Value serialize(SerializationOptions opts) const final override {
-        MONGO_UNIMPLEMENTED;
-    }
+    Value serialize(SerializationOptions opts = SerializationOptions()) const final override;
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         StageConstraints constraints(StreamType::kStreaming,

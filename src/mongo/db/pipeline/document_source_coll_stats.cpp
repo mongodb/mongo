@@ -128,7 +128,10 @@ DocumentSource::GetNextResult DocumentSourceCollStats::doGetNext() {
     return {Document(makeStatsForNs(pExpCtx, pExpCtx->ns, _collStatsSpec))};
 }
 
-Value DocumentSourceCollStats::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceCollStats::serialize(SerializationOptions opts) const {
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        MONGO_UNIMPLEMENTED_TASSERT(7484352);
+    }
     return Value(Document{{getSourceName(), _collStatsSpec.toBSON()}});
 }
 

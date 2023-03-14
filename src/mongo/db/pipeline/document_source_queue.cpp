@@ -80,7 +80,11 @@ DocumentSource::GetNextResult DocumentSourceQueue::doGetNext() {
     return next;
 }
 
-Value DocumentSourceQueue::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceQueue::serialize(SerializationOptions opts) const {
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        MONGO_UNIMPLEMENTED_TASSERT(7484319);
+    }
+
     ValueArrayStream vals;
     for (const auto& elem : _queue) {
         vals << elem.getDocument().getOwned();

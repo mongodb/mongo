@@ -83,7 +83,10 @@ DocumentSource::GetNextResult DocumentSourceSample::doGetNext() {
     return _sortStage->getNext();
 }
 
-Value DocumentSourceSample::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceSample::serialize(SerializationOptions opts) const {
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        MONGO_UNIMPLEMENTED_TASSERT(7484317);
+    }
     return Value(DOC(kStageName << DOC("size" << _size)));
 }
 

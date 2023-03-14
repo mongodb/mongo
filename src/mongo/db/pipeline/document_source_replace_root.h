@@ -63,7 +63,7 @@ public:
 
     Document serializeTransformation(boost::optional<ExplainOptions::Verbosity> explain,
                                      SerializationOptions options = {}) const final {
-        return Document{{"newRoot", _newRoot->serialize(static_cast<bool>(explain))}};
+        return Document{{"newRoot", _newRoot->serialize(explain)}};
     }
 
     DepsTracker::State addDependencies(DepsTracker* deps) const final {

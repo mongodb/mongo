@@ -87,12 +87,11 @@ public:
         return kStageName.rawData();
     }
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final {
+    Value serialize(SerializationOptions opts = SerializationOptions()) const final override {
+        if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+            MONGO_UNIMPLEMENTED_TASSERT(7484330);
+        }
         return Value(Document{{getSourceName(), Document{}}});
-    }
-
-    Value serialize(SerializationOptions opts) const final override {
-        MONGO_UNIMPLEMENTED;
     }
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {

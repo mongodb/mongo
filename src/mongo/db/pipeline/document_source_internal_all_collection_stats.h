@@ -83,11 +83,7 @@ public:
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final{};
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
-
-    Value serialize(SerializationOptions opts) const final override {
-        MONGO_UNIMPLEMENTED;
-    }
+    Value serialize(SerializationOptions opts = SerializationOptions()) const final override;
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         StageConstraints constraints(StreamType::kStreaming,
@@ -114,14 +110,8 @@ public:
     Pipeline::SourceContainer::iterator doOptimizeAt(Pipeline::SourceContainer::iterator itr,
                                                      Pipeline::SourceContainer* container) final;
 
-    void serializeToArray(
-        std::vector<Value>& array,
-        boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
-
     void serializeToArray(std::vector<Value>& array,
-                          SerializationOptions opts) const final override {
-        MONGO_UNIMPLEMENTED;
-    };
+                          SerializationOptions opts = SerializationOptions()) const final override;
 
 private:
     GetNextResult doGetNext() final;

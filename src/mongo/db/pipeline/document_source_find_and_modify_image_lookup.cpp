@@ -178,8 +178,10 @@ StageConstraints DocumentSourceFindAndModifyImageLookup::constraints(
                             ChangeStreamRequirement::kDenylist);
 }
 
-Value DocumentSourceFindAndModifyImageLookup::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceFindAndModifyImageLookup::serialize(SerializationOptions opts) const {
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        MONGO_UNIMPLEMENTED_TASSERT(7484346);
+    }
     return Value(
         Document{{kStageName,
                   Value(Document{{kIncludeCommitTransactionTimestampFieldName,

@@ -118,8 +118,10 @@ intrusive_ptr<DocumentSource> DocumentSourceListCatalog::createFromBson(
     return new DocumentSourceListCatalog(pExpCtx);
 }
 
-Value DocumentSourceListCatalog::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceListCatalog::serialize(SerializationOptions opts) const {
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        MONGO_UNIMPLEMENTED_TASSERT(7484329);
+    }
     return Value(DOC(getSourceName() << Document()));
 }
 }  // namespace mongo

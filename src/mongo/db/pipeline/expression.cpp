@@ -976,7 +976,7 @@ Value ExpressionCoerceToBool::evaluate(const Document& root, Variables* variable
 Value ExpressionCoerceToBool::serialize(SerializationOptions options) const {
     // When not explaining, serialize to an $and expression. When parsed, the $and expression
     // will be optimized back into a ExpressionCoerceToBool.
-    const char* name = options.explain ? "$coerceToBool" : "$and";
+    const char* name = options.verbosity ? "$coerceToBool" : "$and";
     return Value(DOC(name << DOC_ARRAY(_children[_kExpression]->serialize(options))));
 }
 

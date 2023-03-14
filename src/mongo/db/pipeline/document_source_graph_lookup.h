@@ -98,14 +98,8 @@ public:
         _additionalFilter = additionalFilter ? additionalFilter->getOwned() : additionalFilter;
     };
 
-    void serializeToArray(
-        std::vector<Value>& array,
-        boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
-
     void serializeToArray(std::vector<Value>& array,
-                          SerializationOptions opts) const final override {
-        MONGO_UNIMPLEMENTED;
-    };
+                          SerializationOptions opts = SerializationOptions()) const final override;
 
     /**
      * Returns the 'as' path, and possibly the fields modified by an absorbed $unwind.
@@ -179,13 +173,9 @@ private:
         boost::optional<long long> maxDepth,
         boost::optional<boost::intrusive_ptr<DocumentSourceUnwind>> unwindSrc);
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final {
+    Value serialize(SerializationOptions opts = SerializationOptions()) const final override {
         // Should not be called; use serializeToArray instead.
-        MONGO_UNREACHABLE;
-    }
-
-    Value serialize(SerializationOptions opts) const final override {
-        MONGO_UNIMPLEMENTED;
+        MONGO_UNREACHABLE_TASSERT(7484306);
     }
 
     /**

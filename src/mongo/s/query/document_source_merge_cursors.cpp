@@ -114,10 +114,13 @@ DocumentSource::GetNextResult DocumentSourceMergeCursors::doGetNext() {
     return Document::fromBsonWithMetaData(*next.getResult());
 }
 
-Value DocumentSourceMergeCursors::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceMergeCursors::serialize(SerializationOptions opts) const {
     invariant(!_blockingResultsMerger);
     invariant(_armParams);
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        MONGO_UNIMPLEMENTED_TASSERT(7484301);
+    }
+
     return Value(Document{{kStageName, _armParams->toBSON()}});
 }
 

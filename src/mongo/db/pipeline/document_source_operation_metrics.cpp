@@ -113,8 +113,10 @@ intrusive_ptr<DocumentSource> DocumentSourceOperationMetrics::createFromBson(
     return new DocumentSourceOperationMetrics(pExpCtx, clearMetrics);
 }
 
-Value DocumentSourceOperationMetrics::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceOperationMetrics::serialize(SerializationOptions opts) const {
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        MONGO_UNIMPLEMENTED_TASSERT(7484322);
+    }
     return Value(DOC(getSourceName() << Document()));
 }
 }  // namespace mongo

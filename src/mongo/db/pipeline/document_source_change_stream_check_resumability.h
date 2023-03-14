@@ -90,11 +90,7 @@ public:
         return boost::none;
     }
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const override;
-
-    Value serialize(SerializationOptions opts) const override {
-        MONGO_UNIMPLEMENTED;
-    }
+    Value serialize(SerializationOptions opts = SerializationOptions()) const override;
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 

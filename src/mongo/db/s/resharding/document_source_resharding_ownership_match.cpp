@@ -92,8 +92,11 @@ StageConstraints DocumentSourceReshardingOwnershipMatch::constraints(
                             ChangeStreamRequirement::kDenylist);
 }
 
-Value DocumentSourceReshardingOwnershipMatch::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceReshardingOwnershipMatch::serialize(SerializationOptions opts) const {
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        MONGO_UNIMPLEMENTED_TASSERT(7484302);
+    }
+
     return Value{Document{{kStageName,
                            DocumentSourceReshardingOwnershipMatchSpec(
                                _recipientShardId, _reshardingKey.getKeyPattern())

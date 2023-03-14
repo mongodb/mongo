@@ -93,7 +93,10 @@ const char* DocumentSourceExchange::getSourceName() const {
     return kStageName.rawData();
 }
 
-Value DocumentSourceExchange::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceExchange::serialize(SerializationOptions opts) const {
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        MONGO_UNIMPLEMENTED_TASSERT(7484348);
+    }
     return Value(DOC(getSourceName() << _exchange->getSpec().toBSON()));
 }
 

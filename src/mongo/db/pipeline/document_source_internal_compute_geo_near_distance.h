@@ -86,12 +86,7 @@ public:
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
 private:
-    Value serialize(
-        boost::optional<ExplainOptions::Verbosity> explain = boost::none) const override;
-
-    Value serialize(SerializationOptions opts) const final override {
-        MONGO_UNIMPLEMENTED;
-    }
+    Value serialize(SerializationOptions opts = SerializationOptions()) const final override;
 
     GetNextResult doGetNext() override;
 

@@ -208,7 +208,7 @@ public:
      * If 'explain' is false, the returned Value must result in the same Expression when parsed by
      * parseOperand().
      */
-    virtual Value serialize(SerializationOptions options) const = 0;
+    virtual Value serialize(SerializationOptions options = SerializationOptions()) const = 0;
 
     /**
      * Evaluate the expression with respect to the Document given by 'root' and the Variables given

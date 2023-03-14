@@ -95,7 +95,11 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceTelemetry::createFromBson(
                                        parseTelemetryEmbeddedObject(spec.embeddedObject()));
 }
 
-Value DocumentSourceTelemetry::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceTelemetry::serialize(SerializationOptions opts) const {
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        MONGO_UNIMPLEMENTED_TASSERT(7484308);
+    }
+
     return Value{Document{{kStageName, Document{}}}};
 }
 

@@ -57,9 +57,13 @@ DocumentSourcePlanCacheStats::DocumentSourcePlanCacheStats(
     const boost::intrusive_ptr<ExpressionContext>& expCtx)
     : DocumentSource(kStageName, expCtx) {}
 
-void DocumentSourcePlanCacheStats::serializeToArray(
-    std::vector<Value>& array, boost::optional<ExplainOptions::Verbosity> explain) const {
-    if (explain) {
+void DocumentSourcePlanCacheStats::serializeToArray(std::vector<Value>& array,
+                                                    SerializationOptions opts) const {
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        MONGO_UNIMPLEMENTED_TASSERT(7484320);
+    }
+
+    if (opts.verbosity) {
         array.push_back(Value{
             Document{{kStageName,
                       Document{{"match"_sd,

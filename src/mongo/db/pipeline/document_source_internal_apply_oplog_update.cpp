@@ -97,8 +97,10 @@ DocumentSource::GetNextResult DocumentSourceInternalApplyOplogUpdate::doGetNext(
     return Document(doc.getObject());
 }
 
-Value DocumentSourceInternalApplyOplogUpdate::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceInternalApplyOplogUpdate::serialize(SerializationOptions opts) const {
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        MONGO_UNIMPLEMENTED_TASSERT(7484339);
+    }
     return Value(Document{{kStageName, Document{{kOplogUpdateFieldName, _oplogUpdate}}}});
 }
 

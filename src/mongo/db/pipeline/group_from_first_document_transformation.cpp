@@ -52,7 +52,7 @@ Document GroupFromFirstDocumentTransformation::serializeTransformation(
 
     MutableDocument newRoot(_accumulatorExprs.size());
     for (auto&& expr : _accumulatorExprs) {
-        newRoot.addField(expr.first, expr.second->serialize(static_cast<bool>(explain)));
+        newRoot.addField(expr.first, expr.second->serialize(explain));
     }
 
     return {{"newRoot", newRoot.freezeToValue()}};

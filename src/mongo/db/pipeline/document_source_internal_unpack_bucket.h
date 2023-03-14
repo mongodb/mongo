@@ -75,24 +75,14 @@ public:
         return kStageNameInternal.rawData();
     }
 
-    void serializeToArray(
-        std::vector<Value>& array,
-        boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
-
     void serializeToArray(std::vector<Value>& array,
-                          SerializationOptions opts) const final override {
-        MONGO_UNIMPLEMENTED;
-    };
+                          SerializationOptions opts = SerializationOptions()) const final override;
 
     /**
      * Use 'serializeToArray' above.
      */
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final {
-        MONGO_UNREACHABLE;
-    }
-
-    Value serialize(SerializationOptions opts) const final override {
-        MONGO_UNIMPLEMENTED;
+    Value serialize(SerializationOptions opts = SerializationOptions()) const final override {
+        MONGO_UNREACHABLE_TASSERT(7484305);
     }
 
     bool includeMetaField() const {

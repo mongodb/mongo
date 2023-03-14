@@ -77,8 +77,11 @@ DocumentSourceChangeStreamSplitLargeEvent::DocumentSourceChangeStreamSplitLargeE
             !_resumeAfterSplit || resumeAfterSplit->fragmentNum);
 }
 
-Value DocumentSourceChangeStreamSplitLargeEvent::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceChangeStreamSplitLargeEvent::serialize(SerializationOptions opts) const {
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        MONGO_UNIMPLEMENTED_TASSERT(7484355);
+    }
+
     return Value(Document{{DocumentSourceChangeStreamSplitLargeEvent::kStageName, Document{}}});
 }
 

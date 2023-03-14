@@ -74,8 +74,10 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceListSessions::createFromBson(
     return new DocumentSourceListSessions(query, pExpCtx, spec.getAllUsers(), spec.getUsers());
 }
 
-Value DocumentSourceListSessions::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceListSessions::serialize(SerializationOptions opts) const {
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        MONGO_UNIMPLEMENTED_TASSERT(7484327);
+    }
     ListSessionsSpec spec;
     spec.setAllUsers(_allUsers);
     spec.setUsers(_users);

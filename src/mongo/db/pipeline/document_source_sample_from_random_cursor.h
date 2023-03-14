@@ -42,10 +42,7 @@ class DocumentSourceSampleFromRandomCursor final : public DocumentSource {
 public:
     static constexpr StringData kStageName = "$sampleFromRandomCursor"_sd;
     const char* getSourceName() const final;
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
-    Value serialize(SerializationOptions opts) const final override {
-        MONGO_UNIMPLEMENTED;
-    }
+    Value serialize(SerializationOptions opts = SerializationOptions()) const final override;
     DepsTracker::State getDependencies(DepsTracker* deps) const final;
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {

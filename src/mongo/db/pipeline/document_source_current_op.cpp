@@ -289,7 +289,11 @@ intrusive_ptr<DocumentSourceCurrentOp> DocumentSourceCurrentOp::create(
                                        backtrace);
 }
 
-Value DocumentSourceCurrentOp::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceCurrentOp::serialize(SerializationOptions opts) const {
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        MONGO_UNIMPLEMENTED_TASSERT(7484351);
+    }
+
     return Value(Document{
         {getSourceName(),
          Document{{kIdleConnectionsFieldName,

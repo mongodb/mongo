@@ -137,7 +137,6 @@ public:
      */
     virtual Document serialize(boost::intrusive_ptr<Expression> initializer,
                                boost::intrusive_ptr<Expression> argument,
-                               bool explain,
                                SerializationOptions options = {}) const {
         ExpressionConstant const* ec = dynamic_cast<ExpressionConstant const*>(initializer.get());
         invariant(ec);

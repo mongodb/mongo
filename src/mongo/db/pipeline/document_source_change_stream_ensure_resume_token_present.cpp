@@ -152,9 +152,13 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamEnsureResumeTokenPresent
 }
 
 Value DocumentSourceChangeStreamEnsureResumeTokenPresent::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
+    SerializationOptions opts) const {
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        MONGO_UNIMPLEMENTED_TASSERT(7484358);
+    }
+
     // We only serialize this stage in the context of explain.
-    if (explain) {
+    if (opts.verbosity) {
         return Value(DOC(DocumentSourceChangeStream::kStageName
                          << DOC("stage"
                                 << "internalEnsureResumeTokenPresent"_sd

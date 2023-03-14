@@ -139,9 +139,12 @@ boost::optional<Document> DocumentSourceChangeStreamAddPreImage::lookupPreImage(
     return preImageField.getDocument().getOwned();
 }
 
-Value DocumentSourceChangeStreamAddPreImage::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
-    return explain
+Value DocumentSourceChangeStreamAddPreImage::serialize(SerializationOptions opts) const {
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        MONGO_UNIMPLEMENTED_TASSERT(7484362);
+    }
+
+    return opts.verbosity
         ? Value(Document{
               {DocumentSourceChangeStream::kStageName,
                Document{{"stage"_sd, "internalAddPreImage"_sd},

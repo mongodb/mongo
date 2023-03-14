@@ -203,9 +203,12 @@ Pipeline::SourceContainer::iterator DocumentSourceChangeStreamOplogMatch::doOpti
     return nextChangeStreamStageItr;
 }
 
-Value DocumentSourceChangeStreamOplogMatch::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
-    if (explain) {
+Value DocumentSourceChangeStreamOplogMatch::serialize(SerializationOptions opts) const {
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        MONGO_UNIMPLEMENTED_TASSERT(7484356);
+    }
+
+    if (opts.verbosity) {
         return Value(
             Document{{DocumentSourceChangeStream::kStageName,
                       Document{{"stage"_sd, "internalOplogMatch"_sd}, {"filter"_sd, _predicate}}}});

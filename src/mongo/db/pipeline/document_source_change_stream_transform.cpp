@@ -105,9 +105,12 @@ StageConstraints DocumentSourceChangeStreamTransform::constraints(
     return constraints;
 }
 
-Value DocumentSourceChangeStreamTransform::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
-    if (explain) {
+Value DocumentSourceChangeStreamTransform::serialize(SerializationOptions opts) const {
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        MONGO_UNIMPLEMENTED_TASSERT(7484354);
+    }
+
+    if (opts.verbosity) {
         return Value(Document{{DocumentSourceChangeStream::kStageName,
                                Document{{"stage"_sd, "internalTransform"_sd},
                                         {"options"_sd, _changeStreamSpec.toBSON()}}}});

@@ -68,7 +68,12 @@ const char* DocumentSourceMatch::getSourceName() const {
     return kStageName.rawData();
 }
 
-Value DocumentSourceMatch::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceMatch::serialize(SerializationOptions opts) const {
+    auto explain = opts.verbosity;
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        MONGO_UNIMPLEMENTED_TASSERT(7484325);
+    }
+
     if (explain) {
         return Value(DOC(getSourceName() << Document(_expression->serialize())));
     }

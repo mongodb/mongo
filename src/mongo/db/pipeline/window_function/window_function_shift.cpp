@@ -122,7 +122,7 @@ boost::intrusive_ptr<Expression> ExpressionShift::parse(BSONObj obj,
 Value ExpressionShift::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
     MutableDocument args;
     args.addField(kByArg, Value(_offset));
-    args.addField(kOutputArg, _input->serialize(static_cast<bool>(explain)));
+    args.addField(kOutputArg, _input->serialize(explain));
     args.addField(kDefaultArg, _defaultVal.get_value_or(mongo::Value(BSONNULL)));
 
     MutableDocument windowFun;

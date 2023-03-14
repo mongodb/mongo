@@ -1011,8 +1011,12 @@ void DocumentSourceLookUp::appendSpecificExecStats(MutableDocument& doc) const {
     doc["indexesUsed"] = Value{std::move(indexesUsedVec)};
 }
 
-void DocumentSourceLookUp::serializeToArray(
-    std::vector<Value>& array, boost::optional<ExplainOptions::Verbosity> explain) const {
+void DocumentSourceLookUp::serializeToArray(std::vector<Value>& array,
+                                            SerializationOptions opts) const {
+    auto explain = opts.verbosity;
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        MONGO_UNIMPLEMENTED_TASSERT(7484326);
+    }
 
     // Support alternative $lookup from config.cache.chunks* namespaces.
     //
@@ -1038,8 +1042,7 @@ void DocumentSourceLookUp::serializeToArray(
     if (!hasLocalFieldForeignFieldJoin() || pipeline.size() > 0) {
         MutableDocument exprList;
         for (const auto& letVar : _letVariables) {
-            exprList.addField(letVar.name,
-                              letVar.expression->serialize(static_cast<bool>(explain)));
+            exprList.addField(letVar.name, letVar.expression->serialize(explain));
         }
         output[getSourceName()]["let"] = Value(exprList.freeze());
 

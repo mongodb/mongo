@@ -60,8 +60,10 @@ DocumentSource::GetNextResult DocumentSourceInternalInhibitOptimization::doGetNe
     return pSource->getNext();
 }
 
-Value DocumentSourceInternalInhibitOptimization::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceInternalInhibitOptimization::serialize(SerializationOptions opts) const {
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        MONGO_UNIMPLEMENTED_TASSERT(7484336);
+    }
     return Value(Document{{getSourceName(), Value{Document{}}}});
 }
 

@@ -169,8 +169,11 @@ intrusive_ptr<DocumentSource> DocumentSourceRedact::optimize() {
     return this;
 }
 
-Value DocumentSourceRedact::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
-    return Value(DOC(getSourceName() << _expression.get()->serialize(static_cast<bool>(explain))));
+Value DocumentSourceRedact::serialize(SerializationOptions opts) const {
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        MONGO_UNIMPLEMENTED_TASSERT(7484318);
+    }
+    return Value(DOC(getSourceName() << _expression.get()->serialize(opts)));
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceRedact::createFromBson(

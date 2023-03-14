@@ -55,11 +55,7 @@ public:
 
     const char* getSourceName() const override;
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const override;
-
-    Value serialize(SerializationOptions opts) const override {
-        MONGO_UNIMPLEMENTED;
-    }
+    Value serialize(SerializationOptions opts = SerializationOptions()) const override;
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const override {
         StageConstraints constraints{StreamType::kStreaming,

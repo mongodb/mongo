@@ -126,8 +126,12 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalAllCollectionStats::do
     }
 }
 
-void DocumentSourceInternalAllCollectionStats::serializeToArray(
-    std::vector<Value>& array, boost::optional<ExplainOptions::Verbosity> explain) const {
+void DocumentSourceInternalAllCollectionStats::serializeToArray(std::vector<Value>& array,
+                                                                SerializationOptions opts) const {
+    auto explain = opts.verbosity;
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        MONGO_UNIMPLEMENTED_TASSERT(7484341);
+    }
     if (explain) {
         BSONObjBuilder bob;
         _internalAllCollectionStatsSpec.serialize(&bob);
@@ -165,8 +169,10 @@ const char* DocumentSourceInternalAllCollectionStats::getSourceName() const {
     return kStageNameInternal.rawData();
 }
 
-Value DocumentSourceInternalAllCollectionStats::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceInternalAllCollectionStats::serialize(SerializationOptions opts) const {
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        MONGO_UNIMPLEMENTED_TASSERT(7484340);
+    }
     return Value(Document{{getSourceName(), _internalAllCollectionStatsSpec.toBSON()}});
 }
 }  // namespace mongo

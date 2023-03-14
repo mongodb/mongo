@@ -53,13 +53,16 @@ REGISTER_INTERNAL_DOCUMENT_SOURCE(setVariableFromSubPipeline,
                                   DocumentSourceSetVariableFromSubPipeline::createFromBson,
                                   true);
 
-Value DocumentSourceSetVariableFromSubPipeline::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceSetVariableFromSubPipeline::serialize(SerializationOptions opts) const {
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        MONGO_UNIMPLEMENTED_TASSERT(7484314);
+    }
+
     const auto var = "$$" + Variables::getBuiltinVariableName(_variableID);
     SetVariableFromSubPipelineSpec spec;
     tassert(625298, "SubPipeline cannot be null during serialization", _subPipeline);
     spec.setSetVariable(var);
-    spec.setPipeline(_subPipeline->serializeToBson(explain));
+    spec.setPipeline(_subPipeline->serializeToBson(opts.verbosity));
     return Value(DOC(getSourceName() << spec.toBSON()));
 }
 

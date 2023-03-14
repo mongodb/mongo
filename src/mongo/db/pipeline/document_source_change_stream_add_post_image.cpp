@@ -208,9 +208,11 @@ boost::optional<Document> DocumentSourceChangeStreamAddPostImage::lookupLatestPo
         pExpCtx, nss, *resumeTokenData.uuid, documentKey, std::move(readConcern));
 }
 
-Value DocumentSourceChangeStreamAddPostImage::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
-    return explain
+Value DocumentSourceChangeStreamAddPostImage::serialize(SerializationOptions opts) const {
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        MONGO_UNIMPLEMENTED_TASSERT(7484363);
+    }
+    return opts.verbosity
         ? Value(Document{
               {DocumentSourceChangeStream::kStageName,
                Document{{"stage"_sd, kStageName},

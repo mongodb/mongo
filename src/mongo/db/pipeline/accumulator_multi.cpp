@@ -106,7 +106,6 @@ const char* AccumulatorMinMaxN::getOpName() const {
 
 Document AccumulatorMinMaxN::serialize(boost::intrusive_ptr<Expression> initializer,
                                        boost::intrusive_ptr<Expression> argument,
-                                       bool explain,
                                        SerializationOptions options) const {
     MutableDocument args;
     AccumulatorN::serializeHelper(initializer, argument, options, args);
@@ -314,7 +313,6 @@ const char* AccumulatorFirstLastN::getOpName() const {
 
 Document AccumulatorFirstLastN::serialize(boost::intrusive_ptr<Expression> initializer,
                                           boost::intrusive_ptr<Expression> argument,
-                                          bool explain,
                                           SerializationOptions options) const {
     MutableDocument args;
     AccumulatorN::serializeHelper(initializer, argument, options, args);
@@ -462,7 +460,6 @@ template <TopBottomSense sense, bool single>
 Document AccumulatorTopBottomN<sense, single>::serialize(
     boost::intrusive_ptr<Expression> initializer,
     boost::intrusive_ptr<Expression> argument,
-    bool explain,
     SerializationOptions options) const {
     MutableDocument args;
 

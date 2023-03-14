@@ -1768,7 +1768,7 @@ Document parseAndSerializeAccum(
 
     auto expr = func(expCtx.get(), elem, vps);
     auto accum = expr.factory();
-    return accum->serialize(expr.initializer, expr.argument, false, options);
+    return accum->serialize(expr.initializer, expr.argument, options);
 }
 
 TEST(Accumulators, SerializeWithRedaction) {

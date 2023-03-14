@@ -293,7 +293,11 @@ Pipeline::SourceContainer::iterator DocumentSourceUnwind::doOptimizeAt(
     return std::next(itr);
 }
 
-Value DocumentSourceUnwind::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceUnwind::serialize(SerializationOptions opts) const {
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        MONGO_UNIMPLEMENTED_TASSERT(7484306);
+    }
+
     return Value(DOC(getSourceName() << DOC(
                          "path" << _unwindPath.fullPathWithPrefix() << "preserveNullAndEmptyArrays"
                                 << (_preserveNullAndEmptyArrays ? Value(true) : Value())

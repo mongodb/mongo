@@ -43,11 +43,7 @@ public:
     // virtuals from DocumentSource
     const char* getSourceName() const final;
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
-
-    Value serialize(SerializationOptions opts) const final override {
-        MONGO_UNIMPLEMENTED;
-    }
+    Value serialize(SerializationOptions opts = SerializationOptions()) const final override;
 
     /**
      * Returns the unwound path, and the 'includeArrayIndex' path, if specified.

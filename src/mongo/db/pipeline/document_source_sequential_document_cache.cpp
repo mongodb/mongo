@@ -155,9 +155,11 @@ Pipeline::SourceContainer::iterator DocumentSourceSequentialDocumentCache::doOpt
     return container->end();
 }
 
-Value DocumentSourceSequentialDocumentCache::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
-    if (explain) {
+Value DocumentSourceSequentialDocumentCache::serialize(SerializationOptions opts) const {
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        MONGO_UNIMPLEMENTED_TASSERT(7484315);
+    }
+    if (opts.verbosity) {
         return Value(Document{
             {kStageName,
              Document{{"maxSizeBytes"_sd, Value(static_cast<long long>(_cache->maxSizeBytes()))},

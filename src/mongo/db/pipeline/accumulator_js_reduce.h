@@ -66,7 +66,6 @@ public:
 
     virtual Document serialize(boost::intrusive_ptr<Expression> initializer,
                                boost::intrusive_ptr<Expression> argument,
-                               bool explain,
                                SerializationOptions options = {}) const override;
 
 private:
@@ -104,7 +103,6 @@ public:
 
     Document serialize(boost::intrusive_ptr<Expression> initializer,
                        boost::intrusive_ptr<Expression> argument,
-                       bool explain,
                        SerializationOptions options = {}) const final;
     void startNewGroup(Value const& input) final;
 

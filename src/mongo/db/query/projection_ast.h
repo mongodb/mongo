@@ -275,7 +275,7 @@ public:
     ExpressionASTNode(boost::intrusive_ptr<Expression> expr) : _expr(expr) {}
     ExpressionASTNode(const ExpressionASTNode& other) : ASTNode(other) {
         BSONObjBuilder bob;
-        bob << "" << other._expr->serialize(false);
+        bob << "" << other._expr->serialize();
 
         // TODO SERVER-31003: add a clone() method to Expression.
         // Temporary stop expression counters while processing the cloned expression.

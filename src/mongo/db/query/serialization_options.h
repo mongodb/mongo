@@ -48,7 +48,16 @@ std::string defaultRedactionStrategy(StringData s) {
 struct SerializationOptions {
     SerializationOptions() {}
 
-    SerializationOptions(bool explain_) : explain(explain_) {}
+    SerializationOptions(bool explain_)
+        // kQueryPlanner is the "base" explain level, used as default in the case explain is
+        // specified without a specific verbosity level
+        : verbosity(explain_ ? boost::make_optional(ExplainOptions::Verbosity::kQueryPlanner)
+                             : boost::none) {}
+
+    SerializationOptions(boost::optional<ExplainOptions::Verbosity> verbosity_)
+        : verbosity(verbosity_) {}
+
+    SerializationOptions(ExplainOptions::Verbosity verbosity_) : verbosity(verbosity_) {}
 
     SerializationOptions(std::function<std::string(StringData)> redactFieldNamesStrategy_,
                          boost::optional<StringData> replacementForLiteralArgs_)
@@ -94,7 +103,6 @@ struct SerializationOptions {
     bool includePath = true;
 
     // For aggregation indicate whether we should use the more verbose serialization format.
-    bool explain = false;
     boost::optional<ExplainOptions::Verbosity> verbosity = boost::none;
 };
 

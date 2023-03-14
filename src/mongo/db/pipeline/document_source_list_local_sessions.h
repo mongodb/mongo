@@ -101,12 +101,11 @@ public:
         return DocumentSourceListLocalSessions::kStageName.rawData();
     }
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final {
+    Value serialize(SerializationOptions opts = SerializationOptions()) const final override {
+        if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+            MONGO_UNIMPLEMENTED_TASSERT(7484328);
+        }
         return Value(Document{{getSourceName(), _spec.toBSON()}});
-    }
-
-    Value serialize(SerializationOptions opts) const final override {
-        MONGO_UNIMPLEMENTED;
     }
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {

@@ -161,11 +161,7 @@ private:
                         size_t bufferSizeBytes,
                         size_t maxOutputDocBytes);
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
-
-    Value serialize(SerializationOptions opts) const final override {
-        MONGO_UNIMPLEMENTED;
-    }
+    Value serialize(SerializationOptions opts = SerializationOptions()) const final override;
 
     boost::intrusive_ptr<TeeBuffer> _teeBuffer;
     std::vector<FacetPipeline> _facets;

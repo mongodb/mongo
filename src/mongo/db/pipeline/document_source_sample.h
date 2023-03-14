@@ -41,11 +41,7 @@ public:
     const char* getSourceName() const final {
         return kStageName.rawData();
     }
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain = boost::none) const final;
-
-    Value serialize(SerializationOptions opts) const final override {
-        MONGO_UNIMPLEMENTED;
-    }
+    Value serialize(SerializationOptions opts = SerializationOptions()) const final override;
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         return {StreamType::kBlocking,

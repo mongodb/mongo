@@ -208,7 +208,11 @@ void DocumentSourceCursor::recordPlanSummaryStats() {
     _exec->getPlanExplainer().getSummaryStats(&_stats.planSummaryStats);
 }
 
-Value DocumentSourceCursor::serialize(boost::optional<ExplainOptions::Verbosity> verbosity) const {
+Value DocumentSourceCursor::serialize(SerializationOptions opts) const {
+    auto verbosity = opts.verbosity;
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        MONGO_UNIMPLEMENTED_TASSERT(7484350);
+    }
     // We never parse a DocumentSourceCursor, so we only serialize for explain.
     if (!verbosity)
         return Value();

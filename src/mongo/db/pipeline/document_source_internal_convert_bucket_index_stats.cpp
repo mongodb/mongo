@@ -145,8 +145,11 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalConvertBucketIndexSta
         expCtx, std::move(timeseriesOptions));
 }
 
-Value DocumentSourceInternalConvertBucketIndexStats::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceInternalConvertBucketIndexStats::serialize(SerializationOptions opts) const {
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        MONGO_UNIMPLEMENTED_TASSERT(7484337);
+    }
+
     MutableDocument out;
     out.addField(timeseries::kTimeFieldName, Value{_timeseriesOptions.timeField});
     if (_timeseriesOptions.metaField) {

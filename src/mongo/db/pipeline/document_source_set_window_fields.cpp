@@ -283,8 +283,12 @@ intrusive_ptr<DocumentSource> DocumentSourceInternalSetWindowFields::optimize() 
     return this;
 }
 
-Value DocumentSourceInternalSetWindowFields::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceInternalSetWindowFields::serialize(SerializationOptions opts) const {
+    auto explain = opts.verbosity;
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        MONGO_UNIMPLEMENTED_TASSERT(7484313);
+    }
+
     MutableDocument spec;
     spec[SetWindowFieldsSpec::kPartitionByFieldName] =
         _partitionBy ? (*_partitionBy)->serialize(false) : Value();

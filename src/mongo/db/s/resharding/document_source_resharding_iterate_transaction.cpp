@@ -113,8 +113,11 @@ StageConstraints DocumentSourceReshardingIterateTransaction::constraints(
                             ChangeStreamRequirement::kDenylist);
 }
 
-Value DocumentSourceReshardingIterateTransaction::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceReshardingIterateTransaction::serialize(SerializationOptions opts) const {
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        MONGO_UNIMPLEMENTED_TASSERT(7484303);
+    }
+
     return Value(
         Document{{kStageName,
                   Value(Document{{kIncludeCommitTransactionTimestampFieldName,

@@ -481,8 +481,13 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
         assumeClean);
 }
 
-void DocumentSourceInternalUnpackBucket::serializeToArray(
-    std::vector<Value>& array, boost::optional<ExplainOptions::Verbosity> explain) const {
+void DocumentSourceInternalUnpackBucket::serializeToArray(std::vector<Value>& array,
+                                                          SerializationOptions opts) const {
+    auto explain = opts.verbosity;
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        MONGO_UNIMPLEMENTED_TASSERT(7484332);
+    }
+
     MutableDocument out;
     auto behavior =
         _bucketUnpacker.behavior() == BucketSpec::Behavior::kInclude ? kInclude : kExclude;

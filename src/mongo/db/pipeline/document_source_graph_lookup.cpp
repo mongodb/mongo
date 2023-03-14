@@ -579,8 +579,13 @@ void DocumentSourceGraphLookUp::checkMemoryUsage() {
     _cache.evictDownTo(_maxMemoryUsageBytes - _frontierUsageBytes - _visitedUsageBytes);
 }
 
-void DocumentSourceGraphLookUp::serializeToArray(
-    std::vector<Value>& array, boost::optional<ExplainOptions::Verbosity> explain) const {
+void DocumentSourceGraphLookUp::serializeToArray(std::vector<Value>& array,
+                                                 SerializationOptions opts) const {
+    auto explain = opts.verbosity;
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        MONGO_UNIMPLEMENTED_TASSERT(7484344);
+    }
+
     // Do not include tenantId in serialized 'from' namespace.
     auto fromValue = (pExpCtx->ns.db() == _from.db())
         ? Value(_from.coll())

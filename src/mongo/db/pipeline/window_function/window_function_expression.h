@@ -203,7 +203,7 @@ public:
     virtual Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
         MutableDocument args;
 
-        args[_accumulatorName] = _input->serialize(static_cast<bool>(explain));
+        args[_accumulatorName] = _input->serialize(explain);
         MutableDocument windowField;
         _bounds.serialize(windowField);
         args[kWindowArg] = windowField.freezeToValue();
@@ -339,7 +339,7 @@ public:
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final {
         MutableDocument args;
-        args.addField(_accumulatorName, Value(_input->serialize(static_cast<bool>(explain))));
+        args.addField(_accumulatorName, Value(_input->serialize(explain)));
         return args.freezeToValue();
     }
 };
@@ -512,7 +512,7 @@ public:
         } else {
             subObj[kAlphaArg] = Value(_alpha.get());
         }
-        subObj[kInputArg] = _input->serialize(static_cast<bool>(explain));
+        subObj[kInputArg] = _input->serialize(explain);
         MutableDocument outerObj;
         outerObj[kAccName] = subObj.freezeToValue();
         return outerObj.freezeToValue();
@@ -541,7 +541,7 @@ public:
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final {
         MutableDocument result;
-        result[_accumulatorName][kArgInput] = _input->serialize(static_cast<bool>(explain));
+        result[_accumulatorName][kArgInput] = _input->serialize(explain);
         if (_unit) {
             result[_accumulatorName][kArgUnit] = Value(serializeTimeUnit(*_unit));
         }
@@ -823,7 +823,7 @@ public:
 
     Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final {
         MutableDocument args;
-        args.addField(_accumulatorName, Value(_input->serialize(static_cast<bool>(explain))));
+        args.addField(_accumulatorName, Value(_input->serialize(explain)));
         return args.freezeToValue();
     }
 };

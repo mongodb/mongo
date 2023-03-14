@@ -277,7 +277,7 @@ template <typename WindowFunctionN, typename AccumulatorNType>
 Value ExpressionN<WindowFunctionN, AccumulatorNType>::serialize(
     boost::optional<ExplainOptions::Verbosity> explain) const {
     auto acc = buildAccumulatorOnly();
-    MutableDocument result(acc->serialize(nExpr, _input, static_cast<bool>(explain)));
+    MutableDocument result(acc->serialize(nExpr, _input, explain));
 
     MutableDocument windowField;
     _bounds.serialize(windowField);

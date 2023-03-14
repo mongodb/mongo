@@ -128,11 +128,14 @@ StageConstraints DocumentSourceChangeStreamUnwindTransaction::constraints(
                             ChangeStreamRequirement::kChangeStreamStage);
 }
 
-Value DocumentSourceChangeStreamUnwindTransaction::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceChangeStreamUnwindTransaction::serialize(SerializationOptions opts) const {
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        MONGO_UNIMPLEMENTED_TASSERT(7484353);
+    }
+
     tassert(5467604, "expression has not been initialized", _expression);
 
-    if (explain) {
+    if (opts.verbosity) {
         return Value(
             DOC(DocumentSourceChangeStream::kStageName << DOC("stage"
                                                               << "internalUnwindTransaction"_sd

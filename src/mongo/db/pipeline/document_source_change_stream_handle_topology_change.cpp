@@ -254,9 +254,12 @@ BSONObj DocumentSourceChangeStreamHandleTopologyChange::replaceResumeTokenInComm
     return newCmd.freeze().toBson();
 }
 
-Value DocumentSourceChangeStreamHandleTopologyChange::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
-    if (explain) {
+Value DocumentSourceChangeStreamHandleTopologyChange::serialize(SerializationOptions opts) const {
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        MONGO_UNIMPLEMENTED_TASSERT(7484357);
+    }
+
+    if (opts.verbosity) {
         return Value(DOC(DocumentSourceChangeStream::kStageName
                          << DOC("stage"
                                 << "internalHandleTopologyChange"_sd)));

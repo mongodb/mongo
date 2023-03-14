@@ -531,7 +531,12 @@ boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceMerge::distr
     return DocumentSourceWriter::distributedPlanLogic();
 }
 
-Value DocumentSourceMerge::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
+Value DocumentSourceMerge::serialize(SerializationOptions opts) const {
+    auto explain = opts.verbosity;
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        MONGO_UNIMPLEMENTED_TASSERT(7484324);
+    }
+
     DocumentSourceMergeSpec spec;
     spec.setTargetNss(_outputNs);
     spec.setLet([&]() -> boost::optional<BSONObj> {
@@ -541,7 +546,7 @@ Value DocumentSourceMerge::serialize(boost::optional<ExplainOptions::Verbosity> 
 
         BSONObjBuilder bob;
         for (auto&& [name, expr] : *_letVariables) {
-            bob << name << expr->serialize(static_cast<bool>(explain));
+            bob << name << expr->serialize(explain);
         }
         return bob.obj();
     }());

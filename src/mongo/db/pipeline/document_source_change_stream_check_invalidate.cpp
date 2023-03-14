@@ -180,9 +180,12 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamCheckInvalidate::doGetNe
     return nextInput;
 }
 
-Value DocumentSourceChangeStreamCheckInvalidate::serialize(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
-    if (explain) {
+Value DocumentSourceChangeStreamCheckInvalidate::serialize(SerializationOptions opts) const {
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        MONGO_UNIMPLEMENTED_TASSERT(7484361);
+    }
+
+    if (opts.verbosity) {
         return Value(Document{{DocumentSourceChangeStream::kStageName,
                                Document{{"stage"_sd, "internalCheckInvalidate"_sd}}}});
     }
