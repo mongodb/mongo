@@ -410,14 +410,6 @@ public:
      */
     virtual std::unique_ptr<MatchExpression> clone() const = 0;
 
-    /**
-     * Temporary method to allow for calling shallowClone() from the enterprise module. This will
-     * be removed in the next PR.
-     */
-    std::unique_ptr<MatchExpression> shallowClone() const {
-        return clone();
-    }
-
     // XXX document
     virtual bool equivalent(const MatchExpression* other) const = 0;
 

@@ -131,7 +131,7 @@ Status ParsedDelete::splitOutBucketMatchExpression(const ExtensionsCallback& ext
     } else {
         // The '_residualExpr' becomes the same as the original query predicate because nothing is
         // to be split out if there is no meta field in the timeseries collection.
-        details->_residualExpr = swMatchExpr.getValue()->shallowClone();
+        details->_residualExpr = swMatchExpr.getValue()->clone();
     }
 
     return Status::OK();
