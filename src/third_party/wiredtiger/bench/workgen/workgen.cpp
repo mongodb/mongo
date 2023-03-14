@@ -1525,9 +1525,18 @@ ThreadRunner::op_run_setup(Operation *op)
             ++_throttle_ops;
     }
 
-    // If this is not a table operation, or if it is and has a table assigned, we have
-    // nothing more to do here.
-    if (!op->is_table_op() || op->has_table()) {
+    // If this is not a table operation, we have nothing more to do here.
+    if (!op->is_table_op()) {
+        return op_run(op);
+    }
+
+    // If this is not a dynamic table operation, we still need to generate keys and values.
+    if (op->has_table()) {
+        // Mirrored tables don't need key nor value here.
+        if (!op->_random_table) {
+            tint_t tint = op->_table._internal->_tint;
+            op_kv_gen(op, tint);
+        }
         return op_run(op);
     }
 
