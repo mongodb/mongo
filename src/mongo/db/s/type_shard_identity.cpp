@@ -33,6 +33,7 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -72,6 +73,24 @@ Status ShardIdentityType::validate() const {
                 str::stream() << "config connection string can only be replica sets, got "
                               << ConnectionString::typeToString(configsvrConnStr.type())};
     }
+
+    if (getShardName() == ShardId::kConfigServerId &&
+        serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
+        return {
+            ErrorCodes::UnsupportedFormat,
+            str::stream()
+                << "Invalid shard identity document: the shard name for a shard server cannot be \""
+                << ShardId::kConfigServerId.toString() << "\""};
+    }
+
+    if (getShardName() != ShardId::kConfigServerId &&
+        serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+        return {ErrorCodes::UnsupportedFormat,
+                str::stream() << "Invalid shard identity document: the shard name for a config "
+                                 "server cannot be \""
+                              << getShardName() << "\""};
+    }
+
     return Status::OK();
 }
 

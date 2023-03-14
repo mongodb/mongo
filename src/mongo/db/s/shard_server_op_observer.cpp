@@ -516,6 +516,18 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
                                                OperationSource::kFromMigrate);
         }
     }
+
+    const auto& nss = args.coll->ns();
+    if (nss == NamespaceString::kServerConfigurationNamespace) {
+        auto idElem = args.updateArgs->criteria["_id"];
+        auto shardName = updateDoc["shardName"];
+        if (idElem && idElem.str() == ShardIdentityType::IdName && shardName) {
+            auto updatedShardIdentityDoc = args.updateArgs->updatedDoc;
+            auto shardIdentityDoc = uassertStatusOK(
+                ShardIdentityType::fromShardIdentityDocument(updatedShardIdentityDoc));
+            uassertStatusOK(shardIdentityDoc.validate());
+        }
+    }
 }
 
 void ShardServerOpObserver::aboutToDelete(OperationContext* opCtx,
