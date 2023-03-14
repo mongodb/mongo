@@ -1323,6 +1323,7 @@ buildvariants:
   - name: burn_in_tests_gen
   - name: .aggfuzzer
   - name: .aggregation
+  - name: aggregation_repeat_queries
   - name: audit
   - name: .auth
   - name: unittest_shell_hang_analyzer_gen
@@ -1712,6 +1713,7 @@ buildvariants:
     distros:
     - rhel80-xlarge
   - name: .updatefuzzer
+  - name: aggregation_repeat_queries
   - name: audit
   - name: burn_in_tags_gen
   - name: burn_in_tests_gen
