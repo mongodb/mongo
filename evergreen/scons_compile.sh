@@ -49,6 +49,8 @@ else
   extra_args="$extra_args --release"
 fi
 
+extra_args="$extra_args ENABLE_OOM_RETRY=1"
+
 if [ "${generating_for_ninja}" = "true" ] && [ "Windows_NT" = "$OS" ]; then
   vcvars="$(vswhere -latest -property installationPath | tr '\\' '/' | dos2unix.exe)/VC/Auxiliary/Build/"
   export PATH="$(echo "$(cd "$vcvars" && cmd /C "vcvarsall.bat amd64 && C:/cygwin/bin/bash -c 'echo \$PATH'")" | tail -n +6)":$PATH

@@ -3,6 +3,7 @@
 import atexit
 import copy
 import errno
+import functools
 import json
 import os
 import re
@@ -679,6 +680,17 @@ except ValueError as e:
     print(("Error decoding version.json: {0}".format(e)))
     Exit(1)
 
+
+def to_boolean(s):
+    if isinstance(s, bool):
+        return s
+    elif s.lower() in ('1', "on", "true", "yes"):
+        return True
+    elif s.lower() in ('0', "off", "false", "no"):
+        return False
+    raise ValueError(f'Invalid value {s}, must be a boolean-like string')
+
+
 # Setup the command-line variables
 def variable_shlex_converter(val):
     # If the argument is something other than a string, propogate
@@ -709,6 +721,17 @@ def variable_arch_converter(val):
 
     # Return whatever val is passed in - hopefully it's legit
     return val
+
+
+def bool_var_converter(val, var):
+    try:
+        return to_boolean(val)
+    except ValueError as exc:
+        if val.lower() != "auto":
+            raise ValueError(
+                f'Invalid {var} value {s}, must be a boolean-like string or "auto"') from exc
+    return "auto"
+
 
 # The Scons 'default' tool enables a lot of tools that we don't actually need to enable.
 # On platforms like Solaris, it actually does the wrong thing by enabling the sunstudio
@@ -1059,8 +1082,18 @@ env_vars.Add('STRIP',
     help='Path to the strip utility (non-darwin platforms probably use OBJCOPY for this)',
 )
 
-env_vars.Add('TAPI',
-    help="Configures the path to the 'tapi' (an Xcode) utility")
+env_vars.Add(
+    'ENABLE_OOM_RETRY',
+    help=
+    'Set the boolean (auto, on/off true/false 1/0) to enable retrying a compile or link commands from "out of memory" failures.',
+    converter=functools.partial(bool_var_converter, var='ENABLE_OOM_RETRY'),
+    default="False",
+)
+
+env_vars.Add(
+    'TAPI',
+    help="Configures the path to the 'tapi' (an Xcode) utility",
+)
 
 env_vars.Add('TARGET_ARCH',
     help='Sets the architecture to build for',
@@ -1297,15 +1330,6 @@ def conf_error(env, msg, *args):
 env.AddMethod(fatal_error, 'FatalError')
 env.AddMethod(conf_error, 'ConfError')
 
-def to_boolean(s):
-    if isinstance(s, bool):
-        return s
-    elif s.lower() in ('1', "on", "true", "yes"):
-        return True
-    elif s.lower() in ('0', "off", "false", "no"):
-        return False
-    raise ValueError(f'Invalid value {s}, must be a boolean-like string')
-
 # Normalize the VERBOSE Option, and make its value available as a
 # function.
 if env['VERBOSE'] == "auto":
@@ -1511,6 +1535,30 @@ def is_toolchain(self, *args):
 
 env.AddMethod(get_toolchain_name, 'ToolchainName')
 env.AddMethod(is_toolchain, 'ToolchainIs')
+
+if env.get('ENABLE_OOM_RETRY'):
+    if get_option('ninja') != 'disabled':
+        print('ENABLE_OOM_RETRY not compatible with ninja, disabling ENABLE_OOM_RETRY.')
+    else:
+        env['OOM_RETRY_ATTEMPTS'] = 10
+        env['OOM_RETRY_MAX_DELAY_SECONDS'] = 120
+
+        if env.ToolchainIs('clang', 'gcc'):
+            env['OOM_RETRY_MESSAGES'] = [
+                ': out of memory',
+                'virtual memory exhausted: Cannot allocate memory',
+                ': fatal error: Killed signal terminated program cc1',
+            ]
+        elif env.ToolchainIs('msvc'):
+            env['OOM_RETRY_MESSAGES'] = [
+                'LNK1102: out of memory',
+                'C1060: compiler is out of heap space',
+                'LNK1171: unable to load mspdbcore.dll',
+                "LNK1201: error writing to program database ''",
+            ]
+            env['OOM_RETRY_RETURNCODES'] = [1102]
+
+        env.Tool('oom_auto_retry')
 
 if env['TARGET_ARCH']:
     if not detectSystem.CheckForProcessor(env['TARGET_ARCH']):
