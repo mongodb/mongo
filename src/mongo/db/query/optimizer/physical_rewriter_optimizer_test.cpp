@@ -1819,8 +1819,8 @@ TEST(PhysRewriter, SargableProjectionRenames) {
         "|   |   scanParams: \n"
         "|   |       {'a': pa}\n"
         "|   |           residualReqs: \n"
-        "|   |               refProjection: pa, path: 'PathIdentity []', intervals: {{{=Const "
-        "[1]}}}, entryIndex: 0\n"
+        "|   |               {{{refProjection: pa, path: 'PathIdentity []', intervals: {{{=Const "
+        "[1]}}}, entryIndex: 0}}}\n"
         "Scan [c1, {root}]\n",
         optimized);
 }
@@ -1865,8 +1865,8 @@ TEST(PhysRewriter, SargableAcquireProjection) {
         "|   |   scanParams: \n"
         "|   |       {'a': pa}\n"
         "|   |           residualReqs: \n"
-        "|   |               refProjection: pa, path: 'PathIdentity []', intervals: {{{=Const "
-        "[1]}}}, entryIndex: 0\n"
+        "|   |               {{{refProjection: pa, path: 'PathIdentity []', intervals: {{{=Const "
+        "[1]}}}, entryIndex: 0}}}\n"
         "Scan [c1, {root}]\n",
         optimized);
 }
@@ -5365,8 +5365,8 @@ TEST(PhysRewriter, EqMemberSargable) {
             "|   |   scanParams: \n"
             "|   |       {'a': evalTemp_0}\n"
             "|   |           residualReqs: \n"
-            "|   |               refProjection: evalTemp_0, path: 'PathIdentity []', intervals: "
-            "{{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}, entryIndex: 0\n"
+            "|   |               {{{refProjection: evalTemp_0, path: 'PathIdentity []', intervals: "
+            "{{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}, entryIndex: 0}}}\n"
             "Scan [c1, {root}]\n",
             optimized);
     }

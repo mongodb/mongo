@@ -103,6 +103,13 @@ std::string getPropsStrForExplain(const OptPhaseManager& phaseManager);
     ASSERT_STR_EQ_AUTO(expected, ExplainGenerator::explainIntervalExpr(interval))
 
 
+#define ASSERT_RESIDUAL_REQS(expected, residReqs) \
+    ASSERT_EQ(expected, ExplainGenerator::explainResidualRequirements(residReqs))
+
+#define ASSERT_RESIDUAL_REQS_AUTO(expected, residReqs) \
+    ASSERT_STR_EQ_AUTO(expected, ExplainGenerator::explainResidualRequirements(residReqs))
+
+
 #define ASSERT_BSON_PATH(expected, bson, path)                      \
     ASSERT_EQ(expected,                                             \
               dotted_path_support::extractElementAtPath(bson, path) \

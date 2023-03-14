@@ -249,7 +249,7 @@ struct PartialSchemaKeyLessComparator {
 
 /**
  * Used to track cardinality estimates per predicate inside a PartialSchemaRequirement. The order of
- * estimates is the same as the order in the primary PartialSchemaRequirements map.
+ * estimates is the same as the leaf order in the primary PartialSchemaRequirements.
  */
 using PartialSchemaKeyCE = std::vector<std::pair<PartialSchemaKey, CEType>>;
 
@@ -267,16 +267,18 @@ struct ResidualRequirement {
     PartialSchemaRequirement _req;
     size_t _entryIndex;
 };
-using ResidualRequirements = std::vector<ResidualRequirement>;
+using ResidualRequirements = BoolExpr<ResidualRequirement>;
 
 struct ResidualRequirementWithCE {
     ResidualRequirementWithCE(PartialSchemaKey key, PartialSchemaRequirement req, CEType ce);
+
+    bool operator==(const ResidualRequirementWithCE& other) const;
 
     PartialSchemaKey _key;
     PartialSchemaRequirement _req;
     CEType _ce;
 };
-using ResidualRequirementsWithCE = std::vector<ResidualRequirementWithCE>;
+using ResidualRequirementsWithCE = BoolExpr<ResidualRequirementWithCE>;
 
 struct EqualityPrefixEntry {
     EqualityPrefixEntry(size_t startPos);
@@ -351,9 +353,10 @@ struct CandidateIndexEntry {
     // If we have more than one equality prefix, contains the list of the correlated projections.
     ProjectionNameOrderPreservingSet _correlatedProjNames;
 
-    // Requirements which are not satisfied directly by the IndexScan. They are intended to be
-    // sorted in their containing vector from most to least selective.
-    ResidualRequirements _residualRequirements;
+    // Requirements which are not satisfied directly by the IndexScan. Each Conjunction is intended
+    // to have its children sorted from most to least selective.
+    // boost::none indicates that all requirements are satisfied by the IndexScan.
+    boost::optional<ResidualRequirements::Node> _residualRequirements;
 
     // Types of the predicates which we will answer using a field at a given position in the
     // candidate index.
@@ -378,9 +381,10 @@ struct ScanParams {
 
     FieldProjectionMap _fieldProjectionMap;
 
-    // Requirements which are not satisfied directly by a PhysicalScan or Seek. They are intended to
-    // be sorted in their containing vector from most to least selective.
-    ResidualRequirements _residualRequirements;
+    // Requirements which are not satisfied directly by a PhysicalScan or Seek. Each Conjunction is
+    // intended to have its children sorted from most to least selective. boost::none indicates that
+    // all requirements are satisfied by the PhysicalScan or Seek.
+    boost::optional<ResidualRequirements::Node> _residualRequirements;
 };
 
 using CandidateIndexes = std::vector<CandidateIndexEntry>;

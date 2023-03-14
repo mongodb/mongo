@@ -41,7 +41,7 @@ Sargable [Complete]
 |   |   scanParams: 
 |   |       {'a': evalTemp_0}
 |   |           residualReqs: 
-|   |               refProjection: evalTemp_0, path: 'PathTraverse [1] PathIdentity []', intervals: {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}, entryIndex: 0
+|   |               {{{refProjection: evalTemp_0, path: 'PathTraverse [1] PathIdentity []', intervals: {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}, entryIndex: 0}}}
 Scan [collection, {scan_0}]
 
 
@@ -88,7 +88,7 @@ Sargable [Complete]
 |   |   scanParams: 
 |   |       {'a': evalTemp_0}
 |   |           residualReqs: 
-|   |               refProjection: evalTemp_0, path: 'PathTraverse [1] PathIdentity []', intervals: {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}, entryIndex: 0
+|   |               {{{refProjection: evalTemp_0, path: 'PathTraverse [1] PathIdentity []', intervals: {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}, entryIndex: 0}}}
 Scan [collection, {scan_0}]
 
 
@@ -1066,10 +1066,15 @@ Sargable [Complete]
 |   |   scanParams: 
 |   |       {'a': evalTemp_7, 'b': evalTemp_8}
 |   |           residualReqs: 
-|   |               refProjection: evalTemp_7, path: 'PathIdentity []', intervals: {{{[Const [[]], Const [BinData(0, )])}}}, entryIndex: 0
-|   |               refProjection: evalTemp_7, path: 'PathTraverse [1] PathIdentity []', intervals: {{{[Const [5], Const [6]]}}}, entryIndex: 1
-|   |               refProjection: evalTemp_8, path: 'PathIdentity []', intervals: {{{[Const [[]], Const [BinData(0, )])}}}, entryIndex: 2
-|   |               refProjection: evalTemp_8, path: 'PathTraverse [1] PathIdentity []', intervals: {{{[Const [1], Const [3]]}}}, entryIndex: 3
+|   |               {{
+|   |                   {refProjection: evalTemp_7, path: 'PathIdentity []', intervals: {{{[Const [[]], Const [BinData(0, )])}}}, entryIndex: 0}
+|   |                ^ 
+|   |                   {refProjection: evalTemp_7, path: 'PathTraverse [1] PathIdentity []', intervals: {{{[Const [5], Const [6]]}}}, entryIndex: 1}
+|   |                ^ 
+|   |                   {refProjection: evalTemp_8, path: 'PathIdentity []', intervals: {{{[Const [[]], Const [BinData(0, )])}}}, entryIndex: 2}
+|   |                ^ 
+|   |                   {refProjection: evalTemp_8, path: 'PathTraverse [1] PathIdentity []', intervals: {{{[Const [1], Const [3]]}}}, entryIndex: 3}
+|   |               }}
 Scan [test, {scan_0}]
 
 

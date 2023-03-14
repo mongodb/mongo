@@ -334,18 +334,39 @@ void lowerPartialSchemaRequirement(const PartialSchemaKey& key,
                                    boost::optional<CEType> residualCE,
                                    PhysPlanBuilder& builder);
 
+/**
+ * Lower ResidualRequirementsWithCE to a subtree consisting of functionally equivalent Filter and
+ * Eval nodes. Note that we take indexPredSels by value here because the implementation needs its
+ * own copy.
+ */
 void lowerPartialSchemaRequirements(CEType scanGroupCE,
                                     std::vector<SelectivityType> indexPredSels,
-                                    ResidualRequirementsWithCE& requirements,
+                                    ResidualRequirementsWithCE::Node requirements,
                                     const PathToIntervalFn& pathToInterval,
                                     PhysPlanBuilder& builder);
 
-void sortResidualRequirements(ResidualRequirementsWithCE& residualReq);
+/**
+ * Build ResidualRequirementsWithCE by combining 'residReqs' with the corresponding entries in
+ * 'partialSchemaKeyCE'.
+ */
+ResidualRequirementsWithCE::Node createResidualReqsWithCE(
+    const ResidualRequirements::Node& residReqs, const PartialSchemaKeyCE& partialSchemaKeyCE);
+
+/**
+ * Sort requirements under a Conjunction by estimated cost.
+ */
+void sortResidualRequirements(ResidualRequirementsWithCE::Node& residualReq);
 
 void applyProjectionRenames(ProjectionRenames projectionRenames, ABT& node);
 
+/**
+ * Remove unused requirements from 'residualReqs' and remove unused projections from
+ * 'fieldProjectionMap'. A boost::none 'residualReqs' indicates that there are no residual
+ * requirements to be applied after the IndexScan, PhysicalScan or Seek (can be thought of as
+ * "trivially true" residual requirements).
+ */
 void removeRedundantResidualPredicates(const ProjectionNameOrderPreservingSet& requiredProjections,
-                                       ResidualRequirements& residualReqs,
+                                       boost::optional<ResidualRequirements::Node>& residualReqs,
                                        FieldProjectionMap& fieldProjectionMap);
 
 /**

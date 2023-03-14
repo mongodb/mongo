@@ -217,6 +217,10 @@ ResidualRequirementWithCE::ResidualRequirementWithCE(PartialSchemaKey key,
                                                      CEType ce)
     : _key(std::move(key)), _req(std::move(req)), _ce(ce) {}
 
+bool ResidualRequirementWithCE::operator==(const ResidualRequirementWithCE& other) const {
+    return _key == other._key && _req == other._req && _ce == other._ce;
+}
+
 EqualityPrefixEntry::EqualityPrefixEntry(const size_t startPos)
     : _startPos(startPos), _interval(CompoundIntervalReqExpr::makeSingularDNF()), _predPosSet() {}
 

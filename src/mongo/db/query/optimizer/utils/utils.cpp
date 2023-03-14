@@ -1128,6 +1128,8 @@ static bool computeCandidateIndexEntry(PrefixId& prefixId,
     }
 
     // Compute residual predicates from unsatisfied partial schema keys.
+    ResidualRequirements::Builder residualReqs;
+    residualReqs.pushDisj().pushConj();
     for (auto queryKeyIt = unsatisfiedKeys.begin(); queryKeyIt != unsatisfiedKeys.end();) {
         const auto& queryKey = *queryKeyIt;
         bool satisfied = false;
@@ -1150,7 +1152,7 @@ static bool computeCandidateIndexEntry(PrefixId& prefixId,
                     // Only regular requirements are added to residual predicates.
                     const ProjectionName& tempProjName = getExistingOrTempProjForFieldName(
                         prefixId, FieldNameType{encodeIndexKeyName(indexField)}, fieldProjMap);
-                    entry._residualRequirements.emplace_back(
+                    residualReqs.atom(
                         PartialSchemaKey{tempProjName, std::move(*fusedPath._suffix)}, req, index);
                 }
 
@@ -1177,7 +1179,10 @@ static bool computeCandidateIndexEntry(PrefixId& prefixId,
         // residual predicate loop on the first failure.
         return false;
     }
-    if (entry._intervalPrefixSize == 0 && entry._residualRequirements.empty()) {
+
+    entry._residualRequirements = residualReqs.finish();
+
+    if (entry._intervalPrefixSize == 0 && !entry._residualRequirements) {
         // Need to encode at least one query requirement in the index bounds.
         return false;
     }
@@ -1270,7 +1275,10 @@ boost::optional<ScanParams> computeScanParams(PrefixId& prefixId,
                                               const PartialSchemaRequirements& reqMap,
                                               const ProjectionName& rootProj) {
     ScanParams result;
-    auto& residualReqs = result._residualRequirements;
+
+    ResidualRequirements::Builder residReqs;
+    residReqs.pushDisj().pushConj();
+
     auto& fieldProjMap = result._fieldProjectionMap;
 
     // Expect a DNF with one disjunct; bail out if we have a nontrivial disjunction.
@@ -1301,34 +1309,33 @@ boost::optional<ScanParams> computeScanParams(PrefixId& prefixId,
                     fieldProjMap._fieldProjections.emplace(fieldName, *boundProjName);
 
                 if (!insertedInFPM) {
-                    residualReqs.emplace_back(PartialSchemaKey{it->second, make<PathIdentity>()},
-                                              PartialSchemaRequirement{req.getBoundProjectionName(),
-                                                                       req.getIntervals(),
-                                                                       false /*isPerfOnly*/},
-                                              entryIndex);
+                    residReqs.atom(PartialSchemaKey{it->second, make<PathIdentity>()},
+                                   PartialSchemaRequirement{req.getBoundProjectionName(),
+                                                            req.getIntervals(),
+                                                            false /*isPerfOnly*/},
+                                   entryIndex);
                 } else if (!isIntervalReqFullyOpenDNF(req.getIntervals())) {
-                    residualReqs.emplace_back(
-                        PartialSchemaKey{*boundProjName, make<PathIdentity>()},
-                        PartialSchemaRequirement{boost::none /*boundProjectionName*/,
-                                                 req.getIntervals(),
-                                                 false /*isPerfOnly*/},
-                        entryIndex);
+                    residReqs.atom(PartialSchemaKey{*boundProjName, make<PathIdentity>()},
+                                   PartialSchemaRequirement{boost::none /*boundProjectionName*/,
+                                                            req.getIntervals(),
+                                                            false /*isPerfOnly*/},
+                                   entryIndex);
                 }
             } else {
                 const ProjectionName& tempProjName =
                     getExistingOrTempProjForFieldName(prefixId, fieldName, fieldProjMap);
-                residualReqs.emplace_back(
-                    PartialSchemaKey{tempProjName, pathGet->getPath()}, req, entryIndex);
+                residReqs.atom(PartialSchemaKey{tempProjName, pathGet->getPath()}, req, entryIndex);
             }
         } else {
             // Move other conditions into the residual map.
             fieldProjMap._rootProjection = rootProj;
-            residualReqs.emplace_back(key, req, entryIndex);
+            residReqs.atom(key, req, entryIndex);
         }
 
         entryIndex++;
     }
 
+    result._residualRequirements = residReqs.finish();
     return result;
 }
 
@@ -1581,12 +1588,16 @@ void lowerPartialSchemaRequirement(const PartialSchemaKey& key,
 
 void lowerPartialSchemaRequirements(const CEType scanGroupCE,
                                     std::vector<SelectivityType> indexPredSels,
-                                    ResidualRequirementsWithCE& requirements,
+                                    ResidualRequirementsWithCE::Node requirements,
                                     const PathToIntervalFn& pathToInterval,
                                     PhysPlanBuilder& builder) {
     sortResidualRequirements(requirements);
 
-    for (const auto& [residualKey, residualReq, ce] : requirements) {
+    // TODO SERVER-74101: Extend lowering to support non-singleton DNF
+    tassert(7473000,
+            "Can only lower singleton DNF",
+            ResidualRequirementsWithCE::isSingletonDisjunction(requirements));
+    ResidualRequirementsWithCE::visitDNF(requirements, [&](const ResidualRequirementWithCE& entry) {
         CEType residualCE = scanGroupCE;
         if (!indexPredSels.empty()) {
             // We are intentionally making a copy of the vector here, we are adding elements to it
@@ -1595,40 +1606,69 @@ void lowerPartialSchemaRequirements(const CEType scanGroupCE,
         }
         if (scanGroupCE > 0.0) {
             // Compute the selectivity after we assign CE, which is the "input" to the cost.
-            indexPredSels.push_back(ce / scanGroupCE);
+            indexPredSels.push_back(entry._ce / scanGroupCE);
         }
 
-        lowerPartialSchemaRequirement(
-            residualKey, residualReq, pathToInterval, residualCE, builder);
-    }
+        lowerPartialSchemaRequirement(entry._key, entry._req, pathToInterval, residualCE, builder);
+    });
 }
 
-void sortResidualRequirements(ResidualRequirementsWithCE& residualReq) {
-    // Sort residual requirements by estimated cost.
-    // Assume it is more expensive to deliver a bound projection than to just filter.
+void sortResidualRequirements(ResidualRequirementsWithCE::Node& residualReqs) {
+    ResidualRequirementsWithCE::visitDisjuncts(
+        residualReqs, [](ResidualRequirementsWithCE::Node& child, const size_t) {
+            // Collect the estimated costs of each child under a conjunction. Assume it is
+            // more expensive to deliver a bound projection than to just filter.
+            std::vector<std::pair<double, size_t>> costs;
 
-    std::vector<std::pair<double, size_t>> costs;
-    for (size_t index = 0; index < residualReq.size(); index++) {
-        const auto& entry = residualReq.at(index);
+            ResidualRequirementsWithCE::visitConjuncts(
+                child, [&](ResidualRequirementsWithCE::Node& atom, const size_t index) {
+                    ResidualRequirementsWithCE::visitAtom(
+                        atom, [&](ResidualRequirementWithCE& entry) {
+                            size_t multiplier = 0;
+                            if (entry._req.getBoundProjectionName()) {
+                                multiplier++;
+                            }
+                            if (!isIntervalReqFullyOpenDNF(entry._req.getIntervals())) {
+                                multiplier++;
+                            }
 
-        size_t multiplier = 0;
-        if (entry._req.getBoundProjectionName()) {
-            multiplier++;
-        }
-        if (!isIntervalReqFullyOpenDNF(entry._req.getIntervals())) {
-            multiplier++;
-        }
+                            costs.emplace_back(entry._ce._value * multiplier, index);
+                        });
+                });
 
-        costs.emplace_back(entry._ce._value * multiplier, index);
-    }
+            std::sort(costs.begin(), costs.end());
+            auto& atoms = child.cast<ResidualRequirementsWithCE::Conjunction>()->nodes();
+            for (size_t index = 0; index < atoms.size(); index++) {
+                const size_t targetIndex = costs.at(index).second;
+                if (index < targetIndex) {
+                    std::swap(atoms.at(index), atoms.at(targetIndex));
+                }
+            }
+        });
+}
 
-    std::sort(costs.begin(), costs.end());
-    for (size_t index = 0; index < residualReq.size(); index++) {
-        const size_t targetIndex = costs.at(index).second;
-        if (index < targetIndex) {
-            std::swap(residualReq.at(index), residualReq.at(targetIndex));
-        }
-    }
+ResidualRequirementsWithCE::Node createResidualReqsWithCE(
+    const ResidualRequirements::Node& residReqs, const PartialSchemaKeyCE& partialSchemaKeyCE) {
+    ResidualRequirementsWithCE::Builder b;
+    b.pushDisj();
+
+    ResidualRequirements::visitDisjuncts(
+        residReqs, [&](const ResidualRequirements::Node& child, const size_t) {
+            b.pushConj();
+
+            ResidualRequirements::visitConjuncts(
+                child, [&](const ResidualRequirements::Node& atom, const size_t) {
+                    ResidualRequirements::visitAtom(atom, [&](const ResidualRequirement& req) {
+                        b.atom(req._key, req._req, partialSchemaKeyCE.at(req._entryIndex).second);
+                    });
+                });
+
+            b.pop();
+        });
+
+    auto res = b.finish();
+    tassert(7473001, "ResidualRequirementsWithCE builder did not succeed", res);
+    return std::move(*res);
 }
 
 void applyProjectionRenames(ProjectionRenames projectionRenames, ABT& node) {
@@ -1639,32 +1679,56 @@ void applyProjectionRenames(ProjectionRenames projectionRenames, ABT& node) {
 }
 
 void removeRedundantResidualPredicates(const ProjectionNameOrderPreservingSet& requiredProjections,
-                                       ResidualRequirements& residualReqs,
+                                       boost::optional<ResidualRequirements::Node>& residualReqs,
                                        FieldProjectionMap& fieldProjectionMap) {
     ProjectionNameSet residualTempProjections;
 
     // Remove unused residual requirements.
-    for (auto it = residualReqs.begin(); it != residualReqs.end();) {
-        auto& [key, req, ce] = *it;
+    if (residualReqs) {
+        ResidualRequirements::Builder newReqs;
+        newReqs.pushDisj();
 
-        if (const auto& boundProjName = req.getBoundProjectionName();
-            boundProjName && !requiredProjections.find(*boundProjName)) {
-            if (isIntervalReqFullyOpenDNF(req.getIntervals())) {
-                residualReqs.erase(it++);
-                continue;
-            } else {
-                // We do not use the output binding, but we still want to filter.
-                tassert(6624163,
-                        "Should not be seeing a perf-only predicate as residual",
-                        !req.getIsPerfOnly());
-                req = {boost::none /*boundProjectionName*/,
-                       std::move(req.getIntervals()),
-                       req.getIsPerfOnly()};
-            }
-        }
+        ResidualRequirements::visitDisjuncts(
+            *residualReqs, [&](const ResidualRequirements::Node& child, const size_t) {
+                newReqs.pushConj();
 
-        residualTempProjections.insert(*key._projectionName);
-        it++;
+                ResidualRequirements::visitConjuncts(
+                    child, [&](const ResidualRequirements::Node& atom, const size_t) {
+                        ResidualRequirements::visitAtom(
+                            atom, [&](const ResidualRequirement& residReq) {
+                                auto& [key, req, ce] = residReq;
+
+                                if (const auto& boundProjName = req.getBoundProjectionName();
+                                    boundProjName && !requiredProjections.find(*boundProjName)) {
+                                    if (isIntervalReqFullyOpenDNF(req.getIntervals())) {
+                                        return;
+                                    }
+
+                                    residualTempProjections.insert(*key._projectionName);
+
+                                    // We do not use the output binding, but we still want to
+                                    // filter.
+                                    tassert(
+                                        6624163,
+                                        "Should not be seeing a perf-only predicate as residual",
+                                        !req.getIsPerfOnly());
+                                    newReqs.atom(std::move(key),
+                                                 PartialSchemaRequirement{
+                                                     boost::none /*boundProjectionName*/,
+                                                     std::move(req.getIntervals()),
+                                                     req.getIsPerfOnly()},
+                                                 ce);
+                                } else {
+                                    residualTempProjections.insert(*key._projectionName);
+                                    newReqs.atom(std::move(key), std::move(req), ce);
+                                }
+                            });
+                    });
+
+                newReqs.pop();
+            });
+        auto result = newReqs.finish();
+        std::swap(result, residualReqs);
     }
 
     // Remove unused projections from the field projection map.

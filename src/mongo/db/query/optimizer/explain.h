@@ -113,7 +113,7 @@ public:
 
     static std::string explainPartialSchemaReqMap(const PartialSchemaRequirements& reqMap);
 
-    static std::string explainResidualRequirements(const ResidualRequirements& resReqs);
+    static std::string explainResidualRequirements(const ResidualRequirements::Node& resReqs);
 
     static std::string explainInterval(const IntervalRequirement& interval);
 

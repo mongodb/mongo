@@ -1071,6 +1071,12 @@ public:
         printBooleanFlag(printer, "perfOnly", req.getIsPerfOnly());
     }
 
+    void printResidualRequirement(ExplainPrinter& printer, const ResidualRequirement& entry) {
+        const auto& [key, req, entryIndex] = entry;
+        printPartialSchemaEntry(printer, {key, req});
+        printer.separator(", ").fieldName("entryIndex").print(entryIndex);
+    }
+
     template <class T>
     ExplainPrinter printIntervalExpr(const typename BoolExpr<T>::Node& intervalExpr) {
         const auto printFn = [this](ExplainPrinter& printer, const T& interval) {
@@ -1367,33 +1373,14 @@ public:
     }
 
     void printResidualRequirements(ExplainPrinter& parent,
-                                   const ResidualRequirements& residualReqs) {
-        std::vector<ExplainPrinter> printers;
-        for (const auto& [key, req, entryIndex] : residualReqs) {
-            ExplainPrinter local;
+                                   const ResidualRequirements::Node& residualReqs) {
+        const auto printFn = [this](ExplainPrinter& printer, const ResidualRequirement& entry) {
+            printResidualRequirement(printer, entry);
+        };
 
-            if (const auto& projName = key._projectionName) {
-                local.fieldName("refProjection").print(*projName).separator(", ");
-            }
-            ExplainPrinter pathPrinter = generate(key._path);
-            local.fieldName("path").separator("'").printSingleLevel(pathPrinter).separator("', ");
-
-            if (const auto& boundProjName = req.getBoundProjectionName()) {
-                local.fieldName("boundProjection").print(*boundProjName).separator(", ");
-            }
-
-            local.fieldName("intervals");
-            {
-                ExplainPrinter intervals =
-                    printIntervalExpr<IntervalRequirement>(req.getIntervals());
-                local.printSingleLevel(intervals, "" /*singleLevelSpacer*/);
-            }
-            local.separator(", ").fieldName("entryIndex").print(entryIndex);
-
-            printers.push_back(std::move(local));
-        }
-
-        parent.fieldName("residualReqs").print(printers);
+        ExplainPrinter residualReqsPrinter;
+        BoolExprPrinter<ResidualRequirement>{printFn}.print(residualReqsPrinter, residualReqs);
+        parent.fieldName("residualReqs").print(residualReqsPrinter);
     }
 
     ExplainPrinter transport(const ABT& n,
@@ -1500,14 +1487,13 @@ public:
                     }
                 }
 
-                if (const auto& residualReqs = candidateIndexEntry._residualRequirements;
-                    !residualReqs.empty()) {
+                if (const auto& residualReqs = candidateIndexEntry._residualRequirements) {
                     if constexpr (version < ExplainVersion::V3) {
                         ExplainPrinter residualReqMapPrinter;
-                        printResidualRequirements(residualReqMapPrinter, residualReqs);
+                        printResidualRequirements(residualReqMapPrinter, *residualReqs);
                         local.print(residualReqMapPrinter);
                     } else if (version == ExplainVersion::V3) {
-                        printResidualRequirements(local, residualReqs);
+                        printResidualRequirements(local, *residualReqs);
                     } else {
                         MONGO_UNREACHABLE;
                     }
@@ -1526,14 +1512,13 @@ public:
             printFieldProjectionMap(local, scanParams->_fieldProjectionMap);
             local.separator("}");
 
-            if (const auto& residualReqs = scanParams->_residualRequirements;
-                !residualReqs.empty()) {
+            if (const auto& residualReqs = scanParams->_residualRequirements) {
                 if constexpr (version < ExplainVersion::V3) {
                     ExplainPrinter residualReqMapPrinter;
-                    printResidualRequirements(residualReqMapPrinter, residualReqs);
+                    printResidualRequirements(residualReqMapPrinter, *residualReqs);
                     local.print(residualReqMapPrinter);
                 } else if (version == ExplainVersion::V3) {
-                    printResidualRequirements(local, residualReqs);
+                    printResidualRequirements(local, *residualReqs);
                 } else {
                     MONGO_UNREACHABLE;
                 }
@@ -3035,7 +3020,8 @@ std::string ExplainGenerator::explainPartialSchemaReqMap(const PartialSchemaRequ
     return result.str();
 }
 
-std::string ExplainGenerator::explainResidualRequirements(const ResidualRequirements& resReqs) {
+std::string ExplainGenerator::explainResidualRequirements(
+    const ResidualRequirements::Node& resReqs) {
     ExplainGeneratorV2 gen;
     ExplainGeneratorV2::ExplainPrinter result;
     gen.printResidualRequirements(result, resReqs);

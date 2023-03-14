@@ -798,8 +798,8 @@ TEST(LogicalRewriter, FilterUnionUnionPushdown) {
         "|   |   |   scanParams: \n"
         "|   |   |       {'a': evalTemp_0}\n"
         "|   |   |           residualReqs: \n"
-        "|   |   |               refProjection: evalTemp_0, path: 'PathTraverse [1] PathIdentity "
-        "[]', intervals: {{{=Const [1]}}}, entryIndex: 0\n"
+        "|   |   |               {{{refProjection: evalTemp_0, path: 'PathTraverse [1] "
+        "PathIdentity []', intervals: {{{=Const [1]}}}, entryIndex: 0}}}\n"
         "|   Scan [test3, {ptest}]\n"
         "Union [{ptest}]\n"
         "|   Sargable [Complete]\n"
@@ -810,8 +810,8 @@ TEST(LogicalRewriter, FilterUnionUnionPushdown) {
         "|   |   |   scanParams: \n"
         "|   |   |       {'a': evalTemp_2}\n"
         "|   |   |           residualReqs: \n"
-        "|   |   |               refProjection: evalTemp_2, path: 'PathTraverse [1] PathIdentity "
-        "[]', intervals: {{{=Const [1]}}}, entryIndex: 0\n"
+        "|   |   |               {{{refProjection: evalTemp_2, path: 'PathTraverse [1] "
+        "PathIdentity []', intervals: {{{=Const [1]}}}, entryIndex: 0}}}\n"
         "|   Scan [test2, {ptest}]\n"
         "Sargable [Complete]\n"
         "|   |   |   |   requirements: \n"
@@ -821,8 +821,8 @@ TEST(LogicalRewriter, FilterUnionUnionPushdown) {
         "|   |   scanParams: \n"
         "|   |       {'a': evalTemp_1}\n"
         "|   |           residualReqs: \n"
-        "|   |               refProjection: evalTemp_1, path: 'PathTraverse [1] PathIdentity []', "
-        "intervals: {{{=Const [1]}}}, entryIndex: 0\n"
+        "|   |               {{{refProjection: evalTemp_1, path: 'PathTraverse [1] PathIdentity "
+        "[]', intervals: {{{=Const [1]}}}, entryIndex: 0}}}\n"
         "Scan [test1, {ptest}]\n",
         latest);
 }
@@ -1118,10 +1118,13 @@ TEST(LogicalRewriter, SargableCE) {
         "    |           |   |   scanParams: \n"
         "    |           |   |       {'a': evalTemp_2, 'b': evalTemp_3}\n"
         "    |           |   |           residualReqs: \n"
-        "    |           |   |               refProjection: evalTemp_2, path: 'PathIdentity []', "
-        "intervals: {{{=Const [1]}}}, entryIndex: 0\n"
-        "    |           |   |               refProjection: evalTemp_3, path: 'PathIdentity []', "
-        "intervals: {{{=Const [2]}}}, entryIndex: 1\n"
+        "    |           |   |               {{\n"
+        "    |           |   |                   {refProjection: evalTemp_2, path: 'PathIdentity "
+        "[]', intervals: {{{=Const [1]}}}, entryIndex: 0}\n"
+        "    |           |   |                ^ \n"
+        "    |           |   |                   {refProjection: evalTemp_3, path: 'PathIdentity "
+        "[]', intervals: {{{=Const [2]}}}, entryIndex: 1}\n"
+        "    |           |   |               }}\n"
         "    |           MemoLogicalDelegator [groupId: 0]\n"
         "    physicalNodes: \n"
         "    groupId: 2\n"
@@ -1458,8 +1461,8 @@ TEST(LogicalRewriter, NotPushdownUnderLambdaSuccess) {
         "|   |   scanParams: \n"
         "|   |       {'a': evalTemp_2}\n"
         "|   |           residualReqs: \n"
-        "|   |               refProjection: evalTemp_2, path: 'PathIdentity []', intervals: "
-        "{{{[Const [[]], Const [BinData(0, )])}}}, entryIndex: 0\n"
+        "|   |               {{{refProjection: evalTemp_2, path: 'PathIdentity []', intervals: "
+        "{{{[Const [[]], Const [BinData(0, )])}}}, entryIndex: 0}}}\n"
         "Scan [coll, {scan_0}]\n",
         latest);
 }
@@ -1545,8 +1548,8 @@ TEST(LogicalRewriter, NotPushdownUnderLambdaKeepOuterTraverse) {
         "|   |   scanParams: \n"
         "|   |       {'a': evalTemp_1}\n"
         "|   |           residualReqs: \n"
-        "|   |               refProjection: evalTemp_1, path: 'PathIdentity []', intervals: "
-        "{{{[Const [[]], Const [BinData(0, )])}}}, entryIndex: 0\n"
+        "|   |               {{{refProjection: evalTemp_1, path: 'PathIdentity []', intervals: "
+        "{{{[Const [[]], Const [BinData(0, )])}}}, entryIndex: 0}}}\n"
         "Scan [coll, {scan_0}]\n",
         latest);
 }
@@ -1658,8 +1661,8 @@ TEST(LogicalRewriter, RemoveTraverseSplitComposeM) {
         "|   |   scanParams: \n"
         "|   |       {'a': evalTemp_2}\n"
         "|   |           residualReqs: \n"
-        "|   |               refProjection: evalTemp_2, path: 'PathGet [b] PathIdentity []', "
-        "intervals: {{{(Const [3], Const [8])}}}, entryIndex: 0\n"
+        "|   |               {{{refProjection: evalTemp_2, path: 'PathGet [b] PathIdentity []', "
+        "intervals: {{{(Const [3], Const [8])}}}, entryIndex: 0}}}\n"
         "Scan [coll, {scan_0}]\n",
         latest);
 }
@@ -1908,13 +1911,16 @@ TEST(LogicalRewriter, SargableNodeRIN) {
     ASSERT_EQ(0, ci.at(0)._eqPrefixes.front()._startPos);
 
     // We have two residual predicates for "c" and "e".
-    ASSERT_EQ(
+    ASSERT_RESIDUAL_REQS_AUTO(
         "residualReqs: \n"
-        "    refProjection: evalTemp_24, path: 'PathIdentity []', intervals: {{{=Const [2]}}}, "
-        "entryIndex: 1\n"
-        "    refProjection: evalTemp_25, path: 'PathIdentity []', intervals: {{{=Const [3]}}}, "
-        "entryIndex: 2\n",
-        ExplainGenerator::explainResidualRequirements(ci.at(0)._residualRequirements));
+        "    {{\n"
+        "        {refProjection: evalTemp_24, path: 'PathIdentity []', intervals: {{{=Const "
+        "[2]}}}, entryIndex: 1}\n"
+        "     ^ \n"
+        "        {refProjection: evalTemp_25, path: 'PathIdentity []', intervals: {{{=Const "
+        "[3]}}}, entryIndex: 2}\n"
+        "    }}\n",
+        *ci.at(0)._residualRequirements);
 
 
     // The second candidate index has two equality prefixes.
@@ -1941,12 +1947,11 @@ TEST(LogicalRewriter, SargableNodeRIN) {
     ASSERT_EQ(2, ci.at(1)._correlatedProjNames.getVector().size());
 
     // We have only one residual predicates for "e".
-    ASSERT_EQ(
+    ASSERT_RESIDUAL_REQS_AUTO(
         "residualReqs: \n"
-        "    refProjection: evalTemp_28, path: 'PathIdentity []', intervals: {{{=Const [3]}}}, "
-        "entryIndex: 2\n",
-        ExplainGenerator::explainResidualRequirements(ci.at(1)._residualRequirements));
-
+        "    {{{refProjection: evalTemp_28, path: 'PathIdentity []', intervals: {{{=Const [3]}}}, "
+        "entryIndex: 2}}}\n",
+        *ci.at(1)._residualRequirements);
 
     // The third candidate index has three equality prefixes.
     ASSERT_EQ(3, ci.at(2)._eqPrefixes.size());
