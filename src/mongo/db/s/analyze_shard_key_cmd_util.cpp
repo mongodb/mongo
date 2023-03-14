@@ -250,11 +250,15 @@ boost::optional<IndexSpec> findCompatiblePrefixedIndex(OperationContext* opCtx,
         }
     }
 
+    // Go through the indexes in the index catalog to find the most compatible index.
+    boost::optional<IndexSpec> compatibleIndexSpec;
+
     auto indexIterator =
         indexCatalog->getIndexIterator(opCtx, IndexCatalog::InclusionPolicy::kReady);
     while (indexIterator->more()) {
         auto indexEntry = indexIterator->next();
         auto indexDesc = indexEntry->descriptor();
+        auto indexKey = indexDesc->keyPattern();
 
         if (indexDesc->getIndexType() != IndexType::INDEX_BTREE &&
             indexDesc->getIndexType() != IndexType::INDEX_HASHED) {
@@ -270,13 +274,19 @@ boost::optional<IndexSpec> findCompatiblePrefixedIndex(OperationContext* opCtx,
             continue;
         }
 
-        auto indexKey = indexDesc->keyPattern();
-        if (shardKey.isFieldNamePrefixOf(indexKey)) {
-            return IndexSpec{indexKey, indexDesc->unique()};
+        if (!shardKey.isFieldNamePrefixOf(indexKey)) {
+            continue;
+        }
+        if (!compatibleIndexSpec.has_value() ||
+            compatibleIndexSpec->keyPattern.nFields() > indexKey.nFields() ||
+            (!compatibleIndexSpec->isUnique && indexDesc->unique())) {
+            // Give preference to indexes with fewer fields and unique indexes since they can help
+            // us infer if the shard key is unique.
+            compatibleIndexSpec = IndexSpec{indexKey, indexDesc->unique()};
         }
     }
 
-    return boost::none;
+    return compatibleIndexSpec;
 }
 
 struct CardinalityFrequencyMetrics {
