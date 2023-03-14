@@ -28,30 +28,36 @@ rst.initiate();
 
 const primary = rst.getPrimary();
 
-const testDB = primary.getDB('test');
-const coll = testDB.getCollection('test');
+const primaryDB = primary.getDB('test');
+const primaryColl = primaryDB.getCollection('test');
 
 const secondary = rst.getSecondary();
-const secondaryDB = secondary.getDB(testDB.getName());
+const secondaryDB = secondary.getDB(primaryDB.getName());
 const secondaryColl = secondaryDB.getCollection('test');
 
 // Avoid optimization on empty colls.
-assert.commandWorked(coll.insert({a: 1}));
+assert.commandWorked(primaryColl.insert({a: 1}));
 
 // Pause the index builds on the secondary, using the 'hangAfterStartingIndexBuild' failpoint.
 const failpointHangAfterInit = configureFailPoint(secondaryDB, "hangAfterInitializingIndexBuild");
 
 // Create the index and start the build. Set commitQuorum of 2 nodes explicitly, otherwise as only
 // primary is voter, it would immediately commit.
-const createIdx = IndexBuildTest.startIndexBuild(
-    primary, coll.getFullName(), {a: 1}, {}, [ErrorCodes.IndexBuildAborted], /*commitQuorum: */ 2);
+const createIdx = IndexBuildTest.startIndexBuild(primary,
+                                                 primaryColl.getFullName(),
+                                                 {a: 1},
+                                                 {},
+                                                 [ErrorCodes.IndexBuildAborted],
+                                                 /*commitQuorum: */ 2);
+const kIndexName = 'a_1';
 
 failpointHangAfterInit.wait();
 
 // Extract the index build UUID.
 const buildUUID =
     IndexBuildTest
-        .assertIndexes(secondaryColl, 2, ['_id_'], ['a_1'], {includeBuildUUIDs: true})['a_1']
+        .assertIndexes(
+            secondaryColl, 2, ['_id_'], [kIndexName], {includeBuildUUIDs: true})[kIndexName]
         .buildUUID;
 
 const failSecondaryBuild =
@@ -67,8 +73,12 @@ createIdx();
 
 failSecondaryBuild.off();
 
+// Wait for the builds to be unregistered before asserting indexes.
+IndexBuildTest.waitForIndexBuildToStop(primaryDB, primaryColl.getName(), kIndexName);
+IndexBuildTest.waitForIndexBuildToStop(secondaryDB, secondaryColl.getName(), kIndexName);
+
 // Assert index does not exist.
-IndexBuildTest.assertIndexes(coll, 1, ['_id_'], []);
+IndexBuildTest.assertIndexes(primaryColl, 1, ['_id_'], []);
 IndexBuildTest.assertIndexes(secondaryColl, 1, ['_id_'], []);
 
 rst.stopSet();
