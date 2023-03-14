@@ -415,9 +415,13 @@ RecordId AbstractIndexAccessMethod::findSingle(OperationContext* opCtx,
 void AbstractIndexAccessMethod::validate(OperationContext* opCtx,
                                          int64_t* numKeys,
                                          IndexValidateResults* fullResults) const {
-    long long keys = 0;
-    _newInterface->fullValidate(opCtx, &keys, fullResults);
-    *numKeys = keys;
+    if (numKeys) {
+        long long keys = 0;
+        _newInterface->fullValidate(opCtx, &keys, fullResults);
+        *numKeys = keys;
+    } else {
+        _newInterface->fullValidate(opCtx, nullptr, fullResults);
+    }
 }
 
 bool AbstractIndexAccessMethod::appendCustomStats(OperationContext* opCtx,

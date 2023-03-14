@@ -348,25 +348,25 @@ void WiredTigerIndex::fullValidate(OperationContext* opCtx,
         }
     }
 
-    auto cursor = newCursor(opCtx);
-    long long count = 0;
-    LOGV2_TRACE_INDEX(20094, "fullValidate");
-
-    const auto requestedInfo = TRACING_ENABLED ? Cursor::kKeyAndLoc : Cursor::kJustExistance;
-
-    KeyString::Value keyStringForSeek =
-        IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(BSONObj(),
-                                                              getKeyStringVersion(),
-                                                              getOrdering(),
-                                                              true, /* forward */
-                                                              true  /* inclusive */
-        );
-
-    for (auto kv = cursor->seek(keyStringForSeek, requestedInfo); kv; kv = cursor->next()) {
-        LOGV2_TRACE_INDEX(20095, "fullValidate {kv}", "kv"_attr = kv);
-        count++;
-    }
     if (numKeysOut) {
+        auto cursor = newCursor(opCtx);
+        long long count = 0;
+        LOGV2_TRACE_INDEX(20094, "fullValidate");
+
+        const auto requestedInfo = TRACING_ENABLED ? Cursor::kKeyAndLoc : Cursor::kJustExistance;
+
+        KeyString::Value keyStringForSeek =
+            IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(BSONObj(),
+                                                                  getKeyStringVersion(),
+                                                                  getOrdering(),
+                                                                  true, /* forward */
+                                                                  true  /* inclusive */
+            );
+
+        for (auto kv = cursor->seek(keyStringForSeek, requestedInfo); kv; kv = cursor->next()) {
+            LOGV2_TRACE_INDEX(20095, "fullValidate {kv}", "kv"_attr = kv);
+            count++;
+        }
         *numKeysOut = count;
     }
 }
