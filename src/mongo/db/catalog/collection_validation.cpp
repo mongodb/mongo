@@ -69,15 +69,11 @@ AtomicWord<bool> _validationIsPausedForTest{false};
  * the index files have not been corrupted or compromised.
  *
  * May close or invalidate open cursors.
- *
- * Returns a map from indexName -> number of keys validated.
  */
-std::map<std::string, int64_t> _validateIndexesInternalStructure(
-    OperationContext* opCtx,
-    ValidateState* validateState,
-    ValidateResultsMap* indexNsResultsMap,
-    ValidateResults* results) {
-    std::map<std::string, int64_t> numIndexKeysPerIndex;
+void _validateIndexesInternalStructure(OperationContext* opCtx,
+                                       ValidateState* validateState,
+                                       ValidateResultsMap* indexNsResultsMap,
+                                       ValidateResults* results) {
     // Need to use the IndexCatalog here because the 'validateState->indexes' object hasn't been
     // constructed yet. It must be initialized to ensure we're validating all indexes.
     const IndexCatalog* indexCatalog = validateState->getCollection()->getIndexCatalog();
@@ -101,29 +97,21 @@ std::map<std::string, int64_t> _validateIndexesInternalStructure(
 
         ValidateResults& curIndexResults = (*indexNsResultsMap)[descriptor->indexName()];
 
-        int64_t numValidated;
-        iam->validate(opCtx, &numValidated, &curIndexResults);
+        iam->validate(opCtx, nullptr, &curIndexResults);
 
         if (!curIndexResults.valid) {
             results->valid = false;
         }
-
-        numIndexKeysPerIndex[descriptor->indexName()] = numValidated;
     }
-    return numIndexKeysPerIndex;
 }
 
 /**
  * Validates each index in the Index Catalog using the cursors in 'indexCursors'.
- *
- * If 'level' is kValidateFull, then we will compare new index entry counts with a previously taken
- * count saved in 'numIndexKeysPerIndex'.
  */
 void _validateIndexes(OperationContext* opCtx,
                       ValidateState* validateState,
                       BSONObjBuilder* keysPerIndex,
                       ValidateAdaptor* indexValidator,
-                      const std::map<std::string, int64_t>& numIndexKeysPerIndex,
                       ValidateResultsMap* indexNsResultsMap,
                       ValidateResults* results) {
     // Validate Indexes, checking for mismatch between index entries and collection records.
@@ -141,37 +129,6 @@ void _validateIndexes(OperationContext* opCtx,
         ValidateResults& curIndexResults = (*indexNsResultsMap)[descriptor->indexName()];
         int64_t numTraversedKeys;
         indexValidator->traverseIndex(opCtx, index.get(), &numTraversedKeys, &curIndexResults);
-
-        // If we are performing a full index validation, we have information on the number of index
-        // keys validated in _validateIndexesInternalStructure (when we validated the internal
-        // structure of the index). Check if this is consistent with 'numTraversedKeys' from
-        // traverseIndex above.
-        if (validateState->isFullIndexValidation()) {
-            invariant(opCtx->lockState()->isCollectionLockedForMode(validateState->nss(), MODE_X));
-
-            // Ensure that this index was validated in _validateIndexesInternalStructure.
-            const auto numIndexKeysIt = numIndexKeysPerIndex.find(descriptor->indexName());
-            invariant(numIndexKeysIt != numIndexKeysPerIndex.end());
-
-            // The number of keys counted in _validateIndexesInternalStructure, when checking the
-            // internal structure of the index.
-            const int64_t numIndexKeys = numIndexKeysIt->second;
-
-            // Check if currIndexResults is valid to ensure that this index is not corrupted or
-            // comprised (which was set in _validateIndexesInternalStructure). If the index is
-            // corrupted, there is no use in checking if the traversal yielded the same key count.
-            if (curIndexResults.valid) {
-                if (numIndexKeys != numTraversedKeys) {
-                    curIndexResults.valid = false;
-                    string msg = str::stream()
-                        << "number of traversed index entries (" << numTraversedKeys
-                        << ") does not match the number of expected index entries (" << numIndexKeys
-                        << ")";
-                    results->errors.push_back(msg);
-                    results->valid = false;
-                }
-            }
-        }
 
         keysPerIndex->appendNumber(descriptor->indexName(),
                                    static_cast<long long>(numTraversedKeys));
@@ -491,7 +448,6 @@ Status validate(OperationContext* opCtx,
     }
 
     try {
-        std::map<std::string, int64_t> numIndexKeysPerIndex;
         ValidateResultsMap indexNsResultsMap;
         BSONObjBuilder keysPerIndex;  // not using subObjStart to be exception safe.
 
@@ -506,11 +462,7 @@ Status validate(OperationContext* opCtx,
         }
         if (options & ValidateOptions::kFullIndexValidation) {
             invariant(opCtx->lockState()->isCollectionLockedForMode(validateState.nss(), MODE_X));
-            // For full index validation, we validate the internal structure of each index and save
-            // the number of keys in the index to compare against _validateIndexes()'s count
-            // results.
-            numIndexKeysPerIndex = _validateIndexesInternalStructure(
-                opCtx, &validateState, &indexNsResultsMap, results);
+            _validateIndexesInternalStructure(opCtx, &validateState, &indexNsResultsMap, results);
         }
 
         const string uuidString = str::stream() << " (UUID: " << validateState.uuid() << ")";
@@ -578,13 +530,8 @@ Status validate(OperationContext* opCtx,
         }
 
         // Validate indexes and check for mismatches.
-        _validateIndexes(opCtx,
-                         &validateState,
-                         &keysPerIndex,
-                         &indexValidator,
-                         numIndexKeysPerIndex,
-                         &indexNsResultsMap,
-                         results);
+        _validateIndexes(
+            opCtx, &validateState, &keysPerIndex, &indexValidator, &indexNsResultsMap, results);
 
         if (indexConsistency.haveEntryMismatch()) {
             LOGV2_OPTIONS(20305,

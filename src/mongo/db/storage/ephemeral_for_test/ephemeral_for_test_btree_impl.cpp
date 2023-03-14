@@ -233,7 +233,9 @@ public:
                               long long* numKeysOut,
                               ValidateResults* fullResults) const {
         // TODO check invariants?
-        *numKeysOut = _data->size();
+        if (numKeysOut) {
+            *numKeysOut = _data->size();
+        }
     }
 
     virtual bool appendCustomStats(OperationContext* opCtx,

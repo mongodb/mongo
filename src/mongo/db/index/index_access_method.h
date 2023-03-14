@@ -178,7 +178,6 @@ public:
 
     /**
      * Walk the entire index, checking the internal structure for consistency.
-     * Set numKeys to the number of keys in the index.
      */
     virtual void validate(OperationContext* opCtx,
                           int64_t* numKeys,

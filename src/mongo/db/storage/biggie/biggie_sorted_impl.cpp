@@ -513,7 +513,9 @@ void SortedDataInterface::fullValidate(OperationContext* opCtx,
         ++it;
         numKeys++;
     }
-    *numKeysOut = numKeys;
+    if (numKeysOut) {
+        *numKeysOut = numKeys;
+    }
 }
 
 bool SortedDataInterface::appendCustomStats(OperationContext* opCtx,
