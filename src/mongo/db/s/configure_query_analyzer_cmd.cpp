@@ -51,6 +51,8 @@ namespace analyze_shard_key {
 
 namespace {
 
+constexpr int kMaxSampleRate = 1'000'000;
+
 class ConfigureQueryAnalyzerCmd : public TypedCommand<ConfigureQueryAnalyzerCmd> {
 public:
     using Request = ConfigureQueryAnalyzer;
@@ -71,12 +73,22 @@ public:
             const auto newConfig = request().getConfiguration();
 
             uassertStatusOK(validateNamespace(nss));
-            uassert(ErrorCodes::InvalidOptions,
-                    "Cannot specify 'sampleRate' when 'mode' is \"off\"",
-                    mode != QueryAnalyzerModeEnum::kOff || !sampleRate);
-            uassert(ErrorCodes::InvalidOptions,
-                    str::stream() << "'sampleRate' must be greater than 0",
-                    mode != QueryAnalyzerModeEnum::kFull || (sampleRate && *sampleRate > 0));
+            if (mode == QueryAnalyzerModeEnum::kOff) {
+                uassert(ErrorCodes::InvalidOptions,
+                        "Cannot specify 'sampleRate' when 'mode' is \"off\"",
+                        !sampleRate);
+            } else {
+                uassert(ErrorCodes::InvalidOptions,
+                        str::stream()
+                            << "'sampleRate' must be specified when 'mode' is not \"off\"",
+                        sampleRate);
+                uassert(ErrorCodes::InvalidOptions,
+                        str::stream() << "'sampleRate' must be greater than 0",
+                        *sampleRate > 0);
+                uassert(ErrorCodes::InvalidOptions,
+                        str::stream() << "'sampleRate' must be less than " << kMaxSampleRate,
+                        *sampleRate < kMaxSampleRate);
+            }
 
             auto collUuid = uassertStatusOK(validateCollectionOptions(
                 opCtx, nss, ConfigureQueryAnalyzer::kCommandParameterFieldName));

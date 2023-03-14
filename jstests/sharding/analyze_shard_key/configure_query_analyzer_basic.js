@@ -23,6 +23,11 @@ function testExistingCollection(conn, ns) {
         conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", sampleRate: 0}),
         ErrorCodes.InvalidOptions);
 
+    // Cannot set 'sampleRate' to larger than 1'000'000.
+    assert.commandFailedWithCode(
+        conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", sampleRate: 1000001}),
+        ErrorCodes.InvalidOptions);
+
     // Can set 'sampleRate' to > 0.
     assert.commandWorked(
         conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", sampleRate: 0.1}));
