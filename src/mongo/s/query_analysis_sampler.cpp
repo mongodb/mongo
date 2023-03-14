@@ -275,8 +275,6 @@ void QueryAnalysisSampler::_refreshConfigurations(OperationContext* opCtx) {
               "response"_attr = response);
     }
 
-    QueryAnalysisSampleCounters::get(opCtx).refreshConfigurations(response.getConfigurations());
-
     stdx::lock_guard<Latch> lk(_mutex);
     std::map<NamespaceString, SampleRateLimiter> sampleRateLimiters;
 
@@ -303,6 +301,8 @@ void QueryAnalysisSampler::_refreshConfigurations(OperationContext* opCtx) {
         }
     }
     _sampleRateLimiters = std::move(sampleRateLimiters);
+
+    QueryAnalysisSampleCounters::get(opCtx).refreshConfigurations(response.getConfigurations());
 }
 
 void QueryAnalysisSampler::_incrementCounters(OperationContext* opCtx,
