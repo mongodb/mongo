@@ -844,6 +844,8 @@ if env.TargetOSIs('windows'):
         ],
     )
 
+env.CppUnitTest(target='immutable_test', source=['immutable_test.cpp'], LIBDEPS=[])
+
 env.Benchmark(
     target='base64_bm',
     source='base64_bm.cpp',

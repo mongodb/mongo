@@ -29,6 +29,7 @@ thirdPartyEnvironmentModifications = {
         ],
     },
     'fmt': {'CPPPATH': ['#src/third_party/fmt/dist/include'], },
+    'immer': {'CPPPATH': ['#src/third_party/immer/dist'], },
     's2': {'CPPPATH': ['#src/third_party/s2'], },
     'safeint': {
         'CPPPATH': ['#src/third_party/SafeInt'],

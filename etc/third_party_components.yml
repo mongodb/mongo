@@ -161,6 +161,13 @@ components:
     vulnerability_suppression: TODO SERVER-49211
     upgrade_suppression: TODO SERVER-49211
 
+  immer:
+    homepage_url: https://sinusoid.es/immer
+    open_hub_url: N/A
+    release_monitoring_id: -1
+    local_directory_path: src/third_party/immer
+    team_owner: "Storage Execution"
+
   "Intel Decimal Floating-Point Math Library":
     homepage_url: https://software.intel.com/content/www/us/en/develop/articles/intel-decimal-floating-point-math-library.html
     open_hub_url: N/A
