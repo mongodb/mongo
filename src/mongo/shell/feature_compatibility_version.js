@@ -38,7 +38,7 @@ function binVersionToFCV(binVersion) {
  * of the form {featureCompatibilityVersion: {version: <required>, targetVersion: <optional>,
  * previousVersion: <optional>}, ok: 1}.
  */
-function checkFCV(adminDB, version, targetVersion) {
+function checkFCV(adminDB, version, targetVersion, isCleaningServerMetadata) {
     // When both version and targetVersion are equal to lastContinuousFCV or lastLTSFCV, downgrade
     // is in progress. This tests that previousVersion is always equal to latestFCV in downgrading
     // states or undefined otherwise.
@@ -87,6 +87,16 @@ function checkFCV(adminDB, version, targetVersion) {
         assert.eq(doc.previousVersion,
                   undefined,
                   "FCV document 'previousVersion' field does not match: " + tojson(doc));
+    }
+    if (isCleaningServerMetadata) {
+        assert.eq(doc.isCleaningServerMetadata,
+                  true,
+                  "FCV document 'isCleaningServerMetadata' field should be true: " + tojson(doc));
+    } else {
+        assert.eq(doc.isCleaningServerMetadata,
+                  undefined,
+                  "FCV document 'isCleaningServerMetadata' field should not exist, but did: " +
+                      tojson(doc));
     }
 }
 

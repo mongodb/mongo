@@ -107,13 +107,19 @@ void FcvOpObserver::_setVersion(OperationContext* opCtx,
     // This can only happen in two scenarios:
     // 1. Setting featureCompatibilityVersion from downgrading to fullyDowngraded.
     // 2. Setting featureCompatibilityVersion from fullyDowngraded to upgrading.
+    // Note that the minWireVersion does not change between downgrading -> isCleaningServerMetadata,
+    // as the FCV of the isCleaningServerMetadata is still kDowngrading, so the prevVersion and
+    // newVersion will be equal
     // (Generic FCV reference): This FCV check should exist across LTS binary versions.
-    const auto shouldIncrementTopologyVersion = newVersion == multiversion::GenericFCV::kLastLTS ||
-        (prevVersion &&
-         prevVersion.value() == multiversion::GenericFCV::kDowngradingFromLatestToLastContinuous) ||
-        newVersion == multiversion::GenericFCV::kUpgradingFromLastLTSToLatest ||
-        newVersion == multiversion::GenericFCV::kUpgradingFromLastContinuousToLatest ||
-        newVersion == multiversion::GenericFCV::kUpgradingFromLastLTSToLastContinuous;
+    const auto shouldIncrementTopologyVersion =
+        (newVersion == multiversion::GenericFCV::kLastLTS ||
+         (prevVersion &&
+          prevVersion.value() ==
+              multiversion::GenericFCV::kDowngradingFromLatestToLastContinuous) ||
+         newVersion == multiversion::GenericFCV::kUpgradingFromLastLTSToLatest ||
+         newVersion == multiversion::GenericFCV::kUpgradingFromLastContinuousToLatest ||
+         newVersion == multiversion::GenericFCV::kUpgradingFromLastLTSToLastContinuous) &&
+        !(prevVersion && prevVersion.value() == newVersion);
 
     if (isReplSet && shouldIncrementTopologyVersion) {
         replCoordinator->incrementTopologyVersion();
@@ -128,8 +134,8 @@ void FcvOpObserver::_onInsertOrUpdate(OperationContext* opCtx, const BSONObj& do
     }
     auto newVersion = uassertStatusOK(FeatureCompatibilityVersionParser::parse(doc));
 
-    // To avoid extra log messages when the targetVersion is set/unset, only log when the version
-    // changes.
+    // To avoid extra log messages when the targetVersion is set/unset, only log when the
+    // version changes.
     logv2::DynamicAttributes attrs;
     bool isDifferent = true;
     if (serverGlobalParams.featureCompatibility.isVersionInitialized()) {

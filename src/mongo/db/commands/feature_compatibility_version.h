@@ -81,7 +81,8 @@ public:
         multiversion::FeatureCompatibilityVersion newVersion,
         bool isFromConfigServer,
         boost::optional<Timestamp> timestamp,
-        bool setTargetVersion);
+        bool setTargetVersion,
+        boost::optional<bool> setIsCleaningServerMetadata);
 
     /**
      * If we are in clean startup (the server has no replicated collections), store the

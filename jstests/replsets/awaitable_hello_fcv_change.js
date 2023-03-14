@@ -34,7 +34,7 @@ function runAwaitableHelloBeforeFCVChange(
 
     const minWireVersion = response.minWireVersion;
     const maxWireVersion = response.maxWireVersion;
-    assert.neq(prevMinWireVersion, minWireVersion);
+    assert.neq(prevMinWireVersion, minWireVersion, response);
     if (targetFCV === latestFCV) {
         // minWireVersion should always equal maxWireVersion if we have not fully downgraded FCV.
         assert.eq(minWireVersion, maxWireVersion, response);

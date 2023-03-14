@@ -1,6 +1,7 @@
 /**
  * Verifies that the validate hook is able to upgrade the feature compatibility version of the
- * server regardless of what state any previous upgrades or downgrades have left it in.
+ * server regardless of what state any previous upgrades or downgrades have left it in (besides
+ * the isCleaningServerMetadata state, where we must complete the downgrade before upgrading).
  */
 
 // The global 'db' variable is used by the data consistency hooks.
@@ -142,9 +143,26 @@ function forceInterruptedUpgradeOrDowngrade(conn, targetVersion) {
                 conn.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}));
 
             if (res.featureCompatibilityVersion.hasOwnProperty("targetVersion")) {
-                checkFCV(conn.getDB("admin"), lastLTSFCV, targetVersion);
-                jsTest.log(`Reached partially downgraded state after ${attempts} attempts`);
-                return true;
+                const fcvDoc = conn.getDB("admin")
+                                   .system.version.find({_id: "featureCompatibilityVersion"})
+                                   .limit(1)
+                                   .readConcern("local")
+                                   .next();
+                if (fcvDoc.isCleaningServerMetadata) {
+                    checkFCV(conn.getDB("admin"),
+                             lastLTSFCV,
+                             targetVersion,
+                             true /*isCleaningServerMetadata*/);
+                    // If the setFCV command was interrupted while in the isCleaningServerMetadata
+                    // state, we must complete the FCV downgrade successfully.
+                    assert.commandWorked(
+                        conn.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
+
+                } else {
+                    checkFCV(conn.getDB("admin"), lastLTSFCV, targetVersion);
+                    jsTest.log(`Reached partially downgraded state after ${attempts} attempts`);
+                    return true;
+                }
             }
 
             // Either upgrade the feature compatibility version so we can try downgrading again,

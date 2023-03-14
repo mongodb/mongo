@@ -64,3 +64,8 @@ structs:
                       sequence started must strictly have incrementing timestamp."
         type: timestamp
         optional: true
+      isCleaningServerMetadata:
+        description: "Boolean indicating whether the setFCV downgrade request is in the middle of
+                      cleaning up internal server metadata."
+        type: bool
+        optional: true

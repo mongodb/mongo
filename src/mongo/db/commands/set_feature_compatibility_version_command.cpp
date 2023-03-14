@@ -116,6 +116,9 @@ MONGO_FAIL_POINT_DEFINE(failDowngrading);
 MONGO_FAIL_POINT_DEFINE(hangWhileDowngrading);
 MONGO_FAIL_POINT_DEFINE(hangBeforeUpdatingFcvDoc);
 MONGO_FAIL_POINT_DEFINE(failBeforeUpdatingFcvDoc);
+MONGO_FAIL_POINT_DEFINE(failDowngradingDuringIsCleaningServerMetadata);
+MONGO_FAIL_POINT_DEFINE(hangBeforeTransitioningToDowngraded);
+MONGO_FAIL_POINT_DEFINE(hangDowngradingBeforeIsCleaningServerMetadata);
 
 /**
  * Ensures that only one instance of setFeatureCompatibilityVersion can run at a given time.
@@ -380,13 +383,20 @@ public:
                         "transitional stage due to 'failBeforeTransitioning' failpoint set",
                         !failBeforeTransitioning.shouldFail());
 
+                // We pass boost::none as the setIsCleaningServerMetadata argument in order to
+                // indicate that we don't want to override the existing isCleaningServerMetadata FCV
+                // doc field. This is to protect against the case where a previous FCV downgrade
+                // failed in the isCleaningServerMetadata phase, and the user runs setFCV again. In
+                // that case we do not want to remove the existing isCleaningServerMetadata FCV doc
+                // field because it would not be safe to upgrade the FCV.
                 FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
                     opCtx,
                     actualVersion,
                     requestedVersion,
                     isFromConfigServer,
                     changeTimestamp,
-                    true /* setTargetVersion */);
+                    true /* setTargetVersion */,
+                    boost::none /* setIsCleaningServerMetadata */);
 
                 LOGV2(6744301,
                       "setFeatureCompatibilityVersion has set the FCV to the transitional state",
@@ -441,7 +451,8 @@ public:
                 requestedVersion,
                 isFromConfigServer,
                 changeTimestamp,
-                false /* setTargetVersion */);
+                false /* setTargetVersion */,
+                false /* setIsCleaningServerMetadata */);
         }
 
         // TODO SERVER-72796: Remove once gGlobalIndexesShardingCatalog is enabled.
@@ -1000,16 +1011,22 @@ private:
 
     // This helper function is for any internal server downgrade cleanup, such as dropping
     // collections or aborting. This cleanup will happen after user collection downgrade
-    // cleanup. The code in this helper function is required to be idempotent in case the node
-    // crashes or downgrade fails in a way that the user has to run setFCV again. It also cannot
-    // fail for a non-retryable reason since at this point user data has already been cleaned up.
-    // This helper function can only fail with some transient error that can be retried (like
-    // InterruptedDueToReplStateChange), ManualInterventionRequired, or fasserts. For any
-    // non-retryable error in this helper function, it should error either with an uassert with
-    // ManualInterventionRequired as the error code (indicating a server bug but that all the data
-    // is consistent on disk and for reads/writes) or with an fassert (indicating a server bug and
-    // that the data is corrupted). ManualInterventionRequired and fasserts are errors that are not
-    // expected to occur in practice, but if they did, they would turn into a Support case.
+    // cleanup.
+    // The code in this helper function is required to be IDEMPOTENT and RETRYABLE in case the
+    // node crashes or downgrade fails in a way that the user has to run setFCV again. It cannot
+    // fail for a non-retryable reason since at this point user data has already been cleaned
+    // up.
+    // It also MUST be able to be rolled back. This is because we cannot guarantee the safety of
+    // any server metadata that is not replicated in the event of a rollback.
+    //
+    // This helper function can only fail with some transient error that can be retried
+    // (like InterruptedDueToReplStateChange), ManualInterventionRequired, or fasserts. For
+    // any non-retryable error in this helper function, it should error either with an
+    // uassert with ManualInterventionRequired as the error code (indicating a server bug
+    // but that all the data is consistent on disk and for reads/writes) or with an fassert
+    // (indicating a server bug and that the data is corrupted). ManualInterventionRequired
+    // and fasserts are errors that are not expected to occur in practice, but if they did,
+    // they would turn into a Support case.
     void _internalServerCleanupForDowngrade(
         OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
         _cleanUpClusterParameters(opCtx, requestedVersion);
@@ -1143,6 +1160,8 @@ private:
                        const SetFeatureCompatibilityVersion& request,
                        boost::optional<Timestamp> changeTimestamp) {
         const auto requestedVersion = request.getCommandParameter();
+        const auto actualVersion = serverGlobalParams.featureCompatibility.getVersion();
+        auto isFromConfigServer = request.getFromConfigServer().value_or(false);
 
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             uassert(ErrorCodes::Error(6794600),
@@ -1170,6 +1189,7 @@ private:
         uassert(ErrorCodes::Error(549181),
                 "Failing downgrade due to 'failDowngrading' failpoint set",
                 !failDowngrading.shouldFail());
+        hangWhileDowngrading.pauseWhileSet(opCtx);
 
         // This helper function is for any uasserts for users to clean up user collections. Uasserts
         // for users to change settings or wait for settings to change should also happen here.
@@ -1184,20 +1204,50 @@ private:
         // user must manually clean up some user data in order to retry the FCV downgrade.
         _userCollectionsUassertsForDowngrade(opCtx, requestedVersion);
 
+        hangDowngradingBeforeIsCleaningServerMetadata.pauseWhileSet(opCtx);
+        // Set the isCleaningServerMetadata field to true. This prohibits the downgrading to
+        // upgrading transition until the isCleaningServerMetadata is unset when we successfully
+        // finish the FCV downgrade and transition to the DOWNGRADED state.
+        if (repl::feature_flags::gDowngradingToUpgrading.isEnabledAndIgnoreFCV() &&
+            serverGlobalParams.clusterRole != ClusterRole::ConfigServer &&
+            serverGlobalParams.clusterRole != ClusterRole::ShardServer) {
+            {
+                const auto fcvChangeRegion(
+                    FeatureCompatibilityVersion::enterFCVChangeRegion(opCtx));
+                FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
+                    opCtx,
+                    actualVersion,
+                    requestedVersion,
+                    isFromConfigServer,
+                    changeTimestamp,
+                    true /* setTargetVersion */,
+                    true /* setIsCleaningServerMetadata*/);
+            }
+        }
+
+        uassert(ErrorCodes::Error(7428201),
+                "Failing downgrade due to 'failDowngradingDuringIsCleaningServerMetadata' "
+                "failpoint set",
+                !failDowngradingDuringIsCleaningServerMetadata.shouldFail());
+
         // This helper function is for any internal server downgrade cleanup, such as dropping
         // collections or aborting. This cleanup will happen after user collection downgrade
-        // cleanup. The code in this helper function is required to be idempotent in case the node
-        // crashes or downgrade fails in a way that the user has to run setFCV again. It also cannot
+        // cleanup.
+        // The code in this helper function is required to be IDEMPOTENT and RETRYABLE in case the
+        // node crashes or downgrade fails in a way that the user has to run setFCV again. It cannot
         // fail for a non-retryable reason since at this point user data has already been cleaned
         // up.
+        // It also MUST be able to be rolled back. This is because we cannot guarantee the safety of
+        // any server metadata that is not replicated in the event of a rollback.
+        //
         // This helper function can only fail with some transient error that can be retried
-        // (like InterruptedDueToReplStateChange), ManualInterventionRequired, or fasserts. For any
-        // non-retryable error in this helper function, it should error either with an uassert with
-        // ManualInterventionRequired as the error code (indicating a server bug but that all the
-        // data is consistent on disk and for reads/writes) or with an fassert (indicating a server
-        // bug and that the data is corrupted). ManualInterventionRequired and fasserts are errors
-        // that are not expected to occur in practice, but if they did, they would turn into a
-        // Support case.
+        // (like InterruptedDueToReplStateChange), ManualInterventionRequired, or fasserts. For
+        // any non-retryable error in this helper function, it should error either with an
+        // uassert with ManualInterventionRequired as the error code (indicating a server bug
+        // but that all the data is consistent on disk and for reads/writes) or with an fassert
+        // (indicating a server bug and that the data is corrupted). ManualInterventionRequired
+        // and fasserts are errors that are not expected to occur in practice, but if they did,
+        // they would turn into a Support case.
         _internalServerCleanupForDowngrade(opCtx, requestedVersion);
 
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
@@ -1205,7 +1255,7 @@ private:
             _sendSetFCVRequestToShards(opCtx, request, changeTimestamp, SetFCVPhaseEnum::kComplete);
         }
 
-        hangWhileDowngrading.pauseWhileSet(opCtx);
+        hangBeforeTransitioningToDowngraded.pauseWhileSet(opCtx);
     }
 
     /**

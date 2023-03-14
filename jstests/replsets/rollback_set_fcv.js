@@ -86,6 +86,11 @@ function rollbackFCVFromDowngradedOrUpgraded(fromFCV, toFCV, failPoint) {
     let primaryAdminDB = primary.getDB('admin');
     let secondaryAdminDB = secondary.getDB('admin');
 
+    const isDowngradingToUpgradingFlagOn = FeatureFlagUtil.isEnabled(primaryAdminDB,
+                                                                     "DowngradingToUpgrading",
+                                                                     null /* user not specified */,
+                                                                     true /* ignores FCV */);
+
     // Complete the upgrade/downgrade to ensure we are not in the upgrading/downgrading state.
     assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: toFCV}));
     // Wait for the majority commit point to be updated on the secondary, because checkFCV calls
@@ -111,26 +116,36 @@ function rollbackFCVFromDowngradedOrUpgraded(fromFCV, toFCV, failPoint) {
     }, "Failed waiting for server to unset the targetVersion or to set the FCV to " + fromFCV);
     rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
     // The secondary should never have received the update to unset the targetVersion.
-    checkFCV(secondaryAdminDB, lastLTSFCV, fromFCV);
+    if (fromFCV == lastLTSFCV && isDowngradingToUpgradingFlagOn) {
+        // When downgrading, the secondary should still be in isCleaningServerMetadata.
+        checkFCV(secondaryAdminDB, lastLTSFCV, fromFCV, true /* isCleaningServerMetadata */);
+    } else {
+        checkFCV(secondaryAdminDB, lastLTSFCV, fromFCV);
+    }
+
     rollbackTest.transitionToSyncSourceOperationsDuringRollback();
     setFCVInParallel();
     rollbackTest.transitionToSteadyStateOperations();
     // The primary should have rolled back their FCV to contain the targetVersion.
-    checkFCV(primaryAdminDB, lastLTSFCV, fromFCV);
-    checkFCV(secondaryAdminDB, lastLTSFCV, fromFCV);
+    if (fromFCV == lastLTSFCV && isDowngradingToUpgradingFlagOn) {
+        // Rolling back from downgraded to isCleaningServerMetadata state.
+        checkFCV(primaryAdminDB, lastLTSFCV, fromFCV, true /* isCleaningServerMetadata */);
+        checkFCV(secondaryAdminDB, lastLTSFCV, fromFCV, true /* isCleaningServerMetadata */);
+    } else {
+        checkFCV(primaryAdminDB, lastLTSFCV, fromFCV);
+        checkFCV(secondaryAdminDB, lastLTSFCV, fromFCV);
+    }
 
     let newPrimary = rollbackTest.getPrimary();
-    const newPrimaryAdminDB = newPrimary.getDB('admin');
     // As a rule, we forbid downgrading a node while a node is still in the upgrading state and
-    // vice versa (except for the added path from downgrading to upgrading).
+    // vice versa.
+    // With the new downgrading to upgrading path, we do not permit upgrading if we are cleaning
+    // server metadata.
     // Ensure that the in-memory and on-disk FCV are consistent by checking that this rule is
     // upheld after rollback.
-    if (fromFCV === lastLTSFCV && toFCV === latestFCV &&
-        FeatureFlagUtil.isEnabled(newPrimaryAdminDB,
-                                  "DowngradingToUpgrading",
-                                  null /* user not specified */,
-                                  true /* ignores FCV */)) {
-        assert.commandWorked(newPrimary.adminCommand({setFeatureCompatibilityVersion: toFCV}));
+    if (fromFCV === lastLTSFCV && toFCV === latestFCV && isDowngradingToUpgradingFlagOn) {
+        assert.commandFailedWithCode(
+            newPrimary.adminCommand({setFeatureCompatibilityVersion: toFCV}), 7428200);
     } else {
         assert.commandFailedWithCode(
             newPrimary.adminCommand({setFeatureCompatibilityVersion: toFCV}), 5147403);
@@ -235,6 +250,71 @@ function rollbackFCVFromUpgradingToDowngrading() {
     // We should now be able to set the FCV from downgrading to upgrading to upgraded.
     assert.commandWorked(newPrimary.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
     checkFCV(newPrimaryAdminDB, latestFCV);
+
+    assert.commandWorked(
+        rollbackNode.adminCommand({configureFailPoint: "failDowngrading", mode: "off"}));
+    assert.commandWorked(
+        rollbackNode.adminCommand({configureFailPoint: "failUpgrading", mode: "off"}));
+}
+
+// Tests roll back from isCleaningServerMetadata to downgrading.
+function rollbackFCVFromIsCleaningServerMetadataToDowngrading() {
+    let primary = rollbackTest.getPrimary();
+    let secondary = rollbackTest.getSecondary();
+    let primaryAdminDB = primary.getDB('admin');
+    let secondaryAdminDB = secondary.getDB('admin');
+
+    if (!FeatureFlagUtil.isEnabled(primaryAdminDB,
+                                   "DowngradingToUpgrading",
+                                   null /* user not specified */,
+                                   true /* ignores FCV */)) {
+        jsTestLog(
+            "Skipping rollbackFCVFromIsCleaningServerMetadataToDowngrading test because isDowngradingToUpgrading is not enabled");
+        return;
+    }
+
+    // Complete the upgrade/downgrade to ensure we are not in the upgrading/downgrading state.
+    assert.commandWorked(primary.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
+    // Wait for the majority commit point to be updated on the secondary, because checkFCV calls
+    // getParameter for the featureCompatibilityVersion, which will wait until the FCV change makes
+    // it into the node's majority committed snapshot.
+    rollbackTest.getTestFixture().awaitLastOpCommitted(undefined /* timeout */, [secondary]);
+
+    jsTestLog("Testing rolling back FCV from isCleaningServerMetadata state to Downgrading state");
+
+    // A failpoint to hang right before setting isCleaningServerMetadata.
+    const hangDowngradingBeforeIsCleaningServerMetadata =
+        configureFailPoint(primary, "hangDowngradingBeforeIsCleaningServerMetadata");
+    let setFCVInParallel = startParallelShell(funWithArgs(setFCV, lastLTSFCV), primary.port);
+    hangDowngradingBeforeIsCleaningServerMetadata.wait();
+    rollbackTest.transitionToRollbackOperations();
+    // Turn off the failpoint so the primary will proceed to set isCleaningServerMetadata. This
+    // update should never make it to the secondary.
+    hangDowngradingBeforeIsCleaningServerMetadata.off();
+    assert.soon(function() {
+        let featureCompatibilityVersion = getFCVFromDocument(primary);
+        return featureCompatibilityVersion.hasOwnProperty('targetVersion') &&
+            featureCompatibilityVersion.hasOwnProperty('isCleaningServerMetadata') &&
+            featureCompatibilityVersion.targetVersion === lastLTSFCV &&
+            featureCompatibilityVersion.isCleaningServerMetadata === true &&
+            featureCompatibilityVersion.version === lastLTSFCV;
+    }, "Failed waiting for server to enter isCleaningServerMetadata state");
+    rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
+    // The secondary should never have received the update to set isCleaningServerMetadata
+    checkFCV(secondaryAdminDB, lastLTSFCV, lastLTSFCV);
+
+    rollbackTest.transitionToSyncSourceOperationsDuringRollback();
+    setFCVInParallel();
+    rollbackTest.transitionToSteadyStateOperations();
+    // The primary should have rolled back their FCV to unset isCleaningServerMetadata
+
+    checkFCV(primaryAdminDB, lastLTSFCV, lastLTSFCV);
+    checkFCV(secondaryAdminDB, lastLTSFCV, lastLTSFCV);
+
+    let newPrimary = rollbackTest.getPrimary();
+    // With the new downgrading to upgrading path, we can still go from downgrading -> upgrading
+    // after rollback.
+    assert.commandWorked(newPrimary.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
 }
 
 const testName = jsTest.name();
@@ -247,14 +327,18 @@ rollbackFCVFromDowngradingOrUpgrading(lastLTSFCV, latestFCV);
 // Tests the case where we roll back the FCV state from upgrading to fully downgraded.
 rollbackFCVFromDowngradingOrUpgrading(latestFCV, lastLTSFCV);
 
-// Tests the case where we roll back the FCV state from fully downgraded to downgrading.
-rollbackFCVFromDowngradedOrUpgraded(lastLTSFCV, latestFCV, "hangWhileDowngrading");
+// Tests the case where we roll back the FCV state from fully downgraded to downgrading (while in
+// isCleaningServerMetadata state).
+rollbackFCVFromDowngradedOrUpgraded(lastLTSFCV, latestFCV, "hangBeforeTransitioningToDowngraded");
 
 // Tests the case where we roll back the FCV state from fully upgraded to upgrading.
 rollbackFCVFromDowngradedOrUpgraded(latestFCV, lastLTSFCV, "hangWhileUpgrading");
 
 // Tests the case where we roll back the FCV state from upgrading to downgrading.
 rollbackFCVFromUpgradingToDowngrading();
+
+// Tests roll back from isCleaningServerMetadata to downgrading.
+rollbackFCVFromIsCleaningServerMetadataToDowngrading();
 
 rollbackTest.stop();
 }());
