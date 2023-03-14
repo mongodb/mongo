@@ -1,8 +1,6 @@
 // The test runs commands that are not allowed with security token: hostInfo.
 // @tags: [
 //   not_allowed_with_security_token,
-//     # `hostInfo` command is not available on embedded
-//     incompatible_with_embedded,
 // ]
 // SERVER-4615:  Ensure hostInfo() command returns expected results on each platform
 

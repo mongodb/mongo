@@ -9,8 +9,6 @@
 //     not_allowed_with_security_token,
 //     assumes_read_preference_unchanged,
 //     assumes_unsharded_collection,
-//     # top command is not available on embedded
-//     incompatible_with_embedded,
 //     # This test depends on hardcoded database name equality.
 //     tenant_migration_incompatible,
 //     does_not_support_repeated_reads,

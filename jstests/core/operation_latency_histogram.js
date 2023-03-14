@@ -11,7 +11,6 @@
 //   not_allowed_with_security_token,
 //   assumes_read_preference_unchanged,
 //   does_not_support_repeated_reads,
-//   incompatible_with_embedded,
 //   requires_collstats,
 //   # Tenant migrations passthrough suites automatically retry operations on TenantMigrationAborted
 //   # errors.

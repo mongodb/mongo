@@ -1,8 +1,6 @@
 /**
  * Ensures that the data managed by Top is removed for the source namespace when renaming the
  * collection.
- *
- * @tags: [incompatible_with_embedded]
  */
 (function() {
 

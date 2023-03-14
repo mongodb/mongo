@@ -4,9 +4,6 @@
  * @tags: [
  *  not_allowed_with_security_token,
  *  requires_non_retryable_commands,
- *
- *  # capped collections is not available on embedded
- *  incompatible_with_embedded,
  * ]
  */
 

@@ -5,8 +5,6 @@
  * getDiagnosticData.
  * @tags: [
  *   not_allowed_with_security_token,
- *   # getDiagnosticData command is not available on embedded
- *   incompatible_with_embedded,
  *   # getDiagnosticData is not supported on mongos
  *   assumes_against_mongod_not_mongos,
  * ]

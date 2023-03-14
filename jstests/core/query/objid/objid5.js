@@ -1,8 +1,3 @@
-// @tags: [
-//     # `features` command is not available on embedded
-//     incompatible_with_embedded,
-// ]
-
 t = db.objid5;
 t.drop();
 

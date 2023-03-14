@@ -10,8 +10,6 @@
  *   not_allowed_with_security_token,
  *    assumes_read_preference_unchanged,
  *    requires_fastcount,
- *    # top command is not available on embedded
- *    incompatible_with_embedded,
  *    # This test contains assertions on the number of executed operations, and tenant migrations
  *    # passthrough suites automatically retry operations on TenantMigrationAborted errors.
  *    tenant_migration_incompatible,

@@ -5,8 +5,6 @@
  * @tags: [
  *   not_allowed_with_security_token,
  *   assumes_superuser_permissions,
- *   # fsync command is not available on embedded
- *   incompatible_with_embedded,
  *   uses_parallel_shell,
  * ]
  */

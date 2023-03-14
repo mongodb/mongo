@@ -1,8 +1,6 @@
 // The test runs commands that are not allowed with security token: dbhash.
 // @tags: [
 //   not_allowed_with_security_token,
-//     # dbhash command is not available on embedded
-//     incompatible_with_embedded,
 // ]
 
 a = db.dbhasha;

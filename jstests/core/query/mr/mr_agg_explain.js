@@ -3,7 +3,6 @@
  * The test runs commands that are not allowed with security token: mapReduce.
  * @tags: [
  *   not_allowed_with_security_token,
- *   incompatible_with_embedded,
  *   # mapReduce does not support afterClusterTime.
  *   does_not_support_causal_consistency,
  *   requires_scripting,
