@@ -447,6 +447,7 @@ let viewsCommandTests = {
         }
     },
     getParameter: {skip: isUnrelated},
+    getQueryableEncryptionCountInfo: {skip: isAnInternalCommand},
     getShardMap: {skip: isUnrelated},
     getShardVersion: {
         command: {getShardVersion: "test.view"},

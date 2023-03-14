@@ -40,6 +40,7 @@
 #include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/crypto/fle_crypto.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/commands/fle2_get_count_info_command_gen.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/namespace_string.h"
@@ -150,6 +151,73 @@ boost::optional<BSONObj> mergeLetAndCVariables(const boost::optional<BSONObj>& l
     }
     return c;
 }
+
+template <FLETokenType TokenT>
+FLEToken<TokenT> FLETokenFromCDR(ConstDataRange cdr) {
+    auto block = PrfBlockfromCDR(cdr);
+    return FLEToken<TokenT>(block);
+}
+
+std::vector<QECountInfoRequestTokenSet> toTagSets(
+    const std::vector<std::vector<FLEEdgePrfBlock>>& blockSets) {
+
+    std::vector<QECountInfoRequestTokenSet> nestedBlocks;
+    nestedBlocks.reserve(blockSets.size());
+
+    for (const auto& tags : blockSets) {
+        std::vector<QECountInfoRequestTokens> tagsets;
+
+        tagsets.reserve(tags.size());
+
+        for (auto& tag : tags) {
+            tagsets.emplace_back(FLEUtil::vectorFromCDR(tag.esc));
+            auto& tokenSet = tagsets.back();
+
+            if (tag.edc.has_value()) {
+                tokenSet.setEDCDerivedFromDataTokenAndContentionFactorToken(
+                    ConstDataRange(tag.edc.value()));
+            }
+        }
+
+        nestedBlocks.emplace_back();
+        nestedBlocks.back().setTokens(std::move(tagsets));
+    }
+
+    return nestedBlocks;
+}
+
+std::vector<std::vector<FLEEdgeCountInfo>> toEdgeCounts(
+    const std::vector<QECountInfoReplyTokenSet>& tupleSet) {
+
+    std::vector<std::vector<FLEEdgeCountInfo>> nestedBlocks;
+    nestedBlocks.reserve(tupleSet.size());
+
+    for (const auto& tuple : tupleSet) {
+        std::vector<FLEEdgeCountInfo> blocks;
+
+        const auto& tuples = tuple.getTokens();
+
+        blocks.reserve(tuples.size());
+
+        for (auto& tuple : tuples) {
+            blocks.emplace_back(tuple.getCount(),
+                                FLETokenFromCDR<FLETokenType::ESCTwiceDerivedTagToken>(
+                                    tuple.getESCTwiceDerivedTagToken()));
+            auto& p = blocks.back();
+
+            if (tuple.getEDCDerivedFromDataTokenAndContentionFactorToken().has_value()) {
+                p.edc =
+                    FLETokenFromCDR<FLETokenType::EDCDerivedFromDataTokenAndContentionFactorToken>(
+                        tuple.getEDCDerivedFromDataTokenAndContentionFactorToken().value());
+            }
+        }
+
+        nestedBlocks.emplace_back(std::move(blocks));
+    }
+
+    return nestedBlocks;
+}
+
 }  // namespace
 
 std::shared_ptr<txn_api::SyncTransactionWithRetries> getTransactionWithRetriesForMongoS(
@@ -638,11 +706,11 @@ void processFieldsForInsertV2(FLEQueryInterface* queryImpl,
                               int32_t* pStmtId,
                               bool bypassDocumentValidation) {
 
-    const NamespaceString nssEsc(edcNss.dbName(), efc.getEscCollection().value());
-
     if (serverPayload.empty()) {
         return;
     }
+
+    const NamespaceString nssEsc(edcNss.dbName(), efc.getEscCollection().value());
 
     uint32_t totalTokens = 0;
 
@@ -678,11 +746,19 @@ void processFieldsForInsertV2(FLEQueryInterface* queryImpl,
     auto countInfoSets =
         queryImpl->getTags(nssEsc, tokensSets, FLETagQueryInterface::TagQueryType::kInsert);
 
+    uassert(7415101,
+            "Mismatch in the number of expected tokens",
+            countInfoSets.size() == serverPayload.size());
+
     std::vector<BSONObj> escDocuments;
     escDocuments.reserve(totalTokens);
 
     for (size_t i = 0; i < countInfoSets.size(); i++) {
         auto& countInfos = countInfoSets[i];
+
+        uassert(7415104,
+                "Mismatch in the number of expected counts for a token",
+                countInfos.size() == tokensSets[i].size());
 
         for (auto const& countInfo : countInfos) {
             serverPayload[i].counts.push_back(countInfo.count);
@@ -1737,13 +1813,24 @@ std::vector<std::vector<FLEEdgeCountInfo>> FLEQueryInterfaceImpl::getTags(
     const std::vector<std::vector<FLEEdgePrfBlock>>& tokensSets,
     FLEQueryInterface::TagQueryType type) {
 
-    auto docCount = countDocuments(nss);
+    GetQueryableEncryptionCountInfo getCountsCmd(nss);
 
-    TxnCollectionReader reader(docCount, this, nss);
+    const auto tenantId = nss.tenantId();
+    if (tenantId && gMultitenancySupport) {
+        getCountsCmd.setDollarTenant(tenantId);
+    }
 
-    return ESCCollection::getTags(reader, tokensSets, type);
+    getCountsCmd.setTokens(toTagSets(tokensSets));
+    getCountsCmd.setForInsert(type == FLEQueryInterface::TagQueryType::kInsert);
+
+    auto response = _txnClient.runCommand(nss.db(), getCountsCmd.toBSON({})).get();
+    auto status = getStatusFromWriteCommandReply(response);
+    uassertStatusOK(status);
+
+    auto reply = QECountInfosReply::parse(IDLParserContext("reply"), response);
+
+    return toEdgeCounts(reply.getCounts());
 }
-
 
 StatusWith<write_ops::InsertCommandReply> FLEQueryInterfaceImpl::insertDocuments(
     const NamespaceString& nss,
@@ -1753,6 +1840,7 @@ StatusWith<write_ops::InsertCommandReply> FLEQueryInterfaceImpl::insertDocuments
     bool bypassDocumentValidation) {
     write_ops::InsertCommandRequest insertRequest(nss);
     auto documentCount = objs.size();
+    dassert(documentCount > 0);
     insertRequest.setDocuments(std::move(objs));
 
     const auto tenantId = nss.tenantId();
@@ -1993,4 +2081,5 @@ std::unique_ptr<Pipeline, PipelineDeleter> processFLEPipelineS(
     return fle::processPipeline(
         opCtx, nss, encryptInfo, std::move(toRewrite), &getTransactionWithRetriesForMongoS);
 }
+
 }  // namespace mongo

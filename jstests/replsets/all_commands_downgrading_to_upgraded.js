@@ -699,6 +699,7 @@ const allCommands = {
         // },
     },
     getParameter: {isAdminCommand: true, command: {getParameter: 1, logLevel: 1}},
+    getQueryableEncryptionCountInfo: {skip: isAnInternalCommand},
     getShardMap: {
         // TODO SERVER-69753: Unskip this command when we can test with sharded clusters.
         skip: isNotImplementedYet,

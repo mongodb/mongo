@@ -46,6 +46,8 @@
 #include "mongo/db/query/find_command_gen.h"
 #include "mongo/db/query/fle/server_rewrite.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/session/session.h"
 #include "mongo/db/session/session_catalog.h"
 #include "mongo/db/session/session_catalog_mongod.h"
@@ -142,6 +144,53 @@ public:
 
 private:
     bool _yielded = false;
+};
+
+void toBinData(StringData field, PrfBlock block, BSONObjBuilder* builder) {
+    builder->appendBinData(field, block.size(), BinDataType::BinDataGeneral, block.data());
+}
+
+/**
+ * Read from ESC via StorageInterface
+ */
+class StorageInterfaceCollectionReader : public FLEStateCollectionReader {
+public:
+    StorageInterfaceCollectionReader(OperationContext* opCtx,
+                                     uint64_t count,
+                                     const NamespaceStringOrUUID& nsOrUUID,
+                                     repl::StorageInterface* storageInterface)
+        : _opCtx(opCtx), _count(count), _nssOrUUID(nsOrUUID), _storageInterface(storageInterface) {}
+
+    uint64_t getDocumentCount() const override {
+        return _count;
+    }
+
+    BSONObj getById(PrfBlock block) const override {
+
+        // Check for interruption so we can be killed
+        _opCtx->checkForInterrupt();
+
+        BSONObjBuilder builder;
+        toBinData("_id", block, &builder);
+        auto id = builder.obj();
+
+        auto swDoc = _storageInterface->findById(_opCtx, _nssOrUUID, id.firstElement());
+
+        if (swDoc.getStatus() == ErrorCodes::NoSuchKey ||
+            swDoc.getStatus() == ErrorCodes::NamespaceNotFound) {
+            return BSONObj();
+        }
+
+        uassertStatusOK(swDoc);
+
+        return swDoc.getValue();
+    }
+
+private:
+    OperationContext* _opCtx;
+    uint64_t _count;
+    const NamespaceStringOrUUID& _nssOrUUID;
+    repl::StorageInterface* _storageInterface;
 };
 
 }  // namespace
@@ -288,6 +337,26 @@ processFLEFindAndModifyExplainMongod(OperationContext* opCtx,
 
     return uassertStatusOK(processFindAndModifyRequest<write_ops::FindAndModifyCommandRequest>(
         opCtx, request, &getTransactionWithRetriesForMongoD, processFindAndModifyExplain));
+}
+
+std::vector<std::vector<FLEEdgeCountInfo>> getTagsFromStorage(
+    OperationContext* opCtx,
+    const NamespaceStringOrUUID& nsOrUUID,
+    const std::vector<std::vector<FLEEdgePrfBlock>>& escDerivedFromDataTokens,
+    FLETagQueryInterface::TagQueryType type) {
+
+    auto storageInterface = repl::StorageInterface::get(opCtx);
+
+    auto swDocCount = storageInterface->getCollectionCount(opCtx, nsOrUUID);
+
+    uint64_t docCount = 0;
+    if (swDocCount.getStatus() != ErrorCodes::NamespaceNotFound) {
+        docCount = uassertStatusOK(swDocCount);
+    }
+
+    StorageInterfaceCollectionReader reader(opCtx, docCount, nsOrUUID, storageInterface);
+
+    return ESCCollection::getTags(reader, escDerivedFromDataTokens, type);
 }
 
 }  // namespace mongo

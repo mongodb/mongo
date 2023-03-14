@@ -878,6 +878,7 @@ env.Library(
 env.Library(
     target='fle_crud',
     source=[
+        'commands/fle2_get_count_info_command.idl',
         'fle_crud.cpp',
         'query/fle/encrypted_predicate.cpp',
         'query/fle/equality_predicate.cpp',
@@ -937,6 +938,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/ops/write_ops',
         '$BUILD_DIR/mongo/db/repl/storage_interface_impl',
         'fle_crud',
+        'fle_crud_mongod',
     ],
 )
 

@@ -1824,6 +1824,7 @@ std::vector<std::string> minCoverDecimal128(Decimal128 lowerBound,
 
 class FLEUtil {
 public:
+    static std::vector<uint8_t> vectorFromCDR(ConstDataRange cdr);
     static PrfBlock blockToArray(const SHA256Block& block);
 
     /**

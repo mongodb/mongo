@@ -450,13 +450,6 @@ void appendTag(PrfBlock block, BSONArrayBuilder* builder) {
     builder->appendBinData(block.size(), BinDataType::BinDataGeneral, block.data());
 }
 
-
-std::vector<uint8_t> vectorFromCDR(ConstDataRange cdr) {
-    std::vector<uint8_t> buf(cdr.length());
-    std::copy(cdr.data(), cdr.data() + cdr.length(), buf.data());
-    return buf;
-}
-
 template <typename T>
 std::vector<uint8_t> toEncryptedVector(EncryptedBinDataType dt, T t) {
     BSONObj obj = t.toBSON();
@@ -2401,6 +2394,12 @@ PrfBlock PrfBlockfromCDR(const ConstDataRange& block) {
     return ret;
 }
 
+std::vector<uint8_t> FLEUtil::vectorFromCDR(ConstDataRange cdr) {
+    std::vector<uint8_t> buf(cdr.length());
+    std::copy(cdr.data(), cdr.data() + cdr.length(), buf.data());
+    return buf;
+}
+
 CollectionsLevel1Token FLELevel1TokenGenerator::generateCollectionsLevel1Token(
     FLEIndexKey indexKey) {
     return FLEUtil::prf(hmacKey(indexKey.data), kLevel1Collection);
@@ -3520,7 +3519,7 @@ FLE2IndexedEqualityEncryptedValue::FLE2IndexedEqualityEncryptedValue(
       count(counter),
       bsonType(static_cast<BSONType>(payload.getType())),
       indexKeyId(payload.getIndexKeyId()),
-      clientEncryptedValue(vectorFromCDR(payload.getValue())) {
+      clientEncryptedValue(FLEUtil::vectorFromCDR(payload.getValue())) {
     uassert(6373508,
             "Invalid BSON Type in Queryable Encryption InsertUpdatePayload",
             isValidBSONType(payload.getType()));
@@ -3811,7 +3810,7 @@ FLE2IndexedEqualityEncryptedValueV2::FLE2IndexedEqualityEncryptedValueV2(
     : FLE2IndexedEqualityEncryptedValueV2(
           static_cast<BSONType>(payload.getType()),
           payload.getIndexKeyId(),
-          vectorFromCDR(payload.getValue()),
+          FLEUtil::vectorFromCDR(payload.getValue()),
           FLE2TagAndEncryptedMetadataBlock(
               counter, payload.getContentionFactor(), std::move(tag))) {}
 
@@ -4055,7 +4054,7 @@ FLE2IndexedRangeEncryptedValue::FLE2IndexedRangeEncryptedValue(FLE2InsertUpdateP
       counters(std::move(countersParam)),
       bsonType(static_cast<BSONType>(payload.getType())),
       indexKeyId(payload.getIndexKeyId()),
-      clientEncryptedValue(vectorFromCDR(payload.getValue())) {
+      clientEncryptedValue(FLEUtil::vectorFromCDR(payload.getValue())) {
     uassert(6775312,
             "Invalid BSON Type in Queryable Encryption InsertUpdatePayload",
             isValidBSONType(payload.getType()));
@@ -4348,7 +4347,7 @@ FLE2IndexedRangeEncryptedValueV2::FLE2IndexedRangeEncryptedValueV2(
     const std::vector<uint64_t>& counters)
     : bsonType(static_cast<BSONType>(payload.getType())),
       indexKeyId(payload.getIndexKeyId()),
-      clientEncryptedValue(vectorFromCDR(payload.getValue())) {
+      clientEncryptedValue(FLEUtil::vectorFromCDR(payload.getValue())) {
 
     uassert(7290900,
             "Tags and counters parameters must be non-zero and of the same length",

@@ -4703,6 +4703,26 @@ export const authCommandsLib = {
           ]
         },
         {
+          testname: "getQueryableEncryptionCountInfo",
+          command: {
+            getQueryableEncryptionCountInfo: "foo",
+            tokens: [
+                {tokens: [{"s": BinData(0, "lUBO7Mov5Sb+c/D4cJ9whhhw/+PZFLCk/AQU2+BpumQ=")}]},
+            ],
+            "forInsert": true,
+        },
+          skipTest: (conn) => {
+              return !TestData.setParameters.featureFlagFLE2ProtocolVersion2;
+          },
+          testcases: [
+              {
+                  runOnDb: adminDbName,
+                  roles: {__system: 1},
+                  privileges: [{resource: {cluster: true}, actions: ["internal"]}],
+              },
+          ]
+        },
+        {
           testname: "getShardMap",
           command: {getShardMap: "x"},
           testcases: [
@@ -5503,7 +5523,7 @@ export const authCommandsLib = {
           // Only enterprise knows of this command.
           skipTest:
               (conn) => {
-                return !getBuildInfo().modules.includes("enterprise") 
+                return !getBuildInfo().modules.includes("enterprise")
                         || !TestData.setParameters.featureFlagOIDC;
               },
           testcases: [
@@ -5521,7 +5541,7 @@ export const authCommandsLib = {
           // Only enterprise knows of this command.
           skipTest:
               (conn) => {
-                return !getBuildInfo().modules.includes("enterprise") 
+                return !getBuildInfo().modules.includes("enterprise")
                     || !TestData.setParameters.featureFlagOIDC;
               },
           testcases: [

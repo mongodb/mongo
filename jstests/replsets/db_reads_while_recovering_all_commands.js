@@ -273,6 +273,7 @@ const allCommands = {
         expectFailure: true,
         expectedErrorCode: ErrorCodes.NotPrimaryOrSecondary
     },
+    getQueryableEncryptionCountInfo: {skip: isPrimaryOnly},
     getParameter: {skip: isNotAUserDataRead},
     getShardMap: {skip: isNotAUserDataRead},
     getShardVersion: {skip: isPrimaryOnly},

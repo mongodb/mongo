@@ -58,11 +58,7 @@ std::vector<std::vector<FLEEdgeCountInfo>> FLEQueryInterfaceMock::getTags(
     const std::vector<std::vector<FLEEdgePrfBlock>>& tokensSets,
     FLETagQueryInterface::TagQueryType type) {
 
-    auto docCount = countDocuments(nss);
-
-    TxnCollectionReader reader(docCount, this, nss);
-
-    return ESCCollection::getTags(reader, tokensSets, type);
+    return getTagsFromStorage(_opCtx, nss, tokensSets, type);
 }
 
 StatusWith<write_ops::InsertCommandReply> FLEQueryInterfaceMock::insertDocuments(

@@ -490,4 +490,13 @@ write_ops::UpdateCommandReply processUpdate(OperationContext* opCtx,
 void validateInsertUpdatePayloads(const std::vector<EncryptedField>& fields,
                                   const std::vector<EDCServerPayloadInfo>& payload);
 
+/**
+ * Get the tags from local storage.
+ */
+std::vector<std::vector<FLEEdgeCountInfo>> getTagsFromStorage(
+    OperationContext* opCtx,
+    const NamespaceStringOrUUID& nsOrUUID,
+    const std::vector<std::vector<FLEEdgePrfBlock>>& escDerivedFromDataTokens,
+    FLETagQueryInterface::TagQueryType type);
+
 }  // namespace mongo

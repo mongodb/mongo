@@ -258,6 +258,7 @@ let testCases = {
     getLog: {skip: "does not return user data"},
     getMore: {skip: "shard version already established"},
     getParameter: {skip: "does not return user data"},
+    getQueryableEncryptionCountInfo: {skip: "primary only"},
     getShardMap: {skip: "does not return user data"},
     getShardVersion: {skip: "primary only"},
     godinsert: {skip: "for testing only"},

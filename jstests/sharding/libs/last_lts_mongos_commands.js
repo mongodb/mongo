@@ -31,6 +31,7 @@ const commandsAddedToMongosSinceLastLTS = [
     "createSearchIndexes",
     "dropSearchIndex",
     "getClusterParameter",
+    "getQueryableEncryptionCountInfo",
     "listSearchIndexes",
     "mergeAllChunksOnShard",
     "moveRange",
