@@ -308,6 +308,10 @@ CounterMetric ttlCollSubpassesIncreasedPriority("ttl.collSubpassesIncreasedPrior
 
 using MtabType = TenantMigrationAccessBlocker::BlockerType;
 
+TTLMonitor::TTLMonitor()
+    : BackgroundJob(false /* selfDelete */),
+      _ttlMonitorSleepSecs(Seconds{ttlMonitorSleepSecs.load()}) {}
+
 TTLMonitor* TTLMonitor::get(ServiceContext* serviceCtx) {
     return getTTLMonitor(serviceCtx).get();
 }
@@ -323,19 +327,48 @@ void TTLMonitor::set(ServiceContext* serviceCtx, std::unique_ptr<TTLMonitor> mon
     ttlMonitor = std::move(monitor);
 }
 
+Status TTLMonitor::onUpdateTTLMonitorSleepSeconds(int newSleepSeconds) {
+    if (auto client = Client::getCurrent()) {
+        if (auto ttlMonitor = TTLMonitor::get(client->getServiceContext())) {
+            ttlMonitor->updateSleepSeconds(Seconds{newSleepSeconds});
+        }
+    }
+    return Status::OK();
+}
+
+void TTLMonitor::updateSleepSeconds(Seconds newSeconds) {
+    {
+        stdx::lock_guard lk(_stateMutex);
+        _ttlMonitorSleepSecs = newSeconds;
+    }
+    _notificationCV.notify_all();
+}
+
 void TTLMonitor::run() {
     ThreadClient tc(name(), getGlobalServiceContext());
     AuthorizationSession::get(cc())->grantInternalAuthorization(&cc());
 
     while (true) {
         {
-            // Wait until either ttlMonitorSleepSecs passes or a shutdown is requested.
-            auto deadline = Date_t::now() + Seconds(ttlMonitorSleepSecs.load());
+            auto startTime = Date_t::now();
+            // Wait until either ttlMonitorSleepSecs passes, a shutdown is requested, or the
+            // sleeping time has changed.
             stdx::unique_lock<Latch> lk(_stateMutex);
+            auto deadline = startTime + _ttlMonitorSleepSecs;
 
             MONGO_IDLE_THREAD_BLOCK;
-            _shuttingDownCV.wait_until(
-                lk, deadline.toSystemTimePoint(), [&] { return _shuttingDown; });
+            while (Date_t::now() <= deadline && !_shuttingDown) {
+                _notificationCV.wait_until(lk, deadline.toSystemTimePoint());
+                // Recompute the deadline in case the sleep time has changed since we started.
+                auto newDeadline = startTime + _ttlMonitorSleepSecs;
+                if (deadline != newDeadline) {
+                    LOGV2_INFO(7005501,
+                               "TTL sleep deadline has changed",
+                               "oldDeadline"_attr = deadline,
+                               "newDeadline"_attr = newDeadline);
+                    deadline = newDeadline;
+                }
+            }
 
             if (_shuttingDown) {
                 return;
@@ -374,7 +407,7 @@ void TTLMonitor::shutdown() {
     {
         stdx::lock_guard<Latch> lk(_stateMutex);
         _shuttingDown = true;
-        _shuttingDownCV.notify_one();
+        _notificationCV.notify_all();
     }
     wait();
     LOGV2(3684101, "Finished shutting down TTL collection monitor thread");

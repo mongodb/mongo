@@ -13,8 +13,10 @@ const TTLUtil = class {
      * @param {DB} db   Database connection.
      * @param {boolean} waitForMajorityCommit   Only applies when 'db' is from a replica set, set to
      *     false to disable waiting for TTL deletes to become majority commited.
+     * @param {number} timeoutMillis   timeout in milliseconds for the TTL wait. Defaults to
+     *     whatever value is used for assert.soon.
      */
-    static waitForPass(db, waitForMajorityCommit = true) {
+    static waitForPass(db, waitForMajorityCommit = true, timeoutMillis = undefined) {
         // The 'ttl.passes' metric is incremented when the TTL monitor has finished a pass.
         // Depending on the timing of the pass, seeing an increment of this metric might not
         // necessarily imply the data we are expecting to be deleted has been seen, as the TTL pass
@@ -23,7 +25,7 @@ const TTLUtil = class {
         const ttlPasses = db.serverStatus().metrics.ttl.passes;
         assert.soon(function() {
             return db.serverStatus().metrics.ttl.passes > ttlPasses + 1;
-        });
+        }, "Expected 2 TTL passes but achieved less than 2 in the given time", timeoutMillis);
 
         // Readers using a "majority" read concern might expect TTL deletes to be visible after
         // waitForPass. TTL writes do not imply 'majority' nor 'j: true', and are made durable by

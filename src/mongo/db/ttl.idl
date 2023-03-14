@@ -27,7 +27,8 @@
 
 global:
     cpp_namespace: mongo
-
+    cpp_includes:
+        - "mongo/db/ttl.h"
 server_parameters:
     ttlMonitorEnabled:
         description: "Enable the TTL monitor."
@@ -41,6 +42,7 @@ server_parameters:
         set_at: [ startup, runtime ]
         cpp_vartype: AtomicWord<int>
         cpp_varname: ttlMonitorSleepSecs
+        on_update: "TTLMonitor::onUpdateTTLMonitorSleepSeconds"
         default: 60
         validator:
             gt: 0
