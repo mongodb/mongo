@@ -31,6 +31,7 @@
 #pragma once
 
 #include "mongo/db/exec/bucket_unpacker.h"
+#include "mongo/db/exec/delete_stage.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/requires_collection_stage.h"
 
@@ -47,6 +48,7 @@ public:
     static const char* kStageType;
 
     TimeseriesModifyStage(ExpressionContext* expCtx,
+                          std::unique_ptr<DeleteStageParams> params,
                           WorkingSet* ws,
                           std::unique_ptr<PlanStage> child,
                           const CollectionPtr& coll,
@@ -68,15 +70,20 @@ public:
     PlanStage::StageState doWork(WorkingSetID* id);
 
 protected:
-    void doSaveStateRequiresCollection() final {}
+    void doSaveStateRequiresCollection() final {
+        _preWriteFilter.saveState();
+    }
 
-    void doRestoreStateRequiresCollection() final {}
+    void doRestoreStateRequiresCollection() final;
 
 private:
     /**
      * Writes the modifications to a bucket when the end of the bucket is detected.
      */
     void _writeToTimeseriesBuckets();
+
+    boost::optional<PlanStage::StageState> rememberIfWritingToOrphanedBucket(
+        WorkingSetMember* member);
 
     /**
      * Fetches the document for the bucket pointed to by this WSM.
@@ -87,6 +94,8 @@ private:
      * Gets the next bucket to process.
      */
     PlanStage::StageState _getNextBucket(WorkingSetID& id);
+
+    std::unique_ptr<DeleteStageParams> _params;
 
     WorkingSet* _ws;
 
@@ -110,6 +119,21 @@ private:
 
     std::vector<BSONObj> _unchangedMeasurements;
     std::vector<BSONObj> _deletedMeasurements;
+
+    /**
+     * This member is used to check whether the write should be performed, and if so, any other
+     * behavior that should be done as part of the write (e.g. skipping it because it affects an
+     * orphan document). A yield cannot happen between the check and the write, so the checks are
+     * embedded in the stage.
+     *
+     * It's refreshed after yielding and reacquiring the locks.
+     */
+    write_stage_common::PreWriteFilter _preWriteFilter;
+
+    // True if the current bucket is an orphan and we're writing to an orphaned bucket, when such
+    // writes should be excluded from user-visible change stream events. This can be achieved by
+    // setting 'fromMigrate' flag when calling performAtomicWrites().
+    bool _currentBucketFromMigrate = false;
 
     TimeseriesModifyStats _specificStats{};
 };

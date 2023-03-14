@@ -37,15 +37,18 @@ namespace mongo {
 const char* TimeseriesModifyStage::kStageType = "TS_MODIFY";
 
 TimeseriesModifyStage::TimeseriesModifyStage(ExpressionContext* expCtx,
+                                             std::unique_ptr<DeleteStageParams> params,
                                              WorkingSet* ws,
                                              std::unique_ptr<PlanStage> child,
                                              const CollectionPtr& coll,
                                              BucketUnpacker bucketUnpacker,
                                              std::unique_ptr<MatchExpression> residualPredicate)
     : RequiresCollectionStage(kStageType, expCtx, coll),
+      _params(std::move(params)),
       _ws(ws),
       _bucketUnpacker{std::move(bucketUnpacker)},
-      _residualPredicate(std::move(residualPredicate)) {
+      _residualPredicate(std::move(residualPredicate)),
+      _preWriteFilter(opCtx(), coll->ns()) {
     _children.emplace_back(std::move(child));
 }
 
@@ -69,7 +72,12 @@ void TimeseriesModifyStage::_writeToTimeseriesBuckets() {
         _specificStats.measurementsDeleted += _deletedMeasurements.size();
         _deletedMeasurements.clear();
         _unchangedMeasurements.clear();
+        _currentBucketFromMigrate = false;
     });
+
+    if (_params->isExplain) {
+        return;
+    }
 
     // No measurements needed to be deleted from the bucket document.
     if (_deletedMeasurements.empty()) {
@@ -82,7 +90,7 @@ void TimeseriesModifyStage::_writeToTimeseriesBuckets() {
         write_ops::DeleteCommandRequest op(collection()->ns(), {deleteEntry});
         // TODO (SERVER-73093): Handles the write failures through retry.
         auto result = timeseries::performAtomicWrites(
-            opCtx(), collection(), _currentBucketRid, op, /*fromMigrate=*/false);
+            opCtx(), collection(), _currentBucketRid, op, _currentBucketFromMigrate);
     } else {
         auto timeseriesOptions = collection()->getTimeseriesOptions();
         auto metaFieldName = timeseriesOptions->getMetaField();
@@ -100,8 +108,40 @@ void TimeseriesModifyStage::_writeToTimeseriesBuckets() {
         write_ops::UpdateCommandRequest op(collection()->ns(), {updateEntry});
         // TODO (SERVER-73093): Handles the write failures through retry.
         auto result = timeseries::performAtomicWrites(
-            opCtx(), collection(), _currentBucketRid, op, /*fromMigrate=*/false);
+            opCtx(), collection(), _currentBucketRid, op, _currentBucketFromMigrate);
     }
+}
+
+boost::optional<PlanStage::StageState> TimeseriesModifyStage::rememberIfWritingToOrphanedBucket(
+    WorkingSetMember* member) {
+    // If we are in explain mode, we do not need to check if the bucket is orphaned since we're not
+    // writing to bucket. If we are migrating a bucket, we also do not need to check if the bucket
+    // is not writable and just remember it.
+    if (_params->isExplain || _params->fromMigrate) {
+        _currentBucketFromMigrate = _params->fromMigrate;
+        return boost::none;
+    }
+
+    auto [immediateReturnStageState, currentBucketFromMigrate] =
+        _preWriteFilter.checkIfNotWritable(member->doc.value(),
+                                           "timeseriesDelete"_sd,
+                                           collection()->ns(),
+                                           [&](const ExceptionFor<ErrorCodes::StaleConfig>& ex) {
+                                               planExecutorShardingCriticalSectionFuture(opCtx()) =
+                                                   ex->getCriticalSectionSignal();
+                                               // TODO (SERVER-73093): Retry the write if we're in
+                                               // the sharding critical section.
+                                           });
+
+    // We need to immediately return if the bucket is orphaned or we're in the sharding critical
+    // section and hence should yield.
+    if (immediateReturnStageState) {
+        return *immediateReturnStageState;
+    }
+
+    _currentBucketFromMigrate = currentBucketFromMigrate;
+
+    return boost::none;
 }
 
 PlanStage::StageState TimeseriesModifyStage::_fetchBucket(WorkingSetID id) {
@@ -159,8 +199,18 @@ PlanStage::StageState TimeseriesModifyStage::doWork(WorkingSetID* out) {
         auto status = _getNextBucket(id);
 
         if (PlanStage::ADVANCED == status) {
+            // We want to free this member when we return because we either have an owned copy of
+            // the bucket for normal write and write to orphan cases, or we skip the bucket, or we
+            // don't retry as of now.
+            // TODO (SERVER-73093): Need to dismiss 'memberFreer' if we're going to retry the write.
+            ScopeGuard memberFreer([&] { _ws->free(id); });
+
             auto member = _ws->get(id);
             tassert(7459100, "Expected a RecordId from the child stage", member->hasRecordId());
+
+            if (auto immediateReturnStageState = rememberIfWritingToOrphanedBucket(member)) {
+                return *immediateReturnStageState;
+            }
             _currentBucketRid = member->recordId;
 
             // Make an owned copy of the bucket document if necessary. The bucket will be
@@ -187,5 +237,15 @@ PlanStage::StageState TimeseriesModifyStage::doWork(WorkingSetID* out) {
     }
 
     return PlanStage::NEED_TIME;
+}
+
+void TimeseriesModifyStage::doRestoreStateRequiresCollection() {
+    const NamespaceString& ns = collection()->ns();
+    uassert(ErrorCodes::PrimarySteppedDown,
+            "Demoted from primary while removing from {}"_format(ns.ns()),
+            !opCtx()->writesAreReplicated() ||
+                repl::ReplicationCoordinator::get(opCtx())->canAcceptWritesFor(opCtx(), ns));
+
+    _preWriteFilter.restoreState();
 }
 }  // namespace mongo

@@ -1983,6 +1983,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
         // directly.
         root = std::make_unique<TimeseriesModifyStage>(
             expCtxRaw,
+            std::move(deleteStageParams),
             ws.get(),
             std::move(root),
             collection,
