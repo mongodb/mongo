@@ -199,35 +199,3 @@
         if ((source)->prepare != 0)                                                           \
             (dest)->prepare = 1;                                                              \
     } while (0)
-
-/* Abstract away checking whether all records in an aggregated time window have been deleted. */
-#define WT_TIME_AGGREGATE_ALL_DELETED(ta) ((ta)->newest_stop_ts != WT_TS_MAX)
-
-/*
- * Update a time aggregate in preparation for an obsolete visibility check. This deserves a macro,
- * since the mechanism for identifying whether an aggregated time window contains only obsolete (i.e
- * deleted) data requires checking two different timestamps. Note the output time aggregate might be
- * either empty initialized, or have been populated via prior calls to this macro with other
- * aggregated windows.
- */
-#define WT_TIME_AGGREGATE_MERGE_OBSOLETE_VISIBLE(session, out_ta, in_ta)                         \
-    do {                                                                                         \
-        WT_ASSERT(session, (out_ta)->init_merge == 1);                                           \
-        (out_ta)->newest_stop_durable_ts =                                                       \
-          WT_MAX((out_ta)->newest_stop_durable_ts, (in_ta)->newest_stop_durable_ts);             \
-        /*                                                                                       \
-         * The durable and non-durable stop timestamps are interestingly different in that the   \
-         * non-durable version encodes whether all records are deleted by setting WT_TS_MAX in   \
-         * there are non-deleted records (the common case), but durable doesn't and records the  \
-         * largest timestamp associated with any deleted record. Use this copy-macro to abstract \
-         * that subtlety away. Since obsolete checks always want to know whether all content was \
-         * removed, copy that semantic into the durable stop timestamp to make visibility        \
-         * checking sensible.                                                                    \
-         */                                                                                      \
-        if (!WT_TIME_AGGREGATE_ALL_DELETED((in_ta)))                                             \
-            (out_ta)->newest_stop_durable_ts = WT_TS_MAX;                                        \
-                                                                                                 \
-        (out_ta)->newest_txn = WT_MAX((out_ta)->newest_txn, (in_ta)->newest_txn);                \
-        (out_ta)->newest_stop_ts = WT_MAX((out_ta)->newest_stop_ts, (in_ta)->newest_stop_ts);    \
-        (out_ta)->newest_stop_txn = WT_MAX((out_ta)->newest_stop_txn, (in_ta)->newest_stop_txn); \
-    } while (0)
