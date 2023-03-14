@@ -263,13 +263,21 @@ void IndexCatalogImpl::init(OperationContext* opCtx,
 
         bool ready = collection->isIndexReady(indexName);
         if (!ready) {
-            auto buildUUID = collection->getIndexBuildUUID(indexName);
-            invariant(buildUUID,
-                      str::stream() << "collection: " << collection->ns() << "index:" << indexName);
+            if (!isPointInTimeRead) {
+                // When initializing the indexes at the latest timestamp for existing collections,
+                // the only non-ready indexes will be two-phase index builds. Unfinished
+                // single-phase index builds are dropped during startup and rollback.
+                auto buildUUID = collection->getIndexBuildUUID(indexName);
+                invariant(buildUUID,
+                          str::stream()
+                              << "collection: " << collection->ns() << "index:" << indexName);
+            }
+
             // We intentionally do not drop or rebuild unfinished two-phase index builds before
             // initializing the IndexCatalog when starting a replica set member in standalone mode.
             // This is because the index build cannot complete until it receives a replicated commit
-            // or abort oplog entry.
+            // or abort oplog entry. When performing a point-in-time read, this non-ready index may
+            // represent a single-phase index build.
             if (replSetMemberInStandaloneMode) {
                 // Indicate that this index is "frozen". It is not ready but is not currently in
                 // progress either. These indexes may be dropped.
