@@ -789,234 +789,24 @@ print_missing(REPORT *r, const char *fname, const char *msg)
 }
 
 /*
- * handler --
- *     Signal handler to catch if the child died unexpectedly.
+ * recover_and_verify --
+ *     Run the recovery and verify the database.
  */
-static void
-handler(int sig)
+static int
+recover_and_verify(void)
 {
-    pid_t pid;
-
-    WT_UNUSED(sig);
-    pid = wait(NULL);
-    /*
-     * The core file will indicate why the child exited. Choose EINVAL here.
-     */
-    testutil_die(EINVAL, "Child process %" PRIu64 " abnormally exited", (uint64_t)pid);
-}
-
-/*
- * main --
- *     TODO: Add a comment describing this function.
- */
-int
-main(int argc, char *argv[])
-{
-    struct sigaction sa;
-    struct stat sb;
     FILE *fp;
     REPORT c_rep[MAX_TH], l_rep[MAX_TH], o_rep[MAX_TH];
     WT_CONNECTION *conn;
     WT_CURSOR *cur_coll, *cur_local, *cur_oplog, *cur_shadow;
-    WT_LAZY_FS lazyfs;
     WT_SESSION *session;
-    pid_t pid;
     uint64_t absent_coll, absent_local, absent_oplog, absent_shadow, count, key, last_key;
     uint64_t commit_fp, durable_fp, stable_val;
-    uint32_t i, rand_value, timeout;
-    int ch, status, ret;
-    char buf[PATH_MAX], fname[64], kname[64], statname[1024], bucket[512];
-    char cwd_start[PATH_MAX]; /* The working directory when we started */
+    uint32_t i;
+    int ret;
+    char buf[PATH_MAX], fname[64], kname[64];
     char ts_string[WT_TS_HEX_STRING_SIZE];
-    bool fatal, rand_th, rand_time, verify_only;
-
-    (void)testutil_set_progname(argv);
-
-    opts = &_opts;
-    memset(opts, 0, sizeof(*opts));
-
-    columns = stress = false;
-    use_lazyfs = lazyfs_is_implicitly_enabled();
-    use_ts = true;
-    nth = MIN_TH;
-    rand_th = rand_time = true;
-    timeout = MIN_TIME;
-    verify_only = false;
-
-    testutil_parse_begin_opt(argc, argv, SHARED_PARSE_OPTIONS, opts);
-
-    while ((ch = __wt_getopt(progname, argc, argv, "cLlsT:t:vz" SHARED_PARSE_OPTIONS)) != EOF)
-        switch (ch) {
-        case 'c':
-            /* Variable-length columns only (for now) */
-            columns = true;
-            break;
-        case 'L':
-            table_pfx = "lsm";
-            break;
-        case 'l':
-            use_lazyfs = true;
-            break;
-        case 's':
-            stress = true;
-            break;
-        case 'T':
-            rand_th = false;
-            nth = (uint32_t)atoi(__wt_optarg);
-            if (nth > MAX_TH) {
-                fprintf(
-                  stderr, "Number of threads is larger than the maximum %" PRId32 "\n", MAX_TH);
-                return (EXIT_FAILURE);
-            }
-            break;
-        case 't':
-            rand_time = false;
-            timeout = (uint32_t)atoi(__wt_optarg);
-            break;
-        case 'v':
-            verify_only = true;
-            break;
-        case 'z':
-            use_ts = false;
-            break;
-        default:
-            /* The option is either one that we're asking testutil to support, or illegal. */
-            if (testutil_parse_single_opt(opts, ch) != 0)
-                usage();
-        }
-    argc -= __wt_optind;
-    if (argc != 0)
-        usage();
-
-    /*
-     * Among other things, this initializes the random number generators in the option structure.
-     */
-    testutil_parse_end_opt(opts);
-
-    testutil_work_dir_from_path(home, sizeof(home), opts->home);
-
-    /*
-     * If the user wants to verify they need to tell us how many threads there were so we can find
-     * the old record files.
-     */
-    if (verify_only && rand_th) {
-        fprintf(stderr, "Verify option requires specifying number of threads\n");
-        exit(EXIT_FAILURE);
-    }
-
-    /* Remember the current working directory. */
-    testutil_assert_errno(getcwd(cwd_start, sizeof(cwd_start)) != NULL);
-
-    /* Create the database, run the test, and fail. */
-    if (!verify_only) {
-        /* Create the test's home directory. */
-        testutil_make_work_dir(home);
-
-        /* Set up the test subdirectories. */
-        testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/%s", home, RECORDS_DIR));
-        testutil_make_work_dir(buf);
-        testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/%s", home, WT_HOME_DIR));
-        testutil_make_work_dir(buf);
-
-        /* Set up LazyFS. */
-        if (use_lazyfs)
-            testutil_lazyfs_setup(&lazyfs, home);
-
-        if (opts->tiered_storage) {
-            testutil_check(
-              __wt_snprintf(bucket, sizeof(bucket), "%s/%s/bucket", home, WT_HOME_DIR));
-            testutil_make_work_dir(bucket);
-        }
-
-        if (rand_time) {
-            timeout = __wt_random(&opts->extra_rnd) % MAX_TIME;
-            if (timeout < MIN_TIME)
-                timeout = MIN_TIME;
-        }
-
-        /*
-         * We unconditionally grab a random value to be used for the thread count to keep the RNG in
-         * sync for all runs. If we are run first without having a thread count or random seed
-         * argument, then when we rerun (with the thread count and random seed that was output),
-         * we'll have the same results.
-         *
-         * We use the data random generator because the number of threads affects the data for this
-         * test.
-         */
-        rand_value = __wt_random(&opts->data_rnd);
-        if (rand_th) {
-            nth = rand_value % MAX_TH;
-            if (nth < MIN_TH)
-                nth = MIN_TH;
-        }
-
-        printf(
-          "Parent: compatibility: %s, in-mem log sync: %s, add timing stress: %s, timestamp in "
-          "use: %s\n",
-          opts->compat ? "true" : "false", opts->inmem ? "true" : "false",
-          stress ? "true" : "false", use_ts ? "true" : "false");
-        printf("Parent: Create %" PRIu32 " threads; sleep %" PRIu32 " seconds\n", nth, timeout);
-        printf("CONFIG: %s%s%s%s%s%s%s%s -h %s -T %" PRIu32 " -t %" PRIu32 " " TESTUTIL_SEED_FORMAT
-               "\n",
-          progname, opts->compat ? " -C" : "", columns ? " -c" : "", use_lazyfs ? " -l" : "",
-          opts->inmem ? " -m" : "", opts->tiered_storage ? " -PT" : "", stress ? " -s" : "",
-          !use_ts ? " -z" : "", opts->home, nth, timeout, opts->data_seed, opts->extra_seed);
-        /*
-         * Fork a child to insert as many items. We will then randomly kill the child, run recovery
-         * and make sure all items we wrote exist after recovery runs.
-         */
-        memset(&sa, 0, sizeof(sa));
-        sa.sa_handler = handler;
-        testutil_assert_errno(sigaction(SIGCHLD, &sa, NULL) == 0);
-        testutil_assert_errno((pid = fork()) >= 0);
-
-        if (pid == 0) { /* child */
-            run_workload();
-            /* NOTREACHED */
-        }
-
-        /* parent */
-        /*
-         * Sleep for the configured amount of time before killing the child. Start the timeout from
-         * the time we notice that the file has been created. That allows the test to run correctly
-         * on really slow machines.
-         */
-        testutil_check(__wt_snprintf(statname, sizeof(statname), "%s/%s", home, ckpt_file));
-        while (stat(statname, &sb) != 0)
-            testutil_sleep_wait(1, pid);
-        sleep(timeout);
-        sa.sa_handler = SIG_DFL;
-        testutil_assert_errno(sigaction(SIGCHLD, &sa, NULL) == 0);
-
-        /*
-         * !!! It should be plenty long enough to make sure more than
-         * one log file exists.  If wanted, that check would be added
-         * here.
-         */
-        printf("Kill child\n");
-        testutil_assert_errno(kill(pid, SIGKILL) == 0);
-        testutil_assert_errno(waitpid(pid, &status, 0) != -1);
-    }
-
-    /*
-     * !!! If we wanted to take a copy of the directory before recovery,
-     * this is the place to do it. Don't do it all the time because
-     * it can use a lot of disk space, which can cause test machine
-     * issues.
-     */
-    if (chdir(home) != 0)
-        testutil_die(errno, "parent chdir: %s", home);
-
-    /* Copy the data to a separate folder for debugging purpose. */
-    testutil_copy_data(home);
-
-    /*
-     * Clear the cache, if we are using LazyFS. Do this after we save the data for debugging
-     * purposes, so that we can see what we might have lost. If we are using LazyFS, the underlying
-     * directory shows the state that we'd get after we clear the cache.
-     */
-    if (!verify_only && use_lazyfs)
-        testutil_lazyfs_clear_cache(&lazyfs);
+    bool fatal;
 
     printf("Open database and run recovery\n");
 
@@ -1026,9 +816,11 @@ main(int argc, char *argv[])
     testutil_wiredtiger_open(opts, WT_HOME_DIR, NULL, &my_event, &conn, true, false);
 
     printf("Connection open and recovery complete. Verify content\n");
+
     /* Sleep to guarantee the statistics thread has enough time to run. */
     usleep(USEC_STAT + 10);
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
+
     /*
      * Open a cursor on all the tables.
      */
@@ -1234,6 +1026,237 @@ main(int argc, char *argv[])
         ret = EXIT_SUCCESS;
         printf("%" PRIu64 " records verified\n", count);
     }
+
+    return (ret);
+}
+
+/*
+ * handler --
+ *     Signal handler to catch if the child died unexpectedly.
+ */
+static void
+handler(int sig)
+{
+    pid_t pid;
+
+    WT_UNUSED(sig);
+    pid = wait(NULL);
+    /*
+     * The core file will indicate why the child exited. Choose EINVAL here.
+     */
+    testutil_die(EINVAL, "Child process %" PRIu64 " abnormally exited", (uint64_t)pid);
+}
+
+/*
+ * main --
+ *     TODO: Add a comment describing this function.
+ */
+int
+main(int argc, char *argv[])
+{
+    struct sigaction sa;
+    struct stat sb;
+    WT_LAZY_FS lazyfs;
+    pid_t pid;
+    uint32_t rand_value, timeout;
+    int ch, status, ret;
+    char buf[PATH_MAX], bucket[512], statname[1024];
+    char cwd_start[PATH_MAX]; /* The working directory when we started */
+    bool rand_th, rand_time, verify_only;
+
+    (void)testutil_set_progname(argv);
+
+    opts = &_opts;
+    memset(opts, 0, sizeof(*opts));
+
+    columns = stress = false;
+    use_lazyfs = lazyfs_is_implicitly_enabled();
+    use_ts = true;
+    nth = MIN_TH;
+    rand_th = rand_time = true;
+    timeout = MIN_TIME;
+    verify_only = false;
+
+    testutil_parse_begin_opt(argc, argv, SHARED_PARSE_OPTIONS, opts);
+
+    while ((ch = __wt_getopt(progname, argc, argv, "cLlsT:t:vz" SHARED_PARSE_OPTIONS)) != EOF)
+        switch (ch) {
+        case 'c':
+            /* Variable-length columns only (for now) */
+            columns = true;
+            break;
+        case 'L':
+            table_pfx = "lsm";
+            break;
+        case 'l':
+            use_lazyfs = true;
+            break;
+        case 's':
+            stress = true;
+            break;
+        case 'T':
+            rand_th = false;
+            nth = (uint32_t)atoi(__wt_optarg);
+            if (nth > MAX_TH) {
+                fprintf(
+                  stderr, "Number of threads is larger than the maximum %" PRId32 "\n", MAX_TH);
+                return (EXIT_FAILURE);
+            }
+            break;
+        case 't':
+            rand_time = false;
+            timeout = (uint32_t)atoi(__wt_optarg);
+            break;
+        case 'v':
+            verify_only = true;
+            break;
+        case 'z':
+            use_ts = false;
+            break;
+        default:
+            /* The option is either one that we're asking testutil to support, or illegal. */
+            if (testutil_parse_single_opt(opts, ch) != 0)
+                usage();
+        }
+    argc -= __wt_optind;
+    if (argc != 0)
+        usage();
+
+    /*
+     * Among other things, this initializes the random number generators in the option structure.
+     */
+    testutil_parse_end_opt(opts);
+
+    testutil_work_dir_from_path(home, sizeof(home), opts->home);
+
+    /*
+     * If the user wants to verify they need to tell us how many threads there were so we can find
+     * the old record files.
+     */
+    if (verify_only && rand_th) {
+        fprintf(stderr, "Verify option requires specifying number of threads\n");
+        exit(EXIT_FAILURE);
+    }
+
+    /* Remember the current working directory. */
+    testutil_assert_errno(getcwd(cwd_start, sizeof(cwd_start)) != NULL);
+
+    /* Create the database, run the test, and fail. */
+    if (!verify_only) {
+        /* Create the test's home directory. */
+        testutil_make_work_dir(home);
+
+        /* Set up the test subdirectories. */
+        testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/%s", home, RECORDS_DIR));
+        testutil_make_work_dir(buf);
+        testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/%s", home, WT_HOME_DIR));
+        testutil_make_work_dir(buf);
+
+        /* Set up LazyFS. */
+        if (use_lazyfs)
+            testutil_lazyfs_setup(&lazyfs, home);
+
+        if (opts->tiered_storage) {
+            testutil_check(
+              __wt_snprintf(bucket, sizeof(bucket), "%s/%s/bucket", home, WT_HOME_DIR));
+            testutil_make_work_dir(bucket);
+        }
+
+        if (rand_time) {
+            timeout = __wt_random(&opts->extra_rnd) % MAX_TIME;
+            if (timeout < MIN_TIME)
+                timeout = MIN_TIME;
+        }
+
+        /*
+         * We unconditionally grab a random value to be used for the thread count to keep the RNG in
+         * sync for all runs. If we are run first without having a thread count or random seed
+         * argument, then when we rerun (with the thread count and random seed that was output),
+         * we'll have the same results.
+         *
+         * We use the data random generator because the number of threads affects the data for this
+         * test.
+         */
+        rand_value = __wt_random(&opts->data_rnd);
+        if (rand_th) {
+            nth = rand_value % MAX_TH;
+            if (nth < MIN_TH)
+                nth = MIN_TH;
+        }
+
+        printf(
+          "Parent: compatibility: %s, in-mem log sync: %s, add timing stress: %s, timestamp in "
+          "use: %s\n",
+          opts->compat ? "true" : "false", opts->inmem ? "true" : "false",
+          stress ? "true" : "false", use_ts ? "true" : "false");
+        printf("Parent: Create %" PRIu32 " threads; sleep %" PRIu32 " seconds\n", nth, timeout);
+        printf("CONFIG: %s%s%s%s%s%s%s%s -h %s -T %" PRIu32 " -t %" PRIu32 " " TESTUTIL_SEED_FORMAT
+               "\n",
+          progname, opts->compat ? " -C" : "", columns ? " -c" : "", use_lazyfs ? " -l" : "",
+          opts->inmem ? " -m" : "", opts->tiered_storage ? " -PT" : "", stress ? " -s" : "",
+          !use_ts ? " -z" : "", opts->home, nth, timeout, opts->data_seed, opts->extra_seed);
+
+        /*
+         * Fork a child to insert as many items. We will then randomly kill the child, run recovery
+         * and make sure all items we wrote exist after recovery runs.
+         */
+        memset(&sa, 0, sizeof(sa));
+        sa.sa_handler = handler;
+        testutil_assert_errno(sigaction(SIGCHLD, &sa, NULL) == 0);
+        testutil_assert_errno((pid = fork()) >= 0);
+
+        if (pid == 0) { /* child */
+            run_workload();
+            /* NOTREACHED */
+        }
+
+        /* parent */
+        /*
+         * Sleep for the configured amount of time before killing the child. Start the timeout from
+         * the time we notice that the file has been created. That allows the test to run correctly
+         * on really slow machines.
+         */
+        testutil_check(__wt_snprintf(statname, sizeof(statname), "%s/%s", home, ckpt_file));
+        while (stat(statname, &sb) != 0)
+            testutil_sleep_wait(1, pid);
+        sleep(timeout);
+        sa.sa_handler = SIG_DFL;
+        testutil_assert_errno(sigaction(SIGCHLD, &sa, NULL) == 0);
+
+        /*
+         * !!! It should be plenty long enough to make sure more than
+         * one log file exists.  If wanted, that check would be added
+         * here.
+         */
+        printf("Kill child\n");
+        testutil_assert_errno(kill(pid, SIGKILL) == 0);
+        testutil_assert_errno(waitpid(pid, &status, 0) != -1);
+    }
+
+    /*
+     * !!! If we wanted to take a copy of the directory before recovery,
+     * this is the place to do it. Don't do it all the time because
+     * it can use a lot of disk space, which can cause test machine
+     * issues.
+     */
+    if (chdir(home) != 0)
+        testutil_die(errno, "parent chdir: %s", home);
+
+    /* Copy the data to a separate folder for debugging purpose. */
+    testutil_copy_data(home);
+
+    /*
+     * Clear the cache, if we are using LazyFS. Do this after we save the data for debugging
+     * purposes, so that we can see what we might have lost. If we are using LazyFS, the underlying
+     * directory shows the state that we'd get after we clear the cache.
+     */
+    if (!verify_only && use_lazyfs)
+        testutil_lazyfs_clear_cache(&lazyfs);
+
+    /*
+     * Recover and verify the database.
+     */
+    ret = recover_and_verify();
 
     /*
      * Clean up.
