@@ -39,11 +39,9 @@
 
 
 namespace mongo::optimizer {
-using PartialSchemaSelHints = ce::PartialSchemaSelHints;
-
 namespace {
-// Default selectivity of predicates used by HintedCE to force certain plans.
-constexpr SelectivityType kDefaultSelectivity{0.1};
+
+using namespace unit_test_abt_literals;
 
 TEST(PhysRewriter, PhysicalRewriterBasic) {
     using namespace properties;
@@ -1496,7 +1494,6 @@ TEST(PhysRewriter, FilterIndexingMaxKey) {
 
 TEST(PhysRewriter, FilterIndexingRIN) {
     using namespace properties;
-    using namespace unit_test_abt_literals;
     auto prefixId = PrefixId::createForTests();
 
     // Construct a query which tests "a" > 1 and "c" > 2 and "e" = 3.
@@ -1588,7 +1585,6 @@ TEST(PhysRewriter, FilterIndexingRIN) {
 
 TEST(PhysRewriter, FilterIndexingRIN1) {
     using namespace properties;
-    using namespace unit_test_abt_literals;
     auto prefixId = PrefixId::createForTests();
 
     // Construct a query which tests "a" > 1 and "b" > 2, and sorts descending on "a", then
@@ -1658,7 +1654,6 @@ TEST(PhysRewriter, FilterIndexingRIN1) {
 
 TEST(PhysRewriter, FilterIndexingRIN2) {
     using namespace properties;
-    using namespace unit_test_abt_literals;
     auto prefixId = PrefixId::createForTests();
 
     // Construct a query which tests "a" in [1, 2] U [3, 4] and "b" in [5, 6] U [7, 8].
@@ -1877,7 +1872,7 @@ TEST(PhysRewriter, FilterReorder) {
 
     ABT result = make<ScanNode>("root", "c1");
 
-    PartialSchemaSelHints hints;
+    ce::PartialSchemaSelHints hints;
     static constexpr size_t kFilterCount = 5;
     for (size_t i = 0; i < kFilterCount; i++) {
         ProjectionName projName = prefixId.getNextId("field");
@@ -1956,7 +1951,7 @@ TEST(PhysRewriter, CoveredScan) {
     using namespace properties;
     auto prefixId = PrefixId::createForTests();
 
-    PartialSchemaSelHints hints;
+    ce::PartialSchemaSelHints hints;
     hints.emplace(PartialSchemaKey{"root", make<PathGet>("a", make<PathIdentity>())},
                   SelectivityType{0.01});
 
@@ -2198,7 +2193,6 @@ TEST(PhysRewriter, EvalIndexing2) {
 
 TEST(PhysRewriter, EvalIndexing3) {
     using namespace properties;
-    using namespace unit_test_abt_literals;
     auto prefixId = PrefixId::createForTests();
 
     ABT rootNode = NodeBuilder{}
@@ -2241,7 +2235,7 @@ TEST(PhysRewriter, MultiKeyIndex) {
     using namespace properties;
     auto prefixId = PrefixId::createForTests();
 
-    PartialSchemaSelHints hints;
+    ce::PartialSchemaSelHints hints;
     hints.emplace(PartialSchemaKey{"root", make<PathGet>("a", make<PathIdentity>())},
                   kDefaultSelectivity);
     hints.emplace(PartialSchemaKey{"root", make<PathGet>("b", make<PathIdentity>())},
@@ -2662,7 +2656,7 @@ TEST(PhysRewriter, CompoundIndex4Negative) {
     using namespace properties;
     auto prefixId = PrefixId::createForTests();
 
-    PartialSchemaSelHints hints;
+    ce::PartialSchemaSelHints hints;
     hints.emplace(PartialSchemaKey{"root", make<PathGet>("a", make<PathIdentity>())},
                   SelectivityType{0.05});
     hints.emplace(PartialSchemaKey{"root", make<PathGet>("b", make<PathIdentity>())},
@@ -2740,8 +2734,6 @@ TEST(PhysRewriter, CompoundIndex4Negative) {
 
 TEST(PhysRewriter, CompoundIndex5) {
     using namespace properties;
-    using namespace unit_test_abt_literals;
-
     auto prefixId = PrefixId::createForTests();
 
     // Test the following scenario: (a = 0 or a = 1) and (b = 2 or b = 3) over a compound index on
@@ -3070,8 +3062,6 @@ TEST(PhysRewriter, IndexBoundsIntersect3) {
 
 TEST(PhysRewriter, IndexBoundsIntersect4) {
     using namespace properties;
-    using namespace unit_test_abt_literals;
-
     auto prefixId = PrefixId::createForTests();
 
     ABT rootNode = NodeBuilder{}
@@ -3824,7 +3814,7 @@ TEST(PhysRewriter, NestedElemMatch) {
 TEST(PhysRewriter, PathObj) {
     using namespace properties;
 
-    PartialSchemaSelHints hints;
+    ce::PartialSchemaSelHints hints;
     hints.emplace(PartialSchemaKey{"root", make<PathGet>("a", make<PathIdentity>())},
                   kDefaultSelectivity);
 
@@ -4023,535 +4013,6 @@ TEST(PhysRewriter, ArrayConstantNoIndex) {
         "|   Const [0]\n"
         "PhysicalScan [{'<root>': root, 'b': evalTemp_1}, c1]\n",
         optimized);
-}
-
-TEST(PhysRewriter, ParallelScan) {
-    using namespace properties;
-    auto prefixId = PrefixId::createForTests();
-
-    ABT scanNode = make<ScanNode>("root", "c1");
-
-    ABT filterNode = make<FilterNode>(
-        make<EvalFilter>(make<PathGet>("a",
-                                       make<PathTraverse>(
-                                           PathTraverse::kSingleLevel,
-                                           make<PathCompare>(Operations::Eq, Constant::int64(1)))),
-                         make<Variable>("root")),
-        std::move(scanNode));
-
-    ABT rootNode =
-        make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterNode));
-
-    auto phaseManager = makePhaseManager(
-        {OptPhase::MemoSubstitutionPhase,
-         OptPhase::MemoExplorationPhase,
-         OptPhase::MemoImplementationPhase},
-        prefixId,
-        {{{"c1",
-           createScanDef({}, {}, ConstEval::constFold, {DistributionType::UnknownPartitioning})}},
-         5 /*numberOfPartitions*/},
-        boost::none /*costModel*/,
-        {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
-
-    ABT optimized = rootNode;
-    phaseManager.optimize(optimized);
-    ASSERT_EQ(4, phaseManager.getMemo().getStats()._physPlanExplorationCount);
-
-    ASSERT_EXPLAIN_V2_AUTO(
-        "Root [{root}]\n"
-        "Exchange []\n"
-        "|   |   distribution: \n"
-        "|   |       type: Centralized\n"
-        "Filter []\n"
-        "|   EvalFilter []\n"
-        "|   |   Variable [evalTemp_0]\n"
-        "|   PathTraverse [1]\n"
-        "|   PathCompare [Eq]\n"
-        "|   Const [1]\n"
-        "PhysicalScan [{'<root>': root, 'a': evalTemp_0}, c1, parallel]\n",
-        optimized);
-}
-
-TEST(PhysRewriter, HashPartitioning) {
-    using namespace properties;
-    auto prefixId = PrefixId::createForTests();
-
-    ABT scanNode = make<ScanNode>("root", "c1");
-
-    ABT projectionANode = make<EvaluationNode>(
-        "pa",
-        make<EvalPath>(make<PathGet>("a", make<PathIdentity>()), make<Variable>("root")),
-        std::move(scanNode));
-    ABT projectionBNode = make<EvaluationNode>(
-        "pb",
-        make<EvalPath>(make<PathGet>("b", make<PathIdentity>()), make<Variable>("root")),
-        std::move(projectionANode));
-
-    ABT groupByNode = make<GroupByNode>(ProjectionNameVector{"pa"},
-                                        ProjectionNameVector{"pc"},
-                                        makeSeq(make<Variable>("pb")),
-                                        std::move(projectionBNode));
-
-    ABT rootNode =
-        make<RootNode>(ProjectionRequirement{ProjectionNameVector{"pc"}}, std::move(groupByNode));
-
-    auto phaseManager = makePhaseManager(
-        {OptPhase::MemoSubstitutionPhase,
-         OptPhase::MemoExplorationPhase,
-         OptPhase::MemoImplementationPhase},
-        prefixId,
-        {{{"c1",
-           createScanDef({},
-                         {},
-                         ConstEval::constFold,
-                         {DistributionType::HashPartitioning,
-                          makeSeq(make<PathGet>("a", make<PathIdentity>()))})}},
-         5 /*numberOfPartitions*/},
-        boost::none /*costModel*/,
-        {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
-
-    ABT optimized = rootNode;
-    phaseManager.optimize(optimized);
-    ASSERT_BETWEEN(5, 10, phaseManager.getMemo().getStats()._physPlanExplorationCount);
-
-    ASSERT_EXPLAIN_V2_AUTO(
-        "Root [{pc}]\n"
-        "Exchange []\n"
-        "|   |   distribution: \n"
-        "|   |       type: Centralized\n"
-        "GroupBy [{pa}]\n"
-        "|   aggregations: \n"
-        "|       [pc]\n"
-        "|           Variable [pb]\n"
-        "PhysicalScan [{'a': pa, 'b': pb}, c1]\n",
-        optimized);
-}
-
-TEST(PhysRewriter, IndexPartitioning0) {
-    using namespace properties;
-    auto prefixId = PrefixId::createForTests();
-
-    PartialSchemaSelHints hints;
-    hints.emplace(PartialSchemaKey{"root", make<PathGet>("a", make<PathIdentity>())},
-                  kDefaultSelectivity);
-    hints.emplace(PartialSchemaKey{"root", make<PathGet>("b", make<PathIdentity>())},
-                  kDefaultSelectivity);
-
-    ABT scanNode = make<ScanNode>("root", "c1");
-
-    ABT projectionANode = make<EvaluationNode>(
-        "pa",
-        make<EvalPath>(make<PathGet>("a", make<PathIdentity>()), make<Variable>("root")),
-        std::move(scanNode));
-
-    ABT filterANode =
-        make<FilterNode>(make<EvalFilter>(make<PathCompare>(Operations::Gt, Constant::int64(0)),
-                                          make<Variable>("pa")),
-                         std::move(projectionANode));
-
-    ABT projectionBNode = make<EvaluationNode>(
-        "pb",
-        make<EvalPath>(make<PathGet>("b", make<PathIdentity>()), make<Variable>("root")),
-        std::move(filterANode));
-
-    ABT filterBNode =
-        make<FilterNode>(make<EvalFilter>(make<PathCompare>(Operations::Gt, Constant::int64(1)),
-                                          make<Variable>("pb")),
-                         std::move(projectionBNode));
-
-    ABT groupByNode = make<GroupByNode>(ProjectionNameVector{"pa"},
-                                        ProjectionNameVector{"pc"},
-                                        makeSeq(make<Variable>("pb")),
-                                        std::move(filterBNode));
-
-    ABT rootNode =
-        make<RootNode>(ProjectionRequirement{ProjectionNameVector{"pc"}}, std::move(groupByNode));
-
-    auto phaseManager = makePhaseManager(
-        {OptPhase::MemoSubstitutionPhase,
-         OptPhase::MemoExplorationPhase,
-         OptPhase::MemoImplementationPhase},
-        prefixId,
-        {{{"c1",
-           createScanDef(
-               {},
-               {{"index1",
-                 IndexDefinition{
-                     {{makeNonMultikeyIndexPath("a"), CollationOp::Ascending}},
-                     false /*isMultiKey*/,
-                     {DistributionType::HashPartitioning, makeSeq(makeNonMultikeyIndexPath("a"))},
-                     {}}}},
-               ConstEval::constFold,
-               {DistributionType::HashPartitioning, makeSeq(makeNonMultikeyIndexPath("b"))})}},
-         5 /*numberOfPartitions*/},
-        makeHintedCE(std::move(hints)),
-        boost::none /*costModel*/,
-        {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
-
-    ABT optimized = rootNode;
-    phaseManager.optimize(optimized);
-    ASSERT_BETWEEN(60, 100, phaseManager.getMemo().getStats()._physPlanExplorationCount);
-
-    ASSERT_EXPLAIN_V2_AUTO(
-        "Root [{pc}]\n"
-        "Exchange []\n"
-        "|   |   distribution: \n"
-        "|   |       type: Centralized\n"
-        "GroupBy [{pa}]\n"
-        "|   aggregations: \n"
-        "|       [pc]\n"
-        "|           Variable [pb]\n"
-        "Exchange []\n"
-        "|   |   distribution: \n"
-        "|   |       type: HashPartitioning\n"
-        "|   |           projections: \n"
-        "|   |               pa\n"
-        "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
-        "|   |   Const [true]\n"
-        "|   Filter []\n"
-        "|   |   EvalFilter []\n"
-        "|   |   |   Variable [pb]\n"
-        "|   |   PathCompare [Gt]\n"
-        "|   |   Const [1]\n"
-        "|   LimitSkip [limit: 1, skip: 0]\n"
-        "|   Seek [ridProjection: rid_0, {'b': pb}, c1]\n"
-        "Exchange []\n"
-        "|   |   distribution: \n"
-        "|   |       type: RoundRobin\n"
-        "IndexScan [{'<indexKey> 0': pa, '<rid>': rid_0}, scanDefName: c1, indexDefName: index1, "
-        "interval: {>Const [0]}]\n",
-        optimized);
-}
-
-TEST(PhysRewriter, IndexPartitioning1) {
-    using namespace properties;
-    auto prefixId = PrefixId::createForTests();
-
-    PartialSchemaSelHints hints;
-    hints.emplace(PartialSchemaKey{"root", make<PathGet>("a", make<PathIdentity>())},
-                  SelectivityType{0.02});
-    hints.emplace(PartialSchemaKey{"root", make<PathGet>("b", make<PathIdentity>())},
-                  SelectivityType{0.01});
-
-    ABT scanNode = make<ScanNode>("root", "c1");
-
-    ABT projectionANode = make<EvaluationNode>(
-        "pa",
-        make<EvalPath>(make<PathGet>("a", make<PathIdentity>()), make<Variable>("root")),
-        std::move(scanNode));
-
-    ABT filterANode =
-        make<FilterNode>(make<EvalFilter>(make<PathCompare>(Operations::Gt, Constant::int64(0)),
-                                          make<Variable>("pa")),
-                         std::move(projectionANode));
-
-    ABT projectionBNode = make<EvaluationNode>(
-        "pb",
-        make<EvalPath>(make<PathGet>("b", make<PathIdentity>()), make<Variable>("root")),
-        std::move(filterANode));
-
-    ABT filterBNode =
-        make<FilterNode>(make<EvalFilter>(make<PathCompare>(Operations::Gt, Constant::int64(1)),
-                                          make<Variable>("pb")),
-                         std::move(projectionBNode));
-
-    ABT groupByNode = make<GroupByNode>(ProjectionNameVector{"pa"},
-                                        ProjectionNameVector{"pc"},
-                                        makeSeq(make<Variable>("pb")),
-                                        std::move(filterBNode));
-
-    ABT rootNode =
-        make<RootNode>(ProjectionRequirement{ProjectionNameVector{"pc"}}, std::move(groupByNode));
-
-    // TODO SERVER-71551 Follow up unit tests with overriden Cost Model.
-    auto costModel = getTestCostModel();
-    costModel.setNestedLoopJoinIncrementalCost(0.002);
-    costModel.setHashJoinIncrementalCost(5e-5);
-
-    auto phaseManager = makePhaseManager(
-        {OptPhase::MemoSubstitutionPhase,
-         OptPhase::MemoExplorationPhase,
-         OptPhase::MemoImplementationPhase},
-        prefixId,
-        {{{"c1",
-           createScanDef(
-               {},
-               {{"index1",
-                 IndexDefinition{
-                     {{makeNonMultikeyIndexPath("a"), CollationOp::Ascending}},
-                     false /*isMultiKey*/,
-                     {DistributionType::HashPartitioning, makeSeq(makeNonMultikeyIndexPath("a"))},
-                     {}}},
-                {"index2",
-                 IndexDefinition{
-                     {{makeNonMultikeyIndexPath("b"), CollationOp::Ascending}},
-                     false /*isMultiKey*/,
-                     {DistributionType::HashPartitioning, makeSeq(makeNonMultikeyIndexPath("b"))},
-                     {}}}},
-               ConstEval::constFold,
-               {DistributionType::HashPartitioning, makeSeq(makeNonMultikeyIndexPath("c"))})}},
-         5 /*numberOfPartitions*/},
-        makeHintedCE(std::move(hints)),
-        std::move(costModel),
-        {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
-
-    ABT optimized = rootNode;
-    phaseManager.optimize(optimized);
-    ASSERT_BETWEEN(110, 160, phaseManager.getMemo().getStats()._physPlanExplorationCount);
-
-    const BSONObj& result = ExplainGenerator::explainBSONObj(optimized);
-
-    // Compare using BSON since the rid vars are currently unstable for this test.
-    ASSERT_BSON_PATH("\"Exchange\"", result, "child.nodeType");
-    ASSERT_BSON_PATH(
-        "{ type: \"Centralized\", disableExchanges: false }", result, "child.distribution");
-    ASSERT_BSON_PATH("\"GroupBy\"", result, "child.child.nodeType");
-    ASSERT_BSON_PATH("\"HashJoin\"", result, "child.child.child.nodeType");
-    ASSERT_BSON_PATH("\"Exchange\"", result, "child.child.child.leftChild.nodeType");
-    ASSERT_BSON_PATH("{ type: \"Replicated\", disableExchanges: false }",
-                     result,
-                     "child.child.child.leftChild.distribution");
-    ASSERT_BSON_PATH("\"IndexScan\"", result, "child.child.child.leftChild.child.nodeType");
-    ASSERT_BSON_PATH("\"index2\"", result, "child.child.child.leftChild.child.indexDefName");
-    ASSERT_BSON_PATH("\"Union\"", result, "child.child.child.rightChild.nodeType");
-    ASSERT_BSON_PATH("\"Evaluation\"", result, "child.child.child.rightChild.children.0.nodeType");
-    ASSERT_BSON_PATH(
-        "\"IndexScan\"", result, "child.child.child.rightChild.children.0.child.nodeType");
-    ASSERT_BSON_PATH(
-        "\"index1\"", result, "child.child.child.rightChild.children.0.child.indexDefName");
-}
-
-TEST(PhysRewriter, LocalGlobalAgg) {
-    using namespace properties;
-    auto prefixId = PrefixId::createForTests();
-
-    ABT scanNode = make<ScanNode>("root", "c1");
-
-    ABT evalANode = make<EvaluationNode>(
-        "pa",
-        make<EvalPath>(make<PathGet>("a", make<PathIdentity>()), make<Variable>("root")),
-        std::move(scanNode));
-    ABT evalBNode = make<EvaluationNode>(
-        "pb",
-        make<EvalPath>(make<PathGet>("b", make<PathIdentity>()), make<Variable>("root")),
-        std::move(evalANode));
-
-    ABT groupByNode =
-        make<GroupByNode>(ProjectionNameVector{"pa"},
-                          ProjectionNameVector{"pc"},
-                          makeSeq(make<FunctionCall>("$sum", makeSeq(make<Variable>("pb")))),
-                          std::move(evalBNode));
-
-    ABT rootNode = make<RootNode>(ProjectionRequirement{ProjectionNameVector{"pa", "pc"}},
-                                  std::move(groupByNode));
-
-    auto phaseManager = makePhaseManager(
-        {OptPhase::MemoSubstitutionPhase,
-         OptPhase::MemoExplorationPhase,
-         OptPhase::MemoImplementationPhase},
-        prefixId,
-        {{{"c1",
-           createScanDef({}, {}, ConstEval::constFold, {DistributionType::UnknownPartitioning})}},
-         5 /*numberOfPartitions*/},
-        boost::none /*costModel*/,
-        {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
-
-    ABT optimized = rootNode;
-    phaseManager.optimize(optimized);
-    ASSERT_BETWEEN(15, 25, phaseManager.getMemo().getStats()._physPlanExplorationCount);
-
-    ASSERT_EXPLAIN_V2_AUTO(
-        "Root [{pa, pc}]\n"
-        "Exchange []\n"
-        "|   |   distribution: \n"
-        "|   |       type: Centralized\n"
-        "GroupBy [{pa}, Global]\n"
-        "|   aggregations: \n"
-        "|       [pc]\n"
-        "|           FunctionCall [$sum]\n"
-        "|           Variable [preagg_0]\n"
-        "Exchange []\n"
-        "|   |   distribution: \n"
-        "|   |       type: HashPartitioning\n"
-        "|   |           projections: \n"
-        "|   |               pa\n"
-        "GroupBy [{pa}, Local]\n"
-        "|   aggregations: \n"
-        "|       [preagg_0]\n"
-        "|           FunctionCall [$sum]\n"
-        "|           Variable [pb]\n"
-        "PhysicalScan [{'a': pa, 'b': pb}, c1, parallel]\n",
-        optimized);
-}
-
-TEST(PhysRewriter, LocalGlobalAgg1) {
-    using namespace properties;
-    auto prefixId = PrefixId::createForTests();
-
-    ABT scanNode = make<ScanNode>("root", "c1");
-
-    ABT evalBNode = make<EvaluationNode>(
-        "pb",
-        make<EvalPath>(make<PathGet>("b", make<PathIdentity>()), make<Variable>("root")),
-        std::move(scanNode));
-
-    ABT groupByNode =
-        make<GroupByNode>(ProjectionNameVector{},
-                          ProjectionNameVector{"pc"},
-                          makeSeq(make<FunctionCall>("$sum", makeSeq(make<Variable>("pb")))),
-                          std::move(evalBNode));
-
-    ABT rootNode =
-        make<RootNode>(ProjectionRequirement{ProjectionNameVector{"pc"}}, std::move(groupByNode));
-
-    auto phaseManager = makePhaseManager(
-        {OptPhase::MemoSubstitutionPhase,
-         OptPhase::MemoExplorationPhase,
-         OptPhase::MemoImplementationPhase},
-        prefixId,
-        {{{"c1",
-           createScanDef({}, {}, ConstEval::constFold, {DistributionType::UnknownPartitioning})}},
-         5 /*numberOfPartitions*/},
-        boost::none /*costModel*/,
-        {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
-
-    ABT optimized = rootNode;
-    phaseManager.optimize(optimized);
-    ASSERT_BETWEEN(5, 15, phaseManager.getMemo().getStats()._physPlanExplorationCount);
-
-    ASSERT_EXPLAIN_V2_AUTO(
-        "Root [{pc}]\n"
-        "GroupBy [Global]\n"
-        "|   aggregations: \n"
-        "|       [pc]\n"
-        "|           FunctionCall [$sum]\n"
-        "|           Variable [preagg_0]\n"
-        "Exchange []\n"
-        "|   |   distribution: \n"
-        "|   |       type: Centralized\n"
-        "GroupBy [Local]\n"
-        "|   aggregations: \n"
-        "|       [preagg_0]\n"
-        "|           FunctionCall [$sum]\n"
-        "|           Variable [pb]\n"
-        "PhysicalScan [{'b': pb}, c1, parallel]\n",
-        optimized);
-}
-
-TEST(PhysRewriter, LocalLimitSkip) {
-    using namespace properties;
-    auto prefixId = PrefixId::createForTests();
-
-    ABT scanNode = make<ScanNode>("root", "c1");
-
-    ABT limitSkipNode = make<LimitSkipNode>(LimitSkipRequirement{20, 10}, std::move(scanNode));
-    ABT rootNode = make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}},
-                                  std::move(limitSkipNode));
-
-    auto phaseManager = makePhaseManager(
-        {OptPhase::MemoSubstitutionPhase,
-         OptPhase::MemoExplorationPhase,
-         OptPhase::MemoImplementationPhase},
-        prefixId,
-        {{{"c1",
-           createScanDef({}, {}, ConstEval::constFold, {DistributionType::UnknownPartitioning})}},
-         5 /*numberOfPartitions*/},
-        boost::none /*costModel*/,
-        {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
-
-    ABT optimized = rootNode;
-    phaseManager.optimize(optimized);
-    ASSERT_BETWEEN(5, 15, phaseManager.getMemo().getStats()._physPlanExplorationCount);
-
-    ASSERT_EXPLAIN_PROPS_V2_AUTO(
-        "Properties [cost: 0.00929774, localCost: 0, adjustedCE: 20]\n"
-        "|   |   Logical:\n"
-        "|   |       cardinalityEstimate: \n"
-        "|   |           ce: 20\n"
-        "|   |       projections: \n"
-        "|   |           root\n"
-        "|   |       collectionAvailability: \n"
-        "|   |           c1\n"
-        "|   |       distributionAvailability: \n"
-        "|   |           distribution: \n"
-        "|   |               type: Centralized\n"
-        "|   |           distribution: \n"
-        "|   |               type: UnknownPartitioning\n"
-        "|   Physical:\n"
-        "|       distribution: \n"
-        "|           type: Centralized\n"
-        "Root [{root}]\n"
-        "Properties [cost: 0.00929774, localCost: 0.00252777, adjustedCE: 30]\n"
-        "|   |   Logical:\n"
-        "|   |       cardinalityEstimate: \n"
-        "|   |           ce: 1000\n"
-        "|   |       projections: \n"
-        "|   |           root\n"
-        "|   |       indexingAvailability: \n"
-        "|   |           [groupId: 0, scanProjection: root, scanDefName: c1, eqPredsOnly]\n"
-        "|   |       collectionAvailability: \n"
-        "|   |           c1\n"
-        "|   |       distributionAvailability: \n"
-        "|   |           distribution: \n"
-        "|   |               type: UnknownPartitioning\n"
-        "|   Physical:\n"
-        "|       limitSkip:\n"
-        "|           limit: 20\n"
-        "|           skip: 10\n"
-        "|       projections: \n"
-        "|           root\n"
-        "|       distribution: \n"
-        "|           type: Centralized\n"
-        "|       indexingRequirement: \n"
-        "|           Complete, dedupRID\n"
-        "LimitSkip [limit: 20, skip: 10]\n"
-        "Properties [cost: 0.00676997, localCost: 0.003001, adjustedCE: 30]\n"
-        "|   |   Logical:\n"
-        "|   |       cardinalityEstimate: \n"
-        "|   |           ce: 1000\n"
-        "|   |       projections: \n"
-        "|   |           root\n"
-        "|   |       indexingAvailability: \n"
-        "|   |           [groupId: 0, scanProjection: root, scanDefName: c1, eqPredsOnly]\n"
-        "|   |       collectionAvailability: \n"
-        "|   |           c1\n"
-        "|   |       distributionAvailability: \n"
-        "|   |           distribution: \n"
-        "|   |               type: UnknownPartitioning\n"
-        "|   Physical:\n"
-        "|       projections: \n"
-        "|           root\n"
-        "|       distribution: \n"
-        "|           type: Centralized\n"
-        "|       indexingRequirement: \n"
-        "|           Complete, dedupRID\n"
-        "|       limitEstimate: 30\n"
-        "Exchange []\n"
-        "|   |   distribution: \n"
-        "|   |       type: Centralized\n"
-        "Properties [cost: 0.00376897, localCost: 0.00376897, adjustedCE: 30]\n"
-        "|   |   Logical:\n"
-        "|   |       cardinalityEstimate: \n"
-        "|   |           ce: 1000\n"
-        "|   |       projections: \n"
-        "|   |           root\n"
-        "|   |       indexingAvailability: \n"
-        "|   |           [groupId: 0, scanProjection: root, scanDefName: c1, eqPredsOnly]\n"
-        "|   |       collectionAvailability: \n"
-        "|   |           c1\n"
-        "|   |       distributionAvailability: \n"
-        "|   |           distribution: \n"
-        "|   |               type: UnknownPartitioning\n"
-        "|   Physical:\n"
-        "|       projections: \n"
-        "|           root\n"
-        "|       distribution: \n"
-        "|           type: UnknownPartitioning, disableExchanges\n"
-        "|       indexingRequirement: \n"
-        "|           Complete, dedupRID\n"
-        "|       limitEstimate: 30\n"
-        "PhysicalScan [{'<root>': root}, c1, parallel]\n",
-        phaseManager);
 }
 
 TEST(PhysRewriter, CollationLimit) {
@@ -5161,7 +4622,6 @@ TEST(PhysRewriter, RootInterval) {
 
 TEST(PhysRewriter, ResidualFilterPathIsBalanced) {
     using namespace properties;
-    using namespace unit_test_abt_literals;
 
     ABT root =
         NodeBuilder{}
@@ -5209,7 +4669,6 @@ TEST(PhysRewriter, ResidualFilterPathIsBalanced) {
 
 TEST(PhysRewriter, DisjunctiveEqsConsolidatedIntoEqMember) {
     using namespace properties;
-    using namespace unit_test_abt_literals;
 
     const auto [tag1, val1] = sbe::value::makeNewArray();
     sbe::value::Array* arr1 = sbe::value::getArrayView(val1);
@@ -5277,7 +4736,6 @@ TEST(PhysRewriter, DisjunctiveEqsConsolidatedIntoEqMember) {
 
 TEST(PhysRewriter, KeepBoundsForNothingCheck) {
     using namespace properties;
-    using namespace unit_test_abt_literals;
 
     ABT root =
         NodeBuilder{}
@@ -5319,8 +4777,6 @@ TEST(PhysRewriter, KeepBoundsForNothingCheck) {
 
 TEST(PhysRewriter, EqMemberSargable) {
     using namespace properties;
-    using namespace unit_test_abt_literals;
-
 
     const auto [tag, val] = sbe::value::makeNewArray();
     sbe::value::Array* arr = sbe::value::getArrayView(val);
@@ -5581,7 +5037,7 @@ TEST(PhysRewriter, IndexSubfieldCovered) {
 TEST(PhysRewriter, PerfOnlyPreds1) {
     using namespace properties;
 
-    PartialSchemaSelHints hints;
+    ce::PartialSchemaSelHints hints;
     hints.emplace(PartialSchemaKey{"root", make<PathGet>("a", make<PathIdentity>())},
                   SelectivityType{0.01});
     hints.emplace(PartialSchemaKey{"root", make<PathGet>("b", make<PathIdentity>())},
@@ -5656,7 +5112,7 @@ TEST(PhysRewriter, PerfOnlyPreds1) {
 TEST(PhysRewriter, PerfOnlyPreds2) {
     using namespace properties;
 
-    PartialSchemaSelHints hints;
+    ce::PartialSchemaSelHints hints;
     hints.emplace(PartialSchemaKey{"root", make<PathGet>("a", make<PathIdentity>())},
                   SelectivityType{0.001});
     hints.emplace(PartialSchemaKey{"root", make<PathGet>("b", make<PathIdentity>())},
@@ -5743,7 +5199,6 @@ TEST(PhysRewriter, PerfOnlyPreds2) {
 
 TEST(PhysRewriter, ConjunctionTraverseMultikey1) {
     using namespace properties;
-    using namespace unit_test_abt_literals;
     auto prefixId = PrefixId::createForTests();
 
     ABT root = NodeBuilder{}
@@ -5758,7 +5213,7 @@ TEST(PhysRewriter, ConjunctionTraverseMultikey1) {
                    .finish(_scan("root", "c1"));
     // Hint one predicate to be more selective than the other to ensure we have a predictable
     // outcome instead of a tie.
-    PartialSchemaSelHints hints;
+    ce::PartialSchemaSelHints hints;
     hints.emplace(PartialSchemaKey{"root", _get("a", _traverse1(_get("x", _id())))._n},
                   kDefaultSelectivity);
     hints.emplace(PartialSchemaKey{"root", _get("a", _traverse1(_get("y", _id())))._n},
@@ -5816,7 +5271,6 @@ TEST(PhysRewriter, ConjunctionTraverseMultikey1) {
 
 TEST(PhysRewriter, ConjunctionTraverseMultikey2) {
     using namespace properties;
-    using namespace unit_test_abt_literals;
     auto prefixId = PrefixId::createForTests();
 
     ABT root = NodeBuilder{}
@@ -5871,8 +5325,6 @@ TEST(PhysRewriter, ConjunctionTraverseMultikey2) {
 
 TEST(PhysRewriter, ExtractAllPlans) {
     using namespace properties;
-    using namespace unit_test_abt_literals;
-
 
     ABT rootNode = NodeBuilder{}
                        .root("root")
