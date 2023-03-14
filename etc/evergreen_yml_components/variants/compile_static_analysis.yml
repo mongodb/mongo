@@ -128,6 +128,7 @@ buildvariants:
       --ocsp-stapling=off
       -j$(grep -c ^processor /proc/cpuinfo)
       --link-model=dynamic
+      --enable-free-mon=on
     compile_variant: *linux-debug-aubsan-compile-required
 
 - name: &windows-compile-required windows-compile-required
