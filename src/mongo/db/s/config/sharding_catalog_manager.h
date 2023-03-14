@@ -308,8 +308,6 @@ public:
 
     /**
      * Updates metadata in config.chunks collection to show the given chunk in its new shard.
-     * If 'validAfter' is not set, this means the commit request came from an older server version,
-     * which is not history-aware.
      *
      * Returns a ShardAndCollectionPlacementVersions object with the newly produced chunk versions
      * after the migration:
@@ -323,8 +321,7 @@ public:
         const OID& collectionEpoch,
         const Timestamp& collectionTimestamp,
         const ShardId& fromShard,
-        const ShardId& toShard,
-        const Timestamp& validAfter);
+        const ShardId& toShard);
 
     /**
      * Removes the jumbo flag from the specified chunk.

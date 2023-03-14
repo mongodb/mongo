@@ -1223,8 +1223,7 @@ ShardingCatalogManager::commitChunkMigration(OperationContext* opCtx,
                                              const OID& collectionEpoch,
                                              const Timestamp& collectionTimestamp,
                                              const ShardId& fromShard,
-                                             const ShardId& toShard,
-                                             const Timestamp& validAfter) {
+                                             const ShardId& toShard) {
     uassertStatusOK(
         ShardKeyPattern::checkShardKeyIsValidForMetadataStorage(migratedChunk.getMin()));
     uassertStatusOK(
@@ -1376,6 +1375,10 @@ ShardingCatalogManager::commitChunkMigration(OperationContext* opCtx,
         {currentCollectionPlacementVersion.epoch(),
          currentCollectionPlacementVersion.getTimestamp()},
         {currentCollectionPlacementVersion.majorVersion() + 1, minVersionIncrement++}));
+
+    // Set the commit time of the migration.
+    const auto currentTime = VectorClock::get(opCtx)->getTime();
+    const auto validAfter = currentTime.clusterTime().asTimestamp();
 
     // Copy the complete history.
     auto newHistory = currentChunk.getHistory();

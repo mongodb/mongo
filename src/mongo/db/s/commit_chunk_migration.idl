@@ -80,7 +80,3 @@ commands:
             fromShardCollectionVersion:
                 type: ChunkVersion
                 description: "{ shardVersionField: <version> }" 
-                
-            validAfter:
-                type: timestamp 
-                description: "The time after which this chunk is at the new shard"

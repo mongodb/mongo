@@ -476,14 +476,11 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
 
         auto migratedChunk = MigratedChunkType(*_chunkVersion, *_args.getMin(), *_args.getMax());
 
-        const auto currentTime = VectorClock::get(_opCtx)->getTime();
-
         CommitChunkMigrationRequest request(nss(),
                                             _args.getFromShard(),
                                             _args.getToShard(),
                                             migratedChunk,
-                                            metadata.getCollPlacementVersion(),
-                                            currentTime.clusterTime().asTimestamp());
+                                            metadata.getCollPlacementVersion());
 
         request.serialize({}, &builder);
         builder.append(kWriteConcernField, kMajorityWriteConcern.toBSON());

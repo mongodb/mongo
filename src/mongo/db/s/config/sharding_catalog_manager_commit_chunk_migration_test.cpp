@@ -40,6 +40,7 @@
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/session/logical_session_cache_noop.h"
 #include "mongo/db/session/session_catalog_mongod.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_shard.h"
@@ -129,7 +130,9 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectly) {
 
     setupCollection(kNamespace, kKeyPattern, {migratedChunk, controlChunk});
 
-    Timestamp validAfter{101, 0};
+    const auto currentTime = VectorClock::get(getServiceContext())->getTime();
+    const auto expectedValidAfter = currentTime.clusterTime().asTimestamp();
+
     auto versions = assertGet(ShardingCatalogManager::get(operationContext())
                                   ->commitChunkMigration(operationContext(),
                                                          kNamespace,
@@ -137,8 +140,7 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectly) {
                                                          migratedChunk.getVersion().epoch(),
                                                          collTimestamp,
                                                          ShardId(shard0.getName()),
-                                                         ShardId(shard1.getName()),
-                                                         validAfter));
+                                                         ShardId(shard1.getName())));
 
     // Verify the versions returned match expected values.
     auto mver = versions.shardPlacementVersion;
@@ -158,8 +160,8 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectly) {
 
     // The migrated chunk's history should be updated.
     ASSERT_EQ(2UL, chunkDoc0.getHistory().size());
-    ASSERT_EQ(validAfter, chunkDoc0.getHistory().front().getValidAfter());
-    ASSERT_EQ(validAfter, *chunkDoc0.getOnCurrentShardSince());
+    ASSERT_EQ(expectedValidAfter, chunkDoc0.getHistory().front().getValidAfter());
+    ASSERT_EQ(expectedValidAfter, *chunkDoc0.getOnCurrentShardSince());
 
     auto chunkDoc1 = uassertStatusOK(
         getChunkDoc(operationContext(), controlChunk.getMin(), collEpoch, collTimestamp));
@@ -209,8 +211,8 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectlyWithoutControlChunk) {
     chunk0.setMax(chunkMax);
 
     setupCollection(kNamespace, kKeyPattern, {chunk0});
-
-    Timestamp validAfter{101, 0};
+    const auto currentTime = VectorClock::get(getServiceContext())->getTime();
+    const auto expectedValidAfter = currentTime.clusterTime().asTimestamp();
 
     StatusWith<ShardingCatalogManager::ShardAndCollectionPlacementVersions> result =
         ShardingCatalogManager::get(operationContext())
@@ -220,8 +222,7 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectlyWithoutControlChunk) {
                                    origVersion.epoch(),
                                    collTimestamp,
                                    ShardId(shard0.getName()),
-                                   ShardId(shard1.getName()),
-                                   validAfter);
+                                   ShardId(shard1.getName()));
 
     ASSERT_OK(result.getStatus());
 
@@ -240,8 +241,8 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectlyWithoutControlChunk) {
     ASSERT_EQ("shard1", chunkDoc0.getShard().toString());
     // The history should be updated.
     ASSERT_EQ(2UL, chunkDoc0.getHistory().size());
-    ASSERT_EQ(validAfter, chunkDoc0.getHistory().front().getValidAfter());
-    ASSERT_EQ(validAfter, *chunkDoc0.getOnCurrentShardSince());
+    ASSERT_EQ(expectedValidAfter, chunkDoc0.getHistory().front().getValidAfter());
+    ASSERT_EQ(expectedValidAfter, *chunkDoc0.getOnCurrentShardSince());
 }
 
 TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandNoCtlTrimHistory) {
@@ -279,7 +280,10 @@ TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandNoCtlTrimHistory) {
     setupCollection(kNamespace, kKeyPattern, {chunk0});
 
     // Make the time distance between the last history element large enough.
-    Timestamp validAfter{200, 0};
+    const auto currentTime = VectorClock::get(getServiceContext())->getTime();
+    const auto currentClusterTime = currentTime.clusterTime().asTimestamp();
+    const auto updatedClusterTime = LogicalTime(currentClusterTime + Timestamp(200.0).asULL());
+    VectorClock::get(getServiceContext())->advanceClusterTime_forTest(updatedClusterTime);
 
     StatusWith<ShardingCatalogManager::ShardAndCollectionPlacementVersions> result =
         ShardingCatalogManager::get(operationContext())
@@ -289,8 +293,7 @@ TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandNoCtlTrimHistory) {
                                    origVersion.epoch(),
                                    collTimestamp,
                                    ShardId(shard0.getName()),
-                                   ShardId(shard1.getName()),
-                                   validAfter);
+                                   ShardId(shard1.getName()));
 
     ASSERT_OK(result.getStatus());
 
@@ -306,8 +309,8 @@ TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandNoCtlTrimHistory) {
 
     // The new history entry should be added, but the old one preserved.
     ASSERT_EQ(2UL, chunkDoc0.getHistory().size());
-    ASSERT_EQ(validAfter, chunkDoc0.getHistory().front().getValidAfter());
-    ASSERT_EQ(validAfter, *chunkDoc0.getOnCurrentShardSince());
+    ASSERT_EQ(updatedClusterTime.asTimestamp(), chunkDoc0.getHistory().front().getValidAfter());
+    ASSERT_EQ(updatedClusterTime.asTimestamp(), *chunkDoc0.getOnCurrentShardSince());
 }
 
 TEST_F(CommitChunkMigrate, RejectOutOfOrderHistory) {
@@ -331,7 +334,7 @@ TEST_F(CommitChunkMigrate, RejectOutOfOrderHistory) {
     chunk0.setCollectionUUID(collUUID);
     chunk0.setVersion(origVersion);
     chunk0.setShard(shard0.getName());
-    chunk0.setOnCurrentShardSince(Timestamp(100, 0));
+    chunk0.setOnCurrentShardSince(Timestamp(100, 1));
     chunk0.setHistory({ChunkHistory(*chunk0.getOnCurrentShardSince(), shard0.getName())});
 
     // apportion
@@ -342,8 +345,9 @@ TEST_F(CommitChunkMigrate, RejectOutOfOrderHistory) {
 
     setupCollection(kNamespace, kKeyPattern, {chunk0});
 
-    // Make the time before the last change to trigger the failure.
-    Timestamp validAfter{99, 0};
+    // Ensure that the current cluster time is earlier than the timestamp associated to the chunk
+    // being migrated.
+    VectorClock::get(getServiceContext())->resetVectorClock_forTest();
 
     StatusWith<ShardingCatalogManager::ShardAndCollectionPlacementVersions> result =
         ShardingCatalogManager::get(operationContext())
@@ -353,8 +357,7 @@ TEST_F(CommitChunkMigrate, RejectOutOfOrderHistory) {
                                    origVersion.epoch(),
                                    origVersion.getTimestamp(),
                                    ShardId(shard0.getName()),
-                                   ShardId(shard1.getName()),
-                                   validAfter);
+                                   ShardId(shard1.getName()));
 
     ASSERT_EQ(ErrorCodes::IncompatibleShardingMetadata, result.getStatus());
 }
@@ -399,8 +402,6 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch0) {
 
     setupCollection(kNamespace, kKeyPattern, {chunk0, chunk1});
 
-    Timestamp validAfter{1};
-
     StatusWith<ShardingCatalogManager::ShardAndCollectionPlacementVersions> result =
         ShardingCatalogManager::get(operationContext())
             ->commitChunkMigration(operationContext(),
@@ -409,8 +410,7 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch0) {
                                    OID::gen(),
                                    Timestamp(52),
                                    ShardId(shard0.getName()),
-                                   ShardId(shard1.getName()),
-                                   validAfter);
+                                   ShardId(shard1.getName()));
 
     ASSERT_EQ(ErrorCodes::StaleEpoch, result.getStatus());
 }
@@ -457,8 +457,6 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch1) {
     // get version from the control chunk this time
     setupCollection(kNamespace, kKeyPattern, {chunk1, chunk0});
 
-    Timestamp validAfter{1};
-
     StatusWith<ShardingCatalogManager::ShardAndCollectionPlacementVersions> result =
         ShardingCatalogManager::get(operationContext())
             ->commitChunkMigration(operationContext(),
@@ -467,8 +465,7 @@ TEST_F(CommitChunkMigrate, RejectWrongCollectionEpoch1) {
                                    origVersion.epoch(),
                                    origVersion.getTimestamp(),
                                    ShardId(shard0.getName()),
-                                   ShardId(shard1.getName()),
-                                   validAfter);
+                                   ShardId(shard1.getName()));
 
     ASSERT_EQ(ErrorCodes::StaleEpoch, result.getStatus());
 }
@@ -521,7 +518,9 @@ TEST_F(CommitChunkMigrate, CommitWithLastChunkOnShardShouldNotAffectOtherChunks)
 
     setupCollection(kNamespace, kKeyPattern, {chunk0, chunk1});
 
-    Timestamp validAfter{101, 0};
+    const auto currentTime = VectorClock::get(getServiceContext())->getTime();
+    const auto expectedValidAfter = currentTime.clusterTime().asTimestamp();
+
     StatusWith<ShardingCatalogManager::ShardAndCollectionPlacementVersions> result =
         ShardingCatalogManager::get(operationContext())
             ->commitChunkMigration(operationContext(),
@@ -530,8 +529,7 @@ TEST_F(CommitChunkMigrate, CommitWithLastChunkOnShardShouldNotAffectOtherChunks)
                                    origVersion.epoch(),
                                    origVersion.getTimestamp(),
                                    ShardId(shard0.getName()),
-                                   ShardId(shard1.getName()),
-                                   validAfter);
+                                   ShardId(shard1.getName()));
 
     ASSERT_OK(result.getStatus());
 
@@ -547,8 +545,9 @@ TEST_F(CommitChunkMigrate, CommitWithLastChunkOnShardShouldNotAffectOtherChunks)
 
     // The migrated chunk's history should be updated.
     ASSERT_EQ(2UL, chunkDoc0.getHistory().size());
-    ASSERT_EQ(validAfter, chunkDoc0.getHistory().front().getValidAfter());
-    ASSERT_EQ(validAfter, *chunkDoc0.getOnCurrentShardSince());
+    ASSERT_EQ(chunkDoc0.getHistory().front().getValidAfter(), *chunkDoc0.getOnCurrentShardSince());
+    ASSERT_EQ(expectedValidAfter, chunkDoc0.getHistory().front().getValidAfter());
+    ASSERT_EQ(expectedValidAfter, *chunkDoc0.getOnCurrentShardSince());
 
     auto chunkDoc1 =
         uassertStatusOK(getChunkDoc(operationContext(), chunkMax, collEpoch, collTimestamp));
@@ -600,7 +599,6 @@ TEST_F(CommitChunkMigrate, RejectMissingChunkVersion) {
 
     setupCollection(kNamespace, kKeyPattern, {currentChunk});
 
-    Timestamp validAfter{101, 0};
     ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
                            ->commitChunkMigration(operationContext(),
                                                   kNamespace,
@@ -608,8 +606,7 @@ TEST_F(CommitChunkMigrate, RejectMissingChunkVersion) {
                                                   origVersion.epoch(),
                                                   origVersion.getTimestamp(),
                                                   ShardId(shard0.getName()),
-                                                  ShardId(shard1.getName()),
-                                                  validAfter),
+                                                  ShardId(shard1.getName())),
                        DBException,
                        4683300);
 }
@@ -656,7 +653,6 @@ TEST_F(CommitChunkMigrate, RejectOlderChunkVersion) {
 
     setupCollection(kNamespace, kKeyPattern, {currentChunk});
 
-    Timestamp validAfter{101, 0};
     auto result = ShardingCatalogManager::get(operationContext())
                       ->commitChunkMigration(operationContext(),
                                              kNamespace,
@@ -664,8 +660,7 @@ TEST_F(CommitChunkMigrate, RejectOlderChunkVersion) {
                                              origVersion.epoch(),
                                              origVersion.getTimestamp(),
                                              ShardId(shard0.getName()),
-                                             ShardId(shard1.getName()),
-                                             validAfter);
+                                             ShardId(shard1.getName()));
 
     ASSERT_NOT_OK(result.getStatus());
     ASSERT_EQ(result.getStatus(), ErrorCodes::ConflictingOperationInProgress);
@@ -712,7 +707,6 @@ TEST_F(CommitChunkMigrate, RejectMismatchedEpoch) {
 
     setupCollection(kNamespace, kKeyPattern, {currentChunk});
 
-    Timestamp validAfter{101, 0};
     auto result = ShardingCatalogManager::get(operationContext())
                       ->commitChunkMigration(operationContext(),
                                              kNamespace,
@@ -720,8 +714,7 @@ TEST_F(CommitChunkMigrate, RejectMismatchedEpoch) {
                                              origVersion.epoch(),
                                              origVersion.getTimestamp(),
                                              ShardId(shard0.getName()),
-                                             ShardId(shard1.getName()),
-                                             validAfter);
+                                             ShardId(shard1.getName()));
 
     ASSERT_NOT_OK(result.getStatus());
     ASSERT_EQ(result.getStatus(), ErrorCodes::StaleEpoch);
@@ -753,7 +746,8 @@ public:
     }
 
     /*
-     * Setup the collection with `numberOfChunks` contiguous chunks covering all the shard key space
+     * Setup the collection with `numberOfChunks` contiguous chunks covering all the shard key
+     space
      */
     void setupCollectionWithNChunks(int numberOfChunks) {
         invariant(numberOfChunks > 0);
@@ -793,11 +787,6 @@ public:
                                const ChunkType& migratedChunk,
                                const bool expectLeftSplit,
                                const bool expectRightSplit) {
-        Timestamp validAfter = [&]() {
-            auto currValidAfter = migratedChunk.getHistory().at(0).getValidAfter();
-            return Timestamp(currValidAfter.getSecs() + 100, 0);
-        }();
-
         const auto donor = migratedChunk.getShard();
         const auto recipient =
             migratedChunk.getShard() == _shardIds.at(0) ? _shardIds.at(1) : _shardIds.at(0);
@@ -813,6 +802,9 @@ public:
             return chunk.getVersion();
         }();
 
+        const auto currentTime = VectorClock::get(getServiceContext())->getTime();
+        const auto expectedValidAfter = currentTime.clusterTime().asTimestamp();
+
         uassertStatusOK(ShardingCatalogManager::get(operationContext())
                             ->commitChunkMigration(operationContext(),
                                                    kNamespace,
@@ -820,8 +812,7 @@ public:
                                                    migratedChunk.getVersion().epoch(),
                                                    migratedChunk.getVersion().getTimestamp(),
                                                    donor,
-                                                   recipient,
-                                                   validAfter));
+                                                   recipient));
 
         // Verify the new chunk is on the recipient shard
         {
@@ -840,8 +831,8 @@ public:
 
             // The migrated chunk's history should have been updated with a new `validAfter` entry
             ASSERT_EQ(origChunk.getHistory().size() + 1, newChunk.getHistory().size());
-            ASSERT_EQ(validAfter, newChunk.getHistory().front().getValidAfter());
-            ASSERT_EQ(validAfter, *newChunk.getOnCurrentShardSince());
+            ASSERT_EQ(expectedValidAfter, newChunk.getHistory().front().getValidAfter());
+            ASSERT_EQ(expectedValidAfter, *newChunk.getOnCurrentShardSince());
 
             // The migrated chunk's history must inherit the previous chunk's history
             assertSameHistories(std::vector<ChunkHistory>(newChunk.getHistory().begin() + 1,

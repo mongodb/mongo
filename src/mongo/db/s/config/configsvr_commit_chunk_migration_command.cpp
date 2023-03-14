@@ -136,8 +136,7 @@ public:
                     request().getFromShardCollectionVersion().epoch(),
                     request().getFromShardCollectionVersion().getTimestamp(),
                     request().getFromShard(),
-                    request().getToShard(),
-                    request().getValidAfter());
+                    request().getToShard());
 
             auto shardAndCollVers = uassertStatusOK(response);
 
