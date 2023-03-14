@@ -376,6 +376,13 @@ public:
                                                                const std::string& donorShardId);
 
     /**
+     * Constructs a dummy NamespaceString, "<tenantId>.config.dummy.namespace", to be used where a
+     * placeholder NamespaceString is needed. It must be acceptable for tenantId to be empty, so we
+     * use "config" as the db.
+     */
+    static NamespaceString makeDummyNamespace(const boost::optional<TenantId>& tenantId);
+
+    /**
      * NOTE: DollarInDbNameBehavior::allow is deprecated.
      *
      * Please use DollarInDbNameBehavior::disallow and check explicitly for any DB names that must

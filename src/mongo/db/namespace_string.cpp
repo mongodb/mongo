@@ -236,6 +236,11 @@ NamespaceString NamespaceString::makeReshardingLocalConflictStashNSS(
                                donorShardId);
 }
 
+NamespaceString NamespaceString::makeDummyNamespace(const boost::optional<TenantId>& tenantId) {
+    return NamespaceString(tenantId, DatabaseName::kConfig.db(), "dummy.namespace");
+}
+
+
 std::string NamespaceString::getSisterNS(StringData local) const {
     verify(local.size() && local[0] != '.');
     return db().toString() + "." + local.toString();
