@@ -45,7 +45,6 @@ struct IndexValidateResults {
     std::vector<std::string> errors;
     std::vector<std::string> warnings;
     int64_t keysTraversed = 0;
-    int64_t keysTraversedFromFullValidate = 0;
     int64_t keysRemovedFromRecordStore = 0;
 };
 

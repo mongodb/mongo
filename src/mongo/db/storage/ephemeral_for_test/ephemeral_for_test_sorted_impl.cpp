@@ -1460,7 +1460,9 @@ void SortedDataInterfaceUnique::fullValidate(OperationContext* opCtx,
         numKeys += UniqueIndexData(it->second, _rsKeyFormat).size();
         ++it;
     }
-    *numKeysOut = numKeys;
+    if (numKeysOut) {
+        *numKeysOut = numKeys;
+    }
 }
 
 bool SortedDataInterfaceBase::appendCustomStats(OperationContext* opCtx,
@@ -1642,7 +1644,9 @@ void SortedDataInterfaceStandard::fullValidate(OperationContext* opCtx,
         ++numKeys;
         ++it;
     }
-    *numKeysOut = numKeys;
+    if (numKeysOut) {
+        *numKeysOut = numKeys;
+    }
 }
 
 std::unique_ptr<mongo::SortedDataInterface::Cursor> SortedDataInterfaceStandard::newCursor(
