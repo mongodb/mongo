@@ -30,7 +30,9 @@
 #include "mongo/db/s/move_primary/move_primary_donor_service.h"
 
 #include "mongo/db/persistent_task_store.h"
+#include "mongo/db/s/move_primary/move_primary_recipient_cmds_gen.h"
 #include "mongo/db/s/move_primary/move_primary_server_parameters_gen.h"
+#include "mongo/s/grid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kMovePrimary
 
@@ -143,13 +145,16 @@ void MovePrimaryDonorService::checkIfConflictsWithOtherInstances(
 
 std::shared_ptr<repl::PrimaryOnlyService::Instance> MovePrimaryDonorService::constructInstance(
     BSONObj initialState) {
+    auto initialDoc = MovePrimaryDonorDocument::parse(
+        IDLParserContext("MovePrimaryDonorServiceConstructInstance"), initialState);
     return std::make_shared<MovePrimaryDonor>(
-        _serviceContext,
-        this,
-        MovePrimaryDonorDocument::parse(
-            IDLParserContext("MovePrimaryDonorServiceConstructInstance"), initialState));
+        _serviceContext, this, initialDoc, makeDependencies(initialDoc));
 }
 
+MovePrimaryDonorDependencies MovePrimaryDonorService::makeDependencies(
+    const MovePrimaryDonorDocument& initialDoc) {
+    return {std::make_unique<MovePrimaryDonorExternalStateImpl>(initialDoc.getMetadata())};
+}
 
 MovePrimaryDonorCancelState::MovePrimaryDonorCancelState(const CancellationToken& stepdownToken)
     : _stepdownToken{stepdownToken},
@@ -164,10 +169,14 @@ const CancellationToken& MovePrimaryDonorCancelState::getAbortToken() {
     return _abortToken;
 }
 
+const Backoff MovePrimaryDonorRetryHelper::kBackoff{Seconds(1), Milliseconds::max()};
+
 MovePrimaryDonorRetryHelper::MovePrimaryDonorRetryHelper(
+    const MovePrimaryCommonMetadata& metadata,
     std::shared_ptr<executor::ScopedTaskExecutor> taskExecutor,
     MovePrimaryDonorCancelState* cancelState)
-    : _taskExecutor{taskExecutor},
+    : _metadata{metadata},
+      _taskExecutor{taskExecutor},
       _markKilledExecutor{std::make_shared<ThreadPool>([] {
           ThreadPool::Options options;
           options.poolName = "MovePrimaryDonorRetryHelperCancelableOpCtxPool";
@@ -181,17 +190,78 @@ MovePrimaryDonorRetryHelper::MovePrimaryDonorRetryHelper(
     _markKilledExecutor->startup();
 }
 
-void MovePrimaryDonorRetryHelper::handleTransientError(const Status& status) {}
-void MovePrimaryDonorRetryHelper::handleUnrecoverableError(const Status& status) {}
+void MovePrimaryDonorRetryHelper::handleTransientError(const std::string& operationName,
+                                                       const Status& status) {
+    LOGV2(7306301,
+          "MovePrimaryDonor has encountered a transient error",
+          "operation"_attr = operationName,
+          "status"_attr = redact(status),
+          "migrationId"_attr = _metadata.get_id(),
+          "databaseName"_attr = _metadata.getDatabaseName(),
+          "toShard"_attr = _metadata.getShardName());
+}
+
+void MovePrimaryDonorRetryHelper::handleUnrecoverableError(const std::string& operationName,
+                                                           const Status& status) {
+    LOGV2(7306302,
+          "MovePrimaryDonor has encountered an unrecoverable error",
+          "operation"_attr = operationName,
+          "status"_attr = redact(status),
+          "migrationId"_attr = _metadata.get_id(),
+          "databaseName"_attr = _metadata.getDatabaseName(),
+          "toShard"_attr = _metadata.getShardName());
+}
+
+MovePrimaryDonorExternalState::MovePrimaryDonorExternalState(
+    const MovePrimaryCommonMetadata& metadata)
+    : _metadata{metadata} {}
+
+
+const MovePrimaryCommonMetadata& MovePrimaryDonorExternalState::getMetadata() const {
+    return _metadata;
+}
+
+ShardId MovePrimaryDonorExternalState::getRecipientShardId() const {
+    return ShardId{_metadata.getShardName().toString()};
+}
+
+void MovePrimaryDonorExternalState::syncDataOnRecipient(OperationContext* opCtx) {
+    MovePrimaryRecipientSyncData request;
+    request.setMovePrimaryCommonMetadata(getMetadata());
+    request.setDbName(getMetadata().getDatabaseName().db());
+    uassertStatusOK(runCommand(opCtx,
+                               getRecipientShardId(),
+                               ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                               DatabaseName::kAdmin.toString(),
+                               request.toBSON({}),
+                               Shard::RetryPolicy::kNoRetry));
+}
+
+MovePrimaryDonorExternalStateImpl::MovePrimaryDonorExternalStateImpl(
+    const MovePrimaryCommonMetadata& metadata)
+    : MovePrimaryDonorExternalState{metadata} {}
+
+StatusWith<Shard::CommandResponse> MovePrimaryDonorExternalStateImpl::runCommand(
+    OperationContext* opCtx,
+    const ShardId& shardId,
+    const ReadPreferenceSetting& readPref,
+    const std::string& dbName,
+    const BSONObj& cmdObj,
+    Shard::RetryPolicy retryPolicy) {
+    auto shard = uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
+    return shard->runCommand(opCtx, readPref, dbName, cmdObj, retryPolicy);
+}
 
 MovePrimaryDonor::MovePrimaryDonor(ServiceContext* serviceContext,
                                    MovePrimaryDonorService* donorService,
-                                   MovePrimaryDonorDocument initialState)
+                                   MovePrimaryDonorDocument initialState,
+                                   MovePrimaryDonorDependencies dependencies)
     : _serviceContext{serviceContext},
       _donorService{donorService},
       _metadata{std::move(initialState.getMetadata())},
       _mutableFields{std::move(initialState.getMutableFields())},
-      _metrics{MovePrimaryMetrics::initializeFrom(initialState, _serviceContext)} {
+      _metrics{MovePrimaryMetrics::initializeFrom(initialState, _serviceContext)},
+      _externalState{std::move(dependencies.externalState)} {
     _metrics->onStateTransition(boost::none, getCurrentState());
 }
 
@@ -255,41 +325,65 @@ void MovePrimaryDonor::initializeRun(std::shared_ptr<executor::ScopedTaskExecuto
     stdx::unique_lock lock(_mutex);
     _taskExecutor = executor;
     _cancelState.emplace(stepdownToken);
-    _retry.emplace(_taskExecutor, _cancelState.get_ptr());
+    _retry.emplace(_metadata, _taskExecutor, _cancelState.get_ptr());
 }
 
 ExecutorFuture<void> MovePrimaryDonor::runDonorWorkflow() {
     return runOnTaskExecutor([] { pauseBeforeBeginningMovePrimaryDonorWorkflow.pauseWhileSet(); })
         .then([this] { return transitionToState(MovePrimaryDonorStateEnum::kInitializing); })
-        .then([this] { return doInitializing(); });
+        .then([this] { return doInitializing(); })
+        .then([this] { return transitionToState(MovePrimaryDonorStateEnum::kCloning); })
+        .then([this] { return doCloning(); })
+        .then(
+            [this] { return transitionToState(MovePrimaryDonorStateEnum::kWaitingToBlockWrites); });
 }
 
 ExecutorFuture<void> MovePrimaryDonor::transitionToState(MovePrimaryDonorStateEnum newState) {
-    return _retry->untilAbortOrSuccess([this, newState](const auto& factory) {
-        auto oldState = getCurrentState();
-        if (oldState >= newState) {
-            return;
-        }
-        auto opCtx = factory.makeOperationContext(&cc());
-        auto newDocument = buildCurrentStateDocument();
-        newDocument.getMutableFields().setState(newState);
-        evaluatePauseDuringStateTransitionFailpoints(StateTransitionProgress::kBefore, newState);
+    return _retry->untilAbortOrSuccess(
+        fmt::format("transitionToState({})", MovePrimaryDonorState_serializer(newState)),
+        [this, newState](const auto& factory) {
+            auto oldState = getCurrentState();
+            if (oldState >= newState) {
+                return;
+            }
+            auto opCtx = factory.makeOperationContext(&cc());
+            auto newDocument = buildCurrentStateDocument();
+            newDocument.getMutableFields().setState(newState);
+            evaluatePauseDuringStateTransitionFailpoints(StateTransitionProgress::kBefore,
+                                                         newState);
 
-        updateOnDiskState(opCtx.get(), newDocument);
+            updateOnDiskState(opCtx.get(), newDocument);
 
-        evaluatePauseDuringStateTransitionFailpoints(StateTransitionProgress::kPartial, newState);
+            evaluatePauseDuringStateTransitionFailpoints(StateTransitionProgress::kPartial,
+                                                         newState);
 
-        updateInMemoryState(newDocument);
-        _metrics->onStateTransition(oldState, newState);
+            updateInMemoryState(newDocument);
+            _metrics->onStateTransition(oldState, newState);
 
-        evaluatePauseDuringStateTransitionFailpoints(StateTransitionProgress::kAfter, newState);
-    });
+            evaluatePauseDuringStateTransitionFailpoints(StateTransitionProgress::kAfter, newState);
+
+            LOGV2(7306300,
+                  "Transitioned movePrimary donor state",
+                  "oldState"_attr = MovePrimaryDonorState_serializer(oldState),
+                  "newState"_attr = MovePrimaryDonorState_serializer(newState),
+                  "migrationId"_attr = _metadata.get_id(),
+                  "databaseName"_attr = _metadata.getDatabaseName(),
+                  "toShard"_attr = _metadata.getShardName());
+        });
 }
 
 void MovePrimaryDonor::updateOnDiskState(OperationContext* opCtx,
                                          const MovePrimaryDonorDocument& newStateDocument) {
     PersistentTaskStore<MovePrimaryDonorDocument> store(_donorService->getStateDocumentsNS());
-    store.add(opCtx, newStateDocument);
+    auto state = newStateDocument.getMutableFields().getState();
+    if (state == MovePrimaryDonorStateEnum::kInitializing) {
+        store.add(opCtx, newStateDocument);
+    } else {
+        store.update(opCtx,
+                     BSON(MovePrimaryDonorDocument::k_idFieldName << _metadata.get_id()),
+                     BSON("$set" << BSON(MovePrimaryDonorDocument::kMutableFieldsFieldName
+                                         << newStateDocument.getMutableFields().toBSON())));
+    }
 }
 
 void MovePrimaryDonor::updateInMemoryState(const MovePrimaryDonorDocument& newStateDocument) {
@@ -298,9 +392,17 @@ void MovePrimaryDonor::updateInMemoryState(const MovePrimaryDonorDocument& newSt
 }
 
 ExecutorFuture<void> MovePrimaryDonor::doInitializing() {
-    return _retry->untilAbortOrSuccess([](const auto& factory) {
+    return _retry->untilAbortOrSuccess("doInitializing()", [](const auto& factory) {
         // TODO: SERVER-74757
     });
 }
+
+ExecutorFuture<void> MovePrimaryDonor::doCloning() {
+    return _retry->untilAbortOrSuccess("doCloning()", [this](const auto& factory) {
+        auto opCtx = factory.makeOperationContext(&cc());
+        _externalState->syncDataOnRecipient(opCtx.get());
+    });
+}
+
 
 }  // namespace mongo
