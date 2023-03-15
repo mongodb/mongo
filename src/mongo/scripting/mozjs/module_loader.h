@@ -84,7 +84,7 @@ private:
 
     JSObject* createScriptPrivateInfo(JSContext* cx,
                                       JS::Handle<JSString*> path,
-                                      JS::Handle<JSString*> source);
+                                      boost::optional<StringData> source = boost::none);
 
     std::string _baseUrl;
 };

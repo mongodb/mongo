@@ -68,15 +68,7 @@ JSObject* ModuleLoader::loadRootModule(JSContext* cx,
                                        const std::string& path,
                                        boost::optional<StringData> source) {
     JS::RootedString baseUrl(cx, JS_NewStringCopyN(cx, _baseUrl.c_str(), _baseUrl.size()));
-    JS::RootedObject info(cx, [&]() {
-        if (source) {
-            JS::RootedString src(cx, JS_NewStringCopyN(cx, source->rawData(), source->size()));
-            return createScriptPrivateInfo(cx, baseUrl, src);
-        }
-
-        return createScriptPrivateInfo(cx, baseUrl, nullptr);
-    }());
-
+    JS::RootedObject info(cx, createScriptPrivateInfo(cx, baseUrl, source));
     if (!info) {
         return nullptr;
     }
@@ -126,7 +118,7 @@ bool ModuleLoader::importModuleDynamically(JSContext* cx,
                                            JS::HandleObject moduleRequest,
                                            JS::HandleObject promise) {
     JS::RootedString baseUrl(cx, JS_NewStringCopyN(cx, _baseUrl.c_str(), _baseUrl.size()));
-    JS::RootedObject info(cx, createScriptPrivateInfo(cx, baseUrl, nullptr));
+    JS::RootedObject info(cx, createScriptPrivateInfo(cx, baseUrl));
     JS::RootedValue newReferencingPrivate(cx, JS::ObjectValue(*info));
 
     // The dynamic `import` method returns a Promise, and thus allows us to perform module loading
@@ -301,7 +293,7 @@ JSObject* ModuleLoader::loadAndParse(JSContext* cx,
         return nullptr;
     }
 
-    JS::RootedObject info(cx, createScriptPrivateInfo(cx, path, nullptr));
+    JS::RootedObject info(cx, createScriptPrivateInfo(cx, path));
     if (!info) {
         return nullptr;
     }
@@ -462,7 +454,7 @@ JSString* ModuleLoader::fileAsString(JSContext* cx, JS::HandleString pathnameStr
 
 JSObject* ModuleLoader::createScriptPrivateInfo(JSContext* cx,
                                                 JS::Handle<JSString*> path,
-                                                JS::Handle<JSString*> source) {
+                                                boost::optional<StringData> source) {
     JS::Rooted<JSObject*> info(cx, JS_NewPlainObject(cx));
     if (!info) {
         return nullptr;
@@ -476,7 +468,13 @@ JSObject* ModuleLoader::createScriptPrivateInfo(JSContext* cx,
     }
 
     if (source) {
-        JS::Rooted<JS::Value> sourceValue(cx, JS::StringValue(source));
+        size_t len = source->size();
+        JS::UniqueTwoByteChars ucbuf(
+            JS::LossyUTF8CharsToNewTwoByteCharsZ(
+                cx, JS::UTF8Chars(source->rawData(), len), &len, js::MallocArena)
+                .get());
+
+        JS::RootedString sourceValue(cx, JS_NewUCStringCopyN(cx, ucbuf.get(), len));
         if (!JS_DefineProperty(cx, info, "source", sourceValue, JSPROP_ENUMERATE)) {
             return nullptr;
         }
