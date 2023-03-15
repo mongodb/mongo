@@ -98,7 +98,7 @@ void _openCursor(WT_SESSION* session,
         // these operations concurrently with this code path, except for validation.
 
         uassertStatusOK(status);
-    } else if (ret == ENOENT || ret == WT_NOTFOUND) {
+    } else if (ret == ENOENT) {
         uasserted(ErrorCodes::CursorNotFound,
                   str::stream() << "Failed to open a WiredTiger cursor. Reason: " << status
                                 << ", uri: " << uri << ", config: " << config);
