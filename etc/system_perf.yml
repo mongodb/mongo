@@ -2962,36 +2962,110 @@ buildvariants:
     tasks: *classic_engine_1nodereplset_tasks
 
   - name: linux-standalone-telemetry
-    display_name: Linux Standalone (Telemetry)
+    display_name: Linux Standalone 2022-11 (Telemetry)
     cron: "0 0 * * 0,2,3,4,5" # Run it every day except Saturday and Monday.
     modules: *modules
     expansions:
+      mongodb_setup_release: 2022-11
       mongodb_setup: standalone-telemetry
+      infrastructure_provisioning_release: 2022-11
       infrastructure_provisioning: single
+      workload_setup: 2022-11
       platform: linux
       project_dir: *project_dir
       authentication: enabled
       storageEngine: wiredTiger
+      compile_variant: "-arm64"
     run_on:
       - "rhel70-perf-single"
-    depends_on: *_compile_amazon2
-    tasks: *classic_engine_tasks
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: ycsb_60GB
+      - name: ycsb_60GB.long
+      - name: crud_workloads_majority
+      - name: tpcc
 
   - name: linux-1-node-replSet-telemetry
-    display_name: Linux 1-Node ReplSet (Telemetry)
+    display_name: Linux 1-Node ReplSet 2022-11 (Telemetry)
     cron: "0 0 * * 0,2,3,4,5" # Run it every day except Saturday and Monday.
     modules: *modules
     expansions:
+      mongodb_setup_release: 2022-11
       mongodb_setup: single-replica-telemetry
+      infrastructure_provisioning_release: 2022-11
       infrastructure_provisioning: single
+      workload_setup: 2022-11
       platform: linux
       project_dir: *project_dir
       authentication: enabled
       storageEngine: wiredTiger
+      compile_variant: "-arm64"
     run_on:
       - "rhel70-perf-single"
-    depends_on: *_compile_amazon2
-    tasks: *classic_engine_1nodereplset_tasks
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: ycsb_60GB
+      - name: ycsb_60GB.long
+      - name: crud_workloads_majority
+      - name: mixed_workloads
+      - name: tpcc
+
+  - name: linux-3-node-replSet-telemetry
+    display_name: Linux 3-Node ReplSet 2022-11 (Telemetry)
+    cron: "0 0 * * 0,2,3,4,5" # Run it every day except Saturday and Monday.
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: replica-telemetry
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: replica
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-replset"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: ycsb_60GB
+      - name: ycsb_60GB.long
+      - name: crud_workloads_majority
+      - name: crud_workloads_w1
+      - name: mixed_workloads
+      - name: tpcc
+
+  - name: linux-3-shard-telemetry
+    display_name: Linux 3-Shard Cluster 2022-11 (Telemetry)
+    cron: "0 0 * * 0,2,3,4,5" # Run it every day except Saturday and Monday.
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: shard-telemetry
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: shard
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-shard"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: crud_workloads_majority
+      - name: crud_workloads_w1
+      - name: mixed_workloads
 
   - name: linux-1-node-replSet-all-feature-flags.2022-11
     display_name: Linux 1-Node ReplSet (all feature flags) 2022-11
