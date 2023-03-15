@@ -1117,6 +1117,31 @@ TEST_F(NetworkInterfaceTest, TearDownWaitsForInProgress) {
     ASSERT_EQ(getInProgress(), 0);
 }
 
+TEST_F(NetworkInterfaceTest, RunCommandOnLeasedStream) {
+    auto cs = fixture();
+    auto target = cs.getServers().front();
+    auto leasedStream = net().leaseStream(target, transport::kGlobalSSLMode, kNoTimeout).get();
+    auto* client = leasedStream->getClient();
+
+    auto request = RemoteCommandRequest(target, "admin", makeEchoCmdObj(), nullptr, kNoTimeout);
+    auto deferred = client->runCommandRequest(request);
+
+    auto res = deferred.get();
+
+    ASSERT(res.elapsed);
+    uassertStatusOK(res.status);
+    leasedStream->indicateSuccess();
+    leasedStream->indicateUsed();
+
+    // This opmsg request expect the following reply, which is generated below
+    // { echo: { echo: 1, foo: "bar", $db: "admin" }, ok: 1.0 }
+    auto cmdObj = res.data.getObjectField("echo");
+    ASSERT_EQ(1, cmdObj.getIntField("echo"));
+    ASSERT_EQ("bar"_sd, cmdObj.getStringField("foo"));
+    ASSERT_EQ("admin"_sd, cmdObj.getStringField("$db"));
+    ASSERT_EQ(1, res.data.getIntField("ok"));
+}
+
 }  // namespace
 }  // namespace executor
 }  // namespace mongo

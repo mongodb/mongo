@@ -252,7 +252,7 @@ auto ShardingTaskExecutorPoolController::updateHost(PoolId id, const HostState& 
                 "maxConns"_attr = maxConns);
 
     // Update the target for just the pool first
-    poolData.target = stats.requests + stats.active;
+    poolData.target = stats.requests + stats.active + stats.leased;
 
     if (poolData.target < minConns) {
         poolData.target = minConns;

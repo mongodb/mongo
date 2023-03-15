@@ -34,6 +34,7 @@
 #include <string>
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/async_client.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/transport/baton.h"
 #include "mongo/util/fail_point.h"
@@ -250,6 +251,46 @@ public:
                             transport::ConnectSSLMode sslMode,
                             Milliseconds timeout,
                             Status status) = 0;
+
+    /**
+     * An RAII type that NetworkInterface uses to allow users to access a stream corresponding to a
+     * single network-level (i.e. TCP, UDS) connection on which to run commands directly. Generally
+     * speaking, users should use the NetworkInterface itself to run commands to take advantage of
+     * connection-pooling, hedging, and other features - but for special cases where users need to
+     * borrow their own network-stream for manual use, they can lease one through this type.
+     * LeasedStreams are minimal and do not offer automated health-management/automated refreshing
+     * while on lease - users are responsible for examining the health of the stream as-needed if
+     * they desire. Users are also responsible for reporting on the health of stream before the
+     * lease ends so that it can be subsequently re-used; see comments below for detail.
+     */
+    class LeasedStream {
+    public:
+        virtual ~LeasedStream() = default;
+
+        // AsyncDBClient provides the mongoRPC-API for running commands over this stream. This
+        // stream owns the AsyncDBClient and no outstanding networking should be scheduled on the
+        // client when it is destroyed.
+        virtual AsyncDBClient* getClient() = 0;
+
+        // Indicates that the user is done with this leased stream, and no failures on it occured.
+        // Users MUST call either this function or indicateFailure before the LeasedStream is
+        // destroyed.
+        virtual void indicateSuccess() = 0;
+        // Indicates that the stream is unhealthy (i.e. the user received a network error indicating
+        // the stream failed). This prevents the stream from being reused.
+        virtual void indicateFailure(Status) = 0;
+        // Indicates that the stream has successfully performed networking over the stream. Updates
+        // metadata indicating the last healthy networking over the stream so that appropriate
+        // health-checks can be done after the lease ends.
+        virtual void indicateUsed() = 0;
+    };
+
+    /**
+     * Lease a stream from this NetworkInterface for manual use.
+     */
+    virtual SemiFuture<std::unique_ptr<LeasedStream>> leaseStream(const HostAndPort& hostAndPort,
+                                                                  transport::ConnectSSLMode sslMode,
+                                                                  Milliseconds timeout) = 0;
 
 protected:
     NetworkInterface();

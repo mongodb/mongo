@@ -238,6 +238,11 @@ Date_t PoolImpl::now() {
 }
 
 void PoolImpl::setNow(Date_t now) {
+    if (_now) {
+        // If we're not initializing the virtual clock, advance the fast clock source as well.
+        Milliseconds diff = now - *_now;
+        _fastClockSource.advance(diff);
+    }
     _now = now;
     TimerImpl::fireIfNecessary();
 }

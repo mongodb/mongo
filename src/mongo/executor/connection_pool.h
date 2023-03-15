@@ -81,6 +81,7 @@ public:
     using ConnectionHandleDeleter = std::function<void(ConnectionInterface* connection)>;
     using ConnectionHandle = std::unique_ptr<ConnectionInterface, ConnectionHandleDeleter>;
 
+    using RetrieveConnection = unique_function<SemiFuture<ConnectionHandle>()>;
     using GetConnectionCallback = unique_function<void(StatusWith<ConnectionHandle>)>;
 
     using PoolId = uint64_t;
@@ -212,6 +213,7 @@ public:
         size_t pending = 0;
         size_t ready = 0;
         size_t active = 0;
+        size_t leased = 0;
 
         std::string toString() const;
     };
@@ -254,15 +256,38 @@ public:
                     const std::function<transport::Session::TagMask(transport::Session::TagMask)>&
                         mutateFunc) override;
 
-    SemiFuture<ConnectionHandle> get(
+    inline SemiFuture<ConnectionHandle> get(
         const HostAndPort& hostAndPort,
         transport::ConnectSSLMode sslMode,
         Milliseconds timeout,
-        ErrorCodes::Error timeoutCode = ErrorCodes::NetworkInterfaceExceededTimeLimit);
+        ErrorCodes::Error timeoutCode = ErrorCodes::NetworkInterfaceExceededTimeLimit) {
+        return _get(hostAndPort, sslMode, timeout, false /*lease*/, timeoutCode);
+    }
+
     void get_forTest(const HostAndPort& hostAndPort,
                      Milliseconds timeout,
                      ErrorCodes::Error timeoutCode,
                      GetConnectionCallback cb);
+
+    /**
+     * "Lease" a connection from the pool.
+     *
+     * Connections retrieved via this method are not assumed to be in active use for the duration of
+     * their lease and are reported separately in metrics. Otherwise, this method behaves similarly
+     * to `ConnectionPool::get`.
+     */
+    inline SemiFuture<ConnectionHandle> lease(
+        const HostAndPort& hostAndPort,
+        transport::ConnectSSLMode sslMode,
+        Milliseconds timeout,
+        ErrorCodes::Error timeoutCode = ErrorCodes::NetworkInterfaceExceededTimeLimit) {
+        return _get(hostAndPort, sslMode, timeout, true /*lease*/, timeoutCode);
+    }
+
+    void lease_forTest(const HostAndPort& hostAndPort,
+                       Milliseconds timeout,
+                       ErrorCodes::Error timeoutCode,
+                       GetConnectionCallback cb);
 
     void appendConnectionStats(ConnectionPoolStats* stats) const;
 
@@ -274,6 +299,15 @@ public:
 
 private:
     ClockSource* _getFastClockSource() const;
+
+    SemiFuture<ConnectionHandle> _get(
+        const HostAndPort& hostAndPort,
+        transport::ConnectSSLMode sslMode,
+        Milliseconds timeout,
+        bool leased,
+        ErrorCodes::Error timeoutCode = ErrorCodes::NetworkInterfaceExceededTimeLimit);
+
+    void retrieve_forTest(RetrieveConnection retrieve, GetConnectionCallback cb);
 
     std::string _name;
 
