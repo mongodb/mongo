@@ -776,6 +776,8 @@ using DocumentSourceGraphLookupServerlessTest = ServerlessAggregationContextFixt
 
 TEST_F(DocumentSourceGraphLookupServerlessTest,
        LiteParsedDocumentSourceLookupStringExpectedNamespacesInServerless) {
+    RAIIServerParameterControllerForTest multitenancySupportController("multitenancySupport", true);
+
     auto expCtx = getExpCtx();
     auto originalBSON = BSON("$graphLookup" << BSON("from"
                                                     << "foo"
@@ -872,6 +874,8 @@ TEST_F(DocumentSourceGraphLookupServerlessTest,
 
 TEST_F(DocumentSourceGraphLookupServerlessTest,
        CreateFromBSONContainsExpectedNamespacesInServerless) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+
     auto expCtx = getExpCtx();
     auto tenantId = expCtx->ns.tenantId();
     ASSERT(tenantId);

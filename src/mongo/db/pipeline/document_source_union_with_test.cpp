@@ -49,6 +49,7 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/stub_lookup_single_document_process_interface.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/intrusive_counter.h"
 
@@ -612,6 +613,8 @@ using DocumentSourceUnionWithServerlessTest = ServerlessAggregationContextFixtur
 
 TEST_F(DocumentSourceUnionWithServerlessTest,
        LiteParsedDocumentSourceLookupContainsExpectedNamespacesInServerless) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+
     auto tenantId = TenantId(OID::gen());
     NamespaceString nss =
         NamespaceString::createNamespaceString_forTest(tenantId, "test", "testColl");
@@ -640,6 +643,8 @@ TEST_F(DocumentSourceUnionWithServerlessTest,
 
 TEST_F(DocumentSourceUnionWithServerlessTest,
        CreateFromBSONContainsExpectedNamespacesInServerless) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+
     auto expCtx = getExpCtx();
     ASSERT(expCtx->ns.tenantId());
 

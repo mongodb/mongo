@@ -1502,6 +1502,8 @@ using DocumentSourceLookUpServerlessTest = ServerlessAggregationContextFixture;
 
 TEST_F(DocumentSourceLookUpServerlessTest,
        LiteParsedDocumentSourceLookupContainsExpectedNamespacesInServerless) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+
     auto expCtx = getExpCtx();
 
     auto stageSpec =
@@ -1623,6 +1625,8 @@ TEST_F(DocumentSourceLookUpServerlessTest,
 }
 
 TEST_F(DocumentSourceLookUpServerlessTest, CreateFromBSONContainsExpectedNamespacesInServerless) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+
     auto expCtx = getExpCtx();
     ASSERT(expCtx->ns.tenantId());
 

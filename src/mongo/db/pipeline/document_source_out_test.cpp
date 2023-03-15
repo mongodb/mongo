@@ -35,6 +35,7 @@
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_out.h"
+#include "mongo/idl/server_parameter_test_util.h"
 
 namespace mongo {
 namespace {
@@ -118,6 +119,8 @@ using DocumentSourceOutServerlessTest = ServerlessAggregationContextFixture;
 
 TEST_F(DocumentSourceOutServerlessTest,
        LiteParsedDocumentSourceLookupContainsExpectedNamespacesInServerless) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+
     auto tenantId = TenantId(OID::gen());
     NamespaceString nss =
         NamespaceString::createNamespaceString_forTest(tenantId, "test", "testColl");
@@ -147,6 +150,8 @@ TEST_F(DocumentSourceOutServerlessTest,
 }
 
 TEST_F(DocumentSourceOutServerlessTest, CreateFromBSONContainsExpectedNamespacesInServerless) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+
     auto expCtx = getExpCtx();
     ASSERT(expCtx->ns.tenantId());
     auto defaultDb = expCtx->ns.dbName();
