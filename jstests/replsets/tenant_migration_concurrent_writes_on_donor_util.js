@@ -456,7 +456,6 @@ export const TenantMigrationConcurrentWriteUtil = {
         donorForgetMigration: {skip: isNotRunOnUserDatabase},
         donorStartMigration: {skip: isNotRunOnUserDatabase},
         donorWaitForMigrationToCommit: {skip: isNotRunOnUserDatabase},
-        driverOIDTest: {skip: isNotRunOnUserDatabase},
         drop: {
             explicitlyCreateCollection: true,
             command: function(dbName, collName) {

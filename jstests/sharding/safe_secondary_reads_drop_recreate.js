@@ -196,7 +196,6 @@ let testCases = {
         },
         behavior: "versioned"
     },
-    driverOIDTest: {skip: "does not return user data"},
     drop: {skip: "primary only"},
     dropAllRolesFromDatabase: {skip: "primary only"},
     dropAllUsersFromDatabase: {skip: "primary only"},

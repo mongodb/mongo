@@ -398,7 +398,6 @@ let testCases = {
     abortShardSplit: {skip: "internal command"},
     commitShardSplit: {skip: "internal command"},
     forgetShardSplit: {skip: "internal command"},
-    driverOIDTest: {skip: "internal command"},
     drop: {
         setUp: function(conn) {
             assert.commandWorked(conn.getDB(db).runCommand({create: coll, writeConcern: {w: 1}}));

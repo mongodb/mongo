@@ -230,7 +230,6 @@ const allCommands = {
     abortShardSplit: {skip: isPrimaryOnly},
     commitShardSplit: {skip: isPrimaryOnly},
     forgetShardSplit: {skip: isPrimaryOnly},
-    driverOIDTest: {skip: isNotAUserDataRead},
     drop: {skip: isPrimaryOnly},
     dropAllRolesFromDatabase: {skip: isPrimaryOnly},
     dropAllUsersFromDatabase: {skip: isPrimaryOnly},

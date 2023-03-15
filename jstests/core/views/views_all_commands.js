@@ -365,7 +365,6 @@ let viewsCommandTests = {
     abortShardSplit: {skip: isUnrelated},
     commitShardSplit: {skip: isUnrelated},
     forgetShardSplit: {skip: isUnrelated},
-    driverOIDTest: {skip: isUnrelated},
     drop: {command: {drop: "view"}},
     dropAllRolesFromDatabase: {skip: isUnrelated},
     dropAllUsersFromDatabase: {skip: isUnrelated},

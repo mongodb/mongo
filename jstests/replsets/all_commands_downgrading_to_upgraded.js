@@ -534,7 +534,6 @@ const allCommands = {
     abortShardSplit: {skip: isAnInternalCommand},
     commitShardSplit: {skip: isAnInternalCommand},
     forgetShardSplit: {skip: isAnInternalCommand},
-    driverOIDTest: {skip: isAnInternalCommand},
     drop: {
         setUp: function(conn) {
             assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));

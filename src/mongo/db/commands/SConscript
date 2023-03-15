@@ -535,7 +535,6 @@ env.Library(
         "dbcheck.cpp",
         "dbcommands_d.cpp",
         "dbhash.cpp",
-        "driverHelpers.cpp",
         'get_cluster_parameter_command.cpp',
         "internal_rename_if_options_and_indexes_match_cmd.cpp",
         "internal_transactions_test_command_d.cpp",
