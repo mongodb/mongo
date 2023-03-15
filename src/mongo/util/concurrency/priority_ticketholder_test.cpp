@@ -107,27 +107,22 @@ TEST_F(PriorityTicketHolderTest, PriorityTwoQueuedOperations) {
         // Allocate the only available ticket. Priority is irrelevant when there are tickets
         // available.
         MockAdmission initialAdmission(this->getServiceContext(), AdmissionContext::Priority::kLow);
-        initialAdmission.ticket = holder.waitForTicket(initialAdmission.opCtx.get(),
-                                                       &initialAdmission.admCtx,
-                                                       TicketHolder::WaitMode::kInterruptible);
+        initialAdmission.ticket =
+            holder.waitForTicket(initialAdmission.opCtx.get(), &initialAdmission.admCtx);
         ASSERT(initialAdmission.ticket);
 
         MockAdmission lowPriorityAdmission(this->getServiceContext(),
                                            AdmissionContext::Priority::kLow);
         stdx::thread lowPriorityThread([&]() {
             lowPriorityAdmission.ticket =
-                holder.waitForTicket(lowPriorityAdmission.opCtx.get(),
-                                     &lowPriorityAdmission.admCtx,
-                                     TicketHolder::WaitMode::kUninterruptible);
+                holder.waitForTicket(nullptr, &lowPriorityAdmission.admCtx);
         });
 
         MockAdmission normalPriorityAdmission(this->getServiceContext(),
                                               AdmissionContext::Priority::kNormal);
         stdx::thread normalPriorityThread([&]() {
             normalPriorityAdmission.ticket =
-                holder.waitForTicket(normalPriorityAdmission.opCtx.get(),
-                                     &normalPriorityAdmission.admCtx,
-                                     TicketHolder::WaitMode::kUninterruptible);
+                holder.waitForTicket(nullptr, &normalPriorityAdmission.admCtx);
         });
 
         // Wait for the threads to to queue for a ticket.
@@ -188,17 +183,14 @@ TEST_F(PriorityTicketHolderTest, OnlyLowPriorityOps) {
         // Allocate the only available ticket. Priority is irrelevant when there are tickets
         // available.
         MockAdmission initialAdmission(this->getServiceContext(), AdmissionContext::Priority::kLow);
-        initialAdmission.ticket = holder.waitForTicket(initialAdmission.opCtx.get(),
-                                                       &initialAdmission.admCtx,
-                                                       TicketHolder::WaitMode::kInterruptible);
+        initialAdmission.ticket =
+            holder.waitForTicket(initialAdmission.opCtx.get(), &initialAdmission.admCtx);
         ASSERT(initialAdmission.ticket);
 
         MockAdmission low1PriorityAdmission(this->getServiceContext(),
                                             AdmissionContext::Priority::kLow);
         stdx::thread low1PriorityThread([&]() {
-            auto ticket = holder.waitForTicket(low1PriorityAdmission.opCtx.get(),
-                                               &low1PriorityAdmission.admCtx,
-                                               TicketHolder::WaitMode::kUninterruptible);
+            auto ticket = holder.waitForTicket(nullptr, &low1PriorityAdmission.admCtx);
             stdx::lock_guard lk(ticketCheckMutex);
             low1PriorityAdmission.ticket = std::move(ticket);
         });
@@ -207,9 +199,7 @@ TEST_F(PriorityTicketHolderTest, OnlyLowPriorityOps) {
         MockAdmission low2PriorityAdmission(this->getServiceContext(),
                                             AdmissionContext::Priority::kLow);
         stdx::thread low2PriorityThread([&]() {
-            auto ticket = holder.waitForTicket(low2PriorityAdmission.opCtx.get(),
-                                               &low2PriorityAdmission.admCtx,
-                                               TicketHolder::WaitMode::kUninterruptible);
+            auto ticket = holder.waitForTicket(nullptr, &low2PriorityAdmission.admCtx);
             stdx::lock_guard lk(ticketCheckMutex);
             low2PriorityAdmission.ticket = std::move(ticket);
         });
@@ -233,9 +223,7 @@ TEST_F(PriorityTicketHolderTest, OnlyLowPriorityOps) {
         MockAdmission low3PriorityAdmission(this->getServiceContext(),
                                             AdmissionContext::Priority::kLow);
         stdx::thread low3PriorityThread([&]() {
-            auto ticket = holder.waitForTicket(low3PriorityAdmission.opCtx.get(),
-                                               &low3PriorityAdmission.admCtx,
-                                               TicketHolder::WaitMode::kUninterruptible);
+            auto ticket = holder.waitForTicket(nullptr, &low3PriorityAdmission.admCtx);
             stdx::lock_guard lk(ticketCheckMutex);
             low3PriorityAdmission.ticket = std::move(ticket);
         });
@@ -310,18 +298,15 @@ TEST_F(PriorityTicketHolderTest, PriorityTwoNormalOneLowQueuedOperations) {
         // Allocate the only available ticket. Priority is irrelevant when there are tickets
         // available.
         MockAdmission initialAdmission(this->getServiceContext(), AdmissionContext::Priority::kLow);
-        initialAdmission.ticket = holder.waitForTicket(initialAdmission.opCtx.get(),
-                                                       &initialAdmission.admCtx,
-                                                       TicketHolder::WaitMode::kInterruptible);
+        initialAdmission.ticket =
+            holder.waitForTicket(initialAdmission.opCtx.get(), &initialAdmission.admCtx);
         ASSERT(initialAdmission.ticket);
 
         MockAdmission lowPriorityAdmission(this->getServiceContext(),
                                            AdmissionContext::Priority::kLow);
         stdx::thread lowPriorityThread([&]() {
             lowPriorityAdmission.ticket =
-                holder.waitForTicket(lowPriorityAdmission.opCtx.get(),
-                                     &lowPriorityAdmission.admCtx,
-                                     TicketHolder::WaitMode::kUninterruptible);
+                holder.waitForTicket(nullptr, &lowPriorityAdmission.admCtx);
         });
 
 
@@ -329,9 +314,7 @@ TEST_F(PriorityTicketHolderTest, PriorityTwoNormalOneLowQueuedOperations) {
                                                AdmissionContext::Priority::kNormal);
         stdx::thread normal1PriorityThread([&]() {
             normal1PriorityAdmission.ticket =
-                holder.waitForTicket(normal1PriorityAdmission.opCtx.get(),
-                                     &normal1PriorityAdmission.admCtx,
-                                     TicketHolder::WaitMode::kUninterruptible);
+                holder.waitForTicket(nullptr, &normal1PriorityAdmission.admCtx);
         });
 
 
@@ -350,9 +333,7 @@ TEST_F(PriorityTicketHolderTest, PriorityTwoNormalOneLowQueuedOperations) {
                                                AdmissionContext::Priority::kNormal);
         stdx::thread normal2PriorityThread([&]() {
             normal2PriorityAdmission.ticket =
-                holder.waitForTicket(normal2PriorityAdmission.opCtx.get(),
-                                     &normal2PriorityAdmission.admCtx,
-                                     TicketHolder::WaitMode::kUninterruptible);
+                holder.waitForTicket(nullptr, &normal2PriorityAdmission.admCtx);
         });
 
         // Wait for the new thread on the queue.
@@ -403,9 +384,8 @@ TEST_F(PriorityTicketHolderTest, PriorityBasicMetrics) {
     Stats stats(&holder);
 
     MockAdmission lowPriorityAdmission(this->getServiceContext(), AdmissionContext::Priority::kLow);
-    lowPriorityAdmission.ticket = holder.waitForTicket(lowPriorityAdmission.opCtx.get(),
-                                                       &lowPriorityAdmission.admCtx,
-                                                       TicketHolder::WaitMode::kInterruptible);
+    lowPriorityAdmission.ticket =
+        holder.waitForTicket(lowPriorityAdmission.opCtx.get(), &lowPriorityAdmission.admCtx);
 
     unittest::Barrier barrierAcquiredTicket(2);
     unittest::Barrier barrierReleaseTicket(2);
@@ -417,9 +397,7 @@ TEST_F(PriorityTicketHolderTest, PriorityBasicMetrics) {
                                               AdmissionContext::Priority::kNormal);
 
         normalPriorityAdmission.ticket =
-            holder.waitForTicket(normalPriorityAdmission.opCtx.get(),
-                                 &normalPriorityAdmission.admCtx,
-                                 TicketHolder::WaitMode::kUninterruptible);
+            holder.waitForTicket(nullptr, &normalPriorityAdmission.admCtx);
         barrierAcquiredTicket.countDownAndWait();
         barrierReleaseTicket.countDownAndWait();
     });
@@ -482,8 +460,7 @@ TEST_F(PriorityTicketHolderTest, PriorityBasicMetrics) {
     ASSERT_EQ(normalPriorityStats.getIntField("canceled"), 0);
 
     // Retake ticket.
-    holder.waitForTicket(
-        _opCtx.get(), &lowPriorityAdmission.admCtx, TicketHolder::WaitMode::kInterruptible);
+    holder.waitForTicket(_opCtx.get(), &lowPriorityAdmission.admCtx);
 
     ASSERT_EQ(lowPriorityAdmission.admCtx.getAdmissions(), 2);
 
@@ -504,19 +481,15 @@ TEST_F(PriorityTicketHolderTest, PriorityCanceled) {
     {
         MockAdmission lowPriorityAdmission(this->getServiceContext(),
                                            AdmissionContext::Priority::kLow);
-        lowPriorityAdmission.ticket = holder.waitForTicket(lowPriorityAdmission.opCtx.get(),
-                                                           &lowPriorityAdmission.admCtx,
-                                                           TicketHolder::WaitMode::kInterruptible);
+        lowPriorityAdmission.ticket =
+            holder.waitForTicket(lowPriorityAdmission.opCtx.get(), &lowPriorityAdmission.admCtx);
         stdx::thread waiting([&]() {
             MockAdmission normalPriorityAdmission(this->getServiceContext(),
                                                   AdmissionContext::Priority::kNormal);
 
             auto deadline = Date_t::now() + Milliseconds(100);
-            normalPriorityAdmission.ticket =
-                holder.waitForTicketUntil(normalPriorityAdmission.opCtx.get(),
-                                          &normalPriorityAdmission.admCtx,
-                                          deadline,
-                                          TicketHolder::WaitMode::kInterruptible);
+            normalPriorityAdmission.ticket = holder.waitForTicketUntil(
+                normalPriorityAdmission.opCtx.get(), &normalPriorityAdmission.admCtx, deadline);
             ASSERT_FALSE(normalPriorityAdmission.ticket);
         });
 
@@ -571,9 +544,8 @@ TEST_F(PriorityTicketHolderTest, LowPriorityExpedited) {
     // Allocate the only available ticket. Priority is irrelevant when there are tickets
     // available.
     MockAdmission initialAdmission(svcCtx, AdmissionContext::Priority::kNormal);
-    initialAdmission.ticket = holder.waitForTicket(initialAdmission.opCtx.get(),
-                                                   &initialAdmission.admCtx,
-                                                   TicketHolder::WaitMode::kInterruptible);
+    initialAdmission.ticket =
+        holder.waitForTicket(initialAdmission.opCtx.get(), &initialAdmission.admCtx);
     ASSERT(initialAdmission.ticket);
 
     std::vector<stdx::thread> threads;
@@ -582,9 +554,7 @@ TEST_F(PriorityTicketHolderTest, LowPriorityExpedited) {
     Mutex ticketMutex;
 
     threads.emplace_back([&]() {
-        auto ticket = holder.waitForTicket(lowPriorityAdmission.opCtx.get(),
-                                           &lowPriorityAdmission.admCtx,
-                                           TicketHolder::WaitMode::kUninterruptible);
+        auto ticket = holder.waitForTicket(nullptr, &lowPriorityAdmission.admCtx);
         stdx::lock_guard lk(ticketMutex);
         lowPriorityAdmission.ticket = std::move(ticket);
     });
@@ -593,8 +563,7 @@ TEST_F(PriorityTicketHolderTest, LowPriorityExpedited) {
     for (int i = 0; i < queuedNormalAdmissionsCount; i++) {
         threads.emplace_back([&]() {
             MockAdmission adm(svcCtx, AdmissionContext::Priority::kNormal);
-            adm.ticket = holder.waitForTicket(
-                adm.opCtx.get(), &adm.admCtx, TicketHolder::WaitMode::kUninterruptible);
+            adm.ticket = holder.waitForTicket(nullptr, &adm.admCtx);
             adm.ticket.reset();
         });
     }

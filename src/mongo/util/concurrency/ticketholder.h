@@ -56,14 +56,9 @@ public:
     virtual ~TicketHolder(){};
 
     /**
-     * Wait mode for ticket acquisition: interruptible or uninterruptible.
-     */
-    enum WaitMode { kInterruptible, kUninterruptible };
-
-    /**
      * Adjusts the total number of tickets allocated for the ticket pool to 'newSize'.
      */
-    virtual void resize(OperationContext* opCtx, int32_t newSize) noexcept {};
+    virtual void resize(int32_t newSize) noexcept {};
 
     /**
      * Attempts to acquire a ticket without blocking.
@@ -73,22 +68,20 @@ public:
 
     /**
      * Attempts to acquire a ticket. Blocks until a ticket is acquired or the OperationContext
-     * 'opCtx' is killed, throwing an AssertionException.
+     * 'opCtx' is killed, throwing an AssertionException. If no OperationContext is provided, then
+     * the operation is uninterruptible.
      */
-    virtual Ticket waitForTicket(OperationContext* opCtx,
-                                 AdmissionContext* admCtx,
-                                 WaitMode waitMode) = 0;
+    virtual Ticket waitForTicket(OperationContext* opCtx, AdmissionContext* admCtx) = 0;
 
     /**
      * Attempts to acquire a ticket within a deadline, 'until'. Returns 'true' if a ticket is
      * acquired and 'false' if the deadline is reached, but the operation is retryable. Throws an
      * AssertionException if the OperationContext 'opCtx' is killed and no waits for tickets can
-     * proceed.
+     * proceed. If no OperationContext is provided, then the operation is uninterruptible.
      */
     virtual boost::optional<Ticket> waitForTicketUntil(OperationContext* opCtx,
                                                        AdmissionContext* admCtx,
-                                                       Date_t until,
-                                                       WaitMode waitMode) = 0;
+                                                       Date_t until) = 0;
 
     virtual void appendStats(BSONObjBuilder& b) const = 0;
 
@@ -146,19 +139,16 @@ public:
 
     boost::optional<Ticket> tryAcquire(AdmissionContext* admCtx) override;
 
-    Ticket waitForTicket(OperationContext* opCtx,
-                         AdmissionContext* admCtx,
-                         TicketHolder::WaitMode waitMode) override;
+    Ticket waitForTicket(OperationContext* opCtx, AdmissionContext* admCtx) override;
 
     boost::optional<Ticket> waitForTicketUntil(OperationContext* opCtx,
                                                AdmissionContext* admCtx,
-                                               Date_t until,
-                                               TicketHolder::WaitMode waitMode) override;
+                                               Date_t until) override;
 
     /**
      * Adjusts the total number of tickets allocated for the ticket pool to 'newSize'.
      */
-    void resize(OperationContext* opCtx, int32_t newSize) noexcept override;
+    void resize(int32_t newSize) noexcept override;
 
     int32_t used() const override {
         return outof() - available();
@@ -215,14 +205,13 @@ private:
 
     virtual boost::optional<Ticket> _waitForTicketUntilImpl(OperationContext* opCtx,
                                                             AdmissionContext* admCtx,
-                                                            Date_t until,
-                                                            TicketHolder::WaitMode waitMode) = 0;
+                                                            Date_t until) = 0;
 
     virtual void _appendImplStats(BSONObjBuilder& b) const = 0;
 
     virtual void _releaseToTicketPoolImpl(AdmissionContext* admCtx) noexcept = 0;
 
-    virtual void _resize(OperationContext* opCtx, int32_t newSize, int32_t oldSize) noexcept = 0;
+    virtual void _resize(int32_t newSize, int32_t oldSize) noexcept = 0;
 
     /**
      * Fetches the queueing statistics corresponding to the 'admCtx'. All statistics that are queue
@@ -251,18 +240,17 @@ class MockTicketHolder : public TicketHolder {
 public:
     explicit MockTicketHolder(int32_t outof) : _outof(outof) {}
 
-    void resize(OperationContext*, int32_t newSize) noexcept override {
+    void resize(int32_t newSize) noexcept override {
         _outof = newSize;
     }
 
     boost::optional<Ticket> tryAcquire(AdmissionContext*) override;
 
-    Ticket waitForTicket(OperationContext*, AdmissionContext*, WaitMode) override;
+    Ticket waitForTicket(OperationContext*, AdmissionContext*) override;
 
     boost::optional<Ticket> waitForTicketUntil(OperationContext*,
                                                AdmissionContext*,
-                                               Date_t,
-                                               WaitMode) override;
+                                               Date_t) override;
 
     void appendStats(BSONObjBuilder&) const override {}
 

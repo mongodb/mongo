@@ -98,12 +98,11 @@ private:
 
     boost::optional<Ticket> _waitForTicketUntilImpl(OperationContext* opCtx,
                                                     AdmissionContext* admCtx,
-                                                    Date_t until,
-                                                    WaitMode waitMode) override final;
+                                                    Date_t until) override final;
 
     void _releaseToTicketPoolImpl(AdmissionContext* admCtx) noexcept override final;
 
-    void _resize(OperationContext* opCtx, int32_t newSize, int32_t oldSize) noexcept override final;
+    void _resize(int32_t newSize, int32_t oldSize) noexcept override final;
 
     QueueStats& _getQueueStatsToUse(const AdmissionContext* admCtx) noexcept override final;
 

@@ -49,7 +49,6 @@ static int kTickets = 128;
 static int kThreadMin = 16;
 static int kThreadMax = 1024;
 static int kLowPriorityAdmissionBypassThreshold = 100;
-static TicketHolder::WaitMode waitMode = TicketHolder::WaitMode::kUninterruptible;
 
 // For a given benchmark, specifies the AdmissionContext::Priority of ticket admissions
 enum class AdmissionsPriority {
@@ -66,9 +65,6 @@ template <typename TicketHolderImpl>
 class TicketHolderFixture {
 public:
     std::unique_ptr<TicketHolder> ticketHolder;
-    std::vector<ServiceContext::UniqueClient> clients;
-    std::vector<ServiceContext::UniqueOperationContext> opCtxs;
-
 
     TicketHolderFixture(int threads, ServiceContext* serviceContext) {
         if constexpr (std::is_same_v<PriorityTicketHolder, TicketHolderImpl>) {
@@ -76,12 +72,6 @@ public:
                 kTickets, kLowPriorityAdmissionBypassThreshold, serviceContext);
         } else {
             ticketHolder = std::make_unique<TicketHolderImpl>(kTickets, serviceContext);
-        }
-
-        for (int i = 0; i < threads; ++i) {
-            clients.push_back(
-                serviceContext->makeClient(str::stream() << "test client for thread " << i));
-            opCtxs.push_back(clients[i]->makeOperationContext());
         }
     }
 };
@@ -141,10 +131,9 @@ void BM_acquireAndRelease(benchmark::State& state) {
         Microseconds timeForAcquire;
         AdmissionContext admCtx;
         admCtx.setPriority(priority);
-        auto opCtx = fixture->opCtxs[state.thread_index].get();
         {
             auto ticket =
-                fixture->ticketHolder->waitForTicketUntil(opCtx, &admCtx, Date_t::max(), waitMode);
+                fixture->ticketHolder->waitForTicketUntil(nullptr, &admCtx, Date_t::max());
             timeForAcquire = timer.elapsed();
             state.PauseTiming();
             sleepmicros(1);

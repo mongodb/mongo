@@ -102,8 +102,7 @@ boost::optional<Ticket> SemaphoreTicketHolder::_tryAcquireImpl(AdmissionContext*
 
 boost::optional<Ticket> SemaphoreTicketHolder::_waitForTicketUntilImpl(OperationContext* opCtx,
                                                                        AdmissionContext* admCtx,
-                                                                       Date_t until,
-                                                                       WaitMode waitMode) {
+                                                                       Date_t until) {
     const Milliseconds intervalMs(500);
     struct timespec ts;
 
@@ -128,7 +127,7 @@ boost::optional<Ticket> SemaphoreTicketHolder::_waitForTicketUntilImpl(Operation
 
         // To correctly handle errors from sem_timedwait, we should check for interrupts last.
         // It is possible to unset 'errno' after a call to checkForInterrupt().
-        if (waitMode == WaitMode::kInterruptible)
+        if (opCtx)
             opCtx->checkForInterrupt();
     }
     return Ticket{this, admCtx};
@@ -144,9 +143,7 @@ int32_t SemaphoreTicketHolder::available() const {
     return val;
 }
 
-void SemaphoreTicketHolder::_resize(OperationContext* opCtx,
-                                    int32_t newSize,
-                                    int32_t oldSize) noexcept {
+void SemaphoreTicketHolder::_resize(int32_t newSize, int32_t oldSize) noexcept {
     auto difference = newSize - oldSize;
 
     if (difference > 0) {
@@ -177,12 +174,11 @@ boost::optional<Ticket> SemaphoreTicketHolder::_tryAcquireImpl(AdmissionContext*
 
 boost::optional<Ticket> SemaphoreTicketHolder::_waitForTicketUntilImpl(OperationContext* opCtx,
                                                                        AdmissionContext* admCtx,
-                                                                       Date_t until,
-                                                                       WaitMode waitMode) {
+                                                                       Date_t until) {
     stdx::unique_lock<Latch> lk(_mutex);
 
     bool taken = [&] {
-        if (waitMode == WaitMode::kInterruptible) {
+        if (opCtx) {
             return opCtx->waitForConditionOrInterruptUntil(
                 _newTicket, lk, until, [this] { return _tryAcquire(); });
         } else {
@@ -224,9 +220,7 @@ bool SemaphoreTicketHolder::_tryAcquire() {
     return true;
 }
 
-void SemaphoreTicketHolder::_resize(OperationContext* opCtx,
-                                    int32_t newSize,
-                                    int32_t oldSize) noexcept {
+void SemaphoreTicketHolder::_resize(int32_t newSize, int32_t oldSize) noexcept {
     auto difference = newSize - oldSize;
 
     stdx::lock_guard<Latch> lk(_mutex);

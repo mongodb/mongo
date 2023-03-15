@@ -63,10 +63,10 @@ void updateQueueStatsOnTicketAcquisition(ServiceContext* serviceContext,
 }
 }  // namespace
 
-void TicketHolderWithQueueingStats::resize(OperationContext* opCtx, int32_t newSize) noexcept {
+void TicketHolderWithQueueingStats::resize(int32_t newSize) noexcept {
     stdx::lock_guard<Latch> lk(_resizeMutex);
 
-    _resize(opCtx, newSize, _outof.load());
+    _resize(newSize, _outof.load());
     _outof.store(newSize);
 }
 
@@ -84,9 +84,8 @@ void TicketHolderWithQueueingStats::_releaseToTicketPool(AdmissionContext* admCt
 }
 
 Ticket TicketHolderWithQueueingStats::waitForTicket(OperationContext* opCtx,
-                                                    AdmissionContext* admCtx,
-                                                    WaitMode waitMode) {
-    auto res = waitForTicketUntil(opCtx, admCtx, Date_t::max(), waitMode);
+                                                    AdmissionContext* admCtx) {
+    auto res = waitForTicketUntil(opCtx, admCtx, Date_t::max());
     invariant(res);
     return std::move(*res);
 }
@@ -107,8 +106,7 @@ boost::optional<Ticket> TicketHolderWithQueueingStats::tryAcquire(AdmissionConte
 
 boost::optional<Ticket> TicketHolderWithQueueingStats::waitForTicketUntil(OperationContext* opCtx,
                                                                           AdmissionContext* admCtx,
-                                                                          Date_t until,
-                                                                          WaitMode waitMode) {
+                                                                          Date_t until) {
     invariant(admCtx && admCtx->getPriority() != AdmissionContext::Priority::kImmediate);
 
     // Attempt a quick acquisition first.
@@ -135,7 +133,7 @@ boost::optional<Ticket> TicketHolderWithQueueingStats::waitForTicketUntil(Operat
         queueStats.totalCanceled.fetchAndAddRelaxed(1);
     });
 
-    auto ticket = _waitForTicketUntilImpl(opCtx, admCtx, until, waitMode);
+    auto ticket = _waitForTicketUntilImpl(opCtx, admCtx, until);
 
     if (ticket) {
         cancelWait.dismiss();
@@ -187,14 +185,13 @@ boost::optional<Ticket> MockTicketHolder::tryAcquire(AdmissionContext*) {
     return {};
 }
 
-Ticket MockTicketHolder::waitForTicket(OperationContext*, AdmissionContext*, WaitMode) {
+Ticket MockTicketHolder::waitForTicket(OperationContext*, AdmissionContext*) {
     return {nullptr, nullptr};
 }
 
 boost::optional<Ticket> MockTicketHolder::waitForTicketUntil(OperationContext*,
                                                              AdmissionContext*,
-                                                             Date_t,
-                                                             WaitMode) {
+                                                             Date_t) {
     return {};
 }
 

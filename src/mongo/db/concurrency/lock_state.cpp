@@ -388,12 +388,9 @@ bool LockerImpl::_acquireTicket(OperationContext* opCtx, LockMode mode, Date_t d
         // hole.
         invariant(!opCtx->recoveryUnit()->isTimestamped());
 
-        auto waitMode = _uninterruptibleLocksRequested ? TicketHolder::WaitMode::kUninterruptible
-                                                       : TicketHolder::WaitMode::kInterruptible;
         _admCtx.setLockMode(mode);
-        if (deadline == Date_t::max()) {
-            _ticket = holder->waitForTicket(opCtx, &_admCtx, waitMode);
-        } else if (auto ticket = holder->waitForTicketUntil(opCtx, &_admCtx, deadline, waitMode)) {
+        if (auto ticket = holder->waitForTicketUntil(
+                _uninterruptibleLocksRequested ? nullptr : opCtx, &_admCtx, deadline)) {
             _ticket = std::move(*ticket);
         } else {
             return false;

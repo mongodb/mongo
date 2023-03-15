@@ -87,7 +87,7 @@ Status TicketHolderManager::updateConcurrentWriteTransactions(const int32_t& new
         }
         auto& writer = ticketHolderManager->_writeTicketHolder;
         if (writer) {
-            writer->resize(client->getOperationContext(), newWriteTransactions);
+            writer->resize(newWriteTransactions);
             return Status::OK();
         }
         LOGV2_WARNING(6754202,
@@ -120,7 +120,7 @@ Status TicketHolderManager::updateConcurrentReadTransactions(const int32_t& newR
         }
         auto& reader = ticketHolderManager->_readTicketHolder;
         if (reader) {
-            reader->resize(client->getOperationContext(), newReadTransactions);
+            reader->resize(newReadTransactions);
             return Status::OK();
         }
 

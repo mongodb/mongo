@@ -60,13 +60,13 @@ private:
 
     void _run(Client*) override;
 
-    void _probeStable(OperationContext* opCtx, double throughput);
-    void _probeUp(OperationContext* opCtx, double throughput);
-    void _probeDown(OperationContext* opCtx, double throughput);
+    void _probeStable(double throughput);
+    void _probeUp(double throughput);
+    void _probeDown(double throughput);
 
-    void _setConcurrency(OperationContext* opCtx, int concurrency);
+    void _setConcurrency(int32_t concurrency);
 
-    int _stableConcurrency;
+    int32_t _stableConcurrency;
     double _stableThroughput = 0;
     ProbingState _state = ProbingState::kStable;
 

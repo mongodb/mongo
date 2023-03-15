@@ -100,14 +100,11 @@ TicketBroker::WaitingResult PriorityTicketHolder::_attemptToAcquireTicket(
 
 boost::optional<Ticket> PriorityTicketHolder::_waitForTicketUntilImpl(OperationContext* opCtx,
                                                                       AdmissionContext* admCtx,
-                                                                      Date_t until,
-                                                                      WaitMode waitMode) {
+                                                                      Date_t until) {
     invariant(admCtx);
 
     auto queueType = _getQueueType(admCtx);
     auto& ticketBroker = _getBroker(queueType);
-
-    bool interruptible = waitMode == WaitMode::kInterruptible;
 
     while (true) {
         // We attempt to acquire a ticket for a period of time. This may or may not succeed, in
@@ -119,7 +116,7 @@ boost::optional<Ticket> PriorityTicketHolder::_waitForTicketUntilImpl(OperationC
                 _releaseToTicketPoolImpl(admCtx);
             }
         });
-        if (interruptible) {
+        if (opCtx) {
             opCtx->checkForInterrupt();
         }
         auto hasTimedOut = waitingResult.hasTimedOut;
@@ -150,9 +147,7 @@ void PriorityTicketHolder::_releaseToTicketPoolImpl(AdmissionContext* admCtx) no
     }
 }
 
-void PriorityTicketHolder::_resize(OperationContext* opCtx,
-                                   int32_t newSize,
-                                   int32_t oldSize) noexcept {
+void PriorityTicketHolder::_resize(int32_t newSize, int32_t oldSize) noexcept {
     auto difference = newSize - oldSize;
 
     if (difference > 0) {
@@ -173,8 +168,7 @@ void PriorityTicketHolder::_resize(OperationContext* opCtx,
             // This operation is uninterruptible as the resize operation is conceptually atomic.
             // Cancelling the resize and leaving it in-between the old size and the new one is not
             // allowed.
-            auto ticket = _waitForTicketUntilImpl(
-                opCtx, &admCtx, Date_t::max(), TicketHolder::WaitMode::kUninterruptible);
+            auto ticket = _waitForTicketUntilImpl(nullptr, &admCtx, Date_t::max());
             invariant(ticket);
             ticket->discard();
         }
