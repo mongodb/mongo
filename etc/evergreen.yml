@@ -2375,7 +2375,6 @@ buildvariants:
   - name: compile_and_archive_dist_test_then_package_TG
   - name: .concurrency !.no_txns !.repl !.kill_terminate
   - name: disk_wiredtiger
-  - name: .updatefuzzer
 
 - name: &rhel80-debug-ubsan-classic-engine rhel80-debug-ubsan-classic-engine
   display_name: "* UBSAN Enterprise RHEL 8.0 DEBUG (Classic Engine)"
@@ -2558,6 +2557,7 @@ buildvariants:
   - name: .shard_split
   - name: .shard_merge
   - name: telemetry_passthrough
+  - name: .updatefuzzer
   - name: .watchdog
 
 - &enterprise-rhel80-debug-tsan-template
