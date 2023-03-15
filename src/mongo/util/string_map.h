@@ -33,6 +33,7 @@
 #include <absl/container/flat_hash_set.h>
 
 #include "mongo/base/string_data.h"
+#include "mongo/stdx/trusted_hasher.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -117,5 +118,12 @@ template <typename V>
 using StringDataMap = absl::flat_hash_map<StringData, V, StringMapHasher, StringMapEq>;
 
 using StringDataSet = absl::flat_hash_set<StringData, StringMapHasher, StringMapEq>;
+
+// StringMapHasher is a trusted hasher, no need to wrap in a secondary layer of hashing when used in
+// stdx unordered containers.
+template <>
+struct IsTrustedHasher<StringMapHasher, std::string> : std::true_type {};
+template <>
+struct IsTrustedHasher<StringMapHasher, StringData> : std::true_type {};
 
 }  // namespace mongo
