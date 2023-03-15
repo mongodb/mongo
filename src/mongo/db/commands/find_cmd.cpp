@@ -221,7 +221,8 @@ public:
             : CommandInvocation(definition),
               _request(request),
               _dbName(DatabaseNameUtil::deserialize(_request.getValidatedTenantId(),
-                                                    _request.getDatabase())) {
+                                                    _request.getDatabase())),
+              _ns(CommandHelpers::parseNsFromCommand(_dbName, _request.body)) {
             invariant(_request.body.isOwned());
         }
 
@@ -251,8 +252,7 @@ public:
         }
 
         NamespaceString ns() const override {
-            // TODO get the ns from the parsed QueryRequest.
-            return NamespaceString(CommandHelpers::parseNsFromCommand(_dbName, _request.body));
+            return _ns;
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const final {
@@ -387,11 +387,9 @@ public:
 
             // Parse the command BSON to a FindCommandRequest. Pass in the parsedNss in case cmdObj
             // does not have a UUID.
-            auto parsedNss = ns();
             const bool isExplain = false;
-            const bool isOplogNss = (parsedNss == NamespaceString::kRsOplogNamespace);
-            auto findCommand =
-                _parseCmdObjectToFindCommandRequest(opCtx, std::move(parsedNss), cmdObj);
+            const bool isOplogNss = (_ns == NamespaceString::kRsOplogNamespace);
+            auto findCommand = _parseCmdObjectToFindCommandRequest(opCtx, _ns, cmdObj);
             CurOp::get(opCtx)->beginQueryPlanningTimer();
 
             // Only allow speculative majority for internal commands that specify the correct flag.
@@ -773,6 +771,7 @@ public:
     private:
         const OpMsgRequest _request;
         const DatabaseName _dbName;
+        const NamespaceString _ns;
 
         // Parses the command object to a FindCommandRequest. If the client request did not specify
         // any runtime constants, make them available to the query here.
