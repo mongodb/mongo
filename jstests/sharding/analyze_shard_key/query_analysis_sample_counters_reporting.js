@@ -44,8 +44,8 @@ function getCurrentOpAndServerStatus(st) {
 }
 
 /**
- * Runs a db command, and compares resulting currentOp and serverStatus to oldState, the initial
- * state before running the command.
+ * Runs a db command, and compares resulting currentOp and serverStatus to oldState, the
+ * initial state before running the command.
  * Returns the output of currentOp and serverStatus of both mongod and mongos.
  */
 function runCommandAndAssertCurrentOpAndServerStatus(st, db, command, opKind, oldState) {
@@ -55,127 +55,79 @@ function runCommandAndAssertCurrentOpAndServerStatus(st, db, command, opKind, ol
 
     assert.eq(newState.currentOp.mongos.length, 1);
     assert.eq(newState.currentOp.mongod.length, 1);
+    if (oldState) {
+        assert.eq(oldState.currentOp.mongos.length, newState.currentOp.mongos.length);
+        assert.eq(oldState.currentOp.mongod.length, newState.currentOp.mongod.length);
+        assert.eq(oldState.serverStatus.mongos.activeCollections,
+                  newState.serverStatus.mongos.activeCollections);
+        assert.eq(oldState.serverStatus.mongos.totalCollections,
+                  newState.serverStatus.mongos.totalCollections);
+        assert.eq(oldState.serverStatus.mongod.totalCollections,
+                  newState.serverStatus.mongod.totalCollections);
 
-    // Verify mongos currentOp and serverStatus.
+        if (opKind === opKindRead) {
+            assert.eq(oldState.currentOp.mongos[0].sampledReadsCount + 1,
+                      newState.currentOp.mongos[0].sampledReadsCount);
+            assert.eq(oldState.currentOp.mongos[0].sampledWritesCount,
+                      newState.currentOp.mongos[0].sampledWritesCount);
 
-    assert.eq(oldState.currentOp.mongos.length,
-              newState.currentOp.mongos.length,
-              tojson([oldState.currentOp.mongos, newState.currentOp.mongos]));
-    assert.eq(oldState.serverStatus.mongos.activeCollections,
-              newState.serverStatus.mongos.activeCollections,
-              tojson([oldState.serverStatus.mongos, newState.serverStatus.mongos]));
-    assert.eq(oldState.serverStatus.mongos.totalCollections,
-              newState.serverStatus.mongos.totalCollections,
-              tojson([oldState.serverStatus.mongos, newState.serverStatus.mongos]));
+            printjson(newState);
+            assert.eq(oldState.currentOp.mongod[0].sampledReadsCount + 1,
+                      newState.currentOp.mongod[0].sampledReadsCount);
+            assert.eq(oldState.currentOp.mongod[0].sampledWritesCount,
+                      newState.currentOp.mongod[0].sampledWritesCount);
+            // Instead of figuring out the size of the sample being written, just make sure
+            // that the byte counter is greater than before.
+            assert.lt(oldState.currentOp.mongod[0].sampledReadsBytes,
+                      newState.currentOp.mongod[0].sampledReadsBytes);
+            assert.eq(oldState.currentOp.mongod[0].sampledWritesBytes,
+                      newState.currentOp.mongod[0].sampledWritesBytes);
 
-    if (opKind === opKindRead) {
-        assert.eq(oldState.currentOp.mongos[0].sampledReadsCount + 1,
-                  newState.currentOp.mongos[0].sampledReadsCount,
-                  tojson([oldState.currentOp.mongos, newState.currentOp.mongos]));
-        assert.eq(oldState.currentOp.mongos[0].sampledWritesCount,
-                  newState.currentOp.mongos[0].sampledWritesCount,
-                  tojson([oldState.currentOp.mongos, newState.currentOp.mongos]));
+            assert.eq(oldState.serverStatus.mongos.totalSampledReadsCount + 1,
+                      newState.serverStatus.mongos.totalSampledReadsCount);
+            assert.eq(oldState.serverStatus.mongos.totalSampledWritesCount,
+                      newState.serverStatus.mongos.totalSampledWritesCount);
 
-        assert.eq(oldState.serverStatus.mongos.totalSampledReadsCount + 1,
-                  newState.serverStatus.mongos.totalSampledReadsCount,
-                  tojson([oldState.serverStatus.mongos, newState.serverStatus.mongos]));
-        assert.eq(oldState.serverStatus.mongos.totalSampledWritesCount,
-                  newState.serverStatus.mongos.totalSampledWritesCount,
-                  tojson([oldState.serverStatus.mongos, newState.serverStatus.mongos]));
-    } else if (opKind === opKindWrite) {
-        assert.eq(oldState.currentOp.mongos[0].sampledReadsCount,
-                  newState.currentOp.mongos[0].sampledReadsCount,
-                  tojson([oldState.currentOp.mongos, newState.currentOp.mongos]));
-        assert.eq(oldState.currentOp.mongos[0].sampledWritesCount + 1,
-                  newState.currentOp.mongos[0].sampledWritesCount,
-                  tojson([oldState.currentOp.mongos, newState.currentOp.mongos]));
+            assert.eq(oldState.serverStatus.mongod.totalSampledReadsCount + 1,
+                      newState.serverStatus.mongod.totalSampledReadsCount);
+            assert.eq(oldState.serverStatus.mongod.totalSampledWritesCount,
+                      newState.serverStatus.mongod.totalSampledWritesCount);
+            assert.lt(oldState.serverStatus.mongod.totalSampledReadsBytes,
+                      newState.serverStatus.mongod.totalSampledReadsBytes);
+            assert.eq(oldState.serverStatus.mongod.totalSampledWritesBytes,
+                      newState.serverStatus.mongod.totalSampledWritesBytes);
+        } else if (opKind === opKindWrite) {
+            assert.eq(oldState.currentOp.mongos[0].sampledReadsCount,
+                      newState.currentOp.mongos[0].sampledReadsCount);
+            assert.eq(oldState.currentOp.mongos[0].sampledWritesCount + 1,
+                      newState.currentOp.mongos[0].sampledWritesCount);
 
-        assert.eq(oldState.serverStatus.mongos.totalSampledReadsCount,
-                  newState.serverStatus.mongos.totalSampledReadsCount,
-                  tojson([oldState.serverStatus.mongos, newState.serverStatus.mongos]));
-        assert.eq(oldState.serverStatus.mongos.totalSampledWritesCount + 1,
-                  newState.serverStatus.mongos.totalSampledWritesCount,
-                  tojson([oldState.serverStatus.mongos, newState.serverStatus.mongos]));
-    } else {
-        throw new Error("Unknown operation kind " + opKind);
+            assert.eq(oldState.currentOp.mongod[0].sampledReadsCount,
+                      newState.currentOp.mongod[0].sampledReadsCount);
+            assert.eq(oldState.currentOp.mongod[0].sampledWritesCount + 1,
+                      newState.currentOp.mongod[0].sampledWritesCount);
+            assert.eq(oldState.currentOp.mongod[0].sampledReadsBytes,
+                      newState.currentOp.mongod[0].sampledReadsBytes);
+            assert.lt(oldState.currentOp.mongod[0].sampledWritesBytes,
+                      newState.currentOp.mongod[0].sampledWritesBytes);
+
+            assert.eq(oldState.serverStatus.mongos.totalSampledReadsCount,
+                      newState.serverStatus.mongos.totalSampledReadsCount);
+            assert.eq(oldState.serverStatus.mongos.totalSampledWritesCount + 1,
+                      newState.serverStatus.mongos.totalSampledWritesCount);
+
+            assert.eq(oldState.serverStatus.mongod.totalSampledReadsCount,
+                      newState.serverStatus.mongod.totalSampledReadsCount);
+            assert.eq(oldState.serverStatus.mongod.totalSampledWritesCount + 1,
+                      newState.serverStatus.mongod.totalSampledWritesCount);
+            assert.eq(oldState.serverStatus.mongod.totalSampledReadsBytes,
+                      newState.serverStatus.mongod.totalSampledReadsBytes);
+            assert.lt(oldState.serverStatus.mongod.totalSampledWritesBytes,
+                      newState.serverStatus.mongod.totalSampledWritesBytes);
+        } else {
+            throw new Error("Unknown operation kind " + opKind);
+        }
     }
-
-    // Verify mongod currentOp and serverStatus.
-
-    assert.eq(oldState.currentOp.mongod.length,
-              newState.currentOp.mongod.length,
-              tojson([oldState.currentOp.mongod, newState.currentOp.mongod]));
-    assert.eq(oldState.serverStatus.mongod.totalCollections,
-              newState.serverStatus.mongod.totalCollections,
-              tojson([oldState.serverStatus.mongod, newState.serverStatus.mongod]));
-
-    if (opKind == opKindRead) {
-        // QueryAnalysisWriter (on mongod) updates its counters on a separate thread, so we need
-        // to use assert.soon. After this counter is updated, we don't need to wait to check the
-        // other counters.
-        assert.soon(() => {
-            return oldState.currentOp.mongod[0].sampledReadsCount + 1 ==
-                newState.currentOp.mongod[0].sampledReadsCount;
-        }, tojson([oldState.currentOp.mongod[0], newState.currentOp.mongod[0]]));
-        assert.eq(oldState.currentOp.mongod[0].sampledWritesCount,
-                  newState.currentOp.mongod[0].sampledWritesCount,
-                  tojson([oldState.currentOp.mongod[0], newState.currentOp.mongod[0]]));
-
-        // Instead of figuring out the size of the sample being written, just make sure
-        // that the byte counter is greater than before.
-        assert.lt(oldState.currentOp.mongod[0].sampledReadsBytes,
-                  newState.currentOp.mongod[0].sampledReadsBytes,
-                  tojson([oldState.currentOp.mongod[0], newState.currentOp.mongod[0]]));
-        assert.eq(oldState.currentOp.mongod[0].sampledWritesBytes,
-                  newState.currentOp.mongod[0].sampledWritesBytes,
-                  tojson([oldState.currentOp.mongod[0], newState.currentOp.mongod[0]]));
-
-        assert.eq(oldState.serverStatus.mongod.totalSampledReadsCount + 1,
-                  newState.serverStatus.mongod.totalSampledReadsCount,
-                  tojson([oldState.serverStatus.mongod[0], newState.serverStatus.mongod[0]]));
-        assert.eq(oldState.serverStatus.mongod.totalSampledWritesCount,
-                  newState.serverStatus.mongod.totalSampledWritesCount,
-                  tojson([oldState.serverStatus.mongod[0], newState.serverStatus.mongod[0]]));
-        assert.lt(oldState.serverStatus.mongod.totalSampledReadsBytes,
-                  newState.serverStatus.mongod.totalSampledReadsBytes,
-                  tojson([oldState.serverStatus.mongod[0], newState.serverStatus.mongod[0]]));
-        assert.eq(oldState.serverStatus.mongod.totalSampledWritesBytes,
-                  newState.serverStatus.mongod.totalSampledWritesBytes,
-                  tojson([oldState.serverStatus.mongod[0], newState.serverStatus.mongod[0]]));
-    } else if (opKind == opKindWrite) {
-        // QueryAnalysisWriter (on mongod) updates its counters on a separate thread, so we need
-        // to use assert.soon. After this counter is updated, we don't need to wait to check the
-        // other counters.
-        assert.soon(() => {
-            return oldState.currentOp.mongod[0].sampledWritesCount + 1 ==
-                newState.currentOp.mongod[0].sampledWritesCount;
-        }, tojson([oldState.currentOp.mongod[0], newState.currentOp.mongod[0]]));
-        assert.eq(oldState.currentOp.mongod[0].sampledReadsCount,
-                  newState.currentOp.mongod[0].sampledReadsCount,
-                  tojson([oldState.currentOp.mongod[0], newState.currentOp.mongod[0]]));
-        assert.eq(oldState.currentOp.mongod[0].sampledReadsBytes,
-                  newState.currentOp.mongod[0].sampledReadsBytes,
-                  tojson([oldState.currentOp.mongod[0], newState.currentOp.mongod[0]]));
-        assert.lt(oldState.currentOp.mongod[0].sampledWritesBytes,
-                  newState.currentOp.mongod[0].sampledWritesBytes,
-                  tojson([oldState.currentOp.mongod[0], newState.currentOp.mongod[0]]));
-
-        assert.eq(oldState.serverStatus.mongod.totalSampledReadsCount,
-                  newState.serverStatus.mongod.totalSampledReadsCount,
-                  tojson([oldState.serverStatus.mongod[0], newState.serverStatus.mongod[0]]));
-        assert.eq(oldState.serverStatus.mongod.totalSampledWritesCount + 1,
-                  newState.serverStatus.mongod.totalSampledWritesCount,
-                  tojson([oldState.serverStatus.mongod[0], newState.serverStatus.mongod[0]]));
-        assert.eq(oldState.serverStatus.mongod.totalSampledReadsBytes,
-                  newState.serverStatus.mongod.totalSampledReadsBytes,
-                  tojson([oldState.serverStatus.mongod[0], newState.serverStatus.mongod[0]]));
-        assert.lt(oldState.serverStatus.mongod.totalSampledWritesBytes,
-                  newState.serverStatus.mongod.totalSampledWritesBytes,
-                  tojson([oldState.serverStatus.mongod[0], newState.serverStatus.mongod[0]]));
-    } else {
-        throw new Error("Unknown operation kind " + opKind);
-    }
-
     return newState;
 }
 
