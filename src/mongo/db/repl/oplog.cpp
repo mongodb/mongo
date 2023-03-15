@@ -51,7 +51,6 @@
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/drop_database.h"
 #include "mongo/db/catalog/drop_indexes.h"
-#include "mongo/db/catalog/health_log_interface.h"
 #include "mongo/db/catalog/import_collection_oplog_entry_gen.h"
 #include "mongo/db/catalog/local_oplog_info.h"
 #include "mongo/db/catalog/multi_index_block.h"
@@ -1362,36 +1361,6 @@ StatusWith<OplogApplication::Mode> OplogApplication::parseMode(const std::string
     MONGO_UNREACHABLE;
 }
 
-// Logger for oplog constraint violations.
-OplogConstraintViolationLogger* oplogConstraintViolationLogger;
-
-MONGO_INITIALIZER(CreateOplogConstraintViolationLogger)(InitializerContext* context) {
-    oplogConstraintViolationLogger = new OplogConstraintViolationLogger();
-}
-
-void logOplogConstraintViolation(OperationContext* opCtx,
-                                 const NamespaceString& nss,
-                                 OplogConstraintViolationEnum type,
-                                 const std::string& operation,
-                                 const BSONObj& opObj,
-                                 boost::optional<Status> status) {
-    // Log the violation.
-    oplogConstraintViolationLogger->logViolationIfReady(type, opObj, status);
-
-    // Write a new entry to the health log.
-    HealthLogEntry entry;
-    entry.setNss(nss);
-    entry.setTimestamp(Date_t::now());
-    // Oplog constraint violations should always be marked as warning.
-    entry.setSeverity(SeverityEnum::Warning);
-    entry.setScope(ScopeEnum::Document);
-    entry.setMsg(toString(type));
-    entry.setOperation(operation);
-    entry.setData(opObj);
-
-    HealthLogInterface::get(opCtx->getServiceContext())->log(entry);
-}
-
 // @return failure status if an update should have happened and the document DNE.
 // See replset initial sync code.
 Status applyOperation_inlock(OperationContext* opCtx,
@@ -1681,17 +1650,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                             return status;
                         }
                         if (mode == OplogApplication::Mode::kSecondary) {
-                            const auto& opObj = redact(op.toBSONForLogging());
-
                             opCounters->gotInsertOnExistingDoc();
-                            logOplogConstraintViolation(
-                                opCtx,
-                                op.getNss(),
-                                OplogConstraintViolationEnum::kInsertOnExistingDoc,
-                                "insert",
-                                opObj,
-                                boost::none /* status */);
-
                             if (oplogApplicationEnforcesSteadyStateConstraints) {
                                 return status;
                             }
@@ -1912,15 +1871,10 @@ Status applyOperation_inlock(OperationContext* opCtx,
                            !ur.upsertedId.isEmpty() && !(collection && collection->isCapped())) {
                     // This indicates we upconverted an update to an upsert, and it did indeed
                     // upsert.  In steady state mode this is unexpected.
-                    const auto& opObj = redact(op.toBSONForLogging());
-
+                    LOGV2_WARNING(2170001,
+                                  "update needed to be converted to upsert",
+                                  "op"_attr = redact(op.toBSONForLogging()));
                     opCounters->gotUpdateOnMissingDoc();
-                    logOplogConstraintViolation(opCtx,
-                                                op.getNss(),
-                                                OplogConstraintViolationEnum::kUpdateOnMissingDoc,
-                                                "update",
-                                                opObj,
-                                                boost::none /* status */);
 
                     // We shouldn't be doing upserts in secondary mode when enforcing steady state
                     // constraints.
@@ -2043,6 +1997,11 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 // documents at all times.
                 if (result.nDeleted == 0 && mode == OplogApplication::Mode::kSecondary &&
                     !requestNss.isChangeStreamPreImagesCollection()) {
+                    LOGV2_WARNING(2170002,
+                                  "Applied a delete which did not delete anything in steady state "
+                                  "replication",
+                                  "op"_attr = redact(op.toBSONForLogging()));
+
                     // In FCV 4.4, each node is responsible for deleting the excess documents in
                     // capped collections. This implies that capped deletes may not be synchronized
                     // between nodes at times. When upgraded to FCV 5.0, the primary will generate
@@ -2055,25 +2014,11 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     // capped collections when oplog application is enforcing steady state
                     // constraints.
                     bool isCapped = false;
-                    const auto& opObj = redact(op.toBSONForLogging());
                     if (collection) {
                         isCapped = collection->isCapped();
                         opCounters->gotDeleteWasEmpty();
-                        logOplogConstraintViolation(opCtx,
-                                                    op.getNss(),
-                                                    OplogConstraintViolationEnum::kDeleteWasEmpty,
-                                                    "delete",
-                                                    opObj,
-                                                    boost::none /* status */);
                     } else {
                         opCounters->gotDeleteFromMissingNamespace();
-                        logOplogConstraintViolation(
-                            opCtx,
-                            op.getNss(),
-                            OplogConstraintViolationEnum::kDeleteOnMissingNs,
-                            "delete",
-                            opObj,
-                            boost::none /* status */);
                     }
 
                     if (!isCapped) {
@@ -2350,16 +2295,12 @@ Status applyCommand_inlock(OperationContext* opCtx,
 
                 if (mode == OplogApplication::Mode::kSecondary &&
                     status.code() != ErrorCodes::IndexNotFound) {
-                    const auto& opObj = redact(op->toBSONForLogging());
-
+                    LOGV2_WARNING(2170000,
+                                  "Acceptable error during oplog application",
+                                  "db"_attr = nss.db(),
+                                  "error"_attr = status,
+                                  "oplogEntry"_attr = redact(op->toBSONForLogging()));
                     opCounters->gotAcceptableErrorInCommand();
-                    logOplogConstraintViolation(
-                        opCtx,
-                        op->getNss(),
-                        OplogConstraintViolationEnum::kAcceptableErrorInCommand,
-                        "command",
-                        opObj,
-                        status);
                 } else {
                     LOGV2_DEBUG(51776,
                                 1,

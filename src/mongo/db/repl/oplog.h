@@ -37,7 +37,6 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection_options.h"
-#include "mongo/db/repl/oplog_constraint_violation_logger.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_or_grouped_inserts.h"
 #include "mongo/db/repl/optime.h"
@@ -201,16 +200,6 @@ public:
 inline std::ostream& operator<<(std::ostream& s, OplogApplication::Mode mode) {
     return (s << OplogApplication::modeToString(mode));
 }
-
-/**
- * Logs an oplog constraint violation and writes an entry into the health log.
- */
-void logOplogConstraintViolation(OperationContext* opCtx,
-                                 const NamespaceString& nss,
-                                 OplogConstraintViolationEnum type,
-                                 const std::string& operation,
-                                 const BSONObj& opObj,
-                                 boost::optional<Status> status);
 
 /**
  * Used for applying from an oplog entry or grouped inserts.

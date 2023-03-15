@@ -31,8 +31,6 @@
 
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/catalog/health_log.h"
-#include "mongo/db/catalog/health_log_interface.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
@@ -197,13 +195,9 @@ void OplogApplierImplTest::setUp() {
     // This is necessary to generate ghost timestamps for index builds that are not 0, since 0 is an
     // invalid timestamp.
     VectorClockMutable::get(_opCtx.get())->tickClusterTimeTo(LogicalTime(Timestamp(1, 0)));
-
-    HealthLogInterface::set(serviceContext, std::make_unique<HealthLog>());
-    HealthLogInterface::get(serviceContext)->startup();
 }
 
 void OplogApplierImplTest::tearDown() {
-    HealthLogInterface::get(serviceContext)->shutdown();
     _opCtx.reset();
     _consistencyMarkers = {};
     DropPendingCollectionReaper::set(serviceContext, {});
@@ -238,7 +232,6 @@ void OplogApplierImplTest::_testApplyOplogEntryOrGroupedInsertsCrudOperation(
     bool expectedApplyOpCalled) {
     bool applyOpCalled = false;
 
-    // auto testOpCtx = _opCtx.get();
     auto checkOpCtx = [&targetNss](OperationContext* opCtx) {
         ASSERT_TRUE(opCtx);
         ASSERT_TRUE(opCtx->lockState()->isDbLockedForMode(targetNss.dbName(), MODE_IX));
@@ -250,14 +243,9 @@ void OplogApplierImplTest::_testApplyOplogEntryOrGroupedInsertsCrudOperation(
 
     _opObserver->onInsertsFn =
         [&](OperationContext* opCtx, const NamespaceString& nss, const std::vector<BSONObj>& docs) {
-            // Other threads may be calling into the opObserver. Only assert if we are writing to
-            // the target ns, otherwise skip these asserts.
-            if (targetNss != nss) {
-                return Status::OK();
-            }
-
             applyOpCalled = true;
             checkOpCtx(opCtx);
+            ASSERT_EQUALS(targetNss, nss);
             ASSERT_EQUALS(1U, docs.size());
             // For upserts we don't know the intended value of the document.
             if (op.getOpType() == repl::OpTypeEnum::kInsert) {
@@ -270,28 +258,18 @@ void OplogApplierImplTest::_testApplyOplogEntryOrGroupedInsertsCrudOperation(
                                   const CollectionPtr& coll,
                                   StmtId stmtId,
                                   const OplogDeleteEntryArgs& args) {
-        // Other threads may be calling into the opObserver. Only assert if we are writing to
-        // the target ns, otherwise skip these asserts.
-        if (targetNss != coll->ns()) {
-            return Status::OK();
-        }
-
         applyOpCalled = true;
         checkOpCtx(opCtx);
+        ASSERT_EQUALS(targetNss, coll->ns());
         ASSERT(args.deletedDoc);
         ASSERT_BSONOBJ_EQ(op.getObject(), *(args.deletedDoc));
         return Status::OK();
     };
 
     _opObserver->onUpdateFn = [&](OperationContext* opCtx, const OplogUpdateEntryArgs& args) {
-        // Other threads may be calling into the opObserver. Only assert if we are writing to
-        // the target ns, otherwise skip these asserts.
-        if (targetNss != args.coll->ns()) {
-            return Status::OK();
-        }
-
         applyOpCalled = true;
         checkOpCtx(opCtx);
+        ASSERT_EQUALS(targetNss, args.coll->ns());
         return Status::OK();
     };
 
