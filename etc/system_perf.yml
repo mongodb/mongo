@@ -2020,6 +2020,8 @@ buildvariants:
       atlas_setup: M60-repl
       use_custom_build: true
       infrastructure_provisioning: workload_client
+      infrastructure_provisioning_release: 2022-11
+      workload_setup: 2022-11
       platform: linux
       project_dir: *project_dir
       storageEngine: wiredTiger
@@ -2054,8 +2056,9 @@ buildvariants:
       atlas_setup: M60-repl-azure
       use_custom_build_azure: true
       compile_variant: -rhel70
-      run_on_azure: true
       infrastructure_provisioning: workload_client
+      infrastructure_provisioning_release: 2022-11
+      workload_setup: 2022-11
       platform: linux
       project_dir: *project_dir
       storageEngine: wiredTiger
