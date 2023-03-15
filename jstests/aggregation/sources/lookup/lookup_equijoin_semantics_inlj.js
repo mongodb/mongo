@@ -7,24 +7,31 @@
 load("jstests/aggregation/sources/lookup/lookup_equijoin_semantics_lib.js");  // For runTests and
                                                                               // runTest_*.
 
-localColl = db.lookup_arrays_semantics_local_inlj;
-foreignColl = db.lookup_arrays_semantics_foreign_inlj;
-
 /**
  * Run the tests with sorted ascending/descending indexes.
  */
-currentJoinAlgorithm = JoinAlgorithm.INLJ_Asc;
-runTests();
+runTests({
+    localColl: db.lookup_arrays_semantics_local_inlj,
+    foreignColl: db.lookup_arrays_semantics_foreign_inlj,
+    currentJoinAlgorithm: JoinAlgorithm.INLJ_Asc
+});
 
-currentJoinAlgorithm = JoinAlgorithm.INLJ_Dec;
-runTests();
+runTests({
+    localColl: db.lookup_arrays_semantics_local_inlj,
+    foreignColl: db.lookup_arrays_semantics_foreign_inlj,
+    currentJoinAlgorithm: JoinAlgorithm.INLJ_Dec
+});
 
 /**
  * Tests with hashed index. Because hashed index doesn't support array data, it's easier to provide
  * separate tests for it (even if with some duplication) than adjust the data in the common tests.
  */
 (function runHashedIndexTests() {
-    currentJoinAlgorithm = JoinAlgorithm.INLJ_Hashed;
+    const testConfig = {
+        localColl: db.lookup_arrays_semantics_local_inlj,
+        foreignColl: db.lookup_arrays_semantics_foreign_inlj,
+        currentJoinAlgorithm: JoinAlgorithm.INLJ_Hashed
+    };
 
     (function testVariousDataTypes() {
         // NOTE: There is no shell equivalent for the following BSON types:
@@ -49,7 +56,7 @@ runTests();
             {_id: 14, a: null},
         ];
         docs.forEach(doc => {
-            runTest_SingleLocalRecord({
+            runTest_SingleLocalRecord(testConfig, {
                 testDescription: "Various data types in foreign matching to: " + tojson(doc),
                 localRecord: {b: doc.a},
                 localField: "b",
@@ -61,7 +68,7 @@ runTests();
 
         // Hashed indexes don't support array data, but asking to match an array from local is
         // allowed and should produce no matches.
-        runTest_SingleLocalRecord({
+        runTest_SingleLocalRecord(testConfig, {
             testDescription: "Various data types in foreign matching to an array",
             localRecord: {b: [[1, 2]]},
             localField: "b",
@@ -82,7 +89,7 @@ runTests();
             {_id: 13, a: ""},
         ];
 
-        runTest_SingleLocalRecord({
+        runTest_SingleLocalRecord(testConfig, {
             testDescription: "Null in local",
             localRecord: {b: null},
             localField: "b",
@@ -99,7 +106,7 @@ runTests();
             {_id: 2, a: {b: {no_c: 1}}},
         ];
 
-        runTest_SingleLocalRecord({
+        runTest_SingleLocalRecord(testConfig, {
             testDescription: "Index join with nested path in foreign field",
             localRecord: {b: 1},
             localField: "b",
@@ -114,7 +121,11 @@ runTests();
  * Other miscelaneous tests for INLJ.
  */
 (function runMiscelaneousInljTests() {
-    currentJoinAlgorithm = JoinAlgorithm.INLJ_Asc;
+    const testConfig = {
+        localColl: db.lookup_arrays_semantics_local_inlj,
+        foreignColl: db.lookup_arrays_semantics_foreign_inlj,
+        currentJoinAlgorithm: JoinAlgorithm.INLJ_Asc
+    };
 
     (function testServer66119() {
         const docs = [
@@ -127,7 +138,7 @@ runTests();
             {_id: 6, a: [{b: [1, 2]}, {b: [3, [1]]}]},
         ];
 
-        runTest_SingleForeignRecord({
+        runTest_SingleForeignRecord(testConfig, {
             testDescription: "Nested arrays with the same value as another key value in local",
             localRecords: docs,
             localField: "a.b",

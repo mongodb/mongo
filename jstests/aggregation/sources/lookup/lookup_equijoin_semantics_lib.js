@@ -18,9 +18,6 @@ load("jstests/aggregation/extras/utils.js");
 load("jstests/libs/analyze_plan.js");  // For 'getAggPlanStages()'
 load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
 
-let localColl;
-let foreignColl;
-
 const JoinAlgorithm = {
     HJ: {name: "HJ", strategy: "HashJoin"},
     NLJ: {name: "NLJ", strategy: "NestedLoopJoin"},
@@ -28,9 +25,9 @@ const JoinAlgorithm = {
     INLJ_Dec: {name: "INLJ_Dec", indexType: -1, strategy: "IndexedLoopJoin"},
     INLJ_Hashed: {name: "INLJ_Hashed", indexType: "hashed", strategy: "IndexedLoopJoin"}
 };
-let currentJoinAlgorithm;
 
-function setupCollections(localRecords, foreignRecords, foreignField) {
+function setupCollections(testConfig, localRecords, foreignRecords, foreignField) {
+    const {localColl, foreignColl, currentJoinAlgorithm} = testConfig;
     localColl.drop();
     assert.commandWorked(localColl.insert(localRecords));
 
@@ -47,7 +44,8 @@ function setupCollections(localRecords, foreignRecords, foreignField) {
  * Checks that the expected join algorithm has been used (to sanity check that the tests do provide
  * the intended coverage).
  */
-function checkJoinConfiguration(explain) {
+function checkJoinConfiguration(testConfig, explain) {
+    const {currentJoinAlgorithm} = testConfig;
     const eqLookupNodes = getAggPlanStages(explain, "EQ_LOOKUP");
     if (checkSBEEnabled(db)) {
         if (eqLookupNodes.length > 0) {
@@ -69,12 +67,14 @@ function checkJoinConfiguration(explain) {
  * 'idsExpectToMatch'.
  */
 function runTest_SingleForeignRecord(
+    testConfig,
     {testDescription, localRecords, localField, foreignRecord, foreignField, idsExpectedToMatch}) {
+    const {localColl, foreignColl, currentJoinAlgorithm} = testConfig;
     assert('object' === typeof (foreignRecord) && !Array.isArray(foreignRecord),
            "foreignRecord should be a single document");
     testDescription += ` (currentJoinAlgorithm: ${currentJoinAlgorithm.name})`;
 
-    setupCollections(localRecords, [foreignRecord], foreignField);
+    setupCollections(testConfig, localRecords, [foreignRecord], foreignField);
 
     const pipeline = [{
         $lookup: {
@@ -116,12 +116,14 @@ function runTest_SingleForeignRecord(
  * for it contains documents with ids from `idsExpectedToMatch`.
  */
 function runTest_SingleLocalRecord(
+    testConfig,
     {testDescription, localRecord, localField, foreignRecords, foreignField, idsExpectedToMatch}) {
+    const {localColl, foreignColl, currentJoinAlgorithm} = testConfig;
     assert('object' === typeof (localRecord) && !Array.isArray(localRecord),
            "localRecord should be a single document");
     testDescription += ` (currentJoinAlgorithm: ${currentJoinAlgorithm.name})`;
 
-    setupCollections([localRecord], foreignRecords, foreignField);
+    setupCollections(testConfig, [localRecord], foreignRecords, foreignField);
 
     const pipeline = [{
         $lookup: {
@@ -153,10 +155,12 @@ function runTest_SingleLocalRecord(
  * Executes $lookup and expects it to fail with the specified 'expectedErrorCode`.
  */
 function runTest_ExpectFailure(
+    testConfig,
     {testDescription, localRecords, localField, foreignRecords, foreignField, expectedErrorCode}) {
+    const {localColl, foreignColl, currentJoinAlgorithm} = testConfig;
     testDescription += ` (currentJoinAlgorithm: ${currentJoinAlgorithm.name})`;
 
-    setupCollections(localRecords, foreignRecords, foreignField);
+    setupCollections(testConfig, localRecords, foreignRecords, foreignField);
 
     assert.commandFailedWithCode(
         localColl.runCommand("aggregate", {
@@ -178,15 +182,17 @@ function runTest_ExpectFailure(
 /**
  * Tests.
  */
-function runTests() {
+function runTests(testConfig) {
+    const {localColl, foreignColl, currentJoinAlgorithm} = testConfig;
+
     // Sanity-test that the join is configured correctly.
-    setupCollections([{a: 1}], [{a: 1}], "a");
+    setupCollections(testConfig, [{a: 1}], [{a: 1}], "a");
     const pipeline = [
         {$lookup: {from: foreignColl.getName(), localField: "a", foreignField: "a", as: "matched"}}
     ];
     const aggOptions = {allowDiskUse: currentJoinAlgorithm == JoinAlgorithm.HJ};
     const explain = localColl.explain().aggregate(pipeline, aggOptions);
-    if (!checkJoinConfiguration(explain)) {
+    if (!checkJoinConfiguration(testConfig, explain)) {
         // Some test suites execute these tests in a way that prevents $lookup from being lowered
         // into SBE (e.g. due to sharding, or wrapping the pipeline into $facet). We'll get coverage
         // for $lookup in the classic engine from running these tests in classic build variant so no
@@ -212,7 +218,7 @@ function runTests() {
             {_id: 26, a: ""}
         ];
 
-        runTest_SingleForeignRecord({
+        runTest_SingleForeignRecord(testConfig, {
             testDescription: "Null in foreign, top-level field in local",
             localRecords: docs,
             localField: "a",
@@ -220,7 +226,7 @@ function runTests() {
             foreignField: "b",
             idsExpectedToMatch: [0, 1, 2, 10]
         });
-        runTest_SingleLocalRecord({
+        runTest_SingleLocalRecord(testConfig, {
             testDescription: "Null in local, top-level field in foreign",
             localRecord: {_id: 0, b: null},
             localField: "b",
@@ -229,7 +235,7 @@ function runTests() {
             idsExpectedToMatch: [0, 1, 2]
         });
 
-        runTest_SingleForeignRecord({
+        runTest_SingleForeignRecord(testConfig, {
             testDescription: "Missing in foreign, top-level field in local",
             localRecords: docs,
             localField: "a",
@@ -237,7 +243,7 @@ function runTests() {
             foreignField: "b",
             idsExpectedToMatch: [0, 1, 2, 10]
         });
-        runTest_SingleLocalRecord({
+        runTest_SingleLocalRecord(testConfig, {
             testDescription: "Missing in local, top-level field in foreign",
             localRecord: {_id: 0, no_b: 1},
             localField: "b",
@@ -260,7 +266,7 @@ function runTests() {
 
         if (checkSBEEnabled(db)) {
             // When lowered to SBE, "undefined" should only match "undefined".
-            runTest_SingleForeignRecord({
+            runTest_SingleForeignRecord(testConfig, {
                 testDescription: "Undefined in foreign, top-level field in local",
                 localRecords: docs,
                 localField: "a",
@@ -268,7 +274,7 @@ function runTests() {
                 foreignField: "b",
                 idsExpectedToMatch: []
             });
-            runTest_SingleForeignRecord({
+            runTest_SingleForeignRecord(testConfig, {
                 testDescription: "Undefined in foreign, undefined in array in local",
                 localRecords: [{_id: 0, a: undefined}, {_id: 1, a: [undefined, 1]}],
                 localField: "a",
@@ -276,7 +282,7 @@ function runTests() {
                 foreignField: "b",
                 idsExpectedToMatch: [0, 1]
             });
-            runTest_SingleLocalRecord({
+            runTest_SingleLocalRecord(testConfig, {
                 testDescription: "Undefined in local, undefined in array in foreign",
                 localRecord: {_id: 0, b: undefined},
                 localField: "a",
@@ -285,7 +291,7 @@ function runTests() {
                 idsExpectedToMatch: [0, 1]
             });
 
-            runTest_SingleLocalRecord({
+            runTest_SingleLocalRecord(testConfig, {
                 testDescription: "Undefined in local, top-level field in foreign",
                 localRecord: {_id: 0, b: undefined},
                 localField: "b",
@@ -296,7 +302,7 @@ function runTests() {
         } else {
             // Due to legacy reasons, in the classic engine "undefined" either matches to null or
             // triggers an error.
-            runTest_SingleForeignRecord({
+            runTest_SingleForeignRecord(testConfig, {
                 testDescription: "Undefined in foreign, top-level field in local",
                 localRecords: docs,
                 localField: "a",
@@ -310,7 +316,7 @@ function runTests() {
             // compare to undefined, such as {$eq:undefined}, are banned. Arguably this behavior
             // could be improved, but we are unlikely to change it given that the undefined BSON
             // type has been deprecated for many years.
-            runTest_ExpectFailure({
+            runTest_ExpectFailure(testConfig, {
                 testDescription: "Undefined in local, top-level field in foreign",
                 localRecords: {_id: 0, b: undefined},
                 localField: "b",
@@ -332,7 +338,7 @@ function runTests() {
             {_id: 11, no_a: 42},
         ];
 
-        runTest_SingleForeignRecord({
+        runTest_SingleForeignRecord(testConfig, {
             testDescription: "NaN in foreign, top-level field in local",
             localRecords: docs,
             localField: "a",
@@ -340,7 +346,7 @@ function runTests() {
             foreignField: "b",
             idsExpectedToMatch: [0, 1, 2, 3]
         });
-        runTest_SingleLocalRecord({
+        runTest_SingleLocalRecord(testConfig, {
             testDescription: "NaN in local, top-level field in foreign",
             localRecord: {_id: 0, b: NaN},
             localField: "b",
@@ -373,7 +379,7 @@ function runTests() {
         ];
 
         docs.forEach(doc => {
-            runTest_SingleForeignRecord({
+            runTest_SingleForeignRecord(testConfig, {
                 testDescription: "Various data types in local matching to: " + tojson(doc),
                 localRecords: docs,
                 localField: "a",
@@ -381,7 +387,7 @@ function runTests() {
                 foreignField: "b",
                 idsExpectedToMatch: [doc._id]
             });
-            runTest_SingleLocalRecord({
+            runTest_SingleLocalRecord(testConfig, {
                 testDescription: "Various data types in foreign matching to: " + tojson(doc),
                 localRecord: {b: doc.a},
                 localField: "b",
@@ -391,7 +397,7 @@ function runTests() {
             });
         });
 
-        runTest_SingleForeignRecord({
+        runTest_SingleForeignRecord(testConfig, {
             testDescription: "Various data types in local, expecting no match",
             localRecords: docs,
             localField: "a",
@@ -399,7 +405,7 @@ function runTests() {
             foreignField: "b",
             idsExpectedToMatch: []
         });
-        runTest_SingleLocalRecord({
+        runTest_SingleLocalRecord(testConfig, {
             testDescription: "Various data types in foreign, expecting no match",
             localRecord: {b: 'xxx'},
             localField: "b",
@@ -430,7 +436,7 @@ function runTests() {
         ];
 
         // When matching a scalar, local and foreign collections are fully symmetric.
-        runTest_SingleForeignRecord({
+        runTest_SingleForeignRecord(testConfig, {
             testDescription: "Top-level field in local and top-level scalar in foreign",
             localRecords: docs,
             localField: "a",
@@ -438,7 +444,7 @@ function runTests() {
             foreignField: "b",
             idsExpectedToMatch: [0, 1, 2, 3, 4, 5, 6, 7]
         });
-        runTest_SingleLocalRecord({
+        runTest_SingleLocalRecord(testConfig, {
             testDescription: "Top-level scalar in local and top-level field in foreign",
             localRecord: {_id: 0, b: 1},
             localField: "b",
@@ -471,7 +477,7 @@ function runTests() {
         ];
 
         // When matching a scalar, local and foreign collections are fully symmetric.
-        runTest_SingleForeignRecord({
+        runTest_SingleForeignRecord(testConfig, {
             testDescription: "Path in local and top-level scalar in foreign",
             localRecords: docs,
             localField: "a.x",
@@ -479,7 +485,7 @@ function runTests() {
             foreignField: "b",
             idsExpectedToMatch: [0, 1, 2, 3, 4, 5, 6, 7]
         });
-        runTest_SingleLocalRecord({
+        runTest_SingleLocalRecord(testConfig, {
             testDescription: "Top-level scalar in local and path in foreign",
             localRecord: {_id: 0, b: 1},
             localField: "b",
@@ -529,7 +535,7 @@ function runTests() {
         ];
 
         // When matching a scalar, local and foreign collections are fully symmetric.
-        runTest_SingleForeignRecord({
+        runTest_SingleForeignRecord(testConfig, {
             testDescription: "Deep path in local and top-level scalar in foreign",
             localRecords: docs,
             localField: "a.b.c",
@@ -539,7 +545,7 @@ function runTests() {
                 [0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11,
                  12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]
         });
-        runTest_SingleLocalRecord({
+        runTest_SingleLocalRecord(testConfig, {
             testDescription: "Top-level scalar in local and deep path in foreign",
             localRecord: {_id: 0, key: 1},
             localField: "key",
@@ -571,7 +577,7 @@ function runTests() {
             {_id: 15, no_a: [1, 2]},
         ];
 
-        runTest_SingleForeignRecord({
+        runTest_SingleForeignRecord(testConfig, {
             testDescription: "Top-level field in local and top-level array in foreign",
             localRecords: docs,
             localField: "a",
@@ -579,7 +585,7 @@ function runTests() {
             foreignField: "b",
             idsExpectedToMatch: [/*match on [1, 2]: */ 0, 1, /*match on 1: */ 2, 11]
         });
-        runTest_SingleLocalRecord({
+        runTest_SingleLocalRecord(testConfig, {
             testDescription: "Top-level array in local and top-level field in foreign",
             localRecord: {_id: 0, b: [1, 2]},
             localField: "b",
@@ -588,7 +594,7 @@ function runTests() {
             idsExpectedToMatch: [/*match on 1: */ 2, 11]
         });
 
-        runTest_SingleForeignRecord({
+        runTest_SingleForeignRecord(testConfig, {
             testDescription: "Top-level field in local and nested array in foreign",
             localRecords: docs,
             localField: "a",
@@ -596,7 +602,7 @@ function runTests() {
             foreignField: "b",
             idsExpectedToMatch: [/*match on [1, 2]: */ 0, 1]
         });
-        runTest_SingleLocalRecord({
+        runTest_SingleLocalRecord(testConfig, {
             testDescription: "Nested array in local and top-level field in foreign",
             localRecord: {_id: 0, b: [[1, 2], 42]},
             localField: "b",
@@ -632,7 +638,7 @@ function runTests() {
             {_id: 15, a: {no_x: [[1, 2], 3]}},
         ];
 
-        runTest_SingleForeignRecord({
+        runTest_SingleForeignRecord(testConfig, {
             testDescription: "Path in local and top-level array in foreign",
             localRecords: docs,
             localField: "a.x",
@@ -641,7 +647,7 @@ function runTests() {
             idsExpectedToMatch:
                 [/*match on [1, 2]: */ 0, 1, 2, 3, /*match on 1: */ 4, 5, 6, 7, 10, 12]
         });
-        runTest_SingleLocalRecord({
+        runTest_SingleLocalRecord(testConfig, {
             testDescription: "Top-level array in local and path in foreign",
             localRecord: {_id: 0, b: [1, 2]},
             localField: "b",
@@ -650,7 +656,7 @@ function runTests() {
             idsExpectedToMatch: [/*match on 1: */ 4, 5, 6, 7, 10, 12]
         });
 
-        runTest_SingleForeignRecord({
+        runTest_SingleForeignRecord(testConfig, {
             testDescription: "Path in local and nested array in foreign",
             localRecords: docs,
             localField: "a.x",
@@ -658,7 +664,7 @@ function runTests() {
             foreignField: "b",
             idsExpectedToMatch: [/*match on [1, 2]: */ 0, 1, 2, 3]
         });
-        runTest_SingleLocalRecord({
+        runTest_SingleLocalRecord(testConfig, {
             testDescription: "Nested array in local and path in foreign",
             localRecord: {_id: 0, b: [[1, 2], 42]},
             localField: "b",
@@ -690,7 +696,7 @@ function runTests() {
             {_id: 21, a: [{x: 2}, {x: 3}]},
         ];
 
-        runTest_SingleForeignRecord({
+        runTest_SingleForeignRecord(testConfig, {
             testDescription: "Missing in local path and top-level null in foreign",
             localRecords: docs,
             localField: "a.x",
@@ -698,7 +704,7 @@ function runTests() {
             foreignField: "b",
             idsExpectedToMatch: [0, 1, 2, 5, 6, 7, 8, 9, 10, 11, 12]
         });
-        runTest_SingleLocalRecord({
+        runTest_SingleLocalRecord(testConfig, {
             testDescription: "Top-level null in local and missing in foreign path",
             localRecord: {_id: 0, b: null},
             localField: "b",
@@ -707,7 +713,7 @@ function runTests() {
             idsExpectedToMatch: [0, 1, 2, 3, 4, 5, 6, 7, 8]
         });
 
-        runTest_SingleForeignRecord({
+        runTest_SingleForeignRecord(testConfig, {
             testDescription: "Missing in local path and top-level missing in foreign",
             localRecords: docs,
             localField: "a.x",
@@ -715,7 +721,7 @@ function runTests() {
             foreignField: "b",
             idsExpectedToMatch: [0, 1, 2, 5, 6, 7, 8, 9, 10, 11, 12]
         });
-        runTest_SingleLocalRecord({
+        runTest_SingleLocalRecord(testConfig, {
             testDescription: "Top-level missing in local and missing in foreign path",
             localRecord: {_id: 0, no_b: 1},
             localField: "b",
@@ -739,7 +745,7 @@ function runTests() {
             {_id: 7, a: {b: [{no_c: 1}, 1]}},
         ];
 
-        runTest_SingleForeignRecord({
+        runTest_SingleForeignRecord(testConfig, {
             testDescription: "Scalars on local path and top-level null in foreign",
             localRecords: docs,
             localField: "a.b.c",
@@ -747,7 +753,7 @@ function runTests() {
             foreignField: "b",
             idsExpectedToMatch: [0, 1, 2, 3, 4, 5, 6, 7]
         });
-        runTest_SingleLocalRecord({
+        runTest_SingleLocalRecord(testConfig, {
             testDescription: "Top-level null in local and scalars on path in foreign",
             localRecord: {_id: 0, b: null},
             localField: "b",
@@ -781,7 +787,7 @@ function runTests() {
             {_id: 23, a: [[null, 1], 2]},
         ];
 
-        runTest_SingleForeignRecord({
+        runTest_SingleForeignRecord(testConfig, {
             testDescription: "Empty top-level array in foreign, top field in local",
             localRecords: docs,
             localField: "a",
@@ -789,7 +795,7 @@ function runTests() {
             foreignField: "b",
             idsExpectedToMatch: [0, 1, 2]
         });
-        runTest_SingleLocalRecord({
+        runTest_SingleLocalRecord(testConfig, {
             testDescription: "Empty top-level array in local, top field in foreign",
             localRecord: {_id: 0, b: []},
             localField: "b",
@@ -798,7 +804,7 @@ function runTests() {
             idsExpectedToMatch: [2, 10, 11, 12, 13]
         });
 
-        runTest_SingleForeignRecord({
+        runTest_SingleForeignRecord(testConfig, {
             testDescription: "Empty nested array in foreign, top field in local",
             localRecords: docs,
             localField: "a",
@@ -806,7 +812,7 @@ function runTests() {
             foreignField: "b",
             idsExpectedToMatch: [0, 1, 2]
         });
-        runTest_SingleLocalRecord({
+        runTest_SingleLocalRecord(testConfig, {
             testDescription: "Empty nested array in local, top field in foreign",
             localRecord: {_id: 0, b: [[], 42]},
             localField: "b",
@@ -831,7 +837,7 @@ function runTests() {
             {_id: 9, a: [{b: {no_c: 42}}, {b: {c: []}}, {b: {c: [[]]}}]},
         ];
 
-        runTest_SingleForeignRecord({
+        runTest_SingleForeignRecord(testConfig, {
             testDescription: "Empty arrays and missing on deep path in local",
             localRecords: docs,
             localField: "a.b.c",
@@ -840,7 +846,7 @@ function runTests() {
             idsExpectedToMatch: [0, 1, 2, 3, 4]
         });
 
-        runTest_SingleForeignRecord({
+        runTest_SingleForeignRecord(testConfig, {
             testDescription: "Empty arrays and missing on deep path in local",
             localRecords: docs,
             localField: "a.b.c",
@@ -891,7 +897,7 @@ function runTests() {
             {_id: 47, a: [{x: [[null, 1], 2]}]},
         ];
 
-        runTest_SingleForeignRecord({
+        runTest_SingleForeignRecord(testConfig, {
             testDescription: "Empty top-level array in foreign, path in local",
             localRecords: docs,
             localField: "a.x",
@@ -899,7 +905,7 @@ function runTests() {
             foreignField: "b",
             idsExpectedToMatch: [0, 1, 2, 3, 4, 5]
         });
-        runTest_SingleLocalRecord({
+        runTest_SingleLocalRecord(testConfig, {
             testDescription: "Empty top-level array in local, path in foreign",
             localRecord: {_id: 0, b: []},
             localField: "b",
@@ -908,7 +914,7 @@ function runTests() {
             idsExpectedToMatch: [3, 4, 12, 13, 20, 21, 22, 23]
         });
 
-        runTest_SingleForeignRecord({
+        runTest_SingleForeignRecord(testConfig, {
             testDescription: "Empty nested array in foreign, path in local",
             localRecords: docs,
             localField: "a.x",
@@ -916,7 +922,7 @@ function runTests() {
             foreignField: "b",
             idsExpectedToMatch: [0, 1, 2, 3, 4, 5]
         });
-        runTest_SingleLocalRecord({
+        runTest_SingleLocalRecord(testConfig, {
             testDescription: "Empty nested array in local, path in foreign",
             localRecord: {_id: 0, b: [[], 42]},
             localField: "b",
@@ -941,7 +947,7 @@ function runTests() {
             {_id: 14, a: [{y: 1}, {x: 1}]},
         ];
 
-        runTest_SingleForeignRecord({
+        runTest_SingleForeignRecord(testConfig, {
             testDescription: "Scalar in foreign, path with numeral in local",
             localRecords: docs,
             localField: "a.0.x",
@@ -949,7 +955,7 @@ function runTests() {
             foreignField: "b",
             idsExpectedToMatch: [0, 1, 2]
         });
-        runTest_SingleLocalRecord({
+        runTest_SingleLocalRecord(testConfig, {
             testDescription: "Scalar in local, path with numeral in foreign",
             localRecord: {_id: 0, b: 1},
             localField: "b",
@@ -975,7 +981,7 @@ function runTests() {
             {_id: 11, a: [{x: [1, 2]}]},
         ];
 
-        runTest_SingleForeignRecord({
+        runTest_SingleForeignRecord(testConfig, {
             testDescription: "Null in foreign, path with numeral in local",
             localRecords: docs,
             localField: "a.0.x",
@@ -988,7 +994,7 @@ function runTests() {
             (currentJoinAlgorithm == JoinAlgorithm.NLJ || currentJoinAlgorithm == JoinAlgorithm.HJ)
             ? [10, 11]
             : [];
-        runTest_SingleLocalRecord({
+        runTest_SingleLocalRecord(testConfig, {
             testDescription: "Null in local, path with numeral in foreign",
             localRecord: {_id: 0, b: null},
             localField: "b",

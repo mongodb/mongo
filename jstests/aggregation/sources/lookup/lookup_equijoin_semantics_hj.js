@@ -12,9 +12,9 @@ if (!checkSBEEnabled(db)) {
     return;
 }
 
-localColl = db.lookup_arrays_semantics_local_hj;
-foreignColl = db.lookup_arrays_semantics_foreign_hj;
-
-currentJoinAlgorithm = JoinAlgorithm.HJ;
-runTests();
+runTests({
+    localColl: db.lookup_arrays_semantics_local_hj,
+    foreignColl: db.lookup_arrays_semantics_foreign_hj,
+    currentJoinAlgorithm: JoinAlgorithm.HJ
+});
 })();
