@@ -297,13 +297,14 @@ PlanExtractorResult OptPhaseManager::optimizeNoAssert(ABT input, const bool incl
         tasserted(6808711, "Plan has free variables: " + generateFreeVarsAssertMsg(env));
     }
 
-    const auto sargableCheckFn = [this](const ABT& expr) {
-        return convertExprToPartialSchemaReq(expr, false /*isFilterContext*/, _pathToInterval)
-            .has_value();
+    const auto canInlineEvalPre = [this](const EvaluationNode& node) {
+        // We are not allowed to inline if we can convert to SargableNode.
+        return !convertExprToPartialSchemaReq(
+            node.getProjection(), false /*isFilterContext*/, _pathToInterval);
     };
 
     runStructuralPhases<OptPhase::ConstEvalPre, OptPhase::PathFuse, ConstEval, PathFusion>(
-        ConstEval{env, sargableCheckFn}, PathFusion{env}, env, input);
+        ConstEval{env, canInlineEvalPre}, PathFusion{env}, env, input);
 
     auto planExtractionResult = runMemoRewritePhases(includeRejected, env, input);
     // At this point "input" has been siphoned out.
@@ -317,26 +318,57 @@ PlanExtractorResult OptPhaseManager::optimizeNoAssert(ABT input, const bool incl
         runStructuralPhase<OptPhase::PathLower, PathLowering>(
             PathLowering{_prefixId, env}, env, planEntry._node);
 
-        ProjectionNameSet erasedProjNames;
-        runStructuralPhase<OptPhase::ConstEvalPost, ConstEval>(
-            ConstEval{env, {} /*disableInline*/, &erasedProjNames}, env, planEntry._node);
+        // The constant folding phase below may inline or erase projections which are referred to by
+        // the plan's projection requirement properties. We need to respond to the ConstEval's
+        // actions by removing them or renaming them as appropriate. For this purpose we have a
+        // usage map, which keeps track of the projection sets where each projection is present.
+        // Note: we currently only update the ProjectionRequirement property which is used for
+        // lowering.
+        // Key: projection name, value: set of pointers to projection sets which contain it.
+        ProjectionNameMap<opt::unordered_set<ProjectionNameOrderPreservingSet*>> usageMap;
 
-        if (!erasedProjNames.empty()) {
-            // If we have erased some eval nodes, make sure to delete the corresponding projection
-            // names from the node property map.
-            for (auto& [nodePtr, props] : planEntry._map) {
-                if (properties::hasProperty<properties::ProjectionRequirement>(
-                        props._physicalProps)) {
-                    auto& requiredProjNames =
-                        properties::getProperty<properties::ProjectionRequirement>(
-                            props._physicalProps)
-                            .getProjections();
-                    for (const ProjectionName& projName : erasedProjNames) {
-                        requiredProjNames.erase(projName);
-                    }
+        // Populate the initial usage map.
+        for (auto& [nodePtr, props] : planEntry._map) {
+            using namespace properties;
+            if (hasProperty<ProjectionRequirement>(props._physicalProps)) {
+                auto& projSet =
+                    getProperty<ProjectionRequirement>(props._physicalProps).getProjections();
+                for (const auto& projName : projSet.getVector()) {
+                    usageMap[projName].insert(&projSet);
                 }
             }
         }
+
+        // Respond to projection deletions.
+        const auto erasedProjFn = [&](const ProjectionName& target) {
+            if (auto it = usageMap.find(target); it != usageMap.cend()) {
+                for (const auto& projSet : it->second) {
+                    projSet->erase(target);
+                }
+                usageMap.erase(it);
+            }
+        };
+
+        // Respond to projection renames.
+        const auto renamedProjFn = [&](const ProjectionName& target, const ProjectionName& source) {
+            auto it = usageMap.find(target);
+            if (it == usageMap.cend()) {
+                return;
+            }
+
+            auto projSetSet = it->second;
+            for (auto& projSet : projSetSet) {
+                projSet->erase(target);
+                projSet->emplace_back(source);
+                usageMap[source].insert(projSet);
+            }
+            usageMap.erase(target);
+        };
+
+        runStructuralPhase<OptPhase::ConstEvalPost, ConstEval>(
+            ConstEval{env, {} /*canInlineEvalFn*/, erasedProjFn, renamedProjFn},
+            env,
+            planEntry._node);
 
         env.rebuild(planEntry._node);
         if (env.hasFreeVariables()) {

@@ -92,7 +92,7 @@ void ConstEval::removeUnusedEvalNodes() {
             // Do not inline nodes which can become Sargable.
             // TODO: consider caching.
             // TODO: consider deriving IndexingAvailability.
-            if (!_disableInline || !_disableInline(k->getProjection())) {
+            if (!_canInlineEval || _canInlineEval(*k)) {
                 // Schedule node inlining as there is exactly one reference.
                 _singleRef.emplace(v.front());
                 _changed = true;
@@ -124,6 +124,9 @@ void ConstEval::transport(ABT& n, const Variable& var) {
             // This is a indirection to another variable. So we can skip, but first remember that we
             // inlined this variable so that we won't try to replace it with a common expression and
             // revert the inlining.
+            if (_renamedProj) {
+                _renamedProj(var.name(), variable->name());
+            }
             _inlinedDefs.emplace(def.definition);
             swapAndUpdate(n, def.definition);
         } else if (_singleRef.erase(&var)) {
@@ -546,8 +549,8 @@ void ConstEval::transport(ABT& n, const FilterNode& op, ABT& child, ABT& expr) {
 void ConstEval::transport(ABT& n, const EvaluationNode& op, ABT& child, ABT& expr) {
     if (_noRefProj.erase(&op)) {
         // The evaluation node is unused so replace it with its own child.
-        if (_erasedProjNames != nullptr) {
-            _erasedProjNames->insert(op.getProjectionName());
+        if (_erasedProj) {
+            _erasedProj(op.getProjectionName());
         }
 
         // First, pull out the child and put in a blackhole.

@@ -35,7 +35,17 @@
 
 namespace mongo::optimizer {
 
-using DisableInlineFn = std::function<bool(const ABT&)>;
+// Handler which should return a boolean indicating if we are allowed to inline an EvaluationNode.
+// If the handler returns "true" we can inline, otherwise we are not allowed to.
+using CanInlineEvalFn = std::function<bool(const EvaluationNode& node)>;
+
+// Handler which is called when we erase an unused projection name.
+using ErasedProjFn = std::function<void(const ProjectionName& erasedProjName)>;
+
+// Handler which is called when we inline a projection name (target) with another projection name
+// (source).
+using RenamedProjFn =
+    std::function<void(const ProjectionName& target, const ProjectionName& source)>;
 
 /**
  * This is an example rewriter that does constant evaluation in-place.
@@ -43,9 +53,13 @@ using DisableInlineFn = std::function<bool(const ABT&)>;
 class ConstEval {
 public:
     ConstEval(VariableEnvironment& env,
-              DisableInlineFn disableInline = {},
-              ProjectionNameSet* erasedProjNames = nullptr)
-        : _env(env), _erasedProjNames(std::move(erasedProjNames)), _disableInline(disableInline) {}
+              const CanInlineEvalFn& canInlineEval = {},
+              const ErasedProjFn& erasedProj = {},
+              const RenamedProjFn& renamedProj = {})
+        : _env(env),
+          _canInlineEval(canInlineEval),
+          _erasedProj(erasedProj),
+          _renamedProj(renamedProj) {}
 
     // The default noop transport. Note the first ABT& parameter.
     template <typename T, typename... Ts>
@@ -111,11 +125,13 @@ private:
     void removeUnusedEvalNodes();
 
     VariableEnvironment& _env;
-    // Optionally collect projection names from erased Eval nodes.
-    ProjectionNameSet* _erasedProjNames;
 
-    // Used to indicate if a given Evaluation node should not be inlined.
-    DisableInlineFn _disableInline;
+    // Handler which controls inlining of EvalNodes.
+    const CanInlineEvalFn& _canInlineEval;
+    // Handler called when a projection is erased.
+    const ErasedProjFn& _erasedProj;
+    // Handler called when a projection is renamed.
+    const RenamedProjFn& _renamedProj;
 
     opt::unordered_set<const Variable*> _singleRef;
     opt::unordered_set<const EvaluationNode*> _noRefProj;
