@@ -311,6 +311,8 @@ CONFIG configuration_list[] = {
 
 {"stress.split_7", "stress splits (#7)", C_BOOL, 2, 0, 0}
 
+{"stress.split_8", "stress splits (#8)", C_BOOL, 2, 0, 0}
+
 {"transaction.implicit", "implicit, without timestamps, transactions (percentage)", 0, 0, 100, 100}
 
 {"transaction.timestamps", "all transactions (or none), have timestamps", C_BOOL, 80, 0, 0}
