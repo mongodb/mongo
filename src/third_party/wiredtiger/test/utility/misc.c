@@ -350,12 +350,12 @@ testutil_verify_src_backup(WT_CONNECTION *conn, const char *backup, const char *
 
     WT_CLEAR(buf);
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
-    testutil_check(session->open_cursor(session, "backup:query_id", NULL, buf, &cursor));
     /*
      * If we are given a source ID, use it. Otherwise query the backup and check against all IDs
      * that exist in the system.
      */
     if (srcid == NULL) {
+        testutil_check(session->open_cursor(session, "backup:query_id", NULL, buf, &cursor));
         i = 0;
         while ((ret = cursor->next(cursor)) == 0) {
             testutil_check(cursor->get_key(cursor, &idstr));
@@ -715,4 +715,28 @@ is_mounted(const char *mount_dir)
 
     return sb.st_dev != parent_sb.st_dev;
 #endif
+}
+
+/*
+ * testutil_system --
+ *     A convenience function that combines snprintf, system, and testutil_check.
+ */
+void
+testutil_system(const char *fmt, ...) WT_GCC_FUNC_ATTRIBUTE((format(printf, 1, 2)))
+{
+    WT_DECL_RET;
+    size_t len;
+    char buf[4096];
+    va_list ap;
+
+    len = 0;
+
+    va_start(ap, fmt);
+    ret = __wt_vsnprintf_len_incr(buf, sizeof(buf), &len, fmt, ap);
+    va_end(ap);
+    testutil_check(ret);
+    if (len >= sizeof(buf))
+        testutil_die(ERANGE, "The command is too long.");
+
+    testutil_check(system(buf));
 }
