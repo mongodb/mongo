@@ -33,7 +33,7 @@ function insertData(collection) {
 }
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
-const kTenantId = "testTenantId";
+const kTenantId = ObjectId().str;
 const kDbName = tenantMigrationTest.tenantDB(kTenantId, "testDB");
 const kCollectionName = "toBeRenamed";
 const donorPrimary = tenantMigrationTest.getDonorPrimary();

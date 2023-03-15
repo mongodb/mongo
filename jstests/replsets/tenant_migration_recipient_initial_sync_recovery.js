@@ -26,7 +26,7 @@ load("jstests/libs/write_concern_util.js");
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
 const kMaxSleepTimeMS = 7500;
-const kTenantId = 'testTenantId';
+const kTenantId = ObjectId().str;
 
 let recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 

@@ -63,21 +63,20 @@ void onTransitionToAbortingIndexBuilds(OperationContext* opCtx,
                                                                     donorStateDoc.getId());
     if (donorStateDoc.getProtocol().value_or(MigrationProtocolEnum::kMultitenantMigrations) ==
         MigrationProtocolEnum::kMultitenantMigrations) {
-
-        TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-            .add(donorStateDoc.getTenantId(), mtab);
+        const auto tenantId = TenantId::parseFromString(donorStateDoc.getTenantId());
+        TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext()).add(tenantId, mtab);
 
         if (opCtx->writesAreReplicated()) {
             // onRollback is not registered on secondaries since secondaries should not fail to
             // apply the write.
-            opCtx->recoveryUnit()->onRollback([donorStateDoc](OperationContext* opCtx) {
-                TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                    .remove(donorStateDoc.getTenantId(),
-                            TenantMigrationAccessBlocker::BlockerType::kDonor);
-                ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
-                    .releaseLock(ServerlessOperationLockRegistry::LockType::kTenantDonor,
-                                 donorStateDoc.getId());
-            });
+            opCtx->recoveryUnit()->onRollback(
+                [migrationId = donorStateDoc.getId(), tenantId](OperationContext* opCtx) {
+                    TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+                        .remove(tenantId, TenantMigrationAccessBlocker::BlockerType::kDonor);
+                    ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
+                        .releaseLock(ServerlessOperationLockRegistry::LockType::kTenantDonor,
+                                     migrationId);
+                });
         }
     } else {
         tassert(6448702,
@@ -202,9 +201,9 @@ public:
                 if (_donorStateDoc.getProtocol().value_or(
                         MigrationProtocolEnum::kMultitenantMigrations) ==
                     MigrationProtocolEnum::kMultitenantMigrations) {
+                    const auto tenantId = TenantId::parseFromString(_donorStateDoc.getTenantId());
                     TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                        .remove(_donorStateDoc.getTenantId(),
-                                TenantMigrationAccessBlocker::BlockerType::kDonor);
+                        .remove(tenantId, TenantMigrationAccessBlocker::BlockerType::kDonor);
                 } else {
                     tassert(6448701,
                             "Bad protocol",

@@ -37,14 +37,12 @@ rst1.initiate();
 rst2.startSet();
 rst2.initiate();
 
-const kTenantIdPrefix = "testTenantId";
-
 // Test concurrent outgoing migrations to different recipients.
 (() => {
     const tenantMigrationTest0 = new TenantMigrationTest({donorRst: rst0, recipientRst: rst1});
     const tenantMigrationTest1 = new TenantMigrationTest({donorRst: rst0, recipientRst: rst2});
-    const tenantId0 = `${kTenantIdPrefix}-ConcurrentOutgoingMigrationsToDifferentRecipient0`;
-    const tenantId1 = `${kTenantIdPrefix}-ConcurrentOutgoingMigrationsToDifferentRecipient1`;
+    const tenantId0 = ObjectId().str;
+    const tenantId1 = ObjectId().str;
     const donorPrimary = rst0.getPrimary();
     const connPoolStatsBefore = assert.commandWorked(donorPrimary.adminCommand({connPoolStats: 1}));
 
@@ -90,8 +88,8 @@ const kTenantIdPrefix = "testTenantId";
 (() => {
     const tenantMigrationTest0 = new TenantMigrationTest({donorRst: rst0, recipientRst: rst2});
     const tenantMigrationTest1 = new TenantMigrationTest({donorRst: rst1, recipientRst: rst2});
-    const tenantId0 = `${kTenantIdPrefix}-ConcurrentIncomingMigrations0`;
-    const tenantId1 = `${kTenantIdPrefix}-ConcurrentIncomingMigrations1`;
+    const tenantId0 = ObjectId().str;
+    const tenantId1 = ObjectId().str;
 
     const migrationOpts0 = {
         migrationIdString: extractUUIDFromObject(UUID()),
@@ -131,8 +129,8 @@ const kTenantIdPrefix = "testTenantId";
     const tenantMigrationTest0 = new TenantMigrationTest({donorRst: rst0, recipientRst: rst1});
     const tenantMigrationTest1 = new TenantMigrationTest({donorRst: rst0, recipientRst: rst1});
 
-    const tenantId0 = `${kTenantIdPrefix}-ConcurrentOutgoingMigrationsToSameRecipient0`;
-    const tenantId1 = `${kTenantIdPrefix}-ConcurrentOutgoingMigrationsToSameRecipient1`;
+    const tenantId0 = ObjectId().str;
+    const tenantId1 = ObjectId().str;
 
     const donorsColl = tenantMigrationTest0.getDonorRst().getPrimary().getCollection(
         TenantMigrationTest.kConfigDonorsNS);

@@ -29,14 +29,12 @@ load("jstests/libs/parallelTester.js");
 load("jstests/replsets/rslib.js");  // `createRstArgs`
 
 const kExternalKeysTTLIndexName = "ExternalKeysTTLIndex";
-const kTenantIdPrefix = "testTenantId";
 const ttlMonitorOptions = {
     ttlMonitorSleepSecs: 1
 };
 
-let counter = 0;
 let makeTenantId = function() {
-    return kTenantIdPrefix + "-" + counter++;
+    return ObjectId().str;
 };
 
 function waitForExternalKeysTTLIndex(conn) {

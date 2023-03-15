@@ -124,7 +124,7 @@ function testRollBack(setUpFunc, rollbackOpsFunc, steadyStateFunc) {
  */
 function testRollbackInitialState() {
     const migrationId = UUID();
-    const migrationOpts = makeMigrationOpts(migrationId, kTenantId + "-initial");
+    const migrationOpts = makeMigrationOpts(migrationId, ObjectId().str);
     let migrationThread;
 
     let setUpFunc = (tenantMigrationTest, donorRstArgs) => {};
@@ -169,7 +169,7 @@ function testRollBackStateTransition(pauseFailPoint, setUpFailPoints, nextState)
         nextState}" after reaching failpoint "${pauseFailPoint}"`);
 
     const migrationId = UUID();
-    const migrationOpts = makeMigrationOpts(migrationId, kTenantId + "-" + nextState);
+    const migrationOpts = makeMigrationOpts(migrationId, ObjectId().str);
     let migrationThread, pauseFp;
 
     let setUpFunc = (tenantMigrationTest, donorRstArgs) => {
@@ -217,7 +217,7 @@ function testRollBackStateTransition(pauseFailPoint, setUpFailPoints, nextState)
  */
 function testRollBackMarkingStateGarbageCollectable() {
     const migrationId = UUID();
-    const migrationOpts = makeMigrationOpts(migrationId, kTenantId + "-markGarbageCollectable");
+    const migrationOpts = makeMigrationOpts(migrationId, ObjectId().str);
     let forgetMigrationThread;
 
     let setUpFunc = (tenantMigrationTest, donorRstArgs) => {
@@ -269,7 +269,7 @@ function testRollBackMarkingStateGarbageCollectable() {
  */
 function testRollBackRandom() {
     const migrationId = UUID();
-    const migrationOpts = makeMigrationOpts(migrationId, kTenantId + "-random");
+    const migrationOpts = makeMigrationOpts(migrationId, ObjectId().str);
     let migrationThread;
 
     let setUpFunc = (tenantMigrationTest, donorRstArgs) => {

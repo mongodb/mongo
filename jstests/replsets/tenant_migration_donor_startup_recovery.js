@@ -43,7 +43,7 @@ donorRst.initiate();
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), donorRst});
 
 const kMaxSleepTimeMS = 1000;
-const kTenantId = 'testTenantId';
+const kTenantId = ObjectId().str;
 
 let donorPrimary = tenantMigrationTest.getDonorPrimary();
 

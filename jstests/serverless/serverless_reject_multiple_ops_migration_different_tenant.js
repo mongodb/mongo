@@ -48,7 +48,7 @@ function cannotStartMigrationWithDifferentTenantWhileShardSplitIsInProgress(prot
         protocol,
     };
     if (protocol != "shard merge") {
-        migrationOpts["tenantId"] = "otherTenantToMove";
+        migrationOpts["tenantId"] = tenantIds[0].str;
     } else {
         migrationOpts["tenantIds"] = tenantIds;
     }

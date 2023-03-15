@@ -23,9 +23,6 @@ load("jstests/libs/parallelTester.js");
 load("jstests/libs/uuid_util.js");
 load("jstests/replsets/rslib.js");  // 'createRstArgs'
 
-const kTenantIdPrefix = "testTenantId";
-let testNum = 0;
-
 function setup() {
     const donorRst = new ReplSetTest({
         name: "donorRst",
@@ -58,7 +55,7 @@ function setup() {
 }
 
 function makeTenantId() {
-    return kTenantIdPrefix + testNum++;
+    return ObjectId().str;
 }
 
 /**
@@ -276,7 +273,8 @@ const kWriteErrorTimeMS = 50;
     jsTest.log("Test that the donor retries state doc update on retriable errors");
 
     const {tenantMigrationTest, teardown} = setup();
-    const tenantId = `${kTenantIdPrefix}RetryOnStateDocUpdateError`;
+    // const tenantId = `${kTenantIdPrefix}RetryOnStateDocUpdateError`;
+    const tenantId = ObjectId().str;
 
     const migrationId = UUID();
     const migrationOpts = {

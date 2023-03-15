@@ -24,7 +24,7 @@ load("jstests/libs/uuid_util.js");
 load("jstests/replsets/rslib.js");  // 'createRstArgs'
 
 const kMaxSleepTimeMS = 100;
-const kTenantId = "testTenantId";
+const kTenantId = ObjectId().str;
 const kMigrationFpNames = [
     "pauseTenantMigrationBeforeLeavingDataSyncState",
     "pauseTenantMigrationBeforeLeavingBlockingState",

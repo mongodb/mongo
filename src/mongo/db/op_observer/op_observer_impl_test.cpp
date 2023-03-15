@@ -347,8 +347,8 @@ protected:
         NamespaceString::createNamespaceString_forTest(boost::none, "testDB3", "testColl3");
     const UUID uuid3{UUID::gen()};
 
-    const std::string kTenantId = OID::gen().toString();
-    const NamespaceString kNssUnderTenantId{boost::none, kTenantId + "_db", "testColl"};
+    const TenantId kTenantId = TenantId(OID::gen());
+    const NamespaceString kNssUnderTenantId{boost::none, kTenantId.toString() + "_db", "testColl"};
     const UUID kNssUnderTenantIdUUID{UUID::gen()};
 
     ReadWriteConcernDefaultsLookupMock _lookupMock;

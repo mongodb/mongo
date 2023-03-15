@@ -44,8 +44,10 @@ setLogVerbosity([donorPrimary, recipientPrimary], {
 });
 
 // Set up tenant data for the migrations.
-const tenantIds = [...Array(kMigrationsCount).keys()].map((i) => `testTenantId-${i}`);
+const tenantIds = [...Array(kMigrationsCount).keys()].map(() => ObjectId().str);
 let migrationOptsArray = [];
+let tenantToIndexMap = {};
+let idx = 0;
 tenantIds.forEach((tenantId) => {
     const dbName = tenantMigrationTest.tenantDB(tenantId, "testDB");
     const collName = "testColl";
@@ -57,16 +59,18 @@ tenantIds.forEach((tenantId) => {
         tenantId: tenantId,
     };
     migrationOptsArray.push(migrationOpts);
+    tenantToIndexMap[tenantId] = idx++;
 });
 
 // Blocks until the migration with index `id` completes (it is supposed to be aborted so
 // the wait should be short) and creates another migration.
-function retryAbortedMigration(id) {
-    let tenantId = migrationOptsArray[id].tenantId;
+function retryAbortedMigration(idx) {
+    const migrationOpt = migrationOptsArray[idx];
+    let tenantId = migrationOpt.tenantId;
     jsTestLog(
         `Forgetting and restarting aborted migration
-        ${migrationOptsArray[id].migrationIdString} for tenant: ${tenantId}`);
-    let waitState = tenantMigrationTest.waitForMigrationToComplete(migrationOptsArray[id]);
+        ${migrationOpt.migrationIdString} for tenant: ${tenantId}`);
+    let waitState = tenantMigrationTest.waitForMigrationToComplete(migrationOpt);
     assert.commandWorked(waitState);
     if (waitState.state != TenantMigrationTest.DonorState.kAborted) {
         // The `currentOp()` seems to be lagging so this condition actually happens.
@@ -81,8 +85,7 @@ function retryAbortedMigration(id) {
         return;
     }
 
-    assert.commandWorked(
-        tenantMigrationTest.forgetMigration(migrationOptsArray[id].migrationIdString));
+    assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpt.migrationIdString));
 
     // Drop recipient DB.
     const dbName = tenantMigrationTest.tenantDB(tenantId, "testDB");
@@ -94,10 +97,10 @@ function retryAbortedMigration(id) {
     }
 
     // Replace migration UUID.
-    migrationOptsArray[id].migrationIdString = extractUUIDFromObject(UUID());
+    migrationOpt.migrationIdString = extractUUIDFromObject(UUID());
     // Old migration needs to be garbage collected before this works.
     assert.soon(function() {
-        let status = tenantMigrationTest.startMigration(migrationOptsArray[id]);
+        let status = tenantMigrationTest.startMigration(migrationOpt);
         if (!status.ok) {
             jsTestLog(`${tojson(status)}`);
         }
@@ -110,7 +113,6 @@ let nextMigration = 0;
 let runningMigrations = 0;
 let setOfCompleteMigrations = new Set();
 let didFirstLoopSleep = false;
-const regexId = /testTenantId-([0-9]+)/;
 // Reduce spam by logging the aborted migration once, also use this flag to abort one migration.
 let seenAbortedMigration = false;
 
@@ -138,10 +140,7 @@ while (setOfCompleteMigrations.size < kMigrationsCount) {
             return false;
         }
         currentOp.inprog.forEach((op) => {
-            let idPatternFound = op.tenantId.match(regexId);
-            assert(idPatternFound !== null);
-            assert.eq(idPatternFound.length, 2);
-            let id = parseInt(idPatternFound[1]);
+            let id = tenantToIndexMap[op.tenantId];
             assert(!isNaN(id));
             assert(id >= 0, `${id}`);
             assert(id <= kMigrationsCount, `${id}`);

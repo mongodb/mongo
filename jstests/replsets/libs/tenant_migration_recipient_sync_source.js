@@ -38,7 +38,7 @@ export function setUpMigrationSyncSourceTest() {
 
     const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), donorRst});
 
-    const tenantId = "testTenantId";
+    const tenantId = ObjectId().str;
     const tenantDB = tenantMigrationTest.tenantDB(tenantId, "DB");
     const collName = "testColl";
 

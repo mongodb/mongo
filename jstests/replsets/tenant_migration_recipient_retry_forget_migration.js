@@ -22,7 +22,7 @@ load("jstests/libs/uuid_util.js");        // For extractUUIDFromObject().
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
 const migrationId = UUID();
-const tenantId = 'testTenantId';
+const tenantId = ObjectId().str;
 const recipientCertificateForDonor =
     getCertificateAndPrivateKey("jstests/libs/tenant_migration_recipient.pem");
 

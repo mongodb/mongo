@@ -26,7 +26,7 @@ load("jstests/libs/uuid_util.js");
 load('jstests/replsets/rslib.js');  // 'createRstArgs'
 
 const kMaxSleepTimeMS = 100;
-const kTenantId = "testTenantId";
+const kTenantId = ObjectId().str;
 
 // Set the delay before a state doc is garbage collected to be short to speed up the test but long
 // enough for the state doc to still be around after stepup or restart.

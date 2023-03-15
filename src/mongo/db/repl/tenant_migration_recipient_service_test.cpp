@@ -3948,13 +3948,13 @@ TEST_F(TenantMigrationRecipientServiceTest,
 
     // Insert a state doc to simulate running a migration with an existing state doc NOT marked for
     // garbage collection.
-    const std::string kTenantId = OID::gen().toString();
+    const auto kTenantId = TenantId(OID::gen());
     const std::string kConnectionString = "donor-rs/localhost:12345";
     const UUID existingMigrationId = UUID::gen();
     TenantMigrationRecipientDocument previousStateDoc(
         existingMigrationId,
         kConnectionString,
-        kTenantId,
+        kTenantId.toString(),
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     previousStateDoc.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -3981,7 +3981,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         kConnectionString,
-        kTenantId,
+        kTenantId.toString(),
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly()));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -3999,7 +3999,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
     // Delete state doc while we are expecting to delete it ourselves.
     auto deleted = uassertStatusOK(
         tenantMigrationRecipientEntryHelpers::deleteStateDocIfMarkedAsGarbageCollectable(
-            opCtx.get(), kTenantId));
+            opCtx.get(), kTenantId.toString()));
 
     // Successfully deletes the old state document before the service deletes it itself.
     ASSERT_TRUE(deleted);
@@ -4018,13 +4018,13 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientFailsDueToOperationConflict
 
     // Insert a state doc to simulate running a migration with an existing state doc NOT marked for
     // garbage collection.
-    const std::string kTenantId = OID::gen().toString();
+    const auto kTenantId = TenantId(OID::gen());
     const std::string kConnectionString = "donor-rs/localhost:12345";
     const UUID existingMigrationId = UUID::gen();
     TenantMigrationRecipientDocument previousStateDoc(
         existingMigrationId,
         kConnectionString,
-        kTenantId,
+        kTenantId.toString(),
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     previousStateDoc.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -4051,7 +4051,7 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientFailsDueToOperationConflict
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         kConnectionString,
-        kTenantId,
+        kTenantId.toString(),
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly()));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);

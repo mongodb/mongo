@@ -64,7 +64,7 @@ function runTest({failPointName, failPointData = {}, batchSize = 10 * 1000}) {
         sharedOptions: {setParameter: {collectionClonerBatchSize: batchSize}}
     });
 
-    const tenantId = "testTenantId";
+    const tenantId = ObjectId().str;
     const dbName = tenantMigrationTest.tenantDB(tenantId, "testDB");
     const collName = "testColl";
 

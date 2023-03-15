@@ -44,7 +44,7 @@ const tenantMigrationTest = new TenantMigrationTest({
     sharedOptions: {setParameter: kGarbageCollectionParams}
 });
 
-const kTenantId = "testTenantId";
+const kTenantId = ObjectId().str;
 const kNs = kTenantId + "_testDb.testColl";
 
 assert.commandWorked(tenantMigrationTest.getDonorPrimary().getCollection(kNs).insert({_id: 0}));

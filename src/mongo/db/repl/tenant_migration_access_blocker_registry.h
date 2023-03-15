@@ -112,9 +112,7 @@ public:
     /**
      * Adds an entry for mtab with the provided tenantId as the key. There must not be
      * a blocker of the same type (donor or recipient) for this tenantId already.
-     * TODO (SERVER-72081) Remove this method since we now use TenantId object type for tenantId.
      */
-    void add(StringData tenantId, std::shared_ptr<TenantMigrationAccessBlocker> mtab);
     void add(const TenantId& tenantId, std::shared_ptr<TenantMigrationAccessBlocker> mtab);
 
     /**
@@ -130,9 +128,7 @@ public:
 
     /**
      * Removes the entry for (tenantId, mtab)
-     * TODO (SERVER-72081) Remove this method since we now use TenantId object type for tenantId.
      */
-    void remove(StringData tenantId, TenantMigrationAccessBlocker::BlockerType type);
     void remove(const TenantId& tenantId, TenantMigrationAccessBlocker::BlockerType type);
 
     /**
@@ -169,18 +165,15 @@ public:
         const DatabaseName& dbName, TenantMigrationAccessBlocker::BlockerType type);
 
     /**
-     * Searches through TenantMigrationAccessBlockers and
+     * Return the global donor access blocker or searches through TenantMigrationAccessBlockers and
      * returns the TenantMigrationAccessBlocker that matches tenantId.
-     * TODO (SERVER-72081) Remove this method since we now use TenantId object type for tenantId.
+     * TODO (SERVER-72213) No longer need to use a boost::optional for the tenantid.
      */
     std::shared_ptr<TenantMigrationAccessBlocker> getTenantMigrationAccessBlockerForTenantId(
-        StringData tenantId, TenantMigrationAccessBlocker::BlockerType type);
-
-    std::shared_ptr<TenantMigrationAccessBlocker> getTenantMigrationAccessBlockerForTenantId(
-        const TenantId& tenantId, TenantMigrationAccessBlocker::BlockerType type);
+        const boost::optional<TenantId>& tenantId, TenantMigrationAccessBlocker::BlockerType type);
 
     using applyAllCallback = std::function<void(
-        std::string tenantId, std::shared_ptr<TenantMigrationAccessBlocker>& mtab)>;
+        const TenantId& tenantId, std::shared_ptr<TenantMigrationAccessBlocker>& mtab)>;
     /**
      * Applies callback to all TenantMigrationAccessBlockers of the desired type.
      */
@@ -222,7 +215,9 @@ public:
     std::shared_ptr<executor::TaskExecutor> getAsyncBlockingOperationsExecutor() const;
 
 private:
-    void _remove(WithLock, StringData tenantId, TenantMigrationAccessBlocker::BlockerType type);
+    void _remove(WithLock,
+                 const TenantId& tenantId,
+                 TenantMigrationAccessBlocker::BlockerType type);
 
     void _clear(WithLock);
 
@@ -244,7 +239,8 @@ private:
     std::shared_ptr<executor::TaskExecutor>
         _asyncBlockingOperationsExecutor;  // (S) Lives for the lifetime of the registry.
 
-    StringMap<DonorRecipientAccessBlockerPair> _tenantMigrationAccessBlockers;  // (M)
+    stdx::unordered_map<TenantId, DonorRecipientAccessBlockerPair, TenantId::Hasher>
+        _tenantMigrationAccessBlockers;  // (M)
 };
 
 }  // namespace mongo

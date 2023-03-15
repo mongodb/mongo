@@ -253,9 +253,10 @@ void TenantMigrationRecipientOpObserver::onUpdate(OperationContext* opCtx,
                     .releaseLock(ServerlessOperationLockRegistry::LockType::kTenantRecipient,
                                  recipientStateDoc.getId());
 
-                std::vector<std::string> tenantIdsToRemove;
+                std::vector<TenantId> tenantIdsToRemove;
                 auto cleanUpBlockerIfGarbage =
-                    [&](std::string tenantId, std::shared_ptr<TenantMigrationAccessBlocker>& mtab) {
+                    [&](const TenantId& tenantId,
+                        std::shared_ptr<TenantMigrationAccessBlocker>& mtab) {
                         if (recipientStateDoc.getId() != mtab->getMigrationId()) {
                             return;
                         }

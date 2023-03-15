@@ -33,7 +33,7 @@ const tenantMigrationTest = new TenantMigrationTest({
 });
 
 const kMigrationId = UUID();
-const kTenantId = 'testTenantId';
+const kTenantId = ObjectId().str;
 const kReadPreference = {
     mode: "primary"
 };

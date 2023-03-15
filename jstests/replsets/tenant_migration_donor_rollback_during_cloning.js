@@ -329,21 +329,21 @@ function listIndexesPostMigrationFunction(tenantId, tenantMigrationTest) {
     assert(indexNames.includes("a_1"), indexes);
 }
 
-runTest('tenantId1',
+runTest(ObjectId().str,
         listCollectionsSetupFunction,
         listCollectionsWhilePausedFunction,
         listCollectionsPostMigrationFunction,
         {cloner: "TenantDatabaseCloner", stage: "listCollections"},
         "tenantDatabaseClonerHangAfterGettingOperationTime");
 
-runTest('tenantId2',
+runTest(ObjectId().str,
         listDatabasesSetupFunction,
         listDatabasesWhilePausedFunction,
         listDatabasesPostMigrationFunction,
         {cloner: "TenantAllDatabaseCloner", stage: "listDatabases"},
         "tenantAllDatabaseClonerHangAfterGettingOperationTime");
 
-runTest('tenantId3',
+runTest(ObjectId().str,
         listIndexesSetupFunction,
         listIndexesWhilePausedFunction,
         listIndexesPostMigrationFunction,

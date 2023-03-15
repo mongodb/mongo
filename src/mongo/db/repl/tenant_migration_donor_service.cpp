@@ -598,6 +598,8 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_updateState
                            // Start blocking writes before getting an oplog slot to guarantee no
                            // writes to the tenant's data can commit with a timestamp after the
                            // block timestamp.
+                           // TODO (SERVER-72213) we should not pass _tenantId for shard merge
+                           // since shard merge does not have a _tenantId (empty string).
                            auto mtab = tenant_migration_access_blocker::
                                getTenantMigrationDonorAccessBlocker(_serviceContext, _tenantId);
                            invariant(mtab);

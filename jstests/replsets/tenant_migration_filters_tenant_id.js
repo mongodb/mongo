@@ -18,13 +18,11 @@ import {
 
 load("jstests/libs/uuid_util.js");
 
-const tenantIdPrefix = "tenantId";
 const baseDBName = "testDB";
 const collName = "testColl";
 
-let currId = 0;
 const makeBaseTenantId = () => {
-    return `${tenantIdPrefix}${currId++}`;
+    return ObjectId().str;
 };
 
 const runTest = (baseTenantId, dbName, shouldMatch) => {
@@ -53,12 +51,6 @@ const testCases = [
     {makeTenantId: baseId => baseId, shouldMatch: true},
     {makeTenantId: baseId => `${baseId}_`, shouldMatch: true},
     {makeTenantId: baseId => `${baseId}_${baseId}`, shouldMatch: true},
-    {makeTenantId: baseId => `a${baseId}`, shouldMatch: false},
-    {makeTenantId: baseId => `${baseId}a`, shouldMatch: false},
-    {makeTenantId: baseId => `^${baseId}`, shouldMatch: false},
-    {makeTenantId: baseId => `${baseId.toUpperCase()}`, shouldMatch: false},
-    {makeTenantId: baseId => `${baseId.toLowerCase()}`, shouldMatch: false},
-    {makeTenantId: baseId => `${baseId}${baseId}`, shouldMatch: false},
 ];
 
 for (const {makeTenantId, shouldMatch} of testCases) {

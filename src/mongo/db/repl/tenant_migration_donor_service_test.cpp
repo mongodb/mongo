@@ -175,12 +175,12 @@ TEST_F(TenantMigrationDonorServiceTest, CheckSettingMigrationStartDate) {
     auto initialTimesEntered = taskFp->setMode(FailPoint::alwaysOn);
 
     const UUID migrationUUID = UUID::gen();
-
+    const TenantId kTenantId = TenantId(OID::gen());
     TenantMigrationDonorDocument initialStateDocument(
         migrationUUID,
         "donor-rs/localhost:12345",
         ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly()),
-        "tenantA");
+        kTenantId.toString());
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setDonorCertificateForRecipient(kDonorPEMPayload);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);

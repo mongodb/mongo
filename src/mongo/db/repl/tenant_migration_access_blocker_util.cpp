@@ -93,11 +93,12 @@ bool recoverTenantMigrationRecipientAccessBlockers(const TenantMigrationRecipien
             TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
                 .add(*doc.getTenantIds(), mtab);
             break;
-        case MigrationProtocolEnum::kMultitenantMigrations:
-            invariant(!doc.getTenantId().empty());
+        case MigrationProtocolEnum::kMultitenantMigrations: {
+            const auto tenantId = TenantId::parseFromString(doc.getTenantId());
             TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                .add(doc.getTenantId(), mtab);
+                .add(tenantId, mtab);
             break;
+        }
         default:
             MONGO_UNREACHABLE;
     }
@@ -141,16 +142,30 @@ std::shared_ptr<TenantMigrationRecipientAccessBlocker> getRecipientAccessBlocker
 
 std::shared_ptr<TenantMigrationDonorAccessBlocker> getTenantMigrationDonorAccessBlocker(
     ServiceContext* const serviceContext, StringData tenantId) {
+
+    // TODO (SERVER-72213) we should no longer need an optional tenantId since we no longer pass
+    // an empty string for shard merge.
+    boost::optional<TenantId> tid = boost::none;
+    if (!tenantId.empty()) {
+        tid = TenantId::parseFromString(tenantId);
+    }
     return checked_pointer_cast<TenantMigrationDonorAccessBlocker>(
         TenantMigrationAccessBlockerRegistry::get(serviceContext)
-            .getTenantMigrationAccessBlockerForTenantId(tenantId, MtabType::kDonor));
+            .getTenantMigrationAccessBlockerForTenantId(tid, MtabType::kDonor));
 }
 
 std::shared_ptr<TenantMigrationRecipientAccessBlocker> getTenantMigrationRecipientAccessBlocker(
     ServiceContext* const serviceContext, StringData tenantId) {
+
+    // TODO (SERVER-72213) we should no longer need an optional tenantId since we no longer pass
+    // an empty string for shard merge.
+    boost::optional<TenantId> tid = boost::none;
+    if (!tenantId.empty()) {
+        tid = TenantId::parseFromString(tenantId);
+    }
     return checked_pointer_cast<TenantMigrationRecipientAccessBlocker>(
         TenantMigrationAccessBlockerRegistry::get(serviceContext)
-            .getTenantMigrationAccessBlockerForTenantId(tenantId, MtabType::kRecipient));
+            .getTenantMigrationAccessBlockerForTenantId(tid, MtabType::kRecipient));
 }
 
 void addTenantMigrationRecipientAccessBlocker(ServiceContext* serviceContext,
@@ -163,7 +178,8 @@ void addTenantMigrationRecipientAccessBlocker(ServiceContext* serviceContext,
     auto mtab =
         std::make_shared<TenantMigrationRecipientAccessBlocker>(serviceContext, migrationId);
 
-    TenantMigrationAccessBlockerRegistry::get(serviceContext).add(tenantId, mtab);
+    const auto tid = TenantId::parseFromString(tenantId);
+    TenantMigrationAccessBlockerRegistry::get(serviceContext).add(tid, mtab);
 }
 
 void validateNssIsBeingMigrated(const boost::optional<TenantId>& tenantId,
@@ -432,7 +448,8 @@ void recoverTenantMigrationAccessBlockers(OperationContext* opCtx) {
         auto& registry = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext());
         auto protocol = doc.getProtocol().value_or(MigrationProtocolEnum::kMultitenantMigrations);
         if (protocol == MigrationProtocolEnum::kMultitenantMigrations) {
-            registry.add(doc.getTenantId(), mtab);
+            const auto tenantId = TenantId::parseFromString(doc.getTenantId());
+            registry.add(tenantId, mtab);
         } else {
             registry.add(mtab);
         }
@@ -492,7 +509,7 @@ void recoverTenantMigrationAccessBlockers(OperationContext* opCtx) {
             auto mtab = std::make_shared<TenantMigrationDonorAccessBlocker>(
                 opCtx->getServiceContext(), doc.getId());
             TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                .add(tenantId.toString(), mtab);
+                .add(tenantId, mtab);
 
             switch (doc.getState()) {
                 case ShardSplitDonorStateEnum::kAbortingIndexBuilds:

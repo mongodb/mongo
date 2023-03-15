@@ -31,7 +31,7 @@ load('jstests/replsets/rslib.js');  // for waitForNewlyAddedRemovalForNodeToBeCo
 
 const testDBName = 'testDB';
 const testCollName = 'testColl';
-const tenantId = 'tenantId1';
+const tenantId = ObjectId().str;
 
 const tenantMigrationTest = new TenantMigrationTest({
     name: jsTestName(),

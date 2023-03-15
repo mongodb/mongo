@@ -70,8 +70,8 @@ function assertHasExternalKeys(conn, migrationId) {
     assert.gt(keys.length, 0, tojson(keys));
 }
 
-const kTenantId1 = "testTenantId1";
-const kTenantId2 = "testTenantId2";
+const kTenantId1 = ObjectId().str;
+const kTenantId2 = ObjectId().str;
 const migrationX509Options = makeX509OptionsForTest();
 
 (() => {

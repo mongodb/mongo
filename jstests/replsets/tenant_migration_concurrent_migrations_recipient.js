@@ -26,7 +26,8 @@ const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 
 // Set up tenant data for the 50 migrations.
-const tenantIds = [...Array(50).keys()].map((i) => `testTenantId-${i}`);
+// todo fix this
+const tenantIds = [...Array(50).keys()].map(() => ObjectId().str);
 let migrationOptsArray = [];
 tenantIds.forEach((tenantId) => {
     const dbName = tenantMigrationTest.tenantDB(tenantId, "testDB");

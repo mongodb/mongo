@@ -51,6 +51,13 @@ public:
         return *systemTenantId;
     }
 
+    /**
+     * Parse a tenantId from a StringData. This method asserts if the tenantId is empty or not in an
+     * OID format.
+     * Returns a TenantId object from the parsed string.
+     */
+    static TenantId parseFromString(StringData tenantId);
+
     explicit TenantId(const OID& oid) : _oid(oid) {}
 
     TenantId() = delete;

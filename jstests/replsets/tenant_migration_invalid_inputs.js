@@ -26,7 +26,7 @@ const tenantMigrationTest =
 const donorPrimary = tenantMigrationTest.getDonorPrimary();
 const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 
-const tenantId = "testTenantId";
+const tenantId = ObjectId().str;
 const readPreference = {
     mode: 'primary'
 };

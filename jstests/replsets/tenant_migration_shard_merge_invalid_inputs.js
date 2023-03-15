@@ -37,7 +37,7 @@ if (!isShardMergeEnabled(donorPrimary.getDB("admin"))) {
 
 const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 
-const tenantId = "testTenantId";
+const tenantId = ObjectId().str;
 const readPreference = {
     mode: 'primary'
 };

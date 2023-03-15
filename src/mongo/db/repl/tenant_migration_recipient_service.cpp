@@ -2973,43 +2973,47 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                        }
                        pauseAfterRunTenantMigrationRecipientInstance.pauseWhileSet();
 
-                       auto mtab = tenant_migration_access_blocker::
-                           getTenantMigrationRecipientAccessBlocker(_serviceContext,
-                                                                    _stateDoc.getTenantId());
-                       if (mtab && mtab->getMigrationId() != _migrationUuid) {
-                           // There is a conflicting migration. If its state doc has already been
-                           // marked as garbage collectable, this instance must correspond to a
-                           // retry and we can delete immediately to allow the migration to restart.
-                           // Otherwise, there is a real conflict so we should throw
-                           // ConflictingInProgress.
-                           lk.unlock();
+                       if (_protocol != MigrationProtocolEnum::kShardMerge) {
+                           auto mtab = tenant_migration_access_blocker::
+                               getTenantMigrationRecipientAccessBlocker(_serviceContext,
+                                                                        _stateDoc.getTenantId());
+                           if (mtab && mtab->getMigrationId() != _migrationUuid) {
+                               // There is a conflicting migration. If its state doc has already
+                               // been marked as garbage collectable, this instance must correspond
+                               // to a retry and we can delete immediately to allow the migration to
+                               // restart. Otherwise, there is a real conflict so we should throw
+                               // ConflictingInProgress.
+                               lk.unlock();
 
-                           auto existingStateDoc =
-                               tenantMigrationRecipientEntryHelpers::getStateDoc(
-                                   opCtx.get(), mtab->getMigrationId());
-                           uassertStatusOK(existingStateDoc.getStatus());
+                               auto existingStateDoc =
+                                   tenantMigrationRecipientEntryHelpers::getStateDoc(
+                                       opCtx.get(), mtab->getMigrationId());
+                               uassertStatusOK(existingStateDoc.getStatus());
 
-                           uassert(ErrorCodes::ConflictingOperationInProgress,
-                                   str::stream()
-                                       << "Found active migration for tenantId \"" << _tenantId
-                                       << "\" with migration id " << mtab->getMigrationId(),
-                                   existingStateDoc.getValue().getExpireAt());
+                               uassert(ErrorCodes::ConflictingOperationInProgress,
+                                       str::stream()
+                                           << "Found active migration for tenantId \"" << _tenantId
+                                           << "\" with migration id " << mtab->getMigrationId(),
+                                       existingStateDoc.getValue().getExpireAt());
 
-                           pauseTenantMigrationRecipientInstanceBeforeDeletingOldStateDoc
-                               .pauseWhileSet();
+                               pauseTenantMigrationRecipientInstanceBeforeDeletingOldStateDoc
+                                   .pauseWhileSet();
 
-                           auto deleted =
-                               uassertStatusOK(tenantMigrationRecipientEntryHelpers::
-                                                   deleteStateDocIfMarkedAsGarbageCollectable(
-                                                       opCtx.get(), _tenantId));
-                           // The doc has an expireAt but was deleted before we had time to delete
-                           // it above therefore it's safe to pursue since it has been cleaned up.
-                           if (!deleted) {
-                               LOGV2_WARNING(6792601,
-                                             "Existing state document was deleted before we could "
-                                             "delete it ourselves.");
+                               auto deleted =
+                                   uassertStatusOK(tenantMigrationRecipientEntryHelpers::
+                                                       deleteStateDocIfMarkedAsGarbageCollectable(
+                                                           opCtx.get(), _tenantId));
+                               // The doc has an expireAt but was deleted before we had time to
+                               // delete it above therefore it's safe to pursue since it has been
+                               // cleaned up.
+                               if (!deleted) {
+                                   LOGV2_WARNING(
+                                       6792601,
+                                       "Existing state document was deleted before we could "
+                                       "delete it ourselves.");
+                               }
+                               lk.lock();
                            }
-                           lk.lock();
                        }
 
                        if (_stateDoc.getState() !=

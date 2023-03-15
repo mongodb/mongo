@@ -19,7 +19,7 @@ load("jstests/core/txns/libs/prepare_helpers.js");
 load("jstests/replsets/rslib.js");
 load("jstests/libs/uuid_util.js");
 
-const tenantId = "testTenantId";
+const tenantId = ObjectId().str;
 const transactionsNS = "config.transactions";
 const collName = "testColl";
 

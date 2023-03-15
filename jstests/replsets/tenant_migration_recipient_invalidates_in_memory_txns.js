@@ -33,7 +33,7 @@ const setParameterOpts = {
 const tenantMigrationTest =
     new TenantMigrationTest({name: jsTestName(), sharedOptions: {setParameter: setParameterOpts}});
 
-const tenantId = "testTenantId";
+const tenantId = ObjectId().str;
 const tenantDB = tenantMigrationTest.tenantDB(tenantId, "testDB");
 const collName = "testColl";
 const transactionsNS = "config.transactions";

@@ -47,7 +47,7 @@ protected:
                                           const std::vector<BSONObj>& secondaryIndexSpecs);
 
     const Timestamp _operationTime = Timestamp(12345, 67);
-    const std::string _tenantId = "tenant42";
+    const std::string _tenantId = OID::gen().toString();
     const UUID _migrationId = UUID::gen();
 
 private:

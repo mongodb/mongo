@@ -508,10 +508,9 @@ TEST_F(TenantMigrationRecipientServiceShardMergeTestInsert,
 
         // Test that access blocker exists.
         for (const auto& tenantId : _tenants) {
-            auto blocker =
-                TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                    .getTenantMigrationAccessBlockerForTenantId(
-                        tenantId.toString(), TenantMigrationAccessBlocker::BlockerType::kRecipient);
+            auto blocker = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+                               .getTenantMigrationAccessBlockerForTenantId(
+                                   tenantId, TenantMigrationAccessBlocker::BlockerType::kRecipient);
             ASSERT(!!blocker);
         }
         fp->setMode(FailPoint::off);

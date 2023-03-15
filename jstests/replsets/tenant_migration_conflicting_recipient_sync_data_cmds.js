@@ -85,16 +85,6 @@ function assertNoCertificateOrPrivateKey(string) {
     assert(!string.includes("PRIVATE KEY"), "found private key");
 }
 
-const kTenantIdPrefix = "testTenantId";
-let tenantCounter = 0;
-
-/**
- * Returns a tenantId that will not match any existing prefix.
- */
-function generateUniqueTenantId() {
-    return kTenantIdPrefix + tenantCounter++;
-}
-
 // Enable the failpoint to stop the tenant migration after persisting the state doc.
 assert.commandWorked(primary.adminCommand({
     configureFailPoint: "fpAfterPersistingTenantMigrationRecipientInstanceStateDoc",
@@ -104,7 +94,7 @@ assert.commandWorked(primary.adminCommand({
 
 // Test migrations with different migrationIds but identical settings.
 (() => {
-    const tenantId = generateUniqueTenantId() + "DiffMigrationId";
+    const tenantId = ObjectId().str;
     // Enable failPoint to pause the migration just as it starts.
     const fpPauseBeforeRunTenantMigrationRecipientInstance =
         configureFailPoint(primary, "pauseBeforeRunTenantMigrationRecipientInstance");
@@ -245,13 +235,13 @@ function testConcurrentConflictingMigration(migrationOpts0, migrationOpts1) {
 (() => {
     const migrationOpts0 = {
         migrationIdString: extractUUIDFromObject(UUID()),
-        tenantId: generateUniqueTenantId() + "DiffTenantId",
+        tenantId: ObjectId().str,
         donorConnectionString: kDonorConnectionString0,
         readPreference: kPrimaryReadPreference,
         recipientCertificateForDonor: kRecipientCertificateForDonor
     };
     const migrationOpts1 = Object.extend({}, migrationOpts0, true);
-    migrationOpts1.tenantId = generateUniqueTenantId() + "DiffTenantId";
+    migrationOpts1.tenantId = ObjectId().str;
     testConcurrentConflictingMigration(migrationOpts0, migrationOpts1);
 })();
 
@@ -259,7 +249,7 @@ function testConcurrentConflictingMigration(migrationOpts0, migrationOpts1) {
 (() => {
     const migrationOpts0 = {
         migrationIdString: extractUUIDFromObject(UUID()),
-        tenantId: generateUniqueTenantId() + "DiffDonorConnString",
+        tenantId: ObjectId().str,
         donorConnectionString: kDonorConnectionString0,
         readPreference: kPrimaryReadPreference,
         recipientCertificateForDonor: kRecipientCertificateForDonor
@@ -273,7 +263,7 @@ function testConcurrentConflictingMigration(migrationOpts0, migrationOpts1) {
 (() => {
     const migrationOpts0 = {
         migrationIdString: extractUUIDFromObject(UUID()),
-        tenantId: generateUniqueTenantId() + "DiffReadPreference",
+        tenantId: ObjectId().str,
         donorConnectionString: kDonorConnectionString0,
         readPreference: kPrimaryReadPreference,
         recipientCertificateForDonor: kRecipientCertificateForDonor
@@ -287,7 +277,7 @@ function testConcurrentConflictingMigration(migrationOpts0, migrationOpts1) {
 (() => {
     const migrationOpts0 = {
         migrationIdString: extractUUIDFromObject(UUID()),
-        tenantId: generateUniqueTenantId() + "DiffCertificate",
+        tenantId: ObjectId().str,
         donorConnectionString: kDonorConnectionString0,
         readPreference: kPrimaryReadPreference,
         recipientCertificateForDonor: kRecipientCertificateForDonor

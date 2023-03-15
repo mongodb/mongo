@@ -33,6 +33,18 @@
 
 namespace mongo {
 
+TenantId TenantId::parseFromString(StringData tenantId) {
+    uassert(ErrorCodes::BadValue, "Failed to parse empty tenantId string.", !tenantId.empty());
+
+    const auto res = OID::parse(tenantId);
+    uassert(ErrorCodes::BadValue,
+            fmt::format("Failed to parse malformatted tenantId: '{}', error: {}",
+                        tenantId,
+                        res.getStatus().reason()),
+            res.isOK());
+    return TenantId(res.getValue());
+}
+
 TenantId TenantId::parseFromBSON(const BSONElement& elem) {
     if (elem.isNull()) {
         uasserted(ErrorCodes::BadValue, "Could not deserialize TenantId from empty element");

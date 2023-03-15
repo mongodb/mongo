@@ -47,7 +47,7 @@ function runTest(failPoint) {
         new TenantMigrationTest({name: jsTestName(), recipientRst, sharedOptions: {nodes: 3}});
 
     jsTestLog("Running test with failpoint: " + failPoint);
-    const tenantId = "testTenantId";
+    const tenantId = ObjectId().str;
     const tenantDB = tenantMigrationTest.tenantDB(tenantId, "DB");
     const collName = "testColl";
 
