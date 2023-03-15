@@ -656,7 +656,9 @@ TEST_F(ServerSelectorTestFixture, ShouldFilterByTags) {
     tags = TagSets::eastOrWestProductionSet;
     servers = makeServerDescriptionList();
     selector.filterTags(&servers, tags);
-    ASSERT_EQ(2, servers.size());
+    ASSERT_EQ(1, servers.size());
+    ASSERT((std::map<std::string, std::string>{{"dc", "east"}, {"usage", "production"}}) ==
+           servers[0]->getTags());
 
     tags = TagSets::testSet;
     servers = makeServerDescriptionList();
