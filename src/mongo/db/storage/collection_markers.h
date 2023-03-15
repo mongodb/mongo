@@ -67,6 +67,19 @@ public:
      * that the current data awaiting a marker should be deleted anyways. This is useful in
      * time-based expiration systems as there could be low activity collections containing data that
      * should be expired but won't because there is no marker.
+     *
+     *                                                               'partial marker'
+     *            |___________________|......|____________________|______
+     *               Oldest Marker               Newest Marker
+     *  Min rid  <-------------------------------------------------<------- Max rid
+     *
+     * A 'Marker' is not created until it is full or its creation is requested by a caller. A
+     * 'partial marker' is not of type 'Marker', but rather metadata counting incoming records and
+     * bytes until it can be used to construct a 'Marker'.
+     *
+     *                    Marker
+     *             |__________________|
+     *                          lastRecord
      */
     struct Marker {
         int64_t records;      // Approximate number of records between the current marker and the
