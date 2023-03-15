@@ -517,10 +517,9 @@ public:
 
 protected:
     void setUp() override {
-        RAIIServerParameterControllerForTest multitenancySupportController("multitenancySupport",
-                                                                           true);
         DatabaseClonerTest::setUp();
     }
+
     std::unique_ptr<DatabaseCloner> makeDatabaseCloner() {
         return std::make_unique<DatabaseCloner>(_dbName,
                                                 getSharedData(),
@@ -534,6 +533,8 @@ protected:
 };
 
 TEST_F(DatabaseClonerMultitenancyTest, ListCollectionsMultitenancySupport) {
+    RAIIServerParameterControllerForTest multitenancySupportController("multitenancySupport", true);
+
     auto cloner = makeDatabaseCloner();
     cloner->setStopAfterStage_forTest("listCollections");
     auto uuid1 = UUID::gen();
@@ -566,7 +567,9 @@ TEST_F(DatabaseClonerMultitenancyTest, ListCollectionsMultitenancySupport) {
 
 TEST_F(DatabaseClonerMultitenancyTest,
        ListCollectionsMultitenancySupportFeatureFlagRequireTenantId) {
+    RAIIServerParameterControllerForTest multitenancySupportController("multitenancySupport", true);
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+
     auto cloner = makeDatabaseCloner();
     cloner->setStopAfterStage_forTest("listCollections");
     auto uuid1 = UUID::gen();

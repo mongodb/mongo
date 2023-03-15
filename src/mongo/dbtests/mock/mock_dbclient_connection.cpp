@@ -84,7 +84,15 @@ std::pair<rpc::UniqueReply, DBClientBase*> MockDBClientConnection::runCommandWit
                 str::stream() << "network error while attempting to run "
                               << "command '" << request.getCommandName() << "' " << status,
                 !ErrorCodes::isNetworkError(status));
-        auto cursorRes = CursorResponse::parseFromBSON(reply->getCommandReply());
+
+        auto dollarTenant = [&]() -> boost::optional<TenantId> {
+            if (auto tenant = request.body.getField("$tenant")) {
+                return TenantId::parseFromBSON(tenant);
+            }
+            return boost::none;
+        }();
+        auto cursorRes =
+            CursorResponse::parseFromBSON(reply->getCommandReply(), nullptr, dollarTenant);
         if (cursorRes.isOK() && cursorRes.getValue().getCursorId() != 0) {
             _lastCursorMessage = request;
         }
