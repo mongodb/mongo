@@ -521,7 +521,11 @@ public:
 
                     try {
                         firstBatch.push_back(ListCollectionsReplyItem::parse(
-                            IDLParserContext("ListCollectionsReplyItem"), nextDoc));
+                            IDLParserContext("ListCollectionsReplyItem",
+                                             false /* apiStrict*/,
+                                             cursorNss.tenantId(),
+                                             SerializationContext::stateCommandReply()),
+                            nextDoc));
                     } catch (const DBException& exc) {
                         LOGV2_ERROR(
                             5254300,

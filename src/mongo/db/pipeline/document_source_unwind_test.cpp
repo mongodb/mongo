@@ -72,7 +72,8 @@ public:
           _opCtx(_queryServiceContext->makeOperationContext()),
           _ctx(new ExpressionContextForTest(
               _opCtx.get(),
-              AggregateCommandRequest(NamespaceString::createNamespaceString_forTest(ns), {}))) {}
+              AggregateCommandRequest(NamespaceString::createNamespaceString_forTest(ns),
+                                      std::vector<mongo::BSONObj>()))) {}
 
     virtual ~CheckResultsBase() {}
 

@@ -67,7 +67,7 @@ public:
             const auto nss = ns();
 
             CursorInitialReply resp;
-            InitialResponseCursor initRespCursor{{}};
+            InitialResponseCursor initRespCursor{std::vector<mongo::BSONObj>()};
             initRespCursor.setResponseCursorBase({0LL /* cursorId */, nss});
             resp.setCursor(std::move(initRespCursor));
             return resp;

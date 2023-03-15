@@ -78,7 +78,8 @@ class DocumentSourceCursorTest : public unittest::Test {
 public:
     DocumentSourceCursorTest()
         : client(_opCtx.get()),
-          _ctx(new ExpressionContextForTest(_opCtx.get(), AggregateCommandRequest(nss, {}))) {
+          _ctx(new ExpressionContextForTest(
+              _opCtx.get(), AggregateCommandRequest(nss, std::vector<mongo::BSONObj>()))) {
         _ctx->tempDir = storageGlobalParams.dbpath + "/_tmp";
     }
 

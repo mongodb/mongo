@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/util/static_immortal.h"
+
 namespace mongo {
 
 /**
@@ -78,6 +80,18 @@ struct SerializationContext {
                          CallerType callerType = CallerType::None,
                          Prefix prefixState = Prefix::Default)
         : _source(source), _callerType(callerType), _prefixState(prefixState) {}
+
+    static const SerializationContext& stateCommandReply() {
+        static StaticImmortal<SerializationContext> stateCommandReply{Source::Command,
+                                                                      CallerType::Reply};
+        return *stateCommandReply;
+    }
+
+    static const SerializationContext& stateCommandRequest() {
+        static StaticImmortal<SerializationContext> stateCommandRequest{Source::Command,
+                                                                        CallerType::Request};
+        return *stateCommandRequest;
+    }
 };
 
 }  // namespace mongo

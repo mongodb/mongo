@@ -177,7 +177,7 @@ TEST(AggregationRequestTest, ShouldParseExplainFlagWithReadConcern) {
 
 TEST(AggregationRequestTest, ShouldOnlySerializeRequiredFieldsIfNoOptionalFieldsAreSpecified) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.collection");
-    AggregateCommandRequest request(nss, {});
+    AggregateCommandRequest request(nss, std::vector<mongo::BSONObj>());
 
     auto expectedSerialization =
         Document{{AggregateCommandRequest::kCommandName, nss.coll()},
@@ -189,7 +189,7 @@ TEST(AggregationRequestTest, ShouldOnlySerializeRequiredFieldsIfNoOptionalFields
 
 TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.collection");
-    AggregateCommandRequest request(nss, {});
+    AggregateCommandRequest request(nss, std::vector<mongo::BSONObj>());
     request.setAllowDiskUse(true);
     request.setFromMongos(true);
     request.setNeedsMerge(true);
@@ -242,7 +242,7 @@ TEST(AggregationRequestTest, ShouldSerializeOptionalValuesIfSet) {
 
 TEST(AggregationRequestTest, ShouldSerializeBatchSizeIfSetAndExplainFalse) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.collection");
-    AggregateCommandRequest request(nss, {});
+    AggregateCommandRequest request(nss, std::vector<mongo::BSONObj>());
     SimpleCursorOptions cursor;
     cursor.setBatchSize(10);
     request.setCursor(cursor);
@@ -258,7 +258,7 @@ TEST(AggregationRequestTest, ShouldSerializeBatchSizeIfSetAndExplainFalse) {
 TEST(AggregationRequestTest, ShouldSerialiseAggregateFieldToOneIfCollectionIsAggregateOneNSS) {
     NamespaceString nss =
         NamespaceString::makeCollectionlessAggregateNSS(DatabaseName(boost::none, "a"));
-    AggregateCommandRequest request(nss, {});
+    AggregateCommandRequest request(nss, std::vector<mongo::BSONObj>());
 
     auto expectedSerialization =
         Document{{AggregateCommandRequest::kCommandName, 1},
@@ -296,7 +296,7 @@ TEST(AggregationRequestTest, ShouldAcceptHintAsString) {
 
 TEST(AggregationRequestTest, ShouldNotSerializeBatchSizeWhenExplainSet) {
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.collection");
-    AggregateCommandRequest request(nss, {});
+    AggregateCommandRequest request(nss, std::vector<mongo::BSONObj>());
     SimpleCursorOptions cursor;
     cursor.setBatchSize(10);
     request.setCursor(cursor);

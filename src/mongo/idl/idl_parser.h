@@ -244,8 +244,11 @@ public:
     IDLParserContext(StringData fieldName, bool apiStrict)
         : IDLParserContext{fieldName, apiStrict, boost::none} {}
 
-    IDLParserContext(StringData fieldName, bool apiStrict, boost::optional<TenantId> tenantId)
-        : _serializationContext(SerializationContext()),
+    IDLParserContext(StringData fieldName,
+                     bool apiStrict,
+                     boost::optional<TenantId> tenantId,
+                     const SerializationContext& serializationContext = SerializationContext())
+        : _serializationContext(serializationContext),
           _currentField(fieldName),
           _apiStrict(apiStrict),
           _tenantId(std::move(tenantId)),

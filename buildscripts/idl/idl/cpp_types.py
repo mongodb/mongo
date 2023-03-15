@@ -528,19 +528,19 @@ def _call_method_or_global_function(expression, ast_type):
     enum deserializers/serializers which are not methods.
     """
     method_name = ast_type.serializer
-    serializer_flags = 'getSerializationContext()' if ast_type.deserialize_with_tenant else ''
+    serialization_context = 'getSerializationContext()' if ast_type.deserialize_with_tenant else ''
 
     short_method_name = writer.get_method_name(method_name)
     if writer.is_function(method_name):
         if ast_type.deserialize_with_tenant:
-            serializer_flags = ', ' + serializer_flags
-        return common.template_args('${method_name}(${expression}${serializer_flags})',
+            serialization_context = ', ' + serialization_context
+        return common.template_args('${method_name}(${expression}${serialization_context})',
                                     expression=expression, method_name=method_name,
-                                    serializer_flags=serializer_flags)
+                                    serialization_context=serialization_context)
 
-    return common.template_args('${expression}.${method_name}(${serializer_flags})',
+    return common.template_args('${expression}.${method_name}(${serialization_context})',
                                 expression=expression, method_name=short_method_name,
-                                serializer_flags=serializer_flags)
+                                serialization_context=serialization_context)
 
 
 class _CommonBsonCppTypeBase(BsonCppTypeBase):

@@ -260,7 +260,8 @@ public:
         : _opCtx(makeOperationContext()),
           _ctx(new ExpressionContextForTest(
               _opCtx.get(),
-              AggregateCommandRequest(NamespaceString::createNamespaceString_forTest(ns), {}))),
+              AggregateCommandRequest(NamespaceString::createNamespaceString_forTest(ns),
+                                      std::vector<mongo::BSONObj>()))),
           _tempDir("DocumentSourceGroupTest"),
           _groupStageType(groupStageType) {}
 
@@ -300,7 +301,8 @@ protected:
 
         intrusive_ptr<ExpressionContextForTest> expressionContext = new ExpressionContextForTest(
             _opCtx.get(),
-            AggregateCommandRequest(NamespaceString::createNamespaceString_forTest(ns), {}));
+            AggregateCommandRequest(NamespaceString::createNamespaceString_forTest(ns),
+                                    std::vector<mongo::BSONObj>()));
         expressionContext->allowDiskUse = true;
         // For $group, 'inShard' implies 'fromMongos' and 'needsMerge'.
         expressionContext->fromMongos = expressionContext->needsMerge = inShard;

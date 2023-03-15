@@ -57,9 +57,16 @@ def _get_arg_for_field(field):
 def _get_required_parameters(struct):
     # type: (ast.Struct) -> List[str]
     """Get a list of arguments for required parameters."""
-    return [
+    params = [
         _get_arg_for_field(field) for field in struct.fields if _is_required_constructor_arg(field)
     ]
+    # Since this contains defaults, we need to push this to the end of the list.
+    params.append(_get_serialization_ctx_arg())
+    return params
+
+
+def _get_serialization_ctx_arg():
+    return 'boost::optional<SerializationContext> serializationContext = boost::none'
 
 
 class ArgumentInfo(object):
@@ -68,13 +75,20 @@ class ArgumentInfo(object):
     def __init__(self, arg):
         # type: (str) -> None
         """Create a instance of the ArgumentInfo class by parsing the argument string."""
-        parts = arg.split(' ')
-        self.type = ' '.join(parts[0:-1])
-        self.name = parts[-1]
+        self.defaults = None
+        equal_tokens = arg.split('=')
+        if len(equal_tokens) > 1:
+            self.defaults = equal_tokens[-1].strip()
 
-    def __str__(self):
-        # type: () -> str
+        space_tokens = equal_tokens[0].strip().split(' ')
+        self.type = ' '.join(space_tokens[0:-1])
+        self.name = space_tokens[-1]
+
+    def get_string(self, get_defaults):
+        # type: (bool) -> str
         """Return a formatted argument string."""
+        if self.defaults and get_defaults:
+            return "%s %s = %s" % (self.type, self.name, self.defaults)  # type: ignore
         return "%s %s" % (self.type, self.name)  # type: ignore
 
 
@@ -119,7 +133,8 @@ class MethodInfo(object):
         return common.template_args(
             "${pre_modifiers}${return_type}${method_name}(${args})${post_modifiers};",
             pre_modifiers=pre_modifiers, return_type=return_type_str, method_name=self.method_name,
-            args=', '.join([str(arg) for arg in self.args]), post_modifiers=post_modifiers)
+            args=', '.join(
+                [arg.get_string(True) for arg in self.args]), post_modifiers=post_modifiers)
 
     def get_definition(self):
         # type: () -> str
@@ -138,7 +153,7 @@ class MethodInfo(object):
             "${pre_modifiers}${return_type}${class_name}::${method_name}(${args})${post_modifiers}",
             pre_modifiers=pre_modifiers, return_type=return_type_str, class_name=self.class_name,
             method_name=self.method_name, args=', '.join(
-                [str(arg) for arg in self.args]), post_modifiers=post_modifiers)
+                [arg.get_string(False) for arg in self.args]), post_modifiers=post_modifiers)
 
     def get_call(self, obj):
         # type: (Optional[str]) -> str
@@ -264,7 +279,7 @@ class _StructTypeInfo(StructTypeInfoBase):
     def get_constructor_method(self, gen_header=False):
         # type: (bool) -> MethodInfo
         class_name = common.title_case(self._struct.cpp_name)
-        return MethodInfo(class_name, class_name, [])
+        return MethodInfo(class_name, class_name, [_get_serialization_ctx_arg()])
 
     def get_required_constructor_method(self, gen_header=False):
         # type: (bool) -> MethodInfo
@@ -440,7 +455,8 @@ class _CommandFromType(_CommandBaseTypeInfo):
         class_name = common.title_case(self._struct.cpp_name)
 
         arg = _get_command_type_parameter(self._command, gen_header)
-        return MethodInfo(class_name, class_name, [arg], explicit=True)
+        sc_arg = _get_serialization_ctx_arg()
+        return MethodInfo(class_name, class_name, [arg, sc_arg], explicit=True)
 
     def get_required_constructor_method(self, gen_header=False):
         # type: (bool) -> MethodInfo
@@ -507,7 +523,9 @@ class _CommandWithNamespaceTypeInfo(_CommandBaseTypeInfo):
     def get_constructor_method(self, gen_header=False):
         # type: (bool) -> MethodInfo
         class_name = common.title_case(self._struct.cpp_name)
-        return MethodInfo(class_name, class_name, [self._get_nss_param(gen_header)], explicit=True)
+        sc_arg = _get_serialization_ctx_arg()
+        return MethodInfo(class_name, class_name, [self._get_nss_param(gen_header), sc_arg],
+                          explicit=True)
 
     def get_required_constructor_method(self, gen_header=False):
         # type: (bool) -> MethodInfo
@@ -585,7 +603,9 @@ class _CommandWithUUIDNamespaceTypeInfo(_CommandBaseTypeInfo):
     def get_constructor_method(self, gen_header=False):
         # type: (bool) -> MethodInfo
         class_name = common.title_case(self._struct.cpp_name)
-        return MethodInfo(class_name, class_name, [self._get_nss_param(gen_header)], explicit=True)
+        sc_arg = _get_serialization_ctx_arg()
+        return MethodInfo(class_name, class_name, [self._get_nss_param(gen_header), sc_arg],
+                          explicit=True)
 
     def get_required_constructor_method(self, gen_header=False):
         # type: (bool) -> MethodInfo
