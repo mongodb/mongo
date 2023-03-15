@@ -3,8 +3,6 @@
  * containing logical expressions ($and, $or).
  *
  * @tags: [
- *  # TODO SERVER-67607: Test plan cache with CQF enabled.
- *  cqf_incompatible,
  *  # Since the plan cache is per-node state, this test assumes that all operations are happening
  *  # against the same mongod.
  *  assumes_read_preference_unchanged,
@@ -13,9 +11,9 @@
  *  # If all chunks are moved off of a shard, it can cause the plan cache to miss commands.
  *  assumes_balancer_off,
  *  assumes_unsharded_collection,
- *  requires_fcv_63,
  *  # Plan cache state is node-local and will not get migrated alongside tenant data.
  *  tenant_migration_incompatible,
+ *  requires_fcv_60,
  * ]
  */
 (function() {
