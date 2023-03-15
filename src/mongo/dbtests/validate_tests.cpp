@@ -905,7 +905,6 @@ public:
             const BSONObj badKey = BSON("a" << -1);
             InsertDeleteOptions options;
             options.dupsAllowed = true;
-            options.logIfError = true;
 
             KeyStringSet keys;
             iam->getKeys(
@@ -1352,7 +1351,6 @@ public:
             int64_t numDeleted;
             const BSONObj actualKey = BSON("a" << 1);
             InsertDeleteOptions options;
-            options.logIfError = true;
             options.dupsAllowed = true;
 
             KeyStringSet keys;
@@ -1741,7 +1739,6 @@ public:
             int64_t numDeleted;
             const BSONObj actualKey = BSON("a" << 1);
             InsertDeleteOptions options;
-            options.logIfError = true;
             options.dupsAllowed = true;
 
             KeyStringSet keys;
@@ -2069,7 +2066,6 @@ public:
             const IndexCatalog* indexCatalog = coll()->getIndexCatalog();
 
             InsertDeleteOptions options;
-            options.logIfError = true;
             options.dupsAllowed = true;
 
             WriteUnitOfWork wunit(&_opCtx);
@@ -2325,7 +2321,6 @@ public:
             const IndexCatalog* indexCatalog = coll()->getIndexCatalog();
 
             InsertDeleteOptions options;
-            options.logIfError = true;
             options.dupsAllowed = true;
 
             WriteUnitOfWork wunit(&_opCtx);
@@ -2585,7 +2580,6 @@ public:
             const IndexCatalog* indexCatalog = coll()->getIndexCatalog();
 
             InsertDeleteOptions options;
-            options.logIfError = true;
             options.dupsAllowed = true;
 
             {
@@ -2627,7 +2621,6 @@ public:
             const IndexCatalog* indexCatalog = coll()->getIndexCatalog();
 
             InsertDeleteOptions options;
-            options.logIfError = true;
             options.dupsAllowed = true;
 
             WriteUnitOfWork wunit(&_opCtx);
@@ -2906,7 +2899,6 @@ public:
             auto iam = indexCatalog->getEntry(descriptor)->accessMethod()->asSortedData();
             InsertDeleteOptions options;
             options.dupsAllowed = true;
-            options.logIfError = true;
 
             // Remove non-multikey index entry.
             {
@@ -3114,7 +3106,6 @@ public:
             int64_t numDeleted;
             const BSONObj actualKey = BSON("a" << 1);
             InsertDeleteOptions options;
-            options.logIfError = true;
             options.dupsAllowed = true;
 
             KeyStringSet keys;
@@ -3152,7 +3143,6 @@ public:
             int64_t numDeleted;
             const BSONObj actualKey = BSON("b" << 1);
             InsertDeleteOptions options;
-            options.logIfError = true;
             options.dupsAllowed = true;
 
             KeyStringSet keys;
@@ -3251,7 +3241,6 @@ public:
             const IndexCatalog* indexCatalog = coll()->getIndexCatalog();
 
             InsertDeleteOptions options;
-            options.logIfError = true;
             options.dupsAllowed = true;
 
             WriteUnitOfWork wunit(&_opCtx);
@@ -3668,7 +3657,6 @@ public:
             auto iam = indexCatalog->getEntry(descriptor)->accessMethod()->asSortedData();
             InsertDeleteOptions options;
             options.dupsAllowed = true;
-            options.logIfError = true;
 
             // Remove non-multikey index entry.
             {
@@ -3894,7 +3882,6 @@ public:
             auto iam = indexCatalog->getEntry(descriptor)->accessMethod()->asSortedData();
             InsertDeleteOptions options;
             options.dupsAllowed = true;
-            options.logIfError = true;
 
             // Remove index keys for original document.
             MultikeyPaths oldMultikeyPaths;

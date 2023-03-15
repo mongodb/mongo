@@ -128,7 +128,6 @@ Status SkippedRecordTracker::retrySkippedRecords(OperationContext* opCtx,
         _indexCatalogEntry->getNSSFromCatalog(opCtx),
         _indexCatalogEntry->descriptor(),
         &options);
-    options.fromIndexBuilder = true;
 
     // This should only be called when constraints are being enforced, on a primary. It does not
     // make sense, nor is it necessary for this to be called on a secondary.

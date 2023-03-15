@@ -394,7 +394,6 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
             index.options.dupsAllowed = _method == IndexBuildMethod::kForeground
                 ? !descriptor->unique() || _ignoreUnique
                 : true;
-            index.options.fromIndexBuilder = true;
 
             LOGV2(20384,
                   "Index build: starting",

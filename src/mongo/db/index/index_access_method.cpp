@@ -1272,8 +1272,6 @@ void SortedDataIndexAccessMethod::_unindexKeysOrWriteToSideTable(
     InsertDeleteOptions options,  // copy!
     CheckRecordId checkRecordId) {
 
-    options.logIfError = logIfError;
-
     if (_indexCatalogEntry->isHybridBuilding()) {
         // The side table interface accepts only records that meet the criteria for this partial
         // index.

@@ -307,15 +307,8 @@ struct UpdateTicket {
  * Flags we can set for inserts and deletes (and updates, which are kind of both).
  */
 struct InsertDeleteOptions {
-    // If there's an error, log() it.
-    bool logIfError = false;
-
     // Are duplicate keys allowed in the index?
     bool dupsAllowed = false;
-
-    // Only an index builder is allowed to insert into the index while it is building, so only the
-    // index builder should set this to 'true'.
-    bool fromIndexBuilder = false;
 
     /**
      * Specifies whether getKeys should relax the index constraints or not, in order of most
