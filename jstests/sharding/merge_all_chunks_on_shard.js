@@ -3,8 +3,6 @@
  *
  * @tags: [
  *   featureFlagAutoMerger,
- *   # Balancer is stopped when stepping down
- *   does_not_support_stepdowns,
  *   temporary_catalog_shard_incompatible,
  * ]
  */
@@ -59,16 +57,20 @@ function setJumboFlag(configDB, coll, chunkQuery) {
 }
 
 function setHistoryWindowInSecs(st, valueInSeconds) {
-    assert.commandWorked(st.configRS.getPrimary().adminCommand({
-        configureFailPoint: 'overrideHistoryWindowInSecs',
-        mode: 'alwaysOn',
-        data: {seconds: valueInSeconds}
-    }));
+    st.forEachConfigServer((conn) => {
+        assert.commandWorked(conn.adminCommand({
+            configureFailPoint: 'overrideHistoryWindowInSecs',
+            mode: 'alwaysOn',
+            data: {seconds: valueInSeconds}
+        }));
+    });
 }
 
 function resetHistoryWindowInSecs(st) {
-    assert.commandWorked(st.configRS.getPrimary().adminCommand(
-        {configureFailPoint: 'overrideHistoryWindowInSecs', mode: 'off'}));
+    st.forEachConfigServer((conn) => {
+        assert.commandWorked(
+            conn.adminCommand({configureFailPoint: 'overrideHistoryWindowInSecs', mode: 'off'}));
+    });
 }
 
 let defaultChunkDefragmentationThrottlingMS = null;
@@ -388,8 +390,9 @@ function testConfigurableAutoMergerIntervalSecs(st, testDB) {
     setHistoryWindowInSecs(st, 0 /* seconds */);
 
     // Set automerger interval to 1 second
-    assert.commandWorked(
-        st.configRS.getPrimary().adminCommand({setParameter: 1, autoMergerIntervalSecs: 1}));
+    st.forEachConfigServer((conn) => {
+        assert.commandWorked(conn.adminCommand({setParameter: 1, autoMergerIntervalSecs: 1}));
+    });
 
     st.startBalancer();
     // Potentially join previous balancing round with longer round interval from previous test case
