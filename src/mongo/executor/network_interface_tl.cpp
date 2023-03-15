@@ -33,12 +33,14 @@
 
 #include <fmt/format.h>
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/config.h"
 #include "mongo/db/auth/security_token.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/connection_pool_tl.h"
 #include "mongo/executor/hedging_metrics.h"
+#include "mongo/executor/network_interface.h"
 #include "mongo/executor/network_interface_tl_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -1349,5 +1351,32 @@ void NetworkInterfaceTL::dropConnections(const HostAndPort& hostAndPort) {
     _pool->dropConnections(hostAndPort);
 }
 
+AsyncDBClient* NetworkInterfaceTL::LeasedStream::getClient() {
+    return checked_cast<connection_pool_tl::TLConnection*>(_conn.get())->client();
+}
+
+void NetworkInterfaceTL::LeasedStream::indicateSuccess() {
+    return _conn->indicateSuccess();
+}
+
+void NetworkInterfaceTL::LeasedStream::indicateFailure(Status status) {
+    _conn->indicateFailure(status);
+}
+
+void NetworkInterfaceTL::LeasedStream::indicateUsed() {
+    _conn->indicateUsed();
+}
+
+SemiFuture<std::unique_ptr<NetworkInterface::LeasedStream>> NetworkInterfaceTL::leaseStream(
+    const HostAndPort& hostAndPort, transport::ConnectSSLMode sslMode, Milliseconds timeout) {
+
+    return _pool->lease(hostAndPort, sslMode, timeout)
+        .thenRunOn(_reactor)
+        .then([](auto conn) -> std::unique_ptr<NetworkInterface::LeasedStream> {
+            auto ptr = std::make_unique<NetworkInterfaceTL::LeasedStream>(std::move(conn));
+            return ptr;
+        })
+        .semi();
+}
 }  // namespace executor
 }  // namespace mongo

@@ -148,6 +148,12 @@ public:
 
     void testEgress(const HostAndPort&, transport::ConnectSSLMode, Milliseconds, Status) override {}
 
+    // Stream-leasing functionality is not mocked at this time.
+    SemiFuture<std::unique_ptr<NetworkInterface::LeasedStream>> leaseStream(
+        const HostAndPort&, transport::ConnectSSLMode, Milliseconds) override {
+        MONGO_UNREACHABLE;
+    }
+
     ////////////////////////////////////////////////////////////////////////////////
     //
     // Methods for simulating network operations and the passage of time.

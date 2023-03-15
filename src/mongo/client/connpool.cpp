@@ -589,6 +589,7 @@ void DBConnectionPool::appendConnectionStats(executor::ConnectionPoolStats* stat
 
             executor::ConnectionStatsPer hostStats{static_cast<size_t>(i->second.numInUse()),
                                                    static_cast<size_t>(i->second.numAvailable()),
+                                                   0,
                                                    static_cast<size_t>(i->second.numCreated()),
                                                    0,
                                                    0};

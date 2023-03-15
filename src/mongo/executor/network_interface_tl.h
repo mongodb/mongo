@@ -31,9 +31,12 @@
 
 #include <deque>
 
+#include <boost/optional.hpp>
+
 #include "mongo/client/async_client.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/connection_pool.h"
+#include "mongo/executor/connection_pool_tl.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/platform/mutex.h"
@@ -102,6 +105,33 @@ public:
                     transport::ConnectSSLMode sslMode,
                     Milliseconds timeout,
                     Status status) override;
+
+    /**
+     * NetworkInterfaceTL's implementation of a leased network-stream
+     * provided for manual use outside of the NITL's usual RPC API.
+     * When this type is destroyed, the destructor of the ConnectionHandle
+     * member will return the connection to this NetworkInterface's ConnectionPool.
+     */
+    class LeasedStream : public NetworkInterface::LeasedStream {
+    public:
+        AsyncDBClient* getClient() override;
+
+        LeasedStream(ConnectionPool::ConnectionHandle&& conn) : _conn{std::move(conn)} {}
+
+        // These pass-through indications of the health of the leased
+        // stream to the underlying ConnectionHandle
+        void indicateSuccess() override;
+        void indicateUsed() override;
+        void indicateFailure(Status) override;
+
+    private:
+        ConnectionPool::ConnectionHandle _conn;
+    };
+
+    SemiFuture<std::unique_ptr<NetworkInterface::LeasedStream>> leaseStream(
+        const HostAndPort& hostAndPort,
+        transport::ConnectSSLMode sslMode,
+        Milliseconds timeout) override;
 
 private:
     struct RequestState;

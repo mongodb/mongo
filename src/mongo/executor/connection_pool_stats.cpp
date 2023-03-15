@@ -36,10 +36,15 @@
 namespace mongo {
 namespace executor {
 
-ConnectionStatsPer::ConnectionStatsPer(
-    size_t nInUse, size_t nAvailable, size_t nCreated, size_t nRefreshing, size_t nRefreshed)
+ConnectionStatsPer::ConnectionStatsPer(size_t nInUse,
+                                       size_t nAvailable,
+                                       size_t nLeased,
+                                       size_t nCreated,
+                                       size_t nRefreshing,
+                                       size_t nRefreshed)
     : inUse(nInUse),
       available(nAvailable),
+      leased(nLeased),
       created(nCreated),
       refreshing(nRefreshing),
       refreshed(nRefreshed) {}
@@ -49,6 +54,7 @@ ConnectionStatsPer::ConnectionStatsPer() = default;
 ConnectionStatsPer& ConnectionStatsPer::operator+=(const ConnectionStatsPer& other) {
     inUse += other.inUse;
     available += other.available;
+    leased += other.leased;
     created += other.created;
     refreshing += other.refreshing;
     refreshed += other.refreshed;
@@ -75,6 +81,7 @@ void ConnectionPoolStats::updateStatsForHost(std::string pool,
     // Update total connection stats.
     totalInUse += newStats.inUse;
     totalAvailable += newStats.available;
+    totalLeased += newStats.leased;
     totalCreated += newStats.created;
     totalRefreshing += newStats.refreshing;
     totalRefreshed += newStats.refreshed;
@@ -83,6 +90,7 @@ void ConnectionPoolStats::updateStatsForHost(std::string pool,
 void ConnectionPoolStats::appendToBSON(mongo::BSONObjBuilder& result, bool forFTDC) {
     result.appendNumber("totalInUse", static_cast<long long>(totalInUse));
     result.appendNumber("totalAvailable", static_cast<long long>(totalAvailable));
+    result.appendNumber("totalLeased", static_cast<long long>(totalLeased));
     result.appendNumber("totalCreated", static_cast<long long>(totalCreated));
     result.appendNumber("totalRefreshing", static_cast<long long>(totalRefreshing));
     result.appendNumber("totalRefreshed", static_cast<long long>(totalRefreshed));
@@ -115,6 +123,7 @@ void ConnectionPoolStats::appendToBSON(mongo::BSONObjBuilder& result, bool forFT
             auto& poolStats = pool.second;
             poolInfo.appendNumber("poolInUse", static_cast<long long>(poolStats.inUse));
             poolInfo.appendNumber("poolAvailable", static_cast<long long>(poolStats.available));
+            poolInfo.appendNumber("poolLeased", static_cast<long long>(poolStats.leased));
             poolInfo.appendNumber("poolCreated", static_cast<long long>(poolStats.created));
             poolInfo.appendNumber("poolRefreshing", static_cast<long long>(poolStats.refreshing));
             poolInfo.appendNumber("poolRefreshed", static_cast<long long>(poolStats.refreshed));
@@ -124,6 +133,7 @@ void ConnectionPoolStats::appendToBSON(mongo::BSONObjBuilder& result, bool forFT
                 auto& hostStats = host.second;
                 hostInfo.appendNumber("inUse", static_cast<long long>(hostStats.inUse));
                 hostInfo.appendNumber("available", static_cast<long long>(hostStats.available));
+                hostInfo.appendNumber("leased", static_cast<long long>(hostStats.leased));
                 hostInfo.appendNumber("created", static_cast<long long>(hostStats.created));
                 hostInfo.appendNumber("refreshing", static_cast<long long>(hostStats.refreshing));
                 hostInfo.appendNumber("refreshed", static_cast<long long>(hostStats.refreshed));
@@ -139,6 +149,7 @@ void ConnectionPoolStats::appendToBSON(mongo::BSONObjBuilder& result, bool forFT
             auto hostStats = host.second;
             hostInfo.appendNumber("inUse", static_cast<long long>(hostStats.inUse));
             hostInfo.appendNumber("available", static_cast<long long>(hostStats.available));
+            hostInfo.appendNumber("leased", static_cast<long long>(hostStats.leased));
             hostInfo.appendNumber("created", static_cast<long long>(hostStats.created));
             hostInfo.appendNumber("refreshing", static_cast<long long>(hostStats.refreshing));
             hostInfo.appendNumber("refreshed", static_cast<long long>(hostStats.refreshed));
