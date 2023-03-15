@@ -107,7 +107,7 @@ function authnFailureLogsMetricsReportWithFailedStatus(mongodRunner, connectionH
                 true),
             "Did not find expected 1 failure metric log entries");
     } else {
-        assert.eq(checkContainsWithCountJson(mongodRunner, 5286307, {}),
+        assert.eq(checkLog.checkContainsWithCountJson(mongodRunner, 5286307, {}),
                   false,
                   "Expected not to find failure metric log entries");
     }
@@ -150,9 +150,10 @@ function multipleAuthnSuccessLogsMultipleCorrectReports(mongodRunner, connection
 }
 
 // Test that multiple authentication failure is logged correctly
-function authnFailureLogsMetricsReportWithFailedStatus(mongodRunner, connectionHealthLoggingOn) {
+function multiAuthnFailureLogsMetricsReportWithFailedStatus(mongodRunner,
+                                                            connectionHealthLoggingOn) {
     jsTest.log(
-        "============================ authnFailureLogsMetricsReportWithFailedStatus ============================");
+        "============================ multiAuthnFailureLogsMetricsReportWithFailedStatus ============================");
 
     const admin = mongodRunner.getDB("admin");
     admin.auth('admin', 'wrong');
@@ -242,6 +243,7 @@ let runTest = (connectionHealthLoggingOn) => {
 
         authnSuccessLogsMetricsReportWithSuccessStatus(mongod, connectionHealthLoggingOn);
         authnFailureLogsMetricsReportWithFailedStatus(mongod, connectionHealthLoggingOn);
+        multiAuthnFailureLogsMetricsReportWithFailedStatus(mongod, connectionHealthLoggingOn);
         multipleAuthnSuccessLogsMultipleCorrectReports(mongod, connectionHealthLoggingOn);
         multipleAuthnMixedLogsMultipleCorrectReports(mongod, connectionHealthLoggingOn);
 
