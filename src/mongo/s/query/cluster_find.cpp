@@ -308,10 +308,10 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
         // deadline so that we have time to return partial results before the opCtx is killed.
         auto deadline = opCtx->getDeadline();
         if (findCommand.getAllowPartialResults() && findCommand.getMaxTimeMS()) {
-            // Reserve 10% of the time budget (up to 100,000 microseconds max) for processing
+            // Reserve 25% of the time budget (up to 100,000 microseconds max) for processing
             // buffered partial results.
             deadline -=
-                Microseconds{std::min(1000LL * (*findCommand.getMaxTimeMS()) / 10, 100'000LL)};
+                Microseconds{std::min(1000LL * findCommand.getMaxTimeMS().get() / 4, 100'000LL)};
             LOGV2_DEBUG(
                 5746901,
                 0,
