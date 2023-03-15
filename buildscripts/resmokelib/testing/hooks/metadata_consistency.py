@@ -12,8 +12,6 @@ class CheckMetadataConsistencyInBackground(jsfile.DataConsistencyHook):
     """Check the metadata consistency of a sharded cluster."""
 
     IS_BACKGROUND = True
-    # TODO SERVER-74741: Re-enable metedata consistency check once the command is lock free
-    SKIP_TESTS = ['jstests/core/txns/many_txns.js']
 
     def __init__(self, hook_logger, fixture, shell_options=None):
         """Initialize CheckMetadataConsistencyInBackground."""
@@ -58,10 +56,6 @@ class CheckMetadataConsistencyInBackground(jsfile.DataConsistencyHook):
             test.logger, test, self, self._js_filename, self._shell_options)
         hook_test_case.configure(self.fixture)
 
-        if test.test_name in self.SKIP_TESTS:
-            self.logger.info("Metadata consistency check explicitely disabled for {test.test_name}")
-            return
-
         self.logger.info("Resuming background metadata consistency checker thread")
         self._background_job.resume(hook_test_case, test_report)
 
@@ -71,9 +65,6 @@ class CheckMetadataConsistencyInBackground(jsfile.DataConsistencyHook):
         """
 
         if self._background_job is None:
-            return
-
-        if test.test_name in self.SKIP_TESTS:
             return
 
         self.logger.info("Pausing background metadata consistency checker thread")

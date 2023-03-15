@@ -73,10 +73,10 @@ public:
 
         Response typedRun(OperationContext* opCtx) {
             uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
+            opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
             const auto& nss = ns();
             const auto& shardId = ShardingState::get(opCtx)->shardId();
-            const auto& collectionCatalog = CollectionCatalog::get(opCtx);
             const auto& primaryShardId = request().getPrimaryShardId();
 
             // Get the list of collections from configsvr sorted by namespace
@@ -86,27 +86,38 @@ public:
                 repl::ReadConcernLevel::kMajorityReadConcern,
                 BSON(CollectionType::kNssFieldName << 1) /*sort*/);
 
-            std::vector<NamespaceString> localNssCollections;
-            {
+            const auto localCollectionsSorted = [&] {
+                std::vector<CollectionPtr> colls;
+
                 // Get the list of local collections sorted by namespace
-                Lock::DBLock dbLock{opCtx, nss.db(), MODE_S};
-                localNssCollections =
-                    collectionCatalog->getAllCollectionNamesFromDb(opCtx, nss.db());
-            }
-            std::sort(localNssCollections.begin(), localNssCollections.end());
-            std::vector<CollectionPtr> localCollection;
-            for (const auto& localNss : localNssCollections) {
-                if (!localNss.isNormalCollection()) {
-                    continue;
+                AutoGetDbForReadMaybeLockFree lockFreeReadBlock(opCtx, nss.dbName());
+                tassert(7466700, "Lock-free mode not avaialable", opCtx->isLockFreeReadsOp());
+                // Take a snapshot of the catalog;
+                auto collectionCatalog = CollectionCatalog::get(opCtx);
+                for (auto it = collectionCatalog->begin(opCtx, nss.dbName());
+                     it != collectionCatalog->end(opCtx);
+                     ++it) {
+                    if (!(*it)->ns().isNormalCollection()) {
+                        continue;
+                    }
+                    colls.emplace_back(CollectionPtr(*it));
                 }
-                localCollection.push_back(
-                    CollectionPtr(collectionCatalog->lookupCollectionByNamespace(opCtx, localNss)));
-            }
+                std::sort(colls.begin(),
+                          colls.end(),
+                          [](const CollectionPtr& prev, const CollectionPtr& next) {
+                              return prev->ns() < next->ns();
+                          });
+                return colls;
+            }();
 
             // Check consistency between local metadata and configsvr metadata
             auto inconsistencies =
                 metadata_consistency_util::checkCollectionMetadataInconsistencies(
-                    opCtx, shardId, primaryShardId, catalogClientCollections, localCollection);
+                    opCtx,
+                    shardId,
+                    primaryShardId,
+                    catalogClientCollections,
+                    localCollectionsSorted);
 
             auto exec = metadata_consistency_util::makeQueuedPlanExecutor(
                 opCtx, std::move(inconsistencies), nss);
