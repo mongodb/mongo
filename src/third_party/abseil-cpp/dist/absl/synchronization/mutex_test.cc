@@ -26,6 +26,7 @@
 #include <random>
 #include <string>
 #include <thread>  // NOLINT(build/c++11)
+#include <type_traits>
 #include <vector>
 
 #include "gtest/gtest.h"
@@ -870,33 +871,6 @@ TEST(Mutex, LockedMutexDestructionBug) ABSL_NO_THREAD_SAFETY_ANALYSIS {
   }
 }
 
-// --------------------------------------------------------
-// Test for bug with pattern of readers using a condvar.  The bug was that if a
-// reader went to sleep on a condition variable while one or more other readers
-// held the lock, but there were no waiters, the reader count (held in the
-// mutex word) would be lost.  (This is because Enqueue() had at one time
-// always placed the thread on the Mutex queue.  Later (CL 4075610), to
-// tolerate re-entry into Mutex from a Condition predicate, Enqueue() was
-// changed so that it could also place a thread on a condition-variable.  This
-// introduced the case where Enqueue() returned with an empty queue, and this
-// case was handled incorrectly in one place.)
-
-static void ReaderForReaderOnCondVar(absl::Mutex *mu, absl::CondVar *cv,
-                                     int *running) {
-  std::random_device dev;
-  std::mt19937 gen(dev());
-  std::uniform_int_distribution<int> random_millis(0, 15);
-  mu->ReaderLock();
-  while (*running == 3) {
-    absl::SleepFor(absl::Milliseconds(random_millis(gen)));
-    cv->WaitWithTimeout(mu, absl::Milliseconds(random_millis(gen)));
-  }
-  mu->ReaderUnlock();
-  mu->Lock();
-  (*running)--;
-  mu->Unlock();
-}
-
 struct True {
   template <class... Args>
   bool operator()(Args...) const {
@@ -943,6 +917,33 @@ TEST(Mutex, FunctorCondition) {
     value = 0;
     EXPECT_TRUE(c.Eval());
   }
+}
+
+// --------------------------------------------------------
+// Test for bug with pattern of readers using a condvar.  The bug was that if a
+// reader went to sleep on a condition variable while one or more other readers
+// held the lock, but there were no waiters, the reader count (held in the
+// mutex word) would be lost.  (This is because Enqueue() had at one time
+// always placed the thread on the Mutex queue.  Later (CL 4075610), to
+// tolerate re-entry into Mutex from a Condition predicate, Enqueue() was
+// changed so that it could also place a thread on a condition-variable.  This
+// introduced the case where Enqueue() returned with an empty queue, and this
+// case was handled incorrectly in one place.)
+
+static void ReaderForReaderOnCondVar(absl::Mutex *mu, absl::CondVar *cv,
+                                     int *running) {
+  std::random_device dev;
+  std::mt19937 gen(dev());
+  std::uniform_int_distribution<int> random_millis(0, 15);
+  mu->ReaderLock();
+  while (*running == 3) {
+    absl::SleepFor(absl::Milliseconds(random_millis(gen)));
+    cv->WaitWithTimeout(mu, absl::Milliseconds(random_millis(gen)));
+  }
+  mu->ReaderUnlock();
+  mu->Lock();
+  (*running)--;
+  mu->Unlock();
 }
 
 static bool IntIsZero(int *x) { return *x == 0; }

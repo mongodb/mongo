@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # Copyright 2021 The Abseil Authors.
 #
@@ -96,6 +96,13 @@ def main(argv):
 
   # Replacement directives go here.
   ReplaceStringsInFile(
+      'absl/base/config.h', {
+          '#undef ABSL_LTS_RELEASE_VERSION':
+              '#define ABSL_LTS_RELEASE_VERSION {}'.format(datestamp),
+          '#undef ABSL_LTS_RELEASE_PATCH_LEVEL':
+              '#define ABSL_LTS_RELEASE_PATCH_LEVEL 0'
+      })
+  ReplaceStringsInFile(
       'absl/base/options.h', {
           '#define ABSL_OPTION_USE_INLINE_NAMESPACE 0':
               '#define ABSL_OPTION_USE_INLINE_NAMESPACE 1',
@@ -108,11 +115,16 @@ def main(argv):
           'project(absl LANGUAGES CXX)':
               'project(absl LANGUAGES CXX VERSION {})'.format(datestamp)
       })
-  # Set the SOVERSION to YYYYMMDD.0.0 - The first 0 means we only have
-  # ABI compatible changes, and the second 0 means we can increment it
-  # to mark changes as ABI-compatible, for patch releases.
-  ReplaceStringsInFile('CMake/AbseilHelpers.cmake',
-                       {'SOVERSION 0': 'SOVERSION "{}.0.0"'.format(datestamp)})
+  # Set the SOVERSION to YYMM.0.0 - The first 0 means we only have ABI
+  # compatible changes, and the second 0 means we can increment it to
+  # mark changes as ABI-compatible, for patch releases.  Note that we
+  # only use the last two digits of the year and the month because the
+  # MacOS linker requires the first part of the SOVERSION to fit into
+  # 16 bits.
+  # https://www.sicpers.info/2013/03/how-to-version-a-mach-o-library/
+  ReplaceStringsInFile(
+      'CMake/AbseilHelpers.cmake',
+      {'SOVERSION 0': 'SOVERSION "{}.0.0"'.format(datestamp[2:6])})
   StripContentBetweenTags('CMakeLists.txt', '# absl:lts-remove-begin',
                           '# absl:lts-remove-end')
 

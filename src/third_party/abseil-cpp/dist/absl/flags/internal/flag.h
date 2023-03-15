@@ -29,6 +29,7 @@
 
 #include "absl/base/attributes.h"
 #include "absl/base/call_once.h"
+#include "absl/base/casts.h"
 #include "absl/base/config.h"
 #include "absl/base/optimization.h"
 #include "absl/base/thread_annotations.h"
@@ -289,7 +290,7 @@ constexpr T InitDefaultValue(EmptyBraces) {
 
 template <typename ValueT, typename GenT,
           typename std::enable_if<std::is_integral<ValueT>::value, int>::type =
-              (GenT{}, 0)>
+              ((void)GenT{}, 0)>
 constexpr FlagDefaultArg DefaultArg(int) {
   return {FlagDefaultSrc(GenT{}.value), FlagDefaultKind::kOneWord};
 }
@@ -305,33 +306,49 @@ constexpr FlagDefaultArg DefaultArg(char) {
 constexpr int64_t UninitializedFlagValue() { return 0xababababababababll; }
 
 template <typename T>
+using FlagUseValueAndInitBitStorage = std::integral_constant<
+    bool, absl::type_traits_internal::is_trivially_copyable<T>::value &&
+              std::is_default_constructible<T>::value && (sizeof(T) < 8)>;
+
+template <typename T>
 using FlagUseOneWordStorage = std::integral_constant<
     bool, absl::type_traits_internal::is_trivially_copyable<T>::value &&
               (sizeof(T) <= 8)>;
 
 template <class T>
-using FlagShouldUseSequenceLock = std::integral_constant<
+using FlagUseSequenceLockStorage = std::integral_constant<
     bool, absl::type_traits_internal::is_trivially_copyable<T>::value &&
               (sizeof(T) > 8)>;
 
 enum class FlagValueStorageKind : uint8_t {
-  kAlignedBuffer = 0,
+  kValueAndInitBit = 0,
   kOneWordAtomic = 1,
   kSequenceLocked = 2,
+  kAlignedBuffer = 3,
 };
 
 template <typename T>
 static constexpr FlagValueStorageKind StorageKind() {
-  return FlagUseOneWordStorage<T>::value ? FlagValueStorageKind::kOneWordAtomic
-         : FlagShouldUseSequenceLock<T>::value
+  return FlagUseValueAndInitBitStorage<T>::value
+             ? FlagValueStorageKind::kValueAndInitBit
+         : FlagUseOneWordStorage<T>::value
+             ? FlagValueStorageKind::kOneWordAtomic
+         : FlagUseSequenceLockStorage<T>::value
              ? FlagValueStorageKind::kSequenceLocked
              : FlagValueStorageKind::kAlignedBuffer;
 }
 
 struct FlagOneWordValue {
-  constexpr FlagOneWordValue() : value(UninitializedFlagValue()) {}
-
+  constexpr explicit FlagOneWordValue(int64_t v) : value(v) {}
   std::atomic<int64_t> value;
+};
+
+template <typename T>
+struct alignas(8) FlagValueAndInitBit {
+  T value;
+  // Use an int instead of a bool to guarantee that a non-zero value has
+  // a bit set.
+  uint8_t init;
 };
 
 template <typename T,
@@ -339,14 +356,21 @@ template <typename T,
 struct FlagValue;
 
 template <typename T>
-struct FlagValue<T, FlagValueStorageKind::kAlignedBuffer> {
-  bool Get(const SequenceLock&, T&) const { return false; }
-
-  alignas(T) char value[sizeof(T)];
+struct FlagValue<T, FlagValueStorageKind::kValueAndInitBit> : FlagOneWordValue {
+  constexpr FlagValue() : FlagOneWordValue(0) {}
+  bool Get(const SequenceLock&, T& dst) const {
+    int64_t storage = value.load(std::memory_order_acquire);
+    if (ABSL_PREDICT_FALSE(storage == 0)) {
+      return false;
+    }
+    dst = absl::bit_cast<FlagValueAndInitBit<T>>(storage).value;
+    return true;
+  }
 };
 
 template <typename T>
 struct FlagValue<T, FlagValueStorageKind::kOneWordAtomic> : FlagOneWordValue {
+  constexpr FlagValue() : FlagOneWordValue(UninitializedFlagValue()) {}
   bool Get(const SequenceLock&, T& dst) const {
     int64_t one_word_val = value.load(std::memory_order_acquire);
     if (ABSL_PREDICT_FALSE(one_word_val == UninitializedFlagValue())) {
@@ -368,6 +392,13 @@ struct FlagValue<T, FlagValueStorageKind::kSequenceLocked> {
 
   alignas(T) alignas(
       std::atomic<uint64_t>) std::atomic<uint64_t> value_words[kNumWords];
+};
+
+template <typename T>
+struct FlagValue<T, FlagValueStorageKind::kAlignedBuffer> {
+  bool Get(const SequenceLock&, T&) const { return false; }
+
+  alignas(T) char value[sizeof(T)];
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -415,7 +446,27 @@ class FlagImpl final : public CommandLineFlag {
         data_guard_{} {}
 
   // Constant access methods
+  int64_t ReadOneWord() const ABSL_LOCKS_EXCLUDED(*DataGuard());
+  bool ReadOneBool() const ABSL_LOCKS_EXCLUDED(*DataGuard());
   void Read(void* dst) const override ABSL_LOCKS_EXCLUDED(*DataGuard());
+  void Read(bool* value) const ABSL_LOCKS_EXCLUDED(*DataGuard()) {
+    *value = ReadOneBool();
+  }
+  template <typename T,
+            absl::enable_if_t<flags_internal::StorageKind<T>() ==
+                                  FlagValueStorageKind::kOneWordAtomic,
+                              int> = 0>
+  void Read(T* value) const ABSL_LOCKS_EXCLUDED(*DataGuard()) {
+    int64_t v = ReadOneWord();
+    std::memcpy(value, static_cast<const void*>(&v), sizeof(T));
+  }
+  template <typename T,
+            typename std::enable_if<flags_internal::StorageKind<T>() ==
+                                        FlagValueStorageKind::kValueAndInitBit,
+                                    int>::type = 0>
+  void Read(T* value) const ABSL_LOCKS_EXCLUDED(*DataGuard()) {
+    *value = absl::bit_cast<FlagValueAndInitBit<T>>(ReadOneWord()).value;
+  }
 
   // Mutating access methods
   void Write(const void* src) ABSL_LOCKS_EXCLUDED(*DataGuard());

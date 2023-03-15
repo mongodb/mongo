@@ -1617,6 +1617,7 @@ static bool ParseUnresolvedName(State *state) {
 //              ::= <2-ary operator-name> <expression> <expression>
 //              ::= <3-ary operator-name> <expression> <expression> <expression>
 //              ::= cl <expression>+ E
+//              ::= cp <simple-id> <expression>* E # Clang-specific.
 //              ::= cv <type> <expression>      # type (expression)
 //              ::= cv <type> _ <expression>* E # type (expr-list)
 //              ::= st <type>
@@ -1639,10 +1640,19 @@ static bool ParseExpression(State *state) {
     return true;
   }
 
-  // Object/function call expression.
   ParseState copy = state->parse_state;
+
+  // Object/function call expression.
   if (ParseTwoCharToken(state, "cl") && OneOrMore(ParseExpression, state) &&
       ParseOneCharToken(state, 'E')) {
+    return true;
+  }
+  state->parse_state = copy;
+
+  // Clang-specific "cp <simple-id> <expression>* E"
+  //   https://clang.llvm.org/doxygen/ItaniumMangle_8cpp_source.html#l04338
+  if (ParseTwoCharToken(state, "cp") && ParseSimpleId(state) &&
+      ZeroOrMore(ParseExpression, state) && ParseOneCharToken(state, 'E')) {
     return true;
   }
   state->parse_state = copy;

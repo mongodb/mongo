@@ -99,6 +99,7 @@ TYPED_TEST(DiscreteDistributionTypeTest, Constructor) {
 }
 
 TEST(DiscreteDistributionTest, InitDiscreteDistribution) {
+  using testing::_;
   using testing::Pair;
 
   {
@@ -111,8 +112,8 @@ TEST(DiscreteDistributionTest, InitDiscreteDistribution) {
     // Each bucket is p=1/3, so bucket 0 will send half it's traffic
     // to bucket 2, while the rest will retain all of their traffic.
     EXPECT_THAT(q, testing::ElementsAre(Pair(0.5, 2),  //
-                                        Pair(1.0, 1),  //
-                                        Pair(1.0, 2)));
+                                        Pair(1.0, _),  //
+                                        Pair(1.0, _)));
   }
 
   {
@@ -135,7 +136,7 @@ TEST(DiscreteDistributionTest, InitDiscreteDistribution) {
 
     EXPECT_THAT(q, testing::ElementsAre(Pair(b0, 3),   //
                                         Pair(b1, 3),   //
-                                        Pair(1.0, 2),  //
+                                        Pair(1.0, _),  //
                                         Pair(b3, 2),   //
                                         Pair(b1, 3)));
   }

@@ -778,9 +778,9 @@ class Condition {
 //
 // Usage to wake T is:
 //       mu.Lock();
-//      // process data, possibly establishing C
-//      if (C) { cv->Signal(); }
-//      mu.Unlock();
+//       // process data, possibly establishing C
+//       if (C) { cv->Signal(); }
+//       mu.Unlock();
 //
 // If C may be useful to more than one waiter, use `SignalAll()` instead of
 // `Signal()`.

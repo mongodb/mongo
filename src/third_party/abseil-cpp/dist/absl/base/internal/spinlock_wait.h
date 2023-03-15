@@ -39,6 +39,8 @@ struct SpinLockWaitTransition {
 // satisfying 0<=i<n && trans[i].done, atomically make the transition,
 // then return the old value of *w.   Make any other atomic transitions
 // where !trans[i].done, but continue waiting.
+//
+// Wakeups for threads blocked on SpinLockWait do not respect priorities.
 uint32_t SpinLockWait(std::atomic<uint32_t> *w, int n,
                       const SpinLockWaitTransition trans[],
                       SchedulingMode scheduling_mode);

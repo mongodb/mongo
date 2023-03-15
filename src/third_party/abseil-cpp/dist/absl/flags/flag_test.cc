@@ -61,6 +61,7 @@ void TestCallback() {}
 struct UDT {
   UDT() = default;
   UDT(const UDT&) = default;
+  UDT& operator=(const UDT&) = default;
 };
 bool AbslParseFlag(absl::string_view, UDT*, std::string*) { return true; }
 std::string AbslUnparseFlag(const UDT&) { return ""; }
@@ -102,9 +103,9 @@ struct S2 {
 
 TEST_F(FlagTest, Traits) {
   EXPECT_EQ(flags::StorageKind<int>(),
-            flags::FlagValueStorageKind::kOneWordAtomic);
+            flags::FlagValueStorageKind::kValueAndInitBit);
   EXPECT_EQ(flags::StorageKind<bool>(),
-            flags::FlagValueStorageKind::kOneWordAtomic);
+            flags::FlagValueStorageKind::kValueAndInitBit);
   EXPECT_EQ(flags::StorageKind<double>(),
             flags::FlagValueStorageKind::kOneWordAtomic);
   EXPECT_EQ(flags::StorageKind<int64_t>(),
@@ -723,6 +724,8 @@ ABSL_FLAG(CustomUDT, test_flag_custom_udt, CustomUDT(), "test flag custom UDT");
 namespace {
 
 TEST_F(FlagTest, TestCustomUDT) {
+  EXPECT_EQ(flags::StorageKind<CustomUDT>(),
+            flags::FlagValueStorageKind::kOneWordAtomic);
   EXPECT_EQ(absl::GetFlag(FLAGS_test_flag_custom_udt), CustomUDT(1, 1));
   absl::SetFlag(&FLAGS_test_flag_custom_udt, CustomUDT(2, 3));
   EXPECT_EQ(absl::GetFlag(FLAGS_test_flag_custom_udt), CustomUDT(2, 3));
@@ -943,3 +946,34 @@ TEST_F(FlagTest, TestNonTriviallyCopyableUDT) {
 }
 
 }  // namespace
+
+// --------------------------------------------------------------------
+
+namespace {
+
+enum TestE { A = 1, B = 2, C = 3 };
+
+struct EnumWrapper {
+  EnumWrapper() : e(A) {}
+
+  TestE e;
+};
+
+bool AbslParseFlag(absl::string_view, EnumWrapper*, std::string*) {
+  return true;
+}
+std::string AbslUnparseFlag(const EnumWrapper&) { return ""; }
+
+}  // namespace
+
+ABSL_FLAG(EnumWrapper, test_enum_wrapper_flag, {}, "help");
+
+TEST_F(FlagTest, TesTypeWrappingEnum) {
+  EnumWrapper value = absl::GetFlag(FLAGS_test_enum_wrapper_flag);
+  EXPECT_EQ(value.e, A);
+
+  value.e = B;
+  absl::SetFlag(&FLAGS_test_enum_wrapper_flag, value);
+  value = absl::GetFlag(FLAGS_test_enum_wrapper_flag);
+  EXPECT_EQ(value.e, B);
+}

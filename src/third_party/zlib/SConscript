@@ -3,8 +3,7 @@
 
 Import("env")
 
-env = env.Clone()
-
+env = env.Clone(NINJA_GENSOURCE_INDEPENDENT=True)
 env.Append(CPPDEFINES=["HAVE_STDARG_H"])
 if not env.TargetOSIs('windows'):
     env.Append(CPPDEFINES=["HAVE_UNISTD_H"])

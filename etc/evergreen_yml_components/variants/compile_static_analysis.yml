@@ -203,3 +203,35 @@ buildvariants:
     - name: .stitch
     - name: crypt_build_debug_and_test
     - name: .integration
+
+
+- <<: *generic_linux_compile_params
+  name: &linux-x86-dynamic-grpc-suggested linux-x86-dynamic-grpc-suggested
+  display_name: "* Linux x86 Shared Library with GRPC"
+  modules:
+    - enterprise
+  stepback: false
+  expansions:
+    <<: *generic_linux_compile_expansions
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=rhel80
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --link-model=dynamic
+      ENABLE_GRPC_BUILD=1
+    compile_variant: *linux-x86-dynamic-grpc-suggested
+    clang_tidy_toolchain: v4
+  tasks:
+    - name: compile_ninja_quick_TG
+    - name: compile_test_and_package_parallel_unittest_stream_TG
+    - name: compile_test_and_package_parallel_core_stream_TG
+    - name: compile_test_and_package_parallel_dbtest_stream_TG
+    - name: generate_buildid_to_debug_symbols_mapping
+    - name: .lint
+    - name: libdeps_graph_linting_TG
+      distros:
+      - rhel80-large
+    - name: clang_tidy_TG
+      distros:
+      - rhel80-xxlarge

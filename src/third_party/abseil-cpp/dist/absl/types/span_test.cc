@@ -661,6 +661,8 @@ TEST(IntSpan, ExposesContainerTypesAndConsts) {
   CheckType<absl::Span<int>::const_reverse_iterator>(slice.crend());
   testing::StaticAssertTypeEq<int, absl::Span<int>::value_type>();
   testing::StaticAssertTypeEq<int, absl::Span<const int>::value_type>();
+  testing::StaticAssertTypeEq<int, absl::Span<int>::element_type>();
+  testing::StaticAssertTypeEq<const int, absl::Span<const int>::element_type>();
   testing::StaticAssertTypeEq<int*, absl::Span<int>::pointer>();
   testing::StaticAssertTypeEq<const int*, absl::Span<const int>::pointer>();
   testing::StaticAssertTypeEq<int&, absl::Span<int>::reference>();

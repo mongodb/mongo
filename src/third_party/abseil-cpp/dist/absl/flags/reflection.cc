@@ -18,11 +18,11 @@
 #include <assert.h>
 
 #include <atomic>
-#include <map>
 #include <string>
 
 #include "absl/base/config.h"
 #include "absl/base/thread_annotations.h"
+#include "absl/container/flat_hash_map.h"
 #include "absl/flags/commandlineflag.h"
 #include "absl/flags/internal/private_handle_accessor.h"
 #include "absl/flags/internal/registry.h"
@@ -68,7 +68,7 @@ class FlagRegistry {
   friend void FinalizeRegistry();
 
   // The map from name to flag, for FindFlag().
-  using FlagMap = std::map<absl::string_view, CommandLineFlag*>;
+  using FlagMap = absl::flat_hash_map<absl::string_view, CommandLineFlag*>;
   using FlagIterator = FlagMap::iterator;
   using FlagConstIterator = FlagMap::const_iterator;
   FlagMap flags_;
@@ -204,6 +204,10 @@ void FinalizeRegistry() {
   for (const auto& f : registry.flags_) {
     registry.flat_flags_.push_back(f.second);
   }
+  std::sort(std::begin(registry.flat_flags_), std::end(registry.flat_flags_),
+            [](const CommandLineFlag* lhs, const CommandLineFlag* rhs) {
+              return lhs->Name() < rhs->Name();
+            });
   registry.flags_.clear();
   registry.finalized_flags_.store(true, std::memory_order_release);
 }

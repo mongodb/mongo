@@ -14,7 +14,6 @@
 # limitations under the License.
 #
 
-load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
 load(
     "//absl:copts/configure_copts.bzl",
     "ABSL_DEFAULT_COPTS",
@@ -510,9 +509,10 @@ cc_library(
         ":have_sse",
         "//absl/base",
         "//absl/base:core_headers",
-        "//absl/base:exponential_biased",
         "//absl/debugging:stacktrace",
         "//absl/memory",
+        "//absl/profiling:exponential_biased",
+        "//absl/profiling:sample_recorder",
         "//absl/synchronization",
         "//absl/utility",
     ],
@@ -526,6 +526,7 @@ cc_test(
         ":hashtablez_sampler",
         ":have_sse",
         "//absl/base:core_headers",
+        "//absl/profiling:sample_recorder",
         "//absl/synchronization",
         "//absl/synchronization:thread_pool",
         "//absl/time",
@@ -598,7 +599,6 @@ cc_library(
         ":hashtable_debug_hooks",
         ":hashtablez_sampler",
         ":have_sse",
-        ":layout",
         "//absl/base:config",
         "//absl/base:core_headers",
         "//absl/base:endian",
@@ -872,6 +872,22 @@ cc_test(
         ":unordered_map_lookup_test",
         ":unordered_map_members_test",
         ":unordered_map_modifiers_test",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "sample_element_size_test",
+    srcs = ["sample_element_size_test.cc"],
+    copts = ABSL_TEST_COPTS,
+    linkopts = ABSL_DEFAULT_LINKOPTS,
+    tags = NOTEST_TAGS_NONMOBILE,
+    visibility = ["//visibility:private"],
+    deps = [
+        ":flat_hash_map",
+        ":flat_hash_set",
+        ":node_hash_map",
+        ":node_hash_set",
         "@com_google_googletest//:gtest_main",
     ],
 )

@@ -17,7 +17,6 @@
 # It will expand later to have utilities around `Status` like `StatusOr`,
 # `StatusBuilder` and macros.
 
-load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
 load(
     "//absl:copts/configure_copts.bzl",
     "ABSL_DEFAULT_COPTS",
@@ -48,6 +47,7 @@ cc_library(
         "//absl/container:inlined_vector",
         "//absl/debugging:stacktrace",
         "//absl/debugging:symbolize",
+        "//absl/functional:function_ref",
         "//absl/strings",
         "//absl/strings:cord",
         "//absl/strings:str_format",
@@ -78,6 +78,7 @@ cc_library(
     copts = ABSL_DEFAULT_COPTS,
     deps = [
         ":status",
+        "//absl/base",
         "//absl/base:core_headers",
         "//absl/base:raw_logging_internal",
         "//absl/meta:type_traits",
@@ -96,6 +97,7 @@ cc_test(
         ":statusor",
         "//absl/base",
         "//absl/memory",
+        "//absl/strings",
         "//absl/types:any",
         "//absl/utility",
         "@com_google_googletest//:gtest_main",

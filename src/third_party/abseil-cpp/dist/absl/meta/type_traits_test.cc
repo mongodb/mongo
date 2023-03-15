@@ -942,6 +942,34 @@ TEST(TypeTraitsTest, TestTriviallyCopyable) {
       absl::type_traits_internal::is_trivially_copyable<Trivial&>::value);
 }
 
+TEST(TypeTraitsTest, TestRemoveCVRef) {
+  EXPECT_TRUE(
+      (std::is_same<typename absl::remove_cvref<int>::type, int>::value));
+  EXPECT_TRUE(
+      (std::is_same<typename absl::remove_cvref<int&>::type, int>::value));
+  EXPECT_TRUE(
+      (std::is_same<typename absl::remove_cvref<int&&>::type, int>::value));
+  EXPECT_TRUE((
+      std::is_same<typename absl::remove_cvref<const int&>::type, int>::value));
+  EXPECT_TRUE(
+      (std::is_same<typename absl::remove_cvref<int*>::type, int*>::value));
+  // Does not remove const in this case.
+  EXPECT_TRUE((std::is_same<typename absl::remove_cvref<const int*>::type,
+                            const int*>::value));
+  EXPECT_TRUE((std::is_same<typename absl::remove_cvref<int[2]>::type,
+                            int[2]>::value));
+  EXPECT_TRUE((std::is_same<typename absl::remove_cvref<int(&)[2]>::type,
+                            int[2]>::value));
+  EXPECT_TRUE((std::is_same<typename absl::remove_cvref<int(&&)[2]>::type,
+                            int[2]>::value));
+  EXPECT_TRUE((std::is_same<typename absl::remove_cvref<const int[2]>::type,
+                            int[2]>::value));
+  EXPECT_TRUE((std::is_same<typename absl::remove_cvref<const int(&)[2]>::type,
+                            int[2]>::value));
+  EXPECT_TRUE((std::is_same<typename absl::remove_cvref<const int(&&)[2]>::type,
+                            int[2]>::value));
+}
+
 #define ABSL_INTERNAL_EXPECT_ALIAS_EQUIVALENCE(trait_name, ...)          \
   EXPECT_TRUE((std::is_same<typename std::trait_name<__VA_ARGS__>::type, \
                             absl::trait_name##_t<__VA_ARGS__>>::value))

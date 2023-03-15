@@ -20,12 +20,25 @@
 
 #ifdef ABSL_HAVE_VDSO_SUPPORT     // defined in vdso_support.h
 
+#if !defined(__has_include)
+#define __has_include(header) 0
+#endif
+
 #include <errno.h>
 #include <fcntl.h>
+#if __has_include(<syscall.h>)
+#include <syscall.h>
+#elif __has_include(<sys/syscall.h>)
 #include <sys/syscall.h>
+#endif
 #include <unistd.h>
 
-#if __GLIBC_PREREQ(2, 16)  // GLIBC-2.16 implements getauxval.
+#if defined(__GLIBC__) && \
+    (__GLIBC__ > 2 || (__GLIBC__ == 2 && __GLIBC_MINOR__ >= 16))
+#define ABSL_HAVE_GETAUXVAL
+#endif
+
+#ifdef ABSL_HAVE_GETAUXVAL
 #include <sys/auxv.h>
 #endif
 
@@ -35,6 +48,11 @@
 
 #ifndef AT_SYSINFO_EHDR
 #define AT_SYSINFO_EHDR 33  // for crosstoolv10
+#endif
+
+#if defined(__FreeBSD__)
+using Elf64_auxv_t = Elf64_Auxinfo;
+using Elf32_auxv_t = Elf32_Auxinfo;
 #endif
 
 namespace absl {
@@ -65,7 +83,7 @@ VDSOSupport::VDSOSupport()
 // the operation should be idempotent.
 const void *VDSOSupport::Init() {
   const auto kInvalidBase = debugging_internal::ElfMemImage::kInvalidBase;
-#if __GLIBC_PREREQ(2, 16)
+#ifdef ABSL_HAVE_GETAUXVAL
   if (vdso_base_.load(std::memory_order_relaxed) == kInvalidBase) {
     errno = 0;
     const void *const sysinfo_ehdr =
@@ -74,7 +92,7 @@ const void *VDSOSupport::Init() {
       vdso_base_.store(sysinfo_ehdr, std::memory_order_relaxed);
     }
   }
-#endif  // __GLIBC_PREREQ(2, 16)
+#endif  // ABSL_HAVE_GETAUXVAL
   if (vdso_base_.load(std::memory_order_relaxed) == kInvalidBase) {
     int fd = open("/proc/self/auxv", O_RDONLY);
     if (fd == -1) {

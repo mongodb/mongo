@@ -174,7 +174,7 @@ void AppendPieces(std::string* dest,
     ASSERT_NO_OVERLAP(*dest, piece);
     total_size += piece.size();
   }
-  strings_internal::STLStringResizeUninitialized(dest, total_size);
+  strings_internal::STLStringResizeUninitializedAmortized(dest, total_size);
 
   char* const begin = &(*dest)[0];
   char* out = begin + old_size;
@@ -199,7 +199,7 @@ void StrAppend(std::string* dest, const AlphaNum& a, const AlphaNum& b) {
   ASSERT_NO_OVERLAP(*dest, a);
   ASSERT_NO_OVERLAP(*dest, b);
   std::string::size_type old_size = dest->size();
-  strings_internal::STLStringResizeUninitialized(
+  strings_internal::STLStringResizeUninitializedAmortized(
       dest, old_size + a.size() + b.size());
   char* const begin = &(*dest)[0];
   char* out = begin + old_size;
@@ -214,7 +214,7 @@ void StrAppend(std::string* dest, const AlphaNum& a, const AlphaNum& b,
   ASSERT_NO_OVERLAP(*dest, b);
   ASSERT_NO_OVERLAP(*dest, c);
   std::string::size_type old_size = dest->size();
-  strings_internal::STLStringResizeUninitialized(
+  strings_internal::STLStringResizeUninitializedAmortized(
       dest, old_size + a.size() + b.size() + c.size());
   char* const begin = &(*dest)[0];
   char* out = begin + old_size;
@@ -231,7 +231,7 @@ void StrAppend(std::string* dest, const AlphaNum& a, const AlphaNum& b,
   ASSERT_NO_OVERLAP(*dest, c);
   ASSERT_NO_OVERLAP(*dest, d);
   std::string::size_type old_size = dest->size();
-  strings_internal::STLStringResizeUninitialized(
+  strings_internal::STLStringResizeUninitializedAmortized(
       dest, old_size + a.size() + b.size() + c.size() + d.size());
   char* const begin = &(*dest)[0];
   char* out = begin + old_size;

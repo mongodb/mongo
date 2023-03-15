@@ -14,7 +14,6 @@
 # limitations under the License.
 #
 
-load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
 load(
     "//absl:copts/configure_copts.bzl",
     "ABSL_DEFAULT_COPTS",
@@ -589,75 +588,6 @@ cc_test(
     deps = [
         ":base",
         "//absl/synchronization",
-        "@com_github_google_benchmark//:benchmark_main",
-    ],
-)
-
-cc_library(
-    name = "exponential_biased",
-    srcs = ["internal/exponential_biased.cc"],
-    hdrs = ["internal/exponential_biased.h"],
-    linkopts = ABSL_DEFAULT_LINKOPTS,
-    visibility = [
-        "//absl:__subpackages__",
-    ],
-    deps = [
-        ":config",
-        ":core_headers",
-    ],
-)
-
-cc_test(
-    name = "exponential_biased_test",
-    size = "small",
-    srcs = ["internal/exponential_biased_test.cc"],
-    copts = ABSL_TEST_COPTS,
-    linkopts = ABSL_DEFAULT_LINKOPTS,
-    visibility = ["//visibility:private"],
-    deps = [
-        ":exponential_biased",
-        "//absl/strings",
-        "@com_google_googletest//:gtest_main",
-    ],
-)
-
-cc_library(
-    name = "periodic_sampler",
-    srcs = ["internal/periodic_sampler.cc"],
-    hdrs = ["internal/periodic_sampler.h"],
-    copts = ABSL_DEFAULT_COPTS,
-    linkopts = ABSL_DEFAULT_LINKOPTS,
-    deps = [
-        ":core_headers",
-        ":exponential_biased",
-    ],
-)
-
-cc_test(
-    name = "periodic_sampler_test",
-    size = "small",
-    srcs = ["internal/periodic_sampler_test.cc"],
-    copts = ABSL_TEST_COPTS,
-    linkopts = ABSL_DEFAULT_LINKOPTS,
-    visibility = ["//visibility:private"],
-    deps = [
-        ":core_headers",
-        ":periodic_sampler",
-        "@com_google_googletest//:gtest_main",
-    ],
-)
-
-cc_binary(
-    name = "periodic_sampler_benchmark",
-    testonly = 1,
-    srcs = ["internal/periodic_sampler_benchmark.cc"],
-    copts = ABSL_TEST_COPTS,
-    linkopts = ABSL_DEFAULT_LINKOPTS,
-    tags = ["benchmark"],
-    visibility = ["//visibility:private"],
-    deps = [
-        ":core_headers",
-        ":periodic_sampler",
         "@com_github_google_benchmark//:benchmark_main",
     ],
 )

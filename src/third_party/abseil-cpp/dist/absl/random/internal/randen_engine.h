@@ -121,6 +121,13 @@ class alignas(16) randen_engine {
       const size_t requested_entropy = (entropy_size == 0) ? 8u : entropy_size;
       std::fill(std::begin(buffer) + requested_entropy, std::end(buffer), 0);
       seq.generate(std::begin(buffer), std::begin(buffer) + requested_entropy);
+#ifdef ABSL_IS_BIG_ENDIAN
+      // Randen expects the seed buffer to be in Little Endian; reverse it on
+      // Big Endian platforms.
+      for (sequence_result_type& e : buffer) {
+        e = absl::little_endian::FromHost(e);
+      }
+#endif
       // The Randen paper suggests preferentially initializing even-numbered
       // 128-bit vectors of the randen state (there are 16 such vectors).
       // The seed data is merged into the state offset by 128-bits, which

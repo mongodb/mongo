@@ -27,7 +27,10 @@ compiler, there several ways to do this:
   file](https://docs.bazel.build/versions/master/guide.html#bazelrc)
 
 If you are using CMake as the build system, you'll need to add a line like
-`set(CMAKE_CXX_STANDARD 17)` to your top level `CMakeLists.txt` file. See the
+`set(CMAKE_CXX_STANDARD 17)` to your top level `CMakeLists.txt` file. If you
+are developing a library designed to be used by other clients, you should
+instead leave `CMAKE_CXX_STANDARD` unset and configure the minimum C++ standard
+required by each of your library targets via `target_compile_features`. See the
 [CMake build
 instructions](https://github.com/abseil/abseil-cpp/blob/master/CMake/README.md)
 for more information.

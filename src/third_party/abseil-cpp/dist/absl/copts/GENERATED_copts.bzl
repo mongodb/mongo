@@ -72,12 +72,13 @@ ABSL_LLVM_FLAGS = [
     "-Wformat-security",
     "-Wgnu-redeclared-enum",
     "-Winfinite-recursion",
+    "-Winvalid-constexpr",
     "-Wliteral-conversion",
     "-Wmissing-declarations",
     "-Woverlength-strings",
     "-Wpointer-arith",
     "-Wself-assign",
-    "-Wshadow",
+    "-Wshadow-all",
     "-Wstring-conversion",
     "-Wtautological-overlap-compare",
     "-Wundef",
@@ -94,6 +95,7 @@ ABSL_LLVM_FLAGS = [
     "-Wno-implicit-int-conversion",
     "-Wno-shorten-64-to-32",
     "-Wno-sign-conversion",
+    "-Wno-unknown-warning-option",
     "-DNOMINMAX",
 ]
 

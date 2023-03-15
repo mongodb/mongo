@@ -433,31 +433,6 @@ ABSL_NAMESPACE_END
 
 #endif
 
-#ifdef __cplusplus
-#ifdef ABSL_HAVE_THREAD_SANITIZER
-ABSL_INTERNAL_BEGIN_EXTERN_C
-int RunningOnValgrind();
-double ValgrindSlowdown();
-ABSL_INTERNAL_END_EXTERN_C
-#else
-namespace absl {
-ABSL_NAMESPACE_BEGIN
-namespace base_internal {
-ABSL_DEPRECATED(
-    "Don't use this interface. It is misleading and is being deleted.")
-ABSL_ATTRIBUTE_ALWAYS_INLINE inline int RunningOnValgrind() { return 0; }
-ABSL_DEPRECATED(
-    "Don't use this interface. It is misleading and is being deleted.")
-ABSL_ATTRIBUTE_ALWAYS_INLINE inline double ValgrindSlowdown() { return 1.0; }
-}  // namespace base_internal
-ABSL_NAMESPACE_END
-}  // namespace absl
-
-using absl::base_internal::RunningOnValgrind;
-using absl::base_internal::ValgrindSlowdown;
-#endif
-#endif
-
 // -------------------------------------------------------------------------
 // Address sanitizer annotations
 
@@ -471,7 +446,7 @@ using absl::base_internal::ValgrindSlowdown;
   __sanitizer_annotate_contiguous_container(beg, end, old_mid, new_mid)
 #define ABSL_ADDRESS_SANITIZER_REDZONE(name) \
   struct {                                   \
-    char x[8] __attribute__((aligned(8)));   \
+    alignas(8) char x[8];                    \
   } name
 
 #else

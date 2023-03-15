@@ -505,7 +505,7 @@ size_t numbers_internal::SixDigitsToBuffer(double d, char* const buffer) {
     *out++ = '-';
     d = -d;
   }
-  if (std::isinf(d)) {
+  if (d > std::numeric_limits<double>::max()) {
     strcpy(out, "inf");  // NOLINT(runtime/printf)
     return out + 3 - buffer;
   }

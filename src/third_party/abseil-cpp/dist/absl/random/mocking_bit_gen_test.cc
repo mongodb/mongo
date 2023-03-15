@@ -15,6 +15,7 @@
 //
 #include "absl/random/mocking_bit_gen.h"
 
+#include <cmath>
 #include <numeric>
 #include <random>
 
@@ -328,8 +329,9 @@ TEST(BasicMocking, WillByDefaultWithArgs) {
 
   absl::MockingBitGen gen;
   ON_CALL(absl::MockPoisson<int>(), Call(gen, _))
-      .WillByDefault(
-          [](double lambda) { return static_cast<int>(lambda * 10); });
+      .WillByDefault([](double lambda) {
+        return static_cast<int>(std::rint(lambda * 10));
+      });
   EXPECT_EQ(absl::Poisson<int>(gen, 1.7), 17);
   EXPECT_EQ(absl::Poisson<int>(gen, 0.03), 0);
 }

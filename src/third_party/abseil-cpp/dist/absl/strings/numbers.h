@@ -96,6 +96,25 @@ ABSL_MUST_USE_RESULT bool SimpleAtod(absl::string_view str, double* out);
 // unspecified state.
 ABSL_MUST_USE_RESULT bool SimpleAtob(absl::string_view str, bool* out);
 
+// SimpleHexAtoi()
+//
+// Converts a hexadecimal string (optionally followed or preceded by ASCII
+// whitespace) to an integer, returning `true` if successful. Only valid base-16
+// hexadecimal integers whose value falls within the range of the integer type
+// (optionally preceded by a `+` or `-`) can be converted. A valid hexadecimal
+// value may include both upper and lowercase character symbols, and may
+// optionally include a leading "0x" (or "0X") number prefix, which is ignored
+// by this function. If any errors are encountered, this function returns
+// `false`, leaving `out` in an unspecified state.
+template <typename int_type>
+ABSL_MUST_USE_RESULT bool SimpleHexAtoi(absl::string_view str, int_type* out);
+
+// Overloads of SimpleHexAtoi() for 128 bit integers.
+ABSL_MUST_USE_RESULT inline bool SimpleHexAtoi(absl::string_view str,
+                                               absl::int128* out);
+ABSL_MUST_USE_RESULT inline bool SimpleHexAtoi(absl::string_view str,
+                                               absl::uint128* out);
+
 ABSL_NAMESPACE_END
 }  // namespace absl
 
@@ -258,6 +277,21 @@ ABSL_MUST_USE_RESULT inline bool SimpleAtoi(absl::string_view str,
 ABSL_MUST_USE_RESULT inline bool SimpleAtoi(absl::string_view str,
                                             absl::uint128* out) {
   return numbers_internal::safe_strtou128_base(str, out, 10);
+}
+
+template <typename int_type>
+ABSL_MUST_USE_RESULT bool SimpleHexAtoi(absl::string_view str, int_type* out) {
+  return numbers_internal::safe_strtoi_base(str, out, 16);
+}
+
+ABSL_MUST_USE_RESULT inline bool SimpleHexAtoi(absl::string_view str,
+                                               absl::int128* out) {
+  return numbers_internal::safe_strto128_base(str, out, 16);
+}
+
+ABSL_MUST_USE_RESULT inline bool SimpleHexAtoi(absl::string_view str,
+                                               absl::uint128* out) {
+  return numbers_internal::safe_strtou128_base(str, out, 16);
 }
 
 ABSL_NAMESPACE_END

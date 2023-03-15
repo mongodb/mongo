@@ -35,7 +35,7 @@
 #ifndef ABSL_META_TYPE_TRAITS_H_
 #define ABSL_META_TYPE_TRAITS_H_
 
-#include <stddef.h>
+#include <cstddef>
 #include <functional>
 #include <type_traits>
 
@@ -46,6 +46,14 @@
 #if defined(_MSC_VER) && !defined(__clang__) && !defined(__GNUC__)
 #define ABSL_META_INTERNAL_STD_CONSTRUCTION_TRAITS_DONT_CHECK_DESTRUCTION 1
 #endif
+
+// Defines the default alignment. `__STDCPP_DEFAULT_NEW_ALIGNMENT__` is a C++17
+// feature.
+#if defined(__STDCPP_DEFAULT_NEW_ALIGNMENT__)
+#define ABSL_INTERNAL_DEFAULT_NEW_ALIGNMENT __STDCPP_DEFAULT_NEW_ALIGNMENT__
+#else  // defined(__STDCPP_DEFAULT_NEW_ALIGNMENT__)
+#define ABSL_INTERNAL_DEFAULT_NEW_ALIGNMENT alignof(std::max_align_t)
+#endif  // defined(__STDCPP_DEFAULT_NEW_ALIGNMENT__)
 
 namespace absl {
 ABSL_NAMESPACE_BEGIN
@@ -499,6 +507,27 @@ struct is_trivially_copy_assignable
 #endif  // ABSL_HAVE_STD_IS_TRIVIALLY_ASSIGNABLE
 };
 
+#if defined(__cpp_lib_remove_cvref) && __cpp_lib_remove_cvref >= 201711L
+template <typename T>
+using remove_cvref = std::remove_cvref<T>;
+
+template <typename T>
+using remove_cvref_t = typename std::remove_cvref<T>::type;
+#else
+// remove_cvref()
+//
+// C++11 compatible implementation of std::remove_cvref which was added in
+// C++20.
+template <typename T>
+struct remove_cvref {
+  using type =
+      typename std::remove_cv<typename std::remove_reference<T>::type>::type;
+};
+
+template <typename T>
+using remove_cvref_t = typename remove_cvref<T>::type;
+#endif
+
 namespace type_traits_internal {
 // is_trivially_copyable()
 //
@@ -613,7 +642,8 @@ using underlying_type_t = typename std::underlying_type<T>::type;
 
 namespace type_traits_internal {
 
-#if __cplusplus >= 201703L
+#if (defined(__cpp_lib_is_invocable) && __cpp_lib_is_invocable >= 201703L) || \
+    (defined(_MSVC_LANG) && _MSVC_LANG >= 201703L)
 // std::result_of is deprecated (C++17) or removed (C++20)
 template<typename> struct result_of;
 template<typename F, typename... Args>

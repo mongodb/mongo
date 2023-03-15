@@ -536,8 +536,7 @@ using FormatArg = str_format_internal::FormatArgImpl;
 // The arguments are provided in an `absl::Span<const absl::FormatArg>`.
 // Each `absl::FormatArg` object binds to a single argument and keeps a
 // reference to it. The values used to create the `FormatArg` objects must
-// outlive this function call. (See `str_format_arg.h` for information on
-// the `FormatArg` class.)_
+// outlive this function call.
 //
 // Example:
 //

@@ -23,49 +23,20 @@
 #include <cstring>
 
 #include "absl/base/attributes.h"
+#include "absl/numeric/int128.h"
 #include "absl/random/internal/platform.h"
 #include "absl/random/internal/randen_traits.h"
 
 // ABSL_RANDEN_HWAES_IMPL indicates whether this file will contain
 // a hardware accelerated implementation of randen, or whether it
 // will contain stubs that exit the process.
-#if defined(ABSL_ARCH_X86_64) || defined(ABSL_ARCH_X86_32)
-// The platform.h directives are sufficient to indicate whether
-// we should build accelerated implementations for x86.
-#if (ABSL_HAVE_ACCELERATED_AES || ABSL_RANDOM_INTERNAL_AES_DISPATCH)
-#define ABSL_RANDEN_HWAES_IMPL 1
-#endif
-#elif defined(ABSL_ARCH_PPC)
-// The platform.h directives are sufficient to indicate whether
-// we should build accelerated implementations for PPC.
-//
-// NOTE: This has mostly been tested on 64-bit Power variants,
-// and not embedded cpus such as powerpc32-8540
 #if ABSL_HAVE_ACCELERATED_AES
+// The following plaforms have implemented RandenHwAes.
+#if defined(ABSL_ARCH_X86_64) || defined(ABSL_ARCH_X86_32) || \
+    defined(ABSL_ARCH_PPC) || defined(ABSL_ARCH_ARM) ||       \
+    defined(ABSL_ARCH_AARCH64)
 #define ABSL_RANDEN_HWAES_IMPL 1
 #endif
-#elif defined(ABSL_ARCH_ARM) || defined(ABSL_ARCH_AARCH64)
-// ARM is somewhat more complicated. We might support crypto natively...
-#if ABSL_HAVE_ACCELERATED_AES || \
-    (defined(__ARM_NEON) && defined(__ARM_FEATURE_CRYPTO))
-#define ABSL_RANDEN_HWAES_IMPL 1
-
-#elif ABSL_RANDOM_INTERNAL_AES_DISPATCH && !defined(__APPLE__) && \
-    (defined(__GNUC__) && __GNUC__ > 4 || __GNUC__ == 4 && __GNUC_MINOR__ > 9)
-// ...or, on GCC, we can use an ASM directive to
-// instruct the assember to allow crypto instructions.
-#define ABSL_RANDEN_HWAES_IMPL 1
-#define ABSL_RANDEN_HWAES_IMPL_CRYPTO_DIRECTIVE 1
-#endif
-#else
-// HWAES is unsupported by these architectures / platforms:
-//   __myriad2__
-//   __mips__
-//
-// Other architectures / platforms are unknown.
-//
-// See the Abseil documentation on supported macros at:
-// https://abseil.io/docs/cpp/platforms/macros
 #endif
 
 #if !defined(ABSL_RANDEN_HWAES_IMPL)
@@ -119,11 +90,6 @@ ABSL_NAMESPACE_END
 namespace {
 
 using absl::random_internal::RandenTraits;
-
-// Randen operates on 128-bit vectors.
-struct alignas(16) u64x2 {
-  uint64_t data[2];
-};
 
 }  // namespace
 
@@ -186,7 +152,7 @@ inline ABSL_TARGET_CRYPTO Vector128 AesRound(const Vector128& state,
 }
 
 // Enables native loads in the round loop by pre-swapping.
-inline ABSL_TARGET_CRYPTO void SwapEndian(u64x2* state) {
+inline ABSL_TARGET_CRYPTO void SwapEndian(absl::uint128* state) {
   for (uint32_t block = 0; block < RandenTraits::kFeistelBlocks; ++block) {
     Vector128Store(ReverseBytes(Vector128Load(state + block)), state + block);
   }
@@ -195,22 +161,6 @@ inline ABSL_TARGET_CRYPTO void SwapEndian(u64x2* state) {
 }  // namespace
 
 #elif defined(ABSL_ARCH_ARM) || defined(ABSL_ARCH_AARCH64)
-
-// This asm directive will cause the file to be compiled with crypto extensions
-// whether or not the cpu-architecture supports it.
-#if ABSL_RANDEN_HWAES_IMPL_CRYPTO_DIRECTIVE
-asm(".arch_extension  crypto\n");
-
-// Override missing defines.
-#if !defined(__ARM_NEON)
-#define __ARM_NEON 1
-#endif
-
-#if !defined(__ARM_FEATURE_CRYPTO)
-#define __ARM_FEATURE_CRYPTO 1
-#endif
-
-#endif
 
 // Rely on the ARM NEON+Crypto advanced simd types, defined in <arm_neon.h>.
 // uint8x16_t is the user alias for underlying __simd128_uint8_t type.
@@ -261,7 +211,7 @@ inline ABSL_TARGET_CRYPTO void SwapEndian(void*) {}
 
 #elif defined(ABSL_ARCH_X86_64) || defined(ABSL_ARCH_X86_32)
 // On x86 we rely on the aesni instructions
-#include <wmmintrin.h>
+#include <immintrin.h>
 
 namespace {
 
@@ -270,7 +220,7 @@ namespace {
 class Vector128 {
  public:
   // Convert from/to intrinsics.
-  inline explicit Vector128(const __m128i& Vector128) : data_(Vector128) {}
+  inline explicit Vector128(const __m128i& v) : data_(v) {}
 
   inline __m128i data() const { return data_; }
 
@@ -327,7 +277,7 @@ namespace {
 
 // Block shuffles applies a shuffle to the entire state between AES rounds.
 // Improved odd-even shuffle from "New criterion for diffusion property".
-inline ABSL_TARGET_CRYPTO void BlockShuffle(u64x2* state) {
+inline ABSL_TARGET_CRYPTO void BlockShuffle(absl::uint128* state) {
   static_assert(RandenTraits::kFeistelBlocks == 16,
                 "Expecting 16 FeistelBlocks.");
 
@@ -374,8 +324,9 @@ inline ABSL_TARGET_CRYPTO void BlockShuffle(u64x2* state) {
 // per 16 bytes (vs. 10 for AES-CTR). Computing eight round functions in
 // parallel hides the 7-cycle AESNI latency on HSW. Note that the Feistel
 // XORs are 'free' (included in the second AES instruction).
-inline ABSL_TARGET_CRYPTO const u64x2* FeistelRound(
-    u64x2* state, const u64x2* ABSL_RANDOM_INTERNAL_RESTRICT keys) {
+inline ABSL_TARGET_CRYPTO const absl::uint128* FeistelRound(
+    absl::uint128* state,
+    const absl::uint128* ABSL_RANDOM_INTERNAL_RESTRICT keys) {
   static_assert(RandenTraits::kFeistelBlocks == 16,
                 "Expecting 16 FeistelBlocks.");
 
@@ -436,7 +387,8 @@ inline ABSL_TARGET_CRYPTO const u64x2* FeistelRound(
 // 2^64 queries if the round function is a PRF. This is similar to the b=8 case
 // of Simpira v2, but more efficient than its generic construction for b=16.
 inline ABSL_TARGET_CRYPTO void Permute(
-    u64x2* state, const u64x2* ABSL_RANDOM_INTERNAL_RESTRICT keys) {
+    absl::uint128* state,
+    const absl::uint128* ABSL_RANDOM_INTERNAL_RESTRICT keys) {
   // (Successfully unrolled; the first iteration jumps into the second half)
 #ifdef __clang__
 #pragma clang loop unroll_count(2)
@@ -473,10 +425,11 @@ void ABSL_TARGET_CRYPTO RandenHwAes::Absorb(const void* seed_void,
   static_assert(RandenTraits::kStateBytes / sizeof(Vector128) == 16,
                 "Unexpected Randen kStateBlocks");
 
-  auto* state =
-      reinterpret_cast<u64x2 * ABSL_RANDOM_INTERNAL_RESTRICT>(state_void);
+  auto* state = reinterpret_cast<absl::uint128 * ABSL_RANDOM_INTERNAL_RESTRICT>(
+      state_void);
   const auto* seed =
-      reinterpret_cast<const u64x2 * ABSL_RANDOM_INTERNAL_RESTRICT>(seed_void);
+      reinterpret_cast<const absl::uint128 * ABSL_RANDOM_INTERNAL_RESTRICT>(
+          seed_void);
 
   Vector128 b1 = Vector128Load(state + 1);
   b1 ^= Vector128Load(seed + 0);
@@ -545,8 +498,8 @@ void ABSL_TARGET_CRYPTO RandenHwAes::Generate(const void* keys_void,
   static_assert(RandenTraits::kCapacityBytes == sizeof(Vector128),
                 "Capacity mismatch");
 
-  auto* state = reinterpret_cast<u64x2*>(state_void);
-  const auto* keys = reinterpret_cast<const u64x2*>(keys_void);
+  auto* state = reinterpret_cast<absl::uint128*>(state_void);
+  const auto* keys = reinterpret_cast<const absl::uint128*>(keys_void);
 
   const Vector128 prev_inner = Vector128Load(state);
 

@@ -13,6 +13,7 @@
 //   limitations under the License.
 
 #include <chrono>
+#include <cstdint>
 #include <iomanip>
 #include <sstream>
 #include <string>
@@ -1135,7 +1136,7 @@ TEST(Parse, ExtendedSeconds) {
   // All %E<prec>S cases are treated the same as %E*S on input.
   auto precisions = {"*", "0", "1",  "2",  "3",  "4",  "5",  "6", "7",
                      "8", "9", "10", "11", "12", "13", "14", "15"};
-  for (const std::string& prec : precisions) {
+  for (const std::string prec : precisions) {
     const std::string fmt = "%E" + prec + "S";
     SCOPED_TRACE(fmt);
     time_point<chrono::nanoseconds> tp = unix_epoch;
@@ -1217,7 +1218,7 @@ TEST(Parse, ExtendedSubeconds) {
   // All %E<prec>f cases are treated the same as %E*f on input.
   auto precisions = {"*", "0", "1",  "2",  "3",  "4",  "5",  "6", "7",
                      "8", "9", "10", "11", "12", "13", "14", "15"};
-  for (const std::string& prec : precisions) {
+  for (const std::string prec : precisions) {
     const std::string fmt = "%E" + prec + "f";
     SCOPED_TRACE(fmt);
     time_point<chrono::nanoseconds> tp = unix_epoch - chrono::seconds(1);
@@ -1504,7 +1505,7 @@ TEST(Parse, MaxRange) {
       parse(RFC3339_sec, "292277026596-12-04T14:30:07-01:00", utc, &tp));
   EXPECT_EQ(tp, time_point<absl::time_internal::cctz::seconds>::max());
   EXPECT_FALSE(
-      parse(RFC3339_sec, "292277026596-12-04T15:30:07-01:00", utc, &tp));
+      parse(RFC3339_sec, "292277026596-12-04T14:30:08-01:00", utc, &tp));
 
   // tests the lower limit using +00:00 offset
   EXPECT_TRUE(
@@ -1525,10 +1526,82 @@ TEST(Parse, MaxRange) {
       parse(RFC3339_sec, "9223372036854775807-12-31T23:59:59-00:01", utc, &tp));
   EXPECT_FALSE(parse(RFC3339_sec, "-9223372036854775808-01-01T00:00:00+00:01",
                      utc, &tp));
+}
 
-  // TODO: Add tests that parsing times with fractional seconds overflow
-  // appropriately. This can't be done until cctz::parse() properly detects
-  // overflow when combining the chrono seconds and femto.
+TEST(Parse, TimePointOverflow) {
+  const time_zone utc = utc_time_zone();
+
+  using D = chrono::duration<std::int64_t, std::nano>;
+  time_point<D> tp;
+
+  EXPECT_TRUE(
+      parse(RFC3339_full, "2262-04-11T23:47:16.8547758079+00:00", utc, &tp));
+  EXPECT_EQ(tp, time_point<D>::max());
+  EXPECT_EQ("2262-04-11T23:47:16.854775807+00:00",
+            format(RFC3339_full, tp, utc));
+#if 0
+  // TODO(#199): Will fail until cctz::parse() properly detects overflow.
+  EXPECT_FALSE(
+      parse(RFC3339_full, "2262-04-11T23:47:16.8547758080+00:00", utc, &tp));
+  EXPECT_TRUE(
+      parse(RFC3339_full, "1677-09-21T00:12:43.1452241920+00:00", utc, &tp));
+  EXPECT_EQ(tp, time_point<D>::min());
+  EXPECT_EQ("1677-09-21T00:12:43.145224192+00:00",
+            format(RFC3339_full, tp, utc));
+  EXPECT_FALSE(
+      parse(RFC3339_full, "1677-09-21T00:12:43.1452241919+00:00", utc, &tp));
+#endif
+
+  using DS = chrono::duration<std::int8_t, chrono::seconds::period>;
+  time_point<DS> stp;
+
+  EXPECT_TRUE(parse(RFC3339_full, "1970-01-01T00:02:07.9+00:00", utc, &stp));
+  EXPECT_EQ(stp, time_point<DS>::max());
+  EXPECT_EQ("1970-01-01T00:02:07+00:00", format(RFC3339_full, stp, utc));
+  EXPECT_FALSE(parse(RFC3339_full, "1970-01-01T00:02:08+00:00", utc, &stp));
+
+  EXPECT_TRUE(parse(RFC3339_full, "1969-12-31T23:57:52+00:00", utc, &stp));
+  EXPECT_EQ(stp, time_point<DS>::min());
+  EXPECT_EQ("1969-12-31T23:57:52+00:00", format(RFC3339_full, stp, utc));
+  EXPECT_FALSE(parse(RFC3339_full, "1969-12-31T23:57:51.9+00:00", utc, &stp));
+
+  using DM = chrono::duration<std::int8_t, chrono::minutes::period>;
+  time_point<DM> mtp;
+
+  EXPECT_TRUE(parse(RFC3339_full, "1970-01-01T02:07:59+00:00", utc, &mtp));
+  EXPECT_EQ(mtp, time_point<DM>::max());
+  EXPECT_EQ("1970-01-01T02:07:00+00:00", format(RFC3339_full, mtp, utc));
+  EXPECT_FALSE(parse(RFC3339_full, "1970-01-01T02:08:00+00:00", utc, &mtp));
+
+  EXPECT_TRUE(parse(RFC3339_full, "1969-12-31T21:52:00+00:00", utc, &mtp));
+  EXPECT_EQ(mtp, time_point<DM>::min());
+  EXPECT_EQ("1969-12-31T21:52:00+00:00", format(RFC3339_full, mtp, utc));
+  EXPECT_FALSE(parse(RFC3339_full, "1969-12-31T21:51:59+00:00", utc, &mtp));
+}
+
+TEST(Parse, TimePointOverflowFloor) {
+  const time_zone utc = utc_time_zone();
+
+  using D = chrono::duration<std::int64_t, std::micro>;
+  time_point<D> tp;
+
+  EXPECT_TRUE(
+      parse(RFC3339_full, "294247-01-10T04:00:54.7758079+00:00", utc, &tp));
+  EXPECT_EQ(tp, time_point<D>::max());
+  EXPECT_EQ("294247-01-10T04:00:54.775807+00:00",
+            format(RFC3339_full, tp, utc));
+#if 0
+  // TODO(#199): Will fail until cctz::parse() properly detects overflow.
+  EXPECT_FALSE(
+      parse(RFC3339_full, "294247-01-10T04:00:54.7758080+00:00", utc, &tp));
+  EXPECT_TRUE(
+      parse(RFC3339_full, "-290308-12-21T19:59:05.2241920+00:00", utc, &tp));
+  EXPECT_EQ(tp, time_point<D>::min());
+  EXPECT_EQ("-290308-12-21T19:59:05.224192+00:00",
+            format(RFC3339_full, tp, utc));
+  EXPECT_FALSE(
+      parse(RFC3339_full, "-290308-12-21T19:59:05.2241919+00:00", utc, &tp));
+#endif
 }
 
 //

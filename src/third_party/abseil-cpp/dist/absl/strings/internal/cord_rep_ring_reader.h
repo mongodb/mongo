@@ -40,6 +40,10 @@ class CordRepRingReader {
   // The returned value is undefined if this instance is empty.
   CordRepRing::index_type index() const { return index_; }
 
+  // Returns the current node inside the ring buffer for this instance.
+  // The returned value is undefined if this instance is empty.
+  CordRep* node() const { return ring_->entry_child(index_); }
+
   // Returns the length of the referenced ring buffer.
   // Requires the current instance to be non empty.
   size_t length() const {

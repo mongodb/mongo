@@ -15,10 +15,12 @@
 #ifndef ABSL_CLEANUP_INTERNAL_CLEANUP_H_
 #define ABSL_CLEANUP_INTERNAL_CLEANUP_H_
 
+#include <new>
 #include <type_traits>
 #include <utility>
 
 #include "absl/base/internal/invoke.h"
+#include "absl/base/macros.h"
 #include "absl/base/thread_annotations.h"
 #include "absl/utility/utility.h"
 
@@ -45,14 +47,22 @@ class Storage {
  public:
   Storage() = delete;
 
-  Storage(Callback callback, bool is_callback_engaged)
-      : callback_(std::move(callback)),
-        is_callback_engaged_(is_callback_engaged) {}
+  explicit Storage(Callback callback) {
+    // Placement-new into a character buffer is used for eager destruction when
+    // the cleanup is invoked or cancelled. To ensure this optimizes well, the
+    // behavior is implemented locally instead of using an absl::optional.
+    ::new (GetCallbackBuffer()) Callback(std::move(callback));
+    is_callback_engaged_ = true;
+  }
 
-  Storage(Storage&& other)
-      : callback_(std::move(other.callback_)),
-        is_callback_engaged_(
-            absl::exchange(other.is_callback_engaged_, false)) {}
+  Storage(Storage&& other) {
+    ABSL_HARDENING_ASSERT(other.IsCallbackEngaged());
+
+    ::new (GetCallbackBuffer()) Callback(std::move(other.GetCallback()));
+    is_callback_engaged_ = true;
+
+    other.DestroyCallback();
+  }
 
   Storage(const Storage& other) = delete;
 
@@ -60,17 +70,26 @@ class Storage {
 
   Storage& operator=(const Storage& other) = delete;
 
+  void* GetCallbackBuffer() { return static_cast<void*>(+callback_buffer_); }
+
+  Callback& GetCallback() {
+    return *reinterpret_cast<Callback*>(GetCallbackBuffer());
+  }
+
   bool IsCallbackEngaged() const { return is_callback_engaged_; }
 
-  void DisengageCallback() { is_callback_engaged_ = false; }
+  void DestroyCallback() {
+    is_callback_engaged_ = false;
+    GetCallback().~Callback();
+  }
 
   void InvokeCallback() ABSL_NO_THREAD_SAFETY_ANALYSIS {
-    std::move(callback_)();
+    std::move(GetCallback())();
   }
 
  private:
-  Callback callback_;
   bool is_callback_engaged_;
+  alignas(Callback) char callback_buffer_[sizeof(Callback)];
 };
 
 }  // namespace cleanup_internal

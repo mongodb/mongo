@@ -852,15 +852,22 @@ class NinjaState:
             # cycle.
             if (generated_source_files and check_generated_source_deps(build)):
 
-                # Make all non-generated source targets depend on
-                # _generated_sources. We use order_only for generated
-                # sources so that we don't rebuild the world if one
-                # generated source was rebuilt. We just need to make
-                # sure that all of these sources are generated before
-                # other builds.
-                order_only = build.get("order_only", [])
-                order_only.append(generated_sources_alias)
-                build["order_only"] = order_only
+                depends_on_gen_source = build['rule'] != 'INSTALL'
+                if build['outputs']:
+                    if self.env.Entry(
+                            build['outputs'][0]).get_build_env().get('NINJA_GENSOURCE_INDEPENDENT'):
+                        depends_on_gen_source = False
+
+                if depends_on_gen_source:
+                    # Make all non-generated source targets depend on
+                    # _generated_sources. We use order_only for generated
+                    # sources so that we don't rebuild the world if one
+                    # generated source was rebuilt. We just need to make
+                    # sure that all of these sources are generated before
+                    # other builds.
+                    order_only = build.get("order_only", [])
+                    order_only.append(generated_sources_alias)
+                    build["order_only"] = order_only
             if "order_only" in build:
                 build["order_only"].sort()
 
@@ -1183,8 +1190,8 @@ def gen_get_response_file_command(env, rule, tool, tool_is_dynamic=False, custom
             # Add 1 so we always keep the actual tool inside of cmd
             tool_idx = cmd_list.index(tool_command) + 1
         except ValueError:
-            raise Exception("Could not find tool {} in {} generated from {}".format(
-                tool, cmd_list, get_comstr(env, action, targets, sources)))
+            raise Exception("Could not find tool {}({}) in {} generated from {}".format(
+                tool, tool_command, cmd_list, get_comstr(env, action, targets, sources)))
 
         cmd, rsp_content = cmd_list[:tool_idx], cmd_list[tool_idx:]
         rsp_content = " ".join(rsp_content)
@@ -1419,8 +1426,8 @@ def register_custom_rule_mapping(env, pre_subst_string, rule):
 
 
 def register_custom_rule(env, rule, command, description="", deps=None, pool=None,
-                         use_depfile=False, use_response_file=False, response_file_content="$rspc",
-                         restat=False):
+                         use_depfile=False, depfile=None, use_response_file=False,
+                         response_file_content="$rspc", restat=False):
     """Allows specification of Ninja rules from inside SCons files."""
     rule_obj = {
         "command": command,
@@ -1428,7 +1435,10 @@ def register_custom_rule(env, rule, command, description="", deps=None, pool=Non
     }
 
     if use_depfile:
-        rule_obj["depfile"] = os.path.join(get_path(env['NINJA_BUILDDIR']), '$out.depfile')
+        if depfile:
+            rule_obj["depfile"] = depfile
+        else:
+            rule_obj["depfile"] = os.path.join(get_path(env['NINJA_BUILDDIR']), '$out.depfile')
 
     if deps is not None:
         rule_obj["deps"] = deps

@@ -88,6 +88,14 @@ components:
     is_test_only: true
     team_owner: "Wiredtiger"
 
+  c-ares:
+    homepage_url: https://c-ares.org/
+    open_hub_url: https://www.openhub.net/p/c-ares
+    release_monitoring_id: 5840
+    local_directory_path: src/third_party/cares
+    team_owner: "Service Architecture"
+    upgrade_suppression: TODO SERVER-74870
+
   "dcleblanc/SafeInt":
     homepage_url: https://github.com/dcleblanc/SafeInt
     open_hub_url: https://www.openhub.net/p/SafeInt
@@ -136,6 +144,13 @@ components:
     team_owner: "Storage Execution"
     # TODO - fix the version number in Black Duck
     upgrade_suppression: TODO SERVER-67432
+
+  grpc:
+    homepage_url: https://grpc.io/
+    open_hub_url: https://www.openhub.net/p/grpc
+    release_monitoring_id: 19117
+    local_directory_path: src/third_party/grpc
+    team_owner: "Service Architecture"
 
   "ICU for C/C++ (ICU4C)":
     homepage_url: http://site.icu-project.org/
@@ -257,6 +272,13 @@ components:
     local_directory_path: src/third_party/pcre2
     team_owner: "Query"
 
+  Protobuf:
+    homepage_url: https://developers.google.com/protocol-buffers/
+    open_hub_url: https://www.openhub.net/p/protobuf
+    release_monitoring_id: 3715
+    local_directory_path: src/third_party/protobuf
+    team_owner: "Service Architecture"
+
   python-testscenarios:
     homepage_url: https://launchpad.net/testscenarios
     open_hub_url: https://www.openhub.net/p/testscenarios
@@ -264,6 +286,13 @@ components:
     local_directory_path: src/third_party/wiredtiger/test/3rdparty/testscenarios-0.4
     is_test_only: true
     team_owner: "Wiredtiger"
+
+  google-re2:
+    homepage_url: https://github.com/google/re2
+    open_hub_url: https://www.openhub.net/p/google-re2
+    release_monitoring_id: 10500
+    local_directory_path: src/third_party/re2
+    team_owner: "Service Architecture"
 
   extras:
     homepage_url: https://github.com/testing-cabal/extras

@@ -1,0 +1,103 @@
+image: Visual Studio 2015
+
+# Github/Bitbucket only: get source code for one particular commit as zip archive, instead of git clone'ing.
+shallow_clone: true
+
+# Github/Bitbucket only: per-file commit filtering
+skip_commits:
+  files:
+    - .gitignore
+    - '**/*.md'
+    - .travis.yml
+
+# List of build configurations to test.
+configuration:
+  - RelWithDebInfo
+
+# Note: You can set extra cmake args for a particular matrix entry with CMAKE_EXTRA_OPTIONS. For example:
+#     CMAKE_EXTRA_OPTIONS: -DOPENSSL_ROOT_DIR=C:/OpenSSL-Win32
+environment:
+  matrix:
+    # MSVC 2015, 32-bit x86 (cmake)
+    - COMPILER: MSVC
+      BUILDTOOL: CMAKE
+      MSVC_SETUP_ARG: x86
+      MSVC_SETUP_PATH: C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat
+
+    # MSVC 2015, 64-bit x86 (cmake)
+    - COMPILER: MSVC
+      BUILDTOOL: CMAKE
+      MSVC_SETUP_ARG: x64
+      MSVC_SETUP_PATH: C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat
+
+    # MinGW, 32-bit x86 (cmake)
+    - COMPILER: MINGW
+      BUILDTOOL: CMAKE
+      PATH: C:\mingw-w64\i686-5.3.0-posix-dwarf-rt_v4-rev0\mingw32\bin;%PATH%
+
+    # MSVC 2015, 32-bit x86 (nmake)
+    - COMPILER: MSVC
+      BUILDTOOL: NMAKE
+      MSVC_SETUP_ARG: x86
+      MSVC_SETUP_PATH: C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat
+
+    # MSVC 2015, 64-bit x86 (nmake)
+    - COMPILER: MSVC
+      BUILDTOOL: NMAKE
+      MSVC_SETUP_ARG: x64
+      MSVC_SETUP_PATH: C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\vcvarsall.bat
+
+    # MinGW, 32-bit x86 (makefiles)
+    - COMPILER: MINGW
+      BUILDTOOL: MAKE
+      PATH: C:\mingw-w64\i686-5.3.0-posix-dwarf-rt_v4-rev0\mingw32\bin;%PATH%
+
+install:
+  - if "%COMPILER%" == "MINGW" rename "C:\Program Files\Git\usr\bin\sh.exe" "sh2.exe"
+
+before_build:
+  # Setup build environment for the selected compiler (not all compilers need to do anything here).
+  #  -- Visual Studio --
+  - if "%COMPILER%" == "MSVC" call "%MSVC_SETUP_PATH%" %MSVC_SETUP_ARG%
+
+build_script:
+  - if "%BUILDTOOL%" == "NMAKE" copy .\include\ares_build.h.dist .\include\ares_build.h
+  - if "%BUILDTOOL%" == "NMAKE" nmake /NOLOGO /f .\Makefile.msvc
+  - if "%BUILDTOOL%" == "CMAKE" mkdir C:\projects\build-cares
+  - if "%BUILDTOOL%" == "CMAKE" cd C:\projects\build-cares
+  - if "%BUILDTOOL%" == "CMAKE" cmake -GNinja -DCMAKE_BUILD_TYPE=%configuration% -DCMAKE_INSTALL_PREFIX=C:\projects\build-cares\test_install -DCARES_STATIC=ON -DCARES_STATIC_PIC=ON -DCARES_BUILD_TESTS=ON %CMAKE_EXTRA_OPTIONS% %APPVEYOR_BUILD_FOLDER%
+  - if "%BUILDTOOL%" == "CMAKE" ninja install
+  - if "%BUILDTOOL%" == "MAKE" copy .\include\ares_build.h.dist .\include\ares_build.h
+  - if "%BUILDTOOL%" == "MAKE" mingw32-make.exe -f Makefile.m32 demos
+
+test_script:
+  # We can't use powershell for tests due to treating stderr as an error
+  - if "%BUILDTOOL%" == "NMAKE" cd test
+  - if "%BUILDTOOL%" == "NMAKE" nmake /NOLOGO /f .\Makefile.msvc vtest
+  - if "%BUILDTOOL%" == "NMAKE" nmake /NOLOGO /f .\Makefile.msvc aresfuzz aresfuzzname dnsdump
+  - if "%BUILDTOOL%" == "NMAKE" .\msvc\arestest\lib-debug\dnsdump.exe fuzzinput\answer_a fuzzinput\answer_aaaa
+  - if "%BUILDTOOL%" == "MAKE" cd test
+  - if "%BUILDTOOL%" == "MAKE" mingw32-make.exe -f Makefile.m32
+  - if "%BUILDTOOL%" == "MAKE" mingw32-make.exe -f Makefile.m32 aresfuzz.exe aresfuzzname.exe dnsdump.exe
+  - if "%BUILDTOOL%" == "MAKE" .\dnsdump.exe fuzzinput\answer_a fuzzinput\answer_aaaa
+  - if "%BUILDTOOL%" == "CMAKE" cd C:\projects\build-cares\bin
+  - if "%BUILDTOOL%" == "CMAKE" .\adig.exe www.google.com
+  - if "%BUILDTOOL%" == "CMAKE" .\acountry.exe www.google.com
+  - if "%BUILDTOOL%" == "CMAKE" .\ahost.exe www.google.com
+  - if "%BUILDTOOL%" == "CMAKE" .\arestest.exe -4 -v
+# Windows cant do shell expansion
+#  - if "%BUILDTOOL%" == "CMAKE" .\aresfuzz.exe %APPVEYOR_BUILD_FOLDER%\test\fuzzinput\*
+#  - if "%BUILDTOOL%" == "CMAKE" .\aresfuzzname.exe %APPVEYOR_BUILD_FOLDER%\test\fuzznames\*
+  - if "%BUILDTOOL%" == "CMAKE" .\dnsdump.exe "%APPVEYOR_BUILD_FOLDER%\test\fuzzinput\answer_a" "%APPVEYOR_BUILD_FOLDER%\test\fuzzinput\answer_aaaa"
+
+#on_finish:
+#  - cd C:\projects\build-cares\test
+#  - dir /B *.log > list.txt
+#  - cmake -E tar cfv all_tests.zip --format=zip --files-from=list.txt
+#  - appveyor PushArtifact all_tests.zip
+#  - ps: $blockRdp = $true; iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))
+# Force build worker to stay open after build is done, so we can RDP into it.
+
+# Enable RDP connections into build worker.
+#init:
+#  - ps: iex ((new-object net.webclient).DownloadString('https://raw.githubusercontent.com/appveyor/ci/master/scripts/enable-rdp.ps1'))

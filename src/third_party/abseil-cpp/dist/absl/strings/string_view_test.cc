@@ -449,6 +449,24 @@ TEST(StringViewTest, STL2) {
   EXPECT_EQ(d.find('x', 4), absl::string_view::npos);
   EXPECT_EQ(e.find('x', 7), absl::string_view::npos);
 
+  EXPECT_EQ(a.find(b.data(), 1, 0), 1);
+  EXPECT_EQ(a.find(c.data(), 9, 0), 9);
+  EXPECT_EQ(a.find(c.data(), absl::string_view::npos, 0),
+            absl::string_view::npos);
+  EXPECT_EQ(b.find(c.data(), absl::string_view::npos, 0),
+            absl::string_view::npos);
+  // empty string nonsense
+  EXPECT_EQ(d.find(b.data(), 4, 0), absl::string_view::npos);
+  EXPECT_EQ(e.find(b.data(), 7, 0), absl::string_view::npos);
+
+  EXPECT_EQ(a.find(b.data(), 1), absl::string_view::npos);
+  EXPECT_EQ(a.find(c.data(), 9), 23);
+  EXPECT_EQ(a.find(c.data(), absl::string_view::npos), absl::string_view::npos);
+  EXPECT_EQ(b.find(c.data(), absl::string_view::npos), absl::string_view::npos);
+  // empty string nonsense
+  EXPECT_EQ(d.find(b.data(), 4), absl::string_view::npos);
+  EXPECT_EQ(e.find(b.data(), 7), absl::string_view::npos);
+
   EXPECT_EQ(a.rfind(b), 0);
   EXPECT_EQ(a.rfind(b, 1), 0);
   EXPECT_EQ(a.rfind(c), 23);
@@ -490,6 +508,14 @@ TEST(StringViewTest, STL2) {
   EXPECT_EQ(e.rfind('o'), absl::string_view::npos);
   EXPECT_EQ(d.rfind('o', 4), absl::string_view::npos);
   EXPECT_EQ(e.rfind('o', 7), absl::string_view::npos);
+
+  EXPECT_EQ(a.rfind(b.data(), 1, 0), 1);
+  EXPECT_EQ(a.rfind(c.data(), 22, 0), 22);
+  EXPECT_EQ(a.rfind(c.data(), 1, 0), 1);
+  EXPECT_EQ(a.rfind(c.data(), 0, 0), 0);
+  EXPECT_EQ(b.rfind(c.data(), 0, 0), 0);
+  EXPECT_EQ(d.rfind(b.data(), 4, 0), 0);
+  EXPECT_EQ(e.rfind(b.data(), 7, 0), 0);
 }
 
 // Continued from STL2
@@ -678,6 +704,7 @@ TEST(StringViewTest, STL2Substr) {
   EXPECT_EQ(a.substr(23, 3), c);
   EXPECT_EQ(a.substr(23, 99), c);
   EXPECT_EQ(a.substr(0), a);
+  EXPECT_EQ(a.substr(), a);
   EXPECT_EQ(a.substr(3, 2), "de");
   // empty string nonsense
   EXPECT_EQ(d.substr(0, 99), e);
@@ -1087,7 +1114,24 @@ TEST(StringViewTest, ConstexprCompiles) {
   EXPECT_EQ(sp_npos, -1);
 }
 
-TEST(StringViewTest, ConstexprSubstr) {
+constexpr char ConstexprMethodsHelper() {
+#if defined(__cplusplus) && __cplusplus >= 201402L
+  absl::string_view str("123", 3);
+  str.remove_prefix(1);
+  str.remove_suffix(1);
+  absl::string_view bar;
+  str.swap(bar);
+  return bar.front();
+#else
+  return '2';
+#endif
+}
+
+TEST(StringViewTest, ConstexprMethods) {
+  // remove_prefix, remove_suffix, swap
+  static_assert(ConstexprMethodsHelper() == '2', "");
+
+  // substr
   constexpr absl::string_view foobar("foobar", 6);
   constexpr absl::string_view foo = foobar.substr(0, 3);
   constexpr absl::string_view bar = foobar.substr(3);

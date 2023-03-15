@@ -188,25 +188,25 @@ void ClearCurrentThreadIdentity();
 // May be chosen at compile time via: -DABSL_FORCE_THREAD_IDENTITY_MODE=<mode
 // index>
 #ifdef ABSL_THREAD_IDENTITY_MODE_USE_POSIX_SETSPECIFIC
-#error ABSL_THREAD_IDENTITY_MODE_USE_POSIX_SETSPECIFIC cannot be direcly set
+#error ABSL_THREAD_IDENTITY_MODE_USE_POSIX_SETSPECIFIC cannot be directly set
 #else
 #define ABSL_THREAD_IDENTITY_MODE_USE_POSIX_SETSPECIFIC 0
 #endif
 
 #ifdef ABSL_THREAD_IDENTITY_MODE_USE_TLS
-#error ABSL_THREAD_IDENTITY_MODE_USE_TLS cannot be direcly set
+#error ABSL_THREAD_IDENTITY_MODE_USE_TLS cannot be directly set
 #else
 #define ABSL_THREAD_IDENTITY_MODE_USE_TLS 1
 #endif
 
 #ifdef ABSL_THREAD_IDENTITY_MODE_USE_CPP11
-#error ABSL_THREAD_IDENTITY_MODE_USE_CPP11 cannot be direcly set
+#error ABSL_THREAD_IDENTITY_MODE_USE_CPP11 cannot be directly set
 #else
 #define ABSL_THREAD_IDENTITY_MODE_USE_CPP11 2
 #endif
 
 #ifdef ABSL_THREAD_IDENTITY_MODE
-#error ABSL_THREAD_IDENTITY_MODE cannot be direcly set
+#error ABSL_THREAD_IDENTITY_MODE cannot be directly set
 #elif defined(ABSL_FORCE_THREAD_IDENTITY_MODE)
 #define ABSL_THREAD_IDENTITY_MODE ABSL_FORCE_THREAD_IDENTITY_MODE
 #elif defined(_WIN32) && !defined(__MINGW32__)
@@ -236,13 +236,18 @@ ABSL_CONST_INIT extern thread_local ThreadIdentity* thread_identity_ptr;
 #error Thread-local storage not detected on this platform
 #endif
 
-// thread_local variables cannot be in headers exposed by DLLs. However, it is
-// important for performance reasons in general that
-// `CurrentThreadIdentityIfPresent` be inlined. This is not possible across a
-// DLL boundary so, with DLLs, we opt to have the function not be inlined. Note
+// thread_local variables cannot be in headers exposed by DLLs or in certain
+// build configurations on Apple platforms. However, it is important for
+// performance reasons in general that `CurrentThreadIdentityIfPresent` be
+// inlined. In the other cases we opt to have the function not be inlined. Note
 // that `CurrentThreadIdentityIfPresent` is declared above so we can exclude
-// this entire inline definition when compiling as a DLL.
-#if !defined(ABSL_BUILD_DLL) && !defined(ABSL_CONSUME_DLL)
+// this entire inline definition.
+#if !defined(__APPLE__) && !defined(ABSL_BUILD_DLL) && \
+    !defined(ABSL_CONSUME_DLL)
+#define ABSL_INTERNAL_INLINE_CURRENT_THREAD_IDENTITY_IF_PRESENT 1
+#endif
+
+#ifdef ABSL_INTERNAL_INLINE_CURRENT_THREAD_IDENTITY_IF_PRESENT
 inline ThreadIdentity* CurrentThreadIdentityIfPresent() {
   return thread_identity_ptr;
 }

@@ -35,7 +35,7 @@ absl_cc_test(
     ${ABSL_TEST_COPTS}
   DEPS
     absl::algorithm
-    gmock_main
+    GTest::gmock_main
 )
 
 absl_cc_library(
@@ -65,5 +65,5 @@ absl_cc_test(
     absl::core_headers
     absl::memory
     absl::span
-    gmock_main
+    GTest::gmock_main
 )

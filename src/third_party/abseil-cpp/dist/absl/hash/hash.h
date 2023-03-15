@@ -73,6 +73,8 @@
 #ifndef ABSL_HASH_HASH_H_
 #define ABSL_HASH_HASH_H_
 
+#include <tuple>
+
 #include "absl/hash/internal/hash.h"
 
 namespace absl {
@@ -213,6 +215,26 @@ ABSL_NAMESPACE_BEGIN
 //
 template <typename T>
 using Hash = absl::hash_internal::Hash<T>;
+
+// HashOf
+//
+// absl::HashOf() is a helper that generates a hash from the values of its
+// arguments.  It dispatches to absl::Hash directly, as follows:
+//  * HashOf(t) == absl::Hash<T>{}(t)
+//  * HashOf(a, b, c) == HashOf(std::make_tuple(a, b, c))
+//
+// HashOf(a1, a2, ...) == HashOf(b1, b2, ...) is guaranteed when
+//  * The argument lists have pairwise identical C++ types
+//  * a1 == b1 && a2 == b2 && ...
+//
+// The requirement that the arguments match in both type and value is critical.
+// It means that `a == b` does not necessarily imply `HashOf(a) == HashOf(b)` if
+// `a` and `b` have different types. For example, `HashOf(2) != HashOf(2.0)`.
+template <int&... ExplicitArgumentBarrier, typename... Types>
+size_t HashOf(const Types&... values) {
+  auto tuple = std::tie(values...);
+  return absl::Hash<decltype(tuple)>{}(tuple);
+}
 
 // HashState
 //

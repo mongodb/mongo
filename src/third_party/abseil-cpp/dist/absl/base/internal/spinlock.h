@@ -16,13 +16,15 @@
 
 //  Most users requiring mutual exclusion should use Mutex.
 //  SpinLock is provided for use in two situations:
-//   - for use in code that Mutex itself depends on
+//   - for use by Abseil internal code that Mutex itself depends on
 //   - for async signal safety (see below)
 
 // SpinLock is async signal safe.  If a spinlock is used within a signal
 // handler, all code that acquires the lock must ensure that the signal cannot
 // arrive while they are holding the lock.  Typically, this is done by blocking
 // the signal.
+//
+// Threads waiting on a SpinLock may be woken in an arbitrary order.
 
 #ifndef ABSL_BASE_INTERNAL_SPINLOCK_H_
 #define ABSL_BASE_INTERNAL_SPINLOCK_H_

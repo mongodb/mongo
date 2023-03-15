@@ -44,11 +44,11 @@ static constexpr size_t kMaxFlatLength = kMaxFlatSize - kFlatOverhead;
 static constexpr size_t kMinFlatLength = kMinFlatSize - kFlatOverhead;
 
 constexpr uint8_t AllocatedSizeToTagUnchecked(size_t size) {
-  return static_cast<uint8_t>((size <= 1024) ? size / 8
-                                             : 128 + size / 32 - 1024 / 32);
+  return static_cast<uint8_t>((size <= 1024) ? size / 8 + 1
+                                             : 129 + size / 32 - 1024 / 32);
 }
 
-static_assert(kMinFlatSize / 8 >= FLAT, "");
+static_assert(kMinFlatSize / 8 + 1 >= FLAT, "");
 static_assert(AllocatedSizeToTagUnchecked(kMaxFlatSize) <= MAX_FLAT_TAG, "");
 
 // Helper functions for rounded div, and rounding to exact sizes.
@@ -73,7 +73,7 @@ inline uint8_t AllocatedSizeToTag(size_t size) {
 
 // Converts the provided tag to the corresponding allocated size
 constexpr size_t TagToAllocatedSize(uint8_t tag) {
-  return (tag <= 128) ? (tag * 8) : (1024 + (tag - 128) * 32);
+  return (tag <= 129) ? ((tag - 1) * 8) : (1024 + (tag - 129) * 32);
 }
 
 // Converts the provided tag to the corresponding available data length
@@ -82,7 +82,7 @@ constexpr size_t TagToLength(uint8_t tag) {
 }
 
 // Enforce that kMaxFlatSize maps to a well-known exact tag value.
-static_assert(TagToAllocatedSize(224) == kMaxFlatSize, "Bad tag logic");
+static_assert(TagToAllocatedSize(225) == kMaxFlatSize, "Bad tag logic");
 
 struct CordRepFlat : public CordRep {
   // Creates a new flat node.
@@ -118,8 +118,8 @@ struct CordRepFlat : public CordRep {
   }
 
   // Returns a pointer to the data inside this flat rep.
-  char* Data() { return storage; }
-  const char* Data() const { return storage; }
+  char* Data() { return reinterpret_cast<char*>(storage); }
+  const char* Data() const { return reinterpret_cast<const char*>(storage); }
 
   // Returns the maximum capacity (payload size) of this instance.
   size_t Capacity() const { return TagToLength(tag); }

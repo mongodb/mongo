@@ -88,7 +88,12 @@ struct StringBtreeDefaultLess {
 
   // Compatibility constructor.
   StringBtreeDefaultLess(std::less<std::string>) {}  // NOLINT
-  StringBtreeDefaultLess(std::less<string_view>) {}  // NOLINT
+  StringBtreeDefaultLess(std::less<absl::string_view>) {}  // NOLINT
+
+  // Allow converting to std::less for use in key_comp()/value_comp().
+  explicit operator std::less<std::string>() const { return {}; }
+  explicit operator std::less<absl::string_view>() const { return {}; }
+  explicit operator std::less<absl::Cord>() const { return {}; }
 
   absl::weak_ordering operator()(absl::string_view lhs,
                                  absl::string_view rhs) const {
@@ -115,7 +120,12 @@ struct StringBtreeDefaultGreater {
   StringBtreeDefaultGreater() = default;
 
   StringBtreeDefaultGreater(std::greater<std::string>) {}  // NOLINT
-  StringBtreeDefaultGreater(std::greater<string_view>) {}  // NOLINT
+  StringBtreeDefaultGreater(std::greater<absl::string_view>) {}  // NOLINT
+
+  // Allow converting to std::greater for use in key_comp()/value_comp().
+  explicit operator std::greater<std::string>() const { return {}; }
+  explicit operator std::greater<absl::string_view>() const { return {}; }
+  explicit operator std::greater<absl::Cord>() const { return {}; }
 
   absl::weak_ordering operator()(absl::string_view lhs,
                                  absl::string_view rhs) const {
@@ -217,6 +227,8 @@ struct prefers_linear_node_search<
 template <typename Key, typename Compare, typename Alloc, int TargetNodeSize,
           bool Multi, typename SlotPolicy>
 struct common_params {
+  using original_key_compare = Compare;
+
   // If Compare is a common comparator for a string-like type, then we adapt it
   // to use heterogeneous lookup and to be a key-compare-to comparator.
   using key_compare = typename key_compare_to_adapter<Compare>::type;
@@ -317,16 +329,21 @@ struct map_params : common_params<Key, Compare, Alloc, TargetNodeSize, Multi,
   using value_type = typename super_type::value_type;
   using init_type = typename super_type::init_type;
 
-  using key_compare = typename super_type::key_compare;
-  // Inherit from key_compare for empty base class optimization.
-  struct value_compare : private key_compare {
-    value_compare() = default;
-    explicit value_compare(const key_compare &cmp) : key_compare(cmp) {}
+  using original_key_compare = typename super_type::original_key_compare;
+  // Reference: https://en.cppreference.com/w/cpp/container/map/value_compare
+  class value_compare {
+    template <typename Params>
+    friend class btree;
 
-    template <typename T, typename U>
-    auto operator()(const T &left, const U &right) const
-        -> decltype(std::declval<key_compare>()(left.first, right.first)) {
-      return key_compare::operator()(left.first, right.first);
+   protected:
+    explicit value_compare(original_key_compare c) : comp(std::move(c)) {}
+
+    original_key_compare comp;  // NOLINT
+
+   public:
+    auto operator()(const value_type &lhs, const value_type &rhs) const
+        -> decltype(comp(lhs.first, rhs.first)) {
+      return comp(lhs.first, rhs.first);
     }
   };
   using is_map_container = std::true_type;
@@ -392,7 +409,8 @@ struct set_params : common_params<Key, Compare, Alloc, TargetNodeSize, Multi,
                                   set_slot_policy<Key>> {
   using value_type = Key;
   using slot_type = typename set_params::common_params::slot_type;
-  using value_compare = typename set_params::common_params::key_compare;
+  using value_compare =
+      typename set_params::common_params::original_key_compare;
   using is_map_container = std::false_type;
 
   template <typename V>
@@ -484,8 +502,8 @@ class btree_node {
                        std::is_same<std::greater<key_type>,
                                     key_compare>::value)>;
 
-  // This class is organized by gtl::Layout as if it had the following
-  // structure:
+  // This class is organized by absl::container_internal::Layout as if it had
+  // the following structure:
   //   // A pointer to the node's parent.
   //   btree_node *parent;
   //
@@ -1129,6 +1147,7 @@ class btree {
   using size_type = typename Params::size_type;
   using difference_type = typename Params::difference_type;
   using key_compare = typename Params::key_compare;
+  using original_key_compare = typename Params::original_key_compare;
   using value_compare = typename Params::value_compare;
   using allocator_type = typename Params::allocator_type;
   using reference = typename Params::reference;
@@ -1338,7 +1357,9 @@ class btree {
     return compare_internal::compare_result_as_less_than(key_comp()(a, b));
   }
 
-  value_compare value_comp() const { return value_compare(key_comp()); }
+  value_compare value_comp() const {
+    return value_compare(original_key_compare(key_comp()));
+  }
 
   // Verifies the structure of the btree.
   void verify() const;

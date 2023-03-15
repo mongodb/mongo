@@ -50,6 +50,7 @@ ABSL_RANDOM_RANDEN_COPTS = select({
     ":cpu_x64_windows": ABSL_RANDOM_HWAES_MSVC_X64_FLAGS,
     ":cpu_k8": ABSL_RANDOM_HWAES_X64_FLAGS,
     ":cpu_ppc": ["-mcrypto"],
+    ":cpu_aarch64": ABSL_RANDOM_HWAES_ARM64_FLAGS,
 
     # Supported by default or unsupported.
     "//conditions:default": [],
@@ -70,6 +71,7 @@ def absl_random_randen_copts_init():
         "darwin",
         "x64_windows_msvc",
         "x64_windows",
+        "aarch64",
     ]
     for cpu in cpu_configs:
         native.config_setting(

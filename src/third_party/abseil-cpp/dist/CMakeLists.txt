@@ -41,11 +41,16 @@ if (POLICY CMP0077)
   cmake_policy(SET CMP0077 NEW)
 endif (POLICY CMP0077)
 
+# Allow the user to specify the MSVC runtime
+if (POLICY CMP0091)
+  cmake_policy(SET CMP0091 NEW)
+endif (POLICY CMP0091)
+
 # Set BUILD_TESTING to OFF by default.
 # This must come before the project() and include(CTest) lines.
 OPTION(BUILD_TESTING "Build tests" OFF)
 
-project(absl LANGUAGES CXX VERSION 20210324)
+project(absl LANGUAGES CXX VERSION 20211102)
 include(CTest)
 
 # Output directory is correct by default for most build setups. However, when
@@ -60,6 +65,13 @@ if(NOT CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
   option(ABSL_ENABLE_INSTALL "Enable install rule" OFF)
 else()
   option(ABSL_ENABLE_INSTALL "Enable install rule" ON)
+endif()
+
+option(ABSL_PROPAGATE_CXX_STD
+  "Use CMake C++ standard meta features (e.g. cxx_std_11) that propagate to targets that link to Abseil"
+  OFF)  # TODO: Default to ON for CMake 3.8 and greater.
+if((${CMAKE_VERSION} VERSION_GREATER_EQUAL 3.8) AND (NOT ABSL_PROPAGATE_CXX_STD))
+  message(WARNING "A future Abseil release will default ABSL_PROPAGATE_CXX_STD to ON for CMake 3.8 and up. We recommend enabling this option to ensure your project still builds correctly.")
 endif()
 
 list(APPEND CMAKE_MODULE_PATH
@@ -97,8 +109,17 @@ endif()
 ## pthread
 find_package(Threads REQUIRED)
 
+include(CMakeDependentOption)
+
 option(ABSL_USE_EXTERNAL_GOOGLETEST
   "If ON, Abseil will assume that the targets for GoogleTest are already provided by the including project. This makes sense when Abseil is used with add_subproject." OFF)
+
+cmake_dependent_option(ABSL_FIND_GOOGLETEST
+  "If ON, Abseil will use find_package(GTest) rather than assuming that GoogleTest is already provided by the including project."
+  ON
+  "ABSL_USE_EXTERNAL_GOOGLETEST"
+  OFF)
+
 
 option(ABSL_USE_GOOGLETEST_HEAD
   "If ON, abseil will download HEAD from GoogleTest at config time." OFF)
@@ -111,7 +132,15 @@ set(ABSL_LOCAL_GOOGLETEST_DIR "/usr/src/googletest" CACHE PATH
 
 if(BUILD_TESTING)
   ## check targets
-  if (NOT ABSL_USE_EXTERNAL_GOOGLETEST)
+  if (ABSL_USE_EXTERNAL_GOOGLETEST)
+    if (ABSL_FIND_GOOGLETEST)
+      find_package(GTest REQUIRED)
+    else()
+      if (NOT TARGET gtest AND NOT TARGET GTest::gtest)
+        message(FATAL_ERROR "ABSL_USE_EXTERNAL_GOOGLETEST is ON and ABSL_FIND_GOOGLETEST is OFF, which means that the top-level project must build the Google Test project. However, the target gtest was not found.")
+      endif()
+    endif()
+  else()
     set(absl_gtest_build_dir ${CMAKE_BINARY_DIR}/googletest-build)
     if(ABSL_USE_GOOGLETEST_HEAD AND ABSL_GOOGLETEST_DOWNLOAD_URL)
       message(FATAL_ERROR "Do not set both ABSL_USE_GOOGLETEST_HEAD and ABSL_GOOGLETEST_DOWNLOAD_URL")
@@ -129,16 +158,18 @@ if(BUILD_TESTING)
     include(CMake/Googletest/DownloadGTest.cmake)
   endif()
 
-  check_target(gtest)
-  check_target(gtest_main)
-  check_target(gmock)
+  if (NOT ABSL_FIND_GOOGLETEST)
+    # When Google Test is included directly rather than through find_package, the aliases are missing.
+    add_library(GTest::gtest ALIAS gtest)
+    add_library(GTest::gtest_main ALIAS gtest_main)
+    add_library(GTest::gmock ALIAS gmock)
+    add_library(GTest::gmock_main ALIAS gmock_main)
+  endif()
 
-  list(APPEND ABSL_TEST_COMMON_LIBRARIES
-    gtest_main
-    gtest
-    gmock
-    ${CMAKE_THREAD_LIBS_INIT}
-  )
+  check_target(GTest::gtest)
+  check_target(GTest::gtest_main)
+  check_target(GTest::gmock)
+  check_target(GTest::gmock_main)
 endif()
 
 add_subdirectory(absl)

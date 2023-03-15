@@ -78,6 +78,7 @@ TEST(CordRingReaderTest, Reset) {
   EXPECT_TRUE(static_cast<bool>(reader));
   EXPECT_THAT(reader.ring(), Eq(ring));
   EXPECT_THAT(reader.index(), Eq(ring->head()));
+  EXPECT_THAT(reader.node(), Eq(ring->entry_child(ring->head())));
   EXPECT_THAT(reader.length(), Eq(ring->length));
   EXPECT_THAT(reader.consumed(), Eq(flats[0].length()));
   EXPECT_THAT(reader.remaining(), Eq(ring->length - reader.consumed()));
@@ -99,11 +100,13 @@ TEST(CordRingReaderTest, Next) {
   size_t consumed = reader.consumed();
   size_t remaining = reader.remaining();
   for (int i = 1; i < flats.size(); ++i) {
+    CordRepRing::index_type index = ring->advance(head, i);
     consumed += flats[i].length();
     remaining -= flats[i].length();
     absl::string_view next = reader.Next();
     ASSERT_THAT(next, Eq(flats[i]));
-    ASSERT_THAT(reader.index(), Eq(ring->advance(head, i)));
+    ASSERT_THAT(reader.index(), Eq(index));
+    ASSERT_THAT(reader.node(), Eq(ring->entry_child(index)));
     ASSERT_THAT(reader.consumed(), Eq(consumed));
     ASSERT_THAT(reader.remaining(), Eq(remaining));
   }
@@ -125,13 +128,15 @@ TEST(CordRingReaderTest, SeekForward) {
   size_t consumed = 0;
   size_t remaining = ring->length;;
   for (int i = 0; i < flats.size(); ++i) {
+    CordRepRing::index_type index = ring->advance(head, i);
     size_t offset = consumed;
     consumed += flats[i].length();
     remaining -= flats[i].length();
     for (int off = 0; off < flats[i].length(); ++off) {
       absl::string_view chunk = reader.Seek(offset + off);
       ASSERT_THAT(chunk, Eq(flats[i].substr(off)));
-      ASSERT_THAT(reader.index(), Eq(ring->advance(head, i)));
+      ASSERT_THAT(reader.index(), Eq(index));
+      ASSERT_THAT(reader.node(), Eq(ring->entry_child(index)));
       ASSERT_THAT(reader.consumed(), Eq(consumed));
       ASSERT_THAT(reader.remaining(), Eq(remaining));
     }
@@ -150,11 +155,13 @@ TEST(CordRingReaderTest, SeekBackward) {
   size_t consumed = ring->length;
   size_t remaining = 0;
   for (int i = flats.size() - 1; i >= 0; --i) {
+    CordRepRing::index_type index = ring->advance(head, i);
     size_t offset = consumed - flats[i].length();
     for (int off = 0; off < flats[i].length(); ++off) {
       absl::string_view chunk = reader.Seek(offset + off);
       ASSERT_THAT(chunk, Eq(flats[i].substr(off)));
-      ASSERT_THAT(reader.index(), Eq(ring->advance(head, i)));
+      ASSERT_THAT(reader.index(), Eq(index));
+      ASSERT_THAT(reader.node(), Eq(ring->entry_child(index)));
       ASSERT_THAT(reader.consumed(), Eq(consumed));
       ASSERT_THAT(reader.remaining(), Eq(remaining));
     }

@@ -481,7 +481,7 @@ class InDegreeOne(Analyzer):
         in_degree_one_nodes = []
         for node, data in self._dependency_graph.nodes(data=True):
             if (len(self._dependents_graph[node]) < 2
-                    and data[NodeProps.bin_type.name] == 'SharedLibrary'):
+                    and data.get(NodeProps.bin_type.name) == 'SharedLibrary'):
 
                 if len(self._dependents_graph[node]) == 1:
                     depender = list(self._dependents_graph[node].items())[0][0]

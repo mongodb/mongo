@@ -14,8 +14,6 @@
 # limitations under the License.
 #
 
-load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
-
 # Internal-only implementation classes for Abseil Random
 load(
     "//absl:copts/configure_copts.bzl",
@@ -82,6 +80,7 @@ cc_library(
     deps = [
         ":fast_uniform_bits",
         "//absl/base:core_headers",
+        "//absl/base:dynamic_annotations",
         "//absl/base:raw_logging_internal",
         "//absl/strings",
         "//absl/types:optional",
@@ -296,6 +295,8 @@ cc_library(
         ":platform",
         "//absl/base:config",
         "//absl/base:core_headers",
+        "//absl/base:endian",
+        "//absl/numeric:int128",
     ],
 )
 
@@ -336,6 +337,7 @@ cc_library(
         ":platform",
         "//absl/base:config",
         "//absl/base:core_headers",
+        "//absl/numeric:int128",
     ],
 )
 
@@ -622,7 +624,7 @@ cc_test(
     name = "randen_hwaes_test",
     size = "small",
     srcs = ["randen_hwaes_test.cc"],
-    copts = ABSL_TEST_COPTS,
+    copts = ABSL_TEST_COPTS + ABSL_RANDOM_RANDEN_COPTS,
     linkopts = ABSL_DEFAULT_LINKOPTS,
     tags = ABSL_RANDOM_NONPORTABLE_TAGS,
     deps = [
@@ -717,7 +719,6 @@ cc_test(
 
 cc_test(
     name = "iostream_state_saver_test",
-    size = "small",
     srcs = ["iostream_state_saver_test.cc"],
     linkopts = ABSL_DEFAULT_LINKOPTS,
     deps = [

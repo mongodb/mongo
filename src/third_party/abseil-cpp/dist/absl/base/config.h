@@ -66,6 +66,35 @@
 #include "absl/base/options.h"
 #include "absl/base/policy_checks.h"
 
+// Abseil long-term support (LTS) releases will define
+// `ABSL_LTS_RELEASE_VERSION` to the integer representing the date string of the
+// LTS release version, and will define `ABSL_LTS_RELEASE_PATCH_LEVEL` to the
+// integer representing the patch-level for that release.
+//
+// For example, for LTS release version "20300401.2", this would give us
+// ABSL_LTS_RELEASE_VERSION == 20300401 && ABSL_LTS_RELEASE_PATCH_LEVEL == 2
+//
+// These symbols will not be defined in non-LTS code.
+//
+// Abseil recommends that clients live-at-head. Therefore, if you are using
+// these symbols to assert a minimum version requirement, we recommend you do it
+// as
+//
+// #if defined(ABSL_LTS_RELEASE_VERSION) && ABSL_LTS_RELEASE_VERSION < 20300401
+// #error Project foo requires Abseil LTS version >= 20300401
+// #endif
+//
+// The `defined(ABSL_LTS_RELEASE_VERSION)` part of the check excludes
+// live-at-head clients from the minimum version assertion.
+//
+// See https://abseil.io/about/releases for more information on Abseil release
+// management.
+//
+// LTS releases can be obtained from
+// https://github.com/abseil/abseil-cpp/releases.
+#define ABSL_LTS_RELEASE_VERSION 20211102
+#define ABSL_LTS_RELEASE_PATCH_LEVEL 0
+
 // Helper macro to convert a CPP variable to a string literal.
 #define ABSL_INTERNAL_DO_TOKEN_STR(x) #x
 #define ABSL_INTERNAL_TOKEN_STR(x) ABSL_INTERNAL_DO_TOKEN_STR(x)
@@ -166,6 +195,22 @@ static_assert(ABSL_INTERNAL_INLINE_NAMESPACE_STR[0] != 'h' ||
 #define ABSL_HAVE_FEATURE(f) 0
 #endif
 
+// Portable check for GCC minimum version:
+// https://gcc.gnu.org/onlinedocs/cpp/Common-Predefined-Macros.html
+#if defined(__GNUC__) && defined(__GNUC_MINOR__)
+#define ABSL_INTERNAL_HAVE_MIN_GNUC_VERSION(x, y) \
+  (__GNUC__ > (x) || __GNUC__ == (x) && __GNUC_MINOR__ >= (y))
+#else
+#define ABSL_INTERNAL_HAVE_MIN_GNUC_VERSION(x, y) 0
+#endif
+
+#if defined(__clang__) && defined(__clang_major__) && defined(__clang_minor__)
+#define ABSL_INTERNAL_HAVE_MIN_CLANG_VERSION(x, y) \
+  (__clang_major__ > (x) || __clang_major__ == (x) && __clang_minor__ >= (y))
+#else
+#define ABSL_INTERNAL_HAVE_MIN_CLANG_VERSION(x, y) 0
+#endif
+
 // ABSL_HAVE_TLS is defined to 1 when __thread should be supported.
 // We assume __thread is supported on Linux when compiled with Clang or compiled
 // against libstdc++ with _GLIBCXX_HAVE_TLS defined.
@@ -183,10 +228,9 @@ static_assert(ABSL_INTERNAL_INLINE_NAMESPACE_STR[0] != 'h' ||
 // gcc >= 4.8.1 using libstdc++, and Visual Studio.
 #ifdef ABSL_HAVE_STD_IS_TRIVIALLY_DESTRUCTIBLE
 #error ABSL_HAVE_STD_IS_TRIVIALLY_DESTRUCTIBLE cannot be directly set
-#elif defined(_LIBCPP_VERSION) ||                                        \
-    (!defined(__clang__) && defined(__GNUC__) && defined(__GLIBCXX__) && \
-     (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 8))) ||        \
-    defined(_MSC_VER)
+#elif defined(_LIBCPP_VERSION) || defined(_MSC_VER) || \
+    (!defined(__clang__) && defined(__GLIBCXX__) &&    \
+     ABSL_INTERNAL_HAVE_MIN_GNUC_VERSION(4, 8))
 #define ABSL_HAVE_STD_IS_TRIVIALLY_DESTRUCTIBLE 1
 #endif
 
@@ -199,16 +243,17 @@ static_assert(ABSL_INTERNAL_INLINE_NAMESPACE_STR[0] != 'h' ||
 //
 // Checks whether `std::is_trivially_copy_assignable<T>` is supported.
 
-// Notes: Clang with libc++ supports these features, as does gcc >= 5.1 with
-// either libc++ or libstdc++, and Visual Studio (but not NVCC).
+// Notes: Clang with libc++ supports these features, as does gcc >= 7.4 with
+// libstdc++, or gcc >= 8.2 with libc++, and Visual Studio (but not NVCC).
 #if defined(ABSL_HAVE_STD_IS_TRIVIALLY_CONSTRUCTIBLE)
 #error ABSL_HAVE_STD_IS_TRIVIALLY_CONSTRUCTIBLE cannot be directly set
 #elif defined(ABSL_HAVE_STD_IS_TRIVIALLY_ASSIGNABLE)
 #error ABSL_HAVE_STD_IS_TRIVIALLY_ASSIGNABLE cannot directly set
-#elif (defined(__clang__) && defined(_LIBCPP_VERSION)) ||        \
-    (!defined(__clang__) && defined(__GNUC__) &&                 \
-     (__GNUC__ > 7 || (__GNUC__ == 7 && __GNUC_MINOR__ >= 4)) && \
-     (defined(_LIBCPP_VERSION) || defined(__GLIBCXX__))) ||      \
+#elif (defined(__clang__) && defined(_LIBCPP_VERSION)) ||                    \
+    (!defined(__clang__) &&                                                  \
+     ((ABSL_INTERNAL_HAVE_MIN_GNUC_VERSION(7, 4) && defined(__GLIBCXX__)) || \
+      (ABSL_INTERNAL_HAVE_MIN_GNUC_VERSION(8, 2) &&                          \
+       defined(_LIBCPP_VERSION)))) ||                                        \
     (defined(_MSC_VER) && !defined(__NVCC__))
 #define ABSL_HAVE_STD_IS_TRIVIALLY_CONSTRUCTIBLE 1
 #define ABSL_HAVE_STD_IS_TRIVIALLY_ASSIGNABLE 1
@@ -222,7 +267,7 @@ static_assert(ABSL_INTERNAL_INLINE_NAMESPACE_STR[0] != 'h' ||
 #if ABSL_INTERNAL_HAS_KEYWORD(__builtin_LINE) && \
     ABSL_INTERNAL_HAS_KEYWORD(__builtin_FILE)
 #define ABSL_HAVE_SOURCE_LOCATION_CURRENT 1
-#elif defined(__GNUC__) && __GNUC__ >= 5
+#elif ABSL_INTERNAL_HAVE_MIN_GNUC_VERSION(5, 0)
 #define ABSL_HAVE_SOURCE_LOCATION_CURRENT 1
 #endif
 #endif
@@ -319,25 +364,21 @@ static_assert(ABSL_INTERNAL_INLINE_NAMESPACE_STR[0] != 'h' ||
 // For further details, consult the compiler's documentation.
 #ifdef ABSL_HAVE_EXCEPTIONS
 #error ABSL_HAVE_EXCEPTIONS cannot be directly set.
-
-#elif defined(__clang__)
-
-#if __clang_major__ > 3 || (__clang_major__ == 3 && __clang_minor__ >= 6)
+#elif ABSL_INTERNAL_HAVE_MIN_CLANG_VERSION(3, 6)
 // Clang >= 3.6
 #if ABSL_HAVE_FEATURE(cxx_exceptions)
 #define ABSL_HAVE_EXCEPTIONS 1
 #endif  // ABSL_HAVE_FEATURE(cxx_exceptions)
-#else
+#elif defined(__clang__)
 // Clang < 3.6
 // http://releases.llvm.org/3.6.0/tools/clang/docs/ReleaseNotes.html#the-exceptions-macro
 #if defined(__EXCEPTIONS) && ABSL_HAVE_FEATURE(cxx_exceptions)
 #define ABSL_HAVE_EXCEPTIONS 1
 #endif  // defined(__EXCEPTIONS) && ABSL_HAVE_FEATURE(cxx_exceptions)
-#endif  // __clang_major__ > 3 || (__clang_major__ == 3 && __clang_minor__ >= 6)
-
 // Handle remaining special cases and default to exceptions being supported.
-#elif !(defined(__GNUC__) && (__GNUC__ < 5) && !defined(__EXCEPTIONS)) &&    \
-    !(defined(__GNUC__) && (__GNUC__ >= 5) && !defined(__cpp_exceptions)) && \
+#elif !(defined(__GNUC__) && (__GNUC__ < 5) && !defined(__EXCEPTIONS)) && \
+    !(ABSL_INTERNAL_HAVE_MIN_GNUC_VERSION(5, 0) &&                        \
+      !defined(__cpp_exceptions)) &&                                      \
     !(defined(_MSC_VER) && !defined(_CPPUNWIND))
 #define ABSL_HAVE_EXCEPTIONS 1
 #endif
@@ -369,10 +410,11 @@ static_assert(ABSL_INTERNAL_INLINE_NAMESPACE_STR[0] != 'h' ||
 // POSIX.1-2001.
 #ifdef ABSL_HAVE_MMAP
 #error ABSL_HAVE_MMAP cannot be directly set
-#elif defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__) ||   \
-    defined(__ros__) || defined(__native_client__) || defined(__asmjs__) || \
-    defined(__wasm__) || defined(__Fuchsia__) || defined(__sun) || \
-    defined(__ASYLO__) || defined(__myriad2__)
+#elif defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__) || \
+    defined(_AIX) || defined(__ros__) || defined(__native_client__) ||    \
+    defined(__asmjs__) || defined(__wasm__) || defined(__Fuchsia__) ||    \
+    defined(__sun) || defined(__ASYLO__) || defined(__myriad2__) ||       \
+    defined(__HAIKU__)
 #define ABSL_HAVE_MMAP 1
 #endif
 
@@ -383,7 +425,7 @@ static_assert(ABSL_INTERNAL_INLINE_NAMESPACE_STR[0] != 'h' ||
 #ifdef ABSL_HAVE_PTHREAD_GETSCHEDPARAM
 #error ABSL_HAVE_PTHREAD_GETSCHEDPARAM cannot be directly set
 #elif defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__) || \
-    defined(__ros__)
+    defined(_AIX) || defined(__ros__)
 #define ABSL_HAVE_PTHREAD_GETSCHEDPARAM 1
 #endif
 
@@ -690,10 +732,6 @@ static_assert(ABSL_INTERNAL_INLINE_NAMESPACE_STR[0] != 'h' ||
 // a compiler instrumentation module and a run-time library.
 #ifdef ABSL_HAVE_MEMORY_SANITIZER
 #error "ABSL_HAVE_MEMORY_SANITIZER cannot be directly set."
-#elif defined(MEMORY_SANITIZER)
-// The MEMORY_SANITIZER macro is deprecated but we will continue to honor it
-// for now.
-#define ABSL_HAVE_MEMORY_SANITIZER 1
 #elif defined(__SANITIZE_MEMORY__)
 #define ABSL_HAVE_MEMORY_SANITIZER 1
 #elif !defined(__native_client__) && ABSL_HAVE_FEATURE(memory_sanitizer)
@@ -705,10 +743,6 @@ static_assert(ABSL_INTERNAL_INLINE_NAMESPACE_STR[0] != 'h' ||
 // ThreadSanitizer (TSan) is a fast data race detector.
 #ifdef ABSL_HAVE_THREAD_SANITIZER
 #error "ABSL_HAVE_THREAD_SANITIZER cannot be directly set."
-#elif defined(THREAD_SANITIZER)
-// The THREAD_SANITIZER macro is deprecated but we will continue to honor it
-// for now.
-#define ABSL_HAVE_THREAD_SANITIZER 1
 #elif defined(__SANITIZE_THREAD__)
 #define ABSL_HAVE_THREAD_SANITIZER 1
 #elif ABSL_HAVE_FEATURE(thread_sanitizer)
@@ -720,10 +754,6 @@ static_assert(ABSL_INTERNAL_INLINE_NAMESPACE_STR[0] != 'h' ||
 // AddressSanitizer (ASan) is a fast memory error detector.
 #ifdef ABSL_HAVE_ADDRESS_SANITIZER
 #error "ABSL_HAVE_ADDRESS_SANITIZER cannot be directly set."
-#elif defined(ADDRESS_SANITIZER)
-// The ADDRESS_SANITIZER macro is deprecated but we will continue to honor it
-// for now.
-#define ABSL_HAVE_ADDRESS_SANITIZER 1
 #elif defined(__SANITIZE_ADDRESS__)
 #define ABSL_HAVE_ADDRESS_SANITIZER 1
 #elif ABSL_HAVE_FEATURE(address_sanitizer)

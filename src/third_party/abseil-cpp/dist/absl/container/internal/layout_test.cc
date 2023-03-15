@@ -1350,7 +1350,13 @@ TEST(Layout, CustomAlignment) {
 TEST(Layout, OverAligned) {
   constexpr size_t M = alignof(max_align_t);
   constexpr Layout<unsigned char, Aligned<unsigned char, 2 * M>> x(1, 3);
+#ifdef __GNUC__
+  // Using __attribute__ ((aligned ())) instead of alignas to bypass a gcc bug:
+  // https://gcc.gnu.org/bugzilla/show_bug.cgi?id=89357
+  __attribute__((aligned(2 * M))) unsigned char p[x.AllocSize()];
+#else
   alignas(2 * M) unsigned char p[x.AllocSize()];
+#endif
   EXPECT_EQ(2 * M + 3, x.AllocSize());
   EXPECT_THAT(x.Pointers(p), Tuple(p + 0, p + 2 * M));
 }

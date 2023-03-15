@@ -16,6 +16,7 @@
 #include <cstdlib>
 #include <utility>
 
+#include "absl/base/call_once.h"
 #include "absl/base/internal/raw_logging.h"
 #include "absl/status/status.h"
 #include "absl/strings/str_cat.h"
@@ -26,12 +27,43 @@ ABSL_NAMESPACE_BEGIN
 BadStatusOrAccess::BadStatusOrAccess(absl::Status status)
     : status_(std::move(status)) {}
 
-BadStatusOrAccess::~BadStatusOrAccess() = default;
+BadStatusOrAccess::BadStatusOrAccess(const BadStatusOrAccess& other)
+    : status_(other.status_) {}
+
+BadStatusOrAccess& BadStatusOrAccess::operator=(
+    const BadStatusOrAccess& other) {
+  // Ensure assignment is correct regardless of whether this->InitWhat() has
+  // already been called.
+  other.InitWhat();
+  status_ = other.status_;
+  what_ = other.what_;
+  return *this;
+}
+
+BadStatusOrAccess& BadStatusOrAccess::operator=(BadStatusOrAccess&& other) {
+  // Ensure assignment is correct regardless of whether this->InitWhat() has
+  // already been called.
+  other.InitWhat();
+  status_ = std::move(other.status_);
+  what_ = std::move(other.what_);
+  return *this;
+}
+
+BadStatusOrAccess::BadStatusOrAccess(BadStatusOrAccess&& other)
+    : status_(std::move(other.status_)) {}
+
 const char* BadStatusOrAccess::what() const noexcept {
-  return "Bad StatusOr access";
+  InitWhat();
+  return what_.c_str();
 }
 
 const absl::Status& BadStatusOrAccess::status() const { return status_; }
+
+void BadStatusOrAccess::InitWhat() const {
+  absl::call_once(init_what_, [this] {
+    what_ = absl::StrCat("Bad StatusOr access: ", status_.ToString());
+  });
+}
 
 namespace internal_statusor {
 

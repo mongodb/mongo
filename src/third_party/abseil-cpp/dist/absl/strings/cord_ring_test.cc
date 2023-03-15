@@ -31,9 +31,6 @@
 
 extern thread_local bool cord_ring;
 
-// TOOD(b/177688959): weird things happened with the original test
-#define ASAN_BUG_177688959_FIXED false
-
 namespace absl {
 ABSL_NAMESPACE_BEGIN
 namespace {
@@ -101,15 +98,22 @@ using TestParams = std::vector<TestParam>;
 // Matcher validating when mutable copies are required / performed.
 MATCHER_P2(EqIfPrivate, param, rep,
            absl::StrCat("Equal 0x", absl::Hex(rep), " if private")) {
-  return param.refcount_is_one ? arg == rep : arg != rep;
+  return param.refcount_is_one ? arg == rep : true;
 }
 
 // Matcher validating when mutable copies are required / performed.
 MATCHER_P2(EqIfPrivateAndCapacity, param, rep,
            absl::StrCat("Equal 0x", absl::Hex(rep),
                         " if private and capacity")) {
-  return (param.refcount_is_one && param.with_capacity) ? arg == rep
-                                                        : arg != rep;
+  return (param.refcount_is_one && param.with_capacity) ? arg == rep : true;
+}
+
+// Matcher validating a shared ring was re-allocated. Should only be used for
+// tests doing exactly one update as subsequent updates could return the
+// original (freed and re-used) pointer.
+MATCHER_P2(NeIfShared, param, rep,
+           absl::StrCat("Not equal 0x", absl::Hex(rep), " if shared")) {
+  return param.refcount_is_one ? true : arg != rep;
 }
 
 MATCHER_P2(EqIfInputPrivate, param, rep, "Equal if input is private") {
@@ -219,7 +223,7 @@ CordRepExternal* MakeFakeExternal(size_t length) {
     std::string s;
     explicit Rep(size_t len) {
       this->tag = EXTERNAL;
-      this->base = this->storage;
+      this->base = reinterpret_cast<const char*>(this->storage);
       this->length = len;
       this->releaser_invoker = [](CordRepExternal* self) {
         delete static_cast<Rep*>(self);
@@ -271,7 +275,7 @@ CordRepConcat* MakeConcat(CordRep* left, CordRep* right, int depth = 0) {
 enum Composition { kMix, kAppend, kPrepend };
 
 Composition RandomComposition() {
-  RandomEngine rng(testing::GTEST_FLAG(random_seed));
+  RandomEngine rng(GTEST_FLAG_GET(random_seed));
   return (rng() & 1) ? kMix : ((rng() & 1) ? kAppend : kPrepend);
 }
 
@@ -340,19 +344,15 @@ std::string TestParamToString(const testing::TestParamInfo<TestParam>& info) {
 class CordRingTest : public testing::Test {
  public:
   ~CordRingTest() override {
-#if ASAN_BUG_177688959_FIXED
     for (CordRep* rep : unrefs_) {
       CordRep::Unref(rep);
     }
-#endif
   }
 
   template <typename CordRepType>
   CordRepType* NeedsUnref(CordRepType* rep) {
     assert(rep);
-#if ASAN_BUG_177688959_FIXED
     unrefs_.push_back(rep);
-#endif
     return rep;
   }
 
@@ -362,26 +362,16 @@ class CordRingTest : public testing::Test {
     return NeedsUnref(rep);
   }
 
-  void Unref(CordRep* rep) {
-#if !ASAN_BUG_177688959_FIXED
-    CordRep::Unref(rep);
-#endif
-  }
-
  private:
-#if ASAN_BUG_177688959_FIXED
   std::vector<CordRep*> unrefs_;
-#endif
 };
 
 class CordRingTestWithParam : public testing::TestWithParam<TestParam> {
  public:
   ~CordRingTestWithParam() override {
-#if ASAN_BUG_177688959_FIXED
     for (CordRep* rep : unrefs_) {
       CordRep::Unref(rep);
     }
-#endif
   }
 
   CordRepRing* CreateWithCapacity(CordRep* child, size_t extra_capacity) {
@@ -400,9 +390,7 @@ class CordRingTestWithParam : public testing::TestWithParam<TestParam> {
   template <typename CordRepType>
   CordRepType* NeedsUnref(CordRepType* rep) {
     assert(rep);
-#if ASAN_BUG_177688959_FIXED
     unrefs_.push_back(rep);
-#endif
     return rep;
   }
 
@@ -412,19 +400,9 @@ class CordRingTestWithParam : public testing::TestWithParam<TestParam> {
     return NeedsUnref(rep);
   }
 
-  void Unref(CordRep* rep) {
-#if !ASAN_BUG_177688959_FIXED
-    CordRep::Unref(rep);
-#endif
-  }
-
   template <typename CordRepType>
   CordRepType* RefIfShared(CordRepType* rep) {
     return Shared() ? Ref(rep) : rep;
-  }
-
-  void UnrefIfShared(CordRep* rep) {
-    if (Shared()) Unref(rep);
   }
 
   template <typename CordRepType>
@@ -432,23 +410,13 @@ class CordRingTestWithParam : public testing::TestWithParam<TestParam> {
     return InputShared() ? Ref(rep) : rep;
   }
 
-  void UnrefIfInputShared(CordRep* rep) {
-    if (InputShared()) Unref(rep);
-  }
-
   template <typename CordRepType>
   CordRepType* RefIfInputSharedIndirect(CordRepType* rep) {
     return InputSharedIndirect() ? Ref(rep) : rep;
   }
 
-  void UnrefIfInputSharedIndirect(CordRep* rep) {
-    if (InputSharedIndirect()) Unref(rep);
-  }
-
  private:
-#if ASAN_BUG_177688959_FIXED
   std::vector<CordRep*> unrefs_;
-#endif
 };
 
 class CordRingCreateTest : public CordRingTestWithParam {
@@ -520,26 +488,26 @@ class CordRingBuildInputTest : public CordRingTestWithParam {
   }
 };
 
-INSTANTIATE_TEST_CASE_P(WithParam, CordRingSubTest,
-                        testing::ValuesIn(CordRingSubTest::CreateTestParams()),
-                        TestParamToString);
+INSTANTIATE_TEST_SUITE_P(WithParam, CordRingSubTest,
+                         testing::ValuesIn(CordRingSubTest::CreateTestParams()),
+                         TestParamToString);
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     WithParam, CordRingCreateTest,
     testing::ValuesIn(CordRingCreateTest::CreateTestParams()),
     TestParamToString);
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     WithParam, CordRingCreateFromTreeTest,
     testing::ValuesIn(CordRingCreateFromTreeTest::CreateTestParams()),
     TestParamToString);
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     WithParam, CordRingBuildTest,
     testing::ValuesIn(CordRingBuildTest::CreateTestParams()),
     TestParamToString);
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     WithParam, CordRingBuildInputTest,
     testing::ValuesIn(CordRingBuildInputTest::CreateTestParams()),
     TestParamToString);
@@ -550,7 +518,6 @@ TEST_P(CordRingCreateTest, CreateFromFlat) {
   ASSERT_THAT(result, IsValidRingBuffer());
   EXPECT_THAT(result->length, Eq(str1.size()));
   EXPECT_THAT(ToFlats(result), ElementsAre(str1));
-  Unref(result);
 }
 
 TEST_P(CordRingCreateTest, CreateFromRing) {
@@ -558,9 +525,8 @@ TEST_P(CordRingCreateTest, CreateFromRing) {
   CordRepRing* result = NeedsUnref(CordRepRing::Create(ring));
   ASSERT_THAT(result, IsValidRingBuffer());
   EXPECT_THAT(result, EqIfPrivate(GetParam(), ring));
+  EXPECT_THAT(result, NeIfShared(GetParam(), ring));
   EXPECT_THAT(ToFlats(result), ElementsAreArray(kFoxFlats));
-  UnrefIfShared(ring);
-  Unref(result);
 }
 
 TEST_P(CordRingCreateFromTreeTest, CreateFromSubstringRing) {
@@ -570,23 +536,20 @@ TEST_P(CordRingCreateFromTreeTest, CreateFromSubstringRing) {
   ASSERT_THAT(result, IsValidRingBuffer());
   EXPECT_THAT(result, EqIfInputPrivate(GetParam(), ring));
   EXPECT_THAT(ToString(result), string_view(kFox).substr(2, 11));
-  UnrefIfInputSharedIndirect(ring);
-  UnrefIfInputShared(sub);
-  Unref(result);
 }
 
 TEST_F(CordRingTest, CreateWithIllegalExtraCapacity) {
-  CordRep* flat = NeedsUnref(MakeFlat("Hello world"));
 #if defined(ABSL_HAVE_EXCEPTIONS)
+  CordRep* flat = NeedsUnref(MakeFlat("Hello world"));
   try {
     CordRepRing::Create(flat, CordRepRing::kMaxCapacity);
     GTEST_FAIL() << "expected std::length_error exception";
   } catch (const std::length_error&) {
   }
 #elif defined(GTEST_HAS_DEATH_TEST)
+  CordRep* flat = NeedsUnref(MakeFlat("Hello world"));
   EXPECT_DEATH(CordRepRing::Create(flat, CordRepRing::kMaxCapacity), ".*");
 #endif
-  Unref(flat);
 }
 
 TEST_P(CordRingCreateFromTreeTest, CreateFromSubstringOfFlat) {
@@ -597,9 +560,6 @@ TEST_P(CordRingCreateFromTreeTest, CreateFromSubstringOfFlat) {
   ASSERT_THAT(result, IsValidRingBuffer());
   EXPECT_THAT(result->length, Eq(20));
   EXPECT_THAT(ToFlats(result), ElementsAre(str1.substr(4, 20)));
-  Unref(result);
-  UnrefIfInputShared(flat);
-  UnrefIfInputSharedIndirect(child);
 }
 
 TEST_P(CordRingCreateTest, CreateFromExternal) {
@@ -609,8 +569,6 @@ TEST_P(CordRingCreateTest, CreateFromExternal) {
   ASSERT_THAT(result, IsValidRingBuffer());
   EXPECT_THAT(result->length, Eq(str1.size()));
   EXPECT_THAT(ToFlats(result), ElementsAre(str1));
-  Unref(result);
-  UnrefIfInputShared(child);
 }
 
 TEST_P(CordRingCreateFromTreeTest, CreateFromSubstringOfExternal) {
@@ -621,9 +579,6 @@ TEST_P(CordRingCreateFromTreeTest, CreateFromSubstringOfExternal) {
   ASSERT_THAT(result, IsValidRingBuffer());
   EXPECT_THAT(result->length, Eq(24));
   EXPECT_THAT(ToFlats(result), ElementsAre(str1.substr(1, 24)));
-  Unref(result);
-  UnrefIfInputShared(external);
-  UnrefIfInputSharedIndirect(child);
 }
 
 TEST_P(CordRingCreateFromTreeTest, CreateFromSubstringOfLargeExternal) {
@@ -637,9 +592,6 @@ TEST_P(CordRingCreateFromTreeTest, CreateFromSubstringOfLargeExternal) {
   ASSERT_THAT(result, IsValidRingBuffer());
   EXPECT_THAT(result->length, Eq(str.size()));
   EXPECT_THAT(ToRawFlats(result), ElementsAre(str));
-  Unref(result);
-  UnrefIfInputShared(external);
-  UnrefIfInputSharedIndirect(child);
 }
 
 TEST_P(CordRingBuildInputTest, CreateFromConcat) {
@@ -652,10 +604,6 @@ TEST_P(CordRingBuildInputTest, CreateFromConcat) {
   ASSERT_THAT(result, IsValidRingBuffer());
   EXPECT_THAT(result->length, Eq(26));
   EXPECT_THAT(ToString(result), Eq(kAlphabet));
-  UnrefIfInputSharedIndirect(flats[0]);
-  UnrefIfInputSharedIndirect(flats[3]);
-  UnrefIfInputShared(concat);
-  Unref(result);
 }
 
 TEST_P(CordRingBuildInputTest, CreateFromSubstringConcat) {
@@ -671,10 +619,6 @@ TEST_P(CordRingBuildInputTest, CreateFromSubstringConcat) {
       ASSERT_THAT(result, IsValidRingBuffer());
       ASSERT_THAT(result->length, Eq(len));
       ASSERT_THAT(ToString(result), string_view(kAlphabet).substr(off, len));
-      UnrefIfInputSharedIndirect(flats[0]);
-      UnrefIfInputSharedIndirect(flats[3]);
-      UnrefIfInputShared(child);
-      Unref(result);
     }
   }
 }
@@ -689,7 +633,6 @@ TEST_P(CordRingCreateTest, Properties) {
   EXPECT_THAT(result->capacity(), Le(2 * 120 + 1));
   EXPECT_THAT(result->entries(), Eq(1));
   EXPECT_THAT(result->begin_pos(), Eq(0));
-  Unref(result);
 }
 
 TEST_P(CordRingCreateTest, EntryForNewFlat) {
@@ -700,7 +643,6 @@ TEST_P(CordRingCreateTest, EntryForNewFlat) {
   EXPECT_THAT(result->entry_child(0), Eq(child));
   EXPECT_THAT(result->entry_end_pos(0), Eq(str1.length()));
   EXPECT_THAT(result->entry_data_offset(0), Eq(0));
-  Unref(result);
 }
 
 TEST_P(CordRingCreateTest, EntryForNewFlatSubstring) {
@@ -712,7 +654,6 @@ TEST_P(CordRingCreateTest, EntryForNewFlatSubstring) {
   EXPECT_THAT(result->entry_child(0), Eq(child));
   EXPECT_THAT(result->entry_end_pos(0), Eq(26));
   EXPECT_THAT(result->entry_data_offset(0), Eq(10));
-  Unref(result);
 }
 
 TEST_P(CordRingBuildTest, AppendFlat) {
@@ -722,10 +663,9 @@ TEST_P(CordRingBuildTest, AppendFlat) {
   CordRepRing* result = NeedsUnref(CordRepRing::Append(ring, MakeFlat(str2)));
   ASSERT_THAT(result, IsValidRingBuffer());
   EXPECT_THAT(result, EqIfPrivateAndCapacity(GetParam(), ring));
+  EXPECT_THAT(result, NeIfShared(GetParam(), ring));
   EXPECT_THAT(result->length, Eq(str1.size() + str2.size()));
   EXPECT_THAT(ToFlats(result), ElementsAre(str1, str2));
-  UnrefIfShared(ring);
-  Unref(result);
 }
 
 TEST_P(CordRingBuildTest, PrependFlat) {
@@ -735,10 +675,9 @@ TEST_P(CordRingBuildTest, PrependFlat) {
   CordRepRing* result = NeedsUnref(CordRepRing::Prepend(ring, MakeFlat(str2)));
   ASSERT_THAT(result, IsValidRingBuffer());
   EXPECT_THAT(result, EqIfPrivateAndCapacity(GetParam(), ring));
+  EXPECT_THAT(result, NeIfShared(GetParam(), ring));
   EXPECT_THAT(result->length, Eq(str1.size() + str2.size()));
   EXPECT_THAT(ToFlats(result), ElementsAre(str2, str1));
-  UnrefIfShared(ring);
-  Unref(result);
 }
 
 TEST_P(CordRingBuildTest, AppendString) {
@@ -748,10 +687,9 @@ TEST_P(CordRingBuildTest, AppendString) {
   CordRepRing* result = NeedsUnref(CordRepRing::Append(ring, str2));
   ASSERT_THAT(result, IsValidRingBuffer());
   EXPECT_THAT(result, EqIfPrivateAndCapacity(GetParam(), ring));
+  EXPECT_THAT(result, NeIfShared(GetParam(), ring));
   EXPECT_THAT(result->length, Eq(str1.size() + str2.size()));
   EXPECT_THAT(ToFlats(result), ElementsAre(str1, str2));
-  UnrefIfShared(ring);
-  Unref(result);
 }
 
 TEST_P(CordRingBuildTest, AppendStringHavingExtra) {
@@ -762,8 +700,7 @@ TEST_P(CordRingBuildTest, AppendStringHavingExtra) {
   ASSERT_THAT(result, IsValidRingBuffer());
   EXPECT_THAT(result->length, Eq(str1.size() + str2.size()));
   EXPECT_THAT(result, EqIfPrivate(GetParam(), ring));
-  UnrefIfShared(ring);
-  Unref(result);
+  EXPECT_THAT(result, NeIfShared(GetParam(), ring));
 }
 
 TEST_P(CordRingBuildTest, AppendStringHavingPartialExtra) {
@@ -785,13 +722,12 @@ TEST_P(CordRingBuildTest, AppendStringHavingPartialExtra) {
   ASSERT_THAT(result, IsValidRingBuffer());
   EXPECT_THAT(result->length, Eq(str1.size() + str2.size()));
   EXPECT_THAT(result, EqIfPrivateAndCapacity(GetParam(), ring));
+  EXPECT_THAT(result, NeIfShared(GetParam(), ring));
   if (GetParam().refcount_is_one) {
     EXPECT_THAT(ToFlats(result), ElementsAre(StrCat(str1, str1a), str2a));
   } else {
     EXPECT_THAT(ToFlats(result), ElementsAre(str1, str2));
   }
-  UnrefIfShared(ring);
-  Unref(result);
 }
 
 TEST_P(CordRingBuildTest, AppendStringHavingExtraInSubstring) {
@@ -802,14 +738,13 @@ TEST_P(CordRingBuildTest, AppendStringHavingExtraInSubstring) {
   CordRepRing* result = NeedsUnref(CordRepRing::Append(ring, str2));
   ASSERT_THAT(result, IsValidRingBuffer());
   EXPECT_THAT(result, EqIfPrivate(GetParam(), ring));
+  EXPECT_THAT(result, NeIfShared(GetParam(), ring));
   EXPECT_THAT(result->length, Eq(4 + str2.size()));
   if (GetParam().refcount_is_one) {
     EXPECT_THAT(ToFlats(result), ElementsAre(StrCat("1234", str2)));
   } else {
     EXPECT_THAT(ToFlats(result), ElementsAre("1234", str2));
   }
-  UnrefIfShared(ring);
-  Unref(result);
 }
 
 TEST_P(CordRingBuildTest, AppendStringHavingSharedExtra) {
@@ -837,10 +772,9 @@ TEST_P(CordRingBuildTest, AppendStringHavingSharedExtra) {
     CordRepRing* result = NeedsUnref(CordRepRing::Append(ring, str2));
     ASSERT_THAT(result, IsValidRingBuffer());
     EXPECT_THAT(result, EqIfPrivateAndCapacity(GetParam(), ring));
+    EXPECT_THAT(result, NeIfShared(GetParam(), ring));
     EXPECT_THAT(result->length, Eq(4 + str2.size()));
     EXPECT_THAT(ToFlats(result), ElementsAre("1234", str2));
-    UnrefIfShared(ring);
-    Unref(result);
 
     CordRep::Unref(shared_type == 1 ? flat1 : flat);
   }
@@ -857,8 +791,6 @@ TEST_P(CordRingBuildTest, AppendStringWithExtra) {
   EXPECT_THAT(result->length, Eq(str1.size() + str2.size() + str3.size()));
   EXPECT_THAT(result, EqIfPrivateAndCapacity(GetParam(), ring));
   EXPECT_THAT(ToFlats(result), ElementsAre(str1, StrCat(str2, str3)));
-  UnrefIfShared(ring);
-  Unref(result);
 }
 
 TEST_P(CordRingBuildTest, PrependString) {
@@ -875,8 +807,6 @@ TEST_P(CordRingBuildTest, PrependString) {
   }
   EXPECT_THAT(result->length, Eq(str1.size() + str2.size()));
   EXPECT_THAT(ToFlats(result), ElementsAre(str2, str1));
-  UnrefIfShared(ring);
-  Unref(result);
 }
 
 TEST_P(CordRingBuildTest, PrependStringHavingExtra) {
@@ -887,14 +817,13 @@ TEST_P(CordRingBuildTest, PrependStringHavingExtra) {
   CordRepRing* result = NeedsUnref(CordRepRing::Prepend(ring, str2));
   ASSERT_THAT(result, IsValidRingBuffer());
   EXPECT_THAT(result, EqIfPrivate(GetParam(), ring));
+  EXPECT_THAT(result, NeIfShared(GetParam(), ring));
   EXPECT_THAT(result->length, Eq(4 + str2.size()));
   if (GetParam().refcount_is_one) {
     EXPECT_THAT(ToFlats(result), ElementsAre(StrCat(str2, "1234")));
   } else {
     EXPECT_THAT(ToFlats(result), ElementsAre(str2, "1234"));
   }
-  UnrefIfShared(ring);
-  Unref(result);
 }
 
 TEST_P(CordRingBuildTest, PrependStringHavingSharedExtra) {
@@ -920,9 +849,8 @@ TEST_P(CordRingBuildTest, PrependStringHavingSharedExtra) {
     ASSERT_THAT(result, IsValidRingBuffer());
     EXPECT_THAT(result->length, Eq(str1a.size() + str2.size()));
     EXPECT_THAT(result, EqIfPrivateAndCapacity(GetParam(), ring));
+    EXPECT_THAT(result, NeIfShared(GetParam(), ring));
     EXPECT_THAT(ToFlats(result), ElementsAre(str2, str1a));
-    UnrefIfShared(ring);
-    Unref(result);
     CordRep::Unref(shared_type == 1 ? flat1 : flat);
   }
 }
@@ -938,8 +866,6 @@ TEST_P(CordRingBuildTest, PrependStringWithExtra) {
   EXPECT_THAT(result->length, Eq(str1.size() + str2.size() + str3.size()));
   EXPECT_THAT(result, EqIfPrivateAndCapacity(GetParam(), ring));
   EXPECT_THAT(ToFlats(result), ElementsAre(StrCat(str3, str2), str1));
-  UnrefIfShared(ring);
-  Unref(result);
 }
 
 TEST_P(CordRingBuildTest, AppendPrependStringMix) {
@@ -950,12 +876,10 @@ TEST_P(CordRingBuildTest, AppendPrependStringMix) {
     result = CordRepRing::Prepend(result, flats[4 - i]);
     result = CordRepRing::Append(result, flats[4 + i]);
   }
-  UnrefIfShared(ring);
   NeedsUnref(result);
   ASSERT_THAT(result, IsValidRingBuffer());
   EXPECT_THAT(result, EqIfPrivateAndCapacity(GetParam(), ring));
   EXPECT_THAT(ToString(result), kFox);
-  Unref(result);
 }
 
 TEST_P(CordRingBuildTest, AppendPrependStringMixWithExtra) {
@@ -976,8 +900,6 @@ TEST_P(CordRingBuildTest, AppendPrependStringMixWithExtra) {
     EXPECT_THAT(ToFlats(result), ElementsAre("The quick brown fox ", "jumps ",
                                              "over the lazy dog"));
   }
-  UnrefIfShared(ring);
-  Unref(result);
 }
 
 TEST_P(CordRingBuildTest, AppendPrependStringMixWithPrependedExtra) {
@@ -998,8 +920,6 @@ TEST_P(CordRingBuildTest, AppendPrependStringMixWithPrependedExtra) {
     EXPECT_THAT(ToFlats(result), ElementsAre("The quick brown fox ", "jumps ",
                                              "over the lazy dog"));
   }
-  UnrefIfShared(ring);
-  Unref(result);
 }
 
 TEST_P(CordRingSubTest, SubRing) {
@@ -1011,16 +931,14 @@ TEST_P(CordRingSubTest, SubRing) {
     CordRepRing* ring = RefIfShared(FromFlats(flats, composition));
     CordRepRing* result = CordRepRing::SubRing(ring, offset, 0);
     EXPECT_THAT(result, nullptr);
-    UnrefIfShared(ring);
 
     for (size_t len = 1; len < all.size() - offset; ++len) {
       ring = RefIfShared(FromFlats(flats, composition));
       result = NeedsUnref(CordRepRing::SubRing(ring, offset, len));
       ASSERT_THAT(result, IsValidRingBuffer());
       ASSERT_THAT(result, EqIfPrivate(GetParam(), ring));
+      ASSERT_THAT(result, NeIfShared(GetParam(), ring));
       ASSERT_THAT(ToString(result), Eq(all.substr(offset, len)));
-      UnrefIfShared(ring);
-      Unref(result);
     }
   }
 }
@@ -1039,18 +957,16 @@ TEST_P(CordRingSubTest, SubRingFromLargeExternal) {
     CordRepRing* ring = RefIfShared(FromFlats(flats, composition));
     CordRepRing* result = CordRepRing::SubRing(ring, offset, 0);
     EXPECT_THAT(result, nullptr);
-    UnrefIfShared(ring);
 
     for (size_t len = all.size() - 30; len < all.size() - offset; ++len) {
       ring = RefIfShared(FromFlats(flats, composition));
       result = NeedsUnref(CordRepRing::SubRing(ring, offset, len));
       ASSERT_THAT(result, IsValidRingBuffer());
       ASSERT_THAT(result, EqIfPrivate(GetParam(), ring));
+      ASSERT_THAT(result, NeIfShared(GetParam(), ring));
       auto str = ToString(result);
       ASSERT_THAT(str, SizeIs(len));
       ASSERT_THAT(str, Eq(all.substr(offset, len)));
-      UnrefIfShared(ring);
-      Unref(result);
     }
   }
 }
@@ -1063,16 +979,14 @@ TEST_P(CordRingSubTest, RemovePrefix) {
   CordRepRing* ring = RefIfShared(FromFlats(flats, composition));
   CordRepRing* result = CordRepRing::RemovePrefix(ring, all.size());
   EXPECT_THAT(result, nullptr);
-  UnrefIfShared(ring);
 
   for (size_t len = 1; len < all.size(); ++len) {
     ring = RefIfShared(FromFlats(flats, composition));
     result = NeedsUnref(CordRepRing::RemovePrefix(ring, len));
     ASSERT_THAT(result, IsValidRingBuffer());
     EXPECT_THAT(result, EqIfPrivate(GetParam(), ring));
+    ASSERT_THAT(result, NeIfShared(GetParam(), ring));
     EXPECT_THAT(ToString(result), Eq(all.substr(len)));
-    UnrefIfShared(ring);
-    Unref(result);
   }
 }
 
@@ -1087,7 +1001,6 @@ TEST_P(CordRingSubTest, RemovePrefixFromLargeExternal) {
       ElementsAre(
           not_a_string_view(external1->base, 1 << 20).remove_prefix(1 << 16),
           not_a_string_view(external2->base, 1 << 20)));
-  Unref(result);
 }
 
 TEST_P(CordRingSubTest, RemoveSuffix) {
@@ -1098,16 +1011,14 @@ TEST_P(CordRingSubTest, RemoveSuffix) {
   CordRepRing* ring = RefIfShared(FromFlats(flats, composition));
   CordRepRing* result = CordRepRing::RemoveSuffix(ring, all.size());
   EXPECT_THAT(result, nullptr);
-  UnrefIfShared(ring);
 
   for (size_t len = 1; len < all.size(); ++len) {
     ring = RefIfShared(FromFlats(flats, composition));
     result = NeedsUnref(CordRepRing::RemoveSuffix(ring, len));
     ASSERT_THAT(result, IsValidRingBuffer());
-    EXPECT_THAT(result, EqIfPrivate(GetParam(), ring));
-    EXPECT_THAT(ToString(result), Eq(all.substr(0, all.size() - len)));
-    UnrefIfShared(ring);
-    Unref(result);
+    ASSERT_THAT(result, EqIfPrivate(GetParam(), ring));
+    ASSERT_THAT(result, NeIfShared(GetParam(), ring));
+    ASSERT_THAT(ToString(result), Eq(all.substr(0, all.size() - len)));
   }
 }
 
@@ -1120,9 +1031,8 @@ TEST_P(CordRingSubTest, AppendRing) {
   CordRepRing* result = NeedsUnref(CordRepRing::Append(ring, child));
   ASSERT_THAT(result, IsValidRingBuffer());
   EXPECT_THAT(result, EqIfPrivate(GetParam(), ring));
+  EXPECT_THAT(result, NeIfShared(GetParam(), ring));
   EXPECT_THAT(ToFlats(result), ElementsAreArray(kFoxFlats));
-  UnrefIfShared(ring);
-  Unref(result);
 }
 
 TEST_P(CordRingBuildInputTest, AppendRingWithFlatOffset) {
@@ -1135,11 +1045,9 @@ TEST_P(CordRingBuildInputTest, AppendRingWithFlatOffset) {
   CordRepRing* result = NeedsUnref(CordRepRing::Append(ring, stripped));
   ASSERT_THAT(result, IsValidRingBuffer());
   EXPECT_THAT(result, EqIfPrivateAndCapacity(GetParam(), ring));
+  EXPECT_THAT(result, NeIfShared(GetParam(), ring));
   EXPECT_THAT(ToFlats(result), ElementsAre("Head", "brown ", "fox ", "jumps ",
                                            "over ", "the ", "lazy ", "dog"));
-  UnrefIfInputSharedIndirect(child);
-  UnrefIfShared(ring);
-  Unref(result);
 }
 
 TEST_P(CordRingBuildInputTest, AppendRingWithBrokenOffset) {
@@ -1152,11 +1060,9 @@ TEST_P(CordRingBuildInputTest, AppendRingWithBrokenOffset) {
   CordRepRing* result = NeedsUnref(CordRepRing::Append(ring, stripped));
   ASSERT_THAT(result, IsValidRingBuffer());
   EXPECT_THAT(result, EqIfPrivateAndCapacity(GetParam(), ring));
+  EXPECT_THAT(result, NeIfShared(GetParam(), ring));
   EXPECT_THAT(ToFlats(result),
               ElementsAre("Head", "umps ", "over ", "the ", "lazy ", "dog"));
-  UnrefIfInputSharedIndirect(child);
-  UnrefIfShared(ring);
-  Unref(result);
 }
 
 TEST_P(CordRingBuildInputTest, AppendRingWithFlatLength) {
@@ -1169,11 +1075,9 @@ TEST_P(CordRingBuildInputTest, AppendRingWithFlatLength) {
   CordRepRing* result = NeedsUnref(CordRepRing::Append(ring, stripped));
   ASSERT_THAT(result, IsValidRingBuffer());
   EXPECT_THAT(result, EqIfPrivateAndCapacity(GetParam(), ring));
+  EXPECT_THAT(result, NeIfShared(GetParam(), ring));
   EXPECT_THAT(ToFlats(result), ElementsAre("Head", "The ", "quick ", "brown ",
                                            "fox ", "jumps ", "over ", "the "));
-  UnrefIfInputSharedIndirect(child);
-  UnrefIfShared(ring);
-  Unref(result);
 }
 
 TEST_P(CordRingBuildTest, AppendRingWithBrokenFlatLength) {
@@ -1186,11 +1090,9 @@ TEST_P(CordRingBuildTest, AppendRingWithBrokenFlatLength) {
   CordRepRing* result = NeedsUnref(CordRepRing::Append(ring, stripped));
   ASSERT_THAT(result, IsValidRingBuffer());
   EXPECT_THAT(result, EqIfPrivateAndCapacity(GetParam(), ring));
+  EXPECT_THAT(result, NeIfShared(GetParam(), ring));
   EXPECT_THAT(ToFlats(result), ElementsAre("Head", "The ", "quick ", "brown ",
                                            "fox ", "jumps ", "ov"));
-  UnrefIfInputSharedIndirect(child);
-  UnrefIfShared(ring);
-  Unref(result);
 }
 
 TEST_P(CordRingBuildTest, AppendRingMiddlePiece) {
@@ -1203,11 +1105,9 @@ TEST_P(CordRingBuildTest, AppendRingMiddlePiece) {
   CordRepRing* result = NeedsUnref(CordRepRing::Append(ring, stripped));
   ASSERT_THAT(result, IsValidRingBuffer());
   EXPECT_THAT(result, EqIfPrivateAndCapacity(GetParam(), ring));
+  EXPECT_THAT(result, NeIfShared(GetParam(), ring));
   EXPECT_THAT(ToFlats(result),
               ElementsAre("Head", "ck ", "brown ", "fox ", "jum"));
-  UnrefIfInputSharedIndirect(child);
-  UnrefIfShared(ring);
-  Unref(result);
 }
 
 TEST_P(CordRingBuildTest, AppendRingSinglePiece) {
@@ -1220,11 +1120,8 @@ TEST_P(CordRingBuildTest, AppendRingSinglePiece) {
   CordRepRing* result = NeedsUnref(CordRepRing::Append(ring, stripped));
   ASSERT_THAT(result, IsValidRingBuffer());
   EXPECT_THAT(result, EqIfPrivateAndCapacity(GetParam(), ring));
+  EXPECT_THAT(result, NeIfShared(GetParam(), ring));
   EXPECT_THAT(ToFlats(result), ElementsAre("Head", "row"));
-  UnrefIfInputSharedIndirect(child);
-  UnrefIfInputShared(stripped);
-  UnrefIfShared(ring);
-  Unref(result);
 }
 
 TEST_P(CordRingBuildInputTest, AppendRingSinglePieceWithPrefix) {
@@ -1241,11 +1138,8 @@ TEST_P(CordRingBuildInputTest, AppendRingSinglePieceWithPrefix) {
   CordRepRing* result = NeedsUnref(CordRepRing::Append(ring, stripped));
   ASSERT_THAT(result, IsValidRingBuffer());
   EXPECT_THAT(result, EqIfPrivateAndCapacity(GetParam(), ring));
+  EXPECT_THAT(result, NeIfShared(GetParam(), ring));
   EXPECT_THAT(ToFlats(result), ElementsAre("Prepend", "Head", "row"));
-  UnrefIfInputSharedIndirect(child);
-  UnrefIfInputShared(stripped);
-  UnrefIfShared(ring);
-  Unref(result);
 }
 
 TEST_P(CordRingBuildInputTest, PrependRing) {
@@ -1258,10 +1152,8 @@ TEST_P(CordRingBuildInputTest, PrependRing) {
   CordRepRing* result = NeedsUnref(CordRepRing::Prepend(ring, child));
   ASSERT_THAT(result, IsValidRingBuffer());
   EXPECT_THAT(result, EqIfPrivateAndCapacity(GetParam(), ring));
+  EXPECT_THAT(result, NeIfShared(GetParam(), ring));
   EXPECT_THAT(ToFlats(result), ElementsAreArray(kFoxFlats));
-  UnrefIfInputShared(child);
-  UnrefIfShared(ring);
-  Unref(result);
 }
 
 TEST_P(CordRingBuildInputTest, PrependRingWithFlatOffset) {
@@ -1274,12 +1166,9 @@ TEST_P(CordRingBuildInputTest, PrependRingWithFlatOffset) {
   CordRepRing* result = NeedsUnref(CordRepRing::Prepend(ring, stripped));
   ASSERT_THAT(result, IsValidRingBuffer());
   EXPECT_THAT(result, EqIfPrivateAndCapacity(GetParam(), ring));
+  EXPECT_THAT(result, NeIfShared(GetParam(), ring));
   EXPECT_THAT(ToFlats(result), ElementsAre("brown ", "fox ", "jumps ", "over ",
                                            "the ", "lazy ", "dog", "Tail"));
-  UnrefIfInputShared(child);
-  UnrefIfInputSharedIndirect(stripped);
-  UnrefIfShared(ring);
-  Unref(result);
 }
 
 TEST_P(CordRingBuildInputTest, PrependRingWithBrokenOffset) {
@@ -1291,12 +1180,9 @@ TEST_P(CordRingBuildInputTest, PrependRingWithBrokenOffset) {
   CordRep* stripped = RefIfInputSharedIndirect(RemovePrefix(21, child));
   CordRepRing* result = NeedsUnref(CordRepRing::Prepend(ring, stripped));
   EXPECT_THAT(result, EqIfPrivateAndCapacity(GetParam(), ring));
+  EXPECT_THAT(result, NeIfShared(GetParam(), ring));
   EXPECT_THAT(ToFlats(result),
               ElementsAre("umps ", "over ", "the ", "lazy ", "dog", "Tail"));
-  UnrefIfInputShared(child);
-  UnrefIfInputSharedIndirect(stripped);
-  UnrefIfShared(ring);
-  Unref(result);
 }
 
 TEST_P(CordRingBuildInputTest, PrependRingWithFlatLength) {
@@ -1309,12 +1195,9 @@ TEST_P(CordRingBuildInputTest, PrependRingWithFlatLength) {
   CordRepRing* result = NeedsUnref(CordRepRing::Prepend(ring, stripped));
   ASSERT_THAT(result, IsValidRingBuffer());
   EXPECT_THAT(result, EqIfPrivateAndCapacity(GetParam(), ring));
+  EXPECT_THAT(result, NeIfShared(GetParam(), ring));
   EXPECT_THAT(ToFlats(result), ElementsAre("The ", "quick ", "brown ", "fox ",
                                            "jumps ", "over ", "the ", "Tail"));
-  UnrefIfShared(ring);
-  UnrefIfInputShared(child);
-  UnrefIfInputSharedIndirect(stripped);
-  Unref(result);
 }
 
 TEST_P(CordRingBuildInputTest, PrependRingWithBrokenFlatLength) {
@@ -1327,12 +1210,9 @@ TEST_P(CordRingBuildInputTest, PrependRingWithBrokenFlatLength) {
   CordRepRing* result = NeedsUnref(CordRepRing::Prepend(ring, stripped));
   ASSERT_THAT(result, IsValidRingBuffer());
   EXPECT_THAT(result, EqIfPrivateAndCapacity(GetParam(), ring));
+  EXPECT_THAT(result, NeIfShared(GetParam(), ring));
   EXPECT_THAT(ToFlats(result), ElementsAre("The ", "quick ", "brown ", "fox ",
                                            "jumps ", "ov", "Tail"));
-  UnrefIfInputShared(child);
-  UnrefIfInputSharedIndirect(stripped);
-  UnrefIfShared(ring);
-  Unref(result);
 }
 
 TEST_P(CordRingBuildInputTest, PrependRingMiddlePiece) {
@@ -1346,12 +1226,9 @@ TEST_P(CordRingBuildInputTest, PrependRingMiddlePiece) {
   CordRepRing* result = NeedsUnref(CordRepRing::Prepend(ring, stripped));
   ASSERT_THAT(result, IsValidRingBuffer());
   EXPECT_THAT(result, EqIfPrivateAndCapacity(GetParam(), ring));
+  EXPECT_THAT(result, NeIfShared(GetParam(), ring));
   EXPECT_THAT(ToFlats(result),
               ElementsAre("ck ", "brown ", "fox ", "jum", "Tail"));
-  UnrefIfInputShared(child);
-  UnrefIfInputSharedIndirect(stripped);
-  UnrefIfShared(ring);
-  Unref(result);
 }
 
 TEST_P(CordRingBuildInputTest, PrependRingSinglePiece) {
@@ -1364,11 +1241,8 @@ TEST_P(CordRingBuildInputTest, PrependRingSinglePiece) {
   CordRepRing* result = NeedsUnref(CordRepRing::Prepend(ring, stripped));
   ASSERT_THAT(result, IsValidRingBuffer());
   EXPECT_THAT(result, EqIfPrivateAndCapacity(GetParam(), ring));
+  EXPECT_THAT(result, NeIfShared(GetParam(), ring));
   EXPECT_THAT(ToFlats(result), ElementsAre("row", "Tail"));
-  UnrefIfInputShared(child);
-  UnrefIfInputSharedIndirect(stripped);
-  UnrefIfShared(ring);
-  Unref(result);
 }
 
 TEST_P(CordRingBuildInputTest, PrependRingSinglePieceWithPrefix) {
@@ -1384,11 +1258,8 @@ TEST_P(CordRingBuildInputTest, PrependRingSinglePieceWithPrefix) {
   CordRepRing* result = NeedsUnref(CordRepRing::Prepend(ring, stripped));
   ASSERT_THAT(result, IsValidRingBuffer());
   EXPECT_THAT(result, EqIfPrivateAndCapacity(GetParam(), ring));
+  EXPECT_THAT(result, NeIfShared(GetParam(), ring));
   EXPECT_THAT(ToFlats(result), ElementsAre("row", "Prepend", "Tail"));
-  UnrefIfInputShared(child);
-  UnrefIfInputSharedIndirect(stripped);
-  UnrefIfShared(ring);
-  Unref(result);
 }
 
 TEST_F(CordRingTest, Find) {
@@ -1406,7 +1277,6 @@ TEST_F(CordRingTest, Find) {
     ASSERT_THAT(found.offset, Lt(data.length()));
     ASSERT_THAT(data[found.offset], Eq(value[i]));
   }
-  Unref(ring);
 }
 
 TEST_F(CordRingTest, FindWithHint) {
@@ -1442,7 +1312,6 @@ TEST_F(CordRingTest, FindWithHint) {
     ++flat_pos;
     flat_offset += flat.length();
   }
-  Unref(ring);
 }
 
 TEST_F(CordRingTest, FindInLargeRing) {
@@ -1464,7 +1333,6 @@ TEST_F(CordRingTest, FindInLargeRing) {
     ASSERT_THAT(pos.offset, Lt(data.length()));
     ASSERT_THAT(data[pos.offset], Eq(value[i]));
   }
-  Unref(ring);
 }
 
 TEST_F(CordRingTest, FindTail) {
@@ -1483,7 +1351,6 @@ TEST_F(CordRingTest, FindTail) {
     ASSERT_THAT(pos.offset, Lt(data.length()));
     ASSERT_THAT(data[data.length() - pos.offset - 1], Eq(value[i]));
   }
-  Unref(ring);
 }
 
 TEST_F(CordRingTest, FindTailWithHint) {
@@ -1510,7 +1377,6 @@ TEST_F(CordRingTest, FindTailWithHint) {
     ASSERT_THAT(pos.offset, Lt(data.length()));
     ASSERT_THAT(data[data.length() - pos.offset - 1], Eq(value[i]));
   }
-  Unref(ring);
 }
 
 TEST_F(CordRingTest, FindTailInLargeRing) {
@@ -1532,7 +1398,6 @@ TEST_F(CordRingTest, FindTailInLargeRing) {
     ASSERT_THAT(pos.offset, Lt(data.length()));
     ASSERT_THAT(data[data.length() - pos.offset - 1], Eq(value[i]));
   }
-  Unref(ring);
 }
 
 TEST_F(CordRingTest, GetCharacter) {
@@ -1544,7 +1409,6 @@ TEST_F(CordRingTest, GetCharacter) {
   for (int i = 0; i < value.length(); ++i) {
     ASSERT_THAT(result->GetCharacter(i), Eq(value[i]));
   }
-  Unref(result);
 }
 
 TEST_F(CordRingTest, GetCharacterWithSubstring) {
@@ -1556,7 +1420,67 @@ TEST_F(CordRingTest, GetCharacterWithSubstring) {
   for (int i = 0; i < value.length(); ++i) {
     ASSERT_THAT(result->GetCharacter(i), Eq(value[i]));
   }
-  Unref(result);
+}
+
+TEST_F(CordRingTest, IsFlatSingleFlat) {
+  for (bool external : {false, true}) {
+    SCOPED_TRACE(external ? "With External" : "With Flat");
+    absl::string_view str = "Hello world";
+    CordRep* rep = external ? MakeExternal(str) : MakeFlat(str);
+    CordRepRing* ring = NeedsUnref(CordRepRing::Create(rep));
+
+    // The ring is a single non-fragmented flat:
+    absl::string_view fragment;
+    EXPECT_TRUE(ring->IsFlat(nullptr));
+    EXPECT_TRUE(ring->IsFlat(&fragment));
+    EXPECT_THAT(fragment, Eq("Hello world"));
+    fragment = "";
+    EXPECT_TRUE(ring->IsFlat(0, 11, nullptr));
+    EXPECT_TRUE(ring->IsFlat(0, 11, &fragment));
+    EXPECT_THAT(fragment, Eq("Hello world"));
+
+    // Arbitrary ranges must check true as well.
+    EXPECT_TRUE(ring->IsFlat(1, 4, &fragment));
+    EXPECT_THAT(fragment, Eq("ello"));
+    EXPECT_TRUE(ring->IsFlat(6, 5, &fragment));
+    EXPECT_THAT(fragment, Eq("world"));
+  }
+}
+
+TEST_F(CordRingTest, IsFlatMultiFlat) {
+  for (bool external : {false, true}) {
+    SCOPED_TRACE(external ? "With External" : "With Flat");
+    absl::string_view str1 = "Hello world";
+    absl::string_view str2 = "Halt and catch fire";
+    CordRep* rep1 = external ? MakeExternal(str1) : MakeFlat(str1);
+    CordRep* rep2 = external ? MakeExternal(str2) : MakeFlat(str2);
+    CordRepRing* ring = CordRepRing::Append(CordRepRing::Create(rep1), rep2);
+    NeedsUnref(ring);
+
+    // The ring is fragmented, IsFlat() on the entire cord must be false.
+    EXPECT_FALSE(ring->IsFlat(nullptr));
+    absl::string_view fragment = "Don't touch this";
+    EXPECT_FALSE(ring->IsFlat(&fragment));
+    EXPECT_THAT(fragment, Eq("Don't touch this"));
+
+    // Check for ranges exactly within both flats.
+    EXPECT_TRUE(ring->IsFlat(0, 11, &fragment));
+    EXPECT_THAT(fragment, Eq("Hello world"));
+    EXPECT_TRUE(ring->IsFlat(11, 19, &fragment));
+    EXPECT_THAT(fragment, Eq("Halt and catch fire"));
+
+    // Check for arbitrary partial range inside each flat.
+    EXPECT_TRUE(ring->IsFlat(1, 4, &fragment));
+    EXPECT_THAT(fragment, "ello");
+    EXPECT_TRUE(ring->IsFlat(26, 4, &fragment));
+    EXPECT_THAT(fragment, "fire");
+
+    // Check ranges spanning across both flats
+    fragment = "Don't touch this";
+    EXPECT_FALSE(ring->IsFlat(1, 18, &fragment));
+    EXPECT_FALSE(ring->IsFlat(10, 2, &fragment));
+    EXPECT_THAT(fragment, Eq("Don't touch this"));
+  }
 }
 
 TEST_F(CordRingTest, Dump) {
@@ -1564,7 +1488,6 @@ TEST_F(CordRingTest, Dump) {
   auto flats = MakeSpan(kFoxFlats);
   CordRepRing* ring = NeedsUnref(FromFlats(flats, kPrepend));
   ss << *ring;
-  Unref(ring);
 }
 
 }  // namespace

@@ -14,6 +14,7 @@
 
 #include "absl/random/uniform_real_distribution.h"
 
+#include <cfloat>
 #include <cmath>
 #include <cstdint>
 #include <iterator>
@@ -70,6 +71,14 @@ using RealTypes =
 TYPED_TEST_SUITE(UniformRealDistributionTest, RealTypes);
 
 TYPED_TEST(UniformRealDistributionTest, ParamSerializeTest) {
+#if (defined(__i386__) || defined(_M_IX86)) && FLT_EVAL_METHOD != 0
+  // We're using an x87-compatible FPU, and intermediate operations are
+  // performed with 80-bit floats. This produces slightly different results from
+  // what we expect below.
+  GTEST_SKIP()
+      << "Skipping the test because we detected x87 floating-point semantics";
+#endif
+
   using param_type =
       typename absl::uniform_real_distribution<TypeParam>::param_type;
 

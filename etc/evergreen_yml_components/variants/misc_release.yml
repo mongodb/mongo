@@ -2810,3 +2810,26 @@ buildvariants:
   - name: push
   - name: .crypt
   - name: .publish_crypt
+
+- name: enterprise-rhel-82-arm64-grpc
+  display_name: "Enterprise RHEL 8.2 arm64 GRPC"
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  modules:
+  - enterprise
+  run_on:
+  - rhel82-arm64-small
+  stepback: false
+  expansions:
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=rhel80
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --link-model=dynamic
+      ENABLE_GRPC_BUILD=1
+    compile_variant: enterprise-rhel-82-arm64-grpc
+    scons_cache_scope: shared
+  tasks:
+    - name: compile_test_and_package_parallel_unittest_stream_TG
+    - name: compile_test_and_package_parallel_core_stream_TG
+    - name: compile_test_and_package_parallel_dbtest_stream_TG

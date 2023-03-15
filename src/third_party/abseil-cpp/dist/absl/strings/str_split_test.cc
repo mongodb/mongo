@@ -29,6 +29,8 @@
 #include "gtest/gtest.h"
 #include "absl/base/dynamic_annotations.h"
 #include "absl/base/macros.h"
+#include "absl/container/btree_map.h"
+#include "absl/container/btree_set.h"
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/node_hash_map.h"
 #include "absl/strings/numbers.h"
@@ -405,6 +407,10 @@ TEST(Splitter, ConversionOperator) {
   TestConversionOperator<std::set<std::string>>(splitter);
   TestConversionOperator<std::multiset<absl::string_view>>(splitter);
   TestConversionOperator<std::multiset<std::string>>(splitter);
+  TestConversionOperator<absl::btree_set<absl::string_view>>(splitter);
+  TestConversionOperator<absl::btree_set<std::string>>(splitter);
+  TestConversionOperator<absl::btree_multiset<absl::string_view>>(splitter);
+  TestConversionOperator<absl::btree_multiset<std::string>>(splitter);
   TestConversionOperator<std::unordered_set<std::string>>(splitter);
 
   // Tests conversion to map-like objects.
@@ -421,6 +427,22 @@ TEST(Splitter, ConversionOperator) {
   TestMapConversionOperator<std::multimap<std::string, absl::string_view>>(
       splitter);
   TestMapConversionOperator<std::multimap<std::string, std::string>>(splitter);
+  TestMapConversionOperator<
+      absl::btree_map<absl::string_view, absl::string_view>>(splitter);
+  TestMapConversionOperator<absl::btree_map<absl::string_view, std::string>>(
+      splitter);
+  TestMapConversionOperator<absl::btree_map<std::string, absl::string_view>>(
+      splitter);
+  TestMapConversionOperator<absl::btree_map<std::string, std::string>>(
+      splitter);
+  TestMapConversionOperator<
+      absl::btree_multimap<absl::string_view, absl::string_view>>(splitter);
+  TestMapConversionOperator<
+      absl::btree_multimap<absl::string_view, std::string>>(splitter);
+  TestMapConversionOperator<
+      absl::btree_multimap<std::string, absl::string_view>>(splitter);
+  TestMapConversionOperator<absl::btree_multimap<std::string, std::string>>(
+      splitter);
   TestMapConversionOperator<std::unordered_map<std::string, std::string>>(
       splitter);
   TestMapConversionOperator<
@@ -921,8 +943,14 @@ TEST(Delimiter, ByLength) {
 }
 
 TEST(Split, WorksWithLargeStrings) {
+#if defined(ABSL_HAVE_ADDRESS_SANITIZER) || \
+    defined(ABSL_HAVE_MEMORY_SANITIZER) || defined(ABSL_HAVE_THREAD_SANITIZER)
+  constexpr size_t kSize = (uint32_t{1} << 26) + 1;  // 64M + 1 byte
+#else
+  constexpr size_t kSize = (uint32_t{1} << 31) + 1;  // 2G + 1 byte
+#endif
   if (sizeof(size_t) > 4) {
-    std::string s((uint32_t{1} << 31) + 1, 'x');  // 2G + 1 byte
+    std::string s(kSize, 'x');
     s.back() = '-';
     std::vector<absl::string_view> v = absl::StrSplit(s, '-');
     EXPECT_EQ(2, v.size());

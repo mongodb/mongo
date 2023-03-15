@@ -282,6 +282,32 @@ TEST(FlatHashMap, NodeHandleMutableKeyAccess) {
 }
 #endif
 
+TEST(FlatHashMap, Reserve) {
+  // Verify that if we reserve(size() + n) then we can perform n insertions
+  // without a rehash, i.e., without invalidating any references.
+  for (size_t trial = 0; trial < 20; ++trial) {
+    for (size_t initial = 3; initial < 100; ++initial) {
+      // Fill in `initial` entries, then erase 2 of them, then reserve space for
+      // two inserts and check for reference stability while doing the inserts.
+      flat_hash_map<size_t, size_t> map;
+      for (size_t i = 0; i < initial; ++i) {
+        map[i] = i;
+      }
+      map.erase(0);
+      map.erase(1);
+      map.reserve(map.size() + 2);
+      size_t& a2 = map[2];
+      // In the event of a failure, asan will complain in one of these two
+      // assignments.
+      map[initial] = a2;
+      map[initial + 1] = a2;
+      // Fail even when not under asan:
+      size_t& a2new = map[2];
+      EXPECT_EQ(&a2, &a2new);
+    }
+  }
+}
+
 }  // namespace
 }  // namespace container_internal
 ABSL_NAMESPACE_END

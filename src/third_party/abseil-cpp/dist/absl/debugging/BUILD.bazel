@@ -14,7 +14,6 @@
 # limitations under the License.
 #
 
-load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
 load(
     "//absl:copts/configure_copts.bzl",
     "ABSL_DEFAULT_COPTS",
@@ -34,8 +33,10 @@ cc_library(
         "internal/stacktrace_aarch64-inl.inc",
         "internal/stacktrace_arm-inl.inc",
         "internal/stacktrace_config.h",
+        "internal/stacktrace_emscripten-inl.inc",
         "internal/stacktrace_generic-inl.inc",
         "internal/stacktrace_powerpc-inl.inc",
+        "internal/stacktrace_riscv-inl.inc",
         "internal/stacktrace_unimplemented-inl.inc",
         "internal/stacktrace_win32-inl.inc",
         "internal/stacktrace_x86-inl.inc",
@@ -57,6 +58,7 @@ cc_library(
         "symbolize.cc",
         "symbolize_darwin.inc",
         "symbolize_elf.inc",
+        "symbolize_emscripten.inc",
         "symbolize_unimplemented.inc",
         "symbolize_win32.inc",
     ],
@@ -180,6 +182,7 @@ cc_library(
     ],
     copts = ABSL_DEFAULT_COPTS,
     linkopts = ABSL_DEFAULT_LINKOPTS,
+    visibility = ["//visibility:private"],
     deps = [
         "//absl/base:config",
         "//absl/base:core_headers",
@@ -194,6 +197,7 @@ cc_library(
     srcs = ["internal/demangle.cc"],
     hdrs = ["internal/demangle.h"],
     copts = ABSL_DEFAULT_COPTS,
+    visibility = ["//visibility:private"],
     deps = [
         "//absl/base",
         "//absl/base:config",
@@ -344,6 +348,7 @@ cc_test(
     srcs = ["internal/stack_consumption_test.cc"],
     copts = ABSL_TEST_COPTS,
     linkopts = ABSL_DEFAULT_LINKOPTS,
+    tags = ["notsan"],
     deps = [
         ":stack_consumption",
         "//absl/base:core_headers",

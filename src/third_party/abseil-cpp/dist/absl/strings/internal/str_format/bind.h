@@ -100,7 +100,7 @@ class FormatSpecTemplate
   // We use the 'unavailable' attribute to give a better compiler error than
   // just 'method is deleted'.
   // To avoid checking the format twice, we just check that the format is
-  // constexpr. If is it valid, then the overload below will kick in.
+  // constexpr. If it is valid, then the overload below will kick in.
   // We add the template here to make this overload have lower priority.
   template <typename = void>
   FormatSpecTemplate(const char* s)  // NOLINT

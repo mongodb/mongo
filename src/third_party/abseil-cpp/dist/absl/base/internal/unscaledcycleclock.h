@@ -46,8 +46,8 @@
 
 // The following platforms have an implementation of a hardware counter.
 #if defined(__i386__) || defined(__x86_64__) || defined(__aarch64__) || \
-  defined(__powerpc__) || defined(__ppc__) || \
-  defined(_M_IX86) || defined(_M_X64)
+    defined(__powerpc__) || defined(__ppc__) || defined(__riscv) ||     \
+    defined(_M_IX86) || defined(_M_X64)
 #define ABSL_HAVE_UNSCALED_CYCLECLOCK_IMPLEMENTATION 1
 #else
 #define ABSL_HAVE_UNSCALED_CYCLECLOCK_IMPLEMENTATION 0
@@ -80,8 +80,8 @@
 
 // This macro can be used to test if UnscaledCycleClock::Frequency()
 // is NominalCPUFrequency() on a particular platform.
-#if  (defined(__i386__) || defined(__x86_64__) || \
-      defined(_M_IX86) || defined(_M_X64))
+#if (defined(__i386__) || defined(__x86_64__) || defined(__riscv) || \
+     defined(_M_IX86) || defined(_M_X64))
 #define ABSL_INTERNAL_UNSCALED_CYCLECLOCK_FREQUENCY_IS_CPU_FREQUENCY
 #endif
 

@@ -37,7 +37,7 @@ absl_cc_test(
   DEPS
     absl::memory
     absl::core_headers
-    gmock_main
+    GTest::gmock_main
 )
 
 absl_cc_test(
@@ -51,5 +51,5 @@ absl_cc_test(
     absl::memory
     absl::config
     absl::exception_safety_testing
-    gmock_main
+    GTest::gmock_main
 )

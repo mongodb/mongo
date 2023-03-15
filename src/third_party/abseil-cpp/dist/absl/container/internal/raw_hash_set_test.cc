@@ -58,6 +58,9 @@ using ::testing::Lt;
 using ::testing::Pair;
 using ::testing::UnorderedElementsAre;
 
+// Convenience function to static cast to ctrl_t.
+ctrl_t CtrlT(int i) { return static_cast<ctrl_t>(i); }
+
 TEST(Util, NormalizeCapacity) {
   EXPECT_EQ(1, NormalizeCapacity(0));
   EXPECT_EQ(1, NormalizeCapacity(1));
@@ -170,15 +173,19 @@ TEST(Group, EmptyGroup) {
 
 TEST(Group, Match) {
   if (Group::kWidth == 16) {
-    ctrl_t group[] = {kEmpty, 1, kDeleted, 3, kEmpty, 5, kSentinel, 7,
-                      7,      5, 3,        1, 1,      1, 1,         1};
+    ctrl_t group[] = {ctrl_t::kEmpty, CtrlT(1), ctrl_t::kDeleted,  CtrlT(3),
+                      ctrl_t::kEmpty, CtrlT(5), ctrl_t::kSentinel, CtrlT(7),
+                      CtrlT(7),       CtrlT(5), CtrlT(3),          CtrlT(1),
+                      CtrlT(1),       CtrlT(1), CtrlT(1),          CtrlT(1)};
     EXPECT_THAT(Group{group}.Match(0), ElementsAre());
     EXPECT_THAT(Group{group}.Match(1), ElementsAre(1, 11, 12, 13, 14, 15));
     EXPECT_THAT(Group{group}.Match(3), ElementsAre(3, 10));
     EXPECT_THAT(Group{group}.Match(5), ElementsAre(5, 9));
     EXPECT_THAT(Group{group}.Match(7), ElementsAre(7, 8));
   } else if (Group::kWidth == 8) {
-    ctrl_t group[] = {kEmpty, 1, 2, kDeleted, 2, 1, kSentinel, 1};
+    ctrl_t group[] = {ctrl_t::kEmpty,    CtrlT(1), CtrlT(2),
+                      ctrl_t::kDeleted,  CtrlT(2), CtrlT(1),
+                      ctrl_t::kSentinel, CtrlT(1)};
     EXPECT_THAT(Group{group}.Match(0), ElementsAre());
     EXPECT_THAT(Group{group}.Match(1), ElementsAre(1, 5, 7));
     EXPECT_THAT(Group{group}.Match(2), ElementsAre(2, 4));
@@ -189,11 +196,15 @@ TEST(Group, Match) {
 
 TEST(Group, MatchEmpty) {
   if (Group::kWidth == 16) {
-    ctrl_t group[] = {kEmpty, 1, kDeleted, 3, kEmpty, 5, kSentinel, 7,
-                      7,      5, 3,        1, 1,      1, 1,         1};
+    ctrl_t group[] = {ctrl_t::kEmpty, CtrlT(1), ctrl_t::kDeleted,  CtrlT(3),
+                      ctrl_t::kEmpty, CtrlT(5), ctrl_t::kSentinel, CtrlT(7),
+                      CtrlT(7),       CtrlT(5), CtrlT(3),          CtrlT(1),
+                      CtrlT(1),       CtrlT(1), CtrlT(1),          CtrlT(1)};
     EXPECT_THAT(Group{group}.MatchEmpty(), ElementsAre(0, 4));
   } else if (Group::kWidth == 8) {
-    ctrl_t group[] = {kEmpty, 1, 2, kDeleted, 2, 1, kSentinel, 1};
+    ctrl_t group[] = {ctrl_t::kEmpty,    CtrlT(1), CtrlT(2),
+                      ctrl_t::kDeleted,  CtrlT(2), CtrlT(1),
+                      ctrl_t::kSentinel, CtrlT(1)};
     EXPECT_THAT(Group{group}.MatchEmpty(), ElementsAre(0));
   } else {
     FAIL() << "No test coverage for Group::kWidth==" << Group::kWidth;
@@ -202,11 +213,15 @@ TEST(Group, MatchEmpty) {
 
 TEST(Group, MatchEmptyOrDeleted) {
   if (Group::kWidth == 16) {
-    ctrl_t group[] = {kEmpty, 1, kDeleted, 3, kEmpty, 5, kSentinel, 7,
-                      7,      5, 3,        1, 1,      1, 1,         1};
+    ctrl_t group[] = {ctrl_t::kEmpty, CtrlT(1), ctrl_t::kDeleted,  CtrlT(3),
+                      ctrl_t::kEmpty, CtrlT(5), ctrl_t::kSentinel, CtrlT(7),
+                      CtrlT(7),       CtrlT(5), CtrlT(3),          CtrlT(1),
+                      CtrlT(1),       CtrlT(1), CtrlT(1),          CtrlT(1)};
     EXPECT_THAT(Group{group}.MatchEmptyOrDeleted(), ElementsAre(0, 2, 4));
   } else if (Group::kWidth == 8) {
-    ctrl_t group[] = {kEmpty, 1, 2, kDeleted, 2, 1, kSentinel, 1};
+    ctrl_t group[] = {ctrl_t::kEmpty,    CtrlT(1), CtrlT(2),
+                      ctrl_t::kDeleted,  CtrlT(2), CtrlT(1),
+                      ctrl_t::kSentinel, CtrlT(1)};
     EXPECT_THAT(Group{group}.MatchEmptyOrDeleted(), ElementsAre(0, 3));
   } else {
     FAIL() << "No test coverage for Group::kWidth==" << Group::kWidth;
@@ -217,28 +232,32 @@ TEST(Batch, DropDeletes) {
   constexpr size_t kCapacity = 63;
   constexpr size_t kGroupWidth = container_internal::Group::kWidth;
   std::vector<ctrl_t> ctrl(kCapacity + 1 + kGroupWidth);
-  ctrl[kCapacity] = kSentinel;
-  std::vector<ctrl_t> pattern = {kEmpty, 2, kDeleted, 2, kEmpty, 1, kDeleted};
+  ctrl[kCapacity] = ctrl_t::kSentinel;
+  std::vector<ctrl_t> pattern = {
+      ctrl_t::kEmpty, CtrlT(2), ctrl_t::kDeleted, CtrlT(2),
+      ctrl_t::kEmpty, CtrlT(1), ctrl_t::kDeleted};
   for (size_t i = 0; i != kCapacity; ++i) {
     ctrl[i] = pattern[i % pattern.size()];
     if (i < kGroupWidth - 1)
       ctrl[i + kCapacity + 1] = pattern[i % pattern.size()];
   }
   ConvertDeletedToEmptyAndFullToDeleted(ctrl.data(), kCapacity);
-  ASSERT_EQ(ctrl[kCapacity], kSentinel);
-  for (size_t i = 0; i < kCapacity + 1 + kGroupWidth; ++i) {
+  ASSERT_EQ(ctrl[kCapacity], ctrl_t::kSentinel);
+  for (size_t i = 0; i < kCapacity + kGroupWidth; ++i) {
     ctrl_t expected = pattern[i % (kCapacity + 1) % pattern.size()];
-    if (i == kCapacity) expected = kSentinel;
-    if (expected == kDeleted) expected = kEmpty;
-    if (IsFull(expected)) expected = kDeleted;
+    if (i == kCapacity) expected = ctrl_t::kSentinel;
+    if (expected == ctrl_t::kDeleted) expected = ctrl_t::kEmpty;
+    if (IsFull(expected)) expected = ctrl_t::kDeleted;
     EXPECT_EQ(ctrl[i], expected)
-        << i << " " << int{pattern[i % pattern.size()]};
+        << i << " " << static_cast<int>(pattern[i % pattern.size()]);
   }
 }
 
 TEST(Group, CountLeadingEmptyOrDeleted) {
-  const std::vector<ctrl_t> empty_examples = {kEmpty, kDeleted};
-  const std::vector<ctrl_t> full_examples = {0, 1, 2, 3, 5, 9, 127, kSentinel};
+  const std::vector<ctrl_t> empty_examples = {ctrl_t::kEmpty, ctrl_t::kDeleted};
+  const std::vector<ctrl_t> full_examples = {
+      CtrlT(0), CtrlT(1), CtrlT(2),   CtrlT(3),
+      CtrlT(5), CtrlT(9), CtrlT(127), ctrl_t::kSentinel};
 
   for (ctrl_t empty : empty_examples) {
     std::vector<ctrl_t> e(Group::kWidth, empty);
@@ -294,6 +313,7 @@ struct ValuePolicy {
 };
 
 using IntPolicy = ValuePolicy<int64_t>;
+using Uint8Policy = ValuePolicy<uint8_t>;
 
 class StringPolicy {
   template <class F, class K, class V,
@@ -371,6 +391,13 @@ struct IntTable
     : raw_hash_set<IntPolicy, container_internal::hash_default_hash<int64_t>,
                    std::equal_to<int64_t>, std::allocator<int64_t>> {
   using Base = typename IntTable::raw_hash_set;
+  using Base::Base;
+};
+
+struct Uint8Table
+    : raw_hash_set<Uint8Policy, container_internal::hash_default_hash<uint8_t>,
+                   std::equal_to<uint8_t>, std::allocator<uint8_t>> {
+  using Base = typename Uint8Table::raw_hash_set;
   using Base::Base;
 };
 
@@ -541,6 +568,37 @@ TEST(Table, InsertCollisionAndFindAfterDelete) {
   EXPECT_TRUE(t.empty());
 }
 
+TEST(Table, InsertWithinCapacity) {
+  IntTable t;
+  t.reserve(10);
+  const size_t original_capacity = t.capacity();
+  const auto addr = [&](int i) {
+    return reinterpret_cast<uintptr_t>(&*t.find(i));
+  };
+  // Inserting an element does not change capacity.
+  t.insert(0);
+  EXPECT_THAT(t.capacity(), original_capacity);
+  const uintptr_t original_addr_0 = addr(0);
+  // Inserting another element does not rehash.
+  t.insert(1);
+  EXPECT_THAT(t.capacity(), original_capacity);
+  EXPECT_THAT(addr(0), original_addr_0);
+  // Inserting lots of duplicate elements does not rehash.
+  for (int i = 0; i < 100; ++i) {
+    t.insert(i % 10);
+  }
+  EXPECT_THAT(t.capacity(), original_capacity);
+  EXPECT_THAT(addr(0), original_addr_0);
+  // Inserting a range of duplicate elements does not rehash.
+  std::vector<int> dup_range;
+  for (int i = 0; i < 100; ++i) {
+    dup_range.push_back(i % 10);
+  }
+  t.insert(dup_range.begin(), dup_range.end());
+  EXPECT_THAT(t.capacity(), original_capacity);
+  EXPECT_THAT(addr(0), original_addr_0);
+}
+
 TEST(Table, LazyEmplace) {
   StringTable t;
   bool called = false;
@@ -588,28 +646,53 @@ TEST(Table, Contains2) {
 }
 
 int decompose_constructed;
+int decompose_copy_constructed;
+int decompose_copy_assigned;
+int decompose_move_constructed;
+int decompose_move_assigned;
 struct DecomposeType {
-  DecomposeType(int i) : i(i) {  // NOLINT
+  DecomposeType(int i = 0) : i(i) {  // NOLINT
     ++decompose_constructed;
   }
 
   explicit DecomposeType(const char* d) : DecomposeType(*d) {}
+
+  DecomposeType(const DecomposeType& other) : i(other.i) {
+    ++decompose_copy_constructed;
+  }
+  DecomposeType& operator=(const DecomposeType& other) {
+    ++decompose_copy_assigned;
+    i = other.i;
+    return *this;
+  }
+  DecomposeType(DecomposeType&& other) : i(other.i) {
+    ++decompose_move_constructed;
+  }
+  DecomposeType& operator=(DecomposeType&& other) {
+    ++decompose_move_assigned;
+    i = other.i;
+    return *this;
+  }
 
   int i;
 };
 
 struct DecomposeHash {
   using is_transparent = void;
-  size_t operator()(DecomposeType a) const { return a.i; }
+  size_t operator()(const DecomposeType& a) const { return a.i; }
   size_t operator()(int a) const { return a; }
   size_t operator()(const char* a) const { return *a; }
 };
 
 struct DecomposeEq {
   using is_transparent = void;
-  bool operator()(DecomposeType a, DecomposeType b) const { return a.i == b.i; }
-  bool operator()(DecomposeType a, int b) const { return a.i == b; }
-  bool operator()(DecomposeType a, const char* b) const { return a.i == *b; }
+  bool operator()(const DecomposeType& a, const DecomposeType& b) const {
+    return a.i == b.i;
+  }
+  bool operator()(const DecomposeType& a, int b) const { return a.i == b; }
+  bool operator()(const DecomposeType& a, const char* b) const {
+    return a.i == *b;
+  }
 };
 
 struct DecomposePolicy {
@@ -619,9 +702,9 @@ struct DecomposePolicy {
 
   template <typename T>
   static void construct(void*, DecomposeType* slot, T&& v) {
-    *slot = DecomposeType(std::forward<T>(v));
+    ::new (slot) DecomposeType(std::forward<T>(v));
   }
-  static void destroy(void*, DecomposeType*) {}
+  static void destroy(void*, DecomposeType* slot) { slot->~DecomposeType(); }
   static DecomposeType& element(slot_type* slot) { return *slot; }
 
   template <class F, class T>
@@ -636,8 +719,13 @@ void TestDecompose(bool construct_three) {
   const int one = 1;
   const char* three_p = "3";
   const auto& three = three_p;
+  const int elem_vector_count = 256;
+  std::vector<DecomposeType> elem_vector(elem_vector_count, DecomposeType{0});
+  std::iota(elem_vector.begin(), elem_vector.end(), 0);
 
-  raw_hash_set<DecomposePolicy, Hash, Eq, std::allocator<int>> set1;
+  using DecomposeSet =
+      raw_hash_set<DecomposePolicy, Hash, Eq, std::allocator<int>>;
+  DecomposeSet set1;
 
   decompose_constructed = 0;
   int expected_constructed = 0;
@@ -695,20 +783,72 @@ void TestDecompose(bool construct_three) {
     expected_constructed += construct_three;
     EXPECT_EQ(expected_constructed, decompose_constructed);
   }
+
+  decompose_copy_constructed = 0;
+  decompose_copy_assigned = 0;
+  decompose_move_constructed = 0;
+  decompose_move_assigned = 0;
+  int expected_copy_constructed = 0;
+  int expected_move_constructed = 0;
+  {  // raw_hash_set(first, last) with random-access iterators
+    DecomposeSet set2(elem_vector.begin(), elem_vector.end());
+    // Expect exactly one copy-constructor call for each element if no
+    // rehashing is done.
+    expected_copy_constructed += elem_vector_count;
+    EXPECT_EQ(expected_copy_constructed, decompose_copy_constructed);
+    EXPECT_EQ(expected_move_constructed, decompose_move_constructed);
+    EXPECT_EQ(0, decompose_move_assigned);
+    EXPECT_EQ(0, decompose_copy_assigned);
+  }
+
+  {  // raw_hash_set(first, last) with forward iterators
+    std::list<DecomposeType> elem_list(elem_vector.begin(), elem_vector.end());
+    expected_copy_constructed = decompose_copy_constructed;
+    DecomposeSet set2(elem_list.begin(), elem_list.end());
+    // Expect exactly N elements copied into set, expect at most 2*N elements
+    // moving internally for all resizing needed (for a growth factor of 2).
+    expected_copy_constructed += elem_vector_count;
+    EXPECT_EQ(expected_copy_constructed, decompose_copy_constructed);
+    expected_move_constructed += elem_vector_count;
+    EXPECT_LT(expected_move_constructed, decompose_move_constructed);
+    expected_move_constructed += elem_vector_count;
+    EXPECT_GE(expected_move_constructed, decompose_move_constructed);
+    EXPECT_EQ(0, decompose_move_assigned);
+    EXPECT_EQ(0, decompose_copy_assigned);
+    expected_copy_constructed = decompose_copy_constructed;
+    expected_move_constructed = decompose_move_constructed;
+  }
+
+  {  // insert(first, last)
+    DecomposeSet set2;
+    set2.insert(elem_vector.begin(), elem_vector.end());
+    // Expect exactly N elements copied into set, expect at most 2*N elements
+    // moving internally for all resizing needed (for a growth factor of 2).
+    const int expected_new_elements = elem_vector_count;
+    const int expected_max_element_moves = 2 * elem_vector_count;
+    expected_copy_constructed += expected_new_elements;
+    EXPECT_EQ(expected_copy_constructed, decompose_copy_constructed);
+    expected_move_constructed += expected_max_element_moves;
+    EXPECT_GE(expected_move_constructed, decompose_move_constructed);
+    EXPECT_EQ(0, decompose_move_assigned);
+    EXPECT_EQ(0, decompose_copy_assigned);
+    expected_copy_constructed = decompose_copy_constructed;
+    expected_move_constructed = decompose_move_constructed;
+  }
 }
 
 TEST(Table, Decompose) {
   TestDecompose<DecomposeHash, DecomposeEq>(false);
 
   struct TransparentHashIntOverload {
-    size_t operator()(DecomposeType a) const { return a.i; }
+    size_t operator()(const DecomposeType& a) const { return a.i; }
     size_t operator()(int a) const { return a; }
   };
   struct TransparentEqIntOverload {
-    bool operator()(DecomposeType a, DecomposeType b) const {
+    bool operator()(const DecomposeType& a, const DecomposeType& b) const {
       return a.i == b.i;
     }
-    bool operator()(DecomposeType a, int b) const { return a.i == b; }
+    bool operator()(const DecomposeType& a, int b) const { return a.i == b; }
   };
   TestDecompose<TransparentHashIntOverload, DecomposeEq>(true);
   TestDecompose<TransparentHashIntOverload, TransparentEqIntOverload>(true);
@@ -750,7 +890,7 @@ TEST(Table, RehashWithNoResize) {
   const size_t capacity = t.capacity();
 
   // Remove elements from all groups except the first and the last one.
-  // All elements removed from full groups will be marked as kDeleted.
+  // All elements removed from full groups will be marked as ctrl_t::kDeleted.
   const size_t erase_begin = Group::kWidth / 2;
   const size_t erase_end = (t.size() / Group::kWidth - 1) * Group::kWidth;
   for (size_t i = erase_begin; i < erase_end; ++i) {
@@ -1898,7 +2038,7 @@ TEST(RawHashSamplerTest, Sample) {
   SetHashtablezEnabled(true);
   SetHashtablezSampleParameter(100);
 
-  auto& sampler = HashtablezSampler::Global();
+  auto& sampler = GlobalHashtablezSampler();
   size_t start_size = 0;
   std::unordered_set<const HashtablezInfo*> preexisting_info;
   start_size += sampler.Iterate([&](const HashtablezInfo& info) {
@@ -1909,16 +2049,33 @@ TEST(RawHashSamplerTest, Sample) {
   std::vector<IntTable> tables;
   for (int i = 0; i < 1000000; ++i) {
     tables.emplace_back();
+
+    const bool do_reserve = (i % 10 > 5);
+    const bool do_rehash = !do_reserve && (i % 10 > 0);
+
+    if (do_reserve) {
+      // Don't reserve on all tables.
+      tables.back().reserve(10 * (i % 10));
+    }
+
     tables.back().insert(1);
     tables.back().insert(i % 5);
+
+    if (do_rehash) {
+      // Rehash some other tables.
+      tables.back().rehash(10 * (i % 10));
+    }
   }
   size_t end_size = 0;
   std::unordered_map<size_t, int> observed_checksums;
+  std::unordered_map<ssize_t, int> reservations;
   end_size += sampler.Iterate([&](const HashtablezInfo& info) {
     if (preexisting_info.count(&info) == 0) {
       observed_checksums[info.hashes_bitwise_xor.load(
           std::memory_order_relaxed)]++;
+      reservations[info.max_reserve.load(std::memory_order_relaxed)]++;
     }
+    EXPECT_EQ(info.inline_element_size, sizeof(int64_t));
     ++end_size;
   });
 
@@ -1928,6 +2085,15 @@ TEST(RawHashSamplerTest, Sample) {
   for (const auto& [_, count] : observed_checksums) {
     EXPECT_NEAR((100 * count) / static_cast<double>(tables.size()), 0.2, 0.05);
   }
+
+  EXPECT_EQ(reservations.size(), 10);
+  for (const auto& [reservation, count] : reservations) {
+    EXPECT_GE(reservation, 0);
+    EXPECT_LT(reservation, 100);
+
+    EXPECT_NEAR((100 * count) / static_cast<double>(tables.size()), 0.1, 0.05)
+        << reservation;
+  }
 }
 #endif  // ABSL_INTERNAL_HASHTABLEZ_SAMPLE
 
@@ -1936,7 +2102,7 @@ TEST(RawHashSamplerTest, DoNotSampleCustomAllocators) {
   SetHashtablezEnabled(true);
   SetHashtablezSampleParameter(100);
 
-  auto& sampler = HashtablezSampler::Global();
+  auto& sampler = GlobalHashtablezSampler();
   size_t start_size = 0;
   start_size += sampler.Iterate([&](const HashtablezInfo&) { ++start_size; });
 
@@ -1977,6 +2143,36 @@ TEST(Sanitizer, PoisoningOnErase) {
   EXPECT_TRUE(__asan_address_is_poisoned(&v));
 }
 #endif  // ABSL_HAVE_ADDRESS_SANITIZER
+
+TEST(Table, AlignOne) {
+  // We previously had a bug in which we were copying a control byte over the
+  // first slot when alignof(value_type) is 1. We test repeated
+  // insertions/erases and verify that the behavior is correct.
+  Uint8Table t;
+  std::unordered_set<uint8_t> verifier;  // NOLINT
+
+  // Do repeated insertions/erases from the table.
+  for (int64_t i = 0; i < 100000; ++i) {
+    SCOPED_TRACE(i);
+    const uint8_t u = (i * -i) & 0xFF;
+    auto it = t.find(u);
+    auto verifier_it = verifier.find(u);
+    if (it == t.end()) {
+      ASSERT_EQ(verifier_it, verifier.end());
+      t.insert(u);
+      verifier.insert(u);
+    } else {
+      ASSERT_NE(verifier_it, verifier.end());
+      t.erase(it);
+      verifier.erase(verifier_it);
+    }
+  }
+
+  EXPECT_EQ(t.size(), verifier.size());
+  for (uint8_t u : t) {
+    EXPECT_EQ(verifier.count(u), 1);
+  }
+}
 
 }  // namespace
 }  // namespace container_internal

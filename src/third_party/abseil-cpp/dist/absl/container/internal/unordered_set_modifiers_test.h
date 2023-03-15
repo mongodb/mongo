@@ -74,6 +74,36 @@ TYPED_TEST_P(ModifiersTest, InsertRange) {
   ASSERT_THAT(keys(m), ::testing::UnorderedElementsAreArray(values));
 }
 
+TYPED_TEST_P(ModifiersTest, InsertWithinCapacity) {
+  using T = hash_internal::GeneratedType<TypeParam>;
+  T val = hash_internal::Generator<T>()();
+  TypeParam m;
+  m.reserve(10);
+  const size_t original_capacity = m.bucket_count();
+  m.insert(val);
+  EXPECT_EQ(m.bucket_count(), original_capacity);
+  m.insert(val);
+  EXPECT_EQ(m.bucket_count(), original_capacity);
+}
+
+TYPED_TEST_P(ModifiersTest, InsertRangeWithinCapacity) {
+#if !defined(__GLIBCXX__)
+  using T = hash_internal::GeneratedType<TypeParam>;
+  std::vector<T> base_values;
+  std::generate_n(std::back_inserter(base_values), 10,
+                  hash_internal::Generator<T>());
+  std::vector<T> values;
+  while (values.size() != 100) {
+    values.insert(values.end(), base_values.begin(), base_values.end());
+  }
+  TypeParam m;
+  m.reserve(10);
+  const size_t original_capacity = m.bucket_count();
+  m.insert(values.begin(), values.end());
+  EXPECT_EQ(m.bucket_count(), original_capacity);
+#endif
+}
+
 TYPED_TEST_P(ModifiersTest, Emplace) {
   using T = hash_internal::GeneratedType<TypeParam>;
   T val = hash_internal::Generator<T>()();
@@ -180,8 +210,9 @@ TYPED_TEST_P(ModifiersTest, Swap) {
 // TODO(alkis): Write tests for merge.
 
 REGISTER_TYPED_TEST_CASE_P(ModifiersTest, Clear, Insert, InsertHint,
-                           InsertRange, Emplace, EmplaceHint, Erase, EraseRange,
-                           EraseKey, Swap);
+                           InsertRange, InsertWithinCapacity,
+                           InsertRangeWithinCapacity, Emplace, EmplaceHint,
+                           Erase, EraseRange, EraseKey, Swap);
 
 }  // namespace container_internal
 ABSL_NAMESPACE_END

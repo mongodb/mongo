@@ -111,7 +111,7 @@ struct FloatTraits<double> {
     return sign ? -ldexp(mantissa, exponent) : ldexp(mantissa, exponent);
 #else
     constexpr uint64_t kMantissaMask =
-        (uint64_t(1) << (kTargetMantissaBits - 1)) - 1;
+        (uint64_t{1} << (kTargetMantissaBits - 1)) - 1;
     uint64_t dbl = static_cast<uint64_t>(sign) << 63;
     if (mantissa > kMantissaMask) {
       // Normal value.
@@ -151,7 +151,7 @@ struct FloatTraits<float> {
     return sign ? -ldexpf(mantissa, exponent) : ldexpf(mantissa, exponent);
 #else
     constexpr uint32_t kMantissaMask =
-        (uint32_t(1) << (kTargetMantissaBits - 1)) - 1;
+        (uint32_t{1} << (kTargetMantissaBits - 1)) - 1;
     uint32_t flt = static_cast<uint32_t>(sign) << 31;
     if (mantissa > kMantissaMask) {
       // Normal value.
@@ -499,7 +499,7 @@ bool MustRoundUp(uint64_t guess_mantissa, int guess_exponent,
 template <typename FloatType>
 CalculatedFloat CalculatedFloatFromRawValues(uint64_t mantissa, int exponent) {
   CalculatedFloat result;
-  if (mantissa == uint64_t(1) << FloatTraits<FloatType>::kTargetMantissaBits) {
+  if (mantissa == uint64_t{1} << FloatTraits<FloatType>::kTargetMantissaBits) {
     mantissa >>= 1;
     exponent += 1;
   }

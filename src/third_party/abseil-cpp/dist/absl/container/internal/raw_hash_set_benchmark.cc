@@ -254,6 +254,23 @@ void BM_CopyAssign(benchmark::State& state) {
 }
 BENCHMARK(BM_CopyAssign)->Range(128, 4096);
 
+void BM_RangeCtor(benchmark::State& state) {
+  std::random_device rd;
+  std::mt19937 rng(rd());
+  std::uniform_int_distribution<uint64_t> dist(0, ~uint64_t{});
+  std::vector<int> values;
+  const size_t desired_size = state.range(0);
+  while (values.size() < desired_size) {
+    values.emplace_back(dist(rng));
+  }
+
+  for (auto unused : state) {
+    IntTable t{values.begin(), values.end()};
+    benchmark::DoNotOptimize(t);
+  }
+}
+BENCHMARK(BM_RangeCtor)->Range(128, 65536);
+
 void BM_NoOpReserveIntTable(benchmark::State& state) {
   IntTable t;
   t.reserve(100000);
@@ -298,9 +315,17 @@ void BM_ReserveStringTable(benchmark::State& state) {
 }
 BENCHMARK(BM_ReserveStringTable)->Range(128, 4096);
 
+// Like std::iota, except that ctrl_t doesn't support operator++.
+template <typename CtrlIter>
+void Iota(CtrlIter begin, CtrlIter end, int value) {
+  for (; begin != end; ++begin, ++value) {
+    *begin = static_cast<ctrl_t>(value);
+  }
+}
+
 void BM_Group_Match(benchmark::State& state) {
   std::array<ctrl_t, Group::kWidth> group;
-  std::iota(group.begin(), group.end(), -4);
+  Iota(group.begin(), group.end(), -4);
   Group g{group.data()};
   h2_t h = 1;
   for (auto _ : state) {
@@ -312,7 +337,7 @@ BENCHMARK(BM_Group_Match);
 
 void BM_Group_MatchEmpty(benchmark::State& state) {
   std::array<ctrl_t, Group::kWidth> group;
-  std::iota(group.begin(), group.end(), -4);
+  Iota(group.begin(), group.end(), -4);
   Group g{group.data()};
   for (auto _ : state) ::benchmark::DoNotOptimize(g.MatchEmpty());
 }
@@ -320,7 +345,7 @@ BENCHMARK(BM_Group_MatchEmpty);
 
 void BM_Group_MatchEmptyOrDeleted(benchmark::State& state) {
   std::array<ctrl_t, Group::kWidth> group;
-  std::iota(group.begin(), group.end(), -4);
+  Iota(group.begin(), group.end(), -4);
   Group g{group.data()};
   for (auto _ : state) ::benchmark::DoNotOptimize(g.MatchEmptyOrDeleted());
 }
@@ -328,7 +353,7 @@ BENCHMARK(BM_Group_MatchEmptyOrDeleted);
 
 void BM_Group_CountLeadingEmptyOrDeleted(benchmark::State& state) {
   std::array<ctrl_t, Group::kWidth> group;
-  std::iota(group.begin(), group.end(), -2);
+  Iota(group.begin(), group.end(), -2);
   Group g{group.data()};
   for (auto _ : state)
     ::benchmark::DoNotOptimize(g.CountLeadingEmptyOrDeleted());
@@ -337,7 +362,7 @@ BENCHMARK(BM_Group_CountLeadingEmptyOrDeleted);
 
 void BM_Group_MatchFirstEmptyOrDeleted(benchmark::State& state) {
   std::array<ctrl_t, Group::kWidth> group;
-  std::iota(group.begin(), group.end(), -2);
+  Iota(group.begin(), group.end(), -2);
   Group g{group.data()};
   for (auto _ : state) ::benchmark::DoNotOptimize(*g.MatchEmptyOrDeleted());
 }
@@ -346,8 +371,11 @@ BENCHMARK(BM_Group_MatchFirstEmptyOrDeleted);
 void BM_DropDeletes(benchmark::State& state) {
   constexpr size_t capacity = (1 << 20) - 1;
   std::vector<ctrl_t> ctrl(capacity + 1 + Group::kWidth);
-  ctrl[capacity] = kSentinel;
-  std::vector<ctrl_t> pattern = {kEmpty, 2, kDeleted, 2, kEmpty, 1, kDeleted};
+  ctrl[capacity] = ctrl_t::kSentinel;
+  std::vector<ctrl_t> pattern = {ctrl_t::kEmpty,   static_cast<ctrl_t>(2),
+                                 ctrl_t::kDeleted, static_cast<ctrl_t>(2),
+                                 ctrl_t::kEmpty,   static_cast<ctrl_t>(1),
+                                 ctrl_t::kDeleted};
   for (size_t i = 0; i != capacity; ++i) {
     ctrl[i] = pattern[i % pattern.size()];
   }
@@ -378,6 +406,12 @@ bool CodegenAbslRawHashSetInt64FindNeEnd(
   return table->find(key) != table->end();
 }
 
+auto CodegenAbslRawHashSetInt64Insert(absl::container_internal::IntTable* table,
+                                      int64_t key)
+    -> decltype(table->insert(key)) {
+  return table->insert(key);
+}
+
 bool CodegenAbslRawHashSetInt64Contains(
     absl::container_internal::IntTable* table, int64_t key) {
   return table->contains(key);
@@ -391,6 +425,7 @@ void CodegenAbslRawHashSetInt64Iterate(
 int odr =
     (::benchmark::DoNotOptimize(std::make_tuple(
          &CodegenAbslRawHashSetInt64Find, &CodegenAbslRawHashSetInt64FindNeEnd,
+         &CodegenAbslRawHashSetInt64Insert,
          &CodegenAbslRawHashSetInt64Contains,
          &CodegenAbslRawHashSetInt64Iterate)),
      1);

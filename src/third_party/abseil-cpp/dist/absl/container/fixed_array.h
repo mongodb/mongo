@@ -73,11 +73,6 @@ constexpr static auto kFixedArrayUseDefault = static_cast<size_t>(-1);
 // uninitialized (e.g. int, int[4], double), and others default-constructed.
 // This matches the behavior of c-style arrays and `std::array`, but not
 // `std::vector`.
-//
-// Note that `FixedArray` does not provide a public allocator; if it requires a
-// heap allocation, it will do so with global `::operator new[]()` and
-// `::operator delete[]()`, even if T provides class-scope overrides for these
-// operators.
 template <typename T, size_t N = kFixedArrayUseDefault,
           typename A = std::allocator<T>>
 class FixedArray {

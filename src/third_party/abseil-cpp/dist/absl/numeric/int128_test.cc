@@ -226,12 +226,35 @@ TEST(Uint128, AllTests) {
   EXPECT_EQ(test >>= 1, one);
   EXPECT_EQ(test <<= 1, two);
 
+  EXPECT_EQ(big, +big);
+  EXPECT_EQ(two, +two);
+  EXPECT_EQ(absl::Uint128Max(), +absl::Uint128Max());
+  EXPECT_EQ(zero, +zero);
+
   EXPECT_EQ(big, -(-big));
   EXPECT_EQ(two, -((-one) - 1));
   EXPECT_EQ(absl::Uint128Max(), -one);
   EXPECT_EQ(zero, -zero);
 
   EXPECT_EQ(absl::Uint128Max(), absl::kuint128max);
+}
+
+TEST(Int128, RightShiftOfNegativeNumbers) {
+  absl::int128 minus_six = -6;
+  absl::int128 minus_three = -3;
+  absl::int128 minus_two = -2;
+  absl::int128 minus_one = -1;
+  if ((-6 >> 1) == -3) {
+    // Right shift is arithmetic (sign propagates)
+    EXPECT_EQ(minus_six >> 1, minus_three);
+    EXPECT_EQ(minus_six >> 2, minus_two);
+    EXPECT_EQ(minus_six >> 65, minus_one);
+  } else {
+    // Right shift is logical (zeros shifted in at MSB)
+    EXPECT_EQ(minus_six >> 1, absl::int128(absl::uint128(minus_six) >> 1));
+    EXPECT_EQ(minus_six >> 2, absl::int128(absl::uint128(minus_six) >> 2));
+    EXPECT_EQ(minus_six >> 65, absl::int128(absl::uint128(minus_six) >> 65));
+  }
 }
 
 TEST(Uint128, ConversionTests) {
@@ -766,6 +789,19 @@ TEST(Int128, ComparisonTest) {
     EXPECT_FALSE(pair.smaller >= pair.larger);  // NOLINT(readability/check)
     EXPECT_TRUE(pair.smaller >= pair.smaller);  // NOLINT(readability/check)
     EXPECT_TRUE(pair.larger >= pair.larger);    // NOLINT(readability/check)
+  }
+}
+
+TEST(Int128, UnaryPlusTest) {
+  int64_t values64[] = {0, 1, 12345, 0x4000000000000000,
+                        std::numeric_limits<int64_t>::max()};
+  for (int64_t value : values64) {
+    SCOPED_TRACE(::testing::Message() << "value = " << value);
+
+    EXPECT_EQ(absl::int128(value), +absl::int128(value));
+    EXPECT_EQ(absl::int128(-value), +absl::int128(-value));
+    EXPECT_EQ(absl::MakeInt128(value, 0), +absl::MakeInt128(value, 0));
+    EXPECT_EQ(absl::MakeInt128(-value, 0), +absl::MakeInt128(-value, 0));
   }
 }
 

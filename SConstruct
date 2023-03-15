@@ -467,11 +467,13 @@ for pack in [
     ('boost', ),
     ('fmt', ),
     ('google-benchmark', 'Google benchmark'),
+    ('grpc', ),
     ('icu', 'ICU'),
     ('intel_decimal128', 'intel decimal128'),
     ('libbson', ),
     ('libmongocrypt', ),
     ('pcre2', ),
+    ('protobuf', "Protocol Buffers"),
     ('snappy', ),
     ('stemmer', ),
     ('tcmalloc', ),
@@ -834,6 +836,14 @@ def variable_shlex_converter(val):
     if parse_mode == 'auto':
         parse_mode = 'other' if mongo_platform.is_running_os('windows') else 'posix'
     return shlex.split(val, posix=(parse_mode == 'posix'))
+
+
+# Setup the command-line variables
+def where_is_converter(val):
+    path = WhereIs(val)
+    if path:
+        return os.path.abspath(path)
+    return val
 
 
 def variable_arch_converter(val):
@@ -1403,11 +1413,33 @@ env_vars.Add(
 )
 
 env_vars.Add(
+    'PROTOC',
+    default="$$PROTOC_VAR_GEN",
+    help='Path to protobuf compiler.',
+    converter=where_is_converter,
+)
+
+env_vars.Add(
+    'PROTOC_GRPC_PLUGIN',
+    default="$$PROTOC_GRPC_PLUGIN_GEN",
+    help='Path to protobuf compiler grpc plugin.',
+    converter=where_is_converter,
+)
+
+env_vars.Add(
     'SPLIT_DWARF',
     help=
     'Set the boolean (auto, on/off true/false 1/0) to enable gsplit-dwarf (non-Windows). Incompatible with DWARF_VERSION=5',
     converter=functools.partial(bool_var_converter, var='SPLIT_DWARF'),
     default="auto",
+)
+
+env_vars.Add(
+    'ENABLE_GRPC_BUILD',
+    help=
+    'Set the boolean (auto, on/off true/false 1/0) to enable building grpc and protobuf compiler.',
+    converter=functools.partial(bool_var_converter, var='ENABLE_GRPC_BUILD'),
+    default="0",
 )
 
 env_vars.Add(
@@ -2183,9 +2215,26 @@ env['BUILDERS']['SharedArchive'] = SCons.Builder.Builder(
     src_suffix=env['BUILDERS']['SharedLibrary'].src_suffix,
 )
 
-# Teach builders how to build idl files
+# Teach object builders how to build underlying generated types
 for builder in ['SharedObject', 'StaticObject']:
     env['BUILDERS'][builder].add_src_builder("Idlc")
+    env['BUILDERS'][builder].add_src_builder("Protoc")
+
+
+# These allow delayed evaluation of the AIB values for the default values of
+# the corresponding command line variables
+def protoc_var_gen(env, target, source, for_signature):
+    return env.File("$DESTDIR/$PREFIX_BINDIR/protobuf_compiler$PROGSUFFIX")
+
+
+env['PROTOC_VAR_GEN'] = protoc_var_gen
+
+
+def protoc_grpc_plugin_var_gen(env, target, source, for_signature):
+    return env.File("$DESTDIR/$PREFIX_BINDIR/grpc_cpp_plugin$PROGSUFFIX")
+
+
+env['PROTOC_GRPC_PLUGIN_GEN'] = protoc_grpc_plugin_var_gen
 
 if link_model.startswith("dynamic"):
 
@@ -5126,6 +5175,16 @@ def doConfigure(myenv):
                     [boostlib + suffix for suffix in boostSuffixList],
                     language='C++',
                 )
+
+    if use_system_version_of_library('protobuf'):
+        conf.FindSysLibDep("protobuf", ["protobuf"])
+        conf.FindSysLibDep("protoc", ["protoc"])
+
+    if use_system_version_of_library('grpc'):
+        conf.FindSysLibDep("grpc", ["grpc"])
+        conf.FindSysLibDep("grpcxx", ["grpc++"])
+        conf.FindSysLibDep("grpcxx_reflection", ["grpc++_reflection"])
+
     if posix_system:
         conf.env.SetConfigHeaderDefine("MONGO_CONFIG_HAVE_HEADER_UNISTD_H")
         conf.CheckLib('rt')
@@ -5534,6 +5593,7 @@ if get_option('ninja') != 'disabled':
         env.AppendUnique(CCFLAGS=["-fdiagnostics-color"])
 
     ninja_builder = Tool("ninja")
+
     env["NINJA_BUILDDIR"] = env.Dir("$NINJA_BUILDDIR")
     ninja_builder.generate(env)
 
@@ -5786,6 +5846,10 @@ if gdb_index_enabled == True:
         gdb_index.generate(env)
     elif env.get('GDB_INDEX') != 'auto':
         env.FatalError('Could not enable explicit request for gdb index generation.')
+
+if env.get('ENABLE_GRPC_BUILD'):
+    env.SetConfigHeaderDefine("MONGO_CONFIG_GRPC")
+    env.Tool('protobuf_compiler')
 
 if get_option('separate-debug') == "on" or env.TargetOSIs("windows"):
 

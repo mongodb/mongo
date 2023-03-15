@@ -52,9 +52,9 @@ TEST(StreamTest, Works) {
               Eq("absl::LogSeverity(4)"));
 }
 
-static_assert(
-    absl::flags_internal::FlagUseOneWordStorage<absl::LogSeverity>::value,
-    "Flags of type absl::LogSeverity ought to be lock-free.");
+static_assert(absl::flags_internal::FlagUseValueAndInitBitStorage<
+                  absl::LogSeverity>::value,
+              "Flags of type absl::LogSeverity ought to be lock-free.");
 
 using ParseFlagFromOutOfRangeIntegerTest = TestWithParam<int64_t>;
 INSTANTIATE_TEST_SUITE_P(

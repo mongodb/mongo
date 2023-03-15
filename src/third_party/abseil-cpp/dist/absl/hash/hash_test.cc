@@ -973,4 +973,39 @@ TEST(HashTest, DoesNotUseImplicitConversionsToBool) {
             absl::Hash<ValueWithBoolConversion>()(ValueWithBoolConversion{1}));
 }
 
+TEST(HashOf, MatchesHashForSingleArgument) {
+  std::string s = "forty two";
+  int i = 42;
+  double d = 42.0;
+  std::tuple<int, int> t{4, 2};
+
+  EXPECT_EQ(absl::HashOf(s), absl::Hash<std::string>{}(s));
+  EXPECT_EQ(absl::HashOf(i), absl::Hash<int>{}(i));
+  EXPECT_EQ(absl::HashOf(d), absl::Hash<double>{}(d));
+  EXPECT_EQ(absl::HashOf(t), (absl::Hash<std::tuple<int, int>>{}(t)));
+}
+
+TEST(HashOf, MatchesHashOfTupleForMultipleArguments) {
+  std::string hello = "hello";
+  std::string world = "world";
+
+  EXPECT_EQ(absl::HashOf(), absl::HashOf(std::make_tuple()));
+  EXPECT_EQ(absl::HashOf(hello), absl::HashOf(std::make_tuple(hello)));
+  EXPECT_EQ(absl::HashOf(hello, world),
+            absl::HashOf(std::make_tuple(hello, world)));
+}
+
+template <typename T>
+std::true_type HashOfExplicitParameter(decltype(absl::HashOf<T>(0))) {
+  return {};
+}
+template <typename T>
+std::false_type HashOfExplicitParameter(size_t) {
+  return {};
+}
+
+TEST(HashOf, CantPassExplicitTemplateParameters) {
+  EXPECT_FALSE(HashOfExplicitParameter<int>(0));
+}
+
 }  // namespace

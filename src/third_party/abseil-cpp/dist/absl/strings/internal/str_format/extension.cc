@@ -23,13 +23,13 @@ namespace absl {
 ABSL_NAMESPACE_BEGIN
 namespace str_format_internal {
 
-std::string Flags::ToString() const {
+std::string FlagsToString(Flags v) {
   std::string s;
-  s.append(left     ? "-" : "");
-  s.append(show_pos ? "+" : "");
-  s.append(sign_col ? " " : "");
-  s.append(alt      ? "#" : "");
-  s.append(zero     ? "0" : "");
+  s.append(FlagsContains(v, Flags::kLeft) ? "-" : "");
+  s.append(FlagsContains(v, Flags::kShowPos) ? "+" : "");
+  s.append(FlagsContains(v, Flags::kSignCol) ? " " : "");
+  s.append(FlagsContains(v, Flags::kAlt) ? "#" : "");
+  s.append(FlagsContains(v, Flags::kZero) ? "0" : "");
   return s;
 }
 

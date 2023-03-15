@@ -86,25 +86,25 @@ class ABSL_MUST_USE_RESULT Cleanup final {
                 "Callbacks that return values are not supported.");
 
  public:
-  Cleanup(Callback callback)  // NOLINT
-      : storage_(std::move(callback), /* is_callback_engaged = */ true) {}
+  Cleanup(Callback callback) : storage_(std::move(callback)) {}  // NOLINT
 
   Cleanup(Cleanup&& other) = default;
 
   void Cancel() && {
     ABSL_HARDENING_ASSERT(storage_.IsCallbackEngaged());
-    storage_.DisengageCallback();
+    storage_.DestroyCallback();
   }
 
   void Invoke() && {
     ABSL_HARDENING_ASSERT(storage_.IsCallbackEngaged());
-    storage_.DisengageCallback();
     storage_.InvokeCallback();
+    storage_.DestroyCallback();
   }
 
   ~Cleanup() {
     if (storage_.IsCallbackEngaged()) {
       storage_.InvokeCallback();
+      storage_.DestroyCallback();
     }
   }
 

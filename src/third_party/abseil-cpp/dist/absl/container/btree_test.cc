@@ -595,7 +595,7 @@ void BtreeTest() {
   using V = typename remove_pair_const<typename T::value_type>::type;
   const std::vector<V> random_values = GenerateValuesWithSeed<V>(
       absl::GetFlag(FLAGS_test_values), 4 * absl::GetFlag(FLAGS_test_values),
-      testing::GTEST_FLAG(random_seed));
+      GTEST_FLAG_GET(random_seed));
 
   unique_checker<T, C> container;
 
@@ -619,7 +619,7 @@ void BtreeMultiTest() {
   using V = typename remove_pair_const<typename T::value_type>::type;
   const std::vector<V> random_values = GenerateValuesWithSeed<V>(
       absl::GetFlag(FLAGS_test_values), 4 * absl::GetFlag(FLAGS_test_values),
-      testing::GTEST_FLAG(random_seed));
+      GTEST_FLAG_GET(random_seed));
 
   multi_checker<T, C> container;
 
@@ -1708,10 +1708,25 @@ TEST(Btree, StrSplitCompatible) {
   EXPECT_EQ(split_set, expected_set);
 }
 
-// We can't use EXPECT_EQ/etc. to compare absl::weak_ordering because they
-// convert literal 0 to int and absl::weak_ordering can only be compared with
-// literal 0. Defining this function allows for avoiding ClangTidy warnings.
-bool Identity(const bool b) { return b; }
+TEST(Btree, KeyComp) {
+  absl::btree_set<int> s;
+  EXPECT_TRUE(s.key_comp()(1, 2));
+  EXPECT_FALSE(s.key_comp()(2, 2));
+  EXPECT_FALSE(s.key_comp()(2, 1));
+
+  absl::btree_map<int, int> m1;
+  EXPECT_TRUE(m1.key_comp()(1, 2));
+  EXPECT_FALSE(m1.key_comp()(2, 2));
+  EXPECT_FALSE(m1.key_comp()(2, 1));
+
+  // Even though we internally adapt the comparator of `m2` to be three-way and
+  // heterogeneous, the comparator we expose through key_comp() is the original
+  // unadapted comparator.
+  absl::btree_map<std::string, int> m2;
+  EXPECT_TRUE(m2.key_comp()("a", "b"));
+  EXPECT_FALSE(m2.key_comp()("b", "b"));
+  EXPECT_FALSE(m2.key_comp()("b", "a"));
+}
 
 TEST(Btree, ValueComp) {
   absl::btree_set<int> s;
@@ -1724,13 +1739,13 @@ TEST(Btree, ValueComp) {
   EXPECT_FALSE(m1.value_comp()(std::make_pair(2, 0), std::make_pair(2, 0)));
   EXPECT_FALSE(m1.value_comp()(std::make_pair(2, 0), std::make_pair(1, 0)));
 
+  // Even though we internally adapt the comparator of `m2` to be three-way and
+  // heterogeneous, the comparator we expose through value_comp() is based on
+  // the original unadapted comparator.
   absl::btree_map<std::string, int> m2;
-  EXPECT_TRUE(Identity(
-      m2.value_comp()(std::make_pair("a", 0), std::make_pair("b", 0)) < 0));
-  EXPECT_TRUE(Identity(
-      m2.value_comp()(std::make_pair("b", 0), std::make_pair("b", 0)) == 0));
-  EXPECT_TRUE(Identity(
-      m2.value_comp()(std::make_pair("b", 0), std::make_pair("a", 0)) > 0));
+  EXPECT_TRUE(m2.value_comp()(std::make_pair("a", 0), std::make_pair("b", 0)));
+  EXPECT_FALSE(m2.value_comp()(std::make_pair("b", 0), std::make_pair("b", 0)));
+  EXPECT_FALSE(m2.value_comp()(std::make_pair("b", 0), std::make_pair("a", 0)));
 }
 
 TEST(Btree, DefaultConstruction) {
@@ -2891,6 +2906,46 @@ TEST(Btree, AllocMoveConstructor_DifferentAlloc) {
   // We didn't free these bytes allocated by `set1` yet.
   EXPECT_EQ(bytes_used1, original_bytes_used);
   EXPECT_EQ(bytes_used2, original_bytes_used);
+}
+
+bool IntCmp(const int a, const int b) { return a < b; }
+
+TEST(Btree, SupportsFunctionPtrComparator) {
+  absl::btree_set<int, decltype(IntCmp) *> set(IntCmp);
+  set.insert({1, 2, 3});
+  EXPECT_THAT(set, ElementsAre(1, 2, 3));
+  EXPECT_TRUE(set.key_comp()(1, 2));
+  EXPECT_TRUE(set.value_comp()(1, 2));
+
+  absl::btree_map<int, int, decltype(IntCmp) *> map(&IntCmp);
+  map[1] = 1;
+  EXPECT_THAT(map, ElementsAre(Pair(1, 1)));
+  EXPECT_TRUE(map.key_comp()(1, 2));
+  EXPECT_TRUE(map.value_comp()(std::make_pair(1, 1), std::make_pair(2, 2)));
+}
+
+template <typename Compare>
+struct TransparentPassThroughComp {
+  using is_transparent = void;
+
+  // This will fail compilation if we attempt a comparison that Compare does not
+  // support, and the failure will happen inside the function implementation so
+  // it can't be avoided by using SFINAE on this comparator.
+  template <typename T, typename U>
+  bool operator()(const T &lhs, const U &rhs) const {
+    return Compare()(lhs, rhs);
+  }
+};
+
+TEST(Btree,
+     SupportsTransparentComparatorThatDoesNotImplementAllVisibleOperators) {
+  absl::btree_set<MultiKey, TransparentPassThroughComp<MultiKeyComp>> set;
+  set.insert(MultiKey{1, 2});
+  EXPECT_TRUE(set.contains(1));
+}
+
+TEST(Btree, ConstructImplicitlyWithUnadaptedComparator) {
+  absl::btree_set<MultiKey, MultiKeyComp> set = {{}, MultiKeyComp{}};
 }
 
 }  // namespace

@@ -97,7 +97,7 @@ void BM_MutexEnqueue(benchmark::State& state) {
   // Mutex queueing behavior is modified.
   const bool multiple_priorities = state.range(0);
   ScopedThreadMutexPriority priority_setter(
-      (multiple_priorities && state.thread_index != 0) ? 1 : 0);
+      (multiple_priorities && state.thread_index() != 0) ? 1 : 0);
 
   struct Shared {
     absl::Mutex mu;
@@ -176,7 +176,7 @@ BENCHMARK(BM_MutexEnqueue)
 
 template <typename MutexType>
 void BM_Contended(benchmark::State& state) {
-  int priority = state.thread_index % state.range(1);
+  int priority = state.thread_index() % state.range(1);
   ScopedThreadMutexPriority priority_setter(priority);
 
   struct Shared {
@@ -196,7 +196,7 @@ void BM_Contended(benchmark::State& state) {
     // To achieve this amount of local work is multiplied by number of threads
     // to keep ratio between local work and critical section approximately
     // equal regardless of number of threads.
-    DelayNs(100 * state.threads, &local);
+    DelayNs(100 * state.threads(), &local);
     RaiiLocker<MutexType> locker(&shared->mu);
     DelayNs(state.range(0), &shared->data);
   }

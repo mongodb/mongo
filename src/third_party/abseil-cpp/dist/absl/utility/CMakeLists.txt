@@ -40,5 +40,5 @@ absl_cc_test(
     absl::core_headers
     absl::memory
     absl::strings
-    gmock_main
+    GTest::gmock_main
 )

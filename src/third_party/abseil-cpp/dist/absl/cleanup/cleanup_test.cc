@@ -264,4 +264,48 @@ TYPED_TEST(CleanupTest, Move) {
   EXPECT_FALSE(called);  // Destructor shouldn't invoke the callback
 }
 
+int DestructionCount = 0;
+
+struct DestructionCounter {
+  void operator()() {}
+
+  ~DestructionCounter() { ++DestructionCount; }
+};
+
+TYPED_TEST(CleanupTest, DestructorDestroys) {
+  {
+    auto cleanup =
+        absl::MakeCleanup(TypeParam::AsCallback(DestructionCounter()));
+    DestructionCount = 0;
+  }
+
+  EXPECT_EQ(DestructionCount, 1);  // Engaged cleanup destroys
+}
+
+TYPED_TEST(CleanupTest, CancelDestroys) {
+  {
+    auto cleanup =
+        absl::MakeCleanup(TypeParam::AsCallback(DestructionCounter()));
+    DestructionCount = 0;
+
+    std::move(cleanup).Cancel();
+    EXPECT_EQ(DestructionCount, 1);  // Cancel destroys
+  }
+
+  EXPECT_EQ(DestructionCount, 1);  // Canceled cleanup does not double destroy
+}
+
+TYPED_TEST(CleanupTest, InvokeDestroys) {
+  {
+    auto cleanup =
+        absl::MakeCleanup(TypeParam::AsCallback(DestructionCounter()));
+    DestructionCount = 0;
+
+    std::move(cleanup).Invoke();
+    EXPECT_EQ(DestructionCount, 1);  // Invoke destroys
+  }
+
+  EXPECT_EQ(DestructionCount, 1);  // Invoked cleanup does not double destroy
+}
+
 }  // namespace

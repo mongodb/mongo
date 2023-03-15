@@ -77,6 +77,10 @@
 #include "absl/debugging/internal/vdso_support.h"
 #include "absl/strings/string_view.h"
 
+#if defined(__FreeBSD__) && !defined(ElfW)
+#define ElfW(x) __ElfN(x)
+#endif
+
 namespace absl {
 ABSL_NAMESPACE_BEGIN
 
@@ -700,6 +704,16 @@ static ABSL_ATTRIBUTE_NOINLINE FindSymbolResult FindSymbol(
           reinterpret_cast<const char *>(symbol.st_value);
       const char *start_address =
           ComputeOffset(original_start_address, relocation);
+
+#ifdef __arm__
+      // ARM functions are always aligned to multiples of two bytes; the
+      // lowest-order bit in start_address is ignored by the CPU and indicates
+      // whether the function contains ARM (0) or Thumb (1) code. We don't care
+      // about what encoding is being used; we just want the real start address
+      // of the function.
+      start_address = reinterpret_cast<const char *>(
+          reinterpret_cast<uintptr_t>(start_address) & ~1);
+#endif
 
       if (deref_function_descriptor_pointer &&
           InSection(original_start_address, opd)) {

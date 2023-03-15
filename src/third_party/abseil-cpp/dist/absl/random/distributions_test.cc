@@ -14,6 +14,7 @@
 
 #include "absl/random/distributions.h"
 
+#include <cfloat>
 #include <cmath>
 #include <cstdint>
 #include <random>
@@ -224,6 +225,15 @@ TEST_F(RandomDistributionsTest, UniformNoBounds) {
 TEST_F(RandomDistributionsTest, UniformNonsenseRanges) {
   // The ranges used in this test are undefined behavior.
   // The results are arbitrary and subject to future changes.
+
+#if (defined(__i386__) || defined(_M_IX86)) && FLT_EVAL_METHOD != 0
+  // We're using an x87-compatible FPU, and intermediate operations can be
+  // performed with 80-bit floats. This produces slightly different results from
+  // what we expect below.
+  GTEST_SKIP()
+      << "Skipping the test because we detected x87 floating-point semantics";
+#endif
+
   absl::InsecureBitGen gen;
 
   // <uint>

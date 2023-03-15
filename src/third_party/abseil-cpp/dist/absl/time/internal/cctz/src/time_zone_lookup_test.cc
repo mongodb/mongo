@@ -579,6 +579,7 @@ const char* const kTimeZoneNames[] = {"Africa/Abidjan",
                                       "Pacific/Guam",
                                       "Pacific/Honolulu",
                                       "Pacific/Johnston",
+                                      "Pacific/Kanton",
                                       "Pacific/Kiritimati",
                                       "Pacific/Kosrae",
                                       "Pacific/Kwajalein",
@@ -716,6 +717,18 @@ TEST(TimeZones, LoadZonesConcurrently) {
   EXPECT_LE(failures.size(), max_failures) << testing::PrintToString(failures);
 }
 #endif
+
+TEST(TimeZone, UTC) {
+  const time_zone utc = utc_time_zone();
+
+  time_zone loaded_utc;
+  EXPECT_TRUE(load_time_zone("UTC", &loaded_utc));
+  EXPECT_EQ(loaded_utc, utc);
+
+  time_zone loaded_utc0;
+  EXPECT_TRUE(load_time_zone("UTC0", &loaded_utc0));
+  EXPECT_EQ(loaded_utc0, utc);
+}
 
 TEST(TimeZone, NamedTimeZones) {
   const time_zone utc = utc_time_zone();
@@ -1014,7 +1027,11 @@ TEST(MakeTime, SysSecondsLimits) {
 #endif
     const year_t min_tm_year = year_t{std::numeric_limits<int>::min()} + 1900;
     tp = convert(civil_second(min_tm_year, 1, 1, 0, 0, 0), cut);
+#if defined(__Fuchsia__)
+    // Fuchsia's gmtime_r() fails on extreme negative values (fxbug.dev/78527).
+#else
     EXPECT_EQ("-2147481748-01-01T00:00:00+00:00", format(RFC3339, tp, cut));
+#endif
 #endif
   }
 }

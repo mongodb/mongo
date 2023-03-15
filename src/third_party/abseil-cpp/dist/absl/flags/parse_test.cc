@@ -46,6 +46,7 @@ using absl::base_internal::ScopedSetEnv;
 struct UDT {
   UDT() = default;
   UDT(const UDT&) = default;
+  UDT& operator=(const UDT&) = default;
   UDT(int v) : value(v) {}  // NOLINT
 
   int value;

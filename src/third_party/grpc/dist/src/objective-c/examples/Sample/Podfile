@@ -1,0 +1,32 @@
+source 'https://github.com/CocoaPods/Specs.git'
+platform :ios, '9.0'
+
+install! 'cocoapods', :deterministic_uuids => false
+
+# Default to use framework, so that providing no 'FRAMEWORK' env parameter works consistently
+# for all Samples, specifically because Swift only supports framework.
+# Only effective for examples/
+use_frameworks! if ENV['FRAMEWORKS'] != 'NO'
+
+# Location of gRPC's repo root relative to this file.
+GRPC_LOCAL_SRC = '../../../..'
+
+target 'Sample' do
+  # Depend on the generated RemoteTestClient library
+  pod 'RemoteTest', :path => "../RemoteTestClient"
+
+  # Use the local versions of Protobuf, BoringSSL, and gRPC. You don't need any of the following
+  # lines in your application.
+  pod '!ProtoCompiler',  :path => "#{GRPC_LOCAL_SRC}/src/objective-c"
+  pod '!ProtoCompiler-gRPCPlugin', :path => "#{GRPC_LOCAL_SRC}/src/objective-c"
+
+  pod 'Protobuf', :path => "#{GRPC_LOCAL_SRC}/third_party/protobuf"
+
+  pod 'BoringSSL-GRPC', :podspec => "#{GRPC_LOCAL_SRC}/src/objective-c"
+  pod 'Libuv-gRPC', :podspec => "#{GRPC_LOCAL_SRC}/src/objective-c"
+
+  pod 'gRPC', :path => GRPC_LOCAL_SRC
+  pod 'gRPC-Core', :path => GRPC_LOCAL_SRC
+  pod 'gRPC-RxLibrary', :path => GRPC_LOCAL_SRC
+  pod 'gRPC-ProtoRPC',  :path => GRPC_LOCAL_SRC
+end

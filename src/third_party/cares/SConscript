@@ -1,0 +1,91 @@
+Import('env')
+
+cares_env = env.Clone()
+
+cares_env.Append(CPPDEFINES=[
+    ('HAVE_CONFIG_H', 1),
+    ('_POSIX_C_SOURCE', '199309L'),
+    'CARES_BUILDING_LIBRARY',
+    'c_ares_EXPORTS',
+])
+
+cares_root = cares_env.Dir(".").srcnode()
+if cares_env.ToolchainIs('msvc'):
+    cares_env.Append(
+        CCFLAGS=[
+            '/wd4996',  # The POSIX name for this item is deprecated
+        ], )
+
+if cares_env.TargetOSIs('darwin'):
+    cares_env.Append(CPPDEFINES=[
+        '_DARWIN_C_SOURCE',
+    ], )
+
+cares_platform = cares_root.Dir("platform/${TARGET_OS}_${TARGET_ARCH}")
+cares_env.Append(
+    CPPPATH=[
+        cares_platform.Dir("build/include"),
+        cares_platform.Dir("install/include"),
+    ], )
+
+cares_env.Library(
+    target='cares',
+    source=[
+        "dist/src/lib/ares_android.c",
+        "dist/src/lib/ares_send.c",
+        "dist/src/lib/ares_search.c",
+        "dist/src/lib/ares_writev.c",
+        "dist/src/lib/ares__close_sockets.c",
+        "dist/src/lib/ares_cancel.c",
+        "dist/src/lib/ares__read_line.c",
+        "dist/src/lib/ares__timeval.c",
+        "dist/src/lib/ares_free_string.c",
+        "dist/src/lib/ares_fds.c",
+        "dist/src/lib/ares_free_hostent.c",
+        "dist/src/lib/ares_freeaddrinfo.c",
+        "dist/src/lib/ares_destroy.c",
+        "dist/src/lib/ares_data.c",
+        "dist/src/lib/ares__get_hostent.c",
+        "dist/src/lib/ares__readaddrinfo.c",
+        "dist/src/lib/ares__parse_into_addrinfo.c",
+        "dist/src/lib/ares__sortaddrinfo.c",
+        "dist/src/lib/ares_expand_string.c",
+        "dist/src/lib/inet_net_pton.c",
+        "dist/src/lib/ares_expand_name.c",
+        "dist/src/lib/ares_getenv.c",
+        "dist/src/lib/ares_getsock.c",
+        "dist/src/lib/ares_mkquery.c",
+        "dist/src/lib/ares_library_init.c",
+        "dist/src/lib/ares_nowarn.c",
+        "dist/src/lib/bitncmp.c",
+        "dist/src/lib/ares_create_query.c",
+        "dist/src/lib/ares_llist.c",
+        "dist/src/lib/ares_gethostbyaddr.c",
+        "dist/src/lib/ares_getnameinfo.c",
+        "dist/src/lib/ares_version.c",
+        "dist/src/lib/ares_gethostbyname.c",
+        "dist/src/lib/ares_getaddrinfo.c",
+        "dist/src/lib/ares_parse_a_reply.c",
+        "dist/src/lib/ares_parse_aaaa_reply.c",
+        "dist/src/lib/ares_parse_caa_reply.c",
+        "dist/src/lib/ares_options.c",
+        "dist/src/lib/ares_parse_mx_reply.c",
+        "dist/src/lib/ares_strsplit.c",
+        "dist/src/lib/ares_timeout.c",
+        "dist/src/lib/ares_parse_naptr_reply.c",
+        "dist/src/lib/windows_port.c",
+        "dist/src/lib/ares_platform.c",
+        "dist/src/lib/ares_strcasecmp.c",
+        "dist/src/lib/ares_parse_ptr_reply.c",
+        "dist/src/lib/ares_parse_soa_reply.c",
+        "dist/src/lib/ares_parse_srv_reply.c",
+        "dist/src/lib/ares_parse_ns_reply.c",
+        "dist/src/lib/ares_init.c",
+        "dist/src/lib/ares_parse_txt_reply.c",
+        "dist/src/lib/ares_query.c",
+        "dist/src/lib/ares_strdup.c",
+        "dist/src/lib/ares_strerror.c",
+        "dist/src/lib/inet_ntop.c",
+        "dist/src/lib/ares_process.c",
+    ],
+)

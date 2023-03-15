@@ -103,3 +103,6 @@
 
 // Defined if WiredTiger storage engine is enabled
 @mongo_config_wiredtiger_enabled@
+
+// Defined if grpc support is enabled
+@mongo_config_grpc@

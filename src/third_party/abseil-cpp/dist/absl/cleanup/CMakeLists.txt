@@ -51,5 +51,5 @@ absl_cc_test(
     absl::cleanup
     absl::config
     absl::utility
-    gmock_main
+    GTest::gmock_main
 )

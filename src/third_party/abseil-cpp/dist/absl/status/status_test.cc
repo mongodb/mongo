@@ -36,7 +36,9 @@ TEST(StatusCode, InsertionOperator) {
 // its creator, and its classifier.
 struct ErrorTest {
   absl::StatusCode code;
-  using Creator = absl::Status (*)(absl::string_view);
+  using Creator = absl::Status (*)(
+      absl::string_view
+  );
   using Classifier = bool (*)(const absl::Status&);
   Creator creator;
   Classifier classifier;
@@ -78,7 +80,9 @@ TEST(Status, CreateAndClassify) {
     // expected error code and message.
     std::string message =
         absl::StrCat("error code ", test.code, " test message");
-    absl::Status status = test.creator(message);
+    absl::Status status = test.creator(
+        message
+    );
     EXPECT_EQ(test.code, status.code());
     EXPECT_EQ(message, status.message());
 
