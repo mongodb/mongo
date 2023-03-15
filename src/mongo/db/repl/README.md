@@ -727,11 +727,11 @@ Guide. <!-- TODO Link to Change Streams Section in Query Arch Guide -->
 ## eMRC=false and Rollback
 
 Even though we added support for taking stable checkpoints when `eMRC=false`, we must still use the
-`rollbackViaRefetch` algorithm instead of the `Recover to A Timestamp` algorithm. As aforementioned,
-when `eMRC=false`, the replication system will set the `stableTimestamp` to the newest `all_durable`
-timestamp. This allows us to take stable checkpoints that are not necessarily majority committed.
-Consequently, the `stableTimestamp` can advance past the `majority commit point`, which will break
-the `Recover to A Timestamp` algorithm.
+`rollbackViaRefetch` algorithm instead of the [`Recover to A Timestamp` algorithm](#Rollback-recover-to-a-timestamp-RTT).
+As aforementioned, when `eMRC=false`, the replication system will set the `stableTimestamp` to the
+newest `all_durable` timestamp. This allows us to take stable checkpoints that are not necessarily
+majority committed. Consequently, the `stableTimestamp` can advance past the `majority commit point`,
+which will break the `Recover to A Timestamp` algorithm.
 
 ### rollbackViaRefetch
 
@@ -740,9 +740,9 @@ realize that the greater than or equal to predicate did not return the last op i
 rolling back, nodes are in the `ROLLBACK` state and reads are prohibited. When a node goes into
 rollback it drops all snapshots.
 
-The rolling-back node first finds the common point between its oplog and its sync source's oplog.
-It then goes through all of the operations in its oplog back to the common point and figures out
-how to undo them.
+The rolling-back node first [finds the common point](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/rs_rollback.cpp#L1228)
+between its oplog and its sync source's oplog. It then goes through all of the operations in its
+oplog back to the common point and figures out how to undo them.
 
 Simply doing the "inverse" operation is sometimes impossible, such as a document remove where we do
 not log the entire document that is removed. Instead, the node simply refetches the problematic
@@ -765,8 +765,8 @@ This process is very similar to initial sync and startup after an unclean shutdo
 operations are applied on data that may already reflect those operations and operations in the
 future. This leads to all of the same idempotency concerns and index constraint relaxation.
 
-Though we primarily use the `Recover To A Timestamp` algorithm from MongoDB 4.0 and onwards, we
-must still keep the `rollbackViaRefetch` to support `eMRC=false` nodes.
+Though we primarily use the [`Recover To A Timestamp`](#rollback-recover-to-a-timestamp-rtt) algorithm
+from MongoDB 4.0 and onwards, we must still keep the `rollbackViaRefetch` to support `eMRC=false` nodes.
 
 ## eMRC=false and Single Replica Set Transactions
 
@@ -1456,11 +1456,11 @@ We try to prevent concurrent conditional stepdown attempts by setting `_leaderMo
 another conditional stepdown attempt from occurring, but still allow unconditional attempts to
 supersede.
 
-# Rollback
+# Rollback: Recover To A Timestamp (RTT)
 
 Rollback is the process whereby a node that diverges from its sync source gets back to a consistent
 point in time on the sync source's branch of history. We currently support two rollback algorithms,
-Recover To A Timestamp (RTT) and Rollback via Refetch. This section will cover the RTT method.
+Recover To A Timestamp (RTT) and [Rollback via Refetch](#rollbackviarefetch). This section will cover the RTT method.
 
 Situations that require rollback can occur due to network partitions. Consider a scenario where a
 secondary can no longer hear from the primary and subsequently runs for an election. We now have
@@ -1477,25 +1477,30 @@ recover to a [`stable_timestamp`](#replication-timestamp-glossary), which is the
 at which the storage engine can take a checkpoint. This can be considered a consistent, majority
 committed point in time for replication and storage.
 
-A node goes into rollback when its last fetched OpTime is greater than its sync source's last
-applied OpTime, but it is in a lower term. In this case, the `OplogFetcher` will return an empty
-batch and fail with an `OplogStartMissing` error.
+A node goes into rollback when its [last fetched OpTime is greater than its sync source's last applied OpTime, but it is in a lower term](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/oplog_fetcher.cpp#L1019-L1024).
+In this case, the `OplogFetcher` will return an empty batch and fail with an `OplogStartMissing` error,
+which [`BackgroundSync` interprets as needing to rollback](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/bgsync.cpp#L600-L603).
 
-During [rollback](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/repl/rollback_impl.cpp#L176),
-nodes first transition to the `ROLLBACK` state and kill all user operations to ensure that we can
-successfully acquire [the RSTL](#replication-state-transition-lock). Reads are prohibited while
-we are in the `ROLLBACK` state.
+During [rollback](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/rollback_impl.cpp#L175),
+nodes first [transition to the `ROLLBACK`](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/rollback_impl.cpp#L194)
+state and kill all user operations to ensure that we can successfully acquire [the RSTL](#replication-state-transition-lock).
+Reads are prohibited while we are in the `ROLLBACK` state.
 
-We then wait for background index builds to complete before finding the `common point` between the
-rolling back node and the sync source node. The `common point` is the OpTime after which the nodes'
-oplogs start to differ. During this step, we keep track of the operations that are rolled back up
+We then [find the `common point`](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/rollback_impl.cpp#L217)
+between the rolling back node and the sync source node. The `common point` is the OpTime after which
+the nodes' oplogs start to differ. During this step, we keep track of the operations that are rolled back up
 until the `common point` and update necessary data structures. This includes metadata that we may
-write out to rollback files and and use to roll back collection fast-counts. Then, we increment
+write out to rollback files and and use to roll back collection fast-counts. Then, we [increment](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/rollback_impl.cpp#L237)
 the Rollback ID (RBID), a monotonically increasing number that is incremented every time a rollback
 occurs. We can use the RBID to check if a rollback has occurred on our sync source since the
-baseline RBID was set.
+baseline RBID was set. [Note that the RBID is stored durably on disk](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/storage_interface_impl.cpp#L181).
 
-Now, we enter the data modification section of the rollback algorithm, which begins with
+We then [wait for background index builds to complete before entering rollback](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/rollback_impl.cpp#L548).
+We aren't sure exactly what issues may arise when index builds run concurrently with rolling back to a
+stable timestamp, but rather than dealing with the complexity we took the conservative approach of waiting
+for all index builds before beginning rollback.
+
+Now, we enter the [data modification section](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/rollback_impl.cpp#L551) of the rollback algorithm, which begins with
 aborting prepared transactions and ends with reconstructing them at the end. If we fail at any point
 during this phase, we must terminate the rollback attempt because we cannot safely recover.
 
@@ -1509,8 +1514,8 @@ in order to avoid unnecessary prepare conflicts when trying to read documents th
 those transactions, which must be aborted for rollback anyway. Finally, if we have rolled back any
 operations, we invalidate all sessions on this server.
 
-Now, we are ready to tell the storage engine to recover to the last `stable_timestamp`. Upon
-success, the storage engine restores the data reflected in the database to the data reflected at the
+Now, we are ready to tell the storage engine to [recover to the last `stable_timestamp`](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/rollback_impl.cpp#L585-L586).
+Upon success, the storage engine restores the data reflected in the database to the data reflected at the
 last `stable_timestamp`. This does not, however, revert the oplog. In order to revert the oplog,
 rollback must remove all oplog entries after the `common point`. This is called the truncate point
 and is written into the `oplogTruncateAfterPoint` document. Now, the recovery process knows where to
@@ -1551,6 +1556,7 @@ applies all oplog entries through the end of the sync source's oplog. See the
 [Startup Recovery](#startup-recovery) section for more information on truncating the oplog and
 applying oplog entries.
 
+Then, we rebuild in-memory structures such as [tenant migration access blockers](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/rollback_impl.cpp#L652).
 The last thing we do before exiting the data modification section is
 [reconstruct prepared transactions](#recovering-prepared-transactions). We must also restore their
 in-memory state to what it was prior to the rollback in order to fulfill the durability guarantees
