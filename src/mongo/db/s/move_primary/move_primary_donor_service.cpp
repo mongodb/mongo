@@ -226,14 +226,27 @@ ShardId MovePrimaryDonorExternalState::getRecipientShardId() const {
 }
 
 void MovePrimaryDonorExternalState::syncDataOnRecipient(OperationContext* opCtx) {
+    syncDataOnRecipient(opCtx, boost::none);
+}
+
+void MovePrimaryDonorExternalState::syncDataOnRecipient(OperationContext* opCtx,
+                                                        boost::optional<Timestamp> timestamp) {
     MovePrimaryRecipientSyncData request;
     request.setMovePrimaryCommonMetadata(getMetadata());
     request.setDbName(getMetadata().getDatabaseName().db());
+    if (timestamp) {
+        request.setReturnAfterReachingDonorTimestamp(*timestamp);
+    }
+    runCommandOnRecipient(opCtx, request.toBSON({}));
+}
+
+void MovePrimaryDonorExternalState::runCommandOnRecipient(OperationContext* opCtx,
+                                                          const BSONObj& command) {
     uassertStatusOK(runCommand(opCtx,
                                getRecipientShardId(),
                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                DatabaseName::kAdmin.toString(),
-                               request.toBSON({}),
+                               command,
                                Shard::RetryPolicy::kNoRetry));
 }
 
@@ -341,7 +354,9 @@ ExecutorFuture<void> MovePrimaryDonor::runDonorWorkflow() {
         .then(
             [this] { return transitionToState(MovePrimaryDonorStateEnum::kWaitingToBlockWrites); })
         .then([this] { return doWaitingToBlockWrites(); })
-        .then([this] { return transitionToState(MovePrimaryDonorStateEnum::kBlockingWrites); });
+        .then([this] { return transitionToState(MovePrimaryDonorStateEnum::kBlockingWrites); })
+        .then([this] { return doBlockingWrites(); })
+        .then([this] { return transitionToState(MovePrimaryDonorStateEnum::kPrepared); });
 }
 
 ExecutorFuture<void> MovePrimaryDonor::transitionToState(MovePrimaryDonorStateEnum newState) {
@@ -403,6 +418,10 @@ ExecutorFuture<void> MovePrimaryDonor::doInitializing() {
     });
 }
 
+ExecutorFuture<void> MovePrimaryDonor::doNothing() {
+    return runOnTaskExecutor([] {});
+}
+
 ExecutorFuture<void> MovePrimaryDonor::doCloning() {
     return _retry->untilAbortOrSuccess("doCloning()", [this](const auto& factory) {
         auto opCtx = factory.makeOperationContext(&cc());
@@ -411,11 +430,16 @@ ExecutorFuture<void> MovePrimaryDonor::doCloning() {
 }
 
 ExecutorFuture<void> MovePrimaryDonor::doWaitingToBlockWrites() {
-    return waitUntilReadyToBlockWrites()
-        .then([this] { return waitUntilCurrentlyBlockingWrites(); })
-        .then([this](repl::OpTime blockingWritesTimestamp) {
-            return persistBlockingWritesTimestamp(blockingWritesTimestamp);
-        });
+    return runOnTaskExecutor([this] {
+        if (getCurrentState() > MovePrimaryDonorStateEnum::kWaitingToBlockWrites) {
+            return doNothing();
+        }
+        return waitUntilReadyToBlockWrites()
+            .then([this] { return waitUntilCurrentlyBlockingWrites(); })
+            .then([this](Timestamp blockingWritesTimestamp) {
+                return persistBlockingWritesTimestamp(blockingWritesTimestamp);
+            });
+    });
 }
 
 ExecutorFuture<void> MovePrimaryDonor::waitUntilReadyToBlockWrites() {
@@ -431,23 +455,22 @@ ExecutorFuture<void> MovePrimaryDonor::waitUntilReadyToBlockWrites() {
     });
 }
 
-ExecutorFuture<repl::OpTime> MovePrimaryDonor::waitUntilCurrentlyBlockingWrites() {
+ExecutorFuture<Timestamp> MovePrimaryDonor::waitUntilCurrentlyBlockingWrites() {
     return runOnTaskExecutor([this] { return _currentlyBlockingWritesPromise.getFuture().get(); });
 }
 
-void MovePrimaryDonor::onBeganBlockingWrites(StatusWith<repl::OpTime> blockingWritesTimestamp) {
+void MovePrimaryDonor::onBeganBlockingWrites(StatusWith<Timestamp> blockingWritesTimestamp) {
     _currentlyBlockingWritesPromise.setFrom(blockingWritesTimestamp);
 }
 
 ExecutorFuture<void> MovePrimaryDonor::persistBlockingWritesTimestamp(
-    repl::OpTime blockingWritesTimestamp) {
+    Timestamp blockingWritesTimestamp) {
     return _retry->untilAbortOrSuccess(
         fmt::format("persistBlockingWritesTimestamp({})", blockingWritesTimestamp.toString()),
         [this, blockingWritesTimestamp](const auto& factory) {
             auto opCtx = factory.makeOperationContext(&cc());
             auto newStateDocument = buildCurrentStateDocument();
-            newStateDocument.getMutableFields().setBlockingWritesTimestamp(
-                blockingWritesTimestamp.getTimestamp());
+            newStateDocument.getMutableFields().setBlockingWritesTimestamp(blockingWritesTimestamp);
             updateOnDiskState(opCtx.get(), newStateDocument);
             updateInMemoryState(newStateDocument);
 
@@ -458,6 +481,15 @@ ExecutorFuture<void> MovePrimaryDonor::persistBlockingWritesTimestamp(
                   "databaseName"_attr = _metadata.getDatabaseName(),
                   "toShard"_attr = _metadata.getShardName());
         });
+}
+
+ExecutorFuture<void> MovePrimaryDonor::doBlockingWrites() {
+    return _retry->untilAbortOrSuccess("doBlockingWrites()", [this](const auto& factory) {
+        auto opCtx = factory.makeOperationContext(&cc());
+        auto timestamp = getMutableFields().getBlockingWritesTimestamp();
+        invariant(timestamp);
+        _externalState->syncDataOnRecipient(opCtx.get(), *timestamp);
+    });
 }
 
 

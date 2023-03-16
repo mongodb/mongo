@@ -146,6 +146,7 @@ public:
     virtual ~MovePrimaryDonorExternalState() = default;
 
     void syncDataOnRecipient(OperationContext* opCtx);
+    void syncDataOnRecipient(OperationContext* opCtx, boost::optional<Timestamp> timestamp);
 
 protected:
     virtual StatusWith<Shard::CommandResponse> runCommand(OperationContext* opCtx,
@@ -159,6 +160,8 @@ protected:
     ShardId getRecipientShardId() const;
 
 private:
+    void runCommandOnRecipient(OperationContext* opCtx, const BSONObj& command);
+
     MovePrimaryCommonMetadata _metadata;
 };
 
@@ -199,7 +202,7 @@ public:
 
     const MovePrimaryCommonMetadata& getMetadata() const;
 
-    void onBeganBlockingWrites(StatusWith<repl::OpTime> blockingWritesTimestamp);
+    void onBeganBlockingWrites(StatusWith<Timestamp> blockingWritesTimestamp);
 
     SharedSemiFuture<void> getReadyToBlockWritesFuture() const;
     SharedSemiFuture<void> getCompletionFuture() const;
@@ -213,12 +216,14 @@ private:
                        const CancellationToken& stepdownToken);
     ExecutorFuture<void> runDonorWorkflow();
     ExecutorFuture<void> transitionToState(MovePrimaryDonorStateEnum state);
+    ExecutorFuture<void> doNothing();
     ExecutorFuture<void> doInitializing();
     ExecutorFuture<void> doCloning();
     ExecutorFuture<void> doWaitingToBlockWrites();
+    ExecutorFuture<void> doBlockingWrites();
     ExecutorFuture<void> waitUntilReadyToBlockWrites();
-    ExecutorFuture<repl::OpTime> waitUntilCurrentlyBlockingWrites();
-    ExecutorFuture<void> persistBlockingWritesTimestamp(repl::OpTime blockingWritesTimestamp);
+    ExecutorFuture<Timestamp> waitUntilCurrentlyBlockingWrites();
+    ExecutorFuture<void> persistBlockingWritesTimestamp(Timestamp blockingWritesTimestamp);
     void updateOnDiskState(OperationContext* opCtx,
                            const MovePrimaryDonorDocument& newStateDocument);
     void updateInMemoryState(const MovePrimaryDonorDocument& newStateDocument);
@@ -243,7 +248,7 @@ private:
     std::unique_ptr<MovePrimaryDonorExternalState> _externalState;
 
     SharedPromise<void> _readyToBlockWritesPromise;
-    SharedPromise<repl::OpTime> _currentlyBlockingWritesPromise;
+    SharedPromise<Timestamp> _currentlyBlockingWritesPromise;
     SharedPromise<void> _completionPromise;
 };
 

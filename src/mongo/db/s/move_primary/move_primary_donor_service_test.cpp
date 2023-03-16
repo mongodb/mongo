@@ -150,6 +150,10 @@ protected:
         return *_commandRunner;
     }
 
+    auto getCurrentTimestamp() {
+        return Timestamp{getServiceContext()->getFastClockSource()->now()};
+    }
+
     std::unique_ptr<repl::PrimaryOnlyService> makeService(ServiceContext* serviceContext) override {
         return std::make_unique<MovePrimaryDonorServiceForTest>(serviceContext, _commandRunner);
     }
@@ -246,11 +250,11 @@ protected:
         auto opCtx = makeOperationContext();
         auto [fp, count] = pauseStateTransition(kAfter, state);
         auto instance = createInstance(opCtx.get());
+        instance->onBeganBlockingWrites(getCurrentTimestamp());
         fp->waitForTimesEntered(count + 1);
         auto onDiskState = getStateDocumentOnDisk(opCtx.get());
         ASSERT_EQ(onDiskState.getMutableFields().getState(), state);
         fp->setMode(FailPoint::off);
-        instance->onBeganBlockingWrites(repl::OpTime{});
         ASSERT_OK(instance->getCompletionFuture().getNoThrow());
     }
 
@@ -259,6 +263,7 @@ protected:
         auto [beforeFp, beforeCount] = pauseStateTransition(kBefore, state);
         auto [afterFp, afterCount] = pauseStateTransitionAlternate(kAfter, state);
         auto instance = createInstance(opCtx.get());
+        instance->onBeganBlockingWrites(getCurrentTimestamp());
         beforeFp->waitForTimesEntered(beforeCount + 1);
 
         auto [failCrud, crudCount] = failCrudOpsOn(NamespaceString::kMovePrimaryDonorNamespace);
@@ -270,21 +275,24 @@ protected:
         auto onDiskState = getStateDocumentOnDisk(opCtx.get());
         ASSERT_EQ(onDiskState.getMutableFields().getState(), state);
         afterFp->setMode(FailPoint::off);
-        instance->onBeganBlockingWrites(repl::OpTime{});
         ASSERT_OK(instance->getCompletionFuture().getNoThrow());
     }
 
     void testStateTransitionUpdatesInMemoryState(MovePrimaryDonorStateEnum state) {
         auto [fp, count] = pauseStateTransition(kAfter, state);
         auto instance = createInstance();
+        instance->onBeganBlockingWrites(getCurrentTimestamp());
         fp->waitForTimesEntered(count + 1);
 
         ASSERT_EQ(getMetrics(instance).getStringField("state"),
                   MovePrimaryDonorState_serializer(state));
 
         fp->setMode(FailPoint::off);
-        instance->onBeganBlockingWrites(repl::OpTime{});
         ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    }
+
+    bool mustBlockWritesToReachState(MovePrimaryDonorStateEnum state) {
+        return state >= MovePrimaryDonorStateEnum::kBlockingWrites;
     }
 
     void testStepUpInState(MovePrimaryDonorStateEnum state) {
@@ -294,6 +302,11 @@ protected:
         {
             auto [fp, count] = pauseStateTransition(kAfter, state);
             auto instance = DonorInstance::getOrCreate(opCtx.get(), _service, stateDoc.toBSON());
+
+            if (mustBlockWritesToReachState(state)) {
+                instance->onBeganBlockingWrites(getCurrentTimestamp());
+            }
+
             fp->waitForTimesEntered(count + 1);
 
             stepDown();
@@ -305,9 +318,13 @@ protected:
         auto count = fp->setMode(FailPoint::alwaysOn);
         stepUp(opCtx.get());
         auto instance = getExistingInstance(opCtx.get(), stateDoc.get_id());
+
+        if (!mustBlockWritesToReachState(state)) {
+            instance->onBeganBlockingWrites(getCurrentTimestamp());
+        }
+
         fp->waitForTimesEntered(count + 1);
         fp->setMode(FailPoint::off);
-        instance->onBeganBlockingWrites(repl::OpTime{});
         ASSERT_OK(instance->getCompletionFuture().getNoThrow());
     }
 
@@ -363,8 +380,12 @@ TEST_F(MovePrimaryDonorServiceTest, StateDocumentIsUpdatedDuringCloning) {
     testStateTransitionUpdatesOnDiskState(MovePrimaryDonorStateEnum::kCloning);
 }
 
-TEST_F(MovePrimaryDonorServiceTest, StateDocumentIsUpdatedDuringkWaitingToBlockWrites) {
+TEST_F(MovePrimaryDonorServiceTest, StateDocumentIsUpdatedDuringWaitingToBlockWrites) {
     testStateTransitionUpdatesOnDiskState(MovePrimaryDonorStateEnum::kWaitingToBlockWrites);
+}
+
+TEST_F(MovePrimaryDonorServiceTest, StateDocumentIsUpdatedDuringBlockingWrites) {
+    testStateTransitionUpdatesOnDiskState(MovePrimaryDonorStateEnum::kBlockingWrites);
 }
 
 TEST_F(MovePrimaryDonorServiceTest, StateDocumentInsertionRetriesIfWriteFails) {
@@ -380,6 +401,11 @@ TEST_F(MovePrimaryDonorServiceTest, TransitionToWaitingToBlockWritesRetriesIfWri
         MovePrimaryDonorStateEnum::kWaitingToBlockWrites);
 }
 
+TEST_F(MovePrimaryDonorServiceTest, TransitionToBlockingWritesRetriesIfWriteFails) {
+    testStateTransitionUpdatesOnDiskStateWithWriteFailure(
+        MovePrimaryDonorStateEnum::kBlockingWrites);
+}
+
 TEST_F(MovePrimaryDonorServiceTest, InitializingUpdatesInMemoryState) {
     testStateTransitionUpdatesInMemoryState(MovePrimaryDonorStateEnum::kInitializing);
 }
@@ -392,6 +418,10 @@ TEST_F(MovePrimaryDonorServiceTest, WaitingToBlockWritesUpdatesInMemoryState) {
     testStateTransitionUpdatesInMemoryState(MovePrimaryDonorStateEnum::kWaitingToBlockWrites);
 }
 
+TEST_F(MovePrimaryDonorServiceTest, BlockingWritesUpdatesInMemoryState) {
+    testStateTransitionUpdatesInMemoryState(MovePrimaryDonorStateEnum::kBlockingWrites);
+}
+
 TEST_F(MovePrimaryDonorServiceTest, StepUpInInitializing) {
     testStepUpInState(MovePrimaryDonorStateEnum::kInitializing);
 }
@@ -402,6 +432,10 @@ TEST_F(MovePrimaryDonorServiceTest, StepUpInCloning) {
 
 TEST_F(MovePrimaryDonorServiceTest, StepUpInWaitingToBlockWrites) {
     testStepUpInState(MovePrimaryDonorStateEnum::kWaitingToBlockWrites);
+}
+
+TEST_F(MovePrimaryDonorServiceTest, StepUpInBlockingWrites) {
+    testStepUpInState(MovePrimaryDonorStateEnum::kBlockingWrites);
 }
 
 TEST_F(MovePrimaryDonorServiceTest, CloningSendsSyncDataCommandWithoutTimestamp) {
@@ -418,7 +452,7 @@ TEST_F(MovePrimaryDonorServiceTest, CloningSendsSyncDataCommandWithoutTimestamp)
         MovePrimaryRecipientSyncData::kReturnAfterReachingDonorTimestampFieldName));
 
     fp->setMode(FailPoint::off);
-    instance->onBeganBlockingWrites(repl::OpTime{});
+    instance->onBeganBlockingWrites(getCurrentTimestamp());
     ASSERT_OK(instance->getCompletionFuture().getNoThrow());
 }
 
@@ -439,7 +473,7 @@ TEST_F(MovePrimaryDonorServiceTest, CloningRetriesSyncDataCommandOnFailure) {
     ASSERT_EQ(getCommandRunner().getCommandsRunCount(), 2);
 
     afterCloning->setMode(FailPoint::off);
-    instance->onBeganBlockingWrites(repl::OpTime{});
+    instance->onBeganBlockingWrites(getCurrentTimestamp());
     ASSERT_OK(instance->getCompletionFuture().getNoThrow());
 }
 
@@ -448,7 +482,7 @@ TEST_F(MovePrimaryDonorServiceTest, WaitingToBlockWritesSetsReadyToBlockWritesFu
     ASSERT_OK(instance->getReadyToBlockWritesFuture().getNoThrow());
     ASSERT_EQ(getMetrics(instance).getStringField("state"),
               MovePrimaryDonorState_serializer(MovePrimaryDonorStateEnum::kWaitingToBlockWrites));
-    instance->onBeganBlockingWrites(repl::OpTime{});
+    instance->onBeganBlockingWrites(getCurrentTimestamp());
     ASSERT_OK(instance->getCompletionFuture().getNoThrow());
 }
 
@@ -459,11 +493,93 @@ TEST_F(MovePrimaryDonorServiceTest, WaitingToBlockWritesPersistsBlockTimestamp) 
     ASSERT_OK(instance->getReadyToBlockWritesFuture().getNoThrow());
 
     const Timestamp timestamp{getServiceContext()->getFastClockSource()->now()};
-    instance->onBeganBlockingWrites(repl::OpTime{timestamp, 1});
+    instance->onBeganBlockingWrites(timestamp);
     fp->waitForTimesEntered(count + 1);
 
     auto docOnDisk = getStateDocumentOnDisk(opCtx.get());
     ASSERT_EQ(docOnDisk.getMutableFields().getBlockingWritesTimestamp(), timestamp);
+
+    fp->setMode(FailPoint::off);
+    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+}
+
+TEST_F(MovePrimaryDonorServiceTest, BlockingWritesSendsSyncDataCommandWithTimestamp) {
+    auto [beforeFp, beforeFpCount] =
+        pauseStateTransition(kAfter, MovePrimaryDonorStateEnum::kBlockingWrites);
+    auto instance = createInstance();
+    const auto kTimestamp = Timestamp{1234, 2};
+    instance->onBeganBlockingWrites(kTimestamp);
+    beforeFp->waitForTimesEntered(beforeFpCount + 1);
+
+    auto beforeCommandCount = getCommandRunner().getCommandsRunCount();
+
+    auto [afterFp, afterFpCount] =
+        pauseStateTransitionAlternate(kBefore, MovePrimaryDonorStateEnum::kPrepared);
+    beforeFp->setMode(FailPoint::off);
+    afterFp->waitForTimesEntered(afterFpCount + 1);
+
+    ASSERT_EQ(getCommandRunner().getCommandsRunCount(), beforeCommandCount + 1);
+    auto details = getCommandRunner().getLastCommandDetails();
+    const auto& command = details->command;
+    ASSERT_TRUE(command.hasField(MovePrimaryRecipientSyncData::kCommandName));
+    ASSERT_EQ(
+        command.getField(MovePrimaryRecipientSyncData::kReturnAfterReachingDonorTimestampFieldName)
+            .timestamp(),
+        kTimestamp);
+
+    afterFp->setMode(FailPoint::off);
+    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+}
+
+TEST_F(MovePrimaryDonorServiceTest, BlockingWritesSyncDataCommandRetriedOnFailure) {
+    auto [beforeFp, beforeFpCount] =
+        pauseStateTransition(kAfter, MovePrimaryDonorStateEnum::kBlockingWrites);
+    auto instance = createInstance();
+    instance->onBeganBlockingWrites(getCurrentTimestamp());
+    beforeFp->waitForTimesEntered(beforeFpCount + 1);
+
+    auto beforeCommandCount = getCommandRunner().getCommandsRunCount();
+    getCommandRunner().addNextResponse(Status{ErrorCodes::Interrupted, "Interrupted"});
+
+    auto [afterFp, afterFpCount] =
+        pauseStateTransitionAlternate(kBefore, MovePrimaryDonorStateEnum::kPrepared);
+    beforeFp->setMode(FailPoint::off);
+    afterFp->waitForTimesEntered(afterFpCount + 1);
+
+    ASSERT_EQ(getCommandRunner().getCommandsRunCount(), beforeCommandCount + 2);
+
+    afterFp->setMode(FailPoint::off);
+    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+}
+
+TEST_F(MovePrimaryDonorServiceTest,
+       BlockingWritesSyncDataCommandSendsProperTimestampAfterFailover) {
+    auto opCtx = makeOperationContext();
+    const auto kTimestamp = Timestamp{1234, 2};
+    boost::optional<UUID> instanceId;
+    {
+        auto [fp, count] = pauseStateTransition(kAfter, MovePrimaryDonorStateEnum::kBlockingWrites);
+        auto instance = createInstance(opCtx.get());
+        instanceId = instance->getMetadata().get_id();
+        instance->onBeganBlockingWrites(kTimestamp);
+        fp->waitForTimesEntered(count + 1);
+        stepDown();
+        fp->setMode(FailPoint::off);
+        ASSERT_NOT_OK(instance->getCompletionFuture().getNoThrow());
+    }
+
+    auto [fp, count] = pauseStateTransition(kBefore, MovePrimaryDonorStateEnum::kPrepared);
+    stepUp(opCtx.get());
+    auto instance = getExistingInstance(opCtx.get(), *instanceId);
+    fp->waitForTimesEntered(count + 1);
+
+    auto details = getCommandRunner().getLastCommandDetails();
+    const auto& command = details->command;
+    ASSERT_TRUE(command.hasField(MovePrimaryRecipientSyncData::kCommandName));
+    ASSERT_EQ(
+        command.getField(MovePrimaryRecipientSyncData::kReturnAfterReachingDonorTimestampFieldName)
+            .timestamp(),
+        kTimestamp);
 
     fp->setMode(FailPoint::off);
     ASSERT_OK(instance->getCompletionFuture().getNoThrow());
