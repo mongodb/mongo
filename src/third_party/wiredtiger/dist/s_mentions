@@ -15,12 +15,17 @@ fi
 # Get what could be the ticket id.
 ticket_id=$(echo "$branch_name" | cut -d "-" -f-2)
 
-# Find the name of the build folder WiredTiger has been compiled in.
-# Users can name this folder anything, but it needs to be in the rootdir and to contain CMakeFiles
-cmake_file=$(find ../ -maxdepth 2 -name CMakeFiles)
-build_folder=$(basename $(dirname $cmake_file))
+search_function="grep -Iinr --exclude-dir=.git"
 
-search_function="grep -Iinr --exclude-dir=.git --exclude-dir=$build_folder $ticket_id ../ 2>&1"
+# Find the name of the build folders WiredTiger has been compiled in.
+# Users can name this folder anything, but it needs to be in the rootdir and to contain CMakeFiles
+build_files=$(find ../ -maxdepth 2 -name CMakeFiles)
+for build_dir in $build_files; do
+    build_folder=$(basename $(dirname $build_dir))
+    search_function="$search_function --exclude-dir=$build_dir"
+done
+
+search_function="$search_function $ticket_id ../ 2>&1"
 
 # Check for comments related to the ticket.
 if eval "$search_function >/dev/null" ; then
