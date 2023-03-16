@@ -25,5 +25,3 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
-        # Fully enable column scan for CSI tests. This can't be done at runtime because it interferes with other tests.
-        internalQueryColumnScanMinNumColumnFilters: 0

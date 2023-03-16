@@ -68,8 +68,7 @@ feature_flags:
     featureFlagColumnstoreIndexes:
       description: "Enables creation of a new columnstore index type"
       cpp_varname: gFeatureFlagColumnstoreIndexes
-      default: true
-      version: 6.3
+      default: false
 
     featureFlagServerlessChangeStreams:
       description: "Feature flag to enable reading change events from the change collection rather than the oplog"

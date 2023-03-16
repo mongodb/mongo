@@ -91,6 +91,8 @@ protected:
     }
 
     void setUp() override {
+        flagController.emplace("featureFlagColumnstoreIndexes", true);
+
         CatalogTestFixture::setUp();
         ASSERT_OK(storageInterface()->createCollection(operationContext(), _nss, {}));
         _coll.emplace(operationContext(), _nss, MODE_X);
@@ -171,6 +173,7 @@ private:
     bool _cursorNeedsSeek;
     boost::optional<FullCellView> _cell;
     SplitCellView _splitCellView;
+    boost::optional<RAIIServerParameterControllerForTest> flagController;
 };
 
 TEST_F(ColumnsAccessMethodTest, Dollars) {

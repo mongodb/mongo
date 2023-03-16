@@ -2,7 +2,8 @@
  * Tests to ensure that COLUMN_SCAN plan and scanned columns appear in slow query log lines when
  * the columstore index is the winning plan.
  * @tags: [
- *   requires_fcv_63,
+ *   featureFlagColumnstoreIndexes,
+ *   featureFlagSbeFull,
  * ]
  */
 (function() {

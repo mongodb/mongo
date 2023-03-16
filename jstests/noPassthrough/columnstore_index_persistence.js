@@ -4,9 +4,11 @@
  * as well as the createIndex response when a columnstore index is created.
  *
  * @tags: [
- *   requires_fcv_63,
  *   requires_persistence,
  *   requires_replication,
+ *   # column store indexes are still under a feature flag and require full sbe
+ *   featureFlagColumnstoreIndexes,
+ *   featureFlagSbeFull,
  * ]
  */
 

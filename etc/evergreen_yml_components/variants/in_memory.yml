@@ -29,8 +29,8 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - rhel80-xlarge
-  - name: .aggfuzzer .common
-  - name: .aggregation !.unwind !.encrypt
+  - name: .aggfuzzer .common !.feature_flag_guarded
+  - name: .aggregation !.unwind !.encrypt !.feature_flag_guarded
   - name: audit
   - name: .auth !.multiversion
   - name: .causally_consistent !.wo_snapshot !.durable_history
@@ -108,7 +108,7 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - windows-vsCurrent-large
-  - name: .aggfuzzer .common
+  - name: .aggfuzzer .common !.feature_flag_guarded
   - name: audit
   - name: auth_audit_gen
   - name: causally_consistent_jscore_txns_passthrough

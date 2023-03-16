@@ -102,7 +102,7 @@ buildvariants:
     large_distro_name: rhel80-medium
     compile_variant: *linux_x86_dynamic_debug_compile_variant_name
   tasks:
-  - name: .aggregation !.encrypt
+  - name: .aggregation !.encrypt !.feature_flag_guarded
   - name: .auth !.audit !.multiversion
   - name: .causally_consistent !.wo_snapshot
   - name: .change_streams !.secondary_reads
@@ -224,8 +224,8 @@ buildvariants:
     variant: generate-tasks-for-version
   tasks:
   #- name: burn_in_tests_gen
-  - name: .aggfuzzer
-  - name: .aggregation
+  - name: .aggfuzzer !.feature_flag_guarded
+  - name: .aggregation !.feature_flag_guarded
   - name: audit
   - name: .auth
   - name: unittest_shell_hang_analyzer_gen

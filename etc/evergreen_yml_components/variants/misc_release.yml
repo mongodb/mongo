@@ -32,8 +32,8 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - amazon2-build
-  - name: .aggfuzzer .common
-  - name: aggregation
+  - name: .aggfuzzer .common !.feature_flag_guarded
+  - name: aggregation !.feature_flag_guarded
   - name: .auth !.audit !.multiversion
   - name: causally_consistent_jscore_txns_passthrough
   - name: .misc_js
@@ -98,8 +98,8 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - amazon2-build
-  - name: .aggfuzzer .common
-  - name: aggregation
+  - name: .aggfuzzer .common !.feature_flag_guarded
+  - name: aggregation !.feature_flag_guarded
   - name: audit
   - name: .auth !.multiversion
   - name: causally_consistent_jscore_txns_passthrough
@@ -153,7 +153,7 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - amazon2-arm64-large
-  - name: aggregation
+  - name: aggregation !.feature_flag_guarded
   - name: .auth !.audit !.multiversion
   - name: causally_consistent_jscore_txns_passthrough
   - name: .misc_js
@@ -220,8 +220,8 @@ buildvariants:
     distros:
     - amazon2-arm64-large
   - name: test_api_version_compatibility
-  - name: .aggfuzzer
-  - name: .aggregation
+  - name: .aggfuzzer !.feature_flag_guarded
+  - name: .aggregation !.feature_flag_guarded
   - name: audit
   - name: .auth
   - name: .causally_consistent !.sharding
@@ -246,7 +246,7 @@ buildvariants:
   - name: jsCore
     distros:
     - amazon2-arm64-large
-  - name: .jscore .common !jsCore
+  - name: .jscore .common !jsCore !.feature_flag_guarded
   - name: jsCore_min_batch_repeat_queries_ese_gsm
   - name: jsCore_txns_large_txns_format
   - name: json_schema
@@ -386,8 +386,8 @@ buildvariants:
     distros:
     - amazon2022-large
   - name: test_api_version_compatibility
-  - name: .aggfuzzer !.multiversion
-  - name: .aggregation
+  - name: .aggfuzzer !.multiversion !.feature_flag_guarded
+  - name: .aggregation !.feature_flag_guarded
   - name: audit
   - name: .auth !.multiversion
   - name: .causally_consistent !.sharding
@@ -486,7 +486,7 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - amazon2022-arm64-large
-  - name: aggregation
+  - name: aggregation !.feature_flag_guarded
   - name: .auth !.audit !.multiversion
   - name: causally_consistent_jscore_txns_passthrough
   - name: .misc_js
@@ -549,8 +549,8 @@ buildvariants:
     distros:
     - amazon2022-arm64-large
   - name: test_api_version_compatibility
-  - name: .aggfuzzer !.multiversion
-  - name: .aggregation
+  - name: .aggfuzzer !.feature_flag_guarded !.multiversion
+  - name: .aggregation !.feature_flag_guarded
   - name: audit
   - name: .auth !.multiversion
   - name: .causally_consistent !.sharding
@@ -575,7 +575,7 @@ buildvariants:
   - name: jsCore
     distros:
     - amazon2022-arm64-large
-  - name: .jscore .common !jsCore
+  - name: .jscore .common !jsCore !.feature_flag_guarded
   - name: jsCore_min_batch_repeat_queries_ese_gsm
   - name: jsCore_txns_large_txns_format
   - name: json_schema
@@ -657,8 +657,8 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - debian10-build
-  - name: .aggfuzzer .common
-  - name: aggregation
+  - name: .aggfuzzer .common !.feature_flag_guarded
+  - name: aggregation !.feature_flag_guarded
   - name: aggregation_auth
   - name: .auth !.audit !.multiversion
   - name: causally_consistent_jscore_txns_passthrough
@@ -667,7 +667,7 @@ buildvariants:
   - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
   - name: free_monitoring
-  - name: .jscore .common !.decimal
+  - name: .jscore .common !.decimal !.feature_flag_guarded
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
   - name: multiversion_gen
@@ -723,14 +723,14 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - debian10-build
-  - name: .aggfuzzer .common
+  - name: .aggfuzzer .common !.feature_flag_guarded
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough
   - name: .encrypt !.replica_sets !.aggregation !.sharding !.jscore
   - name: .jepsen_docker
     distros:
     - debian10-large
-  - name: .jscore .common !.decimal !.sharding
+  - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
   - name: replica_sets_auth_gen
@@ -775,8 +775,8 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - debian11-large
-  - name: .aggfuzzer .common
-  - name: aggregation
+  - name: .aggfuzzer .common !.feature_flag_guarded
+  - name: aggregation !.feature_flag_guarded
   - name: aggregation_auth
   - name: .auth !.audit !.multiversion
   - name: causally_consistent_jscore_txns_passthrough
@@ -785,7 +785,7 @@ buildvariants:
   - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
   - name: free_monitoring
-  - name: .jscore .common !.decimal
+  - name: .jscore .common !.decimal !.feature_flag_guarded
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
   - name: multiversion_gen
@@ -839,14 +839,14 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - debian11-large
-  - name: .aggfuzzer .common
+  - name: .aggfuzzer .common !.feature_flag_guarded
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough
   - name: .encrypt !.replica_sets !.aggregation !.sharding !.jscore
   - name: .jepsen_docker
     distros:
     - debian11-large
-  - name: .jscore .common !.decimal !.sharding
+  - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
   - name: replica_sets_auth_gen
@@ -890,7 +890,7 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - rhel70
-  - name: aggregation
+  - name: aggregation !.feature_flag_guarded
   - name: .auth !.audit !.multiversion
   - name: causally_consistent_jscore_txns_passthrough
   - name: .misc_js
@@ -991,7 +991,7 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - rhel80-build
-  - name: aggregation
+  - name: aggregation !.feature_flag_guarded
   - name: .auth !.audit !.multiversion
   - name: causally_consistent_jscore_txns_passthrough
   - name: .misc_js
@@ -1059,8 +1059,8 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - rhel80-large
-  - name: .aggfuzzer
-  - name: .aggregation
+  - name: .aggfuzzer !.feature_flag_guarded
+  - name: .aggregation !.feature_flag_guarded
   - name: audit
   - name: .auth
   - name: unittest_shell_hang_analyzer_gen
@@ -1168,7 +1168,7 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - rhel82-arm64-large
-  - name: aggregation
+  - name: aggregation !.feature_flag_guarded
   - name: .auth !.audit !.multiversion
   - name: causally_consistent_jscore_txns_passthrough
   - name: .misc_js
@@ -1229,7 +1229,7 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - rhel82-arm64-large
-  - name: .aggfuzzer !.multiversion
+  - name: .aggfuzzer !.multiversion !.feature_flag_guarded
   - name: audit
   - name: auth_audit_gen
   - name: auth_gen
@@ -1237,7 +1237,7 @@ buildvariants:
   - name: .encrypt !.sharding !.replica_sets !.aggregation !.jscore
   - name: external_auth
   - name: external_auth_aws
-  - name: .jscore .common !.decimal !.sharding
+  - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
   - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
@@ -1286,7 +1286,7 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - rhel90-build
-  - name: aggregation
+  - name: aggregation !.feature_flag_guarded
   - name: .auth !.audit !.multiversion
   - name: causally_consistent_jscore_txns_passthrough
   - name: .misc_js
@@ -1343,7 +1343,7 @@ buildvariants:
   - name: compile_build_tools_next_TG
     distros:
     - rhel90-large
-  - name: .aggfuzzer !.multiversion
+  - name: .aggfuzzer !.feature_flag_guarded !.multiversion
   - name: audit
   - name: auth_audit_gen
   - name: auth_gen
@@ -1471,7 +1471,7 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - rhel90-arm64-large
-  - name: .aggfuzzer !.multiversion
+  - name: .aggfuzzer !.multiversion !.feature_flag_guarded
   - name: audit
   - name: auth_audit_gen
   - name: auth_gen
@@ -1536,8 +1536,8 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - suse12-sp5-large
-  - name: .aggfuzzer .common
-  - name: aggregation
+  - name: .aggfuzzer .common !.feature_flag_guarded
+  - name: aggregation !.feature_flag_guarded
   - name: .auth !.audit !.multiversion
   - name: causally_consistent_jscore_txns_passthrough
   - name: .misc_js
@@ -1548,7 +1548,7 @@ buildvariants:
   - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
   - name: free_monitoring
-  - name: .jscore .common !.decimal
+  - name: .jscore .common !.decimal !.feature_flag_guarded
   - name: .jstestfuzz .common
   - name: multiversion_gen
   - name: .logical_session_cache .one_sec
@@ -1604,11 +1604,11 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - suse12-sp5-large
-  - name: .aggfuzzer .common
+  - name: .aggfuzzer .common !.feature_flag_guarded
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough
   - name: .encrypt !.replica_sets !.aggregation !.sharding !.jscore
-  - name: .jscore .common !.decimal !.sharding
+  - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
   - name: replica_sets_auth_gen
@@ -1660,11 +1660,11 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - suse15-build
-  - name: .aggfuzzer .common !.multiversion
+  - name: .aggfuzzer .common !.multiversion !.feature_flag_guarded
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough
   - name: .encrypt !.replica_sets !.aggregation !.sharding !.jscore
-  - name: .jscore .common !.decimal !.sharding
+  - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
   - name: replica_sets_auth_gen
@@ -1709,8 +1709,8 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - suse15-build
-  - name: .aggfuzzer .common !.multiversion
-  - name: aggregation
+  - name: .aggfuzzer .common !.multiversion !.feature_flag_guarded
+  - name: aggregation !.feature_flag_guarded
   - name: .auth !.audit !.multiversion
   - name: causally_consistent_jscore_txns_passthrough
   - name: .misc_js
@@ -1718,7 +1718,7 @@ buildvariants:
   - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
   - name: free_monitoring
-  - name: .jscore .common !.decimal
+  - name: .jscore .common !.decimal !.feature_flag_guarded
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
   - name: multiversion_gen
@@ -1766,8 +1766,8 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - ubuntu1804-build
-  - name: .aggfuzzer .common
-  - name: aggregation
+  - name: .aggfuzzer .common !.feature_flag_guarded
+  - name: aggregation !.feature_flag_guarded
   - name: .auth !.audit !.multiversion
   - name: .misc_js
   - name: .concurrency .common
@@ -1850,7 +1850,7 @@ buildvariants:
     - ubuntu1804-build
   - name: .crypt
   - name: .publish_crypt
-  - name: .aggfuzzer .common
+  - name: .aggfuzzer .common !.feature_flag_guarded
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough
   - name: .encrypt !.aggregation !.replica_sets !.sharding !.jscore
@@ -1859,7 +1859,7 @@ buildvariants:
   - name: .jepsen
     distros:
     - ubuntu1804-build
-  - name: .jscore .common !.decimal !.sharding
+  - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
   - name: jsCore_auth
   - name: .jstestfuzz .common
   - name: libunwind_tests
@@ -1918,7 +1918,7 @@ buildvariants:
     compile_variant: enterprise-ubuntu1804-arm64
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
-  - name: aggregation
+  - name: aggregation !.feature_flag_guarded
   - name: aggregation_wildcard_fuzzer_gen
   - name: .auth !.audit !.multiversion !.jscore
   - name: causally_consistent_jscore_txns_passthrough
@@ -1926,7 +1926,7 @@ buildvariants:
   - name: .concurrency .common
   - name: concurrency_replication_causal_consistency_gen
   - name: fle
-  - name: .jscore .common !.auth
+  - name: .jscore .common !.auth !.feature_flag_guarded
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
   - name: replica_sets_gen
@@ -2012,8 +2012,8 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - ubuntu2204-large
-  - name: .aggfuzzer .common !.multiversion
-  - name: aggregation
+  - name: .aggfuzzer .common !.multiversion !.feature_flag_guarded
+  - name: aggregation !.feature_flag_guarded
   - name: .auth !.audit !.multiversion
   - name: .misc_js
   - name: .concurrency .common
@@ -2067,8 +2067,8 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - ubuntu2004-large
-  - name: .aggfuzzer .common !.multiversion
-  - name: aggregation
+  - name: .aggfuzzer .common !.multiversion !.feature_flag_guarded
+  - name: aggregation !.feature_flag_guarded
   - name: .auth !.audit !.multiversion
   - name: .misc_js
   - name: .concurrency .common
@@ -2136,13 +2136,13 @@ buildvariants:
     - ubuntu2004-large
   - name: .crypt
   - name: .publish_crypt
-  - name: .aggfuzzer .common !.multiversion
+  - name: .aggfuzzer .common !.multiversion !.feature_flag_guarded
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough
   - name: .encrypt !.aggregation !.replica_sets !.sharding !.jscore
   - name: external_auth
   - name: external_auth_aws
-  - name: .jscore .common !.decimal !.sharding
+  - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
   - name: jsCore_auth
   - name: .jstestfuzz .common
   - name: libunwind_tests
@@ -2202,13 +2202,13 @@ buildvariants:
     - ubuntu2204-large
   - name: .crypt
   - name: .publish_crypt
-  - name: .aggfuzzer .common !.multiversion
+  - name: .aggfuzzer .common !.multiversion !.feature_flag_guarded
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough
   - name: .encrypt !.aggregation !.replica_sets !.sharding !.jscore
   - name: external_auth
   - name: external_auth_aws
-  - name: .jscore .common !.decimal !.sharding
+  - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
   - name: jsCore_auth
   - name: .jstestfuzz .common
   - name: libunwind_tests
@@ -2262,7 +2262,7 @@ buildvariants:
     compile_variant: enterprise-ubuntu2004-arm64
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
-  - name: aggregation
+  - name: aggregation !.feature_flag_guarded
   - name: aggregation_wildcard_fuzzer_gen
   - name: .auth !.audit !.multiversion !.jscore
   - name: causally_consistent_jscore_txns_passthrough
@@ -2270,7 +2270,7 @@ buildvariants:
   - name: .concurrency .common
   - name: concurrency_replication_causal_consistency_gen
   - name: fle
-  - name: .jscore .common !.auth
+  - name: .jscore .common !.auth !.feature_flag_guarded
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
   - name: replica_sets_gen
@@ -2354,7 +2354,7 @@ buildvariants:
     compile_variant: enterprise-ubuntu2204-arm64
   tasks:
   - name: compile_test_and_package_serial_no_unittests_TG
-  - name: aggregation
+  - name: aggregation !.feature_flag_guarded
   - name: aggregation_wildcard_fuzzer_gen
   - name: .auth !.audit !.multiversion !.jscore
   - name: causally_consistent_jscore_txns_passthrough
@@ -2362,7 +2362,7 @@ buildvariants:
   - name: .concurrency .common
   - name: concurrency_replication_causal_consistency_gen
   - name: fle
-  - name: .jscore .common !.auth
+  - name: .jscore .common !.auth !.feature_flag_guarded
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
   - name: replica_sets_gen
@@ -2449,8 +2449,8 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - windows-vsCurrent-large
-  - name: .aggfuzzer
-  - name: .aggregation !.auth !.encrypt !.unwind
+  - name: .aggfuzzer !.feature_flag_guarded
+  - name: .aggregation !.auth !.encrypt !.unwind !.feature_flag_guarded
   - name: auth_gen
   - name: causally_consistent_jscore_txns_passthrough
   - name: .misc_js
@@ -2462,7 +2462,7 @@ buildvariants:
   - name: .concurrency .common
   - name: disk_wiredtiger
   - name: free_monitoring
-  - name: .jscore .common !.auth
+  - name: .jscore .common !.auth !.feature_flag_guarded
   - name: json_schema
   - name: .jstestfuzz !.initsync !.flow_control !.stepdowns
   - name: multiversion_gen
@@ -2523,8 +2523,8 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - windows-vsCurrent-large
-  - name: .aggfuzzer
-  - name: .aggregation !.auth !.encrypt !.unwind
+  - name: .aggfuzzer !.feature_flag_guarded
+  - name: .aggregation !.auth !.encrypt !.unwind !.feature_flag_guarded
   - name: auth_gen
   - name: causally_consistent_jscore_txns_passthrough
   - name: .misc_js
@@ -2539,7 +2539,7 @@ buildvariants:
     - windows-vsCurrent-large
   - name: .publish_crypt
   - name: disk_wiredtiger
-  - name: .jscore .common !.auth
+  - name: .jscore .common !.auth !.feature_flag_guarded
   - name: json_schema
   - name: .jstestfuzz !.initsync !.flow_control !.stepdowns
   - name: multiversion_gen
@@ -2582,7 +2582,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: compile_build_tools_next_TG
-  - name: .aggregation !.auth !.encrypt !.unwind
+  - name: .aggregation !.auth !.encrypt !.unwind !.feature_flag_guarded
   - name: auth_gen
   - name: .causally_consistent !.sharding
   - name: .change_streams !.secondary_reads
@@ -2591,7 +2591,7 @@ buildvariants:
   - name: disk_wiredtiger
   - name: free_monitoring
   - name: initial_sync_fuzzer_gen
-  - name: .jscore .common !.auth
+  - name: .jscore .common !.auth !.feature_flag_guarded
   - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz .causal
   - name: .jstestfuzz .interrupt
@@ -2636,7 +2636,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: compile_build_tools_next_TG
-  - name: .aggregation !.auth !.encrypt !.unwind
+  - name: .aggregation !.auth !.encrypt !.unwind !.feature_flag_guarded
   - name: auth_gen
   - name: .causally_consistent !.sharding
   - name: .change_streams !.secondary_reads
@@ -2645,7 +2645,7 @@ buildvariants:
   - name: disk_wiredtiger
   - name: free_monitoring
   - name: initial_sync_fuzzer_gen
-  - name: .jscore .common !.auth
+  - name: .jscore .common !.auth !.feature_flag_guarded
   - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz .causal
   - name: .jstestfuzz .interrupt
@@ -2702,7 +2702,7 @@ buildvariants:
   - name: causally_consistent_jscore_txns_passthrough
   # TODO: SERVER-66945 Re-enable ESE on enterprise macos
   # - name: .encrypt !.replica_sets !.sharding !.aggregation !.jscore
-  - name: .jscore .common !.decimal !.sharding
+  - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
   - name: mqlrun
@@ -2746,7 +2746,7 @@ buildvariants:
   - name: auth_audit_gen
   - name: causally_consistent_jscore_txns_passthrough
   - name: .encrypt !.replica_sets !.sharding !.aggregation !.jscore
-  - name: .jscore .common !.decimal !.sharding
+  - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
   - name: mqlrun

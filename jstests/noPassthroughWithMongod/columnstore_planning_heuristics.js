@@ -2,8 +2,9 @@
  * Testing of the query planner heuristics for determining whether a collection is eligible for
  * column scan.
  * @tags: [
- *   # column store indexes are still under a feature flag
- *   featureFlagColumnstoreIndexes
+ *   # Column store indexes are still under a feature flag and require full sbe.
+ *   featureFlagColumnstoreIndexes,
+ *   featureFlagSbeFull,
  * ]
  */
 (function() {
