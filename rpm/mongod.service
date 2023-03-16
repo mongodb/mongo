@@ -8,6 +8,7 @@ Wants=network-online.target
 User=mongod
 Group=mongod
 Environment="OPTIONS=-f /etc/mongod.conf"
+Environment="MONGODB_CONFIG_OVERRIDE_NOFORK=1"
 EnvironmentFile=-/etc/sysconfig/mongod
 ExecStart=/usr/bin/mongod $OPTIONS
 # file size
