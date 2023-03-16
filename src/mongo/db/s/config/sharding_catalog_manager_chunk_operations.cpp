@@ -63,6 +63,7 @@
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/future_util.h"
 #include "mongo/util/str.h"
 
 MONGO_FAIL_POINT_DEFINE(overrideHistoryWindowInSecs);
@@ -405,7 +406,7 @@ void mergeAllChunksOnShardInTransaction(OperationContext* opCtx,
                                         const std::shared_ptr<std::vector<ChunkType>> newChunks) {
     auto updateChunksFn = [collectionUUID, shardId, newChunks](
                               const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
-        SemiFuture<void> fut = SemiFuture<void>::makeReady();
+        std::vector<ExecutorFuture<void>> statementsChain;
 
         for (auto& chunk : *newChunks) {
             // Prepare deletion of existing chunks in the range
@@ -423,33 +424,27 @@ void mergeAllChunksOnShardInTransaction(OperationContext* opCtx,
                 entry.setMulti(true);
                 return std::vector<write_ops::DeleteOpEntry>{entry};
             }());
-            deleteOp.getWriteCommandRequestBase().setOrdered(false);
 
-            // Prepare insertion of new chunk covering the whole range
+            // Prepare insertion of new chunks covering the whole range
             write_ops::InsertCommandRequest insertOp(ChunkType::ConfigNS, {chunk.toConfigBSON()});
 
-            fut = std::move(fut)
-                      .thenRunOn(txnExec)
-                      .then([&txnClient, deleteOp = std::move(deleteOp)]() {
-                          return txnClient.runCRUDOp(deleteOp, {});
-                      })
-                      .thenRunOn(txnExec)
-                      .then([](auto removeChunksResponse) {
-                          uassertStatusOK(removeChunksResponse.toStatus());
-                      })
-                      .thenRunOn(txnExec)
-                      .then([&txnClient, insertOp = std::move(insertOp)]() {
-                          return txnClient.runCRUDOp(insertOp, {});
-                      })
-                      .thenRunOn(txnExec)
-                      .then([](auto insertChunkResponse) {
-                          uassertStatusOK(insertChunkResponse.toStatus());
-                      })
-                      .thenRunOn(txnExec)
-                      .semi();
+            statementsChain.push_back(txnClient.runCRUDOp(deleteOp, {})
+                                          .thenRunOn(txnExec)
+                                          .then([](auto removeChunksResponse) {
+                                              uassertStatusOK(removeChunksResponse.toStatus());
+                                          })
+                                          .thenRunOn(txnExec)
+                                          .then([&txnClient, insertOp = std::move(insertOp)]() {
+                                              return txnClient.runCRUDOp(insertOp, {});
+                                          })
+                                          .thenRunOn(txnExec)
+                                          .then([](auto insertChunkResponse) {
+                                              uassertStatusOK(insertChunkResponse.toStatus());
+                                          })
+                                          .thenRunOn(txnExec));
         }
 
-        return fut;
+        return whenAllSucceed(std::move(statementsChain));
     };
 
     txn_api::SyncTransactionWithRetries txn(
