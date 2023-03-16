@@ -42,6 +42,17 @@ void TransactionResources::releaseAllResourcesOnCommitOrAbort() noexcept {
     acquiredViews.clear();
 }
 
+void TransactionResources::assertNoAcquiredCollections() const {
+    if (acquiredCollections.empty())
+        return;
+
+    std::stringstream ss("Found acquired collections:");
+    for (const auto& acquisition : acquiredCollections) {
+        ss << "\n" << acquisition.prerequisites.nss;
+    }
+    fassertFailedWithStatus(737660, Status{ErrorCodes::InternalError, ss.str()});
+}
+
 TransactionResources::~TransactionResources() {
     invariant(!locker);
     invariant(!lockSnapshot);

@@ -39,7 +39,7 @@
 namespace mongo {
 
 /**
- * Structure which contains all the prerequsites that the catalog needs to meet in order for an
+ * Structure used to declare all the prerequsites that the catalog needs to meet in order for an
  * acquisition of a namespace to succeed.
  */
 struct CollectionOrViewAcquisitionRequest {
@@ -48,7 +48,7 @@ struct CollectionOrViewAcquisitionRequest {
      */
     CollectionOrViewAcquisitionRequest(
         NamespaceString nss,
-        AcquisitionPrerequisites::PlacementConcern placementConcern,
+        PlacementConcern placementConcern,
         repl::ReadConcernArgs readConcern,
         AcquisitionPrerequisites::OperationType operationType,
         AcquisitionPrerequisites::ViewMode viewMode = AcquisitionPrerequisites::kMustBeCollection)
@@ -65,7 +65,7 @@ struct CollectionOrViewAcquisitionRequest {
     CollectionOrViewAcquisitionRequest(
         NamespaceString nss,
         UUID uuid,
-        AcquisitionPrerequisites::PlacementConcern placementConcern,
+        PlacementConcern placementConcern,
         repl::ReadConcernArgs readConcern,
         AcquisitionPrerequisites::OperationType operationType,
         AcquisitionPrerequisites::ViewMode viewMode = AcquisitionPrerequisites::kMustBeCollection)
@@ -82,7 +82,7 @@ struct CollectionOrViewAcquisitionRequest {
      */
     CollectionOrViewAcquisitionRequest(
         NamespaceStringOrUUID nssOrUUID,
-        AcquisitionPrerequisites::PlacementConcern placementConcern,
+        PlacementConcern placementConcern,
         repl::ReadConcernArgs readConcern,
         AcquisitionPrerequisites::OperationType operationType,
         AcquisitionPrerequisites::ViewMode viewMode = AcquisitionPrerequisites::kMustBeCollection)
@@ -108,7 +108,7 @@ struct CollectionOrViewAcquisitionRequest {
     boost::optional<NamespaceString> nss;
     boost::optional<UUID> uuid;
 
-    AcquisitionPrerequisites::PlacementConcern placementConcern;
+    PlacementConcern placementConcern;
     repl::ReadConcernArgs readConcern;
     AcquisitionPrerequisites::OperationType operationType;
     AcquisitionPrerequisites::ViewMode viewMode;
@@ -119,7 +119,7 @@ struct CollectionAcquisitionRequest : public CollectionOrViewAcquisitionRequest 
      * Overload, which acquires a collection by NSS, ignoring the current UUID mapping.
      */
     CollectionAcquisitionRequest(NamespaceString nss,
-                                 AcquisitionPrerequisites::PlacementConcern placementConcern,
+                                 PlacementConcern placementConcern,
                                  repl::ReadConcernArgs readConcern,
                                  AcquisitionPrerequisites::OperationType operationType)
         : CollectionOrViewAcquisitionRequest(nss,
@@ -134,7 +134,7 @@ struct CollectionAcquisitionRequest : public CollectionOrViewAcquisitionRequest 
      */
     CollectionAcquisitionRequest(NamespaceString nss,
                                  UUID uuid,
-                                 AcquisitionPrerequisites::PlacementConcern placementConcern,
+                                 PlacementConcern placementConcern,
                                  repl::ReadConcernArgs readConcern,
                                  AcquisitionPrerequisites::OperationType operationType)
         : CollectionOrViewAcquisitionRequest(nss,
@@ -149,7 +149,7 @@ struct CollectionAcquisitionRequest : public CollectionOrViewAcquisitionRequest 
      * relationship between NSS and UUID.
      */
     CollectionAcquisitionRequest(NamespaceStringOrUUID nssOrUUID,
-                                 AcquisitionPrerequisites::PlacementConcern placementConcern,
+                                 PlacementConcern placementConcern,
                                  repl::ReadConcernArgs readConcern,
                                  AcquisitionPrerequisites::OperationType operationType)
         : CollectionOrViewAcquisitionRequest(nssOrUUID,
@@ -190,16 +190,13 @@ public:
     // Access to services associated with the specified collection top to bottom on the hierarchical
     // stack
 
-    // Sharding services
-    const ScopedCollectionDescription& getShardingDescription() const {
-        return _acquiredCollection.collectionDescription;
-    }
+    // Sharding catalog services
 
-    const boost::optional<ScopedCollectionFilter>& getCollectionFilter() const {
-        return _acquiredCollection.ownershipFilter;
-    }
+    const ScopedCollectionDescription& getShardingDescription() const;
+    const boost::optional<ScopedCollectionFilter>& getShardingFilter() const;
 
-    // StorEx services
+    // Local catalog services
+
     const CollectionPtr& getCollectionPtr() const {
         return _acquiredCollection.collectionPtr;
     }
@@ -280,6 +277,13 @@ std::vector<ScopedCollectionOrViewAcquisition> acquireCollectionsOrViews(
  */
 std::vector<ScopedCollectionOrViewAcquisition> acquireCollectionsOrViewsWithoutTakingLocks(
     OperationContext* opCtx, std::vector<CollectionOrViewAcquisitionRequest> acquisitionRequests);
+
+/**
+ * Please read the comments on AcquisitionPrerequisites::kLocalCatalogOnlyWithPotentialDataLoss for
+ * more information on the semantics of this acquisition.
+ */
+ScopedCollectionAcquisition acquireCollectionForLocalCatalogOnlyWithPotentialDataLoss(
+    OperationContext* opCtx, const NamespaceString& nss, LockMode mode);
 
 /**
  * Serves as a temporary container for transaction resources which have been yielded via a call to

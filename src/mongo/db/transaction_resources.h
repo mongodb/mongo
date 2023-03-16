@@ -43,11 +43,27 @@
 
 namespace mongo {
 
+struct PlacementConcern {
+    boost::optional<DatabaseVersion> dbVersion;
+    boost::optional<ShardVersion> shardVersion;
+};
+
 struct AcquisitionPrerequisites {
-    struct PlacementConcern {
-        boost::optional<DatabaseVersion> dbVersion;
-        boost::optional<ShardVersion> shardVersion;
+    enum PlacementConcernPlaceholder {
+        /**
+         * Special PlacementConcern which mimics direct connection to a shard, causing the
+         * acquisition to bypass any sharding checks and acquire just the local catalog portion. Any
+         * sharding service values, such as the description or the filter are not allowed to be used
+         * (will invariant).
+         *
+         * Note the *with potential data loss* in the name, which indicates that it allows the
+         * caller to operate on a collection which is not even on the local shard, thus if used
+         * incorrectly can lead to data loss.
+         */
+        kLocalCatalogOnlyWithPotentialDataLoss,
     };
+
+    using PlacementConcernVariant = stdx::variant<PlacementConcern, PlacementConcernPlaceholder>;
 
     enum ViewMode { kMustBeCollection, kCanBeView };
 
@@ -55,7 +71,7 @@ struct AcquisitionPrerequisites {
 
     AcquisitionPrerequisites(NamespaceString nss,
                              boost::optional<UUID> uuid,
-                             PlacementConcern placementConcern,
+                             PlacementConcernVariant placementConcern,
                              OperationType operationType,
                              ViewMode viewMode)
         : nss(std::move(nss)),
@@ -67,7 +83,7 @@ struct AcquisitionPrerequisites {
     NamespaceString nss;
     boost::optional<UUID> uuid;
 
-    PlacementConcern placementConcern;
+    PlacementConcernVariant placementConcern;
     OperationType operationType;
     ViewMode viewMode;
 };
@@ -79,8 +95,10 @@ struct AcquiredCollection {
 
     std::shared_ptr<Lock::DBLock> dbLock;
     boost::optional<Lock::CollectionLock> collectionLock;
-    ScopedCollectionDescription collectionDescription;
+
+    boost::optional<ScopedCollectionDescription> collectionDescription;
     boost::optional<ScopedCollectionFilter> ownershipFilter;
+
     CollectionPtr collectionPtr;
 };
 
@@ -151,6 +169,13 @@ struct TransactionResources {
     }
 
     void releaseAllResourcesOnCommitOrAbort() noexcept;
+
+    /**
+     * Asserts that this transaction context is not holding any collection acquisitions (i.e., it is
+     * pristine). Used for invarianting in places where we do not expect an existing snapshot to
+     * have been acquired because the caller expects to operate on latest.
+     */
+    void assertNoAcquiredCollections() const;
 
     // The read concern with which the whole operation started. Remains the same for the duration of
     // the entire operation.
