@@ -38,3 +38,15 @@ server_parameters:
     validator:
       gte: 0.1
       lte: 0.5
+
+  throughputProbingInitialConcurrency:
+    description: >-
+      The initial number of concurrent read/write transactions for throughput probing. The default
+      value of 0 means to use the number of logical CPU cores.
+    set_at: startup
+    cpp_vartype: int32_t
+    cpp_varname: gInitialConcurrency
+    default: 0
+    validator:
+      gte: 5
+      lte: 128

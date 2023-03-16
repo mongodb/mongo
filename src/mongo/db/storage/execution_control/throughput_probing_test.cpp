@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/storage/execution_control/throughput_probing.h"
+#include "mongo/db/storage/execution_control/throughput_probing_gen.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::execution_control {
@@ -85,8 +86,10 @@ protected:
               svcCtx->setPeriodicRunner(std::move(runner));
               return runnerPtr;
           }()),
-          _readTicketHolder(size),
-          _writeTicketHolder(size) {}
+          _throughputProbing([&]() -> ThroughputProbing {
+              throughput_probing::gInitialConcurrency = size;
+              return {_svcCtx.get(), &_readTicketHolder, &_writeTicketHolder, Milliseconds{1}};
+          }()) {}
 
     void _run() {
         _runner->run(_client.get());
@@ -99,8 +102,7 @@ protected:
     MockTicketHolder _readTicketHolder;
     MockTicketHolder _writeTicketHolder;
 
-    ThroughputProbing _througputProbing{
-        _svcCtx.get(), &_readTicketHolder, &_writeTicketHolder, Milliseconds{1}};
+    ThroughputProbing _throughputProbing;
 };
 
 class ThroughputProbingMaxConcurrencyTest : public ThroughputProbingTest {

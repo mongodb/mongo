@@ -30,6 +30,7 @@
 #include "mongo/db/storage/execution_control/throughput_probing.h"
 #include "mongo/db/storage/execution_control/throughput_probing_gen.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/processinfo.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -40,7 +41,14 @@ ThroughputProbing::ThroughputProbing(ServiceContext* svcCtx,
                                      TicketHolder* writeTicketHolder,
                                      Milliseconds interval)
     : TicketHolderMonitor(svcCtx, readTicketHolder, writeTicketHolder, interval),
-      _stableConcurrency(_readTicketHolder->outof()) {}
+      _stableConcurrency(throughput_probing::gInitialConcurrency
+                             ? throughput_probing::gInitialConcurrency
+                             : std::clamp(static_cast<int32_t>(ProcessInfo::getNumCores()),
+                                          kMinConcurrency,
+                                          kMaxConcurrency)) {
+    _readTicketHolder->resize(_stableConcurrency);
+    _writeTicketHolder->resize(_stableConcurrency);
+}
 
 void ThroughputProbing::appendStats(BSONObjBuilder& builder) const {
     _stats.serialize(builder);

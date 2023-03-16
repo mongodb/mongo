@@ -37,6 +37,7 @@
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
+#include "mongo/db/storage/storage_engine_parameters_gen.h"
 #include "mongo/db/storage/ticketholder_manager.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/future.h"
@@ -71,6 +72,7 @@ class UseReaderWriterGlobalThrottling {
 public:
     explicit UseReaderWriterGlobalThrottling(ServiceContext* svcCtx, int numTickets)
         : _svcCtx(svcCtx) {
+        gStorageEngineConcurrencyAdjustmentAlgorithm = "";
         // TODO SERVER-72616: Remove ifdefs once PriorityTicketHolder is available cross-platform.
 #ifdef __linux__
         if constexpr (std::is_same_v<PriorityTicketHolder, TicketHolderImpl>) {

@@ -238,8 +238,6 @@ protected:
 
 class MockTicketHolder : public TicketHolder {
 public:
-    explicit MockTicketHolder(int32_t outof) : _outof(outof) {}
-
     void resize(int32_t newSize) noexcept override {
         _outof = newSize;
     }
@@ -288,7 +286,7 @@ private:
 
     int32_t _used = 0;
     int32_t _peakUsed = 0;
-    int32_t _outof;
+    int32_t _outof = 0;
     int32_t _numFinishedProcessing = 0;
 };
 
