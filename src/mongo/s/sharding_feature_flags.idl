@@ -88,7 +88,8 @@ feature_flags:
   featureFlagAutoMerger:
     description: "Feature flag for enabling auto-merging of contiguous chunks belonging to the same shard"
     cpp_varname: feature_flags::gAutoMerger
-    default: false
+    default: true
+    version: 7.0
   featureFlagCheckMetadataConsistency:
     description: "Feature flag for checking metadata consistency in the cluster, database or collection"
     cpp_varname: feature_flags::gCheckMetadataConsistency

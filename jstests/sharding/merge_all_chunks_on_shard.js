@@ -2,7 +2,7 @@
  * Tests mergeAllChunksOnShard command and auto-merger behavior
  *
  * @tags: [
- *   featureFlagAutoMerger,
+ *   requires_fcv_70,
  *   temporary_catalog_shard_incompatible,
  * ]
  */

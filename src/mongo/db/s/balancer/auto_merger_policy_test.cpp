@@ -221,8 +221,6 @@ protected:
     const Timestamp _ts = Timestamp(43);
 
     const KeyPattern _keyPattern{BSON("x" << 1)};
-
-    RAIIServerParameterControllerForTest myFeatureFlag{"featureFlagAutoMerger", true};
 };
 
 TEST_F(AutoMergerPolicyTest, FetchCollectionsWithMergeableChunks) {
