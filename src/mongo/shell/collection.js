@@ -17,6 +17,10 @@ DBCollection.prototype.compact = function() {
     return this._db.getMongo().compact(this._fullName);
 };
 
+DBCollection.prototype.cleanup = function() {
+    return this._db.getMongo().cleanup(this._fullName);
+};
+
 DBCollection.prototype.verify = function() {
     assert(this._fullName, "no fullName");
     assert(this._shortName, "no shortName");

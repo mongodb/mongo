@@ -67,7 +67,8 @@ namespace mongo {
 
 namespace {
 constexpr Duration kCacheInvalidationTime = Minutes(1);
-
+constexpr StringData compactCmdName = "compact"_sd;
+constexpr StringData cleanupCmdName = "cleanup"_sd;
 
 ImplicitEncryptedDBClientCallback* implicitEncryptedDBClientCallback{nullptr};
 
@@ -561,20 +562,31 @@ boost::optional<EncryptedFieldConfig> EncryptedDBClientBase::getEncryptedFieldCo
     return EncryptedFieldConfig::parse(IDLParserContext("encryptedFields"), efc.Obj());
 }
 
-void EncryptedDBClientBase::compact(JSContext* cx, JS::CallArgs args) {
+NamespaceString validateStructuredEncryptionParams(JSContext* cx,
+                                                   JS::CallArgs args,
+                                                   StringData cmdName) {
     if (args.length() != 1) {
-        uasserted(ErrorCodes::BadValue, "compact requires 1 arg");
+        uasserted(ErrorCodes::BadValue, str::stream() << cmdName << " requires 1 arg");
     }
     if (!args.get(0).isString()) {
-        uasserted(ErrorCodes::BadValue, "1st param to compact has to be a string");
+        uasserted(ErrorCodes::BadValue,
+                  str::stream() << "1st param to " << cmdName << " has to be a string");
     }
     std::string fullName = mozjs::ValueWriter(cx, args.get(0)).toString();
     NamespaceString nss(fullName);
+
     uassert(
         ErrorCodes::BadValue, str::stream() << "Invalid namespace: " << fullName, nss.isValid());
 
-    auto efc = getEncryptedFieldConfig(nss);
+    return nss;
+}
+
+void EncryptedDBClientBase::compact(JSContext* cx, JS::CallArgs args) {
+    auto nss = validateStructuredEncryptionParams(cx, args, compactCmdName);
+
     BSONObjBuilder builder;
+    auto efc = getEncryptedFieldConfig(nss);
+
     builder.append("compactStructuredEncryptionData", nss.coll());
     builder.append("compactionTokens",
                    efc ? FLEClientCrypto::generateCompactionTokens(*efc, this) : BSONObj());
@@ -583,6 +595,21 @@ void EncryptedDBClientBase::compact(JSContext* cx, JS::CallArgs args) {
     runCommand(nss.dbName(), builder.obj(), reply, 0);
     reply = reply.getOwned();
     mozjs::ValueReader(cx, args.rval()).fromBSON(reply, nullptr, false);
+}
+
+void EncryptedDBClientBase::cleanup(JSContext* cx, JS::CallArgs args) {
+    auto nss = validateStructuredEncryptionParams(cx, args, cleanupCmdName);
+
+    BSONObjBuilder builder;
+    auto efc = getEncryptedFieldConfig(nss);
+
+    builder.append("cleanupStructuredEncryptionData", nss.coll());
+    builder.append("cleanupTokens",
+                   efc ? FLEClientCrypto::generateCompactionTokens(*efc, this) : BSONObj());
+
+    // TODO SERVER-72937: Add call to cleanup function
+    mozjs::ValueReader(cx, args.rval()).fromBSON(BSONObj(), nullptr, false);
+    return;
 }
 
 void EncryptedDBClientBase::trace(JSTracer* trc) {

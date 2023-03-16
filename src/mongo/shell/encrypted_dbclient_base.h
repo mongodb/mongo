@@ -124,6 +124,9 @@ public:
     using EncryptionCallbacks::compact;
     void compact(JSContext* cx, JS::CallArgs args) final;
 
+    using EncryptionCallbacks::cleanup;
+    void cleanup(JSContext* cx, JS::CallArgs args) final;
+
     using EncryptionCallbacks::trace;
     void trace(JSTracer* trc) final;
 
