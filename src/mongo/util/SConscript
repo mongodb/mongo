@@ -263,6 +263,16 @@ env.CppUnitTest(
     ],
 )
 
+env.CppUnitTest(
+    target='concurrent_shared_values_map_test',
+    source=[
+        'concurrent_shared_values_map_test.cpp',
+    ],
+    LIBDEPS=[
+        "$BUILD_DIR/mongo/base",
+    ],
+)
+
 env.Library(
     target="periodic_runner",
     source=[
