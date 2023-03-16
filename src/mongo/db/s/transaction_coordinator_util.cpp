@@ -183,7 +183,7 @@ repl::OpTime persistParticipantListBlocking(
 
     LOGV2_DEBUG(22465,
                 3,
-                "{sessionId}:{txnNumberAndRetryCounter} Wrote participant list",
+                "Wrote participant list",
                 "sessionId"_attr = lsid,
                 "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter);
 
