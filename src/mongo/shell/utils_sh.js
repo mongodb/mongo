@@ -118,9 +118,12 @@ sh.help = function() {
     print("\tsh.status()                               prints a general overview of the cluster");
     print(
         "\tsh.stopBalancer()                         stops the balancer so chunks are not balanced automatically");
-    print("\tsh.disableAutoMerge()                   disable autoMerge on one collection");
-    print("\tsh.enableAutoMerge()                    re-enable autoMerge on one collection");
-    print("\tsh.shouldAutoMerge()                    returns whether autoMerge is enabled");
+    print(
+        "\tsh.startAutoMerger()                      globally enable auto-merger (active only if balancer is up)");
+    print("\tsh.stopAutoMerger()                     globally disable auto-merger");
+    print("\tsh.shouldAutoMerge()                    returns whether the auto-merger is enabled");
+    print("\tsh.disableAutoMerge(coll)               disable auto-merging on one collection");
+    print("\tsh.enableAutoMerge(coll)                re-enable auto-merge on one collection");
     print(
         "\tsh.balancerCollectionStatus(fullName)       " +
         "returns wheter the specified collection is balanced or the balancer needs to take more actions on it");
@@ -225,7 +228,7 @@ sh.startBalancer = function(timeoutMs, interval) {
     return assert.commandWorked(result);
 };
 
-sh.enableAutoMerge = function(configDB) {
+sh.startAutoMerger = function(configDB) {
     if (configDB === undefined)
         configDB = sh._getConfigDB();
     return assert.commandWorked(
@@ -234,7 +237,7 @@ sh.enableAutoMerge = function(configDB) {
                                  {upsert: true, writeConcern: {w: 'majority', wtimeout: 30000}}));
 };
 
-sh.disableAutoMerge = function(configDB) {
+sh.stopAutoMerger = function(configDB) {
     if (configDB === undefined)
         configDB = sh._getConfigDB();
     return assert.commandWorked(
@@ -251,6 +254,44 @@ sh.shouldAutoMerge = function(configDB) {
         return true;
     }
     return automerge.enabled;
+};
+
+sh.disableAutoMerge = function(coll) {
+    if (coll === undefined) {
+        throw Error("Must specify collection");
+    }
+    var dbase = globalThis.db;
+    if (coll instanceof DBCollection) {
+        dbase = coll.getDB();
+    } else {
+        sh._checkMongos();
+    }
+
+    return sh._assertRetryableCommandWorked(() => {
+        dbase.getSiblingDB("config").collections.update(
+            {_id: coll + ""},
+            {$set: {"enableAutoMerge": false}},
+            {writeConcern: {w: 'majority', wtimeout: 60000}});
+    }, 'Timed out waiting for disabling auto-merge');
+};
+
+sh.enableAutoMerge = function(coll) {
+    if (coll === undefined) {
+        throw Error("Must specify collection");
+    }
+    var dbase = globalThis.db;
+    if (coll instanceof DBCollection) {
+        dbase = coll.getDB();
+    } else {
+        sh._checkMongos();
+    }
+
+    return sh._assertRetryableCommandWorked(() => {
+        dbase.getSiblingDB("config").collections.update(
+            {_id: coll + ""},
+            {$unset: {"enableAutoMerge": 1}},
+            {writeConcern: {w: 'majority', wtimeout: 60000}});
+    }, 'Timed out waiting for enabling auto-merge');
 };
 
 sh.waitForPingChange = function(activePings, timeout, interval) {
