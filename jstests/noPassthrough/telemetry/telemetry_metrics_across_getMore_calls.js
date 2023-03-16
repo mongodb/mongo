@@ -3,8 +3,7 @@
  * calls.
  * @tags: [featureFlagTelemetry]
  */
-load("jstests/libs/feature_flag_util.js");  // For FeatureFlagUtil.
-load("jstests/libs/telemetry_utils.js");    // For verifyMetrics.
+load("jstests/libs/telemetry_utils.js");  // For verifyMetrics.
 
 (function() {
 "use strict";

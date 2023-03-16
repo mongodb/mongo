@@ -64,13 +64,6 @@ namespace telemetry {
 // files/libraries here. Instead define here as well.
 static const std::string kTelemetryKeyInShardedCommand = "hashedTelemetryKey";
 
-bool isTelemetryEnabled() {
-    // During initialization FCV may not yet be setup but queries could be run. We can't
-    // check whether telemetry should be enabled without FCV, so default to not recording
-    // those queries.
-    return serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        feature_flags::gFeatureFlagTelemetry.isEnabled(serverGlobalParams.featureCompatibility);
-}
 
 ShardedTelemetryStoreKey telemetryKeyToShardedStoreId(const BSONObj& key, std::string hostAndPort) {
     md5digest finishedMD5;
@@ -367,7 +360,7 @@ size_t capTelemetryStoreSize(size_t requestedSize) {
 size_t getTelemetryStoreSize() {
     auto status = memory_util::MemorySize::parse(queryTelemetryStoreSize.get());
     uassertStatusOK(status);
-    size_t requestedSize = memory_util::getRequestedMemSizeInBytes(status.getValue());
+    size_t requestedSize = memory_util::convertToSizeInBytes(status.getValue());
     return capTelemetryStoreSize(requestedSize);
 }
 
@@ -408,9 +401,8 @@ const auto telemetryRateLimiter =
 class TelemetryOnParamChangeUpdaterImpl final : public telemetry_util::OnParamChangeUpdater {
 public:
     void updateCacheSize(ServiceContext* serviceCtx, memory_util::MemorySize memSize) final {
-        auto requestedSize = memory_util::getRequestedMemSizeInBytes(memSize);
+        auto requestedSize = memory_util::convertToSizeInBytes(memSize);
         auto cappedSize = capTelemetryStoreSize(requestedSize);
-
         auto& telemetryStoreManager = telemetryStoreDecoration(serviceCtx);
         auto&& telemetryStore = telemetryStoreManager->getTelemetryStore();
         size_t numEvicted = telemetryStore.reset(cappedSize);
@@ -556,6 +548,7 @@ void appendWithRedactedLiterals(BSONObjBuilder& builder, const BSONElement& el) 
 
 }  // namespace
 
+
 const BSONObj& TelemetryMetrics::redactKey(const BSONObj& key, bool redactFieldNames) const {
     // The redacted key for each entry is cached on first computation. However, if the redaction
     // straegy has flipped (from no redaction to SHA256, vice versa), we just return the key passed
@@ -613,6 +606,19 @@ const BSONObj& TelemetryMetrics::redactKey(const BSONObj& key, bool redactFieldN
     }
     _redactedKey = redacted.obj();
     return *_redactedKey;
+}
+
+/**
+ * Top-level checks for whether telemetry collection is enabled. If this returns false, we must go
+ * no further.
+ */
+bool isTelemetryEnabled() {
+    // During initialization FCV may not yet be setup but queries could be run. We can't
+    // check whether telemetry should be enabled without FCV, so default to not recording
+    // those queries.
+    return serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+        feature_flags::gFeatureFlagTelemetry.isEnabled(serverGlobalParams.featureCompatibility) &&
+        getTelemetryStoreSize() != 0;
 }
 
 // The originating command/query does not persist through the end of query execution. In order to
@@ -717,7 +723,10 @@ void registerFindRequest(const FindCommandRequest& request,
 }
 
 TelemetryStore& getTelemetryStore(OperationContext* opCtx) {
-    uassert(6579000, "Telemetry is not enabled without the feature flag on", isTelemetryEnabled());
+    uassert(6579000,
+            "Telemetry is not enabled without the feature flag on and a cache size greater than 0 "
+            "bytes",
+            isTelemetryEnabled());
     return telemetryStoreDecoration(opCtx->getServiceContext())->getTelemetryStore();
 }
 
