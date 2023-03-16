@@ -2526,7 +2526,6 @@ buildvariants:
   - name: .encrypt
   - name: free_monitoring
   - name: initial_sync_fuzzer_gen
-  - name: .integration !.audit
   - name: .jscore .common
   - name: jsCore_column_store_indexes
   - name: jsCore_min_batch_repeat_queries_ese_gsm
@@ -2553,7 +2552,6 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot
   - name: .sharding .common !.csrs
   - name: .serverless
-  - name: .stitch
   - name: .shard_split
   - name: .shard_merge
   - name: telemetry_passthrough
