@@ -177,5 +177,20 @@ TEST_F(DBDirectClientTest, ExhaustQuery) {
     ASSERT_EQ(cursor->itcount(), numDocs);
 }
 
+TEST_F(DBDirectClientTest, InternalErrorAllowedToEscapeDBDirectClient) {
+    DBDirectClient client(_opCtx);
+    FindCommandRequest findCmd{kNs};
+
+    FailPointEnableBlock failPoint("failCommand",
+                                   BSON("errorCode" << ErrorCodes::TransactionAPIMustRetryCommit
+                                                    << "failCommands" << BSON_ARRAY("find")
+                                                    << "failInternalCommands" << true
+                                                    << "failLocalClients" << true));
+
+    ASSERT_THROWS_CODE(client.find(std::move(findCmd), ReadPreferenceSetting{}, ExhaustMode::kOff),
+                       DBException,
+                       ErrorCodes::TransactionAPIMustRetryCommit);
+}
+
 }  // namespace
 }  // namespace mongo

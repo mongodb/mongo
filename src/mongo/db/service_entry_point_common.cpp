@@ -204,8 +204,13 @@ struct HandleRequest {
             }
         }
 
+        /**
+         * Note that DBDirectClient is treated as an internal client in relation to letting
+         * internal errors escape.
+         */
         bool isInternalClient() const {
-            return session() && (session()->getTags() & transport::Session::kInternalClient);
+            return (client().isInDirectClient()) ||
+                (session() && (session()->getTags() & transport::Session::kInternalClient));
         }
 
         std::unique_ptr<const ServiceEntryPointCommon::Hooks> behaviors;
