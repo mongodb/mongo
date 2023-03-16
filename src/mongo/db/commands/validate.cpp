@@ -112,10 +112,12 @@ void logCollStats(OperationContext* opCtx, const NamespaceString& nss) {
     BSONObj collStatsResult;
     try {
         // Run $collStats via aggregation.
-        // Any command errors will throw and be caught in the 'catch'.
         client.runCommand(nss.db().toString(),
                           makeCollStatsCommand(nss.coll()),
                           collStatsResult /* command return results */);
+        // Logging $collStats information is best effort. If the collection doesn't exist, for
+        // example, then the $collStats query will fail and the failure reason will be logged.
+        uassertStatusOK(getStatusFromWriteCommandReply(collStatsResult));
         verifyCommandResponse(collStatsResult);
 
         LOGV2_OPTIONS(7463200,
