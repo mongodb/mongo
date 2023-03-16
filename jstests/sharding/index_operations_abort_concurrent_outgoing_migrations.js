@@ -100,6 +100,39 @@ stepNames.forEach((stepName) => {
     }
 });
 
+// TODO SERVER-74825: Remove once 7.0 becomes last-lts.
+if (!jsTestOptions().shardMixedBinVersions &&
+    !jsTest.options().useRandomBinVersionsWithinReplicaSet) {
+    stepNames.forEach((stepName) => {
+        jsTest.log(
+            `Testing that single phase createIndexes aborts concurrent outgoing migrations that are in step ${
+                stepName}...`);
+        const collName = "testSinglePhaseCreateIndexesMoveChunkStep" + stepName;
+        const ns = dbName + "." + collName;
+
+        assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: shardKey}));
+
+        assertCommandAbortsConcurrentOutgoingMigration(st, stepName, ns, () => {
+            const coll = st.s.getCollection(ns);
+
+            assert.commandWorked(coll.createIndexes([index]));
+        });
+
+        // Verify that the index command succeeds.
+        ShardedIndexUtil.assertIndexExistsOnShard(st.shard0, dbName, collName, index);
+
+        // If createIndexes is run after the migration has reached the steady state, shard1
+        // will not have the index created by the command because the index just does not
+        // exist when shard1 clones the collection options and indexes from shard0. However,
+        // if createIndexes is run after the cloning step starts but before the steady state
+        // is reached, shard0 may have the index when shard1 does the cloning so shard1 may
+        // or may not have the index.
+        if (stepName == moveChunkStepNames.reachedSteadyState) {
+            ShardedIndexUtil.assertIndexDoesNotExistOnShard(st.shard1, dbName, collName, index);
+        }
+    });
+}
+
 stepNames.forEach((stepName) => {
     jsTest.log(`Testing that dropIndexes aborts concurrent outgoing migrations that are in step ${
         stepName}...`);

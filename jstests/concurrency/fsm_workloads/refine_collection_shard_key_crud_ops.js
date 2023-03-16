@@ -213,11 +213,9 @@ var $config = (function() {
         // shard key (if this step were done after every refineCollectionShardKey).
         for (let i = this.latchCount; i >= 0; --i) {
             let coll = db.getCollection(collName + '_' + i);
-            // TODO SERVER-74449 revert temporary workaround to `createIndex` before
-            // `shardCollection`
-            assertAlways.commandWorked(coll.createIndex(this.newShardKey));
             assertAlways.commandWorked(
                 db.adminCommand({shardCollection: coll.getFullName(), key: this.oldShardKey}));
+            assertAlways.commandWorked(coll.createIndex(this.newShardKey));
         }
     }
 

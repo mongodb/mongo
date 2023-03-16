@@ -760,6 +760,14 @@ repl::OpTime ShardServerOpObserver::onDropCollection(OperationContext* opCtx,
     return {};
 }
 
+void ShardServerOpObserver::onCreateIndex(OperationContext* opCtx,
+                                          const NamespaceString& nss,
+                                          const UUID& uuid,
+                                          BSONObj indexDoc,
+                                          bool fromMigrate) {
+    abortOngoingMigrationIfNeeded(opCtx, nss);
+}
+
 void ShardServerOpObserver::onStartIndexBuild(OperationContext* opCtx,
                                               const NamespaceString& nss,
                                               const UUID& collUUID,
