@@ -199,6 +199,9 @@ public:
 
     const MovePrimaryCommonMetadata& getMetadata() const;
 
+    void onBeganBlockingWrites(StatusWith<repl::OpTime> blockingWritesTimestamp);
+
+    SharedSemiFuture<void> getReadyToBlockWritesFuture() const;
     SharedSemiFuture<void> getCompletionFuture() const;
 
 private:
@@ -212,6 +215,10 @@ private:
     ExecutorFuture<void> transitionToState(MovePrimaryDonorStateEnum state);
     ExecutorFuture<void> doInitializing();
     ExecutorFuture<void> doCloning();
+    ExecutorFuture<void> doWaitingToBlockWrites();
+    ExecutorFuture<void> waitUntilReadyToBlockWrites();
+    ExecutorFuture<repl::OpTime> waitUntilCurrentlyBlockingWrites();
+    ExecutorFuture<void> persistBlockingWritesTimestamp(repl::OpTime blockingWritesTimestamp);
     void updateOnDiskState(OperationContext* opCtx,
                            const MovePrimaryDonorDocument& newStateDocument);
     void updateInMemoryState(const MovePrimaryDonorDocument& newStateDocument);
@@ -235,6 +242,8 @@ private:
 
     std::unique_ptr<MovePrimaryDonorExternalState> _externalState;
 
+    SharedPromise<void> _readyToBlockWritesPromise;
+    SharedPromise<repl::OpTime> _currentlyBlockingWritesPromise;
     SharedPromise<void> _completionPromise;
 };
 

@@ -299,6 +299,10 @@ const MovePrimaryCommonMetadata& MovePrimaryDonor::getMetadata() const {
     return _metadata;
 }
 
+SharedSemiFuture<void> MovePrimaryDonor::getReadyToBlockWritesFuture() const {
+    return _readyToBlockWritesPromise.getFuture();
+}
+
 SharedSemiFuture<void> MovePrimaryDonor::getCompletionFuture() const {
     return _completionPromise.getFuture();
 }
@@ -335,7 +339,9 @@ ExecutorFuture<void> MovePrimaryDonor::runDonorWorkflow() {
         .then([this] { return transitionToState(MovePrimaryDonorStateEnum::kCloning); })
         .then([this] { return doCloning(); })
         .then(
-            [this] { return transitionToState(MovePrimaryDonorStateEnum::kWaitingToBlockWrites); });
+            [this] { return transitionToState(MovePrimaryDonorStateEnum::kWaitingToBlockWrites); })
+        .then([this] { return doWaitingToBlockWrites(); })
+        .then([this] { return transitionToState(MovePrimaryDonorStateEnum::kBlockingWrites); });
 }
 
 ExecutorFuture<void> MovePrimaryDonor::transitionToState(MovePrimaryDonorStateEnum newState) {
@@ -363,7 +369,7 @@ ExecutorFuture<void> MovePrimaryDonor::transitionToState(MovePrimaryDonorStateEn
             evaluatePauseDuringStateTransitionFailpoints(StateTransitionProgress::kAfter, newState);
 
             LOGV2(7306300,
-                  "Transitioned movePrimary donor state",
+                  "MovePrimaryDonor transitioned state",
                   "oldState"_attr = MovePrimaryDonorState_serializer(oldState),
                   "newState"_attr = MovePrimaryDonorState_serializer(newState),
                   "migrationId"_attr = _metadata.get_id(),
@@ -402,6 +408,56 @@ ExecutorFuture<void> MovePrimaryDonor::doCloning() {
         auto opCtx = factory.makeOperationContext(&cc());
         _externalState->syncDataOnRecipient(opCtx.get());
     });
+}
+
+ExecutorFuture<void> MovePrimaryDonor::doWaitingToBlockWrites() {
+    return waitUntilReadyToBlockWrites()
+        .then([this] { return waitUntilCurrentlyBlockingWrites(); })
+        .then([this](repl::OpTime blockingWritesTimestamp) {
+            return persistBlockingWritesTimestamp(blockingWritesTimestamp);
+        });
+}
+
+ExecutorFuture<void> MovePrimaryDonor::waitUntilReadyToBlockWrites() {
+    return runOnTaskExecutor([this] {
+        // TODO SERVER-74933: Use commit monitor to determine when to engage critical section.
+        LOGV2(7306500,
+              "MovePrimaryDonor ready to block writes",
+              "migrationId"_attr = _metadata.get_id(),
+              "databaseName"_attr = _metadata.getDatabaseName(),
+              "toShard"_attr = _metadata.getShardName());
+
+        _readyToBlockWritesPromise.setFrom(Status::OK());
+    });
+}
+
+ExecutorFuture<repl::OpTime> MovePrimaryDonor::waitUntilCurrentlyBlockingWrites() {
+    return runOnTaskExecutor([this] { return _currentlyBlockingWritesPromise.getFuture().get(); });
+}
+
+void MovePrimaryDonor::onBeganBlockingWrites(StatusWith<repl::OpTime> blockingWritesTimestamp) {
+    _currentlyBlockingWritesPromise.setFrom(blockingWritesTimestamp);
+}
+
+ExecutorFuture<void> MovePrimaryDonor::persistBlockingWritesTimestamp(
+    repl::OpTime blockingWritesTimestamp) {
+    return _retry->untilAbortOrSuccess(
+        fmt::format("persistBlockingWritesTimestamp({})", blockingWritesTimestamp.toString()),
+        [this, blockingWritesTimestamp](const auto& factory) {
+            auto opCtx = factory.makeOperationContext(&cc());
+            auto newStateDocument = buildCurrentStateDocument();
+            newStateDocument.getMutableFields().setBlockingWritesTimestamp(
+                blockingWritesTimestamp.getTimestamp());
+            updateOnDiskState(opCtx.get(), newStateDocument);
+            updateInMemoryState(newStateDocument);
+
+            LOGV2(7306501,
+                  "MovePrimaryDonor persisted block timestamp",
+                  "blockingWritesTimestamp"_attr = blockingWritesTimestamp,
+                  "migrationId"_attr = _metadata.get_id(),
+                  "databaseName"_attr = _metadata.getDatabaseName(),
+                  "toShard"_attr = _metadata.getShardName());
+        });
 }
 
 

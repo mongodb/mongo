@@ -73,11 +73,11 @@ structs:
                 type: MovePrimaryDonorState
                 description: "The state of an in-progress movePrimary operation on the donor."
                 default: kUninitialized
-            blockTimestamp:
+            blockingWritesTimestamp:
                 type: timestamp
                 description: >-
-                    The timestamp at which writes and causal reads against the databases
-                    being migrated should start blocking.
+                    A timestamp after writes began being blocked on the donor node for the database
+                    being moved.
                 optional: true
             abortReason:
                 type: object_owned
