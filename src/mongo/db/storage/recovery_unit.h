@@ -126,6 +126,12 @@ public:
         kCommit
     };
 
+    // Specifies the level of suppression of untimestamped writes errors.
+    enum class UntimestampedWriteAssertionLevel {
+        kSuppressOnce,    // Suppress errors throughout one write unit of work.
+        kSuppressAlways,  // Suppress errors throughout the lifetime of the RecoveryUnit.
+        kEnforce          // Enforce untimestamped writes errors (this is the default).
+    };
 
     void commitRegisteredChanges(boost::optional<Timestamp> commitTimestamp);
     void abortRegisteredChanges();
@@ -397,7 +403,7 @@ public:
 
     /**
      * Sets catalog conflicting timestamp.
-     * This cannot be called after WiredTigerRecoveryUnit::_txnOpen.
+     * This can only be called while the RecoveryUnit is in an inactive state.
      *
      * This value must be set when both of the following conditions are true:
      * - A storage engine snapshot is opened without a read timestamp
@@ -422,9 +428,18 @@ public:
      * MongoDB must update documents with non-decreasing timestamp values. A storage engine is
      * allowed to assert when this contract is violated. An untimestamped write is a subset of these
      * violations, which may be necessary in limited circumstances. This API can be called before a
-     * transaction begins to suppress this subset of errors.
+     * WriteUnitOfWork begins and will suppress this subset of errors until the WriteUnitOfWork is
+     * committed or rolled-back.
      */
-    virtual void allowUntimestampedWrite() {}
+    virtual void allowOneUntimestampedWrite() {}
+
+    /**
+     * Suppresses untimestamped write errors over the lifetime of a RecoveryUnit.
+     *
+     * NOTE: we should be extremely intentional with suppressing untimestamped errors. In most
+     * cases we should enforce untimestamped write errors.
+     */
+    virtual void allowAllUntimestampedWrites() {}
 
     /**
      * Computes the storage level statistics accrued since the last call to this function, or

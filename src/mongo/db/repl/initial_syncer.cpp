@@ -814,7 +814,7 @@ Status InitialSyncer::_truncateOplogAndDropReplicatedDatabases() {
     auto opCtx = makeOpCtx();
     // This code can make untimestamped writes (deletes) to the _mdb_catalog on top of existing
     // timestamped updates.
-    opCtx->recoveryUnit()->allowUntimestampedWrite();
+    opCtx->recoveryUnit()->allowAllUntimestampedWrites();
 
     // We are not replicating nor validating these writes.
     UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx.get());

@@ -128,12 +128,11 @@ template <PrepareConflictBehavior behavior, RoundUpPreparedTimestamps round>
 void BM_WiredTigerBeginTxnBlockWithArgs(benchmark::State& state) {
     WiredTigerTestHelper helper;
     for (auto _ : state) {
-        WiredTigerBeginTxnBlock beginTxn(
-            helper.wtSession(),
-            behavior,
-            round,
-            RoundUpReadTimestamp::kNoRoundError,
-            WiredTigerBeginTxnBlock::UntimestampedWriteAssertion::kEnforce);
+        WiredTigerBeginTxnBlock beginTxn(helper.wtSession(),
+                                         behavior,
+                                         round,
+                                         RoundUpReadTimestamp::kNoRoundError,
+                                         RecoveryUnit::UntimestampedWriteAssertionLevel::kEnforce);
     }
 }
 
