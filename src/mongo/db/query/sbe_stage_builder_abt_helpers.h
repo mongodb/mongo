@@ -121,6 +121,11 @@ optimizer::ABT generateABTNonStringCheck(optimizer::ABT var);
 optimizer::ABT generateABTNonTimestampCheck(optimizer::ProjectionName var);
 optimizer::ABT generateABTNullishOrNotRepresentableInt32Check(optimizer::ProjectionName var);
 /**
+ * Generates an ABT to check the given variable is a number between -20 and 100 inclusive, and is a
+ * whole number.
+ */
+optimizer::ABT generateInvalidRoundPlaceArgCheck(const optimizer::ProjectionName& var);
+/**
  * Generates an ABT that checks if the input expression is NaN _assuming that_ it has
  * already been verified to be numeric.
  */

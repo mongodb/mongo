@@ -5,66 +5,81 @@
 
 // For assertErrorCode.
 load("jstests/aggregation/extras/utils.js");
+load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
 
-var coll = db.server19548;
+const coll = db.server19548;
 coll.drop();
-// Seed collection so that the pipeline will execute.
-assert.commandWorked(coll.insert({}));
 
 // Helper for testing that op returns expResult.
-function testOp(op, expResult) {
-    var pipeline = [{$project: {_id: 0, result: op}}];
+function testOp(exprName, value, expResult, place) {
+    coll.drop();
+    assert.commandWorked(coll.insert({a: value}));
+    const project = place === undefined ? {[exprName]: "$a"} : {[exprName]: ["$a", place]};
+    const pipeline = [{$project: {_id: 0, result: project}}];
     assert.eq(coll.aggregate(pipeline).toArray(), [{result: expResult}]);
 }
 
-// Test $trunc and $round with one argument.
-testOp({$trunc: NumberLong(4)}, NumberLong(4));
-testOp({$trunc: NaN}, NaN);
-testOp({$trunc: Infinity}, Infinity);
-testOp({$trunc: -Infinity}, -Infinity);
-testOp({$trunc: null}, null);
-testOp({$trunc: -2.0}, -2.0);
-testOp({$trunc: 0.9}, 0.0);
-testOp({$trunc: -1.2}, -1.0);
-testOp({$trunc: NumberDecimal("-1.6")}, NumberDecimal("-1"));
+function testRound(value, expResult, place) {
+    testOp("$round", value, expResult, place);
+}
 
-testOp({$round: NumberLong(4)}, NumberLong(4));
-testOp({$round: NaN}, NaN);
-testOp({$round: Infinity}, Infinity);
-testOp({$round: -Infinity}, -Infinity);
-testOp({$round: null}, null);
-testOp({$round: -2.0}, -2.0);
-testOp({$round: 0.9}, 1.0);
-testOp({$round: -1.2}, -1.0);
-testOp({$round: NumberDecimal("-1.6")}, NumberDecimal("-2"));
+function testTrunc(value, expResult, place) {
+    testOp("$trunc", value, expResult, place);
+}
+
+// Test $trunc and $round with one argument.
+testTrunc(NumberLong(4), NumberLong(4));
+testTrunc(NumberLong(4), NumberLong(4));
+testTrunc(NaN, NaN);
+testTrunc(Infinity, Infinity);
+testTrunc(-Infinity, -Infinity);
+testTrunc(null, null);
+testTrunc(-2.0, -2.0);
+testTrunc(0.9, 0.0);
+testTrunc(-1.2, -1.0);
+testTrunc(NumberDecimal("-1.6"), NumberDecimal("-1"));
+
+testRound(NumberLong(4), NumberLong(4));
+testRound(NaN, NaN);
+testRound(Infinity, Infinity);
+testRound(-Infinity, -Infinity);
+testRound(null, null);
+testRound(-2.0, -2.0);
+testRound(0.9, 1.0);
+testRound(-1.2, -1.0);
+testRound(NumberDecimal("-1.6"), NumberDecimal("-2"));
 
 // Test $trunc and $round with two arguments.
-testOp({$trunc: [1.298, 0]}, 1);
-testOp({$trunc: [1.298, 1]}, 1.2);
-testOp({$trunc: [23.298, -1]}, 20);
-testOp({$trunc: [NumberDecimal("1.298"), 0]}, NumberDecimal("1"));
-testOp({$trunc: [NumberDecimal("1.298"), 1]}, NumberDecimal("1.2"));
-testOp({$trunc: [NumberDecimal("23.298"), -1]}, NumberDecimal("2E+1"));
-testOp({$trunc: [1.298, 100]}, 1.298);
-testOp({$trunc: [NumberDecimal("1.298912343250054252245154325"), NumberLong("20")]},
-       NumberDecimal("1.29891234325005425224"));
-testOp({$trunc: [NumberDecimal("1.298"), NumberDecimal("100")]},
-       NumberDecimal("1.298000000000000000000000000000000"));
+testTrunc(1.298, 1, 0);
+testTrunc(1.298, 1.2, 1);
+testTrunc(23.298, 20, -1);
+testTrunc(NumberDecimal("1.298"), NumberDecimal("1"), 0);
+testTrunc(NumberDecimal("1.298"), NumberDecimal("1.2"), 1);
+testTrunc(NumberDecimal("23.298"), NumberDecimal("2E+1"), -1);
+testTrunc(1.298, 1.298, 100);
+testTrunc(NumberDecimal("1.298912343250054252245154325"),
+          NumberDecimal("1.29891234325005425224"),
+          NumberLong("20"));
+testTrunc(NumberDecimal("1.298"),
+          NumberDecimal("1.298000000000000000000000000000000"),
+          NumberDecimal("100"));
 
-testOp({$round: [1.298, 0]}, 1);
-testOp({$round: [1.298, 1]}, 1.3);
-testOp({$round: [23.298, -1]}, 20);
-testOp({$round: [NumberDecimal("1.298"), 0]}, NumberDecimal("1"));
-testOp({$round: [NumberDecimal("1.298"), 1]}, NumberDecimal("1.3"));
-testOp({$round: [NumberDecimal("23.298"), -1]}, NumberDecimal("2E+1"));
-testOp({$round: [1.298, 100]}, 1.298);
-testOp({$round: [NumberDecimal("1.298912343250054252245154325"), NumberLong("20")]},
-       NumberDecimal("1.29891234325005425225"));
-testOp({$round: [NumberDecimal("1.298"), NumberDecimal("100")]},
-       NumberDecimal("1.298000000000000000000000000000000"));
+testRound(1.298, 1, 0);
+testRound(1.298, 1.3, 1);
+testRound(23.298, 20, -1);
+testRound(NumberDecimal("1.298"), NumberDecimal("1"), 0);
+testRound(NumberDecimal("1.298"), NumberDecimal("1.3"), 1);
+testRound(NumberDecimal("23.298"), NumberDecimal("2E+1"), -1);
+testRound(1.298, 1.298, 100);
+testRound(NumberDecimal("1.298912343250054252245154325"),
+          NumberDecimal("1.29891234325005425225"),
+          NumberLong("20"));
+testRound(NumberDecimal("1.298"),
+          NumberDecimal("1.298000000000000000000000000000000"),
+          NumberDecimal("100"));
 
 // Test $round overflow.
-testOp({$round: [NumberInt("2147483647"), -1]}, NumberLong("2147483650"));
+testRound(NumberInt("2147483647"), NumberLong("2147483650"), -1);
 assertErrorCode(coll, [{$project: {a: {$round: [NumberLong("9223372036854775806"), -1]}}}], 51080);
 
 // Test $trunc and $round with more than 2 arguments.
@@ -76,21 +91,24 @@ assertErrorCode(coll, [{$project: {a: {$round: "string"}}}], 51081);
 assertErrorCode(coll, [{$project: {a: {$trunc: "string"}}}], 51081);
 
 // Test NaN and Infinity numeric args.
-testOp({$round: [Infinity, 0]}, Infinity);
-testOp({$round: [-Infinity, 0]}, -Infinity);
-testOp({$round: [NaN, 0]}, NaN);
-testOp({$round: [NumberDecimal("Infinity"), 0]}, NumberDecimal("Infinity"));
-testOp({$round: [NumberDecimal("-Infinity"), 0]}, NumberDecimal("-Infinity"));
-testOp({$round: [NumberDecimal("NaN"), 0]}, NumberDecimal("NaN"));
+testRound(Infinity, Infinity, 0);
+testRound(-Infinity, -Infinity, 0);
+testRound(NaN, NaN, 0);
+testRound(NumberDecimal("Infinity"), NumberDecimal("Infinity"), 0);
+testRound(NumberDecimal("-Infinity"), NumberDecimal("-Infinity"), 0);
+testRound(NumberDecimal("NaN"), NumberDecimal("NaN"), 0);
+testRound(null, null, 1);
+testRound(1, null, null);
 
-testOp({$trunc: [Infinity, 0]}, Infinity);
-testOp({$trunc: [-Infinity, 0]}, -Infinity);
-testOp({$trunc: [NaN, 0]}, NaN);
-testOp({$trunc: [NumberDecimal("Infinity"), 0]}, NumberDecimal("Infinity"));
-testOp({$trunc: [NumberDecimal("-Infinity"), 0]}, NumberDecimal("-Infinity"));
-testOp({$trunc: [NumberDecimal("NaN"), 0]}, NumberDecimal("NaN"));
+testTrunc(Infinity, Infinity, 0);
+testTrunc(-Infinity, -Infinity, 0);
+testTrunc(NaN, NaN, 0);
+testTrunc(NumberDecimal("Infinity"), NumberDecimal("Infinity"), 0);
+testTrunc(NumberDecimal("-Infinity"), NumberDecimal("-Infinity"), 0);
+testTrunc(NumberDecimal("NaN"), NumberDecimal("NaN"), 0);
 
 // Test precision arguments that are out of bounds.
+assert.commandWorked(coll.insert({}));
 assertErrorCode(coll, [{$project: {a: {$round: [1, NumberLong("101")]}}}], 51083);
 assertErrorCode(coll, [{$project: {a: {$round: [1, NumberLong("-21")]}}}], 51083);
 assertErrorCode(coll, [{$project: {a: {$round: [1, NumberDecimal("101")]}}}], 51083);
@@ -111,4 +129,10 @@ assertErrorCode(coll, [{$project: {a: {$trunc: [1, -21]}}}], 51083);
 // Test non-integral precision arguments.
 assertErrorCode(coll, [{$project: {a: {$round: [1, NumberDecimal("1.4")]}}}], 51082);
 assertErrorCode(coll, [{$project: {a: {$trunc: [1, 10.5]}}}], 51082);
+assertErrorCode(coll, [{$project: {a: {$round: [0, NaN]}}}], 31109);
+assertErrorCode(coll, [{$project: {a: {$round: [0, NumberDecimal("NaN")]}}}], 51082);
+assertErrorCode(coll, [{$project: {a: {$round: [BinData(0, ""), 0]}}}], 51081);
+assertErrorCode(coll, [{$project: {a: {$round: [0, BinData(0, "")]}}}], 16004);
+assertErrorCode(coll, [{$project: {a: {$round: MinKey}}}], 51081);
+assertErrorCode(coll, [{$project: {a: {$round: MaxKey}}}], 51081);
 }());

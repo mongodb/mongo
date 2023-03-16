@@ -195,17 +195,17 @@ optimizer::ABT generateABTNonStringCheck(optimizer::ProjectionName var) {
 }
 
 optimizer::ABT generateABTNonTimestampCheck(optimizer::ProjectionName var) {
-    return makeNot(makeABTFunction("isTimestamp"_sd, makeVariable(var)));
+    return makeNot(makeABTFunction("isTimestamp"_sd, makeVariable(std::move(var))));
 }
 
 optimizer::ABT generateABTNegativeCheck(optimizer::ProjectionName var) {
     return optimizer::make<optimizer::BinaryOp>(
-        optimizer::Operations::Lt, makeVariable(var), optimizer::Constant::int32(0));
+        optimizer::Operations::Lt, makeVariable(std::move(var)), optimizer::Constant::int32(0));
 }
 
 optimizer::ABT generateABTNonPositiveCheck(optimizer::ProjectionName var) {
     return optimizer::make<optimizer::BinaryOp>(
-        optimizer::Operations::Lte, makeVariable(var), optimizer::Constant::int32(0));
+        optimizer::Operations::Lte, makeVariable(std::move(var)), optimizer::Constant::int32(0));
 }
 
 optimizer::ABT generateABTPositiveCheck(optimizer::ABT var) {
@@ -214,7 +214,7 @@ optimizer::ABT generateABTPositiveCheck(optimizer::ABT var) {
 }
 
 optimizer::ABT generateABTNonNumericCheck(optimizer::ProjectionName var) {
-    return makeNot(makeABTFunction("isNumber"_sd, makeVariable(var)));
+    return makeNot(makeABTFunction("isNumber"_sd, makeVariable(std::move(var))));
 }
 
 optimizer::ABT generateABTLongLongMinCheck(optimizer::ProjectionName var) {
@@ -230,11 +230,11 @@ optimizer::ABT generateABTLongLongMinCheck(optimizer::ProjectionName var) {
 }
 
 optimizer::ABT generateABTNonArrayCheck(optimizer::ProjectionName var) {
-    return makeNot(makeABTFunction("isArray"_sd, makeVariable(var)));
+    return makeNot(makeABTFunction("isArray"_sd, makeVariable(std::move(var))));
 }
 
 optimizer::ABT generateABTNonObjectCheck(optimizer::ProjectionName var) {
-    return makeNot(makeABTFunction("isObject"_sd, makeVariable(var)));
+    return makeNot(makeABTFunction("isObject"_sd, makeVariable(std::move(var))));
 }
 
 optimizer::ABT generateABTNullishOrNotRepresentableInt32Check(optimizer::ProjectionName var) {
@@ -248,8 +248,34 @@ optimizer::ABT generateABTNullishOrNotRepresentableInt32Check(optimizer::Project
                                                     sbe::value::TypeTags::NumberInt32))))));
 }
 
+static optimizer::ABT generateIsIntegralType(const optimizer::ProjectionName& var) {
+    return makeABTFunction("typeMatch"_sd,
+                           makeVariable(var),
+                           optimizer::Constant::int32(getBSONTypeMask(BSONType::NumberInt) |
+                                                      getBSONTypeMask(BSONType::NumberLong)));
+}
+
+optimizer::ABT generateInvalidRoundPlaceArgCheck(const optimizer::ProjectionName& var) {
+    return makeBalancedBooleanOpTree(
+        optimizer::Operations::Or,
+        {
+            // We can perform our numerical test with trunc. trunc will return nothing if we pass a
+            // non-number to it. We return true if the comparison returns nothing, or if
+            // var != trunc(var), indicating this is not a whole number.
+            makeFillEmpty(
+                optimizer::make<optimizer::BinaryOp>(optimizer::Operations::Neq,
+                                                     makeVariable(var),
+                                                     makeABTFunction("trunc", makeVariable(var))),
+                true),
+            optimizer::make<optimizer::BinaryOp>(
+                optimizer::Operations::Lt, makeVariable(var), optimizer::Constant::int32(-20)),
+            optimizer::make<optimizer::BinaryOp>(
+                optimizer::Operations::Gt, makeVariable(var), optimizer::Constant::int32(100)),
+        });
+}
+
 optimizer::ABT generateABTNaNCheck(optimizer::ProjectionName var) {
-    return makeABTFunction("isNaN"_sd, makeVariable(var));
+    return makeABTFunction("isNaN"_sd, makeVariable(std::move(var)));
 }
 
 optimizer::ABT makeABTFail(ErrorCodes::Error error, StringData errorMessage) {

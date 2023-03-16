@@ -2630,7 +2630,42 @@ public:
         unsupportedExpression(expr->getOpName());
     }
     void visit(const ExpressionRound* expr) final {
-        unsupportedExpression(expr->getOpName());
+        invariant(expr->getChildren().size() == 1 || expr->getChildren().size() == 2);
+        const bool hasPlaceArg = expr->getChildren().size() == 2;
+        _context->ensureArity(expr->getChildren().size());
+
+        auto inputNumName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto inputPlaceName = makeLocalVariableName(_context->state.frameId(), 0);
+
+        // We always need to validate the number parameter, since it will always exist.
+        std::vector<ABTCaseValuePair> inputValidationCases{
+            generateABTReturnNullIfNullOrMissing(makeVariable(inputNumName)),
+            ABTCaseValuePair{
+                generateABTNonNumericCheck(inputNumName),
+                makeABTFail(ErrorCodes::Error{5155300}, "$round only supports numeric types")}};
+        // Only add these cases if we have a "place" argument.
+        if (hasPlaceArg) {
+            inputValidationCases.emplace_back(
+                generateABTReturnNullIfNullOrMissing(makeVariable(inputPlaceName)));
+            inputValidationCases.emplace_back(
+                generateInvalidRoundPlaceArgCheck(inputPlaceName),
+                makeABTFail(ErrorCodes::Error{5155301},
+                            "$round requires \"place\" argument to be "
+                            "an integer between -20 and 100"));
+        }
+
+        auto roundExpr = buildABTMultiBranchConditionalFromCaseValuePairs(
+            std::move(inputValidationCases),
+            makeABTFunction("round"_sd, makeVariable(inputNumName), makeVariable(inputPlaceName)));
+
+        // "place" argument defaults to 0.
+        auto placeABT = hasPlaceArg ? _context->popABTExpr() : optimizer::Constant::int32(0);
+        auto inputABT = _context->popABTExpr();
+        pushABT(optimizer::make<optimizer::Let>(
+            std::move(inputNumName),
+            std::move(inputABT),
+            optimizer::make<optimizer::Let>(
+                std::move(inputPlaceName), std::move(placeABT), std::move(roundExpr))));
     }
     void visit(const ExpressionSplit* expr) final {
         invariant(expr->getChildren().size() == 2);

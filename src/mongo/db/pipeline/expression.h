@@ -3129,9 +3129,7 @@ public:
 class ExpressionRound final : public ExpressionRangedArity<ExpressionRound, 1, 2> {
 public:
     explicit ExpressionRound(ExpressionContext* const expCtx)
-        : ExpressionRangedArity<ExpressionRound, 1, 2>(expCtx) {
-        expCtx->sbeCompatible = false;
-    }
+        : ExpressionRangedArity<ExpressionRound, 1, 2>(expCtx) {}
     ExpressionRound(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionRangedArity<ExpressionRound, 1, 2>(expCtx, std::move(children)) {}
 

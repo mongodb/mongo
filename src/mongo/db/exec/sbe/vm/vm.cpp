@@ -3639,39 +3639,85 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinTanh(ArityType a
     return genericTanh(operandTag, operandValue);
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinRound(ArityType arity) {
-    invariant(arity == 1);
-    auto [owned, tag, val] = getFromStack(0);
-
-    // Round 'val' to the closest integer, with ties rounding to the closest even integer.
-    // If 'val' is +Inf, -Inf, or NaN, this function will simply return 'val' as-is.
+/**
+ * Converts a number to int32 assuming the input fits the range. This is used for $round "place"
+ * argument, which is checked to be a whole number between -20 and 100, but could still be a
+ * non-int32 type.
+ */
+static int32_t convertNumericToInt32(const value::TypeTags tag, const value::Value val) {
     switch (tag) {
-        case value::TypeTags::NumberInt32:
-        case value::TypeTags::NumberInt64:
-            // The value is already an integer, so just return it as-is.
-            return {false, tag, val};
+        case value::TypeTags::NumberInt32: {
+            return value::bitcastTo<int32_t>(val);
+        }
+        case value::TypeTags::NumberInt64: {
+            return static_cast<int32_t>(value::bitcastTo<int64_t>(val));
+        }
         case value::TypeTags::NumberDouble: {
-            // std::nearbyint()'s behavior relies on a thread-local "rounding mode", so
-            // we use boost::numeric::RoundEven<double>::nearbyint() instead. We should
-            // switch over to roundeven() once it becomes available in the standard library.
-            // (See https://en.cppreference.com/w/c/experimental/fpext1 for details.)
-            auto operand = value::bitcastTo<double>(val);
-            auto rounded = boost::numeric::RoundEven<double>::nearbyint(operand);
-            return {false, tag, value::bitcastFrom<double>(rounded)};
+            return static_cast<int32_t>(value::bitcastTo<double>(val));
         }
         case value::TypeTags::NumberDecimal: {
-            auto operand = value::bitcastTo<Decimal128>(val);
-            auto rounded = operand.round(Decimal128::RoundingMode::kRoundTiesToEven);
-            if (operand.isEqual(rounded)) {
-                // If the output of rounding is equal to the input, then we can just take
-                // ownership of 'operand' and return it. (This is more efficient than calling
-                // makeCopyDecimal(), which would allocate memory on the heap.)
-                topStack(false, value::TypeTags::Nothing, 0);
-                return {owned, tag, val};
-            }
+            Decimal128 dec = value::bitcastTo<Decimal128>(val);
+            return dec.toInt(Decimal128::kRoundTiesToEven);
+        }
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
 
-            auto [tag, val] = value::makeCopyDecimal(rounded);
-            return {true, tag, val};
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinRound(ArityType arity) {
+    invariant(arity == 1 || arity == 2);
+    int32_t place = 0;
+    const auto [numOwn, numTag, numVal] = getFromStack(0);
+    if (arity == 2) {
+        const auto [placeOwn, placeTag, placeVal] = getFromStack(1);
+        if (!value::isNumber(placeTag)) {
+            return {false, value::TypeTags::Nothing, 0};
+        }
+        place = convertNumericToInt32(placeTag, placeVal);
+    }
+
+    // Construct 10^-precisionValue, which will be used as the quantize reference. This is passed to
+    // decimal.quantize() to indicate the precision of our rounding.
+    const auto quantum = Decimal128(0LL, Decimal128::kExponentBias - place, 0LL, 1LL);
+    switch (numTag) {
+        case value::TypeTags::NumberDecimal: {
+            auto dec = value::bitcastTo<Decimal128>(numVal);
+            if (!dec.isInfinite()) {
+                dec = dec.quantize(quantum, Decimal128::kRoundTiesToEven);
+            }
+            auto [resultTag, resultValue] = value::makeCopyDecimal(dec);
+            return {true, resultTag, resultValue};
+        }
+        case value::TypeTags::NumberDouble: {
+            auto asDec = Decimal128(value::bitcastTo<double>(numVal), Decimal128::kRoundTo34Digits);
+            if (!asDec.isInfinite()) {
+                asDec = asDec.quantize(quantum, Decimal128::kRoundTiesToEven);
+            }
+            return {
+                false, value::TypeTags::NumberDouble, value::bitcastFrom<double>(asDec.toDouble())};
+        }
+        case value::TypeTags::NumberInt32:
+        case value::TypeTags::NumberInt64: {
+            if (place >= 0) {
+                return {numOwn, numTag, numVal};
+            }
+            auto numericArgll = numTag == value::TypeTags::NumberInt32
+                ? static_cast<int64_t>(value::bitcastTo<int32_t>(numVal))
+                : value::bitcastTo<int64_t>(numVal);
+            auto out = Decimal128(numericArgll).quantize(quantum, Decimal128::kRoundTiesToEven);
+            uint32_t flags = 0;
+            auto outll = out.toLong(&flags);
+            uassert(5155302,
+                    "Invalid conversion to long during $round.",
+                    !Decimal128::hasFlag(flags, Decimal128::kInvalid));
+            if (numTag == value::TypeTags::NumberInt64 ||
+                outll > std::numeric_limits<int32_t>::max()) {
+                // Even if the original was an int to begin with - it has to be a long now.
+                return {false, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(outll)};
+            }
+            return {false,
+                    value::TypeTags::NumberInt32,
+                    value::bitcastFrom<int32_t>(static_cast<int32_t>(outll))};
         }
         default:
             return {false, value::TypeTags::Nothing, 0};

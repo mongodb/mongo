@@ -198,6 +198,7 @@ env.CppUnitTest(
         'expressions/sbe_regex_test.cpp',
         'expressions/sbe_replace_one_expression_test.cpp',
         'expressions/sbe_reverse_array_builtin_test.cpp',
+        'expressions/sbe_round_builtin_test.cpp',
         'expressions/sbe_runtime_environment_test.cpp',
         'expressions/sbe_set_expressions_test.cpp',
         'expressions/sbe_shard_filter_builtin_test.cpp',
