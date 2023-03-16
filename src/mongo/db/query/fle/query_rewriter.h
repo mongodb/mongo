@@ -53,6 +53,8 @@ public:
     /**
      * Takes in references to collection readers for the ESC and ECC that are used during tag
      * computation.
+     *
+     * TODO SERVER-73303 Remove when V2 is enabled.
      */
     QueryRewriter(boost::intrusive_ptr<ExpressionContext> expCtx,
                   FLETagQueryInterface* tagQueryInterface,
@@ -64,6 +66,34 @@ public:
           _matchRewrites(matchPredicateRewriteMap),
           _nssEsc(nssEsc),
           _nssEcc(nssEcc),
+          _tagQueryInterface(tagQueryInterface) {
+
+        if (internalQueryFLEAlwaysUseEncryptedCollScanMode.load()) {
+            _mode = EncryptedCollScanMode::kForceAlways;
+        }
+
+        if (mode == EncryptedCollScanModeAllowed::kDisallow) {
+            _mode = EncryptedCollScanMode::kDisallow;
+        }
+
+        // This isn't the "real" query so we don't want to increment Expression
+        // counters here.
+        _expCtx->stopExpressionCounters();
+    }
+
+    /**
+     * Takes in references to collection readers for the ESC and ECC that are used during tag
+     * computation.
+     */
+    QueryRewriter(boost::intrusive_ptr<ExpressionContext> expCtx,
+                  FLETagQueryInterface* tagQueryInterface,
+                  const NamespaceString& nssEsc,
+                  EncryptedCollScanModeAllowed mode = EncryptedCollScanModeAllowed::kAllow)
+        : _expCtx(expCtx),
+          _exprRewrites(aggPredicateRewriteMap),
+          _matchRewrites(matchPredicateRewriteMap),
+          _nssEsc(nssEsc),
+          _nssEcc(boost::none),
           _tagQueryInterface(tagQueryInterface) {
 
         if (internalQueryFLEAlwaysUseEncryptedCollScanMode.load()) {
@@ -122,7 +152,7 @@ public:
     const NamespaceString& getESCNss() const override {
         return _nssEsc;
     }
-    const NamespaceString& getECCNss() const override {
+    const boost::optional<NamespaceString>& getECCNss() const override {
         return _nssEcc;
     }
 
@@ -157,7 +187,7 @@ private:
     const ExpressionToRewriteMap& _exprRewrites;
     const MatchTypeToRewriteMap& _matchRewrites;
     const NamespaceString& _nssEsc;
-    const NamespaceString& _nssEcc;
+    const boost::optional<NamespaceString> _nssEcc;
     FLETagQueryInterface* _tagQueryInterface;
 };
 }  // namespace mongo::fle

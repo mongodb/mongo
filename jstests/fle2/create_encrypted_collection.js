@@ -62,7 +62,11 @@ assert.commandWorked(dbTest.createCollection("basic", {encryptedFields: sampleEn
 const result = dbTest.getCollectionInfos({name: "basic"});
 const ef = result[0].options.encryptedFields;
 assert.eq(ef.escCollection, "enxcol_.basic.esc");
-assert.eq(ef.eccCollection, "enxcol_.basic.ecc");
+
+// TODO SERVER-73303 remove when V2 is enabled
+if (!isFLE2ProtocolVersion2Enabled()) {
+    assert.eq(ef.eccCollection, "enxcol_.basic.ecc");
+}
 assert.eq(ef.ecocCollection, "enxcol_.basic.ecoc");
 
 assert.commandWorked(dbTest.createCollection("basic_int64_cf", {

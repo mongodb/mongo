@@ -85,8 +85,11 @@ void setEncryptedDefaultEncryptedCollectionNames(const NamespaceString& ns,
         config->setEscCollection(StringData(prefix + ".esc"));
     }
 
-    if (!config->getEccCollection()) {
-        config->setEccCollection(StringData(prefix + ".ecc"));
+    // TODO SERVER-73303: delete when v2 is enabled.
+    if (!gFeatureFlagFLE2ProtocolVersion2.isEnabledAndIgnoreFCV()) {
+        if (!config->getEccCollection()) {
+            config->setEccCollection(StringData(prefix + ".ecc"));
+        }
     }
 
     if (!config->getEcocCollection()) {

@@ -425,8 +425,13 @@ EncryptedStateCollectionsNamespaces::createFromDataCollection(const Collection& 
     namespaces.edcNss = edc.ns();
     namespaces.escNss =
         NamespaceString(db, cfg.getEscCollection().value_or_eval([&f]() { return f("state"_sd); }));
-    namespaces.eccNss =
-        NamespaceString(db, cfg.getEccCollection().value_or_eval([&f]() { return f("cache"_sd); }));
+
+    // TODO SERVER-73303 remove when feature flag is enabled.
+    if (!gFeatureFlagFLE2ProtocolVersion2.isEnabled(serverGlobalParams.featureCompatibility)) {
+        namespaces.eccNss = NamespaceString(
+            db, cfg.getEccCollection().value_or_eval([&f]() { return f("cache"_sd); }));
+    }
+
     namespaces.ecocNss = NamespaceString(
         db, cfg.getEcocCollection().value_or_eval([&f]() { return f("compaction"_sd); }));
 

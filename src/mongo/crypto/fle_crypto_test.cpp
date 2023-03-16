@@ -2408,7 +2408,8 @@ TEST(EncryptionInformation, BadSchema) {
                        6371205);
 }
 
-TEST(EncryptionInformation, MissingStateCollection) {
+// TODO: SERVER-73303 remove when v2 is enabled by default
+TEST(EncryptionInformation, MissingStateCollectionV1) {
     NamespaceString ns = NamespaceString::createNamespaceString_forTest("test.test");
 
     {
@@ -2428,6 +2429,37 @@ TEST(EncryptionInformation, MissingStateCollection) {
                                ns, EncryptionInformation::parse(IDLParserContext("foo"), obj)),
                            DBException,
                            6371206);
+    }
+    {
+        EncryptedFieldConfig efc = getTestEncryptedFieldConfig();
+        efc.setEcocCollection(boost::none);
+        auto obj = EncryptionInformationHelpers::encryptionInformationSerialize(ns, efc);
+        ASSERT_THROWS_CODE(EncryptionInformationHelpers::getAndValidateSchema(
+                               ns, EncryptionInformation::parse(IDLParserContext("foo"), obj)),
+                           DBException,
+                           6371208);
+    }
+}
+
+TEST(EncryptionInformation, MissingStateCollectionV2) {
+    RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
+    NamespaceString ns = NamespaceString::createNamespaceString_forTest("test.test");
+
+    {
+        EncryptedFieldConfig efc = getTestEncryptedFieldConfig();
+        efc.setEscCollection(boost::none);
+        auto obj = EncryptionInformationHelpers::encryptionInformationSerialize(ns, efc);
+        ASSERT_THROWS_CODE(EncryptionInformationHelpers::getAndValidateSchema(
+                               ns, EncryptionInformation::parse(IDLParserContext("foo"), obj)),
+                           DBException,
+                           6371207);
+    }
+    {
+        EncryptedFieldConfig efc = getTestEncryptedFieldConfig();
+        efc.setEccCollection(boost::none);
+        auto obj = EncryptionInformationHelpers::encryptionInformationSerialize(ns, efc);
+        ASSERT_DOES_NOT_THROW(EncryptionInformationHelpers::getAndValidateSchema(
+            ns, EncryptionInformation::parse(IDLParserContext("foo"), obj)));
     }
     {
         EncryptedFieldConfig efc = getTestEncryptedFieldConfig();

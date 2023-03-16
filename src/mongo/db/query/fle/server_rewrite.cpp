@@ -136,6 +136,21 @@ BSONObj rewriteEncryptedFilter(FLETagQueryInterface* queryImpl,
     return filter;
 }
 
+BSONObj rewriteEncryptedFilterV2(FLETagQueryInterface* queryImpl,
+                                 const NamespaceString& nssEsc,
+                                 boost::intrusive_ptr<ExpressionContext> expCtx,
+                                 BSONObj filter,
+                                 EncryptedCollScanModeAllowed mode) {
+
+    if (auto rewritten =
+            QueryRewriter(expCtx, queryImpl, nssEsc, mode).rewriteMatchExpression(filter)) {
+        return rewritten.value();
+    }
+
+    return filter;
+}
+
+
 class RewriteBase {
 public:
     RewriteBase(boost::intrusive_ptr<ExpressionContext> expCtx,
@@ -144,16 +159,23 @@ public:
         : expCtx(expCtx), dbName(nss.dbName()) {
         auto efc = EncryptionInformationHelpers::getAndValidateSchema(nss, encryptInfo);
         esc = efc.getEscCollection()->toString();
-        ecc = efc.getEccCollection()->toString();
+        if (efc.getEccCollection()) {
+            ecc = efc.getEccCollection()->toString();
+        } else {
+            ecc = boost::none;
+        }
     }
     virtual ~RewriteBase(){};
     virtual void doRewrite(FLEQueryInterface* queryImpl,
                            const NamespaceString& nssEsc,
                            const NamespaceString& nssEcc){};
 
+    virtual void doRewrite(FLEQueryInterface* queryImpl, const NamespaceString& nssEsc){};
+
+
     boost::intrusive_ptr<ExpressionContext> expCtx;
     std::string esc;
-    std::string ecc;
+    boost::optional<std::string> ecc;
     DatabaseName dbName;
 };
 
@@ -170,6 +192,15 @@ public:
                    const NamespaceString& nssEsc,
                    const NamespaceString& nssEcc) final {
         auto rewriter = QueryRewriter(expCtx, queryImpl, nssEsc, nssEcc);
+        for (auto&& source : pipeline->getSources()) {
+            if (stageRewriterMap.find(typeid(*source)) != stageRewriterMap.end()) {
+                stageRewriterMap[typeid(*source)](&rewriter, source.get());
+            }
+        }
+    }
+
+    void doRewrite(FLEQueryInterface* queryImpl, const NamespaceString& nssEsc) final {
+        auto rewriter = QueryRewriter(expCtx, queryImpl, nssEsc);
         for (auto&& source : pipeline->getSources()) {
             if (stageRewriterMap.find(typeid(*source)) != stageRewriterMap.end()) {
                 stageRewriterMap[typeid(*source)](&rewriter, source.get());
@@ -203,6 +234,10 @@ public:
             rewriteEncryptedFilter(queryImpl, nssEsc, nssEcc, expCtx, userFilter, _mode);
     }
 
+    void doRewrite(FLEQueryInterface* queryImpl, const NamespaceString& nssEsc) final {
+        rewrittenFilter = rewriteEncryptedFilterV2(queryImpl, nssEsc, expCtx, userFilter, _mode);
+    }
+
     const BSONObj userFilter;
     BSONObj rewrittenFilter;
     EncryptedCollScanModeAllowed _mode;
@@ -219,13 +254,19 @@ void doFLERewriteInTxn(OperationContext* opCtx,
     auto swCommitResult = txn->runNoThrow(
         opCtx, [sharedBlock](const txn_api::TransactionClient& txnClient, auto txnExec) {
             NamespaceString nssEsc(sharedBlock->dbName, sharedBlock->esc);
-            NamespaceString nssEcc(sharedBlock->dbName, sharedBlock->ecc);
 
             // Construct FLE rewriter from the transaction client and encryptionInformation.
             auto queryInterface = FLEQueryInterfaceImpl(txnClient, getGlobalServiceContext());
 
             // Rewrite the MatchExpression.
-            sharedBlock->doRewrite(&queryInterface, nssEsc, nssEcc);
+            if (sharedBlock->ecc) {
+                sharedBlock->doRewrite(
+                    &queryInterface,
+                    nssEsc,
+                    NamespaceString(sharedBlock->dbName, sharedBlock->ecc.get()));
+            } else {
+                sharedBlock->doRewrite(&queryInterface, nssEsc);
+            }
 
             return SemiFuture<void>::makeReady();
         });
@@ -243,9 +284,13 @@ BSONObj rewriteEncryptedFilterInsideTxn(FLETagQueryInterface* queryImpl,
                                         BSONObj filter,
                                         EncryptedCollScanModeAllowed mode) {
     NamespaceString nssEsc(dbName, efc.getEscCollection().value());
-    NamespaceString nssEcc(dbName, efc.getEccCollection().value());
 
-    return rewriteEncryptedFilter(queryImpl, nssEsc, nssEcc, expCtx, filter, mode);
+    if (!gFeatureFlagFLE2ProtocolVersion2.isEnabled(serverGlobalParams.featureCompatibility)) {
+        NamespaceString nssEcc(dbName, efc.getEccCollection().value());
+        return rewriteEncryptedFilter(queryImpl, nssEsc, nssEcc, expCtx, filter, mode);
+    }
+
+    return rewriteEncryptedFilterV2(queryImpl, nssEsc, expCtx, filter, mode);
 }
 
 BSONObj rewriteQuery(OperationContext* opCtx,

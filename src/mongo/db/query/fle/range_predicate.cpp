@@ -137,13 +137,30 @@ std::vector<PrfBlock> RangePredicate::generateTags(BSONValue payload) const {
     std::vector<PrfBlock> tags;
     tassert(7030500, "Must generate tags from a non-stub payload.", !parsedPayload.isStub());
 
+    // TODO: SERVER-73303 remove when v2 is enabled by default
+    if (!gFeatureFlagFLE2ProtocolVersion2.isEnabled(serverGlobalParams.featureCompatibility)) {
+        invariant(_rewriter->getECCNss());
+
+        for (auto& edge : parsedPayload.edges.value()) {
+            auto tagsForEdge = readTags(_rewriter->getTagQueryInterface(),
+                                        _rewriter->getESCNss(),
+                                        _rewriter->getECCNss().get(),
+                                        edge.esc,
+                                        edge.ecc,
+                                        edge.edc,
+                                        parsedPayload.maxCounter);
+            tags.insert(tags.end(),
+                        std::make_move_iterator(tagsForEdge.begin()),
+                        std::make_move_iterator(tagsForEdge.end()));
+        }
+        return tags;
+    }
+
     // TODO - do batch generation of tags here
     for (auto& edge : parsedPayload.edges.value()) {
         auto tagsForEdge = readTags(_rewriter->getTagQueryInterface(),
                                     _rewriter->getESCNss(),
-                                    _rewriter->getECCNss(),
                                     edge.esc,
-                                    edge.ecc,
                                     edge.edc,
                                     parsedPayload.maxCounter);
         tags.insert(tags.end(),

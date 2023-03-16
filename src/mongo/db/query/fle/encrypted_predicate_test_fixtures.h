@@ -48,7 +48,13 @@ using TagMap = std::map<std::pair<StringData, int>, std::vector<PrfBlock>>;
  */
 class MockServerRewrite : public QueryRewriterInterface {
 public:
-    MockServerRewrite() : _expCtx((new ExpressionContextForTest())) {}
+    MockServerRewrite() : _expCtx((new ExpressionContextForTest())) {
+        if (!gFeatureFlagFLE2ProtocolVersion2.isEnabledAndIgnoreFCV()) {
+            _mockOptionalNss = NamespaceString({"mock"_sd});
+            return;
+        }
+        _mockOptionalNss = boost::none;
+    }
     EncryptedCollScanMode getEncryptedCollScanMode() const override {
         return _mode;
     };
@@ -66,8 +72,8 @@ public:
     const NamespaceString& getESCNss() const override {
         return _mockNss;
     }
-    const NamespaceString& getECCNss() const override {
-        return _mockNss;
+    const boost::optional<NamespaceString>& getECCNss() const override {
+        return _mockOptionalNss;
     }
 
 
@@ -75,6 +81,7 @@ private:
     boost::intrusive_ptr<ExpressionContextForTest> _expCtx;
     EncryptedCollScanMode _mode{EncryptedCollScanMode::kUseIfNeeded};
     NamespaceString _mockNss{"mock"_sd};
+    boost::optional<NamespaceString> _mockOptionalNss;
 };
 
 class EncryptedPredicateRewriteTest : public unittest::Test {

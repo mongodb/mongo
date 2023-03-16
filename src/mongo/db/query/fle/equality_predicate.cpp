@@ -47,11 +47,21 @@ REGISTER_ENCRYPTED_AGG_PREDICATE_REWRITE(ExpressionIn, EqualityPredicate);
 
 std::vector<PrfBlock> EqualityPredicate::generateTags(BSONValue payload) const {
     ParsedFindEqualityPayload tokens = parseFindPayload<ParsedFindEqualityPayload>(payload);
+
+    if (!gFeatureFlagFLE2ProtocolVersion2.isEnabled(serverGlobalParams.featureCompatibility)) {
+        invariant(_rewriter->getECCNss());
+        return readTags(_rewriter->getTagQueryInterface(),
+                        _rewriter->getESCNss(),
+                        _rewriter->getECCNss().get(),
+                        tokens.escToken,
+                        tokens.eccToken,
+                        tokens.edcToken,
+                        tokens.maxCounter);
+    }
+
     return readTags(_rewriter->getTagQueryInterface(),
                     _rewriter->getESCNss(),
-                    _rewriter->getECCNss(),
                     tokens.escToken,
-                    tokens.eccToken,
                     tokens.edcToken,
                     tokens.maxCounter);
 }
