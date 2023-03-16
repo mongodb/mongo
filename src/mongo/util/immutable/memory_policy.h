@@ -29,37 +29,35 @@
 
 #pragma once
 
-#include "mongo/stdx/trusted_hasher.h"
-#include "mongo/util/immutable/memory_policy.h"
+#include <immer/memory_policy.hpp>
 
-#include <immer/map.hpp>
-#include <immer/map_transient.hpp>
+namespace mongo::immutable::detail {
 
-namespace mongo::immutable {
+// Memory allocations using regular new/delete operators
+using HeapPolicy = immer::heap_policy<immer::cpp_heap>;
 
-/**
- * Immutable unordered hash table.
- *
- * Interfaces that "modify" the hash table are 'const' and returns a new version of the table with
- * the modifications applied and leaves the original version untouched.
- *
- * It is optimized for efficient copies and low memory usage when multiple versions of the table
- * exist simultaneously at the expense of regular lookups not being as efficient as the regular
- * stdx unordered containers. Suitable for use in code that uses the copy-on-write pattern.
- *
- * Thread-safety: All methods are const, it is safe to perform modifications that result in new
- * versions from multiple threads concurrently.
- *
- * Memory management: Internal memory management is done using reference counting, memory is free'd
- * as references to different versions of the table are released.
- *
- * Multiple modifications can be done efficiently using the 'transient()' interface.
- *
- * Documentation: 'immer/map.h' and https://sinusoid.es/immer/
- */
-template <class K,
-          class V,
-          class Hasher = DefaultHasher<K>,
-          class Eq = absl::container_internal::hash_default_eq<K>>
-using unordered_map = immer::map<K, V, EnsureTrustedHasher<Hasher, K>, Eq, detail::MemoryPolicy>;
-}  // namespace mongo::immutable
+// Refcounting using atomics for thread safety
+using RefcountPolicy = immer::refcount_policy;
+
+// We are not using any features from immer that requires locking. Use 'void' as the lock type which
+// would fail compilation if locking was needed anywhere.
+using LockPolicy = void;
+
+// No transience policy (this is just used for garbage collection)
+using TransiencePolicy = immer::no_transience_policy;
+
+using MemoryPolicy = immer::memory_policy<HeapPolicy,
+                                          RefcountPolicy,
+                                          LockPolicy,
+                                          TransiencePolicy,
+                                          /*PreferFewerBiggerObjects*/ true,
+                                          /*UseTransientRValues*/ true>;
+
+// Verify that the recommended settings for our memory policy is as expected. We need to investigate
+// if any of these fire during a library upgrade.
+static_assert(
+    std::is_same<immer::get_transience_policy_t<RefcountPolicy>, TransiencePolicy>::value);
+static_assert(immer::get_prefer_fewer_bigger_objects_v<HeapPolicy> == true);
+static_assert(immer::get_use_transient_rvalues_v<RefcountPolicy> == true);
+
+}  // namespace mongo::immutable::detail

@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/stdx/trusted_hasher.h"
+#include "mongo/util/immutable/memory_policy.h"
 
 #include <immer/set.hpp>
 #include <immer/set_transient.hpp>
@@ -60,5 +61,5 @@ namespace mongo::immutable {
 template <class T,
           class Hasher = DefaultHasher<T>,
           class Eq = absl::container_internal::hash_default_eq<T>>
-using unordered_set = immer::set<T, EnsureTrustedHasher<Hasher, T>, Eq>;
+using unordered_set = immer::set<T, EnsureTrustedHasher<Hasher, T>, Eq, detail::MemoryPolicy>;
 }  // namespace mongo::immutable
