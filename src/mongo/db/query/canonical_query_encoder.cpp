@@ -102,15 +102,11 @@ void encodeUserString(StringData s, BuilderType* builder) {
             case kEncodeChildrenBegin:
             case kEncodeChildrenEnd:
             case kEncodeChildrenSeparator:
-            case kEncodeCollationSection:
-            case kEncodeProjectionSection:
+            case kEncodeSectionDelimiter:
             case kEncodeProjectionRequirementSeparator:
             case kEncodeRegexFlagsSeparator:
-            case kEncodeSortSection:
-            case kEncodeFlagsSection:
             case kEncodeParamMarker:
             case kEncodeConstantLiteralMarker:
-            case kEncodePipelineSection:
             case '\\':
                 if constexpr (hasAppendChar<BuilderType>) {
                     builder->appendChar('\\');
@@ -383,13 +379,13 @@ char encodeEnum(T val) {
 }
 
 void encodeCollation(const CollatorInterface* collation, StringBuilder* keyBuilder) {
+    *keyBuilder << kEncodeSectionDelimiter;
     if (!collation) {
         return;
     }
 
     const Collation& spec = collation->getSpec();
 
-    *keyBuilder << kEncodeCollationSection;
     *keyBuilder << spec.getLocale();
     *keyBuilder << spec.getCaseLevel();
 
@@ -409,7 +405,7 @@ void encodeCollation(const CollatorInterface* collation, StringBuilder* keyBuild
 
 void encodePipeline(const std::vector<std::unique_ptr<InnerPipelineStageInterface>>& pipeline,
                     BufBuilder* bufBuilder) {
-    bufBuilder->appendChar(kEncodePipelineSection);
+    bufBuilder->appendChar(kEncodeSectionDelimiter);
     for (auto& stage : pipeline) {
         std::vector<Value> serializedArray;
         if (auto lookupStage = dynamic_cast<DocumentSourceLookUp*>(stage->documentSource())) {
@@ -542,11 +538,10 @@ void encodeKeyForMatch(const MatchExpression* tree, StringBuilder* keyBuilder) {
  * FindCommandRequest.
  */
 void encodeKeyForSort(const BSONObj& sortObj, StringBuilder* keyBuilder) {
+    *keyBuilder << kEncodeSectionDelimiter;
     if (sortObj.isEmpty()) {
         return;
     }
-
-    *keyBuilder << kEncodeSortSection;
 
     BSONObjIterator it(sortObj);
     while (it.more()) {
@@ -582,6 +577,7 @@ void encodeKeyForSort(const BSONObj& sortObj, StringBuilder* keyBuilder) {
  * expressions), the projection section is empty.
  */
 void encodeKeyForProj(const projection_ast::Projection* proj, StringBuilder* keyBuilder) {
+    *keyBuilder << kEncodeSectionDelimiter;
     if (!proj || proj->requiresDocument()) {
         // Don't encode anything for the projection section to indicate the entire document is
         // required.
@@ -595,10 +591,6 @@ void encodeKeyForProj(const projection_ast::Projection* proj, StringBuilder* key
     if (requiredFields.size() == 1 && *requiredFields.begin() == "$sortKey") {
         return;
     }
-
-    // If the projection just re-writes the entire document and has no dependencies on the original
-    // document (e.g. {a: "foo", _id: 0}), then just include the projection delimiter.
-    *keyBuilder << kEncodeProjectionSection;
 
     // Encode the fields required by the projection in order.
     bool isFirst = true;
@@ -676,7 +668,7 @@ CanonicalQuery::QueryShapeString encode(const CanonicalQuery& cq) {
 
     // This encoding can be removed once the classic query engine reaches EOL and SBE is used
     // exclusively for all query execution.
-    keyBuilder << kEncodeFlagsSection << (cq.getForceClassicEngine() ? "f" : "t");
+    keyBuilder << kEncodeSectionDelimiter << (cq.getForceClassicEngine() ? "f" : "t");
 
     // The apiStrict flag can cause the query to see different set of indexes. For example, all
     // sparse indexes will be ignored with apiStrict is used.
@@ -1076,6 +1068,7 @@ std::string encodeSBE(const CanonicalQuery& cq) {
     const auto& filter = cq.getQueryObj();
     const auto& proj = cq.getFindCommandRequest().getProjection();
     const auto& sort = cq.getFindCommandRequest().getSort();
+    const auto& hint = cq.getFindCommandRequest().getHint();
 
     StringBuilder strBuilder;
     encodeKeyForSort(sort, &strBuilder);
@@ -1085,14 +1078,19 @@ std::string encodeSBE(const CanonicalQuery& cq) {
     // A constant for reserving buffer size. It should be large enough to reserve the space required
     // to encode various properties from the FindCommandRequest and query knobs.
     const int kBufferSizeConstant = 200;
-    size_t bufSize =
-        filter.objsize() + proj.objsize() + strBuilderEncoded.size() + kBufferSizeConstant;
+    size_t bufSize = filter.objsize() + proj.objsize() + strBuilderEncoded.size() + hint.objsize() +
+        kBufferSizeConstant;
 
     BufBuilder bufBuilder(bufSize);
     encodeKeyForAutoParameterizedMatchSBE(cq.root(), &bufBuilder);
 
     bufBuilder.appendBuf(proj.objdata(), proj.objsize());
     bufBuilder.appendStr(strBuilderEncoded, false /* includeEndingNull */);
+    bufBuilder.appendChar(kEncodeSectionDelimiter);
+    if (!hint.isEmpty()) {
+        bufBuilder.appendBuf(hint.objdata(), hint.objsize());
+    }
+    bufBuilder.appendChar(kEncodeSectionDelimiter);
     bufBuilder.appendChar(cq.getForceGenerateRecordId() ? 1 : 0);
     bufBuilder.appendChar(cq.isCountLike() ? 1 : 0);
     // The apiStrict flag can cause the query to see different set of indexes. For example, all
@@ -1118,6 +1116,8 @@ CanonicalQuery::PlanCacheCommandKey encodeForPlanCacheCommand(const CanonicalQue
     // be encoded.
     if (!cq.getFindCommandRequest().getCollation().isEmpty()) {
         encodeCollation(cq.getCollator(), &keyBuilder);
+    } else {
+        keyBuilder << kEncodeSectionDelimiter;
     }
 
     return keyBuilder.str();

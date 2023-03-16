@@ -1,50 +1,54 @@
 ==== VARIATION: sbe, query={}, sort={}, proj={}
-YW4ABQAAAAAAAAAAAAAAAAAAAG5ubm4FAAAAAGZe
+YW4ABQAAAAB8fHx8AAAAAAAAAAAAAABubm5uBQAAAABmfA==
 ==== VARIATION: sbe, query={$or: [{a: 1}, {b: 2}]}, sort={}, proj={}
-b3IAW2VxAGE/AAAAACxlcQBiPwEAAABdBQAAAAAAAAAAAAAAAAAAAG5ubm4FAAAAAGZe
+b3IAW2VxAGE/AAAAACxlcQBiPwEAAABdBQAAAAB8fHx8AAAAAAAAAAAAAABubm5uBQAAAABmfA==
 ==== VARIATION: sbe, query={a: 1}, sort={}, proj={}
-ZXEAYT8AAAAABQAAAAAAAAAAAAAAAAAAAG5ubm4FAAAAAGZe
+ZXEAYT8AAAAABQAAAAB8fHx8AAAAAAAAAAAAAABubm5uBQAAAABmfA==
 ==== VARIATION: sbe, query={b: 1}, sort={}, proj={}
-ZXEAYj8AAAAABQAAAAAAAAAAAAAAAAAAAG5ubm4FAAAAAGZe
+ZXEAYj8AAAAABQAAAAB8fHx8AAAAAAAAAAAAAABubm5uBQAAAABmfA==
 ==== VARIATION: sbe, query={a: 1, b: 1, c: 1}, sort={}, proj={}
-YW4AW2VxAGE/AAAAACxlcQBiPwEAAAAsZXEAYz8CAAAAXQUAAAAAAAAAAAAAAAAAAABubm5uBQAAAABmXg==
+YW4AW2VxAGE/AAAAACxlcQBiPwEAAAAsZXEAYz8CAAAAXQUAAAAAfHx8fAAAAAAAAAAAAAAAbm5ubgUAAAAAZnw=
 ==== VARIATION: sbe, query={}, sort={a: 1}, proj={}
-YW4ABQAAAAB+YWEAAAAAAAAAAAAAAG5ubm4FAAAAAGZe
+YW4ABQAAAAB8YWF8fHwAAAAAAAAAAAAAAG5ubm4FAAAAAGZ8
 ==== VARIATION: sbe, query={}, sort={a: -1}, proj={}
-YW4ABQAAAAB+ZGEAAAAAAAAAAAAAAG5ubm4FAAAAAGZe
+YW4ABQAAAAB8ZGF8fHwAAAAAAAAAAAAAAG5ubm4FAAAAAGZ8
 ==== VARIATION: sbe, query={a: 1}, sort={a: 1}, proj={}
-ZXEAYT8AAAAABQAAAAB+YWEAAAAAAAAAAAAAAG5ubm4FAAAAAGZe
+ZXEAYT8AAAAABQAAAAB8YWF8fHwAAAAAAAAAAAAAAG5ubm4FAAAAAGZ8
 ==== VARIATION: sbe, query={a: 1}, sort={a: 1}, proj={a: 1}
-ZXEAYT8AAAAADAAAABBhAAEAAAAAfmFhAAAAAAAAAAAAAABubm5uBQAAAABmXg==
+ZXEAYT8AAAAADAAAABBhAAEAAAAAfGFhfHx8AAAAAAAAAAAAAABubm5uBQAAAABmfA==
 ==== VARIATION: sbe, query={}, sort={a: 1}, proj={a: 1}
-YW4ADAAAABBhAAEAAAAAfmFhAAAAAAAAAAAAAABubm5uBQAAAABmXg==
+YW4ADAAAABBhAAEAAAAAfGFhfHx8AAAAAAAAAAAAAABubm5uBQAAAABmfA==
 ==== VARIATION: sbe, query={}, sort={a: 1}, proj={a: 1}
-YW4ADAAAABBhAAEAAAAAfmFhAAAAAAAAAAAAAABubm5uBQAAAABmXg==
+YW4ADAAAABBhAAEAAAAAfGFhfHx8AAAAAAAAAAAAAABubm5uBQAAAABmfA==
 ==== VARIATION: sbe, query={}, sort={}, proj={a: 1}
-YW4ADAAAABBhAAEAAAAAAAAAAAAAAAAAAABubm5uBQAAAABmXg==
+YW4ADAAAABBhAAEAAAAAfHx8fAAAAAAAAAAAAAAAbm5ubgUAAAAAZnw=
 ==== VARIATION: sbe, query={}, sort={}, proj={a: true}
-YW4ACQAAAAhhAAEAAAAAAAAAAAAAAABubm5uBQAAAABmXg==
+YW4ACQAAAAhhAAEAfHx8fAAAAAAAAAAAAAAAbm5ubgUAAAAAZnw=
 ==== VARIATION: sbe, query={}, sort={}, proj={a: false}
-YW4ACQAAAAhhAAAAAAAAAAAAAAAAAABubm5uBQAAAABmXg==
+YW4ACQAAAAhhAAAAfHx8fAAAAAAAAAAAAAAAbm5ubgUAAAAAZnw=
 ==== VARIATION: sbe, query={}, sort={}, proj={}, isCountLike=true
-YW4ABQAAAAAAAQAAAAAAAAAAAG5ubm4FAAAAAGZe
-==== VARIATION: sbe, query={a: 1}, sort={a: 1}, proj={}, allowDiskUse=0, returnKey=0, requestResumeToken=0
-ZXEAYT8AAAAABQAAAAB+YWEAAAAAAAAAAAAAAG5ubm4FAAAAAGZe
-==== VARIATION: sbe, query={a: 1}, sort={a: 1}, proj={}, allowDiskUse=1, returnKey=0, requestResumeToken=0
-ZXEAYT8AAAAABQAAAAB+YWEAAAAAAAAAAAAAAHRubm4FAAAAAGZe
-==== VARIATION: sbe, query={a: 1}, sort={a: 1}, proj={}, allowDiskUse=0, returnKey=0, requestResumeToken=0
-ZXEAYT8AAAAABQAAAAB+YWEAAAAAAAAAAAAAAGZubm4FAAAAAGZe
-==== VARIATION: sbe, query={a: 1}, sort={a: 1}, proj={}, allowDiskUse=0, returnKey=1, requestResumeToken=0
-ZXEAYT8AAAAABQAAAAB+YWEAAAAAAAAAAAAAAG50bm4FAAAAAGZe
-==== VARIATION: sbe, query={a: 1}, sort={a: 1}, proj={}, allowDiskUse=0, returnKey=0, requestResumeToken=0
-ZXEAYT8AAAAABQAAAAB+YWEAAAAAAAAAAAAAAG5uZm4FAAAAAGZe
-==== VARIATION: sbe, query={a: 1}, sort={a: 1}, proj={}, allowDiskUse=0, returnKey=0, requestResumeToken=0
-ZXEAYT8AAAAABQAAAAB+YWEAAAAKAAAAAAAAAAAAAABubm5uBQAAAABmXg==
-==== VARIATION: sbe, query={a: 1}, sort={a: 1}, proj={}, allowDiskUse=0, returnKey=0, requestResumeToken=0
-ZXEAYT8AAAAABQAAAAB+YWEAAAAAAAAACgAAAAAAAABubm5uBQAAAABmXg==
-==== VARIATION: sbe, query={a: 1}, sort={a: 1}, proj={}, allowDiskUse=0, returnKey=0, requestResumeToken=0
-ZXEAYT8AAAAABQAAAAB+YWEAAAAAAAAAAAAAAG5ubm4FAAAAAGZe
-==== VARIATION: sbe, query={a: 1}, sort={a: 1}, proj={}, allowDiskUse=0, returnKey=0, requestResumeToken=0
-ZXEAYT8AAAAABQAAAAB+YWEAAAAAAAAAAAAAAG5ubm4FAAAAAGZe
-==== VARIATION: sbe, query={a: 1}, sort={}, proj={}, allowDiskUse=0, returnKey=0, requestResumeToken=1
-ZXEAYT8AAAAABQAAAAAAAAAAAAAAAAAAAG5udG4YAAAAEiRyZWNvcmRJZAABAAAAAAAAAABmXg==
+YW4ABQAAAAB8fHx8AAEAAAAAAAAAAABubm5uBQAAAABmfA==
+==== VARIATION: sbe, query={a: 1}, sort={a: 1}, proj={}, hint={}, allowDiskUse=0, returnKey=0, requestResumeToken=0
+ZXEAYT8AAAAABQAAAAB8YWF8fHwAAAAAAAAAAAAAAG5ubm4FAAAAAGZ8
+==== VARIATION: sbe, query={a: 1}, sort={a: 1}, proj={}, hint={}, allowDiskUse=1, returnKey=0, requestResumeToken=0
+ZXEAYT8AAAAABQAAAAB8YWF8fHwAAAAAAAAAAAAAAHRubm4FAAAAAGZ8
+==== VARIATION: sbe, query={a: 1}, sort={a: 1}, proj={}, hint={}, allowDiskUse=0, returnKey=0, requestResumeToken=0
+ZXEAYT8AAAAABQAAAAB8YWF8fHwAAAAAAAAAAAAAAGZubm4FAAAAAGZ8
+==== VARIATION: sbe, query={a: 1}, sort={a: 1}, proj={}, hint={}, allowDiskUse=0, returnKey=1, requestResumeToken=0
+ZXEAYT8AAAAABQAAAAB8YWF8fHwAAAAAAAAAAAAAAG50bm4FAAAAAGZ8
+==== VARIATION: sbe, query={a: 1}, sort={a: 1}, proj={}, hint={}, allowDiskUse=0, returnKey=0, requestResumeToken=0
+ZXEAYT8AAAAABQAAAAB8YWF8fHwAAAAAAAAAAAAAAG5uZm4FAAAAAGZ8
+==== VARIATION: sbe, query={a: 1}, sort={a: 1}, proj={}, hint={}, allowDiskUse=0, returnKey=0, requestResumeToken=0
+ZXEAYT8AAAAABQAAAAB8YWF8fHwAAAAKAAAAAAAAAAAAAABubm5uBQAAAABmfA==
+==== VARIATION: sbe, query={a: 1}, sort={a: 1}, proj={}, hint={}, allowDiskUse=0, returnKey=0, requestResumeToken=0
+ZXEAYT8AAAAABQAAAAB8YWF8fHwAAAAAAAAACgAAAAAAAABubm5uBQAAAABmfA==
+==== VARIATION: sbe, query={a: 1}, sort={a: 1}, proj={}, hint={}, allowDiskUse=0, returnKey=0, requestResumeToken=0
+ZXEAYT8AAAAABQAAAAB8YWF8fHwAAAAAAAAAAAAAAG5ubm4FAAAAAGZ8
+==== VARIATION: sbe, query={a: 1}, sort={a: 1}, proj={}, hint={}, allowDiskUse=0, returnKey=0, requestResumeToken=0
+ZXEAYT8AAAAABQAAAAB8YWF8fHwAAAAAAAAAAAAAAG5ubm4FAAAAAGZ8
+==== VARIATION: sbe, query={a: 1}, sort={}, proj={}, hint={ $natural: 1 }, allowDiskUse=0, returnKey=0, requestResumeToken=1
+ZXEAYT8AAAAABQAAAAB8fHwTAAAAECRuYXR1cmFsAAEAAAAAfAAAAAAAAAAAAAAAbm50bhgAAAASJHJlY29yZElkAAEAAAAAAAAAAGZ8
+==== VARIATION: sbe, query={a: 1}, sort={}, proj={}, hint={ a: 1 }, allowDiskUse=0, returnKey=0, requestResumeToken=0
+ZXEAYT8AAAAABQAAAAB8fHwMAAAAEGEAAQAAAAB8AAAAAAAAAAAAAABubm5uBQAAAABmfA==
+==== VARIATION: sbe, query={a: 1}, sort={}, proj={}, hint={ a: -1 }, allowDiskUse=0, returnKey=0, requestResumeToken=0
+ZXEAYT8AAAAABQAAAAB8fHwMAAAAEGEA/////wB8AAAAAAAAAAAAAABubm5uBQAAAABmfA==

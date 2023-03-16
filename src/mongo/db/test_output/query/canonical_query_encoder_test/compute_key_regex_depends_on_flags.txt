@@ -1,24 +1,24 @@
 ==== VARIATION: query={ a: /sometext/ }, sort={}, proj={}
-rea@tf
+rea||||tf
 ==== VARIATION: query={ a: /sometext/ }, sort={}, proj={}
-rea@tf
+rea||||tf
 ==== VARIATION: query={ a: /sometext/s }, sort={}, proj={}
-rea/s/@tf
+rea/s/||||tf
 ==== VARIATION: query={ a: /sometext/ms }, sort={}, proj={}
-rea/ms/@tf
+rea/ms/||||tf
 ==== VARIATION: query={ a: /sometext/im }, sort={}, proj={}
-rea/im/@tf
+rea/im/||||tf
 ==== VARIATION: query={ a: /sometext/mi }, sort={}, proj={}
-rea/im/@tf
+rea/im/||||tf
 ==== VARIATION: query={ a: /abc/mi }, sort={}, proj={}
-rea/im/@tf
+rea/im/||||tf
 ==== VARIATION: query={ a: /efg/mi }, sort={}, proj={}
-rea/im/@tf
+rea/im/||||tf
 ==== VARIATION: query={ a: //ms }, sort={}, proj={}
-rea/ms/@tf
+rea/ms/||||tf
 ==== VARIATION: query={ a: /___/ms }, sort={}, proj={}
-rea/ms/@tf
+rea/ms/||||tf
 ==== VARIATION: query={ a: { $regex: "abc", $options: "imxsu" } }, sort={}, proj={}
-rea/imsx/@tf
+rea/imsx/||||tf
 ==== VARIATION: query={ a: /abc/im }, sort={}, proj={}
-rea/im/@tf
+rea/im/||||tf

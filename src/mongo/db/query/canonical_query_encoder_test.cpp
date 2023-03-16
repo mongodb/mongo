@@ -153,7 +153,8 @@ protected:
         stream << "==== VARIATION: sbe, query=" << queryStr << ", sort=" << sortStr
                << ", proj=" << projStr;
         if (findCommand) {
-            stream << ", allowDiskUse=" << findCommand->getAllowDiskUse()
+            stream << ", hint=" << findCommand->getHint().toString()
+                   << ", allowDiskUse=" << findCommand->getAllowDiskUse()
                    << ", returnKey=" << findCommand->getReturnKey()
                    << ", requestResumeToken=" << findCommand->getRequestResumeToken();
         }
@@ -493,6 +494,13 @@ TEST_F(CanonicalQueryEncoderTest, ComputeKeySBE) {
     // "hint" must be {$natural:1} if 'requestResumeToken' is enabled.
     findCommand->setHint(fromjson("{$natural: 1}"));
     findCommand->setResumeAfter(mongo::fromjson("{ $recordId: NumberLong(1) }"));
+    testComputeSBEKey(gctx, "{a: 1}", "{}", "{}", std::move(findCommand));
+
+    findCommand = std::make_unique<FindCommandRequest>(nss);
+    findCommand->setHint(fromjson("{a: 1}"));
+    testComputeSBEKey(gctx, "{a: 1}", "{}", "{}", std::move(findCommand));
+    findCommand = std::make_unique<FindCommandRequest>(nss);
+    findCommand->setHint(fromjson("{a: -1}"));
     testComputeSBEKey(gctx, "{a: 1}", "{}", "{}", std::move(findCommand));
 }
 

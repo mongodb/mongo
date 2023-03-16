@@ -1,6 +1,6 @@
-==== VARIATION: sbe, query={a: 1}, sort={a: 1}, proj={}, allowDiskUse=0, returnKey=0, requestResumeToken=0
-ZXEAYT8AAAAABQAAAAB+YWEAAAAAAAAAAAAAAG5ubm4FAAAAAGZe
-==== VARIATION: sbe, query={a: 1}, sort={a: 1}, proj={}, allowDiskUse=0, returnKey=0, requestResumeToken=0
-ZXEAYT8AAAAABQAAAAB+YWEAAAAAAAAAAAAAAG5ubm4FAAAAAGZe
-==== VARIATION: sbe, query={a: 1}, sort={a: 1}, proj={}, allowDiskUse=0, returnKey=0, requestResumeToken=0
-ZXEAYT8AAAAABQAAAAB+YWEAAAAAAAAAAAAAAG5ubm4FAAAAAHRe
+==== VARIATION: sbe, query={a: 1}, sort={a: 1}, proj={}, hint={}, allowDiskUse=0, returnKey=0, requestResumeToken=0
+ZXEAYT8AAAAABQAAAAB8YWF8fHwAAAAAAAAAAAAAAG5ubm4FAAAAAGZ8
+==== VARIATION: sbe, query={a: 1}, sort={a: 1}, proj={}, hint={}, allowDiskUse=0, returnKey=0, requestResumeToken=0
+ZXEAYT8AAAAABQAAAAB8YWF8fHwAAAAAAAAAAAAAAG5ubm4FAAAAAGZ8
+==== VARIATION: sbe, query={a: 1}, sort={a: 1}, proj={}, hint={}, allowDiskUse=0, returnKey=0, requestResumeToken=0
+ZXEAYT8AAAAABQAAAAB8YWF8fHwAAAAAAAAAAAAAAG5ubm4FAAAAAHR8

@@ -37,14 +37,14 @@ namespace mongo {
 inline constexpr char kEncodeChildrenBegin = '[';
 inline constexpr char kEncodeChildrenEnd = ']';
 inline constexpr char kEncodeChildrenSeparator = ',';
-inline constexpr char kEncodeCollationSection = '#';
-inline constexpr char kEncodeProjectionSection = '|';
 inline constexpr char kEncodeProjectionRequirementSeparator = '-';
 inline constexpr char kEncodeRegexFlagsSeparator = '/';
-inline constexpr char kEncodeSortSection = '~';
-inline constexpr char kEncodeFlagsSection = '@';
 
-inline constexpr char kEncodePipelineSection = '^';
+// A generic delimiter to separate encoded portions of the plan cache key. For example, used to
+// separate the encoding of the collection, project, sort, flags, and pipeline sections. The
+// delimiter must be included unconditionally even if the corresponding section of the encoded key
+// will be empty.
+inline constexpr char kEncodeSectionDelimiter = '|';
 
 // These special bytes are used in the encoding of auto-parameterized match expressions in the SBE
 // plan cache key.
