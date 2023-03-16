@@ -49,7 +49,7 @@ public:
                        const NamespaceString& nss,
                        const UUID& uuid,
                        BSONObj indexDoc,
-                       bool fromMigrate) override {}
+                       bool fromMigrate) override;
 
     void onStartIndexBuild(OperationContext* opCtx,
                            const NamespaceString& nss,
