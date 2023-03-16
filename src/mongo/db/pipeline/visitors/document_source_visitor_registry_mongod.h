@@ -56,6 +56,7 @@
 #include "mongo/db/pipeline/document_source_internal_convert_bucket_index_stats.h"
 #include "mongo/db/pipeline/document_source_internal_inhibit_optimization.h"
 #include "mongo/db/pipeline/document_source_internal_shard_filter.h"
+#include "mongo/db/pipeline/document_source_internal_shardserver_info.h"
 #include "mongo/db/pipeline/document_source_internal_split_pipeline.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/pipeline/document_source_limit.h"
@@ -143,6 +144,7 @@ void registerMongodVisitor(ServiceContext* service) {
                        DocumentSourceInternalInhibitOptimization,
                        DocumentSourceInternalSetWindowFields,
                        DocumentSourceInternalShardFilter,
+                       DocumentSourceInternalShardServerInfo,
                        DocumentSourceInternalSplitPipeline,
                        DocumentSourceInternalUnpackBucket,
                        DocumentSourceLimit,
