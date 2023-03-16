@@ -6605,6 +6605,7 @@ tasks:
       resmoke_args: "--storageEngine=wiredTiger"
       resmoke_jobs_max: 1
       fallback_num_sub_suites: 1
+      use_large_distro: "true"
 
 - <<: *task_template
   name: concurrency_replication_multi_stmt_txn
