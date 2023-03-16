@@ -220,8 +220,8 @@ std::unique_ptr<HealthLogEntry> dbCheckBatchEntry(
 
 DbCheckHasher::DbCheckHasher(OperationContext* opCtx,
                              const CollectionPtr& collection,
-                             const BSONKey& start,
-                             const BSONKey& end,
+                             boost::optional<BSONKey> start,
+                             boost::optional<BSONKey> end,
                              int64_t maxCount,
                              int64_t maxBytes)
     : _opCtx(opCtx), _maxKey(end), _maxCount(maxCount), _maxBytes(maxBytes) {
@@ -229,32 +229,47 @@ DbCheckHasher::DbCheckHasher(OperationContext* opCtx,
     // Get the MD5 hasher set up.
     md5_init(&_state);
 
+    auto startKey = start ? *start : BSONKey::min();
+    auto endKey = end ? *end : BSONKey::max();
     if (!collection->isClustered()) {
+        // If the user doesn't specify a start then we must include MinKey as well because MinKey is
+        // a valid _id.
+        auto boundInclusion = start ? BoundInclusion::kIncludeEndKeyOnly
+                                    : BoundInclusion::kIncludeBothStartAndEndKeys;
+
         // Get the _id index.
         const IndexDescriptor* desc = collection->getIndexCatalog()->findIdIndex(opCtx);
-        uassert(ErrorCodes::IndexNotFound, "dbCheck needs _id index", desc);
+        uassert(ErrorCodes::IndexNotFound,
+                str::stream() << "Can't find _id index for collection " << collection->ns().ns(),
+                desc);
 
         // Set up a simple index scan on that.
         _exec = InternalPlanner::indexScan(opCtx,
                                            &collection,
                                            desc,
-                                           start.obj(),
-                                           end.obj(),
-                                           BoundInclusion::kIncludeEndKeyOnly,
+                                           startKey.obj(),
+                                           endKey.obj(),
+                                           boundInclusion,
                                            PlanYieldPolicy::YieldPolicy::NO_YIELD,
                                            InternalPlanner::FORWARD,
                                            InternalPlanner::IXSCAN_FETCH);
     } else {
+        // If the user doesn't specify a start then we must include MinKey as well because MaxKey is
+        // a valid _id.
+        auto boundInclusion = start
+            ? CollectionScanParams::ScanBoundInclusion::kIncludeEndRecordOnly
+            : CollectionScanParams::ScanBoundInclusion::kIncludeBothStartAndEndRecords;
+
         CollectionScanParams params;
         params.minRecord = RecordIdBound(uassertStatusOK(
-            record_id_helpers::keyForDoc(start.obj(),
+            record_id_helpers::keyForDoc(startKey.obj(),
                                          collection->getClusteredInfo()->getIndexSpec(),
                                          collection->getDefaultCollator())));
         params.maxRecord = RecordIdBound(uassertStatusOK(
-            record_id_helpers::keyForDoc(end.obj(),
+            record_id_helpers::keyForDoc(endKey.obj(),
                                          collection->getClusteredInfo()->getIndexSpec(),
                                          collection->getDefaultCollator())));
-        params.boundInclusion = CollectionScanParams::ScanBoundInclusion::kIncludeEndRecordOnly;
+        params.boundInclusion = boundInclusion;
         _exec = InternalPlanner::collectionScan(
             opCtx, &collection, params, PlanYieldPolicy::YieldPolicy::NO_YIELD);
     }
@@ -304,9 +319,9 @@ Status DbCheckHasher::hashAll(OperationContext* opCtx, Date_t deadline) {
         }
     }
 
-    // If we got to the end of the collection, set the last key to MaxKey.
+    // If we got to the end of the execution, set the last key.
     if (lastState == PlanExecutor::IS_EOF) {
-        _last = _maxKey;
+        _last = (_maxKey ? _maxKey.get() : BSONKey::max());
     }
 
     return Status::OK();
@@ -397,6 +412,8 @@ Status dbCheckBatchOnSecondary(OperationContext* opCtx,
             return Status::OK();
         }
 
+        // TODO SERVER-74718: This should pass in boost::none for minKey when the user doesn't
+        // specify one.
         hasher.emplace(opCtx, collection, entry.getMinKey(), entry.getMaxKey());
         uassertStatusOK(hasher->hashAll(opCtx));
 
