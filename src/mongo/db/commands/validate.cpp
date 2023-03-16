@@ -39,6 +39,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/logv2/log.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/testing_proctor.h"
@@ -112,10 +113,12 @@ void logCollStats(OperationContext* opCtx, const NamespaceString& nss) {
     BSONObj collStatsResult;
     try {
         // Run $collStats via aggregation.
-        // Any command errors will throw and be caught in the 'catch'.
         client.runCommand(nss.db().toString(),
                           makeCollStatsCommand(nss.coll()),
                           collStatsResult /* command return results */);
+        // Logging $collStats information is best effort. If the collection doesn't exist, for
+        // example, then the $collStats query will fail and the failure reason will be logged.
+        uassertStatusOK(getStatusFromWriteCommandReply(collStatsResult));
         verifyCommandResponse(collStatsResult);
 
         LOGV2_OPTIONS(7463200,
