@@ -34,32 +34,4 @@
 namespace mongo::sbe::vm {
 using LabelId = int64_t;
 
-class CodeFragment;
-
-/**
- * Utility class that holds a label in a scope of a code fragment, and removes it from the code
- * fragment when LabelScope is destroyed.
- * Can be implicitly used in places where LabelId is expected.
- */
-class LabelScope {
-public:
-    LabelScope(CodeFragment& code, LabelId labelId);
-    ~LabelScope();
-
-    LabelScope() = delete;
-    LabelScope(const LabelScope& other) = delete;
-    LabelScope(LabelScope&& other) = delete;
-
-    LabelScope& operator=(const LabelScope& other) = delete;
-    LabelScope& operator=(LabelScope&& other) = delete;
-
-    operator LabelId() const {
-        return _labelId;
-    }
-
-private:
-    CodeFragment& _code;
-    LabelId _labelId;
-};
-
 }  // namespace mongo::sbe::vm
