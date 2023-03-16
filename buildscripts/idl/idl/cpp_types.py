@@ -458,7 +458,6 @@ class _CppTypeOptional(_CppTypeDelegating):
 def get_cpp_type_from_cpp_type_name(field, cpp_type_name, array):
     # type: (ast.Field, str, bool) -> CppTypeBase
     """Get the C++ Type information for the given C++ type name, e.g. std::string."""
-    # print('get_cpp_type_from_cpp_type_name field: ' + field.name + ', cpp type: ' + cpp_type_name)
     cpp_type_info: CppTypeBase
     if cpp_type_name == 'std::string':
         cpp_type_info = _CppTypeView(field, 'std::string', 'std::string', 'StringData')

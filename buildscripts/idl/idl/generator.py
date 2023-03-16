@@ -1291,8 +1291,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         # Class Class::method(const BSONElement& value)
         method_name = writer.get_method_name_from_qualified_method_name(ast_type.deserializer)
 
-        if ast_type.deserialize_with_tenant:  # TODO SERVER-74029 pass in SerializationContext
-            return '%s(%s, %s)' % (method_name, tenant, element_name)
+        if ast_type.deserialize_with_tenant:
+            return '%s(%s, %s, %s)' % (method_name, tenant, element_name, serialization_context)
         else:
             return '%s(%s)' % (method_name, element_name)
 
@@ -2097,8 +2097,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         # Generate custom serialization
         template_params = {
-            'field_name': _get_field_constant_name(field),
-            'access_member': _access_member(field),
+            'field_name': _get_field_constant_name(field), 'access_member': _access_member(field),
+            'serialization_context': '_serializationContext'
         }
 
         with self._with_template(template_params):
@@ -2135,13 +2135,27 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                         self._writer.write_template('item.${method_name}(&arrayBuilder);')
                 else:
                     if writer.is_function(field.type.serializer):
-                        # Call a method like method(value, StringData, BSONObjBuilder*)
-                        self._writer.write_template(
-                            '${method_name}(${access_member}, ${field_name}, builder);')
+                        # SerializationContext bound to deserialize_with_tenant
+                        if field.type.deserialize_with_tenant:
+                            # Call a method like method(value, StringData, BSONObjBuilder*, SerializationContext)
+                            self._writer.write_template(
+                                '${method_name}(${access_member}, ${field_name}, builder, ${serialization_context});'
+                            )
+                        else:
+                            # Call a method like method(value, StringData, BSONObjBuilder*)
+                            self._writer.write_template(
+                                '${method_name}(${access_member}, ${field_name}, builder);')
                     else:
-                        # Call a method like class::method(StringData, BSONObjBuilder*)
-                        self._writer.write_template(
-                            '${access_member}.${method_name}(${field_name}, builder);')
+                        # SerializationContext bound to deserialize_with_tenant
+                        if field.type.deserialize_with_tenant:
+                            # Call a method like class::method(StringData, BSONObjBuilder*, SerializationContext)
+                            self._writer.write_template(
+                                '${access_member}.${method_name}(${field_name}, builder, ${serialization_context});'
+                            )
+                        else:
+                            # Call a method like class::method(StringData, BSONObjBuilder*)
+                            self._writer.write_template(
+                                '${access_member}.${method_name}(${field_name}, builder);')
 
             else:
                 method_name = writer.get_method_name(field.type.serializer)

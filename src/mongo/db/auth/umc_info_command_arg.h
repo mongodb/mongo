@@ -64,7 +64,8 @@ public:
                   "UMCInfoCommandArg only valid with T = UserName | RoleName");
 
     static UMCInfoCommandArg parseFromBSON(const boost::optional<TenantId> tenantId,
-                                           const BSONElement& elem) {
+                                           const BSONElement& elem,
+                                           const SerializationContext&) {
         if (elem.isNumber() && (elem.safeNumberLong() == 1)) {
             return UMCInfoCommandArg(AllOnCurrentDB{});
         }
@@ -83,7 +84,9 @@ public:
         return UMCInfoCommandArg(parseNamedElement(elem, tenantId));
     }
 
-    void serializeToBSON(StringData fieldName, BSONObjBuilder* bob) const {
+    void serializeToBSON(StringData fieldName,
+                         BSONObjBuilder* bob,
+                         const SerializationContext&) const {
         if (stdx::holds_alternative<AllOnCurrentDB>(_value)) {
             bob->append(fieldName, 1);
         } else if (stdx::holds_alternative<AllForAllDBs>(_value)) {
@@ -101,11 +104,12 @@ public:
         }
     }
 
-    void serializeToBSON(BSONArrayBuilder* bob) const {
+    void serializeToBSON(BSONArrayBuilder* bob,
+                         const SerializationContext& serializationContext) const {
         // Minimize code duplication by using object serialization path.
         // In practice, we don't use this API, it only exists for IDL completeness.
         BSONObjBuilder tmp;
-        serializeToBSON("", &tmp);
+        serializeToBSON("", &tmp, serializationContext);
         auto elem = tmp.obj();
         bob->append(elem.firstElement());
     }
