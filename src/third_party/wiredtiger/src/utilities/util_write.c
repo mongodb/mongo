@@ -71,8 +71,8 @@ util_write(WT_SESSION *session, int argc, char *argv[])
     /*
      * Open the object; free allocated memory immediately to simplify future error handling.
      */
-    if ((ret = __wt_snprintf(config, sizeof(config), "%s,%s", append ? "append=true" : "",
-           overwrite ? "overwrite=true" : "")) != 0) {
+    if ((ret = __wt_snprintf(config, sizeof(config), "append=%s,overwrite=%s",
+           append ? "true" : "false", overwrite ? "true" : "false")) != 0) {
         free(uri);
         return (util_err(session, ret, NULL));
     }
