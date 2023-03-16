@@ -68,6 +68,7 @@ public:
         kTimeseriesBucketMinTime,
         kTimeseriesBucketMaxTime,
         kSearchSortValues,
+        kVectorSimilarity,
 
         // New fields must be added before the kNumFields sentinel.
         kNumFields
@@ -361,6 +362,22 @@ public:
         _holder->timeseriesBucketMaxTime = time;
     }
 
+    bool hasVectorSimilarity() const {
+        return _holder && _holder->metaFields.test(MetaType::kVectorSimilarity);
+    }
+
+    double getVectorSimilarity() const {
+        return _holder->vectorSimilarity;
+    }
+
+    void setVectorSimilarity(double vectorSimilarity) {
+        if (!_holder) {
+            _holder = std::make_unique<MetadataHolder>();
+        }
+        _holder->metaFields.set(MetaType::kVectorSimilarity);
+        _holder->vectorSimilarity = vectorSimilarity;
+    }
+
     bool hasSearchSortValues() const {
         return _holder && _holder->metaFields.test(MetaType::kSearchSortValues);
     }
@@ -403,6 +420,7 @@ private:
         Date_t timeseriesBucketMinTime;
         Date_t timeseriesBucketMaxTime;
         BSONObj searchSortValues;
+        double vectorSimilarity{0.0};
     };
 
     // Null until the first setter is called, at which point a MetadataHolder struct is allocated.

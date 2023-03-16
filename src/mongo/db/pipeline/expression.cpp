@@ -3126,6 +3126,7 @@ const std::string sortKeyName = "sortKey";
 const std::string searchScoreDetailsName = "searchScoreDetails";
 const std::string timeseriesBucketMinTimeName = "timeseriesBucketMinTime";
 const std::string timeseriesBucketMaxTimeName = "timeseriesBucketMaxTime";
+const std::string vectorSimilarity = "vectorSimilarity";
 
 using MetaType = DocumentMetadataFields::MetaType;
 const StringMap<DocumentMetadataFields::MetaType> kMetaNameToMetaType = {
@@ -3141,6 +3142,7 @@ const StringMap<DocumentMetadataFields::MetaType> kMetaNameToMetaType = {
     {textScoreName, MetaType::kTextScore},
     {timeseriesBucketMinTimeName, MetaType::kTimeseriesBucketMinTime},
     {timeseriesBucketMaxTimeName, MetaType::kTimeseriesBucketMaxTime},
+    {vectorSimilarity, MetaType::kVectorSimilarity},
 };
 
 const stdx::unordered_map<DocumentMetadataFields::MetaType, StringData> kMetaTypeToMetaName = {
@@ -3156,6 +3158,7 @@ const stdx::unordered_map<DocumentMetadataFields::MetaType, StringData> kMetaTyp
     {MetaType::kTextScore, textScoreName},
     {MetaType::kTimeseriesBucketMinTime, timeseriesBucketMinTimeName},
     {MetaType::kTimeseriesBucketMaxTime, timeseriesBucketMaxTimeName},
+    {MetaType::kVectorSimilarity, vectorSimilarity},
 };
 
 }  // namespace
@@ -3240,6 +3243,10 @@ Value ExpressionMeta::evaluate(const Document& root, Variables* variables) const
         case MetaType::kTimeseriesBucketMaxTime:
             return metadata.hasTimeseriesBucketMaxTime()
                 ? Value(metadata.getTimeseriesBucketMaxTime())
+                : Value();
+        case MetaType::kVectorSimilarity:
+            return metadata.hasVectorSimilarity()
+                ? Value(metadata.getVectorSimilarity())
                 : Value();
         default:
             MONGO_UNREACHABLE;

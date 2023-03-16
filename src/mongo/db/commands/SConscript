@@ -341,6 +341,7 @@ env.Library(
         "count_cmd.cpp",
         "create_command.cpp",
         "create_indexes_cmd.cpp",
+        "create_vector_index_cmd.cpp",
         "current_op.cpp",
         "dbcommands.cpp",
         "distinct.cpp",

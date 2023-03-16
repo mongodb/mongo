@@ -33,6 +33,7 @@ env.InjectThirdParty(libraries=[
     'abseil-cpp',
     'boost',
     'fmt',
+    'libfaiss',
     'murmurhash3',
     'safeint',
     'stemmer',

@@ -94,6 +94,9 @@ void DocumentMetadataFields::mergeWith(const DocumentMetadataFields& other) {
     if (!hasSearchSortValues() && other.hasSearchSortValues()) {
         setSearchSortValues(other.getSearchSortValues());
     }
+    if (!hasVectorSimilarity() && other.hasVectorSimilarity()) {
+        setVectorSimilarity(other.getVectorSimilarity());
+    }
 }
 
 void DocumentMetadataFields::copyFrom(const DocumentMetadataFields& other) {
@@ -132,6 +135,9 @@ void DocumentMetadataFields::copyFrom(const DocumentMetadataFields& other) {
     }
     if (other.hasSearchSortValues()) {
         setSearchSortValues(other.getSearchSortValues());
+    }
+    if (other.hasVectorSimilarity()) {
+        setVectorSimilarity(other.getVectorSimilarity());
     }
 }
 
@@ -210,6 +216,10 @@ void DocumentMetadataFields::serializeForSorter(BufBuilder& buf) const {
         buf.appendNum(static_cast<char>(MetaType::kTimeseriesBucketMaxTime + 1));
         buf.appendNum(getTimeseriesBucketMaxTime().toMillisSinceEpoch());
     }
+    if (hasVectorSimilarity()) {
+        buf.appendNum(static_cast<char>(MetaType::kVectorSimilarity + 1));
+        buf.appendNum(getVectorSimilarity());
+    }
     if (hasSearchSortValues()) {
         buf.appendNum(static_cast<char>(MetaType::kSearchSortValues + 1));
         getSearchSortValues().appendSelfToBufBuilder(buf);
@@ -254,6 +264,8 @@ void DocumentMetadataFields::deserializeForSorter(BufReader& buf, DocumentMetada
         } else if (marker == static_cast<char>(MetaType::kSearchSortValues) + 1) {
             out->setSearchSortValues(
                 BSONObj::deserializeForSorter(buf, BSONObj::SorterDeserializeSettings()));
+        } else if (marker == static_cast<char>(MetaType::kVectorSimilarity) + 1) {
+           out->setVectorSimilarity(buf.read<LittleEndian<double>>());
         } else {
             uasserted(28744, "Unrecognized marker, unable to deserialize buffer");
         }
@@ -313,6 +325,8 @@ const char* DocumentMetadataFields::typeNameToDebugString(DocumentMetadataFields
             return "timeseries bucket min time";
         case DocumentMetadataFields::kTimeseriesBucketMaxTime:
             return "timeseries bucket max time";
+        case DocumentMetadataFields::kVectorSimilarity:
+            return "vector search similarity";
         case DocumentMetadataFields::kSearchSortValues:
             return "$search sort values";
         default:

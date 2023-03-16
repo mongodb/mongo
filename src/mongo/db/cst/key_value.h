@@ -61,7 +61,8 @@ namespace mongo {
     ENUMIFY(textScore)               \
     ENUMIFY(timeseriesBucketMaxTime) \
     ENUMIFY(timeseriesBucketMinTime) \
-    ENUMIFY(trueKey)
+    ENUMIFY(trueKey)                 \
+    ENUMIFY(vectorSimilarity)
 
 QUERY_UTIL_NAMED_ENUM_DEFINE(KeyValue, KEYVALUES)
 #undef KEYVALUES

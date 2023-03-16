@@ -53,6 +53,7 @@
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/document_source_sample.h"
+#include "mongo/db/pipeline/document_source_search_vector.h"
 #include "mongo/db/pipeline/document_source_skip.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
@@ -222,6 +223,9 @@ auto translateMeta(const CNode::ObjectChildren& object, ExpressionContext* expCt
         case KeyValue::timeseriesBucketMaxTime:
             return make_intrusive<ExpressionMeta>(expCtx,
                                                   DocumentMetadataFields::kTimeseriesBucketMaxTime);
+        case KeyValue::vectorSimilarity:
+            return make_intrusive<ExpressionMeta>(expCtx,
+                                                  DocumentMetadataFields::kVectorSimilarity);
         case KeyValue::timeseriesBucketMinTime:
             return make_intrusive<ExpressionMeta>(expCtx,
                                                   DocumentMetadataFields::kTimeseriesBucketMinTime);
@@ -820,6 +824,44 @@ auto translateSample(const CNode& cst, const boost::intrusive_ptr<ExpressionCont
 }
 
 /**
+ * Unwrap a searchVector stage CNode and produce a DocumentSourceSearchVector.
+ */
+auto translateSearchVector(const CNode& cst, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    long long k;
+    std::string lookupFieldName;
+    std::vector<double> lookupVector;
+    for (const auto& [fieldName, expr] : cst.objectChildren()) {
+      switch (stdx::get<KeyFieldname>(fieldName)) {
+        case KeyFieldname::field:
+            if (auto x = stdx::get_if<UserString>(&expr.payload)) {
+                lookupFieldName = *x;
+            } else {
+                dassert(false);
+            }
+        break;
+        case KeyFieldname::k:
+            dassert(expr.isNumber());
+            k = expr.numberLong();
+        break;
+        case KeyFieldname::vector:
+            lookupVector.reserve(expr.arrayChildren().size());
+            for (const auto& [_, childExpr] : expr.objectChildren()) {
+                dassert(childExpr.isNumber());
+                if (auto x = stdx::get_if<UserDouble>(&childExpr.payload)) {
+                    lookupVector.push_back(*x);
+                } else {
+                    dassert(false);
+                }
+            }
+        break;
+        default:
+            MONGO_UNREACHABLE;
+      }
+    }
+    return DocumentSourceSearchVector::create(expCtx, k, lookupFieldName, lookupVector);
+}
+
+/**
  * Unwrap a match stage CNode and produce a DocumentSourceMatch.
  */
 auto translateMatch(const CNode& cst, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
@@ -846,6 +888,8 @@ boost::intrusive_ptr<DocumentSource> translateSource(
             return translateLimit(cst.objectChildren()[0].second, expCtx);
         case KeyFieldname::sample:
             return translateSample(cst.objectChildren()[0].second, expCtx);
+        case KeyFieldname::searchVector:
+            return translateSearchVector(cst.objectChildren()[0].second, expCtx);
         default:
             MONGO_UNREACHABLE;
     }
