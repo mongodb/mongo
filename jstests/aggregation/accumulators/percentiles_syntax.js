@@ -2,8 +2,6 @@
  * Tests for the $percentile accumulator syntax.
  * @tags: [
  *   featureFlagApproxPercentiles,
- *   # sharded collections aren't supported yet
- *   assumes_unsharded_collection,
  * ]
  */
 (function() {

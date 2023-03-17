@@ -2,8 +2,6 @@
  * Tests for the approximate percentile accumulator semantics.
  * @tags: [
  *   featureFlagApproxPercentiles,
- *   # sharded collections aren't supported yet
- *   assumes_unsharded_collection,
  * ]
  */
 (function() {

@@ -58,11 +58,11 @@ public:
 
     static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx,
                                                          const std::vector<double>& ps,
-                                                         std::unique_ptr<PercentileAlgorithm> algo);
+                                                         int32_t algoType);
 
     AccumulatorPercentile(ExpressionContext* expCtx,
                           const std::vector<double>& ps,
-                          std::unique_ptr<PercentileAlgorithm> algo);
+                          int32_t algoType);
 
     /**
      * Ingressing values and computing the requested percentiles.
@@ -75,9 +75,27 @@ public:
      */
     void reset() final;
 
-private:
+    /**
+     * Serializes this accumulator to a valid MQL accumulation statement that would be legal
+     * inside a $group. When executing on a sharded cluster, the result of this function will be
+     * sent to each individual shard.
+     *
+     * The implementation in 'AccumulatorState' assumes the accumulator has the simple syntax {
+     * <name>: <argument> }, such as { $sum: <argument> }. Because $percentile's syntax is more
+     * complex ({$percentile: {p: [0.5, 0.8], input: "$x", algorithm: "approximate"}}) we have to
+     * override this method.
+     */
+    Document serialize(boost::intrusive_ptr<Expression> initializer,
+                       boost::intrusive_ptr<Expression> argument,
+                       SerializationOptions options) const;
+
+protected:
     std::vector<double> _percentiles;
     std::unique_ptr<PercentileAlgorithm> _algo;
+
+    // TODO SERVER-74894: This should have been 'PercentileAlgorithmTypeEnum' but the generated
+    // header from the IDL includes this header, creating a dependency.
+    const int32_t _algoType;
 };
 
 /*
@@ -99,11 +117,19 @@ public:
                                             VariablesParseState vps);
 
     static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx,
-                                                         std::unique_ptr<PercentileAlgorithm> algo);
+                                                         int32_t algoType);
 
-    AccumulatorMedian(ExpressionContext* expCtx, std::unique_ptr<PercentileAlgorithm> algo);
+    AccumulatorMedian(ExpressionContext* expCtx, int32_t algoType);
 
+    /**
+     * Modify the base-class implementation to return a single value rather than a single-element
+     * array.
+     */
     Value getValue(bool toBeMerged) final;
+
+    Document serialize(boost::intrusive_ptr<Expression> initializer,
+                       boost::intrusive_ptr<Expression> argument,
+                       SerializationOptions options) const final;
 };
 
 }  // namespace mongo

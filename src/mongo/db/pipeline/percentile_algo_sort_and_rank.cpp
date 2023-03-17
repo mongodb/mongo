@@ -33,6 +33,8 @@
 
 #include "mongo/db/pipeline/percentile_algo.h"
 
+#include "mongo/db/exec/document_value/value.h"
+
 namespace mongo {
 
 /**
@@ -78,13 +80,50 @@ public:
         return _accumulatedValues.capacity() * sizeof(double);
     }
 
-private:
+protected:
     std::vector<double> _accumulatedValues;
     bool _shouldSort = true;
 };
 
-std::unique_ptr<PercentileAlgorithm> PercentileAlgorithm::createDiscreteSortAndRank() {
-    return std::make_unique<DiscreteSortAndRank>();
+class DiscreteSortAndRankParallelClassic : public DiscreteSortAndRank,
+                                           public PartialPercentile<Value> {
+public:
+    Value serialize() final {
+        if (_shouldSort) {
+            std::sort(_accumulatedValues.begin(), _accumulatedValues.end());
+            _shouldSort = false;
+        }
+
+        return Value(std::vector<Value>(_accumulatedValues.begin(), _accumulatedValues.end()));
+    }
+
+    // 'partial' should be a sorted array created by 'serialize()'
+    void combine(const Value& partial) final {
+        if (_shouldSort) {
+            std::sort(_accumulatedValues.begin(), _accumulatedValues.end());
+            _shouldSort = false;
+        }
+
+        std::vector<double> other;
+        other.reserve(partial.getArrayLength());
+        for (const auto& v : partial.getArray()) {
+            other.push_back(v.coerceToDouble());
+        }
+
+        std::vector<double> temp;
+        temp.reserve(_accumulatedValues.size() + other.size());
+        std::merge(_accumulatedValues.begin(),
+                   _accumulatedValues.end(),
+                   other.begin(),
+                   other.end(),
+                   std::back_inserter(temp));
+
+        _accumulatedValues.swap(temp);
+    }
+};
+
+std::unique_ptr<PercentileAlgorithm> createDiscreteSortAndRankParallelClassic() {
+    return std::make_unique<DiscreteSortAndRankParallelClassic>();
 }
 
 }  // namespace mongo
