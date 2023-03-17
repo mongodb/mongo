@@ -163,6 +163,7 @@ selector:
   - jstests/concurrency/fsm_workloads/view_catalog_cycle_with_drop.js
   - jstests/concurrency/fsm_workloads/view_catalog_direct_system_writes.js
   - jstests/concurrency/fsm_workloads/random_moveChunk_timeseries_deletes.js
+  - jstests/concurrency/fsm_workloads/timeseries_multi_delete.js
 
   ##
   # Denylists specific to this suite

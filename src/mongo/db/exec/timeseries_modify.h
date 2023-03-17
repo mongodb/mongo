@@ -80,20 +80,24 @@ private:
     /**
      * Writes the modifications to a bucket when the end of the bucket is detected.
      */
-    void _writeToTimeseriesBuckets();
-
-    boost::optional<PlanStage::StageState> rememberIfWritingToOrphanedBucket(
-        WorkingSetMember* member);
+    PlanStage::StageState _writeToTimeseriesBuckets();
 
     /**
-     * Fetches the document for the bucket pointed to by this WSM.
+     * Helper to set up state to retry 'bucketId' after yielding and establishing a new storage
+     * snapshot.
      */
-    PlanStage::StageState _fetchBucket(WorkingSetID id);
+    void _retryBucket(const stdx::variant<WorkingSetID, RecordId>& bucketId);
+
+    template <typename F>
+    boost::optional<PlanStage::StageState> _rememberIfWritingToOrphanedBucket(
+        ScopeGuard<F>& bucketFreer, WorkingSetID id);
 
     /**
      * Gets the next bucket to process.
      */
     PlanStage::StageState _getNextBucket(WorkingSetID& id);
+
+    void resetCurrentBucket();
 
     std::unique_ptr<DeleteStageParams> _params;
 
@@ -111,11 +115,10 @@ private:
 
     // The RecordId (also "_id" for the clustered collection) value of the current bucket.
     RecordId _currentBucketRid = RecordId{};
-
-    // The WS id of the next bucket to unpack. This is populated in cases where we successfully read
-    // the RecordId of the next bucket, but receive NEED_YIELD when attempting to fetch the full
-    // document.
-    WorkingSetID _retryFetchBucketId = WorkingSet::INVALID_ID;
+    // Maintained similarly to '_currentBucketRid', but used to determine if we can actually use the
+    // results of unpacking to do a write. If the storage engine snapshot has changed, all bets are
+    // off and it's unsafe to proceed - more details in the implementation which reads this value.
+    SnapshotId _currentBucketSnapshotId = SnapshotId{};
 
     std::vector<BSONObj> _unchangedMeasurements;
     std::vector<BSONObj> _deletedMeasurements;
@@ -136,5 +139,9 @@ private:
     bool _currentBucketFromMigrate = false;
 
     TimeseriesModifyStats _specificStats{};
+
+    // A pending retry to get to after a NEED_YIELD propagation and a new storage snapshot is
+    // established. This can be set when a write fails or when a fetch fails.
+    WorkingSetID _retryBucketId = WorkingSet::INVALID_ID;
 };
 }  //  namespace mongo
