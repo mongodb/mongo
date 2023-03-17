@@ -452,26 +452,6 @@ void mergeAllChunksOnShardInTransaction(OperationContext* opCtx,
     txn.run(opCtx, updateChunksFn);
 }
 
-/*
- * Creates the request to persist a namespace descriptor object into config.placementHistory.
- */
-write_ops::UpdateCommandRequest composePlacementUpsertRequest(
-    const NamespacePlacementType& placementInfo) {
-    write_ops::UpdateCommandRequest upsertRequest(
-        NamespaceString::kConfigsvrPlacementHistoryNamespace);
-    write_ops::UpdateOpEntry upsertEntry;
-    upsertEntry.setQ(BSON(NamespacePlacementType::kNssFieldName
-                          << placementInfo.getNss().ns()
-                          << NamespacePlacementType::kTimestampFieldName
-                          << placementInfo.getTimestamp()));
-    upsertEntry.setU(write_ops::UpdateModification::parseFromClassicUpdate(placementInfo.toBSON()));
-    upsertEntry.setMulti(false);
-    // Upsert to account for concurrent migrations.
-    upsertEntry.setUpsert(true);
-    upsertRequest.setUpdates({std::move(upsertEntry)});
-    return upsertRequest;
-};
-
 }  // namespace
 
 void ShardingCatalogManager::bumpMajorVersionOneChunkPerShard(
@@ -2388,8 +2368,9 @@ void ShardingCatalogManager::_commitChunkMigrationInTransaction(
         // descriptor.
         auto persistPlacementInfoSubchain = [txnExec,
                                              &txnClient](NamespacePlacementType&& placementInfo) {
-            auto upsertRequest = composePlacementUpsertRequest(placementInfo);
-            return txnClient.runCRUDOp(upsertRequest, {})
+            write_ops::InsertCommandRequest insertPlacementEntry(
+                NamespaceString::kConfigsvrPlacementHistoryNamespace, {placementInfo.toBSON()});
+            return txnClient.runCRUDOp(insertPlacementEntry, {})
                 .thenRunOn(txnExec)
                 .then([](const BatchedCommandResponse& insertPlacementEntryResponse) {
                     uassertStatusOK(insertPlacementEntryResponse.toStatus());
@@ -2420,8 +2401,11 @@ void ShardingCatalogManager::_commitChunkMigrationInTransaction(
                         NamespacePlacementType placementInfo(
                             nss, migrationCommitTime, std::move(shardIds));
                         placementInfo.setUuid(collUuid);
-                        auto request = composePlacementUpsertRequest(placementInfo);
-                        return txnClient.runCRUDOp(request, {});
+                        write_ops::InsertCommandRequest insertPlacementEntry(
+                            NamespaceString::kConfigsvrPlacementHistoryNamespace,
+                            {placementInfo.toBSON()});
+
+                        return txnClient.runCRUDOp(insertPlacementEntry, {});
                     })
                     .thenRunOn(txnExec)
                     .then([](const BatchedCommandResponse& insertPlacementEntryResponse) {
