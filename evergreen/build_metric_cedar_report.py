@@ -73,7 +73,9 @@ with open(clean_build_metrics_json) as f:
 
     mongod_metrics = None
     for artifact in build_metrics['artifact_metrics']['artifacts']:
-        if artifact['name'] == 'build/metrics/mongo/db/mongod':
+        if not mongod_metrics and artifact['name'] == 'build/metrics/mongo/db/mongod':
+            mongod_metrics = artifact
+        if artifact['name'] == 'build/metrics/mongo/db/mongod.debug':
             mongod_metrics = artifact
             break
 

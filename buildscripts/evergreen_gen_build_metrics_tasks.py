@@ -36,7 +36,7 @@ def main():
                     "compiling_for_test": "true",
                 }) for step_flags in scons_task_steps
         ]
-
+        task_steps.append(FunctionCall("attach build metrics"))
         task_steps.append(FunctionCall("print top N metrics"))
         return task_steps
 
@@ -121,7 +121,6 @@ def main():
             teardown_task=[
                 FunctionCall("f_expansions_write"),
                 FunctionCall("attach scons logs"),
-                FunctionCall("attach build metrics"),
                 FunctionCall("kill processes"),
                 FunctionCall("save disk statistics"),
                 FunctionCall("save system resource information"),
