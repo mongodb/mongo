@@ -2,8 +2,12 @@
  * This file defines tests for all existing commands and their expected behavior when run against a
  * node that is in the downgrading FCV state.
  *
- * Tagged as multiversion-incompatible as the list of commands will vary depending on version.
- * @tags: [multiversion_incompatible]
+ * @tags: [
+ *   # Tagged as multiversion-incompatible as the list of commands will vary depending on version.
+ *   multiversion_incompatible,
+ *   # Cannot compact when using the in-memory storage engine.
+ *   requires_persistence,
+ * ]
  */
 
 (function() {
@@ -11,8 +15,9 @@
 
 // This will verify the completeness of our map and run all tests.
 load("jstests/libs/all_commands_test.js");
-load("jstests/libs/fixture_helpers.js");  // For isSharded.
-load("jstests/libs/feature_flag_util.js");
+load("jstests/libs/fixture_helpers.js");    // For isSharded and isReplSet
+load("jstests/libs/feature_flag_util.js");  // For isPresentAndEnabled
+load('jstests/replsets/rslib.js');
 
 const name = jsTestName();
 const dbName = "alltestsdb";
@@ -22,26 +27,13 @@ const fullNs = dbName + "." + collName;
 // Pre-written reasons for skipping a test.
 const isAnInternalCommand = "internal command";
 const isDeprecated = "deprecated command";
-// TODO SERVER-69753 some commands we didn't have time for. Other commands are new in recent
-// releases and don't make sense to test here.
-const isNotImplementedYet = "not implemented yet";
+const commandIsDisabledOnLastLTS = "skip command on downgrading fcv";
+const requiresParallelShell = "requires parallel shell";
 
-let _lsid = UUID();
-function getNextLSID() {
-    _lsid = UUID();
-    return {id: _lsid};
-}
-function getLSID() {
-    return {id: _lsid};
-}
-
-// TODO SERVER-69753: Finish implementing commands marked as isNotImplementedYet.
 const allCommands = {
-    _addShard: {
-        skip: isNotImplementedYet,
-    },
-    // TODO SERVER-69753: Make sure these internal commands are tested through passthrough suites.
-    _cloneCollectionOptionsFromPrimaryShard: {skip: isAnInternalCommand},
+    _addShard: {skip: isAnInternalCommand},
+    _clusterQueryWithoutShardKey: {skip: isAnInternalCommand},
+    _clusterWriteWithoutShardKey: {skip: isAnInternalCommand},
     _configsvrAbortReshardCollection: {skip: isAnInternalCommand},
     _configsvrAddShard: {skip: isAnInternalCommand},
     _configsvrAddShardToZone: {skip: isAnInternalCommand},
@@ -153,52 +145,68 @@ const allCommands = {
     _transferMods: {skip: isAnInternalCommand},
     _vectorClockPersist: {skip: isAnInternalCommand},
     abortReshardCollection: {
-        // TODO SERVER-69753: Unskip this command when we can test with sharded clusters.
-        skip: isNotImplementedYet,
-        // command: {abortReshardCollection: "test.x"},
-        // isShardedOnly: true,
-        // isAdminCommand: true
+        // Skipping command because it requires testing through a parallel shell.
+        skip: requiresParallelShell,
     },
     abortTransaction: {
-        // TODO SERVER-69753: Uncomment/unskip and fix the command. Currently abortTransaction
-        // cannot find the transaction number.
-        skip: isNotImplementedYet,
-        // setUp: function(conn) {
-        //     assert.commandWorked(
-        //         conn.getDB(dbName).runCommand({create: collName, writeConcern: {w:
-        //         'majority'}}));
-        //     // Ensure that the dbVersion is known.
-        //     assert.commandWorked(
-        //         conn.getCollection(fullNs).insert({x: 1}, {writeConcern: {w: "majority"}}));
-        //     assert.eq(
-        //         1, conn.getCollection(fullNs).find({x:
-        //         1}).readConcern("local").limit(1).next().x);
+        doesNotRunOnStandalone: true,
+        fullScenario: function(conn) {
+            assert.commandWorked(
+                conn.getDB(dbName).runCommand({create: collName, writeConcern: {w: 'majority'}}));
 
-        //     // Start the transaction.
-        //     assert.commandWorked(conn.getDB(dbName).runCommand({
-        //         insert: collName,
-        //         documents: [{_id: ObjectId()}],
-        //         lsid: getNextLSID(),
-        //         stmtIds: [NumberInt(0)],
-        //         txnNumber: NumberLong(0),
-        //         startTransaction: true,
-        //         autocommit: false,
-        //     }));
-        // },
-        // command:
-        //     {abortTransaction: 1, txnNumber: NumberLong(0), autocommit: false, lsid: getLSID()},
-        // isAdminCommand: true,
-        // teardown: function(conn) {
-        //     assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
-        // }
+            let _lsid = UUID();
+            // Start the transaction.
+            assert.commandWorked(conn.getDB(dbName).runCommand({
+                insert: collName,
+                documents: [{_id: ObjectId()}],
+                lsid: {id: _lsid},
+                stmtIds: [NumberInt(0)],
+                txnNumber: NumberLong(0),
+                startTransaction: true,
+                autocommit: false,
+            }));
+
+            assert.commandWorked(conn.getDB('admin').runCommand({
+                abortTransaction: 1,
+                txnNumber: NumberLong(0),
+                autocommit: false,
+                lsid: {id: _lsid},
+            }));
+            assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
+        }
+    },
+    addShard: {
+        skip: "cannot add shard while in downgrading FCV state",
+    },
+    addShardToZone: {
+        isShardedOnly: true,
+        fullScenario: function(conn, fixture) {
+            assert.commandWorked(
+                conn.adminCommand({addShardToZone: fixture.shard0.shardName, zone: 'x'}));
+            assert.commandWorked(
+                conn.adminCommand({removeShardFromZone: fixture.shard0.shardName, zone: 'x'}));
+        }
     },
     aggregate: {
         setUp: function(conn) {
             assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));
+            for (let i = 0; i < 10; i++) {
+                assert.commandWorked(conn.getCollection(fullNs).insert({a: i}));
+            }
         },
-        // TODO SERVER-69753: Add additional aggregation stages to the pipeline to increase coverage
-        // of all the agg stages.
-        command: {aggregate: collName, pipeline: [{$match: {}}], cursor: {}},
+        command: {
+            aggregate: collName,
+            pipeline: [
+                {$match: {}},
+                {$skip: 1},
+                {$count: "count"},
+                {$project: {_id: 1}},
+                {$sort: {_id: 1}},
+                {$limit: 1},
+                {$set: {x: "1"}},
+            ],
+            cursor: {}
+        },
         teardown: function(conn) {
             assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
         },
@@ -209,93 +217,173 @@ const allCommands = {
         },
         command: {analyze: collName},
         expectFailure: true,
-        expectedErrorCode:
-            6660400,  // Analyze command requires common query framework feature flag to be enabled.
+        expectedErrorCode: [
+            6660400,
+            6765500
+        ],  // Analyze command requires common query framework feature flag to be enabled.
         teardown: function(conn) {
             assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
         },
     },
     analyzeShardKey: {
-        // TODO SERVER-69753: Unskip this command when we can test with sharded clusters.
-        skip: isNotImplementedYet,
-        // setUp: function(conn) {
-        //     assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));
-        // },
-        // command: {analyzeShardKey: fullNs, key: {skey: 1}},
-        // isShardedOnly: true,
-        // isAdminCommand: true,
-        // teardown: function(conn) {
-        //     assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
-        // },
+        // TODO SERVER-74867: Remove the skip once 7.0 is lastLTS.
+        skip: commandIsDisabledOnLastLTS,
+        // TODO SERVER-67966: Remove check when this feature flag is removed.
+        checkFeatureFlag: "AnalyzeShardKey",
+        setUp: function(conn) {
+            assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));
+            assert.commandWorked(
+                conn.getDB('admin').runCommand({shardCollection: fullNs, key: {_id: 1}}));
+            for (let i = 0; i < 10; i++) {
+                assert.commandWorked(conn.getCollection(fullNs).insert({a: i}));
+            }
+        },
+        command: {analyzeShardKey: fullNs, key: {_id: 1}},
+        teardown: function(conn) {
+            assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
+        },
+        isShardedOnly: true,
+        isAdminCommand: true,
     },
-    appendOplogNote: {command: {appendOplogNote: 1, data: {a: 1}}, isAdminCommand: true},
+    appendOplogNote: {
+        command: {appendOplogNote: 1, data: {a: 1}},
+        isAdminCommand: true,
+        doesNotRunOnStandalone: true,
+    },
     applyOps: {
         command: {applyOps: []},
         isAdminCommand: true,
+        isShardSvrOnly: true,
     },
-    authenticate: {skip: isNotImplementedYet},
+    authenticate: {
+        // Skipping command because it requires additional authentication setup.
+        skip: "requires additional authentication setup"
+    },
     autoSplitVector: {skip: isAnInternalCommand},
+    balancerCollectionStatus: {
+        command: {balancerCollectionStatus: fullNs},
+        isShardedOnly: true,
+        isAdminCommand: true,
+        setUp: function(conn) {
+            assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));
+            assert.commandWorked(
+                conn.getDB('admin').runCommand({shardCollection: fullNs, key: {_id: 1}}));
+        },
+        teardown: function(conn) {
+            assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
+        },
+    },
+    balancerStart: {
+        setUp: function(conn) {
+            assert.commandWorked(conn.getDB('admin').runCommand({balancerStop: 1}));
+        },
+        command: {balancerStart: 1},
+        isShardedOnly: true,
+        isAdminCommand: true
+    },
+    balancerStatus: {command: {balancerStatus: 1}, isShardedOnly: true, isAdminCommand: true},
+    balancerStop: {
+        command: {balancerStop: 1},
+        isShardedOnly: true,
+        isAdminCommand: true,
+        teardown: function(conn) {
+            assert.commandWorked(conn.getDB('admin').runCommand({balancerStart: 1}));
+        },
+    },
     buildInfo: {
         command: {buildInfo: 1},
         isAdminCommand: true,
     },
-    bulkWrite: {skip: isNotImplementedYet},
-    captrunc: {
-        // TODO SERVER-69753: Uncomment/unskip and fix the command. Currently it is failing with the
-        // same seg fault error as BF-26123.
-        skip: isNotImplementedYet,
-        // setUp: function(conn) {
-        //     const db = conn.getDB(dbName);
-        //     const coll = conn.getCollection(dbName + ".capped_truncate");
-        //     assert.commandWorked(
-        //         db.runCommand({create: "capped_truncate", capped: true, size: 1024}));
-        //     for (let j = 1; j <= 10; j++) {
-        //         assert.commandWorked(coll.insert({x: j}));
-        //     }
-        // },
-        // command: {captrunc: "capped_truncate", n: 5, inc: false},
-        // teardown: function(conn) {
-        //     assert.commandWorked(conn.getDB(dbName).runCommand({drop: "capped_truncate"}));
-        // }
+    bulkWrite: {
+        // TODO SERVER-74867: Remove the skip once 7.0 is lastLTS.
+        skip: commandIsDisabledOnLastLTS,
+        // TODO SERVER-67711: Remove check when this feature flag is removed.
+        checkFeatureFlag: "BulkWriteCommand",
+        isAdminCommand: true,
+        setUp: function(conn) {
+            assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));
+        },
+        command: {
+            bulkWrite: 1,
+            ops: [
+                {insert: 0, document: {skey: "MongoDB"}},
+                {insert: 0, document: {skey: "MongoDB"}}
+            ],
+            nsInfo: [{ns: fullNs}]
+        },
+        teardown: function(conn) {
+            assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
+        },
     },
-    checkMetadataConsistency: {skip: isNotImplementedYet},
+    captrunc: {
+        skip: isAnInternalCommand,
+    },
+    checkMetadataConsistency: {
+        isAdminCommand: true,
+        isShardedOnly: true,
+        // TODO SERVER-74867: Remove the skip once 7.0 is lastLTS.
+        skip: commandIsDisabledOnLastLTS,
+        // TODO SERVER-70396: Remove check when this feature flag is removed.
+        checkFeatureFlag: "CheckMetadataConsistency",
+        command: {checkMetadataConsistency: 1},
+    },
     checkShardingIndex: {
-        // TODO SERVER-69753: Unskip this command when we can test with sharded clusters.
-        skip: isNotImplementedYet,
-        // setUp: function(conn) {
-        //     const f = conn.getCollection(dbName + ".jstests_sharding_index");
-        //     f.drop();
-        //     f.createIndex({x: 1, y: 1});
-        // },
-        // command: {checkShardingIndex: dbName + ".jstests_sharding_index", keyPattern: {x: 1, y:
-        // 1}},
-        // isShardedOnly: true,
-        // isShardSvrOnly: true,
-        // teardown: function(conn) {
-        //     assert.commandWorked(conn.getDB(dbName).runCommand({drop:
-        //     "jstests_sharding_index"}));
-        // }
+        setUp: function(conn, fixture) {
+            assert.commandWorked(fixture.shard0.getDB(dbName).runCommand({create: collName}));
+            const f = fixture.shard0.getCollection(fullNs);
+            f.createIndex({x: 1, y: 1});
+        },
+        command: {checkShardingIndex: fullNs, keyPattern: {x: 1, y: 1}},
+        isShardedOnly: true,
+        isShardSvrOnly: true,
+        teardown: function(conn) {
+            assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
+        }
     },
     cleanupOrphaned: {
-        // TODO SERVER-69753: Unskip this command when we can test with sharded clusters.
-        skip: isNotImplementedYet,
-        // setUp: function(conn) {
-        //     assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));
-        //     for (let i = 0; i < 10; i++) {
-        //         assert.commandWorked(conn.getCollection(fullNs).insert({a: i}));
-        //     }
-        // },
-        // command: {cleanupOrphaned: fullNs},
-        // isShardedOnly: true,
-        // teardown: function(conn) {
-        //     assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
-        // },
+        setUp: function(conn) {
+            // This would not actually create any orphaned data so the command will be a noop, but
+            // this will be tested through the sharding FCV upgrade/downgrade passthrough.
+            assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));
+            for (let i = 0; i < 10; i++) {
+                assert.commandWorked(conn.getCollection(fullNs).insert({a: i}));
+            }
+        },
+        command: {cleanupOrphaned: fullNs},
+        isShardedOnly: true,
+        isShardSvrOnly: true,
+        isAdminCommand: true,
+        teardown: function(conn) {
+            assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
+        },
     },
     cleanupReshardCollection: {
-        // TODO SERVER-69753: Unskip this command when we can test with sharded clusters.
-        skip: isNotImplementedYet,
-        // command: {cleanupReshardCollection: 1},
-        // isShardedOnly: true,
+        // Skipping command because it requires additional setup through a failed resharding
+        // operation.
+        skip: "requires additional setup through a failed resharding operation",
+    },
+    clearJumboFlag: {
+        isShardedOnly: true,
+        fullScenario: function(conn, fixture) {
+            assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));
+            assert.commandWorked(
+                conn.getDB(dbName).adminCommand({shardCollection: fullNs, key: {a: 1}}));
+
+            assert.commandWorked(conn.adminCommand({split: fullNs, middle: {a: 5}}));
+
+            // Create sufficient documents to create a jumbo chunk, and use the same shard key in
+            // all of
+            // them so that the chunk cannot be split.
+            const largeString = 'X'.repeat(1024 * 1024);
+            for (let i = 0; i < 10; i++) {
+                assert.commandWorked(
+                    conn.getCollection(fullNs).insert({a: 0, big: largeString, i: i}));
+            }
+
+            assert.commandWorked(conn.adminCommand({clearJumboFlag: fullNs, find: {a: 0}}));
+
+            assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
+        },
     },
     clearLog: {
         command: {clearLog: 'global'},
@@ -313,6 +401,7 @@ const allCommands = {
             toCollection: collName + "2",
             size: 10 * 1024 * 1024
         },
+        doesNotRunOnMongos: true,
         teardown: function(conn) {
             assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
             assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName + "2"}));
@@ -321,7 +410,7 @@ const allCommands = {
     clusterAbortTransaction: {skip: "already tested by 'abortTransaction' tests on mongos"},
     clusterAggregate: {skip: "already tested by 'aggregate' tests on mongos"},
     clusterCommitTransaction: {skip: "already tested by 'commitTransaction' tests on mongos"},
-    clusterCount: {skip: isNotImplementedYet},
+    clusterCount: {skip: "already tested by 'count' tests on mongos"},
     clusterDelete: {skip: "already tested by 'delete' tests on mongos"},
     clusterFind: {skip: "already tested by 'find' tests on mongos"},
     clusterGetMore: {skip: "already tested by 'getMore' tests on mongos"},
@@ -349,79 +438,76 @@ const allCommands = {
         },
     },
     commitReshardCollection: {
-        // TODO SERVER-69753: Unskip this command when we can test with sharded clusters.
-        skip: isNotImplementedYet,
-        // command: {commitReshardCollection: "test.x"},
-        // isShardedOnly: true,
+        skip: requiresParallelShell,
     },
     commitTransaction: {
-        skip: isNotImplementedYet,
-        // setUp: function(conn) {
-        //     assert.commandWorked(
-        //         conn.getDB(dbName).runCommand({create: collName, writeConcern: {w:
-        //         'majority'}}));
-        //     // Ensure that the dbVersion is known.
-        //     assert.commandWorked(conn.getCollection(fullNs).insert({x: 1}, {writeConcern: {w:
-        //     1}})); assert.eq(
-        //         1, conn.getCollection(fullNs).find({x:
-        //         1}).readConcern("local").limit(1).next().x);
-        //     const lsid = assert.commandWorked(conn.getDB(dbName).runCommand({startSession:
-        //     1})).id;
-        //     // Start the transaction.
-        //     assert.commandWorked(conn.getDB(dbName).runCommand({
-        //         insert: collName,
-        //         documents: [{_id: ObjectId()}],
-        //         lsid: getNextLSID(),
-        //         // stmtIds: [NumberInt(0)],
-        //         txnNumber: NumberLong(0),
-        //         startTransaction: true,
-        //         autocommit: false
-        //     }));
-        // },
-        // command:
-        //     {commitTransaction: 1, txnNumber: NumberLong(0), autocommit: false, lsid: getLSID()},
-        // teardown: function(conn) {
-        //     assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
-        // },
-        // isAdminCommand: true,
+        doesNotRunOnStandalone: true,
+        fullScenario: function(conn) {
+            assert.commandWorked(
+                conn.getDB(dbName).runCommand({create: collName, writeConcern: {w: 'majority'}}));
+            let _lsid = UUID();
+            // Start the transaction.
+            assert.commandWorked(conn.getDB(dbName).runCommand({
+                insert: collName,
+                documents: [{_id: ObjectId()}],
+                lsid: {id: _lsid},
+                stmtIds: [NumberInt(0)],
+                txnNumber: NumberLong(0),
+                startTransaction: true,
+                autocommit: false,
+            }));
+
+            assert.commandWorked(conn.getDB("admin").runCommand({
+                commitTransaction: 1,
+                txnNumber: NumberLong(0),
+                autocommit: false,
+                lsid: {id: _lsid},
+            }));
+            assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
+        },
     },
     compact: {
-        // TODO SERVER-69753: Uncomment the command and figure out way to skip this command when
-        // running on an evergreen variant with the inMemory record store.
-        skip: isNotImplementedYet,
-        // setUp: function(conn) {
-        //     assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));
-        // },
-        // command: {compact: collName, force: true},
-        // isReplSetOnly: true,
-        // teardown: function(conn) {
-        //     assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
-        // },
-    },
-    compactStructuredEncryptionData: {skip: isNotImplementedYet},
-    configureFailPoint: {skip: isAnInternalCommand},
-    configureCollectionBalancing: {
-        // TODO SERVER-69753: Unskip this command when we can test with sharded clusters.
-        skip: isNotImplementedYet,
-        // setUp: function(conn) {
-        // TODO SERVER-69753: Shard this collection in setUp
-        //     assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));
-        // },
-        // command: {configureCollectionBalancing: collName},
-        // teardown: function(conn) {
-        //     assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
-        // },
-        // isShardedOnly: true,
-    },
-    configureQueryAnalyzer: {
-        isAdminCommand: true,
-        command: {configureQueryAnalyzer: fullNs, mode: "full", sampleRate: 0.1},
         setUp: function(conn) {
             assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));
         },
+        command: {compact: collName, force: true},
+        isReplSetOnly: true,
         teardown: function(conn) {
             assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
         },
+    },
+    compactStructuredEncryptionData: {skip: "requires additional encrypted collection setup"},
+    configureFailPoint: {skip: isAnInternalCommand},
+    configureCollectionBalancing: {
+        setUp: function(conn) {
+            assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));
+            assert.commandWorked(
+                conn.getDB('admin').runCommand({shardCollection: fullNs, key: {_id: 1}}));
+        },
+        command: {configureCollectionBalancing: fullNs, enableAutoSplitter: true},
+        teardown: function(conn) {
+            assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
+        },
+        isShardedOnly: true,
+        isAdminCommand: true,
+    },
+    configureQueryAnalyzer: {
+        // TODO SERVER-74867: Remove the skip once 7.0 is lastLTS.
+        skip: commandIsDisabledOnLastLTS,
+        // TODO SERVER-67966: Remove check when this feature flag is removed.
+        checkFeatureFlag: "AnalyzeShardKey",
+        setUp: function(conn) {
+            assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));
+            for (let i = 0; i < 10; i++) {
+                assert.commandWorked(conn.getCollection(fullNs).insert({a: i}));
+            }
+        },
+        command: {configureQueryAnalyzer: fullNs, mode: "full", sampleRate: 1},
+        teardown: function(conn) {
+            assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
+        },
+        isAdminCommand: true,
+        isShardedOnly: true,
     },
     connPoolStats: {
         isAdminCommand: true,
@@ -464,7 +550,7 @@ const allCommands = {
     createIndexes: {
         setUp: function(conn) {
             assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));
-            assert.commandWorked(conn.getCollection(fullNs).insert({x: 1}, {writeConcern: {w: 1}}));
+            assert.commandWorked(conn.getCollection(fullNs).insert({x: 1}));
         },
         command: {createIndexes: collName, indexes: [{key: {x: 1}, name: "foo"}]},
         teardown: function(conn) {
@@ -478,7 +564,9 @@ const allCommands = {
         }
     },
     createSearchIndexes: {
-        skip: isNotImplementedYet,
+        // Skipping command as it requires additional Mongot mock setup (and is an enterprise
+        // feature).
+        skip: "requires mongot mock setup",
     },
     createUser: {
         command: {createUser: "foo", pwd: "bar", roles: []},
@@ -499,9 +587,10 @@ const allCommands = {
             assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
         },
     },
-    dbCheck: {command: {dbCheck: 1}},
+    dbCheck: {command: {dbCheck: 1}, isShardSvrOnly: true},
     dbHash: {
         command: {dbHash: 1},
+        isShardSvrOnly: true,
     },
     dbStats: {
         command: {dbStats: 1},
@@ -530,7 +619,6 @@ const allCommands = {
     donorAbortMigration: {skip: isAnInternalCommand},
     donorForgetMigration: {skip: isAnInternalCommand},
     donorStartMigration: {skip: isAnInternalCommand},
-    donorWaitForMigrationToCommit: {skip: isAnInternalCommand},
     abortShardSplit: {skip: isAnInternalCommand},
     commitShardSplit: {skip: isAnInternalCommand},
     forgetShardSplit: {skip: isAnInternalCommand},
@@ -554,9 +642,26 @@ const allCommands = {
         },
         command: {dropAllUsersFromDatabase: 1},
     },
-    dropConnections: {skip: isNotImplementedYet},
-    dropDatabase: {skip: isNotImplementedYet},
-    dropIndexes: {skip: isNotImplementedYet},
+    dropConnections: {
+        // This will be tested in FCV upgrade/downgrade passthroughs through tests in the replsets
+        // and sharding directories.
+        skip: "requires additional setup to reconfig and add/remove nodes",
+    },
+    dropDatabase: {
+        command: {dropDatabase: 1},
+    },
+    dropIndexes: {
+        setUp: function(conn) {
+            assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));
+            assert.commandWorked(conn.getCollection(fullNs).insert({x: 1}));
+            assert.commandWorked(conn.getDB(dbName).runCommand(
+                {createIndexes: collName, indexes: [{key: {x: 1}, name: "foo"}]}));
+        },
+        command: {dropIndexes: collName, index: {x: 1}},
+        teardown: function(conn) {
+            assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
+        },
+    },
     dropRole: {
         setUp: function(conn) {
             assert.commandWorked(
@@ -565,7 +670,9 @@ const allCommands = {
         command: {dropRole: "foo"},
     },
     dropSearchIndex: {
-        skip: isNotImplementedYet,
+        // Skipping command as it requires additional Mongot mock setup (and is an enterprise
+        // feature).
+        skip: "requires mongot mock setup",
     },
     dropUser: {
         setUp: function(conn) {
@@ -574,7 +681,7 @@ const allCommands = {
         },
         command: {dropUser: "foo"},
     },
-    echo: {skip: isNotImplementedYet},
+    echo: {command: {echo: 1}},
     emptycapped: {
         command: {emptycapped: collName},
         setUp: function(conn) {
@@ -583,8 +690,14 @@ const allCommands = {
         teardown: function(conn) {
             assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
         },
+        doesNotRunOnMongos: true,
     },
-    endSessions: {skip: isNotImplementedYet},
+    enableSharding: {
+        isShardedOnly: true,
+        isAdminCommand: true,
+        command: {enableSharding: dbName},
+    },
+    endSessions: {skip: "tested in startSession"},
     explain: {
         setUp: function(conn) {
             assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));
@@ -623,18 +736,19 @@ const allCommands = {
             assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
         }
     },
-    flushRouterConfig: {
-        // TODO SERVER-69753: Unskip this command when we can test with sharded clusters.
-        skip: isNotImplementedYet,
-        // isShardedOnly: true,
-        // isAdminCommand: true,
-        // command: {flushRouterConfig: 1}
-    },
+    flushRouterConfig: {isShardedOnly: true, isAdminCommand: true, command: {flushRouterConfig: 1}},
     fsync: {
-        skip: isNotImplementedYet,
+        command: {fsync: 1},
+        isAdminCommand: true,
+        doesNotRunOnMongos: true,
     },
     fsyncUnlock: {
-        skip: isNotImplementedYet,
+        command: {fsyncUnlock: 1},
+        isAdminCommand: true,
+        doesNotRunOnMongos: true,
+        setUp: function(conn) {
+            assert.commandWorked(conn.getDB('admin').runCommand({fsync: 1, lock: 1}));
+        }
     },
     getAuditConfig: {
         isAdminCommand: true,
@@ -642,6 +756,7 @@ const allCommands = {
     },
     getChangeStreamState: {
         isAdminCommand: true,
+        doesNotRunOnMongos: true,
         command: {getChangeStreamState: 1},
         expectFailure: true,
         expectedErrorCode: ErrorCodes.CommandNotSupported  // only supported on serverless.
@@ -649,22 +764,22 @@ const allCommands = {
     getClusterParameter: {
         isAdminCommand: true,
         command: {getClusterParameter: "changeStreamOptions"},
+        doesNotRunOnStandalone: true,
     },
     getCmdLineOpts: {
         isAdminCommand: true,
         command: {getCmdLineOpts: 1},
     },
     getDatabaseVersion: {
-        // TODO SERVER-69753: Unskip this command when we can test with sharded clusters.
-        skip: isNotImplementedYet,
-        // isAdminCommand: true,
-        // command: {getDatabaseVersion: dbName},
-        // isShardedOnly: true,
-        // isShardSvrOnly: true,
+        isAdminCommand: true,
+        command: {getDatabaseVersion: dbName},
+        isShardedOnly: true,
+        isShardSvrOnly: true,
     },
     getDefaultRWConcern: {
         isAdminCommand: true,
         command: {getDefaultRWConcern: 1},
+        doesNotRunOnStandalone: true,
     },
     getDiagnosticData: {
         isAdminCommand: true,
@@ -673,50 +788,46 @@ const allCommands = {
     getFreeMonitoringStatus: {
         isAdminCommand: true,
         command: {getFreeMonitoringStatus: 1},
+        doesNotRunOnMongos: true,
     },
     getLog: {
         isAdminCommand: true,
         command: {getLog: "global"},
     },
     getMore: {
-        // TODO SERVER-69753: Uncomment/unskip the command and fix it so that it passes. Currently
-        // we need to be able to kill cursor ID in teardown in order for it to pass.
-        skip: isNotImplementedYet,
-        // setUp: function(conn) {
-        //     const db = conn.getDB(dbName);
-        //     for (let i = 0; i < 10; i++) {
-        //         assert.commandWorked(conn.getCollection(fullNs).insert({a: i}));
-        //     }
+        fullScenario: function(conn) {
+            const db = conn.getDB(dbName);
+            for (let i = 0; i < 10; i++) {
+                assert.commandWorked(conn.getCollection(fullNs).insert({a: i}));
+            }
 
-        //     const res = db.runCommand({find: collName, batchSize: 1});
-        //     const cmdObj = {getMore: NumberLong(res.cursor.id), collection: collName};
-        //     return cmdObj;
-        // },
-        // command: {},
-        // teardown: function(conn) {
-        //     assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
-        // },
+            const res = db.runCommand({find: collName, batchSize: 1});
+            assert.commandWorked(res);
+            assert.commandWorked(
+                db.runCommand({getMore: NumberLong(res.cursor.id), collection: collName}));
+
+            assert.commandWorked(
+                db.runCommand({killCursors: collName, cursors: [NumberLong(res.cursor.id)]}));
+            assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
+        },
     },
     getParameter: {isAdminCommand: true, command: {getParameter: 1, logLevel: 1}},
     getQueryableEncryptionCountInfo: {skip: isAnInternalCommand},
     getShardMap: {
-        // TODO SERVER-69753: Unskip this command when we can test with sharded clusters.
-        skip: isNotImplementedYet,
-        // isAdminCommand: true,
-        // command: {getShardMap: 1},
-        // isShardedOnly: true,
+        isAdminCommand: true,
+        command: {getShardMap: 1},
+        isShardedOnly: true,
     },
     getShardVersion: {
-        // TODO SERVER-69753: Unskip this command when we can test with sharded clusters.
-        skip: isNotImplementedYet,
-        //     setUp: function(conn) {
-        //         assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));
-        //     },
-        //     command: {getShardVersion: collName},
-        //     teardown: function(conn) {
-        //         assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
-        //     },
-        //     isShardedOnly: true,
+        setUp: function(conn) {
+            assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));
+        },
+        command: {getShardVersion: dbName},
+        teardown: function(conn) {
+            assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
+        },
+        isShardedOnly: true,
+        isAdminCommand: true,
     },
     godinsert: {
         setUp: function(conn) {
@@ -726,6 +837,7 @@ const allCommands = {
             assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
         },
         command: {godinsert: collName, obj: {_id: 0, a: 0}},
+        doesNotRunOnMongos: true,
     },
     grantPrivilegesToRole: {
         setUp: function(conn) {
@@ -773,7 +885,7 @@ const allCommands = {
         command: {hello: 1},
     },
     hostInfo: {isAdminCommand: true, command: {hostInfo: 1}},
-    httpClientRequest: {skip: isNotImplementedYet},
+    httpClientRequest: {skip: isAnInternalCommand},
     exportCollection: {skip: isAnInternalCommand},
     importCollection: {skip: isAnInternalCommand},
     insert: {
@@ -789,6 +901,11 @@ const allCommands = {
     invalidateUserCache: {
         isAdminCommand: 1,
         command: {invalidateUserCache: 1},
+    },
+    isdbgrid: {
+        isAdminCommand: 1,
+        command: {isdbgrid: 1},
+        isShardedOnly: true,
     },
     isMaster: {
         isAdminCommand: 1,
@@ -819,7 +936,11 @@ const allCommands = {
             assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
         },
     },
-    killOp: {skip: isNotImplementedYet},
+    killOp: {
+        // This will be tested in FCV upgrade/downgrade passthroughs through tests in the replsets
+        // directory.
+        skip: requiresParallelShell
+    },
     killSessions: {
         setUp: function(conn) {
             const admin = conn.getDB("admin");
@@ -855,27 +976,38 @@ const allCommands = {
         },
     },
     listSearchIndexes: {
-        skip: isNotImplementedYet,
+        // Skipping command as it requires additional Mongot mock setup (and is an enterprise
+        // feature).
+        skip: "requires mongot mock setup",
     },
-    lockInfo: {skip: isNotImplementedYet, isAdminCommand: 1, command: {lockInfo: 1}},
+    listShards: {
+        isShardedOnly: true,
+        isAdminCommand: true,
+        command: {listShards: 1},
+    },
+    lockInfo: {
+        isAdminCommand: true,
+        command: {lockInfo: 1},
+        doesNotRunOnMongos: true,
+    },
     logApplicationMessage: {
-        skip: isNotImplementedYet,
+        isAdminCommand: true,
+        command: {logApplicationMessage: "hello"},
     },
     logMessage: {
         skip: isAnInternalCommand,
     },
     logRotate: {
-        skip: isNotImplementedYet,
+        isAdminCommand: true,
+        command: {logRotate: 1},
     },
     logout: {
-        // TODO SERVER-69753: Implement this command so that it passes. It is currently failing with
-        // "Each client connection may only be authenticated once.
-        // Previously authenticated as: __system@local" error.
-        skip: isNotImplementedYet,
+        skip: "requires additional authentication setup",
     },
     makeSnapshot: {
         isAdminCommand: true,
         command: {makeSnapshot: 1},
+        doesNotRunOnMongos: true,
     },
     mapReduce: {
         setUp: function(conn) {
@@ -892,43 +1024,112 @@ const allCommands = {
         },
     },
     mergeAllChunksOnShard: {
-        skip: isNotImplementedYet,
         isShardedOnly: true,
+        fullScenario: function(conn, fixture) {
+            assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));
+            assert.commandWorked(
+                conn.getDB(dbName).adminCommand({shardCollection: fullNs, key: {a: 1}}));
+            for (let i = 0; i < 10; i++) {
+                assert.commandWorked(conn.getCollection(fullNs).insert({a: i}));
+            }
+            assert.commandWorked(conn.adminCommand({split: fullNs, middle: {a: 5}}));
+            assert.commandWorked(conn.adminCommand({
+                moveChunk: fullNs,
+                find: {a: 1},
+                to: fixture.shard0.shardName,
+                _waitForDelete: true
+            }));
+            assert.commandWorked(conn.adminCommand({
+                moveChunk: fullNs,
+                find: {a: 9},
+                to: fixture.shard0.shardName,
+                _waitForDelete: true
+            }));
+            assert.commandWorked(conn.adminCommand(
+                {mergeAllChunksOnShard: fullNs, shard: fixture.shard0.shardName}));
+            assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
+        },
     },
     mergeChunks: {
-        // TODO SERVER-69753: Unskip this command when we can test with sharded clusters.
-        skip: isNotImplementedYet,
-        // isShardedOnly: true,
-        // isAdminCommand: true,
-        // setUp: function(conn) {
-        //     assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));
-        //     assert.commandWorked(
-        //         conn.getDB(dbName).adminCommand({shardCollection: fullNs, key: {_id: 1}}));
-        //     for (let i = 0; i < 10; i++) {
-        //         assert.commandWorked(conn.getCollection(fullNs).insert({a: i}));
-        //     }
-        // },
-        // teardown: function(conn) {
-        //     assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
-        // },
-        // command: {mergeChunks: fullNs, bounds: [{_id: MinKey}, {_id: MaxKey}]}
+        isShardedOnly: true,
+        isAdminCommand: true,
+        setUp: function(conn) {
+            assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));
+            assert.commandWorked(
+                conn.getDB(dbName).adminCommand({shardCollection: fullNs, key: {_id: 1}}));
+            for (let i = 0; i < 10; i++) {
+                assert.commandWorked(conn.getCollection(fullNs).insert({a: i}));
+            }
+            assert.commandWorked(conn.adminCommand({split: fullNs, middle: {_id: 5}}));
+        },
+        teardown: function(conn) {
+            assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
+        },
+        command: {mergeChunks: fullNs, bounds: [{_id: MinKey}, {_id: MaxKey}]},
     },
     moveChunk: {
-        skip: isNotImplementedYet,
         isShardedOnly: true,
+        isAdminCommand: true,
+        fullScenario: function(conn, fixture) {
+            assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));
+            assert.commandWorked(
+                conn.getDB(dbName).adminCommand({shardCollection: fullNs, key: {a: 1}}));
+            for (let i = 0; i < 10; i++) {
+                assert.commandWorked(conn.getCollection(fullNs).insert({a: i}));
+            }
+            assert.commandWorked(conn.adminCommand({split: fullNs, middle: {a: 5}}));
+            assert.commandWorked(conn.adminCommand({
+                moveChunk: fullNs,
+                find: {a: 1},
+                to: fixture.shard0.shardName,
+                _waitForDelete: true
+            }));
+            assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
+        },
+    },
+    movePrimary: {
+        isShardedOnly: true,
+        fullScenario: function(conn, fixture) {
+            assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));
+            assert.commandWorked(conn.getDB('admin').runCommand(
+                {movePrimary: dbName, to: fixture.shard0.shardName}));
+            assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
+        }
     },
     moveRange: {
-        skip: isNotImplementedYet,
         isShardedOnly: true,
+        isAdminCommand: true,
+        fullScenario: function(conn, fixture) {
+            assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));
+            assert.commandWorked(
+                conn.getDB(dbName).adminCommand({shardCollection: fullNs, key: {a: 1}}));
+            for (let i = 0; i < 10; i++) {
+                assert.commandWorked(conn.getCollection(fullNs).insert({a: i}));
+            }
+            assert.commandWorked(conn.adminCommand({split: fullNs, middle: {a: 5}}));
+            assert.commandWorked(conn.adminCommand(
+                {moveRange: fullNs, min: {a: 1}, toShard: fixture.shard0.shardName}));
+            assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
+        },
+    },
+    multicast: {
+        command: {multicast: {ping: 0}},
+        isShardedOnly: true,
+        isAdminCommand: true,
+    },
+    netstat: {
+        skip: isAnInternalCommand,
     },
     oidcListKeys: {
-        skip: isNotImplementedYet,
+        // Skipping this command as it requires OIDC/OpenSSL setup.
+        skip: "requires additional OIDC/OpenSSL setup",
     },
     oidcRefreshKeys: {
-        skip: isNotImplementedYet,
+        // Skipping this command as it requires OIDC/OpenSSL setup.
+        skip: "requires additional OIDC/OpenSSL setup",
     },
     pinHistoryReplicated: {
-        skip: isNotImplementedYet,
+        skip: isAnInternalCommand,
     },
     ping: {isAdminCommand: true, command: {ping: 1}},
     planCacheClear: {
@@ -967,9 +1168,14 @@ const allCommands = {
             assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
         },
     },
-    prepareTransaction: {skip: isNotImplementedYet},
+    prepareTransaction: {skip: isAnInternalCommand},
     profile: {
-        skip: isNotImplementedYet,
+        doesNotRunOnMongos: true,
+        isAdminCommand: true,
+        command: {profile: 2},
+        teardown: function(conn) {
+            assert.commandWorked(conn.getDB('admin').runCommand({profile: 0}));
+        },
     },
     reapLogicalSessionCacheNow: {
         isAdminCommand: true,
@@ -978,7 +1184,28 @@ const allCommands = {
     recipientForgetMigration: {skip: isAnInternalCommand},
     recipientSyncData: {skip: isAnInternalCommand},
     recipientVoteImportedFiles: {skip: isAnInternalCommand},
-    refreshLogicalSessionCacheNow: {skip: isNotImplementedYet},
+    refineCollectionShardKey: {
+        isShardedOnly: true,
+        isAdminCommand: true,
+        setUp: function(conn) {
+            assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));
+            assert.commandWorked(
+                conn.getDB(dbName).adminCommand({shardCollection: fullNs, key: {a: 1}}));
+            for (let i = 0; i < 10; i++) {
+                assert.commandWorked(conn.getCollection(fullNs).insert({a: i, b: i}));
+            }
+            const testColl = conn.getCollection(fullNs);
+            assert.commandWorked(testColl.createIndex({a: 1, b: 1}));
+        },
+        command: {refineCollectionShardKey: fullNs, key: {a: 1, b: 1}},
+        teardown: function(conn) {
+            assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
+        },
+    },
+    refreshLogicalSessionCacheNow: {
+        command: {refreshLogicalSessionCacheNow: 1},
+        isAdminCommand: true,
+    },
     refreshSessions: {
         setUp: function(conn) {
             const admin = conn.getDB("admin");
@@ -999,6 +1226,14 @@ const allCommands = {
     reIndex: {
         skip: isDeprecated,
     },
+    removeShard: {
+        // This will be tested in FCV upgrade/downgrade passthroughs in the sharding
+        // directory.
+        skip: "cannot add shard while in downgrading FCV state",
+    },
+    removeShardFromZone: {
+        skip: "tested in addShardToZone",
+    },
     renameCollection: {
         isAdminCommand: true,
         setUp: function(conn) {
@@ -1009,57 +1244,100 @@ const allCommands = {
             assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName + "2"}));
         }
     },
-    repairDatabase: {skip: isDeprecated},
     repairShardedCollectionChunksHistory: {skip: isAnInternalCommand},
     replSetAbortPrimaryCatchUp: {
-        // TODO SERVER-69753: Uncomment this command and implement a way to use the ReplSetTest
-        // fixture functions in the AllCommandsTest framework.
-        skip: isNotImplementedYet,
-        // setUp: function(conn, fixture) {
-        //     var conf = fixture.getReplSetConfig();
-        //     reconfigElectionAndCatchUpTimeout(fixture, 10000, -1);
-        //     assert.commandWorked(conn.adminCommand(
-        //         {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w:
-        //         "majority"}}));
-        //     let stepUpResults =
-        //         stopReplicationAndEnforceNewPrimaryToCatchUp(fixture,
-        //         fixture.getSecondaries()[0]);
-        //     jsTestLog("Restarting server replication");
-        //     restartServerReplication(stepUpResults.oldSecondaries);
-        //     assert.commandWorked(conn.getDB("admin").runCommand({replSetStepDown: 60, force:
-        //     true}));
-        // },
-        // isReplSetOnly: true,
-        // command: {replSetAbortPrimaryCatchUp: 1},
-        // isAdminCommand: true,
-        // teardown: function(conn) {
-        //     assert.commandWorked(conn.adminCommand(
-        //         {setDefaultRWConcern: 1, defaultWriteConcern: {w: "majority"}, writeConcern: {w:
-        //         "majority"}}));
-        // }
+        // This will be tested in FCV upgrade/downgrade passthroughs through the replsets directory.
+        skip: "requires changing primary connection",
     },
     replSetFreeze: {
-        skip: isNotImplementedYet,  // can only run on secondary
         isReplSetOnly: true,
-        isAdminCommand: true,
+        fullScenario: function(conn, fixture) {
+            assert.commandWorked(
+                fixture.getSecondary().getDB("admin").runCommand({replSetFreeze: 1}));
+            assert.commandWorked(
+                fixture.getSecondary().getDB("admin").runCommand({replSetFreeze: 0}));
+        }
     },
     replSetGetConfig: {isReplSetOnly: true, isAdminCommand: true, command: {replSetGetConfig: 1}},
     replSetGetRBID: {isReplSetOnly: true, isAdminCommand: true, command: {replSetGetRBID: 1}},
     replSetGetStatus: {isReplSetOnly: true, isAdminCommand: true, command: {replSetGetStatus: 1}},
     replSetHeartbeat: {skip: isAnInternalCommand},
-    replSetInitiate: {skip: isNotImplementedYet},
-    replSetMaintenance: {skip: isNotImplementedYet},
-    replSetReconfig: {skip: isNotImplementedYet},
-    replSetRequestVotes: {skip: isNotImplementedYet},
-    replSetStepDown: {
-        skip: isNotImplementedYet,
+    replSetInitiate: {
+        // This will be tested in FCV upgrade/downgrade passthroughs through the replsets directory.
+        skip: "requires starting a new replica set"
     },
-    replSetStepUp: {skip: isNotImplementedYet},
-    replSetSyncFrom: {skip: isNotImplementedYet},
-    replSetTest: {skip: isNotImplementedYet},
-    replSetTestEgress: {skip: isNotImplementedYet},
-    replSetUpdatePosition: {skip: isNotImplementedYet},
-    replSetResizeOplog: {skip: isNotImplementedYet},
+    replSetMaintenance: {
+        isReplSetOnly: true,
+        fullScenario: function(conn, fixture) {
+            assert.commandWorked(
+                fixture.getSecondary().getDB("admin").runCommand({replSetMaintenance: 1}));
+            assert.commandWorked(
+                fixture.getSecondary().getDB("admin").runCommand({replSetMaintenance: 0}));
+        }
+    },
+    replSetReconfig: {
+        isReplSetOnly: true,
+        fullScenario: function(conn, fixture) {
+            let config = fixture.getReplSetConfigFromNode();
+            config.version++;
+            assert.commandWorked(conn.getDB("admin").runCommand({replSetReconfig: config}));
+        }
+    },
+    replSetRequestVotes: {skip: isAnInternalCommand},
+    replSetStepDown: {
+        // This will be tested in FCV upgrade/downgrade passthroughs through tests in the replsets
+        // directory.
+        skip: "requires changing primary connection",
+    },
+    replSetStepUp: {
+        // This will be tested in FCV upgrade/downgrade passthroughs through tests in the replsets
+        // directory.
+        skip: "requires changing primary connection",
+    },
+    replSetSyncFrom: {
+        isReplSetOnly: true,
+        fullScenario: function(conn, fixture) {
+            const secondary1 = fixture.getSecondaries()[0];
+            const secondary2 = fixture.getSecondaries()[1];
+            assert.commandWorked(secondary2.adminCommand({replSetSyncFrom: secondary1.name}));
+            // Sync from primary again.
+            assert.commandWorked(secondary2.adminCommand({replSetSyncFrom: conn.name}));
+        }
+    },
+    replSetTest: {skip: isAnInternalCommand},
+    replSetTestEgress: {skip: isAnInternalCommand},
+    replSetUpdatePosition: {skip: isAnInternalCommand},
+    replSetResizeOplog: {
+        isReplSetOnly: true,
+        isAdminCommand: true,
+        command: {replSetResizeOplog: 1, minRetentionHours: 1},
+    },
+    reshardCollection: {
+        // TODO SERVER-74867: Remove the skip once 7.0 is lastLTS.
+        skip: commandIsDisabledOnLastLTS,
+        isShardedOnly: true,
+        isAdminCommand: true,
+        setUp: function(conn) {
+            assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));
+            const testColl = conn.getCollection(fullNs);
+            assert.commandWorked(
+                conn.getDB('admin').runCommand({shardCollection: fullNs, key: {_id: 1}}));
+
+            // Build an index on the collection to support the resharding operation.
+            assert.commandWorked(testColl.createIndex({a: 1}));
+
+            // Insert some documents that will be resharded.
+            assert.commandWorked(testColl.insert({_id: 0, a: 0}));
+            assert.commandWorked(testColl.insert({_id: 1, a: 1}));
+        },
+        command: {
+            reshardCollection: fullNs,
+            key: {a: 1},
+        },
+        teardown: function(conn) {
+            assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
+        },
+    },
     revokePrivilegesFromRole: {
         setUp: function(conn) {
             assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));
@@ -1120,43 +1398,165 @@ const allCommands = {
             assert.commandWorked(conn.getDB(dbName).runCommand({dropRole: "foo"}));
         }
     },
-    rotateCertificates: {skip: isNotImplementedYet},
-    saslContinue: {skip: isNotImplementedYet},
-    saslStart: {skip: isNotImplementedYet},
+    rotateCertificates: {skip: "requires additional authentication setup"},
+    saslContinue: {skip: "requires additional authentication setup"},
+    saslStart: {skip: "requires additional authentication setup"},
     serverStatus: {
         isAdminCommand: true,
         command: {serverStatus: 1},
     },
-    setAuditConfig: {skip: isNotImplementedYet},
-    setCommittedSnapshot: {skip: isNotImplementedYet},
-    setDefaultRWConcern: {skip: isNotImplementedYet},
-    setIndexCommitQuorum: {skip: isNotImplementedYet},
-    setFeatureCompatibilityVersion: {skip: isNotImplementedYet},
-    setFreeMonitoring: {skip: isNotImplementedYet},
-    setProfilingFilterGlobally: {skip: isNotImplementedYet},
-    setParameter: {skip: isNotImplementedYet},
-    setShardVersion: {skip: isNotImplementedYet},
-    setChangeStreamState: {skip: isNotImplementedYet},
-    setClusterParameter: {skip: isNotImplementedYet},
-    setUserWriteBlockMode: {skip: isNotImplementedYet},
-    shardingState: {skip: isNotImplementedYet},
-    shutdown: {skip: isNotImplementedYet},
-    sleep: {skip: isNotImplementedYet},
-    splitChunk: {skip: isNotImplementedYet},
-    splitVector: {skip: isNotImplementedYet},
-    stageDebug: {skip: isNotImplementedYet},
-    startRecordingTraffic: {skip: isNotImplementedYet},
-    startSession: {skip: isNotImplementedYet},
-    stopRecordingTraffic: {skip: isNotImplementedYet},
-    testDeprecation: {skip: isNotImplementedYet},
-    testDeprecationInVersion2: {skip: isNotImplementedYet},
+    setAuditConfig: {skip: "requires additional audit/authentication setup"},
+    setAllowMigrations: {
+        isAdminCommand: true,
+        setUp: function(conn) {
+            assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));
+            assert.commandWorked(
+                conn.getDB(dbName).adminCommand({shardCollection: fullNs, key: {_id: 1}}));
+        },
+        command: {setAllowMigrations: fullNs, allowMigrations: true},
+        teardown: function(conn) {
+            assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
+        },
+        isShardedOnly: true,
+    },
+    setCommittedSnapshot: {skip: isAnInternalCommand},
+    setDefaultRWConcern: {
+        command:
+            {setDefaultRWConcern: 1, defaultWriteConcern: {w: 1}, writeConcern: {w: "majority"}},
+        teardown: function(conn) {
+            assert.commandWorked(conn.adminCommand({
+                setDefaultRWConcern: 1,
+                defaultWriteConcern: {w: "majority"},
+                writeConcern: {w: "majority"}
+            }));
+        },
+        isAdminCommand: true,
+        doesNotRunOnStandalone: true,
+    },
+    setIndexCommitQuorum: {skip: requiresParallelShell},
+    setFeatureCompatibilityVersion: {skip: "is tested through this test"},
+    setFreeMonitoring: {
+        skip: "requires cloudFreeMonitoringEndpointURL setup",
+    },
+    setProfilingFilterGlobally: {
+        // TODO SERVER-74867: Remove the skip once 7.0 is lastLTS.
+        skip: commandIsDisabledOnLastLTS,
+        command: {setProfilingFilterGlobally: 1, filter: {nreturned: 0}},
+        expectFailure: true,
+        expectedErrorCode:
+            7283301  // setProfilingFilterGlobally command requires query knob to be enabled.
+    },
+    setParameter: {
+        command: {setParameter: 1, requireApiVersion: true},
+        isAdminCommand: true,
+        teardown: function(conn) {
+            assert.commandWorked(conn.getDB('admin').runCommand(
+                {setParameter: 1, requireApiVersion: false, apiVersion: "1"}));
+        }
+    },
+    setChangeStreamState: {
+        isAdminCommand: true,
+        command: {setChangeStreamState: 1, enabled: true},
+        doesNotRunOnMongos: true,
+        expectFailure: true,
+        expectedErrorCode: ErrorCodes.CommandNotSupported  // only supported on serverless.
+    },
+    setClusterParameter: {
+        isAdminCommand: true,
+        doesNotRunOnStandalone: true,
+        command: {setClusterParameter: {testIntClusterParameter: {intData: 2022}}}
+    },
+    setUserWriteBlockMode: {
+        command: {setUserWriteBlockMode: 1, global: true},
+        teardown: function(conn) {
+            assert.commandWorked(
+                conn.getDB('admin').runCommand({setUserWriteBlockMode: 1, global: false}));
+        },
+        doesNotRunOnStandalone: true,
+    },
+    shardCollection: {
+        isShardedOnly: true,
+        isAdminCommand: true,
+        setUp: function(conn) {
+            assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));
+        },
+        command: {shardCollection: fullNs, key: {_id: 1}},
+        teardown: function(conn) {
+            assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
+        },
+    },
+    shardingState: {
+        isAdminCommand: true,
+        command: {shardingState: 1},
+        isShardSvrOnly: true,
+    },
+    shutdown: {
+        // TODO SERVER-74810: Add a separate JS test for this.
+        skip: "tested in a separate JS test"
+    },
+    sleep: {skip: isAnInternalCommand},
+    split: {
+        setUp: function(conn) {
+            assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));
+            assert.commandWorked(
+                conn.getDB(dbName).adminCommand({shardCollection: fullNs, key: {_id: 1}}));
+            for (let i = 0; i < 10; i++) {
+                assert.commandWorked(conn.getCollection(fullNs).insert({a: i}));
+            }
+        },
+        command: {split: fullNs, middle: {_id: 5}},
+        teardown: function(conn) {
+            assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
+        },
+        isAdminCommand: true,
+        isShardedOnly: true,
+    },
+    splitChunk: {skip: isAnInternalCommand},
+    splitVector: {skip: isAnInternalCommand},
+    stageDebug: {skip: isAnInternalCommand},
+    startRecordingTraffic: {
+        // Skipping command because it requires an actual file path for recording traffic to.
+        skip: "requires an actual file path to record traffic to",
+    },
+    startSession: {
+        fullScenario: function(conn, fixture) {
+            const res = conn.adminCommand({startSession: 1});
+            assert.commandWorked(res);
+            assert.commandWorked(conn.adminCommand({endSessions: [res.id]}));
+        }
+    },
+    stopRecordingTraffic: {
+        // Skipping command because it requires an actual file path for recording traffic to.
+        skip: "requires an actual file path to record traffic to",
+    },
+    testDeprecation: {skip: isAnInternalCommand},
+    testDeprecationInVersion2: {skip: isAnInternalCommand},
     testInternalTransactions: {skip: isAnInternalCommand},
-    testRemoval: {skip: isNotImplementedYet},
-    testReshardCloneCollection: {skip: isNotImplementedYet},
-    testVersions1And2: {skip: isNotImplementedYet},
-    testVersion2: {skip: isNotImplementedYet},
+    testRemoval: {skip: isAnInternalCommand},
+    testReshardCloneCollection: {skip: isAnInternalCommand},
+    testVersions1And2: {skip: isAnInternalCommand},
+    testVersion2: {skip: isAnInternalCommand},
     top: {
         command: {top: 1},
+        isAdminCommand: true,
+        doesNotRunOnMongos: true,
+    },
+    transitionToCatalogShard: {
+        // TODO SERVER-74867: Remove the skip once 7.0 is lastLTS.
+        skip: commandIsDisabledOnLastLTS,
+        // TODO SERVER-66060: Remove check when this feature flag is removed.
+        checkFeatureFlag: "CatalogShard",
+        command: {transitionToCatalogShard: 1},
+        isShardedOnly: true,
+        isAdminCommand: true,
+    },
+    transitionToDedicatedConfigServer: {
+        // TODO SERVER-74867: Remove the skip once 7.0 is lastLTS.
+        skip: commandIsDisabledOnLastLTS,
+        // TODO SERVER-66060: Remove check when this feature flag is removed.
+        checkFeatureFlag: "CatalogShard",
+        command: {transitionToDedicatedConfigServer: 1},
+        isShardedOnly: true,
         isAdminCommand: true,
     },
     update: {
@@ -1179,7 +1579,9 @@ const allCommands = {
         }
     },
     updateSearchIndex: {
-        skip: isNotImplementedYet,
+        // Skipping command as it requires additional Mongot mock setup (and is an enterprise
+        // feature).
+        skip: "requires mongot mock setup",
     },
     updateUser: {
         setUp: function(conn) {
@@ -1189,6 +1591,26 @@ const allCommands = {
         command: {updateUser: "foo", pwd: "bar2"},
         teardown: function(conn) {
             assert.commandWorked(conn.getDB(dbName).runCommand({dropUser: "foo"}));
+        }
+    },
+    updateZoneKeyRange: {
+        isAdminCommand: true,
+        isShardedOnly: true,
+        setUp: function(conn, fixture) {
+            assert.commandWorked(
+                conn.adminCommand({addShardToZone: fixture.shard0.shardName, zone: 'zone0'}));
+            assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));
+            assert.commandWorked(
+                conn.getDB(dbName).adminCommand({shardCollection: fullNs, key: {a: 1}}));
+            for (let i = 0; i < 10; i++) {
+                assert.commandWorked(conn.getCollection(fullNs).insert({a: i}));
+            }
+        },
+        command: {updateZoneKeyRange: fullNs, min: {a: MinKey}, max: {a: 5}, zone: 'zone0'},
+        teardown: function(conn, fixture) {
+            assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
+            assert.commandWorked(
+                conn.adminCommand({removeShardFromZone: fixture.shard0.shardName, zone: 'zone0'}));
         }
     },
     usersInfo: {
@@ -1223,14 +1645,14 @@ const allCommands = {
         skip: isAnInternalCommand,
     },
     waitForOngoingChunkSplits: {
-        // TODO SERVER-69753: Unskip this command when we can test with sharded clusters.
-        skip: isNotImplementedYet,
-        // command: {waitForOngoingChunkSplits: 1},
-        // isShardedOnly: true
+        command: {waitForOngoingChunkSplits: 1},
+        isShardedOnly: true,
+        isShardSvrOnly: true,
     },
     whatsmysni: {
         command: {whatsmysni: 1},
         isAdminCommand: true,
+        doesNotRunOnMongos: true,
     },
     whatsmyuri: {
         command: {whatsmyuri: 1},
@@ -1253,21 +1675,64 @@ let assertCommandOrWriteFailed = function(res, code, msg) {
     }
 };
 
-let runAllCommandsTest = function(test, conn) {
+let runAllCommands = function(command, test, conn, fixture) {
     let cmdDb = conn.getDB(dbName);
+    const isShardedCluster = isMongos(cmdDb);
+    const isReplSet = FixtureHelpers.isReplSet(cmdDb);
 
-    if (test.isShardedOnly && !isMongos(cmdDb)) {
-        jsTestLog("Skipping " + tojson(test.command) + " because it is for sharded clusters only");
+    // Skip command if it does not run on this type of cluster.
+    if (test.isShardedOnly && !isShardedCluster) {
+        jsTestLog("Skipping " + tojson(command) + " because it is for sharded clusters only");
         return;
     }
-    if (test.isReplSetOnly && isMongos(cmdDb)) {
-        jsTestLog("Skipping " + tojson(test.command) + " because it is for replica sets only");
+    if (test.isReplSetOnly && !isReplSet) {
+        jsTestLog("Skipping " + tojson(command) + " because it is for replica sets only");
+        return;
+    }
+    if (test.isStandaloneOnly && (isShardedCluster || isReplSet)) {
+        jsTestLog("Skipping " + tojson(command) + " because it is for standalones only");
+        return;
+    }
+    if (test.doesNotRunOnStandalone && !(isShardedCluster || isReplSet)) {
+        jsTestLog("Skipping " + tojson(command) + " because it does not run on standalones");
+        return;
+    }
+    if (test.doesNotRunOnMongos && isShardedCluster) {
+        jsTestLog("Skipping " + tojson(command) + " because it does not run on mongos");
         return;
     }
 
+    // Skip command if its feature flag is not enabled.
+    if (test.checkFeatureFlag) {
+        if (isShardedCluster) {
+            if (!FeatureFlagUtil.isPresentAndEnabled(fixture.configRS.getPrimary().getDB('admin'),
+                                                     test.checkFeatureFlag)) {
+                jsTestLog("Skipping " + tojson(command) +
+                          " because its feature flag is not enabled.");
+                return;
+            }
+        } else {
+            if (!FeatureFlagUtil.isPresentAndEnabled(cmdDb.getSiblingDB("admin"),
+                                                     test.checkFeatureFlag)) {
+                jsTestLog("Skipping " + tojson(command) +
+                          " because its feature flag is not enabled.");
+                return;
+            }
+        }
+    }
+
+    jsTestLog("Testing " + command);
+
+    // If fullScenario is defined, run full setup, command, and teardown in one function.
+    if (typeof (test.fullScenario) === "function") {
+        test.fullScenario(conn, fixture);
+        return;
+    }
+
+    // Otherwise run setUp.
     let cmdObj = test.command;
     if (typeof (test.setUp) === "function") {
-        let setUpRes = test.setUp(conn);
+        let setUpRes = test.setUp(conn, fixture);
 
         // For some commands (such as killSessions) the command requires information that is
         // created during the setUp portion (such as a session ID), so we need to create the
@@ -1278,6 +1743,10 @@ let runAllCommandsTest = function(test, conn) {
         }
     }
 
+    // Change cmdDb if necessary.
+    if (test.isShardSvrOnly && isShardedCluster) {
+        cmdDb = fixture.shard0.getDB(dbName);
+    }
     if (test.isAdminCommand) {
         cmdDb = cmdDb.getSiblingDB("admin");
     }
@@ -1291,42 +1760,113 @@ let runAllCommandsTest = function(test, conn) {
         assert.commandWorked(cmdDb.runCommand(cmdObj), () => tojson(cmdObj));
     }
 
+    // Run test teardown.
     if (typeof (test.teardown) === "function") {
-        test.teardown(conn);
+        test.teardown(conn, fixture);
     }
 };
 
-let runTest = function(conn, adminDB) {
+let runTest = function(conn, adminDB, fixture) {
     let runDowngradingToUpgrading = false;
     if (FeatureFlagUtil.isEnabled(adminDB, "DowngradingToUpgrading")) {
         runDowngradingToUpgrading = true;
     }
-    assert.commandWorked(
-        conn.adminCommand({configureFailPoint: "failDowngrading", mode: "alwaysOn"}));
 
     assert.commandFailed(conn.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
 
     jsTestLog("Running all commands in the downgradingToLastLTS FCV");
-    AllCommandsTest.testAllCommands(conn, allCommands, runAllCommandsTest);
+    // First check that the map contains all available commands.
+    let commandsList = AllCommandsTest.checkCommandCoverage(conn, allCommands);
+    if (isMongos(adminDB)) {
+        let shardCommandsList =
+            AllCommandsTest.checkCommandCoverage(fixture.shard0.rs.getPrimary(), allCommands);
+        commandsList = new Set(commandsList.concat(shardCommandsList));
+    }
+
+    for (const command of commandsList) {
+        const test = allCommands[command];
+
+        // Coverage already guaranteed above, but check again just in case.
+        assert(test, "Coverage failure: must explicitly define a test for " + command);
+
+        if (test.skip !== undefined || test.skip === commandIsDisabledOnLastLTS) {
+            jsTestLog("Skipping " + command + ": " + test.skip);
+            continue;
+        }
+
+        // Run all commands.
+        runAllCommands(command, test, conn, fixture);
+    }
 
     if (runDowngradingToUpgrading) {
         assert.commandWorked(conn.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
 
         jsTestLog("Running all commands after upgrading back to the latest FCV");
-        AllCommandsTest.testAllCommands(conn, allCommands, runAllCommandsTest);
+        commandsList = AllCommandsTest.checkCommandCoverage(conn, allCommands);
+        if (isMongos(adminDB)) {
+            let shardCommandsList =
+                AllCommandsTest.checkCommandCoverage(fixture.shard0.rs.getPrimary(), allCommands);
+            commandsList = new Set(commandsList.concat(shardCommandsList));
+        }
+
+        for (const command of Object.keys(allCommands)) {
+            const test = allCommands[command];
+
+            // Coverage already guaranteed above, but check again just in case.
+            assert(test, "Coverage failure: must explicitly define a test for " + command);
+
+            if (test.skip !== undefined) {
+                jsTestLog("Skipping " + command + ": " + test.skip);
+                continue;
+            }
+
+            runAllCommands(command, test, conn, fixture);
+        }
     }
 };
 
-const rst = new ReplSetTest({name: name, nodes: [{}, {rsConfig: {priority: 0}}]});
-rst.startSet();
-rst.initiate();
+let runStandaloneTest = function() {
+    jsTestLog("Starting standalone test");
+    const conn = MongoRunner.runMongod();
+    const adminDB = conn.getDB("admin");
 
-const primary = rst.getPrimary();
-const primaryAdminDB = primary.getDB("admin");
+    assert.commandWorked(
+        conn.adminCommand({configureFailPoint: "failDowngrading", mode: "alwaysOn"}));
 
-runTest(primary, primaryAdminDB);
+    runTest(conn, adminDB);
+    MongoRunner.stopMongod(conn);
+};
 
-rst.stopSet();
+let runReplicaSetTest = function() {
+    jsTestLog("Starting replica set test");
+    const rst = new ReplSetTest(
+        {name: name, nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {priority: 0}}]});
+    rst.startSet();
+    rst.initiate();
 
-// TODO SERVER-69753: Run runTest with a sharded cluster as well
+    const primary = rst.getPrimary();
+    const primaryAdminDB = primary.getDB("admin");
+
+    assert.commandWorked(
+        primary.adminCommand({configureFailPoint: "failDowngrading", mode: "alwaysOn"}));
+
+    runTest(primary, primaryAdminDB, rst);
+    rst.stopSet();
+};
+
+let runShardedClusterTest = function() {
+    jsTestLog("Starting sharded cluster test");
+    const st = new ShardingTest({shards: 2, mongos: 1});
+    const mongos = st.s;
+    const mongosAdminDB = mongos.getDB("admin");
+    const configPrimary = st.configRS.getPrimary();
+    assert.commandWorked(
+        configPrimary.adminCommand({configureFailPoint: "failDowngrading", mode: "alwaysOn"}));
+    runTest(mongos, mongosAdminDB, st);
+    st.stop();
+};
+
+runStandaloneTest();
+runReplicaSetTest();
+runShardedClusterTest();
 })();

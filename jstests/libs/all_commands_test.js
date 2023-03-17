@@ -68,5 +68,5 @@ const AllCommandsTest = (function() {
         }
     }
 
-    return {testAllCommands: testAllCommands};
+    return {testAllCommands: testAllCommands, checkCommandCoverage: checkCommandCoverage};
 })();
