@@ -766,7 +766,6 @@ buildvariants:
   stepback: false
   tasks:
   - name: tooling_metrics_test
-  - name: publish_metrics
 
 ###########################################
 #         Windows buildvariants           #

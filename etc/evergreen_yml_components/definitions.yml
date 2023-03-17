@@ -8161,20 +8161,6 @@ tasks:
     vars:
       suite: query_golden_cqf
 
-- name: publish_metrics
-  patchable: false
-  commands:
-  - *f_expansions_write
-  - func: "do non-compile setup"
-  - *configure_evergreen_api_credentials
-  - command: subprocess.exec
-    type: test
-    params:
-      binary: bash
-      args:
-      - "src/evergreen/run_python_script.sh"
-      - "evergreen/publish_metrics.py"
-
 - name: tooling_metrics_test
   tags: []
   depends_on: []

@@ -1,36 +1,32 @@
 import datetime
-import sys
-import os
 import pkg_resources
 
 from pydantic import ValidationError
 
-# Get relative imports to work when the package is not installed on the PYTHONPATH.
-if __name__ == "__main__" and __package__ is None:
-    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 import mongo_tooling_metrics.client as metrics_client
 from mongo_tooling_metrics.lib.top_level_metrics import NinjaToolingMetrics, ResmokeToolingMetrics, SConsToolingMetrics
-from evergreen.api import RetryingEvergreenApi
-
-
-def return_true():
-    return True
-
-
-# This script will run in Evergreen on a non-vw. Setting this allows us to successfully get the client.
-metrics_client.should_collect_internal_metrics = return_true
+import pymongo
 
 # Check cluster connectivity
 try:
-    client = metrics_client.get_mongo_metrics_client().mongo_client
-    print(client.server_info())
+    client = pymongo.MongoClient(
+        host=metrics_client.INTERNAL_TOOLING_METRICS_HOSTNAME,
+        username=metrics_client.INTERNAL_TOOLING_METRICS_USERNAME,
+        password=metrics_client.INTERNAL_TOOLING_METRICS_PASSWORD,
+    )
+    client.server_info()
 except Exception as exc:
     print("Could not connect to Atlas cluster")
     raise exc
 
+metrics_classes = {
+    'ninja': NinjaToolingMetrics,
+    'scons': SConsToolingMetrics,
+    'resmoke': ResmokeToolingMetrics,
+}
 
-def get_metrics_data(source, MetricsClass, lookback=7):
+
+def get_metrics_data(source, lookback=30):
     try:
         # Get SCons metrics for the lookback period
         tooling_metrics_version = pkg_resources.get_distribution('mongo-tooling-metrics').version
@@ -49,7 +45,7 @@ def get_metrics_data(source, MetricsClass, lookback=7):
         for doc in last_week_metrics:
             total_docs += 1
             try:
-                metrics = MetricsClass(**doc)
+                metrics = metrics_classes[source](**doc)
                 if metrics.is_malformed():
                     malformed_metrics.append(doc['_id'])
             except ValidationError:
@@ -77,13 +73,6 @@ def get_metrics_data(source, MetricsClass, lookback=7):
         raise exc
 
 
-ninja_metrics_overview = get_metrics_data("ninja", NinjaToolingMetrics)
-scons_metrics_overview = get_metrics_data("scons", SConsToolingMetrics)
-resmoke_metrics_overview = get_metrics_data("resmoke", ResmokeToolingMetrics)
-
-# Publish metrics to SDP Slack Channel
-evg_api = RetryingEvergreenApi.get_api(config_file="./.evergreen.yml")
-evg_api.send_slack_message(
-    target="#server-sdp-bfs",
-    msg=ninja_metrics_overview + scons_metrics_overview + resmoke_metrics_overview,
-)
+ninja_metrics_overview = get_metrics_data("ninja")
+scons_metrics_overview = get_metrics_data("scons")
+resmoke_metrics_overview = get_metrics_data("resmoke")
