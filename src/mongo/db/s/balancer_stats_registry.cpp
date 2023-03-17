@@ -213,7 +213,9 @@ long long BalancerStatsRegistry::getCollNumOrphanDocsFromDiskIfNeeded(
         invariant(!cursor->more());
         auto numOrphans = res.getField("count");
         invariant(numOrphans);
-        return numOrphans.exactNumberLong();
+        // Never return a negative number of orphans. It may transiently happen for a negative
+        // number of orphans to be tracked on disk, see SERVER-74842 for details
+        return std::max(0LL, numOrphans.exactNumberLong());
     }
 }
 
