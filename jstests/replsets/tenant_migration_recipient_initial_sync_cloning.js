@@ -135,6 +135,7 @@ function runTestCase(recipientFailpoint, checkMtab, restartNodeAndCheckStateFunc
     const donorRst = new ReplSetTest({
         name: "donorRst",
         nodes: 1,
+        serverless: true,
         nodeOptions: Object.assign(migrationX509Options.donor, {
             setParameter: {
                 // Allow non-timestamped reads on donor after migration completes for testing.

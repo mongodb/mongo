@@ -64,6 +64,16 @@ enums:
             kCommitted: "committed"
             kAborted: "aborted"
 
+    ShardMergeRecipientState:
+        description: "The state of shard merge on recipient side."
+        type: string
+        values:
+            kStarted: "started"
+            kLearnedFilenames: "learned filenames"
+            kConsistent: "consistent"
+            kCommitted: "committed"
+            kAborted: "aborted"
+
 structs:
     tenantMigrationDonorDocument:
         description: "Represents an in-progress tenant migration on the migration donor."
@@ -281,4 +291,109 @@ structs:
                 description:
                     The opTime at which the donor's state document was set to 'aborted'. Only set
                     for 'shard merge' when it goes into 'aborted' state.
+                optional: true
+
+    ShardMergeRecipientDocument:
+        description: "Represents an in-progress shard merge on the merge recipient."
+        strict: true
+        fields:
+            _id:
+                type: uuid
+                description: "Unique identifier for the shard merge."
+                cpp_name: id
+            donorConnectionString:
+                type: string
+                description: >-
+                    The URI string that the recipient will utilize to create a connection
+                    with the donor.
+                validator:
+                    callback: "tenant_migration_util::validateConnectionString"
+            tenantIds:
+                type: array<tenant_id>
+                description: "List of tenants to be migrated."
+            startMigrationDonorTimestamp:
+                type: timestamp
+                description: >-
+                    Timestamp after all index builds for tenant are complete or aborted. Recipient
+                    must not start cloning/fetching oplog entries from the donor until this
+                    timestamp is majority committed.
+                validator:
+                    callback: "tenant_migration_util::validateTimestampNotNull"
+            readPreference:
+                type: readPreference
+                description: >-
+                    The read preference setting that the recipient will use to determine
+                    which node in the donor replica set to clone from.
+            state:
+                type: ShardMergeRecipientState
+                description: "The state of the shard merge recipient"
+                default: kStarted
+            expireAt:
+                type: date
+                description: >-
+                    The wall-clock time at which the state machine document should be
+                    removed.
+                optional: true
+            startApplyingDonorOpTime:
+                description: >-
+                    Populated during migration; the donor's operation time when the data
+                    cloning starts.
+                type: optime
+                optional: true
+            startFetchingDonorOpTime:
+                description: >-
+                    Populated during migration; the donor's operation time of the last open
+                    transaction when the data cloning started.
+                type: optime
+                optional: true
+            rejectReadsBeforeTimestamp:
+                description: >-
+                    Populated during migration when the recipientSyncData with the
+                    returnAfterReachingTimestamp is received after data is consistent; the earliest
+                    timestamp at which reads are allowed on the recipient (corresponds to the
+                    donor's blockTimestamp).
+                type: timestamp
+                optional: true
+            cloneFinishedRecipientOpTime:
+                description: >-
+                    Populated during migration; the recipient operation time when the data
+                    cloning finishes.
+                type: optime
+                optional: true
+            recipientCertificateForDonor:
+                description: >-
+                    The SSL certificate and private key that the recipient should use to
+                    authenticate to the donor.
+                type: TenantMigrationPEMPayload
+                # TODO (SERVER-54085): Remove server parameter tenantMigrationDisableX509Auth.
+                optional: true
+            completedUpdatingTransactionsBeforeStartOpTime:
+                description: >-
+                    Indicates if the recipient has finished updating transaction entries that were
+                    committed before 'startFetchingDonorOpTime'. If true, the recipient can skip
+                    the fetching transactions stage.
+                type: bool
+                default: false
+            completedFetchingRetryableWritesBeforeStartOpTime:
+                description: >-
+                    Indicates if the recipient has finished fetching retryable writes oplog entries
+                    before 'startFetchingDonorOpTime' for each retryable writes entry in
+                    'config.transactions'
+                type: bool
+                default: false
+            startAt:
+                type: date
+                description: >-
+                    The wall-clock time at which the state machine document is initialized.
+                optional: true
+            startGarbageCollect:
+                type: bool
+                description: >-
+                    Indicates if migration needs to be skipped. If true, the recipient state machine
+                    will skip migration and waits for migration decision directly.
+                default: false
+            abortOpTime:
+                type: optime
+                description:
+                    The opTime at which the donor's state document was set to 'aborted'.
                 optional: true

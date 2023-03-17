@@ -8,6 +8,7 @@
  */
 
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+import {isShardMergeEnabled} from "jstests/replsets/libs/tenant_migration_util.js";
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");       // for 'extractUUIDFromObject'
 load("jstests/libs/parallelTester.js");  // for 'Thread'
@@ -46,7 +47,11 @@ function runTest(downgradeFCV) {
     hangAfterSavingFCV.off();
 
     // Make sure we see the FCV mismatch detection message on the recipient.
-    checkLog.containsJson(recipientPrimary, 5382300);
+    if (isShardMergeEnabled(recipientDB)) {
+        checkLog.containsJson(recipientPrimary, 7339749);
+    } else {
+        checkLog.containsJson(recipientPrimary, 5382300);
+    }
 
     // Upgrade again to check on the status of the migration from the donor's point of view.
     assert.commandWorked(donorPrimary.adminCommand({setFeatureCompatibilityVersion: latestFCV}));

@@ -54,8 +54,8 @@ const migrationX509Options = makeX509OptionsForTest();
  */
 function testDonorStartMigrationInterrupt(interruptFunc,
                                           {donorRestarted = false, disableForShardMerge = true}) {
-    const donorRst =
-        new ReplSetTest({nodes: 3, name: "donorRst", nodeOptions: migrationX509Options.donor});
+    const donorRst = new ReplSetTest(
+        {nodes: 3, name: "donorRst", serverless: true, nodeOptions: migrationX509Options.donor});
 
     donorRst.startSet();
     donorRst.initiate();
@@ -128,6 +128,7 @@ function testDonorForgetMigrationInterrupt(interruptFunc) {
     const donorRst = new ReplSetTest({
         nodes: 3,
         name: "donorRst",
+        serverless: true,
         nodeOptions: Object.assign({}, migrationX509Options.donor, {
             setParameter: {
                 tenantMigrationGarbageCollectionDelayMS: kGarbageCollectionDelayMS,
@@ -138,6 +139,7 @@ function testDonorForgetMigrationInterrupt(interruptFunc) {
     const recipientRst = new ReplSetTest({
         nodes: 1,
         name: "recipientRst",
+        serverless: true,
         nodeOptions: Object.assign({}, migrationX509Options.recipient, {
             setParameter: {
                 tenantMigrationGarbageCollectionDelayMS: kGarbageCollectionDelayMS,
@@ -204,6 +206,7 @@ function testDonorAbortMigrationInterrupt(
     const donorRst = new ReplSetTest({
         nodes: 3,
         name: "donorRst",
+        serverless: true,
         nodeOptions: Object.assign({}, migrationX509Options.donor, {
             setParameter: {
                 tenantMigrationGarbageCollectionDelayMS: kGarbageCollectionDelayMS,
@@ -214,6 +217,7 @@ function testDonorAbortMigrationInterrupt(
     const recipientRst = new ReplSetTest({
         nodes: 1,
         name: "recipientRst",
+        serverless: true,
         nodeOptions: Object.assign({}, migrationX509Options.recipient, {
             setParameter: {
                 tenantMigrationGarbageCollectionDelayMS: kGarbageCollectionDelayMS,
@@ -298,8 +302,8 @@ function testDonorAbortMigrationInterrupt(
  * restarting, check the to see if the donorDoc data has persisted.
  */
 function testStateDocPersistenceOnFailover(interruptFunc, fpName, isShutdown = false) {
-    const donorRst =
-        new ReplSetTest({nodes: 3, name: "donorRst", nodeOptions: migrationX509Options.donor});
+    const donorRst = new ReplSetTest(
+        {nodes: 3, name: "donorRst", serverless: true, nodeOptions: migrationX509Options.donor});
 
     donorRst.startSet();
     donorRst.initiate();

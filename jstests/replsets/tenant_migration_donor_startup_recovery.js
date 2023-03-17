@@ -28,6 +28,7 @@ load("jstests/libs/uuid_util.js");
 const donorRst = new ReplSetTest({
     nodes: 1,
     name: 'donor',
+    serverless: true,
     nodeOptions: Object.assign(makeX509OptionsForTest().donor, {
         setParameter:
             // In order to deterministically validate that in-memory state is preserved during

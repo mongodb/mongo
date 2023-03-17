@@ -1,15 +1,13 @@
 /**
- * Tests if the recipient is rolled back well after a migration has been committed, the tenant
- * migration recipient access blocker is initialized in the correct state.
+ * Tests if the recipient is rolled back well after a migration has been committed, the shard
+ * merge recipient access blocker is initialized in the correct state.
  *
  * @tags: [
  *   incompatible_with_macos,
- *   # Shard merge protocol will be tested by
- *   # tenant_migration_shard_merge_recipient_access_blocker_rollback.js.
- *   incompatible_with_shard_merge,
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,
  *   requires_persistence,
+ *   featureFlagShardMerge,
  *   serverless,
  * ]
  */
@@ -17,6 +15,7 @@
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {
     getCertificateAndPrivateKey,
+    isShardMergeEnabled,
     makeX509OptionsForTest
 } from "jstests/replsets/libs/tenant_migration_util.js";
 
@@ -38,28 +37,39 @@ const recipientRst = new ReplSetTest({
 recipientRst.startSet();
 recipientRst.initiate();
 
+// Note: including this explicit early return here due to the fact that multiversion
+// suites will execute this test without featureFlagShardMerge enabled (despite the
+// presence of the featureFlagShardMerge tag above), which means the test will attempt
+// to run a multi-tenant migration and fail.
+if (!isShardMergeEnabled(recipientRst.getPrimary().getDB("admin"))) {
+    recipientRst.stopSet();
+    jsTestLog("Skipping Shard Merge-specific test");
+    quit();
+}
+
 // This test case
 // 1) Completes and commits a tenant migration. Then forgets the migration (state doc marked with
 //    'expireAt', but not yet deleted.)
 // 2) Waits until the replica set is stable.
 // 3) Rolls back the primary. This makes the primary recover its tenant migration access blockers.
 // 4) Ensures that a read is possible from the primary.
-function runRollbackAfterMigrationCommitted(tenantId) {
+function runRollbackAfterMigrationCommitted() {
     jsTestLog("Testing a rollback after the migration has been committed and marked forgotten.");
     const tenantMigrationTest = new TenantMigrationTest(
         {name: jsTestName(), recipientRst: recipientRst, sharedOptions: {nodes: 1}});
 
     const kMigrationId = UUID();
-    const kTenantId = tenantId;
+    const kTenantId = ObjectId();
     const kReadPreference = {mode: "primary"};
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(kMigrationId),
-        tenantId: kTenantId,
+        tenantIds: [kTenantId],
+        protocol: "shard merge",
         readPreference: kReadPreference
     };
 
     // Populate the donor side with data.
-    const dbName = tenantMigrationTest.tenantDB(kTenantId, "testDB");
+    const dbName = tenantMigrationTest.tenantDB(kTenantId.str, "testDB");
     const collName = "testColl";
     const numDocs = 20;
     tenantMigrationTest.insertDonorDB(
@@ -67,7 +77,7 @@ function runRollbackAfterMigrationCommitted(tenantId) {
         collName,
         [...Array(numDocs).keys()].map((i) => ({a: i, band: "Air", song: "La Femme d'Argent"})));
 
-    jsTestLog(`Starting tenant migration with migrationId ${kMigrationId}, tenantId: ${kTenantId}`);
+    jsTestLog(`Starting tenant migration with migrationId ${kMigrationId}`);
     assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
 
     // Complete and commit the migration, and then forget it as well.
@@ -117,18 +127,18 @@ function runRollbackAfterMigrationCommitted(tenantId) {
 //    doc to persist.
 // 3) Performs a rollback on the recipient primary, so that the access blockers are reconstructed.
 // 4) Performs a read on the recipient primary.
-function runRollbackAfterLoneRecipientForgetMigrationCommand(tenantId) {
+function runRollbackAfterLoneRecipientForgetMigrationCommand() {
     jsTestLog("Testing a rollback after migration has been committed and completely forgotten.");
     const tenantMigrationTest = new TenantMigrationTest(
         {name: jsTestName(), recipientRst: recipientRst, sharedOptions: {nodes: 1}});
 
     const kMigrationId = UUID();
-    const kTenantId = tenantId;
+    const kTenantId = ObjectId();
     const kReadPreference = {mode: "primary"};
     const recipientCertificateForDonor =
         getCertificateAndPrivateKey("jstests/libs/tenant_migration_recipient.pem");
 
-    const dbName = tenantMigrationTest.tenantDB(kTenantId, "testDB");
+    const dbName = tenantMigrationTest.tenantDB(kTenantId.str, "testDB");
     const collName = "testColl";
 
     const originalPrimary = recipientRst.getPrimary();
@@ -149,7 +159,7 @@ function runRollbackAfterLoneRecipientForgetMigrationCommand(tenantId) {
     function runRecipientForgetMigration(host, {
         migrationIdString,
         donorConnectionString,
-        tenantId,
+        tenantIds,
         readPreference,
         recipientCertificateForDonor
     }) {
@@ -158,7 +168,9 @@ function runRollbackAfterLoneRecipientForgetMigrationCommand(tenantId) {
             recipientForgetMigration: 1,
             migrationId: UUID(migrationIdString),
             donorConnectionString,
-            tenantId,
+            tenantIds: eval(tenantIds),
+            protocol: "shard merge",
+            decision: "committed",
             readPreference,
             recipientCertificateForDonor
         });
@@ -168,7 +180,7 @@ function runRollbackAfterLoneRecipientForgetMigrationCommand(tenantId) {
         new Thread(runRecipientForgetMigration, originalPrimary.host, {
             migrationIdString: extractUUIDFromObject(kMigrationId),
             donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
-            tenantId: kTenantId,
+            tenantIds: tojson([kTenantId]),
             readPreference: kReadPreference,
             recipientCertificateForDonor
         });
@@ -221,7 +233,7 @@ function runRollbackAfterLoneRecipientForgetMigrationCommand(tenantId) {
     tenantMigrationTest.stop();
 }
 
-runRollbackAfterMigrationCommitted(ObjectId().str);
-runRollbackAfterLoneRecipientForgetMigrationCommand(ObjectId().str);
+runRollbackAfterMigrationCommitted();
+runRollbackAfterLoneRecipientForgetMigrationCommand();
 
 recipientRst.stopSet();

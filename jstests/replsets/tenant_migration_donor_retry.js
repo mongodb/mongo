@@ -27,6 +27,7 @@ function setup() {
     const donorRst = new ReplSetTest({
         name: "donorRst",
         nodes: 1,
+        serverless: true,
         nodeOptions: Object.assign(makeX509OptionsForTest().donor, {
             setParameter: {
                 // Set the delay before a donor state doc is garbage collected to be short to speed

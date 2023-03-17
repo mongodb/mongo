@@ -121,7 +121,7 @@ void ServerlessOperationLockRegistry::recoverLocks(OperationContext* opCtx) {
     PersistentTaskStore<TenantMigrationDonorDocument> donorStore(
         NamespaceString::kTenantMigrationDonorsNamespace);
     donorStore.forEach(opCtx, {}, [&](const TenantMigrationDonorDocument& doc) {
-        // Do not acquire a lock for garbage-collectable documents
+        // Do not acquire a lock for garbage-collectable documents.
         if (doc.getExpireAt()) {
             return true;
         }
@@ -134,7 +134,7 @@ void ServerlessOperationLockRegistry::recoverLocks(OperationContext* opCtx) {
     PersistentTaskStore<TenantMigrationRecipientDocument> recipientStore(
         NamespaceString::kTenantMigrationRecipientsNamespace);
     recipientStore.forEach(opCtx, {}, [&](const TenantMigrationRecipientDocument& doc) {
-        // Do not acquire a lock for garbage-collectable documents
+        // Do not acquire a lock for garbage-collectable documents.
         if (doc.getExpireAt()) {
             return true;
         }
@@ -145,10 +145,32 @@ void ServerlessOperationLockRegistry::recoverLocks(OperationContext* opCtx) {
         return true;
     });
 
+    PersistentTaskStore<ShardMergeRecipientDocument> mergeRecipientStore(
+        NamespaceString::kShardMergeRecipientsNamespace);
+    mergeRecipientStore.forEach(opCtx, {}, [&](const ShardMergeRecipientDocument& doc) {
+        // Do not acquire locks for following cases. Otherwise, we can get into potential race
+        // causing recovery procedure to fail with `ErrorCodes::ConflictingServerlessOperation`.
+        // 1) The migration was skipped.
+        if (doc.getStartGarbageCollect()) {
+            invariant(doc.getState() == ShardMergeRecipientStateEnum::kAborted ||
+                      doc.getState() == ShardMergeRecipientStateEnum::kCommitted);
+            return true;
+        }
+        // 2) State doc marked as garbage collectable.
+        if (doc.getExpireAt()) {
+            return true;
+        }
+
+        registry.acquireLock(ServerlessOperationLockRegistry::LockType::kMergeRecipient,
+                             doc.getId());
+
+        return true;
+    });
+
     PersistentTaskStore<ShardSplitDonorDocument> splitStore(
         NamespaceString::kShardSplitDonorsNamespace);
     splitStore.forEach(opCtx, {}, [&](const ShardSplitDonorDocument& doc) {
-        // Do not acquire a lock for garbage-collectable documents
+        // Do not acquire a lock for garbage-collectable documents.
         if (doc.getExpireAt()) {
             return true;
         }
@@ -177,6 +199,9 @@ void ServerlessOperationLockRegistry::appendInfoForServerStatus(BSONObjBuilder* 
             break;
         case ServerlessOperationLockRegistry::LockType::kTenantRecipient:
             builder->append(kOperationLockFieldName, 3);
+            break;
+        case ServerlessOperationLockRegistry::LockType::kMergeRecipient:
+            builder->append(kOperationLockFieldName, 4);
             break;
     }
 }

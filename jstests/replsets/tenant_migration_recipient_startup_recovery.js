@@ -22,6 +22,7 @@ load("jstests/libs/uuid_util.js");
 const recipientRst = new ReplSetTest({
     nodes: 1,
     name: 'recipient',
+    serverless: true,
     nodeOptions: Object.assign(makeX509OptionsForTest().recipient, {
         setParameter:
             {"failpoint.PrimaryOnlyServiceSkipRebuildingInstances": tojson({mode: "alwaysOn"})}

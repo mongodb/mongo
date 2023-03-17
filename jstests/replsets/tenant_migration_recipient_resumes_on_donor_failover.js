@@ -30,6 +30,7 @@ function runTest(failPoint) {
     const recipientRst = new ReplSetTest({
         nodes: 2,
         name: jsTestName() + "_recipient",
+        serverless: true,
         nodeOptions: Object.assign(makeX509OptionsForTest().recipient, {
             setParameter: {
                 // Use a batch size of 2 so that collection cloner requires more than a single batch

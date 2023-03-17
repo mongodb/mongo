@@ -38,3 +38,10 @@ enums:
         values:
             kMultitenantMigrations: "multitenant migrations"
             kShardMerge: "shard merge"
+
+    MigrationDecision:
+        description: "Whether the migration committed or aborted."
+        type: string
+        values:
+            kCommitted: "committed"
+            kAborted: "aborted"

@@ -304,6 +304,7 @@ const migrationX509Options = makeX509OptionsForTest();
     const donorRst = new ReplSetTest({
         nodes: 3,
         name: "donorRst",
+        serverless: true,
         settings: {chainingAllowed: false},
         nodeOptions: migrationX509Options.donor
     });
@@ -491,8 +492,8 @@ const migrationX509Options = makeX509OptionsForTest();
 (() => {
     jsTestLog("Test sending donorAbortMigration for a non-existent tenant migration.");
 
-    const donorRst =
-        new ReplSetTest({nodes: 2, name: "donorRst", nodeOptions: migrationX509Options.donor});
+    const donorRst = new ReplSetTest(
+        {nodes: 2, name: "donorRst", serverless: true, nodeOptions: migrationX509Options.donor});
 
     donorRst.startSet();
     donorRst.initiate();

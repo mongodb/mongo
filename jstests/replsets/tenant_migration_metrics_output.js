@@ -36,6 +36,7 @@ const testPath = MongoRunner.toRealPath("ftdc_dir_repl_node");
 const donorRst = new ReplSetTest({
     nodes: 1,
     name: "donorRst",
+    serverless: true,
     nodeOptions: Object.assign(makeX509OptionsForTest().donor,
                                {setParameter: {diagnosticDataCollectionDirectoryPath: testPath}})
 });

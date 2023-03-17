@@ -37,6 +37,7 @@ function setup() {
     const donorRst = new ReplSetTest({
         nodes: 1,
         name: 'donor',
+        serverless: true,
         nodeOptions: Object.assign(migrationX509Options.donor, {
             setParameter: {
                 internalInsertMaxBatchSize:
@@ -54,6 +55,7 @@ function setup() {
     const recipientRst = new ReplSetTest({
         nodes: 1,
         name: 'recipient',
+        serverless: true,
         nodeOptions: Object.assign(migrationX509Options.recipient, {
             setParameter: {
                 internalInsertMaxBatchSize:

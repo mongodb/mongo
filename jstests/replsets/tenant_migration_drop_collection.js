@@ -32,6 +32,7 @@ function runDropTest({failPointName, failPointData, expectedLog, createNew}) {
     const recipientRst = new ReplSetTest({
         nodes: 1,
         name: "recipient",
+        serverless: true,
         nodeOptions: Object.assign(makeX509OptionsForTest().recipient,
                                    {setParameter: {collectionClonerBatchSize: 1}})
     });

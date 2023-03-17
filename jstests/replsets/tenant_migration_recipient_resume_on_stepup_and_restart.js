@@ -44,8 +44,12 @@ const migrationX509Options = makeX509OptionsForTest();
  * @param {recipientRestarted} bool is needed to properly assert the tenant migrations stat count.
  */
 function testRecipientSyncDataInterrupt(interruptFunc, recipientRestarted) {
-    const recipientRst = new ReplSetTest(
-        {nodes: 3, name: "recipientRst", nodeOptions: migrationX509Options.recipient});
+    const recipientRst = new ReplSetTest({
+        nodes: 3,
+        name: "recipientRst",
+        serverless: true,
+        nodeOptions: migrationX509Options.recipient
+    });
     recipientRst.startSet();
     recipientRst.initiate();
 
@@ -97,6 +101,7 @@ function testRecipientForgetMigrationInterrupt(interruptFunc) {
     const donorRst = new ReplSetTest({
         nodes: 1,
         name: "donorRst",
+        serverless: true,
         nodeOptions: Object.assign({}, migrationX509Options.donor, {
             setParameter: {
                 tenantMigrationGarbageCollectionDelayMS: kGarbageCollectionDelayMS,
@@ -107,6 +112,7 @@ function testRecipientForgetMigrationInterrupt(interruptFunc) {
     const recipientRst = new ReplSetTest({
         nodes: 3,
         name: "recipientRst",
+        serverless: true,
         nodeOptions: Object.assign({}, migrationX509Options.recipient, {
             setParameter: {
                 tenantMigrationGarbageCollectionDelayMS: kGarbageCollectionDelayMS,

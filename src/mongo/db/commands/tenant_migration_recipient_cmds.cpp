@@ -34,6 +34,7 @@
 #include "mongo/db/feature_compatibility_version_parser.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/shard_merge_recipient_service.h"
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
 #include "mongo/logv2/log.h"
 
@@ -42,39 +43,6 @@
 
 namespace mongo {
 namespace {
-
-// This function requires the definition of MigrationDecision. It cannot be moved to
-// tenant_migration_util.h as this would cause a dependency cycle.
-inline TenantMigrationRecipientStateEnum protocolCheckRecipientForgetDecision(
-    const MigrationProtocolEnum protocol, const boost::optional<MigrationDecisionEnum>& decision) {
-    switch (protocol) {
-        case MigrationProtocolEnum::kShardMerge: {
-            uassert(ErrorCodes::InvalidOptions,
-                    str::stream() << "'decision' is required for protocol '"
-                                  << MigrationProtocol_serializer(protocol) << "'",
-                    decision.has_value());
-
-            // For 'shard merge', return 'kAborted' or 'kCommitted' to allow garbage collection to
-            // proceed.
-            if (decision == MigrationDecisionEnum::kCommitted) {
-                return TenantMigrationRecipientStateEnum::kCommitted;
-            } else {
-                return TenantMigrationRecipientStateEnum::kAborted;
-            }
-        }
-        case MigrationProtocolEnum::kMultitenantMigrations: {
-            // For 'multitenant migration' simply return kDone.
-            uassert(ErrorCodes::InvalidOptions,
-                    str::stream() << "'decision' must be empty for protocol '"
-                                  << MigrationProtocol_serializer(protocol) << "'",
-                    !decision.has_value());
-            return TenantMigrationRecipientStateEnum::kDone;
-        }
-        default:
-            MONGO_UNREACHABLE;
-    }
-}
-
 
 MONGO_FAIL_POINT_DEFINE(returnResponseOkForRecipientSyncDataCmd);
 MONGO_FAIL_POINT_DEFINE(returnResponseOkForRecipientForgetMigrationCmd);
@@ -117,13 +85,33 @@ public:
             tenant_migration_util::protocolReadPreferenceCompatibilityCheck(
                 opCtx, migrationProtocol, cmd.getReadPreference());
 
-            // tenantId will be set to empty string for the "shard merge" protocol.
+            if (MONGO_unlikely(returnResponseOkForRecipientSyncDataCmd.shouldFail())) {
+                LOGV2(4879608,
+                      "Immediately returning OK because failpoint is enabled.",
+                      "migrationId"_attr = cmd.getMigrationId(),
+                      "fpName"_attr = returnResponseOkForRecipientSyncDataCmd.getName());
+                return Response(repl::OpTime());
+            }
+
+            switch (migrationProtocol) {
+                case MigrationProtocolEnum::kMultitenantMigrations:
+                    return _handleMTMRecipientSyncDataCmd(opCtx, cmd);
+                case MigrationProtocolEnum::kShardMerge:
+                    return _handleShardMergeRecipientSyncDataCmd(opCtx, cmd);
+                default:
+                    MONGO_UNREACHABLE;
+            }
+
+            MONGO_UNREACHABLE;
+        }
+
+    private:
+        Response _handleMTMRecipientSyncDataCmd(OperationContext* opCtx, const Request& cmd) {
             TenantMigrationRecipientDocument stateDoc(cmd.getMigrationId(),
                                                       cmd.getDonorConnectionString().toString(),
-                                                      tenantId.value_or("").toString(),
+                                                      cmd.getTenantId()->toString(),
                                                       cmd.getStartMigrationDonorTimestamp(),
                                                       cmd.getReadPreference());
-            stateDoc.setTenantIds(tenantIds);
 
             if (!repl::tenantMigrationDisableX509Auth) {
                 uassert(ErrorCodes::InvalidOptions,
@@ -133,37 +121,54 @@ public:
                 stateDoc.setRecipientCertificateForDonor(cmd.getRecipientCertificateForDonor());
             }
 
-            stateDoc.setProtocol(migrationProtocol);
-
-            const auto stateDocBson = stateDoc.toBSON();
-
-            if (MONGO_unlikely(returnResponseOkForRecipientSyncDataCmd.shouldFail())) {
-                LOGV2(4879608,
-                      "Immediately returning OK because 'returnResponseOkForRecipientSyncDataCmd' "
-                      "failpoint is enabled.",
-                      "tenantMigrationRecipientInstance"_attr = stateDoc.toBSON());
-                return Response(repl::OpTime());
-            }
+            stateDoc.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
 
             auto recipientService =
                 repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
                     ->lookupServiceByName(repl::TenantMigrationRecipientService::
                                               kTenantMigrationRecipientServiceName);
             auto recipientInstance = repl::TenantMigrationRecipientService::Instance::getOrCreate(
-                opCtx, recipientService, stateDocBson);
+                opCtx, recipientService, stateDoc.toBSON());
 
             auto returnAfterReachingDonorTs = cmd.getReturnAfterReachingDonorTimestamp();
 
-            if (!returnAfterReachingDonorTs) {
-                return Response(recipientInstance->waitUntilMigrationReachesConsistentState(opCtx));
-            }
-
-            return Response(
-                recipientInstance->waitUntilMigrationReachesReturnAfterReachingTimestamp(
-                    opCtx, *returnAfterReachingDonorTs));
+            return returnAfterReachingDonorTs
+                ? Response(recipientInstance->waitUntilMigrationReachesReturnAfterReachingTimestamp(
+                      opCtx, *returnAfterReachingDonorTs))
+                : Response(recipientInstance->waitUntilMigrationReachesConsistentState(opCtx));
         }
 
-    private:
+        Response _handleShardMergeRecipientSyncDataCmd(OperationContext* opCtx,
+                                                       const Request& cmd) {
+            ShardMergeRecipientDocument stateDoc(cmd.getMigrationId(),
+                                                 cmd.getDonorConnectionString().toString(),
+                                                 *cmd.getTenantIds(),
+                                                 cmd.getStartMigrationDonorTimestamp(),
+                                                 cmd.getReadPreference());
+
+            if (!repl::tenantMigrationDisableX509Auth) {
+                uassert(ErrorCodes::InvalidOptions,
+                        str::stream() << "'" << Request::kRecipientCertificateForDonorFieldName
+                                      << "' is a required field",
+                        cmd.getRecipientCertificateForDonor());
+                stateDoc.setRecipientCertificateForDonor(cmd.getRecipientCertificateForDonor());
+            }
+
+            auto recipientService =
+                repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
+                    ->lookupServiceByName(
+                        repl::ShardMergeRecipientService::kShardMergeRecipientServiceName);
+            auto recipientInstance = repl::ShardMergeRecipientService::Instance::getOrCreate(
+                opCtx, recipientService, stateDoc.toBSON());
+
+            auto returnAfterReachingDonorTs = cmd.getReturnAfterReachingDonorTimestamp();
+
+            return returnAfterReachingDonorTs
+                ? Response(recipientInstance->waitUntilMigrationReachesReturnAfterReachingTimestamp(
+                      opCtx, *returnAfterReachingDonorTs))
+                : Response(recipientInstance->waitUntilMigrationReachesConsistentState(opCtx));
+        }
+
         void doCheckAuthorization(OperationContext* opCtx) const final {
             uassert(ErrorCodes::Unauthorized,
                     "Unauthorized",
@@ -233,9 +238,9 @@ public:
 
             auto recipientService =
                 repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
-                    ->lookupServiceByName(repl::TenantMigrationRecipientService::
-                                              kTenantMigrationRecipientServiceName);
-            auto instance = repl::TenantMigrationRecipientService::Instance::lookup(
+                    ->lookupServiceByName(
+                        repl::ShardMergeRecipientService::kShardMergeRecipientServiceName);
+            auto instance = repl::ShardMergeRecipientService::Instance::lookup(
                 opCtx, recipientService, BSON("_id" << cmd.getMigrationId()));
             uassert(8423340, "Unknown migrationId", instance);
             (*instance)->onMemberImportedFiles(cmd.getFrom(), cmd.getSuccess(), cmd.getReason());
@@ -264,6 +269,12 @@ class RecipientForgetMigrationCmd : public TypedCommand<RecipientForgetMigration
 public:
     using Request = RecipientForgetMigration;
 
+    // We may not have a document if recipientForgetMigration is received before
+    // recipientSyncData. But even if that's the case, we still need to create an instance
+    // and persist a state document that's marked garbage collectable (which is done by the
+    // main chain).
+    static inline const Timestamp kUnusedStartMigrationTimestamp{1, 1};
+
     std::set<StringData> sensitiveFieldNames() const final {
         return {Request::kRecipientCertificateForDonorFieldName};
     }
@@ -286,28 +297,39 @@ public:
             tenant_migration_util::protocolTenantIdCompatibilityCheck(migrationProtocol, tenantId);
             tenant_migration_util::protocolTenantIdsCompatibilityCheck(migrationProtocol,
                                                                        tenantIds);
-            auto nextState =
-                protocolCheckRecipientForgetDecision(migrationProtocol, cmd.getDecision());
+            tenant_migration_util::protocolCheckRecipientForgetDecision(migrationProtocol,
+                                                                        cmd.getDecision());
+
+            if (MONGO_unlikely(returnResponseOkForRecipientForgetMigrationCmd.shouldFail())) {
+                LOGV2(5949502,
+                      "Immediately returning ok because failpoint is enabled",
+                      "migrationId"_attr = cmd.getMigrationId(),
+                      "fpName"_attr = returnResponseOkForRecipientForgetMigrationCmd.getName());
+                return;
+            }
 
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
-            auto recipientService =
-                repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
-                    ->lookupServiceByName(repl::TenantMigrationRecipientService::
-                                              kTenantMigrationRecipientServiceName);
 
-            // We may not have a document if recipientForgetMigration is received before
-            // recipientSyncData. But even if that's the case, we still need to create an instance
-            // and persist a state document that's marked garbage collectable (which is done by the
-            // main chain).
-            const Timestamp kUnusedStartMigrationTimestamp(1, 1);
+            switch (migrationProtocol) {
+                case MigrationProtocolEnum::kMultitenantMigrations:
+                    return _handleMTMRecipientForgetMigrationCmd(opCtx, cmd);
+                case MigrationProtocolEnum::kShardMerge:
+                    return _handleShardMergeRecipientForgetMigrationCmd(opCtx, cmd);
+                default:
+                    MONGO_UNREACHABLE;
+            }
 
-            // tenantId will be set to empty string for the "shard merge" protocol.
+            MONGO_UNREACHABLE;
+        }
+
+    private:
+        void _handleMTMRecipientForgetMigrationCmd(OperationContext* opCtx, const Request& cmd) {
             TenantMigrationRecipientDocument stateDoc(cmd.getMigrationId(),
                                                       cmd.getDonorConnectionString().toString(),
-                                                      tenantId.value_or("").toString(),
+                                                      cmd.getTenantId()->toString(),
                                                       kUnusedStartMigrationTimestamp,
                                                       cmd.getReadPreference());
-            stateDoc.setTenantIds(tenantIds);
+
             if (!repl::tenantMigrationDisableX509Auth) {
                 uassert(ErrorCodes::InvalidOptions,
                         str::stream() << "'" << Request::kRecipientCertificateForDonorFieldName
@@ -315,30 +337,60 @@ public:
                         cmd.getRecipientCertificateForDonor());
                 stateDoc.setRecipientCertificateForDonor(cmd.getRecipientCertificateForDonor());
             }
-            stateDoc.setProtocol(migrationProtocol);
-            // Set the state to 'kDone' for 'multitenant migration' or 'kCommitted'/'kAborted' for
-            // 'shard merge' so that we don't create a recipient access blocker unnecessarily if
-            // this recipientForgetMigration command is received before a recipientSyncData command
-            // or after the state doc is garbage collected.
-            stateDoc.setState(nextState);
 
-            if (MONGO_unlikely(returnResponseOkForRecipientForgetMigrationCmd.shouldFail())) {
-                LOGV2(5949502,
-                      "Immediately returning ok because "
-                      "'returnResponseOkForRecipientForgetMigrationCmd' failpoint is enabled",
-                      "tenantMigrationRecipientInstance"_attr = stateDoc.toBSON());
-                return;
-            }
+            stateDoc.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
+            // Set the state to 'kDone' so that we don't create a recipient access blocker
+            // unnecessarily if this recipientForgetMigration command is received before a
+            // recipientSyncData command or after the state doc is garbage collected.
+            stateDoc.setState(TenantMigrationRecipientStateEnum::kDone);
 
+            auto recipientService =
+                repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
+                    ->lookupServiceByName(repl::TenantMigrationRecipientService::
+                                              kTenantMigrationRecipientServiceName);
             auto recipientInstance = repl::TenantMigrationRecipientService::Instance::getOrCreate(
                 opCtx, recipientService, stateDoc.toBSON(), false);
 
             // Instruct the instance run() function to mark this migration garbage collectable.
-            recipientInstance->onReceiveRecipientForgetMigration(opCtx, nextState);
+            recipientInstance->onReceiveRecipientForgetMigration(
+                opCtx, TenantMigrationRecipientStateEnum::kDone);
             recipientInstance->getForgetMigrationDurableFuture().get(opCtx);
         }
 
-    private:
+        void _handleShardMergeRecipientForgetMigrationCmd(OperationContext* opCtx,
+                                                          const Request& cmd) {
+            ShardMergeRecipientDocument stateDoc(cmd.getMigrationId(),
+                                                 cmd.getDonorConnectionString().toString(),
+                                                 *cmd.getTenantIds(),
+                                                 kUnusedStartMigrationTimestamp,
+                                                 cmd.getReadPreference());
+
+            if (!repl::tenantMigrationDisableX509Auth) {
+                uassert(ErrorCodes::InvalidOptions,
+                        str::stream() << "'" << Request::kRecipientCertificateForDonorFieldName
+                                      << "' is a required field",
+                        cmd.getRecipientCertificateForDonor());
+                stateDoc.setRecipientCertificateForDonor(cmd.getRecipientCertificateForDonor());
+            }
+
+            // Set 'startGarbageCollect' true to not start a migration (and install access blocker
+            // or get serverless lock) unncessarily if this recipientForgetMigration command is
+            // received before a recipientSyncData command or after the state doc is garbage
+            // collected.
+            stateDoc.setStartGarbageCollect(true);
+
+            auto recipientService =
+                repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
+                    ->lookupServiceByName(
+                        repl::ShardMergeRecipientService::kShardMergeRecipientServiceName);
+            auto recipientInstance = repl::ShardMergeRecipientService::Instance::getOrCreate(
+                opCtx, recipientService, stateDoc.toBSON(), false);
+
+            // Instruct the instance run() function to mark this migration garbage collectable.
+            recipientInstance->onReceiveRecipientForgetMigration(opCtx, *cmd.getDecision());
+            recipientInstance->getForgetMigrationDurableFuture().get(opCtx);
+        }
+
         void doCheckAuthorization(OperationContext* opCtx) const final {
             uassert(ErrorCodes::Unauthorized,
                     "Unauthorized",

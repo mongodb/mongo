@@ -83,7 +83,7 @@ const migrationThread = new Thread(runMigrationAsync, migrationOpts, donorRstArg
 migrationThread.start();
 
 jsTestLog("Wait for recipient to log 'Waiting for all nodes to call recipientVoteImportedFiles'");
-assert.soon(() => checkLog.checkContainsOnceJson(recipientPrimary, 6113402, {}));
+assert.soon(() => checkLog.checkContainsOnceJson(recipientPrimary, 7339751, {}));
 
 jsTestLog("Test that recipientVoteImportedFiles succeeds");
 voteShouldSucceed(migrationId);

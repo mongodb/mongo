@@ -21,6 +21,7 @@ const tenantMigrationFailoverTest = function(isTimeSeries, createCollFn) {
     const recipientRst = new ReplSetTest({
         nodes: 2,
         name: jsTestName() + "_recipient",
+        serverless: true,
         nodeOptions: Object.assign(makeX509OptionsForTest().recipient, {
             setParameter: {
                 // Allow reads on recipient before migration completes for testing.

@@ -30,6 +30,7 @@ const kGarbageCollectionParams = {
 const donorRst = new ReplSetTest({
     nodes: 1,
     name: "donor",
+    serverless: true,
     nodeOptions:
         Object.assign(makeX509OptionsForTest().donor, {setParameter: kGarbageCollectionParams})
 });

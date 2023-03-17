@@ -45,7 +45,7 @@
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/util/str.h"
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTenantMigration
 
 
 namespace mongo {

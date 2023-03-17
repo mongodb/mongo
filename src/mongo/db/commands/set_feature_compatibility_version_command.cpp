@@ -64,6 +64,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/shard_merge_recipient_service.h"
 #include "mongo/db/repl/tenant_migration_donor_service.h"
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
@@ -1281,6 +1282,12 @@ private:
                     repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
                         ->lookupServiceByName(ShardSplitDonorService::kServiceName));
                 splitDonorService->abortAllSplits(opCtx);
+
+                auto mergeRecipientService = checked_cast<repl::ShardMergeRecipientService*>(
+                    repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
+                        ->lookupServiceByName(
+                            repl::ShardMergeRecipientService::kShardMergeRecipientServiceName));
+                mergeRecipientService->abortAllMigrations(opCtx);
             }
         }
     }

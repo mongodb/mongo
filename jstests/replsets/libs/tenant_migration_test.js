@@ -349,11 +349,18 @@ export class TenantMigrationTest {
                     _id: UUID(migrationIdString)
                 });
 
+            const shardMergeRecipientStateDoc =
+                recipientPrimary.getCollection(TenantMigrationTest.kConfigShardMergeRecipientsNS)
+                    .findOne({_id: UUID(migrationIdString)});
+
             if (donorStateDoc) {
                 assert(donorStateDoc.expireAt);
             }
             if (recipientStateDoc) {
                 assert(recipientStateDoc.expireAt);
+            }
+            if (shardMergeRecipientStateDoc) {
+                assert(shardMergeRecipientStateDoc.expireAt);
             }
 
             const configDBCollections = recipientPrimary.getDB('config').getCollectionNames();
@@ -420,6 +427,10 @@ export class TenantMigrationTest {
         recipientNodes.forEach(node => {
             const configRecipientsColl =
                 node.getCollection(TenantMigrationTest.kConfigRecipientsNS);
+            assert.soon(() => 0 === configRecipientsColl.count({_id: migrationId}), tojson(node));
+
+            const configShardMergeRecipientsColl =
+                node.getCollection(TenantMigrationTest.kConfigShardMergeRecipientsNS);
             assert.soon(() => 0 === configRecipientsColl.count({_id: migrationId}), tojson(node));
 
             let mtab;
@@ -534,7 +545,13 @@ export class TenantMigrationTest {
     }) {
         const configRecipientsColl =
             this.getRecipientPrimary().getCollection("config.tenantMigrationRecipients");
-        const configDoc = configRecipientsColl.findOne({_id: migrationId});
+        let configDoc = configRecipientsColl.findOne({_id: migrationId});
+        if (!configDoc) {
+            configDoc = this.getRecipientPrimary()
+                            .getCollection(TenantMigrationTest.kConfigShardMergeRecipientsNS)
+                            .findOne({_id: migrationId});
+        }
+
         const mtab = this.getTenantMigrationAccessBlocker({recipientNode: node, tenantId});
 
         let checkStates = () => {
@@ -673,6 +690,14 @@ TenantMigrationTest.RecipientState = {
     kAborted: "aborted",
 };
 
+TenantMigrationTest.ShardMergeRecipientState = {
+    kStarted: "started",
+    kLearnedFilenames: "learned filenames",
+    kConsistent: "consistent",
+    kCommitted: "committed",
+    kAborted: "aborted",
+};
+
 TenantMigrationTest.RecipientStateEnum =
     Object.keys(TenantMigrationTest.RecipientState).reduce((acc, key, idx) => {
         acc[key] = idx;
@@ -696,3 +721,4 @@ TenantMigrationTest.RecipientAccessState = {
 
 TenantMigrationTest.kConfigDonorsNS = "config.tenantMigrationDonors";
 TenantMigrationTest.kConfigRecipientsNS = "config.tenantMigrationRecipients";
+TenantMigrationTest.kConfigShardMergeRecipientsNS = "config.shardMergeRecipients";

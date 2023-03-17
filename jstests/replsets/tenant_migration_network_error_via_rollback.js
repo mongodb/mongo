@@ -38,6 +38,7 @@ function runTest({failPointName, failPointData = {}, batchSize = 10 * 1000}) {
             {rsConfig: {priority: 0, hidden: true}},
             {rsConfig: {priority: 0, hidden: true}}
         ],
+        serverless: true,
         nodeOptions: Object.assign(migrationX509Options.donor, {
             setParameter: {
                 // Allow non-timestamped reads on donor after migration completes for testing.

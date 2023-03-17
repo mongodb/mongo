@@ -63,7 +63,7 @@ tenantMigrationTest.assertRecipientNodesInExpectedState({
     nodes: tenantMigrationTest.getRecipientRst().nodes,
     migrationId: migrationUuid,
     tenantId: tenantId.str,
-    expectedState: TenantMigrationTest.RecipientState.kLearnedFilenames,
+    expectedState: TenantMigrationTest.ShardMergeRecipientState.kLearnedFilenames,
     expectedAccessState: TenantMigrationTest.RecipientAccessState.kReject
 });
 

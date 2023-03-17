@@ -627,7 +627,7 @@ class _ShardMergeThread(threading.Thread):  # pylint: disable=too-many-instance-
                     try:
                         recipient_node_client = self._create_client(recipient_node)
                         res = recipient_node_client.config.command({
-                            "count": "tenantMigrationRecipients", "query": {
+                            "count": "shardMergeRecipients", "query": {
                                 "_id": Binary(migration_opts.migration_id.bytes, UUID_SUBTYPE)
                             }
                         })

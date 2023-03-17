@@ -67,10 +67,13 @@ function testDonorForgetMigrationAfterMigrationCompletes(
         assert.soon(() => null == getTenantMigrationAccessBlocker({recipientNode: node}));
     });
 
-    assert.soon(() => 0 ===
-                    recipientPrimary.getCollection(TenantMigrationTest.kConfigRecipientsNS).count({
-                        _id: migrationId,
-                    }));
+    const recipientStateDocNss = isShardMergeEnabled(recipientPrimary.getDB("admin"))
+        ? TenantMigrationTest.kConfigShardMergeRecipientsNS
+        : TenantMigrationTest.kConfigRecipientsNS;
+
+    assert.soon(() => 0 === recipientPrimary.getCollection(recipientStateDocNss).count({
+        _id: migrationId,
+    }));
     assert.soon(() => 0 ===
                     recipientPrimary.adminCommand({serverStatus: 1})
                         .repl.primaryOnlyServices.TenantMigrationRecipientService.numInstances);
@@ -92,12 +95,14 @@ const x509Options = makeX509OptionsForTest();
 const donorRst = new ReplSetTest({
     nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {priority: 0}}],
     name: "donor",
+    serverless: true,
     nodeOptions: Object.assign(x509Options.donor, sharedOptions)
 });
 
 const recipientRst = new ReplSetTest({
     nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {priority: 0}}],
     name: "recipient",
+    serverless: true,
     nodeOptions: Object.assign(x509Options.recipient, sharedOptions)
 });
 

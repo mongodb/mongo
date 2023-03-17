@@ -60,6 +60,7 @@ Object.assign(donorNodeOptions.setParameter, {
 const donorRst = new ReplSetTest({
     nodes: 1,
     name: 'donorRst',
+    serverless: true,
     nodeOptions: donorNodeOptions,
 });
 

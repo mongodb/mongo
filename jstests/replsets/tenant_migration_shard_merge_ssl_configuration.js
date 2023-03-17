@@ -6,10 +6,9 @@
  *
  * @tags: [
  *   incompatible_with_macos,
- *   # Shard merge protocol will be tested by tenant_migration_shard_merge_ssl_configuration.js.
- *   incompatible_with_shard_merge,
  *   requires_majority_read_concern,
  *   requires_persistence,
+ *   featureFlagShardMerge,
  *   serverless,
  * ]
  */
@@ -19,12 +18,26 @@ import {
     donorStartMigrationWithProtocol,
     getCertificateAndPrivateKey,
     isMigrationCompleted,
+    isShardMergeEnabled,
     makeMigrationCertificatesForTest,
     makeX509OptionsForTest,
-    runTenantMigrationCommand
+    runTenantMigrationCommand,
 } from "jstests/replsets/libs/tenant_migration_util.js";
 
-const kTenantId = ObjectId().str;
+const standalone = MongoRunner.runMongod({});
+const shardMergeFeatureFlagEnabled = isShardMergeEnabled(standalone.getDB("admin"));
+MongoRunner.stopMongod(standalone);
+
+// Note: including this explicit early return here due to the fact that multiversion
+// suites will execute this test without featureFlagShardMerge enabled (despite the
+// presence of the featureFlagShardMerge tag above), which means the test will attempt
+// to run a multi-tenant migration and fail.
+if (!shardMergeFeatureFlagEnabled) {
+    jsTestLog("Skipping Shard Merge-specific test");
+    quit();
+}
+
+const kTenantId = ObjectId();
 const kReadPreference = {
     mode: "primary"
 };
@@ -46,31 +59,29 @@ const kExpiredMigrationCertificates = {
 
     jsTest.log("Test that donorStartMigration requires 'donorCertificateForRecipient' when  " +
                "tenantMigrationDisableX509Auth=false");
-    assert.commandFailedWithCode(
-        donorPrimary.adminCommand(donorStartMigrationWithProtocol({
-            donorStartMigration: 1,
-            migrationId: UUID(),
-            recipientConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
-            tenantId: kTenantId,
-            readPreference: kReadPreference,
-            recipientCertificateForDonor: kValidMigrationCertificates.recipientCertificateForDonor,
-        },
-                                                                  donorPrimary.getDB("admin"))),
-        ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(donorPrimary.adminCommand({
+        donorStartMigration: 1,
+        migrationId: UUID(),
+        recipientConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
+        tenantIds: [kTenantId],
+        protocol: "shard merge",
+        readPreference: kReadPreference,
+        recipientCertificateForDonor: kValidMigrationCertificates.recipientCertificateForDonor,
+    }),
+                                 ErrorCodes.InvalidOptions);
 
     jsTest.log("Test that donorStartMigration requires 'recipientCertificateForDonor' when  " +
                "tenantMigrationDisableX509Auth=false");
-    assert.commandFailedWithCode(
-        donorPrimary.adminCommand(donorStartMigrationWithProtocol({
-            donorStartMigration: 1,
-            migrationId: UUID(),
-            recipientConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
-            tenantId: kTenantId,
-            readPreference: kReadPreference,
-            donorCertificateForRecipient: kValidMigrationCertificates.donorCertificateForRecipient,
-        },
-                                                                  donorPrimary.getDB("admin"))),
-        ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(donorPrimary.adminCommand({
+        donorStartMigration: 1,
+        migrationId: UUID(),
+        recipientConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
+        tenantIds: [kTenantId],
+        protocol: "shard merge",
+        readPreference: kReadPreference,
+        donorCertificateForRecipient: kValidMigrationCertificates.donorCertificateForRecipient,
+    }),
+                                 ErrorCodes.InvalidOptions);
 
     jsTest.log("Test that recipientSyncData requires 'recipientCertificateForDonor' when " +
                "tenantMigrationDisableX509Auth=false");
@@ -78,7 +89,8 @@ const kExpiredMigrationCertificates = {
         recipientSyncData: 1,
         migrationId: UUID(),
         donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
-        tenantId: kTenantId,
+        tenantIds: [kTenantId],
+        protocol: "shard merge",
         startMigrationDonorTimestamp: Timestamp(1, 1),
         readPreference: kReadPreference
     }),
@@ -90,7 +102,9 @@ const kExpiredMigrationCertificates = {
         recipientForgetMigration: 1,
         migrationId: UUID(),
         donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
-        tenantId: kTenantId,
+        tenantIds: [kTenantId],
+        protocol: "shard merge",
+        decision: "aborted",
         readPreference: kReadPreference
     }),
                                  ErrorCodes.InvalidOptions);
@@ -109,18 +123,17 @@ const kExpiredMigrationCertificates = {
 
     const donorPrimary = tenantMigrationTest.getDonorPrimary();
 
-    assert.commandFailedWithCode(
-        donorPrimary.adminCommand(donorStartMigrationWithProtocol({
-            donorStartMigration: 1,
-            migrationId: UUID(),
-            recipientConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
-            tenantId: kTenantId,
-            readPreference: kReadPreference,
-            donorCertificateForRecipient: kValidMigrationCertificates.donorCertificateForRecipient,
-            recipientCertificateForDonor: kValidMigrationCertificates.recipientCertificateForDonor,
-        },
-                                                                  donorPrimary.getDB("admin"))),
-        ErrorCodes.IllegalOperation);
+    assert.commandFailedWithCode(donorPrimary.adminCommand({
+        donorStartMigration: 1,
+        migrationId: UUID(),
+        recipientConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
+        tenantIds: [kTenantId],
+        protocol: "shard merge",
+        readPreference: kReadPreference,
+        donorCertificateForRecipient: kValidMigrationCertificates.donorCertificateForRecipient,
+        recipientCertificateForDonor: kValidMigrationCertificates.recipientCertificateForDonor,
+    }),
+                                 ErrorCodes.IllegalOperation);
 
     donorRst.stopSet();
     tenantMigrationTest.stop();
@@ -141,7 +154,8 @@ const kExpiredMigrationCertificates = {
         recipientSyncData: 1,
         migrationId: UUID(),
         donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
-        tenantId: kTenantId,
+        tenantIds: [kTenantId],
+        protocol: "shard merge",
         readPreference: kReadPreference,
         startMigrationDonorTimestamp: Timestamp(1, 1),
         recipientCertificateForDonor: kValidMigrationCertificates.recipientCertificateForDonor,
@@ -170,11 +184,16 @@ const kExpiredMigrationCertificates = {
     const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), recipientRst});
     const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 
+    // In order to avoid "SnapshotUnavailable" error, fsync all the data on the donor before
+    // recipient starts migration.
+    assert.commandWorked(tenantMigrationTest.getDonorPrimary().adminCommand({fsync: 1}));
+
     assert.commandWorked(recipientPrimary.adminCommand({
         recipientSyncData: 1,
         migrationId: UUID(),
         donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
-        tenantId: kTenantId,
+        tenantIds: [kTenantId],
+        protocol: "shard merge",
         startMigrationDonorTimestamp: Timestamp(1, 1),
         readPreference: kReadPreference
     }));
@@ -207,7 +226,9 @@ const kExpiredMigrationCertificates = {
         recipientForgetMigration: 1,
         migrationId: UUID(),
         donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
-        tenantId: kTenantId,
+        tenantIds: [kTenantId],
+        protocol: "shard merge",
+        decision: "aborted",
         readPreference: kReadPreference
     }));
 
@@ -248,7 +269,8 @@ const kExpiredMigrationCertificates = {
         donorStartMigration: 1,
         migrationId: migrationId,
         recipientConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
-        tenantId: kTenantId,
+        tenantIds: [kTenantId],
+        protocol: "shard merge",
         readPreference: kReadPreference
     };
     const stateRes = assert.commandWorked(runTenantMigrationCommand(
@@ -294,7 +316,8 @@ const kExpiredMigrationCertificates = {
         donorStartMigration: 1,
         migrationId: UUID(),
         recipientConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
-        tenantId: kTenantId,
+        tenantIds: [kTenantId],
+        protocol: "shard merge",
         readPreference: kReadPreference
     };
 
@@ -341,7 +364,8 @@ const kExpiredMigrationCertificates = {
         donorStartMigration: 1,
         migrationId: UUID(),
         recipientConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
-        tenantId: kTenantId,
+        tenantIds: [kTenantId],
+        protocol: "shard merge",
         readPreference: kReadPreference,
         donorCertificateForRecipient: kExpiredMigrationCertificates.donorCertificateForRecipient,
         recipientCertificateForDonor: kExpiredMigrationCertificates.recipientCertificateForDonor,

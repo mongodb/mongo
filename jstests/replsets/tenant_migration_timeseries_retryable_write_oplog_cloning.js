@@ -33,12 +33,14 @@ function testOplogCloning(ordered) {
     const donorRst = new ReplSetTest({
         nodes: 1,
         name: "donor",
+        serverless: true,
         nodeOptions:
             Object.assign(migrationX509Options.donor, {setParameter: kGarbageCollectionParams})
     });
     const recipientRst = new ReplSetTest({
         nodes: 1,
         name: "recipient",
+        serverless: true,
         nodeOptions:
             Object.assign(migrationX509Options.recipient, {setParameter: kGarbageCollectionParams})
     });

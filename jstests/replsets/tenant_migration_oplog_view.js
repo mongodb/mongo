@@ -17,6 +17,7 @@ const kGarbageCollectionDelayMS = 5 * 1000;
 const donorRst = new ReplSetTest({
     name: "donorRst",
     nodes: 1,
+    serverless: true,
     nodeOptions: {
         setParameter: {
             // Set the delay before a donor state doc is garbage collected to be short to speed

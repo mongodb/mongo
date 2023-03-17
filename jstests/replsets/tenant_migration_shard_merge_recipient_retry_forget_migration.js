@@ -1,22 +1,22 @@
 /**
- * Tests that a recipientForgetMigration is received after the recipient state doc has been deleted.
+ * Tests that a recipientForgetMigration is received after the recipient state doc has been deleted
+ * for shard merge protocol.
  *
  * @tags: [
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,
- *   # Shard merge protocol will be tested by
- *   # tenant_migration_shard_merge_recipient_retry_forget_migration.js.
- *   incompatible_with_shard_merge,
  *   requires_persistence,
+ *   featureFlagShardMerge,
  *   serverless,
- *   # The currentOp output field 'state' was changed from an enum value to a string.
- *   requires_fcv_70,
  * ]
  */
 
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {getCertificateAndPrivateKey} from "jstests/replsets/libs/tenant_migration_util.js";
+import {
+    getCertificateAndPrivateKey,
+    isShardMergeEnabled
+} from "jstests/replsets/libs/tenant_migration_util.js";
 
 load("jstests/libs/fail_point_util.js");  // For configureFailPoint().
 load("jstests/libs/parallelTester.js");   // For Thread()
@@ -24,15 +24,25 @@ load("jstests/libs/uuid_util.js");        // For extractUUIDFromObject().
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
+const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
+
+// Note: including this explicit early return here due to the fact that multiversion
+// suites will execute this test without featureFlagShardMerge enabled (despite the
+// presence of the featureFlagShardMerge tag above), which means the test will attempt
+// to run a multi-tenant migration and fail.
+if (!isShardMergeEnabled(recipientPrimary.getDB("admin"))) {
+    tenantMigrationTest.stop();
+    jsTestLog("Skipping Shard Merge-specific test");
+    quit();
+}
+
 const migrationId = UUID();
-const tenantId = ObjectId().str;
+const tenantId = ObjectId();
 const recipientCertificateForDonor =
     getCertificateAndPrivateKey("jstests/libs/tenant_migration_recipient.pem");
 
-const dbName = tenantMigrationTest.tenantDB(tenantId, "test");
+const dbName = tenantMigrationTest.tenantDB(tenantId.str, "test");
 const collName = "coll";
-
-const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 
 // Not doing a migration before writing to the recipient to mimic that a migration has completed and
 // the state doc has been garbage collected.
@@ -41,7 +51,7 @@ assert.commandWorked(recipientPrimary.getDB(dbName)[collName].insert({_id: 1}));
 function runRecipientForgetMigration(host, {
     migrationIdString,
     donorConnectionString,
-    tenantId,
+    tenantIds,
     readPreference,
     recipientCertificateForDonor
 }) {
@@ -50,20 +60,22 @@ function runRecipientForgetMigration(host, {
         recipientForgetMigration: 1,
         migrationId: UUID(migrationIdString),
         donorConnectionString,
-        tenantId,
-        readPreference,
+        tenantIds: eval(tenantIds),
+        protocol: "shard merge",
+        decision: "committed",
+        readPreference: {mode: "primary"},
         recipientCertificateForDonor
     });
 }
 
-const fp = configureFailPoint(recipientPrimary, "hangBeforeTaskCompletion");
+const fp = configureFailPoint(
+    recipientPrimary, "fpBeforeMarkingStateDocAsGarbageCollectable", {action: "hang"});
 
 const recipientForgetMigrationThread =
     new Thread(runRecipientForgetMigration, recipientPrimary.host, {
         migrationIdString: extractUUIDFromObject(migrationId),
         donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
-        tenantId,
-        readPreference: {mode: "primary"},
+        tenantIds: tojson([tenantId]),
         recipientCertificateForDonor
     });
 
@@ -75,9 +87,9 @@ fp.wait();
 
 let currOp = assert
                  .commandWorked(recipientPrimary.adminCommand(
-                     {currentOp: true, desc: "tenant recipient migration"}))
+                     {currentOp: true, desc: "shard merge recipient"}))
                  .inprog[0];
-assert.eq(currOp.state, TenantMigrationTest.RecipientState.kDone, currOp);
+assert.eq(currOp.state, TenantMigrationTest.ShardMergeRecipientState.kCommitted, currOp);
 assert(!currOp.hasOwnProperty("expireAt"), currOp);
 
 // Test that we can still read from the recipient.
@@ -105,16 +117,15 @@ newPrimaryFp.off();
 assert.commandWorked(runRecipientForgetMigration(newRecipientPrimary.host, {
     migrationIdString: extractUUIDFromObject(migrationId),
     donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
-    tenantId,
-    readPreference: {mode: "primary"},
+    tenantIds: tojson([tenantId]),
     recipientCertificateForDonor
 }));
 
 currOp = assert
-             .commandWorked(newRecipientPrimary.adminCommand(
-                 {currentOp: true, desc: "tenant recipient migration"}))
+             .commandWorked(
+                 newRecipientPrimary.adminCommand({currentOp: true, desc: "shard merge recipient"}))
              .inprog[0];
-assert.eq(currOp.state, TenantMigrationTest.RecipientState.kDone, currOp);
+assert.eq(currOp.state, TenantMigrationTest.ShardMergeRecipientState.kCommitted, currOp);
 assert(currOp.hasOwnProperty("expireAt"), currOp);
 
 tenantMigrationTest.stop();

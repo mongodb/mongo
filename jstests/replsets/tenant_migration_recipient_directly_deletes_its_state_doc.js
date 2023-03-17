@@ -6,6 +6,8 @@
  * @tags: [
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,
+ *   # Shard merge recipient state doc deletion is no longer managed by TTL monitor.
+ *   incompatible_with_shard_merge,
  *   # Uses pauseTenantMigrationRecipientBeforeDeletingStateDoc failpoint, which was added in 6.2
  *   requires_fcv_62,
  *   requires_majority_read_concern,

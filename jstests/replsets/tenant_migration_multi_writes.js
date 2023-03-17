@@ -28,6 +28,7 @@ load("jstests/libs/uuid_util.js");
 const donorRst = new ReplSetTest({
     nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {priority: 0}}],
     name: "TenantMigrationTest_donor",
+    serverless: true,
     nodeOptions: Object.assign(makeX509OptionsForTest().donor, {
         setParameter: {
             // Set the delay before a donor state doc is garbage collected to be short to speed up

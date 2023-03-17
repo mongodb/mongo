@@ -6,8 +6,12 @@
  * recipient's majority read on 'config.transactions' can miss committed retryable writes at that
  * majority commit point.
  *
+ * TODO SERVER-61231: Adapt for shard merge.
+ *
  * @tags: [
  *   incompatible_with_macos,
+ *   # Shard merge only supports 'primary' read preference.
+ *   incompatible_with_shard_merge,
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,
  *   requires_persistence,
@@ -59,6 +63,7 @@ const donorRst = new ReplSetTest({
         n3: {rsConfig: {priority: 0, hidden: true}, setParameter: {bgSyncOplogFetcherBatchSize: 1}},
         n4: {rsConfig: {priority: 0, hidden: true}, setParameter: {bgSyncOplogFetcherBatchSize: 1}},
     },
+    serverless: true,
     // Force secondaries to sync from the primary to guarantee replication progress with the
     // stopReplProducerOnDocument failpoint. Also disable primary catchup because some replicated
     // retryable write statements are intentionally not being made majority committed.
@@ -76,14 +81,6 @@ donorRst.initiateWithHighElectionTimeout();
 const donorPrimary = donorRst.getPrimary();
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), donorRst: donorRst});
-
-if (isShardMergeEnabled(donorPrimary.getDB("admin"))) {
-    jsTestLog(
-        "Skip: incompatible with featureFlagShardMerge. Only 'primary' read preference is supported.");
-    donorRst.stopSet();
-    tenantMigrationTest.stop();
-    quit();
-}
 
 const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 const kTenantId = ObjectId().str;

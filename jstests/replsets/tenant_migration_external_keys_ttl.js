@@ -223,6 +223,7 @@ function makeTestParams() {
         const donorRst = new ReplSetTest({
             nodes: 3,
             name: "donorRst",
+            serverless: true,
             nodeOptions:
                 Object.assign(migrationX509Options.donor, {setParameter: ttlMonitorOptions})
         });
@@ -232,6 +233,7 @@ function makeTestParams() {
         const recipientRst = new ReplSetTest({
             nodes: 3,
             name: "recipientRst",
+            serverless: true,
             nodeOptions:
                 Object.assign(migrationX509Options.recipient, {setParameter: ttlMonitorOptions})
         });

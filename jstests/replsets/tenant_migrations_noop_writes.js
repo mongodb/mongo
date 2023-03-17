@@ -74,6 +74,7 @@ function setup() {
     const donorRst = new ReplSetTest({
         nodes: 3,
         name: "donor",
+        serverless: true,
         settings: {chainingAllowed: false},
         nodeOptions: Object.assign(migrationX509Options.donor, {
             setParameter: {
@@ -89,6 +90,7 @@ function setup() {
     const recipientRst = new ReplSetTest({
         nodes: 3,
         name: "recipient",
+        serverless: true,
         settings: {chainingAllowed: false},
         nodeOptions: migrationX509Options.recipient
     });

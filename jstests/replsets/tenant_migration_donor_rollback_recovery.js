@@ -40,6 +40,7 @@ const migrationX509Options = makeX509OptionsForTest();
 const recipientRst = new ReplSetTest({
     name: "recipientRst",
     nodes: 1,
+    serverless: true,
     nodeOptions: Object.assign({}, migrationX509Options.recipient, {
         setParameter: {
             tenantMigrationGarbageCollectionDelayMS: kGarbageCollectionDelayMS,
@@ -70,6 +71,7 @@ function testRollBack(setUpFunc, rollbackOpsFunc, steadyStateFunc) {
     const donorRst = new ReplSetTest({
         name: "donorRst",
         nodes: 3,
+        serverless: true,
         nodeOptions: Object.assign({}, migrationX509Options.donor, {
             setParameter: {
                 tenantMigrationGarbageCollectionDelayMS: kGarbageCollectionDelayMS,

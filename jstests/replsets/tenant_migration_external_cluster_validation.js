@@ -55,6 +55,7 @@ const x509Options = makeX509OptionsForTest();
 const donorRst = new ReplSetTest({
     nodes: 2,
     name: "donor",
+    serverless: true,
     keyFile: "jstests/libs/key1",
     nodeOptions: Object.assign(x509Options.donor, {
         setParameter: {
@@ -68,6 +69,7 @@ const donorRst = new ReplSetTest({
 const recipientRst = new ReplSetTest({
     nodes: 2,
     name: "recipient",
+    serverless: true,
     keyFile: "jstests/libs/key1",
     nodeOptions: Object.assign(
         x509Options.recipient,

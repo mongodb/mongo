@@ -3,6 +3,8 @@
  *
  * @tags: [
  *   incompatible_with_macos,
+ *   # Shard merge protocol will be tested by tenant_migration_buildindex_shard_merge.js.
+ *   incompatible_with_shard_merge,
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,
  *   requires_persistence,
@@ -22,13 +24,6 @@ load("jstests/libs/uuid_util.js");
 load("jstests/replsets/rslib.js");  // 'createRstArgs'
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
-// TODO (SERVER-63517): This test assumes the donor blocks only some tenants. Replace this test with
-// tenant_migration_buildindex_shard_merge.js.
-if (isShardMergeEnabled(tenantMigrationTest.getDonorPrimary().getDB("adminDB"))) {
-    jsTestLog("Skip: incompatible with featureFlagShardMerge");
-    tenantMigrationTest.stop();
-    quit();
-}
 
 const kTenantId = ObjectId().str;
 const kUnrelatedTenantId = ObjectId().str;

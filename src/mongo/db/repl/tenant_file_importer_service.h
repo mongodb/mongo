@@ -48,6 +48,7 @@ class TenantFileImporterService : public ReplicaSetAwareService<TenantFileImport
 public:
     static constexpr StringData kTenantFileImporterServiceName = "TenantFileImporterService"_sd;
     static TenantFileImporterService* get(ServiceContext* serviceContext);
+    static TenantFileImporterService* get(OperationContext* opCtx);
     TenantFileImporterService() = default;
 
     /**

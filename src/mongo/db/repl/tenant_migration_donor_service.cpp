@@ -1522,7 +1522,7 @@ TenantMigrationDonorService::Instance::_waitForForgetMigrationThenMarkMigrationG
                 // If the abortReason is ConflictingServerlessOperation, it means there are no
                 // document on the recipient. Do not send the forget command.
                 stdx::lock_guard<Latch> lg(_mutex);
-                if (_abortReason &&
+                if (_protocol == MigrationProtocolEnum::kMultitenantMigrations && _abortReason &&
                     _abortReason->code() == ErrorCodes::ConflictingServerlessOperation) {
                     return ExecutorFuture(**executor);
                 }

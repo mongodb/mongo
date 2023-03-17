@@ -36,8 +36,12 @@ function assertCanFindWithReadConcern(conn, dbName, collName, expectedDoc, readC
 
     // Simulate a lagged node by setting secondaryDelaySecs on one recipient secondary. Verify this
     // does not prevent reading all the tenant's data after the migration commits.
-    const recipientRst = new ReplSetTest(
-        {name: "recipient_local_case", nodes: 3, nodeOptions: migrationX509Options.recipient});
+    const recipientRst = new ReplSetTest({
+        name: "recipient_local_case",
+        nodes: 3,
+        serverless: true,
+        nodeOptions: migrationX509Options.recipient
+    });
     recipientRst.startSet();
 
     let config = recipientRst.getReplSetConfig();

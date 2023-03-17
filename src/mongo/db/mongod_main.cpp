@@ -125,6 +125,8 @@
 #include "mongo/db/repl/replication_coordinator_impl_gen.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/replication_recovery.h"
+#include "mongo/db/repl/shard_merge_recipient_op_observer.h"
+#include "mongo/db/repl/shard_merge_recipient_service.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/tenant_migration_donor_op_observer.h"
 #include "mongo/db/repl/tenant_migration_donor_service.h"
@@ -377,6 +379,9 @@ void registerPrimaryOnlyServices(ServiceContext* serviceContext) {
         services.push_back(std::make_unique<ReshardingRecipientService>(serviceContext));
         services.push_back(std::make_unique<TenantMigrationDonorService>(serviceContext));
         services.push_back(std::make_unique<repl::TenantMigrationRecipientService>(serviceContext));
+        if (getGlobalReplSettings().isServerless()) {
+            services.push_back(std::make_unique<repl::ShardMergeRecipientService>(serviceContext));
+        }
     }
 
     if (serverGlobalParams.clusterRole == ClusterRole::None) {
@@ -384,6 +389,7 @@ void registerPrimaryOnlyServices(ServiceContext* serviceContext) {
         services.push_back(std::make_unique<repl::TenantMigrationRecipientService>(serviceContext));
         if (getGlobalReplSettings().isServerless()) {
             services.push_back(std::make_unique<ShardSplitDonorService>(serviceContext));
+            services.push_back(std::make_unique<repl::ShardMergeRecipientService>(serviceContext));
         }
     }
 
@@ -1233,6 +1239,8 @@ void setUpObservers(ServiceContext* serviceContext) {
         opObserverRegistry->addObserver(std::make_unique<UserWriteBlockModeOpObserver>());
         if (getGlobalReplSettings().isServerless()) {
             opObserverRegistry->addObserver(std::make_unique<ShardSplitDonorOpObserver>());
+            opObserverRegistry->addObserver(
+                std::make_unique<repl::ShardMergeRecipientOpObserver>());
         }
     }
 
@@ -1257,6 +1265,8 @@ void setUpObservers(ServiceContext* serviceContext) {
         opObserverRegistry->addObserver(std::make_unique<UserWriteBlockModeOpObserver>());
         if (getGlobalReplSettings().isServerless()) {
             opObserverRegistry->addObserver(std::make_unique<ShardSplitDonorOpObserver>());
+            opObserverRegistry->addObserver(
+                std::make_unique<repl::ShardMergeRecipientOpObserver>());
         }
     }
 

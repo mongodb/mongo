@@ -34,6 +34,7 @@ load('jstests/replsets/rslib.js');
 const donorRst = new ReplSetTest({
     name: `${jsTestName()}_donor`,
     nodes: 3,
+    serverless: true,
     settings: {chainingAllowed: false},
     nodeOptions: Object.assign(makeX509OptionsForTest().donor, {
         setParameter: {

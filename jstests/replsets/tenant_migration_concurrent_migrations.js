@@ -24,9 +24,9 @@ const x509Options0 = makeX509Options("jstests/libs/rs0.pem");
 const x509Options1 = makeX509Options("jstests/libs/rs1.pem");
 const x509Options2 = makeX509Options("jstests/libs/rs2.pem");
 
-const rst0 = new ReplSetTest({nodes: 1, name: 'rst0', nodeOptions: x509Options0});
-const rst1 = new ReplSetTest({nodes: 1, name: 'rst1', nodeOptions: x509Options1});
-const rst2 = new ReplSetTest({nodes: 1, name: 'rst2', nodeOptions: x509Options2});
+const rst0 = new ReplSetTest({nodes: 1, name: 'rst0', serverless: true, nodeOptions: x509Options0});
+const rst1 = new ReplSetTest({nodes: 1, name: 'rst1', serverless: true, nodeOptions: x509Options1});
+const rst2 = new ReplSetTest({nodes: 1, name: 'rst2', serverless: true, nodeOptions: x509Options2});
 
 rst0.startSet();
 rst0.initiate();

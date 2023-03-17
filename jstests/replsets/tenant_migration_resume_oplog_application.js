@@ -28,6 +28,7 @@ load('jstests/replsets/rslib.js');            // For 'createRstArgs'
 const recipientRst = new ReplSetTest({
     nodes: 3,
     name: jsTestName() + "_recipient",
+    serverless: true,
     // Use a batch size of 2 so that we can hang in the middle of tenant oplog application.
     nodeOptions: Object.assign(makeX509OptionsForTest().recipient,
                                {setParameter: {tenantApplierBatchSizeOps: 2}})

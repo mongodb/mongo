@@ -51,6 +51,7 @@ function setup() {
     const donorRst = new ReplSetTest({
         nodes: 3,
         name: "donorRst",
+        serverless: true,
         nodeOptions: Object.assign(makeX509OptionsForTest().donor, {
             setParameter: {
                 tenantMigrationGarbageCollectionDelayMS: 1,

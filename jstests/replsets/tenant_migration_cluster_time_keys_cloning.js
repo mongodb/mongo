@@ -104,8 +104,12 @@ const migrationX509Options = makeX509OptionsForTest();
 (() => {
     jsTest.log("Test that the donor and recipient correctly copy each other's cluster time keys " +
                "when there is no failover but the recipient syncs data from a secondary.");
-    const recipientRst = new ReplSetTest(
-        {nodes: 3, name: "recipientRst", nodeOptions: migrationX509Options.recipient});
+    const recipientRst = new ReplSetTest({
+        nodes: 3,
+        name: "recipientRst",
+        serverless: true,
+        nodeOptions: migrationX509Options.recipient
+    });
     recipientRst.startSet();
     recipientRst.initiate();
 
@@ -131,8 +135,8 @@ const migrationX509Options = makeX509OptionsForTest();
 (() => {
     jsTest.log("Test that the donor and recipient correctly copy each other's cluster time keys " +
                "when there is donor failover.");
-    const donorRst =
-        new ReplSetTest({nodes: 3, name: "donorRst", nodeOptions: migrationX509Options.donor});
+    const donorRst = new ReplSetTest(
+        {nodes: 3, name: "donorRst", serverless: true, nodeOptions: migrationX509Options.donor});
     donorRst.startSet();
     donorRst.initiate();
     if (isShardMergeEnabled(donorRst.getPrimary().getDB("adminDB"))) {
@@ -176,8 +180,12 @@ const migrationX509Options = makeX509OptionsForTest();
 (() => {
     jsTest.log("Test that the donor and recipient correctly copy each other's cluster time keys " +
                "when there is recipient failover.");
-    const recipientRst = new ReplSetTest(
-        {nodes: 3, name: "recipientRst", nodeOptions: migrationX509Options.recipient});
+    const recipientRst = new ReplSetTest({
+        nodes: 3,
+        name: "recipientRst",
+        serverless: true,
+        nodeOptions: migrationX509Options.recipient
+    });
     recipientRst.startSet();
     recipientRst.initiate();
     if (isShardMergeEnabled(recipientRst.getPrimary().getDB("adminDB"))) {
@@ -224,6 +232,7 @@ const migrationX509Options = makeX509OptionsForTest();
     const donorRst = new ReplSetTest({
         nodes: [{}, {}, {rsConfig: {priority: 0}}],
         name: "donorRst",
+        serverless: true,
         settings: {chainingAllowed: false},
         nodeOptions: migrationX509Options.donor
     });

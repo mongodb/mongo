@@ -28,6 +28,7 @@ const migrationX509Options = makeX509OptionsForTest();
 const donorRst = new ReplSetTest({
     nodes: 1,
     name: "donor",
+    serverless: true,
     nodeOptions: Object.assign(migrationX509Options.donor, {
         setParameter: {
             // Allow non-timestamped reads on donor after migration completes for testing.
@@ -35,8 +36,8 @@ const donorRst = new ReplSetTest({
         }
     })
 });
-const recipientRst =
-    new ReplSetTest({nodes: 1, name: "recipient", nodeOptions: migrationX509Options.recipient});
+const recipientRst = new ReplSetTest(
+    {nodes: 1, name: "recipient", serverless: true, nodeOptions: migrationX509Options.recipient});
 
 donorRst.startSet();
 donorRst.initiate();

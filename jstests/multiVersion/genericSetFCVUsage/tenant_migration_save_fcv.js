@@ -4,6 +4,8 @@
  * @tags: [
  *  requires_majority_read_concern,
  *  incompatible_with_windows_tls,
+ *  # Shard merge is not robust to failovers and restarts.
+ *  incompatible_with_shard_merge,
  *  serverless,
  *  ]
  */

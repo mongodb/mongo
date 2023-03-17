@@ -4,6 +4,8 @@
  * @tags: [
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,
+ *   # It is illegal to drop internal state doc collection while migration is active.
+ *   incompatible_with_shard_merge,
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   serverless,

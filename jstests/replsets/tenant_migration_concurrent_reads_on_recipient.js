@@ -18,7 +18,10 @@
  */
 
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {runMigrationAsync} from "jstests/replsets/libs/tenant_migration_util.js";
+import {
+    isShardMergeEnabled,
+    runMigrationAsync
+} from "jstests/replsets/libs/tenant_migration_util.js";
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");
@@ -125,10 +128,12 @@ function testRejectOnlyReadsWithAtClusterTimeLessThanRejectReadsBeforeTimestamp(
     // unspecified atClusterTime have read timestamp >= rejectReadsBeforeTimestamp.
     recipientRst.awaitLastOpCommitted();
 
-    const recipientDoc =
-        recipientPrimary.getCollection(TenantMigrationTest.kConfigRecipientsNS).findOne({
-            _id: UUID(migrationOpts.migrationIdString),
-        });
+    const recipientStateDocNss = isShardMergeEnabled(recipientPrimary.getDB("admin"))
+        ? TenantMigrationTest.kConfigShardMergeRecipientsNS
+        : TenantMigrationTest.kConfigRecipientsNS;
+    const recipientDoc = recipientPrimary.getCollection(recipientStateDocNss).findOne({
+        _id: UUID(migrationOpts.migrationIdString),
+    });
     assert.lt(preMigrationTimestamp, recipientDoc.rejectReadsBeforeTimestamp);
 
     const nodes = testCase.isSupportedOnSecondaries ? recipientRst.nodes : [recipientPrimary];
@@ -270,10 +275,12 @@ function testDoNotRejectReadsAfterMigrationAbortedAfterReachingRejectReadsBefore
     // unspecified atClusterTime have read timestamp >= rejectReadsBeforeTimestamp.
     recipientRst.awaitLastOpCommitted();
 
-    const recipientDoc =
-        recipientPrimary.getCollection(TenantMigrationTest.kConfigRecipientsNS).findOne({
-            _id: UUID(migrationOpts.migrationIdString),
-        });
+    const recipientStateDocNss = isShardMergeEnabled(recipientPrimary.getDB("admin"))
+        ? TenantMigrationTest.kConfigShardMergeRecipientsNS
+        : TenantMigrationTest.kConfigRecipientsNS;
+    const recipientDoc = recipientPrimary.getCollection(recipientStateDocNss).findOne({
+        _id: UUID(migrationOpts.migrationIdString),
+    });
 
     const nodes = testCase.isSupportedOnSecondaries ? recipientRst.nodes : [recipientPrimary];
     nodes.forEach(node => {

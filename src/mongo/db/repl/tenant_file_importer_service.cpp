@@ -106,6 +106,10 @@ TenantFileImporterService* TenantFileImporterService::get(ServiceContext* servic
     return &_TenantFileImporterService(serviceContext);
 }
 
+TenantFileImporterService* TenantFileImporterService::get(OperationContext* opCtx) {
+    return get(opCtx->getServiceContext());
+}
+
 void TenantFileImporterService::startMigration(const UUID& migrationId) {
     _reset();
 
@@ -186,11 +190,11 @@ void TenantFileImporterService::learnedAllFilenames(const UUID& migrationId) {
 void TenantFileImporterService::interrupt(const UUID& migrationId) {
     stdx::lock_guard lk(_mutex);
     if (migrationId != _migrationId) {
-        LOGV2_WARNING(
-            6378901,
-            "Called interrupt with migrationId {migrationId}, but {activeMigrationId} is active",
-            "migrationId"_attr = migrationId.toString(),
-            "activeMigrationId"_attr = _migrationId ? _migrationId->toString() : "no migration");
+        LOGV2_WARNING(6378901,
+                      "TenantFileImporterService interrupted",
+                      "migrationId"_attr = migrationId.toString(),
+                      "activeMigrationId"_attr =
+                          _migrationId ? _migrationId->toString() : "no migration");
         return;
     }
     _interrupt(lk);

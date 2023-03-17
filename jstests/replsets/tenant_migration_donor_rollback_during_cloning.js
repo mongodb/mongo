@@ -24,8 +24,12 @@ load("jstests/libs/write_concern_util.js");  // for 'stopReplicationOnSecondarie
 
 const migrationX509Options = makeX509OptionsForTest();
 
-const recipientRst =
-    new ReplSetTest({name: "recipientRst", nodes: 1, nodeOptions: migrationX509Options.recipient});
+const recipientRst = new ReplSetTest({
+    name: "recipientRst",
+    nodes: 1,
+    serverless: true,
+    nodeOptions: migrationX509Options.recipient
+});
 
 recipientRst.startSet();
 recipientRst.initiateWithHighElectionTimeout();
@@ -55,6 +59,7 @@ function runTest(tenantId,
     const donorRst = new ReplSetTest({
         name: "donorRst",
         nodes: 5,
+        serverless: true,
         nodeOptions: Object.assign(migrationX509Options.donor, {
             setParameter: {
                 // Allow non-timestamped reads on donor after migration completes for testing.

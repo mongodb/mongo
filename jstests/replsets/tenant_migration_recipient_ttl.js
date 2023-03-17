@@ -5,6 +5,8 @@
  * @tags: [
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,
+ *   # Shard merge recipient state doc deletion is no longer managed by TTL monitor.
+ *   incompatible_with_shard_merge,
  *   requires_persistence,
  *   serverless,
  * ]
