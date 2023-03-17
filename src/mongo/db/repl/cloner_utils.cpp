@@ -56,10 +56,6 @@ BSONObj ClonerUtils::buildMajorityWaitRequest(Timestamp operationTime) {
     return bob.obj();
 }
 
-bool ClonerUtils::isDatabaseForTenant(StringData db, StringData prefix) {
-    return db.startsWith(prefix + "_");
-}
-
 bool ClonerUtils::isDatabaseForTenant(const DatabaseName& db,
                                       const boost::optional<TenantId>& prefix,
                                       MigrationProtocolEnum protocol) {
@@ -70,7 +66,12 @@ bool ClonerUtils::isDatabaseForTenant(const DatabaseName& db,
     if (db.tenantId()) {
         return *db.tenantId() == *prefix;
     } else {
-        return isDatabaseForTenant(db.toStringWithTenantId(), (*prefix).toString());
+        auto fullDbName = db.db();
+        auto tenantDelim = fullDbName.find('_');
+        if (tenantDelim != std::string::npos) {
+            return (*prefix).toString() == fullDbName.substr(0, tenantDelim);
+        }
+        return false;
     }
 }
 
@@ -79,7 +80,7 @@ bool ClonerUtils::isNamespaceForTenant(NamespaceString nss, StringData prefix) {
     if (gMultitenancySupport && nss.tenantId() != boost::none) {
         return nss.tenantId()->toString() == prefix;
     }
-    return isDatabaseForTenant(nss.db(), prefix);
+    return nss.db().startsWith(prefix + "_");
 }
 
 }  // namespace repl

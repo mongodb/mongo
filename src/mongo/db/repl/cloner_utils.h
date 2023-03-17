@@ -64,9 +64,7 @@ public:
 
     /**
      * Checks if the database belongs to the given tenant.
-     * TODO (SERVER-71669) only keep the DatabaseName/TenantId method.
      */
-    static bool isDatabaseForTenant(StringData db, StringData prefix);
     static bool isDatabaseForTenant(const DatabaseName& db,
                                     const boost::optional<TenantId>& prefix,
                                     MigrationProtocolEnum protocol);

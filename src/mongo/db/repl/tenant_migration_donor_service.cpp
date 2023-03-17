@@ -1077,8 +1077,11 @@ void TenantMigrationDonorService::Instance::_abortIndexBuilds(const Cancellation
         auto opCtxHolder = cc().makeOperationContext();
         auto* opCtx = opCtxHolder.get();
         auto* indexBuildsCoordinator = IndexBuildsCoordinator::get(opCtx);
-        indexBuildsCoordinator->abortTenantIndexBuilds(
-            opCtx, _protocol, _tenantId, "tenant migration");
+        boost::optional<TenantId> tid = boost::none;
+        if (!_tenantId.empty()) {
+            tid = TenantId::parseFromString(_tenantId);
+        }
+        indexBuildsCoordinator->abortTenantIndexBuilds(opCtx, _protocol, tid, "tenant migration");
     }
 }
 
