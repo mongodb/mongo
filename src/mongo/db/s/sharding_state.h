@@ -32,21 +32,23 @@
 #include <string>
 
 #include "mongo/bson/oid.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/platform/mutex.h"
 
 namespace mongo {
 
-class OperationContext;
-class ServiceContext;
-
 /**
- * Contains information about the shardingness of a running mongod. This is a passive class and its
- * state and concurrency control is driven from outside (specifically ShardingInitializationMongoD,
- * which should be its only caller).
+ * There is one instance of this object per service context on each shard node (primary or
+ * secondary). It sits at the top of the hierarchy of the Shard Role runtime-authoritative caches
+ * (the subordinate ones being the DatabaseShardingState and CollectionShardingState) and contains
+ * global information about the shardedness of the current process, such as its shardId and the
+ * clusterId to which it belongs.
  *
- * There is one instance of this object per service context and once 'setInitialized' is called, it
- * never gets destroyed or uninitialized.
+ * SYNCHRONISATION: This class can only be initialised once and if 'setInitialized' is called, it
+ * never gets destroyed or uninitialized. Because of this it does not require external
+ * synchronisation. Initialisation is driven from outside (specifically
+ * ShardingInitializationMongoD, which should be its only caller).
  */
 class ShardingState {
     ShardingState(const ShardingState&) = delete;

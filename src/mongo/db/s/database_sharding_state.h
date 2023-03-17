@@ -37,7 +37,14 @@
 namespace mongo {
 
 /**
- * Synchronizes access to this shard server's cached database version for Database.
+ * Each shard node process (primary or secondary) has one instance of this object for each database
+ * whose primary is placed on, or is currently being movePrimary'd to, the current shard. It sits on
+ * the second level of the hierarchy of the Shard Role runtime-authoritative caches (along with
+ * CollectionShardingState) and contains sharding-related information about the database, such as
+ * its database version.
+ *
+ * SYNCHRONISATION: Requires some combination of the DB lock and the DSS lock, but different methods
+ * have different requirements though, so be sure to check the function-level comments for details.
  */
 class DatabaseShardingState {
 public:
@@ -230,7 +237,7 @@ private:
     /**
      * Cancel any ongoing database metadata refresh.
      */
-    void cancelDbMetadataRefresh();
+    void _cancelDbMetadataRefresh();
 
     const DatabaseName _dbName;
 
@@ -241,6 +248,7 @@ private:
     // mode is acceptable for reading it. (Note: accessing this class at all requires holding the
     // DBLock in some mode).
 
+    // Tracks the movePrimary critical section state for this collection.
     ShardingMigrationCriticalSection _critSec;
 
     // Is `true` when this database is serving as a source shard for a movePrimary, `false`

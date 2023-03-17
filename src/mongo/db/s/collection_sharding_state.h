@@ -38,9 +38,11 @@
 namespace mongo {
 
 /**
- * Each collection on a MongoD instance is assigned an instance of CollectionShardingState for the
- * duration of its lifetime, which represents the shard's knowledge of that collection's shard
- * version and the set of chunks that it owns, as well as functions for tracking this state.
+ * Each shard node process (primary or secondary) has one instance of this object for each
+ * collection residing on that shard. It sits on the second level of the hierarchy of the Shard Role
+ * runtime-authoritative caches (along with DatabaseShardingState) and represents the shard's
+ * knowledge of that collection's shard version and the set of chunks that it owns, as well as
+ * functions for tracking this state.
  *
  * This is the only interface that non-sharding consumers should be interfacing with.
  *
@@ -52,9 +54,9 @@ namespace mongo {
  * The CollectionShardingStateFactory class below is used to instantiate the correct subclass of
  * CollectionShardingState at runtime.
  *
- * Synchronization rule: In order to obtain an instance of this object, the caller must have some
- * lock on the respective collection. Different functions require different lock levels though, so
- * be sure to check the function-level comments for details.
+ * SYNCHRONISATION: In order to obtain an instance of this object, the caller must have some lock on
+ * the respective collection. Different functions require different lock levels though, so be sure
+ * to check the function-level comments for details.
  */
 class CollectionShardingState {
 public:

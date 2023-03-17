@@ -1,8 +1,5 @@
-> **Warning**
-> This is work in progress and some sections are incomplete
-
 # Sharding Catalog
-Depending on the team on which an engineer works, the definition of "the catalog" can be different. Here, we will define it as a combination of the following:
+Depending on the team, the definition of "the catalog" can be different. Here, we will define it as a combination of the following:
  * **Catalog objects:** The set of conceptual "objects" which we use to talk about in the core server without regard to how they are implemented or stored. Examples are shards, databases, collections, indexes, collMods and views; but not config servers, caches or internal system collections.
  * [**Catalog containers:**](#catalog-containers) The set of WT tables, system collections and in-memory caches that store all or part of the descriptions of the *Catalog Objects*, without regard to the protocols that are used when being read or written to. Examples are the [*__mdb_catalog*](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/storage/storage_engine_impl.cpp#L75), *config.databases*, *config.collections*, *config.chunks*, [*CollectionCatalog*](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/catalog/collection_catalog.h#L50), [*CatalogCache*](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/s/catalog_cache.h#L134), [*SS*](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/s/sharding_state.h#L51), [*DSS*](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/s/database_sharding_state.h#L45), [*CSS*](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/s/collection_sharding_state.h#L59) and any WT tables backing the data for the user collections; but not the actual classes that implement them or the shard versioning protocol
  * [**Sharding catalog API:**](#sharding-catalog-api) The actual C++ classes and methods representing the above concepts that developers use in order to program distributed data applications, along with their contracts. Examples are [*CatalogCache*](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/s/catalog_cache.h#L134), [*SS*](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/s/sharding_state.h#L51), [*DSS*](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/s/database_sharding_state.h#L45), [*CSS*](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/s/collection_sharding_state.h#L59), DDL Coordinator and the shard versioning protocol; but not the transactions API, replication subsystem or the networking code.
@@ -56,9 +53,16 @@ The [*shard loop*](#shard-role) takes a request from a router, checks whether th
 
 ### Router role
 When a piece of code is running in a router loop, it is also said that it is executing in the Router role. Currently, the code for the router role is scattered across at least the following utilities:
+* [ShardRegistry](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/s/client/shard_registry.h#L164)
 * [CatalogCache](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/s/catalog_cache.h#L134)
-* [Stale_shard_version_helpers](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/s/stale_shard_version_helpers.h#L72)
 * [Router](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/s/router.h#L41)
+* [Stale Shard Version Helpers](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/s/stale_shard_version_helpers.h#L71-L72)
 
 ### Shard role
 For a piece of code to be executing in the shard role, it must be holding some kind of synchronisation which guarantees the stability of the catalog for that scope. There are two ways to ensure that stability - (1) by taking a lock on a database or collection or (2) by taking a consistent snapshot of the DSS/CSS and the local catalog (aka CollectionCatalog). In either of these two cases, the catalog is guaranteed to not change and therefore the shard can perform a check for whether the router is up-to-date.
+
+Currently, the code for the shard role is scattered across at least the following utilities:
+* [ShardingState](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/s/sharding_state.h#L51)
+* [CollectionShardingState](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/s/collection_sharding_state.h#L59)
+* [DatabaseShardingState](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/s/database_sharding_state.h#L45)
+* [Service Entry Point Retry Loops](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/service_entry_point_common.h#L86-L94)

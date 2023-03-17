@@ -7,40 +7,55 @@ This page contains details of the source code architecture of the MongoDB Shardi
 It is not intended to be a tutorial on how to operate sharding as a user and it requires that the reader is already familiar with the general concepts of [sharding](https://docs.mongodb.com/manual/sharding/#sharding), the [architecture of a MongoDB sharded cluster](https://docs.mongodb.com/manual/sharding/#sharded-cluster), and the concept of a [shard key](https://docs.mongodb.com/manual/sharding/#shard-keys).
 
 ## Sharding terminology and acronyms
-TODO: 
+* Config Data: All the [catalog containers](README_sharding_catalog.md#catalog-containers) residing on the CSRS.
+* Config Shard: Same as CSRS.
+* CRUD operation: Comes from [Create, Read, Update, Delete](https://en.wikipedia.org/wiki/Create,_read,_update_and_delete), and indicates operations which modify a collection's data as opposed to the catalog.
+* CSRS: **C**onfig **S**erver as a **R**eplica **S**et. This is a fancy name for the [config server](https://www.mongodb.com/docs/manual/core/sharded-cluster-config-servers/). Comes from the times of version 3.2 and earlier, when there was a legacy type of Config server called [SCCC](https://www.mongodb.com/docs/manual/release-notes/3.4-compatibility/#removal-of-support-for-sccc-config-servers) which didn't operate as a replica set.
+* CSS: [Collection Sharding State](https://github.com/mongodb/mongo/blob/master/src/mongo/db/s/collection_sharding_state.h#L59)
+* DDL operation: Comes from [Data Definition Language](https://en.wikipedia.org/wiki/Data_definition_language), and indicates operations which modify the catalog (e.g., create collection, create index, drop database) as opposed to CRUD, which modifies the data.
+* DSS: [Database Sharding State](https://github.com/mongodb/mongo/blob/master/src/mongo/db/s/database_sharding_state.h#L42)
+* Routing Info: The subset of data stored in the [catalog containers](README_sharding_catalog.md#catalog-containers) which is used for making routing decisions. As of the time of this writing, the contents of *config.databases*, *config.collections*, *config.indexes* and *config.chunks*.
+* SS: [Sharding State](https://github.com/mongodb/mongo/blob/master/src/mongo/db/s/sharding_state.h#L51)
 
-## Table of contents
-TODO: 
+## Sharding code architecture
+The graph further down visualises the architecture of the MongoDB Sharding system and the relationships between its various components and the links below point to the relevant sections describing these components.
 
-## Sharding code architectural diagram
-
-This section visualises the architecture of the MongoDB Sharding system along with links to sections in this architecture guide which describe the various subsystems in more detail.
+- [Sharding catalog](README_sharding_catalog.md#sharding-catalog)
+- [Router role](README_sharding_catalog.md#router-role)
+- [Shard role](README_sharding_catalog.md#router-role)
 
 ```mermaid
 C4Component
 
 Container_Boundary(Sharding, "Sharding", $link="README_new.md") {
-  Container_Boundary(ShardingCatalogAPI, "Sharding Catalog API", $link="README_sharding_catalog.md") {
+  Container_Boundary(CatalogAPI, "Catalog API", $link="README_sharding_catalog.md") {
     Component(RouterRole, "Router Role", $link="README_sharding_catalog.md#router-role")
     Component(ShardRole, "Shard Role", $link="README_sharding_catalog.md#shard-role")
   }
 
-  Container_Boundary(ShardingCatalogRuntime, "Sharding Catalog Runtime") {
+  Container_Boundary(CatalogRuntime, "Catalog Runtime") {
     Container_Boundary(CatalogContainers, "Catalog Containers") {
-      ContainerDb(MDBCatalog, "__mdb_catalog")
       ContainerDb(CSRSCollections, "CSRS Collections")
-      ContainerDb(ShardLocalCollections, "Shard Local Collections")
+      ContainerDb(MDBCatalog, "__mdb_catalog")
+      ContainerDb(AuthoritativeShardLocalCollections, "Authoritative Shard Local Collections")
       ContainerDb(ShardLocalCollections, "Shard Local Collections")
     }
 
     Container_Boundary(CatalogContainerCaches, "Catalog Container Caches") {
       Component(CatalogCache, "Catalog Cache")
-      Component(SSCache, "Sharding State Cache")
-      Component(DSSCache, "Database Sharding State Cache")
-      Component(CSSCache, "Collection Sharding State Cache")
+      Component(SSCache, "Sharding State (cache)")
+      Component(DSSCache, "Database Sharding State (cache)")
+      Component(CSSCache, "Collection Sharding State (cache)")
     }
+  }
 
+  Container_Boundary(ShardingServices, "Sharding Services") {
+    Component(Balancer, "Balancer")
+  }
+
+  Container_Boundary(ShardingDDL, "Sharding DDL") {
     Component(DDLCoordinators, "DDL Coordinators")
+    Component(DataCloning, "Data Cloning")
   }
 }
 ```

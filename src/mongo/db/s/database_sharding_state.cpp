@@ -233,7 +233,7 @@ void DatabaseShardingState::clearDbInfo(OperationContext* opCtx, bool cancelOngo
     invariant(opCtx->lockState()->isDbLockedForMode(_dbName, MODE_IX));
 
     if (cancelOngoingRefresh) {
-        cancelDbMetadataRefresh();
+        _cancelDbMetadataRefresh();
     }
 
     LOGV2(7286901, "Clearing this node's cached database info", "db"_attr = _dbName);
@@ -249,7 +249,7 @@ void DatabaseShardingState::enterCriticalSectionCatchUpPhase(OperationContext* o
                                                              const BSONObj& reason) {
     _critSec.enterCriticalSectionCatchUpPhase(reason);
 
-    cancelDbMetadataRefresh();
+    _cancelDbMetadataRefresh();
 }
 
 void DatabaseShardingState::enterCriticalSectionCommitPhase(OperationContext* opCtx,
@@ -290,7 +290,7 @@ void DatabaseShardingState::resetDbMetadataRefreshFuture() {
     _dbMetadataRefresh = boost::none;
 }
 
-void DatabaseShardingState::cancelDbMetadataRefresh() {
+void DatabaseShardingState::_cancelDbMetadataRefresh() {
     if (_dbMetadataRefresh) {
         _dbMetadataRefresh->cancellationSource.cancel();
     }
