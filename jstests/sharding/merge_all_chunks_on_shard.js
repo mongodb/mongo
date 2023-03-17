@@ -402,7 +402,11 @@ function testConfigurableAutoMergerIntervalSecs(st, testDB) {
 
     // Repeatedly split the only chunk and expect the auto-merger to merge it back right away
     for (var i = 0; i < 3; i++) {
-        splitChunk(st, coll, 0 /* middle */);
+        assert.soonNoExcept(() => {
+            // Split may fail if mongos doesn't see the previous merge (SERVER-54979)
+            splitChunk(st, coll, 0 /* middle */);
+            return true;
+        });
         assert.soon(
             () =>
                 findChunksUtil.findChunksByNs(st.config, coll.getFullName()).toArray().length == 1,
