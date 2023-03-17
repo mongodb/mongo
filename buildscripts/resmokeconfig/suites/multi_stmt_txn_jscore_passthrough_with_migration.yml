@@ -155,6 +155,7 @@ selector:
   - jstests/core/views/views_collation.js
   - jstests/core/**/wildcard_index_count.js
   - jstests/core/**/explain_server_params.js
+  - jstests/core/**/regex_distinct.js
 
   # $listSessions
   - jstests/core/**/list_all_local_sessions.js
