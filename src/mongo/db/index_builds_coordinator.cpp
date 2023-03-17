@@ -520,9 +520,8 @@ IndexBuildsCoordinator::makeKillIndexBuildOnLowDiskSpaceAction() {
                   "availableBytes"_attr = availableBytes,
                   "requiredBytes"_attr = getThresholdBytes());
             try {
-                // Only aborts index builds on primaries. This will always fail on secondaries.
-                // TODO SERVER-74194: Allow secondaries to cancel index builds.
-                _coord->abortAllIndexBuildsDueToDiskSpace(opCtx);
+                _coord->abortAllIndexBuildsDueToDiskSpace(
+                    opCtx, availableBytes, getThresholdBytes());
             } catch (...) {
                 LOGV2(7333503, "Failed to kill index builds", "reason"_attr = exceptionToStatus());
             }
@@ -949,25 +948,43 @@ void IndexBuildsCoordinator::abortAllIndexBuildsForInitialSync(OperationContext*
     }
 }
 
-void IndexBuildsCoordinator::abortAllIndexBuildsDueToDiskSpace(OperationContext* opCtx) {
+namespace {
+
+// Interrupts the index builder thread and waits for it to clean up.
+void forceSelfAbortIndexBuild(OperationContext* opCtx,
+                              std::shared_ptr<ReplIndexBuildState>& replState,
+                              Status reason) {
+    if (replState->forceSelfAbort(opCtx, reason)) {
+        auto fut = replState->sharedPromise.getFuture();
+        auto waitStatus = fut.waitNoThrow();              // Result from waiting on future.
+        auto buildStatus = fut.getNoThrow().getStatus();  // Result from _runIndexBuildInner().
+        LOGV2(7419401,
+              "Index build: joined after forceful abort",
+              "buildUUID"_attr = replState->buildUUID,
+              "waitResult"_attr = waitStatus,
+              "status"_attr = buildStatus);
+    }
+}
+
+}  // namespace
+
+void IndexBuildsCoordinator::abortAllIndexBuildsDueToDiskSpace(OperationContext* opCtx,
+                                                               std::int64_t availableBytes,
+                                                               std::int64_t requiredBytes) {
     auto builds = [&]() -> std::vector<std::shared_ptr<ReplIndexBuildState>> {
         auto indexBuildFilter = [](const auto& replState) {
             return true;
         };
         return activeIndexBuilds.filterIndexBuilds(indexBuildFilter);
     }();
-    for (const auto& replState : builds) {
-        if (!abortIndexBuildByBuildUUID(opCtx,
-                                        replState->buildUUID,
-                                        IndexBuildAction::kPrimaryAbort,
-                                        "Insufficient disk space")) {
-            // The index build may already be in the midst of tearing down.
-            LOGV2(7333501,
-                  "Index build: failed to abort index build",
-                  "buildUUID"_attr = replState->buildUUID,
-                  "db"_attr = replState->dbName,
-                  "collectionUUID"_attr = replState->collectionUUID);
-        }
+    auto abortStatus =
+        Status(ErrorCodes::OutOfDiskSpace,
+               fmt::format("available disk space of {} bytes is less than required minimum of {}",
+                           availableBytes,
+                           requiredBytes));
+    for (auto&& replState : builds) {
+        // Signals the index build to abort iself, which may involve signalling the current primary.
+        forceSelfAbortIndexBuild(opCtx, replState, abortStatus);
         indexBuildsSSS.killedDueToInsufficentDiskSpace.addAndFetch(1);
     }
 }
@@ -2592,7 +2609,6 @@ void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterNonShutdownFailure(
     // or crash.
     if (!opCtx->isKillPending() &&
         feature_flags::gIndexBuildGracefulErrorHandling.isEnabledAndIgnoreFCV()) {
-
         if (ErrorCodes::NotWritablePrimary == status && !replState->isAbortCleanUpRequired()) {
             // Clean up if the error happens due to stepdown before 'startIndexBuild' oplog entry is
             // replicated. Other nodes will not be aware of this index build, so trying to signal
@@ -2600,60 +2616,66 @@ void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterNonShutdownFailure(
             activeIndexBuilds.unregisterIndexBuild(&_indexBuildsManager, replState);
             return;
         }
-
-        // Always request an abort to the primary node, even if we are primary. If primary, the
-        // signal will loop back and cause an asynchronous external index build abort.
-        try {
-            _signalPrimaryForAbortAndWaitForExternalAbort(opCtx, replState.get(), status);
-            // The abort, and state clean-up, is done externally by the async 'voteAbortIndexBuild'
-            // command if the node is primary itself, or by the 'indexBuildAbort' oplog entry
-            // application thread on secondaries. We can return without doing anything, as the index
-            // build is already cleaned up.
-            return;
-        } catch (const DBException& ex) {
-            // TODO (SERVER-74135): fix killop behaviour.
-            // On killop, continue to try to self-abort as primary, or crash on secondaries.
-            if (ErrorCodes::Interrupted != ex.code()) {
-                throw;
-            }
-        }
     }
 
-    // The index builder thread can abort on its own if it is interrupted by a user killop. This
-    // would prevent us from taking locks. Use a new OperationContext to abort the index build. This
-    // is still susceptible to shutdown interrupts, in that case, on server restart the index build
-    // will also be restarted.
+    // Use a new OperationContext to abort the index build since our current opCtx may be
+    // interrupted. This is still susceptible to shutdown interrupts, but in that case, on server
+    // restart the index build will also be restarted. This is also susceptible to user killops, but
+    // in that case, we will let the error escape and the server will crash.
     runOnAlternateContext(
         opCtx, "self-abort", [this, replState, status](OperationContext* abortCtx) {
-            ShouldNotConflictWithSecondaryBatchApplicationBlock noConflict(abortCtx->lockState());
+            // The index builder thread will need to reach out to the current primary to abort on
+            // its own. This can happen if an error is thrown, it is interrupted by a user killop,
+            // or is killed internally by something like the DiskSpaceMonitor.
+            if (feature_flags::gIndexBuildGracefulErrorHandling.isEnabledAndIgnoreFCV()) {
+                // If we were interrupted by a caller internally who set a status, use that
+                // status instead of the generic interruption error status.
+                auto abortStatus =
+                    !replState->getAbortStatus().isOK() ? replState->getAbortStatus() : status;
 
-            // Take RSTL (implicitly by DBLock) to observe and prevent replication state from
-            // changing.
-            Lock::DBLock dbLock(abortCtx, replState->dbName, MODE_IX);
+                // Always request an abort to the primary node, even if we are primary. If
+                // primary, the signal will loop back and cause an asynchronous external
+                // index build abort.
+                _signalPrimaryForAbortAndWaitForExternalAbort(
+                    abortCtx, replState.get(), abortStatus);
 
-            const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
-            auto replCoord = repl::ReplicationCoordinator::get(abortCtx);
-            if (!replCoord->canAcceptWritesFor(abortCtx, dbAndUUID)) {
-                if (replState->isSettingUp()) {
-                    // Clean up if the error happens before StartIndexBuild oplog entry is
-                    // replicated during startup or stepdown.
-                    activeIndexBuilds.unregisterIndexBuild(&_indexBuildsManager, replState);
-                    return;
-                } else {
-                    // Index builds may not fail on secondaries. If a primary replicated an
-                    // abortIndexBuild oplog entry, then this index build would have received an
-                    // IndexBuildAborted error code.
-                    fassert(51101,
-                            status.withContext(str::stream()
-                                               << "Index build: " << replState->buildUUID
-                                               << "; Database: " << replState->dbName));
+                // The abort, and state clean-up, is done externally by the async
+                // 'voteAbortIndexBuild' command if the node is primary itself, or by the
+                // 'indexBuildAbort' oplog entry application thread on secondaries. We'll re-throw
+                // our error without doing anything else, as the index build is already cleaned
+                // up, and the server will terminate otherwise.
+            } else {
+                ShouldNotConflictWithSecondaryBatchApplicationBlock noConflict(
+                    abortCtx->lockState());
+
+                // Take RSTL (implicitly by DBLock) to observe and prevent replication state
+                // from changing.
+                Lock::DBLock dbLock(abortCtx, replState->dbName, MODE_IX);
+
+                const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
+                auto replCoord = repl::ReplicationCoordinator::get(abortCtx);
+                if (!replCoord->canAcceptWritesFor(abortCtx, dbAndUUID)) {
+                    if (replState->isSettingUp()) {
+                        // Clean up if the error happens before StartIndexBuild oplog entry
+                        // is replicated during startup or stepdown.
+                        activeIndexBuilds.unregisterIndexBuild(&_indexBuildsManager, replState);
+                        return;
+                    } else {
+                        // Index builds may not fail on secondaries. If a primary replicated
+                        // an abortIndexBuild oplog entry, then this index build would have
+                        // received an IndexBuildAborted error code.
+                        fassert(51101,
+                                status.withContext(str::stream()
+                                                   << "Index build: " << replState->buildUUID
+                                                   << "; Database: " << replState->dbName));
+                    }
                 }
-            }
 
-            CollectionNamespaceOrUUIDLock collLock(abortCtx, dbAndUUID, MODE_X);
-            AutoGetCollection indexBuildEntryColl(
-                abortCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
-            _completeSelfAbort(abortCtx, replState, *indexBuildEntryColl, status);
+                CollectionNamespaceOrUUIDLock collLock(abortCtx, dbAndUUID, MODE_X);
+                AutoGetCollection indexBuildEntryColl(
+                    abortCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
+                _completeSelfAbort(abortCtx, replState, *indexBuildEntryColl, status);
+            }
         });
 }
 

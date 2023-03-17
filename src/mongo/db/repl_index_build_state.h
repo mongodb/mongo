@@ -110,25 +110,7 @@ enum class IndexBuildAction {
 std::string indexBuildActionToString(IndexBuildAction action);
 
 /**
- * Represents the index build state.
- * Valid State transition for primary:
- * ===================================
- * kSetup -> kInProgress
- * kSetup -> kAwaitPrimaryAbort         // Index setup failure.
- * kInProgress -> kAborted              // Was aborted externally.
- * kInProgress -> kAwaitPrimaryAbort    // Failure of index build.
- * kInProgress -> kCommitted            // An index build was committed.
- * kAwaitPrimaryAbort -> kAborted       // Primary aborted.
- *
- * Valid State transition for secondaries:
- * =======================================
- * kSetup -> kInProgress
- * kSetup -> kAwaitPrimaryAbort         // Index setup failure.
- * kInProgress -> kAborted              // An index build received an abort oplog entry.
- * kInProgress -> kAwaitPrimaryAbort    // Failure of index build.
- * kInProgress -> kApplyCommitOplogEntry// Received 'commitIndexBuild', waiting for build to commit.
- * kApplyCommitOplogEntry -> kCommitted // All phases complete, build committed on secondary.
- * kAwaitPrimaryAbort -> kAborted       // Received 'abortIndexBuild' oplog entry.
+ * Represents the index build state. See _checkIfValidTransition() for valid state transitions.
  */
 class IndexBuildState {
 public:
@@ -174,6 +156,12 @@ public:
          * 'abortIndexBuild' oplog entry being replicated by the primary.
          */
         kAwaitPrimaryAbort,
+        /**
+         * This state indicates that an internal operation, regardless of replication state,
+         * requested that this index build abort. The index builder thread is responsible for
+         * handling and cleaning up.
+         */
+        kForceSelfAbort,
     };
 
     /**
@@ -211,6 +199,10 @@ public:
         return _state == kAwaitPrimaryAbort;
     }
 
+    bool isForceSelfAbort() const {
+        return _state == kForceSelfAbort;
+    }
+
     boost::optional<Timestamp> getTimestamp() const {
         return _timestamp;
     }
@@ -243,6 +235,8 @@ public:
                 return "Aborted";
             case kAwaitPrimaryAbort:
                 return "Await primary abort oplog entry";
+            case kForceSelfAbort:
+                return "Forced self-abort";
         }
         MONGO_UNREACHABLE;
     }
@@ -253,6 +247,12 @@ public:
     void appendBuildInfo(BSONObjBuilder* builder) const;
 
 private:
+    /**
+     * Returns true if the requested IndexBuildState transition is allowed.
+     */
+    bool _checkIfValidTransition(IndexBuildState::State currentState,
+                                 IndexBuildState::State newState) const;
+
     // Represents the index build state.
     State _state = kSetup;
     // Timestamp will be populated only if the node is secondary.
@@ -392,6 +392,15 @@ public:
     TryAbortResult tryAbort(OperationContext* opCtx,
                             IndexBuildAction signalAction,
                             std::string reason);
+
+    /**
+     * Force an index build to abort on its own. Will return after signalling the index build or if
+     * the index build is already in progress of aborting. Does not wait.
+     *
+     * Returns true if we signalled the index build. Returns false if we did not, like when the
+     * index build is past a point of no return, like committing.
+     */
+    bool forceSelfAbort(OperationContext* opCtx, const Status& error);
 
     /**
      * Called when the vote request command is scheduled by the task executor.

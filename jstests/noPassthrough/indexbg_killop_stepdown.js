@@ -10,23 +10,10 @@
 "use strict";
 
 load("jstests/libs/fail_point_util.js");
+load("jstests/libs/feature_flag_util.js");
 load('jstests/noPassthrough/libs/index_build.js');
 
-// This test triggers an unclean shutdown (an fassert), which may cause inaccurate fast counts.
-TestData.skipEnforceFastCountOnValidate = true;
-
-const rst = new ReplSetTest({
-    nodes: [
-        {},
-        {
-            // Disallow elections on secondary.
-            rsConfig: {
-                priority: 0,
-                votes: 0,
-            },
-        },
-    ]
-});
+const rst = new ReplSetTest({nodes: 2});
 rst.startSet();
 rst.initiate();
 
@@ -38,10 +25,8 @@ assert.commandWorked(coll.insert({a: 1}));
 
 IndexBuildTest.pauseIndexBuilds(primary);
 
-const awaitIndexBuild =
-    IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1}, {background: true}, [
-        ErrorCodes.InterruptedDueToReplStateChange
-    ]);
+const awaitIndexBuild = IndexBuildTest.startIndexBuild(
+    primary, coll.getFullName(), {a: 1}, {}, [ErrorCodes.InterruptedDueToReplStateChange]);
 
 // When the index build starts, find its op id.
 const opId = IndexBuildTest.waitForIndexBuildToScanCollection(testDB, coll.getName(), 'a_1');
@@ -79,31 +64,58 @@ assert.commandWorked(primary.adminCommand({
 }));
 
 // Step down the primary.
-assert.commandWorked(testDB.adminCommand({"replSetStepDown": 5 * 60, "force": true}));
+assert.commandWorked(testDB.adminCommand({replSetStepDown: 10, secondaryCatchUpPeriodSecs: 10}));
 rst.waitForState(primary, ReplSetTest.State.SECONDARY);
 
-awaitIndexBuild();
-
-// Resume the abort, this should crash the node.
+// Resume the abort.
 assert.commandWorked(
     primary.adminCommand({configureFailPoint: "hangIndexBuildBeforeAbortCleanUp", mode: "off"}));
 
-assert.soon(function() {
-    return rawMongoProgramOutput().search(/Fatal assertion.*51101/) >= 0;
-});
+awaitIndexBuild();
 
-// After restarting the old primary, we expect that the index build completes successfully.
-rst.stop(primary.nodeId, undefined, {forRestart: true, allowedExitCode: MongoRunner.EXIT_ABORT});
-rst.start(primary.nodeId, undefined, true /* restart */);
+const gracefulIndexBuildFlag = FeatureFlagUtil.isEnabled(testDB, "IndexBuildGracefulErrorHandling");
+if (!gracefulIndexBuildFlag) {
+    // We expect the node to crash without this feature enabled.
+    assert.soon(function() {
+        return rawMongoProgramOutput().search(/Fatal assertion.*51101/) >= 0;
+    });
+
+    // After restarting the old primary, we expect that the index build completes successfully.
+    rst.stop(
+        primary.nodeId, undefined, {forRestart: true, allowedExitCode: MongoRunner.EXIT_ABORT});
+    rst.start(primary.nodeId, undefined, true /* restart */);
+} else {
+    primary = rst.waitForPrimary();
+}
 
 // Wait for the index build to complete.
 rst.awaitReplication();
 
-// Verify that the stepped up node completed the index build.
-IndexBuildTest.assertIndexes(
-    rst.getPrimary().getDB('test').getCollection('test'), 2, ['_id_', 'a_1']);
-IndexBuildTest.assertIndexes(
-    rst.getSecondary().getDB('test').getCollection('test'), 2, ['_id_', 'a_1']);
+if (gracefulIndexBuildFlag) {
+    // "Index build: joined after abort".
+    checkLog.containsJson(primary, 20655);
+
+    // Wait for the index build to complete.
+    rst.awaitReplication();
+
+    // Verify that the interrupted index build was aborted.
+    IndexBuildTest.assertIndexes(rst.getPrimary().getDB('test').getCollection('test'), 1, ['_id_']);
+    IndexBuildTest.assertIndexes(
+        rst.getSecondary().getDB('test').getCollection('test'), 1, ['_id_']);
+
+} else {
+    // Wait for the index build to complete.
+    rst.awaitReplication();
+
+    // Verify that the stepped up node completed the index build.
+    IndexBuildTest.assertIndexes(
+        rst.getPrimary().getDB('test').getCollection('test'), 2, ['_id_', 'a_1']);
+    IndexBuildTest.assertIndexes(
+        rst.getSecondary().getDB('test').getCollection('test'), 2, ['_id_', 'a_1']);
+
+    // This test triggers an unclean shutdown (an fassert), which may cause inaccurate fast counts.
+    TestData.skipEnforceFastCountOnValidate = true;
+}
 
 rst.stopSet();
 })();

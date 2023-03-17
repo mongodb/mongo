@@ -306,7 +306,9 @@ public:
      *
      * Does not stop new index builds from starting. Caller must make that guarantee.
      */
-    void abortAllIndexBuildsDueToDiskSpace(OperationContext* opCtx);
+    void abortAllIndexBuildsDueToDiskSpace(OperationContext* opCtx,
+                                           std::int64_t availableBytes,
+                                           std::int64_t requiredBytes);
 
     /**
      * Aborts an index build by index build UUID. Returns when the index build thread exits.

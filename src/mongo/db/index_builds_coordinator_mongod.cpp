@@ -683,7 +683,12 @@ bool IndexBuildsCoordinatorMongod::_signalIfCommitQuorumNotEnabled(
 
 void IndexBuildsCoordinatorMongod::_signalPrimaryForAbortAndWaitForExternalAbort(
     OperationContext* opCtx, ReplIndexBuildState* replState, const Status& abortStatus) {
-
+    LOGV2(7419402,
+          "Index build: signaling primary to abort index build",
+          "buildUUID"_attr = replState->buildUUID,
+          "db"_attr = replState->dbName,
+          "collectionUUID"_attr = replState->collectionUUID,
+          "reason"_attr = abortStatus);
     replState->requestAbortFromPrimary(abortStatus);
 
     hangIndexBuildBeforeSignalingPrimaryForAbort.pauseWhileSet(opCtx);

@@ -20,7 +20,6 @@ const rst = new ReplSetTest({
             // Disallow elections on secondary.
             rsConfig: {
                 priority: 0,
-                votes: 0,
             },
         },
     ]
@@ -40,7 +39,7 @@ const tookActionCountBefore = primaryDB.serverStatus().metrics.diskSpaceMonitor.
 
 jsTestLog("Waiting for index build to start");
 const createIdx = IndexBuildTest.startIndexBuild(
-    primary, primaryColl.getFullName(), {a: 1}, null, [ErrorCodes.IndexBuildAborted]);
+    primary, primaryColl.getFullName(), {a: 1}, null, [ErrorCodes.Interrupted]);
 IndexBuildTest.waitForIndexBuildToStart(primaryDB, primaryColl.getName(), 'a_1');
 
 // Default indexBuildMinAvailableDiskSpaceMB is 100 MB.

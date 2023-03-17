@@ -34,6 +34,7 @@
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 
@@ -59,33 +60,105 @@ std::vector<std::string> extractIndexNames(const std::vector<BSONObj>& specs) {
     return indexNames;
 }
 
-/**
- * Returns true if the requested IndexBuildState transition is allowed.
- */
-bool checkIfValidTransition(const IndexBuildState::State currentState,
-                            const IndexBuildState::State newState) {
+}  // namespace
+
+std::string indexBuildActionToString(IndexBuildAction action) {
+    switch (action) {
+        case IndexBuildAction::kNoAction:
+            return "No action";
+        case IndexBuildAction::kOplogCommit:
+            return "Oplog commit";
+        case IndexBuildAction::kOplogAbort:
+            return "Oplog abort";
+        case IndexBuildAction::kInitialSyncAbort:
+            return "Initial sync abort";
+        case IndexBuildAction::kRollbackAbort:
+            return "Rollback abort";
+        case IndexBuildAction::kTenantMigrationAbort:
+            return "Tenant migration abort";
+        case IndexBuildAction::kPrimaryAbort:
+            return "Primary abort";
+        case IndexBuildAction::kSinglePhaseCommit:
+            return "Single-phase commit";
+        case IndexBuildAction::kCommitQuorumSatisfied:
+            return "Commit quorum Satisfied";
+    }
+    MONGO_UNREACHABLE;
+}
+
+void IndexBuildState::setState(State state,
+                               bool skipCheck,
+                               boost::optional<Timestamp> timestamp,
+                               boost::optional<Status> abortStatus) {
+    if (!skipCheck) {
+        invariant(_checkIfValidTransition(_state, state),
+                  str::stream() << "current state :" << toString(_state)
+                                << ", new state: " << toString(state));
+    }
+    _state = state;
+    if (timestamp)
+        _timestamp = timestamp;
+    if (abortStatus) {
+        invariant(_state == kAborted || _state == kAwaitPrimaryAbort || _state == kForceSelfAbort);
+        _abortStatus = *abortStatus;
+    }
+}
+
+bool IndexBuildState::_checkIfValidTransition(IndexBuildState::State currentState,
+                                              IndexBuildState::State newState) const {
+    const auto graceful = feature_flags::gIndexBuildGracefulErrorHandling.isEnabledAndIgnoreFCV();
     switch (currentState) {
         case IndexBuildState::State::kSetup:
-            return newState == IndexBuildState::State::kPostSetup ||
+            return
+                // Normal case.
+                newState == IndexBuildState::State::kPostSetup ||
+                // Setup failed on a primary.
                 newState == IndexBuildState::State::kAborted ||
-                newState == IndexBuildState::State::kAwaitPrimaryAbort;
+                // Setup failed and we signalled the current primary to abort.
+                (graceful && newState == IndexBuildState::State::kAwaitPrimaryAbort);
 
         case IndexBuildState::State::kPostSetup:
-            return newState == IndexBuildState::State::kInProgress ||
+            return
+                // Normal case.
+                newState == IndexBuildState::State::kInProgress ||
+                // After setup, the primary aborted the index build.
                 newState == IndexBuildState::State::kAborted ||
-                newState == IndexBuildState::State::kAwaitPrimaryAbort;
+                // After setup, we signalled the current primary to abort the index build.
+                (graceful && newState == IndexBuildState::State::kAwaitPrimaryAbort) ||
+                // We were forced to abort ourselves externally.
+                (graceful && newState == IndexBuildState::State::kForceSelfAbort);
 
         case IndexBuildState::State::kInProgress:
-            return newState == IndexBuildState::State::kAborted ||
-                newState == IndexBuildState::State::kAwaitPrimaryAbort ||
+            return
+                // Index build was successfully committed by the primary.
                 newState == IndexBuildState::State::kCommitted ||
-                newState == IndexBuildState::State::kApplyCommitOplogEntry;
+                // As a secondary, we received a commit oplog entry.
+                newState == IndexBuildState::State::kApplyCommitOplogEntry ||
+                // The index build was aborted, and the caller took responsibility for cleanup.
+                newState == IndexBuildState::State::kAborted ||
+                // The index build failed and we are waiting for the primary to send an abort oplog
+                // entry.
+                (graceful && newState == IndexBuildState::State::kAwaitPrimaryAbort) ||
+                // We were forced to abort ourselves externally and cleanup is required.
+                (graceful && newState == IndexBuildState::State::kForceSelfAbort);
 
         case IndexBuildState::State::kApplyCommitOplogEntry:
-            return newState == IndexBuildState::State::kCommitted;
+            return
+                // We successfully committed the index build as a secondary.
+                newState == IndexBuildState::State::kCommitted;
 
         case IndexBuildState::State::kAwaitPrimaryAbort:
-            return newState == IndexBuildState::State::kAborted;
+            return
+                // We successfully aborted the index build as a primary or secondary.
+                (graceful && newState == IndexBuildState::State::kAborted);
+
+        case IndexBuildState::State::kForceSelfAbort:
+            return
+                // After being signalled to self-abort a second caller explicitly aborted the index
+                // build. The second caller has taken responsibility of cleanup.
+                (graceful && newState == IndexBuildState::State::kAborted) ||
+                // We are waiting for the current primary to abort the index build.
+                (graceful && newState == IndexBuildState::State::kAwaitPrimaryAbort);
 
         case IndexBuildState::State::kAborted:
             return false;
@@ -96,48 +169,6 @@ bool checkIfValidTransition(const IndexBuildState::State currentState,
     MONGO_UNREACHABLE;
 }
 
-}  // namespace
-
-std::string indexBuildActionToString(IndexBuildAction action) {
-    if (action == IndexBuildAction::kNoAction) {
-        return "No action";
-    } else if (action == IndexBuildAction::kOplogCommit) {
-        return "Oplog commit";
-    } else if (action == IndexBuildAction::kOplogAbort) {
-        return "Oplog abort";
-    } else if (action == IndexBuildAction::kInitialSyncAbort) {
-        return "Initial sync abort";
-    } else if (action == IndexBuildAction::kRollbackAbort) {
-        return "Rollback abort";
-    } else if (action == IndexBuildAction::kTenantMigrationAbort) {
-        return "Tenant migration abort";
-    } else if (action == IndexBuildAction::kPrimaryAbort) {
-        return "Primary abort";
-    } else if (action == IndexBuildAction::kSinglePhaseCommit) {
-        return "Single-phase commit";
-    } else if (action == IndexBuildAction::kCommitQuorumSatisfied) {
-        return "Commit quorum Satisfied";
-    }
-    MONGO_UNREACHABLE;
-}
-
-void IndexBuildState::setState(State state,
-                               bool skipCheck,
-                               boost::optional<Timestamp> timestamp,
-                               boost::optional<Status> abortStatus) {
-    if (!skipCheck) {
-        invariant(checkIfValidTransition(_state, state),
-                  str::stream() << "current state :" << toString(_state)
-                                << ", new state: " << toString(state));
-    }
-    _state = state;
-    if (timestamp)
-        _timestamp = timestamp;
-    if (abortStatus) {
-        invariant(_state == kAborted || _state == kAwaitPrimaryAbort);
-        _abortStatus = *abortStatus;
-    }
-}
 
 void IndexBuildState::appendBuildInfo(BSONObjBuilder* builder) const {
     BSONObjBuilder stateBuilder;
@@ -294,11 +325,7 @@ std::string ReplIndexBuildState::getAbortReason() const {
 
 Status ReplIndexBuildState::getAbortStatus() const {
     stdx::unique_lock<Latch> lk(_mutex);
-    invariant(_indexBuildState.isAborted() || _indexBuildState.isAwaitingPrimaryAbort(),
-              str::stream() << "Index build: " << buildUUID
-                            << ",  index build state: " << _indexBuildState.toString());
-    Status abortStatus = _indexBuildState.getAbortStatus();
-    return abortStatus;
+    return _indexBuildState.getAbortStatus();
 }
 
 void ReplIndexBuildState::setCommitQuorumSatisfied(OperationContext* opCtx) {
@@ -351,7 +378,7 @@ bool ReplIndexBuildState::tryCommit(OperationContext* opCtx) {
 
     // If the node is secondary, and awaiting a primary abort, the transition is invalid, and the
     // node should crash.
-    if (_indexBuildState.isAwaitingPrimaryAbort()) {
+    if (_indexBuildState.isAwaitingPrimaryAbort() || _indexBuildState.isForceSelfAbort()) {
         LOGV2_FATAL(7329403,
                     "Received an index build commit from the primary for an index build that we "
                     "were unable to build successfully and was waiting for an abort",
@@ -394,7 +421,7 @@ ReplIndexBuildState::TryAbortResult ReplIndexBuildState::tryAbort(OperationConte
         return TryAbortResult::kRetry;
     }
     if (_indexBuildState.isAborted()) {
-        // Returns if a concurrent operation already aborts the index build.
+        // Returns if a concurrent operation already aborted the index build.
         return TryAbortResult::kAlreadyAborted;
     }
     if (_waitForNextAction->getFuture().isReady()) {
@@ -462,6 +489,36 @@ ReplIndexBuildState::TryAbortResult ReplIndexBuildState::tryAbort(OperationConte
     _setSignalAndCancelVoteRequestCbkIfActive(lk, opCtx, signalAction);
 
     return TryAbortResult::kContinueAbort;
+}
+
+bool ReplIndexBuildState::forceSelfAbort(OperationContext* opCtx, const Status& error) {
+    stdx::unique_lock<Latch> lk(_mutex);
+    if (_indexBuildState.isSettingUp() || _indexBuildState.isAborted() ||
+        _indexBuildState.isCommitted() || _indexBuildState.isAwaitingPrimaryAbort() ||
+        _indexBuildState.isApplyingCommitOplogEntry()) {
+        // If the index build has already passed a point of no return, interrupting will not be
+        // productive.
+        return false;
+    }
+
+    _indexBuildState.setState(IndexBuildState::kForceSelfAbort,
+                              false /* skipCheck */,
+                              boost::none /* timestamp */,
+                              error);
+
+    auto serviceContext = opCtx->getServiceContext();
+    invariant(_opId);
+    if (auto target = serviceContext->getLockedClient(*_opId)) {
+        auto targetOpCtx = target->getOperationContext();
+
+        LOGV2(7419400, "Forcefully aborting index build", "buildUUID"_attr = buildUUID);
+
+        // We don't pass IndexBuildAborted as the interruption error code because that would imply
+        // that we are taking responsibility for cleaning up the index build, when in fact the index
+        // builder thread is responsible.
+        serviceContext->killOperation(target, targetOpCtx);
+    }
+    return true;
 }
 
 void ReplIndexBuildState::onVoteRequestScheduled(OperationContext* opCtx,
