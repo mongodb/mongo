@@ -34,14 +34,18 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/change_collection_truncate_markers.h"
 #include "mongo/db/change_stream_change_collection_manager.h"
+#include "mongo/db/change_stream_options_manager.h"
 #include "mongo/db/change_stream_serverless_helpers.h"
+#include "mongo/db/change_streams_cluster_parameter_gen.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/server_parameter_with_storage.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/record_data.h"
 #include "mongo/idl/server_parameter_test_util.h"
@@ -84,7 +88,8 @@ protected:
         auto oplogEntryBson = oplogEntry.toBSON();
 
         RecordData recordData{oplogEntryBson.objdata(), oplogEntryBson.objsize()};
-        RecordId recordId = record_id_helpers::keyForDate(wallTime);
+        RecordId recordId =
+            record_id_helpers::keyForOptime(timestamp, KeyFormat::String).getValue();
 
         AutoGetChangeCollection changeCollection{
             opCtx, AutoGetChangeCollection::AccessMode::kWrite, tenantId};
@@ -145,6 +150,76 @@ protected:
                                                                true};
     RAIIServerParameterControllerForTest queryKnobController{
         "internalChangeStreamUseTenantIdForTesting", true};
+};
+
+class ChangeCollectionTruncateExpirationTest : public ChangeCollectionExpiredChangeRemoverTest {
+protected:
+    ChangeCollectionTruncateExpirationTest() : ChangeCollectionExpiredChangeRemoverTest() {}
+
+    void setExpireAfterSeconds(OperationContext* opCtx, Seconds seconds) {
+        auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
+        auto* changeStreamsParam =
+            clusterParameters
+                ->get<ClusterParameterWithStorage<ChangeStreamsClusterParameterStorage>>(
+                    "changeStreams");
+
+        auto oldSettings = changeStreamsParam->getValue(_tenantId);
+        oldSettings.setExpireAfterSeconds(seconds.count());
+        changeStreamsParam->setValue(oldSettings, _tenantId).ignore();
+    }
+
+    void insertDocumentToChangeCollection(OperationContext* opCtx,
+                                          const TenantId& tenantId,
+                                          const BSONObj& obj) {
+        WriteUnitOfWork wuow(opCtx);
+        ChangeCollectionExpiredChangeRemoverTest::insertDocumentToChangeCollection(
+            opCtx, tenantId, obj);
+        const auto wallTime = now();
+        Timestamp timestamp{wallTime};
+        RecordId recordId =
+            record_id_helpers::keyForOptime(timestamp, KeyFormat::String).getValue();
+
+        _truncateMarkers->updateCurrentMarkerAfterInsertOnCommit(
+            opCtx, obj.objsize(), recordId, wallTime, 1);
+        wuow.commit();
+    }
+
+    void dropAndRecreateChangeCollection(OperationContext* opCtx,
+                                         const TenantId& tenantId,
+                                         int64_t minBytesPerMarker) {
+        auto& changeCollectionManager = ChangeStreamChangeCollectionManager::get(opCtx);
+        changeCollectionManager.dropChangeCollection(opCtx, tenantId);
+        _truncateMarkers.reset();
+        changeCollectionManager.createChangeCollection(opCtx, tenantId);
+        _truncateMarkers = std::make_unique<ChangeCollectionTruncateMarkers>(
+            tenantId, std::deque<CollectionTruncateMarkers::Marker>{}, 0, 0, minBytesPerMarker);
+    }
+
+    size_t removeExpiredChangeCollectionsDocuments(OperationContext* opCtx,
+                                                   boost::optional<TenantId> tenantId,
+                                                   Date_t expirationTime) {
+        // Acquire intent-exclusive lock on the change collection. Early exit if the collection
+        // doesn't exist.
+        const auto changeCollection =
+            AutoGetChangeCollection{opCtx, AutoGetChangeCollection::AccessMode::kWrite, tenantId};
+
+        WriteUnitOfWork wuow(opCtx);
+        size_t numRecordsDeleted = 0;
+        while (boost::optional<CollectionTruncateMarkers::Marker> marker =
+                   _truncateMarkers->peekOldestMarkerIfNeeded(opCtx)) {
+            auto recordStore = changeCollection->getRecordStore();
+
+            ASSERT_OK(recordStore->rangeTruncate(
+                opCtx, RecordId(), marker->lastRecord, -marker->bytes, -marker->records));
+
+            _truncateMarkers->popOldestMarker();
+            numRecordsDeleted += marker->records;
+        }
+        wuow.commit();
+        return numRecordsDeleted;
+    }
+
+    std::unique_ptr<ChangeCollectionTruncateMarkers> _truncateMarkers;
 };
 
 // Tests that the last expired focument retrieved is the expected one.
@@ -230,6 +305,61 @@ TEST_F(ChangeCollectionExpiredChangeRemoverTest, ShouldLeaveAtLeastOneDocument) 
     for (int i = 0; i < 100; ++i) {
         insertDocumentToChangeCollection(opCtx, _tenantId, BSON("_id" << i));
         clockSource()->advance(Milliseconds{1});
+    }
+
+    // Verify that all but the last document is removed.
+    ASSERT_EQ(removeExpiredChangeCollectionsDocuments(opCtx, _tenantId, now()), 99);
+
+    // Only the last document is left in the change collection.
+    const auto changeCollectionEntries = readChangeCollection(opCtx, _tenantId);
+    ASSERT_EQ(changeCollectionEntries.size(), 1);
+    ASSERT_BSONOBJ_EQ(changeCollectionEntries[0].getObject(), BSON("_id" << 99));
+}
+
+// Tests that only the expired documents are removed from the change collection.
+TEST_F(ChangeCollectionTruncateExpirationTest, ShouldRemoveOnlyExpiredDocument_Markers) {
+    const BSONObj firstExpired = BSON("_id"
+                                      << "firstExpired");
+    const BSONObj secondExpired = BSON("_id"
+                                       << "secondExpired");
+    const BSONObj notExpired = BSON("_id"
+                                    << "notExpired");
+
+    const auto timeAtStart = now();
+    const auto opCtx = operationContext();
+    dropAndRecreateChangeCollection(
+        opCtx, _tenantId, firstExpired.objsize() + secondExpired.objsize());
+
+    insertDocumentToChangeCollection(opCtx, _tenantId, firstExpired);
+    clockSource()->advance(Hours(1));
+    insertDocumentToChangeCollection(opCtx, _tenantId, secondExpired);
+
+    // Store the wallTime of the last expired document.
+    const auto expirationTime = now();
+    const auto expirationTimeInSeconds = duration_cast<Seconds>(expirationTime - timeAtStart);
+    setExpireAfterSeconds(opCtx, expirationTimeInSeconds);
+    clockSource()->advance(Hours(1));
+    insertDocumentToChangeCollection(opCtx, _tenantId, notExpired);
+
+    // Verify that only the required documents are removed.
+    ASSERT_EQ(removeExpiredChangeCollectionsDocuments(opCtx, _tenantId, expirationTime), 2);
+
+    // Only the 'notExpired' document is left in the change collection.
+    const auto changeCollectionEntries = readChangeCollection(opCtx, _tenantId);
+    ASSERT_EQ(changeCollectionEntries.size(), 1);
+    ASSERT_BSONOBJ_EQ(changeCollectionEntries[0].getObject(), notExpired);
+}
+
+// Tests that the last expired document is never deleted.
+TEST_F(ChangeCollectionTruncateExpirationTest, ShouldLeaveAtLeastOneDocument_Markers) {
+    const auto opCtx = operationContext();
+    dropAndRecreateChangeCollection(opCtx, _tenantId, 1);
+
+    setExpireAfterSeconds(opCtx, Seconds{1});
+
+    for (int i = 0; i < 100; ++i) {
+        insertDocumentToChangeCollection(opCtx, _tenantId, BSON("_id" << i));
+        clockSource()->advance(Seconds{1});
     }
 
     // Verify that all but the last document is removed.

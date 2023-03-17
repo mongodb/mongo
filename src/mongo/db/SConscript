@@ -519,6 +519,7 @@ env.Library(
 env.Library(
     target='change_stream_change_collection_manager',
     source=[
+        'change_collection_truncate_markers.cpp',
         'change_stream_change_collection_manager.cpp',
     ],
     LIBDEPS_PRIVATE=[
@@ -2581,6 +2582,7 @@ if wiredtiger:
             '$BUILD_DIR/mongo/util/clock_source_mock',
             '$BUILD_DIR/mongo/util/net/network',
             '$BUILD_DIR/mongo/util/net/ssl_options_server',
+            'change_stream_options_manager',
             'collection_index_usage_tracker',
             'commands',
             'common',
