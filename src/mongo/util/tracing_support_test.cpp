@@ -31,6 +31,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -139,6 +140,63 @@ TEST(TracingSupportTest, BasicUsage) {
                                                      << startTicks + 4 * kSpanDurationMicros))
                                      << "stoppedMicros" << startTicks + 4 * kSpanDurationMicros))
                          << "stoppedMicros" << startTicks + 4 * kSpanDurationMicros));
+    ASSERT_BSONOBJ_EQ(expected, trace.value());
+}
+
+BSONObj beginEvent(StringData name, int64_t time) {
+    return BSON("name" << name << "ph"
+                       << "B"
+                       << "ts" << time << "pid" << 1 << "tid" << 1);
+}
+
+BSONObj endEvent(int64_t time) {
+    return BSON("ph"
+                << "E"
+                << "ts" << time << "pid" << 1 << "tid" << 1);
+}
+
+TEST(TracingSupportTest, BasicEventUsage) {
+    const auto kSpanDuration = Seconds(5);
+    auto tracer = TracerProvider::get().getEventTracer(kTracerName);  // NOLINT
+
+    {
+        auto rootSpan = tracer->startSpan("root");
+        advanceTime(tracer, kSpanDuration);
+        {
+            auto childSpan = tracer->startSpan("child");
+            advanceTime(tracer, kSpanDuration);
+            {
+                {
+                    auto grandChildOne = tracer->startSpan("grand child #1");
+                    advanceTime(tracer, kSpanDuration);
+                }
+                {
+                    auto grandChildTwo = tracer->startSpan("grand child #2");
+                    advanceTime(tracer, kSpanDuration);
+                }
+            }
+        }
+    }
+
+    const auto trace = tracer->getLatestTrace();
+    ASSERT_TRUE(trace);
+
+    const auto kSpanDurationMillis = durationCount<Milliseconds>(kSpanDuration);
+
+    const auto expected =
+        BSON("traceEvents" << BSON_ARRAY(beginEvent("root", 0)
+                                         << beginEvent("child", 1 * kSpanDurationMillis) <<
+
+                                         beginEvent("grand child #1", 2 * kSpanDurationMillis)
+                                         << endEvent(3 * kSpanDurationMillis) <<
+
+                                         beginEvent("grand child #2", 3 * kSpanDurationMillis)
+                                         << endEvent(4 * kSpanDurationMillis) <<
+
+                                         endEvent(4 * kSpanDurationMillis)
+                                         << endEvent(4 * kSpanDurationMillis))
+                           << "displayTimeUnit"
+                           << "ms");
     ASSERT_BSONOBJ_EQ(expected, trace.value());
 }
 

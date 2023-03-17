@@ -89,8 +89,6 @@ namespace mongo {
  */
 class Tracer : public std::enable_shared_from_this<Tracer> {
 public:
-    Tracer(std::string name, TickSource* tickSource);
-
     class Span {
     public:
         virtual ~Span() = default;
@@ -106,6 +104,10 @@ public:
 
         virtual boost::optional<BSONObj> getLatestTrace() const = 0;
     };
+
+    Tracer(std::string name,
+           TickSource* tickSource,
+           std::function<std::unique_ptr<Factory>(std::string, Tracer*)> maker);
 
     ScopedSpan startSpan(std::string name) {
         return _factory->startSpan(std::move(name));
@@ -140,6 +142,11 @@ public:
     static TracerProvider& get();
 
     std::shared_ptr<Tracer> getTracer(std::string name);
+
+    /**
+     * Get a tracer that outputs Chrome's Trace Event Format
+     */
+    std::shared_ptr<Tracer> getEventTracer(std::string name);
 
 private:
     std::unique_ptr<TickSource> _tickSource;
