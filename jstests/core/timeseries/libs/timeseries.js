@@ -52,9 +52,16 @@ var TimeseriesTest = class {
     }
 
     static bucketUnpackWithSortEnabled(conn) {
-        return assert
-            .commandWorked(conn.adminCommand({getParameter: 1, featureFlagBucketUnpackWithSort: 1}))
-            .featureFlagBucketUnpackWithSort.value;
+        const resp50 = conn.adminCommand({getParameter: 1, featureFlagBucketUnpackWithSort50: 1});
+        const resp = conn.adminCommand({getParameter: 1, featureFlagBucketUnpackWithSort: 1});
+        assert(Boolean(resp50.ok) ^ Boolean(resp.ok),
+               `Expected exactly one of these feature flags to exist: ${tojson(resp50)} vs ${
+                   tojson(resp)}`);
+        if (resp50.ok) {
+            return assert.commandWorked(resp50).featureFlagBucketUnpackWithSort50.value;
+        } else {
+            return assert.commandWorked(resp).featureFlagBucketUnpackWithSort.value;
+        }
     }
 
     /**
