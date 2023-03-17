@@ -351,4 +351,82 @@ TEST_F(AutoMergerPolicyTest, MaxConcurrentMergeActionsIsHonored) {
     }
 }
 
+TEST_F(AutoMergerPolicyTest, MergeActionRescheduledWhenMergeHappened) {
+    const auto collUuid = UUID::gen();
+    const auto nss = NamespaceString::createNamespaceString_forTest("test.coll");
+    const auto chunks = generateMergeableChunks(collUuid);
+
+    ConfigServerTestFixture::setupCollection(nss, _keyPattern, chunks);
+
+    _automerger.enable();
+
+    // Auto-merger returns action for <shard0, test.coll> because there are mergeable chunks
+    auto optAction = _automerger.getNextStreamingAction(operationContext());
+    ASSERT(optAction.has_value());
+    auto action = stdx::get<MergeAllChunksOnShardInfo>(*optAction);
+    ASSERT_EQ(action.nss, nss);
+    ASSERT_EQ(action.shardId, _shard0);
+    _automerger.applyActionResult(
+        operationContext(), action, BalancerStreamActionResponse(StatusWith<NumMergedChunks>(10)));
+
+    // Auto-merger returns action for <shard0, test.coll> because some chunks were previously merged
+    optAction = _automerger.getNextStreamingAction(operationContext());
+    ASSERT(optAction.has_value());
+    action = stdx::get<MergeAllChunksOnShardInfo>(*optAction);
+    ASSERT_EQ(action.nss, nss);
+    ASSERT_EQ(action.shardId, _shard0);
+    _automerger.applyActionResult(
+        operationContext(), action, BalancerStreamActionResponse(StatusWith<NumMergedChunks>(0)));
+
+    // Auto-merger returns action for <shard1, test.coll> because there are mergeable chunks
+    optAction = _automerger.getNextStreamingAction(operationContext());
+    ASSERT(optAction.has_value());
+    action = stdx::get<MergeAllChunksOnShardInfo>(*optAction);
+    ASSERT_EQ(action.nss, nss);
+    ASSERT_EQ(action.shardId, _shard1);
+    _automerger.applyActionResult(
+        operationContext(), action, BalancerStreamActionResponse(StatusWith<NumMergedChunks>(10)));
+
+    // Auto-merger returns action for <shard1, test.coll> because some chunks were previously merged
+    optAction = _automerger.getNextStreamingAction(operationContext());
+    ASSERT(optAction.has_value());
+    action = stdx::get<MergeAllChunksOnShardInfo>(*optAction);
+    ASSERT_EQ(action.nss, nss);
+    ASSERT_EQ(action.shardId, _shard1);
+    _automerger.applyActionResult(
+        operationContext(), action, BalancerStreamActionResponse(StatusWith<NumMergedChunks>(0)));
+
+    // Auto-merger not returns any action because no chunks were previously merged
+    optAction = _automerger.getNextStreamingAction(operationContext());
+    ASSERT(!optAction.has_value());
+}
+
+TEST_F(AutoMergerPolicyTest, MergeActionRescheduledUponConflictingOperationInProgress) {
+    const auto collUuid = UUID::gen();
+    const auto nss = NamespaceString::createNamespaceString_forTest("test.coll");
+    const auto chunks = generateMergeableChunks(collUuid);
+
+    ConfigServerTestFixture::setupCollection(nss, _keyPattern, chunks);
+
+    _automerger.enable();
+
+    // Auto-merger returns action for <shard0, test.coll> because there are mergeable chunks
+    auto optAction = _automerger.getNextStreamingAction(operationContext());
+    ASSERT(optAction.has_value());
+    auto action = stdx::get<MergeAllChunksOnShardInfo>(*optAction);
+    ASSERT_EQ(action.nss, nss);
+    ASSERT_EQ(action.shardId, _shard0);
+    _automerger.applyActionResult(
+        operationContext(),
+        action,
+        BalancerStreamActionResponse(Status{ErrorCodes::ConflictingOperationInProgress, "err"}));
+
+    // Auto-merger returns action for <shard0, test.coll> upon ConflictingOperationInProgress
+    optAction = _automerger.getNextStreamingAction(operationContext());
+    action = stdx::get<MergeAllChunksOnShardInfo>(*optAction);
+    ASSERT(optAction.has_value());
+    ASSERT_EQ(action.nss, nss);
+    ASSERT_EQ(action.shardId, _shard0);
+}
+
 }  // namespace mongo
