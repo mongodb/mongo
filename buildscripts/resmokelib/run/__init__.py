@@ -440,6 +440,11 @@ class TestRunner(Subcommand):
             self._resmoke_logger.error("Failed to parse YAML suite definition: %s", str(err))
             self.list_suites()
             self.exit(1)
+        except errors.ResmokeError as err:
+            self._resmoke_logger.error(
+                "Cannot run excluded test in suite config. Use '--force-excluded-tests' to override: %s",
+                str(err))
+            self.exit(1)
 
     def _log_suite_config(self, suite):
         sb = [
@@ -701,6 +706,11 @@ class RunPlugin(PluginInterface):
             help=("Comma separated list of tags. Any jstest that contains any of the"
                   " specified tags will be excluded from any suites that are run."
                   " The tag '{}' is implicitly part of this list.".format(config.EXCLUDED_TAG)))
+
+        parser.add_argument(
+            "--force-excluded-tests", dest="force_excluded_tests", action="store_true",
+            help=("Allows running tests in a suite config's excluded test roots"
+                  " when passed as positional arg(s)."))
 
         parser.add_argument("--genny", dest="genny_executable", metavar="PATH",
                             help="The path to the genny executable for resmoke to use.")

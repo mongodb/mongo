@@ -65,6 +65,7 @@ DEFAULTS = {
     "exclude_with_any_tags": None,
     "flow_control": None,
     "flow_control_tickets": None,
+    "force_excluded_tests": False,
     "fuzz_mongod_configs": None,
     "config_fuzz_seed": None,
     "genny_executable": None,
@@ -348,6 +349,9 @@ EVERGREEN_VERSION_ID = None
 
 # If set, then any jstests that have any of the specified tags will be excluded from the suite(s).
 EXCLUDE_WITH_ANY_TAGS = None
+
+# Allow test files passed as positional args to run even if they are excluded on the suite config.
+FORCE_EXCLUDED_TESTS = None
 
 # A tag which is implicited excluded. This is useful for temporarily disabling a test.
 EXCLUDED_TAG = "__TEMPORARILY_DISABLED__"
