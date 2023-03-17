@@ -32,6 +32,8 @@ global:
         - "mongo/client/read_preference.h"
         - "mongo/db/commands/bulk_write_parser.h"
         - "mongo/db/repl/optime.h"
+        - "mongo/s/database_version.h"
+        - "mongo/s/shard_version.h"
 
 imports:
     - "mongo/client/read_preference_setting.idl"
@@ -40,6 +42,7 @@ imports:
     - "mongo/db/repl/read_concern_args.idl"
     - "mongo/db/repl/replication_types.idl"
     - "mongo/db/write_concern_options.idl"
+    - "mongo/s/sharding_types.idl"
 
 types:
     BulkWriteReplyItem:
@@ -220,7 +223,19 @@ structs:
                               mongos on the time-series view, but got rewritten to target
                               time-series buckets namespace before being sent to shards."
                 type: optionalBool
-                stability: internal            
+                stability: internal
+            shardVersion:
+                description: "The shard version of the collection. This is to be attached by
+                              mongos before being sent to a shard."
+                type: shard_version
+                optional: true
+                stability: internal
+            databaseVersion:
+                description: "The database version of the collection. This is to be attached by
+                              mongos before being sent to a shard."
+                type: database_version
+                optional: true
+                stability: internal
 
     BulkWriteCommandResponseCursor:
         description: "Cursor holding results for a successful 'bulkWrite' command."

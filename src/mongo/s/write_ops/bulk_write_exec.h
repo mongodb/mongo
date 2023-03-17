@@ -106,6 +106,11 @@ public:
                             TargetedBatchMap& targetedBatches);
 
     /**
+     * Fills a BulkWriteCommandRequest from a TargetedWriteBatch for this BulkWriteOp.
+     */
+    BulkWriteCommandRequest buildBulkCommandRequest(const TargetedWriteBatch& targetedBatch) const;
+
+    /**
      * Returns false if the bulk write op needs more processing.
      */
     bool isFinished() const;

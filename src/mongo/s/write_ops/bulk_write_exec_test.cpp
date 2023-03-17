@@ -28,6 +28,7 @@
  */
 
 #include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
 #include "mongo/s/concurrency/locker_mongos_client_observer.h"
 #include "mongo/s/mock_ns_targeter.h"
@@ -38,7 +39,13 @@
 #include "mongo/s/write_ops/batch_write_op.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/bulk_write_exec.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/unittest.h"
+#include <boost/none.hpp>
+#include <memory>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
 namespace {
@@ -434,6 +441,72 @@ TEST_F(BulkWriteOpTest, TargetMultiOpsUnordered_RecordTargetErrors) {
     ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(0).getWriteState(), WriteOpState_Pending);
     ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(1).getWriteState(), WriteOpState_Error);
     ASSERT_EQUALS(bulkWriteOp.getWriteOp_forTest(2).getWriteState(), WriteOpState_Pending);
+}
+
+// Tests that a targeted write batch to be sent to a shard is correctly converted to a
+// bulk command request.
+TEST_F(BulkWriteOpTest, BuildChildRequestFromTargetedWriteBatch) {
+    ShardId shardId("shard");
+    NamespaceString nss0("foster.the.people");
+    NamespaceString nss1("sonate.pacifique");
+
+    // Two different endpoints targeting the same shard for the two namespaces.
+    ShardEndpoint endpoint0(ShardId("shard"),
+                            ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none),
+                            boost::none);
+    ShardEndpoint endpoint1(
+        shardId,
+        ShardVersionFactory::make(ChunkVersion({OID::gen(), Timestamp(2)}, {10, 11}),
+                                  boost::optional<CollectionIndexes>(boost::none)),
+        boost::none);
+
+    std::vector<std::unique_ptr<NSTargeter>> targeters;
+    targeters.push_back(initTargeterFullRange(nss0, endpoint0));
+    targeters.push_back(initTargeterFullRange(nss1, endpoint1));
+
+    BulkWriteCommandRequest request(
+        {
+            BulkWriteInsertOp(0, BSON("x" << 1)),  // to nss 0
+            BulkWriteInsertOp(1, BSON("x" << 2)),  // to nss 1
+            BulkWriteInsertOp(0, BSON("x" << 3))   // to nss 0
+        },
+        {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
+
+    // Randomly set ordered and bypass document validation.
+    request.setOrdered(time(nullptr) % 2 == 0);
+    request.setBypassDocumentValidation(time(nullptr) % 2 == 0);
+    LOGV2(7278800,
+          "Ordered and bypass document validation set randomly",
+          "ordered"_attr = request.getOrdered(),
+          "bypassDocumentValidation"_attr = request.getBypassDocumentValidation());
+
+    BulkWriteOp bulkWriteOp(_opCtx, request);
+
+    std::map<ShardId, std::unique_ptr<TargetedWriteBatch>> targeted;
+    ASSERT_OK(bulkWriteOp.target(targeters, false, targeted));
+
+
+    auto& batch = targeted.begin()->second;
+
+    auto childRequest = bulkWriteOp.buildBulkCommandRequest(*batch);
+
+    ASSERT_EQUALS(childRequest.getOrdered(), request.getOrdered());
+    ASSERT_EQUALS(childRequest.getBypassDocumentValidation(),
+                  request.getBypassDocumentValidation());
+
+
+    ASSERT_EQUALS(childRequest.getOps().size(), 3u);
+    for (size_t i = 0; i < 3u; i++) {
+        const auto& childOp = BulkWriteCRUDOp(childRequest.getOps()[i]);
+        const auto& origOp = BulkWriteCRUDOp(request.getOps()[i]);
+        ASSERT_BSONOBJ_EQ(childOp.toBSON(), origOp.toBSON());
+    }
+
+    ASSERT_EQUALS(childRequest.getNsInfo().size(), 2u);
+    ASSERT_EQUALS(childRequest.getNsInfo()[0].getShardVersion(), endpoint0.shardVersion);
+    ASSERT_EQUALS(childRequest.getNsInfo()[0].getNs(), request.getNsInfo()[0].getNs());
+    ASSERT_EQUALS(childRequest.getNsInfo()[1].getShardVersion(), endpoint1.shardVersion);
+    ASSERT_EQUALS(childRequest.getNsInfo()[1].getNs(), request.getNsInfo()[1].getNs());
 }
 
 /**

@@ -31,6 +31,7 @@
 
 #include "mongo/base/error_codes.h"
 #include "mongo/client/remote_command_targeter.h"
+#include "mongo/db/commands/bulk_write_gen.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/client/shard_registry.h"
@@ -187,6 +188,57 @@ StatusWith<bool> BulkWriteOp::target(const std::vector<std::unique_ptr<NSTargete
             return 1;
         },
         targetedBatches);
+}
+
+BulkWriteCommandRequest BulkWriteOp::buildBulkCommandRequest(
+    const TargetedWriteBatch& targetedBatch) const {
+    BulkWriteCommandRequest request;
+
+    // TODO (SERVER-73281): Support update / delete operations on bulkWrite cmd on mongos.
+    // A single bulk command request batch may contain operations of different
+    // types, i.e. they may be inserts, updates or deletes.
+    std::vector<
+        stdx::variant<mongo::BulkWriteInsertOp, mongo::BulkWriteUpdateOp, mongo::BulkWriteDeleteOp>>
+        ops;
+    std::vector<NamespaceInfoEntry> nsInfo = _clientRequest.getNsInfo();
+
+    for (auto&& targetedWrite : targetedBatch.getWrites()) {
+        const WriteOpRef& writeOpRef = targetedWrite->writeOpRef;
+        ops.push_back(_clientRequest.getOps().at(writeOpRef.first));
+
+        // Set the nsInfo's shardVersion & databaseVersion fields based on the endpoint
+        // of each operation. Since some operations may be on the same namespace, this
+        // might result in the same nsInfo entry being written to multiple times. This
+        // is OK, since we know that in a single batch, all operations on the same
+        // namespace MUST have the same shardVersion & databaseVersion.
+        // Invariant checks that either the shardVersion & databaseVersion in nsInfo are
+        // null OR the new versions in the targetedWrite match the existing version in
+        // nsInfo.
+        const auto& bulkWriteOp = BulkWriteCRUDOp(ops.back());
+        auto& nsInfoEntry = nsInfo.at(bulkWriteOp.getNsInfoIdx());
+
+        invariant((!nsInfoEntry.getShardVersion() ||
+                   nsInfoEntry.getShardVersion() == targetedWrite->endpoint.shardVersion) &&
+                  (!nsInfoEntry.getDatabaseVersion() ||
+                   nsInfoEntry.getDatabaseVersion() == targetedWrite->endpoint.databaseVersion));
+
+        nsInfoEntry.setShardVersion(targetedWrite->endpoint.shardVersion);
+        nsInfoEntry.setDatabaseVersion(targetedWrite->endpoint.databaseVersion);
+    }
+
+    request.setOps(ops);
+    request.setNsInfo(nsInfo);
+
+    // It isn't necessary to copy the cursor options over, because the cursor options
+    // are for use in the interaction between the mongos and the client and not
+    // internally between the mongos and the mongods.
+    request.setOrdered(_clientRequest.getOrdered());
+    request.setBypassDocumentValidation(_clientRequest.getBypassDocumentValidation());
+
+    // TODO (SERVER-72989): Attach stmtIds etc. when building support for retryable
+    // writes on mongos
+
+    return request;
 }
 
 bool BulkWriteOp::isFinished() const {

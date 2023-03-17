@@ -117,6 +117,7 @@ ALLOW_ANY_TYPE_LIST: List[str] = [
     'aggregate-param-fromMongos',
     'aggregate-param-$_requestReshardingResumeToken',
     'aggregate-param-isMapReduceCommand',
+    'bulkWrite-param-shardVersion',
     'bulkWrite-reply-_id',
     'bulkWrite-reply-value',
     'count-param-hint',
