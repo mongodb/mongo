@@ -17,6 +17,44 @@ variables:
   scons_cache_mode: all
   has_packages: false
 
+- &linux-x86-dynamic-compile-params  # Essential set of compile parameters used for Linux dev variants.
+  run_on:
+  - rhel80-xlarge
+  activate: true  # These compile variants run on every commit to reduce latency of the auto-reverter.
+  modules:
+    - enterprise
+  stepback: false
+
+- &linux-x86-dynamic-compile-expansions
+  scons_cache_scope: shared
+  scons_cache_mode: all
+  has_packages: false
+  compile_flags: >-
+    --ssl
+    MONGO_DISTMOD=rhel80
+    -j$(grep -c ^processor /proc/cpuinfo)
+    --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+    --link-model=dynamic
+
+- &linux-arm64-dynamic-compile-params  # Essential set of compile parameters used for Linux dev variants.
+  run_on:
+  - amazon2-arm64-small
+  activate: true  # These compile variants run on every commit to reduce latency of the auto-reverter.
+  modules:
+    - enterprise
+  stepback: false
+
+- &linux-arm64-dynamic-compile-expansions
+  scons_cache_scope: shared
+  scons_cache_mode: all
+  has_packages: false
+  compile_flags: >-
+    --ssl
+    MONGO_DISTMOD=amazon2
+    -j$(grep -c ^processor /proc/cpuinfo)
+    --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+    --link-model=dynamic
+
 # If you add anything to san_options, make sure the appropriate changes are
 # also made to SConstruct.
 # and also to the san_options in evergreen.yml
@@ -29,24 +67,11 @@ variables:
 
 buildvariants:
 
-- <<: *generic_linux_compile_params
+- <<: *linux-x86-dynamic-compile-params
   name: &linux-x86-dynamic-compile-required linux-x86-dynamic-compile-required
   display_name: "! Linux x86 Shared Library Compile & Static Analysis"
-  modules:
-    - enterprise
-  stepback: false
   expansions:
-    <<: *generic_linux_compile_expansions
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=rhel80
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --link-model=dynamic
-    crypt_task_compile_flags: >-
-      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
-      -Wl,--no-gnu-unique"
-      CCFLAGS="-fno-gnu-unique"
+    <<: *linux-x86-dynamic-compile-expansions
     clang_tidy_toolchain: v4
     compile_variant: *linux-x86-dynamic-compile-required
   tasks:
@@ -56,21 +81,15 @@ buildvariants:
     - name: compile_test_and_package_parallel_dbtest_stream_TG
     - name: generate_buildid_to_debug_symbols_mapping
     - name: .lint
+    - name: clang_tidy_TG
+      distros:
+      - rhel80-xxlarge
     - name: server_discovery_and_monitoring_json_test_TG
       distros:
       - rhel80-large
     - name: server_selection_json_test_TG
       distros:
       - rhel80-large
-    - name: libdeps_graph_linting_TG
-      distros:
-      - rhel80-large
-    - name: clang_tidy_TG
-      distros:
-      - rhel80-xxlarge
-    - name: .crypt
-    - name: .stitch
-    - name: crypt_build_debug_and_test
     - name: .integration
       distros:
       - rhel80-medium
@@ -96,7 +115,6 @@ buildvariants:
   - name: compile_test_and_package_parallel_unittest_stream_TG
   - name: compile_test_and_package_parallel_dbtest_stream_TG
   - name: generate_buildid_to_debug_symbols_mapping
-  - name: .integration !.audit
 
 - <<: *generic_linux_compile_params
   name: &linux-x86-dynamic-debug-wtdevelop-compile linux-x86-dynamic-debug-wtdevelop-compile
@@ -130,6 +148,29 @@ buildvariants:
       --link-model=dynamic
       --enable-free-mon=on
     compile_variant: *linux-debug-aubsan-compile-required
+
+- <<: *linux-x86-dynamic-compile-params
+  name: &linux-stitch-compile-suggested linux-stitch-compile-suggested
+  display_name: "* Linux x86 Stitch Enterprise Compile"
+  expansions:
+    <<: *linux-x86-dynamic-compile-expansions
+    compile_variant: *linux-stitch-compile-suggested
+  tasks:
+    - name: .stitch
+
+- <<: *linux-x86-dynamic-compile-params
+  name: &linux-crypt-compile-required linux-crypt-compile-required
+  display_name: "! Linux x86 Crypt Enterprise Compile"
+  expansions:
+    <<: *linux-x86-dynamic-compile-expansions
+    crypt_task_compile_flags: >-
+      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
+      -Wl,--no-gnu-unique"
+      CCFLAGS="-fno-gnu-unique"
+    compile_variant: *linux-crypt-compile-required
+  tasks:
+    - name: .crypt
+    - name: crypt_build_debug_and_test
 
 - name: &windows-compile-required windows-compile-required
   display_name: "! Windows Compile"
@@ -169,27 +210,11 @@ buildvariants:
   - name: server_selection_json_test_TG
   - name: .crypt
 
-- <<: *generic_linux_compile_params
+- <<: *linux-arm64-dynamic-compile-params
   name: &amazon-linux2-arm64-compile amazon-linux2-arm64-compile
   display_name: "* Amazon Linux 2 arm64 Shared Library Compile"
-  run_on:
-    - amazon2-arm64-small
-  modules:
-    - enterprise
-  stepback: false
   expansions:
-    <<: *generic_linux_compile_expansions
-    compile_flags: >-
-      --ssl
-      MONGO_DISTMOD=amazon2
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --link-model=dynamic
-    crypt_task_compile_flags: >-
-      SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
-      -Wl,--no-gnu-unique"
-      CCFLAGS="-fno-gnu-unique"
-    clang_tidy_toolchain: v4
+    <<: *linux-arm64-dynamic-compile-expansions
     compile_variant: *amazon-linux2-arm64-compile
   tasks:
     - name: compile_test_and_package_parallel_unittest_stream_TG
@@ -198,12 +223,26 @@ buildvariants:
     - name: generate_buildid_to_debug_symbols_mapping
     - name: server_discovery_and_monitoring_json_test_TG
     - name: server_selection_json_test_TG
-    - name: libdeps_graph_linting_TG
-    - name: .crypt
-    - name: .stitch
-    - name: crypt_build_debug_and_test
     - name: .integration
 
+- <<: *linux-arm64-dynamic-compile-params
+  name: &amazon-linux2-arm64-crypt-compile amazon-linux2-arm64-crypt-compile
+  display_name: "* Amazon Linux 2 arm64 Crypt Compile"
+  expansions:
+    <<: *linux-arm64-dynamic-compile-expansions
+    compile_variant: *amazon-linux2-arm64-crypt-compile
+  tasks:
+    - name: .crypt
+    - name: crypt_build_debug_and_test
+
+- <<: *linux-arm64-dynamic-compile-params
+  name: &amazon-linux2-arm64-stitch-compile amazon-linux2-arm64-stitch-compile
+  display_name: "* Amazon Linux 2 arm64 Stitch Compile"
+  expansions:
+    <<: *linux-arm64-dynamic-compile-expansions
+    compile_variant: *amazon-linux2-arm64-stitch-compile
+  tasks:
+    - name: .stitch
 
 - <<: *generic_linux_compile_params
   name: &linux-x86-dynamic-grpc-suggested linux-x86-dynamic-grpc-suggested

@@ -1885,9 +1885,6 @@ buildvariants:
   - name: compile_build_tools_next_TG
     distros:
     - ubuntu1804-build
-  - name: libdeps_graph_linting_TG
-    distros:
-    - ubuntu1804-build
   - name: .crypt
   - name: .publish_crypt
   - name: .aggfuzzer .common
