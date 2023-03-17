@@ -3669,5 +3669,42 @@ TEST_F(CollectionCatalogTimestampTest, OpenCollectionBetweenIndexBuildInProgress
             coll);
     }
 }
+
+TEST_F(CollectionCatalogTimestampTest, ResolveNamespaceStringOrUUIDAtLatest) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagPointInTimeCatalogLookups", true);
+
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const UUID uuid = createCollection(opCtx.get(), nss, createCollectionTs);
+    const NamespaceStringOrUUID nssOrUUID = NamespaceStringOrUUID(nss.db(), uuid);
+
+    NamespaceString resolvedNss =
+        CollectionCatalog::get(opCtx.get())->resolveNamespaceStringOrUUID(opCtx.get(), nssOrUUID);
+    ASSERT_EQ(resolvedNss, nss);
+
+    const Timestamp dropCollectionTs = Timestamp(20, 20);
+    dropCollection(opCtx.get(), nss, dropCollectionTs);
+
+    // Resolving the UUID throws NamespaceNotFound as the collection is no longer in the latest
+    // collection catalog.
+    ASSERT_THROWS_CODE(
+        CollectionCatalog::get(opCtx.get())->resolveNamespaceStringOrUUID(opCtx.get(), nssOrUUID),
+        DBException,
+        ErrorCodes::NamespaceNotFound);
+
+    {
+        OneOffRead oor(opCtx.get(), createCollectionTs);
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
+
+        CollectionCatalog::get(opCtx.get())
+            ->establishConsistentCollection(opCtx.get(), nss, createCollectionTs);
+
+        // Resolving the UUID looks in OpenedCollections to try to resolve the UUID.
+        resolvedNss = CollectionCatalog::get(opCtx.get())
+                          ->resolveNamespaceStringOrUUID(opCtx.get(), nssOrUUID);
+        ASSERT_EQ(resolvedNss, nss);
+    }
+}
 }  // namespace
 }  // namespace mongo
