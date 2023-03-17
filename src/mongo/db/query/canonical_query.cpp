@@ -59,6 +59,15 @@ bool parsingCanProduceNoopMatchNodes(const ExtensionsCallback& extensionsCallbac
          allowedFeatures & MatchExpressionParser::AllowedFeatures::kJavascript);
 }
 
+boost::optional<size_t> loadMaxParameterCount() {
+    auto value = internalQueryAutoParameterizationMaxParameterCount.load();
+    if (value > 0) {
+        return value;
+    }
+
+    return boost::none;
+}
+
 }  // namespace
 
 // static
@@ -213,7 +222,8 @@ Status CanonicalQuery::init(OperationContext* opCtx,
             // When the SBE plan cache is enabled, we auto-parameterize queries in the hopes of
             // caching a parameterized plan. Here we add parameter markers to the appropriate match
             // expression leaf nodes.
-            _inputParamIdToExpressionMap = MatchExpression::parameterize(_root.get());
+            _inputParamIdToExpressionMap =
+                MatchExpression::parameterize(_root.get(), loadMaxParameterCount());
         } else {
             LOGV2_DEBUG(6579310,
                         5,

@@ -1143,6 +1143,19 @@ server_parameters:
     cpp_vartype: AtomicWord<bool>
     default: true
 
+  internalQueryAutoParameterizationMaxParameterCount:
+    description: "The maximum numbers of parameters that query auto-parameterization can extract from a query. 
+     If auto parameterizating a query would result in a greater number of parameters than the limit, 
+     then auto parameterization will not be performed.
+     If set to 0, then no limit will be applied."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryAutoParameterizationMaxParameterCount"
+    cpp_vartype: AtomicWord<int>
+    default: 512
+    validator:
+      gte: 0
+    on_update: plan_cache_util::clearSbeCacheOnParameterChange
+
 # Note for adding additional query knobs:
 #
 # When adding a new query knob, you should consider whether or not you need to add an 'on_update'

@@ -77,7 +77,7 @@ public:
         return MatchCategory::kOther;
     }
 
-    void setInputParamId(InputParamId paramId) {
+    void setInputParamId(boost::optional<InputParamId> paramId) {
         _inputParamId = paramId;
     }
 

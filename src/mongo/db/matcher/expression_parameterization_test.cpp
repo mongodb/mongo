@@ -34,7 +34,6 @@
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
-
 namespace {
 void walkExpression(MatchExpressionParameterizationVisitorContext* context,
                     MatchExpression* expression) {
@@ -42,6 +41,152 @@ void walkExpression(MatchExpressionParameterizationVisitorContext* context,
     MatchExpressionParameterizationWalker walker{&visitor};
     tree_walker::walk<false, MatchExpression>(expression, &walker);
 }
+
+struct CountInputParamsContext {
+    size_t count{0};
+};
+class CountInputParamsVisitor : public MatchExpressionConstVisitor {
+public:
+    explicit CountInputParamsVisitor(CountInputParamsContext* context) : _context(context) {}
+
+    void visit(const AlwaysFalseMatchExpression* expr) final {}
+    void visit(const AlwaysTrueMatchExpression* expr) final {}
+    void visit(const AndMatchExpression* expr) final {}
+    void visit(const BitsAllClearMatchExpression* expr) final {
+        return visitBitTestExpression(expr);
+    }
+    void visit(const BitsAllSetMatchExpression* expr) final {
+        return visitBitTestExpression(expr);
+    }
+    void visit(const BitsAnyClearMatchExpression* expr) final {
+        return visitBitTestExpression(expr);
+    }
+    void visit(const BitsAnySetMatchExpression* expr) final {
+        return visitBitTestExpression(expr);
+    }
+    void visit(const ElemMatchObjectMatchExpression* matchExpr) final {}
+    void visit(const ElemMatchValueMatchExpression* matchExpr) final {}
+    void visit(const EqualityMatchExpression* expr) final {
+        return visitComparisonMatchExpression(expr);
+    }
+    void visit(const ExistsMatchExpression* expr) final {}
+    void visit(const ExprMatchExpression* expr) final {}
+    void visit(const GTEMatchExpression* expr) final {
+        return visitComparisonMatchExpression(expr);
+    }
+    void visit(const GTMatchExpression* expr) final {
+        return visitComparisonMatchExpression(expr);
+    }
+    void visit(const GeoMatchExpression* expr) final {}
+    void visit(const GeoNearMatchExpression* expr) final {}
+    void visit(const InMatchExpression* expr) final {
+        countParam(expr->getInputParamId());
+    }
+    void visit(const InternalBucketGeoWithinMatchExpression* expr) final {}
+    void visit(const InternalExprEqMatchExpression* expr) final {}
+    void visit(const InternalExprGTMatchExpression* expr) final {}
+    void visit(const InternalExprGTEMatchExpression* expr) final {}
+    void visit(const InternalExprLTMatchExpression* expr) final {}
+    void visit(const InternalExprLTEMatchExpression* expr) final {}
+    void visit(const InternalSchemaAllElemMatchFromIndexMatchExpression* expr) final {}
+    void visit(const InternalSchemaAllowedPropertiesMatchExpression* expr) final {}
+    void visit(const InternalSchemaBinDataEncryptedTypeExpression* expr) final {}
+    void visit(const InternalSchemaBinDataFLE2EncryptedTypeExpression* expr) final {}
+    void visit(const InternalSchemaBinDataSubTypeExpression* expr) final {}
+    void visit(const InternalSchemaCondMatchExpression* expr) final {}
+    void visit(const InternalSchemaEqMatchExpression* expr) final {}
+    void visit(const InternalSchemaFmodMatchExpression* expr) final {}
+    void visit(const InternalSchemaMatchArrayIndexMatchExpression* expr) final {}
+    void visit(const InternalSchemaMaxItemsMatchExpression* expr) final {}
+    void visit(const InternalSchemaMaxLengthMatchExpression* expr) final {}
+    void visit(const InternalSchemaMaxPropertiesMatchExpression* expr) final {}
+    void visit(const InternalSchemaMinItemsMatchExpression* expr) final {}
+    void visit(const InternalSchemaMinLengthMatchExpression* expr) final {}
+    void visit(const InternalSchemaMinPropertiesMatchExpression* expr) final {}
+    void visit(const InternalSchemaObjectMatchExpression* expr) final {}
+    void visit(const InternalSchemaRootDocEqMatchExpression* expr) final {}
+    void visit(const InternalSchemaTypeExpression* expr) final {}
+    void visit(const InternalSchemaUniqueItemsMatchExpression* expr) final {}
+    void visit(const InternalSchemaXorMatchExpression* expr) final {}
+    void visit(const LTEMatchExpression* expr) final {
+        return visitComparisonMatchExpression(expr);
+    }
+    void visit(const LTMatchExpression* expr) final {
+        return visitComparisonMatchExpression(expr);
+    }
+    void visit(const ModMatchExpression* expr) final {
+        countParam(expr->getDivisorInputParamId());
+        countParam(expr->getRemainder());
+    }
+    void visit(const NorMatchExpression* expr) final {}
+    void visit(const NotMatchExpression* expr) final {}
+    void visit(const OrMatchExpression* expr) final {}
+    void visit(const RegexMatchExpression* expr) final {
+        countParam(expr->getSourceRegexInputParamId());
+        countParam(expr->getCompiledRegexInputParamId());
+    }
+    void visit(const SizeMatchExpression* expr) final {
+        countParam(expr->getInputParamId());
+    }
+    void visit(const TextMatchExpression* expr) final {}
+    void visit(const TextNoOpMatchExpression* expr) final {}
+    void visit(const TwoDPtInAnnulusExpression* expr) final {}
+    void visit(const TypeMatchExpression* expr) final {
+        countParam(expr->getInputParamId());
+    }
+    void visit(const WhereMatchExpression* expr) final {
+        countParam(expr->getInputParamId());
+    }
+    void visit(const WhereNoOpMatchExpression* expr) final {}
+
+private:
+    void visitComparisonMatchExpression(const ComparisonMatchExpressionBase* expr) {
+        countParam(expr->getInputParamId());
+    }
+
+    void visitBitTestExpression(const BitTestMatchExpression* expr) {
+        countParam(expr->getBitPositionsParamId());
+        countParam(expr->getBitMaskParamId());
+    }
+
+    void countParam(boost::optional<MatchExpression::InputParamId> param) {
+        if (param) {
+            _context->count++;
+        }
+    }
+
+    CountInputParamsContext* _context;
+};
+
+class CountInputParamWalker {
+public:
+    explicit CountInputParamWalker(CountInputParamsVisitor* visitor) : _visitor{visitor} {
+        invariant(_visitor);
+    }
+
+    void preVisit(const MatchExpression* expr) {
+        expr->acceptVisitor(_visitor);
+    }
+
+    void postVisit(const MatchExpression* expr) {}
+
+    void inVisit(long count, const MatchExpression* expr) {}
+
+private:
+    CountInputParamsVisitor* _visitor;
+};
+
+/**
+ * Return an number of parameters that are set within given expression tree.
+ */
+size_t countInputParams(const MatchExpression* expression) {
+    CountInputParamsContext context;
+    CountInputParamsVisitor visitor{&context};
+    CountInputParamWalker walker{&visitor};
+    tree_walker::walk<true, MatchExpression>(expression, &walker);
+    return context.count;
+}
+
 }  // namespace
 
 TEST(MatchExpressionParameterizationVisitor, AlwaysFalseMatchExpressionSetsNoParamIds) {
@@ -321,12 +466,37 @@ TEST(MatchExpressionParameterizationVisitor,
                                              << gtExpr << BSON("z" << inExpr)
                                              << BSON("$and" << BSON_ARRAY(regexExpr << sizeExpr))));
 
-    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
-    StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
-    ASSERT_TRUE(result.isOK());
+    {
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+        StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
+        ASSERT_TRUE(result.isOK());
+        auto expression = result.getValue().get();
 
-    MatchExpressionParameterizationVisitorContext context{};
-    walkExpression(&context, result.getValue().get());
-    ASSERT_EQ(6, context.inputParamIdToExpressionMap.size());
+        auto inputParamIdToExpressionMap = MatchExpression::parameterize(expression);
+        ASSERT_EQ(6, inputParamIdToExpressionMap.size());
+        ASSERT_EQ(6, countInputParams(expression));
+    }
+
+    {
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+        StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
+        ASSERT_TRUE(result.isOK());
+        auto expression = result.getValue().get();
+
+        auto inputParamIdToExpressionMap = MatchExpression::parameterize(expression, 6);
+        ASSERT_EQ(6, inputParamIdToExpressionMap.size());
+        ASSERT_EQ(6, countInputParams(expression));
+    }
+
+    {
+        boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+        StatusWithMatchExpression result = MatchExpressionParser::parse(query, expCtx);
+        ASSERT_TRUE(result.isOK());
+        auto expression = result.getValue().get();
+
+        auto inputParamIdToExpressionMap = MatchExpression::parameterize(expression, 5);
+        ASSERT_EQ(0, inputParamIdToExpressionMap.size());
+        ASSERT_EQ(0, countInputParams(expression));
+    }
 }
 }  // namespace mongo

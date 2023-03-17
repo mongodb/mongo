@@ -187,7 +187,7 @@ public:
         return _collator;
     }
 
-    void setInputParamId(InputParamId paramId) {
+    void setInputParamId(boost::optional<InputParamId> paramId) {
         _inputParamId = paramId;
     }
 
@@ -531,11 +531,11 @@ public:
         visitor->visit(this);
     }
 
-    void setSourceRegexInputParamId(InputParamId paramId) {
+    void setSourceRegexInputParamId(boost::optional<InputParamId> paramId) {
         _sourceRegexInputParamId = paramId;
     }
 
-    void setCompiledRegexInputParamId(InputParamId paramId) {
+    void setCompiledRegexInputParamId(boost::optional<InputParamId> paramId) {
         _compiledRegexInputParamId = paramId;
     }
 
@@ -609,11 +609,11 @@ public:
         visitor->visit(this);
     }
 
-    void setDivisorInputParamId(InputParamId paramId) {
+    void setDivisorInputParamId(boost::optional<InputParamId> paramId) {
         _divisorInputParamId = paramId;
     }
 
-    void setRemainderInputParamId(InputParamId paramId) {
+    void setRemainderInputParamId(boost::optional<InputParamId> paramId) {
         _remainderInputParamId = paramId;
     }
 
@@ -752,7 +752,7 @@ public:
         visitor->visit(this);
     }
 
-    void setInputParamId(InputParamId paramId) {
+    void setInputParamId(boost::optional<InputParamId> paramId) {
         _inputParamId = paramId;
     }
 
@@ -852,11 +852,11 @@ public:
 
     std::string name() const;
 
-    void setBitPositionsParamId(InputParamId paramId) {
+    void setBitPositionsParamId(boost::optional<InputParamId> paramId) {
         _bitPositionsParamId = paramId;
     }
 
-    void setBitMaskParamId(InputParamId paramId) {
+    void setBitMaskParamId(boost::optional<InputParamId> paramId) {
         _bitMaskParamId = paramId;
     }
 

@@ -115,11 +115,24 @@ void MatchExpression::sortTree(MatchExpression* tree) {
 }
 
 // static
-std::vector<const MatchExpression*> MatchExpression::parameterize(MatchExpression* tree) {
+std::vector<const MatchExpression*> MatchExpression::parameterize(
+    MatchExpression* tree, boost::optional<size_t> maxParameterCount) {
     MatchExpressionParameterizationVisitorContext context{};
     MatchExpressionParameterizationVisitor visitor{&context};
     MatchExpressionParameterizationWalker walker{&visitor};
     tree_walker::walk<false, MatchExpression>(tree, &walker);
+
+    // If the number of parameters exceed the maxParameterCount limit, we need to clear all ParamIds
+    // that were set on expression nodes.
+    //
+    // The alternative could be to count the parameters first and then set the ParamIds, but that
+    // would result in performing always two passes, rather than just one pass in a happy case.
+    if (maxParameterCount && context.inputParamIdToExpressionMap.size() > *maxParameterCount) {
+        context.revertMode = true;
+        context.inputParamIdToExpressionMap.clear();
+        tree_walker::walk<false, MatchExpression>(tree, &walker);
+    }
+
     return std::move(context.inputParamIdToExpressionMap);
 }
 

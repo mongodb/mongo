@@ -45,15 +45,23 @@ namespace mongo {
 struct MatchExpressionParameterizationVisitorContext {
     using InputParamId = MatchExpression::InputParamId;
 
-    InputParamId nextInputParamId(const MatchExpression* expr) {
-        inputParamIdToExpressionMap.push_back(expr);
-        return inputParamIdToExpressionMap.size() - 1;
+    boost::optional<InputParamId> nextInputParamId(const MatchExpression* expr) {
+        if (!revertMode) {
+            inputParamIdToExpressionMap.push_back(expr);
+            return inputParamIdToExpressionMap.size() - 1;
+        } else {
+            return boost::none;
+        }
     }
 
     // Map to from assigned InputParamId to parameterised MatchExpression. Although it is called a
     // map, it can be safely represented as a vector because in this class we control that
     // inputParamId is an increasing sequence of integers starting from 0.
     std::vector<const MatchExpression*> inputParamIdToExpressionMap;
+
+    // Whether instead of setting parameters on MatchExpression tree nodes, the visitor should
+    // clear them instead.
+    bool revertMode{false};
 };
 
 /**
