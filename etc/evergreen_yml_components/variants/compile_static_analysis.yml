@@ -38,7 +38,7 @@ variables:
 
 - &linux-arm64-dynamic-compile-params  # Essential set of compile parameters used for Linux dev variants.
   run_on:
-  - amazon2-arm64-small
+  - amazon2-arm64-large
   activate: true  # These compile variants run on every commit to reduce latency of the auto-reverter.
   modules:
     - enterprise
