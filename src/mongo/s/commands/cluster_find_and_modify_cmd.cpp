@@ -74,6 +74,8 @@
 namespace mongo {
 namespace {
 
+using QuerySamplingOptions = OperationContext::QuerySamplingOptions;
+
 const ReadPreferenceSetting kPrimaryOnlyReadPreference(ReadPreference::PrimaryOnly);
 const char kLegacyRuntimeConstantsField[] = "runtimeConstants";
 
@@ -575,6 +577,8 @@ void FindAndModifyCmd::_constructResult(OperationContext* opCtx,
             handleWouldChangeOwningShardError(opCtx, shardId, nss, cmdObj, responseStatus, result);
         } else {
             // TODO SERVER-67429: Remove this branch.
+            opCtx->setQuerySamplingOptions(QuerySamplingOptions::kOptOut);
+
             if (isRetryableWrite) {
                 _handleWouldChangeOwningShardErrorRetryableWriteLegacy(
                     opCtx, shardId, shardVersion, dbVersion, nss, cmdObj, result);

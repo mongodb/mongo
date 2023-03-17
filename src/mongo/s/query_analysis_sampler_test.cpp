@@ -50,6 +50,8 @@ namespace mongo {
 namespace analyze_shard_key {
 namespace {
 
+using QuerySamplingOptions = OperationContext::QuerySamplingOptions;
+
 const auto smoothingFactor = gQueryAnalysisQueryStatsSmoothingFactor;
 
 TEST(QueryAnalysisSamplerQueryStatsTest, RefreshBasic) {
@@ -914,6 +916,12 @@ TEST_F(QueryAnalysisSamplerTest, TryGenerateSampleIdExternalClient) {
     ASSERT_FALSE(sampler.tryGenerateSampleId(opCtx, nss1, SampledCommandNameEnum::kFind));
     // This collection doesn't have sampling enabled.
     ASSERT_FALSE(sampler.tryGenerateSampleId(opCtx, nss2, SampledCommandNameEnum::kFind));
+
+    advanceTime(Milliseconds(1000));
+    // The number of tokens available in the bucket for rateLimiter0 right after the refill is 0
+    // + 1.0. Cannot sample since the client has explicitly opted out of query sampling.
+    opCtx->setQuerySamplingOptions(QuerySamplingOptions::kOptOut);
+    ASSERT_FALSE(sampler.tryGenerateSampleId(opCtx, nss0, SampledCommandNameEnum::kFind));
 }
 
 TEST_F(QueryAnalysisSamplerTest, TryGenerateSampleIdInternalClient) {
@@ -936,10 +944,16 @@ TEST_F(QueryAnalysisSamplerTest, TryGenerateSampleIdInternalClient) {
     // + 1.0. Cannot sample since the client is internal.
     ASSERT_FALSE(sampler.tryGenerateSampleId(opCtx, nss0, SampledCommandNameEnum::kFind));
 
-    opCtx->setExplicitlyOptIntoQuerySampling();
+    opCtx->setQuerySamplingOptions(QuerySamplingOptions::kOptIn);
     // Can sample now since the client has explicitly opted into query sampling.
     ASSERT(sampler.tryGenerateSampleId(opCtx, nss0, SampledCommandNameEnum::kFind));
     // Cannot sample since there are no tokens left.
+    ASSERT_FALSE(sampler.tryGenerateSampleId(opCtx, nss0, SampledCommandNameEnum::kFind));
+
+    advanceTime(Milliseconds(1000));
+    opCtx->setQuerySamplingOptions(QuerySamplingOptions::kOptOut);
+    // The number of tokens available in the bucket for rateLimiter0 right after the refill is 0
+    // + 1.0. Cannot sample since the client has explicitly opted into query sampling.
     ASSERT_FALSE(sampler.tryGenerateSampleId(opCtx, nss0, SampledCommandNameEnum::kFind));
 }
 

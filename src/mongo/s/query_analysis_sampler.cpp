@@ -46,6 +46,8 @@ namespace analyze_shard_key {
 
 namespace {
 
+using QuerySamplingOptions = OperationContext::QuerySamplingOptions;
+
 MONGO_FAIL_POINT_DEFINE(disableQueryAnalysisSampler);
 MONGO_FAIL_POINT_DEFINE(overwriteQueryAnalysisSamplerAvgLastCountToZero);
 
@@ -329,9 +331,15 @@ void QueryAnalysisSampler::_incrementCounters(OperationContext* opCtx,
 boost::optional<UUID> QueryAnalysisSampler::tryGenerateSampleId(OperationContext* opCtx,
                                                                 const NamespaceString& nss,
                                                                 SampledCommandNameEnum cmdName) {
-    if (!opCtx->getClient()->session() && !opCtx->explicitlyOptedIntoQuerySampling()) {
+    auto opts = opCtx->getQuerySamplingOptions();
+
+    if (!opCtx->getClient()->session() && opts != QuerySamplingOptions::kOptIn) {
         // Do not generate a sample id for an internal query unless it has explicitly opted into
         // query sampling.
+        return boost::none;
+    }
+    if (opts == QuerySamplingOptions::kOptOut) {
+        // Do not generate a sample id for a query that has explicitly opted out of query sampling.
         return boost::none;
     }
 

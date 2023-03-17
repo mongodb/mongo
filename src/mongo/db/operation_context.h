@@ -634,16 +634,17 @@ public:
         _killOpsExempt = true;
     }
 
-    bool explicitlyOptedIntoQuerySampling() const {
-        return _explicitlyOptIntoQuerySampling;
+    // The query sampling options for operations on this opCtx. 'optIn' makes the operations
+    // eligible for query sampling regardless of whether the client is considered as internal by
+    // the sampler. 'optOut' does the opposite.
+    enum QuerySamplingOptions { kOptIn, kOptOut };
+
+    boost::optional<QuerySamplingOptions> getQuerySamplingOptions() {
+        return _querySamplingOpts;
     }
 
-    /**
-     * Makes operations on this opCtx eligible for query sampling regardless of whether the client
-     * is considered as internal by the sampler.
-     */
-    void setExplicitlyOptIntoQuerySampling() {
-        _explicitlyOptIntoQuerySampling = true;
+    void setQuerySamplingOptions(QuerySamplingOptions option) {
+        _querySamplingOpts = option;
     }
 
     /**
@@ -850,9 +851,8 @@ private:
     // to refresh locks for prepared tranasctions or abort in-progress transactions.
     bool _killOpsExempt = false;
 
-    // Make operations on this opCtx eligible for query sampling regardless of whether the client
-    // is considered as internal by the sampler.
-    bool _explicitlyOptIntoQuerySampling = false;
+    // The query sampling options for operations on this opCtx.
+    boost::optional<QuerySamplingOptions> _querySamplingOpts;
 };
 
 // Gets a TimeZoneDatabase pointer from the ServiceContext.
