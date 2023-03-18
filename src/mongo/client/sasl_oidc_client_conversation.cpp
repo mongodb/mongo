@@ -34,6 +34,7 @@
 #include "mongo/base/data_range.h"
 #include "mongo/bson/json.h"
 #include "mongo/client/mongo_uri.h"
+#include "mongo/client/oauth_discovery_factory.h"
 #include "mongo/client/sasl_client_session.h"
 #include "mongo/client/sasl_oidc_client_params_gen.h"
 #include "mongo/db/auth/oidc_protocol_gen.h"
@@ -95,8 +96,10 @@ BSONObj doPostRequest(HttpClient* httpClient, StringData endPoint, const std::st
 
 // @returns {accessToken, refreshToken}
 std::pair<std::string, std::string> doDeviceAuthorizationGrantFlow(
-    const auth::OIDCMechanismServerStep1& serverReply, StringData principalName) {
-    auto deviceAuthorizationEndpoint = serverReply.getDeviceAuthorizationEndpoint().get();
+    const OAuthAuthorizationServerMetadata& discoveryReply,
+    const auth::OIDCMechanismServerStep1& serverReply,
+    StringData principalName) {
+    auto deviceAuthorizationEndpoint = discoveryReply.getDeviceAuthorizationEndpoint().get();
     uassert(ErrorCodes::BadValue,
             "Device authorization endpoint in server reply must be an https endpoint or localhost",
             deviceAuthorizationEndpoint.startsWith("https://"_sd) ||
@@ -137,7 +140,7 @@ std::pair<std::string, std::string> doDeviceAuthorizationGrantFlow(
 
     while (true) {
         BSONObj tokenResponseObj =
-            doPostRequest(httpClient.get(), serverReply.getTokenEndpoint(), tokenRequest);
+            doPostRequest(httpClient.get(), discoveryReply.getTokenEndpoint(), tokenRequest);
         auto tokenResponse =
             OIDCTokenResponse::parse(IDLParserContext{"oidcTokenResponse"}, tokenResponseObj);
 
@@ -271,8 +274,13 @@ StatusWith<bool> SaslOIDCClientConversation::_secondStep(StringData input,
         auto serverReply = auth::OIDCMechanismServerStep1::parse(
             IDLParserContext{"oidcServerStep1Reply"}, payload);
 
+        auto issuer = serverReply.getIssuer();
+
+        OAuthDiscoveryFactory discoveryFactory(HttpClient::create());
+        OAuthAuthorizationServerMetadata discoveryReply = discoveryFactory.acquire(issuer);
+
         // The token endpoint must be provided for both device auth and authz code flows.
-        auto tokenEndpoint = serverReply.getTokenEndpoint();
+        auto tokenEndpoint = discoveryReply.getTokenEndpoint();
         uassert(ErrorCodes::BadValue,
                 "Missing or invalid token endpoint in server reply",
                 !tokenEndpoint.empty() &&
@@ -284,12 +292,13 @@ StatusWith<bool> SaslOIDCClientConversation::_secondStep(StringData input,
 
         // Try device authorization grant flow first if provided, falling back to authorization code
         // flow.
-        if (serverReply.getDeviceAuthorizationEndpoint()) {
-            auto tokens = doDeviceAuthorizationGrantFlow(serverReply, _principalName);
+        if (discoveryReply.getDeviceAuthorizationEndpoint()) {
+            auto tokens =
+                doDeviceAuthorizationGrantFlow(discoveryReply, serverReply, _principalName);
             _accessToken = tokens.first;
             oidcClientGlobalParams.oidcAccessToken = tokens.first;
             oidcClientGlobalParams.oidcRefreshToken = tokens.second;
-        } else if (serverReply.getAuthorizationEndpoint()) {
+        } else if (discoveryReply.getAuthorizationEndpoint()) {
             auto tokens = doAuthorizationCodeFlow(serverReply);
             _accessToken = tokens.first;
             oidcClientGlobalParams.oidcAccessToken = tokens.first;

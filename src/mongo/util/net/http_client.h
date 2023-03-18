@@ -73,6 +73,11 @@ public:
     virtual void allowInsecureHTTP(bool allow) = 0;
 
     /**
+     * Returns Status::OK iff the provided URL endpoint uses HTTPS.
+     */
+    static Status endpointIsHTTPS(StringData url);
+
+    /**
      * Assign a set of headers for this request.
      */
     virtual void setHeaders(const std::vector<std::string>& headers) = 0;

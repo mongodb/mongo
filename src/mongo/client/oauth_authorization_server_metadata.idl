@@ -1,4 +1,4 @@
-# Copyright (C) 2022-present MongoDB, Inc.
+# Copyright (C) 2023-present MongoDB, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the Server Side Public License, version 1,
@@ -27,51 +27,44 @@
 #
 
 global:
-    cpp_namespace: "mongo::auth"
-    cpp_includes: []
+    cpp_namespace: "mongo"
+    cpp_includes:
+      - "mongo/util/net/http_client.h"
 
 imports:
     - "mongo/db/basic_types.idl"
 
 structs:
-    OIDCMechanismClientStep1:
-        description: Client's opening request in saslStart or
-                     hello.speculativeAuthenticate
+    OAuthAuthorizationServerMetadata:
+        description: "Information advertised from an RFC8414 compliant authorization server metadata endpoint"
         strict: false
-        fields:
-            n:
-                description: "Principal name of client"
-                cpp_name: principalName
-                type: string
-                optional: true
-
-    OIDCMechanismServerStep1:
-        description: "Server's reply to clientStep1"
-        strict: false
+        generate_comparison_operators: true
         fields:
             issuer:
-                description: >-
-                    URL which describes the Authorization Server. This identifier should be
-                    the iss of provided access tokens, and be viable for RFC8414
-                    metadata discovery and RFC9207 identification.
+                description: "The authorization server's issuer identifier"
+                cpp_name: issuer
                 type: string
-            clientId:
-                description: "Unique client ID for this OIDC client"
+                validator: { callback: 'HttpClient::endpointIsHTTPS' }
+            authorization_endpoint:
+                description: "URL of the authorization server's authorization endpoint"
+                cpp_name: authorizationEndpoint
                 type: string
-            clientSecret:
-                description: "Secret used when communicating with IDP"
-                type: string
+                validator: { callback: 'HttpClient::endpointIsHTTPS' }
                 optional: true
-            requestScopes:
-                description: "Additional scopes to request from IDP"
-                type: array<string>
-                optional: true
-    OIDCMechanismClientStep2:
-        description: "Client's request with signed token"
-        strict: false
-        fields:
-            jwt:
-                description: "Compact serialized JWT with signature"
-                cpp_name: JWT
+            token_endpoint:
+                description: "URL of the authorization server's token endpoint"
+                cpp_name: tokenEndpoint
                 type: string
-
+                validator: { callback: 'HttpClient::endpointIsHTTPS' }
+            device_authorization_endpoint:
+                description: "URL of the authorization server's device authorization endpoint"
+                cpp_name: deviceAuthorizationEndpoint
+                type: string
+                validator: { callback: 'HttpClient::endpointIsHTTPS' }
+                optional: true
+            jwks_uri:
+                description: "URL of the authorization server's jwks endpoint"
+                cpp_name: jwksUri
+                type: string
+                validator: { callback: 'HttpClient::endpointIsHTTPS' }
+                optional: true

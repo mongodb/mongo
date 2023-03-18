@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2021-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,42 +27,33 @@
  *    it in the license file.
  */
 
-#include "mongo/util/net/http_client.h"
-#include "mongo/base/status.h"
+#include "mongo/client/oauth_discovery_factory.h"
+
+#include <fmt/format.h>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/json.h"
 
 namespace mongo {
 
 namespace {
-HttpClientProvider* _factory{nullptr};
-}
+using namespace fmt::literals;
+}  // namespace
 
-HttpClientProvider::~HttpClientProvider() {}
+OAuthAuthorizationServerMetadata OAuthDiscoveryFactory::acquire(StringData issuer) {
+    // RFC8414 declares that the well-known addresses defined by OpenID Connect are valid for
+    // compliant clients for legacy purposes. Newer clients should use
+    // '.well-known/oauth-authorization-server'. However, that endpoint uses a different URL
+    // construction scheme which doesn't seem to work with any of the authorization servers we've
+    // tested.
+    auto openIDConfiguationEndpoint = "{}/.well-known/openid-configuration"_format(issuer);
 
-void registerHTTPClientProvider(HttpClientProvider* factory) {
-    invariant(_factory == nullptr);
-    _factory = factory;
-}
-
-Status HttpClient::endpointIsHTTPS(StringData url) {
-    if (url.startsWith("https://")) {
-        return Status::OK();
-    }
-    return Status(ErrorCodes::IllegalOperation, "Endpoint is not HTTPS");
-}
-
-std::unique_ptr<HttpClient> HttpClient::create() {
-    invariant(_factory != nullptr);
-    return _factory->create();
-}
-
-std::unique_ptr<HttpClient> HttpClient::createWithoutConnectionPool() {
-    invariant(_factory != nullptr);
-    return _factory->createWithoutConnectionPool();
-}
-
-BSONObj HttpClient::getServerStatus() {
-    invariant(_factory != nullptr);
-    return _factory->getServerStatus();
+    DataBuilder results = _client->get(openIDConfiguationEndpoint);
+    StringData textResult =
+        uassertStatusOK(results.getCursor().readAndAdvanceNoThrow<StringData>());
+    BSONObj bsonResults = fromjson(textResult);
+    IDLParserContext parserContext("metadata");
+    return OAuthAuthorizationServerMetadata::parse(parserContext, bsonResults);
 }
 
 }  // namespace mongo

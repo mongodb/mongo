@@ -213,6 +213,16 @@ else:
         ],
     )
 
+env.Library(
+    target='mock_http_client',
+    source=[
+        'http_client_mock.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
 env.CppUnitTest(
     target='util_net_test',
     source=[

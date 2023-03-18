@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2021-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,42 +27,43 @@
  *    it in the license file.
  */
 
-#include "mongo/util/net/http_client.h"
-#include "mongo/base/status.h"
+#include "mongo/platform/basic.h"
+
+#include "mongo/util/net/http_client_mock.h"
+
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
-namespace {
-HttpClientProvider* _factory{nullptr};
-}
 
-HttpClientProvider::~HttpClientProvider() {}
-
-void registerHTTPClientProvider(HttpClientProvider* factory) {
-    invariant(_factory == nullptr);
-    _factory = factory;
-}
-
-Status HttpClient::endpointIsHTTPS(StringData url) {
-    if (url.startsWith("https://")) {
-        return Status::OK();
+HttpClient::HttpReply MockHttpClient::request(HttpMethod method,
+                                              StringData url,
+                                              ConstDataRange data) const {
+    if (url.startsWith("http://") && !url.startsWith("http://localhost")) {
+        uassert(ErrorCodes::IllegalOperation,
+                "Unsafe and unexpected HTTP operation performed with mock HttpClient",
+                _allow);
     }
-    return Status(ErrorCodes::IllegalOperation, "Endpoint is not HTTPS");
-}
 
-std::unique_ptr<HttpClient> HttpClient::create() {
-    invariant(_factory != nullptr);
-    return _factory->create();
-}
+    auto it = _expectations.find(Request{method, url.toString()});
+    uassert(ErrorCodes::OperationFailed,
+            "Unexpected request submitted to mock HttpClient",
+            it != _expectations.end());
 
-std::unique_ptr<HttpClient> HttpClient::createWithoutConnectionPool() {
-    invariant(_factory != nullptr);
-    return _factory->createWithoutConnectionPool();
-}
+    auto reply = it->second;
+    DataBuilder headerBuilder;
+    for (StringData line : reply.header) {
+        uassertStatusOK(headerBuilder.writeAndAdvance(line));
+        uassertStatusOK(headerBuilder.writeAndAdvance("\n"_sd));
+    }
+    DataBuilder bodyBuilder;
+    uassertStatusOK(bodyBuilder.writeAndAdvance<StringData>(reply.body));
 
-BSONObj HttpClient::getServerStatus() {
-    invariant(_factory != nullptr);
-    return _factory->getServerStatus();
+    HttpClient::HttpReply ret(reply.code, std::move(headerBuilder), std::move(bodyBuilder));
+
+    _expectations.erase(it);
+
+    return ret;
 }
 
 }  // namespace mongo

@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2021-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,42 +27,52 @@
  *    it in the license file.
  */
 
+#pragma once
+
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/net/http_client.h"
-#include "mongo/base/status.h"
+#include <cstdint>
 
 namespace mongo {
 
-namespace {
-HttpClientProvider* _factory{nullptr};
-}
+class MockHttpClient : public HttpClient {
+public:
+    MockHttpClient() = default;
 
-HttpClientProvider::~HttpClientProvider() {}
-
-void registerHTTPClientProvider(HttpClientProvider* factory) {
-    invariant(_factory == nullptr);
-    _factory = factory;
-}
-
-Status HttpClient::endpointIsHTTPS(StringData url) {
-    if (url.startsWith("https://")) {
-        return Status::OK();
+    void allowInsecureHTTP(bool allow) final {
+        _allow = allow;
     }
-    return Status(ErrorCodes::IllegalOperation, "Endpoint is not HTTPS");
-}
 
-std::unique_ptr<HttpClient> HttpClient::create() {
-    invariant(_factory != nullptr);
-    return _factory->create();
-}
+    void setHeaders(const std::vector<std::string>& headers) final {}
 
-std::unique_ptr<HttpClient> HttpClient::createWithoutConnectionPool() {
-    invariant(_factory != nullptr);
-    return _factory->createWithoutConnectionPool();
-}
+    HttpReply request(HttpMethod method,
+                      StringData url,
+                      ConstDataRange data = {nullptr, 0}) const final;
 
-BSONObj HttpClient::getServerStatus() {
-    invariant(_factory != nullptr);
-    return _factory->getServerStatus();
-}
+    struct Request {
+        HttpMethod method;
+        std::string url;
+
+        template <typename H>
+        friend H AbslHashValue(H h, const Request& request) {
+            return H::combine(std::move(h), request.method, request.url);
+        }
+        friend bool operator==(const Request& my, const Request& other) {
+            return my.method == other.method && my.url == other.url;
+        }
+    };
+    struct Response {
+        std::uint16_t code;
+        std::vector<std::string> header;
+        std::string body;
+    };
+    void expect(Request request, Response response) {
+        _expectations.emplace(std::move(request), std::move(response));
+    }
+
+private:
+    bool _allow = false;
+    mutable stdx::unordered_map<Request, Response> _expectations;
+};
 
 }  // namespace mongo
