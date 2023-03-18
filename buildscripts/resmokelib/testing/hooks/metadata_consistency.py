@@ -31,6 +31,12 @@ class CheckMetadataConsistencyInBackground(jsfile.DataConsistencyHook):
     def before_suite(self, test_report):
         """Start the background thread."""
 
+        # TODO SERVER-70396: unconditionally run this hook once the future flag will be removed
+        if not self.fixture.feature_flag_present_and_enabled("CheckMetadataConsistency"):
+            self.logger.info(
+                "Skipping background metadata consistency check because feature flag is disabled")
+            return
+
         self._background_job = _BackgroundJob("CheckMetadataConsistencyInBackground")
         self.logger.info("Starting background metadata consistency checker thread")
         self._background_job.start()
