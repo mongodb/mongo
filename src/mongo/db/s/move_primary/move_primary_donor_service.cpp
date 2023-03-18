@@ -45,6 +45,7 @@ MONGO_FAIL_POINT_DEFINE(pauseDuringMovePrimaryDonorStateEnumTransition);
 MONGO_FAIL_POINT_DEFINE(pauseDuringMovePrimaryDonorStateEnumTransitionAlternate);
 
 MONGO_FAIL_POINT_DEFINE(pauseBeforeBeginningMovePrimaryDonorWorkflow);
+MONGO_FAIL_POINT_DEFINE(pauseBeforeBeginningMovePrimaryDonorCleanup);
 
 enum StateTransitionProgress {
     kBefore,   // Prior to any changes for state.
@@ -240,6 +241,13 @@ void MovePrimaryDonorExternalState::syncDataOnRecipient(OperationContext* opCtx,
     runCommandOnRecipient(opCtx, request.toBSON({}));
 }
 
+void MovePrimaryDonorExternalState::forgetMigrationOnRecipient(OperationContext* opCtx) {
+    MovePrimaryRecipientForgetMigration request;
+    request.setMovePrimaryCommonMetadata(getMetadata());
+    request.setDbName(getMetadata().getDatabaseName().db());
+    runCommandOnRecipient(opCtx, request.toBSON({}));
+}
+
 void MovePrimaryDonorExternalState::runCommandOnRecipient(OperationContext* opCtx,
                                                           const BSONObj& command) {
     uassertStatusOK(runCommand(opCtx,
@@ -316,6 +324,10 @@ SharedSemiFuture<void> MovePrimaryDonor::getReadyToBlockWritesFuture() const {
     return _readyToBlockWritesPromise.getFuture();
 }
 
+SharedSemiFuture<void> MovePrimaryDonor::getDecisionFuture() const {
+    return _decisionPromise.getFuture();
+}
+
 SharedSemiFuture<void> MovePrimaryDonor::getCompletionFuture() const {
     return _completionPromise.getFuture();
 }
@@ -356,41 +368,56 @@ ExecutorFuture<void> MovePrimaryDonor::runDonorWorkflow() {
         .then([this] { return doWaitingToBlockWrites(); })
         .then([this] { return transitionToState(MovePrimaryDonorStateEnum::kBlockingWrites); })
         .then([this] { return doBlockingWrites(); })
-        .then([this] { return transitionToState(MovePrimaryDonorStateEnum::kPrepared); });
+        .then([this] { return transitionToState(MovePrimaryDonorStateEnum::kPrepared); })
+        .then([this] { return doPrepared(); })
+        .then([this] { return doForget(); });
 }
 
 ExecutorFuture<void> MovePrimaryDonor::transitionToState(MovePrimaryDonorStateEnum newState) {
+    if (newState == MovePrimaryDonorStateEnum::kDone) {
+        return deleteStateDocument();
+    }
     return _retry->untilAbortOrSuccess(
         fmt::format("transitionToState({})", MovePrimaryDonorState_serializer(newState)),
         [this, newState](const auto& factory) {
-            auto oldState = getCurrentState();
-            if (oldState >= newState) {
-                return;
-            }
             auto opCtx = factory.makeOperationContext(&cc());
-            auto newDocument = buildCurrentStateDocument();
-            newDocument.getMutableFields().setState(newState);
-            evaluatePauseDuringStateTransitionFailpoints(StateTransitionProgress::kBefore,
-                                                         newState);
-
-            updateOnDiskState(opCtx.get(), newDocument);
-
-            evaluatePauseDuringStateTransitionFailpoints(StateTransitionProgress::kPartial,
-                                                         newState);
-
-            updateInMemoryState(newDocument);
-            _metrics->onStateTransition(oldState, newState);
-
-            evaluatePauseDuringStateTransitionFailpoints(StateTransitionProgress::kAfter, newState);
-
-            LOGV2(7306300,
-                  "MovePrimaryDonor transitioned state",
-                  "oldState"_attr = MovePrimaryDonorState_serializer(oldState),
-                  "newState"_attr = MovePrimaryDonorState_serializer(newState),
-                  "migrationId"_attr = _metadata.get_id(),
-                  "databaseName"_attr = _metadata.getDatabaseName(),
-                  "toShard"_attr = _metadata.getShardName());
+            tryTransitionToStateOnce(opCtx.get(), newState);
         });
+}
+
+ExecutorFuture<void> MovePrimaryDonor::deleteStateDocument() {
+    return _retry->untilStepdownOrSuccess("deleteStateDocument()", [this](const auto& factory) {
+        auto opCtx = factory.makeOperationContext(&cc());
+        tryTransitionToStateOnce(opCtx.get(), MovePrimaryDonorStateEnum::kDone);
+    });
+}
+
+void MovePrimaryDonor::tryTransitionToStateOnce(OperationContext* opCtx,
+                                                MovePrimaryDonorStateEnum newState) {
+    auto oldState = getCurrentState();
+    if (oldState >= newState) {
+        return;
+    }
+    auto newDocument = buildCurrentStateDocument();
+    newDocument.getMutableFields().setState(newState);
+    evaluatePauseDuringStateTransitionFailpoints(StateTransitionProgress::kBefore, newState);
+
+    updateOnDiskState(opCtx, newDocument);
+
+    evaluatePauseDuringStateTransitionFailpoints(StateTransitionProgress::kPartial, newState);
+
+    updateInMemoryState(newDocument);
+    _metrics->onStateTransition(oldState, newState);
+
+    evaluatePauseDuringStateTransitionFailpoints(StateTransitionProgress::kAfter, newState);
+
+    LOGV2(7306300,
+          "MovePrimaryDonor transitioned state",
+          "oldState"_attr = MovePrimaryDonorState_serializer(oldState),
+          "newState"_attr = MovePrimaryDonorState_serializer(newState),
+          "migrationId"_attr = _metadata.get_id(),
+          "databaseName"_attr = _metadata.getDatabaseName(),
+          "toShard"_attr = _metadata.getShardName());
 }
 
 void MovePrimaryDonor::updateOnDiskState(OperationContext* opCtx,
@@ -399,6 +426,8 @@ void MovePrimaryDonor::updateOnDiskState(OperationContext* opCtx,
     auto state = newStateDocument.getMutableFields().getState();
     if (state == MovePrimaryDonorStateEnum::kInitializing) {
         store.add(opCtx, newStateDocument);
+    } else if (state == MovePrimaryDonorStateEnum::kDone) {
+        store.remove(opCtx, BSON(MovePrimaryDonorDocument::k_idFieldName << _metadata.get_id()));
     } else {
         store.update(opCtx,
                      BSON(MovePrimaryDonorDocument::k_idFieldName << _metadata.get_id()),
@@ -423,6 +452,9 @@ ExecutorFuture<void> MovePrimaryDonor::doNothing() {
 }
 
 ExecutorFuture<void> MovePrimaryDonor::doCloning() {
+    if (getCurrentState() > MovePrimaryDonorStateEnum::kCloning) {
+        return doNothing();
+    }
     return _retry->untilAbortOrSuccess("doCloning()", [this](const auto& factory) {
         auto opCtx = factory.makeOperationContext(&cc());
         _externalState->syncDataOnRecipient(opCtx.get());
@@ -430,16 +462,14 @@ ExecutorFuture<void> MovePrimaryDonor::doCloning() {
 }
 
 ExecutorFuture<void> MovePrimaryDonor::doWaitingToBlockWrites() {
-    return runOnTaskExecutor([this] {
-        if (getCurrentState() > MovePrimaryDonorStateEnum::kWaitingToBlockWrites) {
-            return doNothing();
-        }
-        return waitUntilReadyToBlockWrites()
-            .then([this] { return waitUntilCurrentlyBlockingWrites(); })
-            .then([this](Timestamp blockingWritesTimestamp) {
-                return persistBlockingWritesTimestamp(blockingWritesTimestamp);
-            });
-    });
+    if (getCurrentState() > MovePrimaryDonorStateEnum::kWaitingToBlockWrites) {
+        return doNothing();
+    }
+    return waitUntilReadyToBlockWrites()
+        .then([this] { return waitUntilCurrentlyBlockingWrites(); })
+        .then([this](Timestamp blockingWritesTimestamp) {
+            return persistBlockingWritesTimestamp(blockingWritesTimestamp);
+        });
 }
 
 ExecutorFuture<void> MovePrimaryDonor::waitUntilReadyToBlockWrites() {
@@ -466,6 +496,10 @@ void MovePrimaryDonor::onBeganBlockingWrites(StatusWith<Timestamp> blockingWrite
     _currentlyBlockingWritesPromise.setFrom(blockingWritesTimestamp);
 }
 
+void MovePrimaryDonor::onReadyToForget() {
+    _readyToForgetPromise.setFrom(Status::OK());
+}
+
 ExecutorFuture<void> MovePrimaryDonor::persistBlockingWritesTimestamp(
     Timestamp blockingWritesTimestamp) {
     return _retry->untilAbortOrSuccess(
@@ -487,6 +521,9 @@ ExecutorFuture<void> MovePrimaryDonor::persistBlockingWritesTimestamp(
 }
 
 ExecutorFuture<void> MovePrimaryDonor::doBlockingWrites() {
+    if (getCurrentState() > MovePrimaryDonorStateEnum::kBlockingWrites) {
+        return doNothing();
+    }
     return _retry->untilAbortOrSuccess("doBlockingWrites()", [this](const auto& factory) {
         auto opCtx = factory.makeOperationContext(&cc());
         auto timestamp = getMutableFields().getBlockingWritesTimestamp();
@@ -495,5 +532,25 @@ ExecutorFuture<void> MovePrimaryDonor::doBlockingWrites() {
     });
 }
 
+ExecutorFuture<void> MovePrimaryDonor::doPrepared() {
+    return runOnTaskExecutor([this] { _decisionPromise.setFrom(Status::OK()); });
+}
+
+ExecutorFuture<void> MovePrimaryDonor::doForget() {
+    return runOnTaskExecutor([this] {
+               return future_util::withCancellation(_readyToForgetPromise.getFuture(),
+                                                    _cancelState->getStepdownToken());
+           })
+        .then([this] { pauseBeforeBeginningMovePrimaryDonorCleanup.pauseWhileSet(); })
+        .then([this] { return cleanup(); })
+        .then([this] { return transitionToState(MovePrimaryDonorStateEnum::kDone); });
+}
+
+ExecutorFuture<void> MovePrimaryDonor::cleanup() {
+    return _retry->untilStepdownOrSuccess("cleanup()", [this](const auto& factory) {
+        auto opCtx = factory.makeOperationContext(&cc());
+        _externalState->forgetMigrationOnRecipient(opCtx.get());
+    });
+}
 
 }  // namespace mongo

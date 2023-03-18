@@ -78,6 +78,32 @@ private:
     CancellationToken _abortToken;
 };
 
+// Retries indefinitely unless this node is stepping down. Intended to be used with
+// resharding::RetryingCancelableOperationContextFactory for cases where an operation failure is not
+// allowed to abort the task being performed by a PrimaryOnlyService (e.g. because that
+// task is already aborted, or past the point where aborts are allowed).
+template <typename BodyCallable>
+class [[nodiscard]] IndefiniteRetryProvider {
+public:
+    explicit IndefiniteRetryProvider(BodyCallable&& body) : _body{std::move(body)} {}
+
+    template <typename Predicate>
+    auto until(Predicate&& predicate) && {
+        using StatusType =
+            decltype(std::declval<Future<FutureContinuationResult<BodyCallable>>>().getNoThrow());
+        static_assert(
+            std::is_invocable_r_v<bool, Predicate, StatusType>,
+            "Predicate to until() must implement call operator accepting Status or StatusWith "
+            "type that would be returned by this class's BodyCallable, and must return bool");
+        return AsyncTry(std::move(_body))
+            .until([predicate = std::move(predicate)](const auto& statusLike) {
+                return predicate(statusLike);
+            });
+    }
+
+private:
+    BodyCallable _body;
+};
 class MovePrimaryDonorRetryHelper {
 public:
     MovePrimaryDonorRetryHelper(const MovePrimaryCommonMetadata& metadata,
@@ -86,47 +112,33 @@ public:
 
     template <typename Fn>
     auto untilStepdownOrSuccess(const std::string& operationName, Fn&& fn) {
-        return untilImpl(operationName,
-                         std::forward<Fn>(fn),
-                         _cancelOnStepdownFactory,
-                         _cancelState->getStepdownToken());
+        return _cancelOnStepdownFactory
+            .withAutomaticRetry<decltype(fn), IndefiniteRetryProvider>(std::forward<Fn>(fn))
+            .until([this](const auto& statusLike) { return statusLike.isOK(); })
+            .withBackoffBetweenIterations(kBackoff)
+            .on(**_taskExecutor, _cancelState->getStepdownToken());
     }
 
     template <typename Fn>
     auto untilAbortOrSuccess(const std::string& operationName, Fn&& fn) {
-        return untilImpl(operationName,
-                         std::forward<Fn>(fn),
-                         _cancelOnAbortFactory,
-                         _cancelState->getAbortToken());
-    }
-
-private:
-    template <typename Fn>
-    using FuturizedResultType =
-        FutureContinuationResult<Fn, const CancelableOperationContextFactory&>;
-
-    template <typename Fn>
-    using StatusifiedResultType =
-        decltype(std::declval<Future<FuturizedResultType<Fn>>>().getNoThrow());
-
-    template <typename Fn>
-    auto untilImpl(const std::string& operationName,
-                   Fn&& fn,
-                   const resharding::RetryingCancelableOperationContextFactory& factory,
-                   const CancellationToken& token) {
-        return factory.withAutomaticRetry(std::forward<Fn>(fn))
+        using FuturizedResultType =
+            FutureContinuationResult<Fn, const CancelableOperationContextFactory&>;
+        using StatusifiedResultType =
+            decltype(std::declval<Future<FuturizedResultType>>().getNoThrow());
+        return _cancelOnAbortFactory.withAutomaticRetry(std::forward<Fn>(fn))
             .onTransientError([this, operationName](const Status& status) {
                 handleTransientError(operationName, status);
             })
             .onUnrecoverableError([this, operationName](const Status& status) {
                 handleUnrecoverableError(operationName, status);
             })
-            .template until<StatusifiedResultType<Fn>>(
+            .template until<StatusifiedResultType>(
                 [](const auto& statusLike) { return statusLike.isOK(); })
             .withBackoffBetweenIterations(kBackoff)
-            .on(**_taskExecutor, token);
+            .on(**_taskExecutor, _cancelState->getAbortToken());
     }
 
+private:
     void handleTransientError(const std::string& operationName, const Status& status);
     void handleUnrecoverableError(const std::string& operationName, const Status& status);
 
@@ -147,6 +159,7 @@ public:
 
     void syncDataOnRecipient(OperationContext* opCtx);
     void syncDataOnRecipient(OperationContext* opCtx, boost::optional<Timestamp> timestamp);
+    void forgetMigrationOnRecipient(OperationContext* opCtx);
 
 protected:
     virtual StatusWith<Shard::CommandResponse> runCommand(OperationContext* opCtx,
@@ -203,8 +216,10 @@ public:
     const MovePrimaryCommonMetadata& getMetadata() const;
 
     void onBeganBlockingWrites(StatusWith<Timestamp> blockingWritesTimestamp);
+    void onReadyToForget();
 
     SharedSemiFuture<void> getReadyToBlockWritesFuture() const;
+    SharedSemiFuture<void> getDecisionFuture() const;
     SharedSemiFuture<void> getCompletionFuture() const;
 
 private:
@@ -224,6 +239,11 @@ private:
     ExecutorFuture<void> waitUntilReadyToBlockWrites();
     ExecutorFuture<Timestamp> waitUntilCurrentlyBlockingWrites();
     ExecutorFuture<void> persistBlockingWritesTimestamp(Timestamp blockingWritesTimestamp);
+    ExecutorFuture<void> doPrepared();
+    ExecutorFuture<void> doForget();
+    ExecutorFuture<void> cleanup();
+    ExecutorFuture<void> deleteStateDocument();
+    void tryTransitionToStateOnce(OperationContext* opCtx, MovePrimaryDonorStateEnum newState);
     void updateOnDiskState(OperationContext* opCtx,
                            const MovePrimaryDonorDocument& newStateDocument);
     void updateInMemoryState(const MovePrimaryDonorDocument& newStateDocument);
@@ -249,6 +269,8 @@ private:
 
     SharedPromise<void> _readyToBlockWritesPromise;
     SharedPromise<Timestamp> _currentlyBlockingWritesPromise;
+    SharedPromise<void> _decisionPromise;
+    SharedPromise<void> _readyToForgetPromise;
     SharedPromise<void> _completionPromise;
 };
 

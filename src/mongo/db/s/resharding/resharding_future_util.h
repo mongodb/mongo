@@ -170,17 +170,19 @@ private:
 };
 
 /**
- * Wrapper class around CancelableOperationContextFactory which uses resharding::WithAutomaticRetry
- * to ensure all cancelable operations will be retried if able upon failure.
+ * Wrapper class around CancelableOperationContextFactory which by default uses
+ * resharding::WithAutomaticRetry to ensure all cancelable operations will be retried if able upon
+ * failure.
  */
 class RetryingCancelableOperationContextFactory {
 public:
     RetryingCancelableOperationContextFactory(CancellationToken cancelToken, ExecutorPtr executor)
         : _factory{std::move(cancelToken), std::move(executor)} {}
 
-    template <typename BodyCallable>
+    template <typename BodyCallable,
+              template <typename> typename RetryProvider = resharding::WithAutomaticRetry>
     decltype(auto) withAutomaticRetry(BodyCallable&& body) const {
-        return resharding::WithAutomaticRetry([this, body]() { return body(_factory); });
+        return RetryProvider([this, body]() { return body(_factory); });
     }
 
 private:

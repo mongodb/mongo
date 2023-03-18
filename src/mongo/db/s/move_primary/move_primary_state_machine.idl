@@ -42,13 +42,14 @@ enums:
         description: "The state of a movePrimary operation on the donor side."
         type: string
         values:
-            kUninitialized: "uninitialized"
+            kUnused: "unused"
             kInitializing: "initializing"
             kCloning: "cloning"
             kWaitingToBlockWrites: "waitingToBlockWrites"
             kBlockingWrites: "blockingWrites"
             kPrepared: "prepared"
             kAborted: "aborted"
+            kDone: "done"
 
     MovePrimaryRecipientState:
         description: "The state of a movePrimary operation on the recipient side."
@@ -72,7 +73,7 @@ structs:
             state:
                 type: MovePrimaryDonorState
                 description: "The state of an in-progress movePrimary operation on the donor."
-                default: kUninitialized
+                default: kUnused
             blockingWritesTimestamp:
                 type: timestamp
                 description: >-
