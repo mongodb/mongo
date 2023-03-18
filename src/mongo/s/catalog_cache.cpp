@@ -908,7 +908,7 @@ CatalogCache::CollectionCache::LookupResult CatalogCache::CollectionCache::_look
         newComparableVersion.setChunkVersion(newVersion);
 
         LOGV2_FOR_CATALOG_REFRESH(4619901,
-                                  isIncremental || newComparableVersion != previousVersion ? 0 : 1,
+                                  !isIncremental || newComparableVersion != previousVersion ? 0 : 1,
                                   "Refreshed cached collection",
                                   "namespace"_attr = nss,
                                   "lookupSinceVersion"_attr = lookupVersion,
