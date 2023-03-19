@@ -430,7 +430,7 @@ class TestSetParameters(_ResmokeSelftest):
 
 def execute_resmoke(resmoke_args):
     return subprocess.run([sys.executable, "buildscripts/resmoke.py", "run"] + resmoke_args,
-                          text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                          text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE).stdout
 
 
 class TestExceptionExtraction(unittest.TestCase):
@@ -438,7 +438,7 @@ class TestExceptionExtraction(unittest.TestCase):
         resmoke_args = [
             "--suites=buildscripts/tests/resmoke_end2end/suites/resmoke_failing_python.yml",
         ]
-        output = execute_resmoke(resmoke_args).stdout
+        output = execute_resmoke(resmoke_args)
 
         expected = "The following tests failed (with exit code):\n        buildscripts/tests/resmoke_end2end/failtestfiles/python_failure.py (1 DB Exception)\n            [LAST Part of Exception]"
         assert expected in output
@@ -447,7 +447,7 @@ class TestExceptionExtraction(unittest.TestCase):
         resmoke_args = [
             "--suites=buildscripts/tests/resmoke_end2end/suites/resmoke_failing_javascript.yml",
         ]
-        output = execute_resmoke(resmoke_args).stdout
+        output = execute_resmoke(resmoke_args)
 
         expected = "The following tests failed (with exit code):\n        buildscripts/tests/resmoke_end2end/failtestfiles/js_failure.js (253 Failure executing JS file)\n            uncaught exception: Error: [true] != [false] are not equal"
         assert expected in output
@@ -456,7 +456,7 @@ class TestExceptionExtraction(unittest.TestCase):
         resmoke_args = [
             "--suites=buildscripts/tests/resmoke_end2end/suites/resmoke_fixture_error.yml",
         ]
-        output = execute_resmoke(resmoke_args).stdout
+        output = execute_resmoke(resmoke_args)
 
         expected = "The following tests had errors:\n    job0_fixture_setup_0\n        Traceback (most recent call last):\n"
         assert expected in output
@@ -465,34 +465,7 @@ class TestExceptionExtraction(unittest.TestCase):
         resmoke_args = [
             "--suites=buildscripts/tests/resmoke_end2end/suites/resmoke_hook_error.yml",
         ]
-        output = execute_resmoke(resmoke_args).stdout
+        output = execute_resmoke(resmoke_args)
 
         expected = "The following tests had errors:\n    buildscripts/tests/resmoke_end2end/failtestfiles/js_failure.js\n        Traceback (most recent call last):\n"
         assert expected in output
-
-
-class TestForceExcludedTest(unittest.TestCase):
-    def test_no_force_exclude(self):
-        resmoke_args = [
-            "--suites=buildscripts/tests/resmoke_end2end/suites/resmoke_suite_with_excludes.yml",
-            "buildscripts/tests/resmoke_end2end/testfiles/one.js",
-        ]
-
-        result = execute_resmoke(resmoke_args)
-
-        expected = "Cannot run excluded test in suite config. Use '--force-excluded-tests' to override:"
-        assert expected in result.stdout
-        assert result.returncode == 1
-
-    def test_with_force_exclude(self):
-        resmoke_args = [
-            "--suites=buildscripts/tests/resmoke_end2end/suites/resmoke_suite_with_excludes.yml",
-            "--force-excluded-tests",
-            "--dryRun",
-            "tests",
-            "buildscripts/tests/resmoke_end2end/testfiles/one.js",
-        ]
-
-        result = execute_resmoke(resmoke_args)
-
-        assert result.returncode == 0

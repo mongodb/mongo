@@ -3,7 +3,6 @@ import collections
 import os
 from threading import Lock
 from typing import Dict, List
-import buildscripts.resmokelib.logging.loggers as loggers
 
 import buildscripts.resmokelib.utils.filesystem as fs
 from buildscripts.resmokelib import config as _config
@@ -102,20 +101,10 @@ def get_suites(suite_names_or_paths, test_files):
     suites = []
     for suite_filename in suite_names_or_paths:
         suite_config = _get_suite_config(suite_filename)
-        suite = _suite.Suite(suite_filename, suite_config)
         if suite_roots:
             # Override the suite's default test files with those passed in from the command line.
-            override_suite_config = suite_config.copy()
-            override_suite_config.update(suite_roots)
-            override_suite = _suite.Suite(suite_filename, override_suite_config)
-            for test in override_suite.tests:
-                if test in suite.excluded:
-                    if _config.FORCE_EXCLUDED_TESTS:
-                        loggers.ROOT_EXECUTOR_LOGGER.warning("Will forcibly run excluded test: %s",
-                                                             test)
-                    else:
-                        raise errors.ResmokeError(f"'{test}' excluded in '{suite.get_name()}'")
-            suite = override_suite
+            suite_config.update(suite_roots)
+        suite = _suite.Suite(suite_filename, suite_config)
         suites.append(suite)
     return suites
 
