@@ -40,6 +40,10 @@
 namespace mongo {
 namespace change_stream_pre_image_helpers {
 boost::optional<Date_t> getPreImageExpirationTime(OperationContext* opCtx, Date_t currentTime);
+
+Timestamp getPreImageTimestamp(const RecordId& rid);
+
+RecordId toRecordId(ChangeStreamPreImageId id);
 }  // namespace change_stream_pre_image_helpers
 
 /**

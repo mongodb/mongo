@@ -89,6 +89,25 @@ boost::optional<Date_t> getPreImageExpirationTime(OperationContext* opCtx, Date_
     return expireAfterSeconds ? boost::optional<Date_t>(currentTime - Seconds(*expireAfterSeconds))
                               : boost::none;
 }
+
+// TODO SERVER-74981: Investigate whether there is a safer way to extract the Timestamp.
+Timestamp getPreImageTimestamp(const RecordId& rid) {
+    static constexpr auto kTopLevelFieldName = "ridAsBSON"_sd;
+    auto ridAsNestedBSON = record_id_helpers::toBSONAs(rid, kTopLevelFieldName);
+    // 'toBSONAs()' discards type bits of the underlying KeyString of the RecordId. However, since
+    // the 'ts' field of 'ChangeStreamPreImageId' is distinct CType::kTimestamp, type bits aren't
+    // necessary to obtain the original value.
+
+    auto ridBSON = ridAsNestedBSON.getObjectField(kTopLevelFieldName);
+    auto tsElem = ridBSON.getField(ChangeStreamPreImageId::kTsFieldName);
+    return tsElem.timestamp();
+}
+
+RecordId toRecordId(ChangeStreamPreImageId id) {
+    return record_id_helpers::keyForElem(
+        BSON(ChangeStreamPreImage::kIdFieldName << id.toBSON()).firstElement());
+}
+
 }  // namespace change_stream_pre_image_helpers
 
 void ChangeStreamPreImagesCollectionManager::createPreImagesCollection(
@@ -169,11 +188,6 @@ void ChangeStreamPreImagesCollectionManager::insertPreImage(OperationContext* op
 }
 
 namespace {
-RecordId toRecordId(ChangeStreamPreImageId id) {
-    return record_id_helpers::keyForElem(
-        BSON(ChangeStreamPreImage::kIdFieldName << id.toBSON()).firstElement());
-}
-
 /**
  * Finds the next collection UUID in the change stream pre-images collection 'preImagesCollPtr' for
  * which collection UUID is greater than 'collectionUUID'. Returns boost::none if the next
@@ -186,8 +200,9 @@ boost::optional<UUID> findNextCollectionUUID(OperationContext* opCtx,
 ) {
     BSONObj preImageObj;
     auto minRecordId = collectionUUID
-        ? boost::make_optional(RecordIdBound(toRecordId(ChangeStreamPreImageId(
-              *collectionUUID, Timestamp::max(), std::numeric_limits<int64_t>::max()))))
+        ? boost::make_optional(
+              RecordIdBound(change_stream_pre_image_helpers::toRecordId(ChangeStreamPreImageId(
+                  *collectionUUID, Timestamp::max(), std::numeric_limits<int64_t>::max()))))
         : boost::none;
     auto planExecutor =
         InternalPlanner::collectionScan(opCtx,
@@ -249,12 +264,13 @@ size_t _deleteExpiredChangeStreamPreImagesCommon(OperationContext* opCtx,
 
                 std::unique_ptr<BatchedDeleteStageParams> batchedDeleteParams;
                 batchedDeleteParams = std::make_unique<BatchedDeleteStageParams>();
-                RecordIdBound minRecordId(
-                    toRecordId(ChangeStreamPreImageId(*currentCollectionUUID, Timestamp(), 0)));
-                RecordIdBound maxRecordId = RecordIdBound(
-                    toRecordId(ChangeStreamPreImageId(*currentCollectionUUID,
-                                                      maxRecordIdTimestamp,
-                                                      std::numeric_limits<int64_t>::max())));
+                RecordIdBound minRecordId(change_stream_pre_image_helpers::toRecordId(
+                    ChangeStreamPreImageId(*currentCollectionUUID, Timestamp(), 0)));
+                RecordIdBound maxRecordId =
+                    RecordIdBound(change_stream_pre_image_helpers::toRecordId(
+                        ChangeStreamPreImageId(*currentCollectionUUID,
+                                               maxRecordIdTimestamp,
+                                               std::numeric_limits<int64_t>::max())));
 
                 auto exec = InternalPlanner::deleteWithCollectionScan(
                     opCtx,

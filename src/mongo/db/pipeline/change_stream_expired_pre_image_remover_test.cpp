@@ -30,37 +30,50 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/change_stream_options_manager.h"
+
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
+#include "mongo/db/change_stream_pre_images_truncate_markers.h"
+#include "mongo/db/change_stream_serverless_helpers.h"
+#include "mongo/db/change_streams_cluster_parameter_gen.h"
+#include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/op_observer/op_observer_impl.h"
+#include "mongo/db/op_observer/op_observer_registry.h"
+#include "mongo/db/op_observer/oplog_writer_impl.h"
 #include "mongo/db/pipeline/change_stream_expired_pre_image_remover.h"
+#include "mongo/db/pipeline/change_stream_preimage_gen.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
+
 namespace {
+std::unique_ptr<ChangeStreamOptions> populateChangeStreamPreImageOptions(
+    stdx::variant<std::string, std::int64_t> expireAfterSeconds) {
+    PreAndPostImagesOptions preAndPostImagesOptions;
+    preAndPostImagesOptions.setExpireAfterSeconds(expireAfterSeconds);
+
+    auto changeStreamOptions = std::make_unique<ChangeStreamOptions>();
+    changeStreamOptions->setPreAndPostImages(std::move(preAndPostImagesOptions));
+
+    return changeStreamOptions;
+}
+
+void setChangeStreamOptionsToManager(OperationContext* opCtx,
+                                     ChangeStreamOptions& changeStreamOptions) {
+    auto& changeStreamOptionsManager = ChangeStreamOptionsManager::get(opCtx);
+    ASSERT_EQ(changeStreamOptionsManager.setOptions(opCtx, changeStreamOptions).getStatus(),
+              ErrorCodes::OK);
+}
 
 class ChangeStreamPreImageExpirationPolicyTest : public ServiceContextTest {
 public:
     ChangeStreamPreImageExpirationPolicyTest() {
         ChangeStreamOptionsManager::create(getServiceContext());
-    }
-
-    std::unique_ptr<ChangeStreamOptions> populateChangeStreamPreImageOptions(
-        stdx::variant<std::string, std::int64_t> expireAfterSeconds) {
-        PreAndPostImagesOptions preAndPostImagesOptions;
-        preAndPostImagesOptions.setExpireAfterSeconds(expireAfterSeconds);
-
-        auto changeStreamOptions = std::make_unique<ChangeStreamOptions>();
-        changeStreamOptions->setPreAndPostImages(std::move(preAndPostImagesOptions));
-
-        return changeStreamOptions;
-    }
-
-    void setChangeStreamOptionsToManager(OperationContext* opCtx,
-                                         ChangeStreamOptions& changeStreamOptions) {
-        auto& changeStreamOptionsManager = ChangeStreamOptionsManager::get(opCtx);
-        ASSERT_EQ(changeStreamOptionsManager.setOptions(opCtx, changeStreamOptions).getStatus(),
-                  ErrorCodes::OK);
     }
 };
 
@@ -99,4 +112,269 @@ TEST_F(ChangeStreamPreImageExpirationPolicyTest, getPreImageExpirationTimeWithOf
     ASSERT_FALSE(receivedExpireAfterSeconds);
 }
 }  // namespace
+
+class PreImagesTruncateMarkersTest : public ServiceContextMongoDTest {
+protected:
+    explicit PreImagesTruncateMarkersTest() : ServiceContextMongoDTest() {
+        ChangeStreamOptionsManager::create(getServiceContext());
+    }
+
+    virtual void setUp() override {
+        ServiceContextMongoDTest::setUp();
+
+        auto service = getServiceContext();
+        auto opCtx = cc().makeOperationContext();
+
+        // Use the full StorageInterfaceImpl so the earliest oplog entry Timestamp is not the
+        // minimum Timestamp.
+        repl::StorageInterface::set(service, std::make_unique<repl::StorageInterfaceImpl>());
+
+        // Set up ReplicationCoordinator and create oplog. The earliest oplog entry Timestamp is
+        // required for computing whether a truncate marker is expired.
+        repl::ReplicationCoordinator::set(
+            service, std::make_unique<repl::ReplicationCoordinatorMock>(service));
+        repl::createOplog(opCtx.get());
+
+        // Ensure that we are primary.
+        auto replCoord = repl::ReplicationCoordinator::get(opCtx.get());
+        ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
+    }
+
+    void tearDown() override {
+        serverGlobalParams.clusterRole = ClusterRole::None;
+    }
+
+    void serverlessSetExpireAfterSeconds(const TenantId& tenantId, int64_t expireAfterSeconds) {
+        auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
+        auto* changeStreamsParam =
+            clusterParameters
+                ->get<ClusterParameterWithStorage<ChangeStreamsClusterParameterStorage>>(
+                    "changeStreams");
+
+        auto oldSettings = changeStreamsParam->getValue(tenantId);
+        oldSettings.setExpireAfterSeconds(expireAfterSeconds);
+        changeStreamsParam->setValue(oldSettings, tenantId).ignore();
+    }
+
+    RecordId generatePreImageRecordId(Timestamp timestamp) {
+        const UUID uuid{UUID::gen()};
+        ChangeStreamPreImageId preImageId(uuid, timestamp, 0);
+        return change_stream_pre_image_helpers::toRecordId(preImageId);
+    }
+
+
+    RecordId generatePreImageRecordId(Date_t wallTime) {
+        const UUID uuid{UUID::gen()};
+        Timestamp timestamp{wallTime};
+        ChangeStreamPreImageId preImageId(uuid, timestamp, 0);
+        return change_stream_pre_image_helpers::toRecordId(preImageId);
+    }
+
+    bool hasExcessMarkers(OperationContext* opCtx, PreImagesTruncateMarkers& markers) {
+        return markers._hasExcessMarkers(opCtx);
+    }
+
+    // The oplog must be populated in order to produce an earliest Timestamp. Creates then
+    // performs an insert on an arbitrary collection in order to populate the oplog.
+    void initEarliestOplogTSWithInsert(OperationContext* opCtx) {
+        NamespaceString arbitraryNss =
+            NamespaceString::createNamespaceString_forTest("test", "coll");
+
+        writeConflictRetry(opCtx, "createCollection", arbitraryNss.ns(), [&] {
+            WriteUnitOfWork wunit(opCtx);
+            AutoGetCollection collRaii(opCtx, arbitraryNss, MODE_X);
+            invariant(!collRaii);
+            auto db = collRaii.ensureDbExists(opCtx);
+            invariant(db->createCollection(opCtx, arbitraryNss, {}));
+            wunit.commit();
+        });
+
+        std::vector<InsertStatement> insert;
+        insert.emplace_back(BSON("_id" << 0 << "data"
+                                       << "x"));
+        WriteUnitOfWork wuow(opCtx);
+        AutoGetCollection autoColl(opCtx, arbitraryNss, MODE_IX);
+        OpObserverRegistry opObserver;
+        opObserver.addObserver(
+            std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
+        opObserver.onInserts(opCtx, *autoColl, insert.begin(), insert.end(), false);
+        wuow.commit();
+    }
+};
+
+// When 'expireAfterSeconds' is off, defaults to comparing the 'lastRecord's Timestamp of oldest
+// marker with the Timestamp of the ealiest oplog entry.
+//
+// When 'expireAfterSeconds' is on, defaults to comparing the 'lastRecord's wallTime with
+// the current time - 'expireAfterSeconds',  which is already tested as a part of the
+// ChangeStreamPreImageExpirationPolicyTest.
+TEST_F(PreImagesTruncateMarkersTest, hasExcessMarkersExpiredAfterSecondsOff) {
+    auto opCtxPtr = cc().makeOperationContext();
+    auto opCtx = opCtxPtr.get();
+
+    // With no explicit 'expireAfterSeconds', excess markers are determined by whether the Timestamp
+    // of the 'lastRecord' in the oldest marker is greater than the Timestamp of the earliest oplog
+    // entry.
+    auto changeStreamOptions = populateChangeStreamPreImageOptions("off");
+    setChangeStreamOptionsToManager(opCtx, *changeStreamOptions.get());
+
+    initEarliestOplogTSWithInsert(opCtx);
+    const auto currentEarliestOplogEntryTs =
+        repl::StorageInterface::get(opCtx->getServiceContext())->getEarliestOplogTimestamp(opCtx);
+
+    // Ensure that the generated Timestamp associated with the lastRecord of the marker is less than
+    // the earliest oplog entry Timestamp.
+    auto ts = currentEarliestOplogEntryTs - 1;
+    ASSERT_GT(currentEarliestOplogEntryTs, ts);
+    auto wallTime = Date_t::fromMillisSinceEpoch(ts.asInt64());
+    auto lastRecordId = generatePreImageRecordId(wallTime);
+
+    auto numRecords = 1;
+    auto numBytes = 100;
+    std::deque<CollectionTruncateMarkers::Marker> initialMarkers{
+        {numRecords, numBytes, lastRecordId, wallTime}};
+
+    PreImagesTruncateMarkers markers(
+        boost::none /* tenantId */, std::move(initialMarkers), 0, 0, 100);
+    bool excessMarkers = hasExcessMarkers(opCtx, markers);
+    ASSERT_TRUE(excessMarkers);
+}
+
+TEST_F(PreImagesTruncateMarkersTest, hasNoExcessMarkersExpiredAfterSecondsOff) {
+    auto opCtxPtr = cc().makeOperationContext();
+    auto opCtx = opCtxPtr.get();
+
+    // With no explicit 'expireAfterSeconds', excess markers are determined by whether the Timestamp
+    // of the 'lastRecord' in the oldest marker is greater than the Timestamp of the earliest oplog
+    // entry.
+    auto changeStreamOptions = populateChangeStreamPreImageOptions("off");
+    setChangeStreamOptionsToManager(opCtx, *changeStreamOptions.get());
+
+    initEarliestOplogTSWithInsert(opCtx);
+    const auto currentEarliestOplogEntryTs =
+        repl::StorageInterface::get(opCtx->getServiceContext())->getEarliestOplogTimestamp(opCtx);
+
+    // Ensure that the generated Timestamp associated with the lastRecord of the marker is less than
+    // the earliest oplog entry Timestamp.
+    auto ts = currentEarliestOplogEntryTs + 1;
+    ASSERT_LT(currentEarliestOplogEntryTs, ts);
+    auto wallTime = Date_t::fromMillisSinceEpoch(ts.asInt64());
+    auto lastRecordId = generatePreImageRecordId(wallTime);
+
+    auto numRecords = 1;
+    auto numBytes = 100;
+    std::deque<CollectionTruncateMarkers::Marker> initialMarkers{
+        {numRecords, numBytes, lastRecordId, wallTime}};
+
+    PreImagesTruncateMarkers markers(
+        boost::none /* tenantId */, std::move(initialMarkers), 0, 0, 100);
+    bool excessMarkers = hasExcessMarkers(opCtx, markers);
+    ASSERT_FALSE(excessMarkers);
+}
+
+TEST_F(PreImagesTruncateMarkersTest, serverlessHasNoExcessMarkers) {
+    int64_t expireAfterSeconds = 1000;
+    auto tenantId = change_stream_serverless_helpers::getTenantIdForTesting();
+    serverlessSetExpireAfterSeconds(tenantId, expireAfterSeconds);
+
+    auto opCtxPtr = cc().makeOperationContext();
+    auto opCtx = opCtxPtr.get();
+    auto wallTime = opCtx->getServiceContext()->getFastClockSource()->now() + Minutes(120);
+    auto lastRecordId = generatePreImageRecordId(wallTime);
+    auto numRecords = 1;
+    auto numBytes = 100;
+    std::deque<CollectionTruncateMarkers::Marker> initialMarkers{
+        {numRecords, numBytes, lastRecordId, wallTime}};
+
+    PreImagesTruncateMarkers markers(tenantId, std::move(initialMarkers), 0, 0, 100);
+    bool excessMarkers = hasExcessMarkers(opCtx, markers);
+    ASSERT_FALSE(excessMarkers);
+}
+
+TEST_F(PreImagesTruncateMarkersTest, serverlessHasExcessMarkers) {
+    int64_t expireAfterSeconds = 1;
+    auto tenantId = change_stream_serverless_helpers::getTenantIdForTesting();
+    serverlessSetExpireAfterSeconds(tenantId, expireAfterSeconds);
+
+    auto opCtxPtr = cc().makeOperationContext();
+    auto opCtx = opCtxPtr.get();
+    auto wallTime = opCtx->getServiceContext()->getFastClockSource()->now() - Minutes(120);
+    auto lastRecordId = generatePreImageRecordId(wallTime);
+    auto numRecords = 1;
+    auto numBytes = 100;
+    std::deque<CollectionTruncateMarkers::Marker> initialMarkers{
+        {numRecords, numBytes, lastRecordId, wallTime}};
+
+    PreImagesTruncateMarkers markers(tenantId, std::move(initialMarkers), 0, 0, 100);
+    bool excessMarkers = hasExcessMarkers(opCtx, markers);
+    ASSERT_TRUE(excessMarkers);
+}
+
+TEST_F(PreImagesTruncateMarkersTest, RecordIdToPreImageTimstampRetrieval) {
+    // Basic case.
+    {
+        Timestamp ts0(Date_t::now());
+        int64_t applyOpsIndex = 0;
+
+        ChangeStreamPreImageId preImageId(UUID::gen(), ts0, applyOpsIndex);
+        auto preImageRecordId = change_stream_pre_image_helpers::toRecordId(preImageId);
+
+        auto ts1 = change_stream_pre_image_helpers::getPreImageTimestamp(preImageRecordId);
+        ASSERT_EQ(ts0, ts1);
+    }
+
+    // Min Timestamp.
+    {
+        Timestamp ts0 = Timestamp::min();
+        int64_t applyOpsIndex = 0;
+
+        ChangeStreamPreImageId preImageId(UUID::gen(), ts0, applyOpsIndex);
+        auto preImageRecordId = change_stream_pre_image_helpers::toRecordId(preImageId);
+
+        auto ts1 = change_stream_pre_image_helpers::getPreImageTimestamp(preImageRecordId);
+        ASSERT_EQ(ts0, ts1);
+    }
+
+    // Max Timestamp
+    {
+        Timestamp ts0 = Timestamp::max();
+        int64_t applyOpsIndex = 0;
+
+        ChangeStreamPreImageId preImageId(UUID::gen(), ts0, applyOpsIndex);
+        auto preImageRecordId = change_stream_pre_image_helpers::toRecordId(preImageId);
+
+        auto ts1 = change_stream_pre_image_helpers::getPreImageTimestamp(preImageRecordId);
+        ASSERT_EQ(ts0, ts1);
+    }
+
+    // Extra large 'applyOpsIndex'.
+    //
+    // Parsing a RecordId with an underlying KeyString representation into BSON discards type bits.
+    // Since the 'applyOpsIndex' is the only field in 'ChangeStreamPreImageId' that requires type
+    // bits to generate the original value from KeyString, ensure different numeric values of
+    // 'applyOpsIndex' don't impact the Timestamp retrieval.
+    {
+        Timestamp ts0(Date_t::now());
+        int64_t applyOpsIndex = std::numeric_limits<int64_t>::max();
+
+        ChangeStreamPreImageId preImageId(UUID::gen(), ts0, applyOpsIndex);
+        auto preImageRecordId = change_stream_pre_image_helpers::toRecordId(preImageId);
+
+        auto ts1 = change_stream_pre_image_helpers::getPreImageTimestamp(preImageRecordId);
+        ASSERT_EQ(ts0, ts1);
+    }
+
+    // Extra large 'applyOpsIndex' with Timestamp::max().
+    {
+        Timestamp ts0 = Timestamp::max();
+        int64_t applyOpsIndex = std::numeric_limits<int64_t>::max();
+
+        ChangeStreamPreImageId preImageId(UUID::gen(), ts0, applyOpsIndex);
+        auto preImageRecordId = change_stream_pre_image_helpers::toRecordId(preImageId);
+
+        auto ts1 = change_stream_pre_image_helpers::getPreImageTimestamp(preImageRecordId);
+        ASSERT_EQ(ts0, ts1);
+    }
+}
+
 }  // namespace mongo
