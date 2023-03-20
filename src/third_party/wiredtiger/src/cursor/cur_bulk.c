@@ -150,7 +150,8 @@ __curbulk_insert_var(WT_CURSOR *cursor)
          * against the last value; if the same, just increment the RLE count.
          */
         if (recno == cbulk->recno + 1 && cbulk->last->size == cursor->value.size &&
-          memcmp(cbulk->last->data, cursor->value.data, cursor->value.size) == 0) {
+          (cursor->value.size == 0 ||
+            memcmp(cbulk->last->data, cursor->value.data, cursor->value.size) == 0)) {
             ++cbulk->rle;
             ++cbulk->recno;
             goto duplicate;

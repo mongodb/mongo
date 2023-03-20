@@ -5140,8 +5140,7 @@ buildvariants:
     - name: compile-production-disable-static
     - name: examples-c-production-disable-shared-test
     - name: examples-c-production-disable-static-test
-    # FIXME-WT-10386 Enable this test once this failure is resolved.
-    # - name: format-stress-pull-request-test
+    - name: format-stress-pull-request-test
     - name: make-check-test
     - name: cppsuite-operations-test-default
     - name: cppsuite-hs-cleanup-default
