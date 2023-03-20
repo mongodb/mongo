@@ -353,6 +353,9 @@ void waitForReadyRequest(executor::NetworkInterfaceMock* net) {
 class ShardSplitDonorServiceTest : public repl::PrimaryOnlyServiceMongoDTest {
 public:
     void setUp() override {
+        // Set a 30s timeout to prevent spurious timeouts.
+        repl::shardSplitTimeoutMS.store(30 * 1000);
+
         repl::PrimaryOnlyServiceMongoDTest::setUp();
 
         // The database needs to be open before using shard split donor service.
