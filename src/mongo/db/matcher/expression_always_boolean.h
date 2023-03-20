@@ -59,7 +59,8 @@ public:
 
     void debugString(StringBuilder& debug, int indentationLevel = 0) const final {
         _debugAddSpace(debug, indentationLevel);
-        debug << name() << ": 1\n";
+        debug << name() << ": 1";
+        _debugStringAttachTagInfo(&debug);
     }
 
     void serialize(BSONObjBuilder* out, SerializationOptions opts) const final {

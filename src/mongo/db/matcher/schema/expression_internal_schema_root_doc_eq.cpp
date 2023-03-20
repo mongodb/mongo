@@ -44,14 +44,7 @@ void InternalSchemaRootDocEqMatchExpression::debugString(StringBuilder& debug,
                                                          int indentationLevel) const {
     _debugAddSpace(debug, indentationLevel);
     debug << kName << " " << _rhsObj.toString();
-
-    auto td = getTag();
-    if (td) {
-        debug << " ";
-        td->debugString(&debug);
-    }
-
-    debug << "\n";
+    _debugStringAttachTagInfo(&debug);
 }
 
 void InternalSchemaRootDocEqMatchExpression::serialize(BSONObjBuilder* out,

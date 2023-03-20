@@ -46,14 +46,8 @@ InternalSchemaStrLengthMatchExpression::InternalSchemaStrLengthMatchExpression(
 void InternalSchemaStrLengthMatchExpression::debugString(StringBuilder& debug,
                                                          int indentationLevel) const {
     _debugAddSpace(debug, indentationLevel);
-    debug << path() << " " << _name << " " << _strLen << "\n";
-
-    MatchExpression::TagData* td = getTag();
-    if (nullptr != td) {
-        debug << " ";
-        td->debugString(&debug);
-    }
-    debug << "\n";
+    debug << path() << " " << _name << " " << _strLen;
+    _debugStringAttachTagInfo(&debug);
 }
 
 BSONObj InternalSchemaStrLengthMatchExpression::getSerializedRightHandSide(

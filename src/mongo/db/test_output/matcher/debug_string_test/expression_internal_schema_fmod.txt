@@ -1,0 +1,6 @@
+==== VARIATION: matchExpression=InternalSchemaFmodMatchExpression
+a fmod: divisor: 2.3 remainder: 1.1
+
+==== VARIATION: taggedMatchExpression=InternalSchemaFmodMatchExpression
+a fmod: divisor: 2.3 remainder: 1.1 || Selected Index #2 pos 0 combine 1
+

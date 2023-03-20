@@ -1,0 +1,12 @@
+==== VARIATION: matchExpression=InternalSchemaXorMatchExpression
+$_internalSchemaXor
+    a $gt 10
+    a $lt 0
+    b $eq 0
+
+==== VARIATION: taggedMatchExpression=InternalSchemaXorMatchExpression
+$_internalSchemaXor || Selected Index #2 pos 0 combine 1
+    a $gt 10
+    a $lt 0
+    b $eq 0
+

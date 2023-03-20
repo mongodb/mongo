@@ -68,12 +68,7 @@ void InternalSchemaFmodMatchExpression::debugString(StringBuilder& debug,
     _debugAddSpace(debug, indentationLevel);
     debug << path() << " fmod: divisor: " << _divisor.toString()
           << " remainder: " << _remainder.toString();
-    MatchExpression::TagData* td = getTag();
-    if (td) {
-        debug << " ";
-        td->debugString(&debug);
-    }
-    debug << "\n";
+    _debugStringAttachTagInfo(&debug);
 }
 
 BSONObj InternalSchemaFmodMatchExpression::getSerializedRightHandSide(

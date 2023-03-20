@@ -73,6 +73,7 @@ public:
     void debugString(StringBuilder& debug, int indentationLevel = 0) const final {
         _debugAddSpace(debug, indentationLevel);
         debug << "$expr " << _expression->serialize(false).toString();
+        _debugStringAttachTagInfo(&debug);
     }
 
     void serialize(BSONObjBuilder* out, SerializationOptions opts) const final;

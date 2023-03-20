@@ -59,14 +59,7 @@ void InternalSchemaEqMatchExpression::debugString(StringBuilder& debug,
                                                   int indentationLevel) const {
     _debugAddSpace(debug, indentationLevel);
     debug << path() << " " << kName << " " << _rhsElem.toString(false);
-
-    auto td = getTag();
-    if (td) {
-        debug << " ";
-        td->debugString(&debug);
-    }
-
-    debug << "\n";
+    _debugStringAttachTagInfo(&debug);
 }
 
 BSONObj InternalSchemaEqMatchExpression::getSerializedRightHandSide(

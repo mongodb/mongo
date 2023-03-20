@@ -59,7 +59,7 @@ public:
 
     virtual void debugString(StringBuilder* builder) const {
         *builder << " || Selected Index #" << index << " pos " << pos << " combine "
-                 << canCombineBounds;
+                 << canCombineBounds << "\n";
     }
 
     virtual MatchExpression::TagData* clone() const {
@@ -127,7 +127,7 @@ public:
         for (size_t i = 0; i < notFirst.size(); ++i) {
             *builder << notFirst[i] << " ";
         }
-        *builder << "full path: " << path;
+        *builder << "full path: " << path << "\n";
     }
 
     virtual MatchExpression::TagData* clone() const {

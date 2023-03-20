@@ -1,0 +1,6 @@
+==== VARIATION: matchExpression=InternalSchemaUniqueItemsMatchExpression
+{ foo: { $_internalSchemaUniqueItems: true } }
+
+==== VARIATION: taggedMatchExpression=InternalSchemaUniqueItemsMatchExpression
+{ foo: { $_internalSchemaUniqueItems: true } } || Selected Index #2 pos 0 combine 1
+

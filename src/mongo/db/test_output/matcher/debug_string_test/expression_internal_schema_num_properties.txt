@@ -1,0 +1,6 @@
+==== VARIATION: matchExpression=InternalSchemaMaxPropertiesMatchExpression
+{ $_internalSchemaMaxProperties: 2 }
+
+==== VARIATION: taggedMatchExpression=InternalSchemaMaxPropertiesMatchExpression
+{ $_internalSchemaMaxProperties: 2 } || Selected Index #2 pos 0 combine 1
+

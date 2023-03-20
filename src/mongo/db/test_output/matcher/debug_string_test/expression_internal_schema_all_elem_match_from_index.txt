@@ -1,0 +1,10 @@
+==== VARIATION: matchExpression=InternalSchemaAllElemMatchFromIndexMatchExpression
+$_internalSchemaAllElemMatchFromIndex
+ index: 2, query:
+    $and
+
+==== VARIATION: taggedMatchExpression=InternalSchemaAllElemMatchFromIndexMatchExpression
+$_internalSchemaAllElemMatchFromIndex || Selected Index #2 pos 0 combine 1
+ index: 2, query:
+    $and
+

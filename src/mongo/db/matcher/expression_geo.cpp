@@ -438,13 +438,7 @@ void GeoMatchExpression::debugString(StringBuilder& debug, int indentationLevel)
     BSONObjBuilder builder;
     serialize(&builder, {});
     debug << "GEO raw = " << builder.obj().toString();
-
-    MatchExpression::TagData* td = getTag();
-    if (nullptr != td) {
-        debug << " ";
-        td->debugString(&debug);
-    }
-    debug << "\n";
+    _debugStringAttachTagInfo(&debug);
 }
 
 BSONObj GeoMatchExpression::getSerializedRightHandSide(SerializationOptions opts) const {
@@ -499,12 +493,7 @@ bool GeoNearMatchExpression::matchesSingleElement(const BSONElement& e,
 void GeoNearMatchExpression::debugString(StringBuilder& debug, int indentationLevel) const {
     _debugAddSpace(debug, indentationLevel);
     debug << "GEONEAR " << _query->toString();
-    MatchExpression::TagData* td = getTag();
-    if (nullptr != td) {
-        debug << " ";
-        td->debugString(&debug);
-    }
-    debug << "\n";
+    _debugStringAttachTagInfo(&debug);
 }
 
 BSONObj GeoNearMatchExpression::getSerializedRightHandSide(SerializationOptions opts) const {

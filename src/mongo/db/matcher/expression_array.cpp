@@ -93,13 +93,7 @@ bool ElemMatchObjectMatchExpression::matchesArray(const BSONObj& anArray,
 void ElemMatchObjectMatchExpression::debugString(StringBuilder& debug, int indentationLevel) const {
     _debugAddSpace(debug, indentationLevel);
     debug << path() << " $elemMatch (obj)";
-
-    MatchExpression::TagData* td = getTag();
-    if (nullptr != td) {
-        debug << " ";
-        td->debugString(&debug);
-    }
-    debug << "\n";
+    _debugStringAttachTagInfo(&debug);
     _sub->debugString(debug, indentationLevel + 1);
 }
 
@@ -162,12 +156,8 @@ void ElemMatchValueMatchExpression::debugString(StringBuilder& debug, int indent
     _debugAddSpace(debug, indentationLevel);
     debug << path() << " $elemMatch (value)";
 
-    MatchExpression::TagData* td = getTag();
-    if (nullptr != td) {
-        debug << " ";
-        td->debugString(&debug);
-    }
-    debug << "\n";
+    _debugStringAttachTagInfo(&debug);
+
     for (unsigned i = 0; i < _subs.size(); i++) {
         _subs[i]->debugString(debug, indentationLevel + 1);
     }
@@ -210,13 +200,9 @@ bool SizeMatchExpression::matchesArray(const BSONObj& anArray, MatchDetails* det
 
 void SizeMatchExpression::debugString(StringBuilder& debug, int indentationLevel) const {
     _debugAddSpace(debug, indentationLevel);
-    debug << path() << " $size : " << _size << "\n";
+    debug << path() << " $size : " << _size;
 
-    MatchExpression::TagData* td = getTag();
-    if (nullptr != td) {
-        debug << " ";
-        td->debugString(&debug);
-    }
+    _debugStringAttachTagInfo(&debug);
 }
 
 BSONObj SizeMatchExpression::getSerializedRightHandSide(SerializationOptions opts) const {

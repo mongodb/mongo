@@ -70,7 +70,8 @@ bool InternalSchemaAllElemMatchFromIndexMatchExpression::equivalent(
 void InternalSchemaAllElemMatchFromIndexMatchExpression::debugString(StringBuilder& debug,
                                                                      int indentationLevel) const {
     _debugAddSpace(debug, indentationLevel);
-    debug << kName << "\n";
+    debug << kName;
+    _debugStringAttachTagInfo(&debug);
     debug << " index: " << _index << ", query:\n";
     _expression->getFilter()->debugString(debug, indentationLevel + 1);
 }

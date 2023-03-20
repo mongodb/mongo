@@ -334,12 +334,7 @@ bool AndMatchExpression::matchesSingleElement(const BSONElement& e, MatchDetails
 void AndMatchExpression::debugString(StringBuilder& debug, int indentationLevel) const {
     _debugAddSpace(debug, indentationLevel);
     debug << "$and";
-    MatchExpression::TagData* td = getTag();
-    if (td) {
-        debug << " ";
-        td->debugString(&debug);
-    }
-    debug << "\n";
+    _debugStringAttachTagInfo(&debug);
     _debugList(debug, indentationLevel);
 }
 
@@ -378,12 +373,7 @@ bool OrMatchExpression::matchesSingleElement(const BSONElement& e, MatchDetails*
 void OrMatchExpression::debugString(StringBuilder& debug, int indentationLevel) const {
     _debugAddSpace(debug, indentationLevel);
     debug << "$or";
-    MatchExpression::TagData* td = getTag();
-    if (td) {
-        debug << " ";
-        td->debugString(&debug);
-    }
-    debug << "\n";
+    _debugStringAttachTagInfo(&debug);
     _debugList(debug, indentationLevel);
 }
 
@@ -425,7 +415,8 @@ bool NorMatchExpression::matchesSingleElement(const BSONElement& e, MatchDetails
 
 void NorMatchExpression::debugString(StringBuilder& debug, int indentationLevel) const {
     _debugAddSpace(debug, indentationLevel);
-    debug << "$nor\n";
+    debug << "$nor";
+    _debugStringAttachTagInfo(&debug);
     _debugList(debug, indentationLevel);
 }
 
@@ -438,7 +429,8 @@ void NorMatchExpression::serialize(BSONObjBuilder* out, SerializationOptions opt
 
 void NotMatchExpression::debugString(StringBuilder& debug, int indentationLevel) const {
     _debugAddSpace(debug, indentationLevel);
-    debug << "$not\n";
+    debug << "$not";
+    _debugStringAttachTagInfo(&debug);
     _exp->debugString(debug, indentationLevel + 1);
 }
 

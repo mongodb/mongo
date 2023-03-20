@@ -1,0 +1,6 @@
+==== VARIATION: matchExpression=TextMatchExpression
+TEXT : query=something, language=, caseSensitive=0, diacriticSensitive=0
+
+==== VARIATION: taggedMatchExpression=TextMatchExpression
+TEXT : query=something, language=, caseSensitive=0, diacriticSensitive=0 || Selected Index #2 pos 0 combine 1
+

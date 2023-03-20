@@ -52,14 +52,8 @@ void InternalSchemaMatchArrayIndexMatchExpression::debugString(StringBuilder& de
 
     BSONObjBuilder builder;
     serialize(&builder, {});
-    debug << builder.obj().toString() << "\n";
-
-    const auto* tag = getTag();
-    if (tag) {
-        debug << " ";
-        tag->debugString(&debug);
-    }
-    debug << "\n";
+    debug << builder.obj().toString();
+    _debugStringAttachTagInfo(&debug);
 }
 
 bool InternalSchemaMatchArrayIndexMatchExpression::equivalent(const MatchExpression* expr) const {

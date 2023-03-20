@@ -40,7 +40,8 @@ WhereMatchExpressionBase::WhereMatchExpressionBase(WhereParams params)
 
 void WhereMatchExpressionBase::debugString(StringBuilder& debug, int indentationLevel) const {
     _debugAddSpace(debug, indentationLevel);
-    debug << "$where\n";
+    debug << "$where";
+    _debugStringAttachTagInfo(&debug);
 
     _debugAddSpace(debug, indentationLevel + 1);
     debug << "code: " << getCode() << "\n";

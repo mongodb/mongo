@@ -69,7 +69,8 @@ bool InternalSchemaXorMatchExpression::matchesSingleElement(const BSONElement& e
 void InternalSchemaXorMatchExpression::debugString(StringBuilder& debug,
                                                    int indentationLevel) const {
     _debugAddSpace(debug, indentationLevel);
-    debug << kName + "\n";
+    debug << kName;
+    _debugStringAttachTagInfo(&debug);
     _debugList(debug, indentationLevel);
 }
 

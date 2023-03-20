@@ -573,6 +573,16 @@ protected:
 
     void _debugAddSpace(StringBuilder& debug, int indentationLevel) const;
 
+    /** Adds the tag information to the debug string. */
+    void _debugStringAttachTagInfo(StringBuilder* debug) const {
+        MatchExpression::TagData* td = getTag();
+        if (nullptr != td) {
+            td->debugString(debug);
+        } else {
+            *debug << "\n";
+        }
+    }
+
     clonable_ptr<ErrorAnnotation> _errorAnnotation;
 
 private:

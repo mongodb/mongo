@@ -84,14 +84,7 @@ void ComparisonMatchExpressionBase::debugString(StringBuilder& debug, int indent
     _debugAddSpace(debug, indentationLevel);
     debug << path() << " " << name();
     debug << " " << _rhs.toString(false);
-
-    MatchExpression::TagData* td = getTag();
-    if (td) {
-        debug << " ";
-        td->debugString(&debug);
-    }
-
-    debug << "\n";
+    _debugStringAttachTagInfo(&debug);
 }
 
 BSONObj ComparisonMatchExpressionBase::getSerializedRightHandSide(SerializationOptions opts) const {
@@ -280,13 +273,7 @@ bool RegexMatchExpression::matchesSingleElement(const BSONElement& e, MatchDetai
 void RegexMatchExpression::debugString(StringBuilder& debug, int indentationLevel) const {
     _debugAddSpace(debug, indentationLevel);
     debug << path() << " regex /" << _regex << "/" << _flags;
-
-    MatchExpression::TagData* td = getTag();
-    if (nullptr != td) {
-        debug << " ";
-        td->debugString(&debug);
-    }
-    debug << "\n";
+    _debugStringAttachTagInfo(&debug);
 }
 
 BSONObj RegexMatchExpression::getSerializedRightHandSide(SerializationOptions opts) const {
@@ -362,12 +349,7 @@ bool ModMatchExpression::matchesSingleElement(const BSONElement& e, MatchDetails
 void ModMatchExpression::debugString(StringBuilder& debug, int indentationLevel) const {
     _debugAddSpace(debug, indentationLevel);
     debug << path() << " mod " << _divisor << " % x == " << _remainder;
-    MatchExpression::TagData* td = getTag();
-    if (nullptr != td) {
-        debug << " ";
-        td->debugString(&debug);
-    }
-    debug << "\n";
+    _debugStringAttachTagInfo(&debug);
 }
 
 BSONObj ModMatchExpression::getSerializedRightHandSide(SerializationOptions opts) const {
@@ -402,12 +384,7 @@ bool ExistsMatchExpression::matchesSingleElement(const BSONElement& e,
 void ExistsMatchExpression::debugString(StringBuilder& debug, int indentationLevel) const {
     _debugAddSpace(debug, indentationLevel);
     debug << path() << " exists";
-    MatchExpression::TagData* td = getTag();
-    if (nullptr != td) {
-        debug << " ";
-        td->debugString(&debug);
-    }
-    debug << "\n";
+    _debugStringAttachTagInfo(&debug);
 }
 
 BSONObj ExistsMatchExpression::getSerializedRightHandSide(SerializationOptions opts) const {
@@ -491,12 +468,7 @@ void InMatchExpression::debugString(StringBuilder& debug, int indentationLevel) 
         debug << " ";
     }
     debug << "]";
-    MatchExpression::TagData* td = getTag();
-    if (nullptr != td) {
-        debug << " ";
-        td->debugString(&debug);
-    }
-    debug << "\n";
+    _debugStringAttachTagInfo(&debug);
 }
 
 BSONObj InMatchExpression::getSerializedRightHandSide(SerializationOptions opts) const {
@@ -851,11 +823,7 @@ void BitTestMatchExpression::debugString(StringBuilder& debug, int indentationLe
     }
     debug << "]";
 
-    MatchExpression::TagData* td = getTag();
-    if (td) {
-        debug << " ";
-        td->debugString(&debug);
-    }
+    _debugStringAttachTagInfo(&debug);
 }
 
 BSONObj BitTestMatchExpression::getSerializedRightHandSide(SerializationOptions opts) const {

@@ -1,0 +1,6 @@
+==== VARIATION: matchExpression=ExpressionExpr
+$expr {$eq: ["$a", {$const: 5}]}
+
+==== VARIATION: taggedMatchExpression=ExpressionExpr
+$expr {$eq: ["$a", {$const: 5}]} || Selected Index #2 pos 0 combine 1
+

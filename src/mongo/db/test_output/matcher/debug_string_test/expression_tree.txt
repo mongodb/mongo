@@ -1,0 +1,44 @@
+==== VARIATION: matchExpression=AndMatchExpression
+$and
+    a $lt "z1"
+    a $gt "a1"
+    a regex /1/
+
+==== VARIATION: taggedMatchExpression=AndMatchExpression
+$and || Selected Index #2 pos 0 combine 1
+    a $lt "z1"
+    a $gt "a1"
+    a regex /1/
+
+==== VARIATION: matchExpression=OrMatchExpression
+$or
+    a $lt "z1"
+    a $gt "a1"
+    a regex /1/
+
+==== VARIATION: taggedMatchExpression=OrMatchExpression
+$or || Selected Index #2 pos 0 combine 1
+    a $lt "z1"
+    a $gt "a1"
+    a regex /1/
+
+==== VARIATION: matchExpression=NorMatchExpression
+$nor
+    a $lt "z1"
+    a $gt "a1"
+    a regex /1/
+
+==== VARIATION: taggedMatchExpression=NorMatchExpression
+$nor || Selected Index #2 pos 0 combine 1
+    a $lt "z1"
+    a $gt "a1"
+    a regex /1/
+
+==== VARIATION: matchExpression=NotMatchExpression
+$not
+    a $lt "z1"
+
+==== VARIATION: taggedMatchExpression=NotMatchExpression
+$not || Selected Index #2 pos 0 combine 1
+    a $lt "z1"
+

@@ -61,15 +61,8 @@ void InternalSchemaAllowedPropertiesMatchExpression::debugString(StringBuilder& 
 
     BSONObjBuilder builder;
     serialize(&builder, {});
-    debug << builder.obj().toString() << "\n";
-
-    const auto* tag = getTag();
-    if (tag) {
-        debug << " ";
-        tag->debugString(&debug);
-    }
-
-    debug << "\n";
+    debug << builder.obj().toString();
+    _debugStringAttachTagInfo(&debug);
 }
 
 bool InternalSchemaAllowedPropertiesMatchExpression::equivalent(const MatchExpression* expr) const {

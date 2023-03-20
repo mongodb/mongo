@@ -46,14 +46,8 @@ InternalSchemaNumArrayItemsMatchExpression::InternalSchemaNumArrayItemsMatchExpr
 void InternalSchemaNumArrayItemsMatchExpression::debugString(StringBuilder& debug,
                                                              int indentationLevel) const {
     _debugAddSpace(debug, indentationLevel);
-    debug << path() << " " << _name << " " << _numItems << "\n";
-
-    MatchExpression::TagData* td = getTag();
-    if (nullptr != td) {
-        debug << " ";
-        td->debugString(&debug);
-    }
-    debug << "\n";
+    debug << path() << " " << _name << " " << _numItems;
+    _debugStringAttachTagInfo(&debug);
 }
 
 BSONObj InternalSchemaNumArrayItemsMatchExpression::getSerializedRightHandSide(

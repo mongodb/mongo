@@ -73,13 +73,7 @@ public:
     void debugString(StringBuilder& debug, int indentationLevel) const final {
         _debugAddSpace(debug, indentationLevel);
         debug << path() << " " << name() << ": " << _typeSet.toBSONArray().toString();
-
-        MatchExpression::TagData* td = getTag();
-        if (td) {
-            debug << " ";
-            td->debugString(&debug);
-        }
-        debug << "\n";
+        _debugStringAttachTagInfo(&debug);
     }
 
     BSONObj getSerializedRightHandSide(SerializationOptions opts) const final {
@@ -246,13 +240,7 @@ public:
     void debugString(StringBuilder& debug, int indentationLevel) const final {
         _debugAddSpace(debug, indentationLevel);
         debug << path() << " " << name() << ": " << typeName(_binDataSubType);
-
-        MatchExpression::TagData* td = getTag();
-        if (td) {
-            debug << " ";
-            td->debugString(&debug);
-        }
-        debug << "\n";
+        _debugStringAttachTagInfo(&debug);
     }
 
     BSONObj getSerializedRightHandSide(SerializationOptions opts) const final {

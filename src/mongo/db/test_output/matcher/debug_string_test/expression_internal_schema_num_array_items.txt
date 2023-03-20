@@ -1,0 +1,6 @@
+==== VARIATION: matchExpression=InternalSchemaMaxItemsMatchExpression
+a $_internalSchemaMaxItems 2
+
+==== VARIATION: taggedMatchExpression=InternalSchemaMaxItemsMatchExpression
+a $_internalSchemaMaxItems 2 || Selected Index #2 pos 0 combine 1
+

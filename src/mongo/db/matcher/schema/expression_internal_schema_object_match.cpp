@@ -57,7 +57,8 @@ bool InternalSchemaObjectMatchExpression::matchesSingleElement(const BSONElement
 void InternalSchemaObjectMatchExpression::debugString(StringBuilder& debug,
                                                       int indentationLevel) const {
     _debugAddSpace(debug, indentationLevel);
-    debug << kName << "\n";
+    debug << kName;
+    _debugStringAttachTagInfo(&debug);
     _sub->debugString(debug, indentationLevel + 1);
 }
 
