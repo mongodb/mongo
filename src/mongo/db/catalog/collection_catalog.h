@@ -41,6 +41,7 @@
 #include "mongo/db/views/view.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/immutable/unordered_map.h"
+#include "mongo/util/immutable/unordered_set.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -610,8 +611,10 @@ private:
         std::map<std::pair<TenantDatabaseName, UUID>, std::shared_ptr<Collection>>;
     using NamespaceCollectionMap =
         immutable::unordered_map<NamespaceString, std::shared_ptr<Collection>>;
-    using UncommittedViewsSet = stdx::unordered_set<NamespaceString>;
+    using UncommittedViewsSet = immutable::unordered_set<NamespaceString>;
     using DatabaseProfileSettingsMap = StringMap<ProfileSettings>;
+    using ViewsForDatabaseMap =
+        immutable::unordered_map<std::string, ViewsForDatabase, StringMapHasher, StringMapEq>;
 
     CollectionCatalogMap _catalog;
     OrderedCollectionMap _orderedCollections;  // Ordered by <tenantDbName, collUUID> pair
@@ -619,7 +622,7 @@ private:
     UncommittedViewsSet _uncommittedViews;
 
     // Map of database names to their corresponding views and other associated state.
-    StringMap<ViewsForDatabase> _viewsForDatabase;
+    ViewsForDatabaseMap _viewsForDatabase;
 
     // Incremented whenever the CollectionCatalog gets closed and reopened (onCloseCatalog and
     // onOpenCatalog).

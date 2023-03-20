@@ -129,7 +129,7 @@ public:
                 }
                 case UncommittedCatalogUpdates::Entry::Action::kRenamedCollection: {
                     writeJobs.push_back(
-                        [&from = entry.nss, &to = entry.renameTo](CollectionCatalog& catalog) {
+                        [& from = entry.nss, &to = entry.renameTo](CollectionCatalog& catalog) {
                             catalog._collections = catalog._collections.erase(from);
 
                             auto fromStr = from.ns();
@@ -185,7 +185,7 @@ public:
                     break;
                 }
                 case UncommittedCatalogUpdates::Entry::Action::kAddViewResource: {
-                    writeJobs.push_back([&viewName = entry.nss](CollectionCatalog& catalog) {
+                    writeJobs.push_back([& viewName = entry.nss](CollectionCatalog& catalog) {
                         auto viewRid = ResourceId(RESOURCE_COLLECTION, viewName.ns());
                         catalog.addResource(viewRid, viewName.ns());
                         catalog.deregisterUncommittedView(viewName);
@@ -193,7 +193,7 @@ public:
                     break;
                 }
                 case UncommittedCatalogUpdates::Entry::Action::kRemoveViewResource: {
-                    writeJobs.push_back([&viewName = entry.nss](CollectionCatalog& catalog) {
+                    writeJobs.push_back([& viewName = entry.nss](CollectionCatalog& catalog) {
                         auto viewRid = ResourceId(RESOURCE_COLLECTION, viewName.ns());
                         catalog.removeResource(viewRid, viewName.ns());
                     });
@@ -490,7 +490,7 @@ Status CollectionCatalog::createView(OperationContext* opCtx,
     invariant(opCtx->lockState()->isCollectionLockedForMode(
         NamespaceString(viewName.db(), NamespaceString::kSystemDotViewsCollectionName), MODE_X));
 
-    invariant(_viewsForDatabase.contains(viewName.db()));
+    invariant(_viewsForDatabase.find(viewName.db()));
     const ViewsForDatabase& viewsForDb = *_getViewsForDatabase(opCtx, viewName.db());
 
     auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
@@ -540,7 +540,7 @@ Status CollectionCatalog::modifyView(
     invariant(opCtx->lockState()->isCollectionLockedForMode(
         NamespaceString(viewName.db(), NamespaceString::kSystemDotViewsCollectionName), MODE_X));
 
-    invariant(_viewsForDatabase.contains(viewName.db()));
+    invariant(_viewsForDatabase.find(viewName.db()));
     const ViewsForDatabase& viewsForDb = *_getViewsForDatabase(opCtx, viewName.db());
 
     if (viewName.db() != viewOn.db())
@@ -578,12 +578,12 @@ Status CollectionCatalog::dropView(OperationContext* opCtx, const NamespaceStrin
     invariant(opCtx->lockState()->isCollectionLockedForMode(
         NamespaceString(viewName.db(), NamespaceString::kSystemDotViewsCollectionName), MODE_X));
 
-    invariant(_viewsForDatabase.contains(viewName.db()));
+    invariant(_viewsForDatabase.find(viewName.db()));
     const ViewsForDatabase& viewsForDb = *_getViewsForDatabase(opCtx, viewName.db());
     viewsForDb.requireValidCatalog();
 
     // Make sure the view exists before proceeding.
-    if (auto viewPtr = viewsForDb.lookup(viewName); !viewPtr) {
+    if (!viewsForDb.lookup(viewName)) {
         return {ErrorCodes::NamespaceNotFound,
                 str::stream() << "cannot drop missing view: " << viewName.ns()};
     }
@@ -627,9 +627,10 @@ Status CollectionCatalog::reloadViews(OperationContext* opCtx, StringData dbName
 
     // Create a copy of the ViewsForDatabase instance to modify it. Reset the views for this
     // database, but preserve the DurableViewCatalog pointer.
-    auto it = _viewsForDatabase.find(dbName);
-    invariant(it != _viewsForDatabase.end());
-    ViewsForDatabase viewsForDb{it->second.durable};
+    const ViewsForDatabase* viewsForDbPtr = _viewsForDatabase.find(dbName);
+    invariant(viewsForDbPtr);
+    ViewsForDatabase viewsForDb = *viewsForDbPtr;
+
     viewsForDb.valid = false;
     viewsForDb.viewGraphNeedsRefresh = true;
     viewsForDb.viewMap.clear();
@@ -694,16 +695,16 @@ void CollectionCatalog::onOpenDatabase(OperationContext* opCtx,
     invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_IS));
     uassert(ErrorCodes::AlreadyInitialized,
             str::stream() << "Database " << dbName << " is already initialized",
-            _viewsForDatabase.find(dbName) == _viewsForDatabase.end());
+            !_viewsForDatabase.find(dbName));
 
-    _viewsForDatabase[dbName] = std::move(viewsForDb);
+    _viewsForDatabase = _viewsForDatabase.set(dbName.toString(), std::move(viewsForDb));
 }
 
 void CollectionCatalog::onCloseDatabase(OperationContext* opCtx, TenantDatabaseName tenantDbName) {
     invariant(opCtx->lockState()->isDbLockedForMode(tenantDbName.dbName(), MODE_X));
     auto rid = ResourceId(RESOURCE_DATABASE, tenantDbName.dbName());
     removeResource(rid, tenantDbName.dbName());
-    _viewsForDatabase.erase(tenantDbName.dbName());
+    _viewsForDatabase = _viewsForDatabase.erase(tenantDbName.dbName());
 }
 
 void CollectionCatalog::onCloseCatalog() {
@@ -1253,11 +1254,11 @@ void CollectionCatalog::registerUncommittedView(OperationContext* opCtx,
     // namespaces here.
     _ensureNamespaceDoesNotExist(opCtx, nss, NamespaceType::kCollection);
 
-    _uncommittedViews.emplace(nss);
+    _uncommittedViews = _uncommittedViews.insert(nss);
 }
 
 void CollectionCatalog::deregisterUncommittedView(const NamespaceString& nss) {
-    _uncommittedViews.erase(nss);
+    _uncommittedViews = _uncommittedViews.erase(nss);
 }
 
 void CollectionCatalog::_ensureNamespaceDoesNotExist(OperationContext* opCtx,
@@ -1272,7 +1273,7 @@ void CollectionCatalog::_ensureNamespaceDoesNotExist(OperationContext* opCtx,
     }
 
     if (type == NamespaceType::kAll) {
-        if (_uncommittedViews.contains(nss)) {
+        if (_uncommittedViews.find(nss)) {
             LOGV2(5725002,
                   "Conflicted registering namespace, already have a view with the same namespace",
                   "nss"_attr = nss);
@@ -1305,7 +1306,7 @@ void CollectionCatalog::deregisterAllCollectionsAndViews() {
     _collections = {};
     _orderedCollections.clear();
     _catalog = {};
-    _viewsForDatabase.clear();
+    _viewsForDatabase = {};
     _stats = {};
 
     _resourceInformation.clear();
@@ -1315,9 +1316,10 @@ void CollectionCatalog::clearViews(OperationContext* opCtx, StringData dbName) c
     invariant(opCtx->lockState()->isCollectionLockedForMode(
         NamespaceString(dbName, NamespaceString::kSystemDotViewsCollectionName), MODE_X));
 
-    auto it = _viewsForDatabase.find(dbName);
-    invariant(it != _viewsForDatabase.end());
-    ViewsForDatabase viewsForDb = it->second;
+    const ViewsForDatabase* viewsForDbPtr = _viewsForDatabase.find(dbName);
+    invariant(viewsForDbPtr);
+
+    ViewsForDatabase viewsForDb = *viewsForDbPtr;
 
     viewsForDb.viewMap.clear();
     viewsForDb.viewGraph.clear();
@@ -1409,15 +1411,15 @@ boost::optional<const ViewsForDatabase&> CollectionCatalog::_getViewsForDatabase
         return uncommittedViews;
     }
 
-    auto it = _viewsForDatabase.find(dbName);
-    if (it == _viewsForDatabase.end()) {
+    const ViewsForDatabase* viewsForDb = _viewsForDatabase.find(dbName);
+    if (!viewsForDb) {
         return boost::none;
     }
-    return it->second;
+    return *viewsForDb;
 }
 
 void CollectionCatalog::_replaceViewsForDatabase(StringData dbName, ViewsForDatabase&& views) {
-    _viewsForDatabase[dbName] = std::move(views);
+    _viewsForDatabase = _viewsForDatabase.set(dbName.toString(), std::move(views));
 }
 
 Status CollectionCatalog::_createOrUpdateView(
