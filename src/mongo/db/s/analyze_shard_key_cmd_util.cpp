@@ -73,6 +73,8 @@ constexpr StringData kNumDistinctValuesFieldName = "numDistinctValues"_sd;
 constexpr StringData kFrequencyFieldName = "frequency"_sd;
 constexpr StringData kNumOrphanDocsFieldName = "numOrphanDocs"_sd;
 
+const int64_t kEmptyDocSizeBytes = BSONObj().objsize();
+
 /**
  * Returns an aggregate command request for calculating the cardinality and frequency metrics for
  * the given shard key.
@@ -140,7 +142,7 @@ void runLocalAggregate(OperationContext* opCtx,
 }
 
 /**
- * Runs the aggregate command 'aggRequest' on the the shards that the query targets and getMore
+ * Runs the aggregate command 'aggRequest' on the shards that the query targets and getMore
  * commands for it if needed, and applies 'callbackFn' to each returned document. On a sharded
  * cluster, internally retries on shard versioning errors.
  */
@@ -308,7 +310,9 @@ BSONObj truncateBSONObj(const BSONObj& obj, int maxSize, int depth = 0) {
     BSONObjBuilder bob;
     auto getRemainingSize = [&] {
         auto remaining = maxSize - bob.bb().len();
-        invariant(remaining > 0);
+        tassert(7477401,
+                str::stream() << "Failed to truncate BSON object of size " << obj.objsize(),
+                remaining > 0);
         return remaining;
     };
 
@@ -336,7 +340,7 @@ BSONObj truncateBSONObj(const BSONObj& obj, int maxSize, int depth = 0) {
 
 /**
  * Returns the cardinality and frequency metrics for a shard key given that the shard key is unique
- * and the collection has the the given number of documents.
+ * and the collection has the the given fast count of the number of documents.
  */
 CardinalityFrequencyMetrics calculateCardinalityAndFrequencyUnique(OperationContext* opCtx,
                                                                    const NamespaceString& nss,
@@ -348,9 +352,6 @@ CardinalityFrequencyMetrics calculateCardinalityAndFrequencyUnique(OperationCont
           "shardKey"_attr = shardKey);
 
     CardinalityFrequencyMetrics metrics;
-
-    metrics.numDocs = numDocs;
-    metrics.numDistinctValues = numDocs;
 
     const auto numMostCommonValues = gNumMostCommonValues.load();
     const auto maxSizeBytesPerValue = kMaxBSONObjSizeMostCommonValues / numMostCommonValues;
@@ -368,6 +369,24 @@ CardinalityFrequencyMetrics calculateCardinalityAndFrequencyUnique(OperationCont
         }
         metrics.mostCommonValues.emplace_back(std::move(value), 1);
     });
+
+    metrics.numDistinctValues = [&] {
+        if (int64_t numMostCommonValues = metrics.mostCommonValues.size();
+            numDocs < numMostCommonValues) {
+            LOGV2_WARNING(
+                7477402,
+                "The number of documents returned by $collStats appears to be less than the number "
+                "of sampled documents for cardinality and frequency metrics calculation. This is "
+                "likely caused by an unclean shutdown that resulted in an inaccurate fast count "
+                "or by insertions that have occurred since the command started. Setting the number "
+                "of documents to the number of sampled documents.",
+                "numCountedDocs"_attr = numDocs,
+                "numSampledDocs"_attr = numMostCommonValues);
+            return numMostCommonValues;
+        }
+        return numDocs;
+    }();
+    metrics.numDocs = metrics.numDistinctValues;
 
     return metrics;
 }
@@ -498,7 +517,9 @@ MonotonicityMetrics calculateMonotonicity(OperationContext* opCtx,
         throw;
     }
 
-    uassert(ErrorCodes::IllegalOperation,
+    uassert(serverGlobalParams.clusterRole == ClusterRole::ShardServer
+                ? ErrorCodes::CollectionIsEmptyLocally
+                : ErrorCodes::IllegalOperation,
             "Cannot analyze the monotonicity of a shard key for an empty collection",
             recordIds.size() > 0);
 
@@ -558,22 +579,36 @@ CollStatsMetrics calculateCollStats(OperationContext* opCtx, const NamespaceStri
     AggregateCommandRequest aggRequest(nss, pipeline);
     aggRequest.setReadConcern(extractReadConcern(opCtx));
 
-    runAggregate(opCtx, aggRequest, [&](const BSONObj& doc) {
-        metrics.numDocs = doc.getField(kNumDocsFieldName).exactNumberLong();
-        uassert(ErrorCodes::IllegalOperation,
-                "Cannot analyze a shard key for an empty collection",
-                metrics.numDocs > 0);
-        metrics.avgDocSizeBytes =
-            doc.getField(kNumBytesFieldName).exactNumberLong() / metrics.numDocs;
-
+    auto isShardedCollection = [&] {
         if (serverGlobalParams.clusterRole.isShardRole()) {
             auto cm = uassertStatusOK(
                           Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss))
                           .cm;
+            return cm.isSharded();
+        }
+        return false;
+    }();
 
-            if (cm.isSharded()) {
-                metrics.numOrphanDocs = doc.getField(kNumOrphanDocsFieldName).exactNumberLong();
+    runAggregate(opCtx, aggRequest, [&](const BSONObj& doc) {
+        metrics.numDocs = doc.getField(kNumDocsFieldName).exactNumberLong();
+        if (metrics.numDocs == 0) {
+            LOGV2_WARNING(
+                7477403,
+                "The number of documents returned by $collStats indicates that the collection is "
+                "empty. This is likely caused by an unclean shutdown that resulted in an "
+                "inaccurate fast count or by deletions that have occurred since the command "
+                "started.");
+            metrics.avgDocSizeBytes = 0;
+            if (isShardedCollection) {
+                metrics.numOrphanDocs = 0;
             }
+            return;
+        }
+
+        metrics.avgDocSizeBytes =
+            doc.getField(kNumBytesFieldName).exactNumberLong() / metrics.numDocs;
+        if (isShardedCollection) {
+            metrics.numOrphanDocs = doc.getField(kNumOrphanDocsFieldName).exactNumberLong();
         }
     });
 
@@ -710,12 +745,6 @@ KeyCharacteristicsMetrics calculateKeyCharacteristicsMetrics(OperationContext* o
                               << " to " << collection->uuid() << " since the command started",
                 collection->uuid() == collUuid);
 
-        uassert(serverGlobalParams.clusterRole == ClusterRole::ShardServer
-                    ? ErrorCodes::CollectionIsEmptyLocally
-                    : ErrorCodes::IllegalOperation,
-                "Cannot analyze a shard key for an empty collection",
-                collection->numRecords(opCtx) > 0);
-
         // Performs best-effort validation that the shard key does not contain an array field by
         // extracting the shard key value from a random document in the collection and asserting
         // that it does not contain an array field.
@@ -727,6 +756,11 @@ KeyCharacteristicsMetrics calculateKeyCharacteristicsMetrics(OperationContext* o
 
         DBDirectClient client(opCtx);
         auto doc = client.findOne(nss, {});
+        uassert(serverGlobalParams.clusterRole == ClusterRole::ShardServer
+                    ? ErrorCodes::CollectionIsEmptyLocally
+                    : ErrorCodes::IllegalOperation,
+                "Cannot analyze the characteristics of a shard key for an empty collection",
+                !doc.isEmpty());
         auto value = dotted_path_support::extractElementsBasedOnTemplate(doc, shardKeyBson);
         uassertShardKeyValueNotContainArrays(value);
 
@@ -756,15 +790,21 @@ KeyCharacteristicsMetrics calculateKeyCharacteristicsMetrics(OperationContext* o
     }
 
     auto collStatsMetrics = calculateCollStats(opCtx, nss);
-    metrics.setAvgDocSizeBytes(collStatsMetrics.avgDocSizeBytes);
-    metrics.setNumOrphanDocs(collStatsMetrics.numOrphanDocs);
-
     auto cardinalityFrequencyMetrics = *metrics.getIsUnique()
         ? calculateCardinalityAndFrequencyUnique(opCtx, nss, shardKeyBson, collStatsMetrics.numDocs)
         : calculateCardinalityAndFrequencyGeneric(opCtx, nss, shardKeyBson, indexKeyBson);
+
     metrics.setNumDocs(cardinalityFrequencyMetrics.numDocs);
     metrics.setNumDistinctValues(cardinalityFrequencyMetrics.numDistinctValues);
     metrics.setMostCommonValues(cardinalityFrequencyMetrics.mostCommonValues);
+    // The average document size returned by $collStats can be inaccurate (or even zero) if there
+    // has been an unclean shutdown since that can result in inaccurate fast data statistics. To
+    // avoid nonsensical metrics, if the collection is not empty, specify the lower limit for the
+    // average document size to the size of an empty document.
+    metrics.setAvgDocSizeBytes(cardinalityFrequencyMetrics.numDocs > 0
+                                   ? std::max(kEmptyDocSizeBytes, collStatsMetrics.avgDocSizeBytes)
+                                   : 0);
+    metrics.setNumOrphanDocs(collStatsMetrics.numOrphanDocs);
 
     return metrics;
 }

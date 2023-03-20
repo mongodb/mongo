@@ -139,7 +139,8 @@ public:
 
                 if (status == ErrorCodes::CollectionIsEmptyLocally) {
                     uassert(ErrorCodes::IllegalOperation,
-                            "Cannot analyze a shard key for an empty collection",
+                            str::stream() << "Cannot analyze a shard key for an empty collection: "
+                                          << redact(status),
                             !candidateShardIds.empty());
 
                     LOGV2(6875300,
