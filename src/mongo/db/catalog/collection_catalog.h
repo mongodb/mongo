@@ -880,11 +880,12 @@ private:
      */
     boost::optional<mongo::stdx::unordered_map<UUID, NamespaceString, UUID::Hash>> _shadowCatalog;
 
-    using CollectionCatalogMap = stdx::unordered_map<UUID, std::shared_ptr<Collection>, UUID::Hash>;
+    using CollectionCatalogMap =
+        immutable::unordered_map<UUID, std::shared_ptr<Collection>, UUID::Hash>;
     using OrderedCollectionMap =
         std::map<std::pair<DatabaseName, UUID>, std::shared_ptr<Collection>>;
     using NamespaceCollectionMap =
-        stdx::unordered_map<NamespaceString, std::shared_ptr<Collection>>;
+        immutable::unordered_map<NamespaceString, std::shared_ptr<Collection>>;
     using UncommittedViewsSet = stdx::unordered_set<NamespaceString>;
     using DatabaseProfileSettingsMap = stdx::unordered_map<DatabaseName, ProfileSettings>;
     using ViewsForDatabaseMap = stdx::unordered_map<DatabaseName, ViewsForDatabase>;
