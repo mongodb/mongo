@@ -44,6 +44,7 @@ const StatusWith<Shard::CommandResponse> kOkResponse =
     Shard::CommandResponse{boost::none, BSON("ok" << 1), Status::OK(), Status::OK()};
 const Status kRetryableError{ErrorCodes::Interrupted, "Interrupted"};
 const Status kUnrecoverableError{ErrorCodes::UnknownError, "Something bad happened"};
+const Status kAbortedError{ErrorCodes::MovePrimaryAborted, "MovePrimary aborted"};
 
 struct CommandDetails {
     CommandDetails(const ShardId& shardId,
@@ -132,7 +133,7 @@ public:
         : MovePrimaryDonorService{serviceContext}, _commandRunner{commandRunner} {}
 
 protected:
-    virtual MovePrimaryDonorDependencies makeDependencies(
+    virtual MovePrimaryDonorDependencies _makeDependencies(
         const MovePrimaryDonorDocument& initialDoc) override {
         return {std::make_unique<MovePrimaryDonorExternalStateForTest>(initialDoc.getMetadata(),
                                                                        _commandRunner)};
@@ -174,11 +175,17 @@ protected:
         return doc;
     }
 
-    MovePrimaryDonorDocument getStateDocumentOnDisk(OperationContext* opCtx) {
+    MovePrimaryDonorDocument getStateDocumentOnDisk(OperationContext* opCtx, UUID instanceId) {
         DBDirectClient client(opCtx);
-        auto doc = client.findOne(NamespaceString::kMovePrimaryDonorNamespace, BSONObj{});
+        auto doc = client.findOne(NamespaceString::kMovePrimaryDonorNamespace,
+                                  BSON(MovePrimaryDonorDocument::k_idFieldName << instanceId));
         IDLParserContext errCtx("MovePrimaryDonorServiceTest::getStateDocumentOnDisk()");
         return MovePrimaryDonorDocument::parse(errCtx, doc);
+    }
+
+    MovePrimaryDonorDocument getStateDocumentOnDisk(
+        OperationContext* opCtx, const std::shared_ptr<DonorInstance>& instance) {
+        return getStateDocumentOnDisk(opCtx, instance->getMetadata().get_id());
     }
 
     static constexpr auto kBefore = "before";
@@ -208,7 +215,7 @@ protected:
             progress, state, "pauseDuringMovePrimaryDonorStateEnumTransitionAlternate");
     }
 
-    auto failCrudOpsOn(NamespaceString nss) {
+    auto failCrudOpsOn(NamespaceString nss, ErrorCodes::Error code) {
         auto fp = globalFailPointRegistry().find("failCommand");
         auto count =
             fp->setMode(FailPoint::alwaysOn,
@@ -217,7 +224,7 @@ protected:
                                              "namespace: '{}', failLocalClients: true, "
                                              "failInternalCommands: true, errorCode: {}}}",
                                              nss.toString(),
-                                             ErrorCodes::Interrupted)));
+                                             code)));
         return std::tuple{fp, count};
     }
 
@@ -248,92 +255,202 @@ protected:
         return *instance;
     }
 
+    bool mustBlockWritesToReachState(MovePrimaryDonorStateEnum state) {
+        if (state == MovePrimaryDonorStateEnum::kAborted) {
+            return false;
+        }
+        return state >= MovePrimaryDonorStateEnum::kBlockingWrites;
+    }
+
+    bool mustForgetToReachState(MovePrimaryDonorStateEnum state) {
+        return state == MovePrimaryDonorStateEnum::kDone;
+    }
+
+    bool mustAbortToReachState(MovePrimaryDonorStateEnum state) {
+        return state == MovePrimaryDonorStateEnum::kAborted;
+    }
+
+    auto createInstanceBeforeOrAfterState(OperationContext* opCtx,
+                                          const std::string& beforeOrAfter,
+                                          MovePrimaryDonorStateEnum state) {
+        auto [fp, count] = pauseStateTransition(beforeOrAfter, state);
+        auto instance = createInstance(opCtx);
+        if (mustBlockWritesToReachState(state)) {
+            instance->onBeganBlockingWrites(getCurrentTimestamp());
+        }
+        if (mustForgetToReachState(state)) {
+            instance->onReadyToForget();
+        }
+        if (mustAbortToReachState(state)) {
+            instance->abort(kAbortedError);
+        }
+        fp->waitForTimesEntered(count + 1);
+        if (beforeOrAfter == kAfter) {
+            ASSERT_EQ(getState(instance), state);
+        }
+        return std::tuple{instance, fp};
+    }
+
+    auto createInstanceInState(OperationContext* opCtx, MovePrimaryDonorStateEnum state) {
+        return createInstanceBeforeOrAfterState(opCtx, kAfter, state);
+    }
+
+    auto createInstanceInState(MovePrimaryDonorStateEnum state) {
+        auto opCtx = makeOperationContext();
+        return createInstanceInState(opCtx.get(), state);
+    }
+
+    auto createInstanceBeforeState(OperationContext* opCtx, MovePrimaryDonorStateEnum state) {
+        return createInstanceBeforeOrAfterState(opCtx, kBefore, state);
+    }
+
+    auto createInstanceBeforeState(MovePrimaryDonorStateEnum state) {
+        auto opCtx = makeOperationContext();
+        return createInstanceBeforeState(opCtx.get(), state);
+    }
+
+    MovePrimaryDonorStateEnum getState(const std::shared_ptr<DonorInstance>& instance) {
+        auto stateString = getMetrics(instance).getStringField("state").toString();
+        IDLParserContext errCtx("MovePrimaryDonorServiceTest::getState()");
+        return MovePrimaryDonorState_parse(errCtx, stateString);
+    }
+
+    Timestamp getBlockingWritesTimestamp(OperationContext* opCtx,
+                                         const std::shared_ptr<DonorInstance>& instance) {
+        auto doc = getStateDocumentOnDisk(opCtx, instance->getMetadata().get_id());
+        auto timestamp = doc.getMutableFields().getBlockingWritesTimestamp();
+        ASSERT_TRUE(timestamp.has_value());
+        return *timestamp;
+    }
+
     void makeReadyToComplete(const std::shared_ptr<DonorInstance>& instance) {
-        instance->onBeganBlockingWrites(getCurrentTimestamp());
+        auto state = getState(instance);
+        if (state <= MovePrimaryDonorStateEnum::kWaitingToBlockWrites) {
+            instance->onBeganBlockingWrites(getCurrentTimestamp());
+        }
         instance->onReadyToForget();
+    }
+
+    void assertCompletesWithSuccess(const std::shared_ptr<DonorInstance>& instance) {
+        makeReadyToComplete(instance);
+        ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    }
+
+    void assertCompletesWithFailure(const std::shared_ptr<DonorInstance>& instance) {
+        makeReadyToComplete(instance);
+        ASSERT_NOT_OK(instance->getCompletionFuture().getNoThrow());
+    }
+
+    void assertCompletesAppropriately(const std::shared_ptr<DonorInstance>& instance) {
+        if (instance->isAborted()) {
+            assertCompletesWithFailure(instance);
+        } else {
+            assertCompletesWithSuccess(instance);
+        }
+    }
+
+    void unpauseAndAssertCompletesAppropriately(FailPoint* fp,
+                                                const std::shared_ptr<DonorInstance>& instance) {
+        fp->setMode(FailPoint::off);
+        assertCompletesAppropriately(instance);
+    }
+
+    auto createInstanceInStateAndSimulateFailover(OperationContext* opCtx,
+                                                  MovePrimaryDonorStateEnum state) {
+        boost::optional<UUID> instanceId;
+        {
+            auto [instance, fp] = createInstanceInState(opCtx, state);
+            instanceId = instance->getMetadata().get_id();
+            stepDown();
+            fp->setMode(FailPoint::off);
+            ASSERT_NOT_OK(instance->getCompletionFuture().getNoThrow());
+        }
+        auto fp = globalFailPointRegistry().find("pauseBeforeBeginningMovePrimaryDonorWorkflow");
+        auto count = fp->setMode(FailPoint::alwaysOn);
+        stepUp(opCtx);
+        auto instance = getExistingInstance(opCtx, *instanceId);
+        fp->waitForTimesEntered(count + 1);
+        return std::tuple{instance, fp};
     }
 
     void testStateTransitionUpdatesOnDiskState(MovePrimaryDonorStateEnum state) {
         auto opCtx = makeOperationContext();
-        auto [fp, count] = pauseStateTransition(kAfter, state);
-        auto instance = createInstance(opCtx.get());
-        makeReadyToComplete(instance);
-        fp->waitForTimesEntered(count + 1);
-        auto onDiskState = getStateDocumentOnDisk(opCtx.get());
+        auto [instance, fp] = createInstanceInState(opCtx.get(), state);
+
+        auto onDiskState = getStateDocumentOnDisk(opCtx.get(), instance);
         ASSERT_EQ(onDiskState.getMutableFields().getState(), state);
-        fp->setMode(FailPoint::off);
-        ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+
+        unpauseAndAssertCompletesAppropriately(fp, instance);
+    }
+
+    void testStateTransitionAbortsOnUnrecoverableError(MovePrimaryDonorStateEnum state) {
+        auto opCtx = makeOperationContext();
+        auto [instance, beforeFp] = createInstanceBeforeState(opCtx.get(), state);
+        auto [failCrud, crudCount] =
+            failCrudOpsOn(NamespaceString::kMovePrimaryDonorNamespace, kUnrecoverableError.code());
+        auto [afterFp, afterCount] =
+            pauseStateTransitionAlternate(kAfter, MovePrimaryDonorStateEnum::kAborted);
+
+        beforeFp->setMode(FailPoint::off);
+        failCrud->waitForTimesEntered(crudCount + 1);
+        failCrud->setMode(FailPoint::off);
+        afterFp->waitForTimesEntered(afterCount + 1);
+
+        unpauseAndAssertCompletesAppropriately(afterFp, instance);
+        ASSERT_TRUE(instance->isAborted());
     }
 
     void testStateTransitionUpdatesOnDiskStateWithWriteFailure(MovePrimaryDonorStateEnum state) {
         auto opCtx = makeOperationContext();
-        auto [beforeFp, beforeCount] = pauseStateTransition(kBefore, state);
+        auto [instance, beforeFp] = createInstanceBeforeState(opCtx.get(), state);
         auto [afterFp, afterCount] = pauseStateTransitionAlternate(kAfter, state);
-        auto instance = createInstance(opCtx.get());
-        makeReadyToComplete(instance);
-        beforeFp->waitForTimesEntered(beforeCount + 1);
 
-        auto [failCrud, crudCount] = failCrudOpsOn(NamespaceString::kMovePrimaryDonorNamespace);
+        auto [failCrud, crudCount] =
+            failCrudOpsOn(NamespaceString::kMovePrimaryDonorNamespace, kRetryableError.code());
         beforeFp->setMode(FailPoint::off);
         failCrud->waitForTimesEntered(crudCount + 1);
         failCrud->setMode(FailPoint::off);
 
         afterFp->waitForTimesEntered(afterCount + 1);
-        auto onDiskState = getStateDocumentOnDisk(opCtx.get());
+        auto onDiskState = getStateDocumentOnDisk(opCtx.get(), instance);
         ASSERT_EQ(onDiskState.getMutableFields().getState(), state);
-        afterFp->setMode(FailPoint::off);
-        ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+
+        unpauseAndAssertCompletesAppropriately(afterFp, instance);
     }
 
     void testStateTransitionUpdatesInMemoryState(MovePrimaryDonorStateEnum state) {
-        auto [fp, count] = pauseStateTransition(kAfter, state);
-        auto instance = createInstance();
-        makeReadyToComplete(instance);
-        fp->waitForTimesEntered(count + 1);
+        auto [instance, fp] = createInstanceInState(state);
 
         ASSERT_EQ(getMetrics(instance).getStringField("state"),
                   MovePrimaryDonorState_serializer(state));
 
-        fp->setMode(FailPoint::off);
-        ASSERT_OK(instance->getCompletionFuture().getNoThrow());
-    }
-
-    bool mustBlockWritesToReachState(MovePrimaryDonorStateEnum state) {
-        return state >= MovePrimaryDonorStateEnum::kBlockingWrites;
+        unpauseAndAssertCompletesAppropriately(fp, instance);
     }
 
     void testStepUpInState(MovePrimaryDonorStateEnum state) {
         auto opCtx = makeOperationContext();
-        auto stateDoc = createStateDocument();
+        auto [instance, fp] = createInstanceInStateAndSimulateFailover(opCtx.get(), state);
+        unpauseAndAssertCompletesAppropriately(fp, instance);
+    }
 
-        {
-            auto [fp, count] = pauseStateTransition(kAfter, state);
-            auto instance = DonorInstance::getOrCreate(opCtx.get(), _service, stateDoc.toBSON());
-
-            if (mustBlockWritesToReachState(state)) {
-                instance->onBeganBlockingWrites(getCurrentTimestamp());
+    void assertSentRecipientAbortCommand() {
+        auto history = getCommandRunner().getCommandHistory();
+        auto recipientAbortsSent = 0;
+        for (const auto& details : history) {
+            if (details.command.hasField(MovePrimaryRecipientAbortMigration::kCommandName)) {
+                recipientAbortsSent++;
             }
-
-            fp->waitForTimesEntered(count + 1);
-
-            stepDown();
-            fp->setMode(FailPoint::off);
-            ASSERT_NOT_OK(instance->getCompletionFuture().getNoThrow());
         }
+        ASSERT_GTE(recipientAbortsSent, 1);
+    }
 
-        auto fp = globalFailPointRegistry().find("pauseBeforeBeginningMovePrimaryDonorWorkflow");
-        auto count = fp->setMode(FailPoint::alwaysOn);
-        stepUp(opCtx.get());
-        auto instance = getExistingInstance(opCtx.get(), stateDoc.get_id());
+    void testAbortInState(MovePrimaryDonorStateEnum state) {
+        auto [instance, fp] = createInstanceInState(state);
+        instance->abort(kAbortedError);
+        unpauseAndAssertCompletesAppropriately(fp, instance);
 
-        if (!mustBlockWritesToReachState(state)) {
-            instance->onBeganBlockingWrites(getCurrentTimestamp());
-        }
-
-        fp->waitForTimesEntered(count + 1);
-        fp->setMode(FailPoint::off);
-        instance->onReadyToForget();
-        ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+        ASSERT_TRUE(instance->isAborted());
+        assertSentRecipientAbortCommand();
     }
 
 private:
@@ -400,6 +517,10 @@ TEST_F(MovePrimaryDonorServiceTest, StateDocumentIsUpdatedDuringPrepared) {
     testStateTransitionUpdatesOnDiskState(MovePrimaryDonorStateEnum::kPrepared);
 }
 
+TEST_F(MovePrimaryDonorServiceTest, StateDocumentIsUpdatedDuringAborted) {
+    testStateTransitionUpdatesOnDiskState(MovePrimaryDonorStateEnum::kAborted);
+}
+
 TEST_F(MovePrimaryDonorServiceTest, StateDocumentInsertionRetriesIfWriteFails) {
     testStateTransitionUpdatesOnDiskStateWithWriteFailure(MovePrimaryDonorStateEnum::kInitializing);
 }
@@ -422,6 +543,10 @@ TEST_F(MovePrimaryDonorServiceTest, TransitionToPreparedRetriesIfWriteFails) {
     testStateTransitionUpdatesOnDiskStateWithWriteFailure(MovePrimaryDonorStateEnum::kPrepared);
 }
 
+TEST_F(MovePrimaryDonorServiceTest, TransitionToAbortedRetriesIfWriteFails) {
+    testStateTransitionUpdatesOnDiskStateWithWriteFailure(MovePrimaryDonorStateEnum::kAborted);
+}
+
 TEST_F(MovePrimaryDonorServiceTest, InitializingUpdatesInMemoryState) {
     testStateTransitionUpdatesInMemoryState(MovePrimaryDonorStateEnum::kInitializing);
 }
@@ -440,6 +565,10 @@ TEST_F(MovePrimaryDonorServiceTest, BlockingWritesUpdatesInMemoryState) {
 
 TEST_F(MovePrimaryDonorServiceTest, PreparedUpdatesInMemoryState) {
     testStateTransitionUpdatesInMemoryState(MovePrimaryDonorStateEnum::kPrepared);
+}
+
+TEST_F(MovePrimaryDonorServiceTest, AbortedUpdatesInMemoryState) {
+    testStateTransitionUpdatesInMemoryState(MovePrimaryDonorStateEnum::kAborted);
 }
 
 TEST_F(MovePrimaryDonorServiceTest, StepUpInInitializing) {
@@ -462,11 +591,52 @@ TEST_F(MovePrimaryDonorServiceTest, StepUpInPrepared) {
     testStepUpInState(MovePrimaryDonorStateEnum::kPrepared);
 }
 
+TEST_F(MovePrimaryDonorServiceTest, StepUpInAborted) {
+    testStepUpInState(MovePrimaryDonorStateEnum::kAborted);
+}
+
+TEST_F(MovePrimaryDonorServiceTest, AbortInInitializing) {
+    testAbortInState(MovePrimaryDonorStateEnum::kInitializing);
+}
+
+TEST_F(MovePrimaryDonorServiceTest, AbortInCloning) {
+    testAbortInState(MovePrimaryDonorStateEnum::kCloning);
+}
+
+TEST_F(MovePrimaryDonorServiceTest, AbortInWaitingToBlockWrites) {
+    testAbortInState(MovePrimaryDonorStateEnum::kWaitingToBlockWrites);
+}
+
+TEST_F(MovePrimaryDonorServiceTest, AbortInBlockingWrites) {
+    testAbortInState(MovePrimaryDonorStateEnum::kBlockingWrites);
+}
+
+TEST_F(MovePrimaryDonorServiceTest, AbortInPrepared) {
+    testAbortInState(MovePrimaryDonorStateEnum::kPrepared);
+}
+
+TEST_F(MovePrimaryDonorServiceTest, FailTransitionToInitializing) {
+    testStateTransitionAbortsOnUnrecoverableError(MovePrimaryDonorStateEnum::kInitializing);
+}
+
+TEST_F(MovePrimaryDonorServiceTest, FailTransitionToCloning) {
+    testStateTransitionAbortsOnUnrecoverableError(MovePrimaryDonorStateEnum::kCloning);
+}
+
+TEST_F(MovePrimaryDonorServiceTest, FailTransitionToWaitingToBlockWrites) {
+    testStateTransitionAbortsOnUnrecoverableError(MovePrimaryDonorStateEnum::kWaitingToBlockWrites);
+}
+
+TEST_F(MovePrimaryDonorServiceTest, FailTransitionToBlockingWrites) {
+    testStateTransitionAbortsOnUnrecoverableError(MovePrimaryDonorStateEnum::kBlockingWrites);
+}
+
+TEST_F(MovePrimaryDonorServiceTest, FailTransitionToPrepared) {
+    testStateTransitionAbortsOnUnrecoverableError(MovePrimaryDonorStateEnum::kPrepared);
+}
+
 TEST_F(MovePrimaryDonorServiceTest, CloningSendsSyncDataCommandWithoutTimestamp) {
-    auto [fp, count] =
-        pauseStateTransition(kBefore, MovePrimaryDonorStateEnum::kWaitingToBlockWrites);
-    auto instance = createInstance();
-    fp->waitForTimesEntered(count + 1);
+    auto [instance, fp] = createInstanceInState(MovePrimaryDonorStateEnum::kWaitingToBlockWrites);
 
     ASSERT_GT(getCommandRunner().getCommandsRunCount(), 0);
     auto details = getCommandRunner().getLastCommandDetails();
@@ -475,18 +645,13 @@ TEST_F(MovePrimaryDonorServiceTest, CloningSendsSyncDataCommandWithoutTimestamp)
     ASSERT_FALSE(command.hasField(
         MovePrimaryRecipientSyncData::kReturnAfterReachingDonorTimestampFieldName));
 
-    fp->setMode(FailPoint::off);
-    makeReadyToComplete(instance);
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    unpauseAndAssertCompletesAppropriately(fp, instance);
 }
 
 TEST_F(MovePrimaryDonorServiceTest, CloningRetriesSyncDataCommandOnFailure) {
-    auto [beforeCloning, beforeCount] =
-        pauseStateTransition(kAfter, MovePrimaryDonorStateEnum::kCloning);
+    auto [instance, beforeCloning] = createInstanceInState(MovePrimaryDonorStateEnum::kCloning);
     auto [afterCloning, afterCount] =
         pauseStateTransitionAlternate(kBefore, MovePrimaryDonorStateEnum::kWaitingToBlockWrites);
-    auto instance = createInstance();
-    beforeCloning->waitForTimesEntered(beforeCount + 1);
 
     ASSERT_EQ(getCommandRunner().getCommandsRunCount(), 0);
     getCommandRunner().addNextResponse(kRetryableError);
@@ -496,52 +661,50 @@ TEST_F(MovePrimaryDonorServiceTest, CloningRetriesSyncDataCommandOnFailure) {
 
     ASSERT_EQ(getCommandRunner().getCommandsRunCount(), 2);
 
-    afterCloning->setMode(FailPoint::off);
-    makeReadyToComplete(instance);
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    unpauseAndAssertCompletesAppropriately(afterCloning, instance);
+}
+
+TEST_F(MovePrimaryDonorServiceTest, CloningAbortsOnSyncDataCommandUnrecoverableError) {
+    auto [instance, fp] = createInstanceInState(MovePrimaryDonorStateEnum::kCloning);
+    getCommandRunner().addNextResponse(kUnrecoverableError);
+
+    unpauseAndAssertCompletesAppropriately(fp, instance);
+    ASSERT_TRUE(instance->isAborted());
 }
 
 TEST_F(MovePrimaryDonorServiceTest, WaitingToBlockWritesSetsReadyToBlockWritesFuture) {
     auto instance = createInstance();
     ASSERT_OK(instance->getReadyToBlockWritesFuture().getNoThrow());
-    ASSERT_EQ(getMetrics(instance).getStringField("state"),
-              MovePrimaryDonorState_serializer(MovePrimaryDonorStateEnum::kWaitingToBlockWrites));
-    makeReadyToComplete(instance);
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    ASSERT_EQ(getState(instance), MovePrimaryDonorStateEnum::kWaitingToBlockWrites);
+    assertCompletesAppropriately(instance);
 }
 
 TEST_F(MovePrimaryDonorServiceTest, WaitingToBlockWritesPersistsBlockTimestamp) {
     auto opCtx = makeOperationContext();
-    auto instance = createInstance(opCtx.get());
-    auto [fp, count] = pauseStateTransition(kBefore, MovePrimaryDonorStateEnum::kBlockingWrites);
-    ASSERT_OK(instance->getReadyToBlockWritesFuture().getNoThrow());
+    auto [instance, fp] =
+        createInstanceInState(opCtx.get(), MovePrimaryDonorStateEnum::kWaitingToBlockWrites);
+    fp->setMode(FailPoint::off);
 
-    const Timestamp timestamp{getServiceContext()->getFastClockSource()->now()};
+    const auto timestamp = getCurrentTimestamp();
     instance->onBeganBlockingWrites(timestamp);
-    fp->waitForTimesEntered(count + 1);
 
-    auto docOnDisk = getStateDocumentOnDisk(opCtx.get());
+    ASSERT_OK(instance->getDecisionFuture().getNoThrow());
+
+    auto docOnDisk = getStateDocumentOnDisk(opCtx.get(), instance);
     ASSERT_EQ(docOnDisk.getMutableFields().getBlockingWritesTimestamp(), timestamp);
 
-    fp->setMode(FailPoint::off);
-    instance->onReadyToForget();
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    assertCompletesAppropriately(instance);
 }
 
 TEST_F(MovePrimaryDonorServiceTest, BlockingWritesSendsSyncDataCommandWithTimestamp) {
-    auto [beforeFp, beforeFpCount] =
-        pauseStateTransition(kAfter, MovePrimaryDonorStateEnum::kBlockingWrites);
-    auto instance = createInstance();
-    const auto kTimestamp = Timestamp{1234, 2};
-    instance->onBeganBlockingWrites(kTimestamp);
-    beforeFp->waitForTimesEntered(beforeFpCount + 1);
+    auto [instance, fp] = createInstanceInState(MovePrimaryDonorStateEnum::kWaitingToBlockWrites);
+    fp->setMode(FailPoint::off);
+    const auto timestamp = getCurrentTimestamp();
 
     auto beforeCommandCount = getCommandRunner().getCommandsRunCount();
+    instance->onBeganBlockingWrites(timestamp);
 
-    auto [afterFp, afterFpCount] =
-        pauseStateTransitionAlternate(kBefore, MovePrimaryDonorStateEnum::kPrepared);
-    beforeFp->setMode(FailPoint::off);
-    afterFp->waitForTimesEntered(afterFpCount + 1);
+    ASSERT_OK(instance->getDecisionFuture().getNoThrow());
 
     ASSERT_EQ(getCommandRunner().getCommandsRunCount(), beforeCommandCount + 1);
     auto details = getCommandRunner().getLastCommandDetails();
@@ -550,54 +713,40 @@ TEST_F(MovePrimaryDonorServiceTest, BlockingWritesSendsSyncDataCommandWithTimest
     ASSERT_EQ(
         command.getField(MovePrimaryRecipientSyncData::kReturnAfterReachingDonorTimestampFieldName)
             .timestamp(),
-        kTimestamp);
+        timestamp);
 
-    afterFp->setMode(FailPoint::off);
-    instance->onReadyToForget();
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    assertCompletesAppropriately(instance);
 }
 
 TEST_F(MovePrimaryDonorServiceTest, BlockingWritesSyncDataCommandRetriesOnFailure) {
-    auto [beforeFp, beforeFpCount] =
-        pauseStateTransition(kAfter, MovePrimaryDonorStateEnum::kBlockingWrites);
-    auto instance = createInstance();
-    makeReadyToComplete(instance);
-    beforeFp->waitForTimesEntered(beforeFpCount + 1);
-
+    auto [instance, fp] = createInstanceInState(MovePrimaryDonorStateEnum::kBlockingWrites);
     auto beforeCommandCount = getCommandRunner().getCommandsRunCount();
     getCommandRunner().addNextResponse(kRetryableError);
 
-    auto [afterFp, afterFpCount] =
-        pauseStateTransitionAlternate(kBefore, MovePrimaryDonorStateEnum::kPrepared);
-    beforeFp->setMode(FailPoint::off);
-    afterFp->waitForTimesEntered(afterFpCount + 1);
+    fp->setMode(FailPoint::off);
+    ASSERT_OK(instance->getDecisionFuture().getNoThrow());
 
     ASSERT_EQ(getCommandRunner().getCommandsRunCount(), beforeCommandCount + 2);
+    assertCompletesAppropriately(instance);
+}
 
-    afterFp->setMode(FailPoint::off);
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+TEST_F(MovePrimaryDonorServiceTest, BlockingWritesAbortsOnSyncDataCommandUnrecoverableError) {
+    auto [instance, fp] = createInstanceInState(MovePrimaryDonorStateEnum::kBlockingWrites);
+    getCommandRunner().addNextResponse(kUnrecoverableError);
+
+    unpauseAndAssertCompletesAppropriately(fp, instance);
+    ASSERT_TRUE(instance->isAborted());
 }
 
 TEST_F(MovePrimaryDonorServiceTest,
        BlockingWritesSyncDataCommandSendsProperTimestampAfterFailover) {
     auto opCtx = makeOperationContext();
-    const auto kTimestamp = Timestamp{1234, 2};
-    boost::optional<UUID> instanceId;
-    {
-        auto [fp, count] = pauseStateTransition(kAfter, MovePrimaryDonorStateEnum::kBlockingWrites);
-        auto instance = createInstance(opCtx.get());
-        instanceId = instance->getMetadata().get_id();
-        instance->onBeganBlockingWrites(kTimestamp);
-        fp->waitForTimesEntered(count + 1);
-        stepDown();
-        fp->setMode(FailPoint::off);
-        ASSERT_NOT_OK(instance->getCompletionFuture().getNoThrow());
-    }
+    auto [instance, fp] = createInstanceInStateAndSimulateFailover(
+        opCtx.get(), MovePrimaryDonorStateEnum::kBlockingWrites);
 
-    auto [fp, count] = pauseStateTransition(kBefore, MovePrimaryDonorStateEnum::kPrepared);
-    stepUp(opCtx.get());
-    auto instance = getExistingInstance(opCtx.get(), *instanceId);
-    fp->waitForTimesEntered(count + 1);
+    fp->setMode(FailPoint::off);
+    const auto timestamp = getBlockingWritesTimestamp(opCtx.get(), instance);
+    ASSERT_OK(instance->getDecisionFuture().getNoThrow());
 
     auto details = getCommandRunner().getLastCommandDetails();
     const auto& command = details->command;
@@ -605,125 +754,197 @@ TEST_F(MovePrimaryDonorServiceTest,
     ASSERT_EQ(
         command.getField(MovePrimaryRecipientSyncData::kReturnAfterReachingDonorTimestampFieldName)
             .timestamp(),
-        kTimestamp);
+        timestamp);
 
-    fp->setMode(FailPoint::off);
-    instance->onReadyToForget();
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    assertCompletesAppropriately(instance);
 }
 
 TEST_F(MovePrimaryDonorServiceTest, PreparedSetsDecisionFuture) {
-    auto instance = createInstance();
-    instance->onBeganBlockingWrites(getCurrentTimestamp());
+    auto [instance, fp] = createInstanceInState(MovePrimaryDonorStateEnum::kPrepared);
+    ASSERT_FALSE(instance->getDecisionFuture().isReady());
+    fp->setMode(FailPoint::off);
     ASSERT_OK(instance->getDecisionFuture().getNoThrow());
-    instance->onReadyToForget();
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    assertCompletesAppropriately(instance);
 }
 
 TEST_F(MovePrimaryDonorServiceTest, StepUpAfterPreparedSendsNoAdditionalCommands) {
     auto opCtx = makeOperationContext();
-    boost::optional<UUID> instanceId;
-    {
-        auto [fp, count] = pauseStateTransition(kAfter, MovePrimaryDonorStateEnum::kPrepared);
-        auto instance = createInstance(opCtx.get());
-        instanceId = instance->getMetadata().get_id();
-        instance->onBeganBlockingWrites(getCurrentTimestamp());
-        fp->waitForTimesEntered(count + 1);
-        stepDown();
-        fp->setMode(FailPoint::off);
-        ASSERT_NOT_OK(instance->getCompletionFuture().getNoThrow());
-    }
+    auto [instance, fp] =
+        createInstanceInStateAndSimulateFailover(opCtx.get(), MovePrimaryDonorStateEnum::kPrepared);
+
     const auto beforeCommandCount = getCommandRunner().getCommandsRunCount();
-    stepUp(opCtx.get());
-    auto instance = getExistingInstance(opCtx.get(), *instanceId);
-    instance->onReadyToForget();
-
-    auto fp = globalFailPointRegistry().find("pauseBeforeBeginningMovePrimaryDonorCleanup");
-    auto fpCount = fp->setMode(FailPoint::alwaysOn);
-    fp->waitForTimesEntered(fpCount + 1);
-    ASSERT_EQ(getCommandRunner().getCommandsRunCount(), beforeCommandCount);
     fp->setMode(FailPoint::off);
+    ASSERT_OK(instance->getDecisionFuture().getNoThrow());
+    ASSERT_EQ(getCommandRunner().getCommandsRunCount(), beforeCommandCount);
 
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    assertCompletesAppropriately(instance);
 }
 
 TEST_F(MovePrimaryDonorServiceTest, ForgetSendsForgetToRecipient) {
-    auto beforeFp = globalFailPointRegistry().find("pauseBeforeBeginningMovePrimaryDonorCleanup");
-    auto beforeFpCount = beforeFp->setMode(FailPoint::alwaysOn);
-    auto instance = createInstance();
-    makeReadyToComplete(instance);
-    beforeFp->waitForTimesEntered(beforeFpCount + 1);
+    auto [instance, fp] = createInstanceInState(MovePrimaryDonorStateEnum::kPrepared);
+    fp->setMode(FailPoint::off);
 
     auto beforeCommandCount = getCommandRunner().getCommandsRunCount();
-
-    auto [afterFp, afterFpCount] = pauseStateTransition(kBefore, MovePrimaryDonorStateEnum::kDone);
-    beforeFp->setMode(FailPoint::off);
-    afterFp->waitForTimesEntered(afterFpCount + 1);
+    assertCompletesAppropriately(instance);
 
     ASSERT_EQ(getCommandRunner().getCommandsRunCount(), beforeCommandCount + 1);
     auto details = getCommandRunner().getLastCommandDetails();
     const auto& command = details->command;
     ASSERT_TRUE(command.hasField(MovePrimaryRecipientForgetMigration::kCommandName));
-
-    afterFp->setMode(FailPoint::off);
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
 }
 
 TEST_F(MovePrimaryDonorServiceTest, ForgetRetriesRecipientForgetOnAnyFailure) {
-    auto beforeFp = globalFailPointRegistry().find("pauseBeforeBeginningMovePrimaryDonorCleanup");
-    auto beforeFpCount = beforeFp->setMode(FailPoint::alwaysOn);
-    auto instance = createInstance();
-    makeReadyToComplete(instance);
-    beforeFp->waitForTimesEntered(beforeFpCount + 1);
+    auto [instance, fp] = createInstanceInState(MovePrimaryDonorStateEnum::kPrepared);
+    fp->setMode(FailPoint::off);
 
     auto beforeCommandCount = getCommandRunner().getCommandsRunCount();
     getCommandRunner().addNextResponse(kRetryableError);
     getCommandRunner().addNextResponse(kUnrecoverableError);
 
-    auto [afterFp, afterFpCount] = pauseStateTransition(kBefore, MovePrimaryDonorStateEnum::kDone);
-    beforeFp->setMode(FailPoint::off);
-    afterFp->waitForTimesEntered(afterFpCount + 1);
-
+    assertCompletesAppropriately(instance);
     ASSERT_EQ(getCommandRunner().getCommandsRunCount(), beforeCommandCount + 3);
-
-    afterFp->setMode(FailPoint::off);
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
 }
 
 TEST_F(MovePrimaryDonorServiceTest, ForgetRetriesRecipientForgetAfterFailover) {
     auto opCtx = makeOperationContext();
-    boost::optional<UUID> instanceId;
-    {
-        auto fp = globalFailPointRegistry().find("pauseBeforeBeginningMovePrimaryDonorCleanup");
-        auto count = fp->setMode(FailPoint::alwaysOn);
-        auto instance = createInstance(opCtx.get());
-        instanceId = instance->getMetadata().get_id();
-        makeReadyToComplete(instance);
-        fp->waitForTimesEntered(count + 1);
-        stepDown();
-        fp->setMode(FailPoint::off);
-        ASSERT_NOT_OK(instance->getCompletionFuture().getNoThrow());
-    }
+    auto [instance, fp] =
+        createInstanceInStateAndSimulateFailover(opCtx.get(), MovePrimaryDonorStateEnum::kPrepared);
 
     auto beforeCommandCount = getCommandRunner().getCommandsRunCount();
+    fp->setMode(FailPoint::off);
 
-    stepUp(opCtx.get());
-    auto instance = getExistingInstance(opCtx.get(), *instanceId);
-    instance->onReadyToForget();
-
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    assertCompletesAppropriately(instance);
     ASSERT_EQ(getCommandRunner().getCommandsRunCount(), beforeCommandCount + 1);
 }
 
 TEST_F(MovePrimaryDonorServiceTest, StateDocumentRemovedAfterSuccess) {
     auto opCtx = makeOperationContext();
-    auto instance = createInstance(opCtx.get());
-    makeReadyToComplete(instance);
-    ASSERT_OK(instance->getCompletionFuture().getNoThrow());
+    auto [instance, fp] = createInstanceInState(opCtx.get(), MovePrimaryDonorStateEnum::kPrepared);
+    unpauseAndAssertCompletesAppropriately(fp, instance);
 
     DBDirectClient client(opCtx.get());
     auto doc = client.findOne(NamespaceString::kMovePrimaryDonorNamespace, BSONObj{});
     ASSERT_TRUE(doc.isEmpty());
+}
+
+TEST_F(MovePrimaryDonorServiceTest, ReadyToBlockWritesPromiseReturnsErrorIfAborted) {
+    auto opCtx = makeOperationContext();
+    auto instance = createInstance(opCtx.get());
+    instance->abort(kAbortedError);
+    ASSERT_EQ(instance->getReadyToBlockWritesFuture().getNoThrow(), kAbortedError);
+}
+
+TEST_F(MovePrimaryDonorServiceTest, DecisionPromiseReturnsErrorIfAborted) {
+    auto opCtx = makeOperationContext();
+    auto instance = createInstance(opCtx.get());
+    instance->abort(kAbortedError);
+    ASSERT_EQ(instance->getDecisionFuture().getNoThrow(), kAbortedError);
+}
+
+TEST_F(MovePrimaryDonorServiceTest, CompletionPromiseReturnsErrorIfAborted) {
+    auto opCtx = makeOperationContext();
+    auto instance = createInstance(opCtx.get());
+    instance->abort(kAbortedError);
+    instance->onReadyToForget();
+    ASSERT_EQ(instance->getCompletionFuture().getNoThrow(), kAbortedError);
+}
+
+TEST_F(MovePrimaryDonorServiceTest, StateDocumentRemovedAfterAbort) {
+    auto opCtx = makeOperationContext();
+    auto [instance, fp] = createInstanceInState(opCtx.get(), MovePrimaryDonorStateEnum::kAborted);
+    unpauseAndAssertCompletesAppropriately(fp, instance);
+
+    DBDirectClient client(opCtx.get());
+    auto doc = client.findOne(NamespaceString::kMovePrimaryDonorNamespace, BSONObj{});
+    ASSERT_TRUE(doc.isEmpty());
+}
+
+TEST_F(MovePrimaryDonorServiceTest, AbortSendsAbortToRecipient) {
+    auto [instance, fp] = createInstanceInState(MovePrimaryDonorStateEnum::kAborted);
+    auto beforeCommandCount = getCommandRunner().getCommandsRunCount();
+    fp->setMode(FailPoint::off);
+
+    fp = globalFailPointRegistry().find("pauseBeforeBeginningMovePrimaryDonorCleanup");
+    auto count = fp->setMode(FailPoint::alwaysOn);
+    instance->onReadyToForget();
+    fp->waitForTimesEntered(count + 1);
+    fp->setMode(FailPoint::off);
+
+    ASSERT_EQ(getCommandRunner().getCommandsRunCount(), beforeCommandCount + 1);
+    auto details = getCommandRunner().getLastCommandDetails();
+    const auto& command = details->command;
+    ASSERT_TRUE(command.hasField(MovePrimaryRecipientAbortMigration::kCommandName));
+
+    ASSERT_NOT_OK(instance->getCompletionFuture().getNoThrow());
+}
+
+TEST_F(MovePrimaryDonorServiceTest, AbortRetriesAbortToRecipientOnAnyError) {
+    auto [instance, fp] = createInstanceInState(MovePrimaryDonorStateEnum::kAborted);
+    auto beforeCommandCount = getCommandRunner().getCommandsRunCount();
+    getCommandRunner().addNextResponse(kRetryableError);
+    getCommandRunner().addNextResponse(kUnrecoverableError);
+    fp->setMode(FailPoint::off);
+
+    fp = globalFailPointRegistry().find("pauseBeforeBeginningMovePrimaryDonorCleanup");
+    auto count = fp->setMode(FailPoint::alwaysOn);
+    instance->onReadyToForget();
+    fp->waitForTimesEntered(count + 1);
+    fp->setMode(FailPoint::off);
+
+    ASSERT_EQ(getCommandRunner().getCommandsRunCount(), beforeCommandCount + 3);
+    auto details = getCommandRunner().getLastCommandDetails();
+    const auto& command = details->command;
+    ASSERT_TRUE(command.hasField(MovePrimaryRecipientAbortMigration::kCommandName));
+
+    ASSERT_NOT_OK(instance->getCompletionFuture().getNoThrow());
+}
+
+TEST_F(MovePrimaryDonorServiceTest, AbortRetriesAbortToRecipientAfterFailover) {
+    auto opCtx = makeOperationContext();
+    auto [instance, fp] =
+        createInstanceInStateAndSimulateFailover(opCtx.get(), MovePrimaryDonorStateEnum::kAborted);
+    auto beforeCommandCount = getCommandRunner().getCommandsRunCount();
+    fp->setMode(FailPoint::off);
+
+    fp = globalFailPointRegistry().find("pauseBeforeBeginningMovePrimaryDonorCleanup");
+    auto count = fp->setMode(FailPoint::alwaysOn);
+    instance->onReadyToForget();
+    fp->waitForTimesEntered(count + 1);
+    fp->setMode(FailPoint::off);
+
+    ASSERT_EQ(getCommandRunner().getCommandsRunCount(), beforeCommandCount + 1);
+    auto details = getCommandRunner().getLastCommandDetails();
+    const auto& command = details->command;
+    ASSERT_TRUE(command.hasField(MovePrimaryRecipientAbortMigration::kCommandName));
+
+    ASSERT_NOT_OK(instance->getCompletionFuture().getNoThrow());
+}
+
+TEST_F(MovePrimaryDonorServiceTest, AbortPersistsReason) {
+    auto opCtx = makeOperationContext();
+    auto [instance, fp] = createInstanceInState(opCtx.get(), MovePrimaryDonorStateEnum::kAborted);
+
+    auto doc = getStateDocumentOnDisk(opCtx.get(), instance);
+    auto maybeReason = doc.getMutableFields().getAbortReason();
+    ASSERT_TRUE(maybeReason);
+    auto reason = *maybeReason;
+    ASSERT_EQ(ErrorCodes::Error(reason["code"].numberInt()), kAbortedError.code());
+    ASSERT_EQ(reason["errmsg"].String(), kAbortedError.reason());
+
+    unpauseAndAssertCompletesAppropriately(fp, instance);
+}
+
+TEST_F(MovePrimaryDonorServiceTest, ExplicitAbortAfterDecisionSetOk) {
+    auto opCtx = makeOperationContext();
+    auto [instance, fp] = createInstanceInState(opCtx.get(), MovePrimaryDonorStateEnum::kPrepared);
+    fp->setMode(FailPoint::off);
+
+    ASSERT_OK(instance->getDecisionFuture().getNoThrow());
+    instance->abort(kAbortedError);
+    instance->onReadyToForget();
+
+    ASSERT_EQ(instance->getCompletionFuture().getNoThrow(), kAbortedError);
+    assertSentRecipientAbortCommand();
 }
 
 }  // namespace

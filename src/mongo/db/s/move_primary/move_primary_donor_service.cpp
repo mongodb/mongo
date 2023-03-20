@@ -107,6 +107,13 @@ void evaluatePauseDuringStateTransitionFailpoints(StateTransitionProgress progre
         evaluatePauseDuringStateTransitionFailpoint(progress, newState, fp);
     }
 }
+
+Status deserializeStatus(const BSONObj& bson) {
+    auto code = ErrorCodes::Error(bson["code"].numberInt());
+    auto reason = bson["errmsg"].String();
+    return Status{code, reason};
+}
+
 }  // namespace
 
 MovePrimaryDonorService::MovePrimaryDonorService(ServiceContext* serviceContext)
@@ -148,11 +155,14 @@ std::shared_ptr<repl::PrimaryOnlyService::Instance> MovePrimaryDonorService::con
     BSONObj initialState) {
     auto initialDoc = MovePrimaryDonorDocument::parse(
         IDLParserContext("MovePrimaryDonorServiceConstructInstance"), initialState);
-    return std::make_shared<MovePrimaryDonor>(
-        _serviceContext, this, initialDoc, makeDependencies(initialDoc));
+    return std::make_shared<MovePrimaryDonor>(_serviceContext,
+                                              this,
+                                              initialDoc,
+                                              getInstanceCleanupExecutor(),
+                                              _makeDependencies(initialDoc));
 }
 
-MovePrimaryDonorDependencies MovePrimaryDonorService::makeDependencies(
+MovePrimaryDonorDependencies MovePrimaryDonorService::_makeDependencies(
     const MovePrimaryDonorDocument& initialDoc) {
     return {std::make_unique<MovePrimaryDonorExternalStateImpl>(initialDoc.getMetadata())};
 }
@@ -168,6 +178,14 @@ const CancellationToken& MovePrimaryDonorCancelState::getStepdownToken() {
 
 const CancellationToken& MovePrimaryDonorCancelState::getAbortToken() {
     return _abortToken;
+}
+
+bool MovePrimaryDonorCancelState::isSteppingDown() const {
+    return _stepdownToken.isCanceled();
+}
+
+void MovePrimaryDonorCancelState::abort() {
+    _abortSource.cancel();
 }
 
 const Backoff MovePrimaryDonorRetryHelper::kBackoff{Seconds(1), Milliseconds::max()};
@@ -191,8 +209,8 @@ MovePrimaryDonorRetryHelper::MovePrimaryDonorRetryHelper(
     _markKilledExecutor->startup();
 }
 
-void MovePrimaryDonorRetryHelper::handleTransientError(const std::string& operationName,
-                                                       const Status& status) {
+void MovePrimaryDonorRetryHelper::_handleTransientError(const std::string& operationName,
+                                                        const Status& status) {
     LOGV2(7306301,
           "MovePrimaryDonor has encountered a transient error",
           "operation"_attr = operationName,
@@ -202,8 +220,8 @@ void MovePrimaryDonorRetryHelper::handleTransientError(const std::string& operat
           "toShard"_attr = _metadata.getShardName());
 }
 
-void MovePrimaryDonorRetryHelper::handleUnrecoverableError(const std::string& operationName,
-                                                           const Status& status) {
+void MovePrimaryDonorRetryHelper::_handleUnrecoverableError(const std::string& operationName,
+                                                            const Status& status) {
     LOGV2(7306302,
           "MovePrimaryDonor has encountered an unrecoverable error",
           "operation"_attr = operationName,
@@ -211,6 +229,19 @@ void MovePrimaryDonorRetryHelper::handleUnrecoverableError(const std::string& op
           "migrationId"_attr = _metadata.get_id(),
           "databaseName"_attr = _metadata.getDatabaseName(),
           "toShard"_attr = _metadata.getShardName());
+}
+
+ExecutorFuture<void> MovePrimaryDonorRetryHelper::_waitForMajorityOrStepdown(
+    const std::string& operationName) {
+    auto cancelToken = _cancelState->getStepdownToken();
+    return _untilStepdownOrSuccess(operationName, [cancelToken](const auto& factory) {
+        auto opCtx = factory.makeOperationContext(&cc());
+        auto client = opCtx->getClient();
+        repl::ReplClientInfo::forClient(client).setLastOpToSystemLastOpTime(opCtx.get());
+        auto opTime = repl::ReplClientInfo::forClient(client).getLastOp();
+        return WaitForMajorityService::get(client->getServiceContext())
+            .waitUntilMajority(opTime, cancelToken);
+    });
 }
 
 MovePrimaryDonorExternalState::MovePrimaryDonorExternalState(
@@ -238,18 +269,25 @@ void MovePrimaryDonorExternalState::syncDataOnRecipient(OperationContext* opCtx,
     if (timestamp) {
         request.setReturnAfterReachingDonorTimestamp(*timestamp);
     }
-    runCommandOnRecipient(opCtx, request.toBSON({}));
+    _runCommandOnRecipient(opCtx, request.toBSON({}));
+}
+
+void MovePrimaryDonorExternalState::abortMigrationOnRecipient(OperationContext* opCtx) {
+    MovePrimaryRecipientAbortMigration request;
+    request.setMovePrimaryCommonMetadata(getMetadata());
+    request.setDbName(getMetadata().getDatabaseName().db());
+    _runCommandOnRecipient(opCtx, request.toBSON({}));
 }
 
 void MovePrimaryDonorExternalState::forgetMigrationOnRecipient(OperationContext* opCtx) {
     MovePrimaryRecipientForgetMigration request;
     request.setMovePrimaryCommonMetadata(getMetadata());
     request.setDbName(getMetadata().getDatabaseName().db());
-    runCommandOnRecipient(opCtx, request.toBSON({}));
+    _runCommandOnRecipient(opCtx, request.toBSON({}));
 }
 
-void MovePrimaryDonorExternalState::runCommandOnRecipient(OperationContext* opCtx,
-                                                          const BSONObj& command) {
+void MovePrimaryDonorExternalState::_runCommandOnRecipient(OperationContext* opCtx,
+                                                           const BSONObj& command) {
     uassertStatusOK(runCommand(opCtx,
                                getRecipientShardId(),
                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
@@ -276,21 +314,23 @@ StatusWith<Shard::CommandResponse> MovePrimaryDonorExternalStateImpl::runCommand
 MovePrimaryDonor::MovePrimaryDonor(ServiceContext* serviceContext,
                                    MovePrimaryDonorService* donorService,
                                    MovePrimaryDonorDocument initialState,
+                                   const std::shared_ptr<executor::TaskExecutor>& cleanupExecutor,
                                    MovePrimaryDonorDependencies dependencies)
     : _serviceContext{serviceContext},
       _donorService{donorService},
       _metadata{std::move(initialState.getMetadata())},
       _mutableFields{std::move(initialState.getMutableFields())},
       _metrics{MovePrimaryMetrics::initializeFrom(initialState, _serviceContext)},
+      _cleanupExecutor{cleanupExecutor},
       _externalState{std::move(dependencies.externalState)} {
-    _metrics->onStateTransition(boost::none, getCurrentState());
+    _metrics->onStateTransition(boost::none, _getCurrentState());
 }
 
 SemiFuture<void> MovePrimaryDonor::run(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                        const CancellationToken& stepdownToken) noexcept {
-    initializeRun(executor, stepdownToken);
+    _initializeRun(executor, stepdownToken);
     _completionPromise.setFrom(
-        runDonorWorkflow().unsafeToInlineFuture().tapError([](const Status& status) {
+        _runDonorWorkflow().unsafeToInlineFuture().tapError([](const Status& status) {
             LOGV2(7306201, "MovePrimaryDonor encountered an error", "error"_attr = redact(status));
         }));
     return _completionPromise.getFuture().semi();
@@ -321,95 +361,130 @@ const MovePrimaryCommonMetadata& MovePrimaryDonor::getMetadata() const {
 }
 
 SharedSemiFuture<void> MovePrimaryDonor::getReadyToBlockWritesFuture() const {
-    return _readyToBlockWritesPromise.getFuture();
+    return _progressedToReadyToBlockWritesPromise.getFuture();
 }
 
 SharedSemiFuture<void> MovePrimaryDonor::getDecisionFuture() const {
-    return _decisionPromise.getFuture();
+    return _progressedToDecisionPromise.getFuture();
 }
 
 SharedSemiFuture<void> MovePrimaryDonor::getCompletionFuture() const {
     return _completionPromise.getFuture();
 }
 
-MovePrimaryDonorStateEnum MovePrimaryDonor::getCurrentState() const {
+MovePrimaryDonorStateEnum MovePrimaryDonor::_getCurrentState() const {
     stdx::unique_lock lock(_mutex);
     return _mutableFields.getState();
 }
 
-MovePrimaryDonorMutableFields MovePrimaryDonor::getMutableFields() const {
+MovePrimaryDonorMutableFields MovePrimaryDonor::_getMutableFields() const {
     stdx::unique_lock lock(_mutex);
     return _mutableFields;
 }
 
-MovePrimaryDonorDocument MovePrimaryDonor::buildCurrentStateDocument() const {
+bool MovePrimaryDonor::_isAborted(WithLock) const {
+    return _mutableFields.getAbortReason().has_value();
+}
+
+boost::optional<Status> MovePrimaryDonor::_getAbortReason() const {
+    auto reason = _getMutableFields().getAbortReason();
+    if (!reason) {
+        return boost::none;
+    }
+    return deserializeStatus(reason->getOwned());
+}
+
+Status MovePrimaryDonor::_getOperationStatus() const {
+    return _getAbortReason().value_or(Status::OK());
+}
+
+MovePrimaryDonorDocument MovePrimaryDonor::_buildCurrentStateDocument() const {
     MovePrimaryDonorDocument doc;
     doc.setMetadata(getMetadata());
-    doc.setMutableFields(getMutableFields());
+    doc.setMutableFields(_getMutableFields());
     return doc;
 }
 
-void MovePrimaryDonor::initializeRun(std::shared_ptr<executor::ScopedTaskExecutor> executor,
-                                     const CancellationToken& stepdownToken) {
+void MovePrimaryDonor::_initializeRun(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                      const CancellationToken& stepdownToken) {
     stdx::unique_lock lock(_mutex);
     _taskExecutor = executor;
     _cancelState.emplace(stepdownToken);
     _retry.emplace(_metadata, _taskExecutor, _cancelState.get_ptr());
-}
-
-ExecutorFuture<void> MovePrimaryDonor::runDonorWorkflow() {
-    return runOnTaskExecutor([] { pauseBeforeBeginningMovePrimaryDonorWorkflow.pauseWhileSet(); })
-        .then([this] { return transitionToState(MovePrimaryDonorStateEnum::kInitializing); })
-        .then([this] { return doInitializing(); })
-        .then([this] { return transitionToState(MovePrimaryDonorStateEnum::kCloning); })
-        .then([this] { return doCloning(); })
-        .then(
-            [this] { return transitionToState(MovePrimaryDonorStateEnum::kWaitingToBlockWrites); })
-        .then([this] { return doWaitingToBlockWrites(); })
-        .then([this] { return transitionToState(MovePrimaryDonorStateEnum::kBlockingWrites); })
-        .then([this] { return doBlockingWrites(); })
-        .then([this] { return transitionToState(MovePrimaryDonorStateEnum::kPrepared); })
-        .then([this] { return doPrepared(); })
-        .then([this] { return doForget(); });
-}
-
-ExecutorFuture<void> MovePrimaryDonor::transitionToState(MovePrimaryDonorStateEnum newState) {
-    if (newState == MovePrimaryDonorStateEnum::kDone) {
-        return deleteStateDocument();
+    if (_isAborted(lock)) {
+        _cancelState->abort();
     }
-    return _retry->untilAbortOrSuccess(
-        fmt::format("transitionToState({})", MovePrimaryDonorState_serializer(newState)),
-        [this, newState](const auto& factory) {
-            auto opCtx = factory.makeOperationContext(&cc());
-            tryTransitionToStateOnce(opCtx.get(), newState);
+}
+
+ExecutorFuture<void> MovePrimaryDonor::_runDonorWorkflow() {
+    using State = MovePrimaryDonorStateEnum;
+    return _runOnTaskExecutor([] { pauseBeforeBeginningMovePrimaryDonorWorkflow.pauseWhileSet(); })
+        .then([this] { return _transitionToState(State::kInitializing); })
+        .then([this] { return _doInitializing(); })
+        .then([this] { return _transitionToState(State::kCloning); })
+        .then([this] { return _doCloning(); })
+        .then([this] { return _transitionToState(State::kWaitingToBlockWrites); })
+        .then([this] { return _doWaitingToBlockWrites(); })
+        .then([this] { return _transitionToState(State::kBlockingWrites); })
+        .then([this] { return _doBlockingWrites(); })
+        .then([this] { return _transitionToState(State::kPrepared); })
+        .onCompletion([this](Status result) {
+            if (result.isOK()) {
+                return _doPrepared();
+            }
+            abort(result);
+            return _transitionToState(State::kAborted).then([this] { return _doAbort(); });
+        })
+        .then([this] { return _waitForForgetThenDoCleanup(); })
+        .thenRunOn(_cleanupExecutor)
+        .onCompletion([this, self = shared_from_this()](Status okOrStepdownError) {
+            invariant(okOrStepdownError.isOK() || _cancelState->isSteppingDown());
+            const auto& finalResult =
+                _cancelState->isSteppingDown() ? okOrStepdownError : _getOperationStatus();
+            _ensureProgressPromisesAreFulfilled(finalResult);
+            return finalResult;
         });
 }
 
-ExecutorFuture<void> MovePrimaryDonor::deleteStateDocument() {
-    return _retry->untilStepdownOrSuccess("deleteStateDocument()", [this](const auto& factory) {
-        auto opCtx = factory.makeOperationContext(&cc());
-        tryTransitionToStateOnce(opCtx.get(), MovePrimaryDonorStateEnum::kDone);
-    });
+bool MovePrimaryDonor::_allowedToAbortDuringStateTransition(
+    MovePrimaryDonorStateEnum newState) const {
+    switch (newState) {
+        case MovePrimaryDonorStateEnum::kAborted:
+        case MovePrimaryDonorStateEnum::kDone:
+            return false;
+        default:
+            return true;
+    }
 }
 
-void MovePrimaryDonor::tryTransitionToStateOnce(OperationContext* opCtx,
-                                                MovePrimaryDonorStateEnum newState) {
-    auto oldState = getCurrentState();
+ExecutorFuture<void> MovePrimaryDonor::_transitionToState(MovePrimaryDonorStateEnum newState) {
+    auto op = fmt::format("transitionToState({})", MovePrimaryDonorState_serializer(newState));
+    auto action = [this, newState](const auto& factory) {
+        auto opCtx = factory.makeOperationContext(&cc());
+        _tryTransitionToStateOnce(opCtx.get(), newState);
+    };
+    if (_allowedToAbortDuringStateTransition(newState)) {
+        return _retry->untilAbortOrMajorityCommit(op, action);
+    }
+    return _retry->untilStepdownOrMajorityCommit(op, action);
+}
+
+void MovePrimaryDonor::_tryTransitionToStateOnce(OperationContext* opCtx,
+                                                 MovePrimaryDonorStateEnum newState) {
+    auto oldState = _getCurrentState();
     if (oldState >= newState) {
         return;
     }
-    auto newDocument = buildCurrentStateDocument();
+    auto newDocument = _buildCurrentStateDocument();
     newDocument.getMutableFields().setState(newState);
     evaluatePauseDuringStateTransitionFailpoints(StateTransitionProgress::kBefore, newState);
 
-    updateOnDiskState(opCtx, newDocument);
+    _updateOnDiskState(opCtx, newDocument);
 
     evaluatePauseDuringStateTransitionFailpoints(StateTransitionProgress::kPartial, newState);
 
-    updateInMemoryState(newDocument);
+    _updateInMemoryState(newDocument);
     _metrics->onStateTransition(oldState, newState);
-
-    evaluatePauseDuringStateTransitionFailpoints(StateTransitionProgress::kAfter, newState);
 
     LOGV2(7306300,
           "MovePrimaryDonor transitioned state",
@@ -418,62 +493,68 @@ void MovePrimaryDonor::tryTransitionToStateOnce(OperationContext* opCtx,
           "migrationId"_attr = _metadata.get_id(),
           "databaseName"_attr = _metadata.getDatabaseName(),
           "toShard"_attr = _metadata.getShardName());
+
+    evaluatePauseDuringStateTransitionFailpoints(StateTransitionProgress::kAfter, newState);
 }
 
-void MovePrimaryDonor::updateOnDiskState(OperationContext* opCtx,
-                                         const MovePrimaryDonorDocument& newStateDocument) {
+void MovePrimaryDonor::_updateOnDiskState(OperationContext* opCtx,
+                                          const MovePrimaryDonorDocument& newStateDocument) {
     PersistentTaskStore<MovePrimaryDonorDocument> store(_donorService->getStateDocumentsNS());
-    auto state = newStateDocument.getMutableFields().getState();
-    if (state == MovePrimaryDonorStateEnum::kInitializing) {
-        store.add(opCtx, newStateDocument);
-    } else if (state == MovePrimaryDonorStateEnum::kDone) {
-        store.remove(opCtx, BSON(MovePrimaryDonorDocument::k_idFieldName << _metadata.get_id()));
+    auto oldState = _getCurrentState();
+    auto newState = newStateDocument.getMutableFields().getState();
+    if (oldState == MovePrimaryDonorStateEnum::kUnused) {
+        store.add(opCtx, newStateDocument, WriteConcerns::kLocalWriteConcern);
+    } else if (newState == MovePrimaryDonorStateEnum::kDone) {
+        store.remove(opCtx,
+                     BSON(MovePrimaryDonorDocument::k_idFieldName << _metadata.get_id()),
+                     WriteConcerns::kLocalWriteConcern);
     } else {
         store.update(opCtx,
                      BSON(MovePrimaryDonorDocument::k_idFieldName << _metadata.get_id()),
                      BSON("$set" << BSON(MovePrimaryDonorDocument::kMutableFieldsFieldName
-                                         << newStateDocument.getMutableFields().toBSON())));
+                                         << newStateDocument.getMutableFields().toBSON())),
+                     WriteConcerns::kLocalWriteConcern);
     }
 }
 
-void MovePrimaryDonor::updateInMemoryState(const MovePrimaryDonorDocument& newStateDocument) {
+void MovePrimaryDonor::_updateInMemoryState(const MovePrimaryDonorDocument& newStateDocument) {
     stdx::unique_lock lock(_mutex);
     _mutableFields = newStateDocument.getMutableFields();
 }
 
-ExecutorFuture<void> MovePrimaryDonor::doInitializing() {
-    return _retry->untilAbortOrSuccess("doInitializing()", [](const auto& factory) {
+ExecutorFuture<void> MovePrimaryDonor::_doInitializing() {
+    return _retry->untilAbortOrMajorityCommit("doInitializing()", [](const auto& factory) {
         // TODO: SERVER-74757
     });
 }
 
-ExecutorFuture<void> MovePrimaryDonor::doNothing() {
-    return runOnTaskExecutor([] {});
+ExecutorFuture<void> MovePrimaryDonor::_doNothing() {
+    return _runOnTaskExecutor([] {});
 }
 
-ExecutorFuture<void> MovePrimaryDonor::doCloning() {
-    if (getCurrentState() > MovePrimaryDonorStateEnum::kCloning) {
-        return doNothing();
+ExecutorFuture<void> MovePrimaryDonor::_doCloning() {
+    if (_getCurrentState() > MovePrimaryDonorStateEnum::kCloning) {
+        return _doNothing();
     }
-    return _retry->untilAbortOrSuccess("doCloning()", [this](const auto& factory) {
+    return _retry->untilAbortOrMajorityCommit("doCloning()", [this](const auto& factory) {
         auto opCtx = factory.makeOperationContext(&cc());
         _externalState->syncDataOnRecipient(opCtx.get());
     });
 }
 
-ExecutorFuture<void> MovePrimaryDonor::doWaitingToBlockWrites() {
-    if (getCurrentState() > MovePrimaryDonorStateEnum::kWaitingToBlockWrites) {
-        return doNothing();
+ExecutorFuture<void> MovePrimaryDonor::_doWaitingToBlockWrites() {
+    if (_getCurrentState() > MovePrimaryDonorStateEnum::kWaitingToBlockWrites) {
+        return _doNothing();
     }
-    return waitUntilReadyToBlockWrites()
-        .then([this] { return waitUntilCurrentlyBlockingWrites(); })
+    return _waitUntilReadyToBlockWrites()
+        .then([this] { return _waitUntilCurrentlyBlockingWrites(); })
         .then([this](Timestamp blockingWritesTimestamp) {
-            return persistBlockingWritesTimestamp(blockingWritesTimestamp);
+            return _persistBlockingWritesTimestamp(blockingWritesTimestamp);
         });
 }
 
-ExecutorFuture<void> MovePrimaryDonor::waitUntilReadyToBlockWrites() {
-    return runOnTaskExecutor([this] {
+ExecutorFuture<void> MovePrimaryDonor::_waitUntilReadyToBlockWrites() {
+    return _runOnTaskExecutor([this] {
         // TODO SERVER-74933: Use commit monitor to determine when to engage critical section.
         LOGV2(7306500,
               "MovePrimaryDonor ready to block writes",
@@ -481,12 +562,12 @@ ExecutorFuture<void> MovePrimaryDonor::waitUntilReadyToBlockWrites() {
               "databaseName"_attr = _metadata.getDatabaseName(),
               "toShard"_attr = _metadata.getShardName());
 
-        _readyToBlockWritesPromise.setFrom(Status::OK());
+        _progressedToReadyToBlockWritesPromise.setFrom(Status::OK());
     });
 }
 
-ExecutorFuture<Timestamp> MovePrimaryDonor::waitUntilCurrentlyBlockingWrites() {
-    return runOnTaskExecutor([this] {
+ExecutorFuture<Timestamp> MovePrimaryDonor::_waitUntilCurrentlyBlockingWrites() {
+    return _runOnTaskExecutor([this] {
         return future_util::withCancellation(_currentlyBlockingWritesPromise.getFuture(),
                                              _cancelState->getAbortToken());
     });
@@ -500,16 +581,43 @@ void MovePrimaryDonor::onReadyToForget() {
     _readyToForgetPromise.setFrom(Status::OK());
 }
 
-ExecutorFuture<void> MovePrimaryDonor::persistBlockingWritesTimestamp(
+void MovePrimaryDonor::abort(Status reason) {
+    invariant(!reason.isOK());
+    stdx::unique_lock lock(_mutex);
+    if (_isAborted(lock)) {
+        return;
+    }
+
+    BSONObjBuilder bob;
+    reason.serializeErrorToBSON(&bob);
+    _mutableFields.setAbortReason(bob.obj());
+    if (_cancelState) {
+        _cancelState->abort();
+    }
+
+    LOGV2(7306700,
+          "MovePrimaryDonor has received signal to abort",
+          "reason"_attr = redact(reason),
+          "migrationId"_attr = _metadata.get_id(),
+          "databaseName"_attr = _metadata.getDatabaseName(),
+          "toShard"_attr = _metadata.getShardName());
+}
+
+bool MovePrimaryDonor::isAborted() const {
+    stdx::unique_lock lock(_mutex);
+    return _isAborted(lock);
+}
+
+ExecutorFuture<void> MovePrimaryDonor::_persistBlockingWritesTimestamp(
     Timestamp blockingWritesTimestamp) {
-    return _retry->untilAbortOrSuccess(
+    return _retry->untilAbortOrMajorityCommit(
         fmt::format("persistBlockingWritesTimestamp({})", blockingWritesTimestamp.toString()),
         [this, blockingWritesTimestamp](const auto& factory) {
             auto opCtx = factory.makeOperationContext(&cc());
-            auto newStateDocument = buildCurrentStateDocument();
+            auto newStateDocument = _buildCurrentStateDocument();
             newStateDocument.getMutableFields().setBlockingWritesTimestamp(blockingWritesTimestamp);
-            updateOnDiskState(opCtx.get(), newStateDocument);
-            updateInMemoryState(newStateDocument);
+            _updateOnDiskState(opCtx.get(), newStateDocument);
+            _updateInMemoryState(newStateDocument);
 
             LOGV2(7306501,
                   "MovePrimaryDonor persisted block timestamp",
@@ -520,37 +628,65 @@ ExecutorFuture<void> MovePrimaryDonor::persistBlockingWritesTimestamp(
         });
 }
 
-ExecutorFuture<void> MovePrimaryDonor::doBlockingWrites() {
-    if (getCurrentState() > MovePrimaryDonorStateEnum::kBlockingWrites) {
-        return doNothing();
+ExecutorFuture<void> MovePrimaryDonor::_doBlockingWrites() {
+    if (_getCurrentState() > MovePrimaryDonorStateEnum::kBlockingWrites) {
+        return _doNothing();
     }
-    return _retry->untilAbortOrSuccess("doBlockingWrites()", [this](const auto& factory) {
+    return _retry->untilAbortOrMajorityCommit("doBlockingWrites()", [this](const auto& factory) {
         auto opCtx = factory.makeOperationContext(&cc());
-        auto timestamp = getMutableFields().getBlockingWritesTimestamp();
+        auto timestamp = _getMutableFields().getBlockingWritesTimestamp();
         invariant(timestamp);
         _externalState->syncDataOnRecipient(opCtx.get(), *timestamp);
     });
 }
 
-ExecutorFuture<void> MovePrimaryDonor::doPrepared() {
-    return runOnTaskExecutor([this] { _decisionPromise.setFrom(Status::OK()); });
+ExecutorFuture<void> MovePrimaryDonor::_doPrepared() {
+    return _runOnTaskExecutor([this] { _progressedToDecisionPromise.setFrom(Status::OK()); });
 }
 
-ExecutorFuture<void> MovePrimaryDonor::doForget() {
-    return runOnTaskExecutor([this] {
+ExecutorFuture<void> MovePrimaryDonor::_waitForForgetThenDoCleanup() {
+    return _runOnTaskExecutor([this] {
                return future_util::withCancellation(_readyToForgetPromise.getFuture(),
                                                     _cancelState->getStepdownToken());
            })
         .then([this] { pauseBeforeBeginningMovePrimaryDonorCleanup.pauseWhileSet(); })
-        .then([this] { return cleanup(); })
-        .then([this] { return transitionToState(MovePrimaryDonorStateEnum::kDone); });
+        .then([this] { return _doCleanup(); })
+        .then([this] { return _transitionToState(MovePrimaryDonorStateEnum::kDone); });
 }
 
-ExecutorFuture<void> MovePrimaryDonor::cleanup() {
-    return _retry->untilStepdownOrSuccess("cleanup()", [this](const auto& factory) {
+ExecutorFuture<void> MovePrimaryDonor::_doCleanup() {
+    return _doAbortIfRequired().then([this] { return _doForget(); });
+}
+
+ExecutorFuture<void> MovePrimaryDonor::_doAbortIfRequired() {
+    if (!isAborted()) {
+        return _doNothing();
+    }
+    return _doAbort();
+}
+
+ExecutorFuture<void> MovePrimaryDonor::_doAbort() {
+    return _retry->untilStepdownOrMajorityCommit("doAbort()", [this](const auto& factory) {
+        _ensureProgressPromisesAreFulfilled(_getOperationStatus());
+        auto opCtx = factory.makeOperationContext(&cc());
+        _externalState->abortMigrationOnRecipient(opCtx.get());
+    });
+}
+
+ExecutorFuture<void> MovePrimaryDonor::_doForget() {
+    return _retry->untilStepdownOrMajorityCommit("doForget()", [this](const auto& factory) {
         auto opCtx = factory.makeOperationContext(&cc());
         _externalState->forgetMigrationOnRecipient(opCtx.get());
     });
+}
+
+void MovePrimaryDonor::_ensureProgressPromisesAreFulfilled(Status result) {
+    if (!_progressedToReadyToBlockWritesPromise.getFuture().isReady()) {
+        _progressedToReadyToBlockWritesPromise.setFrom(result);
+    }
+    if (!_progressedToDecisionPromise.getFuture().isReady()) {
+        _progressedToDecisionPromise.setFrom(result);
+    }
 }
 
 }  // namespace mongo
