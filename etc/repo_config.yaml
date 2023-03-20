@@ -133,7 +133,7 @@ repos:
     edition: org
     bucket: repo.mongodb.org
     repos:
-      - yum/amazon/2022/mongodb-org
+      - yum/amazon/2023/mongodb-org
 
   - name: suse11
     type: rpm
@@ -381,7 +381,7 @@ repos:
     edition: enterprise
     bucket: repo.mongodb.com
     repos:
-      - yum/amazon/2022/mongodb-enterprise
+      - yum/amazon/2023/mongodb-enterprise
 
   - name: suse11
     type: rpm
