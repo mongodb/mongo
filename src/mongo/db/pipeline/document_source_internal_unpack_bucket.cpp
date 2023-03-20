@@ -27,13 +27,10 @@
  *    it in the license file.
  */
 
-
-#include "mongo/db/pipeline/document_source_sequential_document_cache.h"
-#include <algorithm>
-#include <iterator>
-
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 
+#include <algorithm>
+#include <iterator>
 #include <string>
 #include <type_traits>
 
@@ -54,6 +51,7 @@
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/document_source_sample.h"
+#include "mongo/db/pipeline/document_source_sequential_document_cache.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/document_source_streaming_group.h"
