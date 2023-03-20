@@ -37,6 +37,7 @@
 #include "mongo/db/profile_filter.h"
 #include "mongo/db/service_context.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/immutable/unordered_map.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -419,11 +420,11 @@ private:
         _shadowCatalog;
 
     using CollectionCatalogMap =
-        stdx::unordered_map<CollectionUUID, std::shared_ptr<Collection>, CollectionUUID::Hash>;
+        immutable::unordered_map<CollectionUUID, std::shared_ptr<Collection>, CollectionUUID::Hash>;
     using OrderedCollectionMap =
         std::map<std::pair<std::string, CollectionUUID>, std::shared_ptr<Collection>>;
     using NamespaceCollectionMap =
-        stdx::unordered_map<NamespaceString, std::shared_ptr<Collection>>;
+        immutable::unordered_map<NamespaceString, std::shared_ptr<Collection>>;
     using DatabaseProfileSettingsMap = StringMap<ProfileSettings>;
 
     CollectionCatalogMap _catalog;
