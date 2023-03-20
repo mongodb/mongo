@@ -47,11 +47,9 @@ template <typename T, typename BaseWordT>
 class AtomicProxy {
     MONGO_STATIC_ASSERT_MSG(sizeof(T) == sizeof(BaseWordT),
                             "T and BaseWordT must have the same size");
-    MONGO_STATIC_ASSERT_MSG(std::is_integral<BaseWordT>::value,
-                            "BaseWordT must be an integral type");
-#if MONGO_HAVE_STD_IS_TRIVIALLY_COPYABLE
-    MONGO_STATIC_ASSERT_MSG(std::is_trivially_copyable<T>::value, "T must be trivially copyable");
-#endif
+    MONGO_STATIC_ASSERT_MSG(std::is_integral_v<BaseWordT>, "BaseWordT must be an integral type");
+    MONGO_STATIC_ASSERT_MSG(std::is_trivially_copyable_v<T>, "T must be trivially copyable");
+
 public:
     using value_type = T;
     using base_type = BaseWordT;

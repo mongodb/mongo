@@ -59,13 +59,10 @@ struct DataType {
     template <typename T, typename = void>
     struct Handler {
         static void unsafeLoad(T* t, const char* ptr, size_t* advanced) {
-#if MONGO_HAVE_STD_IS_TRIVIALLY_COPYABLE
-            MONGO_STATIC_ASSERT_MSG(std::is_trivially_copyable<T>::value,
+            MONGO_STATIC_ASSERT_MSG(std::is_trivially_copyable_v<T>,
                                     "The generic DataType implementation requires values to be "
                                     "trivially copyable. You may specialize the template to use it "
                                     "with other types.");
-#endif
-
             if (t) {
                 std::memcpy(t, ptr, sizeof(T));
             }
@@ -87,13 +84,10 @@ struct DataType {
         }
 
         static void unsafeStore(const T& t, char* ptr, size_t* advanced) {
-#if MONGO_HAVE_STD_IS_TRIVIALLY_COPYABLE
-            MONGO_STATIC_ASSERT_MSG(std::is_trivially_copyable<T>::value,
+            MONGO_STATIC_ASSERT_MSG(std::is_trivially_copyable_v<T>,
                                     "The generic DataType implementation requires values to be "
                                     "trivially copyable. You may specialize the template to use it "
                                     "with other types.");
-#endif
-
             if (ptr) {
                 std::memcpy(ptr, &t, sizeof(T));
             }
