@@ -832,48 +832,12 @@ TEST_F(ExprMatchTest, ExprRedactsCorrectly) {
 
     createMatcher(fromjson("{$expr: {$eq: [\"$a\", \"$$NOW\"]}}"));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({
-            "$and": [
-                {
-                    "HASH<a>": {
-                        "$_internalExprEq": "?"
-                    }
-                },
-                {
-                    "$expr": {
-                        "$eq": [
-                            "$HASH<a>",
-                            {
-                                "$const": "?"
-                            }
-                        ]
-                    }
-                }
-            ]
-        })",
+        R"({"$expr":{"$eq":["$HASH<a>","$$NOW"]}})",
         serialize(opts));
 
     createMatcher(fromjson("{$expr: {$eq: [\"$a\", \"$$NOW\"]}}"));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({
-            "$and": [
-                {
-                    "HASH<a>": {
-                        "$_internalExprEq": "?"
-                    }
-                },
-                {
-                    "$expr": {
-                        "$eq": [
-                            "$HASH<a>",
-                            {
-                                "$const": "?"
-                            }
-                        ]
-                    }
-                }
-            ]
-        })",
+        R"({"$expr":{"$eq":["$HASH<a>","$$NOW"]}})",
         serialize(opts));
 
     createMatcher(fromjson("{$expr: {$getField: {field: \"b\", input: {a: 1, b: 2}}}}"));

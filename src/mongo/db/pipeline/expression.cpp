@@ -2501,6 +2501,15 @@ intrusive_ptr<Expression> ExpressionFieldPath::optimize() {
         return ExpressionConstant::create(getExpressionContext(), Value());
     }
 
+    if (_variable == Variables::kNowId || _variable == Variables::kClusterTimeId ||
+        _variable == Variables::kUserRolesId) {
+        // The agg system is allowed to replace the ExpressionFieldPath with an ExpressionConstant,
+        // which in turn would result in a plan cache entry that inlines the value of a system
+        // variable. However, the values of these system variables are not guaranteed to be constant
+        // across different executions of the same query shape, so we prohibit the optimization.
+        return intrusive_ptr<Expression>(this);
+    }
+
     if (getExpressionContext()->variables.hasConstantValue(_variable)) {
         return ExpressionConstant::create(
             getExpressionContext(), evaluate(Document(), &(getExpressionContext()->variables)));
