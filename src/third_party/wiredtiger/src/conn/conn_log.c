@@ -305,6 +305,10 @@ __wt_logmgr_config(WT_SESSION_IMPL *session, const char **cfg, bool reconfig)
     if (cval.val != 0)
         conn->log_prealloc = 1;
 
+    WT_RET(__wt_config_gets(session, cfg, "log.force_write_wait", &cval));
+    if (cval.val != 0)
+        conn->log_force_write_wait = (uint32_t)cval.val;
+
     /*
      * Note it's meaningless to reconfigure this value during runtime, it only matters on create
      * before recovery runs.
@@ -832,20 +836,22 @@ __log_server(void *arg)
     WT_DECL_RET;
     WT_LOG *log;
     WT_SESSION_IMPL *session;
+    uint64_t force_write_time_start, force_write_timediff;
     uint64_t time_start, time_stop, timediff;
     bool did_work, signalled;
 
     session = arg;
     conn = S2C(session);
     log = conn->log;
+    force_write_timediff = 0;
     signalled = false;
 
     /*
-     * Set this to the number of milliseconds we want to run archive and pre-allocation. Start it so
-     * that we run on the first time through.
+     * Set this to the number of milliseconds we want to run log force write, remove and
+     * pre-allocation. Start it so that we run on the first time through.
      */
     timediff = WT_THOUSAND;
-    time_start = __wt_clock(session);
+    force_write_time_start = time_start = __wt_clock(session);
 
     /*
      * The log server thread does a variety of work. It forces out any buffered log writes. It
@@ -863,8 +869,11 @@ __log_server(void *arg)
          * buffer may need to wait for the write_lsn to advance in the case of a synchronous buffer.
          * We end up with a hang.
          */
-        WT_ERR_ERROR_OK(__wt_log_force_write(session, 0, &did_work), EBUSY, false);
-
+        if (conn->log_force_write_wait == 0 ||
+          force_write_timediff >= conn->log_force_write_wait * WT_THOUSAND) {
+            WT_ERR_ERROR_OK(__wt_log_force_write(session, 0, &did_work), EBUSY, false);
+            force_write_time_start = __wt_clock(session);
+        }
         /*
          * We don't want to archive or pre-allocate files as often as we want to force out log
          * buffers. Only do it once per second or if the condition was signalled.
@@ -902,6 +911,7 @@ __log_server(void *arg)
         __wt_cond_auto_wait_signal(session, conn->log_cond, did_work, NULL, &signalled);
         time_stop = __wt_clock(session);
         timediff = WT_CLOCKDIFF_MS(time_stop, time_start);
+        force_write_timediff = WT_CLOCKDIFF_MS(time_stop, force_write_time_start);
     }
 
     if (0) {

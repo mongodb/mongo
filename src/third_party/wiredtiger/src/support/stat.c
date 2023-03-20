@@ -1520,6 +1520,7 @@ static const char *const __stats_connection_desc[] = {
   "transaction: transaction checkpoint prepare total time (msecs)",
   "transaction: transaction checkpoint scrub dirty target",
   "transaction: transaction checkpoint scrub time (msecs)",
+  "transaction: transaction checkpoint stop timing stress active",
   "transaction: transaction checkpoint total time (msecs)",
   "transaction: transaction checkpoints",
   "transaction: transaction checkpoints due to obsolete pages",
@@ -2057,6 +2058,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     /* not clearing txn_checkpoint_prep_total */
     /* not clearing txn_checkpoint_scrub_target */
     /* not clearing txn_checkpoint_scrub_time */
+    /* not clearing txn_checkpoint_stop_stress_active */
     /* not clearing txn_checkpoint_time_total */
     stats->txn_checkpoint = 0;
     stats->txn_checkpoint_obsolete_applied = 0;
@@ -2615,6 +2617,7 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->txn_checkpoint_prep_total += WT_STAT_READ(from, txn_checkpoint_prep_total);
     to->txn_checkpoint_scrub_target += WT_STAT_READ(from, txn_checkpoint_scrub_target);
     to->txn_checkpoint_scrub_time += WT_STAT_READ(from, txn_checkpoint_scrub_time);
+    to->txn_checkpoint_stop_stress_active += WT_STAT_READ(from, txn_checkpoint_stop_stress_active);
     to->txn_checkpoint_time_total += WT_STAT_READ(from, txn_checkpoint_time_total);
     to->txn_checkpoint += WT_STAT_READ(from, txn_checkpoint);
     to->txn_checkpoint_obsolete_applied += WT_STAT_READ(from, txn_checkpoint_obsolete_applied);
