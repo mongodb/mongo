@@ -512,25 +512,30 @@ The \c write command stores records into the specified data source.
 The data source must be configured with string or record number keys and
 string values.
 
-If the \c write command is called with the \c -a option, each
-command-line argument is a single value to be appended to the specified
-column-store data source.  If the \c write command is not called with
-the \c -a option, the command-line arguments are key/value pairs.
+If the \c write command is called with the \c -a option, each command-line
+argument is a single value to be appended to the specified column-store
+data source. If the \c write command is called with the \c -r option,
+the command-line argument is a key. If the \c write command is called with
+neither the \c -a nor the \c -r option, the command-line arguments are
+key/value pairs.
 
 Attempting to overwrite an already existing record will fail.
 
 @subsection util_write_synopsis Synopsis
-\c
-wt [-BLmRrSVv] [-C config] [-E secretkey ] [-h directory] write -a uri value ...
+`wt [-BLmRrSVv] [-C config] [-E secretkey ] [-h directory] write -a uri value ...`
 <br>
-\c
-wt [-BLmRrSVv] [-C config] [-E secretkey ] [-h directory] write [-o] uri key value ...
+`wt [-BLmRrSVv] [-C config] [-E secretkey ] [-h directory] write -r uri key`
+<br>
+`wt [-BLmRrSVv] [-C config] [-E secretkey ] [-h directory] write [-o] uri key value ...`
 
 @subsection util_write_options Options
 The following are command-specific options for the \c write command:
 
 @par \c -a
-Append each value as a new record in the data source.
+Append each value as a new record in the column-store data source.
+
+@par \c -r
+Remove an existing record from the data source.
 
 @par \c -o
 By default, attempting to overwrite an already existing record will

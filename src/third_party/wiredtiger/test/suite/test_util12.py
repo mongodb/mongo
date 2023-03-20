@@ -34,8 +34,12 @@ import wiredtiger, wttest
 class test_util12(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_util12.a'
     session_params = 'key_format=S,value_format=S'
+    errfile = 'writeerr.txt'
 
     def test_write(self):
+        """
+        Test write in a 'wt' process, without command option
+        """
         self.session.create('table:' + self.tablename, self.session_params)
         self.runWt(['write', 'table:' + self.tablename,
                     'def', '456', 'abc', '123'])
@@ -49,26 +53,19 @@ class test_util12(wttest.WiredTigerTestCase, suite_subprocess):
         self.assertEqual(cursor.next(), wiredtiger.WT_NOTFOUND)
         cursor.close()
 
-    def test_write_no_keys(self):
-        """
-        Test write in a 'wt' process, with no args
-        """
-        self.session.create('table:' + self.tablename, self.session_params)
-
-        errfile = 'writeerr.txt'
-        self.runWt(['write', 'table:' + self.tablename],
-            errfilename=errfile, failure=True)
-        self.check_file_contains(errfile, 'usage:')
-
     def test_write_overwrite(self):
+        """
+        Test write in a 'wt' process, with the '-o' command option
+        """
         self.session.create('table:' + self.tablename, self.session_params)
         cursor = self.session.open_cursor('table:' + self.tablename, None, None)
         cursor['def'] = '789'
         cursor.close()
-        errfile = 'writeerr.txt'
+        # The below command is expected to fail as we attempt to overwrite an existing key
+        # without specifying the "-o" command option.
         self.runWt(['write', 'table:' + self.tablename,
-                    'def', '456', 'abc', '123'], errfilename=errfile, failure=True)
-        self.check_file_contains(errfile, 'attempt to insert an existing key')
+                    'def', '456', 'abc', '123'], errfilename=self.errfile, failure=True)
+        self.check_file_contains(self.errfile, 'attempt to insert an existing key')
         self.runWt(['write', '-o', 'table:' + self.tablename,
                     'def', '456', 'abc', '123'])
         cursor = self.session.open_cursor('table:' + self.tablename, None, None)
@@ -81,12 +78,47 @@ class test_util12(wttest.WiredTigerTestCase, suite_subprocess):
         self.assertEqual(cursor.next(), wiredtiger.WT_NOTFOUND)
         cursor.close()
 
-    def test_write_bad_args(self):
+    def test_write_remove(self):
+        """
+        Test write in a 'wt' process, with the '-r' command option
+        """
         self.session.create('table:' + self.tablename, self.session_params)
-        errfile = 'writeerr.txt'
         self.runWt(['write', 'table:' + self.tablename,
-                    'def', '456', 'abc'], errfilename=errfile, failure=True)
-        self.check_file_contains(errfile, 'usage:')
+                    'def', '456', 'abc', '123'])
+        self.runWt(['write', '-r', 'table:' + self.tablename, 'efg'],
+            errfilename=self.errfile, failure=True)
+        self.check_file_contains(self.errfile, 'item not found')
+        # The below command is expected to fail as more than one key are specified.
+        self.runWt(['write', '-r', 'table:' + self.tablename, 'def', 'abc'],
+            errfilename=self.errfile, failure=True)
+        self.check_file_contains(self.errfile, 'usage:')
+        self.runWt(['write', '-r', 'table:' + self.tablename, 'def'])
+        cursor = self.session.open_cursor('table:' + self.tablename, None, None)
+        self.assertEqual(cursor.next(), 0)
+        self.assertEqual(cursor.get_key(), 'abc')
+        self.assertEqual(cursor.get_value(), '123')
+        self.assertEqual(cursor.next(), wiredtiger.WT_NOTFOUND)
+        cursor.close()
+
+    def test_write_no_keys(self):
+        """
+        Test write in a 'wt' process, with no command args
+        """
+        self.session.create('table:' + self.tablename, self.session_params)
+
+        self.runWt(['write', 'table:' + self.tablename],
+            errfilename=self.errfile, failure=True)
+        self.check_file_contains(self.errfile, 'usage:')
+
+    def test_write_bad_args(self):
+        """
+        Test write in a 'wt' process, with unexpected number of args
+        """
+        self.session.create('table:' + self.tablename, self.session_params)
+        # The below command is expected to fail as value for the 2nd key is missed.
+        self.runWt(['write', 'table:' + self.tablename,
+                    'def', '456', 'abc'], errfilename=self.errfile, failure=True)
+        self.check_file_contains(self.errfile, 'usage:')
 
 if __name__ == '__main__':
     wttest.run()

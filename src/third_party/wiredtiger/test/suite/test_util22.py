@@ -33,7 +33,7 @@ from helper import compare_files
 
 # test_util22.py
 # Check that wt correctly processes the help option and that it handles invalid options correctly.
-class test_util21(wttest.WiredTigerTestCase, suite_subprocess):
+class test_util22(wttest.WiredTigerTestCase, suite_subprocess):
     conn_config = ''
 
     # Skip 'copyright', which does not process options
