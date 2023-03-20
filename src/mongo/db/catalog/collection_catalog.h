@@ -40,6 +40,7 @@
 #include "mongo/db/tenant_database_name.h"
 #include "mongo/db/views/view.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/immutable/unordered_map.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -603,11 +604,12 @@ private:
      */
     boost::optional<mongo::stdx::unordered_map<UUID, NamespaceString, UUID::Hash>> _shadowCatalog;
 
-    using CollectionCatalogMap = stdx::unordered_map<UUID, std::shared_ptr<Collection>, UUID::Hash>;
+    using CollectionCatalogMap =
+        immutable::unordered_map<UUID, std::shared_ptr<Collection>, UUID::Hash>;
     using OrderedCollectionMap =
         std::map<std::pair<TenantDatabaseName, UUID>, std::shared_ptr<Collection>>;
     using NamespaceCollectionMap =
-        stdx::unordered_map<NamespaceString, std::shared_ptr<Collection>>;
+        immutable::unordered_map<NamespaceString, std::shared_ptr<Collection>>;
     using UncommittedViewsSet = stdx::unordered_set<NamespaceString>;
     using DatabaseProfileSettingsMap = StringMap<ProfileSettings>;
 

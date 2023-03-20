@@ -91,8 +91,8 @@ public:
 
     static void setCollectionInCatalog(CollectionCatalog& catalog,
                                        std::shared_ptr<Collection> collection) {
-        catalog._collections[collection->ns()] = collection;
-        catalog._catalog[collection->uuid()] = collection;
+        catalog._collections = catalog._collections.set(collection->ns(), collection);
+        catalog._catalog = catalog._catalog.set(collection->uuid(), collection);
         // TODO SERVER-64608 Use tenantID from ns
         auto dbIdPair = std::make_pair(TenantDatabaseName(boost::none, collection->ns().db()),
                                        collection->uuid());
@@ -129,8 +129,8 @@ public:
                 }
                 case UncommittedCatalogUpdates::Entry::Action::kRenamedCollection: {
                     writeJobs.push_back(
-                        [& from = entry.nss, &to = entry.renameTo](CollectionCatalog& catalog) {
-                            catalog._collections.erase(from);
+                        [&from = entry.nss, &to = entry.renameTo](CollectionCatalog& catalog) {
+                            catalog._collections = catalog._collections.erase(from);
 
                             auto fromStr = from.ns();
                             auto toStr = to.ns();
@@ -185,7 +185,7 @@ public:
                     break;
                 }
                 case UncommittedCatalogUpdates::Entry::Action::kAddViewResource: {
-                    writeJobs.push_back([& viewName = entry.nss](CollectionCatalog& catalog) {
+                    writeJobs.push_back([&viewName = entry.nss](CollectionCatalog& catalog) {
                         auto viewRid = ResourceId(RESOURCE_COLLECTION, viewName.ns());
                         catalog.addResource(viewRid, viewName.ns());
                         catalog.deregisterUncommittedView(viewName);
@@ -193,7 +193,7 @@ public:
                     break;
                 }
                 case UncommittedCatalogUpdates::Entry::Action::kRemoveViewResource: {
-                    writeJobs.push_back([& viewName = entry.nss](CollectionCatalog& catalog) {
+                    writeJobs.push_back([&viewName = entry.nss](CollectionCatalog& catalog) {
                         auto viewRid = ResourceId(RESOURCE_COLLECTION, viewName.ns());
                         catalog.removeResource(viewRid, viewName.ns());
                     });
@@ -502,7 +502,7 @@ Status CollectionCatalog::createView(OperationContext* opCtx,
         return Status(ErrorCodes::BadValue,
                       "View must be created on a view or collection in the same database");
 
-    if (viewsForDb.lookup(viewName) || _collections.contains(viewName))
+    if (viewsForDb.lookup(viewName) || _collections.find(viewName))
         return Status(ErrorCodes::NamespaceExists, "Namespace already exists");
 
     if (!NamespaceString::validCollectionName(viewOn.coll()))
@@ -812,8 +812,8 @@ bool CollectionCatalog::isCollectionAwaitingVisibility(UUID uuid) const {
 }
 
 std::shared_ptr<Collection> CollectionCatalog::_lookupCollectionByUUID(UUID uuid) const {
-    auto foundIt = _catalog.find(uuid);
-    return foundIt == _catalog.end() ? nullptr : foundIt->second;
+    const std::shared_ptr<Collection>* coll = _catalog.find(uuid);
+    return coll ? *coll : nullptr;
 }
 
 std::shared_ptr<const Collection> CollectionCatalog::lookupCollectionByNamespaceForRead(
@@ -830,8 +830,8 @@ std::shared_ptr<const Collection> CollectionCatalog::lookupCollectionByNamespace
         return nullptr;
     }
 
-    auto it = _collections.find(nss);
-    auto coll = (it == _collections.end() ? nullptr : it->second);
+    const std::shared_ptr<Collection>* collPtr = _collections.find(nss);
+    auto coll = collPtr ? *collPtr : nullptr;
     return (coll && coll->isCommitted()) ? coll : nullptr;
 }
 
@@ -861,8 +861,8 @@ Collection* CollectionCatalog::lookupCollectionByNamespaceForMetadataWrite(
         return nullptr;
     }
 
-    auto it = _collections.find(nss);
-    auto coll = (it == _collections.end() ? nullptr : it->second);
+    const std::shared_ptr<Collection>* collPtr = _collections.find(nss);
+    auto coll = collPtr ? *collPtr : nullptr;
 
     if (!coll || !coll->isCommitted())
         return nullptr;
@@ -908,8 +908,8 @@ CollectionPtr CollectionCatalog::lookupCollectionByNamespace(OperationContext* o
         return nullptr;
     }
 
-    auto it = _collections.find(nss);
-    auto coll = (it == _collections.end() ? nullptr : it->second);
+    const std::shared_ptr<Collection>* collPtr = _collections.find(nss);
+    auto coll = collPtr ? *collPtr : nullptr;
     return (coll && coll->isCommitted())
         ? CollectionPtr(opCtx, coll.get(), LookupCollectionForYieldRestore(coll->ns()))
         : nullptr;
@@ -927,11 +927,12 @@ boost::optional<NamespaceString> CollectionCatalog::lookupNSSByUUID(OperationCon
         return boost::none;
     }
 
-    auto foundIt = _catalog.find(uuid);
-    if (foundIt != _catalog.end()) {
-        boost::optional<NamespaceString> ns = foundIt->second->ns();
-        invariant(!ns.get().isEmpty());
-        return _collections.find(ns.get())->second->isCommitted() ? ns : boost::none;
+    const std::shared_ptr<Collection>* collPtr = _catalog.find(uuid);
+    if (collPtr) {
+        auto coll = *collPtr;
+        boost::optional<NamespaceString> ns = coll->ns();
+        invariant(!ns.value().isEmpty());
+        return coll->isCommitted() ? ns : boost::none;
     }
 
     // Only in the case that the catalog is closed and a UUID is currently unknown, resolve it
@@ -956,10 +957,11 @@ boost::optional<UUID> CollectionCatalog::lookupUUIDByNSS(OperationContext* opCtx
         return boost::none;
     }
 
-    auto it = _collections.find(nss);
-    if (it != _collections.end()) {
-        const boost::optional<UUID>& uuid = it->second->uuid();
-        return it->second->isCommitted() ? uuid : boost::none;
+    const std::shared_ptr<Collection>* collPtr = _collections.find(nss);
+    if (collPtr) {
+        auto coll = *collPtr;
+        const boost::optional<UUID>& uuid = coll->uuid();
+        return coll->isCommitted() ? uuid : boost::none;
     }
     return boost::none;
 }
@@ -1171,11 +1173,11 @@ void CollectionCatalog::registerCollection(OperationContext* opCtx,
     auto dbIdPair = std::make_pair(tenantDbName, uuid);
 
     // Make sure no entry related to this uuid.
-    invariant(_catalog.find(uuid) == _catalog.end());
+    invariant(!_catalog.find(uuid));
     invariant(_orderedCollections.find(dbIdPair) == _orderedCollections.end());
 
-    _catalog[uuid] = coll;
-    _collections[nss] = coll;
+    _catalog = _catalog.set(uuid, coll);
+    _collections = _collections.set(nss, coll);
     _orderedCollections[dbIdPair] = coll;
 
     if (!nss.isOnInternalDb() && !nss.isSystem()) {
@@ -1202,7 +1204,7 @@ void CollectionCatalog::registerCollection(OperationContext* opCtx,
 
 std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(OperationContext* opCtx,
                                                                     const UUID& uuid) {
-    invariant(_catalog.find(uuid) != _catalog.end());
+    invariant(_catalog.find(uuid));
 
     auto coll = std::move(_catalog[uuid]);
     auto ns = coll->ns();
@@ -1213,12 +1215,12 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(OperationCon
     LOGV2_DEBUG(20281, 1, "Deregistering collection", logAttrs(ns), "uuid"_attr = uuid);
 
     // Make sure collection object exists.
-    invariant(_collections.find(ns) != _collections.end());
+    invariant(_collections.find(ns));
     invariant(_orderedCollections.find(dbIdPair) != _orderedCollections.end());
 
     _orderedCollections.erase(dbIdPair);
-    _collections.erase(ns);
-    _catalog.erase(uuid);
+    _collections = _collections.erase(ns);
+    _catalog = _catalog.erase(uuid);
 
     if (!ns.isOnInternalDb() && !ns.isSystem()) {
         _stats.userCollections -= 1;
@@ -1262,7 +1264,7 @@ void CollectionCatalog::_ensureNamespaceDoesNotExist(OperationContext* opCtx,
                                                      const NamespaceString& nss,
                                                      NamespaceType type) const {
     auto existingCollection = _collections.find(nss);
-    if (existingCollection != _collections.end()) {
+    if (existingCollection) {
         LOGV2(5725001,
               "Conflicted registering namespace, already have a collection with the same namespace",
               "nss"_attr = nss);
@@ -1298,13 +1300,11 @@ void CollectionCatalog::deregisterAllCollectionsAndViews() {
         auto ns = entry.second->ns();
 
         LOGV2_DEBUG(20283, 1, "Deregistering collection", logAttrs(ns), "uuid"_attr = uuid);
-
-        entry.second.reset();
     }
 
-    _collections.clear();
+    _collections = {};
     _orderedCollections.clear();
-    _catalog.clear();
+    _catalog = {};
     _viewsForDatabase.clear();
     _stats = {};
 
