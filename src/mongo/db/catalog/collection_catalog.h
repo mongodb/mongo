@@ -886,9 +886,9 @@ private:
         std::map<std::pair<DatabaseName, UUID>, std::shared_ptr<Collection>>;
     using NamespaceCollectionMap =
         immutable::unordered_map<NamespaceString, std::shared_ptr<Collection>>;
-    using UncommittedViewsSet = stdx::unordered_set<NamespaceString>;
+    using UncommittedViewsSet = immutable::unordered_set<NamespaceString>;
     using DatabaseProfileSettingsMap = stdx::unordered_map<DatabaseName, ProfileSettings>;
-    using ViewsForDatabaseMap = stdx::unordered_map<DatabaseName, ViewsForDatabase>;
+    using ViewsForDatabaseMap = immutable::unordered_map<DatabaseName, ViewsForDatabase>;
 
     CollectionCatalogMap _catalog;
     OrderedCollectionMap _orderedCollections;  // Ordered by <dbName, collUUID> pair

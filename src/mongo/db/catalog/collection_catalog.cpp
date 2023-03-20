@@ -660,7 +660,7 @@ Status CollectionCatalog::createView(OperationContext* opCtx,
     invariant(opCtx->lockState()->isCollectionLockedForMode(
         NamespaceString::makeSystemDotViewsNamespace(viewName.dbName()), MODE_X));
 
-    invariant(_viewsForDatabase.contains(viewName.dbName()));
+    invariant(_viewsForDatabase.find(viewName.dbName()));
     const ViewsForDatabase& viewsForDb = *_getViewsForDatabase(opCtx, viewName.dbName());
 
     auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
@@ -708,7 +708,7 @@ Status CollectionCatalog::modifyView(
     invariant(opCtx->lockState()->isCollectionLockedForMode(viewName, MODE_X));
     invariant(opCtx->lockState()->isCollectionLockedForMode(
         NamespaceString::makeSystemDotViewsNamespace(viewName.dbName()), MODE_X));
-    invariant(_viewsForDatabase.contains(viewName.dbName()));
+    invariant(_viewsForDatabase.find(viewName.dbName()));
     const ViewsForDatabase& viewsForDb = *_getViewsForDatabase(opCtx, viewName.dbName());
 
     if (viewName.db() != viewOn.db())
@@ -753,7 +753,7 @@ Status CollectionCatalog::dropView(OperationContext* opCtx, const NamespaceStrin
     invariant(opCtx->lockState()->isCollectionLockedForMode(viewName, MODE_IX));
     invariant(opCtx->lockState()->isCollectionLockedForMode(
         NamespaceString::makeSystemDotViewsNamespace(viewName.dbName()), MODE_X));
-    invariant(_viewsForDatabase.contains(viewName.dbName()));
+    invariant(_viewsForDatabase.find(viewName.dbName()));
     const ViewsForDatabase& viewsForDb = *_getViewsForDatabase(opCtx, viewName.dbName());
     assertViewCatalogValid(viewsForDb);
     if (!viewsForDb.lookup(viewName)) {
@@ -1339,7 +1339,7 @@ void CollectionCatalog::dropCollection(OperationContext* opCtx,
 void CollectionCatalog::onCloseDatabase(OperationContext* opCtx, DatabaseName dbName) {
     invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_X));
     ResourceCatalog::get(opCtx->getServiceContext()).remove({RESOURCE_DATABASE, dbName}, dbName);
-    _viewsForDatabase.erase(dbName);
+    _viewsForDatabase = _viewsForDatabase.erase(dbName);
 }
 
 void CollectionCatalog::onCloseCatalog() {
@@ -2000,8 +2000,8 @@ void CollectionCatalog::_registerCollection(OperationContext* opCtx,
     resourceCatalog.add({RESOURCE_COLLECTION, nss}, nss);
 
     if (!storageGlobalParams.repair && coll->ns().isSystemDotViews()) {
-        auto [it, emplaced] = _viewsForDatabase.try_emplace(coll->ns().dbName());
-        if (auto status = it->second.reload(
+        ViewsForDatabase viewsForDb;
+        if (auto status = viewsForDb.reload(
                 opCtx, CollectionPtr(_lookupSystemViews(opCtx, coll->ns().dbName())));
             !status.isOK()) {
             LOGV2_WARNING_OPTIONS(20326,
@@ -2011,6 +2011,7 @@ void CollectionCatalog::_registerCollection(OperationContext* opCtx,
                                   "error"_attr = redact(status),
                                   logAttrs(coll->ns()));
         }
+        _viewsForDatabase = _viewsForDatabase.set(coll->ns().dbName(), std::move(viewsForDb));
     }
 }
 
@@ -2074,7 +2075,7 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(
     ResourceCatalog::get(opCtx->getServiceContext()).remove({RESOURCE_COLLECTION, ns}, ns);
 
     if (!storageGlobalParams.repair && coll->ns().isSystemDotViews()) {
-        _viewsForDatabase.erase(coll->ns().dbName());
+        _viewsForDatabase = _viewsForDatabase.erase(coll->ns().dbName());
     }
 
     return coll;
@@ -2089,11 +2090,11 @@ void CollectionCatalog::registerUncommittedView(OperationContext* opCtx,
     // namespaces here.
     _ensureNamespaceDoesNotExist(opCtx, nss, NamespaceType::kCollection);
 
-    _uncommittedViews.emplace(nss);
+    _uncommittedViews = _uncommittedViews.insert(nss);
 }
 
 void CollectionCatalog::deregisterUncommittedView(const NamespaceString& nss) {
-    _uncommittedViews.erase(nss);
+    _uncommittedViews = _uncommittedViews.erase(nss);
 }
 
 void CollectionCatalog::_ensureNamespaceDoesNotExist(OperationContext* opCtx,
@@ -2109,7 +2110,7 @@ void CollectionCatalog::_ensureNamespaceDoesNotExist(OperationContext* opCtx,
     }
 
     if (type == NamespaceType::kAll) {
-        if (_uncommittedViews.contains(nss)) {
+        if (_uncommittedViews.find(nss)) {
             LOGV2(5725002,
                   "Conflicted registering namespace, already have a view with the same namespace",
                   "nss"_attr = nss);
@@ -2409,7 +2410,7 @@ void CollectionCatalog::deregisterAllCollectionsAndViews(ServiceContext* svcCtx)
     _collections = {};
     _orderedCollections.clear();
     _catalog = {};
-    _viewsForDatabase.clear();
+    _viewsForDatabase = {};
     _dropPendingCollection.clear();
     _dropPendingIndex.clear();
     _stats = {};
@@ -2421,10 +2422,10 @@ void CollectionCatalog::clearViews(OperationContext* opCtx, const DatabaseName& 
     invariant(opCtx->lockState()->isCollectionLockedForMode(
         NamespaceString::makeSystemDotViewsNamespace(dbName), MODE_X));
 
-    auto it = _viewsForDatabase.find(dbName);
-    invariant(it != _viewsForDatabase.end());
+    const ViewsForDatabase* viewsForDbPtr = _viewsForDatabase.find(dbName);
+    invariant(viewsForDbPtr);
 
-    ViewsForDatabase viewsForDb = it->second;
+    ViewsForDatabase viewsForDb = *viewsForDbPtr;
     viewsForDb.clear(opCtx);
 
     CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
@@ -2651,16 +2652,16 @@ boost::optional<const ViewsForDatabase&> CollectionCatalog::_getViewsForDatabase
         return uncommittedViews;
     }
 
-    auto it = _viewsForDatabase.find(dbName);
-    if (it == _viewsForDatabase.end()) {
+    const ViewsForDatabase* viewsForDb = _viewsForDatabase.find(dbName);
+    if (!viewsForDb) {
         return boost::none;
     }
-    return it->second;
+    return *viewsForDb;
 }
 
 void CollectionCatalog::_replaceViewsForDatabase(const DatabaseName& dbName,
                                                  ViewsForDatabase&& views) {
-    _viewsForDatabase[dbName] = std::move(views);
+    _viewsForDatabase = _viewsForDatabase.set(dbName, std::move(views));
 }
 
 bool CollectionCatalog::_isCatalogBatchWriter() const {
