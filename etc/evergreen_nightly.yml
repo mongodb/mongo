@@ -582,3 +582,14 @@ buildvariants:
   - name: sharding_api_version_jscore_passthrough_gen
   - name: snmp
   - name: test_api_version_compatibility
+
+- name: security-daily-cron
+  modules:
+  - enterprise
+  display_name: "~ Security Daily Cron"
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  run_on:
+  - rhel80-small
+  stepback: false
+  tasks:
+  - name: blackduck_scanner
