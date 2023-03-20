@@ -112,7 +112,7 @@ struct CollModRequest {
     boost::optional<Collection::Validator> collValidator;
     boost::optional<ValidationActionEnum> collValidationAction;
     boost::optional<ValidationLevelEnum> collValidationLevel;
-    bool recordPreImages = false;
+    boost::optional<bool> recordPreImages;
 };
 
 StatusWith<CollModRequest> parseCollModRequest(OperationContext* opCtx,
@@ -677,8 +677,9 @@ Status _collModInternal(OperationContext* opCtx,
                                        "Failed to set validationLevel");
         }
 
-        if (cmrNew.recordPreImages != oldCollOptions.recordPreImages) {
-            coll.getWritableCollection()->setRecordPreImages(opCtx, cmrNew.recordPreImages);
+        if (cmrNew.recordPreImages.has_value() &&
+            *cmrNew.recordPreImages != oldCollOptions.recordPreImages) {
+            coll.getWritableCollection()->setRecordPreImages(opCtx, *cmrNew.recordPreImages);
         }
 
         if (ts.isABSONObj()) {
