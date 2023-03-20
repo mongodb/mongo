@@ -887,7 +887,7 @@ private:
     using NamespaceCollectionMap =
         immutable::unordered_map<NamespaceString, std::shared_ptr<Collection>>;
     using UncommittedViewsSet = immutable::unordered_set<NamespaceString>;
-    using DatabaseProfileSettingsMap = stdx::unordered_map<DatabaseName, ProfileSettings>;
+    using DatabaseProfileSettingsMap = immutable::unordered_map<DatabaseName, ProfileSettings>;
     using ViewsForDatabaseMap = immutable::unordered_map<DatabaseName, ViewsForDatabase>;
 
     CollectionCatalogMap _catalog;

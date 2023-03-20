@@ -1885,28 +1885,32 @@ std::set<TenantId> CollectionCatalog::getAllTenants() const {
 }
 
 void CollectionCatalog::setAllDatabaseProfileFilters(std::shared_ptr<ProfileFilter> filter) {
-    for (auto& [_, settings] : _databaseProfileSettings) {
-        settings.filter = filter;
+    auto dbProfileSettingsWriter = _databaseProfileSettings.transient();
+    for (const auto& [dbName, settings] : _databaseProfileSettings) {
+        ProfileSettings clone = settings;
+        clone.filter = filter;
+        dbProfileSettingsWriter.set(dbName, std::move(clone));
     }
+    _databaseProfileSettings = dbProfileSettingsWriter.persistent();
 }
 
 void CollectionCatalog::setDatabaseProfileSettings(
     const DatabaseName& dbName, CollectionCatalog::ProfileSettings newProfileSettings) {
-    _databaseProfileSettings[dbName] = newProfileSettings;
+    _databaseProfileSettings = _databaseProfileSettings.set(dbName, std::move(newProfileSettings));
 }
 
 CollectionCatalog::ProfileSettings CollectionCatalog::getDatabaseProfileSettings(
     const DatabaseName& dbName) const {
-    auto it = _databaseProfileSettings.find(dbName);
-    if (it != _databaseProfileSettings.end()) {
-        return it->second;
+    const ProfileSettings* settings = _databaseProfileSettings.find(dbName);
+    if (settings) {
+        return *settings;
     }
 
     return {serverGlobalParams.defaultProfile, ProfileFilter::getDefault()};
 }
 
 void CollectionCatalog::clearDatabaseProfileSettings(const DatabaseName& dbName) {
-    _databaseProfileSettings.erase(dbName);
+    _databaseProfileSettings = _databaseProfileSettings.erase(dbName);
 }
 
 CollectionCatalog::Stats CollectionCatalog::getStats() const {
