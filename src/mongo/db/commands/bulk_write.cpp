@@ -41,23 +41,41 @@
 #include "mongo/db/commands/bulk_write_crud_op.h"
 #include "mongo/db/commands/bulk_write_gen.h"
 #include "mongo/db/commands/bulk_write_parser.h"
+#include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/exec/queued_data_stage.h"
+#include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/db/ops/insert.h"
+#include "mongo/db/ops/parsed_update.h"
+#include "mongo/db/ops/update_request.h"
 #include "mongo/db/ops/write_ops_exec.h"
+#include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/transaction_validation.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/log_and_backoff.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
 
 namespace mongo {
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(hangBeforeBulkWritePerformsUpdate);
+
+using UpdateCallback = std::function<void(OperationContext*,
+                                          int,
+                                          const Status&,
+                                          const boost::optional<UpdateResult>&,
+                                          const boost::optional<BSONObj>&)>;
+
+using DeleteCallback = std::function<void(OperationContext*, int, const SingleWriteResult&)>;
 
 /**
  * Class representing an InsertBatch. Maintains a reference to the request and a callback function
@@ -79,7 +97,7 @@ public:
     }
 
     // Returns true if the write was successful and did not encounter errors.
-    bool flush(OperationContext* opCtx) {
+    bool flush(OperationContext* opCtx) noexcept {
         if (empty()) {
             return true;
         }
@@ -185,7 +203,7 @@ public:
             // We do not pass in a proper numErrors since it causes unwanted truncation in error
             // message generation.
             if (auto error = write_ops_exec::generateError(
-                    opCtx, writes.results[i].getStatus(), i, 0 /* numErrors */)) {
+                    opCtx, writes.results[i].getStatus(), idx, 0 /* numErrors */)) {
                 auto replyItem = BulkWriteReplyItem(idx, error.get().getStatus());
                 _replies.emplace_back(replyItem);
             } else {
@@ -198,7 +216,23 @@ public:
 
     void addUpdateReply(OperationContext* opCtx,
                         size_t currentOpIdx,
-                        const SingleWriteResult& write) {}
+                        const Status& status,
+                        const boost::optional<UpdateResult>& result,
+                        const boost::optional<BSONObj>& value) {
+        auto replyItem = BulkWriteReplyItem(currentOpIdx, status);
+        if (status.isOK()) {
+            invariant(result);
+            replyItem.setNModified(result->numDocsModified);
+            if (!result->upsertedId.isEmpty()) {
+                replyItem.setUpserted(
+                    write_ops::Upserted(0, IDLAnyTypeOwned(result->upsertedId.firstElement())));
+            }
+            if (value) {
+                replyItem.setValue(value);
+            }
+        }
+        _replies.emplace_back(replyItem);
+    }
 
     void addDeleteReply(OperationContext* opCtx,
                         size_t currentOpIdx,
@@ -235,7 +269,7 @@ bool handleInsertOp(OperationContext* opCtx,
                     const BulkWriteInsertOp* op,
                     const BulkWriteCommandRequest& req,
                     size_t currentOpIdx,
-                    InsertBatch& batch) {
+                    InsertBatch& batch) noexcept {
     const auto& nsInfo = req.getNsInfo();
     auto idx = op->getInsert();
 
@@ -253,18 +287,126 @@ bool handleUpdateOp(OperationContext* opCtx,
                     const BulkWriteUpdateOp* op,
                     const BulkWriteCommandRequest& req,
                     size_t currentOpIdx,
-                    std::function<void(OperationContext*, int, const SingleWriteResult&)> replyCB) {
-    // Perform the update operation then call replyCB with the SingleWriteResult and currentOpIdx
-    // to save the response to be used in cursor creation.
-    // see write_ops_exec::performUpdates for reference.
-    return false;
+                    UpdateCallback replyCB) noexcept {
+    try {
+        const auto& nsInfo = req.getNsInfo();
+
+        auto idx = op->getUpdate();
+
+        if (op->getMulti()) {
+            uassert(ErrorCodes::InvalidOptions,
+                    "May not specify both multi and return in bulkWrite command.",
+                    !op->getReturn());
+        }
+
+        if (op->getReturnFields()) {
+            uassert(ErrorCodes::InvalidOptions,
+                    "Must specify return if returnFields is provided in bulkWrite command.",
+                    op->getReturn());
+        }
+
+        const NamespaceString& nsString = nsInfo[idx].getNs();
+        uassertStatusOK(userAllowedWriteNS(opCtx, nsString));
+        auto const curOp = CurOp::get(opCtx);
+        OpDebug* const opDebug = &curOp->debug();
+
+        doTransactionValidationForWrites(opCtx, nsString);
+
+        auto updateRequest = UpdateRequest();
+        updateRequest.setNamespaceString(nsString);
+        updateRequest.setQuery(op->getFilter());
+        updateRequest.setProj(op->getReturnFields().value_or(BSONObj()));
+        updateRequest.setUpdateModification(op->getUpdateMods());
+        updateRequest.setLegacyRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
+        updateRequest.setLetParameters(op->getLet());
+        updateRequest.setSort(op->getSort().value_or(BSONObj()));
+        updateRequest.setHint(op->getHint());
+        updateRequest.setCollation(op->getCollation().value_or(BSONObj()));
+        updateRequest.setArrayFilters(op->getArrayFilters().value_or(std::vector<BSONObj>()));
+        updateRequest.setUpsert(op->getUpsert());
+        if (op->getReturn()) {
+            updateRequest.setReturnDocs((op->getReturn().get() == "pre")
+                                            ? UpdateRequest::RETURN_OLD
+                                            : UpdateRequest::RETURN_NEW);
+        } else {
+            updateRequest.setReturnDocs(UpdateRequest::RETURN_NONE);
+        }
+        updateRequest.setMulti(op->getMulti());
+
+        updateRequest.setYieldPolicy(opCtx->inMultiDocumentTransaction()
+                                         ? PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY
+                                         : PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
+
+        if (req.getStmtIds()) {
+            updateRequest.setStmtIds(*req.getStmtIds());
+        } else if (req.getStmtId()) {
+            updateRequest.setStmtIds({*req.getStmtId()});
+        }
+
+        const bool inTransaction = opCtx->inMultiDocumentTransaction();
+
+        // Although usually the PlanExecutor handles WCE internally, it will throw WCEs when it
+        // is executing an update. This is done to ensure that we can always match,
+        // modify, and return the document under concurrency, if a matching document exists.
+        return writeConflictRetry(opCtx, "bulkWriteUpdate", nsString.ns(), [&] {
+            if (MONGO_unlikely(hangBeforeBulkWritePerformsUpdate.shouldFail())) {
+                CurOpFailpointHelpers::waitWhileFailPointEnabled(
+                    &hangBeforeBulkWritePerformsUpdate, opCtx, "hangBeforeBulkWritePerformsUpdate");
+            }
+
+            // Nested retry loop to handle concurrent conflicting upserts with equality
+            // match.
+            int retryAttempts = 0;
+            for (;;) {
+                const ExtensionsCallbackReal extensionsCallback(
+                    opCtx, &updateRequest.getNamespaceString());
+                ParsedUpdate parsedUpdate(opCtx, &updateRequest, extensionsCallback);
+                uassertStatusOK(parsedUpdate.parseRequest());
+
+                try {
+                    boost::optional<BSONObj> docFound;
+                    auto result = write_ops_exec::writeConflictRetryUpsert(opCtx,
+                                                                           nsString,
+                                                                           curOp,
+                                                                           opDebug,
+                                                                           inTransaction,
+                                                                           false,
+                                                                           updateRequest.isUpsert(),
+                                                                           docFound,
+                                                                           &parsedUpdate);
+                    replyCB(opCtx, currentOpIdx, Status::OK(), result, docFound);
+                    return true;
+                } catch (const ExceptionFor<ErrorCodes::DuplicateKey>& ex) {
+                    if (!parsedUpdate.hasParsedQuery()) {
+                        uassertStatusOK(parsedUpdate.parseQueryToCQ());
+                    }
+
+                    if (!write_ops_exec::shouldRetryDuplicateKeyException(
+                            parsedUpdate, *ex.extraInfo<DuplicateKeyErrorInfo>())) {
+                        throw;
+                    }
+
+                    ++retryAttempts;
+                    logAndBackoff(7276500,
+                                  ::mongo::logv2::LogComponent::kWrite,
+                                  logv2::LogSeverity::Debug(1),
+                                  retryAttempts,
+                                  "Caught DuplicateKey exception during bulkWrite update",
+                                  "namespace"_attr = updateRequest.getNamespaceString().ns());
+                }
+            }
+        });
+    } catch (const DBException& ex) {
+        replyCB(opCtx, currentOpIdx, ex.toStatus(), boost::none, boost::none);
+        return !req.getOrdered();
+    }
 }
 
 bool handleDeleteOp(OperationContext* opCtx,
                     const BulkWriteDeleteOp* op,
                     const BulkWriteCommandRequest& req,
                     size_t currentOpIdx,
-                    std::function<void(OperationContext*, int, const SingleWriteResult&)> replyCB) {
+                    DeleteCallback replyCB) noexcept {
     // Perform the update operation then call replyCB with the SingleWriteResult and currentOpIdx
     // to save the response to be used in cursor creation.
     // see write_ops_exec::performDeletes for reference.
@@ -279,6 +421,9 @@ std::vector<BulkWriteReplyItem> performWrites(OperationContext* opCtx,
     DisableDocumentSchemaValidationIfTrue docSchemaValidationDisabler(opCtx,
                                                                       bypassDocumentValidation);
 
+    DisableSafeContentValidationIfTrue safeContentValidationDisabler(
+        opCtx, bypassDocumentValidation, false);
+
     auto responses = BulkWriteReplies(req, ops.size());
 
     // Construct reply handler callbacks.
@@ -287,10 +432,13 @@ std::vector<BulkWriteReplyItem> performWrites(OperationContext* opCtx,
                                  write_ops_exec::WriteResult& writes) {
         responses.addInsertReplies(opCtx, currentOpIdx, writes);
     };
-    auto updateCB =
-        [&responses](OperationContext* opCtx, int currentOpIdx, const SingleWriteResult& write) {
-            responses.addUpdateReply(opCtx, currentOpIdx, write);
-        };
+    auto updateCB = [&responses](OperationContext* opCtx,
+                                 int currentOpIdx,
+                                 const Status& status,
+                                 const boost::optional<UpdateResult>& result,
+                                 const boost::optional<BSONObj>& value) {
+        responses.addUpdateReply(opCtx, currentOpIdx, status, result, value);
+    };
     auto deleteCB =
         [&responses](OperationContext* opCtx, int currentOpIdx, const SingleWriteResult& write) {
             responses.addDeleteReply(opCtx, currentOpIdx, write);
@@ -404,11 +552,29 @@ public:
                 "BulkWrite may not be run without featureFlagBulkWriteCommand enabled",
                 gFeatureFlagBulkWriteCommand.isEnabled(serverGlobalParams.featureCompatibility));
 
-            // Validate that every ops entry has a valid nsInfo index.
             auto& req = request();
             const auto& ops = req.getOps();
             const auto& nsInfo = req.getNsInfo();
 
+            uassert(ErrorCodes::InvalidOptions,
+                    str::stream()
+                        << "May not specify both stmtId and stmtIds in bulkWrite command. Got "
+                        << BSON("stmtId" << *req.getStmtId() << "stmtIds" << *req.getStmtIds())
+                        << ". BulkWrite command: " << req.toBSON({}),
+                    !(req.getStmtId() && req.getStmtIds()));
+
+            if (const auto& stmtIds = req.getStmtIds()) {
+                uassert(
+                    ErrorCodes::InvalidLength,
+                    str::stream()
+                        << "Number of statement ids must match the number of batch entries. Got "
+                        << stmtIds->size() << " statement ids but " << ops.size()
+                        << " operations. Statement ids: " << BSON("stmtIds" << *stmtIds)
+                        << ". BulkWrite command: " << req.toBSON({}),
+                    stmtIds->size() == ops.size());
+            }
+
+            // Validate that every ops entry has a valid nsInfo index.
             for (const auto& op : ops) {
                 const auto& bulkWriteOp = BulkWriteCRUDOp(op);
                 unsigned int nsInfoIdx = bulkWriteOp.getNsInfoIdx();

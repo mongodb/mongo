@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/ops/update_result.h"
 #include <boost/optional.hpp>
 
 #include "mongo/base/status_with.h"
@@ -47,6 +48,7 @@
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/ops/parsed_delete.h"
 #include "mongo/db/ops/parsed_update.h"
+#include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/ops/write_ops_retryability.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/get_executor.h"
@@ -164,21 +166,22 @@ void makeDeleteRequest(OperationContext* opCtx,
                                    : PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
 }
 
-write_ops::FindAndModifyCommandReply buildResponse(const PlanExecutor* exec,
-                                                   bool isRemove,
-                                                   const boost::optional<BSONObj>& value) {
+write_ops::FindAndModifyCommandReply buildResponse(
+    const boost::optional<UpdateResult>& updateResult,
+    bool isRemove,
+    const boost::optional<BSONObj>& value) {
     write_ops::FindAndModifyLastError lastError;
     if (isRemove) {
         lastError.setNumDocs(value ? 1 : 0);
     } else {
-        const auto updateResult = exec->getUpdateResult();
-        lastError.setNumDocs(!updateResult.upsertedId.isEmpty() ? 1 : updateResult.numMatched);
-        lastError.setUpdatedExisting(updateResult.numMatched > 0);
+        invariant(updateResult);
+        lastError.setNumDocs(!updateResult->upsertedId.isEmpty() ? 1 : updateResult->numMatched);
+        lastError.setUpdatedExisting(updateResult->numMatched > 0);
 
         // Note we have to use the upsertedId from the update result here, rather than 'value'
         // because the _id field could have been excluded by a projection.
-        if (!updateResult.upsertedId.isEmpty()) {
-            lastError.setUpserted(IDLAnyTypeOwned(updateResult.upsertedId.firstElement()));
+        if (!updateResult->upsertedId.isEmpty()) {
+            lastError.setUpserted(IDLAnyTypeOwned(updateResult->upsertedId.firstElement()));
         }
     }
 
@@ -186,6 +189,15 @@ write_ops::FindAndModifyCommandReply buildResponse(const PlanExecutor* exec,
     result.setLastErrorObject(std::move(lastError));
     result.setValue(value);
     return result;
+}
+
+write_ops::FindAndModifyCommandReply buildResponse(const PlanExecutor* exec,
+                                                   bool isRemove,
+                                                   const boost::optional<BSONObj>& value) {
+    if (isRemove) {
+        return buildResponse(boost::none, isRemove, value);
+    }
+    return buildResponse(exec->getUpdateResult(), isRemove, value);
 }
 
 void assertCanWrite_inlock(OperationContext* opCtx, const NamespaceString& nss) {
@@ -295,15 +307,6 @@ public:
             CurOp* curOp,
             OpDebug* opDebug,
             bool inTransaction);
-
-        static write_ops::FindAndModifyCommandReply writeConflictRetryUpsert(
-            OperationContext* opCtx,
-            const NamespaceString& nsString,
-            const write_ops::FindAndModifyCommandRequest& request,
-            CurOp* curOp,
-            OpDebug* opDebug,
-            bool inTransaction,
-            ParsedUpdate* parsedUpdate);
     };
 
 private:
@@ -372,107 +375,6 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::writeConflict
 
     if (curOp->shouldDBProfile()) {
         auto&& explainer = exec->getPlanExplainer();
-        auto&& [stats, _] = explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
-        curOp->debug().execStats = std::move(stats);
-    }
-    recordStatsForTopCommand(opCtx);
-
-    if (docFound) {
-        ResourceConsumption::DocumentUnitCounter docUnitsReturned;
-        docUnitsReturned.observeOne(docFound->objsize());
-
-        auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
-        metricsCollector.incrementDocUnitsReturned(curOp->getNS(), docUnitsReturned);
-    }
-
-    return buildResponse(exec.get(), request.getRemove().value_or(false), docFound);
-}
-
-write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::writeConflictRetryUpsert(
-    OperationContext* opCtx,
-    const NamespaceString& nsString,
-    const write_ops::FindAndModifyCommandRequest& request,
-    CurOp* curOp,
-    OpDebug* opDebug,
-    bool inTransaction,
-    ParsedUpdate* parsedUpdate) {
-
-    AutoGetCollection autoColl(opCtx, nsString, MODE_IX);
-    Database* db = autoColl.ensureDbExists(opCtx);
-
-    {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
-        CurOp::get(opCtx)->enter_inlock(
-            nsString, CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nsString.dbName()));
-    }
-
-    assertCanWrite_inlock(opCtx, nsString);
-
-    CollectionPtr createdCollection;
-    const CollectionPtr* collectionPtr = &autoColl.getCollection();
-
-    // TODO SERVER-50983: Create abstraction for creating collection when using
-    // AutoGetCollection Create the collection if it does not exist when performing an upsert
-    // because the update stage does not create its own collection
-    if (!*collectionPtr && request.getUpsert() && *request.getUpsert()) {
-        assertCanWrite_inlock(opCtx, nsString);
-
-        createdCollection = CollectionPtr(
-            CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nsString));
-
-        // If someone else beat us to creating the collection, do nothing
-        if (!createdCollection) {
-            uassertStatusOK(userAllowedCreateNS(opCtx, nsString));
-            OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
-                unsafeCreateCollection(opCtx);
-            WriteUnitOfWork wuow(opCtx);
-            CollectionOptions defaultCollectionOptions;
-            uassertStatusOK(db->userCreateNS(opCtx, nsString, defaultCollectionOptions));
-            wuow.commit();
-
-            createdCollection = CollectionPtr(
-                CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nsString));
-        }
-
-        invariant(createdCollection);
-        createdCollection.makeYieldable(opCtx,
-                                        LockedCollectionYieldRestore(opCtx, createdCollection));
-        collectionPtr = &createdCollection;
-    }
-    const auto& collection = *collectionPtr;
-
-    checkIfTransactionOnCappedColl(collection, inTransaction);
-
-    const auto exec = uassertStatusOK(
-        getExecutorUpdate(opDebug, &collection, parsedUpdate, boost::none /* verbosity */));
-
-    {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
-        CurOp::get(opCtx)->setPlanSummary_inlock(exec->getPlanExplainer().getPlanSummary());
-    }
-
-    auto docFound =
-        advanceExecutor(opCtx, request, exec.get(), request.getRemove().value_or(false));
-    // Nothing after advancing the plan executor should throw a WriteConflictException,
-    // so the following bookkeeping with execution stats won't end up being done
-    // multiple times.
-
-    PlanSummaryStats summaryStats;
-    auto&& explainer = exec->getPlanExplainer();
-    explainer.getSummaryStats(&summaryStats);
-    if (collection) {
-        CollectionQueryInfo::get(collection).notifyOfQuery(opCtx, collection, summaryStats);
-    }
-    auto updateResult = exec->getUpdateResult();
-    write_ops_exec::recordUpdateResultInOpDebug(updateResult, opDebug);
-    opDebug->setPlanSummaryMetrics(summaryStats);
-
-    if (updateResult.containsDotsAndDollarsField) {
-        // If it's an upsert, increment 'inserts' metric, otherwise increment 'updates'.
-        dotsAndDollarsFieldsCounters.incrementForUpsert(!updateResult.upsertedId.isEmpty());
-    }
-
-    if (curOp->shouldDBProfile()) {
         auto&& [stats, _] = explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
         curOp->debug().execStats = std::move(stats);
     }
@@ -712,8 +614,20 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
                 uassertStatusOK(parsedUpdate.parseRequest());
 
                 try {
-                    return CmdFindAndModify::Invocation::writeConflictRetryUpsert(
-                        opCtx, nsString, req, curOp, opDebug, inTransaction, &parsedUpdate);
+                    boost::optional<BSONObj> docFound;
+                    auto updateResult =
+                        write_ops_exec::writeConflictRetryUpsert(opCtx,
+                                                                 nsString,
+                                                                 curOp,
+                                                                 opDebug,
+                                                                 inTransaction,
+                                                                 req.getRemove().value_or(false),
+                                                                 req.getUpsert().value_or(false),
+                                                                 docFound,
+                                                                 &parsedUpdate);
+                    recordStatsForTopCommand(opCtx);
+                    return buildResponse(updateResult, req.getRemove().value_or(false), docFound);
+
                 } catch (const ExceptionFor<ErrorCodes::DuplicateKey>& ex) {
                     if (!parsedUpdate.hasParsedQuery()) {
                         uassertStatusOK(parsedUpdate.parseQueryToCQ());

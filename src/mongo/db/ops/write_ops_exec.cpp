@@ -33,6 +33,7 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/catalog/collection_write_path.h"
+#include "mongo/db/catalog/collection_yield_restore.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog_raii.h"
@@ -61,6 +62,7 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/get_executor.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -664,6 +666,140 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
     }
 
     return true;
+}
+
+boost::optional<BSONObj> advanceExecutor(OperationContext* opCtx,
+                                         PlanExecutor* exec,
+                                         bool isRemove) {
+    BSONObj value;
+    PlanExecutor::ExecState state;
+    try {
+        state = exec->getNext(&value, nullptr);
+    } catch (DBException& exception) {
+        auto&& explainer = exec->getPlanExplainer();
+        auto&& [stats, _] = explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
+        LOGV2_WARNING(7267501,
+                      "Plan executor error during findAndModify: {error}, stats: {stats}",
+                      "Plan executor error during findAndModify",
+                      "error"_attr = exception.toStatus(),
+                      "stats"_attr = redact(stats));
+
+        exception.addContext("Plan executor error during findAndModify");
+        throw;
+    }
+
+    if (PlanExecutor::ADVANCED == state) {
+        return {std::move(value)};
+    }
+
+    invariant(state == PlanExecutor::IS_EOF);
+    return boost::none;
+}
+
+UpdateResult writeConflictRetryUpsert(OperationContext* opCtx,
+                                      const NamespaceString& nsString,
+                                      CurOp* curOp,
+                                      OpDebug* opDebug,
+                                      bool inTransaction,
+                                      bool remove,
+                                      bool upsert,
+                                      boost::optional<BSONObj>& docFound,
+                                      ParsedUpdate* parsedUpdate) {
+    AutoGetCollection autoColl(opCtx, nsString, MODE_IX);
+    Database* db = autoColl.ensureDbExists(opCtx);
+
+    {
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        CurOp::get(opCtx)->enter_inlock(
+            nsString, CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nsString.dbName()));
+    }
+
+    assertCanWrite_inlock(opCtx, nsString);
+
+    CollectionPtr createdCollection;
+    const CollectionPtr* collectionPtr = &autoColl.getCollection();
+
+    // TODO SERVER-50983: Create abstraction for creating collection when using
+    // AutoGetCollection Create the collection if it does not exist when performing an upsert
+    // because the update stage does not create its own collection
+    if (!*collectionPtr && upsert) {
+        assertCanWrite_inlock(opCtx, nsString);
+
+        createdCollection = CollectionPtr(
+            CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nsString));
+
+        // If someone else beat us to creating the collection, do nothing
+        if (!createdCollection) {
+            uassertStatusOK(userAllowedCreateNS(opCtx, nsString));
+            OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
+                unsafeCreateCollection(opCtx);
+            WriteUnitOfWork wuow(opCtx);
+            CollectionOptions defaultCollectionOptions;
+            uassertStatusOK(db->userCreateNS(opCtx, nsString, defaultCollectionOptions));
+            wuow.commit();
+
+            createdCollection = CollectionPtr(
+                CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nsString));
+        }
+
+        invariant(createdCollection);
+        createdCollection.makeYieldable(opCtx,
+                                        LockedCollectionYieldRestore(opCtx, createdCollection));
+        collectionPtr = &createdCollection;
+    }
+    const auto& collection = *collectionPtr;
+
+    if (collection && collection->isCapped()) {
+        uassert(
+            ErrorCodes::OperationNotSupportedInTransaction,
+            str::stream() << "Collection '" << collection->ns()
+                          << "' is a capped collection. Writes in transactions are not allowed on "
+                             "capped collections.",
+            !inTransaction);
+    }
+
+    const auto exec = uassertStatusOK(
+        getExecutorUpdate(opDebug, &collection, parsedUpdate, boost::none /* verbosity */));
+
+    {
+        stdx::lock_guard<Client> lk(*opCtx->getClient());
+        CurOp::get(opCtx)->setPlanSummary_inlock(exec->getPlanExplainer().getPlanSummary());
+    }
+
+    docFound = advanceExecutor(opCtx, exec.get(), remove);
+    // Nothing after advancing the plan executor should throw a WriteConflictException,
+    // so the following bookkeeping with execution stats won't end up being done
+    // multiple times.
+
+    PlanSummaryStats summaryStats;
+    auto&& explainer = exec->getPlanExplainer();
+    explainer.getSummaryStats(&summaryStats);
+    if (collection) {
+        CollectionQueryInfo::get(collection).notifyOfQuery(opCtx, collection, summaryStats);
+    }
+    auto updateResult = exec->getUpdateResult();
+    write_ops_exec::recordUpdateResultInOpDebug(updateResult, opDebug);
+    opDebug->setPlanSummaryMetrics(summaryStats);
+
+    if (updateResult.containsDotsAndDollarsField) {
+        // If it's an upsert, increment 'inserts' metric, otherwise increment 'updates'.
+        dotsAndDollarsFieldsCounters.incrementForUpsert(!updateResult.upsertedId.isEmpty());
+    }
+
+    if (curOp->shouldDBProfile()) {
+        auto&& [stats, _] = explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
+        curOp->debug().execStats = std::move(stats);
+    }
+
+    if (docFound) {
+        ResourceConsumption::DocumentUnitCounter docUnitsReturned;
+        docUnitsReturned.observeOne(docFound->objsize());
+
+        auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
+        metricsCollector.incrementDocUnitsReturned(curOp->getNS(), docUnitsReturned);
+    }
+
+    return updateResult;
 }
 
 boost::optional<write_ops::WriteError> generateError(OperationContext* opCtx,

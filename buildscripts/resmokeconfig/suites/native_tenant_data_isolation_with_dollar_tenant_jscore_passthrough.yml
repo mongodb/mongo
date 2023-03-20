@@ -77,7 +77,8 @@ selector:
   # TODO SERVER-72357: cannot get the expected error due to an authorization contract issue.
   - jstests/core/txns/multi_statement_transaction_command_args.js
   # TODO SERVER-72187: bulkWrite command does not support Tenant ID command
-  - jstests/core/write/bulk/bulk_write_cursor.js
+  - jstests/core/write/bulk/bulk_write_insert_cursor.js
+  - jstests/core/write/bulk/bulk_write_update_cursor.js
   # TODO SERVER-73023 The tenantId is not attached to the namespace provided to failcommand
   # failpoint
   - jstests/core/failcommand_failpoint.js

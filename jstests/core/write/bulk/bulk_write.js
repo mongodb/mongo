@@ -228,4 +228,6 @@ assert.commandWorked(db.adminCommand({
 }));
 
 assert.eq(1, coll.count({_id: 3}));
+
+coll.drop();
 })();

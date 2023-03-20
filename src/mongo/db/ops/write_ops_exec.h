@@ -47,6 +47,7 @@ namespace mongo {
 
 class OpDebug;
 class ParsedUpdate;
+class PlanExecutor;
 
 namespace write_ops_exec {
 
@@ -81,6 +82,28 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
                                 LastOpFixer* lastOpFixer,
                                 WriteResult* out,
                                 OperationSource source);
+
+/**
+ * If the operation succeeded, then returns either a document to return to the client, or
+ * boost::none if no matching document to update/remove was found. If the operation failed, throws.
+ */
+boost::optional<BSONObj> advanceExecutor(OperationContext* opCtx,
+                                         PlanExecutor* exec,
+                                         bool isRemove);
+
+/**
+ * Executes the a findAndModify, the returned document is placed into docFound (if applicable).
+ * Should be called in a writeConflictRetry loop.
+ */
+UpdateResult writeConflictRetryUpsert(OperationContext* opCtx,
+                                      const NamespaceString& nsString,
+                                      CurOp* curOp,
+                                      OpDebug* opDebug,
+                                      bool inTransaction,
+                                      bool remove,
+                                      bool upsert,
+                                      boost::optional<BSONObj>& docFound,
+                                      ParsedUpdate* parsedUpdate);
 
 /**
  * Generates a WriteError for a given Status.
