@@ -14,9 +14,12 @@ const latest = "latest";
 const testName = "fcv_upgrade_fails_during_is_cleaning_server_metadata";
 const dbpath = MongoRunner.dataPath + testName;
 
-function upgradeFailsDuringIsCleaningServerMetadata(conn, adminDB, replSetTest) {
-    assert.commandWorked(conn.adminCommand(
-        {configureFailPoint: 'failDowngradingDuringIsCleaningServerMetadata', mode: "alwaysOn"}));
+function upgradeFailsDuringIsCleaningServerMetadata(
+    conn, restartDeploymentFn, configureFailPointFn) {
+    let adminDB = conn.getDB("admin");
+
+    configureFailPointFn('failDowngradingDuringIsCleaningServerMetadata', 'alwaysOn');
+
     assert.commandFailed(adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
     let fcvDoc = adminDB.system.version.findOne({_id: 'featureCompatibilityVersion'});
     jsTestLog("Current FCV should be in isCleaningServerMetadata phase: " + tojson(fcvDoc));
@@ -26,15 +29,13 @@ function upgradeFailsDuringIsCleaningServerMetadata(conn, adminDB, replSetTest) 
     assert.commandFailedWithCode(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV}),
                                  7428200);
 
-    assert.commandWorked(conn.adminCommand(
-        {configureFailPoint: 'failDowngradingDuringIsCleaningServerMetadata', mode: "off"}));
+    configureFailPointFn('failDowngradingDuringIsCleaningServerMetadata', 'off');
 
     // We are still in isCleaningServerMetadata even if we retry and fail downgrade at an earlier
     // point.
     jsTestLog(
         "Test that retrying downgrade and failing at an earlier point will still keep failing upgrade");
-    assert.commandWorked(
-        conn.adminCommand({configureFailPoint: 'failDowngrading', mode: "alwaysOn"}));
+    configureFailPointFn('failDowngrading', 'alwaysOn');
     assert.commandFailed(adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
     fcvDoc = adminDB.system.version.findOne({_id: 'featureCompatibilityVersion'});
     jsTestLog("Current FCV should still be in isCleaningServerMetadata phase: " + tojson(fcvDoc));
@@ -45,20 +46,8 @@ function upgradeFailsDuringIsCleaningServerMetadata(conn, adminDB, replSetTest) 
                                  7428200);
 
     jsTestLog("isCleaningServerMetadata should persist through restarts.");
-    if (replSetTest) {
-        replSetTest.stopSet(null /* signal */, true /* forRestart */);
-        replSetTest.startSet({restart: true});
-        adminDB = replSetTest.getPrimary().getDB("admin");
-        conn = replSetTest.getPrimary();
-    } else {
-        MongoRunner.stopMongod(conn);
-        conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: latest, noCleanData: true});
-        assert.neq(
-            null,
-            conn,
-            "mongod was unable to start up with version=" + latest + " and existing data files");
-        adminDB = conn.getDB("admin");
-    }
+    conn = restartDeploymentFn();
+    adminDB = conn.getDB("admin");
 
     fcvDoc = adminDB.system.version.findOne({_id: 'featureCompatibilityVersion'});
     jsTestLog("Current FCV should still be in isCleaningServerMetadata phase: " + tojson(fcvDoc));
@@ -68,24 +57,16 @@ function upgradeFailsDuringIsCleaningServerMetadata(conn, adminDB, replSetTest) 
     assert.commandFailedWithCode(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV}),
                                  7428200);
 
-    assert.commandWorked(conn.adminCommand({configureFailPoint: 'failDowngrading', mode: "off"}));
-
     // Completing downgrade and then upgrading succeeds.
     assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
     checkFCV(adminDB, lastLTSFCV);
 
     assert.commandWorked(adminDB.runCommand({setFeatureCompatibilityVersion: latestFCV}));
     checkFCV(adminDB, latestFCV);
-
-    if (replSetTest) {
-        replSetTest.stopSet();
-    } else {
-        MongoRunner.stopMongod(conn);
-    }
 }
 
 function runStandaloneTest() {
-    const conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: latest});
+    let conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: latest});
     assert.neq(
         null, conn, "mongod was unable to start up with version=" + latest + " and no data files");
     const adminDB = conn.getDB("admin");
@@ -96,7 +77,22 @@ function runStandaloneTest() {
         return;
     }
 
-    upgradeFailsDuringIsCleaningServerMetadata(conn, adminDB);
+    function restartDeploymentFn() {
+        MongoRunner.stopMongod(conn);
+        conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: latest, noCleanData: true});
+        assert.neq(
+            null,
+            conn,
+            "mongod was unable to start up with version=" + latest + " and existing data files");
+        return conn;
+    }
+
+    function configureFailPointFn(failPointName, mode) {
+        assert.commandWorked(
+            conn.getDB("admin").runCommand({configureFailPoint: failPointName, mode: mode}));
+    }
+
+    upgradeFailsDuringIsCleaningServerMetadata(conn, restartDeploymentFn, configureFailPointFn);
 
     MongoRunner.stopMongod(conn);
 }
@@ -114,9 +110,60 @@ function runReplicaSetTest() {
         return;
     }
 
-    upgradeFailsDuringIsCleaningServerMetadata(primary, primaryAdminDB, rst);
+    function restartDeploymentFn() {
+        rst.stopSet(null /* signal */, true /* forRestart */);
+        rst.startSet({restart: true});
+        return rst.getPrimary();
+    }
+
+    function configureFailPointFn(failPointName, mode) {
+        assert.commandWorked(rst.getPrimary().getDB("admin").runCommand(
+            {configureFailPoint: failPointName, mode: mode}));
+    }
+
+    upgradeFailsDuringIsCleaningServerMetadata(primary, restartDeploymentFn, configureFailPointFn);
+    rst.stopSet();
+}
+
+function runShardedClusterTest() {
+    const st = new ShardingTest({shards: 2});
+
+    if (!FeatureFlagUtil.isEnabled(st.configRS.getPrimary(), "DowngradingToUpgrading")) {
+        jsTestLog("Skipping as featureFlagDowngradingToUpgrading is not enabled");
+        st.stop();
+        return;
+    }
+
+    function restartDeploymentFn() {
+        st.stopAllShards({}, true /* forRestart */);
+        st.stopAllConfigServers({}, true /* forRestart */);
+        st.restartAllConfigServers();
+        st.restartAllShards();
+        return st.s;
+    }
+
+    function configureFailPointOnConfigsvrFn(failPointName, mode) {
+        assert.commandWorked(st.configRS.getPrimary().getDB("admin").runCommand(
+            {configureFailPoint: failPointName, mode: mode}));
+    }
+
+    function configureFailPointOnShard1Fn(failPointName, mode) {
+        assert.commandWorked(st.rs1.getPrimary().getDB("admin").runCommand(
+            {configureFailPoint: failPointName, mode: mode}));
+    }
+
+    // Test when the configsvr is the one that fails during the cleanup metadata phase.
+    upgradeFailsDuringIsCleaningServerMetadata(
+        st.s, restartDeploymentFn, configureFailPointOnConfigsvrFn);
+
+    // Test when a shard is the one that fails during the cleanup metadata phase.
+    upgradeFailsDuringIsCleaningServerMetadata(
+        st.s, restartDeploymentFn, configureFailPointOnShard1Fn);
+
+    st.stop();
 }
 
 runStandaloneTest();
 runReplicaSetTest();
+runShardedClusterTest();
 })();

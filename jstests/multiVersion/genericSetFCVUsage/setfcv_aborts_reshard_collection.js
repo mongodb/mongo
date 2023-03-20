@@ -92,7 +92,8 @@ function runTest(forcePooledConnectionsDropped) {
                 pauseBeforeMarkKeepOpen.wait();
 
                 jsTestLog("Set hitDropConnections failpoint");
-                let hitDropConnections = configureFailPoint(config, "finishedDropConnections");
+                let hitDropConnections =
+                    configureFailPoint(config, "finishedDropConnections", {}, {times: 1});
                 pauseBeforeCloseCxns.off();
 
                 waitForFailpoint("Hit finishedDropConnections", 1);

@@ -162,35 +162,46 @@ _Code spelunking starting points:_
 
 
 ## Adding code to the setFCV command 
-The `setFeatureCompatibilityVersion` command is done in two parts. This corresponds to the different
+The `setFeatureCompatibilityVersion` command is done in three parts. This corresponds to the different
 states that the FCV document can be in, as described in the above section.
 
 In the first part, we start transition to `requestedVersion` by updating the local FCV document to a
 `kUpgradingFrom_X_To_Y` or `kDowngradingFrom_X_To_Y` state, respectively.
 
-In the second part, we complete any upgrade or downgrade specific code, done in `_runUpgrade` and 
-`_runDowngrade`. Then we complete transition by updating the local FCV document to the fully 
-upgraded or downgraded version.
+In the second part, we perform upgrade/downgrade-ability checks. This is done on `_prepareToUpgrade`
+and `prepareToDowngrade`. On this part no metadata cleanup is performed yet.
+
+In the last part, we complete any upgrade or downgrade specific code, done in `_runUpgrade` and 
+`_runDowngrade`. This includes possible metadata cleanup. Then we complete transition by updating the
+local FCV document to the fully upgraded or downgraded version.
 
 ***All feature-specific FCV upgrade or downgrade code should go into the respective `_runUpgrade` and 
 `_runDowngrade` functions.*** Each of them have their own helper functions where all feature-specific 
 upgrade/downgrade code should be placed.
 
-`_runUpgrade` performs all the upgrade specific code for setFCV. Any new feature specific upgrade
-code should be placed in the `_runUpgrade` helper functions: 
-* `_prepareForUpgrade`: for any upgrade actions that should be done before taking the FCV full 
+`_prepareToUpgrade`  performs all actions and checks that need to be done before proceeding to make 
+any metadata changes as part of FCV upgrade. Any new feature specific upgrade code should be placed 
+in the helper functions:
+* `_prepareToUpgradeActions`: for any upgrade actions that should be done before taking the FCV full 
 transition lock in S mode
 * `_userCollectionsWorkForUpgrade`: for any user collections uasserts, creations, or deletions that 
 need to happen during the upgrade. This happens after the FCV full transition lock.
+
+`_runUpgrade` _runUpgrade performs all the metadata-changing actions of an FCV upgrade. Any new 
+feature specific upgrade code should be placed in the `_runUpgrade` helper functions: 
 * `_completeUpgrade`: for updating metadata to make sure the new features in the upgraded version 
 work for sharded and non-sharded clusters
 
-`_runDowngrade` performs all the downgrade specific code for setFCV. Any new feature specific 
-downgrade code should be placed in the `_runDowngrade` helper functions: 
-* `_prepareForDowngrade`: Any downgrade actions that should be done before taking the FCV full 
+`_prepareToDowngrade` performs all actions and checks that need to be done before proceeding to make 
+any metadata changes as part of FCV downgrade. Any new feature specific downgrade code should be 
+placed in the helper functions:
+* `_prepareToDowngradeActions`: Any downgrade actions that should be done before taking the FCV full 
 transition lock in S mode should go in this function.
 * `_userCollectionsUassertsForDowngrade`: for any checks on user data or settings that will uassert 
 if users need to manually clean up user data or settings.
+
+`_runDowngrade` _runDowngrade performs all the metadata-changing actions of an FCV downgrade. Any 
+new feature specific downgrade code should be placed in the `_runDowngrade` helper functions: 
 * `_internalServerCleanupForDowngrade`: for any internal server downgrade cleanup
 
 

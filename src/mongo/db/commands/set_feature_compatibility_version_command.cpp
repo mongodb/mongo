@@ -414,10 +414,29 @@ public:
                 // shard servers during phase 1 of the 2-phase setFCV protocol for sharded clusters.
                 // For example, before completing phase 1, we must wait for backward incompatible
                 // ShardingDDLCoordinators to finish.
-                // We do not expect any other feature-specific work to be done in phase 1.
+                // We do not expect any other feature-specific work to be done in the 'start' phase.
                 _shardServerPhase1Tasks(opCtx, actualVersion, requestedVersion);
 
-                // If we are only running phase-1, then we are done
+                // If we are only running the 'start' phase, then we are done.
+                return true;
+            }
+        }
+
+        invariant(serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading());
+
+        if (!request.getPhase() || request.getPhase() == SetFCVPhaseEnum::kPrepare) {
+            // Any checks and actions that need to be performed before being able to downgrade needs
+            // to be placed on the _prepareToUpgrade and _prepareToDowngrade functions. After the
+            // prepare function complete, a node is not allowed to refuse to upgrade/downgrade.
+            if (requestedVersion > actualVersion) {
+                _prepareToUpgrade(opCtx, request, changeTimestamp);
+            } else {
+                _prepareToDowngrade(opCtx, request, changeTimestamp);
+            }
+
+            if (request.getPhase() == SetFCVPhaseEnum::kPrepare) {
+                invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+                // If we are only running the 'prepare' phase, then we are done
                 return true;
             }
         }
@@ -498,7 +517,7 @@ private:
     // possibly downgrade its binary) while the coordinator is still in progress.
     // The fact that the FCV has already transitioned to kDowngrading ensures that no
     // new backward-incompatible ShardingDDLCoordinators can start.
-    // We do not expect any other feature-specific work to be done in phase 1.
+    // We do not expect any other feature-specific work to be done in the 'start' phase.
     void _shardServerPhase1Tasks(OperationContext* opCtx,
                                  multiversion::FeatureCompatibilityVersion actualVersion,
                                  multiversion::FeatureCompatibilityVersion requestedVersion) {
@@ -557,7 +576,7 @@ private:
     // transition lock in S mode. It is required that the code in this helper function is idempotent
     // and could be done after _runDowngrade even if it failed at any point in the middle of
     // _userCollectionsUassertsForDowngrade or _internalServerCleanupForDowngrade.
-    void _prepareForUpgrade(OperationContext* opCtx) {
+    void _prepareToUpgradeActions(OperationContext* opCtx) {
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             return;
         } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
@@ -724,23 +743,20 @@ private:
         }
     }
 
-    // _runUpgrade performs all the upgrade specific code for setFCV. Any new feature specific
-    // upgrade code should be placed in the _runUpgrade helper functions:
-    //  * _prepareForUpgrade: for any upgrade actions that should be done before taking the FCV full
-    //    transition lock in S mode
+    // _prepareToUpgrade performs all actions and checks that need to be done before proceeding to
+    // make any metadata changes as part of FCV upgrade. Any new feature specific upgrade code
+    // should be placed in the _prepareToUpgrade helper functions:
+    //  * _prepareToUpgradeActions: for any upgrade actions that should be done before taking the
+    //  FCV full transition lock in S mode
     //  * _userCollectionsWorkForUpgrade: for any user collections uasserts, creations, or deletions
     //    that need to happen during the upgrade. This happens after the FCV full transition lock.
-    //  * _completeUpgrade: for updating metadata to make sure the new features in the upgraded
-    //    version work for sharded and non-sharded clusters
     // Please read the comments on those helper functions for more details on what should be placed
     // in each function.
-    void _runUpgrade(OperationContext* opCtx,
-                     const SetFeatureCompatibilityVersion& request,
-                     boost::optional<Timestamp> changeTimestamp) {
-        const auto requestedVersion = request.getCommandParameter();
-
+    void _prepareToUpgrade(OperationContext* opCtx,
+                           const SetFeatureCompatibilityVersion& request,
+                           boost::optional<Timestamp> changeTimestamp) {
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-            // Tell the shards to enter phase-1 of setFCV
+            // Tell the shards to enter 'start' phase of setFCV (transition to kUpgrading).
             _sendSetFCVRequestToShards(opCtx, request, changeTimestamp, SetFCVPhaseEnum::kStart);
         }
 
@@ -748,7 +764,7 @@ private:
         // transition lock in S mode. It is required that the code in this helper function is
         // idempotent and could be done after _runDowngrade even if it failed at any point in the
         // middle of _userCollectionsUassertsForDowngrade or _internalServerCleanupForDowngrade.
-        _prepareForUpgrade(opCtx);
+        _prepareToUpgradeActions(opCtx);
 
         {
             // Take the FCV full transition lock in S mode to create a barrier for operations taking
@@ -775,6 +791,24 @@ private:
                 !failUpgrading.shouldFail());
 
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+            // Tell the shards to enter 'prepare' phase of setFCV (check that they will be able to
+            // upgrade).
+            _sendSetFCVRequestToShards(opCtx, request, changeTimestamp, SetFCVPhaseEnum::kPrepare);
+        }
+    }
+
+    // _runUpgrade performs all the metadata-changing actions of an FCV upgrade. Any new feature
+    // specific upgrade code should be placed in the _runUpgrade helper functions:
+    //  * _completeUpgrade: for updating metadata to make sure the new features in the upgraded
+    //    version work for sharded and non-sharded clusters
+    // Please read the comments on those helper functions for more details on what should be placed
+    // in each function.
+    void _runUpgrade(OperationContext* opCtx,
+                     const SetFeatureCompatibilityVersion& request,
+                     boost::optional<Timestamp> changeTimestamp) {
+        const auto requestedVersion = request.getCommandParameter();
+
+        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
 
             // Always abort the reshardCollection regardless of version to ensure that it will run
             // on a consistent version from start to finish. This will ensure that it will be able
@@ -786,7 +820,7 @@ private:
 
             _createShardingIndexCatalogIndexes(opCtx, requestedVersion);
 
-            // Tell the shards to enter phase-2 of setFCV (fully upgraded)
+            // Tell the shards to complete setFCV (transition to fully upgraded)
             _sendSetFCVRequestToShards(opCtx, request, changeTimestamp, SetFCVPhaseEnum::kComplete);
         }
 
@@ -802,7 +836,7 @@ private:
 
     // This helper function is for any actions that should be done before taking the FCV full
     // transition lock in S mode.
-    void _prepareForDowngrade(OperationContext* opCtx) {
+    void _prepareToDowngradeActions(OperationContext* opCtx) {
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             return;
         } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
@@ -1147,34 +1181,31 @@ private:
         }
     }
 
-    // _runDowngrade performs all the downgrade specific code for setFCV. Any new feature specific
-    // downgrade code should be placed in the _runDowngrade helper functions:
-    // * _prepareForDowngrade: Any downgrade actions that should be done before taking the FCV full
-    //   transition lock in S mode should go in this function.
+    // _prepareToDowngrade performs all actions and checks that need to be done before proceeding to
+    // make any metadata changes as part of FCV downgrade. Any new feature specific downgrade
+    // code should be placed in the helper functions:
+    // * _prepareToDowngradeActions: Any downgrade actions that should be done before taking the FCV
+    // full transition lock in S mode should go in this function.
     // * _userCollectionsUassertsForDowngrade: for any checks on user data or settings that will
-    // uassert
-    //   if users need to manually clean up user data or settings.
-    // * _internalServerCleanupForDowngrade: for any internal server downgrade cleanup
+    // uassert if users need to manually clean up user data or settings.
     // Please read the comments on those helper functions for more details on what should be placed
     // in each function.
-    void _runDowngrade(OperationContext* opCtx,
-                       const SetFeatureCompatibilityVersion& request,
-                       boost::optional<Timestamp> changeTimestamp) {
+    void _prepareToDowngrade(OperationContext* opCtx,
+                             const SetFeatureCompatibilityVersion& request,
+                             boost::optional<Timestamp> changeTimestamp) {
         const auto requestedVersion = request.getCommandParameter();
-        const auto actualVersion = serverGlobalParams.featureCompatibility.getVersion();
-        auto isFromConfigServer = request.getFromConfigServer().value_or(false);
 
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             uassert(ErrorCodes::Error(6794600),
                     "Failing downgrade due to 'failBeforeSendingShardsToDowngrading' failpoint set",
                     !failBeforeSendingShardsToDowngrading.shouldFail());
-            // Tell the shards to enter phase-1 of setFCV
+            // Tell the shards to enter 'start' phase of setFCV (transition to kDowngrading)
             _sendSetFCVRequestToShards(opCtx, request, changeTimestamp, SetFCVPhaseEnum::kStart);
         }
 
         // Any actions that should be done before taking the FCV full transition lock in S mode
         // should go in this function.
-        _prepareForDowngrade(opCtx);
+        _prepareToDowngradeActions(opCtx);
 
         {
             // Take the FCV full transition lock in S mode to create a barrier for operations taking
@@ -1205,13 +1236,30 @@ private:
         // user must manually clean up some user data in order to retry the FCV downgrade.
         _userCollectionsUassertsForDowngrade(opCtx, requestedVersion);
 
+        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+            // Tell the shards to enter 'prepare' phase of setFCV (check that they will be able to
+            // downgrade).
+            _sendSetFCVRequestToShards(opCtx, request, changeTimestamp, SetFCVPhaseEnum::kPrepare);
+        }
+    }
+
+    // _runDowngrade performs all the metadata-changing actions of an FCV downgrade. Any new feature
+    // specific downgrade code should be placed in the _runDowngrade helper functions:
+    // * _internalServerCleanupForDowngrade: for any internal server downgrade cleanup
+    // Please read the comments on those helper functions for more details on what should be placed
+    // in each function.
+    void _runDowngrade(OperationContext* opCtx,
+                       const SetFeatureCompatibilityVersion& request,
+                       boost::optional<Timestamp> changeTimestamp) {
+        const auto requestedVersion = request.getCommandParameter();
+        const auto actualVersion = serverGlobalParams.featureCompatibility.getVersion();
+        auto isFromConfigServer = request.getFromConfigServer().value_or(false);
+
         hangDowngradingBeforeIsCleaningServerMetadata.pauseWhileSet(opCtx);
         // Set the isCleaningServerMetadata field to true. This prohibits the downgrading to
         // upgrading transition until the isCleaningServerMetadata is unset when we successfully
         // finish the FCV downgrade and transition to the DOWNGRADED state.
-        if (repl::feature_flags::gDowngradingToUpgrading.isEnabledAndIgnoreFCV() &&
-            serverGlobalParams.clusterRole != ClusterRole::ConfigServer &&
-            serverGlobalParams.clusterRole != ClusterRole::ShardServer) {
+        if (repl::feature_flags::gDowngradingToUpgrading.isEnabledAndIgnoreFCV()) {
             {
                 const auto fcvChangeRegion(
                     FeatureCompatibilityVersion::enterFCVChangeRegion(opCtx));
@@ -1252,7 +1300,7 @@ private:
         _internalServerCleanupForDowngrade(opCtx, requestedVersion);
 
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-            // Tell the shards to enter phase-2 of setFCV (fully downgraded)
+            // Tell the shards to complete setFCV (transition to fully downgraded).
             _sendSetFCVRequestToShards(opCtx, request, changeTimestamp, SetFCVPhaseEnum::kComplete);
         }
 

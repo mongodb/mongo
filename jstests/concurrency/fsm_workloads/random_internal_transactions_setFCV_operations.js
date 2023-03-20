@@ -38,6 +38,15 @@ var $config = extendWorkload($config, function($config, $super) {
                 jsTestLog('setFCV: Invalid transition');
                 return;
             }
+            if (e.code === 7428200) {
+                // Cannot upgrade FCV if a previous FCV downgrade stopped in the middle of cleaning
+                // up internal server metadata.
+                assertAlways.eq(latestFCV, targetFCV);
+                jsTestLog(
+                    'setFCV: Cannot upgrade FCV if a previous FCV downgrade stopped in the middle \
+                    of cleaning up internal server metadata');
+                return;
+            }
             throw e;
         }
         jsTestLog('setFCV state finished');

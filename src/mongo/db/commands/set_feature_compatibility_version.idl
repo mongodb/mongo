@@ -36,10 +36,16 @@ imports:
 
 enums:
     SetFCVPhase:
-        description: "Enum that defines the phases of the 2-phase setFCV protocol."
+        description: "Enum that defines the phases of the 3-phase setFCV protocol."
         type: string
         values:
+            # Tells shards to transition to kUpgrading/kDowngrading FCV.
             kStart: "start"
+            # Tells shards to perform upgrade-ability/downgrade-ability checks and any actions needed
+            # before transitioning to the fully upgraded/downgraded state.
+            kPrepare: "prepare"
+            # Tells shards to execute possibly metadata-changing upgrade/downgrade actions and
+            # transition to the fully upgraded/downgraded FCV.
             kComplete: "complete"
 
 commands:
