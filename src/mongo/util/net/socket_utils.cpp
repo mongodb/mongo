@@ -90,123 +90,158 @@ bool IPv6Enabled() {
     return ipv6;
 }
 
-#ifdef _WIN32
-#ifdef _UNICODE
-#define X_STR_CONST(str) (L##str)
-#else
-#define X_STR_CONST(str) (str)
-#endif
-const CString kKeepAliveGroup(
-    X_STR_CONST("SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters"));
-const CString kKeepAliveTime(X_STR_CONST("KeepAliveTime"));
-const CString kKeepAliveInterval(X_STR_CONST("KeepAliveInterval"));
-#undef X_STR_CONST
-#endif
-
-void setSocketKeepAliveParams(int sock,
-                              logv2::LogSeverity errorLogSeverity,
-                              Seconds maxKeepIdleSecs,
-                              Seconds maxKeepIntvlSecs) {
-    int logSeverity = errorLogSeverity.toInt();
+namespace {
 
 #ifdef _WIN32
-    // Defaults per MSDN when registry key does not exist.
-    // Expressed in seconds here to be consistent with posix,
-    // though Windows uses milliseconds.
-    static constexpr Seconds kWindowsKeepAliveTimeDefault{Hours{2}};
-    static constexpr Seconds kWindowsKeepAliveIntervalDefault{1};
-
-    const auto getKey = [&](const CString& key, Seconds defaultValue) {
-        auto swValOpt = windows::getDWORDRegistryKey(kKeepAliveGroup, key);
-        if (swValOpt.isOK()) {
-            auto valOpt = swValOpt.getValue();
-            // Return seconds
-            return valOpt ? duration_cast<Seconds>(Milliseconds(valOpt.get())) : defaultValue;
-        }
+/**
+ * Search the registry for the `key` TCP parameter, a millisecond value.
+ * Returns an empty optional on error or if key is not found.
+ */
+boost::optional<Milliseconds> getTcpMillisKey(const CString& key, logv2::LogSeverity logSeverity) {
+    auto swValOpt = windows::getDWORDRegistryKey(
+        _T("SYSTEM\\CurrentControlSet\\Services\\Tcpip\\Parameters"), key);
+    if (!swValOpt.isOK()) {
         LOGV2_DEBUG(23203,
-                    logSeverity,
+                    logSeverity.toInt(),
                     "can't get KeepAlive parameter: {error}",
                     "Can't get KeepAlive parameter",
                     "error"_attr = swValOpt.getStatus());
+        return {};
+    }
+    const auto& oDword = swValOpt.getValue();
+    if (!oDword)
+        return {};
+    return Milliseconds{*oDword};
+}
 
-        return defaultValue;
+template <typename In>
+std::error_code windowsSetIoctl(int sock, DWORD controlCode, In&& in) {
+    DWORD outSize = 0;
+    if (WSAIoctl(sock, controlCode, &in, sizeof(in), nullptr, 0, &outSize, nullptr, nullptr))
+        return lastSocketError();
+    return {};
+}
+
+/**
+ * Configure a socket's TCP keepalive behavior. The first keepalive probe is
+ * sent after `idle` with no received packets. Subsequent probes are sent after
+ * each `interval`.
+ */
+std::error_code windowsSetTcpKeepAlive(int sock, Milliseconds idle, Milliseconds interval) {
+    auto uMsec = [](const auto& d) {
+        return u_long(durationCount<Milliseconds>(d));
     };
+    struct tcp_keepalive keepalive;
+    keepalive.onoff = TRUE;
+    keepalive.keepalivetime = uMsec(idle);
+    keepalive.keepaliveinterval = uMsec(interval);
+    return windowsSetIoctl(sock, SIO_KEEPALIVE_VALS, keepalive);
+}
 
-    const auto keepIdleSecs = getKey(kKeepAliveTime, kWindowsKeepAliveTimeDefault);
-    const auto keepIntvlSecs = getKey(kKeepAliveInterval, kWindowsKeepAliveIntervalDefault);
-
-    if ((keepIdleSecs > maxKeepIdleSecs) || (keepIntvlSecs > maxKeepIntvlSecs)) {
-        DWORD sent = 0;
-        struct tcp_keepalive keepalive;
-        keepalive.onoff = TRUE;
-        keepalive.keepalivetime =
-            durationCount<Milliseconds>(std::min(keepIdleSecs, maxKeepIdleSecs));
-        keepalive.keepaliveinterval =
-            durationCount<Milliseconds>(std::min(keepIntvlSecs, maxKeepIntvlSecs));
-        if (WSAIoctl(sock,
-                     SIO_KEEPALIVE_VALS,
-                     &keepalive,
-                     sizeof(keepalive),
-                     nullptr,
-                     0,
-                     &sent,
-                     nullptr,
-                     nullptr)) {
-            auto ec = lastSocketError();
+/**
+ * Configure a TCP socket's keepalive options on Windows.
+ *
+ * On Windows, there has historically been no way to query a socket's TCP
+ * keepalive parameters. We guess from the registry what the settings would be.
+ * If the registry is missing a key, we use the defaults documented at MSDN.
+ *
+ * As of Windows 10, version 1709, the TCP keepalive settings are available as
+ * IPPROTO_TCP options just as on macOS and Linux, and this setup can be much
+ * simpler eventually.
+ */
+void windowsApplyMaxTcpKeepAlive(int sock,
+                                 logv2::LogSeverity logSeverity,
+                                 Milliseconds maxIdle,
+                                 Milliseconds maxInterval) {
+    static constexpr auto defaultIdle = Hours{2};
+    static constexpr auto defaultInterval = Seconds{1};
+    auto idle = getTcpMillisKey(_T("KeepAliveTime"), logSeverity).value_or(defaultIdle);
+    auto interval = getTcpMillisKey(_T("KeepAliveInterval"), logSeverity).value_or(defaultInterval);
+    if (idle > maxIdle || interval > maxInterval) {
+        idle = std::min(idle, maxIdle);
+        interval = std::min(interval, maxInterval);
+        if (auto ec = windowsSetTcpKeepAlive(sock, idle, interval))
             LOGV2_DEBUG(23204,
-                        logSeverity,
+                        logSeverity.toInt(),
                         "failed setting keepalive values: {error}",
                         "Failed setting keepalive values",
                         "error"_attr = errorMessage(ec));
-        }
     }
-#elif defined(__APPLE__) || defined(__linux__)
-    const auto updateSockOpt = [&](int level, int optnum, Seconds maxVal, StringData optname) {
-        Seconds optVal{1};
-        unsigned int rawOptVal = durationCount<Seconds>(optVal);
-        socklen_t optValLen = sizeof(rawOptVal);
+}
+#endif  // _WIN32
 
-        if (getsockopt(sock, level, optnum, reinterpret_cast<char*>(&rawOptVal), &optValLen)) {
-            auto ec = lastSystemError();
-            LOGV2_DEBUG(23205,
-                        logSeverity,
-                        "can't get {optname}: {error}",
-                        "Can't get socket option",
-                        "optname"_attr = optname,
-                        "error"_attr = errorMessage(ec));
-        }
+template <typename T>
+void getSocketOption(int sock, int level, int option, T& val) {
+    socklen_t size = sizeof(val);
+    if (getsockopt(sock, level, option, &val, &size))
+        throw std::system_error(lastSocketError());
+}
 
-        if (optVal > maxVal) {
-            unsigned int rawMaxVal = durationCount<Seconds>(maxVal);
-            socklen_t maxValLen = sizeof(rawMaxVal);
+template <typename T>
+void setSocketOption(int sock, int level, int option, const T& val) {
+    if (setsockopt(sock, level, option, &val, sizeof(val)))
+        throw std::system_error(lastSocketError());
+}
 
-            if (setsockopt(sock, level, optnum, reinterpret_cast<char*>(&rawMaxVal), maxValLen)) {
-                auto ec = lastSystemError();
-                LOGV2_DEBUG(23206,
-                            logSeverity,
-                            "can't set {optname}: {error}",
-                            "Can't set socket option",
-                            "optname"_attr = optname,
-                            "error"_attr = errorMessage(ec));
-            }
-        }
-    };
+/**
+ * Applies a maximum to a socket option. Gets the specified option from `sock`,
+ * and if its current value is greater than `maxVal`, sets it to `maxVal`.
+ * Failures are logged with `severity`, and if the get operation fails, we do
+ * not attempt the set operation.
+ */
+template <typename T>
+void applyMax(
+    int sock, int level, int optnum, T maxVal, StringData optName, logv2::LogSeverity severity) {
+    T val;
+    try {
+        getSocketOption(sock, level, optnum, val);
+    } catch (const std::system_error& ex) {
+        LOGV2_DEBUG(23205,
+                    severity.toInt(),
+                    "can't get {optname}: {error}",
+                    "Can't get socket option",
+                    "optname"_attr = optName,
+                    "error"_attr = errorMessage(ex.code()));
+        return;
+    }
 
-#ifdef __APPLE__
-    updateSockOpt(IPPROTO_TCP, TCP_KEEPALIVE, maxKeepIdleSecs, "TCP_KEEPALIVE");
-#endif
+    if (val <= maxVal)
+        return;
 
-#ifdef __linux__
-#ifdef SOL_TCP
-    const int level = SOL_TCP;
+    try {
+        setSocketOption(sock, level, optnum, maxVal);
+    } catch (const std::system_error& ex) {
+        LOGV2_DEBUG(23206,
+                    severity.toInt(),
+                    "can't set {optname}: {error}",
+                    "Can't set socket option",
+                    "optname"_attr = optName,
+                    "error"_attr = errorMessage(ex.code()));
+    }
+}
+}  // namespace
+
+void setSocketKeepAliveParams(int sock,
+                              logv2::LogSeverity severity,
+                              Seconds maxIdle,
+                              Seconds maxInterval) {
+#if defined(_WIN32)
+    // Windows implementation is funky enough to get its own forwarded function.
+    // More modern Windows versions (i.e. >1709) would support the `applyMax`
+    // steps, and we'll be able to get rid of this special case eventually.
+    windowsApplyMaxTcpKeepAlive(sock, severity, maxIdle, maxInterval);
+#else  // _WIN32
+#if defined(__APPLE__)
+    int idleOpt = TCP_KEEPALIVE;
 #else
-    const int level = SOL_SOCKET;
+    int idleOpt = TCP_KEEPIDLE;
 #endif
-    updateSockOpt(level, TCP_KEEPIDLE, maxKeepIdleSecs, "TCP_KEEPIDLE");
-    updateSockOpt(level, TCP_KEEPINTVL, maxKeepIntvlSecs, "TCP_KEEPINTVL");
-#endif
-
-#endif
+    auto iSec = [](const auto& d) -> int {
+        return durationCount<Seconds>(d);
+    };
+    applyMax(sock, IPPROTO_TCP, idleOpt, iSec(maxIdle), "TCP_KEEPIDLE", severity);
+    applyMax(sock, IPPROTO_TCP, TCP_KEEPINTVL, iSec(maxInterval), "TCP_KEEPINTVL", severity);
+#endif  // _WIN32
 }
 
 std::string makeUnixSockPath(int port) {
