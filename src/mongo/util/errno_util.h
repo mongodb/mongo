@@ -36,6 +36,13 @@
 
 namespace mongo {
 
+#ifdef _WIN32
+namespace errno_util_win32_detail {
+int gle();
+int wsaGle();
+}  // namespace errno_util_win32_detail
+#endif
+
 /**
  * Return a string containing the system errno (error number) and corresponding error message.
  */
@@ -54,6 +61,62 @@ std::pair<int, std::string> errnoAndDescription();
 std::string errnoWithPrefix(StringData prefix);
 
 /**
+ * Returns category to use for POSIX errno error codes.
+ * On POSIX, `errno` codes are the `std::system_category`.
+ * On Windows, the `errno` codes are the `std::generic_category`.
+ */
+inline const std::error_category& posixCategory() {
+#ifdef _WIN32
+    return std::generic_category();
+#else
+    return std::system_category();
+#endif
+}
+
+/** Wraps POSIX `errno` value in an appropriate `std::error_code`. */
+inline std::error_code posixError(int e) {
+    return std::error_code(e, posixCategory());
+}
+
+/** Wraps `e` in a `std::error_code` with `std::system_category`. */
+inline std::error_code systemError(int e) {
+    return std::error_code(e, std::system_category());
+}
+
+/**
+ * Returns `{errno, std::generic_category()}`.
+ * Windows has both Windows errors and POSIX errors. That is, there's a
+ * `GetLastError` and an `errno`. They are tracked separately, and unrelated to
+ * each other.
+ *
+ * In practice, this function is useful only to handle the `errno`-setting POSIX
+ * compatibility functions on Windows.
+ *
+ * On POSIX systems, `std::system_category` is potentially a superset of
+ * `std::generic_category`, so `lastSystemError` should be preferred for
+ * handling system errors.
+ *
+ * Guaranteed to not modify `errno`.
+ */
+inline std::error_code lastPosixError() {
+    return posixError(errno);
+}
+
+/**
+ * On POSIX, returns `{errno, std::system_category()}`.
+ * On Windows, returns `{GetLastError(), std::system_category()}`, but see `lastPosixError`.
+ *
+ * Guaranteed to not modify the system error code variable.
+ */
+inline std::error_code lastSystemError() {
+#ifdef _WIN32
+    return systemError(errno_util_win32_detail::gle());
+#else
+    return systemError(errno);
+#endif
+}
+
+/**
  * Returns `ec.message()`, possibly augmented to disambiguate unknowns.
  *
  * In libstdc++, the unknown error messages include the number. Windows and
@@ -63,5 +126,19 @@ std::string errnoWithPrefix(StringData prefix);
  *     `"Unknown error {}"_format(ec.value())`
  */
 std::string errorMessage(std::error_code ec);
+
+/**
+ * Portable wrapper for socket API calls. On POSIX platforms this is just
+ * `lastSystemError`. On Windows, Winsock API callers must query last error with
+ * `WSAGetLastError` instead of `GetLastError`. The Winsock errors can use the
+ * same error code category as other Windows API calls.
+ */
+inline std::error_code lastSocketError() {
+#ifdef _WIN32
+    return systemError(errno_util_win32_detail::wsaGle());
+#else
+    return lastSystemError();
+#endif
+}
 
 }  // namespace mongo

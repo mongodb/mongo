@@ -34,7 +34,10 @@
 #include <fmt/format.h>
 #include <sstream>
 
-#ifndef _WIN32
+#ifdef _WIN32
+#include <errhandlingapi.h>
+#include <winsock2.h>
+#else               // _WIN32
 #include <cstring>  // For strerror_r
 #include <errno.h>  // For errno
 #endif
@@ -46,6 +49,17 @@
 namespace mongo {
 
 using namespace fmt::literals;
+
+#ifdef _WIN32
+namespace errno_util_win32_detail {
+int gle() {
+    return GetLastError();
+}
+int wsaGle() {
+    return WSAGetLastError();
+}
+}  // namespace errno_util_win32_detail
+#endif
 
 namespace {
 const char kUnknownMsg[] = "Unknown error ";
