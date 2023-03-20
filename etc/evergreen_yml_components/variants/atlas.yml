@@ -41,7 +41,7 @@ buildvariants:
   - name: compile_build_tools_next_TG
     distros:
     - rhel70
-  - name: .aggfuzzer
+  - name: .aggfuzzer !.feature_flag_guarded
   - name: audit
   - name: auth_audit_gen
   - name: auth_gen
@@ -50,7 +50,7 @@ buildvariants:
   - name: .encrypt !.sharding !.replica_sets !.aggregation !.jscore
   - name: external_auth
   - name: external_auth_aws
-  - name: .jscore .common !.decimal !.sharding
+  - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
   - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz .common
   - name: libunwind_tests

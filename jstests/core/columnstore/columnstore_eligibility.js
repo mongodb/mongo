@@ -1,7 +1,9 @@
 /**
  * Tests the eligibility of certain queries to use a columnstore index.
  * @tags: [
- *   requires_fcv_63,
+ *   # Column store indexes are still under a feature flag and require full SBE.
+ *   featureFlagColumnstoreIndexes,
+ *   featureFlagSbeFull,
  *   # Refusing to run a test that issues an aggregation command with explain because it may return
  *   # incomplete results if interrupted by a stepdown.
  *   does_not_support_stepdowns,

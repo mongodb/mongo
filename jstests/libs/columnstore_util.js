@@ -92,9 +92,13 @@ function setUpServerForColumnStoreIndexTest(db) {
         return false;
     }
 
-    // Parallel tests cannot set these server parameters during execution due to the side effect of
-    // clearing the SBE plan cache, so the parallel test suite overrides this for us up front.
-    if (!(TestData || {}).isParallelTest) {
+    // TODO SERVER-75026: Re-enable CSI in parallel tests.
+    // Note that we should not fully enable columnscans during the parallel tests due to the side
+    // effect of clearing the SBE plan cache. Fully enabling column scans should only be done
+    // in non-parallel environments.
+    if ((TestData || {}).isParallelTest) {
+        return false;
+    } else {
         fullyEnableColumnScan(nodes);
     }
 

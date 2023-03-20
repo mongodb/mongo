@@ -3,6 +3,9 @@
  * above a columnscan stage.
  *
  * @tags: [
+ *   # Column store indexes are still under a feature flag and require full SBE.
+ *   featureFlagColumnstoreIndexes,
+ *   featureFlagSbeFull,
  *   # explain is not supported in transactions
  *   does_not_support_transactions,
  *   requires_pipeline_optimization,
@@ -10,8 +13,6 @@
  *   assumes_read_concern_unchanged,
  *   # explain will be different in a sharded collection
  *   assumes_unsharded_collection,
- *   # column store row store expression skipping is new in 6.2.
- *   requires_fcv_62,
  *   # Columnstore tests set server parameters to disable columnstore query planning heuristics -
  *   # 1) server parameters are stored in-memory only so are not transferred onto the recipient,
  *   # 2) server parameters may not be set in stepdown passthroughs because it is a command that may

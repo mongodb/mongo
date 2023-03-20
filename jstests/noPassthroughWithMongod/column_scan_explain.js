@@ -1,7 +1,9 @@
 /**
  * Tests the explain support for the COLUMN_SCAN stage.
  * @tags: [
- *   requires_fcv_63,
+ *   # Column store indexes are still under a feature flag and require full sbe.
+ *   featureFlagColumnstoreIndexes,
+ *   featureFlagSbeFull,
  * ]
  */
 (function() {

@@ -6,8 +6,8 @@
  *   requires_collstats,
  *
  *   # Column store indexes are still under a feature flag and require full SBE.
- *   uses_column_store_index,
  *   featureFlagColumnstoreIndexes,
+ *   featureFlagSbeFull,
  *
  *   # In passthrough suites, this test makes direct connections to mongod instances that compose
  *   # the passthrough fixture in order to perform additional validation. Tenant migration,

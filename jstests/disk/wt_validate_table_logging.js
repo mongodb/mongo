@@ -8,15 +8,21 @@
 (function() {
 'use strict';
 
+load("jstests/libs/columnstore_util.js");  // For setUpServerForColumnStoreIndexTest.
+
 let conn = MongoRunner.runMongod();
 
 const dbpath = conn.dbpath;
 const dbName = jsTestName();
 const collName = 'coll';
 
+const csiEnabled = setUpServerForColumnStoreIndexTest(conn.getDB(dbName));
+
 const create = function(conn) {
     assert.commandWorked(conn.getDB(dbName).createCollection(collName));
-    assert.commandWorked(conn.getDB(dbName)[collName].createIndex({'$**': "columnstore"}));
+    if (csiEnabled) {
+        assert.commandWorked(conn.getDB(dbName)[collName].createIndex({'$**': "columnstore"}));
+    }
 };
 
 const collUri = function(conn) {
@@ -55,14 +61,16 @@ const primary = replTest.getPrimary();
 // Run validate as a replica set, which will expect the tables to not be logged.
 let res = assert.commandWorked(primary.getDB(dbName).runCommand({validate: collName}));
 assert(!res.valid);
-assert.eq(res.errors.length, 3);
+assert.eq(res.errors.length, csiEnabled ? 3 : 2);
 checkLog.containsJson(primary, 6898101, {uri: collUri(primary), expected: false});
 checkLog.containsJson(
     primary, 6898101, {index: '_id_', uri: indexUri(primary, '_id_'), expected: false});
-checkLog.containsJson(
-    primary,
-    6898101,
-    {index: '$**_columnstore', uri: indexUri(primary, '$**_columnstore'), expected: false});
+if (csiEnabled) {
+    checkLog.containsJson(
+        primary,
+        6898101,
+        {index: '$**_columnstore', uri: indexUri(primary, '$**_columnstore'), expected: false});
+}
 
 // Create the collection and indexes as a replica set, which will cause the tables to not be logged.
 assert.commandWorked(primary.getDB(dbName).runCommand({drop: collName}));
@@ -74,13 +82,15 @@ conn = MongoRunner.runMongod(nodeOptions);
 // Run validate as a standalone, which will expect the tables to be logged.
 res = assert.commandWorked(conn.getDB(dbName).runCommand({validate: collName}));
 assert(!res.valid);
-assert.eq(res.errors.length, 3);
+assert.eq(res.errors.length, csiEnabled ? 3 : 2);
 checkLog.containsJson(conn, 6898101, {uri: collUri(conn), expected: true});
 checkLog.containsJson(conn, 6898101, {index: '_id_', uri: indexUri(conn, '_id_'), expected: true});
-checkLog.containsJson(
-    conn,
-    6898101,
-    {index: '$**_columnstore', uri: indexUri(conn, '$**_columnstore'), expected: true});
+if (csiEnabled) {
+    checkLog.containsJson(
+        conn,
+        6898101,
+        {index: '$**_columnstore', uri: indexUri(conn, '$**_columnstore'), expected: true});
+}
 
 MongoRunner.stopMongod(conn, null, {skipValidation: true});
 }());

@@ -32,7 +32,7 @@ buildvariants:
     compile_variant: rhel80-asan
   tasks:
     - name: compile_test_and_package_serial_TG
-    - name: .aggfuzzer .common
+    - name: .aggfuzzer .common !.feature_flag_guarded
     - name: free_monitoring
     - name: .jstestfuzz !.initsync
 
@@ -76,7 +76,7 @@ buildvariants:
     compile_variant: rhel80-debug-asan
   tasks:
   - name: compile_test_benchmark_and_package_serial_TG
-  - name: .aggregation
+  - name: .aggregation !.feature_flag_guarded
   - name: .auth
   - name: audit
   - name: .benchmarks
@@ -159,7 +159,7 @@ buildvariants:
     compile_variant: rhel80-debug-ubsan
   tasks:
   - name: compile_test_benchmark_and_package_serial_TG
-  - name: .aggregation
+  - name: .aggregation !.feature_flag_guarded
   - name: .auth
   - name: audit
   - name: .benchmarks

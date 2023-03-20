@@ -190,12 +190,12 @@ variables:
     distros:
     - windows-vsCurrent-large
   - name: burn_in_tests_gen
-  - name: .aggfuzzer .common
+  - name: .aggfuzzer .common !.feature_flag_guarded
   - name: audit
   - name: auth_audit_gen
   - name: buildscripts_test
   - name: causally_consistent_jscore_txns_passthrough
-  - name: .encrypt !.aggregation !.gcm
+  - name: .encrypt !.aggregation !.gcm !.feature_flag_guarded
   - name: external_auth
   - name: external_auth_aws
   - name: external_auth_windows
@@ -250,7 +250,7 @@ variables:
   - name: compile_build_tools_next_TG
     distros:
     - rhel70
-  - name: .aggfuzzer
+  - name: .aggfuzzer !.feature_flag_guarded
   - name: audit
   - name: auth_audit_gen
   - name: auth_gen
@@ -312,7 +312,7 @@ buildvariants:
     large_distro_name: rhel80-medium
     compile_variant: *linux_x86_dynamic_debug_compile_variant_name
   tasks:
-  - name: .aggregation !.encrypt
+  - name: .aggregation !.encrypt !.feature_flag_guarded
   - name: .auth !.audit !.multiversion
   - name: sharding_auth_gen
   - name: .causally_consistent !.wo_snapshot
@@ -427,8 +427,8 @@ buildvariants:
     distros:
     - rhel80-xlarge
   - name: test_api_version_compatibility
-  - name: .aggfuzzer !.multiversion
-  - name: .aggregation !.multiversion
+  - name: .aggfuzzer !.multiversion !.feature_flag_guarded
+  - name: .aggregation !.multiversion !.feature_flag_guarded
   - name: audit
   - name: .auth !.multiversion
   - name: .causally_consistent !.sharding
@@ -655,8 +655,8 @@ buildvariants:
       distros:
       - rhel80-xlarge
     - name: test_api_version_compatibility
-    - name: .aggfuzzer !.multiversion
-    - name: .aggregation !.multiversion
+    - name: .aggfuzzer !.multiversion !.feature_flag_guarded
+    - name: .aggregation !.multiversion !.feature_flag_guarded
     - name: audit
     - name: .auth !.multiversion
     - name: .causally_consistent !.sharding
@@ -801,7 +801,7 @@ buildvariants:
   - name: compile_build_tools_next_TG
     distros:
     - windows-vsCurrent-xlarge
-  - name: .aggregation !.auth !.encrypt
+  - name: .aggregation !.auth !.encrypt !.feature_flag_guarded
   - name: aggregation_expression_multiversion_fuzzer_gen
   - name: aggregation_expression_optimization_fuzzer_gen
   - name: auth_gen
@@ -1015,8 +1015,8 @@ buildvariants:
   - name: compile_test_and_package_serial_TG
     distros:
     - windows-vsCurrent-large
-  - name: .aggfuzzer
-  - name: .aggregation !.auth !.encrypt !.unwind
+  - name: .aggfuzzer !.feature_flag_guarded
+  - name: .aggregation !.auth !.encrypt !.unwind !.feature_flag_guarded
   - name: auth_gen
   - name: causally_consistent_jscore_txns_passthrough
   - name: .misc_js
@@ -1109,7 +1109,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
   - name: compile_build_tools_next_TG
-  - name: aggregation
+  - name: aggregation !.feature_flag_guarded
   - name: auth_gen
   - name: causally_consistent_jscore_txns_passthrough
   - name: disk_wiredtiger
@@ -1320,8 +1320,8 @@ buildvariants:
     variant: generate-tasks-for-version
   tasks:
   - name: burn_in_tests_gen
-  - name: .aggfuzzer
-  - name: .aggregation
+  - name: .aggfuzzer !.feature_flag_guarded
+  - name: .aggregation !.feature_flag_guarded
   - name: aggregation_repeat_queries
   - name: audit
   - name: .auth
@@ -1425,8 +1425,8 @@ buildvariants:
     distros:
     - rhel80-xlarge
   - name: test_api_version_compatibility
-  - name: .aggfuzzer !.no_debug_mode
-  - name: .aggregation !.no_debug_mode
+  - name: .aggfuzzer !.feature_flag_guarded !.no_debug_mode
+  - name: .aggregation !.feature_flag_guarded !.no_debug_mode
   - name: audit
   - name: .auth !.no_debug_mode
   - name: .causally_consistent !.sharding
@@ -1906,7 +1906,7 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - rhel80-xlarge
-  - name: .aggfuzzer
+  - name: .aggfuzzer !.feature_flag_guarded
   - name: audit
   - name: auth_audit_gen
   - name: auth_gen
@@ -2608,8 +2608,8 @@ buildvariants:
   # - name: test_api_version_compatibility # Not relevant for TSAN
   # - name: burn_in_tests_gen # No burn in tests needed
   - name: check_feature_flag_tags
-  # - name: .aggfuzzer # Not passing
-  # - name: .aggregation # Not passing
+  # - name: .aggfuzzer !.feature_flag_guarded # Not passing
+  # - name: .aggregation !.feature_flag_guarded # Not passing
   - name: audit
   # - name: .auth  # Not passing
   # - name: burn_in_tags_gen # No burn in tests needed
@@ -2716,8 +2716,8 @@ buildvariants:
     compile_variant: *enterprise-rhel80-debug-complete-tsan
   tasks:
   - name: compile_test_and_package_serial_TG
-  - name: .aggfuzzer
-  - name: .aggregation
+  - name: .aggfuzzer !.feature_flag_guarded
+  - name: .aggregation !.feature_flag_guarded
   - name: .auth
   - name: resmoke_end2end_tests
   - name: unittest_shell_hang_analyzer_gen
@@ -2864,7 +2864,7 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-build
-  - name: .aggregation !.no_async
+  - name: .aggregation !.no_async !.feature_flag_guarded
   - name: sharding_auth_gen
   - name: .sharding .causally_consistent !.wo_snapshot
   - name: .concurrency .common !.kill_terminate
@@ -2907,7 +2907,7 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-build
-  - name: .aggregation !.no_async
+  - name: .aggregation !.no_async !.feature_flag_guarded
   - name: sharding_auth_gen
   - name: .sharding .causally_consistent !.wo_snapshot
   - name: .concurrency .common !.kill_terminate
@@ -2947,7 +2947,7 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-build
-  - name: .aggregation !.no_async
+  - name: .aggregation !.no_async !.feature_flag_guarded
   - name: sharding_auth_gen
   - name: .sharding .causally_consistent !.wo_snapshot
   - name: .concurrency .common !.kill_terminate
@@ -2992,7 +2992,7 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-build
-  - name: .aggregation !.no_async
+  - name: .aggregation !.no_async !.feature_flag_guarded
   - name: sharding_auth_gen
   - name: .sharding .causally_consistent !.wo_snapshot
   - name: .concurrency .common !.kill_terminate
@@ -3037,7 +3037,7 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-build
-  - name: .aggregation !.no_async
+  - name: .aggregation !.no_async !.feature_flag_guarded
   - name: sharding_auth_gen
   - name: .sharding .causally_consistent !.wo_snapshot
   - name: .concurrency .common !.kill_terminate
@@ -3075,7 +3075,7 @@ buildvariants:
     distros:
     - rhel80-build
     patch_only: true
-  - name: .aggregation !.no_async
+  - name: .aggregation !.no_async !.feature_flag_guarded
     patch_only: true
   - name: sharding_auth_gen
     patch_only: true

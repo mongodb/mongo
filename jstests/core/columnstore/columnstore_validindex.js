@@ -1,7 +1,8 @@
 /**
  * Tests parsing and validation of columnstore indexes.
  * @tags: [
- *   requires_fcv_63,
+ *   featureFlagColumnstoreIndexes,
+ *   featureFlagSbeFull,
  *   # Uses index building in background.
  *   requires_background_index,
  *   # Columnstore tests set server parameters to disable columnstore query planning heuristics -

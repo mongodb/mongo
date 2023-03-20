@@ -3,7 +3,9 @@
  * might be pushed down into the column scan stage.
  *
  * @tags: [
- *   requires_fcv_63,
+ *   # Column store indexes are still under a feature flag and require full SBE.
+ *   featureFlagColumnstoreIndexes,
+ *   featureFlagSbeFull,
  *   # Runs explain on an aggregate command which is only compatible with readConcern local.
  *   assumes_read_concern_unchanged,
  *   # Columnstore tests set server parameters to disable columnstore query planning heuristics -
