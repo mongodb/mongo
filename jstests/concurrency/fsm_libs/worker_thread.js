@@ -238,6 +238,19 @@ var workerThread = (function() {
                 };
             }
         } finally {
+            // Kill this worker thread's session to ensure any possible idle cursors left open by
+            // the workload are closed.
+            // TODO SERVER-74993: Remove this.
+            try {
+                var session = myDB.getSession();
+                if (session) {
+                    myDB.runCommand({killSessions: [session.getSessionId()]});
+                }
+            } catch (e) {
+                // Ignore errors from killSessions.
+                jsTest.log('Error running killSessions: ' + e);
+            }
+
             // Avoid retention of connection object
             configs = null;
             myDB = null;
