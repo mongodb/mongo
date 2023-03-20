@@ -1,0 +1,164 @@
+# -*- mode: python -*-
+Import([
+    'env',
+])
+import SCons
+
+env = env.Clone()
+
+env.InjectThirdParty(libraries=['zlib', 'zstd'])
+
+if env.TargetOSIs('linux') and env['TARGET_ARCH'] == 'x86_64':
+    platform_name = 'linux_x86_64'
+else:
+    # So the linter doesn't complain about platform_name being undefined.
+    platform_name = 'unsupported'
+    # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
+    env.FatalError("Unsupported platform for librdkafka builds.")
+
+# Suppress some warnings in librdkafka builds.
+env.Append(CCFLAGS=['-Wno-error=unused-variable'])
+if env.ToolchainIs('clang'):
+    env.Append(CCFLAGS=['-Wno-error=uninitialized'])
+else:
+    env.Append(CCFLAGS=['-Wno-error=maybe-uninitialized'])
+
+
+def remove_define(env, define_to_remove):
+    for define in env.get("CPPDEFINES", []):
+        if isinstance(define, tuple) and define[0] == define_to_remove:
+            env.get("CPPDEFINES").remove(define)
+        elif define == define_to_remove:
+            env.get("CPPDEFINES").remove(define)
+
+
+# Kafka manages these defines.
+remove_define(env, "_GNU_SOURCE")
+remove_define(env, "_XOPEN_SOURCE")
+
+# All c files under dist/src, except for win32 files.
+kafka_nodelist = env.Library(
+    target="librdkafka",
+    source=[
+        'dist/src/cJSON.c',
+        'dist/src/crc32c.c',
+        'dist/src/rdaddr.c',
+        'dist/src/rdavl.c',
+        'dist/src/rdbuf.c',
+        'dist/src/rdcrc32.c',
+        'dist/src/rddl.c',
+        'dist/src/rdfnv1a.c',
+        'dist/src/rdgz.c',
+        'dist/src/rdhdrhistogram.c',
+        'dist/src/rdhttp.c',
+        'dist/src/rdkafka.c',
+        'dist/src/rdkafka_admin.c',
+        'dist/src/rdkafka_assignment.c',
+        'dist/src/rdkafka_assignor.c',
+        'dist/src/rdkafka_aux.c',
+        'dist/src/rdkafka_background.c',
+        'dist/src/rdkafka_broker.c',
+        'dist/src/rdkafka_buf.c',
+        'dist/src/rdkafka_cert.c',
+        'dist/src/rdkafka_cgrp.c',
+        'dist/src/rdkafka_conf.c',
+        'dist/src/rdkafka_coord.c',
+        'dist/src/rdkafka_error.c',
+        'dist/src/rdkafka_event.c',
+        'dist/src/rdkafka_feature.c',
+        'dist/src/rdkafka_fetcher.c',
+        'dist/src/rdkafka_header.c',
+        'dist/src/rdkafka_idempotence.c',
+        'dist/src/rdkafka_interceptor.c',
+        'dist/src/rdkafka_lz4.c',
+        'dist/src/rdkafka_metadata.c',
+        'dist/src/rdkafka_metadata_cache.c',
+        'dist/src/rdkafka_mock.c',
+        'dist/src/rdkafka_mock_cgrp.c',
+        'dist/src/rdkafka_mock_handlers.c',
+        'dist/src/rdkafka_msg.c',
+        'dist/src/rdkafka_msgset_reader.c',
+        'dist/src/rdkafka_msgset_writer.c',
+        'dist/src/rdkafka_offset.c',
+        'dist/src/rdkafka_op.c',
+        'dist/src/rdkafka_partition.c',
+        'dist/src/rdkafka_pattern.c',
+        'dist/src/rdkafka_plugin.c',
+        'dist/src/rdkafka_queue.c',
+        'dist/src/rdkafka_range_assignor.c',
+        'dist/src/rdkafka_request.c',
+        'dist/src/rdkafka_roundrobin_assignor.c',
+        'dist/src/rdkafka_sasl.c',
+        'dist/src/rdkafka_sasl_cyrus.c',
+        'dist/src/rdkafka_sasl_oauthbearer.c',
+        'dist/src/rdkafka_sasl_oauthbearer_oidc.c',
+        'dist/src/rdkafka_sasl_plain.c',
+        'dist/src/rdkafka_sasl_scram.c',
+        'dist/src/rdkafka_ssl.c',
+        'dist/src/rdkafka_sticky_assignor.c',
+        'dist/src/rdkafka_subscription.c',
+        'dist/src/rdkafka_timer.c',
+        'dist/src/rdkafka_topic.c',
+        'dist/src/rdkafka_transport.c',
+        'dist/src/rdkafka_txnmgr.c',
+        'dist/src/rdkafka_zstd.c',
+        'dist/src/rdlist.c',
+        'dist/src/rdlog.c',
+        'dist/src/rdmap.c',
+        'dist/src/rdmurmur2.c',
+        'dist/src/rdports.c',
+        'dist/src/rdrand.c',
+        'dist/src/rdregex.c',
+        'dist/src/rdstring.c',
+        'dist/src/rdunittest.c',
+        'dist/src/rdvarint.c',
+        'dist/src/regexp.c',
+        'dist/src/snappy.c',
+        'dist/src/tinycthread.c',
+        'dist/src/tinycthread_extra.c',
+        'dist/src/rdxxhash.c',
+        'dist/src/lz4.c',
+        'dist/src/lz4frame.c',
+        'dist/src/lz4hc.c',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/third_party/shim_zlib',
+        '$BUILD_DIR/third_party/shim_zstd',
+    ],
+    # TODO https://jira.mongodb.org/browse/SERVER-74963: Make sure no other system library dependencies are required here.
+    SYSLIBDEPS=[
+        'curl',
+        'sasl2',
+    ],
+)
+
+# All cpp files under dist/src-cpp
+kafkaxx_nodelist = env.Library(
+    target="librdkafka++",
+    source=[
+        'dist/src-cpp/ConfImpl.cpp',
+        'dist/src-cpp/ConsumerImpl.cpp',
+        'dist/src-cpp/HandleImpl.cpp',
+        'dist/src-cpp/HeadersImpl.cpp',
+        'dist/src-cpp/KafkaConsumerImpl.cpp',
+        'dist/src-cpp/MessageImpl.cpp',
+        'dist/src-cpp/MetadataImpl.cpp',
+        'dist/src-cpp/ProducerImpl.cpp',
+        'dist/src-cpp/QueueImpl.cpp',
+        'dist/src-cpp/RdKafka.cpp',
+        'dist/src-cpp/TopicImpl.cpp',
+        'dist/src-cpp/TopicPartitionImpl.cpp',
+    ],
+    LIBDEPS=[
+        'librdkafka',
+    ],
+)
+
+# The rdkafka c files include their config like #include "../config.h",
+# so we put the config.h at "include/config.h", but we append to the CPPPATH "include/src",
+# so "../config.h" works.
+platform_dir = f'#/src/third_party/librdkafka/dist/platform/{platform_name}/include/src'
+platform_dir_nodelist = env.Command(platform_dir, [], SCons.Node.FS.Mkdir)
+env.Precious(platform_dir_nodelist)
+env.Append(CPPPATH=[platform_dir])
+env.Depends(kafka_nodelist[0].sources + kafkaxx_nodelist[0].sources, platform_dir_nodelist)

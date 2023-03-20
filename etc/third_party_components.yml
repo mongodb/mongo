@@ -194,6 +194,13 @@ components:
     # Note: libmongocrypt exists in Black Duck, but not OpenHub
     upgrade_suppression: TODO SERVER-61193
 
+  librdkafka:
+    homepage_url: https://github.com/confluentinc/librdkafka/
+    open_hub_url: N/A
+    release_monitoring_id: -1
+    local_directory_path: src/third_party/librdkafka
+    team_owner: "Streams"
+
   linenoise:
     homepage_url: https://github.com/antirez/linenoise
     open_hub_url: https://www.openhub.net/p/linenoise

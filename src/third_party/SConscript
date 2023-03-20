@@ -11,6 +11,8 @@ Import([
     'use_system_version_of_library',
     'use_vendored_libunwind',
     'wiredtiger',
+    'releaseBuild',
+    'ssl_provider',
 ])
 
 snappySuffix = '-1.1.7'
@@ -46,6 +48,12 @@ thirdPartyEnvironmentModifications = {
         'FORCEINCLUDES': ['js-config.h', ],
     },
     'murmurhash3': {'CPPPATH': ['#src/third_party/murmurhash3', ], },
+    'librdkafka': {
+        'CPPPATH': [
+            '#/src/third_party/librdkafka/dist/src',
+            '#/src/third_party/librdkafka/dist/src-cpp',
+        ],
+    },
 }
 
 
@@ -266,6 +274,16 @@ def injectThirdParty(thisEnv, libraries=[], parts=[]):
 
 
 env.AddMethod(injectThirdParty, 'InjectThirdParty')
+
+
+def shouldBuildStreams(thisEnv):
+    # TODO https://jira.mongodb.org/browse/SERVER-74963: Streams release builds.
+    # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
+    return not releaseBuild and thisEnv.TargetOSIs(
+        'linux') and thisEnv['TARGET_ARCH'] == 'x86_64' and ssl_provider == 'openssl'
+
+
+env.AddMethod(shouldBuildStreams, 'ShouldBuildStreams')
 
 env = env.Clone()
 
@@ -715,3 +733,12 @@ if env.TargetOSIs('linux') and env['ENABLE_GRPC_BUILD']:
             'grpc/grpc++_reflection',
         ])
     grpcEnv.ShimLibrary(name="grpc", )
+
+if env.ShouldBuildStreams():
+    libKafkaEnv = env.Clone()
+    libKafkaEnv.InjectThirdParty(libraries=['librdkafka'])
+    libKafkaEnv.SConscript('librdkafka/SConscript', exports={'env': libKafkaEnv})
+    libKafkaEnv = libKafkaEnv.Clone(LIBDEPS_INTERFACE=[
+        'librdkafka/rdkafka',
+        'librdkafka/rdkafka++',
+    ])
