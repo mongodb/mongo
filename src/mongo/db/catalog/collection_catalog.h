@@ -425,7 +425,8 @@ private:
         std::map<std::pair<std::string, CollectionUUID>, std::shared_ptr<Collection>>;
     using NamespaceCollectionMap =
         immutable::unordered_map<NamespaceString, std::shared_ptr<Collection>>;
-    using DatabaseProfileSettingsMap = StringMap<ProfileSettings>;
+    using DatabaseProfileSettingsMap =
+        immutable::unordered_map<std::string, ProfileSettings, StringMapHasher, StringMapEq>;
     using ViewsMap = immutable::unordered_map<std::string,
                                               absl::flat_hash_set<NamespaceString>,
                                               StringMapHasher,
