@@ -84,7 +84,7 @@ StatusWith<ClusterQueryResult> RouterStageRemoveMetadataFields::next() {
             builder.append(*iterator);
         }
     }
-    return {builder.obj()};
+    return ClusterQueryResult(builder.obj(), childResult.getValue().getShardId());
 }
 
 }  // namespace mongo

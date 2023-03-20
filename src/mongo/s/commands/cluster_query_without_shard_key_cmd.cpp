@@ -30,6 +30,10 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
+#include "mongo/db/pipeline/document_source_limit.h"
+#include "mongo/db/pipeline/document_source_match.h"
+#include "mongo/db/pipeline/document_source_project.h"
+#include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/update/update_util.h"
 #include "mongo/logv2/log.h"
@@ -37,6 +41,8 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/is_mongos.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
+#include "mongo/s/query/router_stage_merge.h"
+#include "mongo/s/query/router_stage_remove_metadata_fields.h"
 #include "mongo/s/request_types/cluster_commands_without_shard_key_gen.h"
 #include "mongo/s/shard_key_pattern_query_util.h"
 #include "mongo/s/write_ops/batch_write_op.h"
@@ -47,9 +53,12 @@
 namespace mongo {
 namespace {
 
+constexpr auto kIdFieldName = "_id"_sd;
+
 struct ParsedCommandInfo {
     BSONObj query;
     BSONObj collation;
+    boost::optional<BSONObj> sort;
     bool upsert = false;
     int stmtId = kUninitializedStmtId;
     boost::optional<UpdateRequest> updateRequest;
@@ -98,17 +107,30 @@ std::set<ShardId> getShardsToTarget(OperationContext* opCtx,
 BSONObj createAggregateCmdObj(OperationContext* opCtx,
                               const ParsedCommandInfo& parsedInfo,
                               NamespaceString nss) {
-    AggregateCommandRequest aggregate(nss,
-                                      {BSON("$match" << parsedInfo.query),
-                                       BSON("$limit" << 1),
-                                       BSON("$project" << BSON("_id" << 1))});
+    AggregateCommandRequest aggregate(nss);
+
     aggregate.setCollation(parsedInfo.collation);
     aggregate.setIsClusterQueryWithoutShardKeyCmd(true);
     aggregate.setFromMongos(true);
 
+    if (parsedInfo.sort) {
+        aggregate.setNeedsMerge(true);
+    }
+
     if (parsedInfo.stmtId != kUninitializedStmtId) {
         aggregate.setStmtId(parsedInfo.stmtId);
     }
+
+    aggregate.setPipeline([&]() {
+        std::vector<BSONObj> pipeline = {BSON(DocumentSourceMatch::kStageName << parsedInfo.query)};
+        if (parsedInfo.sort) {
+            pipeline.emplace_back(BSON(DocumentSourceSort::kStageName << *parsedInfo.sort));
+        }
+        pipeline.emplace_back(BSON(DocumentSourceLimit::kStageName << 1));
+        pipeline.emplace_back(BSON(DocumentSourceProject::kStageName << BSON(kIdFieldName << 1)));
+        return pipeline;
+    }());
+
     return aggregate.toBSON({});
 }
 
@@ -154,6 +176,7 @@ ParsedCommandInfo parseWriteCommand(OperationContext* opCtx,
             IDLParserContext("_clusterQueryWithoutShardKeyFindAndModify"), writeCmdObj);
         parsedInfo.query = findAndModifyRequest.getQuery();
         parsedInfo.stmtId = findAndModifyRequest.getStmtId().value_or(kUninitializedStmtId);
+        parsedInfo.sort = findAndModifyRequest.getSort();
 
         if ((parsedInfo.upsert = findAndModifyRequest.getUpsert().get_value_or(false))) {
             parsedInfo.updateRequest = UpdateRequest{};
@@ -224,36 +247,71 @@ public:
 
             BSONObj targetDoc;
             Response res;
-            std::vector<AsyncRequestSenderResponseData> responses;
+            bool wasStatementExecuted = false;
+            std::vector<RemoteCursor> remoteCursors;
+
+            // The MultiStatementTransactionSender expects all statements executed by it to be a
+            // part of the transaction. If we break after finding a target document and then
+            // destruct the MultiStatementTransactionSender, we register the remaining responses as
+            // failed requests. This has implications when we go to commit the internal transaction,
+            // since the transaction router will notice that a request "failed" during execution and
+            // try to abort the transaction, which in turn will force the internal transaction to
+            // retry (potentially indefinitely). Thus, we need to wait for all of the responses from
+            // the MultiStatementTransactionSender.
             while (!ars.done()) {
                 auto response = ars.next();
                 uassertStatusOK(response.swResponse);
-                responses.emplace_back(
-                    AsyncRequestSenderResponseData(response.shardId,
-                                                   uassertStatusOK(CursorResponse::parseFromBSON(
-                                                       response.swResponse.getValue().data))));
-            }
 
-            for (auto& responseData : responses) {
-                auto shardId = responseData.shardId;
-                auto cursorResponse = std::move(responseData.cursorResponse);
+                if (wasStatementExecuted) {
+                    continue;
+                }
+
+                auto cursor = uassertStatusOK(
+                    CursorResponse::parseFromBSON(response.swResponse.getValue().data));
 
                 // Return the first target doc/shard id pair that has already applied the write
                 // for a retryable write.
-                if (cursorResponse.getWasStatementExecuted()) {
+                if (cursor.getWasStatementExecuted()) {
                     // Since the retryable write history check happens before a write is executed,
                     // we can just use an empty BSONObj for the target doc.
                     res.setTargetDoc(BSONObj::kEmptyObject);
-                    res.setShardId(boost::optional<mongo::StringData>(shardId));
-                    break;
+                    res.setShardId(boost::optional<mongo::StringData>(response.shardId));
+                    wasStatementExecuted = true;
+                    continue;
                 }
 
-                if (cursorResponse.getBatch().size() > 0) {
-                    res.setTargetDoc(cursorResponse.releaseBatch().front().getOwned());
-                    res.setShardId(boost::optional<mongo::StringData>(shardId));
-                }
+                remoteCursors.emplace_back(RemoteCursor(
+                    response.shardId.toString(), *response.shardHostAndPort, std::move(cursor)));
             }
 
+            // For retryable writes, if the statement had already been executed successfully on a
+            // particular shard, return that response immediately.
+            if (wasStatementExecuted) {
+                return res;
+            }
+
+            // Return a target document. If a sort order is specified, return the first target
+            // document corresponding to the sort order for a particular sort key.
+            AsyncResultsMergerParams params(std::move(remoteCursors), nss);
+            params.setSort(parsedInfoFromRequest.sort);
+
+            std::unique_ptr<RouterExecStage> root = std::make_unique<RouterStageMerge>(
+                opCtx,
+                Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
+                std::move(params));
+
+            if (parsedInfoFromRequest.sort) {
+                root = std::make_unique<RouterStageRemoveMetadataFields>(
+                    opCtx, std::move(root), StringDataSet{AsyncResultsMerger::kSortKeyField});
+            }
+
+            if (auto nextResponse = uassertStatusOK(root->next()); !nextResponse.isEOF()) {
+                res.setTargetDoc(nextResponse.getResult());
+                res.setShardId(boost::optional<mongo::StringData>(nextResponse.getShardId()));
+            }
+
+            // If there are no targetable documents and {upsert: true}, create the document to
+            // upsert.
             if (!res.getTargetDoc() && parsedInfoFromRequest.upsert) {
                 res.setTargetDoc(write_without_shard_key::generateUpsertDocument(
                     opCtx, parsedInfoFromRequest.updateRequest.get()));

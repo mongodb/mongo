@@ -825,7 +825,7 @@ bool AsyncResultsMerger::_addBatchToBuffer(WithLock lk,
             }
         }
 
-        ClusterQueryResult result(obj);
+        ClusterQueryResult result(obj, remote.shardId);
         remote.docBuffer.push(result);
         ++remote.fetchedCount;
     }

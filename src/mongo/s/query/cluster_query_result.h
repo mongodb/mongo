@@ -32,18 +32,21 @@
 #include <boost/optional.hpp>
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/shard_id.h"
 
 namespace mongo {
 
 /**
- * Holds a single result from a mongos find command shard request. The result can either contain
- * collection data, stored in '_resultObj'; or be EOF, and isEOF() returns true.
+ * Holds a single result from a mongos find command shard request and the shard the request
+ * originated from. The result can either contain collection data, stored in '_resultObj'; or be
+ * EOF, and isEOF() returns true.
  */
 class ClusterQueryResult {
 public:
     ClusterQueryResult() = default;
 
-    ClusterQueryResult(BSONObj resObj) : _resultObj(resObj) {}
+    ClusterQueryResult(BSONObj resObj, boost::optional<ShardId> shardId = boost::none)
+        : _resultObj(resObj), _shardId(shardId) {}
 
     bool isEOF() const {
         return !_resultObj;
@@ -53,8 +56,13 @@ public:
         return _resultObj;
     }
 
+    boost::optional<ShardId> getShardId() const {
+        return _shardId;
+    }
+
 private:
     boost::optional<BSONObj> _resultObj;
+    boost::optional<ShardId> _shardId;
 };
 
 }  // namespace mongo

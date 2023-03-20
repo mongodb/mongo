@@ -106,6 +106,10 @@ var WriteWithoutShardKeyTestUtil = (function() {
                       res.lastErrorObject.updateExisting);
             assert((typeof res.value) !== "undefined");
 
+            if (expectedResponse.value) {
+                assert.eq(expectedResponse.value, res.value, res.value);
+            }
+
             // For findAndModify, get the pre/post image document to compare for retryability tests
             Object.assign(expectedRetryResponse, {value: res.value});
         }
