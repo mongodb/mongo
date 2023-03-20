@@ -166,4 +166,18 @@ assert.eq(1, conn.getDB("config").getCollection("databases").find({_id: "test"})
 assert.eq(0, conn.getDB("config").getCollection("databases").find({_id: "unusedDB"}).count());
 
 MongoRunner.stopMongod(conn);
+
+// Start the config server in standalone restore mode.
+conn = MongoRunner.runMongod({noCleanData: true, dbpath: configDbPath, restore: ""});
+assert(conn);
+
+// Can't run during testing if the config server has unrecognized collections.
+assert.commandWorked(conn.getDB("config").createCollection("unknown"));
+let error = assert.throws(function() {
+    conn.getDB("admin").runCommand({_configsvrRunRestore: 1});
+});
+assert(isNetworkError(error));
+
+// The server should have crashed from fatally asserting on unknown config collection.
+MongoRunner.stopMongod(conn, null, {allowedExitCode: MongoRunner.EXIT_ABORT});
 }());
