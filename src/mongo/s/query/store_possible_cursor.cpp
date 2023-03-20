@@ -97,7 +97,7 @@ StatusWith<BSONObj> storePossibleCursor(OperationContext* opCtx,
 
     if (incomingCursorResponse.getValue().getCursorId() == CursorId(0)) {
         CurOp::get(opCtx)->debug().cursorExhausted = true;
-        collectTelemetryMongos(opCtx);
+        collectTelemetryMongos(opCtx, CurOp::get(opCtx)->opDescription());
         return cmdResult;
     }
 

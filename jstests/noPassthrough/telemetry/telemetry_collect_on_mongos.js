@@ -6,7 +6,8 @@
 "use strict";
 
 // Redacted literal replacement string. This may change in the future, so it's factored out.
-const R = "###";
+const aggRedactString = "###";
+const findRedactString = "?";
 
 const setup = () => {
     const st = new ShardingTest({
@@ -30,7 +31,7 @@ const setup = () => {
 
 // Get the telemetry for a given database, filtering out the actual $telemetry call.
 const getTelemetry = (conn) => {
-    const result = conn.adminCommand({
+    const result = assert.commandWorked(conn.adminCommand({
         aggregate: 1,
         pipeline: [
             {$telemetry: {}},
@@ -38,7 +39,7 @@ const getTelemetry = (conn) => {
             {$sort: {key: 1}},
         ],
         cursor: {}
-    });
+    }));
     return result.cursor.firstBatch;
 };
 
@@ -78,18 +79,14 @@ const assertExpectedResults = (results,
 {
     const st = setup();
     const db = st.s.getDB("test");
-    const coll = db.coll;
+    const collName = "coll";
+    const coll = db[collName];
 
     const telemetryKey = {
-        find: {
-            find: R,
-            filter: {v: {$gt: R, $lt: R}},
-            batchSize: R,
-            readConcern: {level: R, provenance: R},
-        },
-        namespace: `test.${coll.getName()}`,
+        find: collName,
+        filter: {$and: [{v: {$gt: findRedactString}}, {v: {$lt: findRedactString}}]},
+        batchSize: findRedactString,
         readConcern: {level: "local", provenance: "implicitDefault"},
-        applicationName: "MongoDB Shell"
     };
 
     const cursor = coll.find({v: {$gt: 0, $lt: 5}}).batchSize(1);  // returns 1 doc
@@ -144,8 +141,8 @@ const assertExpectedResults = (results,
 
     const telemetryKey = {
         pipeline: [
-            {$match: {v: {$gt: R, $lt: R}}},
-            {$project: {hello: R}},
+            {$match: {v: {$gt: aggRedactString, $lt: aggRedactString}}},
+            {$project: {hello: aggRedactString}},
         ],
         namespace: "test.coll",
         applicationName: "MongoDB Shell"
@@ -213,18 +210,14 @@ const assertExpectedResults = (results,
 {
     const st = setup();
     const db = st.s.getDB("test");
-    const coll = db.coll;
+    const collName = "coll";
+    const coll = db[collName];
 
     const telemetryKey = {
-        find: {
-            find: R,
-            filter: {v: {$gt: R, $lt: R}},
-            batchSize: R,
-            readConcern: {level: R, provenance: R},
-        },
-        namespace: `test.${coll.getName()}`,
+        find: collName,
+        filter: {$and: [{v: {$gt: findRedactString}}, {v: {$lt: findRedactString}}]},
+        batchSize: findRedactString,
         readConcern: {level: "local", provenance: "implicitDefault"},
-        applicationName: "MongoDB Shell"
     };
 
     const cursor1 = coll.find({v: {$gt: 0, $lt: 5}}).batchSize(1);  // returns 1 doc
@@ -253,7 +246,7 @@ const assertExpectedResults = (results,
     const coll = db.coll;
 
     const telemetryKey = {
-        pipeline: [{$match: {v: {$gt: R, $lt: R}}}],
+        pipeline: [{$match: {v: {$gt: aggRedactString, $lt: aggRedactString}}}],
         namespace: `test.${coll.getName()}`,
         applicationName: "MongoDB Shell"
     };

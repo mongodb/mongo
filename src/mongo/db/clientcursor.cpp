@@ -157,7 +157,8 @@ void ClientCursor::dispose(OperationContext* opCtx, boost::optional<Date_t> now)
     }
 
     if (_telemetryStoreKey && opCtx) {
-        telemetry::writeTelemetry(opCtx, _telemetryStoreKey, _queryExecMicros, _docsReturned);
+        telemetry::writeTelemetry(
+            opCtx, _telemetryStoreKey, getOriginatingCommandObj(), _queryExecMicros, _docsReturned);
     }
 
     if (now) {
@@ -397,7 +398,7 @@ void collectTelemetryMongod(OperationContext* opCtx, ClientCursorPin& pinnedCurs
                                          opDebug.nreturned);
 }
 
-void collectTelemetryMongod(OperationContext* opCtx) {
+void collectTelemetryMongod(OperationContext* opCtx, const BSONObj& originatingCommand) {
     auto&& opDebug = CurOp::get(opCtx)->debug();
     // If we haven't registered a cursor to prepare for getMore requests, we record
     // telemetry directly.
@@ -406,6 +407,7 @@ void collectTelemetryMongod(OperationContext* opCtx) {
     // additiveMetrics.queryExecMicros isn't set until curOp is closing out.
     telemetry::writeTelemetry(opCtx,
                               opDebug.telemetryStoreKey,
+                              originatingCommand,
                               CurOp::get(opCtx)->elapsedTimeExcludingPauses().count(),
                               opDebug.nreturned);
 }

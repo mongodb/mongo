@@ -53,7 +53,7 @@ TEST_F(TelemetryStoreTest, BasicUsage) {
         TelemetryMetrics* metrics;
         auto lookupResult = telStore.lookup(key);
         if (!lookupResult.isOK()) {
-            telStore.put(key, TelemetryMetrics{});
+            telStore.put(key, TelemetryMetrics{BSONObj()});
             lookupResult = telStore.lookup(key);
         }
         metrics = lookupResult.getValue();
@@ -99,17 +99,19 @@ TEST_F(TelemetryStoreTest, BasicUsage) {
 
 TEST_F(TelemetryStoreTest, EvictEntries) {
     // This creates a telemetry store with 2 partitions, each with a size of 1200 bytes.
-    TelemetryStore telStore{2400, 2};
+    const auto cacheSize = 2400;
+    const auto numPartitions = 2;
+    TelemetryStore telStore{cacheSize, numPartitions};
 
     for (int i = 0; i < 20; i++) {
         auto query = BSON("query" + std::to_string(i) << 1 << "xEquals" << 42);
-        telStore.put(query, TelemetryMetrics{});
+        telStore.put(query, TelemetryMetrics{BSONObj()});
     }
     int numKeys = 0;
     telStore.forEach([&](const BSONObj& key, const TelemetryMetrics& entry) { numKeys++; });
-    // Given the size of the bson keys (~46 bytes) and values (~112 bytes), each partition (1200
-    // bytes) can hold at most 7 entries.
-    ASSERT_EQ(numKeys, 14);
+
+    int entriesPerPartition = (cacheSize / numPartitions) / (46 + sizeof(TelemetryMetrics));
+    ASSERT_EQ(numKeys, entriesPerPartition * numPartitions);
 }
 
 /**
@@ -127,7 +129,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
     opts.redactFieldNames = true;
     opts.redactFieldNamesStrategy = redactFieldNameForTest;
 
-    auto redacted = telemetry::redactFindRequest(fcr, opts, expCtx);
+    auto redacted = uassertStatusOK(telemetry::redactFindRequest(fcr, opts, expCtx));
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"find":"HASH<testColl>","filter":{"HASH<a>":{"$eq":"?"}}})",
@@ -135,7 +137,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
 
     // Add sort.
     fcr.setSort(BSON("sortVal" << 1 << "otherSort" << -1));
-    redacted = telemetry::redactFindRequest(fcr, opts, expCtx);
+    redacted = uassertStatusOK(telemetry::redactFindRequest(fcr, opts, expCtx));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "find": "HASH<testColl>",
@@ -153,7 +155,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
 
     // Add inclusion projection.
     fcr.setProjection(BSON("e" << true << "f" << true));
-    redacted = telemetry::redactFindRequest(fcr, opts, expCtx);
+    redacted = uassertStatusOK(telemetry::redactFindRequest(fcr, opts, expCtx));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "find": "HASH<testColl>",
@@ -179,7 +181,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                     << "$a"
                     << "var2"
                     << "const1"));
-    redacted = telemetry::redactFindRequest(fcr, opts, expCtx);
+    redacted = uassertStatusOK(telemetry::redactFindRequest(fcr, opts, expCtx));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "find": "HASH<testColl>",
@@ -210,7 +212,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
     fcr.setHint(BSON("z" << 1 << "c" << 1));
     fcr.setMax(BSON("z" << 25));
     fcr.setMin(BSON("z" << 80));
-    redacted = telemetry::redactFindRequest(fcr, opts, expCtx);
+    redacted = uassertStatusOK(telemetry::redactFindRequest(fcr, opts, expCtx));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "find": "HASH<testColl>",
@@ -254,7 +256,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
     fcr.setMaxTimeMS(1000);
     fcr.setNoCursorTimeout(false);
 
-    redacted = telemetry::redactFindRequest(fcr, opts, expCtx);
+    redacted = uassertStatusOK(telemetry::redactFindRequest(fcr, opts, expCtx));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "find": "HASH<testColl>",
@@ -354,9 +356,9 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestEmptyFields) {
     opts.redactFieldNames = true;
     opts.redactFieldNamesStrategy = redactFieldNameForTest;
 
-    auto redacted = telemetry::redactFindRequest(fcr, opts, expCtx);
+    auto redacted = uassertStatusOK(telemetry::redactFindRequest(fcr, opts, expCtx));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({"find":"HASH<testColl>"})",
+        R"({"find":"HASH<testColl>","filter":{}})",
         redacted);  // NOLINT (test auto-update)
 }
 
@@ -370,7 +372,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
     fcr.setMax(BSON("z" << 25));
     fcr.setMin(BSON("z" << 80));
 
-    auto redacted = telemetry::redactFindRequest(fcr, opts, expCtx);
+    auto redacted = uassertStatusOK(telemetry::redactFindRequest(fcr, opts, expCtx));
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -397,7 +399,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
     fcr.setHint(BSON("$hint"
                      << "z"));
 
-    redacted = telemetry::redactFindRequest(fcr, opts, expCtx);
+    redacted = uassertStatusOK(telemetry::redactFindRequest(fcr, opts, expCtx));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "find": "testColl",
@@ -422,7 +424,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
     opts.redactFieldNamesStrategy = redactFieldNameForTest;
     opts.redactFieldNames = true;
     opts.replacementForLiteralArgs = boost::none;
-    redacted = telemetry::redactFindRequest(fcr, opts, expCtx);
+    redacted = uassertStatusOK(telemetry::redactFindRequest(fcr, opts, expCtx));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "find": "HASH<testColl>",
@@ -444,7 +446,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
         })",
         redacted);
 
-    redacted = telemetry::redactFindRequest(fcr, opts, expCtx);
+    redacted = uassertStatusOK(telemetry::redactFindRequest(fcr, opts, expCtx));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "find": "HASH<testColl>",
@@ -467,7 +469,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
         redacted);
 
     opts.replacementForLiteralArgs = "?";
-    redacted = telemetry::redactFindRequest(fcr, opts, expCtx);
+    redacted = uassertStatusOK(telemetry::redactFindRequest(fcr, opts, expCtx));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "find": "HASH<testColl>",
@@ -489,7 +491,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
         })",
         redacted);
 
-    redacted = telemetry::redactFindRequest(fcr, opts, expCtx);
+    redacted = uassertStatusOK(telemetry::redactFindRequest(fcr, opts, expCtx));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "find": "HASH<testColl>",

@@ -221,7 +221,8 @@ public:
                                              MatchExpressionParser::kAllowAllSpecialFeatures));
 
             if (!_didDoFLERewrite) {
-                telemetry::registerFindRequest(cq->getFindCommandRequest(), cq->nss(), opCtx);
+                telemetry::registerFindRequest(
+                    cq->getFindCommandRequest(), cq->nss(), opCtx, cq->getExpCtx());
             }
 
             try {

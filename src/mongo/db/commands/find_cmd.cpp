@@ -576,8 +576,10 @@ public:
             if (collection) {
                 // Collect telemetry. Exclude queries against collections with encrypted fields.
                 if (!collection.get()->getCollectionOptions().encryptedFieldConfig) {
-                    telemetry::registerFindRequest(
-                        cq->getFindCommandRequest(), collection.get()->ns(), opCtx);
+                    telemetry::registerFindRequest(cq->getFindCommandRequest(),
+                                                   collection.get()->ns(),
+                                                   opCtx,
+                                                   cq->getExpCtx());
                 }
             }
 
@@ -730,7 +732,7 @@ public:
                 // We want to destroy executor as soon as possible to release any resources locks it
                 // may hold.
                 exec.reset();
-                collectTelemetryMongod(opCtx);
+                collectTelemetryMongod(opCtx, cmdObj);
             }
 
             // Generate the response object to send to the client.

@@ -138,7 +138,8 @@ void ClusterClientCursorImpl::kill(OperationContext* opCtx) {
     }
 
     if (_telemetryStoreKey && opCtx) {
-        telemetry::writeTelemetry(opCtx, _telemetryStoreKey, _queryExecMicros, _docsReturned);
+        telemetry::writeTelemetry(
+            opCtx, _telemetryStoreKey, getOriginatingCommand(), _queryExecMicros, _docsReturned);
     }
 
     _root->kill(opCtx);

@@ -42,12 +42,14 @@
 #include "mongo/db/query/projection_parser.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_planner_params.h"
+#include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/rate_limiting.h"
 #include "mongo/db/query/sort_pattern.h"
 #include "mongo/db/query/telemetry_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/debug_util.h"
 #include "mongo/util/md5.hpp"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/system_clock_source.h"
@@ -206,9 +208,9 @@ BSONObj redactLetSpec(BSONObj letSpec,
     return bob.obj();
 }
 
-BSONObj redactFindRequest(const FindCommandRequest& findCommand,
-                          const SerializationOptions& opts,
-                          const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+StatusWith<BSONObj> redactFindRequest(const FindCommandRequest& findCommand,
+                                      const SerializationOptions& opts,
+                                      const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     if (!opts.redactFieldNames && !opts.replacementForLiteralArgs) {
         // Short circuit if no redaction needs to be done.
         BSONObjBuilder bob;
@@ -232,18 +234,17 @@ BSONObj redactFindRequest(const FindCommandRequest& findCommand,
         bob.append(FindCommandRequest::kCommandName, toSerialize);
     }
 
+    std::unique_ptr<MatchExpression> filterExpr;
     // Filter.
     {
         auto filter = findCommand.getFilter();
-        if (!filter.isEmpty()) {
-            auto filterParsed = MatchExpressionParser::parse(findCommand.getFilter(), expCtx);
-            uassert(7421701,
-                    "Expected to be able to parse match expression for redaction",
-                    filterParsed.isOK());
-
-            bob.append(FindCommandRequest::kFilterFieldName,
-                       filterParsed.getValue()->serialize(opts));
+        auto filterParsed = MatchExpressionParser::parse(findCommand.getFilter(), expCtx);
+        if (!filterParsed.isOK()) {
+            return filterParsed.getStatus();
         }
+
+        filterExpr = std::move(filterParsed.getValue());
+        bob.append(FindCommandRequest::kFilterFieldName, filterExpr->serialize(opts));
     }
 
     // Let Spec.
@@ -255,8 +256,12 @@ BSONObj redactFindRequest(const FindCommandRequest& findCommand,
 
     if (!findCommand.getProjection().isEmpty()) {
         // Parse to Projection
-        auto projection = projection_ast::parseAndAnalyze(
-            expCtx, findCommand.getProjection(), ProjectionPolicies::findProjectionPolicies());
+        auto projection =
+            projection_ast::parseAndAnalyze(expCtx,
+                                            findCommand.getProjection(),
+                                            filterExpr.get(),
+                                            findCommand.getFilter(),
+                                            ProjectionPolicies::findProjectionPolicies());
 
         bob.append(FindCommandRequest::kProjectionFieldName,
                    projection_ast::serialize(projection, opts));
@@ -507,10 +512,14 @@ void throwIfEncounteringFLEPayload(const BSONElement& e) {
  */
 const stdx::unordered_set<std::string> kKeysToRedact = {"pipeline", "find"};
 
-std::string sha256FieldNameHasher(const BSONElement& e) {
-    auto&& fieldName = e.fieldNameStringData();
+std::string sha256StringDataHasher(const StringData& fieldName) {
     auto hash = SHA256Block::computeHash({ConstDataRange(fieldName.rawData(), fieldName.size())});
     return hash.toString().substr(0, 12);
+}
+
+std::string sha256FieldNameHasher(const BSONElement& e) {
+    auto&& fieldName = e.fieldNameStringData();
+    return sha256StringDataHasher(fieldName);
 }
 
 std::string constantFieldNameHasher(const BSONElement& e) {
@@ -546,10 +555,13 @@ void appendWithRedactedLiterals(BSONObjBuilder& builder, const BSONElement& el) 
     }
 }
 
+static const StringData replacementForLiteralArgs = "?"_sd;
+
 }  // namespace
 
-
-const BSONObj& TelemetryMetrics::redactKey(const BSONObj& key, bool redactFieldNames) const {
+StatusWith<BSONObj> TelemetryMetrics::redactKey(const BSONObj& key,
+                                                bool redactFieldNames,
+                                                OperationContext* opCtx) const {
     // The redacted key for each entry is cached on first computation. However, if the redaction
     // straegy has flipped (from no redaction to SHA256, vice versa), we just return the key passed
     // to the function, so entries returned to the user match the redaction strategy requested in
@@ -560,6 +572,25 @@ const BSONObj& TelemetryMetrics::redactKey(const BSONObj& key, bool redactFieldN
     if (_redactedKey) {
         return *_redactedKey;
     }
+
+    if (cmdObj.hasField(FindCommandRequest::kCommandName)) {
+        auto findCommand = query_request_helper::makeFromFindCommand(cmdObj, boost::none, false);
+
+        SerializationOptions options(sha256StringDataHasher, replacementForLiteralArgs);
+        auto nss = findCommand->getNamespaceOrUUID().nss();
+        uassert(7349400, "Namespace must be defined", nss.has_value());
+        auto expCtx = make_intrusive<ExpressionContext>(opCtx, nullptr, nss.value());
+        expCtx->variables.setDefaultRuntimeConstants(opCtx);
+        expCtx->maxFeatureCompatibilityVersion = boost::none;  // Ensure all features are allowed.
+        expCtx->stopExpressionCounters();
+        auto swRedactedKey = redactFindRequest(*findCommand, options, expCtx);
+        if (!swRedactedKey.isOK()) {
+            return swRedactedKey.getStatus();
+        }
+        _redactedKey = std::move(swRedactedKey.getValue());
+        return *_redactedKey;
+    }
+
     // The telemetry key is of the following form:
     // { "<CMD_TYPE>": {...}, "namespace": "...", "applicationName": "...", ... }
     //
@@ -680,7 +711,8 @@ void registerAggRequest(const AggregateCommandRequest& request, OperationContext
 
 void registerFindRequest(const FindCommandRequest& request,
                          const NamespaceString& collection,
-                         OperationContext* opCtx) {
+                         OperationContext* opCtx,
+                         const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     if (!isTelemetryEnabled()) {
         return;
     }
@@ -700,26 +732,16 @@ void registerFindRequest(const FindCommandRequest& request,
         return;
     }
 
-    BSONObjBuilder telemetryKey;
-    try {
-        // Serialize the request.
-        BSONObjBuilder serializedRequest;
-        BSONObjBuilder asElement = serializedRequest.subobjStart("find");
-        request.serialize({}, &asElement);
-        asElement.done();
-        // And append as an element to the telemetry key.
-        appendWithRedactedLiterals(telemetryKey, serializedRequest.obj().firstElement());
-        telemetryKey.append("namespace", collection.toString());
-        if (request.getReadConcern()) {
-            telemetryKey.append("readConcern", *request.getReadConcern());
-        }
-        if (auto metadata = ClientMetadata::get(opCtx->getClient())) {
-            telemetryKey.append("applicationName", metadata->getApplicationName());
-        }
-    } catch (ExceptionFor<ErrorCodes::EncounteredFLEPayloadWhileRedacting>&) {
-        return;
-    }
-    CurOp::get(opCtx)->debug().telemetryStoreKey = telemetryKey.obj();
+    SerializationOptions options;
+    options.replacementForLiteralArgs = replacementForLiteralArgs;
+    auto swTelemetryKey = redactFindRequest(request, options, expCtx);
+    tassert(7349402,
+            str::stream() << "Error encountered when extracting query shape from command for "
+                             "telemetry collection: "
+                          << swTelemetryKey.getStatus().toString(),
+            swTelemetryKey.isOK());
+
+    CurOp::get(opCtx)->debug().telemetryStoreKey = std::move(swTelemetryKey.getValue());
 }
 
 TelemetryStore& getTelemetryStore(OperationContext* opCtx) {
@@ -732,6 +754,7 @@ TelemetryStore& getTelemetryStore(OperationContext* opCtx) {
 
 void writeTelemetry(OperationContext* opCtx,
                     boost::optional<BSONObj> telemetryKey,
+                    const BSONObj& cmdObj,
                     const uint64_t queryExecMicros,
                     const uint64_t docsReturned) {
     if (!telemetryKey) {
@@ -743,7 +766,8 @@ void writeTelemetry(OperationContext* opCtx,
     if (statusWithMetrics.isOK()) {
         metrics = statusWithMetrics.getValue();
     } else {
-        size_t numEvicted = telemetryStore.put(*telemetryKey, {}, partitionLock);
+        size_t numEvicted =
+            telemetryStore.put(*telemetryKey, TelemetryMetrics(cmdObj), partitionLock);
         telemetryEvictedMetric.increment(numEvicted);
         auto newMetrics = partitionLock->get(*telemetryKey);
         // This can happen if the budget is immediately exceeded. Specifically if the there is

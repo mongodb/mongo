@@ -368,7 +368,7 @@ BSONObj establishMergingMongosCursor(OperationContext* opCtx,
     CurOp::get(opCtx)->debug().cursorExhausted = exhausted;
     CurOp::get(opCtx)->debug().nreturned = responseBuilder.numDocs();
     if (exhausted) {
-        collectTelemetryMongos(opCtx);
+        collectTelemetryMongos(opCtx, ccc->getOriginatingCommand());
     } else {
         collectTelemetryMongos(opCtx, ccc);
     }

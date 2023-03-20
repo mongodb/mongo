@@ -588,7 +588,7 @@ StatusWith<ClusterClientCursorGuard> ClusterCursorManager::_detachCursor(WithLoc
     return std::move(cursor);
 }
 
-void collectTelemetryMongos(OperationContext* opCtx) {
+void collectTelemetryMongos(OperationContext* opCtx, const BSONObj& originatingCommand) {
     auto&& opDebug = CurOp::get(opCtx)->debug();
     // If we haven't registered a cursor to prepare for getMore requests, we record
     // telemetry directly.
@@ -597,6 +597,7 @@ void collectTelemetryMongos(OperationContext* opCtx) {
     // additiveMetrics.queryExecMicros isn't set until curOp is closing out.
     telemetry::writeTelemetry(opCtx,
                               opDebug.telemetryStoreKey,
+                              originatingCommand,
                               CurOp::get(opCtx)->elapsedTimeExcludingPauses().count(),
                               opDebug.nreturned);
 }

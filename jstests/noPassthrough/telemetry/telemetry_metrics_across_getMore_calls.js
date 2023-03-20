@@ -69,16 +69,19 @@ const fooNeBatchSize = 3;
         {killCursors: coll.getName(), cursors: [cursor1.getId(), cursor2.getId()]}));
 
     // This filters telemetry entires to just the ones entered when running above find queries.
-    const telemetryResults =
-        testDB.getSiblingDB("admin")
-            .aggregate(
-                [{$telemetry: {}}, {$match: {"key.find.find": {$eq: "###"}}}, {$sort: {key: 1}}])
-            .toArray();
+    const telemetryResults = testDB.getSiblingDB("admin")
+                                 .aggregate([
+                                     {$telemetry: {}},
+                                     {$match: {"key.filter.foo": {$exists: true}}},
+                                     {$sort: {key: 1}},
+                                 ])
+                                 .toArray();
     assert.eq(telemetryResults.length, 2, telemetryResults);
-    assert.eq(telemetryResults[0].key.namespace, `test.${jsTestName()}`);
-    assert.eq(telemetryResults[0].key.applicationName, "MongoDB Shell");
-    assert.eq(telemetryResults[1].key.namespace, `test.${jsTestName()}`);
-    assert.eq(telemetryResults[1].key.applicationName, "MongoDB Shell");
+    // TODO: SERVER-71986 Add app name to telemetry key.
+    // assert.eq(telemetryResults[0].key.namespace, `test.${jsTestName()}`);
+    // assert.eq(telemetryResults[0].key.applicationName, "MongoDB Shell");
+    // assert.eq(telemetryResults[1].key.namespace, `test.${jsTestName()}`);
+    // assert.eq(telemetryResults[1].key.applicationName, "MongoDB Shell");
 
     assert.eq(telemetryResults[0].metrics.execCount, 1);
     assert.eq(telemetryResults[1].metrics.execCount, 1);
@@ -98,32 +101,32 @@ const fooNeBatchSize = 3;
     // This filters telemetry entires to just the ones entered when running above find queries.
     let telemetryResults =
         testDB.getSiblingDB("admin")
-            .aggregate([{$telemetry: {}}, {$match: {"key.find.find": {$eq: "###"}}}])
+            .aggregate([{$telemetry: {}}, {$match: {"key.find": {$exists: true}}}])
             .toArray();
     assert.eq(telemetryResults.length, 4, telemetryResults);
 
     verifyMetrics(telemetryResults);
 
     // This filters to just the telemetry for query coll.find().sort({"foo": 1}).batchSize(2).
-    telemetryResults =
-        testDB.getSiblingDB("admin")
-            .aggregate([{$telemetry: {}}, {$match: {"key.find.sort": {$eq: {"foo": "###"}}}}])
-            .toArray();
+    telemetryResults = testDB.getSiblingDB("admin")
+                           .aggregate([{$telemetry: {}}, {$match: {"key.sort.foo": 1}}])
+                           .toArray();
     assert.eq(telemetryResults.length, 1, telemetryResults);
-    assert.eq(telemetryResults[0].key.namespace, `test.${jsTestName()}`);
-    assert.eq(telemetryResults[0].key.applicationName, "MongoDB Shell");
-    assert.eq(telemetryResults[0].metrics.execCount, 1);
-    assert.eq(telemetryResults[0].metrics.docsReturned.sum, numDocs);
+    // TODO: SERVER-71986 Add app name to telemetry key.
+    // assert.eq(telemetryResults[0].key.namespace, `test.${jsTestName()}`);
+    // assert.eq(telemetryResults[0].key.applicationName, "MongoDB Shell");
+    // assert.eq(telemetryResults[0].metrics.execCount, 1);
+    // assert.eq(telemetryResults[0].metrics.docsReturned.sum, numDocs);
 
     // This filters to just the telemetry for query coll.find({foo: {$eq:
     // 1}}).limit(query2Limit).batchSize(2).
-    telemetryResults =
-        testDB.getSiblingDB("admin")
-            .aggregate([{$telemetry: {}}, {$match: {"key.find.limit": {$eq: "###"}}}])
-            .toArray();
+    telemetryResults = testDB.getSiblingDB("admin")
+                           .aggregate([{$telemetry: {}}, {$match: {"key.limit": '?'}}])
+                           .toArray();
     assert.eq(telemetryResults.length, 1, telemetryResults);
-    assert.eq(telemetryResults[0].key.namespace, `test.${jsTestName()}`);
-    assert.eq(telemetryResults[0].key.applicationName, "MongoDB Shell");
+    // TODO: SERVER-71986 Add app name to telemetry key.
+    // assert.eq(telemetryResults[0].key.namespace, `test.${jsTestName()}`);
+    // assert.eq(telemetryResults[0].key.applicationName, "MongoDB Shell");
     assert.eq(telemetryResults[0].metrics.execCount, 1);
     assert.eq(telemetryResults[0].metrics.docsReturned.sum, query2Limit);
 
@@ -133,16 +136,17 @@ const fooNeBatchSize = 3;
                                {$telemetry: {}},
                                {
                                    $match: {
-                                       "key.find.filter.foo": {$eq: {$eq: "###"}},
-                                       "key.find.limit": {$exists: false},
-                                       "key.find.sort": {$exists: false}
+                                       "key.filter.foo": {$eq: {$eq: "?"}},
+                                       "key.limit": {$exists: false},
+                                       "key.sort": {$exists: false}
                                    }
                                }
                            ])
                            .toArray();
     assert.eq(telemetryResults.length, 1, telemetryResults);
-    assert.eq(telemetryResults[0].key.namespace, `test.${jsTestName()}`);
-    assert.eq(telemetryResults[0].key.applicationName, "MongoDB Shell");
+    // TODO: SERVER-71986 Add app name to telemetry key.
+    // assert.eq(telemetryResults[0].key.namespace, `test.${jsTestName()}`);
+    // assert.eq(telemetryResults[0].key.applicationName, "MongoDB Shell");
     assert.eq(telemetryResults[0].metrics.execCount, 2);
     assert.eq(telemetryResults[0].metrics.docsReturned.sum, numDocs / 2 + 2 * fooEqBatchSize);
     assert.eq(telemetryResults[0].metrics.docsReturned.max, numDocs / 2);

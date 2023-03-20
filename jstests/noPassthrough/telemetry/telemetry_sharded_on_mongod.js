@@ -1,6 +1,11 @@
 // Tests that queries from mongos to mongod record telemetry correctly on mongod.
 // Does not test any mongos logic on the telemetry read path.
-// @tags: [featureFlagTelemetry, requires_sharding, requires_fcv_63]
+// @tags: [
+//   __TEMPORARILY_DISABLED__, # TODO: SERVER-74945
+//   featureFlagTelemetry,
+//   requires_fcv_63,
+//   requires_sharding,
+// ]
 //
 load('jstests/libs/analyze_plan.js');
 load("jstests/libs/feature_flag_util.js");

@@ -1183,7 +1183,7 @@ Status runAggregate(OperationContext* opCtx,
         if (keepCursor) {
             collectTelemetryMongod(opCtx, pins[0]);
         } else {
-            collectTelemetryMongod(opCtx);
+            collectTelemetryMongod(opCtx, cmdObj);
         }
 
         // For an optimized away pipeline, signal the cache that a query operation has completed.

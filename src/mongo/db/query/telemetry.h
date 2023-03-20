@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/query/partitioned_cache.h"
@@ -81,9 +82,9 @@ void appendShardedTelemetryKeyIfApplicable(BSONObjBuilder& objToModify,
  * Serialize the FindCommandRequest according to the Options passed in. Returns the serialized BSON
  * with all field names and literals redacted.
  */
-BSONObj redactFindRequest(const FindCommandRequest& findCommand,
-                          const SerializationOptions& opts,
-                          const boost::intrusive_ptr<ExpressionContext>& expCtx);
+StatusWith<BSONObj> redactFindRequest(const FindCommandRequest& findCommand,
+                                      const SerializationOptions& opts,
+                                      const boost::intrusive_ptr<ExpressionContext>& expCtx);
 /**
  * An aggregated metric stores a compressed view of data. It balances the loss of information
  * with the reduction in required storage.
@@ -125,7 +126,8 @@ struct AggregatedMetric {
 // Used to aggregate the metrics for one telemetry key over all its executions.
 class TelemetryMetrics {
 public:
-    TelemetryMetrics() : firstSeenTimestamp(Date_t::now().toMillisSinceEpoch() / 1000, 0) {}
+    TelemetryMetrics(const BSONObj& cmdObj)
+        : firstSeenTimestamp(Date_t::now().toMillisSinceEpoch() / 1000, 0), cmdObj(cmdObj.copy()) {}
 
     BSONObj toBSON() const {
         BSONObjBuilder builder{sizeof(TelemetryMetrics) + 100};
@@ -140,7 +142,9 @@ public:
     /**
      * Redact a given telemetry key.
      */
-    const BSONObj& redactKey(const BSONObj& key, bool redactFieldNames) const;
+    StatusWith<BSONObj> redactKey(const BSONObj& key,
+                                  bool redactFieldNames,
+                                  OperationContext* opCtx) const;
 
     /**
      * Timestamp for when this query shape was added to the store. Set on construction.
@@ -160,6 +164,12 @@ public:
     AggregatedMetric queryExecMicros;
 
     AggregatedMetric docsReturned;
+
+    /**
+     * A representative command for a given telemetry key. This is used to derive the redacted
+     * telemetry key at read-time.
+     */
+    BSONObj cmdObj;
 
 private:
     /**
@@ -209,13 +219,15 @@ void registerAggRequest(const AggregateCommandRequest& request, OperationContext
 
 void registerFindRequest(const FindCommandRequest& request,
                          const NamespaceString& collection,
-                         OperationContext* ocCtx);
+                         OperationContext* ocCtx,
+                         const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
 /**
  * Writes telemetry to the telemetry store for the operation identified by `telemetryKey`.
  */
 void writeTelemetry(OperationContext* opCtx,
                     boost::optional<BSONObj> telemetryKey,
+                    const BSONObj& cmdObj,
                     uint64_t queryExecMicros,
                     uint64_t docsReturned);
 }  // namespace telemetry

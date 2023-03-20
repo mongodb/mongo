@@ -599,6 +599,6 @@ void startClientCursorMonitor();
  * telemetry store.
  */
 void collectTelemetryMongod(OperationContext* opCtx, ClientCursorPin& cursor);
-void collectTelemetryMongod(OperationContext* opCtx);
+void collectTelemetryMongod(OperationContext* opCtx, const BSONObj& originatingCommand);
 
 }  // namespace mongo
