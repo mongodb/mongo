@@ -50,7 +50,6 @@
 #include "mongo/db/ops/update.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
-#include "mongo/db/s/periodic_balancer_config_refresher.h"
 #include "mongo/db/s/read_only_catalog_cache_loader.h"
 #include "mongo/db/s/shard_local.h"
 #include "mongo/db/s/shard_server_catalog_cache_loader.h"
@@ -726,9 +725,6 @@ void ShardingInitializationMongoD::_initializeShardingEnvironmentOnShardServer(
         TransactionCoordinatorService::get(opCtx)->onShardingInitialization(
             opCtx, isReplSet && isStandaloneOrPrimary);
     }
-
-    PeriodicBalancerConfigRefresher::get(opCtx).onShardingInitialization(service,
-                                                                         isStandaloneOrPrimary);
 
     LOGV2(22071,
           "Finished initializing sharding components for {memberState} node.",

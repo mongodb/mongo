@@ -195,7 +195,6 @@ env.Library(
         'move_timing_helper.cpp',
         'namespace_metadata_change_notifications.cpp',
         'op_observer_sharding_impl.cpp',
-        'periodic_balancer_config_refresher.cpp',
         'periodic_sharded_index_consistency_checker.cpp',
         'query_analysis_coordinator.cpp',
         'query_analysis_op_observer.cpp',
