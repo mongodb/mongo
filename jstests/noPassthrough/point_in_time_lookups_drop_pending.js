@@ -6,6 +6,7 @@
  *     requires_persistence,
  *     requires_replication,
  *     featureFlagPointInTimeCatalogLookups,
+ *     requires_fcv_70,
  * ]
  */
 (function() {

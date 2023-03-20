@@ -162,10 +162,18 @@ std::string RandomizedIdempotencyTest::getStatesString(const std::vector<Collect
 }
 
 Status RandomizedIdempotencyTest::resetState() {
-    Status dropStatus = runOpInitialSync(dropCollection());
-    if (!dropStatus.isOK()) {
-        return dropStatus;
-    }
+    // Remove the collection without a drop OpTime. As we are re-applying the initOps the create
+    // OpTime would be less than the previous drop. By removing the collection without an OpTime we
+    // completely clear the history for the namespace.
+    CollectionCatalog::write(_opCtx.get(), [&](CollectionCatalog& catalog) {
+        // Lookup the UUID from the namespace, it will not exist if we're 'resetting' the state
+        // before creating it.
+        auto uuid = catalog.lookupUUIDByNSS(_opCtx.get(), _nss);
+        if (uuid) {
+            catalog.deregisterCollection(
+                _opCtx.get(), *uuid, /*isDropPending=*/false, /*commitTime=*/boost::none);
+        }
+    });
 
     return runOpsInitialSync(initOps);
 }

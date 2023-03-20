@@ -194,6 +194,7 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadDBLockCompatibleXCollectionExi
     ASSERT(client1.second->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
 
     AutoGetCollectionForRead coll(client2.second.get(), nss);
+    ASSERT(coll.getCollection());
 }
 
 TEST_F(DBRAIITestFixture, AutoGetCollectionForReadDBLockCompatibleXCollectionExistsReadSource) {
@@ -206,8 +207,11 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadDBLockCompatibleXCollectionExi
     auto opCtx = client2.second.get();
     opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
                                                   Timestamp(1, 2));
-    ASSERT_THROWS_CODE(
-        AutoGetCollectionForRead(opCtx, nss), AssertionException, ErrorCodes::SnapshotUnavailable);
+
+    // We can instantiate AutoGetCollectionForRead but not find a collection at the provided
+    // timestamp
+    AutoGetCollectionForRead coll(opCtx, nss);
+    ASSERT(!coll.getCollection());
 }
 
 
@@ -247,46 +251,6 @@ TEST_F(DBRAIITestFixture,
     AutoGetCollectionForRead coll(client2.second.get(), nss);
 }
 
-TEST_F(DBRAIITestFixture,
-       AutoGetCollectionForReadDBLockCompatibleXCollectionExistsSecondaryLastAppliedNested) {
-    // This test simulates a nested lock situation where the code would normally attempt to acquire
-    // the PBWM, but is stymied.
-    auto replCoord = repl::ReplicationCoordinator::get(client1.second.get());
-    CollectionOptions defaultCollectionOptions;
-    ASSERT_OK(
-        storageInterface()->createCollection(client1.second.get(), nss, defaultCollectionOptions));
-    ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_SECONDARY));
-    // Note that when the collection was created, above, the system chooses a minimum snapshot time
-    // for the collection.  If we now manually set our last applied time to something very early, we
-    // will be guaranteed to hit the logic that triggers when the minimum snapshot time is greater
-    // than the read-at time, since we default to reading at last-applied when in SECONDARY state.
-
-    // Don't call into the ReplicationCoordinator to update lastApplied because it is only a mock
-    // class and does not update the correct state in the SnapshotManager.
-    repl::OpTime opTime(Timestamp(2, 1), 1);
-    auto snapshotManager =
-        client1.second.get()->getServiceContext()->getStorageEngine()->getSnapshotManager();
-    snapshotManager->setLastApplied(opTime.getTimestamp());
-
-    Lock::DBLock dbLock1(client1.second.get(), nss.dbName(), MODE_IX);
-    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
-
-    // Simulate using a DBDirectClient to test this behavior for user reads.
-    client2.first->setInDirectClient(true);
-    AutoGetCollectionForRead coll(
-        client2.second.get(), NamespaceString::createNamespaceString_forTest("local.system.js"));
-    // Reading from an unreplicated collection does not change the ReadSource to kLastApplied.
-    ASSERT_EQ(client2.second.get()->recoveryUnit()->getTimestampReadSource(),
-              RecoveryUnit::ReadSource::kNoTimestamp);
-
-    // Reading from a replicated collection will try to switch to kLastApplied. Because we are
-    // already reading without a timestamp and we can't reacquire the PBWM lock to continue reading
-    // without a timestamp, we uassert in this situation.
-    ASSERT_THROWS_CODE(AutoGetCollectionForRead(client2.second.get(), nss),
-                       DBException,
-                       ErrorCodes::SnapshotUnavailable);
-}
-
 TEST_F(DBRAIITestFixture, AutoGetCollectionForReadLastAppliedConflict) {
     // This test simulates a situation where AutoGetCollectionForRead cant read at lastApplied
     // because it is set to a point earlier than the catalog change. We expect to read without a
@@ -312,20 +276,8 @@ TEST_F(DBRAIITestFixture, AutoGetCollectionForReadLastAppliedConflict) {
     // Simulate using a DBDirectClient to test this behavior for user reads.
     client1.first->setInDirectClient(true);
 
-    auto timeoutError = client1.second->getTimeoutError();
-    auto waitForLock = [&] {
-        auto deadline = Date_t::now() + Milliseconds(10);
-        client1.second->runWithDeadline(deadline, timeoutError, [&] {
-            AutoGetCollectionForRead coll(client1.second.get(), nss);
-        });
-    };
-
-    // Expect that the lock acquisition eventually times out because lastApplied is not advancing.
-    ASSERT_THROWS_CODE(waitForLock(), DBException, timeoutError);
-
-    // Advance lastApplied and ensure the lock acquisition succeeds.
-    snapshotManager->setLastApplied(replCoord->getMyLastAppliedOpTime().getTimestamp());
-
+    // We can perform the lock acquisition even though lastApplied is earlier than the minimum valid
+    // time on the namespace.
     AutoGetCollectionForRead coll(client1.second.get(), nss);
     ASSERT_EQ(client1.second.get()->recoveryUnit()->getTimestampReadSource(),
               RecoveryUnit::ReadSource::kLastApplied);
