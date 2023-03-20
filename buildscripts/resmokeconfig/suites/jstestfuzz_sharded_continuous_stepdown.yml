@@ -35,6 +35,7 @@ executor:
       global_vars:
         TestData:
           skipValidationOnInvalidViewDefinitions: true
+  - class: CheckRoutingTableConsistency
   fixture:
     class: ShardedClusterFixture
     mongos_options:
