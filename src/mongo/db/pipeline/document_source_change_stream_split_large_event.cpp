@@ -34,9 +34,7 @@
 #include "mongo/db/pipeline/document_source_change_stream_handle_topology_change.h"
 
 namespace mongo {
-namespace {
-CounterMetric changeStreamsLargeEventsSplitCounter("changeStreams.largeEventsSplit");
-}
+
 REGISTER_DOCUMENT_SOURCE(changeStreamSplitLargeEvent,
                          LiteParsedDocumentSourceDefault::parse,
                          DocumentSourceChangeStreamSplitLargeEvent::createFromBson,
@@ -126,7 +124,6 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamSplitLargeEvent::doGetNe
     // Process the event to see if it is within the size limit. We have to serialize the document to
     // perform this check, but the helper will also produce a new 'Document' which - if it is small
     // enough to be returned - will not need to be re-serialized by the plan executor.
-    // TODO SERVER-74301: Consider 'this->pExpCtx->forPerShardCursor' here.
     auto [eventDoc, eventBsonSize] = change_stream_split_event::processChangeEventBeforeSplit(
         input.releaseDocument(), this->pExpCtx->needsMerge);
     if (eventBsonSize <= kBSONObjMaxChangeEventSize) {
@@ -136,9 +133,9 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamSplitLargeEvent::doGetNe
     // If we are resuming from a split event, check whether this is it. If so, extract the fragment
     // number from which we are resuming. Otherwise, we have already scanned past the resume point,
     // which implies that it may be on another shard. Continue to split this event without skipping.
+    using DSCSCR = DocumentSourceChangeStreamCheckResumability;
     size_t skipFirstFragments = 0;
     if (_resumeAfterSplit) {
-        using DSCSCR = DocumentSourceChangeStreamCheckResumability;
         auto resumeStatus = DSCSCR::compareAgainstClientResumeToken(eventDoc, *_resumeAfterSplit);
         tassert(7182805,
                 "Observed unexpected event before resume point",
@@ -164,9 +161,6 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamSplitLargeEvent::doGetNe
     tassert(7182804,
             "Unexpected empty fragment queue after splitting a change stream event",
             !_splitEventQueue.empty());
-
-    // Increment the ServerStatus counter to indicate that we have split a change event.
-    changeStreamsLargeEventsSplitCounter.increment();
 
     // Return the first element from the queue of fragments.
     return _popFromQueue();
