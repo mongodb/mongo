@@ -86,3 +86,9 @@ feature_flags:
         primary."
         cpp_varname: feature_flags::gFeatureFlagUseUnreplicatedTruncatesForDeletions
         default: false
+    featureFlagConfigurableX509ClusterAuthn:
+        description: >- 
+            Enable configurable parameters for detection of peer server nodes using X.509 
+            intracluster authentication.
+        cpp_varname: gFeatureFlagConfigurableX509ClusterAuthn
+        default: false
