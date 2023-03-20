@@ -11,6 +11,12 @@ function setup(conn) {
 }
 
 function runTests(conn, tenant, multitenancySupport) {
+    if (tenant == null && multitenancySupport) {
+        // When multitenancySupport is enabled, requests are expected to contain a tenant, so do not
+        // run these tests when tenant is null and multitenancySupport is enabled.
+        return;
+    }
+
     const expectSuccess = (tenant === null) || (multitenancySupport && TestData.enableTestCommands);
     jsTest.log("Runing test: " + tojson({tenant: tenant, multi: multitenancySupport}));
 
