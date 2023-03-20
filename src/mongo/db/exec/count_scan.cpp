@@ -63,6 +63,11 @@ BSONObj replaceBSONFieldNames(const BSONObj& replace, const BSONObj& fieldNames)
 
     return bob.obj();
 }
+
+bool isCompoundWildcardIndex(const IndexDescriptor* indexDescriptor) {
+    return indexDescriptor->getIndexType() == IndexType::INDEX_WILDCARD &&
+        indexDescriptor->keyPattern().nFields() > 1;
+}
 }  // namespace
 
 using std::unique_ptr;
@@ -81,7 +86,7 @@ CountScan::CountScan(ExpressionContext* expCtx,
     : RequiresIndexStage(kStageType, expCtx, collection, params.indexDescriptor, workingSet),
       _workingSet(workingSet),
       _keyPattern(std::move(params.keyPattern)),
-      _shouldDedup(params.isMultiKey),
+      _shouldDedup(params.isMultiKey || isCompoundWildcardIndex(params.indexDescriptor)),
       _startKey(std::move(params.startKey)),
       _startKeyInclusive(params.startKeyInclusive),
       _endKey(std::move(params.endKey)),
