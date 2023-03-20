@@ -897,8 +897,8 @@ private:
     // Namespaces and UUIDs in pending commit. The opened storage snapshot must be consulted to
     // confirm visibility. The instance may be used if the namespace/uuid are otherwise unoccupied
     // in the CollectionCatalog.
-    absl::flat_hash_map<NamespaceString, std::shared_ptr<Collection>> _pendingCommitNamespaces;
-    absl::flat_hash_map<UUID, std::shared_ptr<Collection>, UUID::Hash> _pendingCommitUUIDs;
+    immutable::unordered_map<NamespaceString, std::shared_ptr<Collection>> _pendingCommitNamespaces;
+    immutable::unordered_map<UUID, std::shared_ptr<Collection>, UUID::Hash> _pendingCommitUUIDs;
 
     // CatalogId mappings for all known namespaces and UUIDs for the CollectionCatalog. The vector
     // is sorted on timestamp. UUIDs will have at most two entries. One for the create and another

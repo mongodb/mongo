@@ -179,8 +179,8 @@ public:
         auto dbIdPair = std::make_pair(collection->ns().dbName(), collection->uuid());
         catalog._orderedCollections[dbIdPair] = collection;
 
-        catalog._pendingCommitNamespaces.erase(collection->ns());
-        catalog._pendingCommitUUIDs.erase(collection->uuid());
+        catalog._pendingCommitNamespaces = catalog._pendingCommitNamespaces.erase(collection->ns());
+        catalog._pendingCommitUUIDs = catalog._pendingCommitUUIDs.erase(collection->uuid());
     }
 
     PublishCatalogUpdates(UncommittedCatalogUpdates& uncommittedCatalogUpdates)
@@ -216,17 +216,18 @@ public:
                 }
 
                 // Mark the namespace as pending commit even if we don't have a collection instance.
-                std::shared_ptr<Collection>& collection =
-                    catalog._pendingCommitNamespaces[entry.nss];
+                catalog._pendingCommitNamespaces =
+                    catalog._pendingCommitNamespaces.set(entry.nss, entry.collection);
 
-                collection = entry.collection;
-                if (collection) {
+                if (entry.collection) {
                     // If we have a collection instance for this entry also mark the uuid as pending
-                    catalog._pendingCommitUUIDs[collection->uuid()] = collection;
+                    catalog._pendingCommitUUIDs =
+                        catalog._pendingCommitUUIDs.set(entry.collection->uuid(), entry.collection);
                 } else if (entry.externalUUID) {
                     // Drops do not have a collection instance but set their UUID in the entry. Mark
                     // it as pending with no collection instance.
-                    catalog._pendingCommitUUIDs[*entry.externalUUID] = nullptr;
+                    catalog._pendingCommitUUIDs =
+                        catalog._pendingCommitUUIDs.set(*entry.externalUUID, nullptr);
                 }
             }
         });
@@ -255,7 +256,8 @@ public:
                         // We just need to do modifications on 'from' here. 'to' is taken care
                         // of by a separate kWritableCollection entry.
                         catalog._collections.erase(from);
-                        catalog._pendingCommitNamespaces.erase(from);
+                        catalog._pendingCommitNamespaces =
+                            catalog._pendingCommitNamespaces.erase(from);
 
                         auto& resourceCatalog = ResourceCatalog::get(opCtx->getServiceContext());
                         resourceCatalog.remove({RESOURCE_COLLECTION, from}, from);
@@ -308,8 +310,10 @@ public:
                             catalog._pushCatalogIdForNSSAndUUID(
                                 coll->ns(), coll->uuid(), coll->getCatalogId(), commitTime);
 
-                            catalog._pendingCommitNamespaces.erase(coll->ns());
-                            catalog._pendingCommitUUIDs.erase(coll->uuid());
+                            catalog._pendingCommitNamespaces =
+                                catalog._pendingCommitNamespaces.erase(coll->ns());
+                            catalog._pendingCommitUUIDs =
+                                catalog._pendingCommitUUIDs.erase(coll->uuid());
                             coll->setCommitted(true);
                         });
                     break;
@@ -376,13 +380,15 @@ public:
                     continue;
                 }
 
-                catalog._pendingCommitNamespaces.erase(entry.nss);
+                catalog._pendingCommitNamespaces =
+                    catalog._pendingCommitNamespaces.erase(entry.nss);
 
                 // Entry without collection, nothing more to do
                 if (!entry.collection)
                     continue;
 
-                catalog._pendingCommitUUIDs.erase(entry.collection->uuid());
+                catalog._pendingCommitUUIDs =
+                    catalog._pendingCommitUUIDs.erase(entry.collection->uuid());
             }
         });
     }
@@ -848,9 +854,9 @@ bool CollectionCatalog::_needsOpenCollection(OperationContext* opCtx,
         return !coll || *readTimestamp < coll->getMinimumValidSnapshot();
     } else {
         if (nsOrUUID.nss()) {
-            return _pendingCommitNamespaces.find(*nsOrUUID.nss()) != _pendingCommitNamespaces.end();
+            return _pendingCommitNamespaces.find(*nsOrUUID.nss());
         } else {
-            return _pendingCommitUUIDs.find(*nsOrUUID.uuid()) != _pendingCommitUUIDs.end();
+            return _pendingCommitUUIDs.find(*nsOrUUID.uuid());
         }
     }
 }
@@ -882,14 +888,14 @@ const Collection* CollectionCatalog::_openCollectionAtLatestByNamespaceOrUUID(
     // the in-memory catalog with the durable catalog entry to determine which instance to return.
     const auto& pendingCollection = [&]() -> std::shared_ptr<Collection> {
         if (const auto& nss = nssOrUUID.nss()) {
-            auto it = _pendingCommitNamespaces.find(*nss);
-            invariant(it != _pendingCommitNamespaces.end());
-            return it->second;
+            const std::shared_ptr<Collection>* pending = _pendingCommitNamespaces.find(*nss);
+            invariant(pending);
+            return *pending;
         }
 
-        auto it = _pendingCommitUUIDs.find(*nssOrUUID.uuid());
-        invariant(it != _pendingCommitUUIDs.end());
-        return it->second;
+        const std::shared_ptr<Collection>* pending = _pendingCommitUUIDs.find(*nssOrUUID.uuid());
+        invariant(pending);
+        return *pending;
     }();
 
     auto latestCollection = [&]() -> std::shared_ptr<const Collection> {
@@ -947,9 +953,9 @@ const Collection* CollectionCatalog::_openCollectionAtLatestByNamespaceOrUUID(
     if (nssOrUUID.nss() && nss != nsInDurableCatalog) {
         // Like above, the correct instance is either in the catalog or under pending. First
         // lookup in pending by UUID to determine if it contains the right namespace.
-        auto itUUID = _pendingCommitUUIDs.find(uuid);
-        invariant(itUUID != _pendingCommitUUIDs.end());
-        const auto& pendingCollectionByUUID = itUUID->second;
+        const std::shared_ptr<Collection>* pending = _pendingCommitUUIDs.find(uuid);
+        invariant(pending);
+        const auto& pendingCollectionByUUID = *pending;
         if (pendingCollectionByUUID->ns() == nsInDurableCatalog) {
             openedCollections.store(pendingCollectionByUUID, pendingCollectionByUUID->ns(), uuid);
         } else {
@@ -1960,11 +1966,11 @@ void CollectionCatalog::_registerCollection(OperationContext* opCtx,
     _collections[nss] = coll;
     _orderedCollections[dbIdPair] = coll;
     if (twoPhase) {
-        _pendingCommitNamespaces[nss] = coll;
-        _pendingCommitUUIDs[uuid] = coll;
+        _pendingCommitNamespaces = _pendingCommitNamespaces.set(nss, coll);
+        _pendingCommitUUIDs = _pendingCommitUUIDs.set(uuid, coll);
     } else {
-        _pendingCommitNamespaces.erase(nss);
-        _pendingCommitUUIDs.erase(uuid);
+        _pendingCommitNamespaces = _pendingCommitNamespaces.erase(nss);
+        _pendingCommitUUIDs = _pendingCommitUUIDs.erase(uuid);
     }
 
     if (commitTime && !commitTime->isNull()) {
@@ -2039,8 +2045,8 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(
     _orderedCollections.erase(dbIdPair);
     _collections.erase(ns);
     _catalog.erase(uuid);
-    _pendingCommitNamespaces.erase(ns);
-    _pendingCommitUUIDs.erase(uuid);
+    _pendingCommitNamespaces = _pendingCommitNamespaces.erase(ns);
+    _pendingCommitUUIDs = _pendingCommitUUIDs.erase(uuid);
 
     // Push drop unless this is a rollback of a create
     if (coll->isCommitted()) {
