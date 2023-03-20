@@ -40,6 +40,9 @@
 #include "mongo/util/duration.h"
 
 namespace mongo {
+namespace {
+CounterMetric changeStreamsLargeEventsFailedCounter("changeStreams.largeEventsFailed");
+}
 
 PlanExecutorPipeline::PlanExecutorPipeline(boost::intrusive_ptr<ExpressionContext> expCtx,
                                            std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
@@ -79,9 +82,7 @@ PlanExecutor::ExecState PlanExecutorPipeline::getNext(BSONObj* objOut, RecordId*
     Document docOut;
     auto execState = getNextDocument(&docOut, nullptr);
     if (execState == PlanExecutor::ADVANCED) {
-        // Include metadata if the output will be consumed by a merging node.
-        *objOut = _expCtx->needsMerge || _expCtx->forPerShardCursor ? docOut.toBsonWithMetaData()
-                                                                    : docOut.toBson();
+        *objOut = _trySerializeToBson(docOut);
     }
     return execState;
 }
@@ -141,6 +142,19 @@ boost::optional<Document> PlanExecutorPipeline::_tryGetNext() try {
     return Document::fromBsonWithMetaData(extraInfo->getStartAfterInvalidateEvent());
 }
 
+BSONObj PlanExecutorPipeline::_trySerializeToBson(const Document& doc) try {
+    // Include metadata if the output will be consumed by a merging node.
+    return _expCtx->needsMerge || _expCtx->forPerShardCursor ? doc.toBsonWithMetaData()
+                                                             : doc.toBson();
+} catch (const ExceptionFor<ErrorCodes::BSONObjectTooLarge>&) {
+    // If in a change stream pipeline, increment change stream large event failed error
+    // count metric.
+    if (ResumableScanType::kChangeStream == _resumableScanType) {
+        changeStreamsLargeEventsFailedCounter.increment();
+    }
+    throw;
+}
+
 void PlanExecutorPipeline::_updateResumableScanState(const boost::optional<Document>& document) {
     switch (_resumableScanType) {
         case ResumableScanType::kChangeStream:
@@ -186,9 +200,8 @@ void PlanExecutorPipeline::_performChangeStreamsAccounting(const boost::optional
 
 void PlanExecutorPipeline::_validateChangeStreamsResumeToken(const Document& event) const {
     // Confirm that the document _id field matches the original resume token in the sort key field.
-    auto eventBSON = event.toBson();
     auto resumeToken = event.metadata().getSortKey();
-    auto idField = eventBSON.getObjectField("_id");
+    auto idField = event.getField("_id");
     invariant(!resumeToken.missing());
     uassert(ErrorCodes::ChangeStreamFatalError,
             str::stream() << "Encountered an event whose _id field, which contains the resume "
@@ -197,9 +210,9 @@ void PlanExecutorPipeline::_validateChangeStreamsResumeToken(const Document& eve
                              "transformations that retain the unmodified _id field are allowed. "
                              "Expected: "
                           << BSON("_id" << resumeToken) << " but found: "
-                          << (eventBSON["_id"] ? BSON("_id" << eventBSON["_id"]) : BSONObj()),
-            (resumeToken.getType() == BSONType::Object) &&
-                idField.binaryEqual(resumeToken.getDocument().toBson()));
+                          << (idField.missing() ? BSONObj() : BSON("_id" << idField)),
+            resumeToken.getType() == BSONType::Object &&
+                ValueComparator::kInstance.evaluate(idField == resumeToken));
 }
 
 void PlanExecutorPipeline::_performResumableOplogScanAccounting() {

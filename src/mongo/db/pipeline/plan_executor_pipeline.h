@@ -188,6 +188,11 @@ private:
     boost::optional<Document> _tryGetNext();
 
     /**
+     * Serialize the given document to BSON while updating stats for BSONObjectTooLarge exception.
+     */
+    BSONObj _trySerializeToBson(const Document& doc);
+
+    /**
      * For a change stream or resumable oplog scan, updates the scan state based on the latest
      * document returned by the underlying pipeline.
      */
