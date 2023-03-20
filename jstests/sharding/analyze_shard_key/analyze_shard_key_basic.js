@@ -8,9 +8,10 @@
 
 load("jstests/libs/catalog_shard_util.js");
 
-const dbName = "testDb";
+const dbNameBase = "testDb";
 
-function testNonExistingCollection(testCases) {
+function testNonExistingCollection(testCases, tenantId) {
+    const dbName = tenantId ? (tenantId + "-" + dbNameBase) : dbNameBase;
     const collName = "testCollNonExisting";
     const ns = dbName + "." + collName;
     const candidateKey = {candidateKey: 1};
@@ -18,7 +19,14 @@ function testNonExistingCollection(testCases) {
     testCases.forEach(testCase => {
         jsTest.log(`Running analyzeShardKey command against a non-existing collection: ${
             tojson(testCase)}`);
-        const res = testCase.conn.adminCommand({analyzeShardKey: ns, key: candidateKey});
+        const cmdObj = {analyzeShardKey: ns, key: candidateKey};
+        if (tenantId) {
+            cmdObj.$tenant = tenantId;
+        }
+        const res = testCase.conn.adminCommand(cmdObj);
+        // If the command is not supported, it should fail even before the collection validation
+        // step. That is, it should fail with an IllegalOperation error instead of a
+        // NamespaceNotFound error.
         const expectedErrorCode =
             testCase.isSupported ? ErrorCodes.NamespaceNotFound : ErrorCodes.IllegalOperation;
         assert.commandFailedWithCode(res, expectedErrorCode);
@@ -26,6 +34,7 @@ function testNonExistingCollection(testCases) {
 }
 
 function testExistingUnshardedCollection(writeConn, testCases) {
+    const dbName = dbNameBase;
     const collName = "testCollUnsharded";
     const ns = dbName + "." + collName;
     const coll = writeConn.getCollection(ns);
@@ -45,7 +54,7 @@ function testExistingUnshardedCollection(writeConn, testCases) {
             // This is an unsharded collection so in a sharded cluster it only exists on the
             // primary shard.
             let expectedErrCode = (() => {
-                if (testCase.isMongos || testCase.isNonShardsvrMongod) {
+                if (testCase.isMongos || testCase.isReplSetMongod) {
                     return ErrorCodes.IllegalOperation;
                 } else if (testCase.isPrimaryShardMongod) {
                     return ErrorCodes.CollectionIsEmptyLocally;
@@ -71,8 +80,7 @@ function testExistingUnshardedCollection(writeConn, testCases) {
         if (testCase.isSupported) {
             // This is an unsharded collection so in a sharded cluster it only exists on the
             // primary shard.
-            if (testCase.isNonShardsvrMongod || testCase.isPrimaryShardMongod ||
-                testCase.isMongos) {
+            if (testCase.isReplSetMongod || testCase.isPrimaryShardMongod || testCase.isMongos) {
                 assert.commandWorked(res0);
                 assert.commandWorked(res1);
             } else {
@@ -87,6 +95,7 @@ function testExistingUnshardedCollection(writeConn, testCases) {
 }
 
 function testExistingShardedCollection(st, testCases) {
+    const dbName = dbNameBase;
     const collName = "testCollSharded";
     const ns = dbName + "." + collName;
     const coll = st.s.getCollection(ns);
@@ -163,6 +172,7 @@ function testExistingShardedCollection(st, testCases) {
 }
 
 function testNotSupportReadWriteConcern(writeConn, testCases) {
+    const dbName = dbNameBase;
     const collName = "testCollReadWriteConcern";
     const ns = dbName + "." + collName;
     const coll = writeConn.getCollection(ns);
@@ -195,12 +205,12 @@ function testNotSupportReadWriteConcern(writeConn, testCases) {
         }
     });
 
-    assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-    st.ensurePrimaryShard(dbName, st.shard0.name);
+    assert.commandWorked(st.s.adminCommand({enableSharding: dbNameBase}));
+    st.ensurePrimaryShard(dbNameBase, st.shard0.name);
 
+    const testCases = [];
     // The analyzeShardKey command is supported on mongos and all shardsvr mongods (both primary and
     // secondary).
-    const testCases = [];
     testCases.push({conn: st.s, isSupported: true, isMongos: true});
     st.rs0.nodes.forEach(node => {
         testCases.push({conn: node, isSupported: true, isPrimaryShardMongod: true});
@@ -226,15 +236,15 @@ function testNotSupportReadWriteConcern(writeConn, testCases) {
 }
 
 {
-    const rst = new ReplSetTest({nodes: 2});
+    const rst = new ReplSetTest({name: jsTest.name() + "_non_multitenant", nodes: 2});
     rst.startSet();
     rst.initiate();
     const primary = rst.getPrimary();
 
-    // The analyzeShardKey command is supported on all mongods (both primary and secondary).
     const testCases = [];
+    // The analyzeShardKey command is supported on all mongods (both primary and secondary).
     rst.nodes.forEach(node => {
-        testCases.push({conn: node, isSupported: true, isNonShardsvrMongod: true});
+        testCases.push({conn: node, isSupported: true, isReplSetMongod: true});
     });
 
     testExistingUnshardedCollection(primary, testCases);
@@ -242,5 +252,39 @@ function testNotSupportReadWriteConcern(writeConn, testCases) {
     testNotSupportReadWriteConcern(primary, testCases);
 
     rst.stopSet();
+}
+
+if (!TestData.auth) {
+    const rst = new ReplSetTest({
+        name: jsTest.name() + "_multitenant",
+        nodes: 1,
+        nodeOptions: {auth: "", setParameter: {multitenancySupport: true}}
+    });
+    rst.startSet({keyFile: "jstests/libs/key1"});
+    rst.initiate();
+    const primary = rst.getPrimary();
+    const adminDb = primary.getDB("admin");
+    const tenantId = ObjectId();
+
+    // Prepare a user for testing multitenancy via $tenant.
+    // Must be authenticated as a user with ActionType::useTenant in order to use $tenant.
+    assert.commandWorked(
+        adminDb.runCommand({createUser: "admin", pwd: "pwd", roles: ["__system"]}));
+    assert(adminDb.auth("admin", "pwd"));
+
+    // The analyzeShardKey command is supported on any mongod.
+    const testCases = [{conn: adminDb, isSupported: true}];
+    testNonExistingCollection(testCases, tenantId);
+    rst.stopSet();
+}
+
+{
+    const mongod = MongoRunner.runMongod();
+
+    // The analyzeShardKey command is not supported on standalone mongod.
+    const testCases = [{conn: mongod, isSupported: false}];
+    testExistingUnshardedCollection(mongod, testCases);
+
+    MongoRunner.stopMongod(mongod);
 }
 })();

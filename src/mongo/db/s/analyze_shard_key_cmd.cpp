@@ -68,9 +68,11 @@ public:
 
         Response typedRun(OperationContext* opCtx) {
             uassert(ErrorCodes::IllegalOperation,
+                    "analyzeShardKey command is not supported on a standalone mongod",
+                    repl::ReplicationCoordinator::get(opCtx)->isReplEnabled());
+            uassert(ErrorCodes::IllegalOperation,
                     "analyzeShardKey command is not supported on a configsvr mongod",
-                    serverGlobalParams.clusterRole == ClusterRole::None ||
-                        serverGlobalParams.clusterRole.isShardRole());
+                    !serverGlobalParams.clusterRole.isExclusivelyConfigSvrRole());
 
             const auto& nss = ns();
             const auto& key = request().getKey();
