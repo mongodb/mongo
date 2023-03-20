@@ -923,8 +923,11 @@ private:
     // Map of drop pending idents to their instance of Collection/IndexCatalogEntry. To avoid
     // affecting the lifetime and delay of the ident drop from the ident reaper, these need to be a
     // weak_ptr.
-    StringMap<std::weak_ptr<Collection>> _dropPendingCollection;
-    StringMap<std::weak_ptr<IndexCatalogEntry>> _dropPendingIndex;
+    immutable::unordered_map<std::string, std::weak_ptr<Collection>, StringMapHasher, StringMapEq>
+        _dropPendingCollection;
+    immutable::
+        unordered_map<std::string, std::weak_ptr<IndexCatalogEntry>, StringMapHasher, StringMapEq>
+            _dropPendingIndex;
 
     // Incremented whenever the CollectionCatalog gets closed and reopened (onCloseCatalog and
     // onOpenCatalog).

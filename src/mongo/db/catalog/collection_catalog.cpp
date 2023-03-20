@@ -1176,11 +1176,12 @@ std::shared_ptr<Collection> CollectionCatalog::_createCompatibleCollection(
     const DurableCatalogEntry& catalogEntry) const {
     // Check if the collection is drop pending, not expired, and compatible with the read timestamp.
     std::shared_ptr<Collection> dropPendingColl = [&]() -> std::shared_ptr<Collection> {
-        auto dropPendingIt = _dropPendingCollection.find(catalogEntry.ident);
-        if (dropPendingIt == _dropPendingCollection.end()) {
+        const std::weak_ptr<Collection>* dropPending =
+            _dropPendingCollection.find(catalogEntry.ident);
+        if (!dropPending) {
             return nullptr;
         }
-        return dropPendingIt->second.lock();
+        return dropPending->lock();
     }();
 
     if (isExistingCollectionCompatible(dropPendingColl, readTimestamp)) {
@@ -1272,12 +1273,12 @@ std::shared_ptr<Collection> CollectionCatalog::_createNewPITCollection(
 }
 
 std::shared_ptr<IndexCatalogEntry> CollectionCatalog::findDropPendingIndex(StringData ident) const {
-    auto it = _dropPendingIndex.find(ident);
-    if (it == _dropPendingIndex.end()) {
+    const std::weak_ptr<IndexCatalogEntry>* dropPending = _dropPendingIndex.find(ident);
+    if (!dropPending) {
         return nullptr;
     }
 
-    return it->second.lock();
+    return dropPending->lock();
 }
 
 void CollectionCatalog::onCreateCollection(OperationContext* opCtx,
@@ -2039,9 +2040,8 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(
             LOGV2_DEBUG(
                 6825300, 1, "Registering drop pending collection ident", "ident"_attr = ident);
 
-            auto it = _dropPendingCollection.find(ident);
-            invariant(it == _dropPendingCollection.end());
-            _dropPendingCollection[ident] = coll;
+            invariant(!_dropPendingCollection.find(ident));
+            _dropPendingCollection = _dropPendingCollection.set(ident, coll);
         }
     }
 
@@ -2411,8 +2411,8 @@ void CollectionCatalog::deregisterAllCollectionsAndViews(ServiceContext* svcCtx)
     _orderedCollections.clear();
     _catalog = {};
     _viewsForDatabase = {};
-    _dropPendingCollection.clear();
-    _dropPendingIndex.clear();
+    _dropPendingCollection = {};
+    _dropPendingIndex = {};
     _stats = {};
 
     ResourceCatalog::get(svcCtx).clear();
@@ -2445,11 +2445,10 @@ void CollectionCatalog::deregisterIndex(OperationContext* opCtx,
     // Unfinished index builds return a nullptr for getSharedIdent(). Use getIdent() instead.
     std::string ident = indexEntry->getIdent();
 
-    auto it = _dropPendingIndex.find(ident);
-    invariant(it == _dropPendingIndex.end());
+    invariant(!_dropPendingIndex.find(ident));
 
     LOGV2_DEBUG(6825301, 1, "Registering drop pending index entry ident", "ident"_attr = ident);
-    _dropPendingIndex[ident] = indexEntry;
+    _dropPendingIndex = _dropPendingIndex.set(ident, indexEntry);
 }
 
 void CollectionCatalog::notifyIdentDropped(const std::string& ident) {
@@ -2463,17 +2462,8 @@ void CollectionCatalog::notifyIdentDropped(const std::string& ident) {
     // function, for idents we've already cleared from the collection catalogs in-memory state.
     LOGV2_DEBUG(6825302, 1, "Deregistering drop pending ident", "ident"_attr = ident);
 
-    auto collIt = _dropPendingCollection.find(ident);
-    if (collIt != _dropPendingCollection.end()) {
-        _dropPendingCollection.erase(collIt);
-        return;
-    }
-
-    auto indexIt = _dropPendingIndex.find(ident);
-    if (indexIt != _dropPendingIndex.end()) {
-        _dropPendingIndex.erase(indexIt);
-        return;
-    }
+    _dropPendingCollection = _dropPendingCollection.erase(ident);
+    _dropPendingIndex = _dropPendingIndex.erase(ident);
 }
 
 CollectionCatalog::iterator CollectionCatalog::begin(OperationContext* opCtx,
