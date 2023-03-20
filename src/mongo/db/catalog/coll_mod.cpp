@@ -112,7 +112,7 @@ struct ParsedCollModRequest {
     boost::optional<Collection::Validator> collValidator;
     boost::optional<ValidationActionEnum> collValidationAction;
     boost::optional<ValidationLevelEnum> collValidationLevel;
-    bool recordPreImages = false;
+    boost::optional<bool> recordPreImages;
     boost::optional<ChangeStreamPreAndPostImagesOptions> changeStreamPreAndPostImagesOptions;
     int numModifications = 0;
     bool dryRun = false;
@@ -898,7 +898,7 @@ Status _collModInternal(OperationContext* opCtx,
                 cmrNew.recordPreImages = false;
             }
 
-            if (cmrNew.recordPreImages) {
+            if (cmrNew.recordPreImages && *cmrNew.recordPreImages) {
                 cmrNew.changeStreamPreAndPostImagesOptions =
                     ChangeStreamPreAndPostImagesOptions(false);
             }
@@ -945,8 +945,9 @@ Status _collModInternal(OperationContext* opCtx,
                                        "Failed to set validationLevel");
         }
 
-        if (cmrNew.recordPreImages != oldCollOptions.recordPreImages) {
-            coll.getWritableCollection(opCtx)->setRecordPreImages(opCtx, cmrNew.recordPreImages);
+        if (cmrNew.recordPreImages.has_value() &&
+            *cmrNew.recordPreImages != oldCollOptions.recordPreImages) {
+            coll.getWritableCollection(opCtx)->setRecordPreImages(opCtx, *cmrNew.recordPreImages);
         }
 
         if (cmrNew.changeStreamPreAndPostImagesOptions.has_value() &&

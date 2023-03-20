@@ -46,6 +46,13 @@ assert.commandWorked(testDB.runCommand({create: collName2}));
 assert.commandWorked(testDB.runCommand({collMod: collName2, recordPreImages: true}));
 assert.eq(findCollectionInfo(collName2).options.recordPreImages, true);
 
+// Verify that 'recordPreImages' attribute remains set after collMod command.
+assert.commandWorked(testDB.runCommand({
+    collMod: collName2,
+    "validator": {"$jsonSchema": {"properties": {"items": {"bsonType": "array"}}}}
+}));
+assert.eq(findCollectionInfo(collName2).options.recordPreImages, true);
+
 // Test that the recordPreImages flag can be unset successfully using the 'collMod' command.
 assert.commandWorked(testDB.runCommand({collMod: collName, recordPreImages: false}));
 assert.eq(findCollectionInfo(collName).options, {});
