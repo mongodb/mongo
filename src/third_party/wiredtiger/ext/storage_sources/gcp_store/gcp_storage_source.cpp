@@ -40,18 +40,29 @@
 struct gcp_file_system;
 struct gcp_file_handle;
 
+// Statistics to be collected for the Google cloud storage.
+struct gcp_statistics {
+    uint64_t num_list_objects_requests;
+    uint64_t num_put_object_requests;
+    uint64_t num_read_object_requests;
+    uint64_t num_object_exists_requests;
+};
+
 /*
  * The first struct member must be the WiredTiger interface that is being implemented.
  */
 struct gcp_store {
     WT_STORAGE_SOURCE storage_source;
     WT_EXTENSION_API *wt_api;
+
+    std::vector<gcp_file_system *> fs_list;
+    std::mutex fs_list_mutex;
+    uint32_t reference_count;
+
+    WT_VERBOSE_LEVEL verbose;
     std::shared_ptr<gcp_log_system> log;
     google::cloud::LogSink::BackendId log_id;
-    std::mutex fs_list_mutex;
-    std::vector<gcp_file_system *> fs_list;
-    uint32_t reference_count;
-    WT_VERBOSE_LEVEL verbose;
+    gcp_statistics statistics;
 };
 
 struct gcp_file_system {
@@ -100,6 +111,8 @@ static int gcp_object_list_single(
   WT_FILE_SYSTEM *, WT_SESSION *, const char *, const char *, char ***, uint32_t *);
 static int gcp_object_list_free(WT_FILE_SYSTEM *, WT_SESSION *, char **, uint32_t);
 static int gcp_terminate(WT_STORAGE_SOURCE *, WT_SESSION *);
+
+static void gcp_log_statistics(const gcp_store &);
 
 static gcp_file_system *
 get_gcp_file_system(WT_FILE_SYSTEM *file_system)
@@ -271,6 +284,7 @@ gcp_flush(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session, WT_FILE_SYSTEM
     gcp_file_system *fs = get_gcp_file_system(file_system);
     WT_FILE_SYSTEM *wt_file_system = fs->wt_file_system;
 
+    gcp->statistics.num_put_object_requests++;
     // std::filesystem::canonical will throw an exception if object does not exist so
     // check if the object exists.
     if (!std::filesystem::exists(source)) {
@@ -278,7 +292,6 @@ gcp_flush(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session, WT_FILE_SYSTEM
           "gcp_flush: Object: " + std::string(object) + " does not exist.");
         return ENOENT;
     }
-
     // Confirm that the file exists on the native filesystem.
     std::filesystem::path path = std::filesystem::canonical(source);
     bool exist_native = false;
@@ -319,6 +332,7 @@ gcp_file_system_exists(
     size_t size;
     int ret = 0;
 
+    gcp->statistics.num_object_exists_requests++;
     gcp->log->log_debug_message(
       "gcp_file_system_exists: Checking object: " + std::string(name) + " exists in GCP.");
     ret = fs->gcp_conn->object_exists(name, *existp, size);
@@ -505,6 +519,7 @@ gcp_object_list_helper(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const c
     std::string complete_prefix;
 
     *count = 0;
+    gcp->statistics.num_list_objects_requests++;
 
     if (directory != nullptr) {
         complete_prefix += directory;
@@ -540,8 +555,8 @@ gcp_file_read(
     gcp_file_system *fs = gcp_fh->file_system;
     gcp_store *gcp = fs->storage_source;
 
+    gcp->statistics.num_read_object_requests++;
     int ret;
-
     if ((ret = fs->gcp_conn->read_object(gcp_fh->name, offset, len, buf)) != 0)
         gcp->log->log_error_message("gcp_file_read: read attempt failed.");
 
@@ -639,10 +654,25 @@ gcp_terminate(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session)
         gcp_file_system_terminate(&fs->file_system, session);
     }
 
+    gcp_log_statistics(*gcp);
     gcp->log->log_debug_message("gcp_terminate: terminated GCP storage source.");
     delete (gcp);
 
     return 0;
+}
+
+// Log collected statistics.
+static void
+gcp_log_statistics(const gcp_store &gcp)
+{
+    gcp.log->log_debug_message(
+      "GCP list objects count: " + std::to_string(gcp.statistics.num_list_objects_requests));
+    gcp.log->log_debug_message(
+      "GCP put object count: " + std::to_string(gcp.statistics.num_put_object_requests));
+    gcp.log->log_debug_message(
+      "GCP get object count: " + std::to_string(gcp.statistics.num_read_object_requests));
+    gcp.log->log_debug_message(
+      "GCP object exists count: " + std::to_string(gcp.statistics.num_object_exists_requests));
 }
 
 int
@@ -669,6 +699,7 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
         return ret != 0 ? ret : EINVAL;
     }
 
+    gcp->statistics = {};
     // Initialize the GCP logging.
     gcp->log_id = google::cloud::LogSink::Instance().AddBackend(gcp->log);
 
