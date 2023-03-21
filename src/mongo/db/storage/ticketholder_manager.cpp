@@ -51,6 +51,9 @@ TicketHolderManager::TicketHolderManager(ServiceContext* svcCtx,
     : _readTicketHolder(std::move(readTicketHolder)),
       _writeTicketHolder(std::move(writeTicketHolder)),
       _monitor([this, svcCtx]() -> std::unique_ptr<TicketHolderMonitor> {
+          if (!feature_flags::gFeatureFlagExecutionControl.isEnabledAndIgnoreFCV()) {
+              return nullptr;
+          }
           switch (StorageEngineConcurrencyAdjustmentAlgorithm_parse(
               IDLParserContext{"storageEngineConcurrencyAdjustmentAlgorithm"},
               gStorageEngineConcurrencyAdjustmentAlgorithm)) {
@@ -62,7 +65,7 @@ TicketHolderManager::TicketHolderManager(ServiceContext* svcCtx,
           }
           MONGO_UNREACHABLE;
       }()) {
-    if (_monitor && feature_flags::gFeatureFlagExecutionControl.isEnabledAndIgnoreFCV()) {
+    if (_monitor) {
         _monitor->start();
     }
 }
