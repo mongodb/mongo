@@ -2137,13 +2137,14 @@ TEST_F(ExpressionDateArithmeticsTest, OptimizesToConstant) {
         dateAddExp = Expression::parseExpression(expCtx.get(), doc, expCtx->variablesParseState);
         ASSERT(dynamic_cast<ExpressionConstant*>(dateAddExp->optimize().get()));
 
+        // Test that $$NOW will not be optimized as constant.
         doc = BSON(expName << BSON("startDate"
                                    << "$$NOW"
                                    << "unit"
                                    << "day"
                                    << "amount" << 1));
         dateAddExp = Expression::parseExpression(expCtx.get(), doc, expCtx->variablesParseState);
-        ASSERT(dynamic_cast<ExpressionConstant*>(dateAddExp->optimize().get()));
+        ASSERT_FALSE(dynamic_cast<ExpressionConstant*>(dateAddExp->optimize().get()));
 
 
         // Test that expression does not optimize to constant if some of the parameters is not a
