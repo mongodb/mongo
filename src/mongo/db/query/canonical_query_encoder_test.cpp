@@ -73,7 +73,8 @@ protected:
         BSONObj collation,
         std::unique_ptr<FindCommandRequest> findCommand = nullptr,
         std::vector<BSONObj> pipelineObj = {},
-        bool isCountLike = false) {
+        bool isCountLike = false,
+        bool needsMerge = false) {
         if (!findCommand) {
             findCommand = std::make_unique<FindCommandRequest>(nss);
         }
@@ -84,6 +85,7 @@ protected:
 
         const auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx, nss);
         expCtx->addResolvedNamespaces({foreignNss});
+        expCtx->needsMerge = needsMerge;
         if (!findCommand->getCollation().isEmpty()) {
             auto statusWithCollator = CollatorFactoryInterface::get(opCtx->getServiceContext())
                                           ->makeFromBSON(findCommand->getCollation());
@@ -147,7 +149,8 @@ protected:
                            const char* projStr,
                            std::unique_ptr<FindCommandRequest> findCommand = nullptr,
                            std::vector<BSONObj> pipelineObj = {},
-                           bool isCountLike = false) {
+                           bool isCountLike = false,
+                           bool needsMerge = false) {
         auto& stream = gctx.outStream();
         stream << "==== VARIATION: sbe, query=" << queryStr << ", sort=" << sortStr
                << ", proj=" << projStr;
@@ -159,6 +162,9 @@ protected:
         if (isCountLike) {
             stream << ", isCountLike=true";
         }
+        if (needsMerge) {
+            stream << ", needsMerge=true";
+        }
         stream << std::endl;
         BSONObj collation;
         unique_ptr<CanonicalQuery> cq(canonicalize(opCtx(),
@@ -168,7 +174,8 @@ protected:
                                                    collation,
                                                    std::move(findCommand),
                                                    std::move(pipelineObj),
-                                                   isCountLike));
+                                                   isCountLike,
+                                                   needsMerge));
         cq->setSbeCompatible(true);
         const auto key = canonical_query_encoder::encodeSBE(*cq);
         gctx.outStream() << key << std::endl;
@@ -570,6 +577,30 @@ TEST_F(CanonicalQueryEncoderTest, ComputeKeyWithApiStrict) {
         APIParameters::get(opCtx()).setAPIStrict(true);
         testComputeSBEKey(gctx, "{}", "{}", "{}");
     }
+}
+
+TEST_F(CanonicalQueryEncoderTest, ComputeKeyWithNeedsMerge) {
+    unittest::GoldenTestContext gctx(&goldenTestConfig);
+    RAIIServerParameterControllerForTest controllerSBE("internalQueryFrameworkControl",
+                                                       "trySbeEngine");
+    const auto groupStage = fromjson("{$group: {_id: '$a', out: {$sum: 1}}}");
+    testComputeSBEKey(gctx,
+                      "{}",
+                      "{}",
+                      "{}",
+                      nullptr /* findCommand */,
+                      {groupStage},
+                      false /* isCountLike */,
+                      false /* needsMerge */);
+
+    testComputeSBEKey(gctx,
+                      "{}",
+                      "{}",
+                      "{}",
+                      nullptr /* findCommand */,
+                      {groupStage},
+                      false /* isCountLike */,
+                      true /* needsMerge */);
 }
 
 }  // namespace

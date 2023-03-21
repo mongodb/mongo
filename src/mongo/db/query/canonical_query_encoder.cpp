@@ -1126,6 +1126,12 @@ std::string encodeSBE(const CanonicalQuery& cq) {
         cq.getOpCtx() && APIParameters::get(cq.getOpCtx()).getAPIStrict().value_or(false);
     bufBuilder.appendChar(apiStrict ? 1 : 0);
 
+    // We can wind up with different query plans for aggregate commands if 'needsMerge' is set or
+    // not. For instance, when 'needsMerge' is true, $group queries will produce partial aggregates
+    // as output, and complete output otherwise.
+    const bool needsMerge = cq.getExpCtx()->needsMerge;
+    bufBuilder.appendChar(needsMerge ? 1 : 0);
+
     encodeFindCommandRequest(cq.getFindCommandRequest(), &bufBuilder);
 
     encodePipeline(cq.pipeline(), &bufBuilder);
