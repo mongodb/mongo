@@ -196,9 +196,7 @@ void QueryAnalysisCoordinator::onStartup(OperationContext* opCtx) {
     }
 
     {
-        if (!gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV()) {
-            invariant(_samplers.empty());
-        }
+        invariant(_samplers.empty());
 
         auto minPingTime = _getMinLastPingTime();
         FindCommandRequest findRequest{MongosType::ConfigNS};
