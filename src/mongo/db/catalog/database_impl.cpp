@@ -59,6 +59,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/replication_consistency_markers_impl.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/server_options.h"
@@ -494,8 +495,14 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
                                                        OpObserver::CollectionDropType::kOnePhase,
                                                        markFromMigrate);
             // OpObserver::onDropCollection should not be writing to the oplog on the secondary.
-            invariant(opTime.isNull(),
-                      str::stream() << "OpTime is not null. OpTime: " << opTime.toString());
+            // The exception is shard merge where, we perform unreplicated timestamped drops of
+            // imported collection on observing the state document update to aborted state via op
+            // observer, both on primary and secondaries. In such cases, on primary, we expect
+            // `opTime` equal to dropOpTime (i.e, state document update opTime).
+            invariant(opTime.isNull() || repl::tenantMigrationInfo(opCtx),
+                      str::stream()
+                          << "OpTime is not null or equal to dropOptime. OpTime: "
+                          << opTime.toString() << " dropOpTime: " << dropOpTime.toString());
         }
 
         return _finishDropCollection(opCtx, nss, collection.getWritableCollection(opCtx));

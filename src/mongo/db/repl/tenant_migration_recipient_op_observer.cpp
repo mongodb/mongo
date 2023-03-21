@@ -243,6 +243,7 @@ void TenantMigrationRecipientOpObserver::onUpdate(OperationContext* opCtx,
         !tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         auto recipientStateDoc = TenantMigrationRecipientDocument::parse(
             IDLParserContext("recipientStateDoc"), args.updateArgs->updatedDoc);
+
         opCtx->recoveryUnit()->onCommit([recipientStateDoc](OperationContext* opCtx,
                                                             boost::optional<Timestamp>) {
             if (recipientStateDoc.getExpireAt()) {

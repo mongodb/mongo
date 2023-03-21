@@ -124,7 +124,13 @@ inline Status validateDatabasePrefix(const TenantId& tenantId) {
 }
 
 inline Status validateDatabasePrefix(const std::vector<TenantId>& tenantsId) {
+    std::set<TenantId> tenants;
     for (const auto& tenantId : tenantsId) {
+        auto res = tenants.emplace(tenantId);
+        uassert(ErrorCodes::InvalidOptions,
+                str::stream() << "Duplicate tenantIds are not allowed. Duplicate tenantId : "
+                              << tenantId,
+                res.second);
         auto status = validateDatabasePrefix(tenantId);
         if (!status.isOK()) {
             return status;
@@ -248,10 +254,12 @@ inline void protocolTenantIdsCompatibilityCheck(
 
     switch (protocol) {
         case MigrationProtocolEnum::kShardMerge: {
-            uassert(ErrorCodes::InvalidOptions,
-                    str::stream() << "'tenantIds' is required for protocol '"
-                                  << MigrationProtocol_serializer(protocol) << "'",
-                    tenantIds && !tenantIds->empty());
+            {
+                uassert(ErrorCodes::InvalidOptions,
+                        str::stream() << "'tenantIds' is required for protocol '"
+                                      << MigrationProtocol_serializer(protocol) << "'",
+                        tenantIds && !tenantIds->empty());
+            }
             break;
         }
         case MigrationProtocolEnum::kMultitenantMigrations: {

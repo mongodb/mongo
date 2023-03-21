@@ -1338,7 +1338,7 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
                                               std::uint64_t numRecords,
                                               const CollectionDropType dropType,
                                               bool markFromMigrate) {
-    if (!collectionName.isSystemDotProfile()) {
+    if (!collectionName.isSystemDotProfile() && opCtx->writesAreReplicated()) {
         // Do not replicate system.profile modifications.
         MutableOplogEntry oplogEntry;
         oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
@@ -1351,14 +1351,12 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
         oplogEntry.setObject2(makeObject2ForDropOrRename(numRecords));
         auto opTime =
             logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _oplogWriter.get());
-        if (opCtx->writesAreReplicated()) {
-            LOGV2(7360106,
-                  "Wrote oplog entry for drop",
-                  "namespace"_attr = oplogEntry.getNss(),
-                  "uuid"_attr = oplogEntry.getUuid(),
-                  "opTime"_attr = opTime,
-                  "object"_attr = oplogEntry.getObject());
-        }
+        LOGV2(7360106,
+              "Wrote oplog entry for drop",
+              "namespace"_attr = oplogEntry.getNss(),
+              "uuid"_attr = oplogEntry.getUuid(),
+              "opTime"_attr = opTime,
+              "object"_attr = oplogEntry.getObject());
     }
 
     uassert(50715,

@@ -68,6 +68,7 @@ function verifyChangeCollectionEntries(
 // This class also provides helpers that are commonly used when working with change collections.
 class ChangeStreamMultitenantReplicaSetTest extends ReplSetTest {
     constructor(config = {}) {
+        jsTestLog(`Config is ${tojson(config)}`);
         // Instantiate the 'ReplSetTest' with 'serverless' as an option.
         super(Object.assign({name: "ChangeStreamMultitenantReplicaSetTest", serverless: true},
                             config));
@@ -83,6 +84,7 @@ class ChangeStreamMultitenantReplicaSetTest extends ReplSetTest {
         const nodeOptions = config.nodeOptions || {};
         const setParameter =
             Object.assign({}, nodeOptions.setParameter || {}, this._multitenancyParameters);
+        jsTestLog(`Set parameter is : ${tojson(setParameter)}`);
         this.startSet({setParameter});
         this.initiate();
 

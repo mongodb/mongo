@@ -32,6 +32,11 @@
 
 #include <fmt/format.h>
 
+#include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog/drop_database.h"
+#include "mongo/db/catalog_raii.h"
+#include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/repl/shard_merge_recipient_service.h"
 #include "mongo/db/repl/tenant_file_importer_service.h"
@@ -49,6 +54,65 @@
 namespace mongo::repl {
 using namespace fmt;
 namespace {
+void deleteTenantDataWhenMergeAborts(OperationContext* opCtx,
+                                     const ShardMergeRecipientDocument& doc) {
+    invariant(doc.getAbortOpTime());
+    invariant(opCtx->lockState()->inAWriteUnitOfWork());
+
+    auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
+    const auto dropOpTime = *doc.getAbortOpTime();
+
+    UnreplicatedWritesBlock writeBlock{opCtx};
+    AllowLockAcquisitionOnTimestampedUnitOfWork allowAcquisitionOfLocks(opCtx->lockState());
+
+    for (const auto& tenantId : doc.getTenantIds()) {
+        std::vector<DatabaseName> databases;
+        if (gMultitenancySupport) {
+            databases = storageEngine->listDatabases(tenantId);
+        } else {
+            auto allDatabases = storageEngine->listDatabases();
+            std::copy_if(allDatabases.begin(),
+                         allDatabases.end(),
+                         std::back_inserter(databases),
+                         [tenant = tenantId.toString() + "_"](const DatabaseName& db) {
+                             return StringData{db.db()}.startsWith(tenant);
+                         });
+        }
+
+        for (const auto& database : databases) {
+            AutoGetDb autoDb{opCtx, database, MODE_X};
+            Database* db = autoDb.getDb();
+            if (!db) {
+                continue;
+            }
+
+            LOGV2(7221802,
+                  "Dropping tenant database for shard merge garbage collection",
+                  "tenant"_attr = tenantId,
+                  "database"_attr = database,
+                  "migrationId"_attr = doc.getId(),
+                  "abortOpTime"_attr = *doc.getAbortOpTime());
+
+            IndexBuildsCoordinator::get(opCtx)->assertNoBgOpInProgForDb(db->name());
+
+            auto catalog = CollectionCatalog::get(opCtx);
+            for (auto collIt = catalog->begin(opCtx, db->name()); collIt != catalog->end(opCtx);
+                 ++collIt) {
+                auto collection = *collIt;
+                if (!collection) {
+                    break;
+                }
+
+                uassertStatusOK(
+                    db->dropCollectionEvenIfSystem(opCtx, collection->ns(), dropOpTime));
+            }
+
+            auto databaseHolder = DatabaseHolder::get(opCtx);
+            databaseHolder->close(opCtx, db->name());
+        }
+    }
+}
+
 void onShardMergeRecipientsNssInsert(OperationContext* opCtx,
                                      std::vector<InsertStatement>::const_iterator first,
                                      std::vector<InsertStatement>::const_iterator last) {
@@ -211,6 +275,10 @@ void onTransitioningToAborted(OperationContext* opCtx,
                 .releaseLock(ServerlessOperationLockRegistry::LockType::kMergeRecipient,
                              migrationId);
         });
+
+        tenantMigrationInfo(opCtx) =
+            boost::make_optional<TenantMigrationInfo>(recipientStateDoc.getId());
+        deleteTenantDataWhenMergeAborts(opCtx, recipientStateDoc);
     }
 }
 }  // namespace
