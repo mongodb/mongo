@@ -552,8 +552,6 @@ void GeoNearMatchExpression::debugString(StringBuilder& debug, int indentationLe
 }
 
 BSONObj GeoNearMatchExpression::getSerializedRightHandSide(SerializationOptions opts) const {
-    // TODO SERVER-73672 looks like we'll need to traverse '_rawObj' if 'replacementForLiteralArgs'
-    // is set.
     if (opts.replacementForLiteralArgs) {
         return redactGeoExpression(_rawObj, opts.replacementForLiteralArgs);
     }
