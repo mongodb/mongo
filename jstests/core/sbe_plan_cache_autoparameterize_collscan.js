@@ -7,8 +7,9 @@
  *   assumes_read_preference_unchanged,
  *   assumes_unsharded_collection,
  *   does_not_support_stepdowns,
- *   # The SBE plan cache was enabled by default in 6.3.
- *   requires_fcv_63,
+ *   # The SBE plan cache was enabled by default in 6.3, some of the $in tests behave differently
+ *   # in 7.0.
+ *   requires_fcv_70,
  *   # Plan cache state is node-local and will not get migrated alongside tenant data.
  *   tenant_migration_incompatible,
  *   # TODO SERVER-67607: Test plan cache with CQF enabled.
@@ -334,12 +335,28 @@ if (checkSBEEnabled(db, ["featureFlagSbeFull"])) {
 } else {
     jsTestLog("Skipping $expr test cases because SBE is not fully enabled");
 }
-// Test that the entire list of $in values is treated as a parameter.
+
+// Test that the same length of $in list generates the same plan cache key.
+runTest({query: {a: {$in: [1, 2]}}, projection: {_id: 1}},
+        [{_id: 0}, {_id: 1}],
+        {query: {a: {$in: [2, 3]}}, projection: {_id: 1}},
+        [{_id: 1}, {_id: 2}, {_id: 5}, {_id: 6}],
+        true);
+
+// Test that different length of $in list with the same number of unique values generates the same
+// plan cache key.
+runTest({query: {a: {$in: [1, 2]}}, projection: {_id: 1}},
+        [{_id: 0}, {_id: 1}],
+        {query: {a: {$in: [2, 3, 2]}}, projection: {_id: 1}},
+        [{_id: 1}, {_id: 2}, {_id: 5}, {_id: 6}],
+        true);
+
+// Test that a different number of unique $in values results in a different plan cache key.
 runTest({query: {a: {$in: [1, 2]}}, projection: {_id: 1}},
         [{_id: 0}, {_id: 1}],
         {query: {a: {$in: [1, 2, 3, 4]}}, projection: {_id: 1}},
         [{_id: 0}, {_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}, {_id: 5}, {_id: 6}],
-        true);
+        false);
 
 // Adding a null value to an $in inhibits auto-parameterization.
 runTest({query: {a: {$in: [1, 2]}}, projection: {_id: 1}},

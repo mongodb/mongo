@@ -55,8 +55,12 @@ void bind(const CanonicalQuery&,
  * - 'cq' is the query
  * - 'indexBoundsInfo' contains the IETs and the slots
  * - runtimeEnvironment SBE runtime environment
+ * - 'indexBoundsEvaluationCache' is the evaluation cache used by the explode nodes to keep the
+ * common IET evaluation results.
  */
-void bindIndexBounds(const CanonicalQuery& cq,
-                     const stage_builder::IndexBoundsEvaluationInfo& indexBoundsInfo,
-                     sbe::RuntimeEnvironment* runtimeEnvironment);
+void bindIndexBounds(
+    const CanonicalQuery& cq,
+    const stage_builder::IndexBoundsEvaluationInfo& indexBoundsInfo,
+    sbe::RuntimeEnvironment* runtimeEnvironment,
+    interval_evaluation_tree::IndexBoundsEvaluationCache* indexBoundsEvaluationCache = nullptr);
 }  // namespace mongo::input_params

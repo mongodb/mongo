@@ -54,6 +54,7 @@
 namespace mongo {
 
 using std::endl;
+using std::pair;
 using std::string;
 using std::unique_ptr;
 using std::vector;
@@ -136,6 +137,34 @@ bool isUnionOfPoints(const OrderedIntervalList& oil) {
 }
 
 /**
+ * Returns true if we are safe to explode the 'oil' with the corresponding 'iet' that will be
+ * evaluated on different input parameters.
+ */
+bool isOilExplodable(const OrderedIntervalList& oil,
+                     const boost::optional<interval_evaluation_tree::IET>& iet) {
+    if (!isUnionOfPoints(oil)) {
+        return false;
+    }
+
+    if (iet) {
+        // In order for the IET to be evaluated to the same number of point intervals given any set
+        // of input parameters, the IET needs to be either a const node, or an $eq/$in eval node.
+        // Having union or intersection may result in different number of point intervals when the
+        // IET is evaluated.
+        if (const auto* ietEval = iet->cast<interval_evaluation_tree::EvalNode>(); ietEval) {
+            return ietEval->matchType() == MatchExpression::EQ ||
+                ietEval->matchType() == MatchExpression::MATCH_IN;
+        } else if (iet->is<interval_evaluation_tree::ConstNode>()) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/**
  * Should we try to expand the index scan(s) in 'solnRoot' to pull out an indexed sort?
  *
  * Returns the node which should be replaced by the merge sort of exploded scans, or nullptr
@@ -178,8 +207,17 @@ std::unique_ptr<QuerySolutionNode>* structureOKForExplode(
     return nullptr;
 }
 
-// vectors of vectors can be > > annoying.
+/**
+ * A pair of <PointPrefix, PrefixIndices> are returned from the Cartesian product function,
+ * where PointPrefix is the list of point intervals that has been exploded, and the PrefixIndices is
+ * the list of indices of each point interval in the original union of points OIL.
+ *
+ * For example, if the index bounds is {a: [[1, 1], [2, 2]], b: [[3, 3], c: [[MinKey, MaxKey]]},
+ * then the two PointPrefix are: [[1, 1], [3, 3]] and [[2, 2], [3, 3]].
+ * The two PrefixIndices are [0, 0] and [1, 0].
+ */
 typedef vector<Interval> PointPrefix;
+typedef vector<size_t> PrefixIndices;
 
 /**
  * The first 'fieldsToExplode' fields of 'bounds' are points.  Compute the Cartesian product
@@ -187,36 +225,41 @@ typedef vector<Interval> PointPrefix;
  */
 void makeCartesianProduct(const IndexBounds& bounds,
                           size_t fieldsToExplode,
-                          vector<PointPrefix>* prefixOut) {
-    vector<PointPrefix> prefixForScans;
+                          vector<pair<PointPrefix, PrefixIndices>>* prefixOut) {
+    vector<pair<PointPrefix, PrefixIndices>> prefixForScans;
 
     // We dump the Cartesian product of bounds into prefixForScans, starting w/the first
     // field's points.
-    verify(fieldsToExplode >= 1);
+    invariant(fieldsToExplode >= 1);
     const OrderedIntervalList& firstOil = bounds.fields[0];
-    verify(firstOil.intervals.size() >= 1);
+    invariant(firstOil.intervals.size() >= 1);
     for (size_t i = 0; i < firstOil.intervals.size(); ++i) {
         const Interval& ival = firstOil.intervals[i];
-        verify(ival.isPoint());
+        invariant(ival.isPoint());
         PointPrefix pfix;
         pfix.push_back(ival);
-        prefixForScans.push_back(pfix);
+        PrefixIndices pfixIndices;
+        pfixIndices.push_back(i);
+        prefixForScans.emplace_back(std::make_pair(std::move(pfix), std::move(pfixIndices)));
     }
 
     // For each subsequent field...
     for (size_t i = 1; i < fieldsToExplode; ++i) {
-        vector<PointPrefix> newPrefixForScans;
+        vector<pair<PointPrefix, PrefixIndices>> newPrefixForScans;
         const OrderedIntervalList& oil = bounds.fields[i];
-        verify(oil.intervals.size() >= 1);
+        invariant(oil.intervals.size() >= 1);
         // For each point interval in that field (all ivals must be points)...
         for (size_t j = 0; j < oil.intervals.size(); ++j) {
             const Interval& ival = oil.intervals[j];
-            verify(ival.isPoint());
+            invariant(ival.isPoint());
             // Make a new scan by appending it to all scans in prefixForScans.
             for (size_t k = 0; k < prefixForScans.size(); ++k) {
-                PointPrefix pfix = prefixForScans[k];
+                auto pfix = prefixForScans[k].first;
                 pfix.push_back(ival);
-                newPrefixForScans.push_back(pfix);
+                auto pfixIndicies = prefixForScans[k].second;
+                pfixIndicies.push_back(j);
+                newPrefixForScans.emplace_back(
+                    std::make_pair(std::move(pfix), std::move(pfixIndicies)));
             }
         }
         // And update prefixForScans.
@@ -227,9 +270,10 @@ void makeCartesianProduct(const IndexBounds& bounds,
 }
 
 /**
- * Takes the provided 'node', either an IndexScanNode or FetchNode with a direct child that is an
- * IndexScanNode. Produces a list of new nodes, which are logically equivalent to 'node' if joined
- * by a MergeSort. Inserts these new nodes at the end of 'explosionResult'.
+ * Takes the provided 'node' (identified by 'nodeIndex'), either an IndexScanNode or FetchNode with
+ * a direct child that is an IndexScanNode. Produces a list of new nodes, which are logically
+ * equivalent to 'node' if joined by a MergeSort. Inserts these new nodes at the end of
+ * 'explosionResult'.
  *
  * 'fieldsToExplode' is a count of how many fields in the scan's bounds are the union of point
  * intervals.  This is computed beforehand and provided as a small optimization.
@@ -241,11 +285,14 @@ void makeCartesianProduct(const IndexBounds& bounds,
  * 'sort' will be {b: 1}
  * 'fieldsToExplode' will be 1 (as only one field isUnionOfPoints).
  *
+ * The return value is whether the original index scan needs to be deduplicated.
+ *
  * On return, 'explosionResult' will contain the following two scans:
  * a: [[1, 1]], b: [MinKey, MaxKey]
  * a: [[2, 2]], b: [MinKey, MaxKey]
  */
-void explodeNode(const QuerySolutionNode* node,
+bool explodeNode(const QuerySolutionNode* node,
+                 const size_t nodeIndex,
                  const BSONObj& sort,
                  size_t fieldsToExplode,
                  vector<std::unique_ptr<QuerySolutionNode>>* explosionResult) {
@@ -253,18 +300,57 @@ void explodeNode(const QuerySolutionNode* node,
     const IndexScanNode* isn = getIndexScanNode(node);
 
     // Turn the compact bounds in 'isn' into a bunch of points...
-    vector<PointPrefix> prefixForScans;
+    vector<pair<PointPrefix, PrefixIndices>> prefixForScans;
     makeCartesianProduct(isn->bounds, fieldsToExplode, &prefixForScans);
 
     for (size_t i = 0; i < prefixForScans.size(); ++i) {
-        const PointPrefix& prefix = prefixForScans[i];
-        verify(prefix.size() == fieldsToExplode);
+        const PointPrefix& prefix = prefixForScans[i].first;
+        const PrefixIndices& prefixIndices = prefixForScans[i].second;
+        invariant(prefix.size() == fieldsToExplode);
+        invariant(prefixIndices.size() == fieldsToExplode);
 
         // Copy boring fields into new child.
         auto child = std::make_unique<IndexScanNode>(isn->index);
         child->direction = isn->direction;
         child->addKeyMetadata = isn->addKeyMetadata;
         child->queryCollator = isn->queryCollator;
+
+        // Set up the IET of children when the original index scan has IET.
+        if (!isn->iets.empty()) {
+            // Set the explosion index for the exploded IET so that they can be evaluated to the
+            // correct point interval. When present, the caller should already have verified that
+            // the IETs are the correct shape (i.e. derived from an $in or $eq predicate) so that
+            // they are safe to explode.
+            for (size_t pidx = 0; pidx < prefixIndices.size(); pidx++) {
+                invariant(pidx < isn->iets.size());
+                const auto& iet = isn->iets[pidx];
+                if (const auto* ietEval = iet.cast<interval_evaluation_tree::EvalNode>(); ietEval) {
+                    if (ietEval->matchType() == MatchExpression::MATCH_IN) {
+                        auto ietExplode = interval_evaluation_tree::IET::make<
+                            interval_evaluation_tree::ExplodeNode>(
+                            iet, std::make_pair(nodeIndex, pidx), prefixIndices[pidx]);
+                        child->iets.push_back(std::move(ietExplode));
+                    } else {
+                        child->iets.push_back(iet);
+                    }
+                } else if (const auto* ietConst = iet.cast<interval_evaluation_tree::ConstNode>();
+                           ietConst) {
+                    OrderedIntervalList oilChild(ietConst->oil.name);
+                    oilChild.intervals.push_back(ietConst->oil.intervals[prefixIndices[pidx]]);
+                    invariant(oilChild.isPoint());
+                    auto ietConstChild =
+                        interval_evaluation_tree::IET::make<interval_evaluation_tree::ConstNode>(
+                            oilChild);
+                    child->iets.push_back(ietConstChild);
+                } else {
+                    MONGO_UNREACHABLE;
+                }
+            }
+            // Copy the rest of the unexploded IETs directly into the new child.
+            for (size_t pidx = prefixIndices.size(); pidx < isn->iets.size(); pidx++) {
+                child->iets.push_back(isn->iets[pidx]);
+            }
+        }
 
         // Copy the filter, if there is one.
         if (isn->filter.get()) {
@@ -298,6 +384,8 @@ void explodeNode(const QuerySolutionNode* node,
             explosionResult->push_back(std::move(child));
         }
     }
+
+    return isn->shouldDedup;
 }
 
 void geoSkipValidationOn(const std::set<StringData>& twoDSphereFields,
@@ -856,13 +944,21 @@ bool QueryPlannerAnalysis::explodeForSort(const CanonicalQuery& query,
         // How many scans will we create if we blow up this ixscan?
         size_t numScans = 1;
 
-        // Skip every field that is a union of point intervals and build the resulting sort
-        // order from the remaining fields.
+        // Skip every field that is a union of point intervals. When the index scan is
+        // parameterized, we need to check IET instead of the index bounds alone because we need to
+        // make sure the same number of exploded index scans will result given any set of input
+        // parameters. So that when the plan is recovered from cache and parameterized, we will be
+        // sure to have the same number of sort merge branches.
         BSONObjIterator kpIt(isn->index.keyPattern);
         size_t boundsIdx = 0;
         while (kpIt.more()) {
-            const OrderedIntervalList& oil = bounds.fields[boundsIdx];
-            if (!isUnionOfPoints(oil)) {
+            const auto& oil = bounds.fields[boundsIdx];
+            boost::optional<interval_evaluation_tree::IET> iet;
+            if (!isn->iets.empty()) {
+                invariant(boundsIdx < isn->iets.size());
+                iet = isn->iets[boundsIdx];
+            }
+            if (!isOilExplodable(oil, iet)) {
                 break;
             }
             numScans *= oil.intervals.size();
@@ -946,8 +1042,14 @@ bool QueryPlannerAnalysis::explodeForSort(const CanonicalQuery& query,
     // get our sort order via ixscan blow-up.
     auto merge = std::make_unique<MergeSortNode>();
     merge->sort = desiredSort;
+
+    // Exploded nodes all take different point prefix so they should produce disjoint results.
+    // We only deduplicate if some original index scans need to deduplicate.
+    merge->dedup = false;
     for (size_t i = 0; i < explodableNodes.size(); ++i) {
-        explodeNode(explodableNodes[i], desiredSort, fieldsToExplode[i], &merge->children);
+        if (explodeNode(explodableNodes[i], i, desiredSort, fieldsToExplode[i], &merge->children)) {
+            merge->dedup = true;
+        }
     }
 
     merge->computeProperties();
@@ -997,13 +1099,8 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAnalysis::analyzeSort(
     const CanonicalQuery& query,
     const QueryPlannerParams& params,
     std::unique_ptr<QuerySolutionNode> solnRoot,
-    bool* blockingSortOut,
-    bool* explodeForSortOut) {
-    invariant(blockingSortOut);
-    invariant(explodeForSortOut);
-
+    bool* blockingSortOut) {
     *blockingSortOut = false;
-    *explodeForSortOut = false;
 
     const FindCommandRequest& findCommand = query.getFindCommandRequest();
     if (params.traversalPreference) {
@@ -1065,7 +1162,6 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAnalysis::analyzeSort(
     // index scans over point intervals to an OR of sub-scans in order to pull out a sort.
     // Let's try this.
     if (explodeForSort(query, params, &solnRoot)) {
-        *explodeForSortOut = true;
         return solnRoot;
     }
 
@@ -1166,8 +1262,7 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
     }
 
     bool hasSortStage = false;
-    solnRoot =
-        analyzeSort(query, params, std::move(solnRoot), &hasSortStage, &soln->hasExplodedForSort);
+    solnRoot = analyzeSort(query, params, std::move(solnRoot), &hasSortStage);
 
     // This can happen if we need to create a blocking sort stage and we're not allowed to.
     if (!solnRoot) {

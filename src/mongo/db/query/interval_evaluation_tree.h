@@ -44,12 +44,13 @@ class EvalNode;
 class IntersectNode;
 class UnionNode;
 class ComplementNode;
+class ExplodeNode;
 
 /**
  *  IET is a polyvalue that represents a node of Interval Evaluation Tree.
  */
-using IET =
-    optimizer::algebra::PolyValue<ConstNode, EvalNode, IntersectNode, UnionNode, ComplementNode>;
+using IET = optimizer::algebra::
+    PolyValue<ConstNode, EvalNode, IntersectNode, UnionNode, ComplementNode, ExplodeNode>;
 
 /**
  *  ConstNode is a node that represents an interval with constant bounds, such as (MinKey,
@@ -84,6 +85,39 @@ public:
 private:
     const InputParamId _inputParamId;
     const MatchExpression::MatchType _matchType;
+};
+
+/**
+ * ExplodeNode expects the child node to produce a union of point intervals, and it picks a single
+ * point interval from the union, given the index to pick from. This node is used by the
+ * "explode for sort" optimization in the query planner. It also takes a 'cacheKey' that can be used
+ * to search in the evaluation cache to avoid re-evaluating child.
+ */
+class ExplodeNode : public optimizer::algebra::OpFixedArity<IET, 1> {
+public:
+    using Base = optimizer::algebra::OpFixedArity<IET, 1>;
+    using CacheKey = std::pair<int, int>;
+
+    /**
+     * The 'cacheKey' is a pair of integers ('nodeIndex', 'patternIndex'). The 'nodeIndex'
+     * identifies which unexploded index scan this explosion originates from, and 'patternIndex'
+     * identifies which part of sort pattern this IET is for. 'index' is the index to pick from the
+     * list of point intervals.
+     */
+    ExplodeNode(IET child, CacheKey cacheKey, int index)
+        : Base(std::move(child)), _cacheKey(cacheKey), _index(index) {}
+
+    CacheKey cacheKey() const {
+        return _cacheKey;
+    }
+
+    int index() const {
+        return _index;
+    }
+
+private:
+    const CacheKey _cacheKey;
+    const int _index;
 };
 
 /**
@@ -126,6 +160,7 @@ public:
     void addComplement();
     void addEval(const MatchExpression& expr, const OrderedIntervalList& oil);
     void addConst(const OrderedIntervalList& oil);
+    void addExplode(ExplodeNode::CacheKey cacheKey, int index);
 
     bool isEmpty() const;
     void pop();
@@ -137,6 +172,13 @@ private:
 };
 
 /**
+ * A cache used by 'ExplodeNode' to avoid recomputing common IET evaluation results.
+ */
+struct IndexBoundsEvaluationCache {
+    std::map<ExplodeNode::CacheKey, OrderedIntervalList> unexplodedOils;
+};
+
+/**
  * Evaluate OrderedIntervalList for the given MatchExpression tree using pre-built IET.
  *
  * @param iet is Interval Evaluation Tree to evaluate index intervals
@@ -144,10 +186,13 @@ private:
  * evaluate EvalNodes
  * @param elt is the index pattern field for which intervals are evaluated
  * @param index is the index entry for which intervals are evaluated
- * @return evaluted ordered interval list
+ * @param cache is the evaluation cache used by the explode nodes to avoid recomputing the common
+ * IET evaluation results
+ * @return evaluated ordered interval list
  */
 OrderedIntervalList evaluateIntervals(const IET& iet,
                                       const std::vector<const MatchExpression*>& inputParamIdMap,
                                       const BSONElement& elt,
-                                      const IndexEntry& index);
+                                      const IndexEntry& index,
+                                      IndexBoundsEvaluationCache* cache = nullptr);
 }  // namespace mongo::interval_evaluation_tree

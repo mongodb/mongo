@@ -234,8 +234,9 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
 
     input_params::bind(cq, data->inputParamToSlotMap, env, preparingFromCache);
 
+    interval_evaluation_tree::IndexBoundsEvaluationCache indexBoundsEvaluationCache;
     for (auto&& indexBoundsInfo : data->indexBoundsEvaluationInfos) {
-        input_params::bindIndexBounds(cq, indexBoundsInfo, env);
+        input_params::bindIndexBounds(cq, indexBoundsInfo, env, &indexBoundsEvaluationCache);
     }
 }
 

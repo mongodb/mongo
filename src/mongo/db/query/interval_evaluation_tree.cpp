@@ -70,6 +70,11 @@ public:
             << node.inputParamId() << kClose;
     }
 
+    void operator()(const IET&, const ExplodeNode& node) {
+        _os << kOpen << "explode (" << node.cacheKey().first << ", " << node.cacheKey().second
+            << ") " << node.index() << kClose;
+    }
+
     void operator()(const IET&, const ComplementNode& node) {
         _os << kOpen << "not ";
         node.get<0>().visit(*this);
@@ -117,40 +122,42 @@ auto extractInputParamId(const MatchExpression* expr) {
  * Evaluates given Interval Evalution Tree to index bounds represented by OrderedIntervalList.
  *
  * This class is intended to live for a short period only as it keeps references to some external
- * objects such as the index entry, BSONElement and inputParamIdMap and it is imperative that the
- * referenced objects stay alive for the lifetime of the class.
+ * objects such as the index entry, BSONElement, inputParamIdMap, and cache and it is imperative
+ * that the referenced objects stay alive for the lifetime of the class.
  */
-class IntervalEvalTransporter {
+class IntervalEvalWalker {
 public:
-    IntervalEvalTransporter(const std::vector<const MatchExpression*>& inputParamIdMap,
-                            const IndexEntry& index,
-                            const BSONElement& elt)
-        : _index{index}, _elt{elt}, _inputParamIdMap{inputParamIdMap} {}
+    IntervalEvalWalker(const std::vector<const MatchExpression*>& inputParamIdMap,
+                       const IndexEntry& index,
+                       const BSONElement& elt,
+                       IndexBoundsEvaluationCache* cache)
+        : _index{index}, _elt{elt}, _inputParamIdMap{inputParamIdMap}, _cache{cache} {}
 
-    OrderedIntervalList transport(const IntersectNode&,
-                                  OrderedIntervalList&& left,
-                                  OrderedIntervalList&& right) const {
-        IndexBoundsBuilder::intersectize(right, &left);
-        return std::move(left);
+    OrderedIntervalList walk(const IntersectNode&, const IET& left, const IET& right) const {
+        auto leftOil = optimizer::algebra::walk(left, *this);
+        auto rightOil = optimizer::algebra::walk(right, *this);
+        IndexBoundsBuilder::intersectize(rightOil, &leftOil);
+        return leftOil;
     }
 
-    OrderedIntervalList transport(const UnionNode&,
-                                  OrderedIntervalList&& left,
-                                  OrderedIntervalList&& right) const {
-        for (auto&& interval : right.intervals) {
-            left.intervals.emplace_back(std::move(interval));
+    OrderedIntervalList walk(const UnionNode&, const IET& left, const IET& right) const {
+        auto leftOil = optimizer::algebra::walk(left, *this);
+        auto rightOil = optimizer::algebra::walk(right, *this);
+        for (auto&& interval : rightOil.intervals) {
+            leftOil.intervals.emplace_back(std::move(interval));
         }
 
-        IndexBoundsBuilder::unionize(&left);
-        return std::move(left);
+        IndexBoundsBuilder::unionize(&leftOil);
+        return leftOil;
     }
 
-    OrderedIntervalList transport(const ComplementNode&, OrderedIntervalList&& child) const {
-        child.complement();
-        return std::move(child);
+    OrderedIntervalList walk(const ComplementNode&, const IET& child) const {
+        auto childOil = optimizer::algebra::walk(child, *this);
+        childOil.complement();
+        return childOil;
     }
 
-    OrderedIntervalList transport(const EvalNode& node) const {
+    OrderedIntervalList walk(const EvalNode& node) const {
         tassert(6335000,
                 "InputParamId is not found",
                 static_cast<size_t>(node.inputParamId()) < _inputParamIdMap.size());
@@ -161,7 +168,28 @@ public:
         return oil;
     }
 
-    OrderedIntervalList transport(const ConstNode& node) const {
+    OrderedIntervalList walk(const ExplodeNode& node, const IET& child) const {
+        auto childOil = [&]() {
+            if (_cache) {
+                auto findResult = _cache->unexplodedOils.find(node.cacheKey());
+                if (findResult != _cache->unexplodedOils.end()) {
+                    return findResult->second;
+                }
+                _cache->unexplodedOils[node.cacheKey()] = optimizer::algebra::walk(child, *this);
+                return _cache->unexplodedOils[node.cacheKey()];
+            }
+            return optimizer::algebra::walk(child, *this);
+        }();
+
+        invariant(node.index() < static_cast<int>(childOil.intervals.size()));
+        childOil.intervals[0] = childOil.intervals[node.index()];
+        childOil.intervals.resize(1);
+        invariant(childOil.isPoint());
+
+        return childOil;
+    }
+
+    OrderedIntervalList walk(const ConstNode& node) const {
         return node.oil;
     }
 
@@ -169,6 +197,7 @@ private:
     const IndexEntry& _index;
     const BSONElement& _elt;
     const std::vector<const MatchExpression*>& _inputParamIdMap;
+    IndexBoundsEvaluationCache* _cache;
 };
 }  // namespace
 
@@ -260,6 +289,13 @@ void Builder::addConst(const OrderedIntervalList& oil) {
     _intervals.push(makeInterval<ConstNode>(oil));
 }
 
+void Builder::addExplode(ExplodeNode::CacheKey cacheKey, int index) {
+    tassert(6757600, "Explode requires one index interval", _intervals.size() >= 1);
+    auto child = std::move(_intervals.top());
+    _intervals.pop();
+    _intervals.push(makeInterval<ExplodeNode>(std::move(child), cacheKey, index));
+}
+
 bool Builder::isEmpty() const {
     return _intervals.empty();
 }
@@ -281,8 +317,9 @@ boost::optional<IET> Builder::done() const {
 OrderedIntervalList evaluateIntervals(const IET& iet,
                                       const std::vector<const MatchExpression*>& inputParamIdMap,
                                       const BSONElement& elt,
-                                      const IndexEntry& index) {
-    IntervalEvalTransporter transporter{inputParamIdMap, index, elt};
-    return optimizer::algebra::transport(iet, transporter);
+                                      const IndexEntry& index,
+                                      IndexBoundsEvaluationCache* cache) {
+    IntervalEvalWalker walker{inputParamIdMap, index, elt, cache};
+    return optimizer::algebra::walk(iet, walker);
 }
 }  // namespace mongo::interval_evaluation_tree

@@ -74,9 +74,7 @@ void updatePlanCache(OperationContext* opCtx,
                      const QuerySolution& solution,
                      const sbe::PlanStage& root,
                      const stage_builder::PlanStageData& data) {
-    // TODO SERVER-67576: re-enable caching of "explode for sort" plans in the SBE cache.
-    if (shouldCacheQuery(query) && collections.getMainCollection() &&
-        !solution.hasExplodedForSort) {
+    if (shouldCacheQuery(query) && collections.getMainCollection()) {
         auto key = plan_cache_key_factory::make(query, collections);
         auto plan = std::make_unique<sbe::CachedSbePlan>(root.clone(), data);
         plan->indexFilterApplied = solution.indexFilterApplied;

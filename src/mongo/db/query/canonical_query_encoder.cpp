@@ -734,6 +734,12 @@ public:
 
     void visit(const InMatchExpression* expr) final {
         encodeSingleParamPathNode(expr);
+        // Encode the number of unique $in values as part of the plan cache key. If the query is
+        // optimized by exploding for sort, the number of unique elements in $in determines how many
+        // merge branches we get in the query plan.
+        if (expr->getInputParamId()) {
+            _builder->appendNum(static_cast<int>(expr->getEqualities().size()));
+        }
     }
 
     void visit(const ModMatchExpression* expr) final {

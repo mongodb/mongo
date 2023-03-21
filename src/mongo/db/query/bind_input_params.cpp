@@ -344,7 +344,9 @@ private:
  * Returns the built index bounds.
  */
 std::unique_ptr<IndexBounds> makeIndexBounds(
-    const stage_builder::IndexBoundsEvaluationInfo& indexBoundsInfo, const CanonicalQuery& cq) {
+    const stage_builder::IndexBoundsEvaluationInfo& indexBoundsInfo,
+    const CanonicalQuery& cq,
+    interval_evaluation_tree::IndexBoundsEvaluationCache* indexBoundsEvaluationCache) {
     auto bounds = std::make_unique<IndexBounds>();
     bounds->fields.reserve(indexBoundsInfo.iets.size());
 
@@ -356,8 +358,12 @@ std::unique_ptr<IndexBounds> makeIndexBounds(
     BSONObjIterator it{indexBoundsInfo.index.keyPattern};
     BSONElement keyElt = it.next();
     for (auto&& iet : indexBoundsInfo.iets) {
-        auto oil = interval_evaluation_tree::evaluateIntervals(
-            iet, cq.getInputParamIdToMatchExpressionMap(), keyElt, indexBoundsInfo.index);
+        auto oil =
+            interval_evaluation_tree::evaluateIntervals(iet,
+                                                        cq.getInputParamIdToMatchExpressionMap(),
+                                                        keyElt,
+                                                        indexBoundsInfo.index,
+                                                        indexBoundsEvaluationCache);
         bounds->fields.emplace_back(std::move(oil));
         keyElt = it.next();
     }
@@ -432,10 +438,12 @@ void bind(const CanonicalQuery& canonicalQuery,
     tree_walker::walk<true, MatchExpression>(canonicalQuery.root(), &walker);
 }
 
-void bindIndexBounds(const CanonicalQuery& cq,
-                     const stage_builder::IndexBoundsEvaluationInfo& indexBoundsInfo,
-                     sbe::RuntimeEnvironment* runtimeEnvironment) {
-    auto bounds = makeIndexBounds(indexBoundsInfo, cq);
+void bindIndexBounds(
+    const CanonicalQuery& cq,
+    const stage_builder::IndexBoundsEvaluationInfo& indexBoundsInfo,
+    sbe::RuntimeEnvironment* runtimeEnvironment,
+    interval_evaluation_tree::IndexBoundsEvaluationCache* indexBoundsEvaluationCache) {
+    auto bounds = makeIndexBounds(indexBoundsInfo, cq, indexBoundsEvaluationCache);
     auto intervals = stage_builder::makeIntervalsFromIndexBounds(*bounds,
                                                                  indexBoundsInfo.direction == 1,
                                                                  indexBoundsInfo.keyStringVersion,

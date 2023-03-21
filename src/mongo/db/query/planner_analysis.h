@@ -82,16 +82,14 @@ public:
     /**
      * Sort the results, if there is a sort required.
      *
-     * The mandatory output parameters 'blockingSortOut' and 'explodeForSortOut' indicate if the
-     * generated sub-plan contains a blocking QSN, such as 'SortNode', and if the sub-plan was
-     * "exploded" to obtain an indexed sort (see QueryPlannerAnalysis::explodeForSort()).
+     * The mandatory output parameter 'blockingSortOut' indicates if the generated sub-plan contains
+     * a blocking QSN, such as 'SortNode'.
      */
     static std::unique_ptr<QuerySolutionNode> analyzeSort(
         const CanonicalQuery& query,
         const QueryPlannerParams& params,
         std::unique_ptr<QuerySolutionNode> solnRoot,
-        bool* blockingSortOut,
-        bool* explodeForSortOut);
+        bool* blockingSortOut);
 
     /**
      * Internal helper function used by analyzeSort.
