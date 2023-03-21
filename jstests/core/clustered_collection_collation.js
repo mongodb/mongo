@@ -144,7 +144,7 @@ const verifyNoTightBoundsAndFindsN = function(coll, expected, predicate, queryCo
     const max = res.queryPlanner.winningPlan.maxRecord;
     assert.neq(null, min, "No min bound");
     assert.neq(null, max, "No max bound");
-    assert.neq(min, max, "COLLSCAN bounds are equal");
+    assert(min !== max, "COLLSCAN bounds are equal");
     assert.eq(expected, coll.find(predicate).count(), "Didn't find the expected records");
 };
 
@@ -153,17 +153,25 @@ const testBounds = function(coll, expected, defaultCollation) {
     verifyHasBoundsAndFindsN(coll, 1, {_id: 5});
     verifyHasBoundsAndFindsN(coll, 1, {_id: {int: 5}});
     verifyHasBoundsAndFindsN(coll, 1, {_id: {ints: [5, 10]}});
+    verifyNoTightBoundsAndFindsN(coll, 2, {_id: {$in: [5, {ints: [5, 10]}]}});
 
     // Test non string types with incompatible collations.
     verifyHasBoundsAndFindsN(coll, 1, {_id: 5}, incompatibleCollation);
     verifyHasBoundsAndFindsN(coll, 1, {_id: {int: 5}}, incompatibleCollation);
     verifyHasBoundsAndFindsN(coll, 1, {_id: {ints: [5, 10]}}, incompatibleCollation);
+    verifyNoTightBoundsAndFindsN(
+        coll, 2, {_id: {$in: [5, {ints: [5, 10]}]}}, incompatibleCollation);
 
     // Test strings respect the collation.
     verifyHasBoundsAndFindsN(coll, expected, {_id: "A"});
     verifyHasBoundsAndFindsN(coll, expected, {_id: {str: "A"}});
     verifyHasBoundsAndFindsN(coll, expected, {_id: {strs: ["A", "b"]}});
     verifyHasBoundsAndFindsN(coll, expected, {_id: {strs: ["a", "B"]}});
+    verifyNoTightBoundsAndFindsN(coll, expected, {_id: {$in: ["A", 1]}});
+    verifyNoTightBoundsAndFindsN(coll, expected, {_id: {$in: ["A", "C"]}});
+    verifyNoTightBoundsAndFindsN(coll, expected, {_id: {$in: ["", {str: "A"}]}});
+    verifyNoTightBoundsAndFindsN(coll, expected, {_id: {$in: [{}, {strs: ["A", "b"]}]}});
+    verifyNoTightBoundsAndFindsN(coll, expected, {_id: {$in: [[], {strs: ["a", "B"]}]}});
 
     // Test strings not in the _id field
     verifyNoBoundsAndFindsN(coll, expected, {data: ["A", "b"]});
@@ -177,6 +185,14 @@ const testBounds = function(coll, expected, defaultCollation) {
     verifyNoTightBoundsAndFindsN(coll, expected, {_id: {str: "A"}}, incompatibleCollation);
     verifyNoTightBoundsAndFindsN(coll, expected, {_id: {strs: ["A", "b"]}}, incompatibleCollation);
     verifyNoTightBoundsAndFindsN(coll, expected, {_id: {strs: ["a", "B"]}}, incompatibleCollation);
+    verifyNoTightBoundsAndFindsN(coll, expected, {_id: {$in: ["A", 1]}}, incompatibleCollation);
+    verifyNoTightBoundsAndFindsN(coll, expected, {_id: {$in: ["A", "C"]}}, incompatibleCollation);
+    verifyNoTightBoundsAndFindsN(
+        coll, expected, {_id: {$in: ["", {str: "A"}]}}, incompatibleCollation);
+    verifyNoTightBoundsAndFindsN(
+        coll, expected, {_id: {$in: [{}, {strs: ["A", "b"]}]}}, incompatibleCollation);
+    verifyNoTightBoundsAndFindsN(
+        coll, expected, {_id: {$in: [[], {strs: ["a", "B"]}]}}, incompatibleCollation);
 
     if (defaultCollation != undefined && defaultCollation.locale != simpleCollation.locale) {
         // 'Simple' collations are treated differently than non-simple queries since they are the
@@ -186,6 +202,14 @@ const testBounds = function(coll, expected, defaultCollation) {
         verifyNoTightBoundsAndFindsN(coll, expected, {_id: {str: "A"}}, simpleCollation);
         verifyNoTightBoundsAndFindsN(coll, expected, {_id: {strs: ["A", "b"]}}, simpleCollation);
         verifyNoTightBoundsAndFindsN(coll, expected, {_id: {strs: ["a", "B"]}}, simpleCollation);
+        verifyNoTightBoundsAndFindsN(coll, expected, {_id: {$in: ["A", 1]}}, simpleCollation);
+        verifyNoTightBoundsAndFindsN(coll, expected, {_id: {$in: ["A", "C"]}}, simpleCollation);
+        verifyNoTightBoundsAndFindsN(
+            coll, expected, {_id: {$in: ["", {str: "A"}]}}, simpleCollation);
+        verifyNoTightBoundsAndFindsN(
+            coll, expected, {_id: {$in: [{}, {strs: ["A", "b"]}]}}, simpleCollation);
+        verifyNoTightBoundsAndFindsN(
+            coll, expected, {_id: {$in: [[], {strs: ["a", "B"]}]}}, simpleCollation);
     }
 
     // Test compatible query collations generate bounds
@@ -193,6 +217,13 @@ const testBounds = function(coll, expected, defaultCollation) {
     verifyHasBoundsAndFindsN(coll, expected, {_id: {str: "A"}}, defaultCollation);
     verifyHasBoundsAndFindsN(coll, expected, {_id: {strs: ["A", "b"]}}, defaultCollation);
     verifyHasBoundsAndFindsN(coll, expected, {_id: {strs: ["a", "B"]}}, defaultCollation);
+    verifyNoTightBoundsAndFindsN(coll, expected, {_id: {$in: ["A", 1]}}, defaultCollation);
+    verifyNoTightBoundsAndFindsN(coll, expected, {_id: {$in: ["A", "C"]}}, defaultCollation);
+    verifyNoTightBoundsAndFindsN(coll, expected, {_id: {$in: ["", {str: "A"}]}}, defaultCollation);
+    verifyNoTightBoundsAndFindsN(
+        coll, expected, {_id: {$in: [{}, {strs: ["A", "b"]}]}}, defaultCollation);
+    verifyNoTightBoundsAndFindsN(
+        coll, expected, {_id: {$in: [[], {strs: ["a", "B"]}]}}, defaultCollation);
 };
 
 insertDocuments(collated);
