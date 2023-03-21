@@ -5578,6 +5578,7 @@ tasks:
   commands:
   - func: "generate resmoke tasks"
     vars:
+      exec_timeout_secs: 3600
       use_large_distro: "true"
 
 - <<: *gen_task_template
