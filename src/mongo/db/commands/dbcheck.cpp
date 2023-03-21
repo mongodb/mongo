@@ -45,6 +45,7 @@
 #include "mongo/db/repl/dbcheck.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/idl/command_generic_argument.h"
 #include "mongo/util/background.h"
@@ -135,6 +136,7 @@ private:
  */
 struct DbCheckCollectionInfo {
     NamespaceString nss;
+    UUID uuid;
     BSONKey start;
     BSONKey end;
     int64_t maxCount;
@@ -176,6 +178,7 @@ std::unique_ptr<DbCheckRun> singleCollectionRun(OperationContext* opCtx,
     const auto maxBytesPerBatch = invocation.getMaxBytesPerBatch();
     const auto maxBatchTimeMillis = invocation.getMaxBatchTimeMillis();
     const auto info = DbCheckCollectionInfo{nss,
+                                            agc->uuid(),
                                             start,
                                             end,
                                             maxCount,
@@ -213,6 +216,7 @@ std::unique_ptr<DbCheckRun> fullDatabaseRun(OperationContext* opCtx,
             return true;
         }
         DbCheckCollectionInfo info{coll->ns(),
+                                   coll->uuid(),
                                    BSONKey::min(),
                                    BSONKey::max(),
                                    max,
@@ -266,6 +270,18 @@ std::unique_ptr<DbCheckRun> getRun(OperationContext* opCtx,
     }
 }
 
+std::shared_ptr<const CollectionCatalog> getConsistentCatalogAndSnapshot(OperationContext* opCtx) {
+    // Loop until we get a consistent catalog and snapshot
+    while (true) {
+        const auto catalogBeforeSnapshot = CollectionCatalog::get(opCtx);
+        opCtx->recoveryUnit()->preallocateSnapshot();
+        const auto catalogAfterSnapshot = CollectionCatalog::get(opCtx);
+        if (catalogBeforeSnapshot == catalogAfterSnapshot) {
+            return catalogBeforeSnapshot;
+        }
+        opCtx->recoveryUnit()->abandonSnapshot();
+    }
+}
 
 /**
  * The BackgroundJob in which dbCheck actually executes on the primary.
@@ -505,7 +521,24 @@ private:
         // dbCheck writes to the oplog, so we need to take an IX lock. We don't need to write to the
         // collection, however, so we only take an intent lock on it.
         Lock::GlobalLock glob(opCtx, MODE_IX);
-        AutoGetCollection collection(opCtx, info.nss, MODE_IS);
+
+        // The CollectionCatalog to use for lock-free reads with point-in-time catalog lookups.
+        std::shared_ptr<const CollectionCatalog> catalog;
+
+        boost::optional<AutoGetCollection> autoColl;
+        const Collection* collection = nullptr;
+        if (feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV()) {
+            // Make sure we get a CollectionCatalog in sync with our snapshot.
+            catalog = getConsistentCatalogAndSnapshot(opCtx);
+
+            collection = catalog->establishConsistentCollection(
+                opCtx,
+                {info.nss.db(), info.uuid},
+                opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx));
+        } else {
+            autoColl.emplace(opCtx, info.nss, MODE_IS);
+            collection = autoColl->getCollection().get();
+        }
 
         if (_stepdownHasOccurred(opCtx, info.nss)) {
             _done = true;
@@ -523,15 +556,19 @@ private:
                 readTimestamp);
         auto minVisible = collection->getMinimumVisibleSnapshot();
         if (minVisible && *readTimestamp < *collection->getMinimumVisibleSnapshot()) {
+            invariant(!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV());
             return {ErrorCodes::SnapshotUnavailable,
                     str::stream() << "Unable to read from collection " << info.nss
                                   << " due to pending catalog changes"};
         }
 
+        // The CollectionPtr needs to outlive the DbCheckHasher as it's used internally.
+        const CollectionPtr collectionPtr(collection);
+
         boost::optional<DbCheckHasher> hasher;
         try {
             hasher.emplace(opCtx,
-                           *collection,
+                           collectionPtr,
                            first,
                            info.end,
                            std::min(batchDocs, info.maxCount),
