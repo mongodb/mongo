@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
+
 #include "mongo/transport/session.h"
 #include "mongo/util/net/ssl_types.h"
 
@@ -70,6 +72,14 @@ public:
     static SSLPeerInfo& forSession(const std::shared_ptr<transport::Session>& session);
     static const SSLPeerInfo& forSession(const std::shared_ptr<const transport::Session>& session);
 
+    const boost::optional<std::string>& getClusterMembership() const {
+        return _clusterMembership;
+    }
+
+    void setClusterMembership(boost::optional<std::string> clusterMembership) {
+        _clusterMembership = std::move(clusterMembership);
+    }
+
 private:
     /**
      * This flag is used to indicate if the underlying socket is using TLS or not. A default
@@ -80,5 +90,6 @@ private:
     SSLX509Name _subjectName;
     boost::optional<std::string> _sniName;
     stdx::unordered_set<RoleName> _roles;
+    boost::optional<std::string> _clusterMembership;
 };
 }  // namespace mongo

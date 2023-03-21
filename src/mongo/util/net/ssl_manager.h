@@ -152,6 +152,11 @@ const ASN1OID mongodbRolesOID("1.3.6.1.4.1.34601.2.1.1",
                               "MongoRoles",
                               "Sequence of MongoDB Database Roles");
 
+const ASN1OID mongodbClusterMembershipOID(
+    "1.3.6.1.4.1.34601.2.1.2",
+    "MongoDBClusterMembership",
+    "String name identifying the cluster this certificate is a member of");
+
 /**
  * Counts of negogtiated version used by TLS connections.
  */
@@ -409,6 +414,11 @@ extern bool isSSLServer;
  * x.509 certificate.  Matches a remote host name to an x.509 host name, including wildcards.
  */
 bool hostNameMatchForX509Certificates(std::string nameToMatch, std::string certHostName);
+
+/**
+ * Parse a UTF8 string from a DER encoded ASN.1 DisplayString.
+ */
+StatusWith<std::string> parseDERString(ConstDataRange cdr);
 
 /**
  * Parse a binary blob of DER encoded ASN.1 into a set of RoleNames.

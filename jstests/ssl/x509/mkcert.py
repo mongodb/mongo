@@ -20,10 +20,17 @@ import shutil
 import mkdigest
 
 # pylint: disable=protected-access
-OpenSSL._util.lib.OBJ_create(b'1.2.3.45', b'DummyOID45', b'Dummy OID 45')
-OpenSSL._util.lib.OBJ_create(b'1.2.3.56', b'DummyOID56', b'Dummy OID 56')
-OpenSSL._util.lib.OBJ_create(b'1.3.6.1.4.1.34601.2.1.1', b'mongoRoles',
-                              b'Sequence of MongoDB Database Roles')
+try:
+    # Newer versions of PyOpenSSL hide OBJ_create, but also seem okay without it.
+    OBJ_create = OpenSSL._util.lib.OBJ_create
+    OBJ_create(b'1.2.3.45', b'DummyOID45', b'Dummy OID 45')
+    OBJ_create(b'1.2.3.56', b'DummyOID56', b'Dummy OID 56')
+    OBJ_create(b'1.3.6.1.4.1.34601.2.1.1', b'mongoRoles',
+               b'Sequence of MongoDB Database Roles')
+    OBJ_create(b'1.3.6.1.4.1.34601.2.1.2', b'mongoClusterMembership',
+               b'Name of MongoDB cluster this cert is a member of')
+except:
+    pass
 # pylint: enable=protected-access
 
 CONFIGFILE = 'jstests/ssl/x509/certs.yml'
@@ -319,6 +326,15 @@ def set_mongo_roles_extension(exts, cert):
 
     exts.append(OpenSSL.crypto.X509Extension(b'1.3.6.1.4.1.34601.2.1.1', False, value))
 
+def set_mongo_cluster_membership_extension(exts, cert):
+    """Encode a symbolic name to a mongodbClusterMembership extension."""
+    name = cert.get('extensions', {}).get('mongoClusterMembership')
+    if not name:
+        return
+
+    value = b'DER:' + binascii.hexlify(to_der_utf8_string(name))
+    exts.append(OpenSSL.crypto.X509Extension(b'1.3.6.1.4.1.34601.2.1.2', False, value))
+
 def set_crl_distribution_point_extension(exts, cert):
     """Specify URI(s) for CRL distribution point(s)."""
     uris = cert.get('extensions', {}).get('crlDistributionPoints')
@@ -345,6 +361,7 @@ def set_extensions(x509, cert):
     set_crl_distribution_point_extension(exts, cert)
     set_san_extension(x509, exts, cert)
     set_mongo_roles_extension(exts, cert)
+    set_mongo_cluster_membership_extension(exts, cert)
 
     ns_comment = cert.get('extensions', {}).get('nsComment')
     if ns_comment:

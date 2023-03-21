@@ -1030,7 +1030,7 @@ void CmdUMCTyped<CreateUserCommand>::Invocation::typedRun(OperationContext* opCt
 #ifdef MONGO_CONFIG_SSL
     auto& sslManager = opCtx->getClient()->session()->getSSLManager();
 
-    if (isExternal && sslManager &&
+    if (isExternal && sslManager && sslGlobalParams.clusterAuthX509ExtensionValue.empty() &&
         sslManager->getSSLConfiguration().isClusterMember(userName.getUser())) {
         if (gEnforceUserClusterSeparation) {
             uasserted(ErrorCodes::BadValue,

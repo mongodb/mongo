@@ -37,6 +37,7 @@
 #include "mongo/base/status.h"
 #include "mongo/config.h"
 #include "mongo/db/auth/auth_options_gen.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/options_parser/startup_option_init.h"
@@ -239,6 +240,18 @@ MONGO_STARTUP_OPTIONS_POST(SSLServerOptions)(InitializerContext*) {
                       "cannot have have x.509 cluster authentication while not enforcing user "
                       "cluster separation");
         }
+    }
+
+    if (params.count("net.tls.clusterAuthX509.extensionValue")) {
+        uassert(ErrorCodes::BadValue,
+                "Unknown configuration option 'net.tls.clusterAuthX509.extensionValue'",
+                gFeatureFlagConfigurableX509ClusterAuthn.isEnabledAndIgnoreFCV());
+        uassert(ErrorCodes::BadValue,
+                "net.tls.clusterAuthX509.extensionValue requires "
+                "a clusterAuthMode which allows for usage of X509",
+                clusterAuthMode.allowsX509());
+        sslGlobalParams.clusterAuthX509ExtensionValue =
+            params["net.tls.clusterAuthX509.extensionValue"].as<std::string>();
     }
 
     if (sslGlobalParams.sslMode.load() == SSLParams::SSLMode_allowSSL) {
