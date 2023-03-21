@@ -248,6 +248,7 @@ public:
         curOp->beginQueryPlanningTimer();
         if (shouldDoFLERewrite(request)) {
             processFLECountD(opCtx, nss, &request);
+            curOp->debug().shouldOmitDiagnosticInformation = true;
         }
         if (request.getMirrored().value_or(false)) {
             const auto& invocation = CommandInvocation::get(opCtx);

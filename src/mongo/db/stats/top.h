@@ -85,6 +85,8 @@ public:
         UsageData remove;
         UsageData commands;
         OperationLatencyHistogram opLatencyHistogram;
+
+        bool isStatsRecordingAllowed{true};
     };
 
     enum class LockType {

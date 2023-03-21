@@ -360,6 +360,7 @@ std::pair<FLEBatchResult, write_ops::InsertCommandReply> processInsert(
     const write_ops::InsertCommandRequest& insertRequest,
     GetTxnCallback getTxns) {
 
+    CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
     auto documents = insertRequest.getDocuments();
 
     std::vector<write_ops::WriteError> writeErrors;
@@ -439,6 +440,7 @@ write_ops::DeleteCommandReply processDelete(OperationContext* opCtx,
         }
     }
 
+    CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
     std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxns(opCtx);
 
     auto reply = std::make_shared<write_ops::DeleteCommandReply>();
@@ -533,6 +535,7 @@ write_ops::UpdateCommandReply processUpdate(OperationContext* opCtx,
                         write_ops::UpdateModification::Type::kReplacement);
     }
 
+    CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
     std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxns(opCtx);
 
     // The function that handles the transaction may outlive this function so we need to use
@@ -1012,6 +1015,7 @@ StatusWith<std::pair<ReplyType, OpMsgRequest>> processFindAndModifyRequest(
     GetTxnCallback getTxns,
     ProcessFindAndModifyCallback<ReplyType> processCallback) {
 
+    CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
     validateFindAndModifyRequest(findAndModifyRequest);
 
     std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxns(opCtx);
@@ -1362,6 +1366,7 @@ FLEBatchResult processFLEBatch(OperationContext* opCtx,
                                BatchedCommandResponse* response,
                                boost::optional<OID> targetEpoch) {
 
+    CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
     if (request.getWriteCommandRequestBase().getEncryptionInformation()->getCrudProcessed()) {
         return FLEBatchResult::kNotProcessed;
     }
@@ -1431,6 +1436,8 @@ std::unique_ptr<BatchedCommandRequest> processFLEBatchExplain(
         return expCtx;
     };
 
+    CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
+
     if (request.getBatchType() == BatchedCommandRequest::BatchType_Delete) {
         auto deleteRequest = request.getDeleteRequest();
         auto newDeleteOp = deleteRequest.getDeletes()[0];
@@ -1471,6 +1478,7 @@ write_ops::FindAndModifyCommandReply processFindAndModify(
     FLEQueryInterface* queryImpl,
     const write_ops::FindAndModifyCommandRequest& findAndModifyRequest) {
 
+    CurOp::get(expCtx->opCtx)->debug().shouldOmitDiagnosticInformation = true;
     auto edcNss = findAndModifyRequest.getNamespace();
     auto ei = findAndModifyRequest.getEncryptionInformation().value();
 

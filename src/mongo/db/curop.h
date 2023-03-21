@@ -363,6 +363,9 @@ public:
     // resolved views per query, a hash map would unlikely provide any benefits.
     std::map<NamespaceString, std::pair<std::vector<NamespaceString>, std::vector<BSONObj>>>
         resolvedViews;
+
+    // Flag to decide if diagnostic information should be omitted.
+    bool shouldOmitDiagnosticInformation{false};
 };
 
 /**

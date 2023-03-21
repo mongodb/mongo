@@ -90,6 +90,7 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
     }
 
     validateCompactRequest(request, *edc);
+    CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
 
     auto namespaces =
         uassertStatusOK(EncryptedStateCollectionsNamespaces::createFromDataCollection(*edc));

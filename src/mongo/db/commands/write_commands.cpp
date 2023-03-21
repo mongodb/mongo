@@ -283,13 +283,15 @@ public:
 
         write_ops::InsertCommandReply typedRun(OperationContext* opCtx) final try {
             doTransactionValidationForWrites(opCtx, ns());
-
-            if (request().getEncryptionInformation().has_value() &&
-                !request().getEncryptionInformation()->getCrudProcessed()) {
-                write_ops::InsertCommandReply insertReply;
-                auto batch = processFLEInsert(opCtx, request(), &insertReply);
-                if (batch == FLEBatchResult::kProcessed) {
-                    return insertReply;
+            if (request().getEncryptionInformation().has_value()) {
+                // Flag set here and in fle_crud.cpp since this only executes on a mongod.
+                CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
+                if (!request().getEncryptionInformation()->getCrudProcessed()) {
+                    write_ops::InsertCommandReply insertReply;
+                    auto batch = processFLEInsert(opCtx, request(), &insertReply);
+                    if (batch == FLEBatchResult::kProcessed) {
+                        return insertReply;
+                    }
                 }
             }
 
@@ -447,10 +449,12 @@ public:
             doTransactionValidationForWrites(opCtx, ns());
             write_ops::UpdateCommandReply updateReply;
             OperationSource source = OperationSource::kStandard;
-
-            if (request().getEncryptionInformation().has_value() &&
-                !request().getEncryptionInformation().value().getCrudProcessed()) {
-                return processFLEUpdate(opCtx, request());
+            if (request().getEncryptionInformation().has_value()) {
+                // Flag set here and in fle_crud.cpp since this only executes on a mongod.
+                CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
+                if (!request().getEncryptionInformation().value().getCrudProcessed()) {
+                    return processFLEUpdate(opCtx, request());
+                }
             }
 
             if (isTimeseries(opCtx, request())) {
@@ -654,6 +658,8 @@ public:
             OperationSource source = OperationSource::kStandard;
 
             if (request().getEncryptionInformation().has_value()) {
+                // Flag set here and in fle_crud.cpp since this only executes on a mongod.
+                CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
                 return processFLEDelete(opCtx, request());
             }
 

@@ -505,9 +505,11 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
 
     validate(req);
 
-    if (req.getEncryptionInformation().has_value() &&
-        !req.getEncryptionInformation()->getCrudProcessed().get_value_or(false)) {
-        return processFLEFindAndModify(opCtx, req);
+    if (req.getEncryptionInformation().has_value()) {
+        CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
+        if (!req.getEncryptionInformation()->getCrudProcessed().get_value_or(false)) {
+            return processFLEFindAndModify(opCtx, req);
+        }
     }
 
     const NamespaceString& nsString = req.getNamespace();
