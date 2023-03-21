@@ -99,8 +99,7 @@ public:
                            const BalancerStreamAction& action,
                            const BalancerStreamActionResponse& response) override;
 
-    void startCollectionDefragmentation(OperationContext* opCtx,
-                                        const CollectionType& coll) override;
+    void startCollectionDefragmentations(OperationContext* opCtx) override;
 
     void abortCollectionDefragmentation(OperationContext* opCtx,
                                         const NamespaceString& nss) override;

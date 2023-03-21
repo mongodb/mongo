@@ -40,8 +40,16 @@ using ShardStatistics = ClusterStatistics::ShardStatistics;
 
 class BalancerDefragmentationPolicyTest : public ConfigServerTestFixture {
 protected:
-    const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("testDb.testColl");
-    const UUID kUuid = UUID::gen();
+    inline static const NamespaceString kNss1 =
+        NamespaceString::createNamespaceString_forTest("testDb.testColl1");
+    inline static const UUID kUuid1 = UUID::gen();
+    inline static const NamespaceString kNss2 =
+        NamespaceString::createNamespaceString_forTest("testDb.testColl2");
+    inline static const UUID kUuid2 = UUID::gen();
+    inline static const NamespaceString kNss3 =
+        NamespaceString::createNamespaceString_forTest("testDb.testColl3");
+    inline static const UUID kUuid3 = UUID::gen();
+
     const ShardId kShardId0 = ShardId("shard0");
     const ShardId kShardId1 = ShardId("shard1");
     const ShardId kShardId2 = ShardId("shard2");
@@ -76,12 +84,12 @@ protected:
         : _clusterStats(), _defragmentationPolicy(&_clusterStats, onDefragmentationStateUpdated) {}
 
     CollectionType setupCollectionWithPhase(
+        const NamespaceString& nss,
         const std::vector<ChunkType>& chunkList,
         boost::optional<DefragmentationPhaseEnum> startingPhase = boost::none,
         boost::optional<int64_t> maxChunkSizeBytes = boost::none) {
 
-        setupShards(kShardList);
-        setupCollection(kNss, kShardKeyPattern, chunkList);
+        setupCollection(nss, kShardKeyPattern, chunkList);
 
         const auto updateClause = [&] {
             BSONObjBuilder builder;
@@ -100,35 +108,37 @@ protected:
             return builder.obj();
         }();
 
+        const UUID& uuid = chunkList.at(0).getCollectionUUID();
         ASSERT_OK(updateToConfigCollection(operationContext(),
                                            CollectionType::ConfigNS,
-                                           BSON(CollectionType::kUuidFieldName << kUuid),
+                                           BSON(CollectionType::kUuidFieldName << uuid),
                                            updateClause,
                                            false));
         return Grid::get(operationContext())
             ->catalogClient()
-            ->getCollection(operationContext(), kUuid);
+            ->getCollection(operationContext(), uuid);
     }
 
-    ChunkType makeConfigChunkEntry(const boost::optional<int64_t>& estimatedSize = boost::none) {
+    ChunkType makeConfigChunkEntry(const UUID& uuid,
+                                   const boost::optional<int64_t>& estimatedSize = boost::none) {
         ChunkType chunk(
-            kUuid, ChunkRange(kKeyAtMin, kKeyAtMax), kCollectionPlacementVersion, kShardId0);
+            uuid, ChunkRange(kKeyAtMin, kKeyAtMax), kCollectionPlacementVersion, kShardId0);
         chunk.setEstimatedSizeBytes(estimatedSize);
         return chunk;
     }
 
-    std::vector<ChunkType> makeMergeableConfigChunkEntries() {
+    std::vector<ChunkType> makeMergeableConfigChunkEntries(const UUID& uuid) {
         return {
             ChunkType(
-                kUuid, ChunkRange(kKeyAtMin, kKeyAtTen), kCollectionPlacementVersion, kShardId0),
+                uuid, ChunkRange(kKeyAtMin, kKeyAtTen), kCollectionPlacementVersion, kShardId0),
             ChunkType(
-                kUuid, ChunkRange(kKeyAtTen, kKeyAtMax), kCollectionPlacementVersion, kShardId0)};
+                uuid, ChunkRange(kKeyAtTen, kKeyAtMax), kCollectionPlacementVersion, kShardId0)};
     }
 
-    BSONObj getConfigCollectionEntry() {
+    BSONObj getConfigCollectionEntry(const UUID& uuid) {
         DBDirectClient client(operationContext());
         FindCommandRequest findRequest{NamespaceStringOrUUID{CollectionType::ConfigNS}};
-        findRequest.setFilter(BSON(CollectionType::kUuidFieldName << kUuid));
+        findRequest.setFilter(BSON(CollectionType::kUuidFieldName << uuid));
         auto cursor = client.find(std::move(findRequest));
         if (!cursor || !cursor->more())
             return BSONObj();
@@ -146,7 +156,7 @@ protected:
         return ShardStatistics(id, currentSizeBytes, draining, zones, "");
     }
 
-    void setDefaultClusterStats() {
+    void setDefaultClusterStats(const std::vector<NamespaceString>& nssList = {kNss1}) {
         uint64_t oneKB = 1024 * 1024;
         auto shardInstance = 0;
         std::vector<ShardStatistics> stats;
@@ -154,24 +164,29 @@ protected:
         for (const auto& shard : kShardList) {
             ++shardInstance;
             stats.push_back(buildShardStats(shard.getName(), oneKB * 1024 * shardInstance));
-            collStats[kNss].push_back(buildShardStats(shard.getName(), oneKB * shardInstance));
+
+            for (const auto& nss : nssList) {
+                collStats[nss].push_back(buildShardStats(shard.getName(), oneKB * shardInstance));
+            }
         }
         _clusterStats.setStats(std::move(stats), std::move(collStats));
     }
 
-    void verifyExpectedDefragmentationPhaseOndisk(
-        boost::optional<DefragmentationPhaseEnum> expectedPhase) {
+    void verifyExpectedDefragmentationStateOnDisk(
+        const UUID& uuid, boost::optional<DefragmentationPhaseEnum> expectedPhase) {
         auto configDoc = findOneOnConfigCollection(operationContext(),
                                                    CollectionType::ConfigNS,
-                                                   BSON(CollectionType::kUuidFieldName << kUuid))
+                                                   BSON(CollectionType::kUuidFieldName << uuid))
                              .getValue();
         if (expectedPhase.has_value()) {
             auto storedDefragmentationPhase = DefragmentationPhase_parse(
                 IDLParserContext("BalancerDefragmentationPolicyTest"),
                 configDoc.getStringField(CollectionType::kDefragmentationPhaseFieldName));
             ASSERT_TRUE(storedDefragmentationPhase == *expectedPhase);
+            ASSERT_TRUE(configDoc[CollectionType::kDefragmentCollectionFieldName].Bool());
         } else {
             ASSERT_FALSE(configDoc.hasField(CollectionType::kDefragmentationPhaseFieldName));
+            ASSERT_FALSE(configDoc.hasField(CollectionType::kDefragmentCollectionFieldName));
         }
     };
 
@@ -195,32 +210,35 @@ TEST_F(BalancerDefragmentationPolicyTest, TestGetNextActionIsNotReadyWhenNotDefr
 }
 
 TEST_F(BalancerDefragmentationPolicyTest, TestAddCollectionWhenCollectionRemovedFailsGracefully) {
-    CollectionType coll(kNss, OID::gen(), Timestamp(1, 1), Date_t::now(), kUuid, kShardKeyPattern);
+    CollectionType coll(
+        kNss1, OID::gen(), Timestamp(1, 1), Date_t::now(), kUuid1, kShardKeyPattern);
     coll.setDefragmentCollection(true);
     // Collection entry is not persisted (to simulate collection dropped), defragmentation should
     // not begin.
     ASSERT_FALSE(_defragmentationPolicy.isDefragmentingCollection(coll.getUuid()));
-    _defragmentationPolicy.startCollectionDefragmentation(operationContext(), coll);
+    _defragmentationPolicy.startCollectionDefragmentations(operationContext());
     ASSERT_FALSE(_defragmentationPolicy.isDefragmentingCollection(coll.getUuid()));
     auto configDoc = findOneOnConfigCollection(operationContext(),
                                                CollectionType::ConfigNS,
-                                               BSON(CollectionType::kUuidFieldName << kUuid));
+                                               BSON(CollectionType::kUuidFieldName << kUuid1));
     ASSERT_EQ(configDoc.getStatus(), Status(ErrorCodes::NoMatchingDocument, "No document found"));
 }
 
 // Phase 1 tests.
 
 TEST_F(BalancerDefragmentationPolicyTest, TestPhaseOneAddSingleChunkCollectionTriggersDataSize) {
-    auto coll = setupCollectionWithPhase({makeConfigChunkEntry()});
+    setupShards(kShardList);
+    auto coll = setupCollectionWithPhase(kNss1, {makeConfigChunkEntry(kUuid1)});
     auto nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
     ASSERT_TRUE(nextAction == boost::none);
     ASSERT_FALSE(_defragmentationPolicy.isDefragmentingCollection(coll.getUuid()));
 
-    _defragmentationPolicy.startCollectionDefragmentation(operationContext(), coll);
+    _defragmentationPolicy.startCollectionDefragmentations(operationContext());
 
     // 1. The collection should be marked as undergoing through phase 1 of the algorithm...
     ASSERT_TRUE(_defragmentationPolicy.isDefragmentingCollection(coll.getUuid()));
-    verifyExpectedDefragmentationPhaseOndisk(DefragmentationPhaseEnum::kMergeAndMeasureChunks);
+    verifyExpectedDefragmentationStateOnDisk(coll.getUuid(),
+                                             DefragmentationPhaseEnum::kMergeAndMeasureChunks);
     // 2. The action returned by the stream should be now an actionable DataSizeCommand...
     nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
     DataSizeInfo dataSizeAction = stdx::get<DataSizeInfo>(*nextAction);
@@ -232,16 +250,18 @@ TEST_F(BalancerDefragmentationPolicyTest, TestPhaseOneAddSingleChunkCollectionTr
 
 TEST_F(BalancerDefragmentationPolicyTest,
        AddSingleChunkCollectionWithKnownDataSizeCompletesDefragmentationWithNoOperationIssued) {
-    auto coll = setupCollectionWithPhase({makeConfigChunkEntry(1024)});
+    setupShards(kShardList);
+    auto coll = setupCollectionWithPhase(kNss1, {makeConfigChunkEntry(kUuid1, 1024)});
     setDefaultClusterStats();
 
-    _defragmentationPolicy.startCollectionDefragmentation(operationContext(), coll);
+    _defragmentationPolicy.startCollectionDefragmentations(operationContext());
 
     ASSERT_TRUE(_defragmentationPolicy.isDefragmentingCollection(coll.getUuid()));
 
     auto nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
     ASSERT_TRUE(nextAction == boost::none);
-    verifyExpectedDefragmentationPhaseOndisk(DefragmentationPhaseEnum::kMoveAndMergeChunks);
+    verifyExpectedDefragmentationStateOnDisk(coll.getUuid(),
+                                             DefragmentationPhaseEnum::kMoveAndMergeChunks);
 
     // kMoveAndMergeChunks has no stream actions/migrations to offer, but the condition has to be
     // verified through a sequence of two action requests (the first being selectChunksToMove()) for
@@ -250,19 +270,21 @@ TEST_F(BalancerDefragmentationPolicyTest,
     auto pendingMigrations =
         _defragmentationPolicy.selectChunksToMove(operationContext(), &availableShards);
     ASSERT_TRUE(pendingMigrations.empty());
-    verifyExpectedDefragmentationPhaseOndisk(DefragmentationPhaseEnum::kMoveAndMergeChunks);
+    verifyExpectedDefragmentationStateOnDisk(coll.getUuid(),
+                                             DefragmentationPhaseEnum::kMoveAndMergeChunks);
 
     nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
     ASSERT_TRUE(nextAction == boost::none);
-    verifyExpectedDefragmentationPhaseOndisk(boost::none);
+    verifyExpectedDefragmentationStateOnDisk(coll.getUuid(), boost::none);
     ASSERT_FALSE(_defragmentationPolicy.isDefragmentingCollection(coll.getUuid()));
 }
 
 TEST_F(BalancerDefragmentationPolicyTest,
        TestPhaseOneAcknowledgeFinalDataSizeActionCompletesPhase) {
-    auto coll = setupCollectionWithPhase({makeConfigChunkEntry()});
+    setupShards(kShardList);
+    auto coll = setupCollectionWithPhase(kNss1, {makeConfigChunkEntry(kUuid1)});
     setDefaultClusterStats();
-    _defragmentationPolicy.startCollectionDefragmentation(operationContext(), coll);
+    _defragmentationPolicy.startCollectionDefragmentations(operationContext());
     auto nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
     ASSERT_TRUE(nextAction.has_value());
     DataSizeInfo dataSizeAction = stdx::get<DataSizeInfo>(*nextAction);
@@ -272,7 +294,7 @@ TEST_F(BalancerDefragmentationPolicyTest,
 
     // 1. The outcome of the data size has been stored in the expected document...
     auto chunkQuery = BSON(ChunkType::collectionUUID()
-                           << kUuid << ChunkType::min(kKeyAtMin) << ChunkType::max(kKeyAtMax));
+                           << kUuid1 << ChunkType::min(kKeyAtMin) << ChunkType::max(kKeyAtMax));
     auto configChunkDoc =
         findOneOnConfigCollection(operationContext(), ChunkType::ConfigNS, chunkQuery).getValue();
     ASSERT_EQ(configChunkDoc.getIntField(ChunkType::estimatedSizeBytes.name()), 2000);
@@ -281,14 +303,16 @@ TEST_F(BalancerDefragmentationPolicyTest,
     nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
     ASSERT_TRUE(nextAction == boost::none);
     ASSERT_TRUE(_defragmentationPolicy.isDefragmentingCollection(coll.getUuid()));
-    verifyExpectedDefragmentationPhaseOndisk(DefragmentationPhaseEnum::kMoveAndMergeChunks);
+    verifyExpectedDefragmentationStateOnDisk(coll.getUuid(),
+                                             DefragmentationPhaseEnum::kMoveAndMergeChunks);
 }
 
 TEST_F(BalancerDefragmentationPolicyTest,
        TestPhaseOneDataSizeResponsesWithMaxSizeReachedCausesChunkToBeSkippedByPhaseTwo) {
-    auto coll = setupCollectionWithPhase({makeConfigChunkEntry()});
+    setupShards(kShardList);
+    auto coll = setupCollectionWithPhase(kNss1, {makeConfigChunkEntry(kUuid1)});
     setDefaultClusterStats();
-    _defragmentationPolicy.startCollectionDefragmentation(operationContext(), coll);
+    _defragmentationPolicy.startCollectionDefragmentations(operationContext());
     auto nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
     ASSERT_TRUE(nextAction.has_value());
     DataSizeInfo dataSizeAction = stdx::get<DataSizeInfo>(*nextAction);
@@ -298,7 +322,7 @@ TEST_F(BalancerDefragmentationPolicyTest,
 
     // 1. The outcome of the data size has been stored in the expected document...
     auto chunkQuery = BSON(ChunkType::collectionUUID()
-                           << kUuid << ChunkType::min(kKeyAtMin) << ChunkType::max(kKeyAtMax));
+                           << kUuid1 << ChunkType::min(kKeyAtMin) << ChunkType::max(kKeyAtMax));
     auto configChunkDoc =
         findOneOnConfigCollection(operationContext(), ChunkType::ConfigNS, chunkQuery).getValue();
     ASSERT_EQ(configChunkDoc.getField("estimatedDataSizeBytes").safeNumberLong(),
@@ -308,12 +332,13 @@ TEST_F(BalancerDefragmentationPolicyTest,
     nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
     ASSERT_TRUE(nextAction == boost::none);
     ASSERT_FALSE(_defragmentationPolicy.isDefragmentingCollection(coll.getUuid()));
-    verifyExpectedDefragmentationPhaseOndisk(boost::none);
+    verifyExpectedDefragmentationStateOnDisk(coll.getUuid(), boost::none);
 }
 
 TEST_F(BalancerDefragmentationPolicyTest, TestRetriableFailedDataSizeActionGetsReissued) {
-    auto coll = setupCollectionWithPhase({makeConfigChunkEntry()});
-    _defragmentationPolicy.startCollectionDefragmentation(operationContext(), coll);
+    setupShards(kShardList);
+    auto coll = setupCollectionWithPhase(kNss1, {makeConfigChunkEntry(kUuid1)});
+    _defragmentationPolicy.startCollectionDefragmentations(operationContext());
     auto nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
     DataSizeInfo failingDataSizeAction = stdx::get<DataSizeInfo>(*nextAction);
     StatusWith<DataSizeResponse> response(
@@ -340,8 +365,9 @@ TEST_F(BalancerDefragmentationPolicyTest, TestRetriableFailedDataSizeActionGetsR
 }
 
 TEST_F(BalancerDefragmentationPolicyTest, TestRemoveCollectionEndsDefragmentation) {
-    auto coll = setupCollectionWithPhase({makeConfigChunkEntry()});
-    _defragmentationPolicy.startCollectionDefragmentation(operationContext(), coll);
+    setupShards(kShardList);
+    auto coll = setupCollectionWithPhase(kNss1, {makeConfigChunkEntry(kUuid1)});
+    _defragmentationPolicy.startCollectionDefragmentations(operationContext());
     auto nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
     DataSizeInfo dataSizeAction = stdx::get<DataSizeInfo>(*nextAction);
 
@@ -360,24 +386,27 @@ TEST_F(BalancerDefragmentationPolicyTest, TestRemoveCollectionEndsDefragmentatio
 }
 
 TEST_F(BalancerDefragmentationPolicyTest, TestPhaseOneUserCancellationFinishesDefragmentation) {
-    auto coll = setupCollectionWithPhase({makeConfigChunkEntry()});
-    _defragmentationPolicy.startCollectionDefragmentation(operationContext(), coll);
+    setupShards(kShardList);
+    auto coll = setupCollectionWithPhase(kNss1, {makeConfigChunkEntry(kUuid1)});
+    _defragmentationPolicy.startCollectionDefragmentations(operationContext());
 
     // Collection should be in phase 1
-    verifyExpectedDefragmentationPhaseOndisk(DefragmentationPhaseEnum::kMergeAndMeasureChunks);
+    verifyExpectedDefragmentationStateOnDisk(coll.getUuid(),
+                                             DefragmentationPhaseEnum::kMergeAndMeasureChunks);
 
     // User cancellation of defragmentation
-    _defragmentationPolicy.abortCollectionDefragmentation(operationContext(), kNss);
+    _defragmentationPolicy.abortCollectionDefragmentation(operationContext(), kNss1);
 
     auto nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
     ASSERT_TRUE(nextAction == boost::none);
     ASSERT_FALSE(_defragmentationPolicy.isDefragmentingCollection(coll.getUuid()));
-    verifyExpectedDefragmentationPhaseOndisk(boost::none);
+    verifyExpectedDefragmentationStateOnDisk(coll.getUuid(), boost::none);
 }
 
 TEST_F(BalancerDefragmentationPolicyTest, TestNonRetriableErrorRebuildsCurrentPhase) {
-    auto coll = setupCollectionWithPhase({makeConfigChunkEntry()});
-    _defragmentationPolicy.startCollectionDefragmentation(operationContext(), coll);
+    setupShards(kShardList);
+    auto coll = setupCollectionWithPhase(kNss1, {makeConfigChunkEntry(kUuid1)});
+    _defragmentationPolicy.startCollectionDefragmentations(operationContext());
     auto nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
     DataSizeInfo failingDataSizeAction = stdx::get<DataSizeInfo>(*nextAction);
     StatusWith<DataSizeResponse> response(
@@ -388,7 +417,8 @@ TEST_F(BalancerDefragmentationPolicyTest, TestNonRetriableErrorRebuildsCurrentPh
 
     // 1. The collection should be marked as undergoing through phase 1 of the algorithm...
     ASSERT_TRUE(_defragmentationPolicy.isDefragmentingCollection(coll.getUuid()));
-    verifyExpectedDefragmentationPhaseOndisk(DefragmentationPhaseEnum::kMergeAndMeasureChunks);
+    verifyExpectedDefragmentationStateOnDisk(coll.getUuid(),
+                                             DefragmentationPhaseEnum::kMergeAndMeasureChunks);
     // 2. The action returned by the stream should be now an actionable DataSizeCommand...
     ASSERT_TRUE(nextAction.has_value());
     DataSizeInfo dataSizeAction = stdx::get<DataSizeInfo>(*nextAction);
@@ -400,13 +430,16 @@ TEST_F(BalancerDefragmentationPolicyTest, TestNonRetriableErrorRebuildsCurrentPh
 
 TEST_F(BalancerDefragmentationPolicyTest,
        TestNonRetriableErrorWaitsForAllOutstandingActionsToComplete) {
+    setupShards(kShardList);
     auto coll = setupCollectionWithPhase(
-        {ChunkType{kUuid, ChunkRange(kKeyAtMin, kKeyAtTen), kCollectionPlacementVersion, kShardId0},
-         ChunkType{kUuid,
+        kNss1,
+        {ChunkType{
+             kUuid1, ChunkRange(kKeyAtMin, kKeyAtTen), kCollectionPlacementVersion, kShardId0},
+         ChunkType{kUuid1,
                    ChunkRange(BSON("x" << 11), kKeyAtMax),
                    kCollectionPlacementVersion,
                    kShardId0}});
-    _defragmentationPolicy.startCollectionDefragmentation(operationContext(), coll);
+    _defragmentationPolicy.startCollectionDefragmentations(operationContext());
     auto nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
     DataSizeInfo failingDataSizeAction = stdx::get<DataSizeInfo>(*nextAction);
     auto nextAction2 = _defragmentationPolicy.getNextStreamingAction(operationContext());
@@ -437,8 +470,9 @@ TEST_F(BalancerDefragmentationPolicyTest,
 
 TEST_F(BalancerDefragmentationPolicyTest,
        TestPhaseOneAcknowledgeMergeChunkActionsTriggersDataSizeOnResultingRange) {
-    auto coll = setupCollectionWithPhase({makeMergeableConfigChunkEntries()});
-    _defragmentationPolicy.startCollectionDefragmentation(operationContext(), coll);
+    setupShards(kShardList);
+    auto coll = setupCollectionWithPhase(kNss1, {makeMergeableConfigChunkEntries(kUuid1)});
+    _defragmentationPolicy.startCollectionDefragmentations(operationContext());
     auto nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
     auto mergeChunksAction = stdx::get<MergeInfo>(*nextAction);
 
@@ -459,8 +493,9 @@ TEST_F(BalancerDefragmentationPolicyTest,
 }
 
 TEST_F(BalancerDefragmentationPolicyTest, TestPhaseOneFailedMergeChunksActionGetsReissued) {
-    auto coll = setupCollectionWithPhase(makeMergeableConfigChunkEntries());
-    _defragmentationPolicy.startCollectionDefragmentation(operationContext(), coll);
+    setupShards(kShardList);
+    auto coll = setupCollectionWithPhase(kNss1, {makeMergeableConfigChunkEntries(kUuid1)});
+    _defragmentationPolicy.startCollectionDefragmentations(operationContext());
     auto nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
     auto failingMergeChunksAction = stdx::get<MergeInfo>(*nextAction);
 
@@ -485,10 +520,11 @@ TEST_F(BalancerDefragmentationPolicyTest, TestPhaseOneFailedMergeChunksActionGet
 }
 
 TEST_F(BalancerDefragmentationPolicyTest, TestPhaseOneAcknowledgeSuccessfulMergeAction) {
-    auto coll = setupCollectionWithPhase(makeMergeableConfigChunkEntries());
+    setupShards(kShardList);
+    auto coll = setupCollectionWithPhase(kNss1, {makeMergeableConfigChunkEntries(kUuid1)});
     auto nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
     ASSERT_TRUE(nextAction == boost::none);
-    _defragmentationPolicy.startCollectionDefragmentation(operationContext(), coll);
+    _defragmentationPolicy.startCollectionDefragmentations(operationContext());
     nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
     ASSERT_TRUE(nextAction.has_value());
     MergeInfo mergeInfoAction = stdx::get<MergeInfo>(*nextAction);
@@ -511,7 +547,7 @@ TEST_F(BalancerDefragmentationPolicyTest, TestPhaseOneAllConsecutive) {
     for (int i = 0; i < 5; i++) {
         const auto minKey = (i == 0) ? kKeyAtMin : BSON("x" << i);
         const auto maxKey = BSON("x" << i + 1);
-        ChunkType chunk(kUuid,
+        ChunkType chunk(kUuid1,
                         ChunkRange(minKey, maxKey),
                         ChunkVersion({kCollectionPlacementVersion.epoch(),
                                       kCollectionPlacementVersion.getTimestamp()},
@@ -522,7 +558,7 @@ TEST_F(BalancerDefragmentationPolicyTest, TestPhaseOneAllConsecutive) {
     for (int i = 5; i < 10; i++) {
         const auto minKey = BSON("x" << i);
         const auto maxKey = (i == 9) ? kKeyAtMax : BSON("x" << i + 1);
-        ChunkType chunk(kUuid,
+        ChunkType chunk(kUuid1,
                         ChunkRange(minKey, maxKey),
                         ChunkVersion({kCollectionPlacementVersion.epoch(),
                                       kCollectionPlacementVersion.getTimestamp()},
@@ -530,8 +566,9 @@ TEST_F(BalancerDefragmentationPolicyTest, TestPhaseOneAllConsecutive) {
                         kShardId1);
         chunkList.push_back(chunk);
     }
-    auto coll = setupCollectionWithPhase(chunkList, boost::none, boost::none);
-    _defragmentationPolicy.startCollectionDefragmentation(operationContext(), coll);
+    setupShards(kShardList);
+    auto coll = setupCollectionWithPhase(kNss1, chunkList, boost::none, boost::none);
+    _defragmentationPolicy.startCollectionDefragmentations(operationContext());
     // Test
     auto nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
     ASSERT_TRUE(nextAction.has_value());
@@ -562,7 +599,7 @@ TEST_F(BalancerDefragmentationPolicyTest, PhaseOneNotConsecutive) {
         const auto minKey = (i == 0) ? kKeyAtMin : BSON("x" << i);
         const auto maxKey = (i == 9) ? kKeyAtMax : BSON("x" << i + 1);
         ShardId chosenShard = (i == 5) ? kShardId1 : kShardId0;
-        ChunkType chunk(kUuid,
+        ChunkType chunk(kUuid1,
                         ChunkRange(minKey, maxKey),
                         ChunkVersion({kCollectionPlacementVersion.epoch(),
                                       kCollectionPlacementVersion.getTimestamp()},
@@ -570,8 +607,9 @@ TEST_F(BalancerDefragmentationPolicyTest, PhaseOneNotConsecutive) {
                         chosenShard);
         chunkList.push_back(chunk);
     }
-    auto coll = setupCollectionWithPhase(chunkList, boost::none, boost::none);
-    _defragmentationPolicy.startCollectionDefragmentation(operationContext(), coll);
+    setupShards(kShardList);
+    auto coll = setupCollectionWithPhase(kNss1, chunkList, boost::none, boost::none);
+    _defragmentationPolicy.startCollectionDefragmentations(operationContext());
     // Three actions (in an unspecified order) should be immediately available.
     auto nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
     ASSERT_TRUE(nextAction.has_value());
@@ -621,14 +659,16 @@ TEST_F(BalancerDefragmentationPolicyTest, PhaseOneNotConsecutive) {
 // Phase 2 tests.
 
 TEST_F(BalancerDefragmentationPolicyTest, TestPhaseTwoMissingDataSizeRestartsPhase1) {
-    auto coll = setupCollectionWithPhase({makeConfigChunkEntry()},
-                                         DefragmentationPhaseEnum::kMoveAndMergeChunks);
+    setupShards(kShardList);
+    auto coll = setupCollectionWithPhase(
+        kNss1, {makeConfigChunkEntry(kUuid1)}, DefragmentationPhaseEnum::kMoveAndMergeChunks);
     setDefaultClusterStats();
-    _defragmentationPolicy.startCollectionDefragmentation(operationContext(), coll);
+    _defragmentationPolicy.startCollectionDefragmentations(operationContext());
 
     // Should be in phase 1
     ASSERT_TRUE(_defragmentationPolicy.isDefragmentingCollection(coll.getUuid()));
-    verifyExpectedDefragmentationPhaseOndisk(DefragmentationPhaseEnum::kMergeAndMeasureChunks);
+    verifyExpectedDefragmentationStateOnDisk(kUuid1,
+                                             DefragmentationPhaseEnum::kMergeAndMeasureChunks);
     // There should be a datasize entry and no migrations
     auto availableShards = getAllShardIds(operationContext());
     auto pendingMigrations =
@@ -640,14 +680,14 @@ TEST_F(BalancerDefragmentationPolicyTest, TestPhaseTwoMissingDataSizeRestartsPha
 }
 
 TEST_F(BalancerDefragmentationPolicyTest, TestPhaseTwoChunkCanBeMovedAndMergedWithSibling) {
-    ChunkType biggestChunk(kUuid,
+    ChunkType biggestChunk(kUuid1,
                            ChunkRange(kKeyAtMin, kKeyAtZero),
                            ChunkVersion({kCollectionPlacementVersion.epoch(),
                                          kCollectionPlacementVersion.getTimestamp()},
                                         {1, 0}),
                            kShardId0);
     biggestChunk.setEstimatedSizeBytes(2048);
-    ChunkType smallestChunk(kUuid,
+    ChunkType smallestChunk(kUuid1,
                             ChunkRange(kKeyAtZero, kKeyAtMax),
                             ChunkVersion({kCollectionPlacementVersion.epoch(),
                                           kCollectionPlacementVersion.getTimestamp()},
@@ -655,14 +695,15 @@ TEST_F(BalancerDefragmentationPolicyTest, TestPhaseTwoChunkCanBeMovedAndMergedWi
                             kShardId1);
     smallestChunk.setEstimatedSizeBytes(1024);
 
-    auto coll = setupCollectionWithPhase({smallestChunk, biggestChunk},
-                                         DefragmentationPhaseEnum::kMoveAndMergeChunks);
+    setupShards(kShardList);
+    auto coll = setupCollectionWithPhase(
+        kNss1, {smallestChunk, biggestChunk}, DefragmentationPhaseEnum::kMoveAndMergeChunks);
     std::vector<ShardStatistics> clusterStats{buildShardStats(kShardId0, 4),
                                               buildShardStats(kShardId1, 2)};
     std::map<NamespaceString, std::vector<ShardStatistics>> collectionStats{
-        {kNss, {buildShardStats(kShardId0, 4), buildShardStats(kShardId1, 2)}}};
+        {kNss1, {buildShardStats(kShardId0, 4), buildShardStats(kShardId1, 2)}}};
     _clusterStats.setStats(std::move(clusterStats), std::move(collectionStats));
-    _defragmentationPolicy.startCollectionDefragmentation(operationContext(), coll);
+    _defragmentationPolicy.startCollectionDefragmentations(operationContext());
     ASSERT_TRUE(_defragmentationPolicy.isDefragmentingCollection(coll.getUuid()));
 
 
@@ -714,7 +755,7 @@ TEST_F(BalancerDefragmentationPolicyTest,
        TestPhaseTwoMultipleCollectionChunkMigrationsMayBeIssuedConcurrently) {
     // Define a single collection, distributing 6 chunks across the 4 shards so that there cannot be
     // a merge without migrations
-    ChunkType firstChunkOnShard0(kUuid,
+    ChunkType firstChunkOnShard0(kUuid1,
                                  ChunkRange(kKeyAtMin, kKeyAtZero),
                                  ChunkVersion({kCollectionPlacementVersion.epoch(),
                                                kCollectionPlacementVersion.getTimestamp()},
@@ -722,7 +763,7 @@ TEST_F(BalancerDefragmentationPolicyTest,
                                  kShardId0);
     firstChunkOnShard0.setEstimatedSizeBytes(1);
 
-    ChunkType firstChunkOnShard1(kUuid,
+    ChunkType firstChunkOnShard1(kUuid1,
                                  ChunkRange(kKeyAtZero, kKeyAtTen),
                                  ChunkVersion({kCollectionPlacementVersion.epoch(),
                                                kCollectionPlacementVersion.getTimestamp()},
@@ -730,7 +771,7 @@ TEST_F(BalancerDefragmentationPolicyTest,
                                  kShardId1);
     firstChunkOnShard1.setEstimatedSizeBytes(1);
 
-    ChunkType chunkOnShard2(kUuid,
+    ChunkType chunkOnShard2(kUuid1,
                             ChunkRange(kKeyAtTen, kKeyAtTwenty),
                             ChunkVersion({kCollectionPlacementVersion.epoch(),
                                           kCollectionPlacementVersion.getTimestamp()},
@@ -738,7 +779,7 @@ TEST_F(BalancerDefragmentationPolicyTest,
                             kShardId2);
     chunkOnShard2.setEstimatedSizeBytes(1);
 
-    ChunkType chunkOnShard3(kUuid,
+    ChunkType chunkOnShard3(kUuid1,
                             ChunkRange(kKeyAtTwenty, kKeyAtThirty),
                             ChunkVersion({kCollectionPlacementVersion.epoch(),
                                           kCollectionPlacementVersion.getTimestamp()},
@@ -746,7 +787,7 @@ TEST_F(BalancerDefragmentationPolicyTest,
                             kShardId3);
     chunkOnShard3.setEstimatedSizeBytes(1);
 
-    ChunkType secondChunkOnShard0(kUuid,
+    ChunkType secondChunkOnShard0(kUuid1,
                                   ChunkRange(kKeyAtThirty, kKeyAtForty),
                                   ChunkVersion({kCollectionPlacementVersion.epoch(),
                                                 kCollectionPlacementVersion.getTimestamp()},
@@ -754,7 +795,7 @@ TEST_F(BalancerDefragmentationPolicyTest,
                                   kShardId0);
     secondChunkOnShard0.setEstimatedSizeBytes(1);
 
-    ChunkType secondChunkOnShard1(kUuid,
+    ChunkType secondChunkOnShard1(kUuid1,
                                   ChunkRange(kKeyAtForty, kKeyAtMax),
                                   ChunkVersion({kCollectionPlacementVersion.epoch(),
                                                 kCollectionPlacementVersion.getTimestamp()},
@@ -762,7 +803,9 @@ TEST_F(BalancerDefragmentationPolicyTest,
                                   kShardId1);
     secondChunkOnShard1.setEstimatedSizeBytes(1);
 
-    auto coll = setupCollectionWithPhase({firstChunkOnShard0,
+    setupShards(kShardList);
+    auto coll = setupCollectionWithPhase(kNss1,
+                                         {firstChunkOnShard0,
                                           firstChunkOnShard1,
                                           chunkOnShard2,
                                           chunkOnShard3,
@@ -771,7 +814,7 @@ TEST_F(BalancerDefragmentationPolicyTest,
                                          DefragmentationPhaseEnum::kMoveAndMergeChunks,
                                          boost::none);
     setDefaultClusterStats();
-    _defragmentationPolicy.startCollectionDefragmentation(operationContext(), coll);
+    _defragmentationPolicy.startCollectionDefragmentations(operationContext());
 
     // Two move operation should be returned within a single invocation, using all the possible
     // shards
@@ -782,6 +825,47 @@ TEST_F(BalancerDefragmentationPolicyTest,
     auto numOfUsedShards = numOfShards - availableShards.size();
     ASSERT_EQ(4, numOfUsedShards);
     ASSERT_EQ(2, pendingMigrations.size());
+}
+
+TEST_F(BalancerDefragmentationPolicyTest, DontStartDefragmentationOnAnyCollection) {
+
+    // Init a collection with defragmentation flag unset
+    setupShards(kShardList);
+    setupCollection(kNss1, kShardKeyPattern, {makeConfigChunkEntry(kUuid1)});
+
+    _defragmentationPolicy.startCollectionDefragmentations(operationContext());
+
+    verifyExpectedDefragmentationStateOnDisk(kUuid1, boost::none);
+    ASSERT_FALSE(_defragmentationPolicy.isDefragmentingCollection(kUuid1));
+}
+
+TEST_F(BalancerDefragmentationPolicyTest, StartDefragmentationOnMultipleCollections) {
+
+    // Setup 3 collections:
+    //    coll1 ->     DEFRAGMENTING
+    //    coll2 -> NOT DEFRAGMENTING
+    //    coll3 ->     DEFRAGMENTING
+
+    setupShards(kShardList);
+    auto coll1 = setupCollectionWithPhase(kNss1, {makeConfigChunkEntry(kUuid1)});
+
+    setupCollection(kNss2, kShardKeyPattern, {makeConfigChunkEntry(kUuid2)});
+    auto coll2 =
+        Grid::get(operationContext())->catalogClient()->getCollection(operationContext(), kUuid2);
+
+    auto coll3 = setupCollectionWithPhase(kNss3, {makeConfigChunkEntry(kUuid3)});
+
+    _defragmentationPolicy.startCollectionDefragmentations(operationContext());
+
+    ASSERT_TRUE(_defragmentationPolicy.isDefragmentingCollection(coll1.getUuid()));
+    ASSERT_FALSE(_defragmentationPolicy.isDefragmentingCollection(coll2.getUuid()));
+    ASSERT_TRUE(_defragmentationPolicy.isDefragmentingCollection(coll3.getUuid()));
+
+    verifyExpectedDefragmentationStateOnDisk(kUuid1,
+                                             DefragmentationPhaseEnum::kMergeAndMeasureChunks);
+    verifyExpectedDefragmentationStateOnDisk(kUuid2, boost::none);
+    verifyExpectedDefragmentationStateOnDisk(kUuid3,
+                                             DefragmentationPhaseEnum::kMergeAndMeasureChunks);
 }
 
 }  // namespace

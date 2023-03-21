@@ -45,12 +45,9 @@ public:
     virtual ~BalancerDefragmentationPolicy() {}
 
     /**
-     * Requests the execution of the defragmentation algorithm on the specified collection.
-     * Returns true if the request is accepted, false if ignored (meaning, the specified collection
-     * is already being processed)
+     * Requests the execution of the defragmentation algorithm on the required collections.
      */
-    virtual void startCollectionDefragmentation(OperationContext* opCtx,
-                                                const CollectionType& coll) = 0;
+    virtual void startCollectionDefragmentations(OperationContext* opCtx) = 0;
 
     /**
      * Checks if the collection is currently being defragmented, and signals the defragmentation
