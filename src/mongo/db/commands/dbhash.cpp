@@ -45,7 +45,6 @@
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/internal_plans.h"
-#include "mongo/db/repl/dbcheck.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/transaction/transaction_participant.h"
@@ -137,22 +136,6 @@ public:
                         e.type() == String);
                 desiredCollections.insert(e.String());
             }
-        }
-
-        boost::optional<BSONKey> minKey;
-        if (cmdObj.hasField("minKey")) {
-            minKey.emplace(BSONKey::parseFromBSON(cmdObj["minKey"]));
-            uassert(ErrorCodes::InvalidOptions,
-                    "minKey may only be used when one collection is specified",
-                    desiredCollections.size() == 1);
-        }
-
-        boost::optional<BSONKey> maxKey;
-        if (cmdObj.hasField("maxKey")) {
-            maxKey.emplace(BSONKey::parseFromBSON(cmdObj["maxKey"]));
-            uassert(ErrorCodes::InvalidOptions,
-                    "maxKey may only be used when one collection is specified",
-                    desiredCollections.size() == 1);
         }
 
         const bool skipTempCollections =
@@ -299,7 +282,7 @@ public:
             collectionToUUIDMap.emplace(collNss.coll().toString(), collection->uuid());
 
             // Compute the hash for this collection.
-            std::string hash = _hashCollection(opCtx, db, collNss, minKey, maxKey);
+            std::string hash = _hashCollection(opCtx, db, collNss);
 
             collectionToHashMap[collNss.coll().toString()] = hash;
 
@@ -343,11 +326,7 @@ public:
     }
 
 private:
-    std::string _hashCollection(OperationContext* opCtx,
-                                Database* db,
-                                const NamespaceString& nss,
-                                boost::optional<BSONKey> minKey,
-                                boost::optional<BSONKey> maxKey) {
+    std::string _hashCollection(OperationContext* opCtx, Database* db, const NamespaceString& nss) {
 
         CollectionPtr collection(
             CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss));
@@ -376,20 +355,51 @@ private:
         } else {
             invariant(opCtx->lockState()->isDbLockedForMode(db->name(), MODE_S));
         }
-        boost::optional<DbCheckHasher> hasher;
+
+        auto desc = collection->getIndexCatalog()->findIdIndex(opCtx);
+
+        std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> exec;
+        if (desc) {
+            exec = InternalPlanner::indexScan(opCtx,
+                                              &collection,
+                                              desc,
+                                              BSONObj(),
+                                              BSONObj(),
+                                              BoundInclusion::kIncludeStartKeyOnly,
+                                              PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                              InternalPlanner::FORWARD,
+                                              InternalPlanner::IXSCAN_FETCH);
+        } else if (collection->isCapped() || collection->isClustered()) {
+            exec = InternalPlanner::collectionScan(
+                opCtx, &collection, PlanYieldPolicy::YieldPolicy::NO_YIELD);
+        } else {
+            LOGV2(20455, "Can't find _id index for namespace", "namespace"_attr = nss);
+            return "no _id _index";
+        }
+
+        md5_state_t st;
+        md5_init(&st);
 
         try {
-            hasher.emplace(opCtx, collection, minKey, maxKey);
-            uassertStatusOK(hasher->hashAll(opCtx));
-
-            return hasher->total();
-
+            long long n = 0;
+            BSONObj c;
+            verify(nullptr != exec.get());
+            while (exec->getNext(&c, nullptr) == PlanExecutor::ADVANCED) {
+                md5_append(&st, (const md5_byte_t*)c.objdata(), c.objsize());
+                n++;
+            }
         } catch (DBException& exception) {
             LOGV2_WARNING(
                 20456, "Error while hashing, db possibly dropped", "namespace"_attr = nss);
             exception.addContext("Plan executor error while running dbHash command");
             throw;
         }
+
+        md5digest d;
+        md5_finish(&st, d);
+        std::string hash = digestToString(d);
+
+        return hash;
     }
 
 } dbhashCmd;

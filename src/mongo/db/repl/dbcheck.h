@@ -104,17 +104,15 @@ public:
      * will be thrown.
      *
      * @param collection The collection to hash from.
-     * @param start The first key to hash (exclusive). If the user does not specify a start then we
-     * must include MinKey.
-     * @param end The last key to hash (inclusive). If the user does not specify a end then we must
-     * include MaxKey.
+     * @param start The first key to hash (exclusive).
+     * @param end The last key to hash (inclusive).
      * @param maxCount The maximum number of documents to hash.
      * @param maxBytes The maximum number of bytes to hash.
      */
     DbCheckHasher(OperationContext* opCtx,
                   const CollectionPtr& collection,
-                  boost::optional<BSONKey> start,
-                  boost::optional<BSONKey> end,
+                  const BSONKey& start,
+                  const BSONKey& end,
                   int64_t maxCount = std::numeric_limits<int64_t>::max(),
                   int64_t maxBytes = std::numeric_limits<int64_t>::max());
 
@@ -149,7 +147,7 @@ private:
     std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> _exec;
     md5_state_t _state;
 
-    boost::optional<BSONKey> _maxKey;
+    BSONKey _maxKey;
     BSONKey _last = BSONKey::min();
 
     int64_t _maxCount = 0;
