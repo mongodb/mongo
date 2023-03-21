@@ -238,7 +238,11 @@ StatusWith<BSONObj> redactFindRequest(const FindCommandRequest& findCommand,
     // Filter.
     {
         auto filter = findCommand.getFilter();
-        auto filterParsed = MatchExpressionParser::parse(findCommand.getFilter(), expCtx);
+        auto filterParsed =
+            MatchExpressionParser::parse(findCommand.getFilter(),
+                                         expCtx,
+                                         ExtensionsCallbackNoop(),
+                                         MatchExpressionParser::kAllowAllSpecialFeatures);
         if (!filterParsed.isOK()) {
             return filterParsed.getStatus();
         }
