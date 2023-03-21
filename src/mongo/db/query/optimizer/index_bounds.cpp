@@ -212,12 +212,13 @@ bool ResidualRequirement::operator==(const ResidualRequirement& other) const {
     return _key == other._key && _req == other._req && _entryIndex == other._entryIndex;
 }
 
-ResidualRequirementWithCE::ResidualRequirementWithCE(PartialSchemaKey key,
-                                                     PartialSchemaRequirement req,
-                                                     CEType ce)
+ResidualRequirementWithOptionalCE::ResidualRequirementWithOptionalCE(PartialSchemaKey key,
+                                                                     PartialSchemaRequirement req,
+                                                                     boost::optional<CEType> ce)
     : _key(std::move(key)), _req(std::move(req)), _ce(ce) {}
 
-bool ResidualRequirementWithCE::operator==(const ResidualRequirementWithCE& other) const {
+bool ResidualRequirementWithOptionalCE::operator==(
+    const ResidualRequirementWithOptionalCE& other) const {
     return _key == other._key && _req == other._req && _ce == other._ce;
 }
 

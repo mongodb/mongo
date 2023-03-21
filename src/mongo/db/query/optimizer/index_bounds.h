@@ -269,16 +269,18 @@ struct ResidualRequirement {
 };
 using ResidualRequirements = BoolExpr<ResidualRequirement>;
 
-struct ResidualRequirementWithCE {
-    ResidualRequirementWithCE(PartialSchemaKey key, PartialSchemaRequirement req, CEType ce);
+struct ResidualRequirementWithOptionalCE {
+    ResidualRequirementWithOptionalCE(PartialSchemaKey key,
+                                      PartialSchemaRequirement req,
+                                      boost::optional<CEType> ce);
 
-    bool operator==(const ResidualRequirementWithCE& other) const;
+    bool operator==(const ResidualRequirementWithOptionalCE& other) const;
 
     PartialSchemaKey _key;
     PartialSchemaRequirement _req;
-    CEType _ce;
+    boost::optional<CEType> _ce;
 };
-using ResidualRequirementsWithCE = BoolExpr<ResidualRequirementWithCE>;
+using ResidualRequirementsWithOptionalCE = BoolExpr<ResidualRequirementWithOptionalCE>;
 
 struct EqualityPrefixEntry {
     EqualityPrefixEntry(size_t startPos);

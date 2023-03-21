@@ -38,6 +38,25 @@
 
 
 namespace mongo::optimizer {
+template <typename Builder>
+ABT makeBalancedTreeImpl(Builder builder, std::vector<ABT>& leaves, size_t from, size_t until) {
+    invariant(from < until);
+    if (from + 1 == until) {
+        return std::move(leaves[from]);
+    } else {
+        size_t mid = from + (until - from) / 2;
+        auto lhs = makeBalancedTreeImpl(builder, leaves, from, mid);
+        auto rhs = makeBalancedTreeImpl(builder, leaves, mid, until);
+        return builder(std::move(lhs), std::move(rhs));
+    }
+}
+
+template <typename Builder>
+ABT makeBalancedTree(Builder builder, std::vector<ABT> leaves) {
+    return makeBalancedTreeImpl(builder, leaves, 0, leaves.size());
+}
+
+ABT makeBalancedBooleanOpTree(Operations logicOp, std::vector<ABT> leaves);
 
 inline void updateHash(size_t& result, const size_t hash) {
     result = 31 * result + hash;
@@ -339,23 +358,28 @@ void lowerPartialSchemaRequirement(const PartialSchemaKey& key,
  * Eval nodes. Note that we take indexPredSels by value here because the implementation needs its
  * own copy.
  */
-void lowerPartialSchemaRequirements(CEType scanGroupCE,
+void lowerPartialSchemaRequirements(boost::optional<CEType> scanGroupCE,
                                     std::vector<SelectivityType> indexPredSels,
-                                    ResidualRequirementsWithCE::Node requirements,
+                                    ResidualRequirementsWithOptionalCE::Node requirements,
                                     const PathToIntervalFn& pathToInterval,
                                     PhysPlanBuilder& builder);
 
 /**
- * Build ResidualRequirementsWithCE by combining 'residReqs' with the corresponding entries in
- * 'partialSchemaKeyCE'.
+ * Build ResidualRequirementsWithOptionalCE by combining 'residReqs' with the corresponding entries
+ * in 'partialSchemaKeyCE'.
  */
-ResidualRequirementsWithCE::Node createResidualReqsWithCE(
+ResidualRequirementsWithOptionalCE::Node createResidualReqsWithCE(
     const ResidualRequirements::Node& residReqs, const PartialSchemaKeyCE& partialSchemaKeyCE);
+
+/**
+ * Build ResidualRequirementsWithOptionalCE where each entry in 'reqs' has boost::none CE.
+ */
+ResidualRequirementsWithOptionalCE::Node createResidualReqsWithEmptyCE(const PSRExpr::Node& reqs);
 
 /**
  * Sort requirements under a Conjunction by estimated cost.
  */
-void sortResidualRequirements(ResidualRequirementsWithCE::Node& residualReq);
+void sortResidualRequirements(ResidualRequirementsWithOptionalCE::Node& residualReq);
 
 void applyProjectionRenames(ProjectionRenames projectionRenames, ABT& node);
 

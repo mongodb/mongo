@@ -42,6 +42,13 @@
 
 namespace mongo::optimizer {
 
+ABT makeBalancedBooleanOpTree(Operations logicOp, std::vector<ABT> leaves) {
+    auto builder = [=](ABT lhs, ABT rhs) {
+        return make<BinaryOp>(logicOp, std::move(lhs), std::move(rhs));
+    };
+    return makeBalancedTreeImpl(builder, leaves, 0, leaves.size());
+}
+
 void combineLimitSkipProperties(properties::LimitSkipRequirement& aboveProp,
                                 const properties::LimitSkipRequirement& belowProp) {
     using namespace properties;
@@ -1550,94 +1557,169 @@ private:
     const boost::optional<IntervalRequirement> _intervalObj;
 };
 
+/**
+ * Build the EvalFilter and EvalPath expressions corresponding to the given requirement and path.
+ *
+ * Semantically the EvalPath comes first: the EvalFilter may assume the EvalPath is bound to
+ * req.getBoundProjectionName().
+ */
+static std::pair<boost::optional<ABT>, boost::optional<ABT>> makeLoweredExpressionsForReq(
+    const PartialSchemaKey& key,
+    const PartialSchemaRequirement& req,
+    const PathToIntervalFn& pathToInterval) {
+    boost::optional<ABT> evalPath;
+    boost::optional<ABT> evalFilter;
+
+    PartialSchemaReqLowerTransport transport(req.getBoundProjectionName().has_value(),
+                                             pathToInterval);
+    ABT path = transport.lower(req.getIntervals());
+    const bool hasIntervals = path.is<PathIdentity>();
+
+    ABT inputVar = make<Variable>(*key._projectionName);
+    if (const auto& boundProjName = req.getBoundProjectionName()) {
+        evalPath = make<EvalPath>(key._path, std::move(inputVar));
+
+        if (!hasIntervals) {
+            evalFilter = make<EvalFilter>(std::move(path), make<Variable>(*boundProjName));
+        }
+    } else {
+        uassert(6624162,
+                "If we do not have a bound projection, then we should have a proper path",
+                !hasIntervals);
+
+        path = PathAppender::append(key._path, std::move(path));
+        evalFilter = make<EvalFilter>(std::move(path), std::move(inputVar));
+    }
+
+    return {std::move(evalPath), std::move(evalFilter)};
+}
+
 void lowerPartialSchemaRequirement(const PartialSchemaKey& key,
                                    const PartialSchemaRequirement& req,
                                    const PathToIntervalFn& pathToInterval,
                                    const boost::optional<CEType> residualCE,
                                    PhysPlanBuilder& builder) {
-    PartialSchemaReqLowerTransport transport(req.getBoundProjectionName().has_value(),
-                                             pathToInterval);
-    ABT path = transport.lower(req.getIntervals());
-    const bool pathIsId = path.is<PathIdentity>();
+    auto [evalPath, evalFilter] = makeLoweredExpressionsForReq(key, req, pathToInterval);
 
-    ABT inputVar = make<Variable>(*key._projectionName);
     if (const auto& boundProjName = req.getBoundProjectionName()) {
-        builder.make<EvaluationNode>(residualCE,
-                                     *boundProjName,
-                                     make<EvalPath>(key._path, std::move(inputVar)),
-                                     std::move(builder._node));
+        builder.make<EvaluationNode>(
+            residualCE, *boundProjName, std::move(*evalPath), std::move(builder._node));
+    }
 
-        if (!pathIsId) {
-            builder.make<FilterNode>(
-                residualCE,
-                make<EvalFilter>(std::move(path), make<Variable>(*boundProjName)),
-                std::move(builder._node));
-        }
-    } else {
-        uassert(6624162,
-                "If we do not have a bound projection, then we should have a proper path",
-                !pathIsId);
-
-        path = PathAppender::append(key._path, std::move(path));
-
-        builder.make<FilterNode>(residualCE,
-                                 make<EvalFilter>(std::move(path), std::move(inputVar)),
-                                 std::move(builder._node));
+    if (evalFilter) {
+        builder.make<FilterNode>(residualCE, std::move(*evalFilter), std::move(builder._node));
     }
 }
 
-void lowerPartialSchemaRequirements(const CEType scanGroupCE,
+void lowerPartialSchemaRequirements(boost::optional<CEType> scanGroupCE,
                                     std::vector<SelectivityType> indexPredSels,
-                                    ResidualRequirementsWithCE::Node requirements,
+                                    ResidualRequirementsWithOptionalCE::Node requirements,
                                     const PathToIntervalFn& pathToInterval,
                                     PhysPlanBuilder& builder) {
     sortResidualRequirements(requirements);
 
-    // TODO SERVER-74101: Extend lowering to support non-singleton DNF
-    tassert(7473000,
-            "Can only lower singleton DNF",
-            ResidualRequirementsWithCE::isSingletonDisjunction(requirements));
-    ResidualRequirementsWithCE::visitDNF(requirements, [&](const ResidualRequirementWithCE& entry) {
-        CEType residualCE = scanGroupCE;
-        if (!indexPredSels.empty()) {
-            // We are intentionally making a copy of the vector here, we are adding elements to it
-            // below.
-            residualCE *= ce::conjExponentialBackoff(indexPredSels);
-        }
-        if (scanGroupCE > 0.0) {
-            // Compute the selectivity after we assign CE, which is the "input" to the cost.
-            indexPredSels.push_back(entry._ce / scanGroupCE);
-        }
+    // If there is a single Conjunction, build a sequence of FilterNode (one for each conjunct).
+    if (ResidualRequirementsWithOptionalCE::isSingletonDisjunction(requirements)) {
+        ResidualRequirementsWithOptionalCE::visitDNF(
+            requirements, [&](const ResidualRequirementWithOptionalCE& entry) {
+                auto residualCE = scanGroupCE;
+                if (residualCE) {
+                    if (!indexPredSels.empty()) {
+                        *residualCE *= ce::conjExponentialBackoff(indexPredSels);
+                    }
+                    if (entry._ce && *scanGroupCE > 0.0) {
+                        // Compute the selectivity after we assign CE, which is the "input" to the
+                        // cost.
+                        indexPredSels.push_back(*entry._ce / *scanGroupCE);
+                    }
+                }
 
-        lowerPartialSchemaRequirement(entry._key, entry._req, pathToInterval, residualCE, builder);
-    });
-}
+                lowerPartialSchemaRequirement(
+                    entry._key, entry._req, pathToInterval, residualCE, builder);
+            });
+        return;
+    }
 
-void sortResidualRequirements(ResidualRequirementsWithCE::Node& residualReqs) {
-    ResidualRequirementsWithCE::visitDisjuncts(
-        residualReqs, [](ResidualRequirementsWithCE::Node& child, const size_t) {
-            // Collect the estimated costs of each child under a conjunction. Assume it is
-            // more expensive to deliver a bound projection than to just filter.
-            std::vector<std::pair<double, size_t>> costs;
+    // For multiple Conjunctions, build a top-level Or expression representing the composition.
+    ABTVector toOr;
+    std::vector<SelectivityType> disjSels;
+    ResidualRequirementsWithOptionalCE::visitDisjuncts(
+        requirements,
+        [&](const typename ResidualRequirementsWithOptionalCE::Node& child, const size_t) {
+            ABTVector toAnd;
+            std::vector<SelectivityType> conjSels;
 
-            ResidualRequirementsWithCE::visitConjuncts(
-                child, [&](ResidualRequirementsWithCE::Node& atom, const size_t index) {
-                    ResidualRequirementsWithCE::visitAtom(
-                        atom, [&](ResidualRequirementWithCE& entry) {
-                            size_t multiplier = 0;
-                            if (entry._req.getBoundProjectionName()) {
-                                multiplier++;
+            ResidualRequirementsWithOptionalCE::visitConjuncts(
+                child,
+                [&](const typename ResidualRequirementsWithOptionalCE::Node& atom, const size_t) {
+                    ResidualRequirementsWithOptionalCE::visitAtom(
+                        atom, [&](const ResidualRequirementWithOptionalCE& entry) {
+                            const auto& [key, req, ce] = entry;
+                            auto [evalPath, evalFilter] =
+                                makeLoweredExpressionsForReq(key, req, pathToInterval);
+                            tassert(7506401, "Requirement must have an interval", evalFilter);
+                            tassert(7506402, "Requirement should not bind", !evalPath);
+
+                            toAnd.push_back(std::move(*evalFilter));
+                            if (ce && scanGroupCE && *scanGroupCE > 0.0) {
+                                conjSels.push_back(*ce / *scanGroupCE);
                             }
-                            if (!isIntervalReqFullyOpenDNF(entry._req.getIntervals())) {
-                                multiplier++;
-                            }
-
-                            costs.emplace_back(entry._ce._value * multiplier, index);
                         });
                 });
 
+            if (!conjSels.empty()) {
+                disjSels.push_back(ce::conjExponentialBackoff(conjSels));
+            }
+            toOr.push_back(makeBalancedBooleanOpTree(Operations::And, std::move(toAnd)));
+        });
+
+    boost::optional<CEType> finalFilterCE = scanGroupCE;
+    if (!disjSels.empty()) {
+        indexPredSels.push_back(ce::disjExponentialBackoff(disjSels));
+        finalFilterCE = *scanGroupCE * ce::conjExponentialBackoff(indexPredSels);
+    }
+    builder.make<FilterNode>(finalFilterCE,
+                             makeBalancedBooleanOpTree(Operations::Or, std::move(toOr)),
+                             std::move(builder._node));
+}
+
+void sortResidualRequirements(ResidualRequirementsWithOptionalCE::Node& residualReqs) {
+    ResidualRequirementsWithOptionalCE::visitDisjuncts(
+        residualReqs, [](ResidualRequirementsWithOptionalCE::Node& child, const size_t) {
+            // Collect the estimated costs of each child under a conjunction. Assume it is
+            // more expensive to deliver a bound projection than to just filter.
+            std::vector<std::pair<double, size_t>> costs;
+            size_t numConjuncts = 0;
+
+            ResidualRequirementsWithOptionalCE::visitConjuncts(
+                child, [&](ResidualRequirementsWithOptionalCE::Node& atom, const size_t index) {
+                    ResidualRequirementsWithOptionalCE::visitAtom(
+                        atom, [&](ResidualRequirementWithOptionalCE& entry) {
+                            numConjuncts++;
+
+                            if (entry._ce) {
+                                size_t multiplier = 0;
+                                if (entry._req.getBoundProjectionName()) {
+                                    multiplier++;
+                                }
+                                if (!isIntervalReqFullyOpenDNF(entry._req.getIntervals())) {
+                                    multiplier++;
+                                }
+                                costs.emplace_back(entry._ce->_value * multiplier, index);
+                            }
+                        });
+                });
+
+            // The entries may not have CE values, in which case there is no way to sort them.
+            if (costs.empty()) {
+                return;
+            }
+            tassert(7506403,
+                    "Residual requirements missing cardinality estimate for at least one atom",
+                    costs.size() == numConjuncts);
+
             std::sort(costs.begin(), costs.end());
-            auto& atoms = child.cast<ResidualRequirementsWithCE::Conjunction>()->nodes();
+            auto& atoms = child.cast<ResidualRequirementsWithOptionalCE::Conjunction>()->nodes();
             for (size_t index = 0; index < atoms.size(); index++) {
                 const size_t targetIndex = costs.at(index).second;
                 if (index < targetIndex) {
@@ -1647,9 +1729,9 @@ void sortResidualRequirements(ResidualRequirementsWithCE::Node& residualReqs) {
         });
 }
 
-ResidualRequirementsWithCE::Node createResidualReqsWithCE(
+ResidualRequirementsWithOptionalCE::Node createResidualReqsWithCE(
     const ResidualRequirements::Node& residReqs, const PartialSchemaKeyCE& partialSchemaKeyCE) {
-    ResidualRequirementsWithCE::Builder b;
+    ResidualRequirementsWithOptionalCE::Builder b;
     b.pushDisj();
 
     ResidualRequirements::visitDisjuncts(
@@ -1666,9 +1748,26 @@ ResidualRequirementsWithCE::Node createResidualReqsWithCE(
             b.pop();
         });
 
-    auto res = b.finish();
-    tassert(7473001, "ResidualRequirementsWithCE builder did not succeed", res);
-    return std::move(*res);
+    return std::move(*b.finish());
+}
+
+ResidualRequirementsWithOptionalCE::Node createResidualReqsWithEmptyCE(const PSRExpr::Node& reqs) {
+    ResidualRequirementsWithOptionalCE::Builder b;
+    b.pushDisj();
+
+    PSRExpr::visitDisjuncts(reqs, [&](const PSRExpr::Node& child, const size_t) {
+        b.pushConj();
+
+        PSRExpr::visitConjuncts(child, [&](const PSRExpr::Node& atom, const size_t) {
+            PSRExpr::visitAtom(atom, [&](const PartialSchemaEntry& entry) {
+                b.atom(entry.first, entry.second, boost::none);
+            });
+        });
+
+        b.pop();
+    });
+
+    return std::move(*b.finish());
 }
 
 void applyProjectionRenames(ProjectionRenames projectionRenames, ABT& node) {

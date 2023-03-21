@@ -41,30 +41,6 @@ namespace mongo::stage_builder {
 std::unique_ptr<sbe::EExpression> makeBalancedBooleanOpTree(
     sbe::EPrimBinary::Op logicOp, std::vector<std::unique_ptr<sbe::EExpression>> leaves);
 
-template <typename Builder>
-optimizer::ABT makeBalancedTreeImpl(Builder builder,
-                                    std::vector<optimizer::ABT>& leaves,
-                                    size_t from,
-                                    size_t until) {
-    invariant(from < until);
-    if (from + 1 == until) {
-        return std::move(leaves[from]);
-    } else {
-        size_t mid = (from + until) / 2;
-        auto lhs = makeBalancedTreeImpl(builder, leaves, from, mid);
-        auto rhs = makeBalancedTreeImpl(builder, leaves, mid, until);
-        return builder(std::move(lhs), std::move(rhs));
-    }
-}
-
-template <typename Builder>
-optimizer::ABT makeBalancedTree(Builder builder, std::vector<optimizer::ABT> leaves) {
-    return makeBalancedTreeImpl(builder, leaves, 0, leaves.size());
-}
-
-optimizer::ABT makeBalancedBooleanOpTree(optimizer::Operations logicOp,
-                                         std::vector<optimizer::ABT> leaves);
-
 EvalExpr makeBalancedBooleanOpTree(sbe::EPrimBinary::Op logicOp,
                                    std::vector<EvalExpr> leaves,
                                    StageBuilderState& state);

@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/pipeline/abt/utils.h"
 #include "mongo/db/query/optimizer/cascades/rewriter_rules.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/metadata_factory.h"
@@ -5438,6 +5439,71 @@ TEST(PhysRewriter, ExtractAllPlans) {
         "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {[Const [1 "
         "| minKey], Const [1 | maxKey]]}]\n",
         getExplainForPlan(2));
+}
+
+TEST(PhysRewriter, LowerRequirementsWithTopLevelDisjunction) {
+    using namespace unit_test_abt_literals;
+
+    auto req =
+        PartialSchemaRequirement(boost::none,
+                                 _disj(_conj(_interval(_incl("1"_cint32), _incl("1"_cint32)))),
+                                 false /*perfOnly*/);
+
+    auto makeKey = [](std::string pathName) {
+        return PartialSchemaKey("ptest",
+                                make<PathGet>(FieldNameType{pathName}, make<PathIdentity>()));
+    };
+
+    CEType scanGroupCE{10.0};
+    FieldProjectionMap fieldProjectionMap;
+    fieldProjectionMap._rootProjection = "ptest";
+    std::vector<SelectivityType> indexPredSels;
+
+    PhysPlanBuilder builder;
+    builder.make<PhysicalScanNode>(
+        scanGroupCE, fieldProjectionMap, "test" /* scanDefName */, false /* parallelScan */);
+
+    ResidualRequirementsWithOptionalCE::Builder residReqsBuilder;
+    residReqsBuilder.pushDisj()
+        .pushConj()
+        .atom({makeKey("a"), req, CEType{2.0}})
+        .atom({makeKey("b"), req, CEType{3.0}})
+        .pop()
+        .pushConj()
+        .atom({makeKey("c"), req, CEType{5.0}})
+        .atom({makeKey("d"), req, CEType{4.0}})
+        .pop();
+    auto residReqs = residReqsBuilder.finish().get();
+    lowerPartialSchemaRequirements(
+        scanGroupCE, indexPredSels, residReqs, defaultConvertPathToInterval, builder);
+
+    ASSERT_EXPLAIN_V2_AUTO(
+        "Filter []\n"
+        "|   BinaryOp [Or]\n"
+        "|   |   BinaryOp [And]\n"
+        "|   |   |   EvalFilter []\n"
+        "|   |   |   |   Variable [ptest]\n"
+        "|   |   |   PathGet [c]\n"
+        "|   |   |   PathCompare [Eq]\n"
+        "|   |   |   Const [1]\n"
+        "|   |   EvalFilter []\n"
+        "|   |   |   Variable [ptest]\n"
+        "|   |   PathGet [d]\n"
+        "|   |   PathCompare [Eq]\n"
+        "|   |   Const [1]\n"
+        "|   BinaryOp [And]\n"
+        "|   |   EvalFilter []\n"
+        "|   |   |   Variable [ptest]\n"
+        "|   |   PathGet [b]\n"
+        "|   |   PathCompare [Eq]\n"
+        "|   |   Const [1]\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [ptest]\n"
+        "|   PathGet [a]\n"
+        "|   PathCompare [Eq]\n"
+        "|   Const [1]\n"
+        "PhysicalScan [{'<root>': ptest}, test]\n",
+        builder._node);
 }
 
 }  // namespace
