@@ -68,7 +68,7 @@ public:
         MONGO_UNREACHABLE_TASSERT(5424302);
     }
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final;
+    Value serialize(SerializationOptions opts) const final;
 
 private:
     static boost::intrusive_ptr<Expression> parseShiftArgs(BSONObj obj,

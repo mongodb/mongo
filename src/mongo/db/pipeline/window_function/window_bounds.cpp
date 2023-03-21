@@ -63,12 +63,15 @@ WindowBounds::Bound<T> parseBound(ExpressionContext* expCtx,
 }
 
 template <class T>
-Value serializeBound(const WindowBounds::Bound<T>& bound) {
+Value serializeBound(const WindowBounds::Bound<T>& bound, SerializationOptions opts) {
     return stdx::visit(
         OverloadedVisitor{
-            [](const WindowBounds::Unbounded&) { return Value(WindowBounds::kValUnbounded); },
-            [](const WindowBounds::Current&) { return Value(WindowBounds::kValCurrent); },
-            [](const T& n) { return Value(n); },
+            [&](const WindowBounds::Unbounded&) { return Value(WindowBounds::kValUnbounded); },
+            [&](const WindowBounds::Current&) { return Value(WindowBounds::kValCurrent); },
+            [&](const T& n) {
+                // If not "unbounded" or "current", n must be a literal constant
+                return opts.serializeLiteralValue(n);
+            },
         },
         bound);
 }
@@ -218,21 +221,22 @@ WindowBounds WindowBounds::parse(BSONObj args,
         return bounds;
     }
 }
-void WindowBounds::serialize(MutableDocument& args) const {
+void WindowBounds::serialize(MutableDocument& args, SerializationOptions opts) const {
     stdx::visit(OverloadedVisitor{
                     [&](const DocumentBased& docBounds) {
                         args[kArgDocuments] = Value{std::vector<Value>{
-                            serializeBound(docBounds.lower),
-                            serializeBound(docBounds.upper),
+                            serializeBound(docBounds.lower, opts),
+                            serializeBound(docBounds.upper, opts),
                         }};
                     },
                     [&](const RangeBased& rangeBounds) {
                         args[kArgRange] = Value{std::vector<Value>{
-                            serializeBound(rangeBounds.lower),
-                            serializeBound(rangeBounds.upper),
+                            serializeBound(rangeBounds.lower, opts),
+                            serializeBound(rangeBounds.upper, opts),
                         }};
                         if (rangeBounds.unit) {
-                            args[kArgUnit] = Value{serializeTimeUnit(*rangeBounds.unit)};
+                            args[kArgUnit] = Value{
+                                opts.serializeLiteralValue(serializeTimeUnit(*rangeBounds.unit))};
                         }
                     },
                 },

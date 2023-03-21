@@ -31,6 +31,7 @@
 
 #include <boost/intrusive_ptr.hpp>
 #include <memory>
+#include <vector>
 
 #include "mongo/db/concurrency/locker_noop_client_observer.h"
 #include "mongo/db/pipeline/document_source.h"
@@ -71,6 +72,24 @@ public:
 
     auto getOpCtx() {
         return _opCtx.get();
+    }
+
+    /*
+     * Serialize and redact a document source.
+     */
+    BSONObj redact(const DocumentSource& docSource, bool performRedaction = true) {
+        SerializationOptions options;
+        if (performRedaction) {
+            options.replacementForLiteralArgs = "?";
+            options.redactFieldNamesStrategy = [](StringData s) -> std::string {
+                return str::stream() << "HASH<" << s << ">";
+            };
+            options.redactFieldNames = true;
+        }
+        std::vector<Value> serialized;
+        docSource.serializeToArray(serialized, options);
+        ASSERT_EQ(1, serialized.size());
+        return serialized[0].getDocument().toBson().getOwned();
     }
 
 private:

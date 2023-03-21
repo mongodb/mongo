@@ -212,5 +212,250 @@ TEST_F(DocumentSourceSetWindowFieldsTest, ReportsModifiedFields) {
     ASSERT_EQUALS(modified.paths.count("b"), 1U);
     ASSERT_TRUE(modified.renames.empty());
 }
+
+TEST_F(DocumentSourceSetWindowFieldsTest, RedactionOnShiftOperator) {
+    auto spec = fromjson(
+        R"({
+            $setWindowFields: {
+                partitionBy: '$foo',
+                sortBy: {
+                    bar: 1
+                },
+                output: {
+                    x: {
+                        $shift: {
+                            output: '$y',
+                            by: 1,
+                            default: 'BAZ'
+                        }
+                    }
+                }
+            }
+        })");
+    auto docSource =
+        DocumentSourceInternalSetWindowFields::createFromBson(spec.firstElement(), getExpCtx());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$_internalSetWindowFields": {
+                "partitionBy": "$HASH<foo>",
+                "sortBy": {
+                    "HASH<bar>": 1
+                },
+                "output": {
+                    "HASH<x>": {
+                        "$shift": {
+                            by: "?",
+                            output: "$HASH<y>",
+                            default: "?"
+                        }
+                    }
+                }
+            }
+        })",
+        redact(*docSource));
+}
+
+TEST_F(DocumentSourceSetWindowFieldsTest, RedactionOnExpMovingAvgOperator) {
+    auto spec = fromjson(
+        R"({
+            $setWindowFields: {
+                partitionBy: '$foo',
+                sortBy: {
+                    bar: 1
+                },
+                output: {
+                    x: {
+                        $expMovingAvg: {
+                            alpha: 0.5,
+                            input: '$y'
+                        }
+                    }
+                }
+            }
+        })");
+    auto docSource =
+        DocumentSourceInternalSetWindowFields::createFromBson(spec.firstElement(), getExpCtx());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$_internalSetWindowFields": {
+                "partitionBy": "$HASH<foo>",
+                "sortBy": {
+                    "HASH<bar>": 1
+                },
+                "output": {
+                    "HASH<x>": {
+                        "$expMovingAvg": {
+                            alpha: "?",
+                            input: "$HASH<y>"
+                        }
+                    }
+                }
+            }
+        })",
+        redact(*docSource));
+}
+
+TEST_F(DocumentSourceSetWindowFieldsTest, RedactionOnExpressionNOperator) {
+    auto spec = fromjson(
+        R"({
+            $setWindowFields: {
+                partitionBy: '$a',
+                output: {
+                    b: {
+                        $minN: {
+                            n: 3,
+                            input: '$y'
+                        }
+                    }
+                }
+            }
+        })");
+    auto docSource =
+        DocumentSourceInternalSetWindowFields::createFromBson(spec.firstElement(), getExpCtx());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$_internalSetWindowFields": {
+                "partitionBy": "$HASH<a>",
+                "output": {
+                    "HASH<b>": {
+                        "$minN": {
+                            "n": {
+                                "$const": "?"
+                            },
+                            "input": "$HASH<y>"
+                        },
+                        "window": {
+                            "documents": [
+                                "unbounded",
+                                "unbounded"
+                            ]
+                        }
+                    }
+                }
+            }
+        })",
+        redact(*docSource));
+}
+
+TEST_F(DocumentSourceSetWindowFieldsTest, RedactionOnSumWithDocumentsWindow) {
+    auto spec = fromjson(R"({
+        $setWindowFields: {
+            partitionBy: {
+                $year: '$x'
+            },
+            sortBy: {
+                a: 1,
+                b: -1
+            },
+            output: {
+                cumulative: {
+                    $sum: '$baz',
+                    window: {
+                        documents: [
+                            'unbounded',
+                            'current'
+                        ]
+                    }
+                },
+                maximum: {
+                    $max: '$baz',
+                    window: {
+                        documents: [
+                            'unbounded',
+                            'unbounded'
+                        ]
+                    }
+                }
+            }
+        }
+    })");
+    auto docSource =
+        DocumentSourceInternalSetWindowFields::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$_internalSetWindowFields": {
+                "partitionBy": {
+                    "$year": {
+                        "date": "$HASH<x>"
+                    }
+                },
+                "sortBy": {
+                    "HASH<a>": 1,
+                    "HASH<b>": -1
+                },
+                "output": {
+                    "HASH<cumulative>": {
+                        "$sum": "$HASH<baz>",
+                        "window": {
+                            "documents": [
+                                "unbounded",
+                                "current"
+                            ]
+                        }
+                    },
+                    "HASH<maximum>": {
+                        "$max": "$HASH<baz>",
+                        "window": {
+                            "documents": [
+                                "unbounded",
+                                "unbounded"
+                            ]
+                        }
+                    }
+                }
+            }
+        })",
+        redact(*docSource));
+}
+
+TEST_F(DocumentSourceSetWindowFieldsTest, RedactionOnPushWithRangeWindowWithUnit) {
+    auto spec = fromjson(R"({
+        $setWindowFields: {
+            partitionBy: '$foo',
+            sortBy: {
+                bar: 1
+            },
+            output: {
+                a: {
+                    $push: '$b',
+                    window: {
+                        range: [
+                            'unbounded',
+                            -10
+                        ],
+                        unit: 'month'
+                    }
+                }
+            }
+        }
+    })");
+    auto docSource =
+        DocumentSourceInternalSetWindowFields::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$_internalSetWindowFields": {
+                "partitionBy": "$HASH<foo>",
+                "sortBy": {
+                    "HASH<bar>": 1
+                },
+                "output": {
+                    "HASH<a>": {
+                        "$push": "$HASH<b>",
+                        "window": {
+                            "range": [
+                                "unbounded",
+                                "?"
+                            ],
+                            "unit": "?"
+                        }
+                    }
+                }
+            }
+        })",
+        redact(*docSource));
+}
 }  // namespace
 }  // namespace mongo

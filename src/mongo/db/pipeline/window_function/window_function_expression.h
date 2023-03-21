@@ -200,16 +200,15 @@ public:
         }
     }
 
-    virtual Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
+    virtual Value serialize(SerializationOptions opts) const {
         MutableDocument args;
 
-        args[_accumulatorName] = _input->serialize(explain);
+        args[_accumulatorName] = _input->serialize(opts);
         MutableDocument windowField;
-        _bounds.serialize(windowField);
+        _bounds.serialize(windowField, opts);
         args[kWindowArg] = windowField.freezeToValue();
         return args.freezeToValue();
     }
-
 
 protected:
     ExpressionContext* _expCtx;
@@ -337,9 +336,9 @@ public:
                                 << " is not supported as a removable window function");
     }
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final {
+    Value serialize(SerializationOptions opts) const final {
         MutableDocument args;
-        args.addField(_accumulatorName, Value(_input->serialize(explain)));
+        args.addField(_accumulatorName, Value(_input->serialize(opts)));
         return args.freezeToValue();
     }
 };
@@ -455,7 +454,7 @@ public:
                                 << " is not supported with a removable window");
     }
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final {
+    Value serialize(SerializationOptions opts) const final {
         MutableDocument args;
         args.addField(_accumulatorName, Value(Document()));
         return args.freezeToValue();
@@ -504,15 +503,15 @@ public:
                                 << " is not supported with a removable window");
     }
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final {
+    Value serialize(SerializationOptions opts) const final {
         MutableDocument subObj;
         tassert(5433604, "ExpMovingAvg neither N nor alpha was set", _N || _alpha);
         if (_N) {
-            subObj[kNArg] = Value(_N.get());
+            subObj[kNArg] = opts.serializeLiteralValue(_N.get());
         } else {
-            subObj[kAlphaArg] = Value(_alpha.get());
+            subObj[kAlphaArg] = opts.serializeLiteralValue(_alpha.get());
         }
-        subObj[kInputArg] = _input->serialize(explain);
+        subObj[kInputArg] = _input->serialize(opts);
         MutableDocument outerObj;
         outerObj[kAccName] = subObj.freezeToValue();
         return outerObj.freezeToValue();
@@ -539,15 +538,15 @@ public:
         return _unit;
     }
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final {
+    Value serialize(SerializationOptions opts) const final {
         MutableDocument result;
-        result[_accumulatorName][kArgInput] = _input->serialize(explain);
+        result[_accumulatorName][kArgInput] = _input->serialize(opts);
         if (_unit) {
             result[_accumulatorName][kArgUnit] = Value(serializeTimeUnit(*_unit));
         }
 
         MutableDocument windowField;
-        _bounds.serialize(windowField);
+        _bounds.serialize(windowField, opts);
         result[kWindowArg] = windowField.freezeToValue();
         return result.freezeToValue();
     }
@@ -821,9 +820,9 @@ public:
         MONGO_UNREACHABLE_TASSERT(5490705);
     }
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final {
+    Value serialize(SerializationOptions opts) const final {
         MutableDocument args;
-        args.addField(_accumulatorName, Value(_input->serialize(explain)));
+        args.addField(_accumulatorName, Value(_input->serialize(opts)));
         return args.freezeToValue();
     }
 };
@@ -915,7 +914,7 @@ public:
           nExpr(std::move(nExpr)),
           sortPattern(std::move(sortPattern)) {}
 
-    Value serialize(boost::optional<ExplainOptions::Verbosity> explain) const final;
+    Value serialize(SerializationOptions opts) const final;
 
     boost::intrusive_ptr<AccumulatorState> buildAccumulatorOnly() const final;
 

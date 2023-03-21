@@ -77,8 +77,7 @@ struct WindowFunctionStatement {
         }
     }
 
-    void serialize(MutableDocument& outputFields,
-                   boost::optional<ExplainOptions::Verbosity> explain) const;
+    void serialize(MutableDocument& outputFields, SerializationOptions opts) const;
 };
 
 /**

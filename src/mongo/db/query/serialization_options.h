@@ -29,6 +29,7 @@
 
 #pragma once
 #include "mongo/base/string_data.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/util/assert_util.h"
 #include <boost/optional.hpp>
@@ -70,6 +71,14 @@ struct SerializationOptions {
             return redactFieldNamesStrategy(str);
         }
         return str.toString();
+    }
+
+    template <class T>
+    Value serializeLiteralValue(T n) {
+        if (replacementForLiteralArgs) {
+            return Value(*replacementForLiteralArgs);
+        }
+        return Value(n);
     }
 
     // 'replacementForLiteralArgs' is an independent option to serialize in a genericized format

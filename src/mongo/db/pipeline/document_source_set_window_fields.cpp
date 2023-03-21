@@ -139,8 +139,8 @@ WindowFunctionStatement WindowFunctionStatement::parse(BSONElement elem,
         window_function::Expression::parse(elem.embeddedObject(), sortBy, expCtx));
 }
 void WindowFunctionStatement::serialize(MutableDocument& outputFields,
-                                        boost::optional<ExplainOptions::Verbosity> explain) const {
-    outputFields[fieldName] = expr->serialize(explain);
+                                        SerializationOptions opts) const {
+    outputFields[opts.serializeFieldName(fieldName)] = expr->serialize(opts);
 }
 
 list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::create(
@@ -284,35 +284,30 @@ intrusive_ptr<DocumentSource> DocumentSourceInternalSetWindowFields::optimize() 
 }
 
 Value DocumentSourceInternalSetWindowFields::serialize(SerializationOptions opts) const {
-    auto explain = opts.verbosity;
-    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
-        MONGO_UNIMPLEMENTED_TASSERT(7484313);
-    }
-
     MutableDocument spec;
     spec[SetWindowFieldsSpec::kPartitionByFieldName] =
-        _partitionBy ? (*_partitionBy)->serialize(false) : Value();
+        _partitionBy ? (*_partitionBy)->serialize(opts) : Value();
 
-    auto sortKeySerialization = explain
+    auto sortKeySerialization = opts.verbosity
         ? SortPattern::SortKeySerialization::kForExplain
         : SortPattern::SortKeySerialization::kForPipelineSerialization;
     spec[SetWindowFieldsSpec::kSortByFieldName] =
-        _sortBy ? Value(_sortBy->serialize(sortKeySerialization)) : Value();
+        _sortBy ? Value(_sortBy->serialize(sortKeySerialization, opts)) : Value();
 
     MutableDocument output;
     for (auto&& stmt : _outputFields) {
-        stmt.serialize(output, explain);
+        stmt.serialize(output, opts);
     }
     spec[SetWindowFieldsSpec::kOutputFieldName] = output.freezeToValue();
 
     MutableDocument out;
     out[getSourceName()] = Value(spec.freeze());
 
-    if (explain && *explain >= ExplainOptions::Verbosity::kExecStats) {
+    if (opts.verbosity && *opts.verbosity >= ExplainOptions::Verbosity::kExecStats) {
         MutableDocument md;
 
         for (auto&& [fieldName, function] : _executableOutputs) {
-            md[fieldName] =
+            md[opts.serializeFieldName(fieldName)] =
                 Value(static_cast<long long>(_memoryTracker[fieldName].maxMemoryBytes()));
         }
 
