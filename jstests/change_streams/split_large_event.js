@@ -62,15 +62,19 @@ assert.commandWorked(testColl.insertMany([
 
 // For sharded passthrough suites with 2 or more shards, ensure the two inserted documents are on
 // different shards.
-if (FixtureHelpers.isMongos(db) && FixtureHelpers.isSharded(testColl)) {
-    const primaries = FixtureHelpers.getPrimaries(db);
-    if (primaries.length >= 2) {
-        primaries.forEach((conn) => {
-            assert.lte(1,
-                       conn.getDB(jsTestName()).getCollection(testColl.getName()).find().itcount(),
-                       "Unexpected document count on connection " + conn);
-        });
-    }
+if (FixtureHelpers.numberOfShardsForCollection(testColl) >= 2) {
+    FixtureHelpers.getPrimaries(db).forEach((conn) => {
+        assert.lte(conn.getDB(jsTestName()).getCollection(testColl.getName()).find().itcount(),
+                   1,
+                   "Unexpected document count on connection " + conn);
+    });
+}
+
+function getChangeStreamMetricSum(metricName) {
+    return FixtureHelpers
+        .mapOnEachShardNode(
+            {db: testDB, func: (db) => db.serverStatus().metrics.changeStreams[metricName]})
+        .reduce((total, val) => total + val, 0);
 }
 
 // Enable pre- and post-images.
@@ -107,10 +111,38 @@ assert.commandWorked(testColl.update({_id: "bbb"}, {$set: {a: "y".repeat(kLargeS
     assert(!fullEvent.splitEvent);
 }
 
+{
+    // Test that for events which are over the size limit, $changeStreamSplitLargeEvent is required.
+    // Additionally, test that 'changeStreams.largeEventsFailed' metric is counted correctly.
+
+    const oldChangeStreamsLargeEventsFailed = getChangeStreamMetricSum("largeEventsFailed");
+
+    const csCursor = testColl.watch([], {
+        batchSize: 0,  // Ensure same behavior for replica sets and sharded clusters.
+        fullDocument: "required",
+        fullDocumentBeforeChange: "required",
+        resumeAfter: testStartToken
+    });
+    assert.throwsWithCode(() => assert.soon(() => csCursor.hasNext()),
+                          ErrorCodes.BSONObjectTooLarge);
+
+    const newChangeStreamsLargeEventsFailed = getChangeStreamMetricSum("largeEventsFailed");
+    // We will hit this exception once on each shard that encounters a large change event document.
+    const numShardsWithLargeDocs =
+        Math.min(2, FixtureHelpers.numberOfShardsForCollection(testColl));
+    assert.eq(newChangeStreamsLargeEventsFailed,
+              oldChangeStreamsLargeEventsFailed + numShardsWithLargeDocs);
+}
+
 // Open a change stream with $changeStreamSplitLargeEvent and request both pre- and post-images.
-csCursor = testColl.watch(
-    [{$changeStreamSplitLargeEvent: {}}],
-    {fullDocument: "required", fullDocumentBeforeChange: "required", resumeAfter: testStartToken});
+csCursor =
+    testColl.watch([{$changeStreamSplitLargeEvent: {}}],
+                   {
+                       batchSize: 0,  // Ensure same behavior for replica sets and sharded clusters.
+                       fullDocument: "required",
+                       fullDocumentBeforeChange: "required",
+                       resumeAfter: testStartToken
+                   });
 
 /**
  * Helper function to reconstruct the fragments of a split event into the original event. The
@@ -144,12 +176,17 @@ function validateReconstructedEvent(event, expectedId) {
     assert.eq(kLargeStringSize, event.updateDescription.updatedFields.a.length);
 }
 
+const oldChangeStreamsLargeEventsSplit = getChangeStreamMetricSum("largeEventSplit");
+
 const [reconstructedEvent, resumeTokens] = reconstructSplitEvent(csCursor, 3);
 const fragmentCount = resumeTokens.length;
 validateReconstructedEvent(reconstructedEvent, "aaa");
 
 const [reconstructedEvent2, _] = reconstructSplitEvent(csCursor, 3);
 validateReconstructedEvent(reconstructedEvent2, "bbb");
+
+const newChangeStreamsLargeEventsSplit = getChangeStreamMetricSum("largeEventSplit");
+assert.eq(oldChangeStreamsLargeEventsSplit + 2, newChangeStreamsLargeEventsSplit);
 
 {
     // Test that we can filter on fields that sum to more than 16MB without throwing. Note that
