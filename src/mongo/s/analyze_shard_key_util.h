@@ -108,15 +108,27 @@ double round(double val, int n);
 double calculatePercentage(double part, double whole);
 
 /*
+ * Runs the command 'cmdObj' against the database 'dbName'. If this mongod is currently the
+ * primary, runs the command locally. Otherwise, runs the command on the remote primary. Then
+ * asserts the command status using the given 'uassertCmdStatusFn' callback. Internally retries
+ * the command on retryable errors for a set number of times so the command must be idempotent.
+ * Returns the command response.
+ */
+BSONObj executeCommandOnPrimary(OperationContext* opCtx,
+                                const DatabaseName& dbName,
+                                const BSONObj& cmdObj,
+                                const std::function<void(const BSONObj&)>& uassertCmdStatusFn);
+
+/*
  * Inserts the documents 'docs' into the collection 'nss'. If this mongod is currently the primary,
- * runs the insert command locally. Otherwise, runs the command on the remote primary. Internally
- * asserts that the top-level command is OK, then asserts the write status using the
- * 'uassertWriteStatusFn' callback. Internally retries the write command on retryable errors.
+ * runs the insert command locally. Otherwise, runs the command on the remote primary. Then asserts
+ * the command status using the 'uassertCmdStatusFn' callback. Internally retries the insert
+ * command on retryable errors.
  */
 void insertDocuments(OperationContext* opCtx,
                      const NamespaceString& nss,
                      const std::vector<BSONObj>& docs,
-                     const std::function<void(const BSONObj&)>& uassertWriteStatusFn);
+                     const std::function<void(const BSONObj&)>& uassertCmdStatusFn);
 
 /*
  * Drops the collection 'nss'. If this mongod is currently the primary, runs the dropCollection
