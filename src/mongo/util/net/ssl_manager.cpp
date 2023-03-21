@@ -1071,6 +1071,11 @@ StatusWith<DERToken> DERToken::parse(ConstDataRange cdr, size_t* outLength) {
 }
 }  // namespace
 
+StatusWith<std::string> parseDERString(ConstDataRange cdrExtension) {
+    ConstDataRangeCursor cdcExtension(cdrExtension);
+    return readDERString(cdcExtension);
+}
+
 StatusWith<stdx::unordered_set<RoleName>> parsePeerRoles(ConstDataRange cdrExtension) {
     stdx::unordered_set<RoleName> roles;
 
