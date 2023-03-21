@@ -96,14 +96,11 @@ ReshardingCollectionCloner::ReshardingCollectionCloner(ReshardingMetrics* metric
       _atClusterTime(atClusterTime),
       _outputNss(std::move(outputNss)) {}
 
-std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::makePipeline(
+std::pair<std::vector<BSONObj>, boost::intrusive_ptr<ExpressionContext>>
+ReshardingCollectionCloner::makeRawPipeline(
     OperationContext* opCtx,
     std::shared_ptr<MongoProcessInterface> mongoProcessInterface,
     Value resumeId) {
-    using Doc = Document;
-    using Arr = std::vector<Value>;
-    using V = Value;
-
     // Assume that the input collection isn't a view. The collectionUUID parameter to
     // the aggregate would enforce this anyway.
     StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
@@ -115,15 +112,15 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::makePipel
         NamespaceString(DatabaseName::kConfig, "cache.chunks." + tempNss.ns());
     resolvedNamespaces[tempCacheChunksNss.coll()] = {tempCacheChunksNss, std::vector<BSONObj>{}};
 
-    // sharded_agg_helpers::targetShardsAndAddMergeCursors() ignores the collation set on the
-    // AggregationRequest (or lack thereof) and instead only considers the collator set on the
-    // ExpressionContext. Setting nullptr as the collator on the ExpressionContext means that the
-    // aggregation pipeline is always using the "simple" collation, even when the collection default
-    // collation for _sourceNss is non-simple. The chunk ranges in the $lookup stage must be
-    // compared using the simple collation because collections are always sharded using the simple
-    // collation. However, resuming by _id is only efficient (i.e. non-blocking seek/sort) when the
-    // aggregation pipeline would be using the collection's default collation. We cannot do both so
-    // we choose to disallow automatic resuming for collections with non-simple default collations.
+    // Pipeline::makePipeline() ignores the collation set on the AggregationRequest (or lack
+    // thereof) and instead only considers the collator set on the ExpressionContext. Setting
+    // nullptr as the collator on the ExpressionContext means that the aggregation pipeline is
+    // always using the "simple" collation, even when the collection default collation for
+    // _sourceNss is non-simple. The chunk ranges in the $lookup stage must be compared using the
+    // simple collation because collections are always sharded using the simple collation. However,
+    // resuming by _id is only efficient (i.e. non-blocking seek/sort) when the aggregation pipeline
+    // would be using the collection's default collation. We cannot do both so we choose to disallow
+    // automatic resuming for collections with non-simple default collations.
     uassert(4929303,
             "Cannot resume cloning when sharded collection has non-simple default collation",
             resumeId.missing() || collectionHasSimpleCollation(opCtx, _sourceNss));
@@ -142,49 +139,48 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::makePipel
                                                     std::move(resolvedNamespaces),
                                                     _sourceUUID);
 
-    Pipeline::SourceContainer stages;
+    std::vector<BSONObj> rawPipeline;
 
     if (!resumeId.missing()) {
-        stages.emplace_back(DocumentSourceMatch::create(
-            Doc{{"$expr",
-                 Doc{{"$gte", Arr{V{"$_id"_sd}, V{Doc{{"$literal", std::move(resumeId)}}}}}}}}
-                .toBson(),
-            expCtx));
+        rawPipeline.emplace_back(BSON(
+            "$match" << BSON(
+                "$expr" << BSON("$gte" << BSON_ARRAY("$_id" << BSON("$literal" << resumeId))))));
     }
 
-    stages.emplace_back(DocumentSourceReshardingOwnershipMatch::create(
-        _recipientShard, ShardKeyPattern{_newShardKeyPattern.getKeyPattern()}, expCtx));
+    auto keyPattern = ShardKeyPattern(_newShardKeyPattern.getKeyPattern()).toBSON();
+    rawPipeline.emplace_back(
+        BSON(DocumentSourceReshardingOwnershipMatch::kStageName
+             << BSON("recipientShardId" << _recipientShard << "reshardingKey" << keyPattern)));
 
-    // We use $arrayToObject to synthesize the $sortKeys needed by the AsyncResultsMerger to merge
-    // the results from all of the donor shards by {_id: 1}. This expression wouldn't be correct if
-    // the aggregation pipeline was using a non-"simple" collation.
-    stages.emplace_back(
-        DocumentSourceReplaceRoot::createFromBson(fromjson("{$replaceWith: {$mergeObjects: [\
+    // We use $arrayToObject to synthesize the $sortKeys needed by the AsyncResultsMerger to
+    // merge the results from all of the donor shards by {_id: 1}. This expression wouldn't
+    // be correct if the aggregation pipeline was using a non-"simple" collation.
+    rawPipeline.emplace_back(
+        fromjson("{$replaceWith: {$mergeObjects: [\
             '$$ROOT',\
             {$arrayToObject: {$concatArrays: [[{\
                 k: {$literal: '$sortKey'},\
                 v: ['$$ROOT._id']\
             }]]}}\
-        ]}}")
-                                                      .firstElement(),
-                                                  expCtx));
+        ]}}"));
 
-    return Pipeline::create(std::move(stages), std::move(expCtx));
+    return std::make_pair(std::move(rawPipeline), std::move(expCtx));
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::_targetAggregationRequest(
-    const Pipeline& pipeline) {
-    auto opCtx = pipeline.getContext()->opCtx;
-    // We associate the aggregation cursors established on each donor shard with a logical session
-    // to prevent them from killing the cursor when it is idle locally. Due to the cursor's merging
-    // behavior across all donor shards, it is possible for the cursor to be active on one donor
-    // shard while idle for a long period on another donor shard.
+    const std::vector<BSONObj>& rawPipeline,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+    auto opCtx = expCtx->opCtx;
+    // We associate the aggregation cursors established on each donor shard with a logical
+    // session to prevent them from killing the cursor when it is idle locally. Due to the
+    // cursor's merging behavior across all donor shards, it is possible for the cursor to be
+    // active on one donor shard while idle for a long period on another donor shard.
     {
         auto lk = stdx::lock_guard(*opCtx->getClient());
         opCtx->setLogicalSessionId(makeLogicalSessionId(opCtx));
     }
 
-    AggregateCommandRequest request(_sourceNss, pipeline.serializeToBson());
+    AggregateCommandRequest request(_sourceNss, rawPipeline);
     request.setCollectionUUID(_sourceUUID);
 
     auto hint = collectionHasSimpleCollation(opCtx, _sourceNss)
@@ -213,8 +209,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::_targetAg
                                  // We use the hint as an implied sort for $mergeCursors because
                                  // the aggregation pipeline synthesizes the necessary $sortKeys
                                  // fields in the result set.
-                                 return sharded_agg_helpers::targetShardsAndAddMergeCursors(
-                                     pipeline.getContext(), request, hint);
+                                 return Pipeline::makePipeline(request, std::move(expCtx), hint);
                              });
 }
 
@@ -236,8 +231,9 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::_restartP
     curOp->ensureStarted();
     ON_BLOCK_EXIT([curOp] { curOp->done(); });
 
-    auto pipeline = _targetAggregationRequest(
-        *makePipeline(opCtx, MongoProcessInterface::create(opCtx), idToResumeFrom));
+    auto [rawPipeline, expCtx] =
+        makeRawPipeline(opCtx, MongoProcessInterface::create(opCtx), idToResumeFrom);
+    auto pipeline = _targetAggregationRequest(rawPipeline, expCtx);
 
     if (!idToResumeFrom.missing()) {
         // Skip inserting the first document retrieved after resuming because $gte was used in the

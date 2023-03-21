@@ -114,42 +114,31 @@ BSONObj buildInitialReplaceRootForCloner(const KeyPattern& globalIndexKeyPattern
     return replaceRootBuilder.obj();
 }
 
-/**
- * Returns a BSONObj with the format:
- *
- * {
- *   $expr: {$gte: ["$_id", {$literal: <resumeIdElement>}]}
- * }
- */
-BSONObj buildResumeFilter(const Value& resumeId) {
-    return BSON("$expr" << BSON("$gte" << BSON_ARRAY("$_id" << BSON("$literal" << resumeId))));
-}
-
-Pipeline::SourceContainer buildPipelineForCloner(
+std::vector<BSONObj> buildRawPipelineForCloner(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const ShardId& myShardId,
     const KeyPattern& globalIndexKeyPattern,
     const KeyPattern& sourceShardKeyPattern,
     const Value& resumeId) {
-    Pipeline::SourceContainer stages;
+    std::vector<BSONObj> rawPipeline;
 
     if (!resumeId.missing()) {
-        stages.emplace_back(DocumentSourceMatch::create(buildResumeFilter(resumeId), expCtx));
+        rawPipeline.emplace_back(BSON(
+            "$match" << BSON(
+                "$expr" << BSON("$gte" << BSON_ARRAY("$_id" << BSON("$literal" << resumeId))))));
     }
+    rawPipeline.emplace_back(BSON("$sort" << BSON("_id" << 1)));
 
-    stages.emplace_back(DocumentSourceSort::create(expCtx, BSON("_id" << 1)));
-
-    stages.emplace_back(DocumentSourceReshardingOwnershipMatch::create(
-        myShardId, ShardKeyPattern{globalIndexKeyPattern}, expCtx));
+    auto keyPattern = ShardKeyPattern(globalIndexKeyPattern).toBSON();
+    rawPipeline.emplace_back(
+        BSON(DocumentSourceReshardingOwnershipMatch::kStageName
+             << BSON("recipientShardId" << myShardId << "reshardingKey" << keyPattern)));
 
     const BSONObj replaceWithExpression =
         BSON("$replaceRoot" << BSON("newRoot" << buildInitialReplaceRootForCloner(
                                         globalIndexKeyPattern, sourceShardKeyPattern)));
-
-    stages.emplace_back(
-        DocumentSourceReplaceRoot::createFromBson(replaceWithExpression.firstElement(), expCtx));
-
-    return stages;
+    rawPipeline.emplace_back(replaceWithExpression);
+    return rawPipeline;
 }
 
 }  // namespace
@@ -205,23 +194,23 @@ boost::optional<GlobalIndexClonerFetcher::FetchedEntry> GlobalIndexClonerFetcher
     return boost::none;
 }
 
-std::unique_ptr<Pipeline, PipelineDeleter> GlobalIndexClonerFetcher::makePipeline(
-    OperationContext* opCtx) {
+std::pair<std::vector<BSONObj>, boost::intrusive_ptr<ExpressionContext>>
+GlobalIndexClonerFetcher::makeRawPipeline(OperationContext* opCtx) {
     // Assume that the input collection isn't a view. The collectionUUID parameter to
     // the aggregate would enforce this anyway.
     StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
     resolvedNamespaces[_nss.coll()] = {_nss, std::vector<BSONObj>{}};
 
     auto expCtx = makeExpressionContext(opCtx, _nss, _collUUID);
-    auto pipelineStages = buildPipelineForCloner(
+    auto rawPipeline = buildRawPipelineForCloner(
         expCtx, _myShardId, _globalIndexKeyPattern, _sourceShardKeyPattern, _resumeId);
 
-    return Pipeline::create(std::move(pipelineStages), std::move(expCtx));
+    return std::make_pair(std::move(rawPipeline), std::move(expCtx));
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter> GlobalIndexClonerFetcher::_targetAggregationRequest(
-    const Pipeline& pipeline) {
-    auto opCtx = pipeline.getContext()->opCtx;
+    const std::vector<BSONObj>& rawPipeline, boost::intrusive_ptr<ExpressionContext> expCtx) {
+    auto opCtx = expCtx->opCtx;
     // We associate the aggregation cursors established on each donor shard with a logical session
     // to prevent them from killing the cursor when it is idle locally. Due to the cursor's merging
     // behavior across all donor shards, it is possible for the cursor to be active on one donor
@@ -231,7 +220,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> GlobalIndexClonerFetcher::_targetAggr
         opCtx->setLogicalSessionId(makeLogicalSessionId(opCtx));
     }
 
-    AggregateCommandRequest request(_nss, pipeline.serializeToBson());
+    AggregateCommandRequest request(_nss, rawPipeline);
     request.setCollectionUUID(_collUUID);
 
     request.setReadConcern(BSON(repl::ReadConcernArgs::kLevelFieldName
@@ -249,10 +238,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> GlobalIndexClonerFetcher::_targetAggr
                              Grid::get(opCtx)->catalogCache(),
                              _nss,
                              "targeting donor shards for global index collection cloning"_sd,
-                             [&] {
-                                 return sharded_agg_helpers::targetShardsAndAddMergeCursors(
-                                     pipeline.getContext(), request);
-                             });
+                             [&] { return Pipeline::makePipeline(request, std::move(expCtx)); });
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter> GlobalIndexClonerFetcher::_restartPipeline(
@@ -263,8 +249,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> GlobalIndexClonerFetcher::_restartPip
     auto* curOp = CurOp::get(opCtx);
     curOp->ensureStarted();
     ON_BLOCK_EXIT([curOp] { curOp->done(); });
-
-    auto pipeline = _targetAggregationRequest(*makePipeline(opCtx));
+    auto [rawPipeline, expCtx] = makeRawPipeline(opCtx);
+    auto pipeline = _targetAggregationRequest(rawPipeline, expCtx);
 
     pipeline->detachFromOperationContext();
     pipeline.get_deleter().dismissDisposal();

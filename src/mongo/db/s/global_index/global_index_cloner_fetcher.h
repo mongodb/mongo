@@ -82,15 +82,17 @@ public:
     boost::optional<FetchedEntry> getNext(OperationContext* opCtx) override;
 
     /**
-     * Builds the aggregation pipeline for fetching the documents
+     * Builds a vector of BSONObjs representing DocumentSources.
      */
-    std::unique_ptr<Pipeline, PipelineDeleter> makePipeline(OperationContext* opCtx);
+    std::pair<std::vector<BSONObj>, boost::intrusive_ptr<ExpressionContext>> makeRawPipeline(
+        OperationContext* opCtx);
 
     void setResumeId(Value resumeId) override;
 
 private:
     std::unique_ptr<Pipeline, PipelineDeleter> _restartPipeline(OperationContext* opCtx);
-    std::unique_ptr<Pipeline, PipelineDeleter> _targetAggregationRequest(const Pipeline& pipeline);
+    std::unique_ptr<Pipeline, PipelineDeleter> _targetAggregationRequest(
+        const std::vector<BSONObj>& rawPipeline, boost::intrusive_ptr<ExpressionContext> expCtx);
     BSONObj _buildProjectionSpec();
 
     const NamespaceString _nss;

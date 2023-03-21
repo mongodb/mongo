@@ -69,7 +69,7 @@ public:
                                Timestamp atClusterTime,
                                NamespaceString outputNss);
 
-    std::unique_ptr<Pipeline, PipelineDeleter> makePipeline(
+    std::pair<std::vector<BSONObj>, boost::intrusive_ptr<ExpressionContext>> makeRawPipeline(
         OperationContext* opCtx,
         std::shared_ptr<MongoProcessInterface> mongoProcessInterface,
         Value resumeId = Value());
@@ -95,7 +95,9 @@ public:
     bool doOneBatch(OperationContext* opCtx, Pipeline& pipeline);
 
 private:
-    std::unique_ptr<Pipeline, PipelineDeleter> _targetAggregationRequest(const Pipeline& pipeline);
+    std::unique_ptr<Pipeline, PipelineDeleter> _targetAggregationRequest(
+        const std::vector<BSONObj>& rawPipeline,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx);
 
     std::unique_ptr<Pipeline, PipelineDeleter> _restartPipeline(OperationContext* opCtx);
 

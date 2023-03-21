@@ -195,8 +195,7 @@ void runClusterAggregate(OperationContext* opCtx,
 
     auto pipeline =
         shardVersionRetry(opCtx, Grid::get(opCtx)->catalogCache(), nss, "AnalyzeShardKey"_sd, [&] {
-            // TODO (SERVER-73935): Use the new Pipeline::makePipeline() below.
-            return sharded_agg_helpers::targetShardsAndAddMergeCursors(expCtx, aggRequest);
+            return Pipeline::makePipeline(aggRequest, expCtx);
         });
 
     while (auto doc = pipeline->getNext()) {

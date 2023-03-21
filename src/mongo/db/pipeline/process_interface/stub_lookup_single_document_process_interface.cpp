@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/process_interface/stub_lookup_single_document_process_interface.h"
 
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/pipeline.h"
@@ -40,7 +41,7 @@ namespace mongo {
 
 std::unique_ptr<Pipeline, PipelineDeleter>
 StubLookupSingleDocumentProcessInterface::attachCursorSourceToPipelineForLocalRead(
-    Pipeline* ownedPipeline) {
+    Pipeline* ownedPipeline, boost::optional<const AggregateCommandRequest&> aggRequest) {
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline(
         ownedPipeline, PipelineDeleter(ownedPipeline->getContext()->opCtx));
     pipeline->addInitialSource(
@@ -54,6 +55,19 @@ StubLookupSingleDocumentProcessInterface::attachCursorSourceToPipeline(
     ShardTargetingPolicy shardTargetingPolicy,
     boost::optional<BSONObj> readConcern) {
     return attachCursorSourceToPipelineForLocalRead(ownedPipeline);
+}
+
+std::unique_ptr<Pipeline, PipelineDeleter>
+StubLookupSingleDocumentProcessInterface::attachCursorSourceToPipeline(
+    const AggregateCommandRequest& aggRequest,
+    Pipeline* pipeline,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    boost::optional<BSONObj> shardCursorsSortSpec,
+    ShardTargetingPolicy shardTargetingPolicy,
+    boost::optional<BSONObj> readConcern) {
+    // Implement this method should any cases require setting aggregate command options via
+    // 'aggRequest'.
+    MONGO_UNREACHABLE;
 }
 
 boost::optional<Document> StubLookupSingleDocumentProcessInterface::lookupSingleDocument(

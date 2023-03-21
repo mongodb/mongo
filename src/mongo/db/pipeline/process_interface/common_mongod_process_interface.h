@@ -79,7 +79,8 @@ public:
                                 BSONObjBuilder* builder) const final override;
     BSONObj getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) override;
     std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipelineForLocalRead(
-        Pipeline* pipeline) final;
+        Pipeline* pipeline,
+        boost::optional<const AggregateCommandRequest&> aggRequest = boost::none) final;
     std::string getShardName(OperationContext* opCtx) const final;
 
     bool inShardedEnvironment(OperationContext* opCtx) const final;

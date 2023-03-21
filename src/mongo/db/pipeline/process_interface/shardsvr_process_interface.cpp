@@ -390,6 +390,24 @@ ShardServerProcessInterface::attachCursorSourceToPipeline(Pipeline* ownedPipelin
         ownedPipeline, shardTargetingPolicy, std::move(readConcern));
 }
 
+std::unique_ptr<Pipeline, PipelineDeleter>
+ShardServerProcessInterface::attachCursorSourceToPipeline(
+    const AggregateCommandRequest& aggRequest,
+    Pipeline* pipeline,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    boost::optional<BSONObj> shardCursorsSortSpec,
+    ShardTargetingPolicy shardTargetingPolicy,
+    boost::optional<BSONObj> readConcern) {
+    std::unique_ptr<Pipeline, PipelineDeleter> targetPipeline(pipeline,
+                                                              PipelineDeleter(expCtx->opCtx));
+    return sharded_agg_helpers::targetShardsAndAddMergeCursors(
+        expCtx,
+        std::make_pair(aggRequest, std::move(targetPipeline)),
+        shardCursorsSortSpec,
+        shardTargetingPolicy,
+        std::move(readConcern));
+}
+
 std::unique_ptr<MongoProcessInterface::ScopedExpectUnshardedCollection>
 ShardServerProcessInterface::expectUnshardedCollectionInScope(
     OperationContext* opCtx,

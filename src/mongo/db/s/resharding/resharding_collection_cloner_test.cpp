@@ -72,6 +72,16 @@ public:
         return pipeline;
     }
 
+    std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
+        const AggregateCommandRequest& aggRequest,
+        Pipeline* pipeline,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        boost::optional<BSONObj> shardCursorsSortSpec = boost::none,
+        ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
+        boost::optional<BSONObj> readConcern = boost::none) final {
+        return attachCursorSourceToPipeline(pipeline, shardTargetingPolicy, std::move(readConcern));
+    }
+
 private:
     std::deque<DocumentSource::GetNextResult> _mockResults;
 };
@@ -101,9 +111,9 @@ protected:
 
         getCatalogCacheMock()->setChunkManagerReturnValue(
             createChunkManager(newShardKeyPattern, configCacheChunksData));
-
-        _pipeline = _cloner->makePipeline(
+        auto [rawPipeline, expCtx] = _cloner->makeRawPipeline(
             operationContext(), std::make_shared<MockMongoInterface>(configCacheChunksData));
+        _pipeline = Pipeline::parse(std::move(rawPipeline), std::move(expCtx));
 
         _pipeline->addInitialSource(
             DocumentSourceMock::createForTest(sourceCollectionData, _pipeline->getContext()));

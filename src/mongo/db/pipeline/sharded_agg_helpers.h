@@ -212,10 +212,18 @@ std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(
  * Use the AggregateCommandRequest alternative for 'targetRequest' to explicitly specify command
  * options (e.g. read concern) to the shards when establishing remote cursors. Note that doing so
  * incurs the cost of parsing the pipeline.
+ *
+ * Use the std::pair<AggregateCommandRequest, std::unique_ptr<Pipeline, PipelineDeleter>>
+ * alternative for 'targetRequest' to explicitly specify command options (e.g. read concern) to the
+ * shards when establishing remote cursors, and to pass a pipeline that has already been parsed.
+ * This is useful when the pipeline has already been parsed as it avoids the cost
+ * of parsing it again.
  */
 std::unique_ptr<Pipeline, PipelineDeleter> targetShardsAndAddMergeCursors(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    stdx::variant<std::unique_ptr<Pipeline, PipelineDeleter>, AggregateCommandRequest>
+    stdx::variant<std::unique_ptr<Pipeline, PipelineDeleter>,
+                  AggregateCommandRequest,
+                  std::pair<AggregateCommandRequest, std::unique_ptr<Pipeline, PipelineDeleter>>>
         targetRequest,
     boost::optional<BSONObj> shardCursorsSortSpec = boost::none,
     ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,

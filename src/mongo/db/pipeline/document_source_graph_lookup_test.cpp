@@ -76,6 +76,18 @@ public:
         return pipeline;
     }
 
+    std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
+        const AggregateCommandRequest& aggRequest,
+        Pipeline* pipeline,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        boost::optional<BSONObj> shardCursorsSortSpec = boost::none,
+        ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
+        boost::optional<BSONObj> readConcern = boost::none) final {
+        // Implement this method should any test cases require setting aggregate command options via
+        // 'aggRequest'.
+        MONGO_UNREACHABLE;
+    }
+
 private:
     std::deque<DocumentSource::GetNextResult> _results;
 };

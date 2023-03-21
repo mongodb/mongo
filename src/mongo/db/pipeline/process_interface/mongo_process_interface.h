@@ -326,6 +326,18 @@ public:
         boost::optional<BSONObj> readConcern = boost::none) = 0;
 
     /**
+     * Same as above but takes in an aggRequest and pipeline. This preserves any
+     * aggregation options set on the AggregateCommandRequest.
+     */
+    virtual std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipeline(
+        const AggregateCommandRequest& aggRequest,
+        Pipeline* pipeline,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        boost::optional<BSONObj> shardCursorsSortSpec = boost::none,
+        ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
+        boost::optional<BSONObj> readConcern = boost::none) = 0;
+
+    /**
      * Accepts a pipeline and attaches a cursor source to it. Returns a BSONObj of the form
      * {"pipeline": <explainOutput>}. Note that <explainOutput> can be an object (shardsvr) or an
      * array (non_shardsvr).
@@ -348,7 +360,8 @@ public:
      * compiler expects to find an implementation of PipelineDeleter.
      */
     virtual std::unique_ptr<Pipeline, PipelineDeleter> attachCursorSourceToPipelineForLocalRead(
-        Pipeline* pipeline) = 0;
+        Pipeline* pipeline,
+        boost::optional<const AggregateCommandRequest&> aggRequest = boost::none) = 0;
 
     /**
      * Returns a vector of owned BSONObjs, each of which contains details of an in-progress

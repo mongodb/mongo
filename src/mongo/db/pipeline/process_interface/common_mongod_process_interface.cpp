@@ -435,7 +435,8 @@ BSONObj CommonMongodProcessInterface::getCollectionOptions(OperationContext* opC
 }
 
 std::unique_ptr<Pipeline, PipelineDeleter>
-CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(Pipeline* ownedPipeline) {
+CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(
+    Pipeline* ownedPipeline, boost::optional<const AggregateCommandRequest&> aggRequest) {
     auto expCtx = ownedPipeline->getContext();
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline(ownedPipeline,
                                                         PipelineDeleter(expCtx->opCtx));
@@ -478,8 +479,9 @@ CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(Pipeline*
                                       autoColl->getNss(),
                                       autoColl->isAnySecondaryNamespaceAViewOrSharded(),
                                       secondaryNamespaces};
+    auto resolvedAggRequest = aggRequest ? &aggRequest.get() : nullptr;
     PipelineD::buildAndAttachInnerQueryExecutorToPipeline(
-        holder, expCtx->ns, nullptr, pipeline.get());
+        holder, expCtx->ns, resolvedAggRequest, pipeline.get());
 
     return pipeline;
 }
