@@ -146,6 +146,8 @@ ServiceContext::ConstructorActionRegisterer telemetryStoreManagerRegisterer{
             // featureFlags are not allowed to be changed at runtime. Therefore it's not an issue
             // to not create a telemetry store in ConstructorActionRegisterer at start up with the
             // flag off - because the flag can not be turned on at any point afterwards.
+            telemetry_util::telemetryStoreOnParamChangeUpdater(serviceCtx) =
+                std::make_unique<telemetry_util::NoChangesAllowedTelemetryParamUpdater>();
             return;
         }
 

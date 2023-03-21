@@ -60,6 +60,19 @@ public:
 };
 
 /**
+ * A stub implementation that does not allow changing any parameters - to be used if the telemetry
+ * store is disabled and cannot be re-enabled without restarting, as with a feature flag.
+ */
+class NoChangesAllowedTelemetryParamUpdater : public OnParamChangeUpdater {
+public:
+    void updateCacheSize(ServiceContext* serviceCtx, memory_util::MemorySize memSize) final {
+        uasserted(7373500,
+                  "Cannot configure telemetry store - it is currently disabled and a restart is "
+                  "required to activate.");
+    }
+};
+
+/**
  * Decorated accessor to the 'OnParamChangeUpdater' stored in 'ServiceContext'.
  */
 extern const Decorable<ServiceContext>::Decoration<std::unique_ptr<OnParamChangeUpdater>>
