@@ -34,21 +34,13 @@
 namespace mongo {
 namespace analyze_shard_key {
 
-bool isFeatureFlagEnabled();
+bool isFeatureFlagEnabled(bool ignoreFCV = false);
 
-bool isFeatureFlagEnabledIgnoreFCV();
+bool supportsCoordinatingQueryAnalysis(bool ignoreFCV = false);
 
-bool supportsCoordinatingQueryAnalysis();
+bool supportsPersistingSampledQueries(bool ignoreFCV = false);
 
-bool supportsCoordinatingQueryAnalysisIgnoreFCV();
-
-bool supportsPersistingSampledQueries();
-
-bool supportsPersistingSampledQueriesIgnoreFCV();
-
-bool supportsSamplingQueries();
-
-bool supportsSamplingQueriesIgnoreFCV();
+bool supportsSamplingQueries(bool ignoreFCV = false);
 
 }  // namespace analyze_shard_key
 }  // namespace mongo

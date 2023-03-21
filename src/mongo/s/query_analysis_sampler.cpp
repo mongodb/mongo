@@ -66,10 +66,7 @@ QueryAnalysisSampler& QueryAnalysisSampler::get(OperationContext* opCtx) {
 }
 
 QueryAnalysisSampler& QueryAnalysisSampler::get(ServiceContext* serviceContext) {
-    invariant(analyze_shard_key::isFeatureFlagEnabledIgnoreFCV(),
-              "Only support analyzing queries when the feature flag is enabled");
-    invariant(isMongos() || serverGlobalParams.clusterRole == ClusterRole::ShardServer,
-              "Only support analyzing queries on a sharded cluster");
+    invariant(analyze_shard_key::supportsSamplingQueries(true /* ignoreFCV */));
     return getQueryAnalysisSampler(serviceContext);
 }
 

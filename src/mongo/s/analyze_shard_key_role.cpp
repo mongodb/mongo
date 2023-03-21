@@ -35,41 +35,26 @@
 namespace mongo {
 namespace analyze_shard_key {
 
-bool isFeatureFlagEnabled() {
+bool isFeatureFlagEnabled(bool ignoreFCV) {
+    if (ignoreFCV) {
+        return gFeatureFlagAnalyzeShardKey.isEnabledAndIgnoreFCV();
+    }
     return serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        analyze_shard_key::gFeatureFlagAnalyzeShardKey.isEnabled(
-            serverGlobalParams.featureCompatibility);
+        gFeatureFlagAnalyzeShardKey.isEnabled(serverGlobalParams.featureCompatibility);
 }
 
-bool isFeatureFlagEnabledIgnoreFCV() {
-    return analyze_shard_key::gFeatureFlagAnalyzeShardKey.isEnabledAndIgnoreFCV();
-}
-
-bool supportsCoordinatingQueryAnalysis() {
-    return isFeatureFlagEnabled() && serverGlobalParams.clusterRole == ClusterRole::ConfigServer;
-}
-
-bool supportsCoordinatingQueryAnalysisIgnoreFCV() {
-    return isFeatureFlagEnabledIgnoreFCV() &&
+bool supportsCoordinatingQueryAnalysis(bool ignoreFCV) {
+    return isFeatureFlagEnabled(ignoreFCV) &&
         serverGlobalParams.clusterRole == ClusterRole::ConfigServer;
 }
 
-bool supportsPersistingSampledQueries() {
-    return isFeatureFlagEnabled() && serverGlobalParams.clusterRole == ClusterRole::ShardServer;
-}
-
-bool supportsPersistingSampledQueriesIgnoreFCV() {
-    return isFeatureFlagEnabledIgnoreFCV() &&
+bool supportsPersistingSampledQueries(bool ignoreFCV) {
+    return isFeatureFlagEnabled(ignoreFCV) &&
         serverGlobalParams.clusterRole == ClusterRole::ShardServer;
 }
 
-bool supportsSamplingQueries() {
-    return isFeatureFlagEnabled() &&
-        (isMongos() || serverGlobalParams.clusterRole == ClusterRole::ShardServer);
-}
-
-bool supportsSamplingQueriesIgnoreFCV() {
-    return isFeatureFlagEnabledIgnoreFCV() &&
+bool supportsSamplingQueries(bool ignoreFCV) {
+    return isFeatureFlagEnabled(ignoreFCV) &&
         (isMongos() || serverGlobalParams.clusterRole == ClusterRole::ShardServer);
 }
 

@@ -212,7 +212,7 @@ Status initializeGlobalShardingState(
     LogicalTimeValidator::set(service, std::make_unique<LogicalTimeValidator>(keyManager));
     initializeTenantToShardCache(service);
 
-    if (analyze_shard_key::supportsSamplingQueriesIgnoreFCV()) {
+    if (analyze_shard_key::supportsSamplingQueries(true /* ignoreFCV */)) {
         analyze_shard_key::QueryAnalysisSampler::get(service).onStartup();
     }
 
