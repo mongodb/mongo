@@ -50,7 +50,6 @@
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/s/balancer/type_migration.h"
 #include "mongo/db/s/config/index_on_config.h"
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/db/vector_clock.h"
@@ -633,15 +632,6 @@ Status ShardingCatalogManager::_initConfigIndexes(OperationContext* opCtx) {
     Status result = createIndexesForConfigChunks(opCtx);
     if (result != Status::OK()) {
         return result;
-    }
-
-    result =
-        createIndexOnConfigCollection(opCtx,
-                                      MigrationType::ConfigNS,
-                                      BSON(MigrationType::ns() << 1 << MigrationType::min() << 1),
-                                      unique);
-    if (!result.isOK()) {
-        return result.withContext("couldn't create ns_1_min_1 index on config.migrations");
     }
 
     result = createIndexOnConfigCollection(

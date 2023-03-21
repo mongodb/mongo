@@ -119,7 +119,6 @@ commands:
 
     _shardsvrMoveRange:
         command_name: _shardsvrMoveRange
-        command_alias: moveChunk
         cpp_name: ShardsvrMoveRange
         description: "Definition of the moveRange command called from the config server on shards."
         namespace: type

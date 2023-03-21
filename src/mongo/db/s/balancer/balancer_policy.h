@@ -75,8 +75,6 @@ struct MigrateInfo {
 
     std::string getName() const;
 
-    BSONObj getMigrationTypeQuery() const;
-
     std::string toString() const;
 
     boost::optional<int64_t> getMaxChunkSizeBytes() const;
@@ -93,7 +91,6 @@ struct MigrateInfo {
     ForceJumbo forceJumbo;
 
     // Set only in case of data-size aware balancing
-    // TODO SERVER-65322 make `optMaxChunkSizeBytes` non-optional
     boost::optional<int64_t> optMaxChunkSizeBytes;
 };
 

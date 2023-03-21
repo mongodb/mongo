@@ -261,7 +261,8 @@ NSS_CONSTANT(kLocalClusterManagerNamespace, DatabaseName::kLocal, "clustermanage
 // Namespace used for startup log.
 NSS_CONSTANT(kStartupLogNamespace, DatabaseName::kLocal, "startup_log"_sd)
 
-// Namespace for storing the persisted state of migrations.
+// TODO SERVER-75080 delete unused `config.migrations` namespace
+// Deptecated: namespace for storing the persisted state of migrations on the config server.
 NSS_CONSTANT(kMigrationsNamespace, DatabaseName::kConfig, "migrations"_sd)
 
 // Namespace for changelog on CSRS.

@@ -61,8 +61,7 @@ class ShardsvrMoveRangeCommand final : public TypedCommand<ShardsvrMoveRangeComm
 public:
     using Request = ShardsvrMoveRange;
 
-    ShardsvrMoveRangeCommand()
-        : TypedCommand<ShardsvrMoveRangeCommand>(Request::kCommandName, Request::kCommandAlias) {}
+    ShardsvrMoveRangeCommand() : TypedCommand<ShardsvrMoveRangeCommand>(Request::kCommandName) {}
 
     bool skipApiVersionCheck() const override {
         // Internal command (server to server).

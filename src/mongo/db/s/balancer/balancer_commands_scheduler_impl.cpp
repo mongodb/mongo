@@ -47,7 +47,6 @@ namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(pauseSubmissionsFailPoint);
-MONGO_FAIL_POINT_DEFINE(deferredCleanupCompletedCheckpoint);
 
 void waitForQuiescedCluster(OperationContext* opCtx) {
     const auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
@@ -90,87 +89,6 @@ Status processRemoteResponse(const executor::RemoteCommandResponse& remoteRespon
                                << causedBy(remoteStatus));
 }
 
-Status persistRecoveryInfo(OperationContext* opCtx, const CommandInfo& command) {
-    const auto& migrationCommand = checked_cast<const MoveChunkCommandInfo&>(command);
-    auto migrationType = migrationCommand.asMigrationType();
-    DBDirectClient dbClient(opCtx);
-    std::vector<BSONObj> recoveryDocument;
-    recoveryDocument.emplace_back(migrationType.toBSON());
-
-    auto reply = dbClient.insertAcknowledged(
-        MigrationType::ConfigNS, recoveryDocument, true, WriteConcernOptions::Majority);
-    auto insertStatus = getStatusFromWriteCommandReply(reply);
-    if (insertStatus != ErrorCodes::DuplicateKey) {
-        return insertStatus;
-    }
-
-    // If the error has been caused by a duplicate command that is/was still active,
-    // skip the insertion and go ahead - the execution of the two requests will eventually join.
-    auto conflictingDoc =
-        dbClient.findOne(MigrationType::ConfigNS, migrationCommand.getRecoveryDocumentIdentifier());
-    if (conflictingDoc.isEmpty()) {
-        return Status::OK();
-    }
-    auto swConflictingMigration = MigrationType::fromBSON(conflictingDoc);
-    Status conflictConfirmedStatus(ErrorCodes::ConflictingOperationInProgress,
-                                   "Conflict detected while persisting recovery info");
-    if (!swConflictingMigration.isOK()) {
-        LOGV2_ERROR(5847211,
-                    "Parse error detected while processing duplicate recovery info",
-                    "error"_attr = swConflictingMigration.getStatus(),
-                    "recoveryInfo"_attr = redact(conflictingDoc));
-        return conflictConfirmedStatus;
-    }
-    auto conflictingMigrationType = swConflictingMigration.getValue();
-    return conflictingMigrationType.getSource() == migrationType.getSource() &&
-            conflictingMigrationType.getDestination() == conflictingMigrationType.getDestination()
-        ? Status::OK()
-        : conflictConfirmedStatus;
-}
-
-std::vector<RequestData> rebuildRequestsFromRecoveryInfo(
-    OperationContext* opCtx, const MigrationsRecoveryDefaultValues& defaultValues) {
-    std::vector<RequestData> rebuiltRequests;
-    auto documentProcessor = [&rebuiltRequests, &defaultValues](const BSONObj& recoveryDoc) {
-        auto swTypeMigration = MigrationType::fromBSON(recoveryDoc);
-        if (swTypeMigration.isOK()) {
-            auto requestId = UUID::gen();
-            auto recoveredMigrationCommand =
-                MoveChunkCommandInfo::recoverFrom(swTypeMigration.getValue(), defaultValues);
-            LOGV2_DEBUG(5847210,
-                        1,
-                        "Command request recovered and set for rescheduling",
-                        "reqId"_attr = requestId,
-                        "command"_attr = redact(recoveredMigrationCommand->serialise()));
-            rebuiltRequests.emplace_back(requestId, std::move(recoveredMigrationCommand));
-        } else {
-            LOGV2_ERROR(5847209,
-                        "Failed to parse recovery info",
-                        "error"_attr = swTypeMigration.getStatus(),
-                        "recoveryInfo"_attr = redact(recoveryDoc));
-        }
-    };
-    DBDirectClient dbClient(opCtx);
-    try {
-        FindCommandRequest findRequest{MigrationType::ConfigNS};
-        dbClient.find(std::move(findRequest), documentProcessor);
-    } catch (const DBException& e) {
-        LOGV2_ERROR(5847215, "Failed to fetch requests to recover", "error"_attr = redact(e));
-    }
-
-    return rebuiltRequests;
-}
-
-void deletePersistedRecoveryInfo(DBDirectClient& dbClient, const CommandInfo& command) {
-    const auto& migrationCommand = checked_cast<const MoveChunkCommandInfo&>(command);
-    auto recoveryDocId = migrationCommand.getRecoveryDocumentIdentifier();
-    try {
-        dbClient.remove(MigrationType::ConfigNS, recoveryDocId, false /*removeMany*/);
-    } catch (const DBException& e) {
-        LOGV2_ERROR(5847214, "Failed to remove recovery info", "error"_attr = redact(e));
-    }
-}
-
 }  // namespace
 
 const std::string MergeChunksCommandInfo::kCommandName = "mergeChunks";
@@ -192,8 +110,7 @@ BalancerCommandsSchedulerImpl::~BalancerCommandsSchedulerImpl() {
     stop();
 }
 
-void BalancerCommandsSchedulerImpl::start(OperationContext* opCtx,
-                                          const MigrationsRecoveryDefaultValues& defaultValues) {
+void BalancerCommandsSchedulerImpl::start(OperationContext* opCtx) {
     LOGV2(5847200, "Balancer command scheduler start requested");
     stdx::lock_guard<Latch> lg(_mutex);
     invariant(!_workerThreadHandle.joinable());
@@ -209,17 +126,10 @@ void BalancerCommandsSchedulerImpl::start(OperationContext* opCtx,
         LOGV2_WARNING(
             6648002, "Could not join migration activity on shards", "error"_attr = redact(e));
     }
-    auto requestsToRecover = rebuildRequestsFromRecoveryInfo(opCtx, defaultValues);
 
-    _numRequestsToRecover = requestsToRecover.size();
-    if (_numRequestsToRecover == 0) {
-        LOGV2(6648003, "Balancer scheduler recovery complete. Switching to regular execution");
-        _state = SchedulerState::Running;
-    } else {
-        for (auto& requestToRecover : requestsToRecover) {
-            _enqueueRequest(lg, std::move(requestToRecover));
-        }
-    }
+    LOGV2(6648003, "Balancer scheduler recovery complete. Switching to regular execution");
+    _state = SchedulerState::Running;
+
     _workerThreadHandle = stdx::thread([this] { _workerThread(); });
 }
 
@@ -236,35 +146,6 @@ void BalancerCommandsSchedulerImpl::stop() {
         _stateUpdatedCV.notify_all();
     }
     _workerThreadHandle.join();
-}
-
-SemiFuture<void> BalancerCommandsSchedulerImpl::requestMoveChunk(
-    OperationContext* opCtx,
-    const MigrateInfo& migrateInfo,
-    const MoveChunkSettings& commandSettings,
-    bool issuedByRemoteUser) {
-
-    auto externalClientInfo =
-        issuedByRemoteUser ? boost::optional<ExternalClientInfo>(opCtx) : boost::none;
-
-    invariant(migrateInfo.maxKey.has_value(), "Bound not present when requesting move chunk");
-    auto commandInfo = std::make_shared<MoveChunkCommandInfo>(migrateInfo.nss,
-                                                              migrateInfo.from,
-                                                              migrateInfo.to,
-                                                              migrateInfo.minKey,
-                                                              *migrateInfo.maxKey,
-                                                              commandSettings.maxChunkSizeBytes,
-                                                              commandSettings.secondaryThrottle,
-                                                              commandSettings.waitForDelete,
-                                                              migrateInfo.forceJumbo,
-                                                              migrateInfo.version,
-                                                              std::move(externalClientInfo));
-
-    return _buildAndEnqueueNewRequest(opCtx, std::move(commandInfo))
-        .then([](const executor::RemoteCommandResponse& remoteResponse) {
-            return processRemoteResponse(remoteResponse);
-        })
-        .semi();
 }
 
 SemiFuture<void> BalancerCommandsSchedulerImpl::requestMoveRange(
@@ -412,13 +293,6 @@ CommandSubmissionResult BalancerCommandsSchedulerImpl::_submit(
             return CommandSubmissionResult(params.id, shardHostWithStatus.getStatus());
         }
 
-        if (params.commandInfo->requiresRecoveryOnCrash()) {
-            auto writeStatus = persistRecoveryInfo(opCtx, *(params.commandInfo));
-            if (!writeStatus.isOK()) {
-                return CommandSubmissionResult(params.id, writeStatus);
-            }
-        }
-
         const executor::RemoteCommandRequest remoteCommand =
             executor::RemoteCommandRequest(shardHostWithStatus.getValue(),
                                            params.commandInfo->getTargetDb(),
@@ -477,23 +351,6 @@ void BalancerCommandsSchedulerImpl::_applyCommandResponse(
                 "response"_attr = response);
 }
 
-void BalancerCommandsSchedulerImpl::_performDeferredCleanup(
-    OperationContext* opCtx,
-    const stdx::unordered_map<UUID, RequestData, UUID::Hash>& requestsHoldingResources) {
-    if (requestsHoldingResources.empty()) {
-        return;
-    }
-
-    DBDirectClient dbClient(opCtx);
-    for (const auto& [_, request] : requestsHoldingResources) {
-        if (request.requiresRecoveryCleanupOnCompletion()) {
-            deletePersistedRecoveryInfo(dbClient, request.getCommandInfo());
-        }
-    }
-
-    deferredCleanupCompletedCheckpoint.pauseWhileSet();
-}
-
 void BalancerCommandsSchedulerImpl::_workerThread() {
     ON_BLOCK_EXIT([this] {
         LOGV2(5847208, "Leaving balancer command scheduler thread");
@@ -509,7 +366,6 @@ void BalancerCommandsSchedulerImpl::_workerThread() {
     while (!stopWorkerRequested) {
         std::vector<CommandSubmissionParameters> commandsToSubmit;
         std::vector<CommandSubmissionResult> submissionResults;
-        stdx::unordered_map<UUID, RequestData, UUID::Hash> completedRequestsToCleanUp;
 
         // 1. Check the internal state and plan for the actions to be taken ont this round.
         {
@@ -524,7 +380,6 @@ void BalancerCommandsSchedulerImpl::_workerThread() {
 
             for (const auto& requestId : _recentlyCompletedRequestIds) {
                 auto it = _requests.find(requestId);
-                completedRequestsToCleanUp.emplace(it->first, std::move(it->second));
                 _requests.erase(it);
             }
             _recentlyCompletedRequestIds.clear();
@@ -537,7 +392,6 @@ void BalancerCommandsSchedulerImpl::_workerThread() {
                     requestData.setOutcome(
                         Status(ErrorCodes::BalancerInterrupted,
                                "Request cancelled - balancer scheduler is stopping"));
-                    completedRequestsToCleanUp.emplace(requestId, std::move(requestData));
                     _requests.erase(requestId);
                 }
             }
@@ -545,14 +399,7 @@ void BalancerCommandsSchedulerImpl::_workerThread() {
             stopWorkerRequested = _state == SchedulerState::Stopping;
         }
 
-        // 2.a Free any resource acquired by already completed/aborted requests.
-        {
-            auto opCtxHolder = cc().makeOperationContext();
-            _performDeferredCleanup(opCtxHolder.get(), completedRequestsToCleanUp);
-            completedRequestsToCleanUp.clear();
-        }
-
-        // 2.b Serve the picked up requests, submitting their related commands.
+        // 2. Serve the picked up requests, submitting their related commands.
         for (auto& submissionInfo : commandsToSubmit) {
             auto opCtxHolder = cc().makeOperationContext();
             if (submissionInfo.commandInfo) {

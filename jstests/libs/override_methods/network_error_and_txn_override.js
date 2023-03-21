@@ -78,7 +78,6 @@ const kNonRetryableCommands = new Set([
     "_configsvrCommitChunkSplit",
     "_configsvrCommitMergeAllChunksOnShard",
     "_configsvrCreateDatabase",
-    "_configsvrMoveChunk",
     "_configsvrMoveRange",
     "_configsvrRemoveShard",
     "_configsvrRemoveShardFromZone",

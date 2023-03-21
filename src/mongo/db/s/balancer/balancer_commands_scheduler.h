@@ -42,34 +42,6 @@ class KeyPattern;
 class MigrationSecondaryThrottleOptions;
 
 /**
- * Default values for MoveChunkRequests that the Scheduler might recover from a prior
- * step-down or crash as part of its self-initialisation
- */
-struct MigrationsRecoveryDefaultValues {
-    MigrationsRecoveryDefaultValues(int64_t maxChunkSizeBytes,
-                                    const MigrationSecondaryThrottleOptions& secondaryThrottle)
-        : maxChunkSizeBytes(maxChunkSizeBytes), secondaryThrottle(secondaryThrottle) {}
-    const int64_t maxChunkSizeBytes;
-    const MigrationSecondaryThrottleOptions secondaryThrottle;
-};
-
-/**
- * Set of command-specific aggregations of submission settings
- */
-struct MoveChunkSettings {
-    MoveChunkSettings(int64_t maxChunkSizeBytes,
-                      const MigrationSecondaryThrottleOptions& secondaryThrottle,
-                      bool waitForDelete)
-        : maxChunkSizeBytes(maxChunkSizeBytes),
-          secondaryThrottle(secondaryThrottle),
-          waitForDelete(waitForDelete) {}
-
-    int64_t maxChunkSizeBytes;
-    const MigrationSecondaryThrottleOptions secondaryThrottle;
-    bool waitForDelete;
-};
-
-/**
  * Interface for the asynchronous submission of chunk-related commands.
  * Every method assumes that the ChunkType input parameter is filled up with information about
  * version and location (shard ID).
@@ -82,19 +54,13 @@ public:
      * Triggers an asynchronous self-initialisation of the component,
      * which will start accepting request<Command>() invocations.
      */
-    virtual void start(OperationContext* opCtx,
-                       const MigrationsRecoveryDefaultValues& defaultValues) = 0;
+    virtual void start(OperationContext* opCtx) = 0;
 
     /**
      * Stops the scheduler and the processing of any outstanding and incoming request
      * (which will be resolved as cancelled).
      */
     virtual void stop() = 0;
-
-    virtual SemiFuture<void> requestMoveChunk(OperationContext* opCtx,
-                                              const MigrateInfo& migrateInfo,
-                                              const MoveChunkSettings& commandSettings,
-                                              bool issuedByRemoteUser = false) = 0;
 
     virtual SemiFuture<void> requestMergeChunks(OperationContext* opCtx,
                                                 const NamespaceString& nss,

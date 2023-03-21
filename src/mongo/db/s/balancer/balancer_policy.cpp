@@ -34,7 +34,6 @@
 
 #include <random>
 
-#include "mongo/db/s/balancer/type_migration.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/balancer_configuration.h"
@@ -689,12 +688,6 @@ std::string MigrateInfo::getName() const {
     }
 
     return buf.str();
-}
-
-BSONObj MigrateInfo::getMigrationTypeQuery() const {
-    // Generates a query object for a single MigrationType based on the namespace and the lower
-    // bound of the chunk being moved.
-    return BSON(MigrationType::ns(nss.ns()) << MigrationType::min(minKey));
 }
 
 string MigrateInfo::toString() const {

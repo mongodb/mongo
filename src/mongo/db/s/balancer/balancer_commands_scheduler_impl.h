@@ -31,7 +31,6 @@
 
 #include "mongo/db/s/balancer/auto_merger_policy.h"
 #include "mongo/db/s/balancer/balancer_commands_scheduler.h"
-#include "mongo/db/s/balancer/type_migration.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/scoped_task_executor.h"
@@ -141,120 +140,6 @@ private:
 /**
  * Set of command-specific subclasses of CommandInfo.
  */
-class MoveChunkCommandInfo : public CommandInfo {
-public:
-    MoveChunkCommandInfo(const NamespaceString& nss,
-                         const ShardId& origin,
-                         const ShardId& recipient,
-                         const BSONObj& lowerBoundKey,
-                         const BSONObj& upperBoundKey,
-                         int64_t maxChunkSizeBytes,
-                         const MigrationSecondaryThrottleOptions& secondaryThrottle,
-                         bool waitForDelete,
-                         ForceJumbo forceJumbo,
-                         const ChunkVersion& version,
-                         boost::optional<ExternalClientInfo>&& clientInfo,
-                         bool requiresRecoveryOnCrash = true)
-        : CommandInfo(origin, nss, std::move(clientInfo)),
-          _chunkBoundaries(lowerBoundKey, upperBoundKey),
-          _recipient(recipient),
-          _version(version),
-          _maxChunkSizeBytes(maxChunkSizeBytes),
-          _secondaryThrottle(secondaryThrottle),
-          _waitForDelete(waitForDelete),
-          _forceJumbo(forceJumbo),
-          _requiresRecoveryOnCrash(requiresRecoveryOnCrash) {}
-
-    static std::shared_ptr<MoveChunkCommandInfo> recoverFrom(
-        const MigrationType& migrationType, const MigrationsRecoveryDefaultValues& defaultValues) {
-        auto maxChunkSize =
-            migrationType.getMaxChunkSizeBytes().value_or(defaultValues.maxChunkSizeBytes);
-        const auto& secondaryThrottle =
-            migrationType.getSecondaryThrottle().value_or(defaultValues.secondaryThrottle);
-        return std::make_shared<MoveChunkCommandInfo>(migrationType.getNss(),
-                                                      migrationType.getSource(),
-                                                      migrationType.getDestination(),
-                                                      migrationType.getMinKey(),
-                                                      migrationType.getMaxKey(),
-                                                      maxChunkSize,
-                                                      secondaryThrottle,
-                                                      migrationType.getWaitForDelete(),
-                                                      migrationType.getForceJumbo(),
-                                                      migrationType.getChunkVersion(),
-                                                      boost::none /* clientInfo */,
-                                                      false /* requiresRecoveryOnCrash */);
-    }
-
-    BSONObj serialise() const override {
-
-
-        ShardsvrMoveRange request(getNameSpace(), getTarget(), _maxChunkSizeBytes);
-
-        MoveRangeRequestBase baseRequest;
-        baseRequest.setWaitForDelete(_waitForDelete);
-        baseRequest.setMin(_chunkBoundaries.getMin());
-        baseRequest.setMax(_chunkBoundaries.getMax());
-        baseRequest.setToShard(_recipient);
-        request.setMoveRangeRequestBase(baseRequest);
-
-        request.setForceJumbo(_forceJumbo);
-        request.setEpoch(_version.epoch());
-
-        BSONObjBuilder commandBuilder;
-        request.serialize({}, &commandBuilder);
-        _secondaryThrottle.append(&commandBuilder);
-
-        if (!_secondaryThrottle.isWriteConcernSpecified()) {
-            commandBuilder.append(WriteConcernOptions::kWriteConcernField,
-                                  WriteConcernOptions::kInternalWriteDefault);
-        }
-
-
-        return commandBuilder.obj();
-    }
-
-    bool requiresRecoveryOnCrash() const override {
-        return _requiresRecoveryOnCrash;
-    }
-
-    bool requiresRecoveryCleanupOnCompletion() const override {
-        return true;
-    }
-
-    MigrationType asMigrationType() const {
-        return MigrationType(getNameSpace(),
-                             _chunkBoundaries.getMin(),
-                             _chunkBoundaries.getMax(),
-                             getTarget(),
-                             _recipient,
-                             _version,
-                             _waitForDelete,
-                             _forceJumbo,
-                             _maxChunkSizeBytes,
-                             _secondaryThrottle);
-    }
-
-    BSONObj getRecoveryDocumentIdentifier() const {
-        // Use the config.migration index to identify the recovery info document: It is expected
-        // that only commands that are functionally equivalent can match such value
-        // (@see persistRecoveryInfo() in balancer_commands_scheduler_impl.cpp for details).
-        BSONObjBuilder builder;
-        builder.append(MigrationType::ns.name(), getNameSpace().ns());
-        builder.append(MigrationType::min.name(), _chunkBoundaries.getMin());
-        return builder.obj();
-    }
-
-
-private:
-    ChunkRange _chunkBoundaries;
-    ShardId _recipient;
-    ChunkVersion _version;
-    int64_t _maxChunkSizeBytes;
-    MigrationSecondaryThrottleOptions _secondaryThrottle;
-    bool _waitForDelete;
-    ForceJumbo _forceJumbo;
-    bool _requiresRecoveryOnCrash;
-};
 
 class MergeChunksCommandInfo : public CommandInfo {
 public:
@@ -472,15 +357,9 @@ public:
 
     ~BalancerCommandsSchedulerImpl();
 
-    void start(OperationContext* opCtx,
-               const MigrationsRecoveryDefaultValues& defaultValues) override;
+    void start(OperationContext* opCtx) override;
 
     void stop() override;
-
-    SemiFuture<void> requestMoveChunk(OperationContext* opCtx,
-                                      const MigrateInfo& migrateInfo,
-                                      const MoveChunkSettings& commandSettings,
-                                      bool issuedByRemoteUser) override;
 
     SemiFuture<void> requestMoveRange(OperationContext* opCtx,
                                       const ShardsvrMoveRange& request,
@@ -548,15 +427,6 @@ private:
         OperationContext* opCtx, std::shared_ptr<CommandInfo>&& commandInfo);
 
     void _enqueueRequest(WithLock, RequestData&& request);
-
-    /**
-     * Clears any persisted state associated to the list of requests specified.
-     * This method must not be called while holding any mutex (this could cause deadlocks if a
-     * stepdown request is also being served).
-     */
-    void _performDeferredCleanup(
-        OperationContext* opCtx,
-        const stdx::unordered_map<UUID, RequestData, UUID::Hash>& requestsHoldingResources);
 
     CommandSubmissionResult _submit(OperationContext* opCtx,
                                     const CommandSubmissionParameters& data);

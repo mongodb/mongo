@@ -115,40 +115,6 @@ void MigrationTestFixture::removeAllChunks(const NamespaceString& collName, cons
     ASSERT_EQ(ErrorCodes::NoMatchingDocument, findStatus);
 }
 
-void MigrationTestFixture::setUpMigration(const NamespaceString& ns,
-                                          const ChunkType& chunk,
-                                          const ShardId& toShard) {
-    BSONObjBuilder builder;
-    builder.append(MigrationType::ns(), ns.ns());
-    builder.append(MigrationType::min(), chunk.getMin());
-    builder.append(MigrationType::max(), chunk.getMax());
-    builder.append(MigrationType::toShard(), toShard.toString());
-    builder.append(MigrationType::fromShard(), chunk.getShard().toString());
-    chunk.getVersion().serialize("chunkVersion", &builder);
-    builder.append(MigrationType::forceJumbo(), "doNotForceJumbo");
-
-    MigrationType migrationType = assertGet(MigrationType::fromBSON(builder.obj()));
-    ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
-                                                    MigrationType::ConfigNS,
-                                                    migrationType.toBSON(),
-                                                    kMajorityWriteConcern));
-}
-
-void MigrationTestFixture::checkMigrationsCollectionIsEmpty() {
-    auto statusWithMigrationsQueryResponse =
-        shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
-            operationContext(),
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            repl::ReadConcernLevel::kMajorityReadConcern,
-            MigrationType::ConfigNS,
-            BSONObj(),
-            BSONObj(),
-            boost::none);
-    Shard::QueryResponse migrationsQueryResponse =
-        uassertStatusOK(statusWithMigrationsQueryResponse);
-    ASSERT_EQUALS(0U, migrationsQueryResponse.docs.size());
-}
-
 ShardId MigrationTestFixture::getShardIdByHost(HostAndPort host) {
     if (host == kShardHost0) {
         return kShardId0;

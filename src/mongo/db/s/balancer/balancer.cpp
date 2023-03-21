@@ -384,74 +384,6 @@ void Balancer::joinCurrentRound(OperationContext* opCtx) {
     });
 }
 
-Status Balancer::rebalanceSingleChunk(OperationContext* opCtx,
-                                      const NamespaceString& nss,
-                                      const ChunkType& chunk) {
-    auto migrateStatus = _chunkSelectionPolicy->selectSpecificChunkToMove(opCtx, nss, chunk);
-    if (!migrateStatus.isOK()) {
-        return migrateStatus.getStatus();
-    }
-
-    auto migrateInfo = std::move(migrateStatus.getValue());
-    if (!migrateInfo) {
-        LOGV2_DEBUG(21854,
-                    1,
-                    "Unable to find more appropriate location for chunk {chunk}",
-                    "Unable to find more appropriate location for chunk",
-                    "chunk"_attr = redact(chunk.toString()));
-        return Status::OK();
-    }
-
-    auto balancerConfig = Grid::get(opCtx)->getBalancerConfiguration();
-    Status refreshStatus = balancerConfig->refreshAndCheck(opCtx);
-    if (!refreshStatus.isOK()) {
-        return refreshStatus;
-    }
-
-    const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
-    auto coll =
-        catalogClient->getCollection(opCtx, nss, repl::ReadConcernLevel::kMajorityReadConcern);
-    auto maxChunkSize =
-        coll.getMaxChunkSizeBytes().value_or(balancerConfig->getMaxChunkSizeBytes());
-
-    MoveChunkSettings settings(
-        maxChunkSize, balancerConfig->getSecondaryThrottle(), balancerConfig->waitForDelete());
-    auto response =
-        _commandScheduler
-            ->requestMoveChunk(opCtx, *migrateInfo, settings, true /* issuedByRemoteUser */)
-            .getNoThrow(opCtx);
-    return processManualMigrationOutcome(
-        opCtx, chunk.getMin(), boost::none, nss, migrateInfo->to, response);
-}
-
-Status Balancer::moveSingleChunk(OperationContext* opCtx,
-                                 const NamespaceString& nss,
-                                 const ChunkType& chunk,
-                                 const ShardId& newShardId,
-                                 const MigrationSecondaryThrottleOptions& secondaryThrottle,
-                                 bool waitForDelete,
-                                 bool forceJumbo) {
-    auto moveAllowedStatus = _chunkSelectionPolicy->checkMoveAllowed(opCtx, chunk, newShardId);
-    if (!moveAllowedStatus.isOK()) {
-        return moveAllowedStatus;
-    }
-
-    const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
-    auto coll =
-        catalogClient->getCollection(opCtx, nss, repl::ReadConcernLevel::kMajorityReadConcern);
-    const auto maxChunkSize = getMaxChunkSizeBytes(opCtx, coll);
-
-    MoveChunkSettings settings(maxChunkSize, secondaryThrottle, waitForDelete);
-    MigrateInfo migrateInfo(
-        newShardId, nss, chunk, forceJumbo ? ForceJumbo::kForceManual : ForceJumbo::kDoNotForce);
-    auto response =
-        _commandScheduler
-            ->requestMoveChunk(opCtx, migrateInfo, settings, true /* issuedByRemoteUser */)
-            .getNoThrow(opCtx);
-    return processManualMigrationOutcome(
-        opCtx, chunk.getMin(), boost::none, nss, newShardId, response);
-}
-
 Status Balancer::moveRange(OperationContext* opCtx,
                            const NamespaceString& nss,
                            const ConfigsvrMoveRange& request,
@@ -743,10 +675,7 @@ void Balancer::_mainThread() {
 
     LOGV2(6036605, "Starting command scheduler");
 
-    _commandScheduler->start(
-        opCtx.get(),
-        MigrationsRecoveryDefaultValues(balancerConfig->getMaxChunkSizeBytes(),
-                                        balancerConfig->getSecondaryThrottle()));
+    _commandScheduler->start(opCtx.get());
 
     _actionStreamConsumerThread = stdx::thread([&] { _consumeActionStreamLoop(); });
 

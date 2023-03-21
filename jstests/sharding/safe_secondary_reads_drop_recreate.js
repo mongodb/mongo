@@ -60,7 +60,6 @@ let testCases = {
     _configsvrCommitMergeAllChunksOnShard: {skip: "primary only"},
     _configsvrConfigureCollectionBalancing: {skip: "primary only"},
     _configsvrDropIndexCatalogEntry: {skip: "primary only"},
-    _configsvrMoveChunk: {skip: "primary only"},
     _configsvrMoveRange: {skip: "primary only"},
     _configsvrRemoveShardFromZone: {skip: "primary only"},
     _configsvrReshardCollection: {skip: "primary only"},

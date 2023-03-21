@@ -112,7 +112,6 @@ let viewsCommandTests = {
     _configsvrDropIndexCatalogEntry: {skip: isAnInternalCommand},
     _configsvrEnsureChunkVersionIsGreaterThan: {skip: isAnInternalCommand},
     _configsvrGetHistoricalPlacement: {skip: isAnInternalCommand},  // TODO SERVER-73029 remove
-    _configsvrMoveChunk: {skip: isAnInternalCommand},  // Can be removed once 6.0 is last LTS
     _configsvrMovePrimary: {skip: isAnInternalCommand},
     _configsvrMoveRange: {skip: isAnInternalCommand},
     _configsvrRefineCollectionShardKey: {skip: isAnInternalCommand},

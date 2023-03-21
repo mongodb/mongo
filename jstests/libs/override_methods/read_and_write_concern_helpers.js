@@ -38,7 +38,6 @@ var kCommandsSupportingWriteConcern = new Set([
     "_configsvrCommitMergeAllChunksOnShard",
     "_configsvrCreateDatabase",
     "_configsvrDropIndexCatalogEntry",
-    "_configsvrMoveChunk",
     "_configsvrMoveRange",
     "_configsvrRemoveShard",
     "_configsvrRemoveShardFromZone",

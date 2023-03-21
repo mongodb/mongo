@@ -5,6 +5,7 @@
 const commandsRemovedFromMongodSinceLastLTS = [
     "_configsvrCommitChunkMerge",
     "_configsvrCreateCollection",
+    "_configsvrMoveChunk",
     "_configsvrRepairShardedCollectionChunksHistory",
     "mapreduce.shardedfinish",
     "availableQueryOptions",  // TODO SERVER-67689: remove this once 7.0 becomes last-lts
