@@ -438,8 +438,10 @@ class _Selector(object):
         # 1. Find the root files.
         if selector_config.roots is not None:
             roots = selector_config.roots
-        else:
+        elif selector_config.root is not None:
             roots = self._test_file_explorer.read_root_file(selector_config.root)
+        else:
+            roots = []
 
         # 2. Create a _TestList.
         test_list = _TestList(self._test_file_explorer, roots, self._tests_are_files)
