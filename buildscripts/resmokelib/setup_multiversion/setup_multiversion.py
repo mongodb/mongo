@@ -11,6 +11,7 @@ import re
 import sys
 import time
 
+import requests
 import structlog
 import yaml
 
@@ -82,6 +83,30 @@ class SetupMultiversion(Subcommand):
             # Use the Evergreen project ID as fallback.
             return re.search(r"(\d+\.\d+$)", evg_project_id).group(0)
 
+    def get_backup_url(self, target_version):
+        """Get the backup url from downloads.mongodb.org/current.json."""
+        # If these attributes are not set, we can't get the backup url
+        if not self.architecture or not self.edition or not self.platform:
+            return None
+
+        # Get released mongo version data
+        current_json = requests.get('https://downloads.mongodb.org/current.json')
+        current_releases = current_json.json()
+
+        # Find a match in current.json
+        for version in current_releases['versions']:
+            if version['version'].startswith(target_version):
+                for download_obj in version['downloads']:
+                    if download_obj.get('arch', None) == self.architecture and download_obj.get(
+                            'edition', None) == self.edition and download_obj.get(
+                                'target', None) == self.platform:
+                        backup_url = download_obj.get('archive', {}).get('url', None)
+                        LOGGER.info(
+                            "Found backup url from https://downloads.mongodb.org/current.json: ",
+                            backup_url=backup_url)
+                        return backup_url
+        return None
+
     def execute(self):
         """Execute setup multiversion mongodb."""
 
@@ -93,6 +118,7 @@ class SetupMultiversion(Subcommand):
                 urls = {}
                 if self.use_latest:
                     urls = self.get_latest_urls(version)
+                    urls['backup_url'] = self.get_backup_url(version)
                 if not urls:
                     LOGGER.warning("Latest URL is not available or not requested, "
                                    "we fallback to getting the URL for a specific "
@@ -101,6 +127,7 @@ class SetupMultiversion(Subcommand):
 
                 artifacts_url = urls.get("Artifacts", "") if self.download_artifacts else None
                 binaries_url = urls.get("Binaries", "") if self.download_binaries else None
+                backup_url = urls.get("backup_url", "") if self.download_binaries else None
                 download_symbols_url = None
 
                 if self.download_symbols:
@@ -112,8 +139,8 @@ class SetupMultiversion(Subcommand):
                 # Give each version a unique install dir
                 install_dir = os.path.join(self.install_dir, version)
 
-                self.setup_mongodb(artifacts_url, binaries_url, download_symbols_url, install_dir,
-                                   bin_suffix, self.link_dir)
+                self.setup_mongodb(artifacts_url, binaries_url, backup_url, download_symbols_url,
+                                   install_dir, bin_suffix, self.link_dir)
 
             except (github_conn.GithubConnError, evergreen_conn.EvergreenConnError,
                     download.DownloadError) as ex:
@@ -181,19 +208,18 @@ class SetupMultiversion(Subcommand):
         return urls
 
     @staticmethod
-    def setup_mongodb(artifacts_url, binaries_url, symbols_url, install_dir, bin_suffix=None,
-                      link_dir=None):
+    def setup_mongodb(artifacts_url, binaries_url, backup_url, symbols_url, install_dir,
+                      bin_suffix=None, link_dir=None):
         # pylint: disable=too-many-arguments
         """Download, extract and symlink."""
 
-        for url in [artifacts_url, binaries_url, symbols_url]:
+        def try_download(download_url):
+            tarball = download.download_from_s3(download_url)
+            download.extract_archive(tarball, install_dir)
+            os.remove(tarball)
+
+        for url in [artifacts_url, symbols_url]:
             if url is not None:
-
-                def try_download(download_url):
-                    tarball = download.download_from_s3(download_url)
-                    download.extract_archive(tarball, install_dir)
-                    os.remove(tarball)
-
                 try:
                     try_download(url)
                 except Exception as err:  # pylint: disable=broad-except
@@ -201,6 +227,19 @@ class SetupMultiversion(Subcommand):
                                    error=err)
                     time.sleep(1)
                     try_download(url)
+
+        if binaries_url is not None:
+            try:
+                try_download(binaries_url)
+            except Exception as err:  # pylint: disable=broad-except
+                LOGGER.warning("Setting up binaries tarball failed with error, retrying once...",
+                               error=err)
+                time.sleep(1)
+                if backup_url:
+                    LOGGER.info("Using backup url for download.")
+                    try_download(backup_url)
+                else:
+                    try_download(binaries_url)
 
         if binaries_url is not None:
             if not link_dir:

@@ -77,7 +77,7 @@ def download_debug_symbols(root_logger, download_url):
 
     while True:
         try:
-            SetupMultiversion.setup_mongodb(artifacts_url=None, binaries_url=None,
+            SetupMultiversion.setup_mongodb(artifacts_url=None, binaries_url=None, backup_url=None,
                                             symbols_url=download_url, install_dir=os.getcwd())
 
             break
