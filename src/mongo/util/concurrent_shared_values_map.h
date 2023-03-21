@@ -49,16 +49,9 @@ namespace mongo {
  */
 template <typename Key, typename Value, typename... ExtraAbslArgs>
 class ConcurrentSharedValuesMap {
-private:
-    using Map = absl::flat_hash_map<Key, std::shared_ptr<Value>, ExtraAbslArgs...>;
-    ConcurrentSharedValuesMap(std::shared_ptr<Map> otherMap) : _map(std::move(otherMap)){};
-
-    // shared_ptr in order to allow lock-free reads of the values.
-    std::shared_ptr<Map> _map;
-    // Locked in order to modify the map by either inserting or removing an element.
-    Mutex _mapModificationMutex;
-
 public:
+    using Map = absl::flat_hash_map<Key, std::shared_ptr<Value>, ExtraAbslArgs...>;
+
     ConcurrentSharedValuesMap() : _map(std::make_shared<Map>()) {}
 
     /**
@@ -136,5 +129,32 @@ public:
         auto emptyMap = std::make_shared<Map>();
         atomic_store(&_map, std::move(emptyMap));
     }
+
+    /**
+     * Updates the map atomically, this method accepts a function that will return the new map to
+     * use. Existing copies of the map or values previously obtained via find() will not be
+     * invalidated.
+     *
+     * This is a blocking operation as all writes are serialized. As the function can be expensive
+     * to execute, care must be taken in order to minimize its cost. Otherwise it risks blocking
+     * writes for longer than desired.
+     */
+    template <typename F>
+    void updateWith(F&& updateFunc) {
+        static_assert(std::is_invocable_r_v<Map, F, const Map&>,
+                      "Function must be of type Map(const Map&)");
+        stdx::lock_guard lk(_mapModificationMutex);
+        auto currentMap = atomic_load(&_map);
+        auto newMap = std::make_shared<Map>(std::forward<F>(updateFunc)(*currentMap));
+        atomic_store(&_map, std::move(newMap));
+    }
+
+private:
+    ConcurrentSharedValuesMap(std::shared_ptr<Map> otherMap) : _map(std::move(otherMap)){};
+
+    // shared_ptr in order to allow lock-free reads of the values.
+    std::shared_ptr<Map> _map;
+    // Locked in order to modify the map by either inserting or removing an element.
+    Mutex _mapModificationMutex;
 };
 }  // namespace mongo

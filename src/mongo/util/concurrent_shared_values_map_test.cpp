@@ -83,5 +83,25 @@ TEST(ConcurrentSharedValuesMapTest, GetOrEmplaceInsertsOnce) {
     ASSERT_EQ(ref1, ref2);
 }
 
+TEST(ConcurrentSharedValuesMapTest, ReplaceWithOtherMap) {
+    ConcurrentSharedValuesMap<int, std::string> map;
+
+    using Map = decltype(map)::Map;
+
+    auto ref1 = map.getOrEmplace(1, "old value");
+
+    map.updateWith([](const Map& oldMap) {
+        Map newResult;
+        newResult.emplace(1, std::make_shared<std::string>("new value"));
+        return newResult;
+    });
+
+    ASSERT_EQ(*ref1, "old value");
+
+    auto ref2 = map.find(1);
+    ASSERT_TRUE(ref2);
+    ASSERT_EQ(*ref2, "new value");
+}
+
 }  // namespace
 }  // namespace mongo
