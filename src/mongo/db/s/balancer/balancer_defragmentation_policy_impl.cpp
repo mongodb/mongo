@@ -1432,13 +1432,26 @@ private:
 
 }  // namespace
 
-void BalancerDefragmentationPolicyImpl::startCollectionDefragmentation(OperationContext* opCtx,
-                                                                       const CollectionType& coll) {
-    {
-        stdx::lock_guard<Latch> lk(_stateMutex);
-        const auto& uuid = coll.getUuid();
-        if (!coll.getDefragmentCollection() || _defragmentationStates.contains(uuid)) {
-            return;
+void BalancerDefragmentationPolicyImpl::startCollectionDefragmentations(OperationContext* opCtx) {
+    stdx::lock_guard<Latch> lk(_stateMutex);
+
+    // Fetch all collections with `defragmentCollection` flag enabled
+    static const auto query = BSON(CollectionType::kDefragmentCollectionFieldName << true);
+    auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+    const auto& collDocs = uassertStatusOK(configShard->exhaustiveFindOnConfig(
+                                               opCtx,
+                                               ReadPreferenceSetting(ReadPreference::Nearest),
+                                               repl::ReadConcernLevel::kMajorityReadConcern,
+                                               NamespaceString::kConfigsvrCollectionsNamespace,
+                                               query,
+                                               BSONObj(),
+                                               boost::none))
+                               .docs;
+
+    for (const BSONObj& obj : collDocs) {
+        const CollectionType coll{obj};
+        if (_defragmentationStates.contains(coll.getUuid())) {
+            continue;
         }
         _initializeCollectionState(lk, opCtx, coll);
     }

@@ -658,7 +658,6 @@ void Balancer::_mainThread() {
     Client::initThread("Balancer");
     auto opCtx = cc().makeOperationContext();
     auto shardingContext = Grid::get(opCtx.get());
-    const auto catalogClient = ShardingCatalogManager::get(opCtx.get())->localCatalogClient();
 
     LOGV2(21856, "CSRS balancer is starting");
 
@@ -770,13 +769,7 @@ void Balancer::_mainThread() {
                 }
 
                 // Collect and apply up-to-date configuration values on the cluster collections.
-                {
-                    OperationContext* ctx = opCtx.get();
-                    auto allCollections = catalogClient->getCollections(ctx, {});
-                    for (const auto& coll : allCollections) {
-                        _defragmentationPolicy->startCollectionDefragmentation(ctx, coll);
-                    }
-                }
+                _defragmentationPolicy->startCollectionDefragmentations(opCtx.get());
 
                 Status status = _splitChunksIfNeeded(opCtx.get());
                 if (!status.isOK()) {
