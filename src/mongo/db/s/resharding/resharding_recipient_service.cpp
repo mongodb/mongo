@@ -624,7 +624,8 @@ void ReshardingRecipientService::RecipientStateMachine::
         notifyChangeStreamsOnShardCollection(opCtx.get(),
                                              _metadata.getTempReshardingNss(),
                                              _metadata.getReshardingUUID(),
-                                             createCollRequest);
+                                             createCollRequest,
+                                             CommitPhase::kSuccessful);
     }
 
     _transitionToCloning(factory);

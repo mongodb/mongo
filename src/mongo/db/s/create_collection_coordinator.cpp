@@ -541,7 +541,8 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                                 opCtx,
                                 nss(),
                                 *createCollectionResponseOpt->getCollectionUUID(),
-                                _request.toBSON());
+                                _request.toBSON(),
+                                CommitPhase::kSuccessful);
 
                             // The critical section might have been taken by a migration, we force
                             // to skip the invariant check and we do nothing in case it was taken.
@@ -592,7 +593,8 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                         opCtx,
                         nss(),
                         *createCollectionResponseOpt->getCollectionUUID(),
-                        _request.toBSON());
+                        _request.toBSON(),
+                        CommitPhase::kSuccessful);
 
                     // Return any previously acquired resource.
                     _releaseCriticalSections(opCtx);
@@ -1284,6 +1286,14 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx,
     _updateSession(opCtx);
 
     try {
+
+        notifyChangeStreamsOnShardCollection(opCtx,
+                                             nss(),
+                                             *_collectionUUID,
+                                             _request.toBSON(),
+                                             CommitPhase::kPrepare,
+                                             *shardsHoldingData);
+
         if (feature_flags::gHistoricalPlacementShardingCatalog.isEnabled(
                 serverGlobalParams.featureCompatibility)) {
             insertCollectionAndPlacementEntries(
@@ -1292,7 +1302,8 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx,
             insertCollectionEntry(opCtx, *coll, getCurrentSession());
         }
 
-        notifyChangeStreamsOnShardCollection(opCtx, nss(), *_collectionUUID, _request.toBSON());
+        notifyChangeStreamsOnShardCollection(
+            opCtx, nss(), *_collectionUUID, _request.toBSON(), CommitPhase::kSuccessful);
 
         LOGV2_DEBUG(5277907, 2, "Collection successfully committed", "namespace"_attr = nss());
 
@@ -1307,10 +1318,15 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx,
         // operation to refresh the metadata.
 
         // TODO (SERVER-71444): Fix to be interruptible or document exception.
-        UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
-        AutoGetCollection autoColl(opCtx, nss(), MODE_IX);
-        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss())
-            ->clearFilteringMetadata(opCtx);
+        {
+            UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
+            AutoGetCollection autoColl(opCtx, nss(), MODE_IX);
+            CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss())
+                ->clearFilteringMetadata(opCtx);
+        }
+
+        notifyChangeStreamsOnShardCollection(
+            opCtx, nss(), *_collectionUUID, _request.toBSON(), CommitPhase::kAborted);
 
         throw;
     }

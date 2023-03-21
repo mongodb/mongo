@@ -34,6 +34,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/shard_id.h"
 
 namespace mongo {
 
@@ -60,9 +61,28 @@ void insertOplogEntry(OperationContext* opCtx,
 void notifyChangeStreamsOnShardCollection(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           const UUID& uuid,
-                                          BSONObj cmd) {
+                                          BSONObj cmd,
+                                          CommitPhase commitPhase,
+                                          const boost::optional<std::set<ShardId>>& shardIds) {
     BSONObjBuilder cmdBuilder;
-    cmdBuilder.append("shardCollection", nss.ns());
+    std::string opName;
+    switch (commitPhase) {
+        case mongo::CommitPhase::kSuccessful:
+            opName = "shardCollection";
+            break;
+        case CommitPhase::kAborted:
+            opName = "shardCollectionAbort";
+            break;
+        case CommitPhase::kPrepare:
+            // in case of prepare, shardsIds is required
+            cmdBuilder.append("shards", *shardIds);
+            opName = "shardCollectionPrepare";
+            break;
+        default:
+            MONGO_UNREACHABLE;
+    }
+
+    cmdBuilder.append(opName, nss.ns());
     cmdBuilder.appendElements(cmd);
 
     BSONObj fullCmd = cmdBuilder.obj();
@@ -72,7 +92,7 @@ void notifyChangeStreamsOnShardCollection(OperationContext* opCtx,
     oplogEntry.setNss(nss);
     oplogEntry.setUuid(uuid);
     oplogEntry.setTid(nss.tenantId());
-    oplogEntry.setObject(BSON("msg" << BSON("shardCollection" << nss.ns())));
+    oplogEntry.setObject(BSON("msg" << BSON(opName << nss.ns())));
     oplogEntry.setObject2(fullCmd);
     oplogEntry.setOpTime(repl::OpTime());
     oplogEntry.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
