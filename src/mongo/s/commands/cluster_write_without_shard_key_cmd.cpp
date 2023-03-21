@@ -198,48 +198,10 @@ public:
                 Shard::RetryPolicy::kNoRetry);
 
             auto response = uassertStatusOK(ars.next().swResponse);
-            auto status = getStatusFromWriteCommandReply(response.data);
-
-            if (status == ErrorCodes::WouldChangeOwningShard) {
-                // Parse into OpMsgRequest to append the $db field, which is required for command
-                // parsing.
-                auto opMsgRequest = OpMsgRequest::fromDBAndBody(ns().db(), cmdObj);
-                if (commandName == write_ops::UpdateCommandRequest::kCommandName) {
-                    auto request = BatchedCommandRequest::parseUpdate(opMsgRequest);
-
-                    write_ops::WriteError error(0, getStatusFromCommandResult(response.data));
-                    error.setIndex(0);
-                    BatchedCommandResponse emulatedResponse;
-                    emulatedResponse.setStatus(Status::OK());
-                    emulatedResponse.setN(0);
-                    emulatedResponse.addToErrDetails(std::move(error));
-
-                    auto wouldChangeOwningShardSucceeded =
-                        ClusterWriteCmd::handleWouldChangeOwningShardError(
-                            opCtx, &request, &emulatedResponse, {});
-
-                    if (wouldChangeOwningShardSucceeded) {
-                        BSONObjBuilder bob(emulatedResponse.toBSON());
-                        bob.append("ok", 1);
-                        auto res = bob.obj();
-                        return Response(res, shardId.toString());
-                    }
-                } else {
-                    BSONObjBuilder res;
-                    FindAndModifyCmd::handleWouldChangeOwningShardError(
-                        opCtx,
-                        shardId,
-                        nss,
-                        opMsgRequest.body,
-                        getStatusFromCommandResult(response.data),
-                        &res);
-                    return Response(res.obj(), shardId.toString());
-                }
-            }
-
             // We uassert on the extracted write status in order to preserve error labels for the
             // transaction api to use in case of a retry.
-            uassertStatusOK(status);
+            uassertStatusOK(getStatusFromWriteCommandReply(response.data));
+
             return Response(response.data, shardId.toString());
         }
 

@@ -151,6 +151,7 @@ private:
                                  const boost::optional<DatabaseVersion>& dbVersion,
                                  const NamespaceString& nss,
                                  const BSONObj& cmdObj,
+                                 const Status& responseStatus,
                                  const BSONObj& response,
                                  BSONObjBuilder* result);
 

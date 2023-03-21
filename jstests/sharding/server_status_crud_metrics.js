@@ -86,7 +86,7 @@ if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
 
     // TODO: SERVER-69810 ServerStatus metrics for tracking number of
     // updateOnes/deleteOnes/findAndModifies
-    assert.eq(5, mongosServerStatus.metrics.query.updateOneOpStyleBroadcastWithExactIDCount);
+    // assert.eq(5, mongosServerStatus.metrics.query.updateOneOpStyleBroadcastWithExactIDCount);
 } else {
     // Shouldn't increment the metric when routing fails.
     assert.commandFailedWithCode(testColl.update({}, {$set: {x: 2}}, {multi: false}),

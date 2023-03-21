@@ -554,12 +554,12 @@ void FindAndModifyCmd::_constructResult(OperationContext* opCtx,
                                         const boost::optional<DatabaseVersion>& dbVersion,
                                         const NamespaceString& nss,
                                         const BSONObj& cmdObj,
+                                        const Status& responseStatus,
                                         const BSONObj& response,
                                         BSONObjBuilder* result) {
     auto txnRouter = TransactionRouter::get(opCtx);
     bool isRetryableWrite = opCtx->getTxnNumber() && !txnRouter;
 
-    const auto responseStatus = getStatusFromCommandResult(response);
     if (ErrorCodes::isNeedRetargettingError(responseStatus.code()) ||
         ErrorCodes::isSnapshotError(responseStatus.code()) ||
         responseStatus.code() == ErrorCodes::StaleDbVersion) {
@@ -591,6 +591,9 @@ void FindAndModifyCmd::_constructResult(OperationContext* opCtx,
         return;
     }
 
+    // Throw if a non-OK status is not because of any of the above errors.
+    uassertStatusOK(responseStatus);
+
     // First append the properly constructed writeConcernError. It will then be skipped in
     // appendElementsUnique.
     if (auto wcErrorElem = response["writeConcernError"]) {
@@ -612,31 +615,38 @@ void FindAndModifyCmd::_runCommandWithoutShardKey(OperationContext* opCtx,
 
     auto swRes =
         write_without_shard_key::runTwoPhaseWriteProtocol(opCtx, nss, cmdObjForPassthrough);
-    uassertStatusOK(swRes.getStatus());
 
-    // runTwoPhaseWriteProtocol returns an empty response when there are not matching documents
+    // runTwoPhaseWriteProtocol returns an empty response when there are no matching documents
     // and {upsert: false}.
-    BSONObj response;
-    if (swRes.getValue().getResponse().isEmpty()) {
-        write_ops::FindAndModifyLastError lastError(0 /* n */);
-        lastError.setUpdatedExisting(false);
+    BSONObj cmdResponse;
+    // If runTwoPhaseWriteProtocol has a non-OK status, shardId will not be set, since we did not
+    // successfully apply the operation on a shard.
+    ShardId shardId;
 
-        write_ops::FindAndModifyCommandReply findAndModifyResponse;
-        findAndModifyResponse.setLastErrorObject(std::move(lastError));
-        findAndModifyResponse.setValue(boost::none);
-        response = findAndModifyResponse.toBSON();
-    } else {
-        response = swRes.getValue().getResponse();
+    if (swRes.isOK()) {
+        if (swRes.getValue().getResponse().isEmpty()) {
+            write_ops::FindAndModifyLastError lastError(0 /* n */);
+            lastError.setUpdatedExisting(false);
+
+            write_ops::FindAndModifyCommandReply findAndModifyResponse;
+            findAndModifyResponse.setLastErrorObject(std::move(lastError));
+            findAndModifyResponse.setValue(boost::none);
+            cmdResponse = findAndModifyResponse.toBSON();
+        } else {
+            cmdResponse = swRes.getValue().getResponse();
+        }
+        shardId = ShardId(swRes.getValue().getShardId().toString());
     }
 
     // Extract findAndModify command result from the result of the two phase write protocol.
     _constructResult(opCtx,
-                     ShardId(swRes.getValue().getShardId().toString()),
+                     shardId,
                      boost::none /* shardVersion */,
                      boost::none /* dbVersion */,
                      nss,
                      cmdObj,
-                     response,
+                     swRes.getStatus(),
+                     cmdResponse,
                      result);
 }
 
@@ -672,8 +682,15 @@ void FindAndModifyCmd::_runCommand(OperationContext* opCtx,
         return uassertStatusOK(std::move(response.swResponse));
     }();
 
-    uassertStatusOK(response.status);
-    _constructResult(opCtx, shardId, shardVersion, dbVersion, nss, cmdObj, response.data, result);
+    _constructResult(opCtx,
+                     shardId,
+                     shardVersion,
+                     dbVersion,
+                     nss,
+                     cmdObj,
+                     getStatusFromCommandResult(response.data),
+                     response.data,
+                     result);
 }
 
 // TODO SERVER-67429: Remove this function.
@@ -691,21 +708,30 @@ void FindAndModifyCmd::_handleWouldChangeOwningShardErrorRetryableWriteLegacy(
         readConcernArgs = repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
         // Re-run the findAndModify command that will change the shard key value in a
-        // transaction. We call _runCommand recursively, and this second time through
-        // since it will be run as a transaction it will take the other code path to
-        // handleWouldChangeOwningShardErrorTransactionLegacy.  We ensure the retried
+        // transaction. We call _runCommand or _runCommandWithoutShardKey recursively, and this
+        // second time through since it will be run as a transaction it will take the other code
+        // path to handleWouldChangeOwningShardErrorTransactionLegacy.  We ensure the retried
         // operation does not include WC inside the transaction by stripping it from the
         // cmdObj.  The transaction commit will still use the WC, because it uses the WC
         // from the opCtx (which has been set previously in Strategy).
         documentShardKeyUpdateUtil::startTransactionForShardKeyUpdate(opCtx);
-        _runCommand(opCtx,
-                    shardId,
-                    shardVersion,
-                    dbVersion,
-                    nss,
-                    stripWriteConcern(cmdObj),
-                    false /* isExplain */,
-                    result);
+
+        if (const auto query = cmdObj.getObjectField("query");
+            write_without_shard_key::useTwoPhaseProtocol(
+                opCtx, nss, false /* isUpdateOrDelete */, query, getCollation(cmdObj))) {
+            _runCommandWithoutShardKey(
+                opCtx, nss, stripWriteConcern(cmdObj), false /* isExplain */, result);
+        } else {
+            _runCommand(opCtx,
+                        shardId,
+                        shardVersion,
+                        dbVersion,
+                        nss,
+                        stripWriteConcern(cmdObj),
+                        false /* isExplain */,
+                        result);
+        }
+
         uassertStatusOK(getStatusFromCommandResult(result->asTempObj()));
         auto commitResponse = documentShardKeyUpdateUtil::commitShardKeyUpdateTransaction(opCtx);
 

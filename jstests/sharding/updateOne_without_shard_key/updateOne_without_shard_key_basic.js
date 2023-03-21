@@ -5,7 +5,6 @@
  *  requires_sharding,
  *  requires_fcv_63,
  *  featureFlagUpdateOneWithoutShardKey,
- *  featureFlagUpdateDocumentShardKeyUsingTransactionApi
  * ]
  */
 (function() {
@@ -356,53 +355,9 @@ const testCases = [
         collName: collName
     },
     {
-        logMessage: "Running mixed replacement style update with shard key and updateOne " +
-            "without shard key for documents on the same shard.",
-        docsToInsert: [
-            {_id: 0, x: xFieldValShard0_1, y: yFieldVal},
-            {_id: 1, x: xFieldValShard0_2, y: yFieldVal}
-        ],
-
-        replacementDocTest: true,  // Replacement tests validate that the final replacement
-        // operation was only applied once.
-        cmdObj: {
-            update: collName,
-            updates: [
-                {
-                    q: {x: xFieldValShard0_1},
-                    u: {x: xFieldValShard0_2 - 1, y: yFieldVal, a: setFieldVal}
-                },
-                {q: {y: yFieldVal}, u: {x: xFieldValShard0_2 - 1, y: yFieldVal, b: setFieldVal}},
-            ],
-        },
-        options: [{ordered: true}, {ordered: false}],
-        expectedMods: [{x: xFieldValShard0_2 - 1, y: yFieldVal, b: setFieldVal}],
-        expectedResponse: {n: 2, nModified: 2},
-        dbName: dbName,
-        collName: collName
-    },
-    {
+        // Due to WouldChangeOwningShard batch size restrictions, we only have a test case for
+        // replacement updates of a batch size of 1.
         logMessage: "Running single replacement style update with shard key and updateOne " +
-            "without shard key on different shards.",
-        docsToInsert: [
-            {_id: 0, x: xFieldValShard0_1, y: yFieldVal},
-            {_id: 1, x: xFieldValShard1_1, y: yFieldVal}
-        ],
-
-        replacementDocTest: true,  // Replacement tests validate that the final replacement
-        // operation was only applied once.
-        cmdObj: {
-            update: collName,
-            updates: [{q: {y: yFieldVal}, u: {x: xFieldValShard0_2, y: yFieldVal, a: setFieldVal}}]
-        },
-        options: [{ordered: true}, {ordered: false}],
-        expectedMods: [{x: xFieldValShard0_2, y: yFieldVal, a: setFieldVal}],
-        expectedResponse: {n: 1, nModified: 1},
-        dbName: dbName,
-        collName: collName
-    },
-    {
-        logMessage: "Running multiple replacement style update with shard key and updateOne " +
             "without shard key on different shards.",
         docsToInsert: [
             {_id: 0, x: xFieldValShard0_1, y: yFieldVal},
@@ -413,40 +368,11 @@ const testCases = [
                                    // operation was only applied once.
         cmdObj: {
             update: collName,
-            updates: [
-                {q: {y: yFieldVal}, u: {x: xFieldValShard0_2, y: yFieldVal, a: setFieldVal}},
-                {q: {y: yFieldVal}, u: {x: xFieldValShard0_2 - 1, y: yFieldVal, z: setFieldVal}}
-            ]
+            updates: [{q: {y: yFieldVal}, u: {x: xFieldValShard0_2, y: yFieldVal, a: setFieldVal}}]
         },
         options: [{ordered: true}, {ordered: false}],
-        expectedMods: [{x: xFieldValShard0_2 - 1, y: yFieldVal, z: setFieldVal}],
-        expectedResponse: {n: 2, nModified: 2},
-        dbName: dbName,
-        collName: collName
-    },
-    {
-        logMessage: "Running mixed replacement style update with shard key and updateOne " +
-            "without shard key for documents on different shards.",
-        docsToInsert: [
-            {_id: 0, x: xFieldValShard0_1, y: yFieldVal},
-            {_id: 1, x: xFieldValShard1_1, y: yFieldVal}
-        ],
-
-        replacementDocTest: true,  // Replacement tests validate that the final replacement
-        // operation was only applied once.
-        cmdObj: {
-            update: collName,
-            updates: [
-                {
-                    q: {x: xFieldValShard0_1},
-                    u: {x: xFieldValShard0_2, y: yFieldVal, a: setFieldVal}
-                },
-                {q: {y: yFieldVal}, u: {x: xFieldValShard0_2 - 1, y: yFieldVal, b: setFieldVal}},
-            ],
-        },
-        options: [{ordered: true}, {ordered: false}],
-        expectedMods: [{x: xFieldValShard0_2 - 1, y: yFieldVal, b: setFieldVal}],
-        expectedResponse: {n: 2, nModified: 2},
+        expectedMods: [{x: xFieldValShard0_2, y: yFieldVal, a: setFieldVal}],
+        expectedResponse: {n: 1, nModified: 1},
         dbName: dbName,
         collName: collName
     },
