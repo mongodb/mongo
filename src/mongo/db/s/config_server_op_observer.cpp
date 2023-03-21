@@ -39,6 +39,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_config_version.h"
 #include "mongo/s/catalog/type_shard.h"
+#include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/cluster_identity_loader.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -109,6 +110,17 @@ void ConfigServerOpObserver::onInserts(OperationContext* opCtx,
                                        std::vector<InsertStatement>::const_iterator begin,
                                        std::vector<InsertStatement>::const_iterator end,
                                        bool fromMigrate) {
+    if (coll->ns().isServerConfigurationCollection()) {
+        auto idElement = begin->doc["_id"];
+        if (idElement.type() == BSONType::String &&
+            idElement.String() == multiversion::kParameterName) {
+            opCtx->recoveryUnit()->onCommit(
+                [](OperationContext* opCtx, boost::optional<Timestamp>) mutable {
+                    CatalogCacheLoader::get(opCtx).onFCVChanged();
+                });
+        }
+    }
+
     if (coll->ns() != NamespaceString::kConfigsvrShardsNamespace) {
         return;
     }
@@ -137,6 +149,17 @@ void ConfigServerOpObserver::onInserts(OperationContext* opCtx,
 }
 
 void ConfigServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) {
+    if (args.coll->ns().isServerConfigurationCollection()) {
+        auto idElement = args.updateArgs->updatedDoc["_id"];
+        if (idElement.type() == BSONType::String &&
+            idElement.String() == multiversion::kParameterName) {
+            opCtx->recoveryUnit()->onCommit(
+                [](OperationContext* opCtx, boost::optional<Timestamp>) mutable {
+                    CatalogCacheLoader::get(opCtx).onFCVChanged();
+                });
+        }
+    }
+
     if (args.coll->ns() != NamespaceString::kConfigsvrShardsNamespace) {
         return;
     }

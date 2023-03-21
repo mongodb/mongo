@@ -27,12 +27,18 @@
  *    it in the license file.
  */
 
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/s/shard_server_catalog_cache_loader.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
+#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/catalog_cache_loader_mock.h"
 #include "mongo/s/type_collection_common_types_gen.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
 namespace {
@@ -78,6 +84,7 @@ public:
     std::pair<CollectionType, vector<ChunkType>> setUpChunkLoaderWithFiveChunks();
 
     void refreshCollectionEpochOnRemoteLoader();
+    void refreshDatabaseOnRemoteLoader();
 
     const KeyPattern kKeyPattern = KeyPattern(BSON(kPattern << 1));
 
@@ -217,6 +224,12 @@ ShardServerCatalogCacheLoaderTest::setUpChunkLoaderWithFiveChunks() {
     }
 
     return std::pair{collectionType, std::move(chunks)};
+}
+
+void ShardServerCatalogCacheLoaderTest::refreshDatabaseOnRemoteLoader() {
+    DatabaseType databaseType(
+        kNss.db().toString(), kShardId, DatabaseVersion{UUID::gen(), Timestamp{1, 1}});
+    _remoteLoaderMock->setDatabaseRefreshReturnValue(std::move(databaseType));
 }
 
 TEST_F(ShardServerCatalogCacheLoaderTest, PrimaryLoadFromUnshardedToUnsharded) {
@@ -510,6 +523,125 @@ TEST_F(ShardServerCatalogCacheLoaderTest, CollAndChunkTasksConsistency) {
     // updates on metadata
     refreshCollectionEpochOnRemoteLoader();
     _shardLoader->getChunksSince(kNss, ChunkVersion::UNSHARDED()).get();
+}
+
+TEST_F(ShardServerCatalogCacheLoaderTest, setFCVForGetChunks) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagCatalogShard", true);
+
+    const auto kOriginalRole = serverGlobalParams.clusterRole;
+    const auto kOriginalFCV = serverGlobalParams.featureCompatibility.getVersion();
+
+    ON_BLOCK_EXIT([&] {
+        serverGlobalParams.clusterRole = kOriginalRole;
+        serverGlobalParams.mutableFeatureCompatibility.setVersion(kOriginalFCV);
+    });
+
+    serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
+    // (Generic FCV reference): for testing only. This comment is required by linter.
+    serverGlobalParams.mutableFeatureCompatibility.setVersion(multiversion::GenericFCV::kLastLTS);
+
+    const ChunkVersion collectionPlacementVersion({OID::gen(), Timestamp(1, 1)}, {1, 2});
+    const auto collectionType = makeCollectionType(collectionPlacementVersion);
+    auto setRemoteLoaderMockResponse = [&]() {
+        vector<ChunkType> chunks = makeFiveChunks(collectionPlacementVersion);
+        _remoteLoaderMock->setCollectionRefreshReturnValue(collectionType);
+        _remoteLoaderMock->setChunkRefreshReturnValue(chunks);
+    };
+
+    FindCommandRequest persistedCacheQuery(NamespaceString::kShardConfigCollectionsNamespace);
+    DBDirectClient client(operationContext());
+
+    {
+        // Pause the thread processing the pending updates on metadata
+        FailPointEnableBlock failPoint("hangCollectionFlush");
+
+        setRemoteLoaderMockResponse();
+        auto getChunksFuture = _shardLoader->getChunksSince(kNss, ChunkVersion::UNSHARDED());
+
+        _shardLoader->onFCVChanged();
+
+        // Should be able to join since downgrade should interrupt ongoing refreshes.
+        (void)getChunksFuture.waitNoThrow();
+        _shardLoader->waitForCollectionFlush(operationContext(), kNss);
+    }
+
+    auto cachedDoc = client.findOne(persistedCacheQuery);
+    ASSERT_TRUE(cachedDoc.isEmpty()) << cachedDoc;
+
+    setRemoteLoaderMockResponse();
+    auto getChunksFuture = _shardLoader->getChunksSince(kNss, ChunkVersion::UNSHARDED());
+    auto newChunks = getChunksFuture.get().changedChunks;
+    ASSERT_EQ(5, newChunks.size());
+
+    _shardLoader->waitForCollectionFlush(operationContext(), kNss);
+    cachedDoc = client.findOne(persistedCacheQuery);
+    ASSERT_TRUE(cachedDoc.isEmpty()) << cachedDoc;
+
+    serverGlobalParams.mutableFeatureCompatibility.setVersion(kOriginalFCV);
+
+    setRemoteLoaderMockResponse();
+    auto chunkVersionFrom = newChunks[2].getVersion();
+    getChunksFuture = _shardLoader->getChunksSince(kNss, chunkVersionFrom);
+    newChunks = getChunksFuture.get().changedChunks;
+    ASSERT_EQ(3, newChunks.size());
+    ASSERT_EQ(chunkVersionFrom, newChunks.front().getVersion());
+
+    _shardLoader->waitForCollectionFlush(operationContext(), kNss);
+    cachedDoc = client.findOne(persistedCacheQuery);
+    ASSERT_FALSE(cachedDoc.isEmpty());
+}
+
+TEST_F(ShardServerCatalogCacheLoaderTest, setFCVForGetDatabase) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagCatalogShard", true);
+
+    const auto kOriginalRole = serverGlobalParams.clusterRole;
+    const auto kOriginalFCV = serverGlobalParams.featureCompatibility.getVersion();
+
+    ON_BLOCK_EXIT([&] {
+        serverGlobalParams.clusterRole = kOriginalRole;
+        serverGlobalParams.mutableFeatureCompatibility.setVersion(kOriginalFCV);
+    });
+
+    serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
+    // (Generic FCV reference): for testing only. This comment is required by linter.
+    serverGlobalParams.mutableFeatureCompatibility.setVersion(multiversion::GenericFCV::kLastLTS);
+
+    refreshDatabaseOnRemoteLoader();
+
+    FindCommandRequest persistedCacheQuery(NamespaceString::kShardConfigDatabasesNamespace);
+    DBDirectClient client(operationContext());
+    const auto kDb = kNss.db();
+
+    {
+        // Pause the thread processing the pending updates on metadata
+        FailPointEnableBlock failPoint("hangDatabaseFlush");
+
+        // Put a first task in the list of pending updates on metadata (in-memory)
+        auto getDbFuture = _shardLoader->getDatabase(kDb);
+
+        _shardLoader->onFCVChanged();
+
+        // Should be able to join since downgrade should interrupt ongoing refreshes.
+        (void)getDbFuture.waitNoThrow();
+        _shardLoader->waitForDatabaseFlush(operationContext(), kDb);
+    }
+
+    auto cachedDoc = client.findOne(persistedCacheQuery);
+    ASSERT_TRUE(cachedDoc.isEmpty()) << cachedDoc;
+
+    auto getDbFuture = _shardLoader->getDatabase(kDb);
+    getDbFuture.wait();
+    _shardLoader->waitForDatabaseFlush(operationContext(), kDb);
+    cachedDoc = client.findOne(persistedCacheQuery);
+    ASSERT_TRUE(cachedDoc.isEmpty()) << cachedDoc;
+
+    serverGlobalParams.mutableFeatureCompatibility.setVersion(kOriginalFCV);
+
+    getDbFuture = _shardLoader->getDatabase(kDb);
+    getDbFuture.wait();
+    _shardLoader->waitForDatabaseFlush(operationContext(), kDb);
+    cachedDoc = client.findOne(persistedCacheQuery);
+    ASSERT_FALSE(cachedDoc.isEmpty());
 }
 
 }  // namespace

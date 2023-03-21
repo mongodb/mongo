@@ -32,6 +32,7 @@
 #include <fmt/format.h>
 
 #include "mongo/db/catalog/rename_collection.h"
+#include "mongo/db/catalog_shard_feature_flag_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/operation_context.h"
@@ -59,6 +60,7 @@ using CollectionAndChangedChunks = CatalogCacheLoader::CollectionAndChangedChunk
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangCollectionFlush);
+MONGO_FAIL_POINT_DEFINE(hangDatabaseFlush);
 
 AtomicWord<unsigned long long> taskIdGenerator{0};
 
@@ -237,7 +239,6 @@ CollectionAndChangedChunks getPersistedMetadataSinceVersion(OperationContext* op
                        {0, 0});
 
     QueryAndSort diff = createShardChunkDiffQuery(startingVersion);
-
     auto changedChunks = uassertStatusOK(readShardChunks(opCtx,
                                                          nss,
                                                          diff.query,
@@ -352,6 +353,14 @@ void forcePrimaryDatabaseRefreshAndWaitForReplication(OperationContext* opCtx, S
     uassertStatusOK(repl::ReplicationCoordinator::get(opCtx)->waitUntilOpTimeForRead(
         opCtx, {LogicalTime::fromOperationTime(cmdResponse.response), boost::none}));
 }
+
+// TODO: SERVER-74105 remove
+bool shouldSkipStoringLocally() {
+    // Note: cannot use isExclusivelyConfigSvrRole as it ignores fcv.
+    return serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
+        !gFeatureFlagCatalogShard.isEnabled(serverGlobalParams.featureCompatibility);
+}
+
 }  // namespace
 
 ShardServerCatalogCacheLoader::ShardServerCatalogCacheLoader(
@@ -661,7 +670,6 @@ StatusWith<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_runSecond
     OperationContext* opCtx,
     const NamespaceString& nss,
     const ChunkVersion& catalogCacheSinceVersion) {
-
     Timer t;
     forcePrimaryCollectionRefreshAndWaitForReplication(opCtx, nss);
     LOGV2_FOR_CATALOG_REFRESH(5965800,
@@ -688,9 +696,16 @@ ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
     const NamespaceString& nss,
     const ChunkVersion& catalogCacheSinceVersion,
     long long termScheduled) {
+    const auto decidedToSkipStoringLocally = shouldSkipStoringLocally();
 
     // Get the max version the loader has.
     const auto maxLoaderVersion = [&] {
+        // If we are not storing locally, use the requested version to prevent fetching the entire
+        // routing table everytime.
+        if (decidedToSkipStoringLocally) {
+            return catalogCacheSinceVersion;
+        }
+
         {
             stdx::lock_guard<Latch> lock(_mutex);
             auto taskListIt = _collAndChunkTaskLists.find(nss);
@@ -711,7 +726,8 @@ ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
     auto swCollectionAndChangedChunks =
         _configServerLoader->getChunksSince(nss, maxLoaderVersion).getNoThrow();
 
-    if (swCollectionAndChangedChunks == ErrorCodes::NamespaceNotFound) {
+    if (swCollectionAndChangedChunks == ErrorCodes::NamespaceNotFound &&
+        !decidedToSkipStoringLocally) {
         _ensureMajorityPrimaryAndScheduleCollAndChunksTask(
             opCtx,
             nss,
@@ -745,8 +761,9 @@ ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
                           << "'."};
     }
 
-    if (collAndChunks.changedChunks.back().getVersion().isNotComparableWith(maxLoaderVersion) ||
-        maxLoaderVersion.isOlderThan(collAndChunks.changedChunks.back().getVersion())) {
+    if (!decidedToSkipStoringLocally &&
+        (collAndChunks.changedChunks.back().getVersion().isNotComparableWith(maxLoaderVersion) ||
+         maxLoaderVersion.isOlderThan(collAndChunks.changedChunks.back().getVersion()))) {
         _ensureMajorityPrimaryAndScheduleCollAndChunksTask(
             opCtx,
             nss,
@@ -764,6 +781,10 @@ ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
         "oldCollectionPlacementVersion"_attr = maxLoaderVersion,
         "refreshedCollectionPlacementVersion"_attr =
             collAndChunks.changedChunks.back().getVersion());
+
+    if (decidedToSkipStoringLocally) {
+        return swCollectionAndChangedChunks;
+    }
 
     // Metadata was found remotely
     // -- otherwise we would have received NamespaceNotFound rather than Status::OK().
@@ -1015,6 +1036,9 @@ void ShardServerCatalogCacheLoader::_ensureMajorityPrimaryAndScheduleCollAndChun
 void ShardServerCatalogCacheLoader::_ensureMajorityPrimaryAndScheduleDbTask(OperationContext* opCtx,
                                                                             StringData dbName,
                                                                             DBTask task) {
+    if (shouldSkipStoringLocally()) {
+        return;
+    }
 
     {
         stdx::lock_guard<Latch> lock(_mutex);
@@ -1053,7 +1077,7 @@ void ShardServerCatalogCacheLoader::_runCollAndChunksTasks(const NamespaceString
 
     if (MONGO_unlikely(hangCollectionFlush.shouldFail())) {
         LOGV2(5710200, "Hit hangCollectionFlush failpoint");
-        hangCollectionFlush.pauseWhileSet();
+        hangCollectionFlush.pauseWhileSet(context.opCtx());
     }
 
     bool taskFinished = false;
@@ -1129,6 +1153,10 @@ void ShardServerCatalogCacheLoader::_runCollAndChunksTasks(const NamespaceString
 void ShardServerCatalogCacheLoader::_runDbTasks(StringData dbName) {
     ThreadClient tc("ShardServerCatalogCacheLoader::runDbTasks", getGlobalServiceContext());
     auto context = _contexts.makeOperationContext(*tc);
+
+    if (MONGO_unlikely(hangDatabaseFlush.shouldFail())) {
+        hangDatabaseFlush.pauseWhileSet(context.opCtx());
+    }
 
     // TODO(SERVER-74658): Please revisit if this thread could be made killable.
     {
@@ -1506,6 +1534,12 @@ ShardServerCatalogCacheLoader::CollAndChunkTaskList::getEnqueuedMetadataForTerm(
         }
     }
     return collAndChunks;
+}
+
+void ShardServerCatalogCacheLoader::onFCVChanged() {
+    stdx::lock_guard<Latch> lg(_mutex);
+    _contexts.interrupt(ErrorCodes::Interrupted);
+    ++_term;
 }
 
 }  // namespace mongo
