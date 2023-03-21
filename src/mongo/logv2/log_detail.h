@@ -73,7 +73,7 @@ void doLogUnpacked(int32_t id,
                    LogOptions const& options,
                    const S& message,
                    const NamedArg<Args>&... args) {
-    auto attributes = makeAttributeStorage(args...);
+    auto attributes = AttributeStorage(args...);
 
     fmt::string_view msg{message};
     doLogImpl(id, severity, options, StringData(msg.data(), msg.size()), attributes);

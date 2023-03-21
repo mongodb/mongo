@@ -186,6 +186,25 @@ BSONObj toBSON(const TypeWithNonMemberFormatting&) {
     return builder.obj();
 }
 
+struct TypeWithToStringForLogging {
+    friend std::string toStringForLogging(const TypeWithToStringForLogging& x) {
+        return "toStringForLogging";
+    }
+    std::string toString() const {
+        return "[overridden]";
+    }
+};
+
+enum EnumWithToStringForLogging { e1, e2, e3 };
+
+inline std::string toStringForLogging(EnumWithToStringForLogging x) {
+    return "[log-friendly enum]";
+}
+
+inline std::string toString(EnumWithToStringForLogging x) {
+    return "[not to be used]";
+}
+
 LogManager& mgr() {
     return LogManager::global();
 }
@@ -838,6 +857,20 @@ TEST_F(LogV2Test, TextFormat) {
     TypeWithNonMemberFormatting t3;
     LOGV2(20079, "{name}", "name"_attr = t3);
     ASSERT(lines.back().rfind(toString(t3)) != std::string::npos);
+}
+
+TEST_F(LogV2Test, StructToStringForLogging) {
+    auto lines = makeLineCapture(JSONFormatter());
+    TypeWithToStringForLogging x;
+    LOGV2(7496800, "Msg", "x"_attr = x);
+    ASSERT_STRING_CONTAINS(lines.back(), toStringForLogging(x));
+}
+
+TEST_F(LogV2Test, EnumToStringForLogging) {
+    auto lines = makeLineCapture(JSONFormatter());
+    auto e = EnumWithToStringForLogging::e1;
+    LOGV2(7496801, "Msg", "e"_attr = e);
+    ASSERT_STRING_CONTAINS(lines.back(), toStringForLogging(e));
 }
 
 std::string hello() {
@@ -1968,7 +2001,7 @@ TEST_F(UnstructuredLoggingTest, VectorBSON) {
                                        BSON("str3"
                                             << "str4")};
     logd("{}", vectorBSON);  // NOLINT
-    validate([&vectorBSON](const BSONObj& obj) {
+    validate([](const BSONObj& obj) {
         ASSERT_EQUALS(obj.getField(kMessageFieldName).String(),
                       "({\"str1\":\"str2\"}, {\"str3\":\"str4\"})");
     });
@@ -1982,7 +2015,7 @@ TEST_F(UnstructuredLoggingTest, MapBSON) {
                                                BSON("str3"
                                                     << "str4")}};
     logd("{}", mapBSON);  // NOLINT
-    validate([&mapBSON](const BSONObj& obj) {
+    validate([](const BSONObj& obj) {
         ASSERT_EQUALS(obj.getField(kMessageFieldName).String(),
                       "(key1: {\"str1\":\"str2\"}, key2: {\"str3\":\"str4\"})");
     });
