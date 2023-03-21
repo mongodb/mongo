@@ -326,6 +326,10 @@ last-continuous:
     ticket: SERVER-75517
   - test_file: jstests/core/clustered/clustered_collection_hint.js
     ticket: SERVER-73482
+  - test_file: jstests/core/clustered/clustered_collection_collation.js
+    ticket: SERVER-67105
+  - test_file: jstests/core/clustered/clustered_collection_bounded_scan.js
+    ticket: SERVER-67105
   - test_file: jstests/replsets/session_cache_refresh_write_error_fail.js
     ticket: SERVER-73229
   - test_file: jstests/noPassthrough/ttl_operation_metrics_multi_dbs.js
@@ -729,6 +733,10 @@ last-lts:
     ticket: SERVER-75517
   - test_file: jstests/core/clustered/clustered_collection_hint.js
     ticket: SERVER-73482
+  - test_file: jstests/core/clustered/clustered_collection_collation.js
+    ticket: SERVER-67105
+  - test_file: jstests/core/clustered/clustered_collection_bounded_scan.js
+    ticket: SERVER-67105
   - test_file: jstests/replsets/session_cache_refresh_write_error_fail.js
     ticket: SERVER-73229
   - test_file: jstests/noPassthrough/ttl_operation_metrics_multi_dbs.js
