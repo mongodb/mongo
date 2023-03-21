@@ -1,0 +1,75 @@
+test_kind: js_test
+
+selector:
+  roots:
+  - jstests/core/**/*.js
+
+  exclude_files:
+  # Compound wildcard indexes aren't available in API V1.
+  - jstests/core/administrative/validate_db_metadata_command.js
+  # The following tests check explain, and may fail if an implicitly created index is chosen by
+  # multiplanning.
+  - jstests/core/index/hidden_index.js
+  - jstests/core/index/index_partial_read_ops.js
+  - jstests/core/index/index_stats.js
+  - jstests/core/columnstore/*.js
+  - jstests/core/query/explain/explain_winning_plan.js
+  - jstests/core/query/expr/expr_index_use.js
+  - jstests/core/query/sort/sort_merge.js
+  - jstests/core/sbe/sbe_explain_rejected_plans.js
+  - jstests/core/timeseries/partialFilterExpression_with_internalBucketGeoWithin.js
+  - jstests/core/timeseries/timeseries_index_partial.js
+  - jstests/core/timeseries/timeseries_index_use.js
+  - jstests/core/timeseries/timeseries_lastpoint.js
+  - jstests/core/query/find/finda.js
+  # The following tests check $indexStats and are not expecting to see implicitly created indexes.
+  - jstests/core/timeseries/timeseries_index_stats.js
+  # The following tests already create some of the indexes we would create implicitly, and may
+  # therefore fail spuriously.
+  - jstests/core/index/wildcard/wildcard_index_minmax.js
+  - jstests/core/index/wildcard/compound_wildcard_index_hint.js
+  # This test expects a certain number of indexes at the start.
+  - jstests/core/administrative/check_shard_index.js
+  # Latency histogram statistics are affected by the creation of an implicit index.
+  - jstests/core/top.js
+  # Creating an implicit index results in the following failure: "add index fails, too many indexes
+  # for test.transaction_too_large_for_cache key"
+  - jstests/core/transaction_too_large_for_cache.js
+  # Creating an implicit index causes the plan cache entry we're expecting to be invalidated.
+  - jstests/core/query/sbe_plan_cache_autoparameterize_ixscan.js
+
+  exclude_with_any_tags:
+  # This suite implicitly creates compound wildcard indexes.
+  - assumes_no_implicit_index_creation
+  # This suite has a replica set fixture.
+  - assumes_standalone_mongod
+  # The rename command is not compatibile with auto-created indexes since it will try to copy over
+  # existing indexes and get an error for a duplicate index.
+  - uses_rename
+  # Creating indexes implicitly may result in unexpected profiler entries which cause tests to
+  # fail spuriously.
+  - requires_profiling
+  - uses_transactions
+
+executor:
+  archive:
+    hooks:
+      - ValidateCollections
+  config:
+    shell_options:
+      eval: >-
+        testingReplication = true;
+        load("jstests/libs/override_methods/implicit_wildcard_indexes.js");
+  hooks:
+  - class: ValidateCollections
+  - class: CleanEveryN
+    n: 20
+  fixture:
+    # Use a replica set fixture so that we can run the transactions tests as well.
+    class: ReplicaSetFixture
+    mongod_options:
+      oplogSize: 1024
+      set_parameters:
+        enableTestCommands: true
+        featureFlagCompoundWildcardIndexes: true
+    num_nodes: 1

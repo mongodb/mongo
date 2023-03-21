@@ -5543,6 +5543,17 @@ tasks:
       suite: core_column_store_indexes
 
 - <<: *task_template
+  name: jsCore_wildcard_indexes
+  depends_on:
+  - name: jsCore
+  tags: ["jscore"]
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      suite: core_wildcard_indexes
+
+- <<: *task_template
   name: mongosTest
   tags: ["misc_js", "non_read_maj", "non_live_record"]
   commands:
