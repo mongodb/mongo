@@ -47,11 +47,20 @@ assert.commandWorked(
     testDB.runCommand({create: collName1, recordPreImages: true, writeConcern: {w: 'majority'}}));
 assert.eq(findCollectionInfo(testDB, collName1).options.recordPreImages, true);
 
+// Verify that 'recordPreImages' attribute remains set after collMod command.
+assert.commandWorked(testDB.runCommand({
+    collMod: collName1,
+    "validator": {"$jsonSchema": {"properties": {"items": {"bsonType": "array"}}}}
+}));
+assert.eq(findCollectionInfo(testDB, collName1).options.recordPreImages, true);
+
 // Check the collMod collection command in FCV 4.4 succeeds.
 assert.commandWorked(testDB.runCommand({create: collName2, writeConcern: {w: 'majority'}}));
 assert.commandWorked(
     testDB.runCommand({collMod: collName2, recordPreImages: true, writeConcern: {w: 'majority'}}));
 assert.eq(findCollectionInfo(testDB, collName2).options.recordPreImages, true);
+
+// Test that the recordPreImages flag can be unset successfully using the 'collMod' command.
 assert.commandWorked(
     testDB.runCommand({collMod: collName2, recordPreImages: false, writeConcern: {w: 'majority'}}));
 assert.eq(findCollectionInfo(testDB, collName2).options, {});

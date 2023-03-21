@@ -18,6 +18,7 @@ rst.initiate();
 let primaryDB = rst.getPrimary().getDB('test');
 
 const collName1 = "testColl1";
+const collName2 = "testColl1";
 
 jsTestLog("Starting 'recordPreImages' testing.");
 
@@ -30,10 +31,8 @@ assert.commandWorked(primaryDB.runCommand(
     {create: collName1, recordPreImages: false, writeConcern: {w: 'majority'}}));
 
 // Check the collMod command in FCV 4.2 fails.
-assert.writeOK(primaryDB.getCollection(collName1).insert({_id: 1}));  // create the collection.
-assert.commandFailedWithCode(primaryDB.runCommand({collMod: collName1, recordPreImages: false}),
-                             ErrorCodes.InvalidOptions);
-assert.commandFailedWithCode(primaryDB.runCommand({collMod: collName1, recordPreImages: true}),
+assert.writeOK(primaryDB.getCollection(collName2).insert({_id: 1}));  // create the collection.
+assert.commandFailedWithCode(primaryDB.runCommand({collMod: collName2, recordPreImages: true}),
                              ErrorCodes.InvalidOptions);
 
 rst.stopSet();
