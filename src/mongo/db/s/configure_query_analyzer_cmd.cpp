@@ -42,6 +42,7 @@
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/configure_query_analyzer_cmd_gen.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/stale_shard_version_helpers.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -52,6 +53,81 @@ namespace analyze_shard_key {
 namespace {
 
 constexpr int kMaxSampleRate = 1'000'000;
+
+/*
+ * The helper for 'validateCollectionOptions'. Performs the same validation as
+ * 'validateCollectionOptionsLocally' but does that based on the listCollections response from the
+ * primary shard for the database.
+ */
+StatusWith<UUID> validateCollectionOptionsOnPrimaryShard(OperationContext* opCtx,
+                                                         const NamespaceString& nss) {
+    ListCollections listCollections;
+    listCollections.setDbName(nss.db());
+    listCollections.setFilter(BSON("name" << nss.coll()));
+    auto listCollectionsCmdObj =
+        CommandHelpers::filterCommandRequestForPassthrough(listCollections.toBSON({}));
+
+    auto catalogCache = Grid::get(opCtx)->catalogCache();
+    return shardVersionRetry(
+        opCtx,
+        catalogCache,
+        nss,
+        "validateCollectionOptionsOnPrimaryShard"_sd,
+        [&]() -> StatusWith<UUID> {
+            auto dbInfo = uassertStatusOK(catalogCache->getDatabaseWithRefresh(opCtx, nss.db()));
+            auto cmdResponse = executeCommandAgainstDatabasePrimary(
+                opCtx,
+                nss.db(),
+                dbInfo,
+                listCollectionsCmdObj,
+                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                Shard::RetryPolicy::kIdempotent);
+            auto remoteResponse = uassertStatusOK(cmdResponse.swResponse);
+            uassertStatusOK(getStatusFromCommandResult(remoteResponse.data));
+
+            auto cursorResponse =
+                uassertStatusOK(CursorResponse::parseFromBSON(remoteResponse.data));
+            auto firstBatch = cursorResponse.getBatch();
+
+            if (firstBatch.empty()) {
+                return Status{ErrorCodes::NamespaceNotFound,
+                              str::stream() << "The namespace does not exist"};
+            }
+            uassert(6915300,
+                    str::stream() << "The namespace corresponds to multiple collections",
+                    firstBatch.size() == 1);
+
+            auto listCollRepItem = ListCollectionsReplyItem::parse(
+                IDLParserContext("ListCollectionsReplyItem"), firstBatch[0]);
+
+            if (listCollRepItem.getType() == "view") {
+                return Status{ErrorCodes::CommandNotSupportedOnView,
+                              "The namespace corresponds to a view"};
+            }
+            if (auto obj = listCollRepItem.getOptions()) {
+                auto options = uassertStatusOK(CollectionOptions::parse(*obj));
+                if (options.encryptedFieldConfig.has_value()) {
+                    return Status{ErrorCodes::IllegalOperation,
+                                  str::stream()
+                                      << "The collection has queryable encryption enabled"};
+                }
+            }
+
+            auto info = listCollRepItem.getInfo();
+            uassert(6915301,
+                    str::stream() << "The listCollections reply for '" << nss
+                                  << "' does not have the 'info' field",
+                    info);
+            return *info->getUuid();
+        });
+}
+
+StatusWith<UUID> validateCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) {
+    if (serverGlobalParams.clusterRole == ClusterRole::None) {
+        return validateCollectionOptionsLocally(opCtx, nss);
+    }
+    return validateCollectionOptionsOnPrimaryShard(opCtx, nss);
+}
 
 class ConfigureQueryAnalyzerCmd : public TypedCommand<ConfigureQueryAnalyzerCmd> {
 public:
@@ -95,9 +171,7 @@ public:
                         str::stream() << "'sampleRate' must be less than " << kMaxSampleRate,
                         *sampleRate < kMaxSampleRate);
             }
-
-            auto collUuid = uassertStatusOK(validateCollectionOptions(
-                opCtx, nss, ConfigureQueryAnalyzer::kCommandParameterFieldName));
+            auto collUuid = uassertStatusOK(validateCollectionOptions(opCtx, nss));
 
             // TODO (SERVER-74065): Support query sampling on replica sets.
             if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
