@@ -184,7 +184,7 @@ which can be re-loaded into a new table using the \c load command.
 See @subpage dump_formats for details of the dump file formats.
 
 @subsection util_dump_synopsis Synopsis
-`wt [-BLmRrSVv] [-C config] [-E secretkey ] [-h directory] dump [-jprx] [-c checkpoint] [-f output] [-t timestamp] uri`
+`wt [-BLmRrSVv] [-C config] [-E secretkey ] [-h directory] dump [-jknprx] [-c checkpoint] [-f output] [-t timestamp] uri`
 
 @subsection util_dump_options Options
 The following are command-specific options for the \c dump command:
@@ -201,6 +201,12 @@ the \c -f option re-directs the output to the specified file.
 @par \c -j
 Dump in JSON (<a href="http://www.json.org">JavaScript Object Notation</a>)
 format.
+
+@par \c -k
+The specific key to look for in the format of the data packed into key items.
+
+@par \c -n
+If the requested key (see the \c -k option) cannot be found, return the key retrieved by \c search_near.
 
 @par \c -p
 Dump in human-readable format (pretty-print). The \c -p flag is incompatible

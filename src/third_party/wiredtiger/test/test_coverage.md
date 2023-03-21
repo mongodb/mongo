@@ -50,4 +50,4 @@
 |Truncate||[test_truncate01.py](../test/suite/test_truncate01.py)
 |Truncate|Prepare|[test_prepare13.py](../test/suite/test_prepare13.py)
 |Verify|Prepare|[test_prepare_hs03.py](../test/suite/test_prepare_hs03.py), [test_timestamp18.py](../test/suite/test_timestamp18.py)
-|Wt Util||[test_backup01.py](../test/suite/test_backup01.py), [test_dump.py](../test/suite/test_dump.py), [test_dump01.py](../test/suite/test_dump01.py), [test_util11.py](../test/suite/test_util11.py)
+|Wt Util||[test_backup01.py](../test/suite/test_backup01.py), [test_dump.py](../test/suite/test_dump.py), [test_dump01.py](../test/suite/test_dump01.py), [test_dump02.py](../test/suite/test_dump02.py), [test_util11.py](../test/suite/test_util11.py)
