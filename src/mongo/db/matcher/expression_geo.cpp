@@ -104,6 +104,60 @@ Status GeoExpression::parseQuery(const BSONObj& obj) {
     return Status::OK();
 }
 
+BSONObj redactGeoExpression(const BSONObj& obj,
+                            boost::optional<StringData> literalArgsReplacement) {
+
+    // Ideally each sub operator ($minDistance, $maxDistance, $geometry, $box) would serialize
+    // itself, rather than GeoExpression reparse the query during serialization. However GeoMatch
+    // and GeoNearMatch don't capture the nesting of the various sub-operators. Moreover, the data
+    // members representing the suboperators do not have serialize functions. As re-parsing is
+    // therefore required to serialize GeoNear and GeoNearMatch, the compromise is to have the same
+    // class responsible for parsing (GeoExpression) also responsible for serializing.
+
+    BSONElement outerElem = obj.firstElement();
+    BSONObjBuilder bob;
+
+    // Legacy GeoNear query.
+    if (outerElem.type() == mongo::Array) {
+        BSONObjIterator it(obj);
+        while (it.more()) {
+            // In a legacy GeoNear query, the value associated with the first field ($near or
+            // $geoNear) is an array where the first two array elements represent the x and y
+            // coordinates respectively. An optional third array element denotes the $maxDistance.
+            // Alternatively, a legacy query can have a $maxDistance suboperator to make it more
+            // explicit. None of these values are enums so it is fine to treat them as literals
+            // during redaction.
+            outerElem = it.next();
+            bob.append(outerElem.fieldNameStringData(), *literalArgsReplacement);
+        }
+        return bob.obj();
+    }
+    // Non-legacy geo expressions have embedded objects that have to be traversed.
+    else {
+        BSONObjIterator embedded_it(outerElem.embeddedObject());
+        StringData fieldName = outerElem.fieldNameStringData();
+        BSONObjBuilder subObj = BSONObjBuilder(bob.subobjStart(fieldName));
+
+        while (embedded_it.more()) {
+            BSONElement argElem = embedded_it.next();
+            fieldName = argElem.fieldNameStringData();
+            if (fieldName == "$geometry") {
+                BSONObjBuilder nestedSubObj = BSONObjBuilder(subObj.subobjStart(fieldName));
+                nestedSubObj.append(argElem.Obj().getField("type"));
+                nestedSubObj.append("coordinates", *literalArgsReplacement);
+                nestedSubObj.doneFast();
+            }
+            if (fieldName == "$maxDistance" || fieldName == "$box" || fieldName == "$nearSphere" ||
+                fieldName == "$minDistance") {
+                subObj.append(fieldName, *literalArgsReplacement);
+            }
+        }
+        subObj.doneFast();
+    }
+
+    return bob.obj();
+}
+
 Status GeoExpression::parseFrom(const BSONObj& obj) {
     // Initialize geoContainer and parse BSON object
     Status status = parseQuery(obj);
@@ -442,9 +496,10 @@ void GeoMatchExpression::debugString(StringBuilder& debug, int indentationLevel)
 }
 
 BSONObj GeoMatchExpression::getSerializedRightHandSide(SerializationOptions opts) const {
+    if (opts.replacementForLiteralArgs) {
+        return redactGeoExpression(_rawObj, opts.replacementForLiteralArgs);
+    }
     BSONObjBuilder subobj;
-    // TODO SERVER-73672 looks like we'll need to traverse '_rawObj' if 'replacementForLiteralArgs'
-    // is set.
     subobj.appendElements(_rawObj);
     return subobj.obj();
 }
@@ -499,6 +554,9 @@ void GeoNearMatchExpression::debugString(StringBuilder& debug, int indentationLe
 BSONObj GeoNearMatchExpression::getSerializedRightHandSide(SerializationOptions opts) const {
     // TODO SERVER-73672 looks like we'll need to traverse '_rawObj' if 'replacementForLiteralArgs'
     // is set.
+    if (opts.replacementForLiteralArgs) {
+        return redactGeoExpression(_rawObj, opts.replacementForLiteralArgs);
+    }
     BSONObjBuilder objBuilder;
     objBuilder.appendElements(_rawObj);
     return objBuilder.obj();

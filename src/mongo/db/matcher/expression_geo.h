@@ -73,7 +73,8 @@ private:
     // e.g.
     // { "$intersect" : { "$geometry" : { "type" : "Point", "coordinates": [ 40, 5 ] } } }
     Status parseQuery(const BSONObj& obj);
-
+    BSONObj redactGeoExpression(const BSONObj& obj,
+                                boost::optional<StringData> literalArgsReplacement);
     // Name of the field in the query.
     std::string field;
     std::shared_ptr<GeometryContainer> geoContainer;
