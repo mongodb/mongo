@@ -2060,6 +2060,7 @@ env.Library(
     source=[
         'tenant_oplog_batcher.cpp',
         'tenant_oplog_applier.cpp',
+        'tenant_oplog_applier_progress.idl',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',

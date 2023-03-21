@@ -36,6 +36,7 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/tenant_oplog_applier_progress_gen.h"
 #include "mongo/db/repl/tenant_oplog_batcher.h"
 #include "mongo/db/serverless/serverless_types_gen.h"
 #include "mongo/util/future.h"
@@ -75,11 +76,13 @@ public:
     TenantOplogApplier(const UUID& migrationUuid,
                        const MigrationProtocolEnum& protocol,
                        boost::optional<std::string> tenantId,
+                       boost::optional<NamespaceString> progressNss,
                        OpTime StartApplyingAfterOpTime,
                        RandomAccessOplogBuffer* oplogBuffer,
                        std::shared_ptr<executor::TaskExecutor> executor,
                        ThreadPool* writerPool,
-                       Timestamp resumeBatchingTs = Timestamp());
+                       OpTime cloneFinishedRecipientOpTime,
+                       bool isResuming);
 
     virtual ~TenantOplogApplier();
 
@@ -98,19 +101,20 @@ public:
     }
 
     /**
-     * This should only be called once before the applier starts.
+     * Returns information describing TenantOplogApplier progress for the
+     * given migration UUID.
      */
-    void setCloneFinishedRecipientOpTime(OpTime cloneFinishedRecipientOpTime);
+    boost::optional<TenantOplogApplierProgress> getStoredProgress(OperationContext* opCtx);
 
     /**
      * Returns the optime the applier will start applying from.
      */
     OpTime getStartApplyingAfterOpTime() const;
 
-    /**
-     * Returns the timestamp the applier will resume batching from.
-     */
-    Timestamp getResumeBatchingTs() const;
+    void setDeprecatedResumeOpTime(OpTime deprecatedResumeOpTime) {
+        stdx::lock_guard lk(_mutex);
+        _deprecatedResumeOpTime = deprecatedResumeOpTime;
+    }
 
 private:
     void _doStartup_inlock() final;
@@ -143,6 +147,11 @@ private:
                                                                   TenantOplogBatch* batch);
 
     /**
+     * Stores information describing TenantOplogApplier progress in a replicated collection.
+     */
+    void _storeProgress(OperationContext* opCtx, OpTime donorOpTime);
+
+    /**
      * Sets the _finalStatus to the new status if and only if the old status is "OK".
      */
     void _setFinalStatusIfOk(WithLock, Status newStatus);
@@ -161,13 +170,14 @@ private:
     // (X)  Access only allowed from the main flow of control called from run() or constructor.
 
     // Handles consuming oplog entries from the OplogBuffer for oplog application.
-    std::shared_ptr<TenantOplogBatcher> _oplogBatcher;  // (R)
-    const UUID _migrationUuid;                          // (R)
-    const MigrationProtocolEnum _protocol;              // (R)
+    std::shared_ptr<TenantOplogBatcher> _oplogBatcher;                // (R)
+    const UUID _migrationUuid;                                        // (R)
+    const boost::optional<NamespaceString> _progressNamespaceString;  // (R)
+    const MigrationProtocolEnum _protocol;                            // (R)
     // For multi-tenant migration protocol, _tenantId is set.
     // But, for shard merge protcol, _tenantId is empty.
     const boost::optional<std::string> _tenantId;       // (R)
-    const OpTime _startApplyingAfterOpTime;             // (R)
+    OpTime _startApplyingAfterOpTime;                   // (R)
     RandomAccessOplogBuffer* _oplogBuffer;              // (R)
     std::shared_ptr<executor::TaskExecutor> _executor;  // (R)
     // All no-op entries written by this tenant migration should have OpTime greater than this
@@ -179,10 +189,11 @@ private:
     // Pool of worker threads for writing ops to the databases.
     // Not owned by us.
     ThreadPool* const _writerPool;  // (S)
-    // The timestamp to resume batching from. A null timestamp indicates that the oplog applier
-    // is starting fresh (not a retry), and will start batching from the beginning of the oplog
-    // buffer.
-    const Timestamp _resumeBatchingTs;                                    // (R)
+    // Used when resuming oplog applier state via oplog scanning for nodes running FCV <= 6.3. If
+    // set, we will use this as our _startApplyingAfterOpTime, as well as the resume batching
+    // timestamp passed to the TenantOplogBatcher.
+    OpTime _deprecatedResumeOpTime;                                       // (M)
+    const bool _isResuming;                                               // (R)
     std::map<OpTime, SharedPromise<OpTimePair>> _opTimeNotificationList;  // (M)
     Status _finalStatus = Status::OK();                                   // (M)
     stdx::unordered_set<UUID, UUID::Hash> _knownGoodUuids;                // (X)

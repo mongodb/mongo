@@ -196,7 +196,7 @@ types:
 
     array:
         bson_serialization_type: array
-        description: "An unowned BSONArray without custom deserialization or seialization"
+        description: "An unowned BSONArray without custom deserialization or serialization"
         cpp_type: "mongo::BSONArray"
 
     array_owned:

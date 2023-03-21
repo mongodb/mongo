@@ -154,6 +154,7 @@ export async function runMigrationAsync(migrationOpts, donorRstArgs, opts = {}) 
         migrationId: UUID(migrationOpts.migrationIdString),
         tenantId: migrationOpts.tenantId,
         tenantIds: eval(migrationOpts.tenantIds),
+        protocol: migrationOpts.protocol,
         recipientConnectionString: migrationOpts.recipientConnString,
         readPreference: migrationOpts.readPreference || {mode: "primary"},
         donorCertificateForRecipient: migrationOpts.donorCertificateForRecipient ||

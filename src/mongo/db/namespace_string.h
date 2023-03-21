@@ -188,6 +188,8 @@ public:
     static constexpr StringData kAnalyzeShardKeySplitPointsCollectionPrefix =
         "analyzeShardKey.splitPoints."_sd;
 
+    // Prefix for tracking TenantOplogApplier progress during a tenant migration.
+    static constexpr StringData kTenantOplogApplierProgressPrefix = "repl.migration.progress_"_sd;
 
     // Maintainers Note: The large set of `NamespaceString`-typed static data
     // members of the `NamespaceString` class representing system-reserved
@@ -381,6 +383,12 @@ public:
      * use "config" as the db.
      */
     static NamespaceString makeDummyNamespace(const boost::optional<TenantId>& tenantId);
+
+    /**
+     * Constructs a NamespaceString used for tracking TenantOplogApplier progress during a tenant
+     * migration.
+     */
+    static NamespaceString makeTenantOplogApplierProgressNSS(const UUID& migrationUUID);
 
     /**
      * NOTE: DollarInDbNameBehavior::allow is deprecated.

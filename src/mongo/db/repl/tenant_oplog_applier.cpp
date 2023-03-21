@@ -41,6 +41,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/op_observer/op_observer.h"
+#include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/cloner_utils.h"
 #include "mongo/db/repl/insert_group.h"
@@ -70,21 +71,25 @@ MONGO_FAIL_POINT_DEFINE(fpBeforeTenantOplogApplyingBatch);
 TenantOplogApplier::TenantOplogApplier(const UUID& migrationUuid,
                                        const MigrationProtocolEnum& protocol,
                                        boost::optional<std::string> tenantId,
+                                       boost::optional<NamespaceString> progressNss,
                                        OpTime startApplyingAfterOpTime,
                                        RandomAccessOplogBuffer* oplogBuffer,
                                        std::shared_ptr<executor::TaskExecutor> executor,
                                        ThreadPool* writerPool,
-                                       Timestamp resumeBatchingTs)
+                                       OpTime cloneFinishedRecipientOpTime,
+                                       const bool isResuming)
     : AbstractAsyncComponent(executor.get(),
                              std::string("TenantOplogApplier_") + migrationUuid.toString()),
       _migrationUuid(migrationUuid),
+      _progressNamespaceString(progressNss),
       _protocol(protocol),
       _tenantId(tenantId),
       _startApplyingAfterOpTime(startApplyingAfterOpTime),
       _oplogBuffer(oplogBuffer),
       _executor(std::move(executor)),
+      _cloneFinishedRecipientOpTime(cloneFinishedRecipientOpTime),
       _writerPool(writerPool),
-      _resumeBatchingTs(resumeBatchingTs) {
+      _isResuming(isResuming) {
     if (_protocol != MigrationProtocolEnum::kShardMerge) {
         invariant(_tenantId);
     } else {
@@ -120,21 +125,58 @@ OpTime TenantOplogApplier::getStartApplyingAfterOpTime() const {
     return _startApplyingAfterOpTime;
 }
 
-Timestamp TenantOplogApplier::getResumeBatchingTs() const {
-    return _resumeBatchingTs;
+boost::optional<TenantOplogApplierProgress> TenantOplogApplier::getStoredProgress(
+    OperationContext* opCtx) {
+    if (!_progressNamespaceString) {
+        return boost::none;
+    }
+
+    DBDirectClient client(opCtx);
+    const auto tenantOplogApplierProgress =
+        client.findOne(_progressNamespaceString.get(),
+                       BSON(TenantOplogApplierProgress::kMigrationUuidFieldName << _migrationUuid));
+    if (tenantOplogApplierProgress.isEmpty()) {
+        return boost::none;
+    }
+
+    IDLParserContext ctx("TenantOplogApplierProgress");
+    return TenantOplogApplierProgress::parse(ctx, tenantOplogApplierProgress);
 }
 
-void TenantOplogApplier::setCloneFinishedRecipientOpTime(OpTime cloneFinishedRecipientOpTime) {
-    stdx::lock_guard lk(_mutex);
-    invariant(!_isActive_inlock());
-    invariant(!cloneFinishedRecipientOpTime.isNull());
-    invariant(_cloneFinishedRecipientOpTime.isNull());
-    _cloneFinishedRecipientOpTime = cloneFinishedRecipientOpTime;
+void TenantOplogApplier::_storeProgress(OperationContext* opCtx, OpTime donorOpTime) {
+    if (!_progressNamespaceString) {
+        return;
+    }
+
+    PersistentTaskStore<TenantOplogApplierProgress> store(_progressNamespaceString.get());
+
+    BSONObjBuilder builder;
+    builder.append("$set", BSON(TenantOplogApplierProgress::kDonorOpTimeFieldName << donorOpTime));
+
+    store.upsert(opCtx,
+                 BSON(TenantOplogApplierProgress::kMigrationUuidFieldName << _migrationUuid),
+                 builder.obj());
 }
 
 void TenantOplogApplier::_doStartup_inlock() {
+    Timestamp resumeBatchingTs = Timestamp();
+    if (_isResuming) {
+        if (_deprecatedResumeOpTime.isNull()) {
+            auto opCtx = cc().makeOperationContext();
+            if (const auto storedProgress = getStoredProgress(opCtx.get())) {
+                auto donorOpTime = storedProgress->getDonorOpTime();
+                _startApplyingAfterOpTime = std::max(donorOpTime, _startApplyingAfterOpTime);
+                resumeBatchingTs = donorOpTime.getTimestamp();
+            }
+        } else {
+            _startApplyingAfterOpTime =
+                std::max(_deprecatedResumeOpTime, _startApplyingAfterOpTime);
+            resumeBatchingTs = _deprecatedResumeOpTime.getTimestamp();
+        }
+    }
+
     _oplogBatcher = std::make_shared<TenantOplogBatcher>(
-        _migrationUuid, _oplogBuffer, _executor, _resumeBatchingTs, _startApplyingAfterOpTime);
+        _migrationUuid, _oplogBuffer, _executor, resumeBatchingTs, _startApplyingAfterOpTime);
     uassertStatusOK(_oplogBatcher->startup());
     auto fut = _oplogBatcher->getNextBatch(
         TenantOplogBatcher::BatchLimits(std::size_t(tenantApplierBatchSizeBytes.load()),
@@ -322,6 +364,7 @@ void TenantOplogApplier::_applyOplogBatch(TenantOplogBatch* batch) {
                 "Tenant Oplog Applier starting to write no-ops",
                 "protocol"_attr = _protocol,
                 "migrationId"_attr = _migrationUuid);
+
     auto lastBatchCompletedOpTimes = _writeNoOpEntries(opCtx.get(), *batch);
     stdx::lock_guard lk(_mutex);
     _lastAppliedOpTimesUpToLastBatch.donorOpTime = lastBatchCompletedOpTimes.donorOpTime;
@@ -333,6 +376,8 @@ void TenantOplogApplier::_applyOplogBatch(TenantOplogBatch* batch) {
     }
 
     _numOpsApplied += batch->ops.size();
+
+    _storeProgress(opCtx.get(), lastBatchCompletedOpTimes.donorOpTime);
 
     LOGV2_DEBUG(4886002,
                 1,
@@ -630,7 +675,12 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
             // Check out the session.
             if (!scopedSession) {
                 auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx.get());
-                scopedSession = mongoDSessionCatalog->checkOutSessionWithoutOplogRead(opCtx.get());
+                if (_isResuming) {
+                    scopedSession = mongoDSessionCatalog->checkOutSession(opCtx.get());
+                } else {
+                    scopedSession =
+                        mongoDSessionCatalog->checkOutSessionWithoutOplogRead(opCtx.get());
+                }
             }
 
             auto txnParticipant = TransactionParticipant::get(opCtx.get());
@@ -736,6 +786,7 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
                     noopEntry.setObject2(o2Entry.toBSON());
                 }
             }
+
             stmtIds.insert(stmtIds.end(), entryStmtIds.begin(), entryStmtIds.end());
 
             if (!prePostImageEntry && (entry.getPreImageOpTime() || entry.getPostImageOpTime())) {
@@ -779,9 +830,15 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
                 opCtx->setLogicalSessionId(sessionId);
                 opCtx->setTxnNumber(txnNumber);
             }
+
             if (!scopedSession) {
                 auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx.get());
-                scopedSession = mongoDSessionCatalog->checkOutSessionWithoutOplogRead(opCtx.get());
+                if (_isResuming) {
+                    scopedSession = mongoDSessionCatalog->checkOutSession(opCtx.get());
+                } else {
+                    scopedSession =
+                        mongoDSessionCatalog->checkOutSessionWithoutOplogRead(opCtx.get());
+                }
             }
 
             auto txnParticipant = TransactionParticipant::get(opCtx.get());
@@ -790,6 +847,7 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
                                      "for transaction "
                                   << txnNumber << " on session " << sessionId,
                     txnParticipant);
+
             // beginOrContinue throws on failure, which will abort the migration. Failure should
             // only result from out-of-order processing, which should not happen.
             TxnNumberAndRetryCounter txnNumberAndRetryCounter{txnNumber};
@@ -819,7 +877,7 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
                             "_cloneFinishedRecipientOpTime"_attr = _cloneFinishedRecipientOpTime,
                             "sessionId"_attr = sessionId,
                             "txnNumber"_attr = txnNumber,
-                            "statementIds"_attr = entryStmtIds,
+                            "statementIds"_attr = stmtIds,
                             "protocol"_attr = _protocol,
                             "migrationId"_attr = _migrationUuid);
                 txnParticipant.invalidate(opCtx.get());
@@ -832,19 +890,26 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
             }
 
             // We should never process the same donor statement twice, except in failover
-            // cases where we'll also have "forgotten" the statement was executed.
-            uassert(5350902,
-                    str::stream() << "Tenant oplog application processed same retryable write "
-                                     "twice for transaction "
-                                  << txnNumber << " statement " << entryStmtIds.front()
-                                  << " on session " << sessionId,
-                    !txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx.get(),
-                                                                            entryStmtIds.front()));
+            // cases. In the event of a failover, it is possible that we were able to successfully
+            // log the noop but failed to persist progress checkpoint data. As a result, we can end
+            // up re-applying noop entries. We can safely skip the entry in this case.
+            if (txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx.get(),
+                                                                       stmtIds.front())) {
+                LOGV2_DEBUG(7262200,
+                            1,
+                            "Tenant Oplog Applier skipping previously processed retryable write",
+                            "protocol"_attr = _protocol,
+                            "migrationId"_attr = _migrationUuid,
+                            "txnNumber"_attr = txnNumber,
+                            "statement"_attr = entryStmtIds.front(),
+                            "sessionId"_attr = sessionId);
+                continue;
+            }
 
             // Set sessionId, txnNumber, and statementId for all ops in a retryable write.
             noopEntry.setSessionId(sessionId);
             noopEntry.setTxnNumber(txnNumber);
-            noopEntry.setStatementIds(entryStmtIds);
+            noopEntry.setStatementIds(stmtIds);
 
             // set fromMigrate on the no-op so the session update tracker recognizes it.
             noopEntry.setFromMigrate(true);
@@ -884,7 +949,6 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
                     TransactionParticipant::get(opCtx.get())
                         .onWriteOpCompletedOnPrimary(opCtx.get(), {stmtIds}, *sessionTxnRecord);
                 }
-
                 wuow.commit();
             });
         prePostImageEntry = boost::none;
