@@ -28,10 +28,12 @@ fi
 # again for each file that needs checking.
 if [ "$single_file" -ne 1 ]; then
     cd ..
+    # Skip auto-generated and third party code, including SWIG generated workgen code.
     eval $search_str |
     sed -e '/Makefile.in/d' \
         -e '/test\/3rdparty/d' \
         -e '/test\/checksum\/power8/d' \
+        -e '/bench\/workgen\/workgen_wrap.cxx/d' \
         -e '/checksum\/zseries/d' |
     xargs $xp -I{} sh ./dist/s_style {}
 else

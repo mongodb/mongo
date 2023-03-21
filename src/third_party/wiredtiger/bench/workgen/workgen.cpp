@@ -202,9 +202,11 @@ thread_tables_drop_workload(void *arg)
     return (nullptr);
 }
 
-// The signal handler allows us to gracefully terminate workgen and the user to close the
-// connection in the runner script, thus ensuring a clean shutdown of wiredtiger. The exact
-// signals handled are registered in the WorkloadRunner::run_all function.
+/*
+ * The signal handler allows us to gracefully terminate workgen and the user to close the connection
+ * in the runner script, thus ensuring a clean shutdown of wiredtiger. The exact signals handled are
+ * registered in the WorkloadRunner::run_all function.
+ */
 volatile std::sig_atomic_t signal_raised = 0;
 
 void
@@ -345,9 +347,11 @@ gen_random_table_name(char *name, workgen_random_state volatile *rand_state)
     name[DYNAMIC_TABLE_LEN - 1] = '\0';
 }
 
-// Create a dynamic table with the specified name and config. If mirroring tables, add the
-// mirror table uri to the table runtime. Return an error status if the uri already exists
-// or the create fails.
+/*
+ * Create a dynamic table with the specified name and config. If mirroring tables, add the mirror
+ * table uri to the table runtime. Return an error status if the uri already exists or the create
+ * fails.
+ */
 int
 WorkloadRunner::create_table(WT_SESSION *session, const std::string &config, const std::string &uri,
   const std::string &mirror_uri, const bool is_base)
@@ -416,10 +420,11 @@ WorkloadRunner::start_tables_create(WT_CONNECTION *conn)
     int creates, retries, status;
     char rand_chars[DYNAMIC_TABLE_LEN];
 
-    // Add app_metadata to the config to indicate the table was created dynamically (can be
-    // selected for random deletion), the name of the table's mirror if mirroring is enabled,
-    // and if this table is a base table or a mirror. We want these settings to persist over
-    // restarts.
+    /*
+     * Add app_metadata to the config to indicate the table was created dynamically (can be selected
+     * for random deletion), the name of the table's mirror if mirroring is enabled, and if this
+     * table is a base table or a mirror. We want these settings to persist over restarts.
+     */
     std::string base_config =
       "key_format=S,value_format=S,app_metadata=\"" + DYN_TABLE_APP_METADATA;
     if (_workload->options.mirror_tables) {
@@ -524,9 +529,11 @@ WorkloadRunner::select_table_for_drop(std::vector<std::string> &pending_delete)
     return 0;
 }
 
-// The table specified by the dynamic table iterator is flagged for deletion and added to the
-// pending delete list. If the table has a mirror, the mirror is also flagged for deletion and
-// added to the pending delete list.
+/*
+ * The table specified by the dynamic table iterator is flagged for deletion and added to the
+ * pending delete list. If the table has a mirror, the mirror is also flagged for deletion and added
+ * to the pending delete list.
+ */
 void
 WorkloadRunner::schedule_table_for_drop(
   const std::map<std::string, tint_t>::iterator &itr, std::vector<std::string> &pending_delete)
@@ -1467,12 +1474,14 @@ ThreadRunner::op_kv_gen(Operation *op, const tint_t tint)
         return;
     }
 
-    // A potential race: thread1 is inserting, and increments Context->_recno[] for fileX.wt.
-    // thread2 is doing one of remove/search/update and grabs the new value of Context->_recno[]
-    // for fileX.wt. thread2 randomly chooses the highest recno (which has not yet been inserted
-    // by thread1), and when it accesses the record will get WT_NOTFOUND. It should be somewhat
-    // rare (and most likely when the threads are first beginning). Any WT_NOTFOUND returns are
-    // allowed and get their own statistic bumped.
+    /*
+     * A potential race: thread1 is inserting, and increments Context->_recno[] for fileX.wt.
+     * thread2 is doing one of remove/search/update and grabs the new value of Context->_recno[] for
+     * fileX.wt. thread2 randomly chooses the highest recno (which has not yet been inserted by
+     * thread1), and when it accesses the record will get WT_NOTFOUND. It should be somewhat rare
+     * (and most likely when the threads are first beginning). Any WT_NOTFOUND returns are allowed
+     * and get their own statistic bumped.
+     */
     uint64_t recno = 0;
     uint64_t range = op->_table.options.range;
     if (op->_optype == Operation::OP_INSERT) {
@@ -1512,9 +1521,11 @@ ThreadRunner::op_run_setup(Operation *op)
 
     if (_throttle != nullptr) {
         while (_throttle_ops >= _throttle_limit && !_in_transaction && !_stop) {
-            // Calling throttle causes a sleep until the next time division, and we are given a
-            // new batch of operations to do before calling throttle again. If the number of
-            // operations in the batch is zero, we'll need to go around and throttle again.
+            /*
+             * Calling throttle causes a sleep until the next time division, and we are given a new
+             * batch of operations to do before calling throttle again. If the number of operations
+             * in the batch is zero, we'll need to go around and throttle again.
+             */
             if ((ret = _throttle->throttle(_throttle_ops, &_throttle_limit)) != 0)
                 return ret;
             _throttle_ops = 0;

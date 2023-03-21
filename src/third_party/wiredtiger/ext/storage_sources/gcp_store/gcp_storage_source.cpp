@@ -556,11 +556,12 @@ gcp_object_list(WT_FILE_SYSTEM *file_system, WT_SESSION *session, const char *di
       file_system, session, directory, prefix, object_list, count, false);
 }
 
-// Allocate and initialize an array of C strings from vector of strings.
-//
-// Requires count <= objects.size().
-// count==0 is valid, and in this case object_list will be set to nullptr.
-// Caller is responsible for memory allocated for object_list.
+/*
+ * Allocate and initialize an array of C strings from vector of strings.
+ *
+ * Requires count <= objects.size(). count==0 is valid, and in this case object_list will be set to
+ * nullptr. Caller is responsible for memory allocated for object_list.
+ */
 static int
 make_object_list(gcp_store *gcp, char ***object_list, const std::vector<std::string> &objects,
   const uint32_t count)
@@ -671,9 +672,8 @@ wiredtiger_extension_init(WT_CONNECTION *connection, WT_CONFIG_ARG *config)
     // Initialize the GCP logging.
     gcp->log_id = google::cloud::LogSink::Instance().AddBackend(gcp->log);
 
-    // Allocate a gcp storage structure, with a WT_STORAGE structure as the first field.
-    // This allows us to treat references to either type of structure as a reference to the other
-    // type.
+    // Allocate a gcp storage structure, with a WT_STORAGE structure as the first field. This allows
+    // us to treat references to either type of structure as a reference to the other type.
     gcp->storage_source.ss_customize_file_system = gcp_customize_file_system;
     gcp->storage_source.ss_add_reference = gcp_add_reference;
     gcp->storage_source.terminate = gcp_terminate;

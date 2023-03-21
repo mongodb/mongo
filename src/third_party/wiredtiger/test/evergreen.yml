@@ -2546,7 +2546,7 @@ tasks:
           script: |
             set -o errexit
             set -o verbose
-            sh s_all -A -E 2>&1
+            sh -x s_all -A -E 2>&1
 
   - name: s-string
     # Run the script with "-r" option to remove no-longer-needed words in s_string.ok

@@ -127,7 +127,8 @@ if __name__ == '__main__':
         'src/support/mtx_rw.c',
     ]
 
-    command = "find bench examples ext src test -name \"*.[ch]\" -o -name \"*.in\" -o -name \
+    command = "find bench examples ext src test -name \"*.[ch]\" \
+        -o \( -name \"*.in\" ! -name \"Makefile.in\" \) \
         -o -name \"*.cpp\" -o -name \"*.i\" "
     if args.fast:
         command = "git diff --name-only $(git merge-base --fork-point develop) bench \
@@ -147,4 +148,5 @@ if __name__ == '__main__':
 
     if (count != 0):
         print('Detected ' + str(count) +' comment format issues!')
+        sys.exit(1)
 

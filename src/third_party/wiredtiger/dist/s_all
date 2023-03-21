@@ -53,14 +53,9 @@ errchk()
     sed -e 's/^/    /' $2
     echo "#######################"
 
-    # If the test was skipped, ignore the failure.
-    if ! `grep "$1.*skipped" $2 > /dev/null`; then
+    # If the test was skipped or marked warning only, ignore the failure.
+    if [ ! `grep "$1.*skipped" $2 > /dev/null` ] && [ ! "$3" = "--warning-only" ] ; then
         errfound=1;
-    fi
-
-    # Ignore errors if the script is marked warning-only
-    if [ "$3" = "--warning-only" ]; then
-        errfound=0;
     fi
 
     rm -f $2
@@ -113,7 +108,8 @@ COMMANDS="
 2>&1 python3 function.py > ${t_pfx}py_function
 2>&1 python3 style.py > ${t_pfx}py_style
 2>&1 python3 comment_style.py ${fast} > ${t_pfx}py_comment_style
-2>&1 python3 type_to_str.py > ${t_pfx}py_type_to_str"
+2>&1 python3 type_to_str.py > ${t_pfx}py_type_to_str
+" # the closing quote needs to be on a separate line, or the wrong command is run.
 
 # Parallelize if possible.
 xp=""
@@ -125,15 +121,17 @@ echo "$COMMANDS" | xargs $xp -I{} /bin/sh -c {}
 
 # For each command check if an output file has been generated. If it has, report the contents and
 # the command used to populate it.
-echo "$COMMANDS" | while read -r line; do
+while read -r line ; do
     outputfile=$(echo "$line" | sed -e 's/.* > //')
     if test -s "$outputfile" ; then
         check=$(echo "$line" | sed -e 's/ >.*//' -e 's/2>&1 //')
         errchk "$check" "$outputfile"
     fi
-done
+done <<EOT
+"$COMMANDS"
+EOT
 
-echo 'dist/s_all run finished'
+echo "dist/s_all run finished. Error? $errfound"
 if test $errmode -ne 0; then
     exit $errfound;
 fi
