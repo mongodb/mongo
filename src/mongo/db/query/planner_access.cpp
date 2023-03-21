@@ -223,18 +223,28 @@ bool affectedByCollator(const BSONElement& element) {
     }
 }
 
-void setMinRecord(CollectionScanNode* collScan, const BSONObj& min) {
-    const auto newMinRecord = record_id_helpers::keyForObj(min);
-    if (!collScan->minRecord || newMinRecord > collScan->minRecord->recordId()) {
-        collScan->minRecord = RecordIdBound(newMinRecord, min);
+// Set 'curr' to 'newMin' if 'newMin' < 'curr'
+void setLowestRecord(boost::optional<RecordIdBound>& curr, const RecordIdBound& newMin) {
+    if (!curr || newMin.recordId() < curr->recordId()) {
+        curr = newMin;
     }
 }
 
-void setMaxRecord(CollectionScanNode* collScan, const BSONObj& max) {
-    const auto newMaxRecord = record_id_helpers::keyForObj(max);
-    if (!collScan->maxRecord || newMaxRecord < collScan->maxRecord->recordId()) {
-        collScan->maxRecord = RecordIdBound(newMaxRecord, max);
+// Set 'curr' to 'newMax' if 'newMax' > 'curr'
+void setHighestRecord(boost::optional<RecordIdBound>& curr, const RecordIdBound& newMax) {
+    if (!curr || newMax.recordId() > curr->recordId()) {
+        curr = newMax;
     }
+}
+
+// Set 'curr' to 'newMin' if 'newMin' < 'curr'
+void setLowestRecord(boost::optional<RecordIdBound>& curr, const BSONObj& newMin) {
+    setLowestRecord(curr, RecordIdBound(record_id_helpers::keyForObj(newMin), newMin));
+}
+
+// Set 'curr' to 'newMax' if 'newMax' > 'curr'
+void setHighestRecord(boost::optional<RecordIdBound>& curr, const BSONObj& newMax) {
+    setHighestRecord(curr, RecordIdBound(record_id_helpers::keyForObj(newMax), newMax));
 }
 
 // Returns whether element is not affected by collators or query and collection collators are
@@ -276,12 +286,14 @@ void handleRIDRangeMinMax(const CanonicalQuery& query,
         // Assumes clustered collection scans are only supported with the forward direction.
         collScan->boundInclusion =
             CollectionScanParams::ScanBoundInclusion::kIncludeStartRecordOnly;
-        setMaxRecord(collScan, IndexBoundsBuilder::objFromElement(maxObj.firstElement(), collator));
+        setLowestRecord(collScan->maxRecord,
+                        IndexBoundsBuilder::objFromElement(maxObj.firstElement(), collator));
     }
 
     if (!minObj.isEmpty() && compatibleCollator(params, collator, minObj.firstElement())) {
         // The min() is inclusive as are bounded collection scans by default.
-        setMinRecord(collScan, IndexBoundsBuilder::objFromElement(minObj.firstElement(), collator));
+        setHighestRecord(collScan->minRecord,
+                         IndexBoundsBuilder::objFromElement(minObj.firstElement(), collator));
     }
 }
 
@@ -314,6 +326,45 @@ void handleRIDRangeScan(const MatchExpression* conjunct,
         return;
     }
 
+    // TODO SERVER-62707: Allow $in with regex to use a clustered index.
+    auto inMatch = dynamic_cast<const InMatchExpression*>(conjunct);
+    if (inMatch && !inMatch->hasRegex()) {
+        // Iterate through the $in equalities to find the min/max values. The min/max bounds for the
+        // collscan need to be loose enough to cover all of these values.
+        boost::optional<RecordIdBound> minBound;
+        boost::optional<RecordIdBound> maxBound;
+
+        bool allEltsCollationCompatible = true;
+        for (const auto& element : inMatch->getEqualities()) {
+            if (compatibleCollator(params, collator, element)) {
+                const auto collated = IndexBoundsBuilder::objFromElement(element, collator);
+                setLowestRecord(minBound, collated);
+                setHighestRecord(maxBound, collated);
+            } else {
+                // Set coarse min/max bounds based on type when we can't set tight bounds.
+                allEltsCollationCompatible = false;
+
+                BSONObjBuilder bMin;
+                bMin.appendMinForType("", element.type());
+                setLowestRecord(minBound, bMin.obj());
+
+                BSONObjBuilder bMax;
+                bMax.appendMaxForType("", element.type());
+                setHighestRecord(maxBound, bMax.obj());
+            }
+        }
+        collScan->hasCompatibleCollation = allEltsCollationCompatible;
+
+        // Finally, tighten the collscan bounds with the min/max bounds for the $in.
+        if (minBound) {
+            setHighestRecord(collScan->minRecord, *minBound);
+        }
+        if (maxBound) {
+            setLowestRecord(collScan->maxRecord, *maxBound);
+        }
+        return;
+    }
+
     auto match = dynamic_cast<const ComparisonMatchExpression*>(conjunct);
     if (match == nullptr) {
         return;  // Not a comparison match expression.
@@ -324,11 +375,11 @@ void handleRIDRangeScan(const MatchExpression* conjunct,
     // Set coarse min/max bounds based on type in case we can't set tight bounds.
     BSONObjBuilder minb;
     minb.appendMinForType("", element.type());
-    setMinRecord(collScan, minb.obj());
+    setHighestRecord(collScan->minRecord, minb.obj());
 
     BSONObjBuilder maxb;
     maxb.appendMaxForType("", element.type());
-    setMaxRecord(collScan, maxb.obj());
+    setLowestRecord(collScan->maxRecord, maxb.obj());
 
     bool compatible = compatibleCollator(params, collator, element);
     if (!compatible) {
@@ -341,14 +392,14 @@ void handleRIDRangeScan(const MatchExpression* conjunct,
 
     const auto collated = IndexBoundsBuilder::objFromElement(element, collator);
     if (dynamic_cast<const EqualityMatchExpression*>(match)) {
-        setMinRecord(collScan, collated);
-        setMaxRecord(collScan, collated);
+        setHighestRecord(collScan->minRecord, collated);
+        setLowestRecord(collScan->maxRecord, collated);
     } else if (dynamic_cast<const LTMatchExpression*>(match) ||
                dynamic_cast<const LTEMatchExpression*>(match)) {
-        setMaxRecord(collScan, collated);
+        setLowestRecord(collScan->maxRecord, collated);
     } else if (dynamic_cast<const GTMatchExpression*>(match) ||
                dynamic_cast<const GTEMatchExpression*>(match)) {
-        setMinRecord(collScan, collated);
+        setHighestRecord(collScan->minRecord, collated);
     }
 }
 

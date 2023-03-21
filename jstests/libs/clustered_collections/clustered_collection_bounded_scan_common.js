@@ -94,6 +94,23 @@ const testClusteredCollectionBoundedScan = function(coll, clusterKey) {
         assert.eq(expectedNReturned, expl.executionStats.executionStages.nReturned);
         assert.eq(expectedDocsExamined, expl.executionStats.executionStages.docsExamined);
     }
+    function testIn() {
+        initAndPopulate(coll, clusterKey);
+
+        const expl = assert.commandWorked(coll.getDB().runCommand({
+            explain: {find: coll.getName(), filter: {[clusterKeyFieldName]: {$in: [10, 20, 30]}}},
+            verbosity: "executionStats"
+        }));
+
+        assert(getPlanStage(expl, "CLUSTERED_IXSCAN"));
+        assert.eq(10, getPlanStage(expl, "CLUSTERED_IXSCAN").minRecord);
+        assert.eq(30, getPlanStage(expl, "CLUSTERED_IXSCAN").maxRecord);
+
+        assert.eq(3, expl.executionStats.executionStages.nReturned);
+        // The range scanned is 21 documents + 1 extra document by design - additional cursor
+        // 'next' beyond the range.
+        assert.eq(22, expl.executionStats.executionStages.docsExamined);
+    }
     function testNonClusterKeyScan() {
         initAndPopulate(coll, clusterKey);
 
@@ -128,6 +145,8 @@ const testClusteredCollectionBoundedScan = function(coll, clusterKey) {
         testRange("$gte", 20, "$lt", 40, 20, 22);
         testRange("$gt", 20, "$lte", 40, 20, 22);
         testRange("$gte", 20, "$lte", 40, 21, 22);
+        testIn();
+
         testNonClusterKeyScan();
     }
 
