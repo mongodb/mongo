@@ -38,16 +38,24 @@ namespace mongo {
 
 class CollatorInterface;
 
+struct IndexProperties {
+    bool isSparse = false;  // 'true' if a sparse index can answer the field.
+};
+
+// A relevant field to index requirement map.
+using RelevantFieldIndexMap = stdx::unordered_map<std::string, IndexProperties>;
+
 /**
  * Methods for determining what fields and predicates can use indices.
  */
 class QueryPlannerIXSelect {
 public:
     /**
-     * Return all the fields in the tree rooted at 'node' that we can use an index on
-     * in order to answer the query.
+     * Return all the fields in the tree rooted at 'node' that we can use an index to answer the
+     * query. The output, 'RelevantFieldIndexMap', contains the requirements of the index that can
+     * answer the field. e.g. Some fields can be supported only by a non-sparse index.
      */
-    static void getFields(const MatchExpression* node, stdx::unordered_set<std::string>* out);
+    static void getFields(const MatchExpression* node, RelevantFieldIndexMap* out);
 
     /**
      * Similar to other getFields() method, but with 'prefix' argument which is a path prefix to be
@@ -57,7 +65,7 @@ public:
      */
     static void getFields(const MatchExpression* node,
                           std::string prefix,
-                          stdx::unordered_set<std::string>* out);
+                          RelevantFieldIndexMap* out);
 
     /**
      * Finds all indices that correspond to the hinted index. Matches the index both by name and by
@@ -70,8 +78,8 @@ public:
      * Finds all indices prefixed by fields we have predicates over.  Only these indices are
      * useful in answering the query.
      */
-    static std::vector<IndexEntry> findRelevantIndices(
-        const stdx::unordered_set<std::string>& fields, const std::vector<IndexEntry>& allIndices);
+    static std::vector<IndexEntry> findRelevantIndices(const RelevantFieldIndexMap& fields,
+                                                       const std::vector<IndexEntry>& allIndices);
 
     /**
      * Determine how useful all of our relevant 'indices' are to all predicates in the subtree
@@ -130,9 +138,12 @@ public:
     /**
      * Given a list of IndexEntries and fields used by a query's match expression, return a list
      * "expanded" indexes (where the $** indexes in the given list have been expanded).
+     * 'hintedIndexBson' indicates that the indexes in 'relevantIndices' are the results of the
+     * user's hint.
      */
-    static std::vector<IndexEntry> expandIndexes(const stdx::unordered_set<std::string>& fields,
-                                                 std::vector<IndexEntry> relevantIndices);
+    static std::vector<IndexEntry> expandIndexes(const RelevantFieldIndexMap& fields,
+                                                 std::vector<IndexEntry> relevantIndices,
+                                                 bool hintedIndexBson = false);
 
     /**
      * Check if this match expression is a leaf and is supported by a wildcard index.

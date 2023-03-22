@@ -198,26 +198,20 @@ TEST_F(QueryPlannerTest, SparseIndexForQuery) {
         "{filter: null, pattern: {a: 1}}}}}");
 }
 
-TEST_F(QueryPlannerTest, ExprEqCanUseSparseIndex) {
+TEST_F(QueryPlannerTest, ExprEqCannotUseSparseIndex) {
     params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     addIndex(fromjson("{a: 1}"), false, true);
     runQuery(fromjson("{a: {$_internalExprEq: 1}}"));
 
-    assertNumSolutions(1U);
-    assertSolutionExists(
-        "{fetch: {filter: null, node: {ixscan: "
-        "{filter: null, pattern: {a: 1}, bounds: {a: [[1,1,true,true]]}}}}}");
+    assertHasOnlyCollscan();
 }
 
-TEST_F(QueryPlannerTest, ExprEqCanUseSparseIndexForEqualityToNull) {
+TEST_F(QueryPlannerTest, ExprEqCannotUseSparseIndexForEqualityToNull) {
     params.options &= ~QueryPlannerParams::INCLUDE_COLLSCAN;
     addIndex(fromjson("{a: 1}"), false, true);
     runQuery(fromjson("{a: {$_internalExprEq: null}}"));
 
-    assertNumSolutions(1U);
-    assertSolutionExists(
-        "{fetch: {filter: {a: {$_internalExprEq: null}}, node: {ixscan: {filter: null, pattern: "
-        "{a: 1}, bounds: {a: [[undefined,undefined,true,true], [null,null,true,true]]}}}}}");
+    assertHasOnlyCollscan();
 }
 
 TEST_F(QueryPlannerTest, NegationCannotUseSparseIndex) {

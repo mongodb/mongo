@@ -418,25 +418,18 @@ TEST_F(QueryPlannerWildcardTest, EqualityIndexScanOverNestedField) {
         "bounds: {'$_path': [['a.b','a.b',true,true]], 'a.b': [[5,5,true,true]]}}}}}");
 }
 
-TEST_F(QueryPlannerWildcardTest, ExprEqCanUseIndex) {
+TEST_F(QueryPlannerWildcardTest, ExprEqCannotUseIndex) {
     addWildcardIndex(BSON("$**" << 1));
     runQuery(fromjson("{a: {$_internalExprEq: 1}}"));
 
-    assertNumSolutions(1U);
-    assertSolutionExists(
-        "{fetch: {filter: null, node: {ixscan: {pattern: {'$_path': 1, a: 1},"
-        "bounds: {'$_path': [['a','a',true,true]], a: [[1,1,true,true]]}}}}}");
+    assertHasOnlyCollscan();
 }
 
-TEST_F(QueryPlannerWildcardTest, ExprEqCanUseSparseIndexForEqualityToNull) {
+TEST_F(QueryPlannerWildcardTest, ExprEqCannotUseSparseIndexForEqualityToNull) {
     addWildcardIndex(BSON("$**" << 1));
     runQuery(fromjson("{a: {$_internalExprEq: null}}"));
 
-    assertNumSolutions(1U);
-    assertSolutionExists(
-        "{fetch: {filter: {a: {$_internalExprEq: null}}, node: {ixscan: {pattern: {'$_path': 1, a: "
-        "1}, bounds: {'$_path': [['a','a',true,true]], a: [[undefined,undefined,true,true], "
-        "[null,null,true,true]]}}}}}");
+    assertHasOnlyCollscan();
 }
 
 TEST_F(QueryPlannerWildcardTest, PrefixRegex) {

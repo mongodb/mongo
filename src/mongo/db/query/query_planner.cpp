@@ -712,10 +712,11 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::planFromCache(
                 "filter"_attr = redact(clone->debugString()),
                 "cacheData"_attr = redact(winnerCacheData.toString()));
 
-    stdx::unordered_set<string> fields;
+    RelevantFieldIndexMap fields;
     QueryPlannerIXSelect::getFields(query.root(), &fields);
+    // We will not cache queries with 'hint'.
     std::vector<IndexEntry> expandedIndexes =
-        QueryPlannerIXSelect::expandIndexes(fields, params.indices);
+        QueryPlannerIXSelect::expandIndexes(fields, params.indices, false /* indexHinted */);
 
     // Map from index name to index number.
     map<IndexEntry::Identifier, size_t> indexMap;
@@ -917,13 +918,14 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     }
 
     // Figure out what fields we care about.
-    stdx::unordered_set<string> fields;
+    RelevantFieldIndexMap fields;
     QueryPlannerIXSelect::getFields(query.root(), &fields);
     for (auto&& field : fields) {
-        LOGV2_DEBUG(20970, 5, "Predicate over field", "field"_attr = field);
+        LOGV2_DEBUG(20970, 5, "Predicate over field", "field"_attr = field.first);
     }
 
-    fullIndexList = QueryPlannerIXSelect::expandIndexes(fields, std::move(fullIndexList));
+    fullIndexList = QueryPlannerIXSelect::expandIndexes(
+        fields, std::move(fullIndexList), !hintedIndex.isEmpty());
     std::vector<IndexEntry> relevantIndices;
 
     if (!hintedIndexEntry) {
