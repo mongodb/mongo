@@ -61,11 +61,6 @@ struct OIDCClientGlobalParams {
     std::string oidcClientId;
 
     /**
-     * Client Secret. Populated via server SASL reply.
-     */
-    std::string oidcClientSecret;
-
-    /**
      * Token endpoint. Populated via server SASL reply.
      */
     std::string oidcTokenEndpoint;

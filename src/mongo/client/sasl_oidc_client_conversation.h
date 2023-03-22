@@ -73,7 +73,7 @@ private:
     StatusWith<bool> _firstStep(std::string* output);
 
     // Parse the server's response to the client-side message, which should contain the identity
-    // provider's issuer endpoint, the clientID, and the clientSecret. Then, perform the
+    // provider's issuer endpoint, and the clientID. Then, perform the
     // device authorization grant flow to retrieve a device code, present a user code and
     // verification uri to the user, and poll the token endpoint with the device code until the user
     // authenticates and a token is provided.

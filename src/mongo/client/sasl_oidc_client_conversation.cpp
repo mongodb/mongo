@@ -45,7 +45,6 @@
 namespace mongo {
 namespace {
 constexpr auto kClientIdParameterName = "client_id"_sd;
-constexpr auto kClientSecretParameterName = "client_secret"_sd;
 constexpr auto kRequestScopesParameterName = "scope"_sd;
 constexpr auto kGrantTypeParameterName = "grant_type"_sd;
 constexpr auto kGrantTypeParameterDeviceCodeValue =
@@ -54,13 +53,8 @@ constexpr auto kGrantTypeParameterRefreshTokenValue = "refresh_token"_sd;
 constexpr auto kDeviceCodeParameterName = "device_code"_sd;
 constexpr auto kRefreshTokenParameterName = kGrantTypeParameterRefreshTokenValue;
 
-inline void appendPostBodyRequiredParams(StringBuilder* sb,
-                                         StringData clientId,
-                                         const boost::optional<StringData>& clientSecret) {
+inline void appendPostBodyRequiredParams(StringBuilder* sb, StringData clientId) {
     *sb << kClientIdParameterName << "=" << uriEncode(clientId);
-    if (clientSecret) {
-        *sb << "&" << kClientSecretParameterName << "=" << uriEncode(clientSecret->toString());
-    }
 }
 
 inline void appendPostBodyDeviceCodeRequestParams(
@@ -114,7 +108,7 @@ std::pair<std::string, std::string> doDeviceAuthorizationGrantFlow(
     // Construct body of POST request to device authorization endpoint based on provided
     // parameters.
     StringBuilder deviceCodeRequestSb;
-    appendPostBodyRequiredParams(&deviceCodeRequestSb, clientId, serverReply.getClientSecret());
+    appendPostBodyRequiredParams(&deviceCodeRequestSb, clientId);
     appendPostBodyDeviceCodeRequestParams(&deviceCodeRequestSb, serverReply.getRequestScopes());
     auto deviceCodeRequest = deviceCodeRequestSb.str();
 
@@ -134,7 +128,7 @@ std::pair<std::string, std::string> doDeviceAuthorizationGrantFlow(
     // Poll token endpoint for access and refresh tokens. It should return immediately since
     // the shell blocks on the authenticationSimulator until it completes, but poll anyway.
     StringBuilder tokenRequestSb;
-    appendPostBodyRequiredParams(&tokenRequestSb, clientId, serverReply.getClientSecret());
+    appendPostBodyRequiredParams(&tokenRequestSb, clientId);
     appendPostBodyTokenRequestParams(&tokenRequestSb, deviceAuthorizationResponse.getDeviceCode());
     auto tokenRequest = tokenRequestSb.str();
 
@@ -207,9 +201,7 @@ StatusWith<std::string> SaslOIDCClientConversation::doRefreshFlow() try {
                 !oidcClientGlobalParams.oidcTokenEndpoint.empty());
 
     StringBuilder refreshFlowRequestBuilder;
-    appendPostBodyRequiredParams(&refreshFlowRequestBuilder,
-                                 oidcClientGlobalParams.oidcClientId,
-                                 StringData(oidcClientGlobalParams.oidcClientSecret));
+    appendPostBodyRequiredParams(&refreshFlowRequestBuilder, oidcClientGlobalParams.oidcClientId);
     appendPostBodyRefreshFlowParams(&refreshFlowRequestBuilder,
                                     oidcClientGlobalParams.oidcRefreshToken);
 
