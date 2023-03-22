@@ -22,7 +22,6 @@ for (let i = 0; i < 40; i++) {
 }
 
 assert.commandWorked(t.createIndex({'a': 1}, {partialFilterExpression: {'b': 2}}));
-// assert.commandWorked(t.createIndex({'a': 1}));
 
 // TODO: verify with explain the plan should use the index.
 let res = t.aggregate([{$match: {'a': 3, 'b': 2}}]).toArray();
