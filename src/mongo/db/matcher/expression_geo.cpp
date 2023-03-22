@@ -143,7 +143,10 @@ BSONObj redactGeoExpression(const BSONObj& obj,
             fieldName = argElem.fieldNameStringData();
             if (fieldName == "$geometry") {
                 BSONObjBuilder nestedSubObj = BSONObjBuilder(subObj.subobjStart(fieldName));
-                nestedSubObj.append(argElem.Obj().getField("type"));
+                BSONElement typeElt = argElem.Obj().getField("type");
+                if (!typeElt.eoo()) {
+                    nestedSubObj.append(typeElt);
+                }
                 nestedSubObj.append("coordinates", *literalArgsReplacement);
                 nestedSubObj.doneFast();
             }

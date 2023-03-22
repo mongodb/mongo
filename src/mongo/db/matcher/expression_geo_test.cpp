@@ -242,6 +242,13 @@ TEST(ExpressionGeoTest, SerializeGeoExpressions) {
             "{ $geoNear: \"?\", $maxDistance: \"?\" }",  // NOLINT (test auto-update)
             gne->getSerializedRightHandSide(opts));
     }
+    {
+        BSONObj query = fromjson("{$geoIntersects: {$geometry: [0, 0]}}");
+        std::unique_ptr<GeoMatchExpression> ge(makeGeoMatchExpression(query));
+        ASSERT_VALUE_EQ_AUTO(  // NOLINT
+            "{ $geoIntersects: { $geometry: { coordinates: \"?\" } } }",
+            ge->getSerializedRightHandSide(opts));
+    }
 }
 
 /**
