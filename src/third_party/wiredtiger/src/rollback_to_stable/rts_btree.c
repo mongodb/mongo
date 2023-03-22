@@ -49,7 +49,7 @@ __rts_btree_abort_update(WT_SESSION_IMPL *session, WT_ITEM *key, WT_UPDATE *firs
           upd->prepare_state == WT_PREPARE_INPROGRESS) {
             __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
               WT_RTS_VERB_TAG_UPDATE_ABORT
-              "rollback to stable update aborted with txnid=%" PRIu64
+              "rollback to stable aborting update with txnid=%" PRIu64
               ", txnid_not_visible=%s"
               ", stable_timestamp=%s < durable_timestamp=%s: %s, prepare_state=%s",
               upd->txnid, !txn_id_visible ? "true" : "false",
@@ -1078,7 +1078,7 @@ __wt_rts_btree_abort_updates(
 
     WT_STAT_CONN_INCR(session, txn_rts_pages_visited);
     __wt_verbose_level_multi(session, WT_VERB_RECOVERY_RTS(session), WT_VERBOSE_DEBUG_2,
-      WT_RTS_VERB_TAG_PAGE_ROLLBACK "roll back page, addr=%p modified=%s", (void *)ref,
+      WT_RTS_VERB_TAG_PAGE_ROLLBACK "rolling back page, addr=%p modified=%s", (void *)ref,
       modified ? "true" : "false");
 
     switch (page->type) {

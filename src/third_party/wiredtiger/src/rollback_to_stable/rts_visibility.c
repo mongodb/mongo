@@ -149,7 +149,7 @@ __wt_rts_visibility_page_needs_abort(
     __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
       WT_RTS_VERB_TAG_PAGE_ABORT_CHECK
       "ref=%p: page with %s, durable_timestamp=%s, newest_txn=%" PRIu64
-      ", prepared_updates=%s, needs_abort=%s",
+      ", prepared_updates=%s, has_updates_need_abort=%s",
       (void *)ref, tag, __wt_timestamp_to_string(durable_ts, ts_string), newest_txn,
       prepared ? "true" : "false", result ? "true" : "false");
 

@@ -204,15 +204,15 @@ __wt_rts_btree_walk_btree_apply(
     /*
      * The rollback to stable will skip the tables during recovery and shutdown in the following
      * conditions.
-     * 1. Empty table.
+     * 1. Empty table or newly-created table.
      * 2. Table has timestamped updates without a stable timestamp.
      */
     if ((F_ISSET(S2C(session), WT_CONN_RECOVERING) ||
           F_ISSET(S2C(session), WT_CONN_CLOSING_CHECKPOINT)) &&
       (addr_size == 0 || (rollback_timestamp == WT_TS_NONE && max_durable_ts != WT_TS_NONE))) {
         __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
-          WT_RTS_VERB_TAG_FILE_SKIP "skip rollback to stable on file=%s because %s", uri,
-          addr_size == 0 ? "its checkpoint address length is 0" :
+          WT_RTS_VERB_TAG_FILE_SKIP "skipping rollback to stable on file=%s because %s", uri,
+          addr_size == 0 ? "it has never been checkpointed" :
                            "it has timestamped updates and the stable timestamp is 0");
         return (0);
     }
@@ -245,7 +245,7 @@ __wt_rts_btree_walk_btree_apply(
 
         __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
           WT_RTS_VERB_TAG_TREE
-          "tree rolled back. modified=%s, durable_timestamp=%s > stable_timestamp=%s: %s, "
+          "rolling back tree. modified=%s, durable_timestamp=%s > stable_timestamp=%s: %s, "
           "has_prepared_updates=%s, durable_timestamp_not_found=%s, txnid=%" PRIu64
           " > recovery_checkpoint_snap_min=%" PRIu64 ": %s",
           S2BT(session)->modified ? "true" : "false",
@@ -299,7 +299,7 @@ __wt_rts_btree_walk_btree(WT_SESSION_IMPL *session, wt_timestamp_t rollback_time
     btree = S2BT(session);
     conn = S2C(session);
 
-    __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
+    __wt_verbose_level_multi(session, WT_VERB_RECOVERY_RTS(session), WT_VERBOSE_DEBUG_4,
       WT_RTS_VERB_TAG_TREE_LOGGING
       "rollback to stable connection_logging_enabled=%s and btree_logging_enabled=%s",
       FLD_ISSET(conn->log_flags, WT_CONN_LOG_ENABLED) ? "true" : "false",
