@@ -43,11 +43,12 @@ def custom_validator(data):
         "deleted page walk skipped",
         "page with reconciled",
         "performing recovery rollback",
-        "performing rollback to stable",
+        "start rollback to stable",
         "performing shutdown rollback",
         "recovered checkpoint snapshot",
         "rolling back tree",
-        "tree rolled back"
+        "tree rolled back",
+        "finished rollback to stable",
     ]
     needle = "skipped performing rollback to stable"
 
@@ -60,7 +61,7 @@ def custom_validator(data):
             if s in line:
                 ok = True
                 break
-        if not ok:
+        if not ok and not found:
             raise Exception("Got unexpected message: {}".format(line))
 
     if not found:

@@ -223,3 +223,7 @@ class Checker:
     def __apply_check_hs_truncated(self, operation):
         # TODO expand this out
         pass
+
+    def __apply_check_end(self, operation):
+        # TODO expand this out
+        pass

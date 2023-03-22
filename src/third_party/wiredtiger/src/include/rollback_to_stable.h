@@ -9,6 +9,7 @@
 /*
  * Helper macros for finer-grained RTS verbose messaging categories.
  */
+#define WT_RTS_VERB_TAG_END "[END] "
 #define WT_RTS_VERB_TAG_FILE_SKIP "[FILE_SKIP] "
 #define WT_RTS_VERB_TAG_HS_ABORT_STOP "[HS_ABORT_STOP] "
 #define WT_RTS_VERB_TAG_HS_GT_ONDISK "[HS_GT_ONDISK] "
