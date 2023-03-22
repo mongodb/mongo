@@ -456,6 +456,9 @@ public:
     bool isNormalCollection() const {
         return !isSystem() && !(isLocal() && coll().startsWith("replset."));
     }
+    bool isGlobalIndex() const {
+        return coll().startsWith(kGlobalIndexCollectionPrefix);
+    }
     bool isAdminDB() const {
         return db() == DatabaseName::kAdmin.db();
     }

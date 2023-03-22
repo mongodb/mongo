@@ -63,6 +63,20 @@ namespace {
 
 constexpr char SKIP_TEMP_COLLECTION[] = "skipTempCollections";
 
+std::shared_ptr<const CollectionCatalog> getConsistentCatalogAndSnapshot(OperationContext* opCtx) {
+    // Loop until we get a consistent catalog and snapshot. This is only used for the lock-free
+    // implementation of dbHash which skips acquiring database and collection locks.
+    while (true) {
+        const auto catalogBeforeSnapshot = CollectionCatalog::get(opCtx);
+        opCtx->recoveryUnit()->preallocateSnapshot();
+        const auto catalogAfterSnapshot = CollectionCatalog::get(opCtx);
+        if (catalogBeforeSnapshot == catalogAfterSnapshot) {
+            return catalogBeforeSnapshot;
+        }
+        opCtx->recoveryUnit()->abandonSnapshot();
+    }
+}
+
 class DBHashCmd : public BasicCommand {
 public:
     DBHashCmd() : BasicCommand("dbHash", "dbhash") {}
@@ -216,26 +230,41 @@ public:
             opCtx->recoveryUnit()->setPrepareConflictBehavior(PrepareConflictBehavior::kEnforce);
         }
 
-        // We lock the entire database in S-mode in order to ensure that the contents will not
-        // change for the snapshot.
-        auto lockMode = LockMode::MODE_S;
-        boost::optional<ShouldNotConflictWithSecondaryBatchApplicationBlock> shouldNotConflictBlock;
-        if (opCtx->recoveryUnit()->getTimestampReadSource() ==
-            RecoveryUnit::ReadSource::kProvided) {
-            // However, if we are performing a read at a timestamp, then we only need to lock the
-            // database in intent mode and then collection in intent mode as well to ensure that
-            // none of the collections get dropped.
-            lockMode = LockMode::MODE_IS;
+        const bool isPointInTimeRead =
+            opCtx->recoveryUnit()->getTimestampReadSource() == RecoveryUnit::ReadSource::kProvided;
 
-            // Additionally, if we are performing a read at a timestamp, then we allow oplog
-            // application to proceed concurrently with the dbHash command. This is done
-            // to ensure a prepare conflict is able to eventually be resolved by processing a
-            // later commitTransaction or abortTransaction oplog entry.
+        boost::optional<ShouldNotConflictWithSecondaryBatchApplicationBlock> shouldNotConflictBlock;
+        if (isPointInTimeRead) {
+            // If we are performing a read at a timestamp, then we allow oplog application to
+            // proceed concurrently with the dbHash command. This is done to ensure a prepare
+            // conflict is able to eventually be resolved by processing a later commitTransaction or
+            // abortTransaction oplog entry.
             shouldNotConflictBlock.emplace(opCtx->lockState());
         }
 
-        AutoGetDb autoDb(opCtx, dbName, lockMode);
-        Database* db = autoDb.getDb();
+        // We take the global lock here as dbHash runs lock-free with point-in-time catalog lookups.
+        Lock::GlobalLock globalLock(opCtx, MODE_IS);
+
+        // The CollectionCatalog to use for lock-free reads with point-in-time catalog lookups.
+        std::shared_ptr<const CollectionCatalog> catalog;
+        if (feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV()) {
+            // Make sure we get a CollectionCatalog in sync with our snapshot.
+            catalog = getConsistentCatalogAndSnapshot(opCtx);
+        }
+
+        boost::optional<AutoGetDb> autoDb;
+        if (isPointInTimeRead) {
+            if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV()) {
+                // We only need to lock the database in intent mode and then collection in intent
+                // mode as well to ensure that none of the collections get dropped. This is no
+                // longer necessary with point-in-time catalog lookups.
+                autoDb.emplace(opCtx, dbName, MODE_IS);
+            }
+        } else {
+            // We lock the entire database in S-mode in order to ensure that the contents will not
+            // change for the snapshot when not reading at a timestamp.
+            autoDb.emplace(opCtx, dbName, MODE_S);
+        }
 
         result.append("host", prettyHostName());
 
@@ -246,7 +275,7 @@ public:
         std::map<std::string, UUID> collectionToUUIDMap;
         std::set<std::string> cappedCollectionSet;
 
-        catalog::forEachCollectionFromDb(opCtx, dbName, MODE_IS, [&](const Collection* collection) {
+        auto checkAndHashCollection = [&](const Collection* collection) -> bool {
             auto collNss = collection->ns();
 
             uassert(ErrorCodes::BadValue,
@@ -282,12 +311,61 @@ public:
             collectionToUUIDMap.emplace(collNss.coll().toString(), collection->uuid());
 
             // Compute the hash for this collection.
-            std::string hash = _hashCollection(opCtx, db, collNss);
+            std::string hash = _hashCollection(opCtx, CollectionPtr(collection));
 
             collectionToHashMap[collNss.coll().toString()] = hash;
 
             return true;
-        });
+        };
+
+        if (feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV()) {
+            for (auto it = catalog->begin(opCtx, dbName); it != catalog->end(opCtx); ++it) {
+                UUID uuid = it.uuid();
+
+                // The namespace must be found as the UUID is fetched from the same
+                // CollectionCatalog instance.
+                boost::optional<NamespaceString> nss = catalog->lookupNSSByUUID(opCtx, uuid);
+                invariant(nss);
+
+                const Collection* coll = nullptr;
+                if (nss->isGlobalIndex()) {
+                    // TODO SERVER-74209: Reading earlier than the minimum valid snapshot is not
+                    // supported for global indexes. It appears that the primary and secondaries
+                    // apply operations differently resulting in hash mismatches. This requires
+                    // further investigation. In the meantime, global indexes use the behaviour
+                    // prior to point-in-time lookups.
+                    coll = *it;
+
+                    if (auto readTimestamp =
+                            opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx)) {
+                        auto minSnapshot = coll->getMinimumValidSnapshot();
+                        uassert(ErrorCodes::SnapshotUnavailable,
+                                str::stream()
+                                    << "Unable to read from a snapshot due to pending collection"
+                                       " catalog changes; please retry the operation. Snapshot"
+                                       " timestamp is "
+                                    << readTimestamp->toString()
+                                    << ". Collection minimum timestamp is "
+                                    << minSnapshot->toString(),
+                                !minSnapshot || *readTimestamp >= *minSnapshot);
+                    }
+                } else {
+                    coll = catalog->establishConsistentCollection(
+                        opCtx,
+                        {dbName, uuid},
+                        opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx));
+
+                    if (!coll) {
+                        // The collection did not exist at the read timestamp with the given UUID.
+                        continue;
+                    }
+                }
+
+                (void)checkAndHashCollection(coll);
+            }
+        } else {
+            catalog::forEachCollectionFromDb(opCtx, dbName, MODE_IS, checkAndHashCollection);
+        }
 
         BSONObjBuilder bb(result.subobjStart("collections"));
         BSONArrayBuilder cappedCollections;
@@ -326,12 +404,7 @@ public:
     }
 
 private:
-    std::string _hashCollection(OperationContext* opCtx, Database* db, const NamespaceString& nss) {
-
-        CollectionPtr collection(
-            CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss));
-        invariant(collection);
-
+    std::string _hashCollection(OperationContext* opCtx, const CollectionPtr& collection) {
         boost::optional<Lock::CollectionLock> collLock;
         if (opCtx->recoveryUnit()->getTimestampReadSource() ==
             RecoveryUnit::ReadSource::kProvided) {
@@ -339,7 +412,7 @@ private:
             // intent mode. We need to also acquire the collection lock in intent mode to ensure
             // reading from the consistent snapshot doesn't overlap with any catalog operations on
             // the collection.
-            invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IS));
+            invariant(opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_IS));
 
             auto minSnapshot = collection->getMinimumVisibleSnapshot();
             auto mySnapshot = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
@@ -353,7 +426,7 @@ private:
                                   << minSnapshot->toString(),
                     !minSnapshot || *mySnapshot >= *minSnapshot);
         } else {
-            invariant(opCtx->lockState()->isDbLockedForMode(db->name(), MODE_S));
+            invariant(opCtx->lockState()->isDbLockedForMode(collection->ns().dbName(), MODE_S));
         }
 
         auto desc = collection->getIndexCatalog()->findIdIndex(opCtx);
@@ -373,7 +446,7 @@ private:
             exec = InternalPlanner::collectionScan(
                 opCtx, &collection, PlanYieldPolicy::YieldPolicy::NO_YIELD);
         } else {
-            LOGV2(20455, "Can't find _id index for namespace", "namespace"_attr = nss);
+            LOGV2(20455, "Can't find _id index for namespace", "namespace"_attr = collection->ns());
             return "no _id _index";
         }
 
@@ -381,16 +454,15 @@ private:
         md5_init(&st);
 
         try {
-            long long n = 0;
             BSONObj c;
             verify(nullptr != exec.get());
             while (exec->getNext(&c, nullptr) == PlanExecutor::ADVANCED) {
                 md5_append(&st, (const md5_byte_t*)c.objdata(), c.objsize());
-                n++;
             }
         } catch (DBException& exception) {
-            LOGV2_WARNING(
-                20456, "Error while hashing, db possibly dropped", "namespace"_attr = nss);
+            LOGV2_WARNING(20456,
+                          "Error while hashing, db possibly dropped",
+                          "namespace"_attr = collection->ns());
             exception.addContext("Plan executor error while running dbHash command");
             throw;
         }
