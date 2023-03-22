@@ -13,7 +13,6 @@
  *   # We need a timeseries collection.
  *   requires_timeseries,
  *   featureFlagTimeseriesUpdatesDeletesSupport,
- *   # TODO SERVER-75094: Enable this test.
  *   __TEMPORARILY_DISABLED__,
  * ]
  */

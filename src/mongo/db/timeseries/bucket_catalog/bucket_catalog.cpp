@@ -329,6 +329,9 @@ void directWriteStart(BucketStateRegistry& registry, const NamespaceString& ns, 
         BucketId{ns, oid},
         [](boost::optional<BucketState> input, std::uint64_t) -> boost::optional<BucketState> {
             if (input.has_value()) {
+                if (input.value().isPrepared()) {
+                    return input.value();
+                }
                 return input.value().addDirectWrite();
             }
             // The underlying bucket isn't tracked by the catalog, but we need to insert a state

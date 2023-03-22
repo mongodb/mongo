@@ -833,9 +833,7 @@ TEST_F(BucketCatalogTest, PrepareCommitOnClearedBatchWithAlreadyPreparedBatch) {
     ASSERT_EQ(batch1->bucketHandle.bucketId, batch2->bucketHandle.bucketId);
 
     // Now clear the bucket. Since there's a prepared batch it should conflict.
-    ASSERT_THROWS(directWriteStart(
-                      _bucketCatalog->bucketStateRegistry, _ns1, batch1->bucketHandle.bucketId.oid),
-                  WriteConflictException);
+    clear(*_bucketCatalog, _ns1);
 
     // Now try to prepare the second batch. Ensure it aborts the batch.
     ASSERT(claimWriteBatchCommitRights(*batch2));
@@ -844,9 +842,7 @@ TEST_F(BucketCatalogTest, PrepareCommitOnClearedBatchWithAlreadyPreparedBatch) {
     ASSERT_EQ(getWriteBatchResult(*batch2).getStatus(), ErrorCodes::TimeseriesBucketCleared);
 
     // Make sure we didn't clear the bucket state when we aborted the second batch.
-    ASSERT_THROWS(directWriteStart(
-                      _bucketCatalog->bucketStateRegistry, _ns1, batch1->bucketHandle.bucketId.oid),
-                  WriteConflictException);
+    clear(*_bucketCatalog, _ns1);
 
     // Make sure a subsequent insert, which opens a new bucket, doesn't corrupt the old bucket
     // state and prevent us from finishing the first batch.
