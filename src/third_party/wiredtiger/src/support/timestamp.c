@@ -30,7 +30,7 @@ __wt_time_point_to_string(
 {
     char ts_string[WT_TS_INT_STRING_SIZE];
 
-    WT_IGNORE_RET(__wt_snprintf(tp_string, WT_TP_STRING_SIZE, "%s/%s/%" PRIu64,
+    WT_IGNORE_RET(__wt_snprintf(tp_string, WT_TIME_STRING_SIZE, "%s/%s/%" PRIu64,
       __wt_timestamp_to_string(ts, ts_string), __wt_timestamp_to_string(durable_ts, ts_string),
       txn_id));
     return (tp_string);

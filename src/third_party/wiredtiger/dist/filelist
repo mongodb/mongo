@@ -38,6 +38,7 @@ src/btree/bt_slvg.c
 src/btree/bt_split.c
 src/btree/bt_stat.c
 src/btree/bt_sync.c
+src/btree/bt_sync_obsolete.c
 src/btree/bt_upgrade.c
 src/btree/bt_vrfy.c
 src/btree/bt_vrfy_dsk.c

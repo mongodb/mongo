@@ -3300,6 +3300,9 @@ tasks:
       - func: "format test script"
         vars:
           format_test_script_args: -e "SEGFAULT_SIGNALS=all" -b "catchsegv ./t" -S
+      - func: "format test"
+        vars:
+          extra_args: -C "verbose=(checkpoint_cleanup:1)"
 
   - name: format-asan-smoke-test
     commands:
@@ -3313,6 +3316,12 @@ tasks:
             ASAN_OPTIONS="detect_leaks=1:abort_on_error=1:disable_coredump=0:unmap_shadow_on_exit=1"
             ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer
           format_test_script_args: -S
+      - func: "format test"
+        vars:
+          test_env_vars:
+            ASAN_OPTIONS="detect_leaks=1:abort_on_error=1:disable_coredump=0:unmap_shadow_on_exit=1"
+            ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer
+          extra_args: -C "verbose=(checkpoint_cleanup:1)"
 
   - name: format-wtperf-test
     commands:
