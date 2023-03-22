@@ -25,6 +25,7 @@ The graph further down visualises the architecture of the MongoDB Sharding syste
 - [Shard role](README_sharding_catalog.md#router-role)
 - [Shard versioning protocol](README_versioning_protocols.md)
 - [Balancer](README_balancer.md)
+- [Migrations](README_migrations.md)
 
 ```mermaid
 C4Component
