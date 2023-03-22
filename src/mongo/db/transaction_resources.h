@@ -158,7 +158,7 @@ struct TransactionResources {
 
     ~TransactionResources();
 
-    const AcquiredCollection& addAcquiredCollection(AcquiredCollection&& acquiredCollection) {
+    AcquiredCollection& addAcquiredCollection(AcquiredCollection&& acquiredCollection) {
         return acquiredCollections.emplace_back(std::move(acquiredCollection));
     }
 

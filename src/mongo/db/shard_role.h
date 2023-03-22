@@ -180,12 +180,25 @@ public:
     ~ScopedCollectionAcquisition();
 
     ScopedCollectionAcquisition(OperationContext* opCtx,
-                                const shard_role_details::AcquiredCollection& acquiredCollection)
+                                shard_role_details::AcquiredCollection& acquiredCollection)
         : _opCtx(opCtx), _acquiredCollection(acquiredCollection) {}
 
     const NamespaceString& nss() const {
         return _acquiredCollection.prerequisites.nss;
     }
+
+    /**
+     * Returns whether the acquisition found a collection or the collection didn't exist.
+     */
+    bool exists() const {
+        return bool(_acquiredCollection.prerequisites.uuid);
+    }
+
+    /**
+     * Returns the UUID of the acquired collection, but this operation is only allowed if the
+     * collection `exists()`, otherwise this method will invariant.
+     */
+    const UUID& uuid() const;
 
     // Access to services associated with the specified collection top to bottom on the hierarchical
     // stack
@@ -202,12 +215,14 @@ public:
     }
 
 private:
+    friend class ScopedLocalCatalogWriteFence;
+
     OperationContext* _opCtx;
 
     // Points to the acquired resources that live on the TransactionResources opCtx decoration. The
     // lifetime of these resources is tied to the lifetime of this
     // ScopedCollectionOrViewAcquisition.
-    const shard_role_details::AcquiredCollection& _acquiredCollection;
+    shard_role_details::AcquiredCollection& _acquiredCollection;
 };
 
 class ScopedViewAcquisition {
@@ -284,6 +299,38 @@ std::vector<ScopedCollectionOrViewAcquisition> acquireCollectionsOrViewsWithoutT
  */
 ScopedCollectionAcquisition acquireCollectionForLocalCatalogOnlyWithPotentialDataLoss(
     OperationContext* opCtx, const NamespaceString& nss, LockMode mode);
+
+/**
+ * This utility is what allows modifications to the local catalog part of an acquisition for a
+ * specific collection to become visible on a previously established acquisition for that
+ * collection, before or after the end of a WUOW.
+ *
+ * The presence of ScopedLocalCatalogWriteFence on the stack renders the collection for which it was
+ * instantiated unusable within its scope. Once it goes out of scope, any changes performed to the
+ * catalog collection will be visible to:
+ *  - The transaction only, if the WUOW has not yet committed
+ *  - Any subsequent collection acquisitions, when the WUOW commits
+ *
+ * NOTE: This utility by itself does not ensure that catalog modifications which are subordinate to
+ * the placement concern (create collection is subordinate to the location of the DB primary, for
+ * example) do not conflict with placement changes (e.g. movePrimary). This is currently implemented
+ * at a higher level through the usage of DB/Collection X-locks.
+ */
+class ScopedLocalCatalogWriteFence {
+public:
+    ScopedLocalCatalogWriteFence(OperationContext* opCtx, ScopedCollectionAcquisition* acquisition);
+    ~ScopedLocalCatalogWriteFence();
+
+    ScopedLocalCatalogWriteFence(ScopedLocalCatalogWriteFence&) = delete;
+    ScopedLocalCatalogWriteFence(ScopedLocalCatalogWriteFence&&) = delete;
+
+private:
+    static void _updateAcquiredLocalCollection(
+        OperationContext* opCtx, shard_role_details::AcquiredCollection* acquiredCollection);
+
+    OperationContext* _opCtx;
+    shard_role_details::AcquiredCollection* _acquiredCollection;
+};
 
 /**
  * Serves as a temporary container for transaction resources which have been yielded via a call to

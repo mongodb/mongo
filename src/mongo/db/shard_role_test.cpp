@@ -192,7 +192,6 @@ void ShardRoleTest::setUp() {
     // Create nssShardedCollection1
     createTestCollection(opCtx(), nssShardedCollection1);
     const auto uuidShardedCollection1 = getCollectionUUID(_opCtx.get(), nssShardedCollection1);
-    installDatabaseMetadata(opCtx(), dbNameTestDb, dbVersionTestDb);
     installShardedCollectionMetadata(
         opCtx(),
         nssShardedCollection1,
@@ -1187,6 +1186,125 @@ TEST_F(ShardRoleTest, RestoreForReadFailsIfCollectionIsNowAView) {
 }
 TEST_F(ShardRoleTest, RestoreForWriteFailsIfCollectionIsNowAView) {
     testRestoreFailsIfCollectionIsNowAView(AcquisitionPrerequisites::kWrite);
+}
+
+// ---------------------------------------------------------------------------
+// ScopedLocalCatalogWriteFence
+
+TEST_F(ShardRoleTest, ScopedLocalCatalogWriteFenceWUOWCommitWithinWriterScope) {
+    auto acquisition = acquireCollection(opCtx(),
+                                         {nssShardedCollection1,
+                                          PlacementConcern{{}, shardVersionShardedCollection1},
+                                          repl::ReadConcernArgs(),
+                                          AcquisitionPrerequisites::kRead},
+                                         MODE_X);
+    ASSERT(!acquisition.getCollectionPtr()->isTemporary());
+
+    {
+        WriteUnitOfWork wuow(opCtx());
+        CollectionWriter localCatalogWriter(opCtx(), &acquisition);
+        localCatalogWriter.getWritableCollection(opCtx())->setIsTemp(opCtx(), true);
+        wuow.commit();
+    }
+
+    ASSERT(acquisition.getCollectionPtr()->isTemporary());
+}
+
+TEST_F(ShardRoleTest, ScopedLocalCatalogWriteFenceWUOWCommitAfterWriterScope) {
+    auto acquisition = acquireCollection(opCtx(),
+                                         {nssShardedCollection1,
+                                          PlacementConcern{{}, shardVersionShardedCollection1},
+                                          repl::ReadConcernArgs(),
+                                          AcquisitionPrerequisites::kRead},
+                                         MODE_X);
+    ASSERT(!acquisition.getCollectionPtr()->isTemporary());
+
+    WriteUnitOfWork wuow(opCtx());
+    {
+        CollectionWriter localCatalogWriter(opCtx(), &acquisition);
+        localCatalogWriter.getWritableCollection(opCtx())->setIsTemp(opCtx(), true);
+    }
+    ASSERT(acquisition.getCollectionPtr()->isTemporary());
+    wuow.commit();
+    ASSERT(acquisition.getCollectionPtr()->isTemporary());
+}
+
+TEST_F(ShardRoleTest, ScopedLocalCatalogWriteFenceWUOWRollbackWithinWriterScope) {
+    auto acquisition = acquireCollection(opCtx(),
+                                         {nssShardedCollection1,
+                                          PlacementConcern{{}, shardVersionShardedCollection1},
+                                          repl::ReadConcernArgs(),
+                                          AcquisitionPrerequisites::kRead},
+                                         MODE_X);
+    ASSERT(!acquisition.getCollectionPtr()->isTemporary());
+
+    {
+        WriteUnitOfWork wuow(opCtx());
+        CollectionWriter localCatalogWriter(opCtx(), &acquisition);
+        localCatalogWriter.getWritableCollection(opCtx())->setIsTemp(opCtx(), true);
+    }
+    ASSERT(!acquisition.getCollectionPtr()->isTemporary());
+}
+
+TEST_F(ShardRoleTest, ScopedLocalCatalogWriteFenceWUOWRollbackAfterWriterScope) {
+    auto acquisition = acquireCollection(opCtx(),
+                                         {nssShardedCollection1,
+                                          PlacementConcern{{}, shardVersionShardedCollection1},
+                                          repl::ReadConcernArgs(),
+                                          AcquisitionPrerequisites::kRead},
+                                         MODE_X);
+    ASSERT(!acquisition.getCollectionPtr()->isTemporary());
+
+    {
+        WriteUnitOfWork wuow(opCtx());
+        {
+            CollectionWriter localCatalogWriter(opCtx(), &acquisition);
+            localCatalogWriter.getWritableCollection(opCtx())->setIsTemp(opCtx(), true);
+        }
+        ASSERT(acquisition.getCollectionPtr()->isTemporary());
+    }
+    ASSERT(!acquisition.getCollectionPtr()->isTemporary());
+}
+
+TEST_F(ShardRoleTest, ScopedLocalCatalogWriteFenceOutsideWUOUCommit) {
+    auto acquisition = acquireCollection(opCtx(),
+                                         {nssShardedCollection1,
+                                          PlacementConcern{{}, shardVersionShardedCollection1},
+                                          repl::ReadConcernArgs(),
+                                          AcquisitionPrerequisites::kRead},
+                                         MODE_X);
+    ASSERT(!acquisition.getCollectionPtr()->isTemporary());
+
+    {
+        CollectionWriter localCatalogWriter(opCtx(), &acquisition);
+        WriteUnitOfWork wuow(opCtx());
+        localCatalogWriter.getWritableCollection(opCtx())->setIsTemp(opCtx(), true);
+        ASSERT(localCatalogWriter->isTemporary());
+        wuow.commit();
+        ASSERT(localCatalogWriter->isTemporary());
+    }
+    ASSERT(acquisition.getCollectionPtr()->isTemporary());
+}
+
+TEST_F(ShardRoleTest, ScopedLocalCatalogWriteFenceOutsideWUOURollback) {
+    auto acquisition = acquireCollection(opCtx(),
+                                         {nssShardedCollection1,
+                                          PlacementConcern{{}, shardVersionShardedCollection1},
+                                          repl::ReadConcernArgs(),
+                                          AcquisitionPrerequisites::kRead},
+                                         MODE_X);
+    ASSERT(!acquisition.getCollectionPtr()->isTemporary());
+
+    {
+        CollectionWriter localCatalogWriter(opCtx(), &acquisition);
+        {
+            WriteUnitOfWork wuow(opCtx());
+            localCatalogWriter.getWritableCollection(opCtx())->setIsTemp(opCtx(), true);
+            ASSERT(localCatalogWriter->isTemporary());
+        }
+        ASSERT(!localCatalogWriter->isTemporary());
+    }
+    ASSERT(!acquisition.getCollectionPtr()->isTemporary());
 }
 
 }  // namespace
