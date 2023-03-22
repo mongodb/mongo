@@ -148,10 +148,10 @@ void CollectionQueryInfo::computeIndexKeys(OperationContext* opCtx, const Collec
         // handle partial indexes
         const MatchExpression* filter = entry->getFilterExpression();
         if (filter) {
-            stdx::unordered_set<std::string> paths;
+            RelevantFieldIndexMap paths;
             QueryPlannerIXSelect::getFields(filter, &paths);
             for (auto it = paths.begin(); it != paths.end(); ++it) {
-                _indexedPaths.addPath(FieldRef(*it));
+                _indexedPaths.addPath(FieldRef(it->first));
             }
         }
     }

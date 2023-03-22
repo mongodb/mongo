@@ -55,6 +55,26 @@ public:
     }
 
     /**
+     * Type bracketing does not apply to internal Expressions. This could cause the use of a sparse
+     * index return incomplete results. For example, a query {$expr: {$lt: ["$missing", "r"]}} would
+     * expect a document like, {a: 1}, with field "missing" missing be returned. However, a sparse
+     * index, {missing: 1} does not index the document. Therefore, we should ban use of any sparse
+     * index on following expression types.
+     */
+    static bool nodeSupportedBySparseIndex(const MatchExpression* me) {
+        switch (me->matchType()) {
+            case MatchExpression::INTERNAL_EXPR_EQ:
+            case MatchExpression::INTERNAL_EXPR_GT:
+            case MatchExpression::INTERNAL_EXPR_GTE:
+            case MatchExpression::INTERNAL_EXPR_LT:
+            case MatchExpression::INTERNAL_EXPR_LTE:
+                return false;
+            default:
+                return true;
+        }
+    }
+
+    /**
      * This array operator doesn't have any children with fields and can use an index.
      *
      * Example: a: {$elemMatch: {$gte: 1, $lte: 1}}.
