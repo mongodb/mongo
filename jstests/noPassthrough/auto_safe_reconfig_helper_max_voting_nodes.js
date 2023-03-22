@@ -11,6 +11,15 @@
 
 load("jstests/replsets/rslib.js");
 
+function waitAllNodesHaveConfig(replTest, config) {
+    replTest.nodes.forEach(function(node) {
+        assert.soon(function() {
+            const nodeConfig = replTest.getReplSetConfigFromNode(node.nodeId);
+            return isSameConfigContent(config, nodeConfig);
+        });
+    });
+}
+
 // Make secondaries unelectable. Add 7 voting nodes, which is the maximum allowed.
 const replTest = new ReplSetTest({
     nodes: [
@@ -79,5 +88,8 @@ m7.votes = 0;
 m7.priority = 0;
 config.members = [m0, m1, m2, m3, m4, m5, m6, m7];
 reconfig(replTest, config);
+// There is a chance that some nodes haven't finished reconfig, if we directly call stopSet, those
+// nodes may fail to answer certain commands and fail the test.
+waitAllNodesHaveConfig(replTest, config);
 replTest.stopSet();
 })();

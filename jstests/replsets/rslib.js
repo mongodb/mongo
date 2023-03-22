@@ -17,6 +17,7 @@ var setLogVerbosity;
 var stopReplicationAndEnforceNewPrimaryToCatchUp;
 var isConfigCommitted;
 var assertSameConfigContent;
+var isSameConfigContent;
 var getConfigWithNewlyAdded;
 var isMemberNewlyAdded;
 var waitForNewlyAddedRemovalForNodeToBeCommitted;
@@ -741,19 +742,28 @@ isConfigCommitted = function(node) {
  * 'term' field.
  */
 assertSameConfigContent = function(configA, configB) {
+    assert(isSameConfigContent(configA, configB));
+};
+
+/**
+ * Returns true if replica set config A is the same as replica set config B ignoring the 'version'
+ * and 'term' field.
+ */
+isSameConfigContent = function(configA, configB) {
     // Save original versions and terms.
     const [versionA, termA] = [configA.version, configA.term];
     const [versionB, termB] = [configB.version, configB.term];
 
     configA.version = configA.term = 0;
     configB.version = configB.term = 0;
-    assert.eq(configA, configB);
+    const isEqual = tojson(configA) === tojson(configB);
 
     // Reset values so we don't modify the original objects.
     configA.version = versionA;
     configA.term = termA;
     configB.version = versionB;
     configB.term = termB;
+    return isEqual;
 };
 
 /**
