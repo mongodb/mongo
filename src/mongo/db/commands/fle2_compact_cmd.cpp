@@ -44,9 +44,11 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/fail_point.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
+MONGO_FAIL_POINT_DEFINE(fleCompactHangBeforeECOCCreateUnsharded);
 
 namespace mongo {
 namespace {
@@ -115,12 +117,26 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
     }
 
     if (!ecoc) {
+        if (MONGO_unlikely(fleCompactHangBeforeECOCCreateUnsharded.shouldFail())) {
+            LOGV2(7299601, "Hanging due to fleCompactHangBeforeECOCCreateUnsharded fail point");
+            fleCompactHangBeforeECOCCreateUnsharded.pauseWhileSet();
+        }
+
         // create ECOC
         CreateCommand createCmd(namespaces.ecocNss);
         mongo::ClusteredIndexSpec clusterIdxSpec(BSON("_id" << 1), true);
         createCmd.setClusteredIndex(
             stdx::variant<bool, mongo::ClusteredIndexSpec>(std::move(clusterIdxSpec)));
-        uassertStatusOK(createCollection(opCtx, createCmd));
+        auto status = createCollection(opCtx, createCmd);
+        if (!status.isOK()) {
+            if (status != ErrorCodes::NamespaceExists) {
+                uassertStatusOK(status);
+            }
+            LOGV2_DEBUG(7299602,
+                        1,
+                        "Create collection failed because namespace already exists",
+                        "namespace"_attr = namespaces.ecocNss);
+        }
     }
 
     // Step 2: for each encrypted field in compactionTokens, get distinct set of entries 'C'

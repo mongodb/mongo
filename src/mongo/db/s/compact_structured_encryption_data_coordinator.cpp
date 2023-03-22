@@ -60,11 +60,11 @@ const auto kMajorityWriteConcern = BSON("writeConcern" << BSON("w"
  * using majority write concern.
  */
 template <typename Request>
-void doRunCommand(OperationContext* opCtx, StringData dbname, const Request& request) {
+Status doRunCommand(OperationContext* opCtx, StringData dbname, const Request& request) {
     DBDirectClient client(opCtx);
     BSONObj cmd = request.toBSON(kMajorityWriteConcern);
     auto reply = client.runCommand(OpMsgRequest::fromDBAndBody(dbname, cmd))->getCommandReply();
-    uassertStatusOK(getStatusFromCommandResult(reply));
+    return getStatusFromCommandResult(reply);
 }
 
 void doRenameOperation(const CompactStructuredEncryptionDataState& state,
@@ -151,7 +151,7 @@ void doRenameOperation(const CompactStructuredEncryptionDataState& state,
         cmd.setDropTarget(false);
         cmd.setCollectionUUID(state.getEcocUuid().value());
 
-        doRunCommand(opCtx.get(), ecocNss.db(), cmd);
+        uassertStatusOK(doRunCommand(opCtx.get(), ecocNss.db(), cmd));
         *newEcocRenameUuid = state.getEcocUuid();
     }
 
@@ -165,7 +165,16 @@ void doRenameOperation(const CompactStructuredEncryptionDataState& state,
     mongo::ClusteredIndexSpec clusterIdxSpec(BSON("_id" << 1), true);
     createCmd.setClusteredIndex(
         stdx::variant<bool, mongo::ClusteredIndexSpec>(std::move(clusterIdxSpec)));
-    doRunCommand(opCtx.get(), ecocNss.db(), createCmd);
+    auto status = doRunCommand(opCtx.get(), ecocNss.db(), createCmd);
+    if (!status.isOK()) {
+        if (status != ErrorCodes::NamespaceExists) {
+            uassertStatusOK(status);
+        }
+        LOGV2_DEBUG(7299603,
+                    1,
+                    "Create collection failed because namespace already exists",
+                    "namespace"_attr = ecocNss);
+    }
 
     if (MONGO_unlikely(fleCompactHangAfterECOCCreate.shouldFail())) {
         LOGV2(7140501, "Hanging due to fleCompactHangAfterECOCCreate fail point");
@@ -216,7 +225,7 @@ void doDropOperation(const CompactStructuredEncryptionDataState& state) {
 
     Drop cmd(ecocNss);
     cmd.setCollectionUUID(state.getEcocRenameUuid().value());
-    doRunCommand(opCtx.get(), ecocNss.db(), cmd);
+    uassertStatusOK(doRunCommand(opCtx.get(), ecocNss.db(), cmd));
 }
 
 }  // namespace
