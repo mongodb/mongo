@@ -184,7 +184,7 @@ which can be re-loaded into a new table using the \c load command.
 See @subpage dump_formats for details of the dump file formats.
 
 @subsection util_dump_synopsis Synopsis
-`wt [-BLmRrSVv] [-C config] [-E secretkey ] [-h directory] dump [-jknprx] [-c checkpoint] [-f output] [-t timestamp] uri`
+`wt [-BLmRrSVv] [-C config] [-E secretkey ] [-h directory] dump [-jnprx] [-c checkpoint] [-f output] [-l lower bound] [-t timestamp] [-u upper bound] uri`
 
 @subsection util_dump_options Options
 The following are command-specific options for the \c dump command:
@@ -205,6 +205,9 @@ format.
 @par \c -k
 The specific key to look for in the format of the data packed into key items.
 
+@par \c -l
+The lower bound of the key range to dump.
+
 @par \c -n
 If the requested key (see the \c -k option) cannot be found, return the key retrieved by \c search_near.
 
@@ -220,6 +223,12 @@ Dump in reverse order, from largest key to smallest.
 By default, the \c dump command opens the most recent version of the data
 source; the \c -t option changes the \c dump command to dump as of the specified
 timestamp.
+
+@par \c -u
+The upper bound of the key range to dump.
+
+@par \c -w
+Dump n records before and after the record sought.
 
 @par \c -x
 Dump all characters in a hexadecimal encoding (the default is to leave

@@ -40,7 +40,8 @@ class test_dump(wttest.WiredTigerTestCase, suite_subprocess):
     uri = 'table:test_dump'
     output = 'dump.out'
     data_header = 'Data\n'
-
+    # First line is the key, second line is the value.
+    lines_per_record = 2
     n_rows = 100
 
     def gen_key(self, i):
@@ -69,8 +70,7 @@ class test_dump(wttest.WiredTigerTestCase, suite_subprocess):
         self.populate_table(self.uri, self.n_rows)
 
         self.runWt(['dump', self.uri], outfilename=self.output)
-        assert self.get_num_data_lines_from_dump(self.output) == (self.n_rows - 1) * 2
-
+        assert self.get_num_data_lines_from_dump(self.output) == (self.n_rows - 1) * self.lines_per_record
 
     def test_dump_single_key(self):
         self.session.create(self.uri, self.table_format)
@@ -84,12 +84,31 @@ class test_dump(wttest.WiredTigerTestCase, suite_subprocess):
         # The nearest key should be found.
         self.runWt(['dump', '-k', 'key0', '-n', self.uri], outfilename=self.output)
         num_lines = self.get_num_data_lines_from_dump(self.output)
-        assert num_lines == 2, num_lines
+        assert num_lines == self.lines_per_record, num_lines
 
         # Existing key.
         self.runWt(['dump', '-k', 'key1', self.uri], outfilename=self.output)
         num_lines = self.get_num_data_lines_from_dump(self.output)
-        assert num_lines == 2, num_lines
+        assert num_lines == self.lines_per_record, num_lines
+
+    def test_dump_bounds(self):
+        self.session.create(self.uri, self.table_format)
+        self.populate_table(self.uri, self.n_rows)
+
+        # Expect half of the keys: 50 to 99, as well as the keys 6, 7, 8 and 9.
+        self.runWt(['dump', '-l', 'key50', self.uri], outfilename=self.output)
+        num_lines = self.get_num_data_lines_from_dump(self.output)
+        assert num_lines == (self.n_rows / 2) * self.lines_per_record + (4 * self.lines_per_record), num_lines
+
+        # Expect 3 keys.
+        self.runWt(['dump', '-u', 'key11', self.uri], outfilename=self.output)
+        num_lines = self.get_num_data_lines_from_dump(self.output)
+        assert num_lines == 3 * self.lines_per_record, num_lines
+
+        # Expect 10 keys.
+        self.runWt(['dump', '-l', 'key50', '-u', 'key59', self.uri], outfilename=self.output)
+        num_lines = self.get_num_data_lines_from_dump(self.output)
+        assert num_lines == 10 * self.lines_per_record, num_lines
 
 if __name__ == '__main__':
     wttest.run()
