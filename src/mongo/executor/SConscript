@@ -330,6 +330,17 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='inline_executor',
+    source=[
+        'inline_executor.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        'task_executor_interface',
+    ],
+)
+
 env.CppUnitTest(
     target='executor_test',
     source=[
@@ -339,6 +350,7 @@ env.CppUnitTest(
         'connection_pool_test_fixture.cpp',
         'hedged_async_rpc_test.cpp',
         'hedge_options_util_test.cpp',
+        'inline_executor_test.cpp',
         'mock_async_rpc_test.cpp',
         'mock_network_fixture_test.cpp',
         'network_interface_mock_test.cpp',
@@ -365,6 +377,7 @@ env.CppUnitTest(
         'egress_tag_closer_manager',
         'hedge_options_util',
         'hedging_metrics',
+        'inline_executor',
         'network_interface_mock',
         'network_interface_tl',
         'network_test_env',
