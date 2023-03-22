@@ -145,3 +145,8 @@ feature_flags:
       description: "Feature flag to enable using SBE for a larger number of queries"
       cpp_varname: gFeatureFlagSbeFull
       default: false
+
+    featureFlagShardedSearchCustomSort:
+      description: "Feature flag to enable user specified sort for sharded $search queries."
+      cpp_varname: gFeatureFlagShardedSearchCustomSort
+      default: false
