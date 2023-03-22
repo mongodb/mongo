@@ -51,21 +51,18 @@ def get_auth_token(storage_source):
         auth_token = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
     return auth_token
 
-# Get buckets configured for the storage source
-
-# S3 buckets with their regions
-s3_buckets = ['s3testext-us;us-east-2', 's3testext;ap-southeast-2']
-
-# Local buckets do not have a region
-local_buckets = ['bucket1', 'bucket2']
+# Buckets configured for the storage source.
+buckets = {
+    # S3 buckets requires a region.
+    "s3_store": ['s3testext-us;us-east-2', 's3testext;ap-southeast-2'],
+    "dir_store": ['bucket1', 'bucket2'],
+    "gcp_store": ["gcptestext-us-jie", "gcptestext-ap-jie"],
+    "azure_store": ["azuretestext-us", "azuretestext-ap"]
+}
 
 # Get name of the bucket at specified index in the list.
 def get_bucket_name(storage_source, i):
-    if storage_source == 's3_store':
-        return s3_buckets[i]
-    if storage_source == 'dir_store':
-        return local_buckets[i]
-    return None
+    return buckets[storage_source][i]
 
 # Set up configuration
 def get_conn_config(storage_source):
@@ -101,7 +98,7 @@ def get_check(storage_source, tc, base, n):
     storage_source.assertEquals(tc.search(), wiredtiger.WT_NOTFOUND)
 
 # Generate a unique object prefix for the S3 store. 
-def generate_s3_prefix(random_prefix = '', test_name = ''):
+def generate_prefix(random_prefix = '', test_name = ''):
     # Generates a unique prefix to be used with the object keys, eg:
     # "s3test/python/2022-31-01-16-34-10/623843294--".
     # Objects with the prefix pattern "s3test/*" are deleted after a certain period of time 
@@ -127,9 +124,10 @@ def generate_s3_prefix(random_prefix = '', test_name = ''):
 
 def gen_tiered_storage_sources(random_prefix='', test_name='', tiered_only=False, tiered_shared=False):
     tiered_storage_sources = [
-        ('dirstore', dict(is_tiered = True,
+        ('dir_store', dict(is_tiered = True,
             is_tiered_shared = tiered_shared,
             is_local_storage = True,
+            has_cache = True,
             auth_token = get_auth_token('dir_store'),
             bucket = get_bucket_name('dir_store', 0),
             bucket1 = get_bucket_name('dir_store', 1),
@@ -141,21 +139,47 @@ def gen_tiered_storage_sources(random_prefix='', test_name='', tiered_only=False
         ('s3', dict(is_tiered = True,
             is_tiered_shared = tiered_shared,
             is_local_storage = False,
+            has_cache = True,
             auth_token = get_auth_token('s3_store'),
             bucket = get_bucket_name('s3_store', 0),
             bucket1 = get_bucket_name('s3_store', 1),
-            bucket_prefix = generate_s3_prefix(random_prefix, test_name),
-            bucket_prefix1 = generate_s3_prefix(random_prefix, test_name),
-            bucket_prefix2 = generate_s3_prefix(random_prefix, test_name),
+            bucket_prefix = generate_prefix(random_prefix, test_name),
+            bucket_prefix1 = generate_prefix(random_prefix, test_name),
+            bucket_prefix2 = generate_prefix(random_prefix, test_name),
             num_ops=20,
             ss_name = 's3_store')),
+        ('gcp_store', dict(is_tiered = True,
+            is_tiered_shared = tiered_shared,
+            is_local_storage = False,
+            has_cache = False,
+            auth_token = get_auth_token('gcp_store'),
+            bucket = get_bucket_name('gcp_store', 0),
+            bucket1 = get_bucket_name('gcp_store', 1),
+            bucket_prefix = generate_prefix(random_prefix, test_name),
+            bucket_prefix1 = generate_prefix(random_prefix, test_name),
+            bucket_prefix2 = generate_prefix(random_prefix, test_name),
+            num_ops=100,
+            ss_name = 'gcp_store')),
+        ('azure_store', dict(is_tiered = True,
+            is_tiered_shared = tiered_shared,
+            is_local_storage = False,
+            has_cache = False,
+            auth_token = "",
+            bucket = get_bucket_name('azure_store', 0),
+            bucket1 = get_bucket_name('azure_store', 1),
+            bucket_prefix = generate_prefix(random_prefix, test_name),
+            bucket_prefix1 = generate_prefix(random_prefix, test_name),
+            bucket_prefix2 = generate_prefix(random_prefix, test_name),
+            num_ops=100,
+            ss_name = 'azure_store')),
+        # This must be the last item as we seperate the non-tiered from the tiered items later on.
         ('non_tiered', dict(is_tiered = False)),
     ]
 
     # Return a sublist to use for the tiered test scenarios as last item on list is not a scenario
     # for the tiered tests.  
     if tiered_only:
-        return tiered_storage_sources[:2]
+        return tiered_storage_sources[:-1]
 
     return tiered_storage_sources
 

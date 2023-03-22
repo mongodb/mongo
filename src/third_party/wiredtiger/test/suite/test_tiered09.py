@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import os, wiredtiger, wttest
-from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources, get_conn_config, get_check, generate_s3_prefix
+from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources, get_conn_config, get_check
 from wtscenario import make_scenarios
 StorageSource = wiredtiger.StorageSource  # easy access to constants
 

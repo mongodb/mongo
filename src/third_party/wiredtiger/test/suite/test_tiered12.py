@@ -92,8 +92,9 @@ class test_tiered12(wttest.WiredTigerTestCase, TieredConfigMixin):
         # Sleep more than the one second stress timing amount and give the thread time to run.
         time.sleep(2)
         # After sleeping, the internal thread should have created the cached object.
-        cache_obj = os.path.join(cache, self.bucket_prefix + self.obj1file)
-        self.assertTrue(os.path.exists(cache_obj))
+        if self.has_cache:
+            cache_obj = os.path.join(cache, self.bucket_prefix + self.obj1file)
+            self.assertTrue(os.path.exists(cache_obj))
 
 if __name__ == '__main__':
     wttest.run()

@@ -231,6 +231,25 @@ functions:
         script: |
           set -o errexit
 
+          # Set the Azure credentials using config variable.
+          export AZURE_STORAGE_CONNECTION_STRING="${azure_sdk_ext_access_key}"
+
+          # GCP requires a path to a credentials file for authorization. To not expose the private
+          # information within the file, we use a placeholder private variable which are replaced 
+          # in the command line with the evergreen expansion variables and stored in a temporary 
+          # file.
+          file=$(mktemp --suffix ".json")
+
+          # Use '|' as the delimiter instead of default behaviour because the private key contains
+          # slash characters.
+          sed -e 's|gcp_project_id|${gcp_sdk_ext_project_id}|'                      \
+              -e 's|gcp_private_key|'"${gcp_sdk_ext_private_key}"'|'                \
+              -e 's|gcp_private_id|${gcp_sdk_ext_private_key_id}|'                  \
+              -e 's|gcp_client_email|${gcp_sdk_ext_client_email}|'                  \
+              -e 's|gcp_client_id|${gcp_sdk_ext_client_id}|'                        \
+              -e 's|gcp_client_x509_cert_url|${gcp_sdk_ext_client_x509_cert_url}|'  ../test/evergreen/gcp_auth.json > $file
+          export GOOGLE_APPLICATION_CREDENTIALS="$file"
+
           virtualenv -p python3 venv
           source venv/bin/activate
           pip3 install boto3
@@ -2961,13 +2980,20 @@ tasks:
           display_name: " 1 Coverage report main page"
           remote_file: wiredtiger/${build_variant}/${revision}/coverage_report_${build_id}-${execution}/1_coverage_report_main.html
 
-  - name: tiered-storage-extensions-test
+  - name: s3-tiered-storage-extensions-test
     tags: ["python"]
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
         vars:
           <<: *configure_flags_tiered_storage_s3
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/cmake_build"
+          shell: bash
+          script: |
+            set -o errexit
+            set -o verbose
       - func: "run tiered storage test"
         vars:
           # Set this in case of a core to get the correct python binary.
@@ -3006,46 +3032,39 @@ tasks:
 
             # Run S3 extension unit testing.
             ext/storage_sources/s3_store/test/run_s3_unit_tests
-  - name: azure-tiered-unittest-test
-    tags: ["tiered_unittest"]
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
-        vars:
-          <<: *configure_flags_tiered_storage_azure
-          HAVE_UNITTEST: -DHAVE_UNITTEST=1
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build"
-          shell: bash
-          include_expansions_in_env:
-            - azure_sdk_ext_access_key
-          script: |
-            set -o errexit
-            # Set the Azure credentials using config variable.
-            export AZURE_STORAGE_CONNECTION_STRING="${azure_sdk_ext_access_key}"
-            set -o verbose
-
-            # Run Azure extension unit testing.
-            ext/storage_sources/azure_store/test/run_azure_unit_tests
-  - name: gcp-tiered-unittest-test
-    tags: ["tiered_unittest"]
+  - name: azure-gcp-tiered-storage-extensions-test
+    tags: ["python"]
     commands:
       - func: "get project"
       - func: "install gcp dependencies"
       - func: "compile wiredtiger"
         vars:
+          <<: *configure_flags_tiered_storage_azure
+          <<: *configure_flags_tiered_storage_gcp
+      - func: "run tiered storage test"
+        vars:
+          # Set this in case of a core to get the correct python binary.
+          python_binary: $(pwd)/venv/bin/python3
+          tiered_storage_test_name: tiered
+  - name: azure-gcp-tiered-unittest-test
+    tags: ["pull_request", "tiered_unittest"]
+    commands:
+      - func: "get project"
+      - func: "install gcp dependencies"
+      - func: "compile wiredtiger"
+        vars:
+          <<: *configure_flags_tiered_storage_azure
           <<: *configure_flags_tiered_storage_gcp
           HAVE_UNITTEST: -DHAVE_UNITTEST=1
       - command: shell.exec
         params:
           working_dir: "wiredtiger/cmake_build"
           shell: bash
-          include_expansions_in_env:
-            - gcp_sdk_ext_private_key
-            - gcp_sdk_ext_private_key_id
-          script: | 
+          script: |
             set -o errexit
+            # Set the Azure credentials using config variable.
+            export AZURE_STORAGE_CONNECTION_STRING="${azure_sdk_ext_access_key}"
+            
             # GCP requires a path to a credentials file for authorization. To not expose the private
             # information within the file, we use a placeholder private variable which are replaced 
             # in the command line with the evergreen expansion variables and stored in a temporary 
@@ -3063,64 +3082,23 @@ tasks:
             export GOOGLE_APPLICATION_CREDENTIALS="$file"
             set -o verbose
 
-            # Run GCP extension unit testing.
-            ext/storage_sources/gcp_store/test/run_gcp_unit_tests
-  - name: azure-tiered-test-small
-    tags: ["python"]
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
-        vars:
-          <<: *configure_flags_tiered_storage_azure
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build"
-          shell: bash
-          include_expansions_in_env:
-            - azure_sdk_ext_access_key
-          script: |
-            set -o errexit
-            # Set the Azure credentials using config variable.
-            export AZURE_STORAGE_CONNECTION_STRING="${azure_sdk_ext_access_key}"
-            set -o verbose
+            # Run Azure extension unit testing.
+            ext/storage_sources/azure_store/test/run_azure_unit_tests
 
-            ${test_env_vars|} python3 ../test/suite/run.py -j $(nproc) tiered19
-  - name: gcp-tiered-test-small
-    tags: ["python"]
+  - name: azure-gcp-tiered-test-small
+    tags: ["pull_request", "python"]
     commands:
       - func: "get project"
       - func: "install gcp dependencies"
       - func: "compile wiredtiger"
         vars:
+          <<: *configure_flags_tiered_storage_azure
           <<: *configure_flags_tiered_storage_gcp
-      - command: shell.exec
-        params:
-          working_dir: "wiredtiger/cmake_build"
-          shell: bash
-          include_expansions_in_env:
-            - gcp_sdk_ext_private_key
-            - gcp_sdk_ext_private_key_id
-          script: |
-            set -o errexit
-            # GCP requires a path to a credentials file for authorization. To not expose the private
-            # information within the file, we use a placeholder private variable which are replaced 
-            # in the command line with the evergreen expansion variables and stored in a temporary 
-            # file.
-            file=$(mktemp --suffix ".json")
-
-            # Use '|' as the delimiter instead of default behaviour because the private key contains
-            # slash characters.
-            sed -e 's|gcp_project_id|${gcp_sdk_ext_project_id}|'                      \
-                -e 's|gcp_private_key|'"${gcp_sdk_ext_private_key}"'|'                \
-                -e 's|gcp_private_id|${gcp_sdk_ext_private_key_id}|'                  \
-                -e 's|gcp_client_email|${gcp_sdk_ext_client_email}|'                  \
-                -e 's|gcp_client_id|${gcp_sdk_ext_client_id}|'                        \
-                -e 's|gcp_client_x509_cert_url|${gcp_sdk_ext_client_x509_cert_url}|'  \
-                ../test/evergreen/gcp_auth.json > $file       
-            export GOOGLE_APPLICATION_CREDENTIALS="$file"
-            set -o verbose
-
-            ${test_env_vars|} python3 ../test/suite/run.py -j $(nproc) tiered19
+      - func: "run tiered storage test"
+        vars:
+          # Set this in case of a core to get the correct python binary.
+          python_binary: $(pwd)/venv/bin/python3
+          tiered_storage_test_name: tiered06
 
   - name: spinlock-gcc-test
     commands:
@@ -5028,7 +5006,8 @@ buildvariants:
     - name: format-failure-configs-test
     - name: ".data-validation-stress-test"
     - name: unittest-test
-    - name: tiered-storage-extensions-test
+    - name: s3-tiered-storage-extensions-test
+    - name: azure-gcp-tiered-storage-extensions-test
     - name: bench-tiered-push-pull
     - name: compile-nonstandalone
     - name: make-check-nonstandalone
@@ -5038,8 +5017,6 @@ buildvariants:
     - name: ".data-validation-stress-test-nonstandalone"
     - name: unittest-assertions
     - name: ".tiered_unittest"
-    - name: azure-tiered-test-small
-    - name: gcp-tiered-test-small
     - name: bench-tiered-push-pull-s3
     - name: csuite-timestamp-abort-test-s3
 
@@ -5529,7 +5506,7 @@ buildvariants:
     - name: long-test
     - name: configure-combinations
     - name: format-smoke-test
-    - name: tiered-storage-extensions-test
+    - name: s3-tiered-storage-extensions-test
     - name: compile-nonstandalone
     - name: make-check-nonstandalone
     - name: unit-test-nonstandalone
@@ -5574,7 +5551,7 @@ buildvariants:
     - name: ftruncate-test
     - name: long-test
     - name: format-smoke-test
-    - name: tiered-storage-extensions-test
+    - name: s3-tiered-storage-extensions-test
     - name: compile-nonstandalone
     - name: make-check-nonstandalone
     - name: unit-test-nonstandalone

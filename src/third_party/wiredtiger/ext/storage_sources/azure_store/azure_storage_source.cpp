@@ -212,6 +212,7 @@ azure_flush(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session, WT_FILE_SYST
     azure_file_system *azure_fs = reinterpret_cast<azure_file_system *>(file_system);
     WT_FILE_SYSTEM *wtFileSystem = azure_fs->wt_fs;
     auto log = azure_fs->store->log.get();
+    std::string local_file_path = azure_fs->home_dir + "/" + source;
 
     WT_UNUSED(storage_source);
     WT_UNUSED(source);
@@ -220,14 +221,14 @@ azure_flush(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session, WT_FILE_SYST
     azure_fs->store->statistics.num_put_object_requests++;
     // std::filesystem::canonical will throw an exception if object does not exist so
     // check if the object exists.
-    if (!std::filesystem::exists(source)) {
-        log->log_err_msg("azure_flush: Object: " + std::string(object) + " does not exist.");
+    if (!std::filesystem::exists(local_file_path)) {
+        log->log_err_msg("azure_flush: No such file " + local_file_path + ".");
         return ENOENT;
     }
 
     bool exists_native = false;
-    int ret = wtFileSystem->fs_exist(
-      wtFileSystem, session, std::filesystem::canonical(source).string().c_str(), &exists_native);
+    int ret = wtFileSystem->fs_exist(wtFileSystem, session,
+      std::filesystem::canonical(local_file_path).string().c_str(), &exists_native);
     if (ret != 0) {
         log->log_err_msg("azure_flush: Failed to check for the existence of " +
           std::string(source) + " on the native filesystem.");
@@ -235,14 +236,14 @@ azure_flush(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session, WT_FILE_SYST
     }
 
     if (!exists_native) {
-        log->log_err_msg("azure_flush: " + std::string(object) + " No such file.");
+        log->log_err_msg("azure_flush: No such file" + std::string(object) + ".");
         return ENOENT;
     }
     log->log_debug_message(
       "azure_flush: Uploading object: " + std::string(object) + " into bucket using put_object.");
 
     // Upload the object into the bucket.
-    if (azure_fs->azure_conn->put_object(object, std::filesystem::canonical(source)) != 0)
+    if (azure_fs->azure_conn->put_object(object, std::filesystem::canonical(local_file_path)) != 0)
         log->log_err_msg("azure_flush: Put object request to Azure failed.");
     else
         log->log_debug_message("azure_flush: Uploaded object to Azure.");

@@ -283,24 +283,25 @@ gcp_flush(WT_STORAGE_SOURCE *storage_source, WT_SESSION *session, WT_FILE_SYSTEM
     gcp_store *gcp = reinterpret_cast<gcp_store *>(storage_source);
     gcp_file_system *fs = get_gcp_file_system(file_system);
     WT_FILE_SYSTEM *wt_file_system = fs->wt_file_system;
+    std::string local_file_path = fs->home_dir + "/" + source;
 
     gcp->statistics.num_put_object_requests++;
     // std::filesystem::canonical will throw an exception if object does not exist so
     // check if the object exists.
-    if (!std::filesystem::exists(source)) {
-        gcp->log->log_error_message(
-          "gcp_flush: Object: " + std::string(object) + " does not exist.");
+    if (!std::filesystem::exists(local_file_path)) {
+        gcp->log->log_error_message("gcp_flush: No such file" + std::string(object) + ".");
         return ENOENT;
     }
     // Confirm that the file exists on the native filesystem.
-    std::filesystem::path path = std::filesystem::canonical(source);
+    std::filesystem::path absolute_file_path = std::filesystem::canonical(local_file_path);
     bool exist_native = false;
-    int ret = wt_file_system->fs_exist(wt_file_system, session, path.c_str(), &exist_native);
+    int ret =
+      wt_file_system->fs_exist(wt_file_system, session, absolute_file_path.c_str(), &exist_native);
     if (ret != 0)
         return ret;
     if (!exist_native)
         return ENOENT;
-    return fs->gcp_conn->put_object(object, path);
+    return fs->gcp_conn->put_object(object, absolute_file_path);
 }
 
 // Check if a file has been flushed successfully by checking if it exists in the cloud.
@@ -444,7 +445,8 @@ gcp_remove(WT_FILE_SYSTEM *file_system, [[maybe_unused]] WT_SESSION *session,
     gcp_file_system *fs = reinterpret_cast<gcp_file_system *>(file_system);
     gcp_store *gcp = fs->storage_source;
 
-    gcp->log->log_error_message("gcp_remove: file removal is not supported.");
+    gcp->log->log_error_message(
+      "gcp_remove: Object: " + std::string(name) + ": remove of file not supported.");
     return ENOTSUP;
 }
 
@@ -456,7 +458,8 @@ gcp_rename(WT_FILE_SYSTEM *file_system, [[maybe_unused]] WT_SESSION *session,
     gcp_file_system *fs = reinterpret_cast<gcp_file_system *>(file_system);
     gcp_store *gcp = fs->storage_source;
 
-    gcp->log->log_error_message("gcp_rename: file renaming is not supported.");
+    gcp->log->log_error_message(
+      "gcp_rename: Object: " + std::string(from) + ": rename of file not supported.");
     return ENOTSUP;
 }
 
