@@ -37,7 +37,7 @@
 /* The connection simulator is a Singleton class. */
 class connection_simulator {
     /* Methods */
-    public:
+public:
     static connection_simulator &get_connection();
     session_simulator *open_session();
     void close_session(session_simulator *);
@@ -52,21 +52,21 @@ class connection_simulator {
     int query_timestamp(const std::string &, std::string &, bool &);
     ~connection_simulator();
 
-    private:
+private:
     int decode_timestamp_config_map(std::map<std::string, std::string> &, uint64_t &, uint64_t &,
       uint64_t &, bool &, bool &, bool &, bool &);
 
     /* No copies of the singleton allowed. */
-    private:
+private:
     connection_simulator();
 
-    public:
+public:
     /* Deleted functions should generally be public as it results in better error messages. */
     connection_simulator(connection_simulator const &) = delete;
     connection_simulator &operator=(connection_simulator const &) = delete;
 
     /* Member variables */
-    private:
+private:
     std::vector<session_simulator *> _session_list;
     uint64_t _oldest_ts;
     uint64_t _stable_ts;

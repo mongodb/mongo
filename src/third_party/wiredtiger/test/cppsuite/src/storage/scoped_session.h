@@ -47,7 +47,7 @@ extern "C" {
 
 namespace test_harness {
 class scoped_session {
-    public:
+public:
     scoped_session() = default;
     explicit scoped_session(WT_CONNECTION *conn);
 
@@ -74,7 +74,7 @@ class scoped_session {
 
     scoped_cursor open_scoped_cursor(const std::string &uri, const std::string &cfg = "");
 
-    private:
+private:
     WT_SESSION *_session = nullptr;
 };
 

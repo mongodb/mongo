@@ -39,7 +39,7 @@ namespace test_harness {
  * the following order: load, run, end_run, finish.
  */
 class component {
-    public:
+public:
     component(const std::string &name, configuration *config);
     virtual ~component();
 
@@ -81,13 +81,13 @@ class component {
      */
     virtual void finish();
 
-    protected:
+protected:
     bool _enabled = false;
     volatile bool _running = false;
     uint64_t _sleep_time_ms = 1000;
     configuration *_config;
 
-    private:
+private:
     std::string _name;
 };
 } // namespace test_harness

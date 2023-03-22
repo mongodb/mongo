@@ -37,10 +37,10 @@
 namespace test_harness {
 /* Singleton class that can write statistics to a file. */
 class metrics_writer {
-    public:
+public:
     static metrics_writer &instance();
 
-    public:
+public:
     /* No copies of the singleton allowed. */
     metrics_writer(metrics_writer const &) = delete;
     metrics_writer &operator=(metrics_writer const &) = delete;
@@ -48,7 +48,7 @@ class metrics_writer {
     void add_stat(const std::string &stat_string);
     void output_perf_file(const std::string &test_name);
 
-    private:
+private:
     metrics_writer();
     std::vector<std::string> _stats;
     std::mutex _stat_mutex;

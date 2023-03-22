@@ -37,7 +37,7 @@
 namespace test_harness {
 
 class statistics {
-    public:
+public:
     statistics() = default;
     statistics(configuration &config, const std::string &stat_name, int stat_field);
     virtual ~statistics() = default;
@@ -57,7 +57,7 @@ class statistics {
     bool get_runtime() const;
     bool get_save() const;
 
-    protected:
+protected:
     int field;
     int64_t max;
     int64_t min;

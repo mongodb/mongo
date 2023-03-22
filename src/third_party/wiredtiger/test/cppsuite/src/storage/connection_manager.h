@@ -47,10 +47,10 @@ namespace test_harness {
  * required connection API calls.
  */
 class connection_manager {
-    public:
+public:
     static connection_manager &instance();
 
-    public:
+public:
     /* No copies of the singleton allowed. */
     connection_manager(connection_manager const &) = delete;
     connection_manager &operator=(connection_manager const &) = delete;
@@ -67,10 +67,10 @@ class connection_manager {
      */
     void set_timestamp(const std::string &config);
 
-    private:
+private:
     connection_manager();
 
-    private:
+private:
     WT_CONNECTION *_conn = nullptr;
     std::mutex _conn_mutex;
 };

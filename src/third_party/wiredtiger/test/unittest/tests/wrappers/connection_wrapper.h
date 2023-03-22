@@ -23,7 +23,7 @@
  * also need to be removed.
  */
 class ConnectionWrapper {
-    public:
+public:
     ConnectionWrapper(const std::string &db_home, const char *cfg_str = "create");
     ~ConnectionWrapper();
 
@@ -37,7 +37,7 @@ class ConnectionWrapper {
     WT_CONNECTION_IMPL *getWtConnectionImpl() const;
     WT_CONNECTION *getWtConnection() const;
 
-    private:
+private:
     WT_CONNECTION_IMPL *_conn_impl;
     WT_CONNECTION *_conn;
     std::string _db_home;

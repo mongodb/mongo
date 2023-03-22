@@ -36,7 +36,7 @@ using namespace test_harness;
  * mongod instance loading a large amount of data over a long period of time.
  */
 class burst_inserts : public test {
-    public:
+public:
     burst_inserts(const test_args &args) : test(args)
     {
         _burst_duration = _config->get_int("burst_duration");
@@ -149,6 +149,6 @@ class burst_inserts : public test {
         tc->txn.try_rollback();
     }
 
-    private:
+private:
     int _burst_duration = 0;
 };

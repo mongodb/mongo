@@ -38,14 +38,14 @@
 namespace test_harness {
 
 class cache_limit : public statistics {
-    public:
+public:
     cache_limit(configuration &config, const std::string &name);
     virtual ~cache_limit() = default;
 
     void check(scoped_cursor &cursor) override final;
     std::string get_value_str(scoped_cursor &cursor) override final;
 
-    private:
+private:
     double get_cache_value(scoped_cursor &cursor);
 };
 } // namespace test_harness

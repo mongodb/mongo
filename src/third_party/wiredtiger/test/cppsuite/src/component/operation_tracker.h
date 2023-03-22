@@ -57,7 +57,7 @@ enum class tracking_operation { CREATE_COLLECTION, CUSTOM, DELETE_COLLECTION, DE
 
 /* Class used to track operations performed on collections */
 class operation_tracker : public component {
-    public:
+public:
     operation_tracker(configuration *_config, const bool use_compression, timestamp_manager &tsm);
     virtual ~operation_tracker() = default;
 
@@ -83,7 +83,7 @@ class operation_tracker : public component {
       const uint64_t &collection_id, const std::string &key, const std::string &value,
       wt_timestamp_t ts, scoped_cursor &op_track_cursor);
 
-    private:
+private:
     scoped_session _session;
     scoped_session _sweep_session;
     scoped_cursor _schema_track_cursor;

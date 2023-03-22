@@ -11,7 +11,7 @@
 #include <string>
 
 class item_wrapper {
-    public:
+public:
     explicit item_wrapper(const char *string);
     ~item_wrapper();
     WT_ITEM *
@@ -20,7 +20,7 @@ class item_wrapper {
         return &_item;
     };
 
-    private:
+private:
     WT_ITEM _item;
     std::string _string;
 };

@@ -37,7 +37,7 @@ namespace test_harness {
  * convenient way of creating prefix bounds.
  */
 class bound_set {
-    public:
+public:
     /* No default constructor is allowed. */
     bound_set() = delete;
     /* Construct a bound set given two bounds. */
@@ -52,7 +52,7 @@ class bound_set {
     const bound &get_lower() const;
     const bound &get_upper() const;
 
-    private:
+private:
     bound _lower;
     bound _upper;
 };

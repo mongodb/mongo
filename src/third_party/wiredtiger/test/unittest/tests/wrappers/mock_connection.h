@@ -18,7 +18,7 @@
  * will write a bunch of files to disk during the test, which also need to be removed.
  */
 class MockConnection {
-    public:
+public:
     ~MockConnection();
     WT_CONNECTION_IMPL *
     getWtConnectionImpl()
@@ -33,7 +33,7 @@ class MockConnection {
 
     static std::shared_ptr<MockConnection> buildTestMockConnection();
 
-    private:
+private:
     explicit MockConnection(WT_CONNECTION_IMPL *connectionImpl);
 
     // This class is implemented such that it owns, and is responsible for freeing,

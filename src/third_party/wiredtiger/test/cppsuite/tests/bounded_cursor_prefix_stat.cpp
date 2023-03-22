@@ -102,7 +102,7 @@ class bounded_cursor_prefix_stat : public test {
         }
     }
 
-    public:
+public:
     bounded_cursor_prefix_stat(const test_args &args) : test(args)
     {
         init_operation_tracker();

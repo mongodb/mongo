@@ -45,7 +45,7 @@ struct key_state {
 typedef std::map<key_value_t, key_state> validation_collection;
 /* Class that defines a basic validation algorithm. */
 class validator {
-    public:
+public:
     /*
      * Validate the on disk data against what has been tracked during the test. This is done by
      * replaying the tracked operations so a representation in memory of the collections is created.
@@ -57,7 +57,7 @@ class validator {
     void validate(
       const std::string &operation_table_name, const std::string &schema_table_name, database &db);
 
-    private:
+private:
     /*
      * Read the tracking table to retrieve the created and deleted collections during the test.
      * collection_name: collection that contains the operations on the different collections during

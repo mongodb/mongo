@@ -34,7 +34,7 @@
 #include <string>
 
 class S3Cleanup {
-    public:
+public:
     S3Cleanup(S3Connection &conn, const std::string &prefix, const std::string &fileName)
         : _conn(conn), _prefix(prefix), _fileName(fileName), _totalObjects(0)
     {
@@ -54,7 +54,7 @@ class S3Cleanup {
         std::remove(_fileName.c_str());
     }
 
-    private:
+private:
     S3Connection &_conn;
     const std::string &_prefix;
     const std::string &_fileName;

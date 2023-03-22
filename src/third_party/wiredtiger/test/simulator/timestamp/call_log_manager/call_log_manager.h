@@ -48,16 +48,16 @@ enum class api_method {
 
 class call_log_manager {
     /* Methods */
-    public:
+public:
     call_log_manager(const std::string &);
     void process_call_log();
 
-    private:
+private:
     void process_call_log_entry(const json &);
     void api_map_setup();
     session_simulator *get_session(const std::string &);
 
-    private:
+private:
     void call_log_begin_transaction(const json &);
     void call_log_close_session(const json &);
     void call_log_commit_transaction(const json &);
@@ -70,7 +70,7 @@ class call_log_manager {
     void call_log_timestamp_transaction_uint(const json &);
 
     /* Member variables */
-    private:
+private:
     connection_simulator *_conn;
     json _call_log;
     std::map<std::string, api_method> _api_map;

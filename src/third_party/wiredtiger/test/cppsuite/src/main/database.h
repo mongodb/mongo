@@ -42,10 +42,10 @@ typedef std::string key_value_t;
 
 /* Representation of the collections in memory. */
 class database {
-    public:
+public:
     static std::string build_collection_name(const uint64_t id);
 
-    public:
+public:
     /*
      * Add a new collection, this will create the underlying collection in the database.
      */
@@ -71,7 +71,7 @@ class database {
     void set_operation_tracker(operation_tracker *op_tracker);
     void set_create_config(bool use_compression, bool use_reverse_collator);
 
-    private:
+private:
     std::string _collection_create_config = "";
     scoped_session _session;
     timestamp_manager *_tsm = nullptr;

@@ -47,7 +47,7 @@ class bounded_cursor_prefix_indices : public test {
     std::vector<std::vector<std::string>> prefixes_map;
     const std::string ALPHABET{"abcdefghijklmnopqrstuvwxyz"};
 
-    public:
+public:
     bounded_cursor_prefix_indices(const test_args &args) : test(args)
     {
         init_operation_tracker();

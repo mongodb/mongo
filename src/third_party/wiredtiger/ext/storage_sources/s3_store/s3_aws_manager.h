@@ -40,7 +40,7 @@
  * reaches 0 at which point SDK shutdown will be called.
  */
 class AwsManager {
-    public:
+public:
     static AwsManager &
     Get()
     {
@@ -62,7 +62,7 @@ class AwsManager {
         return Get().TerminateInternal();
     }
 
-    private:
+private:
     AwsManager()
     {
         refCount = 0;

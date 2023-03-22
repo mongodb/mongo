@@ -37,7 +37,7 @@ namespace test_harness {
  * added at the end of the tree. This means the test frequently executes the reverse split path.
  */
 class reverse_split : public test {
-    public:
+public:
     reverse_split(test_args &args) : test(args)
     {
         /*

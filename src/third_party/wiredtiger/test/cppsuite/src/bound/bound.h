@@ -32,7 +32,7 @@
 
 namespace test_harness {
 class bound {
-    public:
+public:
     bound();
     bound(const std::string &key, bool lower_bound, bool inclusive);
     bound(uint64_t key_size_max, bool lower_bound);
@@ -46,7 +46,7 @@ class bound {
     void clear();
     void apply(scoped_cursor &cursor) const;
 
-    private:
+private:
     std::string _key;
     bool _inclusive;
     bool _lower_bound;

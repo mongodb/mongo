@@ -55,14 +55,14 @@ namespace test_harness {
 void get_time(char *time_buf, size_t buf_size);
 
 class logger {
-    public:
+public:
     /* Current log level. Default is LOG_WARN. */
     static int64_t trace_level;
 
     /* Include date in the logs if enabled. Default is true. */
     static bool include_date;
 
-    public:
+public:
     /* Used to print out traces for debugging purpose. */
     static void log_msg(int64_t trace_type, const std::string &str);
 

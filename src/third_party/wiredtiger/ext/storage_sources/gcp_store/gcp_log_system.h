@@ -53,7 +53,7 @@ static const std::map<int32_t, google::cloud::Severity> verbosity_mapping = {
  * GCP's LogSink is used to initialize the log system to the SDK.
  */
 class gcp_log_system : public google::cloud::LogBackend {
-    public:
+public:
     explicit gcp_log_system(WT_EXTENSION_API *wt_api, int32_t wt_verbosity_level);
 
     void Process(const google::cloud::LogRecord &log_record) override;
@@ -87,7 +87,7 @@ class gcp_log_system : public google::cloud::LogBackend {
     // to this.
     void set_wt_verbosity_level(int32_t wtVerbosityLevel);
 
-    private:
+private:
     void log_verbose_message(int32_t verbosity_level, const std::string &message) const;
     google::cloud::Severity _gcp_log_level;
     WT_EXTENSION_API *_wt_api;

@@ -34,7 +34,7 @@
 
 namespace test_harness {
 class database_operation {
-    public:
+public:
     /*
      * Function that performs the following steps using the configuration that is defined by the
      * test:

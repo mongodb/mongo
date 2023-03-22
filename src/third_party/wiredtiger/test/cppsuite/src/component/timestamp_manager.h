@@ -46,10 +46,10 @@ namespace test_harness {
  * The last 32 bits represent an increment for uniqueness.
  */
 class timestamp_manager : public component {
-    public:
+public:
     static const std::string decimal_to_hex(uint64_t value);
 
-    public:
+public:
     explicit timestamp_manager(configuration *config);
     virtual ~timestamp_manager() = default;
 
@@ -74,11 +74,11 @@ class timestamp_manager : public component {
      */
     wt_timestamp_t get_valid_read_ts() const;
 
-    private:
+private:
     /* Get the current time in seconds, bit shifted to the expected location. */
     uint64_t get_time_now_s() const;
 
-    private:
+private:
     std::atomic<wt_timestamp_t> _increment_ts{0};
     /* The tracking table sweep needs to read the oldest timestamp. */
     std::atomic<wt_timestamp_t> _oldest_ts{0U};

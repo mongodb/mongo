@@ -38,7 +38,7 @@ namespace test_harness {
  * statistics writer when destroyed.
  */
 class execution_timer {
-    public:
+public:
     execution_timer(const std::string id, const std::string &test_name);
     virtual ~execution_timer();
 
@@ -51,7 +51,7 @@ class execution_timer {
      */
     template <typename T> auto track(T lambda);
 
-    private:
+private:
     std::string _id;
     std::string _test_name;
     int _it_count;

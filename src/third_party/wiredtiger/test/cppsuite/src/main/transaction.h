@@ -41,7 +41,7 @@ extern "C" {
 namespace test_harness {
 
 class transaction {
-    public:
+public:
     transaction(configuration *config, timestamp_manager *timestamp_manager, WT_SESSION *session);
 
     bool active() const;
@@ -69,7 +69,7 @@ class transaction {
     /* Get the number of operations this transaction needs before it can commit */
     int64_t get_target_op_count() const;
 
-    private:
+private:
     bool _in_txn = false;
     bool _needs_rollback = false;
 

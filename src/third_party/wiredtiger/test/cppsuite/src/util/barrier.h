@@ -41,14 +41,14 @@ namespace test_harness {
  * called wait() they will exit the wait() and continue.
  */
 class barrier {
-    public:
+public:
     /* Mutexes have a deleted copy constructor so we need to as well. */
     barrier(barrier const &) = delete;
     ~barrier() = default;
     explicit barrier(std::size_t thread_count);
     void wait();
 
-    private:
+private:
     std::mutex _mutex;
     std::condition_variable _cond;
     std::size_t _threshold;

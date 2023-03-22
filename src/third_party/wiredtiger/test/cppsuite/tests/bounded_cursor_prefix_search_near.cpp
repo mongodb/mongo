@@ -42,7 +42,7 @@ using namespace test_harness;
  * Each search_near call with bounds enabled is verified using the default search_near.
  */
 class bounded_cursor_prefix_search_near : public test {
-    public:
+public:
     bounded_cursor_prefix_search_near(const test_args &args) : test(args)
     {
         init_operation_tracker();
@@ -220,7 +220,7 @@ class bounded_cursor_prefix_search_near : public test {
         tc->txn.try_rollback();
     }
 
-    private:
+private:
     /* Validate bounded search_near call outputs using a cursor without bounds key enabled. */
     void
     validate_prefix_search_near(int ret_prefix, int exact_prefix, const std::string &key_prefix,

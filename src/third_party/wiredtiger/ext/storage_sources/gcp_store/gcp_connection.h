@@ -42,7 +42,7 @@ static const std::map<google::cloud::StatusCode, int32_t> toErrno = {
   {google::cloud::StatusCode::kAlreadyExists, EBUSY},
   {google::cloud::StatusCode::kPermissionDenied, EACCES}};
 class gcp_connection {
-    public:
+public:
     gcp_connection(const std::string &bucket_name, const std::string &prefix);
     int list_objects(
       std::string search_prefix, std::vector<std::string> &objects, bool list_single);
@@ -54,7 +54,7 @@ class gcp_connection {
 
     ~gcp_connection() = default;
 
-    private:
+private:
     google::cloud::storage::Client _gcp_client;
     const std::string _bucket_name;
     const std::string _bucket_prefix;

@@ -21,7 +21,7 @@
 
 #ifdef AVOID_CPP20_SEMAPHORE
 #include "basic_semaphore.h"
-using  binary_semaphore = basic_semaphore;
+using binary_semaphore = basic_semaphore;
 const std::string binary_semaphore_version = "basic_semaphore";
 #else
 #include <semaphore>
@@ -57,7 +57,7 @@ thread_function(std::string const &thread_name, binary_semaphore &start_semaphor
 
 template <typename thread_1_code_t, typename thread_2_code_t, typename out_of_order_check_code_t>
 class test_config {
-    public:
+public:
     test_config(std::string test_name, std::string test_description, thread_1_code_t thread_1_code,
       thread_2_code_t thread_2_code, out_of_order_check_code_t out_of_order_check_code,
       bool out_of_order_allowed)
@@ -79,9 +79,9 @@ class test_config {
 template <typename thread_1_code, typename thread_2_code, typename out_of_order_check_code>
 void
 perform_test(test_config<thread_1_code, thread_2_code, out_of_order_check_code> config, int &x,
-  int &y, int &r1, int &r2, binary_semaphore &start_semaphore1,
-  binary_semaphore &start_semaphore2, binary_semaphore &end_semaphore1,
-  binary_semaphore &end_semaphore2, std::ostream &ostream, int loop_count, bool progress)
+  int &y, int &r1, int &r2, binary_semaphore &start_semaphore1, binary_semaphore &start_semaphore2,
+  binary_semaphore &end_semaphore1, binary_semaphore &end_semaphore2, std::ostream &ostream,
+  int loop_count, bool progress)
 {
     ostream << "Test name:        " << config._test_name << std::endl;
     ostream << "Test description: " << config._test_description << std::endl;
@@ -398,8 +398,8 @@ main(int argc, char *argv[])
         }
     }
 
-    std::cout << "C++ language standard: " << __cplusplus << ", with binary_semaphore: " << binary_semaphore_version
-              << std::endl;
+    std::cout << "C++ language standard: " << __cplusplus
+              << ", with binary_semaphore: " << binary_semaphore_version << std::endl;
 
     if (is_arm64)
         std::cout << "Running on ARM64";

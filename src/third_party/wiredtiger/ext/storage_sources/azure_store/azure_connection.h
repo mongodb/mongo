@@ -53,7 +53,7 @@ static const std::map<Azure::Core::Http::HttpStatusCode, int32_t> to_errno = {
  * unique container.
  */
 class azure_connection {
-    public:
+public:
     azure_connection(const std::string &bucket_name, const std::string &bucket_prefix = "");
     int list_objects(
       const std::string &search_prefix, std::vector<std::string> &objects, bool list_single) const;
@@ -62,7 +62,7 @@ class azure_connection {
     int read_object(const std::string &object_key, int64_t offset, size_t len, void *buf) const;
     int object_exists(const std::string &object_key, bool &exists, size_t &object_size) const;
 
-    private:
+private:
     const std::string _bucket_name;
     const std::string _bucket_prefix;
     const Azure::Storage::Blobs::BlobContainerClient _azure_client;

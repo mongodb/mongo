@@ -38,7 +38,7 @@
 namespace test_harness {
 
 class database_size : public statistics {
-    public:
+public:
     database_size(configuration &config, const std::string &name, database &database);
     virtual ~database_size() = default;
 
@@ -46,11 +46,11 @@ class database_size : public statistics {
     void check(scoped_cursor &) override final;
     std::string get_value_str(scoped_cursor &) override final;
 
-    private:
+private:
     size_t get_db_size() const;
     const std::vector<std::string> get_file_names() const;
 
-    private:
+private:
     database &_database;
 };
 } // namespace test_harness

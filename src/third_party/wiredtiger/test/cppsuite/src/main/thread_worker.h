@@ -49,7 +49,7 @@ const std::string type_string(thread_type type);
 
 /* Container class for a thread and any data types it may need to interact with the database. */
 class thread_worker {
-    public:
+public:
     thread_worker(uint64_t id, thread_type type, configuration *config,
       scoped_session &&created_session, timestamp_manager *timestamp_manager,
       operation_tracker *op_tracker, database &dbase);
@@ -103,7 +103,7 @@ class thread_worker {
     bool running() const;
     void sync();
 
-    public:
+public:
     const int64_t collection_count;
     const int64_t key_count;
     const int64_t key_size;
@@ -119,7 +119,7 @@ class thread_worker {
     transaction txn;
     operation_tracker *op_tracker;
 
-    private:
+private:
     std::shared_ptr<barrier> _barrier = nullptr;
     bool _running = true;
     uint64_t _sleep_time_ms = 1000;

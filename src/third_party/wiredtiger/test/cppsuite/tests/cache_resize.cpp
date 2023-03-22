@@ -37,7 +37,7 @@ using namespace test_harness;
 /* Defines what data is written to the tracking table for use in custom validation. */
 class operation_tracker_cache_resize : public operation_tracker {
 
-    public:
+public:
     operation_tracker_cache_resize(
       configuration *config, const bool use_compression, timestamp_manager &tsm)
         : operation_tracker(config, use_compression, tsm)
@@ -70,7 +70,7 @@ class operation_tracker_cache_resize : public operation_tracker {
  * be allowed.
  */
 class cache_resize : public test {
-    public:
+public:
     cache_resize(const test_args &args) : test(args)
     {
         init_operation_tracker(

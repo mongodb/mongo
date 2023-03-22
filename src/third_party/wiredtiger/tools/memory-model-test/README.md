@@ -46,6 +46,7 @@ There are two options:
 - Use the CMakeLists.txt file with CMake:
   ```
   mkdir build
+  cd build
   cmake -G Ninja ../.
   ninja
   ```

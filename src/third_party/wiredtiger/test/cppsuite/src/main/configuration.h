@@ -57,7 +57,7 @@ split_string(const std::string &str, const char delim)
 }
 
 class configuration {
-    public:
+public:
     configuration(const std::string &test_config_name, const std::string &config);
     explicit configuration(const WT_CONFIG_ITEM &nested);
 
@@ -85,7 +85,7 @@ class configuration {
     /* Get the sleep time from the configuration in ms. */
     uint64_t get_throttle_ms();
 
-    private:
+private:
     enum class types { BOOL, INT, LIST, STRING, STRUCT };
 
     template <typename T>
@@ -106,7 +106,7 @@ class configuration {
     static bool comparator(
       std::pair<std::string, std::string> a, std::pair<std::string, std::string> b);
 
-    private:
+private:
     std::string _config;
     WT_CONFIG_PARSER *_config_parser = nullptr;
 };

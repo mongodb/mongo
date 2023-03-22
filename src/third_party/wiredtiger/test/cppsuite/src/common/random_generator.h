@@ -46,7 +46,7 @@ namespace test_harness {
 enum class characters_type { PSEUDO_ALPHANUMERIC, ALPHABET };
 
 class random_generator {
-    public:
+public:
     static random_generator &instance();
 
     /* No copies of the singleton allowed. */
@@ -78,7 +78,7 @@ class random_generator {
         return dis(_generator);
     }
 
-    private:
+private:
     random_generator();
     std::uniform_int_distribution<> &get_distribution(characters_type type);
     const std::string &get_characters(characters_type type);

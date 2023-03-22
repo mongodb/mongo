@@ -35,7 +35,7 @@
 namespace test_harness {
 /* Class that handles threads, from their initialization to their deletion. */
 class thread_manager {
-    public:
+public:
     ~thread_manager();
 
     /*
@@ -54,7 +54,7 @@ class thread_manager {
      */
     void join();
 
-    private:
+private:
     std::vector<std::thread *> _workers;
 };
 } // namespace test_harness

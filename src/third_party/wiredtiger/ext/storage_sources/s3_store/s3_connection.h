@@ -55,7 +55,7 @@ static const std::map<Aws::Http::HttpResponseCode, int32_t> toErrno = {
  * the S3 client.
  */
 class S3Connection {
-    public:
+public:
     /*
      * We have two constructors for the two different ways to start a S3 connection. First
      * constructor uses provided credentials, the following uses credentials stored in a local file.
@@ -74,7 +74,7 @@ class S3Connection {
 
     ~S3Connection() = default;
 
-    private:
+private:
     const Aws::S3Crt::S3CrtClient _s3CrtClient;
     const std::string _bucketName;
     const std::string _objectPrefix;

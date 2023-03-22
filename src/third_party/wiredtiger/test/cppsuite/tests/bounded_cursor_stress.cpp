@@ -49,12 +49,12 @@ using namespace test_harness;
  */
 class bounded_cursor_stress : public test {
     /* Class helper to represent the lower and uppers bounds for the range cursor. */
-    private:
+private:
     bool _reverse_collator_enabled = false;
     const uint64_t MAX_ROLLBACKS = 100;
     enum class bound_action { NO_BOUNDS, LOWER_BOUND_SET, UPPER_BOUND_SET, ALL_BOUNDS_SET };
 
-    public:
+public:
     bounded_cursor_stress(const test_args &args) : test(args)
     {
         /* Track reverse_collator value as it is required for the custom comparator. */

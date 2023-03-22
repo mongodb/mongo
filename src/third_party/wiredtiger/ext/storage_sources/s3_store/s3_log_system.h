@@ -56,7 +56,7 @@ static const std::map<int32_t, Aws::Utils::Logging::LogLevel> verbosityMapping =
  * with WiredTiger's logging system.
  */
 class S3LogSystem : public Aws::Utils::Logging::LogSystemInterface {
-    public:
+public:
     S3LogSystem(WT_EXTENSION_API *wtApi, uint32_t wtVerbosityLevel);
     Aws::Utils::Logging::LogLevel
     GetLogLevel(void) const override
@@ -92,7 +92,7 @@ class S3LogSystem : public Aws::Utils::Logging::LogSystemInterface {
     {
     }
 
-    private:
+private:
     void LogAwsMessage(const char *tag, const std::string &message) const;
     void LogVerboseMessage(int32_t verbosityLevel, const std::string &message) const;
     std::atomic<Aws::Utils::Logging::LogLevel> _awsLogLevel;

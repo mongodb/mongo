@@ -51,7 +51,7 @@ const std::map<int32_t, Azure::Core::Diagnostics::Logger::Level> wt_to_azure_ver
  * logged through the use of the WT_EXTENSION_API.
  */
 class azure_log_system {
-    public:
+public:
     explicit azure_log_system(WT_EXTENSION_API *wt_api, int32_t wt_verbosity_level);
     const Azure::Core::Diagnostics::Logger::Level wt_to_azure_verbosity_level(
       int32_t wt_verbosity_level);
@@ -60,7 +60,7 @@ class azure_log_system {
     void log_debug_message(const std::string &message) const;
     void azure_log_listener(Azure::Core::Diagnostics::Logger::Level lvl, std::string msg);
 
-    private:
+private:
     void log_verbose_message(int32_t verbosity_level, const std::string &message) const;
     WT_EXTENSION_API *_wt_api;
     int32_t _wt_verbosity_level;

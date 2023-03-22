@@ -34,7 +34,7 @@ namespace test_harness {
 /* Defines what data is written to the tracking table for use in custom validation. */
 class operation_tracker_template : public operation_tracker {
 
-    public:
+public:
     operation_tracker_template(
       configuration *config, const bool use_compression, timestamp_manager &tsm)
         : operation_tracker(config, use_compression, tsm)
@@ -57,7 +57,7 @@ class operation_tracker_template : public operation_tracker {
  * can be overridden and customized.
  */
 class test_template : public test {
-    public:
+public:
     test_template(const test_args &args) : test(args)
     {
         init_operation_tracker(

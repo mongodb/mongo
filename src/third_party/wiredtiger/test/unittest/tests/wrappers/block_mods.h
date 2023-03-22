@@ -12,7 +12,7 @@
 #include "wt_internal.h"
 
 class BlockMods {
-    public:
+public:
     BlockMods();
     ~BlockMods();
     WT_BLOCK_MODS *
@@ -21,7 +21,7 @@ class BlockMods {
         return &_block_mods;
     };
 
-    private:
+private:
     void initBlockMods();
     WT_BLOCK_MODS _block_mods;
 };

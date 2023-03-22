@@ -33,12 +33,12 @@
 
 class session_simulator {
     /* Methods */
-    public:
+public:
     session_simulator();
     ~session_simulator() = default;
 
     /* API functions */
-    public:
+public:
     int begin_transaction(const std::string & = "");
     int rollback_transaction(const std::string & = "");
     int prepare_transaction(const std::string & = "");
@@ -48,7 +48,7 @@ class session_simulator {
     int query_timestamp(const std::string &, std::string &);
 
     /* Transaction relevant functions. */
-    public:
+public:
     uint64_t get_commit_timestamp() const;
     uint64_t get_durable_timestamp() const;
     uint64_t get_first_commit_timestamp() const;
@@ -64,7 +64,7 @@ class session_simulator {
     bool is_txn_prepared() const;
     bool is_txn_running() const;
 
-    private:
+private:
     int decode_timestamp_config_map(
       std::map<std::string, std::string> &, uint64_t &, uint64_t &, uint64_t &, uint64_t &);
     int set_commit_timestamp(uint64_t);
@@ -73,13 +73,13 @@ class session_simulator {
     int set_read_timestamp(uint64_t);
     void reset_txn_level_var();
 
-    public:
+public:
     /* Deleted functions should generally be public as it results in better error messages. */
     session_simulator(session_simulator const &) = delete;
     session_simulator &operator=(session_simulator const &) = delete;
 
     /* Transaction relevant member variables */
-    private:
+private:
     bool _has_commit_ts;
     bool _ts_round_prepared;
     bool _ts_round_read;

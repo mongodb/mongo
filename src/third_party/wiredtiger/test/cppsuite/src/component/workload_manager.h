@@ -41,7 +41,7 @@ namespace test_harness {
  * Class that can execute operations based on a given configuration.
  */
 class workload_manager : public component {
-    public:
+public:
     workload_manager(configuration *configuration, database_operation *db_operation,
       timestamp_manager *timestamp_manager, database &database);
 
@@ -61,7 +61,7 @@ class workload_manager : public component {
     /* Set the tracking component. */
     void set_operation_tracker(operation_tracker *op_tracker);
 
-    private:
+private:
     database &_database;
     database_operation *_database_operation = nullptr;
     thread_manager _thread_manager;
