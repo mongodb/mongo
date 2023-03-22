@@ -634,19 +634,16 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalDensify::createFromBs
 }
 
 Value DocumentSourceInternalDensify::serialize(SerializationOptions opts) const {
-    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
-        MONGO_UNIMPLEMENTED_TASSERT(7484349);
-    }
-
     MutableDocument spec;
-    spec[kFieldFieldName] = Value(_field.fullPath());
+    spec[kFieldFieldName] = Value(opts.serializeFieldName(_field.fullPath()));
     std::vector<Value> serializedPartitionByFields(_partitions.size());
-    std::transform(_partitions.begin(),
-                   _partitions.end(),
-                   serializedPartitionByFields.begin(),
-                   [&](FieldPath field) -> Value { return Value(field.fullPath()); });
+    std::transform(
+        _partitions.begin(),
+        _partitions.end(),
+        serializedPartitionByFields.begin(),
+        [&](FieldPath field) -> Value { return Value(opts.serializeFieldName(field.fullPath())); });
     spec[kPartitionByFieldsFieldName] = Value(serializedPartitionByFields);
-    spec[kRangeFieldName] = _range.serialize();
+    spec[kRangeFieldName] = _range.serialize(opts);
     MutableDocument out;
     out[getSourceName()] = Value(spec.freeze());
 

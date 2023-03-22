@@ -49,6 +49,7 @@ using DensifyExplicitNumericTest = AggregationContextFixture;
 using DensifyPartitionNumericTest = AggregationContextFixture;
 using DensifyCloneTest = AggregationContextFixture;
 using DensifyStepTest = AggregationContextFixture;
+using DensifyRedactionTest = AggregationContextFixture;
 
 Date_t makeDate(std::string dateStr) {
     auto statusDate = dateFromISOString(dateStr);
@@ -1282,6 +1283,99 @@ TEST(DensifyStepTest, InternalDensifyIsOffStepForDaysWithLargeDateStep) {
     auto base = DensifyValue(makeDate("2021-01-01T00:00:00.000Z"));
 
     ASSERT_FALSE(val.isOnStepRelativeTo(base, range));
+}
+
+TEST_F(DensifyRedactionTest, RedactionDateBounds) {
+    auto spec = fromjson(R"({
+        $densify: {
+            field: "a",
+            range: {
+                step: 1,
+                unit: "hour",
+                bounds: [
+                    {$date: "2023-04-23T00:00:00.000Z"},
+                    {$date: "2023-04-23T08:00:00.000Z"}
+                ]
+            }
+        }
+    })");
+    auto docSource =
+        DocumentSourceInternalDensify::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$_internalDensify": {
+                "field": "HASH<a>",
+                "partitionByFields": [],
+                "range": {
+                    "step": "?",
+                    "bounds": ["?", "?"],
+                    "unit": "?"
+                }
+            }
+        })",
+        redact(*docSource));
+}
+
+TEST_F(DensifyRedactionTest, RedactionFullBoundsWithPartitionFields) {
+    auto spec = fromjson(R"({
+        $densify: {
+            field: "foo",
+            partitionByFields: ["a", "b", "c"],
+            range: {
+                bounds: "full",
+                step: 100
+            }
+        }
+    })");
+    auto docSource =
+        DocumentSourceInternalDensify::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$_internalDensify": {
+                "field": "HASH<foo>",
+                "partitionByFields": [
+                    "HASH<a>",
+                    "HASH<b>",
+                    "HASH<c>"
+                ],
+                "range": {
+                    "step": "?",
+                    "bounds": "full"
+                }
+            }
+        })",
+        redact(*docSource));
+}
+
+TEST_F(DensifyRedactionTest, RedactionPartitionBounds) {
+    auto spec = fromjson(R"({
+        $densify: {
+            field: "x",
+            partitionByFields: ["foo"],
+            range: {
+                bounds: "partition",
+                step: 50,
+                unit: "second"
+            }
+        }
+    })");
+    auto docSource =
+        DocumentSourceInternalDensify::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$_internalDensify": {
+                "field": "HASH<x>",
+                "partitionByFields": [
+                    "HASH<foo>"
+                ],
+                "range": {
+                    "step": "?",
+                    "bounds": "partition",
+                    "unit": "?"
+                }
+            }
+        })",
+        redact(*docSource));
 }
 }  // namespace
 }  // namespace mongo
