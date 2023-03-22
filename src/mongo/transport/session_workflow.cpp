@@ -81,10 +81,11 @@ namespace metrics_detail {
 /** Applies X(id) for each SplitId */
 #define EXPAND_TIME_SPLIT_IDS(X) \
     X(started)                   \
-    X(yielded)                   \
+    X(yieldedBeforeReceive)      \
     X(receivedWork)              \
     X(processedWork)             \
     X(sentResponse)              \
+    X(yieldedAfterSend)          \
     X(done)                      \
     /**/
 
@@ -96,27 +97,29 @@ namespace metrics_detail {
  * `intervals` are durations between notable pairs of them.
  *
  *  [started]
- *  |   [yielded]
+ *  |   [yieldedBeforeReceive]
  *  |   |   [receivedWork]
  *  |   |   |   [processedWork]
  *  |   |   |   |   [sentResponse]
- *  |   |   |   |   |   [done]
- *  |<----------------->| total
- *  |<->|   |   |   |   | yield
- *  |   |<->|   |   |   | receiveWork
- *  |   |   |<--------->| active
- *  |   |   |<->|   |   | processWork
- *  |   |   |   |<->|   | sendResponse
- *  |   |   |   |   |<->| finalize
+ *  |   |   |   |   |   [yieldedAfterSend]
+ *  |   |   |   |   |   |   [done]
+ *  |<--------------------->| total
+ *  |<->|   |   |   |   |   | yieldBeforeReceive
+ *  |   |<->|   |   |   |   | receiveWork
+ *  |   |   |<------------->| active
+ *  |   |   |<->|   |   |   | processWork
+ *  |   |   |   |<->|   |   | sendResponse
+ *  |   |   |   |   |<->|   | yieldAfterSend
+ *  |   |   |   |   |   |<->| finalize
  */
-#define EXPAND_INTERVAL_IDS(X)                   \
-    X(total, started, done)                      \
-    X(yield, started, yielded)                   \
-    X(receiveWork, yielded, receivedWork)        \
-    X(active, receivedWork, done)                \
-    X(processWork, receivedWork, processedWork)  \
-    X(sendResponse, processedWork, sentResponse) \
-    X(finalize, sentResponse, done)              \
+#define EXPAND_INTERVAL_IDS(X)                           \
+    X(total, started, done)                              \
+    X(yieldBeforeReceive, started, yieldedBeforeReceive) \
+    X(receiveWork, yieldedBeforeReceive, receivedWork)   \
+    X(active, receivedWork, done)                        \
+    X(processWork, receivedWork, processedWork)          \
+    X(sendResponse, processedWork, sentResponse)         \
+    X(finalize, yieldedAfterSend, done)                  \
     /**/
 
 #define X_ID(id, ...) id,
@@ -233,6 +236,9 @@ public:
     void start() {
         _t.emplace(SplitTimerPolicy{_sep});
     }
+    void yieldedBeforeReceive() {
+        _t->notify(TimeSplitId::yieldedBeforeReceive);
+    }
     void received() {
         _t->notify(TimeSplitId::receivedWork);
     }
@@ -245,8 +251,8 @@ public:
             duration_cast<Milliseconds>(*_t->getSplitInterval(IntervalId::processWork)),
             duration_cast<Milliseconds>(*_t->getSplitInterval(IntervalId::sendResponse)));
     }
-    void yielded() {
-        _t->notify(TimeSplitId::yielded);
+    void yieldedAfterSend() {
+        _t->notify(TimeSplitId::yieldedAfterSend);
     }
     void finish() {
         _t.reset();
@@ -262,10 +268,11 @@ class NoopSessionWorkflowMetrics {
 public:
     explicit NoopSessionWorkflowMetrics(ServiceEntryPoint*) {}
     void start() {}
+    void yieldedBeforeReceive() {}
     void received() {}
     void processed() {}
     void sent(Session&) {}
-    void yielded() {}
+    void yieldedAfterSend() {}
     void finish() {}
 };
 
@@ -470,7 +477,7 @@ private:
             // we're trying deliberately to make it happen, to reduce long tail
             // latency.
             _yieldPointReached();
-            _iterationFrame->metrics.yielded();
+            _iterationFrame->metrics.yieldedBeforeReceive();
             return _receiveRequest();
         }
         auto&& [p, f] = makePromiseFuture<void>();
@@ -753,6 +760,8 @@ Future<void> SessionWorkflow::Impl::_doOneIteration() {
             _iterationFrame->metrics.processed();
             _sendResponse();
             _iterationFrame->metrics.sent(*session());
+            _yieldPointReached();
+            _iterationFrame->metrics.yieldedAfterSend();
             _iterationFrame.reset();
         });
 }
