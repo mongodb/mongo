@@ -2814,16 +2814,19 @@ buildvariants:
   modules:
   - enterprise
   run_on:
-  - rhel82-arm64-small
+  - rhel82-arm64-large
   stepback: false
   expansions:
     compile_flags: >-
       --ssl
+      --dbg=on
       MONGO_DISTMOD=rhel80
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --link-model=dynamic
       ENABLE_GRPC_BUILD=1
+      --use-libunwind=off
+    # TODO: SERVER-75120 disabling libunwind here until the test can pass
     compile_variant: enterprise-rhel-82-arm64-grpc
     scons_cache_scope: shared
   tasks:

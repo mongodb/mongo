@@ -1,5 +1,5 @@
 Import('env')
-
+Import('debugBuild')
 protobuf_env = env.Clone(NINJA_GENSOURCE_INDEPENDENT=True)
 
 protobuf_env.InjectThirdParty(libraries=['zlib'])
@@ -20,6 +20,8 @@ if protobuf_env.ToolchainIs('gcc', 'clang'):
             '-Wno-overloaded-virtual',
         ],
     )
+    if debugBuild:
+        protobuf_env.Append(CCFLAGS=['-Wno-error'])
 
 if protobuf_env.ToolchainIs('gcc'):
     protobuf_env.Append(
