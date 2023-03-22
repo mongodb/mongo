@@ -872,9 +872,8 @@ public:
         return CommandHelpers::parseNsFromCommand(dbName, cmdObj);
     }
 
-    ResourcePattern parseResourcePattern(const std::string& dbname, const BSONObj& cmdObj) const {
-        return CommandHelpers::resourcePatternForNamespace(
-            parseNs({boost::none, dbname}, cmdObj).ns());
+    ResourcePattern parseResourcePattern(const DatabaseName& dbName, const BSONObj& cmdObj) const {
+        return CommandHelpers::resourcePatternForNamespace(parseNs(dbName, cmdObj).ns());
     }
 
     //

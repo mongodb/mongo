@@ -162,7 +162,7 @@ Status PlanCacheClearCommand::checkAuthForOperation(OperationContext* opCtx,
                                                     const DatabaseName& dbName,
                                                     const BSONObj& cmdObj) const {
     AuthorizationSession* authzSession = AuthorizationSession::get(opCtx->getClient());
-    ResourcePattern pattern = parseResourcePattern(dbName.db(), cmdObj);
+    ResourcePattern pattern = parseResourcePattern(dbName, cmdObj);
 
     if (authzSession->isAuthorizedForActionsOnResource(pattern, ActionType::planCacheWrite)) {
         return Status::OK();

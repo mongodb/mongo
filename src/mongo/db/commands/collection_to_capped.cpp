@@ -64,7 +64,7 @@ public:
                                  const DatabaseName& dbName,
                                  const BSONObj& cmdObj) const override {
         auto* as = AuthorizationSession::get(opCtx->getClient());
-        if (!as->isAuthorizedForActionsOnResource(parseResourcePattern(dbName.db(), cmdObj),
+        if (!as->isAuthorizedForActionsOnResource(parseResourcePattern(dbName, cmdObj),
                                                   ActionType::find)) {
             return {ErrorCodes::Unauthorized, "unauthorized"};
         }
@@ -166,7 +166,7 @@ public:
                                  const DatabaseName& dbName,
                                  const BSONObj& cmdObj) const override {
         auto* as = AuthorizationSession::get(opCtx->getClient());
-        if (!as->isAuthorizedForActionsOnResource(parseResourcePattern(dbName.db(), cmdObj),
+        if (!as->isAuthorizedForActionsOnResource(parseResourcePattern(dbName, cmdObj),
                                                   ActionType::convertToCapped)) {
             return {ErrorCodes::Unauthorized, "unauthorized"};
         }

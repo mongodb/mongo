@@ -338,11 +338,15 @@ Status checkAuthForMapReduce(const BasicCommand* commandTemplate,
                              const BSONObj& cmdObj) {
     OutputOptions outputOptions = parseOutputOptions(dbName.db(), cmdObj);
 
-    ResourcePattern inputResource(commandTemplate->parseResourcePattern(dbName.db(), cmdObj));
+    ResourcePattern inputResource(commandTemplate->parseResourcePattern(dbName, cmdObj));
+
+    auto mapReduceField = cmdObj.firstElement();
+    const auto emptyNss =
+        mapReduceField.type() == mongo::String && mapReduceField.valueStringData().empty();
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "Invalid input namespace " << inputResource.databaseToMatch() << "."
-                          << cmdObj["mapReduce"].String(),
-            inputResource.isExactNamespacePattern());
+                          << (emptyNss ? "" : cmdObj["mapReduce"].String()),
+            !emptyNss && inputResource.isExactNamespacePattern());
 
     auto* as = AuthorizationSession::get(opCtx->getClient());
     if (!as->isAuthorizedForActionsOnResource(inputResource, ActionType::find)) {
