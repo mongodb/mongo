@@ -544,7 +544,7 @@ void ValuePrinter<T>::writeValueToStream(TypeTags tag, Value val, size_t depth) 
             break;
         case TypeTags::sortKeyComponentVector:
             stream << "SortKeyComponentVector(";
-            for (auto elt : getSortKeyComponentVectorView(val)->elts) {
+            for (const auto& elt : getSortKeyComponentVectorView(val)->elts) {
                 stream << elt << ", ";
             }
             stream << ")";
