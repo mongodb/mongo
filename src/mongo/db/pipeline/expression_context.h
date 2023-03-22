@@ -498,6 +498,11 @@ public:
         return _requiresTimeseriesExtendedRangeSupport;
     }
 
+    // Returns true if the resolved collation of the context is simple.
+    bool isResolvedCollationSimple() const {
+        return getCollatorBSON().woCompare(CollationSpec::kSimpleSpec) == 0;
+    }
+
 protected:
     static const int kInterruptCheckPeriod = 128;
 
