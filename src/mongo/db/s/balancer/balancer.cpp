@@ -106,13 +106,10 @@ class BalanceRoundDetails {
 public:
     BalanceRoundDetails() : _executionTimer() {}
 
-    void setSucceeded(int numCandidateChunks,
-                      int numChunksMoved,
-                      int numImbalancedCachedCollections) {
+    void setSucceeded(int candidateChunks, int chunksMoved) {
         invariant(!_errMsg);
-        _numCandidateChunks = numCandidateChunks;
-        _numChunksMoved = numChunksMoved;
-        _numImbalancedCachedCollections = numImbalancedCachedCollections;
+        _candidateChunks = candidateChunks;
+        _chunksMoved = chunksMoved;
     }
 
     void setFailed(const string& errMsg) {
@@ -127,9 +124,8 @@ public:
         if (_errMsg) {
             builder.append("errmsg", *_errMsg);
         } else {
-            builder.append("candidateChunks", _numCandidateChunks);
-            builder.append("chunksMoved", _numChunksMoved);
-            builder.append("imbalancedCachedCollections", _numImbalancedCachedCollections);
+            builder.append("candidateChunks", _candidateChunks);
+            builder.append("chunksMoved", _chunksMoved);
         }
         return builder.obj();
     }
@@ -138,9 +134,8 @@ private:
     const Timer _executionTimer;
 
     // Set only on success
-    int _numCandidateChunks{0};
-    int _numChunksMoved{0};
-    int _numImbalancedCachedCollections{0};
+    int _candidateChunks{0};
+    int _chunksMoved{0};
 
     // Set only on failure
     boost::optional<string> _errMsg;
@@ -307,8 +302,7 @@ Balancer::Balancer()
       _defragmentationPolicy(std::make_unique<BalancerDefragmentationPolicyImpl>(
           _clusterStats.get(), [this]() { _onActionsStreamPolicyStateUpdate(); })),
       _autoMergerPolicy(
-          std::make_unique<AutoMergerPolicy>([this]() { _onActionsStreamPolicyStateUpdate(); })),
-      _imbalancedCollectionsCache(std::make_unique<stdx::unordered_set<NamespaceString>>()) {}
+          std::make_unique<AutoMergerPolicy>([this]() { _onActionsStreamPolicyStateUpdate(); })) {}
 
 Balancer::~Balancer() {
     // Terminate the balancer thread so it doesn't leak memory.
@@ -339,7 +333,6 @@ void Balancer::onBecomeArbiter() {
 
 void Balancer::initiateBalancer(OperationContext* opCtx) {
     stdx::lock_guard<Latch> scopedLock(_mutex);
-    _imbalancedCollectionsCache->clear();
     invariant(_state == kStopped);
     _state = kRunning;
 
@@ -787,11 +780,9 @@ void Balancer::_mainThread() {
                 const auto chunksToDefragment =
                     _defragmentationPolicy->selectChunksToMove(opCtx.get(), &availableShards);
 
-                const auto chunksToRebalance = uassertStatusOK(
-                    _chunkSelectionPolicy->selectChunksToMove(opCtx.get(),
-                                                              shardStats,
-                                                              &availableShards,
-                                                              _imbalancedCollectionsCache.get()));
+                const auto chunksToRebalance =
+                    uassertStatusOK(_chunkSelectionPolicy->selectChunksToMove(
+                        opCtx.get(), shardStats, &availableShards));
 
                 if (chunksToRebalance.empty() && chunksToDefragment.empty()) {
                     LOGV2_DEBUG(21862, 1, "No need to move any chunk");
@@ -813,8 +804,7 @@ void Balancer::_mainThread() {
 
                     roundDetails.setSucceeded(
                         static_cast<int>(chunksToRebalance.size() + chunksToDefragment.size()),
-                        _balancedLastTime,
-                        _imbalancedCollectionsCache->size());
+                        _balancedLastTime);
 
                     ShardingLogging::get(opCtx.get())
                         ->logAction(opCtx.get(), "balancer.round", "", roundDetails.toBSON())

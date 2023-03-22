@@ -279,8 +279,6 @@ private:
     std::unique_ptr<BalancerDefragmentationPolicy> _defragmentationPolicy;
 
     std::unique_ptr<AutoMergerPolicy> _autoMergerPolicy;
-
-    std::unique_ptr<stdx::unordered_set<NamespaceString>> _imbalancedCollectionsCache;
 };
 
 }  // namespace mongo

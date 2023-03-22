@@ -49,8 +49,7 @@ public:
     StatusWith<MigrateInfoVector> selectChunksToMove(
         OperationContext* opCtx,
         const std::vector<ClusterStatistics::ShardStatistics>& shardStats,
-        stdx::unordered_set<ShardId>* availableShards,
-        stdx::unordered_set<NamespaceString>* imbalancedCollectionsCachePtr) override;
+        stdx::unordered_set<ShardId>* availableShards) override;
 
     StatusWith<MigrateInfosWithReason> selectChunksToMove(OperationContext* opCtx,
                                                           const NamespaceString& ns) override;
