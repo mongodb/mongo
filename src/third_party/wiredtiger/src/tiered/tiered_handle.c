@@ -787,7 +787,6 @@ __tiered_open(WT_SESSION_IMPL *session, const char *cfg[])
         WT_ERR(__wt_tiered_switch(session, config));
     }
     WT_ERR(__wt_btree_open(session, tiered_cfg));
-    WT_ERR(__wt_btree_switch_object(session, tiered->current_id));
 
 #if 1
     if (0) {
