@@ -277,11 +277,6 @@ confirmExpectedExprExecution({$eq: ["$w", NaN]}, {nReturned: 1, expectedIndex: {
 confirmExpectedExprExecution({$eq: ["$w", undefined]}, {nReturned: 16});
 confirmExpectedExprExecution({$eq: ["$w", "$$REMOVE"]}, {nReturned: 16});
 
-// Test that equality to null queries can use a sparse index.
-assert.commandWorked(coll.dropIndex({w: "hashed"}));
-assert.commandWorked(coll.createIndex({w: 1}, {sparse: true}));
-confirmExpectedExprExecution({$eq: ["$w", null]}, {nReturned: 1, expectedIndex: {w: 1}});
-
 // Equality match against text index prefix is expected to fail. Equality predicates are
 // required against the prefix fields of a text index, but currently $eq inside $expr does not
 // qualify.

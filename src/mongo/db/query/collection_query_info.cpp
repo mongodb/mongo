@@ -191,10 +191,10 @@ void CollectionQueryInfo::computeUpdateIndexData(const IndexCatalogEntry* entry,
     // handle partial indexes
     const MatchExpression* filter = entry->getFilterExpression();
     if (filter) {
-        stdx::unordered_set<std::string> paths;
+        RelevantFieldIndexMap paths;
         QueryPlannerIXSelect::getFields(filter, &paths);
         for (auto it = paths.begin(); it != paths.end(); ++it) {
-            outData->addPath(FieldRef(*it));
+            outData->addPath(FieldRef(it->first));
         }
     }
 }

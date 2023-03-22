@@ -249,7 +249,7 @@ static bool boundsGeneratingNodeContainsComparisonToType(MatchExpression* node, 
 // static
 void QueryPlannerIXSelect::getFields(const MatchExpression* node,
                                      string prefix,
-                                     stdx::unordered_set<string>* out) {
+                                     RelevantFieldIndexMap* out) {
     // Do not traverse tree beyond a NOR negation node
     MatchExpression::MatchType exprtype = node->matchType();
     if (exprtype == MatchExpression::NOR) {
@@ -258,7 +258,8 @@ void QueryPlannerIXSelect::getFields(const MatchExpression* node,
 
     // Leaf nodes with a path and some array operators.
     if (Indexability::nodeCanUseIndexOnOwnField(node)) {
-        out->insert(prefix + node->path().toString());
+        bool supportSparse = Indexability::nodeSupportedBySparseIndex(node);
+        (*out)[prefix + node->path().toString()] = {supportSparse};
     } else if (Indexability::arrayUsesIndexOnChildren(node) && !node->path().empty()) {
         // If the array uses an index on its children, it's something like
         // {foo : {$elemMatch: {bar: 1}}}, in which case the predicate is really over foo.bar.
@@ -275,8 +276,7 @@ void QueryPlannerIXSelect::getFields(const MatchExpression* node,
     }
 }
 
-void QueryPlannerIXSelect::getFields(const MatchExpression* node,
-                                     stdx::unordered_set<string>* out) {
+void QueryPlannerIXSelect::getFields(const MatchExpression* node, RelevantFieldIndexMap* out) {
     getFields(node, "", out);
 }
 
@@ -316,26 +316,40 @@ std::vector<IndexEntry> QueryPlannerIXSelect::findIndexesByHint(
 
 // static
 std::vector<IndexEntry> QueryPlannerIXSelect::findRelevantIndices(
-    const stdx::unordered_set<std::string>& fields, const std::vector<IndexEntry>& allIndices) {
+    const RelevantFieldIndexMap& fields, const std::vector<IndexEntry>& allIndices) {
 
     std::vector<IndexEntry> out;
-    for (auto&& entry : allIndices) {
-        BSONObjIterator it(entry.keyPattern);
+    for (auto&& index : allIndices) {
+        BSONObjIterator it(index.keyPattern);
         BSONElement elt = it.next();
-        if (fields.end() != fields.find(elt.fieldName())) {
-            out.push_back(entry);
+        const std::string fieldName = elt.fieldNameStringData().toString();
+
+        // If the index is non-sparse we can use the field regardless its sparsity, otherwise we
+        // should find the field that can be answered by a sparse index.
+        if (fields.contains(fieldName) &&
+            (!index.sparse || fields.find(fieldName)->second.isSparse)) {
+            out.push_back(index);
         }
     }
 
     return out;
 }
 
-std::vector<IndexEntry> QueryPlannerIXSelect::expandIndexes(
-    const stdx::unordered_set<std::string>& fields, std::vector<IndexEntry> relevantIndices) {
+std::vector<IndexEntry> QueryPlannerIXSelect::expandIndexes(const RelevantFieldIndexMap& fields,
+                                                            std::vector<IndexEntry> relevantIndices,
+                                                            bool indexHinted) {
     std::vector<IndexEntry> out;
+    // Filter out fields that cannot be answered by any sparse index. We know wildcard indexes are
+    // sparse, so we don't want to expand the wildcard index based on such fields.
+    stdx::unordered_set<std::string> sparseIncompatibleFields;
+    for (auto&& [fieldName, idxProperty] : fields) {
+        if (idxProperty.isSparse || indexHinted) {
+            sparseIncompatibleFields.insert(fieldName);
+        }
+    }
     for (auto&& entry : relevantIndices) {
         if (entry.type == IndexType::INDEX_WILDCARD) {
-            wcp::expandWildcardIndexEntry(entry, fields, &out);
+            wcp::expandWildcardIndexEntry(entry, sparseIncompatibleFields, &out);
         } else {
             out.push_back(std::move(entry));
         }

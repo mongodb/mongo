@@ -229,10 +229,15 @@ IndexEntry indexEntryFromIndexCatalogEntry(OperationContext* opCtx,
             MultikeyMetadataAccessStats mkAccessStats;
 
             if (canonicalQuery) {
-                stdx::unordered_set<std::string> fields;
-                QueryPlannerIXSelect::getFields(canonicalQuery->root(), &fields);
-                const auto projectedFields = projection_executor_utils::applyProjectionToFields(
-                    wildcardProjection->exec(), fields);
+                RelevantFieldIndexMap fieldIndexProps;
+                QueryPlannerIXSelect::getFields(canonicalQuery->root(), &fieldIndexProps);
+                stdx::unordered_set<std::string> projectedFields;
+                for (auto&& [fieldName, _] : fieldIndexProps) {
+                    if (projection_executor_utils::applyProjectionToOneField(
+                            wildcardProjection->exec(), fieldName)) {
+                        projectedFields.insert(fieldName);
+                    }
+                }
 
                 multikeyPathSet =
                     getWildcardMultikeyPathSet(wam, opCtx, projectedFields, &mkAccessStats);

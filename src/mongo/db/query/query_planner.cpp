@@ -940,10 +940,11 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::planFromCache(
                 "filter"_attr = redact(clone->debugString()),
                 "cacheData"_attr = redact(winnerCacheData.toString()));
 
-    stdx::unordered_set<string> fields;
+    RelevantFieldIndexMap fields;
     QueryPlannerIXSelect::getFields(query.root(), &fields);
+    // We will not cache queries with 'hint'.
     std::vector<IndexEntry> expandedIndexes =
-        QueryPlannerIXSelect::expandIndexes(fields, params.indices);
+        QueryPlannerIXSelect::expandIndexes(fields, params.indices, false /* indexHinted */);
 
     // Map from index name to index number.
     map<IndexEntry::Identifier, size_t> indexMap;
@@ -1114,7 +1115,7 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     // Hints require us to only consider the hinted index. If index filters in the query settings
     // were used to override the allowed indices for planning, we should not use the hinted index
     // requested in the query.
-    boost::optional<BSONObj> hintedIndexBson;
+    boost::optional<BSONObj> hintedIndexBson = boost::none;
     if (!params.indexFiltersApplied) {
         if (auto hintObj = query.getFindCommandRequest().getHint(); !hintObj.isEmpty()) {
             hintedIndexBson = hintObj;
@@ -1170,13 +1171,14 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
     }
 
     // Figure out what fields we care about.
-    stdx::unordered_set<string> fields;
+    RelevantFieldIndexMap fields;
     QueryPlannerIXSelect::getFields(query.root(), &fields);
     for (auto&& field : fields) {
-        LOGV2_DEBUG(20970, 5, "Predicate over field", "field"_attr = field);
+        LOGV2_DEBUG(20970, 5, "Predicate over field", "field"_attr = field.first);
     }
 
-    fullIndexList = QueryPlannerIXSelect::expandIndexes(fields, std::move(fullIndexList));
+    fullIndexList = QueryPlannerIXSelect::expandIndexes(
+        fields, std::move(fullIndexList), hintedIndexBson != boost::none);
     std::vector<IndexEntry> relevantIndices;
 
     if (!hintedIndexEntry) {
