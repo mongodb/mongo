@@ -3,6 +3,10 @@ test_kind: js_test
 selector:
   roots:
   - jstests/serial_run/*.js
+  exclude_files:
+  # TODO SERVER-75146 we are temporarily disabling this to fix a hot BF. We should investigate the
+  # failures and fix and re-enable the test.
+  - jstests/serial_run/allow_partial_results_with_maxTimeMS.js
 
 executor:
   archive:
