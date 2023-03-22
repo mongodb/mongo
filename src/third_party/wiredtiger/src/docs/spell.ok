@@ -305,6 +305,7 @@ dumpfile
 dup
 dups
 ebusy
+ejnprx
 encrypt
 encryptor
 encryptor's
@@ -410,7 +411,6 @@ je
 jemalloc
 jitter
 jni
-jnprx
 jrx
 json
 jxf

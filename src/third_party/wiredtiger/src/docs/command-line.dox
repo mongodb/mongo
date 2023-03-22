@@ -184,7 +184,7 @@ which can be re-loaded into a new table using the \c load command.
 See @subpage dump_formats for details of the dump file formats.
 
 @subsection util_dump_synopsis Synopsis
-`wt [-BLmRrSVv] [-C config] [-E secretkey ] [-h directory] dump [-jnprx] [-c checkpoint] [-f output] [-l lower bound] [-t timestamp] [-u upper bound] uri`
+`wt [-BLmRrSVv] [-C config] [-E secretkey ] [-h directory] dump [-ejnprx] [-c checkpoint] [-f output] [-l lower bound] [-t timestamp] [-u upper bound] [-w window] uri`
 
 @subsection util_dump_options Options
 The following are command-specific options for the \c dump command:
@@ -193,6 +193,9 @@ The following are command-specific options for the \c dump command:
 By default, the \c dump command opens the most recent version of the data
 source; the \c -c option changes the \c dump command to dump as of the named
 checkpoint.
+
+@par \c -e
+Start the explore mode to dump the file interactively.
 
 @par \c -f
 By default, the \c dump command output is written to the standard output;

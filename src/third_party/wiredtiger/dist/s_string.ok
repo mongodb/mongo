@@ -465,6 +465,7 @@ basecfg
 bbb
 bbuilddir
 bcr
+bd
 beginthreadex
 bigram
 binutils
@@ -486,6 +487,7 @@ booleans
 boption
 br
 breakpoint
+bs
 bstorage
 bswap
 btcur
@@ -660,6 +662,7 @@ dup
 dv
 eee
 eg
+ejnprx
 el
 emp
 encodings
@@ -835,7 +838,6 @@ isrc
 isspace
 iter
 jjj
-jnprx
 js
 json
 kB
@@ -900,6 +902,7 @@ lsn
 lt
 lte
 lu
+luc
 lwsync
 lz
 madvise
@@ -1072,6 +1075,7 @@ rN
 rS
 rbrace
 rbracket
+rc
 rdlock
 rdtsc
 rduppo
@@ -1100,6 +1104,7 @@ retp
 revint
 rf
 risc
+rl
 rle
 rmw
 rng
@@ -1138,6 +1143,7 @@ skiplist
 skiplists
 skipp
 slvg
+sn
 snaplen
 snapsort
 snprintf
