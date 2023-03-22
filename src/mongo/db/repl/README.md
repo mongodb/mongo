@@ -805,10 +805,10 @@ aborts, all of its operations abort and all corresponding data changes are abort
 
 ## Life of a Multi-Document Transaction
 
-All transactions are associated with a server session and at any given time, only one open
-transaction can be associated with a single session. The state of a transaction is maintained
-through the
-[`TransactionParticipant`](https://github.com/mongodb/mongo/blob/v6.1/src/mongo/db/transaction/transaction_participant.h),
+All transactions are associated with a server session and at any given time,
+[only one open transaction can be associated with a single session](https://github.com/mongodb/mongo/blob/r6.0.5/src/mongo/db/service_entry_point_common.cpp#L881-L902).
+The state of a transaction is maintained
+through the [`TransactionParticipant`](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/transaction_participant.h),
 which is a decoration on the session. Any thread that attempts to modify the state of the
 transaction, which can include committing, aborting, or adding an operation to the transaction, must
 have the correct session checked out before doing so. Only one operation can check out a session at
@@ -819,34 +819,34 @@ a time, so other operations that need to use the same session must wait for it t
 Transactions are started on the server by the first operation in the transaction, indicated by a
 `startTransaction: true` parameter. All operations in a transaction must include an `lsid`, which is
 a unique ID for a session, a `txnNumber`, and an `autocommit:false` parameter. The `txnNumber` must
-be higher than the previous `txnNumber` on this session. Otherwise, we will throw a
-`TransactionTooOld` error.
+be higher than the previous `txnNumber` on this session. Otherwise, we will
+[throw a `TransactionTooOld` error](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/transaction_participant.cpp#L957-L978).
 
 When starting a new transaction, we implicitly abort the previously running transaction (if one
 exists) on the session by updating our `txnNumber`. Next, we update our `txnState` to
 `kInProgress`. The `txnState` maintains the state of the transaction and allows us to determine
 legal state transitions. Finally, we reset the in memory state of the transaction as well as any
-corresponding transaction metrics from a previous transaction.
+[corresponding transaction metrics](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/transaction_participant.cpp#L896-L902) from a previous transaction.
 
-When a node starts a transaction, it will acquire the global lock in intent exclusive mode (and as a
-result, the [RSTL](#replication-state-transition-lock) in intent exclusive as well), which it will
+When a node starts a transaction, it will [acquire the global lock in intent exclusive mode](https://github.com/mongodb/mongo/blob/master/src/mongo/db/transaction/transaction_participant.cpp#L1569)
+(and as a result, the [RSTL](#replication-state-transition-lock) in intent exclusive as well), which it will
 hold for the duration of the transaction. The only exception is when
 [preparing a transaction](#preparing-a-transaction-on-the-primary), which will release the RSTL and
 reacquire it when [committing](#committing-a-prepared-transaction) or
-[aborting](#aborting-a-prepared-transaction) the transaction. It also opens a `WriteUnitOfWork`,
-which begins a storage engine transaction on the `RecoveryUnit`. The `RecoveryUnit` is responsible
-for making sure data is persisted and all on-disk data must be modified through this interface. The
+[aborting](#aborting-a-prepared-transaction) the transaction. It also
+[opens a `WriteUnitOfWork`, which begins a storage engine transaction on the `RecoveryUnit`](https://github.com/mongodb/mongo/blob/411e11d88eaa52d70d02cab8e94d3a5b224900ab/src/mongo/db/transaction/transaction_participant.cpp#L1571-L1577).
+The `RecoveryUnit` is responsible for making sure data is persisted and all on-disk data must be modified through this interface. The
 storage transaction is updated every time an operation comes in so that we can read our own writes
 within a multi-document transaction. These changes are not visible to outside operations because the
 node hasn't committed the transaction (and therefore, the WUOW) yet.
 
 ### Adding Operations to a Transaction
 
-A user can add additional operations to an existing multi-document transaction by running more
+A user can [add additional operations](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/op_observer_impl.cpp#L554) to an existing multi-document transaction by running more
 commands on the same session. These operations are then stored in memory. Once a write completes on
-the primary, we update the corresponding `sessionTxnRecord` in the transactions table
-(`config.transactions`) with information about the transaction. This includes things like the
-`lsid`, the `txnNumber` currently associated with the session, and the `txnState`.
+the primary, [we update the corresponding `sessionTxnRecord`](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/op_observer_impl.cpp#L1664-L1673)
+in the transactions table (`config.transactions`) with information about the transaction. 
+This includes things like the `lsid`, the `txnNumber` currently associated with the session, and the `txnState`.
 
 This table was introduced for retryable writes and is used to keep track of retryable write and
 transaction progress on a session. When checking out a session, this table can be used to restore
@@ -856,24 +856,24 @@ the transactions table is used during transaction recovery.
 
 ### Committing a Single Replica Set Transaction
 
-If we decide to commit this transaction, we retrieve those operations, group them into an `applyOps`
+If we decide to commit this transaction, [we retrieve those operations, group them into an `applyOps`](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/op_observer_impl.cpp#L1981-L1983)
 command and write down an `applyOps` oplog entry. Since an `applyOps` oplog entry can only be up to
 16MB, transactions larger than this require multiple `applyOps` oplog entries upon committing.
 
-If we are committing a read-only transaction, meaning that we did not modify any data, it must wait
+If we are committing a [read-only transaction](#read-concern-behavior-within-transactions), meaning that we did not modify any data, it must wait
 for any data it reads to be majority committed regardless of the `readConcern` level.
 
-Once we log the transaction oplog entries, we must commit the storage-transaction on the
-`OperationContext`. This involves calling commit() on the WUOW. Once commit() is called on the WUOW
+Once we log the transaction oplog entries, [we must commit the storage-transaction](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/transaction_participant.cpp#L1850-L1852)
+on the `OperationContext`. This involves calling commit() on the WUOW. Once commit() is called on the WUOW
 associated with a transaction, all writes that occurred during its lifetime will commit in the
 storage engine.
 
-Finally, we update the transactions table, update our local `txnState` to `kCommitted`, log any
+Finally, we update the transactions table, [update our local `txnState` to `kCommitted`](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/transaction_participant.cpp#L2012), log any
 transactions metrics, and clear our txnResources.
 
 ### Aborting a Single Replica Set Transaction
 
-The process for aborting a multi-document transaction is simpler than committing. We abort the
+The process for aborting a multi-document transaction is simpler than committing. We [abort](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/transaction_participant.cpp#L2072) the
 storage transaction and change our local `txnState` to `kAbortedWithoutPrepare`. We then log any
 transactions metrics and reset the in memory state of the `TransactionParticipant`. None of the
 transaction operations are visible at this point, so we don't need to write an abort oplog entry
