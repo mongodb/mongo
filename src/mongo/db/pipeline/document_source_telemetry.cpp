@@ -153,11 +153,11 @@ DocumentSource::GetNextResult DocumentSourceTelemetry::doGetNext() {
                             "Error encountered when redacting query shape, will not publish "
                             "telemetry for this entry.",
                             "status"_attr = swKey.getStatus());
-                continue;
                 if (kDebugBuild) {
                     tasserted(7349401,
                               "Was not able to re-parse telemetry key when reading telemetry.");
                 }
+                continue;
             }
             _materializedPartition.push_back({{"key", std::move(swKey.getValue())},
                                               {"metrics", metrics.toBSON()},

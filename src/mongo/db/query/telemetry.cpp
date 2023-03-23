@@ -35,6 +35,7 @@
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/projection_executor_builder.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/query/find_command_gen.h"
 #include "mongo/db/query/plan_explainer.h"
@@ -160,6 +161,12 @@ void addRemainingFindCommandFields(BSONObjBuilder* bob, const FindCommandRequest
         bob->append(FindCommandRequest::kCollationFieldName, collation);
     }
 }
+boost::optional<std::string> getApplicationName(const OperationContext* opCtx) {
+    if (auto metadata = ClientMetadata::get(opCtx->getClient())) {
+        return metadata->getApplicationName().toString();
+    }
+    return boost::none;
+}
 }  // namespace
 BSONObj redactHintComponent(BSONObj obj, const SerializationOptions& opts, bool redactValues) {
     BSONObjBuilder bob;
@@ -208,9 +215,13 @@ BSONObj redactLetSpec(BSONObj letSpec,
     return bob.obj();
 }
 
-StatusWith<BSONObj> redactFindRequest(const FindCommandRequest& findCommand,
-                                      const SerializationOptions& opts,
-                                      const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+StatusWith<BSONObj> makeTelemetryKey(const FindCommandRequest& findCommand,
+                                     const SerializationOptions& opts,
+                                     const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                     boost::optional<const TelemetryMetrics&> existingMetrics) {
+    // TODO: SERVER-75156 Factor query shape out of telemetry. That ticket will involve splitting
+    // this function up and moving most of it to another, non-telemetry related header.
+
     if (!opts.redactFieldNames && !opts.replacementForLiteralArgs) {
         // Short circuit if no redaction needs to be done.
         BSONObjBuilder bob;
@@ -221,6 +232,25 @@ StatusWith<BSONObj> redactFindRequest(const FindCommandRequest& findCommand,
     // This function enumerates all the fields in a find command and either copies or attempts to
     // redact them.
     BSONObjBuilder bob;
+
+    // Serialize the namespace as part of the query shape.
+    {
+        BSONObjBuilder cmdNs = bob.subobjStart("cmdNs");
+        auto ns = findCommand.getNamespaceOrUUID();
+        if (ns.nss()) {
+            auto nss = ns.nss().value();
+            if (nss.tenantId()) {
+                cmdNs.append("tenantId",
+                             opts.serializeFieldName(nss.tenantId().value().toString()));
+            }
+            cmdNs.append("db", opts.serializeFieldName(nss.db()));
+            cmdNs.append("coll", opts.serializeFieldName(nss.coll()));
+        } else {
+            cmdNs.append("uuid", opts.serializeFieldName(ns.uuid()->toString()));
+        }
+        cmdNs.done();
+    }
+
     // Redact the namespace of the command.
     {
         auto nssOrUUID = findCommand.getNamespaceOrUUID();
@@ -309,6 +339,23 @@ StatusWith<BSONObj> redactFindRequest(const FindCommandRequest& findCommand,
 
     // Add the fields that require no redaction.
     addRemainingFindCommandFields(&bob, findCommand);
+
+
+    auto appName = [&]() -> boost::optional<std::string> {
+        if (existingMetrics.has_value()) {
+            if (existingMetrics->applicationName.has_value()) {
+                return existingMetrics->applicationName;
+            }
+        } else {
+            if (auto appName = getApplicationName(expCtx->opCtx)) {
+                return appName.value();
+            }
+        }
+        return boost::none;
+    }();
+    if (appName.has_value()) {
+        bob.append("applicationName", opts.serializeFieldName(appName.value()));
+    }
 
     return bob.obj();
 }
@@ -578,7 +625,9 @@ StatusWith<BSONObj> TelemetryMetrics::redactKey(const BSONObj& key,
     }
 
     if (cmdObj.hasField(FindCommandRequest::kCommandName)) {
-        auto findCommand = query_request_helper::makeFromFindCommand(cmdObj, boost::none, false);
+        tassert(7198600, "Find command must have a namespace string.", this->nss.nss().has_value());
+        auto findCommand =
+            query_request_helper::makeFromFindCommand(cmdObj, this->nss.nss().value(), false);
 
         SerializationOptions options(sha256StringDataHasher, replacementForLiteralArgs);
         auto nss = findCommand->getNamespaceOrUUID().nss();
@@ -587,7 +636,7 @@ StatusWith<BSONObj> TelemetryMetrics::redactKey(const BSONObj& key,
         expCtx->variables.setDefaultRuntimeConstants(opCtx);
         expCtx->maxFeatureCompatibilityVersion = boost::none;  // Ensure all features are allowed.
         expCtx->stopExpressionCounters();
-        auto swRedactedKey = redactFindRequest(*findCommand, options, expCtx);
+        auto swRedactedKey = makeTelemetryKey(*findCommand, options, expCtx, *this);
         if (!swRedactedKey.isOK()) {
             return swRedactedKey.getStatus();
         }
@@ -738,7 +787,7 @@ void registerFindRequest(const FindCommandRequest& request,
 
     SerializationOptions options;
     options.replacementForLiteralArgs = replacementForLiteralArgs;
-    auto swTelemetryKey = redactFindRequest(request, options, expCtx);
+    auto swTelemetryKey = makeTelemetryKey(request, options, expCtx);
     tassert(7349402,
             str::stream() << "Error encountered when extracting query shape from command for "
                              "telemetry collection: "
@@ -770,8 +819,10 @@ void writeTelemetry(OperationContext* opCtx,
     if (statusWithMetrics.isOK()) {
         metrics = statusWithMetrics.getValue();
     } else {
-        size_t numEvicted =
-            telemetryStore.put(*telemetryKey, TelemetryMetrics(cmdObj), partitionLock);
+        size_t numEvicted = telemetryStore.put(
+            *telemetryKey,
+            TelemetryMetrics(cmdObj, getApplicationName(opCtx), CurOp::get(opCtx)->getNSS()),
+            partitionLock);
         telemetryEvictedMetric.increment(numEvicted);
         auto newMetrics = partitionLock->get(*telemetryKey);
         // This can happen if the budget is immediately exceeded. Specifically if the there is

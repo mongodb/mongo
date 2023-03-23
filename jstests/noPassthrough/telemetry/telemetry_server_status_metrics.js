@@ -97,7 +97,7 @@ runTestWithMongodOptions({
  * */
 runTestWithMongodOptions({
     setParameter: {
-        internalQueryConfigureTelemetryCacheSize: "2MB",
+        internalQueryConfigureTelemetryCacheSize: "4MB",
         internalQueryConfigureTelemetrySamplingRate: 2147483647
     },
 },

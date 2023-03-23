@@ -77,11 +77,12 @@ const fooNeBatchSize = 3;
                                  ])
                                  .toArray();
     assert.eq(telemetryResults.length, 2, telemetryResults);
-    // TODO: SERVER-71986 Add app name to telemetry key.
-    // assert.eq(telemetryResults[0].key.namespace, `test.${jsTestName()}`);
-    // assert.eq(telemetryResults[0].key.applicationName, "MongoDB Shell");
-    // assert.eq(telemetryResults[1].key.namespace, `test.${jsTestName()}`);
-    // assert.eq(telemetryResults[1].key.applicationName, "MongoDB Shell");
+    assert.eq(telemetryResults[0].key.cmdNs.db, "test");
+    assert.eq(telemetryResults[0].key.cmdNs.coll, jsTestName());
+    assert.eq(telemetryResults[0].key.applicationName, "MongoDB Shell");
+    assert.eq(telemetryResults[1].key.cmdNs.db, "test");
+    assert.eq(telemetryResults[1].key.cmdNs.coll, jsTestName());
+    assert.eq(telemetryResults[1].key.applicationName, "MongoDB Shell");
 
     assert.eq(telemetryResults[0].metrics.execCount, 1);
     assert.eq(telemetryResults[1].metrics.execCount, 1);
@@ -112,11 +113,11 @@ const fooNeBatchSize = 3;
                            .aggregate([{$telemetry: {}}, {$match: {"key.sort.foo": 1}}])
                            .toArray();
     assert.eq(telemetryResults.length, 1, telemetryResults);
-    // TODO: SERVER-71986 Add app name to telemetry key.
-    // assert.eq(telemetryResults[0].key.namespace, `test.${jsTestName()}`);
-    // assert.eq(telemetryResults[0].key.applicationName, "MongoDB Shell");
-    // assert.eq(telemetryResults[0].metrics.execCount, 1);
-    // assert.eq(telemetryResults[0].metrics.docsReturned.sum, numDocs);
+    assert.eq(telemetryResults[0].key.cmdNs.db, "test");
+    assert.eq(telemetryResults[0].key.cmdNs.coll, jsTestName());
+    assert.eq(telemetryResults[0].key.applicationName, "MongoDB Shell");
+    assert.eq(telemetryResults[0].metrics.execCount, 1);
+    assert.eq(telemetryResults[0].metrics.docsReturned.sum, numDocs);
 
     // This filters to just the telemetry for query coll.find({foo: {$eq:
     // 1}}).limit(query2Limit).batchSize(2).
@@ -124,9 +125,9 @@ const fooNeBatchSize = 3;
                            .aggregate([{$telemetry: {}}, {$match: {"key.limit": '?'}}])
                            .toArray();
     assert.eq(telemetryResults.length, 1, telemetryResults);
-    // TODO: SERVER-71986 Add app name to telemetry key.
-    // assert.eq(telemetryResults[0].key.namespace, `test.${jsTestName()}`);
-    // assert.eq(telemetryResults[0].key.applicationName, "MongoDB Shell");
+    assert.eq(telemetryResults[0].key.cmdNs.db, "test");
+    assert.eq(telemetryResults[0].key.cmdNs.coll, jsTestName());
+    assert.eq(telemetryResults[0].key.applicationName, "MongoDB Shell");
     assert.eq(telemetryResults[0].metrics.execCount, 1);
     assert.eq(telemetryResults[0].metrics.docsReturned.sum, query2Limit);
 
@@ -144,9 +145,9 @@ const fooNeBatchSize = 3;
                            ])
                            .toArray();
     assert.eq(telemetryResults.length, 1, telemetryResults);
-    // TODO: SERVER-71986 Add app name to telemetry key.
-    // assert.eq(telemetryResults[0].key.namespace, `test.${jsTestName()}`);
-    // assert.eq(telemetryResults[0].key.applicationName, "MongoDB Shell");
+    assert.eq(telemetryResults[0].key.cmdNs.db, "test");
+    assert.eq(telemetryResults[0].key.cmdNs.coll, jsTestName());
+    assert.eq(telemetryResults[0].key.applicationName, "MongoDB Shell");
     assert.eq(telemetryResults[0].metrics.execCount, 2);
     assert.eq(telemetryResults[0].metrics.docsReturned.sum, numDocs / 2 + 2 * fooEqBatchSize);
     assert.eq(telemetryResults[0].metrics.docsReturned.max, numDocs / 2);

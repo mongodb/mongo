@@ -83,10 +83,12 @@ const assertExpectedResults = (results,
     const coll = db[collName];
 
     const telemetryKey = {
+        cmdNs: {db: "test", coll: "coll"},
         find: collName,
         filter: {$and: [{v: {$gt: findRedactString}}, {v: {$lt: findRedactString}}]},
         batchSize: findRedactString,
         readConcern: {level: "local", provenance: "implicitDefault"},
+        applicationName: "MongoDB Shell",
     };
 
     const cursor = coll.find({v: {$gt: 0, $lt: 5}}).batchSize(1);  // returns 1 doc
@@ -214,10 +216,12 @@ const assertExpectedResults = (results,
     const coll = db[collName];
 
     const telemetryKey = {
+        cmdNs: {db: "test", coll: "coll"},
         find: collName,
         filter: {$and: [{v: {$gt: findRedactString}}, {v: {$lt: findRedactString}}]},
         batchSize: findRedactString,
         readConcern: {level: "local", provenance: "implicitDefault"},
+        applicationName: "MongoDB Shell"
     };
 
     const cursor1 = coll.find({v: {$gt: 0, $lt: 5}}).batchSize(1);  // returns 1 doc

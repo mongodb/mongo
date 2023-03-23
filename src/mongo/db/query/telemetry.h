@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/partitioned_cache.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/telemetry_gen.h"
@@ -78,13 +79,7 @@ void appendShardedTelemetryKeyIfApplicable(MutableDocument& objToModify,
 void appendShardedTelemetryKeyIfApplicable(BSONObjBuilder& objToModify,
                                            std::string hostAndPort,
                                            OperationContext* opCtx);
-/**
- * Serialize the FindCommandRequest according to the Options passed in. Returns the serialized BSON
- * with all field names and literals redacted.
- */
-StatusWith<BSONObj> redactFindRequest(const FindCommandRequest& findCommand,
-                                      const SerializationOptions& opts,
-                                      const boost::intrusive_ptr<ExpressionContext>& expCtx);
+
 /**
  * An aggregated metric stores a compressed view of data. It balances the loss of information
  * with the reduction in required storage.
@@ -126,8 +121,13 @@ struct AggregatedMetric {
 // Used to aggregate the metrics for one telemetry key over all its executions.
 class TelemetryMetrics {
 public:
-    TelemetryMetrics(const BSONObj& cmdObj)
-        : firstSeenTimestamp(Date_t::now().toMillisSinceEpoch() / 1000, 0), cmdObj(cmdObj.copy()) {}
+    TelemetryMetrics(const BSONObj& cmdObj,
+                     boost::optional<std::string> applicationName,
+                     NamespaceStringOrUUID nss)
+        : firstSeenTimestamp(Date_t::now().toMillisSinceEpoch() / 1000, 0),
+          cmdObj(cmdObj.copy()),
+          applicationName(applicationName),
+          nss(nss) {}
 
     BSONObj toBSON() const {
         BSONObjBuilder builder{sizeof(TelemetryMetrics) + 100};
@@ -170,6 +170,14 @@ public:
      * telemetry key at read-time.
      */
     BSONObj cmdObj;
+
+    /**
+     * The application name that is a part of the query shape. It is necessary to store this
+     * separately from the telemetry key since it exists on the OpCtx, not the cmdObj.
+     */
+    boost::optional<std::string> applicationName;
+
+    NamespaceStringOrUUID nss;
 
 private:
     /**
@@ -230,5 +238,15 @@ void writeTelemetry(OperationContext* opCtx,
                     const BSONObj& cmdObj,
                     uint64_t queryExecMicros,
                     uint64_t docsReturned);
+
+/**
+ * Serialize the FindCommandRequest according to the Options passed in. Returns the serialized BSON
+ * with all field names and literals redacted.
+ */
+StatusWith<BSONObj> makeTelemetryKey(
+    const FindCommandRequest& findCommand,
+    const SerializationOptions& opts,
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    boost::optional<const TelemetryMetrics&> existingMetrics = boost::none);
 }  // namespace telemetry
 }  // namespace mongo
