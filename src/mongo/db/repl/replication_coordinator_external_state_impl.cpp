@@ -1059,7 +1059,7 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
         }
     }
 
-    if (gFeatureFlagCatalogShard.isEnabled(serverGlobalParams.featureCompatibility) &&
+    if (gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV() &&
         serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
         !ShardingState::get(opCtx)->enabled()) {
         // Note this must be called after the config server has created the cluster ID and also

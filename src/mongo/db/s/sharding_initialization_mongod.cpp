@@ -387,6 +387,7 @@ bool ShardingInitializationMongoD::initializeShardingAwarenessIfNeeded(Operation
                           "disk. This most likely means this server has not yet been added to a "
                           "sharded cluster",
                           "namespace"_attr = NamespaceString::kServerConfigurationNamespace);
+
             return false;
         }
 
