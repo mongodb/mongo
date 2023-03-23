@@ -40,6 +40,7 @@
 #include <fmt/format.h>
 #include <fstream>
 
+#include "mongo/bson/bson_bin_util.h"
 #include "mongo/bson/bson_validate.h"
 #include "mongo/bson/util/bsoncolumn.h"
 #include "mongo/scripting/engine.h"
@@ -514,6 +515,13 @@ BSONObj decompressBSONColumn(const BSONObj& a, void* data) {
     return wrapper.obj();
 }
 
+/**
+ * Dumps BSON data as a Hex-formatted string
+ */
+BSONObj dumpBSONAsHex(const BSONObj& a, void* data) {
+    return BSON("" << bson_bin_util::toHex(a));
+}
+
 // The name of the file to dump is provided as a string in the first
 // field of the 'a' object. Other arguments in the BSONObj are
 // ignored. The void* argument is unused.
@@ -620,6 +628,7 @@ void installShellUtilsExtended(Scope& scope) {
     scope.injectNative("umask", changeUmask);
     scope.injectNative("getFileMode", getFileMode);
     scope.injectNative("decompressBSONColumn", decompressBSONColumn);
+    scope.injectNative("dumpBSONAsHex", dumpBSONAsHex);
     scope.injectNative("_copyFileRange", copyFileRange);
     scope.injectNative("_readDumpFile", readDumpFile);
     scope.injectNative("_getEnv", shellGetEnv);
