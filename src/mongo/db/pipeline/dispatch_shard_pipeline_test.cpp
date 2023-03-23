@@ -61,7 +61,8 @@ TEST_F(DispatchShardPipelineTest, DoesNotSplitPipelineIfTargetingOneShard) {
                                                                   hasChangeStream,
                                                                   startsWithDocuments,
                                                                   eligibleForSampling,
-                                                                  std::move(pipeline));
+                                                                  std::move(pipeline),
+                                                                  boost::none /*explain*/);
         ASSERT_EQ(results.remoteCursors.size(), 1UL);
         ASSERT(!results.splitPipeline);
     });
@@ -97,7 +98,8 @@ TEST_F(DispatchShardPipelineTest, DoesSplitPipelineIfMatchSpansTwoShards) {
                                                                   hasChangeStream,
                                                                   startsWithDocuments,
                                                                   eligibleForSampling,
-                                                                  std::move(pipeline));
+                                                                  std::move(pipeline),
+                                                                  boost::none /*explain*/);
         ASSERT_EQ(results.remoteCursors.size(), 2UL);
         ASSERT(bool(results.splitPipeline));
     });
@@ -136,7 +138,8 @@ TEST_F(DispatchShardPipelineTest, DispatchShardPipelineRetriesOnNetworkError) {
                                                                   hasChangeStream,
                                                                   startsWithDocuments,
                                                                   eligibleForSampling,
-                                                                  std::move(pipeline));
+                                                                  std::move(pipeline),
+                                                                  boost::none /*explain*/);
         ASSERT_EQ(results.remoteCursors.size(), 2UL);
         ASSERT(bool(results.splitPipeline));
     });
@@ -186,7 +189,8 @@ TEST_F(DispatchShardPipelineTest, DispatchShardPipelineDoesNotRetryOnStaleConfig
                                                                       hasChangeStream,
                                                                       startsWithDocuments,
                                                                       eligibleForSampling,
-                                                                      std::move(pipeline)),
+                                                                      std::move(pipeline),
+                                                                      boost::none /*explain*/),
                            AssertionException,
                            ErrorCodes::StaleConfig);
     });
@@ -225,16 +229,17 @@ TEST_F(DispatchShardPipelineTest, WrappedDispatchDoesRetryOnStaleConfigError) {
     auto future = launchAsync([&] {
         // Shouldn't throw.
         sharding::router::CollectionRouter router(getServiceContext(), kTestAggregateNss);
-        auto results =
-            router.route(operationContext(),
-                         "dispatch shard pipeline"_sd,
-                         [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
-                             return sharded_agg_helpers::dispatchShardPipeline(serializedCommand,
-                                                                               hasChangeStream,
-                                                                               startsWithDocuments,
-                                                                               eligibleForSampling,
-                                                                               pipeline->clone());
-                         });
+        auto results = router.route(operationContext(),
+                                    "dispatch shard pipeline"_sd,
+                                    [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
+                                        return sharded_agg_helpers::dispatchShardPipeline(
+                                            serializedCommand,
+                                            hasChangeStream,
+                                            startsWithDocuments,
+                                            eligibleForSampling,
+                                            pipeline->clone(),
+                                            boost::none /*explain*/);
+                                    });
         ASSERT_EQ(results.remoteCursors.size(), 1UL);
         ASSERT(!bool(results.splitPipeline));
     });
