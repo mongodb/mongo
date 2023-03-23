@@ -3,6 +3,7 @@
 Import('env')
 
 env = env.Clone()
+env.InjectThirdParty(libraries=['grpc'])
 
 env.Library(
     target='grpc_transport_layer',
@@ -22,5 +23,32 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         'grpc_transport_layer',
+    ],
+)
+
+protoEnv = env.Clone()
+protoEnv.InjectThirdParty(libraries=['proto'])
+protoEnv.AppendUnique(
+    PROTOC_GEN_TYPES=[['cpp', protoEnv.Dir('.')]], PROTOC_PLUGINS={
+        'grpc': {
+            'plugin': '$PROTOC_GRPC_PLUGIN',
+            'options': ['generate_mock_code=true'],
+            'gen_out': protoEnv.Dir('.'),
+            'exts': ['.grpc.pb.cc', '.grpc.pb.h'],
+        },
+    }, CPPPATH=[protoEnv.Dir('.')])
+protoEnv.Append(CPPPATH=[
+    '$BUILD_DIR/third_party/protobuf/dist/src',
+])
+
+protoEnv.CppUnitTest(
+    target='grpc_core_test',
+    source=[
+        'core_test.cpp',
+        'core_test.proto',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/third_party/shim_grpc',
     ],
 )

@@ -4,14 +4,20 @@ Import('env')
 
 env = env.Clone()
 
-env.SConscript(
-    dirs=[
-        'grpc',
-    ],
-    exports=[
-        'env',
-    ],
-)
+
+def shouldBuildGRPC(myEnv):
+    return myEnv.TargetOSIs('linux') and myEnv['ENABLE_GRPC_BUILD']
+
+
+if shouldBuildGRPC(env):
+    env.SConscript(
+        dirs=[
+            'grpc',
+        ],
+        exports=[
+            'env',
+        ],
+    )
 
 env.Library(
     target='transport_layer_common',
@@ -68,7 +74,7 @@ tlEnv.Library(
         'transport_layer_manager.cpp',
     ],
     LIBDEPS=[
-        'grpc/grpc_transport_layer' if env.TargetOSIs('linux') else [],
+        'grpc/grpc_transport_layer' if shouldBuildGRPC(tlEnv) else [],
         'transport_layer',
     ],
     LIBDEPS_PRIVATE=[

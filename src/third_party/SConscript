@@ -239,6 +239,9 @@ if not use_system_version_of_library('protobuf'):
     }
 
 if not use_system_version_of_library('grpc'):
+    thirdPartyEnvironmentModifications['grpc'] = {
+        'CPPPATH': ['#src/third_party/grpc/dist/include'],
+    }
     thirdPartyEnvironmentModifications['re2'] = {
         'CPPPATH': ['#src/third_party/re2/dist'],
     }
