@@ -790,8 +790,10 @@ public:
             // Rewrite any FLE find payloads that exist in the query if this is a FLE 2 query.
             if (shouldDoFLERewrite(findCommand)) {
                 invariant(findCommand->getNamespaceOrUUID().nss());
-                processFLEFindD(
-                    opCtx, findCommand->getNamespaceOrUUID().nss().value(), findCommand.get());
+                if (!findCommand->getEncryptionInformation()->getCrudProcessed().value_or(false)) {
+                    processFLEFindD(
+                        opCtx, findCommand->getNamespaceOrUUID().nss().value(), findCommand.get());
+                }
                 // Set the telemetryStoreKey to none so telemetry isn't collected when we've done a
                 // FLE rewrite.
                 CurOp::get(opCtx)->debug().telemetryStoreKey = boost::none;

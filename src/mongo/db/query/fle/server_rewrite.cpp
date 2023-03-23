@@ -345,11 +345,12 @@ void processFindCommand(OperationContext* opCtx,
                                         findCommand->getFilter().getOwned(),
                                         getTransaction,
                                         EncryptedCollScanModeAllowed::kAllow));
-    // The presence of encryptionInformation is a signal that this is a FLE request that requires
-    // special processing. Once we've rewritten the query, it's no longer a "special" FLE query, but
-    // a normal query that can be executed by the query system like any other, so remove
-    // encryptionInformation.
-    findCommand->setEncryptionInformation(boost::none);
+
+    EncryptionInformation encryptionInformation;
+    encryptionInformation.setCrudProcessed(true);
+    encryptionInformation.setSchema(BSONObj());
+
+    findCommand->setEncryptionInformation(encryptionInformation);
 }
 
 void processCountCommand(OperationContext* opCtx,

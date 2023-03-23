@@ -300,6 +300,7 @@ public:
 
             if (shouldDoFLERewrite(findCommand)) {
                 invariant(findCommand->getNamespaceOrUUID().nss());
+                CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
                 processFLEFindS(
                     opCtx, findCommand->getNamespaceOrUUID().nss().get(), findCommand.get());
                 _didDoFLERewrite = true;

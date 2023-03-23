@@ -49,6 +49,7 @@
 #include "mongo/db/query/explain_common.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
+#include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_cache_key_factory.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_executor_impl.h"
@@ -331,6 +332,10 @@ void appendBasicPlanCacheEntryInfoToBSON(const EntryType& entry, BSONObjBuilder*
     out->append("isActive", entry.isActive);
     out->append("works", static_cast<long long>(entry.works.value_or(0)));
     out->append("timeOfCreation", entry.timeOfCreation);
+
+    if (entry.securityLevel == PlanSecurityLevel::kSensitive) {
+        out->append("securityLevel", entry.securityLevel);
+    }
 }
 }  // namespace
 

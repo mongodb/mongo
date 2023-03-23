@@ -57,6 +57,15 @@ extern CounterMetric planCacheTotalSizeEstimateBytes;
 extern CounterMetric planCacheEntries;
 
 /**
+ * Represents the security level of a plan to help us dictate if we whould filter it out during
+ * planCacheStats.
+ */
+enum class PlanSecurityLevel {
+    kNotSensitive,
+    kSensitive,
+};
+
+/**
  * Information returned from a get(...) query.
  */
 template <class CachedPlanType, class DebugInfoType>
@@ -106,6 +115,7 @@ public:
                                          uint32_t planCacheCommandKey,
                                          Date_t timeOfCreation,
                                          bool isActive,
+                                         PlanSecurityLevel securityLevel,
                                          size_t works,
                                          DebugInfoType debugInfo) {
         // If the cumulative size of the plan caches is estimated to remain within a predefined
@@ -133,6 +143,7 @@ public:
                                                 planCacheKey,
                                                 planCacheCommandKey,
                                                 isActive,
+                                                securityLevel,
                                                 works,
                                                 std::move(debugInfoOpt)));
     }
@@ -147,6 +158,7 @@ public:
                                                uint32_t planCacheKey,
                                                uint32_t planCacheCommandKey,
                                                Date_t timeOfCreation,
+                                               PlanSecurityLevel securityLevel,
                                                DebugInfoType debugInfo) {
         return std::unique_ptr<Entry>(
             new Entry(std::move(cachedPlan),
@@ -154,7 +166,8 @@ public:
                       queryHash,
                       planCacheKey,
                       planCacheCommandKey,
-                      true,         // isActive
+                      true,  // isActive
+                      securityLevel,
                       boost::none,  // decisionWorks
                       std::make_shared<const DebugInfoType>(std::move(debugInfo))));
     }
@@ -183,6 +196,7 @@ public:
                                                 planCacheKey,
                                                 planCacheCommandKey,
                                                 isActive,
+                                                securityLevel,
                                                 works,
                                                 debugInfo));
     }
@@ -221,6 +235,10 @@ public:
     // planning.
     bool isActive = false;
 
+    // Security level of the plan entry, dictates whether a plan should be omitted during
+    // planCacheStats.
+    PlanSecurityLevel securityLevel;
+
     // The number of "works" required for a plan to run on this shape before it becomes
     // active. This value is also used to determine the number of works necessary in order to
     // trigger a replan. Running a query of the same shape while this cache entry is inactive may
@@ -249,6 +267,7 @@ private:
                        uint32_t planCacheKey,
                        uint32_t planCacheCommandKey,
                        bool isActive,
+                       PlanSecurityLevel securityLevel,
                        boost::optional<size_t> works,
                        std::shared_ptr<const DebugInfoType> debugInfo)
         : cachedPlan(std::move(cachedPlan)),
@@ -257,6 +276,7 @@ private:
           planCacheKey(planCacheKey),
           planCacheCommandKey(planCacheCommandKey),
           isActive(isActive),
+          securityLevel(securityLevel),
           works(works),
           debugInfo(std::move(debugInfo)),
           estimatedEntrySizeBytes(_estimateObjectSizeInBytes()) {
@@ -377,6 +397,7 @@ public:
                const plan_ranker::PlanRankingDecision& why,
                Date_t now,
                const PlanCacheCallbacks<KeyType, CachedPlanType, DebugInfoType>* callbacks,
+               PlanSecurityLevel securityLevel,
                boost::optional<double> worksGrowthCoefficient = boost::none) {
         invariant(cachedPlan);
 
@@ -457,6 +478,7 @@ public:
                                                         callbacks->getPlanCacheCommandKeyHash(),
                                                         now,
                                                         isNewEntryActive,
+                                                        securityLevel,
                                                         increasedWorks ? *increasedWorks : newWorks,
                                                         callbacks->buildDebugInfo());
 
@@ -472,14 +494,18 @@ public:
                    const uint32_t planCacheCommandKey,
                    std::unique_ptr<CachedPlanType> plan,
                    Date_t now,
-                   DebugInfoType debugInfo) {
+                   DebugInfoType debugInfo,
+                   bool shouldOmitDiagnosticInformation) {
         invariant(plan);
-        std::shared_ptr<Entry> entry = Entry::createPinned(std::move(plan),
-                                                           key.queryHash(),
-                                                           key.planCacheKeyHash(),
-                                                           planCacheCommandKey,
-                                                           now,
-                                                           std::move(debugInfo));
+        std::shared_ptr<Entry> entry =
+            Entry::createPinned(std::move(plan),
+                                key.queryHash(),
+                                key.planCacheKeyHash(),
+                                planCacheCommandKey,
+                                now,
+                                shouldOmitDiagnosticInformation ? PlanSecurityLevel::kSensitive
+                                                                : PlanSecurityLevel::kNotSensitive,
+                                std::move(debugInfo));
         this->put(key, std::move(entry));
     }
 

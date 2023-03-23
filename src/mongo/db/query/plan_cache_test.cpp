@@ -47,6 +47,7 @@
 #include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/canonical_query_test_util.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_cache_key_factory.h"
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/query_knobs_gen.h"
@@ -329,7 +330,12 @@ void addCacheEntryForShape(const CanonicalQuery& cq, PlanCache* planCache) {
 
     auto decision = createDecision(1U);
     auto callbacks = createCallback(cq, *decision);
-    ASSERT_OK(planCache->set(makeKey(cq), qs->cacheData->clone(), *decision, Date_t{}, &callbacks));
+    ASSERT_OK(planCache->set(makeKey(cq),
+                             qs->cacheData->clone(),
+                             *decision,
+                             Date_t{},
+                             &callbacks,
+                             PlanSecurityLevel::kNotSensitive));
 }
 
 TEST_F(PlanCacheTest, InactiveEntriesDisabled) {
@@ -346,7 +352,12 @@ TEST_F(PlanCacheTest, InactiveEntriesDisabled) {
 
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kNotPresent);
     QueryTestServiceContext serviceContext;
-    ASSERT_OK(planCache.set(makeKey(*cq), qs->cacheData->clone(), *decision, Date_t{}, &callbacks));
+    ASSERT_OK(planCache.set(makeKey(*cq),
+                            qs->cacheData->clone(),
+                            *decision,
+                            Date_t{},
+                            &callbacks,
+                            PlanSecurityLevel::kNotSensitive));
 
     // After add, the planCache should have an _active_ entry.
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentActive);
@@ -409,7 +420,12 @@ TEST_F(PlanCacheTest, PlanCacheRemoveDeletesInactiveEntries) {
     auto callbacks = createCallback(*cq, *decision);
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kNotPresent);
     QueryTestServiceContext serviceContext;
-    ASSERT_OK(planCache.set(makeKey(*cq), qs->cacheData->clone(), *decision, Date_t{}, &callbacks));
+    ASSERT_OK(planCache.set(makeKey(*cq),
+                            qs->cacheData->clone(),
+                            *decision,
+                            Date_t{},
+                            &callbacks,
+                            PlanSecurityLevel::kNotSensitive));
 
     // After add, the planCache should have an inactive entry.
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentInactive);
@@ -430,7 +446,12 @@ TEST_F(PlanCacheTest, PlanCacheFlushDeletesInactiveEntries) {
     auto callbacks = createCallback(*cq, *decision);
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kNotPresent);
     QueryTestServiceContext serviceContext;
-    ASSERT_OK(planCache.set(makeKey(*cq), qs->cacheData->clone(), *decision, Date_t{}, &callbacks));
+    ASSERT_OK(planCache.set(makeKey(*cq),
+                            qs->cacheData->clone(),
+                            *decision,
+                            Date_t{},
+                            &callbacks,
+                            PlanSecurityLevel::kNotSensitive));
 
     // After add, the planCache should have an inactive entry.
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentInactive);
@@ -452,7 +473,12 @@ TEST_F(PlanCacheTest, AddActiveCacheEntry) {
     // Check if key is in cache before and after set().
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kNotPresent);
     QueryTestServiceContext serviceContext;
-    ASSERT_OK(planCache.set(makeKey(*cq), qs->cacheData->clone(), *decision, Date_t{}, &callbacks));
+    ASSERT_OK(planCache.set(makeKey(*cq),
+                            qs->cacheData->clone(),
+                            *decision,
+                            Date_t{},
+                            &callbacks,
+                            PlanSecurityLevel::kNotSensitive));
 
     // After add, the planCache should have an inactive entry.
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentInactive);
@@ -461,8 +487,12 @@ TEST_F(PlanCacheTest, AddActiveCacheEntry) {
     auto callbacks1 = createCallback(*cq, *decision);
     // Calling set() again, with a solution that had a lower works value should create an active
     // entry.
-    ASSERT_OK(
-        planCache.set(makeKey(*cq), qs->cacheData->clone(), *decision, Date_t{}, &callbacks1));
+    ASSERT_OK(planCache.set(makeKey(*cq),
+                            qs->cacheData->clone(),
+                            *decision,
+                            Date_t{},
+                            &callbacks1,
+                            PlanSecurityLevel::kNotSensitive));
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentActive);
     ASSERT_EQUALS(planCache.size(), 1U);
 
@@ -482,7 +512,12 @@ TEST_F(PlanCacheTest, WorksValueIncreases) {
 
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kNotPresent);
     QueryTestServiceContext serviceContext;
-    ASSERT_OK(planCache.set(key, qs->cacheData->clone(), *decision, Date_t{}, &callbacks));
+    ASSERT_OK(planCache.set(key,
+                            qs->cacheData->clone(),
+                            *decision,
+                            Date_t{},
+                            &callbacks,
+                            PlanSecurityLevel::kNotSensitive));
 
     // After add, the planCache should have an inactive entry.
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentInactive);
@@ -495,8 +530,12 @@ TEST_F(PlanCacheTest, WorksValueIncreases) {
     auto callbacks1 = createCallback(*cq, *decision);
     // Calling set() again, with a solution that had a higher works value. This should cause the
     // works on the original entry to be increased.
-    ASSERT_OK(
-        planCache.set(makeKey(*cq), qs->cacheData->clone(), *decision, Date_t{}, &callbacks1));
+    ASSERT_OK(planCache.set(makeKey(*cq),
+                            qs->cacheData->clone(),
+                            *decision,
+                            Date_t{},
+                            &callbacks1,
+                            PlanSecurityLevel::kNotSensitive));
 
     // The entry should still be inactive. Its works should double though.
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentInactive);
@@ -509,8 +548,12 @@ TEST_F(PlanCacheTest, WorksValueIncreases) {
     auto callbacks2 = createCallback(*cq, *decision);
     // Calling set() again, with a solution that had a higher works value. This should cause the
     // works on the original entry to be increased.
-    ASSERT_OK(
-        planCache.set(makeKey(*cq), qs->cacheData->clone(), *decision, Date_t{}, &callbacks2));
+    ASSERT_OK(planCache.set(makeKey(*cq),
+                            qs->cacheData->clone(),
+                            *decision,
+                            Date_t{},
+                            &callbacks2,
+                            PlanSecurityLevel::kNotSensitive));
 
     // The entry should still be inactive. Its works should have doubled again.
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentInactive);
@@ -523,7 +566,12 @@ TEST_F(PlanCacheTest, WorksValueIncreases) {
     auto callbacks3 = createCallback(*cq, *decision);
     // Calling set() again, with a solution that has a lower works value than what's currently in
     // the cache.
-    ASSERT_OK(planCache.set(key, qs->cacheData->clone(), *decision, Date_t{}, &callbacks3));
+    ASSERT_OK(planCache.set(key,
+                            qs->cacheData->clone(),
+                            *decision,
+                            Date_t{},
+                            &callbacks3,
+                            PlanSecurityLevel::kNotSensitive));
 
     // The solution just run should now be in an active cache entry, with a works
     // equal to the number of works the solution took.
@@ -559,7 +607,12 @@ TEST_F(PlanCacheTest, WorksValueIncreasesByAtLeastOne) {
 
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kNotPresent);
     QueryTestServiceContext serviceContext;
-    ASSERT_OK(planCache.set(makeKey(*cq), qs->cacheData->clone(), *decision, Date_t{}, &callbacks));
+    ASSERT_OK(planCache.set(makeKey(*cq),
+                            qs->cacheData->clone(),
+                            *decision,
+                            Date_t{},
+                            &callbacks,
+                            PlanSecurityLevel::kNotSensitive));
 
     // After add, the planCache should have an inactive entry.
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentInactive);
@@ -574,8 +627,13 @@ TEST_F(PlanCacheTest, WorksValueIncreasesByAtLeastOne) {
     // works on the original entry to be increased. In this case, since nWorks is 3,
     // multiplying by the value 1.10 will give a value of 3 (static_cast<size_t>(1.1 * 3) == 3).
     // We check that the works value is increased 1 instead.
-    ASSERT_OK(planCache.set(
-        makeKey(*cq), qs->cacheData->clone(), *decision, Date_t{}, &callbacks1, kWorksCoeff));
+    ASSERT_OK(planCache.set(makeKey(*cq),
+                            qs->cacheData->clone(),
+                            *decision,
+                            Date_t{},
+                            &callbacks1,
+                            PlanSecurityLevel::kNotSensitive,
+                            kWorksCoeff));
 
     // The entry should still be inactive. Its works should increase by 1.
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentInactive);
@@ -600,7 +658,12 @@ TEST_F(PlanCacheTest, SetIsNoopWhenNewEntryIsWorse) {
 
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kNotPresent);
     QueryTestServiceContext serviceContext;
-    ASSERT_OK(planCache.set(makeKey(*cq), qs->cacheData->clone(), *decision, Date_t{}, &callbacks));
+    ASSERT_OK(planCache.set(makeKey(*cq),
+                            qs->cacheData->clone(),
+                            *decision,
+                            Date_t{},
+                            &callbacks,
+                            PlanSecurityLevel::kNotSensitive));
 
     // After add, the planCache should have an inactive entry.
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentInactive);
@@ -613,8 +676,12 @@ TEST_F(PlanCacheTest, SetIsNoopWhenNewEntryIsWorse) {
     auto callbacks1 = createCallback(*cq, *decision);
     // Call set() again, with a solution that has a lower works value. This will result in an
     // active entry being created.
-    ASSERT_OK(
-        planCache.set(makeKey(*cq), qs->cacheData->clone(), *decision, Date_t{}, &callbacks1));
+    ASSERT_OK(planCache.set(makeKey(*cq),
+                            qs->cacheData->clone(),
+                            *decision,
+                            Date_t{},
+                            &callbacks1,
+                            PlanSecurityLevel::kNotSensitive));
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentActive);
     entry = assertGet(planCache.getEntry(key));
     ASSERT_TRUE(entry->isActive);
@@ -625,8 +692,12 @@ TEST_F(PlanCacheTest, SetIsNoopWhenNewEntryIsWorse) {
     auto callbacks2 = createCallback(*cq, *decision);
     // Now call set() again, but with a solution that has a higher works value. This should be
     // a noop.
-    ASSERT_OK(
-        planCache.set(makeKey(*cq), qs->cacheData->clone(), *decision, Date_t{}, &callbacks2));
+    ASSERT_OK(planCache.set(makeKey(*cq),
+                            qs->cacheData->clone(),
+                            *decision,
+                            Date_t{},
+                            &callbacks2,
+                            PlanSecurityLevel::kNotSensitive));
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentActive);
     entry = assertGet(planCache.getEntry(key));
     ASSERT_TRUE(entry->isActive);
@@ -644,7 +715,12 @@ TEST_F(PlanCacheTest, SetOverwritesWhenNewEntryIsBetter) {
     auto callbacks = createCallback(*cq, *decision);
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kNotPresent);
     QueryTestServiceContext serviceContext;
-    ASSERT_OK(planCache.set(makeKey(*cq), qs->cacheData->clone(), *decision, Date_t{}, &callbacks));
+    ASSERT_OK(planCache.set(makeKey(*cq),
+                            qs->cacheData->clone(),
+                            *decision,
+                            Date_t{},
+                            &callbacks,
+                            PlanSecurityLevel::kNotSensitive));
 
     // After add, the planCache should have an inactive entry.
     auto entry = assertGet(planCache.getEntry(key));
@@ -656,8 +732,12 @@ TEST_F(PlanCacheTest, SetOverwritesWhenNewEntryIsBetter) {
     auto callbacks1 = createCallback(*cq, *decision);
     // Call set() again, with a solution that has a lower works value. This will result in an
     // active entry being created.
-    ASSERT_OK(
-        planCache.set(makeKey(*cq), qs->cacheData->clone(), *decision, Date_t{}, &callbacks1));
+    ASSERT_OK(planCache.set(makeKey(*cq),
+                            qs->cacheData->clone(),
+                            *decision,
+                            Date_t{},
+                            &callbacks1,
+                            PlanSecurityLevel::kNotSensitive));
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentActive);
     entry = assertGet(planCache.getEntry(key));
     ASSERT_TRUE(entry->isActive);
@@ -668,8 +748,12 @@ TEST_F(PlanCacheTest, SetOverwritesWhenNewEntryIsBetter) {
     auto callbacks2 = createCallback(*cq, *decision);
     // Now call set() again, with a solution that has a lower works value. The current active entry
     // should be overwritten.
-    ASSERT_OK(
-        planCache.set(makeKey(*cq), qs->cacheData->clone(), *decision, Date_t{}, &callbacks2));
+    ASSERT_OK(planCache.set(makeKey(*cq),
+                            qs->cacheData->clone(),
+                            *decision,
+                            Date_t{},
+                            &callbacks2,
+                            PlanSecurityLevel::kNotSensitive));
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentActive);
     entry = assertGet(planCache.getEntry(key));
     ASSERT_TRUE(entry->isActive);
@@ -687,7 +771,12 @@ TEST_F(PlanCacheTest, DeactivateCacheEntry) {
 
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kNotPresent);
     QueryTestServiceContext serviceContext;
-    ASSERT_OK(planCache.set(makeKey(*cq), qs->cacheData->clone(), *decision, Date_t{}, &callbacks));
+    ASSERT_OK(planCache.set(makeKey(*cq),
+                            qs->cacheData->clone(),
+                            *decision,
+                            Date_t{},
+                            &callbacks,
+                            PlanSecurityLevel::kNotSensitive));
 
     // After add, the planCache should have an inactive entry.
     auto entry = assertGet(planCache.getEntry(key));
@@ -699,8 +788,12 @@ TEST_F(PlanCacheTest, DeactivateCacheEntry) {
     auto callbacks1 = createCallback(*cq, *decision);
     // Call set() again, with a solution that has a lower works value. This will result in an
     // active entry being created.
-    ASSERT_OK(
-        planCache.set(makeKey(*cq), qs->cacheData->clone(), *decision, Date_t{}, &callbacks1));
+    ASSERT_OK(planCache.set(makeKey(*cq),
+                            qs->cacheData->clone(),
+                            *decision,
+                            Date_t{},
+                            &callbacks1,
+                            PlanSecurityLevel::kNotSensitive));
     ASSERT_EQ(planCache.get(key).state, PlanCache::CacheEntryState::kPresentActive);
     entry = assertGet(planCache.getEntry(key));
     ASSERT_TRUE(entry->isActive);
@@ -726,8 +819,12 @@ TEST_F(PlanCacheTest, GetMatchingStatsMatchesAndSerializesCorrectly) {
         auto qs = getQuerySolutionForCaching();
         auto decision = createDecision(1U, 5);
         auto callbacks = createCallback(*cq, *decision);
-        ASSERT_OK(
-            planCache.set(makeKey(*cq), qs->cacheData->clone(), *decision, Date_t{}, &callbacks));
+        ASSERT_OK(planCache.set(makeKey(*cq),
+                                qs->cacheData->clone(),
+                                *decision,
+                                Date_t{},
+                                &callbacks,
+                                PlanSecurityLevel::kNotSensitive));
     }
 
     // Create a second cache entry with 3 works.
@@ -736,8 +833,12 @@ TEST_F(PlanCacheTest, GetMatchingStatsMatchesAndSerializesCorrectly) {
         auto qs = getQuerySolutionForCaching();
         auto decision = createDecision(1U, 3);
         auto callbacks = createCallback(*cq, *decision);
-        ASSERT_OK(
-            planCache.set(makeKey(*cq), qs->cacheData->clone(), *decision, Date_t{}, &callbacks));
+        ASSERT_OK(planCache.set(makeKey(*cq),
+                                qs->cacheData->clone(),
+                                *decision,
+                                Date_t{},
+                                &callbacks,
+                                PlanSecurityLevel::kNotSensitive));
     }
 
     // Verify that the cache entries have been created.
@@ -1052,6 +1153,7 @@ protected:
                                    0, /* planCacheCommandKey */
                                    Date_t(),
                                    false /* isActive  */,
+                                   PlanSecurityLevel::kNotSensitive,
                                    0 /* works */,
                                    plan_cache_util::buildDebugInfo(*scopedCq, std::move(decision)));
         CachedSolution cachedSoln(*entry);
@@ -1736,27 +1838,47 @@ TEST_F(PlanCacheTest, PlanCacheSizeWithCRUDOperations) {
 
     // Verify that the plan cache size increases after adding new entry to cache.
     previousSize = planCacheTotalSizeEstimateBytes.get();
-    ASSERT_OK(planCache.set(key, qs->cacheData->clone(), *decision, Date_t{}, &callbacks));
+    ASSERT_OK(planCache.set(key,
+                            qs->cacheData->clone(),
+                            *decision,
+                            Date_t{},
+                            &callbacks,
+                            PlanSecurityLevel::kNotSensitive));
     ASSERT_GT(planCacheTotalSizeEstimateBytes.get(), previousSize);
 
     decision = createDecision(1U);
     auto callbacks1 = createCallback(*cq, *decision);
     // Verify that trying to set the same entry won't change the plan cache size.
     previousSize = planCacheTotalSizeEstimateBytes.get();
-    ASSERT_OK(planCache.set(key, qs->cacheData->clone(), *decision, Date_t{}, &callbacks1));
+    ASSERT_OK(planCache.set(key,
+                            qs->cacheData->clone(),
+                            *decision,
+                            Date_t{},
+                            &callbacks1,
+                            PlanSecurityLevel::kNotSensitive));
     ASSERT_EQ(planCacheTotalSizeEstimateBytes.get(), previousSize);
 
     decision = createDecision(2U);
     auto callbacks2 = createCallback(*cq, *decision);
     // Verify that the plan cache size increases after updating the same entry with more solutions.
-    ASSERT_OK(planCache.set(key, qs->cacheData->clone(), *decision, Date_t{}, &callbacks2));
+    ASSERT_OK(planCache.set(key,
+                            qs->cacheData->clone(),
+                            *decision,
+                            Date_t{},
+                            &callbacks2,
+                            PlanSecurityLevel::kNotSensitive));
     ASSERT_GT(planCacheTotalSizeEstimateBytes.get(), previousSize);
 
     decision = createDecision(1U);
     auto callbacks3 = createCallback(*cq, *decision);
     // Verify that the plan cache size decreases after updating the same entry with fewer solutions.
     previousSize = planCacheTotalSizeEstimateBytes.get();
-    ASSERT_OK(planCache.set(key, qs->cacheData->clone(), *decision, Date_t{}, &callbacks3));
+    ASSERT_OK(planCache.set(key,
+                            qs->cacheData->clone(),
+                            *decision,
+                            Date_t{},
+                            &callbacks3,
+                            PlanSecurityLevel::kNotSensitive));
     ASSERT_LT(planCacheTotalSizeEstimateBytes.get(), previousSize);
     ASSERT_GT(planCacheTotalSizeEstimateBytes.get(), originalSize);
 
@@ -1770,8 +1892,12 @@ TEST_F(PlanCacheTest, PlanCacheSizeWithCRUDOperations) {
         decision = createDecision(1U);
         auto callbacks4 = createCallback(*query, *decision);
         previousSize = planCacheTotalSizeEstimateBytes.get();
-        ASSERT_OK(planCache.set(
-            makeKey(*query), qs->cacheData->clone(), *decision, Date_t{}, &callbacks4));
+        ASSERT_OK(planCache.set(makeKey(*query),
+                                qs->cacheData->clone(),
+                                *decision,
+                                Date_t{},
+                                &callbacks4,
+                                PlanSecurityLevel::kNotSensitive));
         ASSERT_GT(planCacheTotalSizeEstimateBytes.get(), previousSize);
     }
 
@@ -1817,8 +1943,12 @@ TEST_F(PlanCacheTest, PlanCacheSizeWithEviction) {
         previousSize = planCacheTotalSizeEstimateBytes.get();
         auto decision = createDecision(2U);
         auto callbacks = createCallback(*query, *decision);
-        ASSERT_OK(planCache.set(
-            makeKey(*query), qs->cacheData->clone(), *decision, Date_t{}, &callbacks));
+        ASSERT_OK(planCache.set(makeKey(*query),
+                                qs->cacheData->clone(),
+                                *decision,
+                                Date_t{},
+                                &callbacks,
+                                PlanSecurityLevel::kNotSensitive));
         ASSERT_GT(planCacheTotalSizeEstimateBytes.get(), previousSize);
     }
 
@@ -1830,7 +1960,12 @@ TEST_F(PlanCacheTest, PlanCacheSizeWithEviction) {
         auto callbacks = createCallback(*cq, *decision);
         previousSize = planCacheTotalSizeEstimateBytes.get();
         ASSERT_EQ(planCache.size(), kCacheSize);
-        ASSERT_OK(planCache.set(key, qs->cacheData->clone(), *decision, Date_t{}, &callbacks));
+        ASSERT_OK(planCache.set(key,
+                                qs->cacheData->clone(),
+                                *decision,
+                                Date_t{},
+                                &callbacks,
+                                PlanSecurityLevel::kNotSensitive));
         ASSERT_EQ(planCache.size(), kCacheSize);
         ASSERT_EQ(planCacheTotalSizeEstimateBytes.get(), previousSize);
     }
@@ -1843,8 +1978,12 @@ TEST_F(PlanCacheTest, PlanCacheSizeWithEviction) {
         auto decision = createDecision(2U);
         auto callbacks = createCallback(*queryBiggerKey, *decision);
         previousSize = planCacheTotalSizeEstimateBytes.get();
-        ASSERT_OK(planCache.set(
-            makeKey(*queryBiggerKey), qs->cacheData->clone(), *decision, Date_t{}, &callbacks));
+        ASSERT_OK(planCache.set(makeKey(*queryBiggerKey),
+                                qs->cacheData->clone(),
+                                *decision,
+                                Date_t{},
+                                &callbacks,
+                                PlanSecurityLevel::kNotSensitive));
         ASSERT_GT(planCacheTotalSizeEstimateBytes.get(), previousSize);
     }
 
@@ -1856,7 +1995,12 @@ TEST_F(PlanCacheTest, PlanCacheSizeWithEviction) {
         auto decision = createDecision(3U);
         auto callbacks = createCallback(*cq, *decision);
         previousSize = planCacheTotalSizeEstimateBytes.get();
-        ASSERT_OK(planCache.set(key, qs->cacheData->clone(), *decision, Date_t{}, &callbacks));
+        ASSERT_OK(planCache.set(key,
+                                qs->cacheData->clone(),
+                                *decision,
+                                Date_t{},
+                                &callbacks,
+                                PlanSecurityLevel::kNotSensitive));
         ASSERT_GT(planCacheTotalSizeEstimateBytes.get(), previousSize);
     }
 
@@ -1868,7 +2012,12 @@ TEST_F(PlanCacheTest, PlanCacheSizeWithEviction) {
         auto decision = createDecision(1U);
         auto callbacks = createCallback(*cq, *decision);
         previousSize = planCacheTotalSizeEstimateBytes.get();
-        ASSERT_OK(planCache.set(key, qs->cacheData->clone(), *decision, Date_t{}, &callbacks));
+        ASSERT_OK(planCache.set(key,
+                                qs->cacheData->clone(),
+                                *decision,
+                                Date_t{},
+                                &callbacks,
+                                PlanSecurityLevel::kNotSensitive));
         ASSERT_LT(planCacheTotalSizeEstimateBytes.get(), previousSize);
 
         // clear() should reset the size.
@@ -1893,15 +2042,23 @@ TEST_F(PlanCacheTest, PlanCacheSizeWithMultiplePlanCaches) {
         auto decision = createDecision(1U);
         auto callbacks = createCallback(*query, *decision);
         previousSize = planCacheTotalSizeEstimateBytes.get();
-        ASSERT_OK(planCache1.set(
-            makeKey(*query), qs->cacheData->clone(), *decision, Date_t{}, &callbacks));
+        ASSERT_OK(planCache1.set(makeKey(*query),
+                                 qs->cacheData->clone(),
+                                 *decision,
+                                 Date_t{},
+                                 &callbacks,
+                                 PlanSecurityLevel::kNotSensitive));
         ASSERT_GT(planCacheTotalSizeEstimateBytes.get(), previousSize);
 
         decision = createDecision(1U);
         auto callbacks1 = createCallback(*query, *decision);
         previousSize = planCacheTotalSizeEstimateBytes.get();
-        ASSERT_OK(planCache2.set(
-            makeKey(*query), qs->cacheData->clone(), *decision, Date_t{}, &callbacks1));
+        ASSERT_OK(planCache2.set(makeKey(*query),
+                                 qs->cacheData->clone(),
+                                 *decision,
+                                 Date_t{},
+                                 &callbacks1,
+                                 PlanSecurityLevel::kNotSensitive));
         ASSERT_GT(planCacheTotalSizeEstimateBytes.get(), previousSize);
     }
 
@@ -1922,8 +2079,12 @@ TEST_F(PlanCacheTest, PlanCacheSizeWithMultiplePlanCaches) {
         auto callbacks = createCallback(*cq, *decision);
         PlanCache planCache(5000);
         previousSize = planCacheTotalSizeEstimateBytes.get();
-        ASSERT_OK(
-            planCache.set(makeKey(*cq), qs->cacheData->clone(), *decision, Date_t{}, &callbacks));
+        ASSERT_OK(planCache.set(makeKey(*cq),
+                                qs->cacheData->clone(),
+                                *decision,
+                                Date_t{},
+                                &callbacks,
+                                PlanSecurityLevel::kNotSensitive));
         ASSERT_GT(planCacheTotalSizeEstimateBytes.get(), previousSize);
     }
 
@@ -1947,8 +2108,12 @@ TEST_F(PlanCacheTest, PlanCacheMaxSizeParameterCanBeZero) {
     auto decision = createDecision(1U);
     auto callbacks = createCallback(*query, *decision);
 
-    ASSERT_OK(
-        planCache.set(makeKey(*query), qs->cacheData->clone(), *decision, Date_t{}, &callbacks));
+    ASSERT_OK(planCache.set(makeKey(*query),
+                            qs->cacheData->clone(),
+                            *decision,
+                            Date_t{},
+                            &callbacks,
+                            PlanSecurityLevel::kNotSensitive));
     ASSERT_EQ(0U, planCache.size());
 }
 }  // namespace

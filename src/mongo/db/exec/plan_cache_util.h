@@ -29,10 +29,12 @@
 
 #pragma once
 
+#include "mongo/db/curop.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
+#include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_cache_debug_info.h"
 #include "mongo/db/query/plan_cache_key_factory.h"
 #include "mongo/db/query/plan_explainer_factory.h"
@@ -187,6 +189,7 @@ void updatePlanCache(
             winningPlan.solution->cacheData->indexFilterApplied =
                 winningPlan.solution->indexFilterApplied;
             auto& collection = collections.getMainCollection();
+            auto isSensitive = CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation;
             uassertStatusOK(CollectionQueryInfo::get(collection)
                                 .getPlanCache()
                                 ->set(plan_cache_key_factory::make<PlanCacheKey>(query, collection),
@@ -194,6 +197,8 @@ void updatePlanCache(
                                       *rankingDecision,
                                       opCtx->getServiceContext()->getPreciseClockSource()->now(),
                                       &callbacks,
+                                      isSensitive ? PlanSecurityLevel::kSensitive
+                                                  : PlanSecurityLevel::kNotSensitive,
                                       boost::none /* worksGrowthCoefficient */));
         };
 
@@ -217,12 +222,15 @@ void updatePlanCache(
                                        sbe::CachedSbePlan,
                                        plan_cache_debug_info::DebugInfoSBE>
                     callbacks{query, buildDebugInfoFn};
+
+                auto isSensitive = CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation;
                 uassertStatusOK(sbe::getPlanCache(opCtx).set(
                     plan_cache_key_factory::make(query, collections),
                     std::move(cachedPlan),
                     *rankingDecision,
                     opCtx->getServiceContext()->getPreciseClockSource()->now(),
                     &callbacks,
+                    isSensitive ? PlanSecurityLevel::kSensitive : PlanSecurityLevel::kNotSensitive,
                     boost::none /* worksGrowthCoefficient */));
             } else {
                 static_assert(std::is_same_v<PlanStageType, PlanStage*>);

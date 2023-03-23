@@ -78,13 +78,17 @@ void updatePlanCache(OperationContext* opCtx,
         auto key = plan_cache_key_factory::make(query, collections);
         auto plan = std::make_unique<sbe::CachedSbePlan>(root.clone(), data);
         plan->indexFilterApplied = solution.indexFilterApplied;
+
+        bool shouldOmitDiagnosticInformation =
+            CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation;
         sbe::getPlanCache(opCtx).setPinned(
             std::move(key),
             canonical_query_encoder::computeHash(
                 canonical_query_encoder::encodeForPlanCacheCommand(query)),
             std::move(plan),
             opCtx->getServiceContext()->getPreciseClockSource()->now(),
-            buildDebugInfo(&solution));
+            buildDebugInfo(&solution),
+            shouldOmitDiagnosticInformation);
     }
 }
 

@@ -581,6 +581,9 @@ std::vector<BSONObj> CommonMongodProcessInterface::getMatchingPlanCacheEntryStat
     };
 
     const auto predicate = [&matchExp](const BSONObj& obj) {
+        if (obj.hasField("securityLevel")) {
+            return false;
+        }
         return !matchExp ? true : matchExp->matchesBSON(obj);
     };
 

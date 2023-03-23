@@ -41,6 +41,7 @@
 #include "mongo/db/json.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_cache_key_factory.h"
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/query_solution.h"
@@ -297,6 +298,7 @@ private:
             *decisionPtr,
             _operationContext.get()->getServiceContext()->getPreciseClockSource()->now(),
             &callbacks,
+            PlanSecurityLevel::kNotSensitive,
             boost::none /* worksGrowthCoefficient */));
     }
 
@@ -334,6 +336,7 @@ private:
             *decision,
             _operationContext.get()->getServiceContext()->getPreciseClockSource()->now(),
             &callbacks,
+            PlanSecurityLevel::kNotSensitive,
             boost::none /* worksGrowthCoefficient */));
     }
 
