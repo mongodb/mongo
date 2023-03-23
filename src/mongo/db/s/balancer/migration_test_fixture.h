@@ -102,6 +102,11 @@ protected:
      */
     void removeAllChunks(const NamespaceString& collName, const UUID& uuid);
 
+    /**
+     * Returns the ShardId by its HostAndPort
+     */
+    ShardId getShardIdByHost(HostAndPort host);
+
     // Random static initialization order can result in X constructor running before Y constructor
     // if X and Y are defined in different source files. Defining variables here to enforce order.
     const ShardId kShardId0 = ShardId("shard0");
