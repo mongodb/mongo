@@ -247,6 +247,7 @@ private:
      */
     static void _setVersion(OperationContext* opCtx,
                             multiversion::FeatureCompatibilityVersion newVersion,
+                            bool onRollback,
                             boost::optional<Timestamp> commitTs = boost::none);
 
     /**

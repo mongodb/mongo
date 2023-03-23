@@ -29,6 +29,16 @@ function getFCVFromDocument(conn) {
     return conn.getDB("admin").system.version.find().readConcern("local").toArray()[0];
 }
 
+function getTopologyVersion(node) {
+    // We need to use a new connection here because we run an internalClient command, which
+    // will make the connection be marked as internal and leads to following commands fail.
+    let connInternal = new Mongo(node.host);
+    const res = assert.commandWorked(connInternal.adminCommand(
+        {hello: 1, internalClient: {minWireVersion: NumberInt(0), maxWireVersion: NumberInt(9)}}));
+    connInternal.close();
+    return res.topologyVersion;
+}
+
 // fromFCV refers to the FCV we will test rolling back from.
 // toFCV refers to the FCV we will test rolling back to.
 function rollbackFCVFromDowngradingOrUpgrading(fromFCV, toFCV) {
@@ -63,9 +73,20 @@ function rollbackFCVFromDowngradingOrUpgrading(fromFCV, toFCV) {
     rollbackTest.transitionToSyncSourceOperationsBeforeRollback();
     // Secondaries should never have received the FCV update.
     checkFCV(secondaryAdminDB, toFCV);
+    const topologyVersionBeforeRollback = getTopologyVersion(primary);
+
     rollbackTest.transitionToSyncSourceOperationsDuringRollback();
     setFCVInParallel();
     rollbackTest.transitionToSteadyStateOperations();
+    const topologyVersionAfterRollback = getTopologyVersion(primary);
+    // There should be 3 topology version changes without FCV change when we transition to
+    // kSyncSourceOpsDuringRollback and kSteadyStateOps, including reconnect node, transition from
+    // primary to rollback and transition from rollback to secondary. If the FCV change also
+    // triggers a topology version change, then the topology version gap between before and after
+    // rollback should be 4.
+    const topologyVersionDiff = 4;
+    assert.eq(topologyVersionBeforeRollback.counter + topologyVersionDiff,
+              topologyVersionAfterRollback.counter);
     // The primary should have rolled back their FCV to be consistent with the rest of the replica
     // set.
     checkFCV(primaryAdminDB, toFCV);
@@ -123,9 +144,20 @@ function rollbackFCVFromDowngradedOrUpgraded(fromFCV, toFCV, failPoint) {
         checkFCV(secondaryAdminDB, lastLTSFCV, fromFCV);
     }
 
+    const topologyVersionBeforeRollback = getTopologyVersion(primary);
+
     rollbackTest.transitionToSyncSourceOperationsDuringRollback();
     setFCVInParallel();
     rollbackTest.transitionToSteadyStateOperations();
+    const topologyVersionAfterRollback = getTopologyVersion(primary);
+    // There should be 3 topology version changes without FCV change when we transition to
+    // kSyncSourceOpsDuringRollback and kSteadyStateOps, including reconnect node, transition from
+    // primary to rollback and transition from rollback to secondary. If the FCV change also
+    // triggers a topology version change, then the topology version gap between before and after
+    // rollback should be 4.
+    const topologyVersionDiff = 4;
+    assert.eq(topologyVersionBeforeRollback.counter + topologyVersionDiff,
+              topologyVersionAfterRollback.counter);
     // The primary should have rolled back their FCV to contain the targetVersion.
     if (fromFCV == lastLTSFCV && isDowngradingToUpgradingFlagOn) {
         // Rolling back from downgraded to isCleaningServerMetadata state.
@@ -233,8 +265,17 @@ function rollbackFCVFromUpgradingToDowngrading() {
     jsTestLog(`syncSource's version (should still be downgrading): ${tojson(fcvDoc)}`);
     checkFCV(syncSourceAdminDB, lastLTSFCV, lastLTSFCV);
 
+    const topologyVersionBeforeRollback = getTopologyVersion(rollbackNode);
     rollbackTest.transitionToSyncSourceOperationsDuringRollback();
     rollbackTest.transitionToSteadyStateOperations();
+    const topologyVersionAfterRollback = getTopologyVersion(rollbackNode);
+    // There should be 3 topology version changes without FCV change when we transition to
+    // kSyncSourceOpsDuringRollback and kSteadyStateOps, including reconnect node, transition from
+    // primary to rollback and transition from rollback to secondary. When rollback from
+    // upgrading to downgrading, FCV change should not increment topology version.
+    const topologyVersionDiff = 3;
+    assert.eq(topologyVersionBeforeRollback.counter + topologyVersionDiff,
+              topologyVersionAfterRollback.counter);
 
     // The rollbackNode should have rolled back their FCV to be consistent with the rest of the
     // replica set.
@@ -303,13 +344,18 @@ function rollbackFCVFromIsCleaningServerMetadataToDowngrading() {
     // The secondary should never have received the update to set isCleaningServerMetadata
     checkFCV(secondaryAdminDB, lastLTSFCV, lastLTSFCV);
 
+    const topologyVersionBeforeRollback = getTopologyVersion(primary);
     rollbackTest.transitionToSyncSourceOperationsDuringRollback();
     setFCVInParallel();
     rollbackTest.transitionToSteadyStateOperations();
-    // The primary should have rolled back their FCV to unset isCleaningServerMetadata
-
-    checkFCV(primaryAdminDB, lastLTSFCV, lastLTSFCV);
-    checkFCV(secondaryAdminDB, lastLTSFCV, lastLTSFCV);
+    const topologyVersionAfterRollback = getTopologyVersion(primary);
+    // There should be 3 topology version changes without FCV change when we transition to
+    // kSyncSourceOpsDuringRollback and kSteadyStateOps, including reconnect node, transition from
+    // primary to rollback and transition from rollback to secondary. When rollback from
+    // isCleaningServerMetadata to downgrading, FCV change should not increment topology version.
+    const topologyVersionDiff = 3;
+    assert.eq(topologyVersionBeforeRollback.counter + topologyVersionDiff,
+              topologyVersionAfterRollback.counter);
 
     let newPrimary = rollbackTest.getPrimary();
     // With the new downgrading to upgrading path, we can still go from downgrading -> upgrading

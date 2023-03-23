@@ -53,6 +53,7 @@ MONGO_FAIL_POINT_DEFINE(finishedDropConnections);
 
 void FcvOpObserver::_setVersion(OperationContext* opCtx,
                                 multiversion::FeatureCompatibilityVersion newVersion,
+                                bool onRollback,
                                 boost::optional<Timestamp> commitTs) {
     // We set the last FCV update timestamp before setting the new FCV, to make sure we never
     // read an FCV that is not stable.  We might still read a stale one.
@@ -104,9 +105,11 @@ void FcvOpObserver::_setVersion(OperationContext* opCtx,
     const bool isReplSet =
         replCoordinator->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
     // We only want to increment the server TopologyVersion when the minWireVersion has changed.
-    // This can only happen in two scenarios:
+    // This can happen in the following cases:
     // 1. Setting featureCompatibilityVersion from downgrading to fullyDowngraded.
     // 2. Setting featureCompatibilityVersion from fullyDowngraded to upgrading.
+    // 3. Rollback from downgrading to fullyUpgraded.
+    // 4. Rollback from fullyDowngraded to downgrading.
     // Note that the minWireVersion does not change between downgrading -> isCleaningServerMetadata,
     // as the FCV of the isCleaningServerMetadata is still kDowngrading, so the prevVersion and
     // newVersion will be equal
@@ -118,9 +121,12 @@ void FcvOpObserver::_setVersion(OperationContext* opCtx,
               multiversion::GenericFCV::kDowngradingFromLatestToLastContinuous) ||
          newVersion == multiversion::GenericFCV::kUpgradingFromLastLTSToLatest ||
          newVersion == multiversion::GenericFCV::kUpgradingFromLastContinuousToLatest ||
-         newVersion == multiversion::GenericFCV::kUpgradingFromLastLTSToLastContinuous) &&
+         newVersion == multiversion::GenericFCV::kUpgradingFromLastLTSToLastContinuous ||
+         // (Generic FCV reference): This FCV check should exist across LTS binary versions.
+         (onRollback &&
+          (prevVersion == multiversion::GenericFCV::kLastLTS ||
+           newVersion == multiversion::GenericFCV::kLatest))) &&
         !(prevVersion && prevVersion.value() == newVersion);
-
     if (isReplSet && shouldIncrementTopologyVersion) {
         replCoordinator->incrementTopologyVersion();
     }
@@ -151,7 +157,7 @@ void FcvOpObserver::_onInsertOrUpdate(OperationContext* opCtx, const BSONObj& do
 
     opCtx->recoveryUnit()->onCommit(
         [newVersion](OperationContext* opCtx, boost::optional<Timestamp> ts) {
-            _setVersion(opCtx, newVersion, ts);
+            _setVersion(opCtx, newVersion, false /*onRollback*/, ts);
         });
 }
 
@@ -209,7 +215,7 @@ void FcvOpObserver::_onReplicationRollback(OperationContext* opCtx,
                   "Setting featureCompatibilityVersion as part of rollback",
                   "newVersion"_attr = multiversion::toString(diskFcv),
                   "oldVersion"_attr = multiversion::toString(memoryFcv));
-            _setVersion(opCtx, diskFcv);
+            _setVersion(opCtx, diskFcv, true /*onRollback*/);
             // The rollback FCV is already in the stable snapshot.
             FeatureCompatibilityVersion::clearLastFCVUpdateTimestamp();
         }
