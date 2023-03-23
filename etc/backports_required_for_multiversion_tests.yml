@@ -342,6 +342,8 @@ last-continuous:
     ticket: SERVER-73601
   - test_file: jstests/core/clustered/clustered_collection_collation.js
     ticket: SERVER-67105
+  - test_file: jstests/core/clustered/clustered_collection_bounded_scan.js
+    ticket: SERVER-67105
   - test_file: src/mongo/db/modules/enterprise/jstests/fle2/collection_coll_stats.js
     ticket: SERVER-74461
   - test_file: src/mongo/db/modules/enterprise/jstests/fle2/top_command.js
@@ -758,6 +760,8 @@ last-lts:
   - test_file: jstests/replsets/log_ddl_ops.js
     ticket: SERVER-73601
   - test_file: jstests/core/clustered/clustered_collection_collation.js
+    ticket: SERVER-67105
+  - test_file: jstests/core/clustered/clustered_collection_bounded_scan.js
     ticket: SERVER-67105
   - test_file: src/mongo/db/modules/enterprise/jstests/fle2/collection_coll_stats.js
     ticket: SERVER-74461
