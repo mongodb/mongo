@@ -1442,6 +1442,7 @@ void ByteCode::traverseCsiCellTypes(const CodeFragment* code, int64_t position) 
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::setField() {
     auto [newOwn, newTag, newVal] = moveFromStack(0);
+    value::ValueGuard guardNewElem{newTag, newVal};
     auto [fieldOwn, fieldTag, fieldVal] = getFromStack(1);
     // Consider using a moveFromStack optimization.
     auto [objOwn, objTag, objVal] = getFromStack(2);
@@ -1528,6 +1529,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::setField() {
                 }
             }
         }
+        guardNewElem.reset();
         if (!newOwn) {
             auto [copyTag, copyVal] = value::copyValue(newTag, newVal);
             newTag = copyTag;
