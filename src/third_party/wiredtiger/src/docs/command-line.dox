@@ -184,7 +184,7 @@ which can be re-loaded into a new table using the \c load command.
 See @subpage dump_formats for details of the dump file formats.
 
 @subsection util_dump_synopsis Synopsis
-`wt [-BLmRrSVv] [-C config] [-E secretkey ] [-h directory] dump [-ejnprx] [-c checkpoint] [-f output] [-l lower bound] [-t timestamp] [-u upper bound] [-w window] uri`
+`wt [-BLmRrSVv] [-C config] [-E secretkey ] [-h directory] dump [-ejnprx] [-c checkpoint] [-f output] [-k key] [-l lower bound] [-t timestamp] [-u upper bound] [-w window] uri`
 
 @subsection util_dump_options Options
 The following are command-specific options for the \c dump command:
