@@ -9,35 +9,23 @@
 (function() {
 "use strict";
 
-const dbName = "testDb";
+load("jstests/libs/uuid_util.js");  // for 'extractUUIDFromObject'
 
 /**
- * TestCase: {
- *    command: {ns : "coll namespace",
- *              mode : "full"|"off",
- *              sampleRate : 1.2},
- * }
- *
+ * Returns test cases for all combinations of options for the configureQueryAnalyzer command.
  */
-
-/**
- * Create documents represting all combinations of options for configureQueryAnalyzer command.
- * @returns array of documents
- */
-function optionsAllCombinations() {
+function makeTestCases() {
     const testCases = [];
-    const collName = "collection";
     for (const mode of ["off", "full"]) {
         for (const sampleRate of [null, -1.0, 0.0, 0.2]) {
-            let testCase =
-                Object.assign({}, {command: {ns: dbName + "." + collName, mode, sampleRate}});
+            let testCase = Object.assign({}, {command: {mode, sampleRate}});
             if (sampleRate == null) {
                 delete testCase.command.sampleRate;
             }
             if ((mode == "off" && sampleRate !== null) ||
                 (mode == "full" &&
                  (sampleRate == null || typeof sampleRate !== "number" || sampleRate <= 0.0))) {
-                continue;  // These cases are tested in configuer_query_analyzer_basic.js.
+                continue;  // These cases are tested in configure_query_analyzer_basic.js.
             }
             testCases.push(testCase);
         }
@@ -46,17 +34,15 @@ function optionsAllCombinations() {
 }
 
 function assertConfigQueryAnalyzerResponse(res, mode, sampleRate) {
-    assert.eq(res.ok, 1);
     assert.eq(res.mode, mode);
     assert.eq(res.sampleRate, sampleRate);
 }
 
-function assertQueryAnalyzerConfigDoc(configDb, db, collName, mode, sampleRate) {
-    const configColl = configDb.getCollection('queryAnalyzers');
-    const listCollRes =
-        assert.commandWorked(db.runCommand({listCollections: 1, filter: {name: collName}}));
+function assertQueryAnalyzerConfigDoc(conn, dbName, collName, mode, sampleRate) {
+    const listCollRes = assert.commandWorked(
+        conn.getDB(dbName).runCommand({listCollections: 1, filter: {name: collName}}));
     const uuid = listCollRes.cursor.firstBatch[0].info.uuid;
-    const doc = configColl.findOne({_id: uuid});
+    const doc = conn.getCollection("config.queryAnalyzers").findOne({_id: uuid});
     assert.eq(doc.mode, mode, doc);
     if (mode == "off") {
         assert.eq(doc.hasOwnProperty("sampleRate"), false, doc);
@@ -65,141 +51,103 @@ function assertQueryAnalyzerConfigDoc(configDb, db, collName, mode, sampleRate) 
     }
 }
 
-function assertNoQueryAnalyzerConfigDoc(configDb, db, collName) {
-    const configColl = configDb.getCollection('queryAnalyzers');
-    const ns = db.getName() + "." + collName;
-    const doc = configColl.findOne({ns: ns});
+function assertNoQueryAnalyzerConfigDoc(conn, dbName, collName) {
+    const ns = dbName + "." + collName;
+    const doc = conn.getCollection("config.queryAnalyzers").findOne({ns: ns});
     assert.eq(doc, null, doc);
 }
 
-function testConfigurationOptions(conn, testCases) {
-    const collName = "collection";
+function testPersistingConfiguration(conn, testCases) {
+    const dbName = "testDb-" + extractUUIDFromObject(UUID());
+    const collName = "testColl";
     const ns = dbName + "." + collName;
-    const db = conn.getDB(dbName);
-    const coll = db.getCollection(ns);
-    let config = conn.getDB('config');
-    assert.commandWorked(coll.remove({}));
-    assert.commandWorked(db.runCommand({insert: collName, documents: [{x: 1}]}));
+
+    assert.commandWorked(conn.getDB(dbName).runCommand({insert: collName, documents: [{x: 1}]}));
 
     testCases.forEach(testCase => {
-        jsTest.log(`Running configureQueryAnalyzer command on test case ${tojson(testCase)}`);
+        jsTest.log(
+            `Testing that the configureQueryAnalyzer command persists the configuration correctly ${
+                tojson(testCase)}`);
 
         const res = conn.adminCommand({
-            configureQueryAnalyzer: testCase.command.ns,
+            configureQueryAnalyzer: ns,
             mode: testCase.command.mode,
             sampleRate: testCase.command.sampleRate
         });
         assert.commandWorked(res);
         assertConfigQueryAnalyzerResponse(res, testCase.command.mode, testCase.command.sampleRate);
         assertQueryAnalyzerConfigDoc(
-            config, db, collName, testCase.command.mode, testCase.command.sampleRate);
+            conn, dbName, collName, testCase.command.mode, testCase.command.sampleRate);
     });
 }
 
-function testDropCollectionDeletesConfig(conn) {
+function testDeletingConfigurations(conn, {dropDatabase, dropCollection, isShardedColl, st}) {
+    assert(dropDatabase || dropCollection, "Expected the test to drop the database or collection");
+    assert(!dropDatabase || !dropCollection);
+    assert(!isShardedColl || st);
+
+    const dbName = "testDb-" + extractUUIDFromObject(UUID());
+    const collName = isShardedColl ? "testCollSharded" : "testCollUnsharded";
+    const ns = dbName + "." + collName;
     const db = conn.getDB(dbName);
+    const coll = db.getCollection(collName);
+    jsTest.log(`Testing configuration deletion ${
+        tojson({dbName, collName, isShardedColl, dropDatabase, dropCollection})}`);
 
-    const collNameSh = "collection2DropSh";
-    const nsSh = dbName + "." + collNameSh;
-    const collSh = db.getCollection(collNameSh);
-    const collNameUnsh = "collection2DropUnsh";
-    const nsUnsh = dbName + "." + collNameUnsh;
-    const collUnsh = db.getCollection(collNameUnsh);
-
-    const config = conn.getDB('config');
-    const shardKey = {skey: 1};
-    const shardKeySplitPoint = {skey: 2};
-
-    jsTest.log('Testing drop collection deletes query analyzer config doc');
-
-    assert.commandWorked(conn.adminCommand({shardCollection: nsSh, key: shardKey}));
-    assert.commandWorked(conn.adminCommand({split: nsSh, middle: shardKeySplitPoint}));
-
-    assert.commandWorked(db.runCommand({insert: collNameSh, documents: [{skey: 1, y: 1}]}));
-    assert.commandWorked(db.runCommand({insert: collNameUnsh, documents: [{skey: 1, y: 1}]}));
-
-    // sharded collection
+    assert.commandWorked(db.createCollection(collName));
+    if (isShardedColl) {
+        assert.commandWorked(st.s0.adminCommand({enableSharding: dbName}));
+        st.ensurePrimaryShard(dbName, st.shard0.name);
+        assert.commandWorked(st.s0.adminCommand({shardCollection: ns, key: {x: 1}}));
+        assert.commandWorked(st.s0.adminCommand({split: ns, middle: {x: 0}}));
+        assert.commandWorked(
+            st.s0.adminCommand({moveChunk: ns, find: {x: 0}, to: st.shard1.shardName}));
+    }
 
     const mode = "full";
     const sampleRate = 0.5;
-    const resSh =
-        conn.adminCommand({configureQueryAnalyzer: nsSh, mode: mode, sampleRate: sampleRate});
-    assert.commandWorked(resSh);
-    assertConfigQueryAnalyzerResponse(resSh, mode, sampleRate);
-    assertQueryAnalyzerConfigDoc(config, db, collNameSh, mode, sampleRate);
+    const res =
+        assert.commandWorked(conn.adminCommand({configureQueryAnalyzer: ns, mode, sampleRate}));
+    assertConfigQueryAnalyzerResponse(res, mode, sampleRate);
+    assertQueryAnalyzerConfigDoc(conn, dbName, collName, mode, sampleRate);
 
-    collSh.drop();
-    assertNoQueryAnalyzerConfigDoc(config, db, collNameSh);
+    if (dropDatabase) {
+        assert.commandWorked(db.dropDatabase());
+    } else if (dropCollection) {
+        assert(coll.drop());
+    }
 
-    // unsharded collection
-
-    const resUnsh =
-        conn.adminCommand({configureQueryAnalyzer: nsUnsh, mode: mode, sampleRate: sampleRate});
-    assert.commandWorked(resUnsh);
-    assertConfigQueryAnalyzerResponse(resUnsh, mode, sampleRate);
-    assertQueryAnalyzerConfigDoc(config, db, collNameUnsh, mode, sampleRate);
-
-    collUnsh.drop();
-    assertNoQueryAnalyzerConfigDoc(config, db, collNameUnsh);
+    assertNoQueryAnalyzerConfigDoc(conn, dbName, collName);
 }
 
-function testDropDatabaseDeletesConfig(conn) {
-    let db = conn.getDB(dbName);
-    const collNameSh = "collection2DropSh";
-    const nsSh = dbName + "." + collNameSh;
-    const collSh = db.getCollection(nsSh);
+const testCases = makeTestCases();
 
-    const config = conn.getDB('config');
-    const shardKey = {skey: 1};
-    const shardKeySplitPoint = {skey: 2};
+{
+    const st = new ShardingTest({shards: 2, rs: {nodes: 1}});
 
-    jsTest.log('Testing drop database deletes query analyzer config doc');
-    assert.commandWorked(conn.adminCommand({shardCollection: nsSh, key: shardKey}));
-    assert.commandWorked(conn.adminCommand({split: nsSh, middle: shardKeySplitPoint}));
-    assert.commandWorked(db.runCommand({insert: collNameSh, documents: [{skey: 1, y: 1}]}));
+    testPersistingConfiguration(st.s, testCases);
+    // TODO (SERVER-70479): Make sure that dropDatabase and dropCollection delete the
+    // config.queryAnalyzers doc for the collection being dropped.
+    // testDeletingConfigurations(st.s, {dropDatabase: true, isShardedColl: false, st});
+    testDeletingConfigurations(st.s, {dropDatabase: true, isShardedColl: true, st});
+    testDeletingConfigurations(st.s, {dropCollection: true, isShardedColl: false, st});
+    testDeletingConfigurations(st.s, {dropCollection: true, isShardedColl: true, st});
 
-    // sharded collection
-
-    const mode = "full";
-    const sampleRate = 0.5;
-    const resSh =
-        conn.adminCommand({configureQueryAnalyzer: nsSh, mode: mode, sampleRate: sampleRate});
-    assert.commandWorked(resSh);
-    assertConfigQueryAnalyzerResponse(resSh, mode, sampleRate);
-    assertQueryAnalyzerConfigDoc(config, db, collNameSh, mode, sampleRate);
-    db.dropDatabase();
-    assertNoQueryAnalyzerConfigDoc(config, db, collNameSh);
-
-    // unsharded collection
-
-    db = conn.getDB(dbName);
-    const collNameUnsh = "collection2DropUnsh";
-    const nsUnsh = dbName + "." + collNameUnsh;
-    const collUnsh = db.getCollection(nsUnsh);
-    assert.commandWorked(db.runCommand({insert: collNameUnsh, documents: [{skey: 1, y: 1}]}));
-
-    const resUnsh =
-        conn.adminCommand({configureQueryAnalyzer: nsUnsh, mode: mode, sampleRate: sampleRate});
-    assert.commandWorked(resUnsh);
-    assertConfigQueryAnalyzerResponse(resUnsh, mode, sampleRate);
-    assertQueryAnalyzerConfigDoc(config, db, collNameUnsh, mode, sampleRate);
-    db.dropDatabase();
-    // TODO (SERVER-70479): dropDatabase doesn't delete the config.queryAnalyzers docs for unsharded
-    // collections.
-    // assertNoQueryAnalyzerConfigDoc(config, db, collNameUnsh);
+    st.stop();
 }
 
 {
-    const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
+    const rst = new ReplSetTest({nodes: 1});
+    rst.startSet();
+    rst.initiate();
+    const primary = rst.getPrimary();
 
-    st.s.adminCommand({enableSharding: dbName, primaryShard: st.shard0.name});
+    testPersistingConfiguration(primary, testCases);
+    // TODO (SERVER-70479): Make sure that dropDatabase and dropCollection delete the
+    // config.queryAnalyzers doc for the collection being dropped.
+    // testDeletingConfigurations(primary, {dropDatabase: true, isShardedColl: false});
+    // testDeletingConfigurations(primary, {dropCollection: true, isShardedColl: false});
 
-    const AllTestCases = optionsAllCombinations();
-    testConfigurationOptions(st.s, AllTestCases);
-
-    testDropCollectionDeletesConfig(st.s);
-    testDropDatabaseDeletesConfig(st.s);
-
-    st.stop();
+    rst.stopSet();
 }
 })();

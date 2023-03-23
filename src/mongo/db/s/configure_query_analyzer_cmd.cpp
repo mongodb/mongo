@@ -173,28 +173,25 @@ public:
             }
             auto collUuid = uassertStatusOK(validateCollectionOptions(opCtx, nss));
 
-            // TODO (SERVER-74065): Support query sampling on replica sets.
-            if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-                QueryAnalyzerDocument qad;
-                qad.setNs(nss);
-                qad.setCollectionUuid(collUuid);
-                qad.setConfiguration(newConfig);
-                // TODO SERVER-69804: Implement start/stop timestamp in config.queryAnalyzers
-                // document.
-                LOGV2(6915001,
-                      "Persisting query analyzer configuration",
-                      "namespace"_attr = nss,
-                      "collectionUUID"_attr = collUuid,
-                      "mode"_attr = mode,
-                      "sampleRate"_attr = sampleRate);
-                PersistentTaskStore<QueryAnalyzerDocument> store{
-                    NamespaceString::kConfigQueryAnalyzersNamespace};
-                store.upsert(opCtx,
-                             BSON(QueryAnalyzerDocument::kCollectionUuidFieldName
-                                  << qad.getCollectionUuid()),
-                             qad.toBSON(),
-                             WriteConcerns::kMajorityWriteConcernNoTimeout);
-            }
+            QueryAnalyzerDocument qad;
+            qad.setNs(nss);
+            qad.setCollectionUuid(collUuid);
+            qad.setConfiguration(newConfig);
+            // TODO SERVER-69804: Implement start/stop timestamp in config.queryAnalyzers
+            // document.
+            LOGV2(6915001,
+                  "Persisting query analyzer configuration",
+                  "namespace"_attr = nss,
+                  "collectionUUID"_attr = collUuid,
+                  "mode"_attr = mode,
+                  "sampleRate"_attr = sampleRate);
+            PersistentTaskStore<QueryAnalyzerDocument> store{
+                NamespaceString::kConfigQueryAnalyzersNamespace};
+            store.upsert(
+                opCtx,
+                BSON(QueryAnalyzerDocument::kCollectionUuidFieldName << qad.getCollectionUuid()),
+                qad.toBSON(),
+                WriteConcerns::kMajorityWriteConcernNoTimeout);
 
             Response response;
             // TODO SERVER-70019: Make configQueryAnalyzer return old configuration.
