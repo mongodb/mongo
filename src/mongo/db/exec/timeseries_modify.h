@@ -40,8 +40,8 @@ namespace mongo {
 /**
  * Unpacks time-series bucket documents and writes the modified documents.
  *
- * The stage processes one measurement at a time, but only performs a write after each bucket is
- * exhausted.
+ * The stage processes one bucket at a time, unpacking all the measurements and writing the output
+ * bucket in a single doWork() call.
  */
 class TimeseriesModifyStage final : public RequiresMutableCollectionStage {
 public:
@@ -78,26 +78,28 @@ protected:
 
 private:
     /**
-     * Writes the modifications to a bucket when the end of the bucket is detected.
+     * Writes the modifications to a bucket.
      */
-    PlanStage::StageState _writeToTimeseriesBuckets();
+    PlanStage::StageState _writeToTimeseriesBuckets(
+        WorkingSetID bucketWsmId,
+        const std::vector<BSONObj>& unchangedMeasurements,
+        const std::vector<BSONObj>& deletedMeasurements,
+        bool bucketFromMigrate);
 
     /**
      * Helper to set up state to retry 'bucketId' after yielding and establishing a new storage
      * snapshot.
      */
-    void _retryBucket(const stdx::variant<WorkingSetID, RecordId>& bucketId);
+    void _retryBucket(WorkingSetID bucketId);
 
     template <typename F>
-    boost::optional<PlanStage::StageState> _rememberIfWritingToOrphanedBucket(
+    std::pair<boost::optional<PlanStage::StageState>, bool> _checkIfWritingToOrphanedBucket(
         ScopeGuard<F>& bucketFreer, WorkingSetID id);
 
     /**
      * Gets the next bucket to process.
      */
     PlanStage::StageState _getNextBucket(WorkingSetID& id);
-
-    void resetCurrentBucket();
 
     std::unique_ptr<DeleteStageParams> _params;
 
@@ -113,16 +115,6 @@ private:
     // unmodified.
     std::unique_ptr<MatchExpression> _residualPredicate;
 
-    // The RecordId (also "_id" for the clustered collection) value of the current bucket.
-    RecordId _currentBucketRid = RecordId{};
-    // Maintained similarly to '_currentBucketRid', but used to determine if we can actually use the
-    // results of unpacking to do a write. If the storage engine snapshot has changed, all bets are
-    // off and it's unsafe to proceed - more details in the implementation which reads this value.
-    SnapshotId _currentBucketSnapshotId = SnapshotId{};
-
-    std::vector<BSONObj> _unchangedMeasurements;
-    std::vector<BSONObj> _deletedMeasurements;
-
     /**
      * This member is used to check whether the write should be performed, and if so, any other
      * behavior that should be done as part of the write (e.g. skipping it because it affects an
@@ -132,11 +124,6 @@ private:
      * It's refreshed after yielding and reacquiring the locks.
      */
     write_stage_common::PreWriteFilter _preWriteFilter;
-
-    // True if the current bucket is an orphan and we're writing to an orphaned bucket, when such
-    // writes should be excluded from user-visible change stream events. This can be achieved by
-    // setting 'fromMigrate' flag when calling performAtomicWrites().
-    bool _currentBucketFromMigrate = false;
 
     TimeseriesModifyStats _specificStats{};
 
