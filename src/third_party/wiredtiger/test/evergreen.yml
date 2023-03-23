@@ -4993,7 +4993,6 @@ buildvariants:
     - name: compile
     - name: doc-compile
     - name: make-check-test
-    - name: unit-test
     - name: configure-combinations
     - name: syscall-linux
     - name: checkpoint-filetypes-test
@@ -5316,7 +5315,6 @@ buildvariants:
   tasks:
     - name: compile
     - name: make-check-test
-    - name: unit-test
     - name: fops
     - name: time-shift-sensitivity-test
     - name: linux-directio
