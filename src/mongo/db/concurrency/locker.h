@@ -118,6 +118,8 @@ public:
      * deadline and 'maxTimeout' is reached. Presumably these callers do not expect to handle lock
      * acquisition failure, so this is done to ensure the caller does not proceed as if the lock
      * were successfully acquired.
+     *
+     * Note that this max lock timeout will not apply to ticket acquisition.
      */
     virtual void setMaxLockTimeout(Milliseconds maxTimeout) = 0;
 
@@ -430,8 +432,12 @@ public:
     /**
      * Reacquires a ticket for the Locker. This must only be called after releaseTicket(). It
      * restores the ticket under its previous LockMode.
-     * An OperationContext is required to interrupt the ticket acquisition to prevent deadlocks.
-     * A dead lock is possible when a ticket is reacquired while holding a lock.
+     *
+     * Requires that all locks granted to this locker are modes IS or IX.
+     *
+     * Note that this ticket acquisition will not time out due to a max lock timeout set on the
+     * locker. However, it may time out if a potential deadlock scenario is detected due to ticket
+     * exhaustion and pending S or X locks.
      */
     virtual void reacquireTicket(OperationContext* opCtx) = 0;
 

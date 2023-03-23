@@ -146,6 +146,12 @@ public:
     void cleanupUnusedLocks();
 
     /**
+     * Returns whether there are any conflicting lock requests for the resource associated with the
+     * given lock request. Note that this return value may be immediately stale.
+     */
+    bool hasConflictingRequests(const LockRequest* request) const;
+
+    /**
      * Dumps the contents of all locks to the log.
      */
     void dump() const;

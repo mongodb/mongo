@@ -1608,22 +1608,6 @@ TEST_F(DConcurrencyTestFixture, TicketAcquireCanThrowDueToKill) {
     runWithThrottling<SemaphoreTicketHolder>(numTickets, runTest);
 }
 
-TEST_F(DConcurrencyTestFixture, TicketAcquireCanThrowDueToMaxLockTimeout) {
-    auto runTest = [&]() {
-        auto clients = makeKClientsWithLockers(1);
-        auto opCtx = clients[0].second.get();
-
-        opCtx->lockState()->setMaxLockTimeout(Milliseconds(100));
-        ASSERT_THROWS_CODE(
-            Lock::GlobalLock(opCtx, MODE_IX), AssertionException, ErrorCodes::LockTimeout);
-    };
-
-    // Limit the locker to 0 tickets at a time.
-    int numTickets = 0;
-    runWithThrottling<PriorityTicketHolder>(numTickets, runTest);
-    runWithThrottling<SemaphoreTicketHolder>(numTickets, runTest);
-}
-
 TEST_F(DConcurrencyTestFixture, TicketAcquireCanThrowDueToDeadline) {
     auto runTest = [&]() {
         auto clients = makeKClientsWithLockers(1);
@@ -1648,8 +1632,10 @@ TEST_F(DConcurrencyTestFixture, TicketAcquireShouldNotThrowIfBehaviorIsLeaveUnlo
         auto clients = makeKClientsWithLockers(1);
         auto opCtx = clients[0].second.get();
 
-        opCtx->lockState()->setMaxLockTimeout(Milliseconds(100));
-        Lock::GlobalLock(opCtx, MODE_IX, Date_t::max(), Lock::InterruptBehavior::kLeaveUnlocked);
+        Lock::GlobalLock(opCtx,
+                         MODE_IX,
+                         Date_t::now() + Milliseconds(1500),
+                         Lock::InterruptBehavior::kLeaveUnlocked);
     };
 
     int numTickets = 0;
@@ -1716,14 +1702,16 @@ TEST_F(DConcurrencyTestFixture, TicketReacquireCanBeInterrupted) {
         auto opctx1 = clientOpctxPairs[0].second.get();
         auto opctx2 = clientOpctxPairs[1].second.get();
 
-        Lock::GlobalRead R1(opctx1, Date_t::now(), Lock::InterruptBehavior::kThrow);
+        Lock::GlobalLock R1(
+            opctx1, LockMode::MODE_IS, Date_t::now(), Lock::InterruptBehavior::kThrow);
         ASSERT(R1.isLocked());
 
         {
             // A second Locker should not be able to acquire a ticket.
 
             ASSERT_THROWS_CODE(
-                Lock::GlobalRead(opctx2, Date_t::now(), Lock::InterruptBehavior::kThrow),
+                Lock::GlobalLock(
+                    opctx2, LockMode::MODE_IS, Date_t::now(), Lock::InterruptBehavior::kThrow),
                 AssertionException,
                 ErrorCodes::LockTimeout);
         }
@@ -1731,13 +1719,56 @@ TEST_F(DConcurrencyTestFixture, TicketReacquireCanBeInterrupted) {
         opctx1->lockState()->releaseTicket();
 
         // Now a second Locker can acquire a ticket.
-        Lock::GlobalRead R2(opctx2, Date_t::now(), Lock::InterruptBehavior::kThrow);
+        Lock::GlobalLock R2(
+            opctx2, LockMode::MODE_IS, Date_t::now(), Lock::InterruptBehavior::kThrow);
         ASSERT(R2.isLocked());
 
         // This thread should block because it cannot acquire a ticket.
         auto result = runTaskAndKill(opctx1, [&] { opctx1->lockState()->reacquireTicket(opctx1); });
 
         ASSERT_THROWS_CODE(result.get(), AssertionException, ErrorCodes::Interrupted);
+    };
+
+    // Limit the locker to 1 ticket at a time.
+    int numTickets = 1;
+    runWithThrottling<PriorityTicketHolder>(numTickets, runTest);
+    runWithThrottling<SemaphoreTicketHolder>(numTickets, runTest);
+}
+
+TEST_F(DConcurrencyTestFixture,
+       TicketReacquireWithTicketExhaustionAndConflictingLockThrowsLockTimeout) {
+    auto runTest = [&] {
+        auto clientOpctxPairs = makeKClientsWithLockers(2);
+        auto opCtx1 = clientOpctxPairs[0].second.get();
+        auto opCtx2 = clientOpctxPairs[1].second.get();
+
+        DatabaseName dbName{boost::none, "test"};
+
+        boost::optional<Lock::GlobalLock> globalIX = Lock::GlobalLock{opCtx1, LockMode::MODE_IX};
+        boost::optional<Lock::DBLock> dbIX = Lock::DBLock{opCtx1, dbName, LockMode::MODE_IX};
+        opCtx1->lockState()->releaseTicket();
+
+        stdx::packaged_task<void()> task{[opCtx2, &dbName] {
+            Lock::GlobalLock globalIX{opCtx2, LockMode::MODE_IX};
+            Lock::DBLock dbX{opCtx2, dbName, LockMode::MODE_X};
+        }};
+        auto result = task.get_future();
+        stdx::thread taskThread{std::move(task)};
+
+        ScopeGuard joinGuard{[&taskThread] {
+            taskThread.join();
+        }};
+
+        // Wait for the database X lock to conflict.
+        while (!opCtx2->lockState()->hasLockPending()) {
+        }
+
+        ASSERT_THROWS_CODE(opCtx1->lockState()->reacquireTicket(opCtx1),
+                           AssertionException,
+                           ErrorCodes::LockTimeout);
+
+        dbIX.reset();
+        globalIX.reset();
     };
 
     // Limit the locker to 1 ticket at a time.

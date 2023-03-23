@@ -1005,4 +1005,23 @@ TEST_F(LockManagerTest, Fairness) {
     ASSERT(lockMgr.unlock(&requestIX1));
 }
 
+TEST_F(LockManagerTest, HasConflictingRequests) {
+    LockManager lockMgr;
+    ResourceId resId{RESOURCE_GLOBAL, 0};
+
+    LockerImpl lockerIX{getServiceContext()};
+    LockRequestCombo requestIX{&lockerIX};
+    ASSERT_EQ(lockMgr.lock(resId, &requestIX, LockMode::MODE_IX), LockResult::LOCK_OK);
+    ASSERT_FALSE(lockMgr.hasConflictingRequests(&requestIX));
+
+    LockerImpl lockerX{getServiceContext()};
+    LockRequestCombo requestX{&lockerX};
+    ASSERT_EQ(lockMgr.lock(resId, &requestX, LockMode::MODE_X), LockResult::LOCK_WAITING);
+    ASSERT_TRUE(lockMgr.hasConflictingRequests(&requestIX));
+    ASSERT_TRUE(lockMgr.hasConflictingRequests(&requestX));
+
+    ASSERT(lockMgr.unlock(&requestIX));
+    ASSERT(lockMgr.unlock(&requestX));
+}
+
 }  // namespace mongo
