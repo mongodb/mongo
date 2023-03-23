@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/overloaded_visitor.h"
 
 #include "mongo/bson/bsonobj.h"
@@ -326,13 +327,26 @@ BatchedCommandRequest BatchedCommandRequest::buildPipelineUpdateOp(
 }
 
 BatchItemRef::BatchItemRef(const BatchedCommandRequest* request, int index)
-    : _batchedRequest(*request), _index(index) {
+    : _batchedRequest(*request), _index(index), _batchType(_batchedRequest->getBatchType()) {
     invariant(index < int(request->sizeWriteOps()));
 }
 
 BatchItemRef::BatchItemRef(const BulkWriteCommandRequest* request, int index)
     : _bulkWriteRequest(*request), _index(index) {
     invariant(index < int(request->getOps().size()));
+    switch (BulkWriteCRUDOp(request->getOps()[index]).getType()) {
+        case BulkWriteCRUDOp::OpType::kInsert:
+            _batchType = BatchedCommandRequest::BatchType_Insert;
+            break;
+        case BulkWriteCRUDOp::OpType::kUpdate:
+            _batchType = BatchedCommandRequest::BatchType_Update;
+            break;
+        case BulkWriteCRUDOp::OpType::kDelete:
+            _batchType = BatchedCommandRequest::BatchType_Delete;
+            break;
+        default:
+            MONGO_UNREACHABLE;
+    }
 }
 
 }  // namespace mongo

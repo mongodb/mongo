@@ -94,6 +94,10 @@ public:
         }
 
         Reply typedRun(OperationContext* opCtx) final {
+            uassert(ErrorCodes::CommandNotSupported,
+                    "BulkWrite on mongos is not currently supported.",
+                    false);
+
             uassert(
                 ErrorCodes::CommandNotSupported,
                 "BulkWrite may not be run without featureFlagBulkWriteCommand enabled",

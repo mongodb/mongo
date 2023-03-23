@@ -246,13 +246,7 @@ public:
     BatchItemRef(const BulkWriteCommandRequest* request, int index);
 
     BatchedCommandRequest::BatchType getOpType() const {
-        if (_batchedRequest) {
-            return _batchedRequest->getBatchType();
-        } else {
-            // TODO(SERVER-73281): Support bulkWrite update and delete.
-            tassert(7263702, "invalid bulkWrite request reference", _bulkWriteRequest);
-            return BatchedCommandRequest::BatchType_Insert;
-        }
+        return _batchType;
     }
 
     int getItemIndex() const {
@@ -312,6 +306,7 @@ private:
     boost::optional<const BatchedCommandRequest&> _batchedRequest;
     boost::optional<const BulkWriteCommandRequest&> _bulkWriteRequest;
     const int _index;
+    BatchedCommandRequest::BatchType _batchType;
 };
 
 }  // namespace mongo
