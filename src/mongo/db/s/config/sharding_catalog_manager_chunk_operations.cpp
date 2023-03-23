@@ -519,7 +519,7 @@ ShardingCatalogManager::_splitChunkInTransaction(OperationContext* opCtx,
     // We need to use a shared pointer to prevent an scenario where the operation context is
     // interrupted and the scope containing SyncTransactionWithRetries goes away but the callback is
     // called from the executor thread.
-    // TODO SERVER-66261: remove after SERVER-66261 is committed.
+    // TODO SERVER-75189: remove after SERVER-66261 is committed.
     struct SharedBlock {
         SharedBlock(const NamespaceString& nss_,
                     const ChunkRange& range_,

@@ -57,7 +57,7 @@ void dropIndexInTransaction(OperationContext* opCtx,
                             const std::string& name,
                             const UUID& collectionUUID,
                             const Timestamp& lastmod) {
-    // TODO SERVER-66261: remove the usage of shared_ptr once the executor is inlined, so the
+    // TODO SERVER-75189: remove the usage of shared_ptr once the executor is inlined, so the
     // variable will never be out of scope.
     auto deleteOp = std::make_shared<write_ops::DeleteCommandRequest>(
         NamespaceString::kConfigsvrIndexCatalogNamespace);

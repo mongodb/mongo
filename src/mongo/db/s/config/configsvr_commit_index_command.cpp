@@ -62,7 +62,7 @@ void commitIndexInTransaction(OperationContext* opCtx,
     IndexCatalogType indexCatalogEntry(name, keyPattern, options, lastmod, collectionUUID);
     indexCatalogEntry.setIndexCollectionUUID(indexCollectionUUID);
 
-    // TODO SERVER-66261: remove the usage of shared_ptr once the executor is inlined, so the
+    // TODO SERVER-75189: remove the usage of shared_ptr once the executor is inlined, so the
     // variable will never be out of scope.
     auto upsertIndexOp = std::make_shared<write_ops::UpdateCommandRequest>(
         NamespaceString::kConfigsvrIndexCatalogNamespace);

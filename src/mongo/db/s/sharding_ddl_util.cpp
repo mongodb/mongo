@@ -202,7 +202,7 @@ void deleteCollection(OperationContext* opCtx,
      * NOTE: deleteCollectionFn may be run on a separate thread than the one serving
      * deleteCollection(). For this reason, all the referenced parameters have to
      * be captured by value.
-     * TODO SERVER-66261 replace capture list with a single '&'.
+     * TODO SERVER-75189: replace capture list with a single '&'.
      */
     auto transactionChain = [nss, uuid](const txn_api::TransactionClient& txnClient,
                                         ExecutorPtr txnExec) {
