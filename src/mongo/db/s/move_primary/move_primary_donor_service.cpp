@@ -456,7 +456,10 @@ ExecutorFuture<void> MovePrimaryDonor::waitUntilReadyToBlockWrites() {
 }
 
 ExecutorFuture<Timestamp> MovePrimaryDonor::waitUntilCurrentlyBlockingWrites() {
-    return runOnTaskExecutor([this] { return _currentlyBlockingWritesPromise.getFuture().get(); });
+    return runOnTaskExecutor([this] {
+        return future_util::withCancellation(_currentlyBlockingWritesPromise.getFuture(),
+                                             _cancelState->getAbortToken());
+    });
 }
 
 void MovePrimaryDonor::onBeganBlockingWrites(StatusWith<Timestamp> blockingWritesTimestamp) {
