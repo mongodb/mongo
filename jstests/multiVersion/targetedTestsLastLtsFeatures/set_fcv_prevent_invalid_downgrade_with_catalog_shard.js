@@ -16,9 +16,17 @@ jsTest.log("Downgrading FCV to an unsupported version when catalogShard is enabl
 var st = new ShardingTest({catalogShard: true});
 var mongosAdminDB = st.s.getDB("admin");
 
-assert.commandFailed(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV}),
-                     `cannot downgrade featureCompatibilityVersion to ${
-                         lastLTSFCV} when catalog shard is enabled as it may result in data loss`);
+let errRes = assert.commandFailedWithCode(
+    mongosAdminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV}),
+    ErrorCodes.CannotDowngrade);
+assert.eq(errRes.errmsg,
+          `Cannot downgrade featureCompatibilityVersion to ${lastLTSFCV} with a catalog shard as it is not supported in earlier versions. Please transition the config server to dedicated mode using the transitionToDedicatedConfigServer command.`);
+
+errRes = assert.commandFailedWithCode(
+    mongosAdminDB.runCommand({setFeatureCompatibilityVersion: lastContinuousFCV}),
+    ErrorCodes.CannotDowngrade);
+assert.eq(errRes.errmsg,
+          `Cannot downgrade featureCompatibilityVersion to ${lastContinuousFCV} with a catalog shard as it is not supported in earlier versions. Please transition the config server to dedicated mode using the transitionToDedicatedConfigServer command.`);
 
 var res = st.config0.getDB("admin").runCommand({getParameter: 1, featureCompatibilityVersion: 1});
 assert(res.featureCompatibilityVersion);
@@ -32,9 +40,7 @@ st = new ShardingTest({catalogShard: false});
 mongosAdminDB = st.s.getDB("admin");
 
 assert.commandWorked(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
-assert.commandFailed(
-    mongosAdminDB.runCommand({transitionToCatalogShard: 1}),
-    "Cannot add a shard with catalogShard as its name if the catalog shard feature flag is not enabled");
+assert.commandFailedWithCode(mongosAdminDB.runCommand({transitionToCatalogShard: 1}), 5563604);
 
 st.stop();
 })();

@@ -370,11 +370,11 @@ public:
                                                  BSON("_id" << ShardId::kConfigServerId.toString()))
                          .isEmpty();
 
-                // TODO SERVER-73784: Update catalog_shard_feature_flag.idl so that the version for
-                // gFeatureFlagCatalogShard is 7.0 when master is 7.0
-                uassert(ErrorCodes::IllegalOperation,
+                uassert(ErrorCodes::CannotDowngrade,
                         "Cannot downgrade featureCompatibilityVersion to {} "
-                        "with a catalog shard as it may result in data loss "_format(
+                        "with a catalog shard as it is not supported in earlier versions. "
+                        "Please transition the config server to dedicated mode using the "
+                        "transitionToDedicatedConfigServer command."_format(
                             multiversion::toString(requestedVersion)),
                         !isCatalogShard ||
                             gFeatureFlagCatalogShard.isEnabledOnVersion(requestedVersion));
