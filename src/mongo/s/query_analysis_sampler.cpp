@@ -50,6 +50,7 @@ using QuerySamplingOptions = OperationContext::QuerySamplingOptions;
 
 MONGO_FAIL_POINT_DEFINE(disableQueryAnalysisSampler);
 MONGO_FAIL_POINT_DEFINE(overwriteQueryAnalysisSamplerAvgLastCountToZero);
+MONGO_FAIL_POINT_DEFINE(queryAnalysisSamplerFilterByComment);
 
 const auto getQueryAnalysisSampler = ServiceContext::declareDecoration<QueryAnalysisSampler>();
 
@@ -261,7 +262,7 @@ void QueryAnalysisSampler::_refreshConfigurations(OperationContext* opCtx) {
         IDLParserContext("configurationRefresher"), swResponse.getValue().response);
 
     LOGV2_DEBUG(6876103,
-                2,
+                3,
                 "Refreshed query analyzer configurations",
                 "numQueriesExecutedPerSecond"_attr = lastAvgCount,
                 "response"_attr = response);
@@ -314,7 +315,6 @@ void QueryAnalysisSampler::_incrementCounters(OperationContext* opCtx,
         case SampledCommandNameEnum::kDistinct:
             QueryAnalysisSampleCounters::get(opCtx).incrementReads(nss);
             break;
-        case SampledCommandNameEnum::kInsert:
         case SampledCommandNameEnum::kUpdate:
         case SampledCommandNameEnum::kDelete:
         case SampledCommandNameEnum::kFindAndModify:
@@ -337,6 +337,19 @@ boost::optional<UUID> QueryAnalysisSampler::tryGenerateSampleId(OperationContext
     }
     if (opts == QuerySamplingOptions::kOptOut) {
         // Do not generate a sample id for a query that has explicitly opted out of query sampling.
+        return boost::none;
+    }
+
+    if (cmdName == SampledCommandNameEnum::kInsert) {
+        // Insert queries are not sampled by design.
+        return boost::none;
+    }
+
+    if (auto scoped = queryAnalysisSamplerFilterByComment.scopedIf([&](const BSONObj& data) {
+            return !opCtx->getComment() ||
+                (data.getStringField("comment") != opCtx->getComment()->checkAndGetStringData());
+        });
+        MONGO_unlikely(scoped.isActive())) {
         return boost::none;
     }
 

@@ -541,6 +541,7 @@ MonotonicityMetrics calculateMonotonicity(OperationContext* opCtx,
           "namespace"_attr = collection->ns(),
           "shardKey"_attr = shardKey,
           "indexKey"_attr = indexKeyPattern,
+          "numRecords"_attr = recordIds.size(),
           "coefficient"_attr = metrics.getRecordIdCorrelationCoefficient(),
           "coefficientThreshold"_attr = coefficientThreshold);
 

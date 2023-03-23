@@ -156,6 +156,17 @@ var AnalyzeShardKeyUtil = (function() {
         return assert.lte(Math.abs(actual - expected), epsilon, {actual, expected, msg});
     }
 
+    /**
+     * Asserts that the difference between 'actual' and 'expected' is less than 'maxPercentage' of
+     * 'expected'.
+     */
+    function assertDiffPercentage(actual, expected, maxPercentage) {
+        const actualPercentage = Math.abs(actual - expected) * 100 / expected;
+        assert.lt(actualPercentage,
+                  maxPercentage,
+                  tojson({actual, expected, maxPercentage, actualPercentage}));
+    }
+
     function validateKeyCharacteristicsMetrics(metrics) {
         assert.gte(metrics.numDocs, metrics.numDistinctValues, metrics);
         assert.gte(metrics.numDistinctValues, metrics.mostCommonValues.length, metrics);
@@ -332,6 +343,7 @@ var AnalyzeShardKeyUtil = (function() {
         disableProfiler,
         calculatePercentage,
         assertApprox,
+        assertDiffPercentage,
         assertNotContainKeyCharacteristicsMetrics,
         assertContainKeyCharacteristicsMetrics,
         assertKeyCharacteristicsMetrics,

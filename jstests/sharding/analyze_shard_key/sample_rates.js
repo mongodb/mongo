@@ -8,6 +8,7 @@
 (function() {
 "use strict";
 
+load("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
 load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
 
 // Make the periodic jobs for refreshing sample rates and writing sampled queries and diffs have a
@@ -164,17 +165,6 @@ function getSampleSize(st) {
 }
 
 /**
- * Asserts that the difference between 'actual' and 'expected' is less than 'maxPercentage' of
- * 'expected'.
- */
-function assertDiffPercentage(actual, expected, maxPercentage) {
-    const actualPercentage = Math.abs(actual - expected) * 100 / expected;
-    assert.lt(actualPercentage,
-              maxPercentage,
-              tojson({actual, expected, maxPercentage, actualPercentage}));
-}
-
-/**
  * Tests that query sampling respects the configured sample rate and that the number of queries
  * sampled by each mongos or shardsvr mongod is proportional to the number of queries it executes.
  */
@@ -253,10 +243,14 @@ function testQuerySampling(dbName, collNameNotSampled, collNameSampled) {
                tojsononeline(
                    {expectedTotalCount, expectedFindCount, expectedDeleteCount, expectedAggCount}));
 
-    assertDiffPercentage(sampleSize.total, expectedTotalCount, 10 /* maxDiffPercentage */);
-    assertDiffPercentage(sampleSize.find, expectedFindCount, 15 /* maxDiffPercentage */);
-    assertDiffPercentage(sampleSize.delete, expectedDeleteCount, 15 /* maxDiffPercentage */);
-    assertDiffPercentage(sampleSize.aggregate, expectedAggCount, 15 /* maxDiffPercentage */);
+    AnalyzeShardKeyUtil.assertDiffPercentage(
+        sampleSize.total, expectedTotalCount, 10 /* maxDiffPercentage */);
+    AnalyzeShardKeyUtil.assertDiffPercentage(
+        sampleSize.find, expectedFindCount, 15 /* maxDiffPercentage */);
+    AnalyzeShardKeyUtil.assertDiffPercentage(
+        sampleSize.delete, expectedDeleteCount, 15 /* maxDiffPercentage */);
+    AnalyzeShardKeyUtil.assertDiffPercentage(
+        sampleSize.aggregate, expectedAggCount, 15 /* maxDiffPercentage */);
 
     QuerySamplingUtil.clearSampledQueryCollectionOnAllShards(st);
 }

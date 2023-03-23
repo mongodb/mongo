@@ -215,7 +215,7 @@ void QueryAnalysisWriter::onStartup(OperationContext* opCtx) {
 
     stdx::lock_guard<Latch> lk(_mutex);
 
-    PeriodicRunner::PeriodicJob QueryWriterJob(
+    PeriodicRunner::PeriodicJob queryWriterJob(
         "QueryAnalysisQueryWriter",
         [this](Client* client) {
             if (MONGO_unlikely(disableQueryAnalysisWriter.shouldFail())) {
@@ -225,7 +225,7 @@ void QueryAnalysisWriter::onStartup(OperationContext* opCtx) {
             _flushQueries(opCtx.get());
         },
         Seconds(gQueryAnalysisWriterIntervalSecs));
-    _periodicQueryWriter = periodicRunner->makeJob(std::move(QueryWriterJob));
+    _periodicQueryWriter = periodicRunner->makeJob(std::move(queryWriterJob));
     _periodicQueryWriter.start();
 
     PeriodicRunner::PeriodicJob diffWriterJob(
