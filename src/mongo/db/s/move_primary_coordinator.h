@@ -51,8 +51,12 @@ public:
 private:
     StringData serializePhase(const Phase& phase) const override;
     void appendCommandInfo(BSONObjBuilder* cmdInfoBuilder) const override;
+    bool _mustAlwaysMakeProgress() override;
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
+    ExecutorFuture<void> _cleanupOnAbort(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                         const CancellationToken& token,
+                                         const Status& status) noexcept override;
 
     ExecutorFuture<void> runMovePrimaryWorkflow(
         std::shared_ptr<executor::ScopedTaskExecutor> executor,
@@ -61,7 +65,9 @@ private:
     /**
      * Logs in the `config.changelog` collection a specific event for `movePrimary` operations.
      */
-    void logChange(OperationContext* opCtx, const std::string& what) const;
+    void logChange(OperationContext* opCtx,
+                   const std::string& what,
+                   const Status& status = Status::OK()) const;
 
     /**
      * Returns the list of unsharded collections for the given database. These are the collections
