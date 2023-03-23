@@ -792,7 +792,7 @@ TEST(MakeMatchStageFromInput, NonArrayValueUsesEqQuery) {
     auto input = Document{{"local", 1}};
     BSONObj matchStage = DocumentSourceLookUp::makeMatchStageFromInput(
         input, FieldPath("local"), "foreign", BSONObj());
-    ASSERT_BSONOBJ_EQ(matchStage, fromjson("{$match: {$and: [{foreign: {$eq: 1}}, {}]}}"));
+    ASSERT_BSONOBJ_EQ(matchStage, fromjson("{$match: {foreign: {$eq: 1}}}"));
 }
 
 TEST(MakeMatchStageFromInput, RegexValueUsesEqQuery) {
@@ -800,10 +800,7 @@ TEST(MakeMatchStageFromInput, RegexValueUsesEqQuery) {
     Document input = DOC("local" << Value(regex));
     BSONObj matchStage = DocumentSourceLookUp::makeMatchStageFromInput(
         input, FieldPath("local"), "foreign", BSONObj());
-    ASSERT_BSONOBJ_EQ(
-        matchStage,
-        BSON("$match" << BSON(
-                 "$and" << BSON_ARRAY(BSON("foreign" << BSON("$eq" << regex)) << BSONObj()))));
+    ASSERT_BSONOBJ_EQ(matchStage, BSON("$match" << BSON("foreign" << BSON("$eq" << regex))));
 }
 
 TEST(MakeMatchStageFromInput, ArrayValueUsesInQuery) {
@@ -811,7 +808,7 @@ TEST(MakeMatchStageFromInput, ArrayValueUsesInQuery) {
     Document input = DOC("local" << Value(inputArray));
     BSONObj matchStage = DocumentSourceLookUp::makeMatchStageFromInput(
         input, FieldPath("local"), "foreign", BSONObj());
-    ASSERT_BSONOBJ_EQ(matchStage, fromjson("{$match: {$and: [{foreign: {$in: [1, 2]}}, {}]}}"));
+    ASSERT_BSONOBJ_EQ(matchStage, fromjson("{$match: {foreign: {$in: [1, 2]}}}"));
 }
 
 TEST(MakeMatchStageFromInput, ArrayValueWithRegexUsesOrQuery) {
@@ -822,12 +819,9 @@ TEST(MakeMatchStageFromInput, ArrayValueWithRegexUsesOrQuery) {
         input, FieldPath("local"), "foreign", BSONObj());
     ASSERT_BSONOBJ_EQ(
         matchStage,
-        BSON("$match" << BSON(
-                 "$and" << BSON_ARRAY(
-                     BSON("$or" << BSON_ARRAY(BSON("foreign" << BSON("$eq" << Value(1)))
-                                              << BSON("foreign" << BSON("$eq" << regex))
-                                              << BSON("foreign" << BSON("$eq" << Value(2)))))
-                     << BSONObj()))));
+        BSON("$match" << BSON("$or" << BSON_ARRAY(BSON("foreign" << BSON("$eq" << Value(1)))
+                                                  << BSON("foreign" << BSON("$eq" << regex))
+                                                  << BSON("foreign" << BSON("$eq" << Value(2)))))));
 }
 
 //

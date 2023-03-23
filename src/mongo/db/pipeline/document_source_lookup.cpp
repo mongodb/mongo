@@ -124,6 +124,69 @@ NamespaceString parseLookupFromAndResolveNamespace(const BSONElement& elem,
     return nss;
 }
 
+// Creates the conditions for joining the local and foreign fields inside of a $match.
+static BSONObj createMatchStageJoinObj(const Document& input,
+                                       const FieldPath& localFieldPath,
+                                       const std::string& foreignFieldName) {
+    // Add the 'localFieldPath' of 'input' into 'localFieldList'. If 'localFieldPath' references a
+    // field with an array in its path, we may need to join on multiple values, so we add each
+    // element to 'localFieldList'.
+    BSONArrayBuilder arrBuilder;
+    bool containsRegex = false;
+    document_path_support::visitAllValuesAtPath(input, localFieldPath, [&](const Value& nextValue) {
+        arrBuilder << nextValue;
+        if (!containsRegex && nextValue.getType() == BSONType::RegEx) {
+            containsRegex = true;
+        }
+    });
+
+    if (arrBuilder.arrSize() == 0) {
+        // Missing values are treated as null.
+        arrBuilder << BSONNULL;
+    }
+
+    // We construct a query of one of the following forms, depending on the contents of
+    // 'localFieldList'.
+    //
+    //   {<foreignFieldName>: {$eq: <localFieldList[0]>}}
+    //     if 'localFieldList' contains a single element.
+    //
+    //   {<foreignFieldName>: {$in: [<value>, <value>, ...]}}
+    //     if 'localFieldList' contains more than one element but doesn't contain any that are
+    //     regular expressions.
+    //
+    //   {$or: [{<foreignFieldName>: {$eq: <value>}}, {<foreignFieldName>: {$eq: <value>}}, ...]}
+    //     if 'localFieldList' contains more than one element and it contains at least one element
+    //     that is a regular expression.
+    const auto localFieldListSize = arrBuilder.arrSize();
+    const auto localFieldList = arrBuilder.arr();
+    BSONObjBuilder joinObj;
+    if (localFieldListSize > 1) {
+        // A $lookup on an array value corresponds to finding documents in the foreign collection
+        // that have a value of any of the elements in the array value, rather than finding
+        // documents that have a value equal to the entire array value. These semantics are
+        // automatically provided to us by using the $in query operator.
+        if (containsRegex) {
+            // A regular expression inside the $in query operator will perform pattern matching on
+            // any string values. Since we want regular expressions to only match other RegEx types,
+            // we write the query as a $or of equality comparisons instead.
+            return buildEqualityOrQuery(foreignFieldName, localFieldList);
+        } else {
+            // { <foreignFieldName> : { "$in" : <localFieldList> } }
+            BSONObjBuilder subObj(joinObj.subobjStart(foreignFieldName));
+            subObj << "$in" << localFieldList;
+            subObj.doneFast();
+            return joinObj.obj();
+        }
+    }
+    // Otherwise we have a simple $eq.
+    // { <foreignFieldName> : { "$eq" : <localFieldList[0]> } }
+    BSONObjBuilder subObj(joinObj.subobjStart(foreignFieldName));
+    subObj << "$eq" << localFieldList[0];
+    subObj.doneFast();
+    return joinObj.obj();
+}
+
 }  // namespace
 
 DocumentSourceLookUp::DocumentSourceLookUp(
@@ -828,83 +891,25 @@ BSONObj DocumentSourceLookUp::makeMatchStageFromInput(const Document& input,
                                                       const FieldPath& localFieldPath,
                                                       const std::string& foreignFieldName,
                                                       const BSONObj& additionalFilter) {
-    // Add the 'localFieldPath' of 'input' into 'localFieldList'. If 'localFieldPath' references a
-    // field with an array in its path, we may need to join on multiple values, so we add each
-    // element to 'localFieldList'.
-    BSONArrayBuilder arrBuilder;
-    bool containsRegex = false;
-    document_path_support::visitAllValuesAtPath(input, localFieldPath, [&](const Value& nextValue) {
-        arrBuilder << nextValue;
-        if (!containsRegex && nextValue.getType() == BSONType::RegEx) {
-            containsRegex = true;
-        }
-    });
-
-    if (arrBuilder.arrSize() == 0) {
-        // Missing values are treated as null.
-        arrBuilder << BSONNULL;
-    }
-
-    const auto localFieldListSize = arrBuilder.arrSize();
-    const auto localFieldList = arrBuilder.arr();
-
-    // We construct a query of one of the following forms, depending on the contents of
-    // 'localFieldList'.
-    //
-    //   {$and: [{<foreignFieldName>: {$eq: <localFieldList[0]>}}, <additionalFilter>]}
-    //     if 'localFieldList' contains a single element.
-    //
-    //   {$and: [{<foreignFieldName>: {$in: [<value>, <value>, ...]}}, <additionalFilter>]}
-    //     if 'localFieldList' contains more than one element but doesn't contain any that are
-    //     regular expressions.
-    //
-    //   {$and: [{$or: [{<foreignFieldName>: {$eq: <value>}},
-    //                  {<foreignFieldName>: {$eq: <value>}}, ...]},
-    //           <additionalFilter>]}
-    //     if 'localFieldList' contains more than one element and it contains at least one element
-    //     that is a regular expression.
-
     // We wrap the query in a $match so that it can be parsed into a DocumentSourceMatch when
     // constructing a pipeline to execute.
     BSONObjBuilder match;
-    BSONObjBuilder query(match.subobjStart("$match"));
 
-    BSONArrayBuilder andObj(query.subarrayStart("$and"));
-    BSONObjBuilder joiningObj(andObj.subobjStart());
+    BSONObj joinObj = createMatchStageJoinObj(input, localFieldPath, foreignFieldName);
 
-    if (localFieldListSize > 1) {
-        // A $lookup on an array value corresponds to finding documents in the foreign collection
-        // that have a value of any of the elements in the array value, rather than finding
-        // documents that have a value equal to the entire array value. These semantics are
-        // automatically provided to us by using the $in query operator.
-        if (containsRegex) {
-            // A regular expression inside the $in query operator will perform pattern matching on
-            // any string values. Since we want regular expressions to only match other RegEx types,
-            // we write the query as a $or of equality comparisons instead.
-            BSONObj orQuery = buildEqualityOrQuery(foreignFieldName, localFieldList);
-            joiningObj.appendElements(orQuery);
-        } else {
-            // { <foreignFieldName> : { "$in" : <localFieldList> } }
-            BSONObjBuilder subObj(joiningObj.subobjStart(foreignFieldName));
-            subObj << "$in" << localFieldList;
-            subObj.doneFast();
-        }
+    // If we have one condition, do not place inside a $and. This BSON could be created many times,
+    // so we want to produce simple queries for the planner if possible.
+    if (additionalFilter.isEmpty()) {
+        match << "$match" << joinObj;
     } else {
-        // { <foreignFieldName> : { "$eq" : <localFieldList[0]> } }
-        BSONObjBuilder subObj(joiningObj.subobjStart(foreignFieldName));
-        subObj << "$eq" << localFieldList[0];
-        subObj.doneFast();
+        BSONObjBuilder query(match.subobjStart("$match"));
+        BSONArrayBuilder andObj(query.subarrayStart("$and"));
+        andObj.append(joinObj);
+        andObj.append(additionalFilter);
+        andObj.doneFast();
+        query.doneFast();
     }
 
-    joiningObj.doneFast();
-
-    BSONObjBuilder additionalFilterObj(andObj.subobjStart());
-    additionalFilterObj.appendElements(additionalFilter);
-    additionalFilterObj.doneFast();
-
-    andObj.doneFast();
-
-    query.doneFast();
     return match.obj();
 }
 
