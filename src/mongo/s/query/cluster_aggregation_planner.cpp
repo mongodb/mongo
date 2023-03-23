@@ -383,6 +383,9 @@ DispatchShardPipelineResults dispatchExchangeConsumerPipeline(
     const NamespaceString& executionNss,
     Document serializedCommand,
     DispatchShardPipelineResults* shardDispatchResults) {
+    tassert(7163600,
+            "dispatchExchangeConsumerPipeline() must not be called for explain operation",
+            !expCtx->explain);
     auto opCtx = expCtx->opCtx;
 
     if (MONGO_unlikely(shardedAggregateFailToDispatchExchangeConsumerPipeline.shouldFail())) {
@@ -419,7 +422,8 @@ DispatchShardPipelineResults dispatchExchangeConsumerPipeline(
                                                                 serializedCommand,
                                                                 consumerPipelines.back(),
                                                                 boost::none, /* exchangeSpec */
-                                                                false /* needsMerge */);
+                                                                false /* needsMerge */,
+                                                                boost::none /* explain */);
 
         requests.emplace_back(shardDispatchResults->exchangeSpec->consumerShards[idx],
                               consumerCmdObj);
@@ -681,8 +685,12 @@ Status dispatchPipelineAndMerge(OperationContext* opCtx,
                                 bool startsWithDocuments) {
     auto expCtx = targeter.pipeline->getContext();
     // If not, split the pipeline as necessary and dispatch to the relevant shards.
-    auto shardDispatchResults = sharded_agg_helpers::dispatchShardPipeline(
-        serializedCommand, hasChangeStream, startsWithDocuments, std::move(targeter.pipeline));
+    auto shardDispatchResults =
+        sharded_agg_helpers::dispatchShardPipeline(serializedCommand,
+                                                   hasChangeStream,
+                                                   startsWithDocuments,
+                                                   std::move(targeter.pipeline),
+                                                   expCtx->explain);
 
     // If the operation is an explain, then we verify that it succeeded on all targeted
     // shards, write the results to the output builder, and return immediately.

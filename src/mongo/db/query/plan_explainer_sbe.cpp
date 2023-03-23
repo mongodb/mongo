@@ -371,9 +371,10 @@ void PlanExplainerSBE::getSummaryStats(PlanSummaryStats* statsOut) const {
 
     // Use the pre-computed summary stats instead of traversing the QuerySolution tree.
     const auto& indexesUsed = _debugInfo->mainStats.indexesUsed;
+    statsOut->indexesUsed.clear();
     statsOut->indexesUsed.insert(indexesUsed.begin(), indexesUsed.end());
-    statsOut->collectionScans += _debugInfo->mainStats.collectionScans;
-    statsOut->collectionScansNonTailable += _debugInfo->mainStats.collectionScansNonTailable;
+    statsOut->collectionScans = _debugInfo->mainStats.collectionScans;
+    statsOut->collectionScansNonTailable = _debugInfo->mainStats.collectionScansNonTailable;
 }
 
 void PlanExplainerSBE::getSecondarySummaryStats(std::string secondaryColl,

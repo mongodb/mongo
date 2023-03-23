@@ -236,7 +236,12 @@ let testQueryExecutorStatsWithCollectionScan = function() {
         checkExplainOutputForAllVerbosityLevels(
             localColl,
             fromColl,
-            {totalDocsExamined: 20, totalKeysExamined: 0, collectionScans: 4, indexesUsed: []},
+            {
+                totalDocsExamined: localDocCount * foreignDocCount,
+                totalKeysExamined: 0,
+                collectionScans: localDocCount,
+                indexesUsed: []
+            },
             {allowDiskUse: false});
     }
 };

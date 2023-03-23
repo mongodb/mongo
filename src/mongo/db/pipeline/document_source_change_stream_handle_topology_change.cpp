@@ -228,7 +228,8 @@ BSONObj DocumentSourceChangeStreamHandleTopologyChange::createUpdatedCommandForN
                                                                Document{shardCommand},
                                                                splitPipelines,
                                                                boost::none, /* exhangeSpec */
-                                                               true /* needsMerge */);
+                                                               true /* needsMerge */,
+                                                               boost::none /* explain */);
 }
 
 BSONObj DocumentSourceChangeStreamHandleTopologyChange::replaceResumeTokenInCommand(

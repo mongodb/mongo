@@ -120,12 +120,26 @@ SplitPipeline splitPipeline(std::unique_ptr<Pipeline, PipelineDeleter> pipeline)
  * Targets shards for the pipeline and returns a struct with the remote cursors or results, and
  * the pipeline that will need to be executed to merge the results from the remotes. If a stale
  * shard version is encountered, refreshes the routing table and tries again.
+ *
+ * Although the 'pipeline' has an 'ExpressionContext' which indicates whether this operation is an
+ * explain (and if it is an explain what the verbosity is), the caller must explicitly indicate
+ * whether it wishes to dispatch a regular aggregate command or an explain command using the
+ * explicit 'explain' parameter. The reason for this is that in some contexts, the caller wishes to
+ * dispatch a regular agg command rather than an explain command even if the top-level operation is
+ * an explain. Consider the example of an explain that contains a stage like this:
+ *
+ *     {$unionWith: {coll: "innerShardedColl", pipeline: <sub-pipeline>}}
+ *
+ * The explain works by first executing the inner and outer subpipelines in order to gather runtime
+ * statistics. While dispatching the inner pipeline, we must dispatch it not as an explain but as a
+ * regular agg command so that the runtime stats are accurate.
  */
 DispatchShardPipelineResults dispatchShardPipeline(
     Document serializedCommand,
     bool hasChangeStream,
     bool startsWithDocuments,
     std::unique_ptr<Pipeline, PipelineDeleter> pipeline,
+    boost::optional<ExplainOptions::Verbosity> explain,
     ShardTargetingPolicy shardTargetingPolicy = ShardTargetingPolicy::kAllowed,
     boost::optional<BSONObj> readConcern = boost::none);
 
@@ -143,6 +157,7 @@ BSONObj createCommandForTargetedShards(const boost::intrusive_ptr<ExpressionCont
                                        const SplitPipeline& splitPipeline,
                                        boost::optional<ShardedExchangePolicy> exchangeSpec,
                                        bool needsMerge,
+                                       boost::optional<ExplainOptions::Verbosity> explain,
                                        boost::optional<BSONObj> readConcern = boost::none);
 
 /**
@@ -202,6 +217,11 @@ std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(
  * creates a DocumentSourceMergeCursors stage to merge the remote cursors. Returns a pipeline
  * beginning with that DocumentSourceMergeCursors stage. Note that one of the 'remote' cursors might
  * be this node itself.
+ *
+ * Even if the ExpressionContext indicates that this operation is explain, this function still
+ * dispatches the pipeline as a non-explain, since it must open cursors on the remote nodes and
+ * merge them with a $mergeCursors. If the caller's intent is to dispatch an explain command, it
+ * must use a different helper.
  *
  * Use the AggregateCommandRequest alternative for 'targetRequest' to explicitly specify command
  * options (e.g. read concern) to the shards when establishing remote cursors. Note that doing so
