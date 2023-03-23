@@ -54,7 +54,11 @@ void performNoopRetryableWriteForIndexCommit(
     const std::set<ShardId>& shardIdSet,
     const std::shared_ptr<executor::TaskExecutor>& executor) {
     std::vector<ShardId> shardsAndConfigsvr{shardIdSet.begin(), shardIdSet.end()};
-    shardsAndConfigsvr.push_back(Grid::get(opCtx)->shardRegistry()->getConfigShard()->getId());
+    if (std::find(shardsAndConfigsvr.begin(), shardsAndConfigsvr.end(), ShardId::kConfigServerId) ==
+        shardsAndConfigsvr.end()) {
+        // The config server may be a shard, so only add if it isn't already in shardsAndConfigsvr.
+        shardsAndConfigsvr.push_back(Grid::get(opCtx)->shardRegistry()->getConfigShard()->getId());
+    }
     sharding_ddl_util::performNoopRetryableWriteOnShards(opCtx, shardsAndConfigsvr, osi, executor);
     osi.setTxnNumber(++osi.getTxnNumber().get());
 }

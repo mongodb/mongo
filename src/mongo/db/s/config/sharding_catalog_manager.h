@@ -574,6 +574,12 @@ public:
     ShardingCatalogClient* localCatalogClient();
 
     /**
+     * Returns a Shard representing the config server that will always run commands locally. Can
+     * only be used on a config server node.
+     */
+    const std::shared_ptr<Shard>& localConfigShard();
+
+    /**
      * Initializes the config.placementHistory collection:
         - one entry per collection and its placement information at the current timestamp
         - one entry per database with the current primary shard at the current timestamp

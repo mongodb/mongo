@@ -31,6 +31,7 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/s/client/shard.h"
 
 namespace mongo {
 
@@ -52,24 +53,32 @@ public:
     Status logAction(OperationContext* opCtx,
                      StringData what,
                      StringData ns,
-                     const BSONObj& detail);
+                     const BSONObj& detail,
+                     std::shared_ptr<Shard> configShard = nullptr,
+                     ShardingCatalogClient* catalogClient = nullptr);
 
     Status logChangeChecked(
         OperationContext* opCtx,
         StringData what,
         StringData ns,
         const BSONObj& detail = BSONObj(),
-        const WriteConcernOptions& writeConcern = ShardingCatalogClient::kMajorityWriteConcern);
+        const WriteConcernOptions& writeConcern = ShardingCatalogClient::kMajorityWriteConcern,
+        std::shared_ptr<Shard> configShard = nullptr,
+        ShardingCatalogClient* catalogClient = nullptr);
 
     void logChange(
         OperationContext* const opCtx,
         const StringData what,
         const StringData ns,
         const BSONObj& detail = BSONObj(),
-        const WriteConcernOptions& writeConcern = ShardingCatalogClient::kMajorityWriteConcern) {
+        const WriteConcernOptions& writeConcern = ShardingCatalogClient::kMajorityWriteConcern,
+        std::shared_ptr<Shard> configShard = nullptr,
+        ShardingCatalogClient* catalogClient = nullptr) {
         // It is safe to ignore the results of `logChangeChecked` in many cases, as the
         // failure to log a change is often of no consequence.
-        logChangeChecked(opCtx, what, ns, detail, writeConcern).ignore();
+        logChangeChecked(
+            opCtx, what, ns, detail, writeConcern, std::move(configShard), catalogClient)
+            .ignore();
     }
 
 private:
@@ -79,7 +88,8 @@ private:
     Status _createCappedConfigCollection(OperationContext* opCtx,
                                          StringData collName,
                                          int cappedSize,
-                                         const WriteConcernOptions& writeConcern);
+                                         const WriteConcernOptions& writeConcern,
+                                         std::shared_ptr<Shard> configShard);
 
     /**
      * Best effort method, which logs diagnostic events on the config server. If the config server
@@ -98,7 +108,8 @@ private:
                 StringData what,
                 StringData operationNSS,
                 const BSONObj& detail,
-                const WriteConcernOptions& writeConcern);
+                const WriteConcernOptions& writeConcern,
+                ShardingCatalogClient* catalogClient);
 
     // Member variable properties:
     // (S) Self-synchronizing; access in any way from any context.

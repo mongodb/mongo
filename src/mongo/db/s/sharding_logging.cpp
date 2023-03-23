@@ -71,12 +71,19 @@ ShardingLogging* ShardingLogging::get(OperationContext* operationContext) {
 Status ShardingLogging::logAction(OperationContext* opCtx,
                                   const StringData what,
                                   const StringData ns,
-                                  const BSONObj& detail) {
+                                  const BSONObj& detail,
+                                  std::shared_ptr<Shard> configShard,
+                                  ShardingCatalogClient* catalogClient) {
+    auto configShardToUse =
+        configShard ? std::move(configShard) : Grid::get(opCtx)->shardRegistry()->getConfigShard();
+    auto catalogClientToUse = catalogClient ? catalogClient : Grid::get(opCtx)->catalogClient();
+
     if (_actionLogCollectionCreated.load() == 0) {
         Status result = _createCappedConfigCollection(opCtx,
                                                       kActionLogCollectionName,
                                                       kActionLogCollectionSizeMB,
-                                                      ShardingCatalogClient::kMajorityWriteConcern);
+                                                      ShardingCatalogClient::kMajorityWriteConcern,
+                                                      std::move(configShardToUse));
         if (result.isOK()) {
             _actionLogCollectionCreated.store(1);
         } else {
@@ -93,19 +100,35 @@ Status ShardingLogging::logAction(OperationContext* opCtx,
                 what,
                 ns,
                 detail,
-                ShardingCatalogClient::kMajorityWriteConcern);
+                ShardingCatalogClient::kMajorityWriteConcern,
+                catalogClientToUse);
 }
 
 Status ShardingLogging::logChangeChecked(OperationContext* opCtx,
                                          const StringData what,
                                          const StringData ns,
                                          const BSONObj& detail,
-                                         const WriteConcernOptions& writeConcern) {
-    invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer ||
-              writeConcern.isMajority());
+                                         const WriteConcernOptions& writeConcern,
+                                         std::shared_ptr<Shard> configShard,
+                                         ShardingCatalogClient* catalogClient) {
+    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+        // If we're using a non-majority write concern, we should have provided an overriden
+        // configShard and catalogClient to perform local operations.
+        invariant(writeConcern.isMajority() || (configShard && catalogClient));
+    } else {
+        invariant(writeConcern.isMajority());
+    }
+
+    auto configShardToUse =
+        configShard ? std::move(configShard) : Grid::get(opCtx)->shardRegistry()->getConfigShard();
+    auto catalogClientToUse = catalogClient ? catalogClient : Grid::get(opCtx)->catalogClient();
+
     if (_changeLogCollectionCreated.load() == 0) {
-        Status result = _createCappedConfigCollection(
-            opCtx, ChangeLogType::ConfigNS.coll(), kChangeLogCollectionSizeMB, writeConcern);
+        Status result = _createCappedConfigCollection(opCtx,
+                                                      ChangeLogType::ConfigNS.coll(),
+                                                      kChangeLogCollectionSizeMB,
+                                                      writeConcern,
+                                                      std::move(configShardToUse));
         if (result.isOK()) {
             _changeLogCollectionCreated.store(1);
         } else {
@@ -117,7 +140,8 @@ Status ShardingLogging::logChangeChecked(OperationContext* opCtx,
         }
     }
 
-    return _log(opCtx, ChangeLogType::ConfigNS.coll(), what, ns, detail, writeConcern);
+    return _log(
+        opCtx, ChangeLogType::ConfigNS.coll(), what, ns, detail, writeConcern, catalogClientToUse);
 }
 
 Status ShardingLogging::_log(OperationContext* opCtx,
@@ -125,7 +149,8 @@ Status ShardingLogging::_log(OperationContext* opCtx,
                              const StringData what,
                              const StringData operationNS,
                              const BSONObj& detail,
-                             const WriteConcernOptions& writeConcern) {
+                             const WriteConcernOptions& writeConcern,
+                             ShardingCatalogClient* catalogClient) {
     Date_t now = Grid::get(opCtx)->getNetwork()->now();
 
     const auto& session = opCtx->getClient()->session();
@@ -160,8 +185,7 @@ Status ShardingLogging::_log(OperationContext* opCtx,
           "event"_attr = redact(changeLogBSON));
 
     const NamespaceString nss(NamespaceString::makeGlobalConfigCollection(logCollName));
-    Status result = Grid::get(opCtx)->catalogClient()->insertConfigDocument(
-        opCtx, nss, changeLogBSON, writeConcern);
+    Status result = catalogClient->insertConfigDocument(opCtx, nss, changeLogBSON, writeConcern);
 
     if (!result.isOK()) {
         LOGV2_ERROR(5538900,
@@ -176,20 +200,20 @@ Status ShardingLogging::_log(OperationContext* opCtx,
 Status ShardingLogging::_createCappedConfigCollection(OperationContext* opCtx,
                                                       StringData collName,
                                                       int cappedSize,
-                                                      const WriteConcernOptions& writeConcern) {
+                                                      const WriteConcernOptions& writeConcern,
+                                                      std::shared_ptr<Shard> configShard) {
     BSONObj createCmd =
         BSON("create" << collName << "capped" << true << "size" << cappedSize
                       << WriteConcernOptions::kWriteConcernField << writeConcern.toBSON());
 
     while (true) {
-        auto result =
-            Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
-                opCtx,
-                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                "config",
-                createCmd,
-                Shard::kDefaultConfigCommandTimeout,
-                Shard::RetryPolicy::kIdempotent);
+        auto result = configShard->runCommandWithFixedRetryAttempts(
+            opCtx,
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            "config",
+            createCmd,
+            Shard::kDefaultConfigCommandTimeout,
+            Shard::RetryPolicy::kIdempotent);
 
         if (!result.isOK()) {
             return result.getStatus();

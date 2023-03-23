@@ -601,6 +601,11 @@ ShardingCatalogClient* ShardingCatalogManager::localCatalogClient() {
     return _localCatalogClient.get();
 }
 
+const std::shared_ptr<Shard>& ShardingCatalogManager::localConfigShard() {
+    invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+    return _localConfigShard;
+}
+
 void ShardingCatalogManager::discardCachedConfigDatabaseInitializationState() {
     stdx::lock_guard<Latch> lk(_mutex);
     _configInitialized = false;

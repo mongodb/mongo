@@ -112,7 +112,11 @@ void CollModCoordinator::_performNoopRetryableWriteOnParticipants(
     auto shardsAndConfigsvr = [&] {
         const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
         auto participants = shardRegistry->getAllShardIds(opCtx);
-        participants.emplace_back(shardRegistry->getConfigShard()->getId());
+        if (std::find(participants.begin(), participants.end(), ShardId::kConfigServerId) ==
+            participants.end()) {
+            // The config server may be a shard, so only add if it isn't already in participants.
+            participants.emplace_back(shardRegistry->getConfigShard()->getId());
+        }
         return participants;
     }();
 

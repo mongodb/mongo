@@ -36,6 +36,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/balancer/balancer.h"
+#include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/grid.h"
@@ -114,7 +115,15 @@ private:
         uassertStatusOK(balancerConfig->enableAutoSplit(opCtx, true));
         uassertStatusOK(balancerConfig->changeAutoMergeSettings(opCtx, true));
         Balancer::get(opCtx)->notifyPersistedBalancerSettingsChanged(opCtx);
-        ShardingLogging::get(opCtx)->logAction(opCtx, "balancer.start", "", BSONObj()).ignore();
+        auto catalogManager = ShardingCatalogManager::get(opCtx);
+        ShardingLogging::get(opCtx)
+            ->logAction(opCtx,
+                        "balancer.start",
+                        "",
+                        BSONObj(),
+                        catalogManager->localConfigShard(),
+                        catalogManager->localCatalogClient())
+            .ignore();
     }
 };
 
@@ -137,7 +146,15 @@ private:
         Balancer::get(opCtx)->notifyPersistedBalancerSettingsChanged(opCtx);
         Balancer::get(opCtx)->joinCurrentRound(opCtx);
 
-        ShardingLogging::get(opCtx)->logAction(opCtx, "balancer.stop", "", BSONObj()).ignore();
+        auto catalogManager = ShardingCatalogManager::get(opCtx);
+        ShardingLogging::get(opCtx)
+            ->logAction(opCtx,
+                        "balancer.stop",
+                        "",
+                        BSONObj(),
+                        catalogManager->localConfigShard(),
+                        catalogManager->localCatalogClient())
+            .ignore();
     }
 };
 

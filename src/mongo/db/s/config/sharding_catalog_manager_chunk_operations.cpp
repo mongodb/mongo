@@ -388,7 +388,9 @@ void logMergeToChangelog(OperationContext* opCtx,
                          const ChunkVersion& mergedVersion,
                          const ShardId& owningShard,
                          const ChunkRange& chunkRange,
-                         const size_t numChunks) {
+                         const size_t numChunks,
+                         std::shared_ptr<Shard> configShard,
+                         ShardingCatalogClient* catalogClient) {
     BSONObjBuilder logDetail;
     prevPlacementVersion.serialize("prevPlacementVersion", &logDetail);
     mergedVersion.serialize("mergedVersion", &logDetail);
@@ -396,8 +398,13 @@ void logMergeToChangelog(OperationContext* opCtx,
     chunkRange.append(&logDetail);
     logDetail.append("numChunks", static_cast<int>(numChunks));
 
-    ShardingLogging::get(opCtx)->logChange(
-        opCtx, "merge", nss.ns(), logDetail.obj(), WriteConcernOptions());
+    ShardingLogging::get(opCtx)->logChange(opCtx,
+                                           "merge",
+                                           nss.ns(),
+                                           logDetail.obj(),
+                                           WriteConcernOptions(),
+                                           std::move(configShard),
+                                           catalogClient);
 }
 
 void mergeAllChunksOnShardInTransaction(OperationContext* opCtx,
@@ -757,8 +764,13 @@ ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
         appendShortVersion(&logDetail.subobjStart("right"), splitChunkResult.newChunks->at(1));
         logDetail.append("owningShard", shardName);
 
-        ShardingLogging::get(opCtx)->logChange(
-            opCtx, "split", nss.ns(), logDetail.obj(), WriteConcernOptions());
+        ShardingLogging::get(opCtx)->logChange(opCtx,
+                                               "split",
+                                               nss.ns(),
+                                               logDetail.obj(),
+                                               WriteConcernOptions(),
+                                               _localConfigShard,
+                                               _localCatalogClient.get());
     } else {
         BSONObj beforeDetailObj = logDetail.obj();
         BSONObj firstDetailObj = beforeDetailObj.getOwned();
@@ -773,8 +785,14 @@ ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
                                splitChunkResult.newChunks->at(i));
             chunkDetail.append("owningShard", shardName);
 
-            const auto status = ShardingLogging::get(opCtx)->logChangeChecked(
-                opCtx, "multi-split", nss.ns(), chunkDetail.obj(), WriteConcernOptions());
+            const auto status =
+                ShardingLogging::get(opCtx)->logChangeChecked(opCtx,
+                                                              "multi-split",
+                                                              nss.ns(),
+                                                              chunkDetail.obj(),
+                                                              WriteConcernOptions(),
+                                                              _localConfigShard,
+                                                              _localCatalogClient.get());
 
             // Stop logging if the last log op failed because the primary stepped down
             if (status.code() == ErrorCodes::InterruptedDueToReplStateChange)
@@ -1018,8 +1036,15 @@ ShardingCatalogManager::commitChunksMerge(OperationContext* opCtx,
         opCtx, nss, coll.getUuid(), mergeVersion, validAfter, chunkRange, shardId, chunksToMerge);
 
     // 5. log changes
-    logMergeToChangelog(
-        opCtx, nss, initialVersion, mergeVersion, shardId, chunkRange, chunksToMerge->size());
+    logMergeToChangelog(opCtx,
+                        nss,
+                        initialVersion,
+                        mergeVersion,
+                        shardId,
+                        chunkRange,
+                        chunksToMerge->size(),
+                        _localConfigShard,
+                        _localCatalogClient.get());
 
     return ShardAndCollectionPlacementVersions{mergeVersion /*shardPlacementVersion*/,
                                                mergeVersion /*collectionPlacementVersion*/};
@@ -1173,7 +1198,9 @@ ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
                                 newChunk.getVersion(),
                                 shardId,
                                 newChunk.getRange(),
-                                numMergedChunks.second.at(i));
+                                numMergedChunks.second.at(i),
+                                _localConfigShard,
+                                _localCatalogClient.get());
 
             // we can know the prevVersion since newChunks vector is sorted by version
             prevVersion = newChunk.getVersion();

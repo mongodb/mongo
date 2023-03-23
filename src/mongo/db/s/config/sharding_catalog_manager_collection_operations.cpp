@@ -237,7 +237,9 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
         nss.ns(),
         BSON("oldKey" << oldShardKeyPattern.toBSON() << "newKey" << newShardKeyPattern.toBSON()
                       << "oldEpoch" << collType.getEpoch() << "newEpoch" << newEpoch),
-        ShardingCatalogClient::kLocalWriteConcern));
+        ShardingCatalogClient::kLocalWriteConcern,
+        _localConfigShard,
+        _localCatalogClient.get()));
 
     const auto oldFields = oldShardKeyPattern.toBSON();
     const auto newFields =
@@ -358,7 +360,9 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
                                            "refineCollectionShardKey.end",
                                            nss.ns(),
                                            BSONObj(),
-                                           ShardingCatalogClient::kLocalWriteConcern);
+                                           ShardingCatalogClient::kLocalWriteConcern,
+                                           _localConfigShard,
+                                           _localCatalogClient.get());
 
     // Trigger refreshes on each shard containing chunks in the namespace 'nss'. Since this isn't
     // necessary for correctness, all refreshes are best-effort.
@@ -403,8 +407,13 @@ void ShardingCatalogManager::configureCollectionBalancing(
             logChangeDetail.append("enableAutoSplitter", enableAutoSplitter.get());
         }
 
-        ShardingLogging::get(opCtx)->logChange(
-            opCtx, "configureCollectionBalancing", nss.ns(), logChangeDetail.obj());
+        ShardingLogging::get(opCtx)->logChange(opCtx,
+                                               "configureCollectionBalancing",
+                                               nss.ns(),
+                                               logChangeDetail.obj(),
+                                               ShardingCatalogClient::kMajorityWriteConcern,
+                                               _localConfigShard,
+                                               _localCatalogClient.get());
     };
 
     short updatedFields = 0;
@@ -533,7 +542,9 @@ void ShardingCatalogManager::renameShardedMetadata(
             "renameCollection.metadata",
             str::stream() << logMsg << ": dropped target collection and renamed source collection",
             BSON("newCollMetadata" << collType.toBSON()),
-            ShardingCatalogClient::kLocalWriteConcern);
+            ShardingCatalogClient::kLocalWriteConcern,
+            _localConfigShard,
+            _localCatalogClient.get());
     } else {
         // Remove stale CSRS metadata in case the source collection is unsharded and the
         // target collection was sharded
@@ -547,7 +558,9 @@ void ShardingCatalogManager::renameShardedMetadata(
                                                str::stream()
                                                    << logMsg << " : dropped target collection.",
                                                BSONObj(),
-                                               ShardingCatalogClient::kLocalWriteConcern);
+                                               ShardingCatalogClient::kLocalWriteConcern,
+                                               _localConfigShard,
+                                               _localCatalogClient.get());
     }
 }
 

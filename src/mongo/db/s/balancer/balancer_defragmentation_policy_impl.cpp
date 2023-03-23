@@ -1205,7 +1205,7 @@ void BalancerDefragmentationPolicyImpl::startCollectionDefragmentations(Operatio
 
     // Fetch all collections with `defragmentCollection` flag enabled
     static const auto query = BSON(CollectionType::kDefragmentCollectionFieldName << true);
-    auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+    const auto& configShard = ShardingCatalogManager::get(opCtx)->localConfigShard();
     const auto& collDocs = uassertStatusOK(configShard->exhaustiveFindOnConfig(
                                                opCtx,
                                                ReadPreferenceSetting(ReadPreference::Nearest),

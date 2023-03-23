@@ -674,6 +674,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/pipeline/sharded_agg_helpers',
         '$BUILD_DIR/mongo/s/sessions_collection_sharded',
         '$BUILD_DIR/mongo/s/sharding_api',
+        'sharding_catalog_manager',
     ],
 )
 

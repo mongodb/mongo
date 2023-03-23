@@ -856,8 +856,13 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
     shardDetails.append("name", shardType.getName());
     shardDetails.append("host", shardConnectionString.toString());
 
-    ShardingLogging::get(opCtx)->logChange(
-        opCtx, "addShard", "", shardDetails.obj(), ShardingCatalogClient::kMajorityWriteConcern);
+    ShardingLogging::get(opCtx)->logChange(opCtx,
+                                           "addShard",
+                                           "",
+                                           shardDetails.obj(),
+                                           ShardingCatalogClient::kMajorityWriteConcern,
+                                           _localConfigShard,
+                                           _localCatalogClient.get());
 
     // Ensure the added shard is visible to this process.
     shardRegistry->reload(opCtx);
@@ -926,12 +931,14 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
               "shardId"_attr = name);
 
         // Record start in changelog
-        uassertStatusOK(ShardingLogging::get(opCtx)->logChangeChecked(
-            opCtx,
-            "removeShard.start",
-            "",
-            BSON("shard" << name),
-            ShardingCatalogClient::kLocalWriteConcern));
+        uassertStatusOK(
+            ShardingLogging::get(opCtx)->logChangeChecked(opCtx,
+                                                          "removeShard.start",
+                                                          "",
+                                                          BSON("shard" << name),
+                                                          ShardingCatalogClient::kLocalWriteConcern,
+                                                          _localConfigShard,
+                                                          _localCatalogClient.get()));
 
         uassertStatusOKWithContext(_localCatalogClient->updateConfigDocument(
                                        opCtx,
@@ -1021,8 +1028,13 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     }
 
     // Record finish in changelog
-    ShardingLogging::get(opCtx)->logChange(
-        opCtx, "removeShard", "", BSON("shard" << name), ShardingCatalogClient::kLocalWriteConcern);
+    ShardingLogging::get(opCtx)->logChange(opCtx,
+                                           "removeShard",
+                                           "",
+                                           BSON("shard" << name),
+                                           ShardingCatalogClient::kLocalWriteConcern,
+                                           _localConfigShard,
+                                           _localCatalogClient.get());
 
     return {RemoveShardProgress::COMPLETED,
             boost::optional<RemoveShardProgress::DrainingShardUsage>(boost::none)};

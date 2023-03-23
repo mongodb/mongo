@@ -30,6 +30,7 @@
 #include "mongo/db/s/sessions_collection_config_server.h"
 #include "mongo/db/repl/replication_coordinator.h"
 
+#include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/chunk_constraints.h"
 #include "mongo/s/client/shard_registry.h"
@@ -130,13 +131,14 @@ void SessionsCollectionConfigServer::setupSessionsCollection(OperationContext* o
                                                << logical_sessions::kMaxChunkSizeBytes
                                                << CollectionType::kNoAutoSplitFieldName << true));
 
-        uassertStatusOK(Grid::get(opCtx)->catalogClient()->updateConfigDocument(
-            opCtx,
-            CollectionType::ConfigNS,
-            filterQuery,
-            updateQuery,
-            false,
-            ShardingCatalogClient::kLocalWriteConcern));
+        const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
+        uassertStatusOK(
+            catalogClient->updateConfigDocument(opCtx,
+                                                CollectionType::ConfigNS,
+                                                filterQuery,
+                                                updateQuery,
+                                                false,
+                                                ShardingCatalogClient::kLocalWriteConcern));
     }
 }
 

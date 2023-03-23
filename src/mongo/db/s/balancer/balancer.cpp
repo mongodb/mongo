@@ -263,7 +263,7 @@ const ReplicaSetAwareServiceRegistry::Registerer<Balancer> _balancerRegisterer("
  */
 std::vector<std::string> getDrainingShardNames(OperationContext* opCtx) {
     // Find the shards that are currently draining.
-    const auto configShard{Grid::get(opCtx)->shardRegistry()->getConfigShard()};
+    const auto& configShard = ShardingCatalogManager::get(opCtx)->localConfigShard();
     const auto drainingShardsDocs{
         uassertStatusOK(
             configShard->exhaustiveFindOnConfig(opCtx,
@@ -816,8 +816,14 @@ void Balancer::_mainThread() {
                         _balancedLastTime,
                         _imbalancedCollectionsCache->size());
 
+                    auto catalogManager = ShardingCatalogManager::get(opCtx.get());
                     ShardingLogging::get(opCtx.get())
-                        ->logAction(opCtx.get(), "balancer.round", "", roundDetails.toBSON())
+                        ->logAction(opCtx.get(),
+                                    "balancer.round",
+                                    "",
+                                    roundDetails.toBSON(),
+                                    catalogManager->localConfigShard(),
+                                    catalogManager->localCatalogClient())
                         .ignore();
 
                     LOGV2_DEBUG(6679500, 1, "End balancing round");
@@ -838,8 +844,14 @@ void Balancer::_mainThread() {
             // This round failed, tell the world!
             roundDetails.setFailed(e.what());
 
+            auto catalogManager = ShardingCatalogManager::get(opCtx.get());
             ShardingLogging::get(opCtx.get())
-                ->logAction(opCtx.get(), "balancer.round", "", roundDetails.toBSON())
+                ->logAction(opCtx.get(),
+                            "balancer.round",
+                            "",
+                            roundDetails.toBSON(),
+                            catalogManager->localConfigShard(),
+                            catalogManager->localCatalogClient())
                 .ignore();
 
             // Sleep a fair amount before retrying because of the error
