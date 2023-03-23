@@ -98,9 +98,6 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalShardFilter::doOptimiz
 }
 
 Value DocumentSourceInternalShardFilter::serialize(SerializationOptions opts) const {
-    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
-        MONGO_UNIMPLEMENTED_TASSERT(7484335);
-    }
     return Value(DOC(getSourceName() << Document()));
 }
 

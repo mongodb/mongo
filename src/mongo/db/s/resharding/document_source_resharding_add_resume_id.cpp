@@ -102,10 +102,6 @@ StageConstraints DocumentSourceReshardingAddResumeId::constraints(
 }
 
 Value DocumentSourceReshardingAddResumeId::serialize(SerializationOptions opts) const {
-    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
-        MONGO_UNIMPLEMENTED_TASSERT(7484304);
-    }
-
     return Value(Document{{kStageName, Value(Document{})}});
 }
 

@@ -72,10 +72,6 @@ void DocumentSourceTeeConsumer::doDispose() {
 }
 
 Value DocumentSourceTeeConsumer::serialize(SerializationOptions opts) const {
-    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
-        MONGO_UNIMPLEMENTED_TASSERT(7484309);
-    }
-
     // We only serialize this stage in the context of explain.
     return opts.verbosity ? Value(DOC(_stageName << Document())) : Value();
 }

@@ -170,9 +170,6 @@ intrusive_ptr<DocumentSource> DocumentSourceRedact::optimize() {
 }
 
 Value DocumentSourceRedact::serialize(SerializationOptions opts) const {
-    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
-        MONGO_UNIMPLEMENTED_TASSERT(7484318);
-    }
     return Value(DOC(getSourceName() << _expression.get()->serialize(opts)));
 }
 

@@ -114,10 +114,6 @@ StageConstraints DocumentSourceReshardingIterateTransaction::constraints(
 }
 
 Value DocumentSourceReshardingIterateTransaction::serialize(SerializationOptions opts) const {
-    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
-        MONGO_UNIMPLEMENTED_TASSERT(7484303);
-    }
-
     return Value(
         Document{{kStageName,
                   Value(Document{{kIncludeCommitTransactionTimestampFieldName,
