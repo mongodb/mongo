@@ -12,9 +12,8 @@
  * @tags: [
  *   # We need a timeseries collection.
  *   requires_timeseries,
+ *   requires_non_retryable_writes,
  *   featureFlagTimeseriesDeletesSupport,
- *   # TODO SERVER-73319: Enable this test.
- *   __TEMPORARILY_DISABLED__,
  * ]
  */
 
@@ -138,14 +137,9 @@ var $config = (function() {
                         readingNo}, nReadings: ${nReadings}, nSensorsRemaining: ${
                         nSensorsRemaining}`);
             } else if (wasInserted && wasDeleted) {
-                // This reading was both inserted and deleted. Since we don't know which order the
-                // operations happened in, allow both cases through (but expect a consistent
-                // result).
-                assertWhenOwnColl(
-                    nReadings == 0 || nReadings >= nSensorsRemaining,
-                    `Expected all or none of the remaining sensors' readings to be deleted: readingNo: ${
-                        readingNo}, nReadings: ${nReadings}, nSensorsRemaining: ${
-                        nSensorsRemaining}`);
+                // This reading was both inserted and deleted. Since the operations could happen
+                // concurrently, any number of readings could exist in the collection in the end.
+                // Skip checking anything for this case.
             } else {
                 // This reading was not inserted or deleted. If it was a part of the seed data, make
                 // sure that it still exists.
