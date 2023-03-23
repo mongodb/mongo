@@ -26,64 +26,32 @@ const st = new ShardingTest({
 
 // Create a sharded collection where shard key is 'shard'.
 const coll = createShardedCollection(st, "shard" /* shardKey */, dbName, collName, 1 /* splitAt */);
-const testDB = st.s.getDB(dbName);
-
-// A helper that opens a change stream with the user supplied match expression 'userMatchExpr' and
-// validates that:
-// (1) for each shard, the events are seen in that order as specified in 'expectedOps'; and
-// (2) the number of docs returned by each shard matches what we expect as specified by
-//     'expectedChangeStreamDocsReturned'; and
-// (3) the number of docs returned by the oplog cursor on each shard matches what we expect as
-//     specified in 'expectedOplogCursorReturnedDocs'.
-function verifyOps(resumeAfterToken,
-                   userMatchExpr,
-                   expectedOps,
-                   expectedChangeStreamDocsReturned,
-                   expectedOplogCursorReturnedDocs,
-                   runOnWholeDB) {
-    const cursor = (runOnWholeDB ? testDB : coll).aggregate([
-        {$changeStream: {resumeAfter: resumeAfterToken, fullDocument: "updateLookup"}},
-        userMatchExpr
-    ]);
-
-    for (const [op, id, shardId] of expectedOps) {
-        assert.soon(() => cursor.hasNext());
-        const event = cursor.next();
-        assert.eq(event.operationType, op, event);
-        if (id !== undefined) {
-            assert.eq(event.fullDocument._id, id, event);
-        }
-        if (shardId !== undefined) {
-            assert.eq(event.fullDocument.shard, shardId, event);
-        }
-    }
-
-    assert(!cursor.hasNext());
-
-    // An 'executionStats' could only be captured for a non-invalidating stream.
-    const stats = assert.commandWorked(testDB.runCommand({
-        explain: {
-            aggregate: (runOnWholeDB ? 1 : coll.getName()),
-            pipeline: [
-                {$changeStream: {resumeAfter: resumeAfterToken, fullDocument: "updateLookup"}},
-                userMatchExpr
-            ],
-            cursor: {}
-        },
-        verbosity: "executionStats"
-    }));
-
-    assertNumChangeStreamDocsReturnedFromShard(
-        stats, st.rs0.name, expectedChangeStreamDocsReturned[0]);
-    assertNumChangeStreamDocsReturnedFromShard(
-        stats, st.rs1.name, expectedChangeStreamDocsReturned[1]);
-    assertNumMatchingOplogEventsForShard(stats, st.rs0.name, expectedOplogCursorReturnedDocs[0]);
-    assertNumMatchingOplogEventsForShard(stats, st.rs1.name, expectedOplogCursorReturnedDocs[1]);
-}
 
 // Open a change stream and store the resume token. This resume token will be used to replay the
 // stream after this point.
 const resumeAfterToken = coll.watch([]).getResumeToken();
+
+// A helper that opens a change stream on the whole cluster with the user supplied match expression
+// 'userMatchExpr' and validates that:
+// 1. for each shard, the events are seen in that order as specified in 'expectedResult'
+// 2. the filtering is been done at oplog level
+// 3. the number of docs returned by the oplog cursor on each shard matches what we expect
+//    as specified in 'expectedOplogRetDocsForEachShard'.
+// 4. the number of docs returned by each shard matches what we expect as specified by
+//     'expectedChangeStreamDocsForEachShard'; and
+function verifyOnWholeCluster(userMatchExpr,
+                              expectedResult,
+                              expectedOplogRetDocsForEachShard,
+                              expectedChangeStreamDocsForEachShard) {
+    verifyChangeStreamOnWholeCluster({
+        st: st,
+        changeStreamSpec: {resumeAfter: resumeAfterToken, fullDocument: "updateLookup"},
+        userMatchExpr: userMatchExpr,
+        expectedResult: expectedResult,
+        expectedOplogNReturnedPerShard: expectedOplogRetDocsForEachShard,
+        expectedChangeStreamDocsReturnedPerShard: expectedChangeStreamDocsForEachShard
+    });
+}
 
 // These operations will create oplog events. The change stream will apply several filters on these
 // series of events and ensure that the '$match' expressions are rewritten correctly.
@@ -121,84 +89,76 @@ const runVerifyOpsTestcases = (op) => {
             jsTestLog("Testing path '" + fullDocumentPath + "' for 'delete' events");
 
             // Test out the '{$exists: true}' predicate on the 'fullDocument' field.
-            verifyOps(resumeAfterToken,
-                      {$match: {operationType: op, [fullDocumentPath]: {$exists: true}}},
-                      [],
-                      [0, 0] /* expectedChangeStreamDocsReturned */,
-                      [0, 0] /* expectedOplogCursorReturnedDocs */);
+            verifyOnWholeCluster({$match: {operationType: op, [fullDocumentPath]: {$exists: true}}},
+                                 {},
+                                 [0, 0] /* expectedOplogRetDocsForEachShard */,
+                                 [0, 0] /* expectedChangeStreamDocsForEachShard */);
 
             // Test out the '{$exists: false}' predicate on the 'fullDocument' field.
-            verifyOps(resumeAfterToken,
-                      {$match: {operationType: op, [fullDocumentPath]: {$exists: false}}},
-                      [[op], [op], [op], [op]],
-                      [2, 2] /* expectedChangeStreamDocsReturned */,
-                      [2, 2] /* expectedOplogCursorReturnedDocs */);
+            verifyOnWholeCluster(
+                {$match: {operationType: op, [fullDocumentPath]: {$exists: false}}},
+                {[collName]: {[op]: [2, 3, 2, 3]}},
+                [2, 2] /* expectedOplogRetDocsForEachShard */,
+                [2, 2] /* expectedChangeStreamDocsForEachShard */);
 
             // Test out the '{$eq: null}' predicate on the 'fullDocument' field.
-            verifyOps(resumeAfterToken,
-                      {$match: {operationType: op, [fullDocumentPath]: {$eq: null}}},
-                      [[op], [op], [op], [op]],
-                      [2, 2] /* expectedChangeStreamDocsReturned */,
-                      [2, 2] /* expectedOplogCursorReturnedDocs */);
+            verifyOnWholeCluster({$match: {operationType: op, [fullDocumentPath]: {$eq: null}}},
+                                 {[collName]: {[op]: [2, 3, 2, 3]}},
+                                 [2, 2] /* expectedOplogRetDocsForEachShard */,
+                                 [2, 2] /* expectedChangeStreamDocsForEachShard */);
 
             // Test out the '{$ne: null}' predicate on the 'fullDocument' field. We cannot perform
             // an exact rewrite of this negated predicate on 'fullDocument', so the oplog scan
             // returns all 'delete' events and we subsequently filter them out in the pipeline.
-            verifyOps(resumeAfterToken,
-                      {$match: {operationType: op, [fullDocumentPath]: {$ne: null}}},
-                      [],
-                      [0, 0] /* expectedChangeStreamDocsReturned */,
-                      [2, 2] /* expectedOplogCursorReturnedDocs */);
+            verifyOnWholeCluster({$match: {operationType: op, [fullDocumentPath]: {$ne: null}}},
+                                 {},
+                                 [2, 2] /* expectedOplogRetDocsForEachShard */,
+                                 [0, 0] /* expectedChangeStreamDocsForEachShard */);
 
             // Test out an inequality on null for the 'fullDocument' field.
-            verifyOps(resumeAfterToken,
-                      {$match: {operationType: op, [fullDocumentPath]: {$gt: null}}},
-                      [],
-                      [0, 0] /* expectedChangeStreamDocsReturned */,
-                      [0, 0] /* expectedOplogCursorReturnedDocs */);
+            verifyOnWholeCluster({$match: {operationType: op, [fullDocumentPath]: {$gt: null}}},
+                                 {},
+                                 [0, 0] /* expectedOplogRetDocsForEachShard */,
+                                 [0, 0] /* expectedChangeStreamDocsForEachShard */);
 
             // Test out a negated inequality on null for the 'fullDocument' field.
-            verifyOps(resumeAfterToken,
-                      {$match: {operationType: op, [fullDocumentPath]: {$not: {$gt: null}}}},
-                      [[op], [op], [op], [op]],
-                      [2, 2] /* expectedChangeStreamDocsReturned */,
-                      [2, 2] /* expectedOplogCursorReturnedDocs */);
+            verifyOnWholeCluster(
+                {$match: {operationType: op, [fullDocumentPath]: {$not: {$gt: null}}}},
+                {[collName]: {[op]: [2, 3, 2, 3]}},
+                [2, 2] /* expectedOplogRetDocsForEachShard */,
+                [2, 2] /* expectedChangeStreamDocsForEachShard */);
 
             // We expect the same results for $lte as we got for {$not: {$gt}}, although we can
             // rewrite this predicate into the oplog.
-            verifyOps(resumeAfterToken,
-                      {$match: {operationType: op, [fullDocumentPath]: {$lte: null}}},
-                      [[op], [op], [op], [op]],
-                      [2, 2] /* expectedChangeStreamDocsReturned */,
-                      [2, 2] /* expectedOplogCursorReturnedDocs */);
+            verifyOnWholeCluster({$match: {operationType: op, [fullDocumentPath]: {$lte: null}}},
+                                 {[collName]: {[op]: [2, 3, 2, 3]}},
+                                 [2, 2] /* expectedOplogRetDocsForEachShard */,
+                                 [2, 2] /* expectedChangeStreamDocsForEachShard */);
 
             // Test that {$type: 'null'} on the 'fullDocument' field does not match.
-            verifyOps(resumeAfterToken,
-                      {$match: {operationType: op, [fullDocumentPath]: {$type: "null"}}},
-                      [],
-                      [0, 0] /* expectedChangeStreamDocsReturned */,
-                      [0, 0] /* expectedOplogCursorReturnedDocs */);
+            verifyOnWholeCluster({$match: {operationType: op, [fullDocumentPath]: {$type: "null"}}},
+                                 {},
+                                 [0, 0] /* expectedOplogRetDocsForEachShard */,
+                                 [0, 0] /* expectedChangeStreamDocsForEachShard */);
 
             // Test that negated {$type: 'null'} on the 'fullDocument' field matches.
-            verifyOps(resumeAfterToken,
-                      {$match: {operationType: op, [fullDocumentPath]: {$not: {$type: "null"}}}},
-                      [[op], [op], [op], [op]],
-                      [2, 2] /* expectedChangeStreamDocsReturned */,
-                      [2, 2] /* expectedOplogCursorReturnedDocs */);
+            verifyOnWholeCluster(
+                {$match: {operationType: op, [fullDocumentPath]: {$not: {$type: "null"}}}},
+                {[collName]: {[op]: [2, 3, 2, 3]}},
+                [2, 2] /* expectedOplogRetDocsForEachShard */,
+                [2, 2] /* expectedChangeStreamDocsForEachShard */);
 
             // Test out a non-null non-$exists predicate on the 'fullDocument' field.
-            verifyOps(resumeAfterToken,
-                      {$match: {operationType: op, [fullDocumentPath]: {$eq: 5}}},
-                      [],
-                      [0, 0] /* expectedChangeStreamDocsReturned */,
-                      [0, 0] /* expectedOplogCursorReturnedDocs */);
+            verifyOnWholeCluster({$match: {operationType: op, [fullDocumentPath]: {$eq: 5}}},
+                                 {},
+                                 [0, 0] /* expectedOplogRetDocsForEachShard */,
+                                 [0, 0] /* expectedChangeStreamDocsForEachShard */);
 
             // Test out a negated non-null non-$exists predicate on the 'fullDocument' field.
-            verifyOps(resumeAfterToken,
-                      {$match: {operationType: op, [fullDocumentPath]: {$ne: 5}}},
-                      [[op], [op], [op], [op]],
-                      [2, 2] /* expectedChangeStreamDocsReturned */,
-                      [2, 2] /* expectedOplogCursorReturnedDocs */);
+            verifyOnWholeCluster({$match: {operationType: op, [fullDocumentPath]: {$ne: 5}}},
+                                 {[collName]: {[op]: [2, 3, 2, 3]}},
+                                 [2, 2] /* expectedOplogRetDocsForEachShard */,
+                                 [2, 2] /* expectedChangeStreamDocsForEachShard */);
         }
         return;
     }
@@ -208,28 +168,22 @@ const runVerifyOpsTestcases = (op) => {
     // to tell whether we will see one drop or two, or from which shard.
     if (op == "drop") {
         // Test that {$eq: null} on the 'fullDocument' field matches the 'drop' event.
-        verifyOps(resumeAfterToken,
-                  {$match: {operationType: op, fullDocument: {$eq: null}}},
-                  [[op]],
-                  [1, 0] /* expectedChangeStreamDocsReturned */,
-                  [1, 0] /* expectedOplogCursorReturnedDocs */,
-                  true /* runOnWholeDB */);
+        verifyOnWholeCluster({$match: {operationType: op, fullDocument: {$eq: null}}},
+                             {[collName]: {[op]: [collName]}},
+                             [1, 0] /* expectedOplogRetDocsForEachShard */,
+                             [1, 0] /* expectedChangeStreamDocsForEachShard */);
 
         // Test that {$exists: false} on the 'fullDocument' field matches the 'drop' event.
-        verifyOps(resumeAfterToken,
-                  {$match: {operationType: op, fullDocument: {$exists: false}}},
-                  [[op]],
-                  [1, 0] /* expectedChangeStreamDocsReturned */,
-                  [1, 0] /* expectedOplogCursorReturnedDocs */,
-                  true /* runOnWholeDB */);
+        verifyOnWholeCluster({$match: {operationType: op, fullDocument: {$exists: false}}},
+                             {[collName]: {[op]: [collName]}},
+                             [1, 0] /* expectedOplogRetDocsForEachShard */,
+                             [1, 0] /* expectedChangeStreamDocsForEachShard */);
 
         // Test that {$exists: true} on the 'fullDocument' field does not match the 'drop' event.
-        verifyOps(resumeAfterToken,
-                  {$match: {operationType: op, fullDocument: {$exists: true}}},
-                  [],
-                  [0, 0] /* expectedChangeStreamDocsReturned */,
-                  [0, 0] /* expectedOplogCursorReturnedDocs */,
-                  true /* runOnWholeDB */);
+        verifyOnWholeCluster({$match: {operationType: op, fullDocument: {$exists: true}}},
+                             {},
+                             [0, 0] /* expectedOplogRetDocsForEachShard */,
+                             [0, 0] /* expectedChangeStreamDocsForEachShard */);
         return;
     }
 
@@ -247,74 +201,64 @@ const runVerifyOpsTestcases = (op) => {
     // returned by the oplog scan are different for updates than for other event types.
 
     // Test out a predicate on the full 'fullDocument' field.
-    verifyOps(resumeAfterToken,
-              {$match: {operationType: op, fullDocument: doc}},
-              [[op, 2, 0]],
-              [1, 0] /* expectedChangeStreamDocsReturned */,
-              op != "update" ? [1, 0] : [2, 2] /* expectedOplogCursorReturnedDocs */);
+    verifyOnWholeCluster({$match: {operationType: op, fullDocument: doc}},
+                         {[collName]: {[op]: [2]}},
+                         op != "update" ? [1, 0] : [2, 2] /* expectedOplogRetDocsForEachShard */,
+                         [1, 0] /* expectedChangeStreamDocsForEachShard */);
 
     // Test out a predicate on 'fullDocument._id'.
-    verifyOps(resumeAfterToken,
-              {$match: {operationType: op, "fullDocument._id": {$lt: 3}}},
-              [[op, 2, 0], [op, 2, 1]],
-              [1, 1] /* expectedChangeStreamDocsReturned */,
-              op != "update" ? [1, 1] : [2, 2] /* expectedOplogCursorReturnedDocs */);
+    verifyOnWholeCluster({$match: {operationType: op, "fullDocument._id": {$lt: 3}}},
+                         {[collName]: {[op]: [2, 2]}},
+                         op != "update" ? [1, 1] : [2, 2] /* expectedOplogRetDocsForEachShard */,
+                         [1, 1] /* expectedChangeStreamDocsForEachShard */);
 
     // Test out a predicate on 'fullDocument.shard'.
-    verifyOps(resumeAfterToken,
-              {$match: {operationType: op, "fullDocument.shard": {$gt: 0}}},
-              [[op, 2, 1], [op, 3, 1]],
-              [0, 2] /* expectedChangeStreamDocsReturned */,
-              op != "update" ? [0, 2] : [2, 2] /* expectedOplogCursorReturnedDocs */);
+    verifyOnWholeCluster({$match: {operationType: op, "fullDocument.shard": {$gt: 0}}},
+                         {[collName]: {[op]: [2, 3]}},
+                         op != "update" ? [0, 2] : [2, 2] /* expectedOplogRetDocsForEachShard */,
+                         [0, 2] /* expectedChangeStreamDocsForEachShard */);
 
     // Test out a negated predicate on the full 'fullDocument' field.
-    verifyOps(resumeAfterToken,
-              {$match: {operationType: op, fullDocument: {$not: {$eq: doc}}}},
-              [[op, 3, 0], [op, 2, 1], [op, 3, 1]],
-              [1, 2] /* expectedChangeStreamDocsReturned */,
-              [2, 2] /* expectedOplogCursorReturnedDocs */);
+    verifyOnWholeCluster({$match: {operationType: op, fullDocument: {$not: {$eq: doc}}}},
+                         {[collName]: {[op]: [3, 2, 3]}},
+                         [2, 2] /* expectedOplogRetDocsForEachShard */,
+                         [1, 2] /* expectedChangeStreamDocsForEachShard */);
 
     // Test out a negated predicate on 'fullDocument._id'.
-    verifyOps(resumeAfterToken,
-              {$match: {operationType: op, "fullDocument._id": {$not: {$lt: 3}}}},
-              [[op, 3, 0], [op, 3, 1]],
-              [1, 1] /* expectedChangeStreamDocsReturned */,
-              [2, 2] /* expectedOplogCursorReturnedDocs */);
+    verifyOnWholeCluster({$match: {operationType: op, "fullDocument._id": {$not: {$lt: 3}}}},
+                         {[collName]: {[op]: [3, 3]}},
+                         [2, 2] /* expectedOplogRetDocsForEachShard */,
+                         [1, 1] /* expectedChangeStreamDocsForEachShard */);
 
     // Test out a negated predicate on 'fullDocument.shard'.
-    verifyOps(resumeAfterToken,
-              {$match: {operationType: op, "fullDocument.shard": {$not: {$gt: 0}}}},
-              [[op, 2, 0], [op, 3, 0]],
-              [2, 0] /* expectedChangeStreamDocsReturned */,
-              [2, 2] /* expectedOplogCursorReturnedDocs */);
+    verifyOnWholeCluster({$match: {operationType: op, "fullDocument.shard": {$not: {$gt: 0}}}},
+                         {[collName]: {[op]: [2, 3]}},
+                         [2, 2] /* expectedOplogRetDocsForEachShard */,
+                         [2, 0] /* expectedChangeStreamDocsForEachShard */);
 
     // Test out the '{$exists: true}' predicate on the full 'fullDocument' field.
-    verifyOps(resumeAfterToken,
-              {$match: {operationType: op, fullDocument: {$exists: true}}},
-              [[op, 2, 0], [op, 3, 0], [op, 2, 1], [op, 3, 1]],
-              [2, 2] /* expectedChangeStreamDocsReturned */,
-              [2, 2] /* expectedOplogCursorReturnedDocs */);
+    verifyOnWholeCluster({$match: {operationType: op, fullDocument: {$exists: true}}},
+                         {[collName]: {[op]: [2, 3, 2, 3]}},
+                         [2, 2] /* expectedOplogRetDocsForEachShard */,
+                         [2, 2] /* expectedChangeStreamDocsForEachShard */);
 
     // Test out the '{$exists: false}' predicate on the full 'fullDocument' field.
-    verifyOps(resumeAfterToken,
-              {$match: {operationType: op, fullDocument: {$exists: false}}},
-              [],
-              [0, 0] /* expectedChangeStreamDocsReturned */,
-              [2, 2] /* expectedOplogCursorReturnedDocs */);
+    verifyOnWholeCluster({$match: {operationType: op, fullDocument: {$exists: false}}},
+                         {},
+                         [2, 2] /* expectedOplogRetDocsForEachShard */,
+                         [0, 0] /* expectedChangeStreamDocsForEachShard */);
 
     // Test out the '{$eq: null}' predicate on the 'fullDocument' field.
-    verifyOps(resumeAfterToken,
-              {$match: {operationType: op, fullDocument: {$eq: null}}},
-              [],
-              [0, 0] /* expectedChangeStreamDocsReturned */,
-              op != "update" ? [0, 0] : [2, 2] /* expectedOplogCursorReturnedDocs */);
+    verifyOnWholeCluster({$match: {operationType: op, fullDocument: {$eq: null}}},
+                         {},
+                         op != "update" ? [0, 0] : [2, 2] /* expectedOplogRetDocsForEachShard */,
+                         [0, 0] /* expectedChangeStreamDocsForEachShard */);
 
     // Test out the '{$ne: null}' predicate on the 'fullDocument' field.
-    verifyOps(resumeAfterToken,
-              {$match: {operationType: op, fullDocument: {$ne: null}}},
-              [[op, 2, 0], [op, 3, 0], [op, 2, 1], [op, 3, 1]],
-              [2, 2] /* expectedChangeStreamDocsReturned */,
-              [2, 2] /* expectedOplogCursorReturnedDocs */);
+    verifyOnWholeCluster({$match: {operationType: op, fullDocument: {$ne: null}}},
+                         {[collName]: {[op]: [2, 3, 2, 3]}},
+                         [2, 2] /* expectedOplogRetDocsForEachShard */,
+                         [2, 2] /* expectedChangeStreamDocsForEachShard */);
 };
 
 // Verify '$match's on the 'update' operation type with various predicates get rewritten correctly.
