@@ -867,13 +867,13 @@ variables:
 
   # Configure flags for tiered storage Azure extension.
   - &configure_flags_tiered_storage_azure
-    ENABLE_S3: -DENABLE_AZURE=1
-    IMPORT_S3_SDK: -DIMPORT_AZURE_SDK=external
+    ENABLE_AZURE: -DENABLE_AZURE=1
+    IMPORT_AZURE_SDK: -DIMPORT_AZURE_SDK=external
   
   # Configure flags for tiered storage GCP extension.
   - &configure_flags_tiered_storage_gcp
-    ENABLE_S3: -DENABLE_GCP=1
-    IMPORT_S3_SDK: -DIMPORT_GCP_SDK=external
+    ENABLE_GCP: -DENABLE_GCP=1
+    IMPORT_GCP_SDK: -DIMPORT_GCP_SDK=external
   
   # Configure flags for tiered storage S3 extension.
   - &configure_flags_tiered_storage_s3

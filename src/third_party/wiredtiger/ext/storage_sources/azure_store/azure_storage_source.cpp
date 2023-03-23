@@ -440,7 +440,7 @@ azure_file_system_exists(
     }
 
     if (!*existp)
-        log->log_err_msg(
+        log->log_debug_message(
           "azure_file_system_exists: Object: " + std::string(name) + " does not exist in Azure.");
     else
         log->log_debug_message(
