@@ -39,7 +39,9 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/crypto/fle_crypto.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/fle_crud.h"
+#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/ops/write_ops_parsers.h"
@@ -51,6 +53,7 @@
 #include "mongo/db/session/session.h"
 #include "mongo/db/session/session_catalog.h"
 #include "mongo/db/session/session_catalog_mongod.h"
+#include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/transaction/transaction_api.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction/transaction_participant_resource_yielder.h"
@@ -150,49 +153,154 @@ void toBinData(StringData field, PrfBlock block, BSONObjBuilder* builder) {
     builder->appendBinData(field, block.size(), BinDataType::BinDataGeneral, block.data());
 }
 
+
 /**
- * Read from ESC via StorageInterface
+ * If the collection is missing (which should not happen in practice), we create a mock reader that
+ * just returns nothing rather then special case the algorithm for a missing collection.
  */
-class StorageInterfaceCollectionReader : public FLEStateCollectionReader {
+class MissingCollectionReader : public FLEStateCollectionReader {
 public:
-    StorageInterfaceCollectionReader(OperationContext* opCtx,
-                                     uint64_t count,
-                                     const NamespaceStringOrUUID& nsOrUUID,
-                                     repl::StorageInterface* storageInterface)
-        : _opCtx(opCtx), _count(count), _nssOrUUID(nsOrUUID), _storageInterface(storageInterface) {}
+    uint64_t getDocumentCount() const override {
+        return 0;
+    }
+
+    BSONObj getById(PrfBlock block) const override {
+
+        return BSONObj();
+    }
+};
+
+
+/**
+ * Lookup a ESC document by _id by clustered index id.
+ *
+ * Clustered indexes mean we only have to hit one table in WT so this will be very quick.
+ */
+class StorageEngineClusteredCollectionReader : public FLEStateCollectionReader {
+public:
+    StorageEngineClusteredCollectionReader(OperationContext* opCtx,
+                                           uint64_t count,
+                                           const NamespaceStringOrUUID& nsOrUUID,
+                                           SeekableRecordCursor* cursor)
+        : _opCtx(opCtx), _count(count), _nssOrUUID(nsOrUUID), _cursor(cursor) {}
 
     uint64_t getDocumentCount() const override {
         return _count;
     }
 
     BSONObj getById(PrfBlock block) const override {
+        auto record = getRecordById(block);
+        if (record.has_value()) {
+            return record->data.releaseToBson();
+        }
 
+        return BSONObj();
+    }
+
+    virtual bool existsById(PrfBlock block) const override {
+        return getRecordById(block).has_value();
+    }
+
+private:
+    boost::optional<Record> getRecordById(PrfBlock block) const {
         // Check for interruption so we can be killed
         _opCtx->checkForInterrupt();
 
-        BSONObjBuilder builder;
-        toBinData("_id", block, &builder);
-        auto id = builder.obj();
+        KeyString::Builder builder(KeyString::Version::kLatestVersion);
+        builder.appendBinData(BSONBinData(block.data(), block.size(), BinDataType::BinDataGeneral));
+        auto recordId = RecordId(builder.getBuffer(), builder.getSize());
 
-        auto swDoc = _storageInterface->findById(_opCtx, _nssOrUUID, id.firstElement());
-
-        if (swDoc.getStatus() == ErrorCodes::NoSuchKey ||
-            swDoc.getStatus() == ErrorCodes::NamespaceNotFound) {
-            return BSONObj();
-        }
-
-        uassertStatusOK(swDoc);
-
-        return swDoc.getValue();
+        return _cursor->seekExact(recordId);
     }
 
 private:
     OperationContext* _opCtx;
-    uint64_t _count;
+    const uint64_t _count;
     const NamespaceStringOrUUID& _nssOrUUID;
-    repl::StorageInterface* _storageInterface;
+    SeekableRecordCursor* _cursor;
 };
 
+/**
+ * Lookup a ESC document by _id in non-clustered collection.
+ *
+ * We have to lookup first by _id in the _id index and then get the document from the base
+ * collection via its record id.
+ */
+class StorageEngineIndexCollectionReader : public FLEStateCollectionReader {
+public:
+    StorageEngineIndexCollectionReader(OperationContext* opCtx,
+                                       uint64_t count,
+                                       const NamespaceStringOrUUID& nsOrUUID,
+                                       SeekableRecordCursor* cursor,
+                                       SortedDataInterface* sdi,
+                                       SortedDataInterface::Cursor* indexCursor)
+        : _opCtx(opCtx),
+          _count(count),
+          _nssOrUUID(nsOrUUID),
+          _sdi(sdi),
+          _indexCursor(indexCursor),
+          _cursor(cursor) {}
+
+    uint64_t getDocumentCount() const override {
+        return _count;
+    }
+
+    BSONObj getById(PrfBlock block) const override {
+        auto record = getRecordById(block);
+        if (record.has_value()) {
+            return record->data.releaseToBson();
+        }
+
+        return BSONObj();
+    }
+
+    virtual bool existsById(PrfBlock block) const override {
+        return getRecordById(block).has_value();
+    }
+
+private:
+    boost::optional<Record> getRecordById(PrfBlock block) const {
+        // Check for interruption so we can be killed
+        _opCtx->checkForInterrupt();
+
+        KeyString::Builder kb(
+            _sdi->getKeyStringVersion(), _sdi->getOrdering(), KeyString::Discriminator::kInclusive);
+
+        kb.appendBinData(BSONBinData(block.data(), block.size(), BinDataGeneral));
+        KeyString::Value id(kb.getValueCopy());
+
+        auto ksEntry = _indexCursor->seekForKeyString(id);
+        if (!ksEntry) {
+            return boost::none;
+        }
+
+        // Seek will almost always give us a document, it just may not be a document we were
+        // looking for. We need to check if seeked to the document we want
+        auto sizeWithoutRecordId = KeyString::sizeWithoutRecordIdLongAtEnd(
+            ksEntry->keyString.getBuffer(), ksEntry->keyString.getSize());
+
+        if (KeyString::compare(ksEntry->keyString.getBuffer(),
+                               id.getBuffer(),
+                               sizeWithoutRecordId,
+                               id.getSize()) == 0) {
+
+            // Get the document from the base collection
+            return _cursor->seekExact(ksEntry->loc);
+        }
+
+        return boost::none;
+    }
+
+private:
+    OperationContext* _opCtx;
+    const uint64_t _count;
+    const NamespaceStringOrUUID& _nssOrUUID;
+    SortedDataInterface* _sdi;
+    SortedDataInterface::Cursor* _indexCursor;
+    SeekableRecordCursor* _cursor;
+};
+
+const auto kIdIndexName = "_id_"_sd;
 }  // namespace
 
 std::shared_ptr<txn_api::SyncTransactionWithRetries> getTransactionWithRetriesForMongoD(
@@ -345,18 +453,72 @@ std::vector<std::vector<FLEEdgeCountInfo>> getTagsFromStorage(
     const std::vector<std::vector<FLEEdgePrfBlock>>& escDerivedFromDataTokens,
     FLETagQueryInterface::TagQueryType type) {
 
-    auto storageInterface = repl::StorageInterface::get(opCtx);
+    auto opStr = "getTagsFromStorage"_sd;
+    return writeConflictRetry(
+        opCtx, opStr, nsOrUUID.toString(), [&]() -> std::vector<std::vector<FLEEdgeCountInfo>> {
+            AutoGetCollectionForReadMaybeLockFree autoColl(opCtx, nsOrUUID);
 
-    auto swDocCount = storageInterface->getCollectionCount(opCtx, nsOrUUID);
+            const auto& collection = autoColl.getCollection();
 
-    uint64_t docCount = 0;
-    if (swDocCount.getStatus() != ErrorCodes::NamespaceNotFound) {
-        docCount = uassertStatusOK(swDocCount);
-    }
+            // If there is no collection, run through the algorithm with a special reader that only
+            // returns empty documents. This simplifies the implementation of other readers.
+            if (!collection) {
+                MissingCollectionReader reader;
+                return ESCCollection::getTags(reader, escDerivedFromDataTokens, type);
+            }
 
-    StorageInterfaceCollectionReader reader(opCtx, docCount, nsOrUUID, storageInterface);
+            // numRecords is signed so guard against negative numbers
+            auto docCountSigned = collection->numRecords(opCtx);
+            uint64_t docCount = docCountSigned < 0 ? 0 : static_cast<uint64_t>(docCountSigned);
 
-    return ESCCollection::getTags(reader, escDerivedFromDataTokens, type);
+            std::unique_ptr<SeekableRecordCursor> cursor = collection->getCursor(opCtx, true);
+
+            // If clustered collection, we have simpler searches
+            if (collection->isClustered() &&
+                collection->getClusteredInfo()
+                        ->getIndexSpec()
+                        .getKey()
+                        .firstElement()
+                        .fieldNameStringData() == "_id"_sd) {
+
+                StorageEngineClusteredCollectionReader reader(
+                    opCtx, docCount, nsOrUUID, cursor.get());
+
+                return ESCCollection::getTags(reader, escDerivedFromDataTokens, type);
+            }
+
+            // Non-clustered case, we need to look a index entry in _id index and then the
+            // collection
+            auto indexCatalog = collection->getIndexCatalog();
+
+            const IndexDescriptor* indexDescriptor = indexCatalog->findIndexByName(
+                opCtx, kIdIndexName, IndexCatalog::InclusionPolicy::kReady);
+            if (!indexDescriptor) {
+                uasserted(ErrorCodes::IndexNotFound,
+                          str::stream() << "Index not found, ns:" << nsOrUUID.toString()
+                                        << ", index: " << kIdIndexName);
+            }
+
+            if (indexDescriptor->isPartial()) {
+                uasserted(ErrorCodes::IndexOptionsConflict,
+                          str::stream() << "Partial index is not allowed for this operation, ns:"
+                                        << nsOrUUID.toString() << ", index: " << kIdIndexName);
+            }
+
+            auto indexCatalogEntry = indexDescriptor->getEntry()->shared_from_this();
+
+            auto sdi = indexCatalogEntry->accessMethod()->asSortedData();
+            auto indexCursor = sdi->newCursor(opCtx, true);
+
+            StorageEngineIndexCollectionReader reader(opCtx,
+                                                      docCount,
+                                                      nsOrUUID,
+                                                      cursor.get(),
+                                                      sdi->getSortedDataInterface(),
+                                                      indexCursor.get());
+
+            return ESCCollection::getTags(reader, escDerivedFromDataTokens, type);
+        });
 }
 
 }  // namespace mongo

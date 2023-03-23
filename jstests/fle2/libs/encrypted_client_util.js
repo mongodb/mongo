@@ -186,7 +186,7 @@ var EncryptedClient = class {
             Object.extend(createIndexCmdObj, {"$tenant": dollarTenant});
         }
         assert.commandWorked(this._edb.runCommand(createIndexCmdObj));
-        let tenantOption = {};
+        let tenantOption = {clusteredIndex: {key: {_id: 1}, unique: true}};
         if (dollarTenant) {
             Object.extend(tenantOption, {"$tenant": dollarTenant});
         }

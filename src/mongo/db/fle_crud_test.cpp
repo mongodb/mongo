@@ -32,6 +32,7 @@
 #include <algorithm>
 #include <array>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -49,6 +50,7 @@
 #include "mongo/crypto/fle_crypto.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/crypto/fle_tags.h"
+#include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/fle_query_interface_mock.h"
@@ -188,6 +190,17 @@ std::string fieldNameFromInt(uint64_t i) {
     return "field" + std::to_string(i);
 }
 
+int32_t getTestSeed() {
+    static std::unique_ptr<mongo::PseudoRandom> rnd;
+    if (!rnd.get()) {
+        auto seed = SecureRandom().nextInt64();
+        rnd = std::make_unique<mongo::PseudoRandom>(seed);
+        std::cout << "FLE TEST SEED: " << seed << std::endl;
+    }
+
+    return rnd->nextInt32();
+}
+
 class FleCrudTest : public ServiceContextMongoDTest {
 protected:
     void setUp();
@@ -299,6 +312,16 @@ void FleCrudTest::tearDown() {
 void FleCrudTest::createCollection(const NamespaceString& ns) {
     CollectionOptions collectionOptions;
     collectionOptions.uuid = UUID::gen();
+
+    // Make the state collections clustered sometimes, allows us to ensure the tags reading code can
+    // handle clustered and non-clustered state collections
+    if (ns != _edcNs) {
+        auto seed = getTestSeed();
+        if (seed % 2 == 0) {
+            collectionOptions.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex();
+        }
+    }
+
     auto statusCC = _storage->createCollection(
         _opCtx.get(),
         NamespaceString::createNamespaceString_forTest(ns.dbName(), ns.coll()),

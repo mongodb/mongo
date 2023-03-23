@@ -916,7 +916,9 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/crypto/fle_crypto',
+        '$BUILD_DIR/mongo/db/concurrency/exception_util',
         '$BUILD_DIR/mongo/db/query/query_request',
+        '$BUILD_DIR/mongo/db/record_id_helpers',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/db/session/logical_session_id',
         '$BUILD_DIR/mongo/db/session/session_catalog',
@@ -927,6 +929,7 @@ env.Library(
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
         '$BUILD_DIR/mongo/util/concurrency/thread_pool',
         'fle_crud',
+        'shard_role',
     ],
 )
 
