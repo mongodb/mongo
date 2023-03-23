@@ -750,12 +750,12 @@ class WiredTigerTestCase(unittest.TestCase):
 
         self.platform_api.tearDown()
 
-        # Download the files from the S3 bucket for tiered tests if the test fails or preserve is
+        # Download the files from the bucket for tiered tests if the test fails or preserve is
         # turned on.
-        if hasattr(self, 'ss_name') and self.ss_name == 's3_store' and not self.skipped and \
+        if hasattr(self, 'ss_name') and not self.skipped and \
             (not passed or WiredTigerTestCase._preserveFiles):
+                self.pr('downloading object files')
                 self.download_objects(self.bucket, self.bucket_prefix)
-                self.pr('downloading s3 files')
 
         self.pr('finishing')
 
