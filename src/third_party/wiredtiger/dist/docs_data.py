@@ -95,7 +95,7 @@ arch_doc_pages = [
         ['src/include/btree.h']),
     ArchDocPage('arch-rts',
         [''],
-        ['src/txn/']),
+        ['src/rollback_to_stable/']),
     ArchDocPage('arch-s3-extension',
         ['S3_FILE_HANDLE', 'S3_FILE_SYSTEM', 'S3_STORAGE'],
         ['ext/storage_sources/s3_store/']),
