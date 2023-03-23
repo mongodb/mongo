@@ -228,10 +228,7 @@ TEST_F(ShardRoleTest, NamespaceOrViewAcquisitionRequestWithOpCtxTakesPlacementFr
         ScopedSetShardRole setShardRole(
             opCtx(), anotherCollection, ShardVersion::UNSHARDED(), dbVersionTestDb);
         auto acquisition = CollectionOrViewAcquisitionRequest::fromOpCtx(
-            opCtx(),
-            nss,
-            AcquisitionPrerequisites::kWrite,
-            AcquisitionPrerequisites::kMustBeCollection);
+            opCtx(), nss, AcquisitionPrerequisites::kWrite);
         ASSERT_EQ(boost::none, acquisition.placementConcern.dbVersion);
         ASSERT_EQ(boost::none, acquisition.placementConcern.shardVersion);
     }
@@ -241,10 +238,7 @@ TEST_F(ShardRoleTest, NamespaceOrViewAcquisitionRequestWithOpCtxTakesPlacementFr
         const auto shardVersion = boost::none;
         ScopedSetShardRole setShardRole(opCtx(), nss, shardVersion, dbVersion);
         auto acquisition = CollectionOrViewAcquisitionRequest::fromOpCtx(
-            opCtx(),
-            nss,
-            AcquisitionPrerequisites::kWrite,
-            AcquisitionPrerequisites::kMustBeCollection);
+            opCtx(), nss, AcquisitionPrerequisites::kWrite);
         ASSERT_EQ(dbVersion, acquisition.placementConcern.dbVersion);
         ASSERT_EQ(shardVersion, acquisition.placementConcern.shardVersion);
     }
@@ -254,10 +248,7 @@ TEST_F(ShardRoleTest, NamespaceOrViewAcquisitionRequestWithOpCtxTakesPlacementFr
         const auto shardVersion = ShardVersion::UNSHARDED();
         ScopedSetShardRole setShardRole(opCtx(), nss, shardVersion, dbVersion);
         auto acquisition = CollectionOrViewAcquisitionRequest::fromOpCtx(
-            opCtx(),
-            nss,
-            AcquisitionPrerequisites::kWrite,
-            AcquisitionPrerequisites::kMustBeCollection);
+            opCtx(), nss, AcquisitionPrerequisites::kWrite);
         ASSERT_EQ(dbVersion, acquisition.placementConcern.dbVersion);
         ASSERT_EQ(shardVersion, acquisition.placementConcern.shardVersion);
     }
@@ -267,10 +258,7 @@ TEST_F(ShardRoleTest, NamespaceOrViewAcquisitionRequestWithOpCtxTakesPlacementFr
         const auto shardVersion = shardVersionShardedCollection1;
         ScopedSetShardRole setShardRole(opCtx(), nss, shardVersion, dbVersion);
         auto acquisition = CollectionOrViewAcquisitionRequest::fromOpCtx(
-            opCtx(),
-            nss,
-            AcquisitionPrerequisites::kWrite,
-            AcquisitionPrerequisites::kMustBeCollection);
+            opCtx(), nss, AcquisitionPrerequisites::kWrite);
         ASSERT_EQ(dbVersion, acquisition.placementConcern.dbVersion);
         ASSERT_EQ(shardVersion, acquisition.placementConcern.shardVersion);
     }
@@ -598,13 +586,11 @@ TEST_F(ShardRoleTest, AcquireCollectionButItIsAView) {
                        DBException,
                        ErrorCodes::CommandNotSupportedOnView);
 
-    const auto acquisition = acquireCollectionOrView(
-        opCtx(),
-        CollectionOrViewAcquisitionRequest::fromOpCtx(opCtx(),
-                                                      nssView,
-                                                      AcquisitionPrerequisites::kWrite,
-                                                      AcquisitionPrerequisites::kCanBeView),
-        MODE_IX);
+    const auto acquisition =
+        acquireCollectionOrView(opCtx(),
+                                CollectionOrViewAcquisitionRequest::fromOpCtx(
+                                    opCtx(), nssView, AcquisitionPrerequisites::kWrite),
+                                MODE_IX);
 
     ASSERT_TRUE(std::holds_alternative<ScopedViewAcquisition>(acquisition));
     const ScopedViewAcquisition& viewAcquisition = std::get<ScopedViewAcquisition>(acquisition);
@@ -1144,13 +1130,11 @@ TEST_F(ShardRoleTest, RestoreForReadSucceedsEvenIfPlacementHasChanged) {
 }
 
 DEATH_TEST_REGEX_F(ShardRoleTest, YieldingViewAcquisitionIsForbidden, "Tripwire assertion") {
-    const auto acquisition = acquireCollectionOrView(
-        opCtx(),
-        CollectionOrViewAcquisitionRequest::fromOpCtx(opCtx(),
-                                                      nssView,
-                                                      AcquisitionPrerequisites::kWrite,
-                                                      AcquisitionPrerequisites::kCanBeView),
-        MODE_IX);
+    const auto acquisition =
+        acquireCollectionOrView(opCtx(),
+                                CollectionOrViewAcquisitionRequest::fromOpCtx(
+                                    opCtx(), nssView, AcquisitionPrerequisites::kWrite),
+                                MODE_IX);
 
     ASSERT_THROWS_CODE(
         yieldTransactionResourcesFromOperationContext(opCtx()), DBException, 7300502);
