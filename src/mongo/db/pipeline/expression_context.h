@@ -431,6 +431,11 @@ public:
     // expression counting.
     bool enabledCounters = true;
 
+    // Returns true if the resolved collation of the context is simple.
+    bool isResolvedCollationSimple() const {
+        return getCollatorBSON().woCompare(CollationSpec::kSimpleSpec) == 0;
+    }
+
 protected:
     static const int kInterruptCheckPeriod = 128;
 
