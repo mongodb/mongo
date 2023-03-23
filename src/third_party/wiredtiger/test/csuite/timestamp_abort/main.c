@@ -85,7 +85,7 @@ static char home[1024]; /* Program working dir */
 /* Include worker threads and prepare extra sessions */
 #define SESSION_MAX (MAX_TH + 3 + MAX_TH * PREPARE_PCT)
 #define STAT_WAIT 1
-#define USEC_STAT (10 * WT_THOUSAND)
+#define USEC_STAT (50 * WT_THOUSAND)
 
 static const char *table_pfx = "table";
 static const char *const uri_collection = "collection";
@@ -101,6 +101,7 @@ static uint32_t backup_granularity_kb;
 
 static TEST_OPTS *opts, _opts;
 
+static int recover_and_verify(uint32_t backup_index);
 extern int __wt_optind;
 extern char *__wt_optarg;
 
@@ -500,6 +501,9 @@ backup_create_incremental(WT_CONNECTION *conn, uint32_t src_index, uint32_t inde
                     first_range = false;
                     testutil_system(
                       "cp %s/%s %s/%s", src_backup_home, filename, backup_home, filename);
+                    printf(
+                      "INCR: cp %s/%s %s/%s\n", src_backup_home, filename, backup_home, filename);
+                    fflush(stdout);
 
                     testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/%s", WT_HOME_DIR, filename));
                     testutil_assert((rfd = open(buf, O_RDONLY, 0666)) >= 0);
@@ -571,7 +575,7 @@ backup_create_incremental(WT_CONNECTION *conn, uint32_t src_index, uint32_t inde
  *     no good reason.
  */
 static void
-backup_delete_old_backups(int retain)
+backup_delete_old_backups(int retain, int last_full)
 {
     struct dirent *dir;
     struct stat sb;
@@ -588,7 +592,10 @@ backup_delete_old_backups(int retain)
         count = 0;
         while ((dir = readdir(d)) != NULL) {
             if (strncmp(dir->d_name, BACKUP_BASE, len) == 0) {
-                indexes[count++] = atoi(dir->d_name + len);
+                i = atoi(dir->d_name + len);
+                if (i == last_full)
+                    continue;
+                indexes[count++] = i;
 
                 /* If the backup failed to finish, delete it right away. */
                 testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/done", dir->d_name));
@@ -697,11 +704,11 @@ thread_backup_run(void *arg)
 {
     THREAD_DATA *td;
     WT_SESSION *session;
-    uint32_t last_backup, sleep_time, u;
+    uint32_t last_backup, last_full, sleep_time, u;
     int i;
 
     td = (THREAD_DATA *)arg;
-    last_backup = 0;
+    last_backup = last_full = 0;
 
     testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
 
@@ -714,16 +721,17 @@ thread_backup_run(void *arg)
 
         /* Create a backup. */
         u = BACKUP_INDEX(td, (uint32_t)i);
-        if (last_backup == 0)
+        if (last_backup == 0 || i % 4 == 0) {
             backup_create_full(td->conn, __wt_random(&td->extra_rnd) % 2, u);
-        else
+            last_full = u;
+        } else
             backup_create_incremental(td->conn, last_backup, u);
 
         last_backup = u;
 
         /* Periodically delete old backups. */
         if (i % 5 == 0)
-            backup_delete_old_backups(3);
+            backup_delete_old_backups(3, (int)last_full);
     }
 
     /* NOTREACHED */
@@ -1114,6 +1122,87 @@ print_missing(REPORT *r, const char *fname, const char *msg)
 }
 
 /*
+ * backup_exists --
+ *     Check whether the backup with the given ID exists in the database.
+ */
+static bool
+backup_exists(WT_CONNECTION *conn, uint32_t index)
+{
+    WT_CURSOR *cursor;
+    WT_SESSION *session;
+    char backup_id[64];
+    const char *idstr;
+    bool found;
+
+    testutil_check(__wt_snprintf(backup_id, sizeof(backup_id), "ID%" PRIu32, index));
+    testutil_check(conn->open_session(conn, NULL, NULL, &session));
+
+    testutil_check(session->open_cursor(session, "backup:query_id", NULL, NULL, &cursor));
+    found = false;
+    while (cursor->next(cursor) == 0) {
+        testutil_check(cursor->get_key(cursor, &idstr));
+        if (strcmp(idstr, backup_id) == 0) {
+            found = true;
+            break;
+        }
+    }
+    testutil_check(cursor->close(cursor));
+
+    testutil_check(session->close(session, NULL));
+    return (found);
+}
+
+/*
+ * backup_verify --
+ *     Verify previous backups.
+ */
+static void
+backup_verify(WT_CONNECTION *conn)
+{
+    struct dirent *dir;
+    struct stat sb;
+    DIR *d;
+    size_t len;
+    uint32_t index;
+    char backup_id[64], buf[1024];
+
+    testutil_assert_errno((d = opendir(".")) != NULL);
+    len = strlen(BACKUP_BASE);
+    while ((dir = readdir(d)) != NULL) {
+        if (strncmp(dir->d_name, BACKUP_BASE, len) == 0) {
+
+            /* Verify the backup only if it has completed. */
+            testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/done", dir->d_name));
+            if (stat(buf, &sb) != 0) {
+                testutil_assert_errno(errno == ENOENT);
+                continue;
+            }
+
+            index = (uint32_t)atoi(dir->d_name + len);
+
+            if (backup_verify_quick) {
+                /* Just check that chunks that are supposed to be different are indeed different. */
+                printf("Verify backup %" PRIu32 " (quick)\n", index);
+
+                /* Continue the verification only if we have the backup ID. */
+                if (backup_exists(conn, index)) {
+                    testutil_check(
+                      __wt_snprintf(backup_id, sizeof(backup_id), "ID%" PRIu32, index));
+                    printf("==== Verify ID %s dir %s against backup source ====\n", backup_id,
+                      dir->d_name);
+                    testutil_verify_src_backup(conn, dir->d_name, WT_HOME_DIR, backup_id);
+                    printf("==== DONE Verify ID %s dir %s against backup source ====\n", backup_id,
+                      dir->d_name);
+                }
+            } else
+                /* Perform a full test. */
+                testutil_check(recover_and_verify(index));
+        }
+    }
+    testutil_check(closedir(d));
+}
+
+/*
  * recover_and_verify --
  *     Run the recovery and verify the database or the given backup (use 0 for the main database).
  */
@@ -1144,6 +1233,19 @@ recover_and_verify(uint32_t backup_index)
     if (backup_index == 0) {
         testutil_wiredtiger_open(opts, WT_HOME_DIR, NULL, &my_event, &conn, true, false);
         printf("Connection open and recovery complete. Verify content\n");
+        /* Compare against the copy of the home directory just before recovery. */
+        if (use_backups) {
+            printf("==== Verify saved dir against backup source ====\n");
+            testutil_check(__wt_snprintf(buf, sizeof(buf), "%s.SAVE/%s", home, WT_HOME_DIR));
+            testutil_verify_src_backup(conn, buf, WT_HOME_DIR, NULL);
+            printf("==== DONE Verify saved dir against backup source ====\n");
+        }
+        /*
+         * Only call this when index is 0 because it calls back into here to verify a specific
+         * backup.
+         */
+        if (use_backups)
+            backup_verify(conn);
     } else {
         testutil_check(__wt_snprintf(buf, sizeof(buf), BACKUP_BASE "%" PRIu32, backup_index));
         testutil_system("rm -rf check; cp -rf %s check", buf);
@@ -1368,91 +1470,6 @@ recover_and_verify(uint32_t backup_index)
     }
 
     return (ret);
-}
-
-/*
- * backup_exists --
- *     Check whether the backup with the given ID exists in the database.
- */
-static bool
-backup_exists(uint32_t index)
-{
-    WT_CONNECTION *conn;
-    WT_CURSOR *cursor;
-    WT_SESSION *session;
-    char backup_id[64];
-    const char *idstr;
-    bool found;
-
-    testutil_check(__wt_snprintf(backup_id, sizeof(backup_id), "ID%" PRIu32, index));
-    testutil_wiredtiger_open(opts, WT_HOME_DIR, NULL, &my_event, &conn, true, false);
-    testutil_check(conn->open_session(conn, NULL, NULL, &session));
-
-    testutil_check(session->open_cursor(session, "backup:query_id", NULL, NULL, &cursor));
-    found = false;
-    while (cursor->next(cursor) == 0) {
-        testutil_check(cursor->get_key(cursor, &idstr));
-        if (strcmp(idstr, backup_id) == 0) {
-            found = true;
-            break;
-        }
-    }
-    testutil_check(cursor->close(cursor));
-
-    testutil_check(session->close(session, NULL));
-    testutil_check(conn->close(conn, NULL));
-    return (found);
-}
-
-/*
- * backup_verify --
- *     Verify previous backups.
- */
-static void
-backup_verify(void)
-{
-    struct dirent *dir;
-    struct stat sb;
-    DIR *d;
-    WT_CONNECTION *conn;
-    size_t len;
-    uint32_t index;
-    char backup_id[64], buf[1024];
-
-    testutil_assert_errno((d = opendir(".")) != NULL);
-    len = strlen(BACKUP_BASE);
-    while ((dir = readdir(d)) != NULL) {
-        if (strncmp(dir->d_name, BACKUP_BASE, len) == 0) {
-
-            /* Verify the backup only if it has completed. */
-            testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/done", dir->d_name));
-            if (stat(buf, &sb) != 0) {
-                testutil_assert_errno(errno == ENOENT);
-                continue;
-            }
-
-            index = (uint32_t)atoi(dir->d_name + len);
-
-            if (backup_verify_quick) {
-                /* Just check that chunks that are supposed to be different are indeed different. */
-                printf("Verify backup %" PRIu32 " (quick)\n", index);
-
-                /* Continue the verification only if we have the backup ID. */
-                if (backup_exists(index)) {
-                    testutil_check(
-                      __wt_snprintf(backup_id, sizeof(backup_id), "ID%" PRIu32, index));
-                    testutil_wiredtiger_open(
-                      opts, WT_HOME_DIR, NULL, &my_event, &conn, true, false);
-                    testutil_verify_src_backup(conn, dir->d_name, WT_HOME_DIR, backup_id);
-                    testutil_check(conn->close(conn, NULL));
-                }
-            } else {
-                /* Perform a full test. */
-                testutil_check(recover_and_verify(index));
-            }
-        }
-    }
-    testutil_check(closedir(d));
 }
 
 /*
@@ -1722,13 +1739,10 @@ main(int argc, char *argv[])
      * Recover and verify the database, and test all backups.
      */
     ret = recover_and_verify(0);
-    if (ret == EXIT_SUCCESS && use_backups)
-        backup_verify();
 
     /*
      * Clean up.
      */
-
     /* Clean up the test directory. */
     if (ret == EXIT_SUCCESS && !opts->preserve)
         testutil_clean_test_artifacts(home);
