@@ -411,6 +411,7 @@ env.Library(
         'participant_block.idl',
         'remove_tags.idl',
         'sharded_index_catalog_commands.idl',
+        'sharding_cluster_parameters.idl',
         'sharding_config_server_parameters.idl',
         'sharding_ddl_util.cpp',
         'sharding_index_catalog_util.cpp',
