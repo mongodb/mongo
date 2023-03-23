@@ -149,4 +149,18 @@ void MigrationTestFixture::checkMigrationsCollectionIsEmpty() {
     ASSERT_EQUALS(0U, migrationsQueryResponse.docs.size());
 }
 
+ShardId MigrationTestFixture::getShardIdByHost(HostAndPort host) {
+    if (host == kShardHost0) {
+        return kShardId0;
+    } else if (host == kShardHost1) {
+        return kShardId1;
+    } else if (host == kShardHost2) {
+        return kShardId2;
+    } else if (host == kShardHost3) {
+        return kShardId3;
+    }
+
+    MONGO_UNREACHABLE;
+}
+
 }  // namespace mongo

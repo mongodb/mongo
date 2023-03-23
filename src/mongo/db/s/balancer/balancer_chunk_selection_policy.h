@@ -74,7 +74,8 @@ public:
     virtual StatusWith<MigrateInfoVector> selectChunksToMove(
         OperationContext* opCtx,
         const std::vector<ClusterStatistics::ShardStatistics>& shardStats,
-        stdx::unordered_set<ShardId>* availableShards) = 0;
+        stdx::unordered_set<ShardId>* availableShards,
+        stdx::unordered_set<NamespaceString>* imbalancedCollectionsCachePtr) = 0;
 
 
     /**
