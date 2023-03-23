@@ -36,7 +36,8 @@
  * maintaining at least 1 entry in the change collection.
  */
 namespace mongo {
-class ChangeCollectionTruncateMarkers final : public CollectionTruncateMarkers {
+class ChangeCollectionTruncateMarkers final
+    : public CollectionTruncateMarkersWithPartialExpiration {
 public:
     ChangeCollectionTruncateMarkers(TenantId tenantId,
                                     std::deque<Marker> markers,

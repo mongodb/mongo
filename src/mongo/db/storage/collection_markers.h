@@ -53,20 +53,13 @@ class OperationContext;
 // If these requirements hold then this class can be used to compute and maintain up-to-date markers
 // for ranges of deletions. These markers will be expired and returned to the deleter whenever the
 // implementation defined '_hasExcessMarkers' returns true.
-//
-// Some implementations can also provide utilities for expiring partially built markers if they
-// implement '_hasPartialMarkerExpired'.
 class CollectionTruncateMarkers {
 public:
     /** Markers represent "waypoints" of the collection that contain information between the current
      * marker and the previous one.
      *
      * Markers are created by the class automatically whenever there are more than X number of bytes
-     * between the previous marker and the latest insertion. Alternatively they can be created by
-     * CollectionTruncateMarkers::createPartialMarkerIfNecessary if the implementation considers
-     * that the current data awaiting a marker should be deleted anyways. This is useful in
-     * time-based expiration systems as there could be low activity collections containing data that
-     * should be expired but won't because there is no marker.
+     * between the previous marker and the latest insertion.
      *
      *                                                               'partial marker'
      *            |___________________|......|____________________|______
@@ -100,10 +93,8 @@ public:
     CollectionTruncateMarkers(std::deque<Marker> markers,
                               int64_t leftoverRecordsCount,
                               int64_t leftoverRecordsBytes,
-                              int64_t minBytesPerMarker,
-                              bool supportsExpiringPartialMarkers)
-        : _supportsExpiringPartialMarkers(supportsExpiringPartialMarkers),
-          _minBytesPerMarker(minBytesPerMarker),
+                              int64_t minBytesPerMarker)
+        : _minBytesPerMarker(minBytesPerMarker),
           _currentRecords(leftoverRecordsCount),
           _currentBytes(leftoverRecordsBytes),
           _markers(std::move(markers)) {}
@@ -131,11 +122,11 @@ public:
                                  Date_t wallTime);
 
     // Updates the current marker with the inserted value if the operation commits the WUOW.
-    void updateCurrentMarkerAfterInsertOnCommit(OperationContext* opCtx,
-                                                int64_t bytesInserted,
-                                                const RecordId& highestInsertedRecordId,
-                                                Date_t wallTime,
-                                                int64_t countInserted);
+    virtual void updateCurrentMarkerAfterInsertOnCommit(OperationContext* opCtx,
+                                                        int64_t bytesInserted,
+                                                        const RecordId& highestInsertedRecordId,
+                                                        Date_t wallTime,
+                                                        int64_t countInserted);
 
     // Clears all the markers of the instance whenever the current WUOW commits.
     void clearMarkersOnCommit(OperationContext* opCtx);
@@ -189,10 +180,6 @@ public:
         int64_t estimatedBytesPerMarker,
         std::function<RecordIdAndWallTime(const Record&)> getRecordIdAndWallTime);
 
-    // Creates a partially filled marker if necessary. The criteria used is whether there is data in
-    // the partial marker and whether the implementation's '_hasPartialMarkerExpired' returns true.
-    void createPartialMarkerIfNecessary(OperationContext* opCtx);
-
     void setMinBytesPerMarker(int64_t size);
 
     //
@@ -213,34 +200,18 @@ public:
     }
 
 private:
+    friend class CollectionTruncateMarkersWithPartialExpiration;
+
     // Used to decide whether the oldest marker has expired. Implementations are free to use
     // whichever process they want to discern if there are expired markers.
     // This method will get called holding the _collectionMarkersReclaimMutex and _markersMutex.
     virtual bool _hasExcessMarkers(OperationContext* opCtx) const = 0;
 
-    // Replaces the highest marker if _isMarkerLargerThanHighest returns true.
-    void _replaceNewHighestMarkingIfNecessary(const RecordId& newMarkerRecordId,
-                                              Date_t newMarkerWallTime);
-
-    // Used to decide if the current partially built marker has expired.
-    virtual bool _hasPartialMarkerExpired(OperationContext* opCtx) const {
-        return false;
-    }
-
     static constexpr uint64_t kRandomSamplesPerMarker = 10;
-
-    // Highest marker seen during the lifetime of the CollectionMarker. Modifications must happen
-    // while holding '_lastHighestRecordMutex'.
-    mutable Mutex _lastHighestRecordMutex =
-        MONGO_MAKE_LATCH("CollectionTruncateMarkers::_lastHighestRecordMutex");
-    RecordId _lastHighestRecordId;
-    Date_t _lastHighestWallTime;
 
     Mutex _collectionMarkersReclaimMutex =
         MONGO_MAKE_LATCH("CollectionTruncateMarkers::_collectionMarkersReclaimMutex");
     stdx::condition_variable _reclaimCv;
-
-    bool _supportsExpiringPartialMarkers = false;
 
     // True if '_rs' has been destroyed, e.g. due to repairDatabase being called on the collection's
     // database, and false otherwise.
@@ -267,6 +238,57 @@ protected:
     void pokeReclaimThreadIfNeeded(OperationContext* opCtx);
 
     Marker& createNewMarker(const RecordId& lastRecord, Date_t wallTime);
+};
+
+/**
+ * An extension of CollectionTruncateMarkers that provides support for creating "partial markers".
+ *
+ * Partial markers are normal markers that can be requested by the user calling
+ * CollectionTruncateMarkersWithPartialExpiration::createPartialMarkerIfNecessary. The
+ * implementation will then consider whether the current data awaiting a marker should be deleted
+ * according to some internal logic. This is useful in time-based expiration systems as there could
+ * be low activity collections containing data that should be expired but won't because there is no
+ * marker.
+ */
+class CollectionTruncateMarkersWithPartialExpiration : public CollectionTruncateMarkers {
+public:
+    CollectionTruncateMarkersWithPartialExpiration(std::deque<Marker> markers,
+                                                   int64_t leftoverRecordsCount,
+                                                   int64_t leftoverRecordsBytes,
+                                                   int64_t minBytesPerMarker)
+        : CollectionTruncateMarkers(
+              std::move(markers), leftoverRecordsCount, leftoverRecordsBytes, minBytesPerMarker) {}
+
+    // Creates a partially filled marker if necessary. The criteria used is whether there is data in
+    // the partial marker and whether the implementation's '_hasPartialMarkerExpired' returns true.
+    void createPartialMarkerIfNecessary(OperationContext* opCtx);
+
+    virtual void updateCurrentMarkerAfterInsertOnCommit(OperationContext* opCtx,
+                                                        int64_t bytesInserted,
+                                                        const RecordId& highestInsertedRecordId,
+                                                        Date_t wallTime,
+                                                        int64_t countInserted) final;
+
+private:
+    // Highest marker seen during the lifetime of the class. Modifications must happen
+    // while holding '_lastHighestRecordMutex'.
+    mutable Mutex _lastHighestRecordMutex =
+        MONGO_MAKE_LATCH("CollectionTruncateMarkersWithPartialExpiration::_lastHighestRecordMutex");
+    RecordId _lastHighestRecordId;
+    Date_t _lastHighestWallTime;
+
+    // Replaces the highest marker if _isMarkerLargerThanHighest returns true.
+    void _replaceNewHighestMarkingIfNecessary(const RecordId& newMarkerRecordId,
+                                              Date_t newMarkerWallTime);
+
+    // Used to decide if the current partially built marker has expired.
+    virtual bool _hasPartialMarkerExpired(OperationContext* opCtx) const {
+        return false;
+    }
+
+protected:
+    CollectionTruncateMarkersWithPartialExpiration(
+        CollectionTruncateMarkersWithPartialExpiration&& other);
 
     std::pair<const RecordId&, const Date_t&> getPartialMarker() const {
         return {_lastHighestRecordId, _lastHighestWallTime};

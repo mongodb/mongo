@@ -201,11 +201,8 @@ WiredTigerRecordStore::OplogTruncateMarkers::OplogTruncateMarkers(
     Microseconds totalTimeSpentBuilding,
     CollectionTruncateMarkers::MarkersCreationMethod creationMethod,
     WiredTigerRecordStore* rs)
-    : CollectionTruncateMarkers(std::move(markers),
-                                partialMarkerRecords,
-                                partialMarkerBytes,
-                                minBytesPerMarker,
-                                /* supportsExpiringPartialMarkers */ false),
+    : CollectionTruncateMarkers(
+          std::move(markers), partialMarkerRecords, partialMarkerBytes, minBytesPerMarker),
       _rs(rs),
       _totalTimeProcessing(totalTimeSpentBuilding),
       _processBySampling(creationMethod ==

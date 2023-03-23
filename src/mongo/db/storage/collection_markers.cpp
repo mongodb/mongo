@@ -44,16 +44,12 @@ MONGO_FAIL_POINT_DEFINE(slowOplogSamplingReads);
 CollectionTruncateMarkers::CollectionTruncateMarkers(CollectionTruncateMarkers&& other) {
     stdx::lock_guard lk(other._collectionMarkersReclaimMutex);
     stdx::lock_guard lk2(other._markersMutex);
-    stdx::lock_guard lk3(other._lastHighestRecordMutex);
 
     _currentRecords.store(other._currentRecords.swap(0));
     _currentBytes.store(other._currentBytes.swap(0));
     _minBytesPerMarker = other._minBytesPerMarker;
     _markers = std::move(other._markers);
     _isDead = other._isDead;
-    _supportsExpiringPartialMarkers = other._supportsExpiringPartialMarkers;
-    _lastHighestRecordId = std::exchange(other._lastHighestRecordId, RecordId());
-    _lastHighestWallTime = std::exchange(other._lastHighestWallTime, Date_t());
 }
 
 bool CollectionTruncateMarkers::isDead() {
@@ -67,12 +63,6 @@ void CollectionTruncateMarkers::kill() {
     _reclaimCv.notify_one();
 }
 
-void CollectionTruncateMarkers::_replaceNewHighestMarkingIfNecessary(const RecordId& rId,
-                                                                     Date_t wallTime) {
-    stdx::unique_lock lk(_lastHighestRecordMutex);
-    _lastHighestRecordId = std::max(_lastHighestRecordId, rId);
-    _lastHighestWallTime = std::max(_lastHighestWallTime, wallTime);
-}
 
 void CollectionTruncateMarkers::awaitHasExcessMarkersOrDead(OperationContext* opCtx) {
     // Wait until kill() is called or there are too many collection markers.
@@ -184,14 +174,6 @@ void CollectionTruncateMarkers::updateCurrentMarkerAfterInsertOnCommit(
         invariant(bytesInserted >= 0);
         invariant(recordId.isValid());
 
-        if (collectionMarkers->_supportsExpiringPartialMarkers) {
-            // By putting the highest marker modification first we can guarantee than in the
-            // event of a race condition between expiring a partial marker the metrics increase
-            // will happen after the marker has been created. This guarantees that the metrics
-            // will eventually be correct as long as the expiration criteria checks for the
-            // metrics and the highest marker expiration.
-            collectionMarkers->_replaceNewHighestMarkingIfNecessary(recordId, wallTime);
-        }
         collectionMarkers->_currentRecords.addAndFetch(countInserted);
         int64_t newCurrentBytes = collectionMarkers->_currentBytes.addAndFetch(bytesInserted);
         if (wallTime != Date_t() && newCurrentBytes >= collectionMarkers->_minBytesPerMarker) {
@@ -495,7 +477,47 @@ CollectionTruncateMarkers::createFromExistingRecordStore(
                                                               std::move(getRecordIdAndWallTime));
 }
 
-void CollectionTruncateMarkers::createPartialMarkerIfNecessary(OperationContext* opCtx) {
+CollectionTruncateMarkersWithPartialExpiration::CollectionTruncateMarkersWithPartialExpiration(
+    CollectionTruncateMarkersWithPartialExpiration&& other)
+    : CollectionTruncateMarkers(std::move(other)) {
+    stdx::lock_guard lk3(other._lastHighestRecordMutex);
+    _lastHighestRecordId = std::exchange(other._lastHighestRecordId, RecordId());
+    _lastHighestWallTime = std::exchange(other._lastHighestWallTime, Date_t());
+}
+
+void CollectionTruncateMarkersWithPartialExpiration::updateCurrentMarkerAfterInsertOnCommit(
+    OperationContext* opCtx,
+    int64_t bytesInserted,
+    const RecordId& highestInsertedRecordId,
+    Date_t wallTime,
+    int64_t countInserted) {
+    opCtx->recoveryUnit()->onCommit([collectionMarkers = this,
+                                     bytesInserted,
+                                     recordId = highestInsertedRecordId,
+                                     wallTime,
+                                     countInserted](OperationContext* opCtx, auto) {
+        invariant(bytesInserted >= 0);
+        invariant(recordId.isValid());
+
+        // By putting the highest marker modification first we can guarantee than in the
+        // event of a race condition between expiring a partial marker the metrics increase
+        // will happen after the marker has been created. This guarantees that the metrics
+        // will eventually be correct as long as the expiration criteria checks for the
+        // metrics and the highest marker expiration.
+        collectionMarkers->_replaceNewHighestMarkingIfNecessary(recordId, wallTime);
+        collectionMarkers->_currentRecords.addAndFetch(countInserted);
+        int64_t newCurrentBytes = collectionMarkers->_currentBytes.addAndFetch(bytesInserted);
+        if (wallTime != Date_t() && newCurrentBytes >= collectionMarkers->_minBytesPerMarker) {
+            // When other transactions commit concurrently, an uninitialized wallTime may delay
+            // the creation of a new marker. This delay is limited to the number of concurrently
+            // running transactions, so the size difference should be inconsequential.
+            collectionMarkers->createNewMarkerIfNeeded(opCtx, recordId, wallTime);
+        }
+    });
+}
+
+void CollectionTruncateMarkersWithPartialExpiration::createPartialMarkerIfNecessary(
+    OperationContext* opCtx) {
     auto logFailedLockAcquisition = [&](const std::string& lock) {
         LOGV2_DEBUG(7393202,
                     2,
@@ -540,5 +562,12 @@ void CollectionTruncateMarkers::createPartialMarkerIfNecessary(OperationContext*
                     "numMarkers"_attr = _markers.size());
         pokeReclaimThreadIfNeeded(opCtx);
     }
+}
+
+void CollectionTruncateMarkersWithPartialExpiration::_replaceNewHighestMarkingIfNecessary(
+    const RecordId& rId, Date_t wallTime) {
+    stdx::unique_lock lk(_lastHighestRecordMutex);
+    _lastHighestRecordId = std::max(_lastHighestRecordId, rId);
+    _lastHighestWallTime = std::max(_lastHighestWallTime, wallTime);
 }
 }  // namespace mongo

@@ -37,14 +37,8 @@ ChangeCollectionTruncateMarkers::ChangeCollectionTruncateMarkers(TenantId tenant
                                                                  int64_t leftoverRecordsCount,
                                                                  int64_t leftoverRecordsBytes,
                                                                  int64_t minBytesPerMarker)
-    : CollectionTruncateMarkers(
-          std::move(markers),
-          leftoverRecordsCount,
-          leftoverRecordsBytes,
-          minBytesPerMarker,
-          /* We enable partial marker support as we need to know the last
-             recordId inserted. Otherwise we risk fully emptying the collection */
-          true),
+    : CollectionTruncateMarkersWithPartialExpiration(
+          std::move(markers), leftoverRecordsCount, leftoverRecordsBytes, minBytesPerMarker),
       _tenantId(std::move(tenantId)) {}
 
 bool ChangeCollectionTruncateMarkers::_hasExcessMarkers(OperationContext* opCtx) const {

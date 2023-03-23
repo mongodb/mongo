@@ -35,7 +35,7 @@
  * Implementation of truncate markers for the pre-images collection.
  */
 namespace mongo {
-class PreImagesTruncateMarkers final : public CollectionTruncateMarkers {
+class PreImagesTruncateMarkers final : public CollectionTruncateMarkersWithPartialExpiration {
 public:
     PreImagesTruncateMarkers(boost::optional<TenantId> tenantId,
                              std::deque<Marker> markers,
