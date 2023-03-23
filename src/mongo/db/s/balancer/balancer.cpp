@@ -472,19 +472,19 @@ void Balancer::_consumeActionStreamLoop() {
     };
 
     // Lambda function to sleep for throttling
-    auto applyThrottling = [lastActionTime = Date_t::fromMillisSinceEpoch(0)]() mutable {
-        const Milliseconds throttle{chunkDefragmentationThrottlingMS.load()};
-        auto timeSinceLastAction = Date_t::now() - lastActionTime;
-        if (throttle > timeSinceLastAction) {
-            auto sleepingTime = throttle - timeSinceLastAction;
-            LOGV2_DEBUG(6443700,
-                        2,
-                        "Applying throttling on balancer secondary thread",
-                        "sleepingTime"_attr = sleepingTime);
-            sleepFor(sleepingTime);
-        }
-        lastActionTime = Date_t::now();
-    };
+    auto applyThrottling =
+        [lastActionTime = Date_t::fromMillisSinceEpoch(0)](const Milliseconds throttle) mutable {
+            auto timeSinceLastAction = Date_t::now() - lastActionTime;
+            if (throttle > timeSinceLastAction) {
+                auto sleepingTime = throttle - timeSinceLastAction;
+                LOGV2_DEBUG(6443700,
+                            2,
+                            "Applying throttling on balancer secondary thread",
+                            "sleepingTime"_attr = sleepingTime);
+                sleepFor(sleepingTime);
+            }
+            lastActionTime = Date_t::now();
+        };
 
     auto backOff = Backoff(Seconds(1), Milliseconds::max());
     bool errorOccurred = false;
@@ -538,7 +538,6 @@ void Balancer::_consumeActionStreamLoop() {
             [&]() -> std::tuple<boost::optional<BalancerStreamAction>, ActionsStreamPolicy*> {
             std::shuffle(activeStreams.begin(), activeStreams.end(), _random);
             for (auto stream : activeStreams) {
-
                 try {
                     auto action = stream->getNextStreamingAction(opCtx.get());
                     if (action.has_value()) {
@@ -568,7 +567,7 @@ void Balancer::_consumeActionStreamLoop() {
         stdx::visit(
             OverloadedVisitor{
                 [&, stream = sourcedStream](MergeInfo&& mergeAction) {
-                    applyThrottling();
+                    applyThrottling(Milliseconds(chunkDefragmentationThrottlingMS.load()));
                     auto result =
                         _commandScheduler
                             ->requestMergeChunks(opCtx.get(),
@@ -606,7 +605,7 @@ void Balancer::_consumeActionStreamLoop() {
                 },
                 [&, stream = sourcedStream](MergeAllChunksOnShardInfo&& mergeAllChunksAction) {
                     if (mergeAllChunksAction.applyThrottling) {
-                        applyThrottling();
+                        applyThrottling(Milliseconds(autoMergerThrottlingMS.load()));
                     }
 
                     auto result =

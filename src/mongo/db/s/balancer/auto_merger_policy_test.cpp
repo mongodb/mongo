@@ -360,6 +360,7 @@ TEST_F(AutoMergerPolicyTest, MergeActionRescheduledWhenMergeHappened) {
 
     _automerger.enable();
 
+    // ------ FIRST ROUND
     // Auto-merger returns action for <shard0, test.coll> because there are mergeable chunks
     auto optAction = _automerger.getNextStreamingAction(operationContext());
     ASSERT(optAction.has_value());
@@ -368,15 +369,6 @@ TEST_F(AutoMergerPolicyTest, MergeActionRescheduledWhenMergeHappened) {
     ASSERT_EQ(action.shardId, _shard0);
     _automerger.applyActionResult(
         operationContext(), action, BalancerStreamActionResponse(StatusWith<NumMergedChunks>(10)));
-
-    // Auto-merger returns action for <shard0, test.coll> because some chunks were previously merged
-    optAction = _automerger.getNextStreamingAction(operationContext());
-    ASSERT(optAction.has_value());
-    action = stdx::get<MergeAllChunksOnShardInfo>(*optAction);
-    ASSERT_EQ(action.nss, nss);
-    ASSERT_EQ(action.shardId, _shard0);
-    _automerger.applyActionResult(
-        operationContext(), action, BalancerStreamActionResponse(StatusWith<NumMergedChunks>(0)));
 
     // Auto-merger returns action for <shard1, test.coll> because there are mergeable chunks
     optAction = _automerger.getNextStreamingAction(operationContext());
@@ -387,6 +379,16 @@ TEST_F(AutoMergerPolicyTest, MergeActionRescheduledWhenMergeHappened) {
     _automerger.applyActionResult(
         operationContext(), action, BalancerStreamActionResponse(StatusWith<NumMergedChunks>(10)));
 
+    // ------ SECOND ROUND
+    // Auto-merger returns action for <shard0, test.coll> because some chunks were previously merged
+    optAction = _automerger.getNextStreamingAction(operationContext());
+    ASSERT(optAction.has_value());
+    action = stdx::get<MergeAllChunksOnShardInfo>(*optAction);
+    ASSERT_EQ(action.nss, nss);
+    ASSERT_EQ(action.shardId, _shard0);
+    _automerger.applyActionResult(
+        operationContext(), action, BalancerStreamActionResponse(StatusWith<NumMergedChunks>(0)));
+
     // Auto-merger returns action for <shard1, test.coll> because some chunks were previously merged
     optAction = _automerger.getNextStreamingAction(operationContext());
     ASSERT(optAction.has_value());
@@ -396,6 +398,7 @@ TEST_F(AutoMergerPolicyTest, MergeActionRescheduledWhenMergeHappened) {
     _automerger.applyActionResult(
         operationContext(), action, BalancerStreamActionResponse(StatusWith<NumMergedChunks>(0)));
 
+    // ------ THIRD ROUND
     // Auto-merger not returns any action because no chunks were previously merged
     optAction = _automerger.getNextStreamingAction(operationContext());
     ASSERT(!optAction.has_value());
@@ -420,6 +423,9 @@ TEST_F(AutoMergerPolicyTest, MergeActionRescheduledUponConflictingOperationInPro
         operationContext(),
         action,
         BalancerStreamActionResponse(Status{ErrorCodes::ConflictingOperationInProgress, "err"}));
+
+    // Discard merge scheduled for shard1
+    _automerger.getNextStreamingAction(operationContext());
 
     // Auto-merger returns action for <shard0, test.coll> upon ConflictingOperationInProgress
     optAction = _automerger.getNextStreamingAction(operationContext());

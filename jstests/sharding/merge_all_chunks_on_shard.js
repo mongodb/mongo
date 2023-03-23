@@ -73,27 +73,24 @@ function resetHistoryWindowInSecs(st) {
     });
 }
 
-let defaultChunkDefragmentationThrottlingMS = null;
+let defaultAutoMergerThrottlingMS = null;
 function setBalancerMergeThrottling(st, valueInMS) {
     st.forEachConfigServer((conn) => {
-        const res =
-            conn.adminCommand({setParameter: 1, chunkDefragmentationThrottlingMS: valueInMS});
+        const res = conn.adminCommand({setParameter: 1, autoMergerThrottlingMS: valueInMS});
         assert.commandWorked(res);
-        defaultChunkDefragmentationThrottlingMS = res.was;
+        defaultAutoMergerThrottlingMS = res.was;
     });
 }
 
 function resetBalancerMergeThrottling(st) {
-    if (!defaultChunkDefragmentationThrottlingMS) {
+    if (!defaultAutoMergerThrottlingMS) {
         // Default throttling param was never changed, hence no need to reset it
         return;
     }
 
     st.forEachConfigServer((conn) => {
-        assert.commandWorked(conn.adminCommand({
-            setParameter: 1,
-            chunkDefragmentationThrottlingMS: defaultChunkDefragmentationThrottlingMS
-        }));
+        assert.commandWorked(conn.adminCommand(
+            {setParameter: 1, autoMergerThrottlingMS: defaultAutoMergerThrottlingMS}));
     });
 }
 

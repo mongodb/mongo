@@ -108,22 +108,31 @@ boost::optional<BalancerStreamAction> AutoMergerPolicy::getNextStreamingAction(
         return boost::none;
     }
 
-    // Get next <shardId, collection> pair to merge
-    for (auto it = _collectionsToMergePerShard.begin(); it != _collectionsToMergePerShard.end();) {
-        auto& [shardId, collections] = *it;
-        if (collections.empty()) {
-            it = _collectionsToMergePerShard.erase(it);
-            applyThrottling = true;
-            continue;
+    while (!_collectionsToMergePerShard.empty() ||
+           !_rescheduledCollectionsToMergePerShard.empty()) {
+
+        if (_collectionsToMergePerShard.empty()) {
+            std::swap(_rescheduledCollectionsToMergePerShard, _collectionsToMergePerShard);
         }
 
-        auto mergeAction = MergeAllChunksOnShardInfo{shardId, collections.back()};
-        mergeAction.applyThrottling = applyThrottling;
+        // Get next <shardId, collection> pair to merge
+        for (auto it = _collectionsToMergePerShard.begin();
+             it != _collectionsToMergePerShard.end();) {
+            auto& [shardId, collections] = *it;
+            if (collections.empty()) {
+                it = _collectionsToMergePerShard.erase(it);
+                applyThrottling = true;
+                continue;
+            }
 
-        collections.pop_back();
-        ++_outstandingActions;
+            auto mergeAction = MergeAllChunksOnShardInfo{shardId, collections.back()};
+            mergeAction.applyThrottling = applyThrottling;
 
-        return boost::optional<BalancerStreamAction>(mergeAction);
+            collections.pop_back();
+            ++_outstandingActions;
+
+            return boost::optional<BalancerStreamAction>(mergeAction);
+        }
     }
 
     return boost::none;
@@ -151,14 +160,14 @@ void AutoMergerPolicy::applyActionResult(OperationContext* opCtx,
         auto numMergedChunks = swResponse.getValue();
         if (numMergedChunks > 0) {
             // Reschedule auto-merge for <shard, nss> until no merge has been performed
-            _collectionsToMergePerShard[mergeAction.shardId].push_back(mergeAction.nss);
+            _rescheduledCollectionsToMergePerShard[mergeAction.shardId].push_back(mergeAction.nss);
         }
     } catch (std::exception&) {
         // Parsing of StatusWith<NumMergedChunks> failed, meaning we need to parse a status
         const auto& status = stdx::get<Status>(response);
         if (status.code() == ErrorCodes::ConflictingOperationInProgress) {
             // Reschedule auto-merge for <shard, nss> because commit overlapped with other chunk ops
-            _collectionsToMergePerShard[mergeAction.shardId].push_back(mergeAction.nss);
+            _rescheduledCollectionsToMergePerShard[mergeAction.shardId].push_back(mergeAction.nss);
         } else {
             // Reset the history window to consider during next round because chunk merges may have
             // been potentially missed due to an unexpected error

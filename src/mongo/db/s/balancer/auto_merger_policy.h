@@ -34,6 +34,16 @@
 
 namespace mongo {
 
+/*
+ * When the auto-merger is enabled, it works as follows:
+ * - Identify all the <shard, collection uuid> pairs for which there are mergeable chunks.
+ * - While auto-merge is possible:
+ * --- For each shard:
+ * ----- For each namespace
+ * ------- Schedule a mergeAllChunksOnShard command (max 1000 chunks per time)
+ * ----- Apply throttling of `defaultAutoMergerThrottlingMS`
+ * - Sleep for `autoMergerIntervalSecs`
+ */
 class AutoMergerPolicy : public ActionsStreamPolicy {
 
 public:
@@ -89,7 +99,13 @@ private:
     Timestamp _maxHistoryTimePreviousRound{0, 0};
     uint32_t _outstandingActions = 0;
 
+    // Map initially populated by querying `config.chunks` and - during an auto-merge window -
+    // potentially repopulated with the content of _rescheduledCollectionsToMergePerShard.
     std::map<ShardId, std::vector<NamespaceString>> _collectionsToMergePerShard;
+
+    // When a merge succeeds and some chunks were merged, the action gets rescheduled.
+    // When a merge succeeds with no merged chunks, the action does not get rescheduled.
+    std::map<ShardId, std::vector<NamespaceString>> _rescheduledCollectionsToMergePerShard;
 
     friend class AutoMergerPolicyTest;
 };

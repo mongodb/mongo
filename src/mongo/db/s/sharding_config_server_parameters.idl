@@ -52,4 +52,14 @@ server_parameters:
         set_at: [startup, runtime]
         cpp_vartype: int
         cpp_varname: autoMergerIntervalSecs
-        default: 86400 # 24 hours
+        default: 3600 # 1 hour
+
+    autoMergerThrottlingMS:
+        description: >-
+            The minimum amount of time between two consecutive auto-merge commands for the same collection.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int32_t>
+        cpp_varname: autoMergerThrottlingMS
+        validator:
+          gte: 0
+        default: 15000 # 15 seconds
