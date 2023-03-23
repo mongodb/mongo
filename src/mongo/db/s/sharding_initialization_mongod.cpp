@@ -378,16 +378,18 @@ bool ShardingInitializationMongoD::initializeShardingAwarenessIfNeeded(Operation
 
     if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
         if (!foundShardIdentity) {
-            LOGV2_WARNING(22074,
-                          "Started with --shardsvr, but no shardIdentity document was found on "
-                          "disk in {namespace}. This most "
-                          "likely means this server has not yet been added to a "
-                          "sharded cluster.",
-                          "Started with --shardsvr, but no shardIdentity document was found on "
-                          "disk. This most likely means this server has not yet been added to a "
-                          "sharded cluster",
-                          "namespace"_attr = NamespaceString::kServerConfigurationNamespace);
-
+            if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+                LOGV2_WARNING(7445900,
+                              "Started with ShardServer role, but no shardIdentity document was "
+                              "found on disk.",
+                              "namespace"_attr = NamespaceString::kServerConfigurationNamespace);
+            } else {
+                LOGV2_WARNING(22074,
+                              "Started with ShardServer role, but no shardIdentity document was "
+                              "found on disk. This most likely means this server has not yet been "
+                              "added to a sharded cluster.",
+                              "namespace"_attr = NamespaceString::kServerConfigurationNamespace);
+            }
             return false;
         }
 
