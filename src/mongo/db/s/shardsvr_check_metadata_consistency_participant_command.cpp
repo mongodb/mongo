@@ -86,38 +86,32 @@ public:
                 repl::ReadConcernLevel::kMajorityReadConcern,
                 BSON(CollectionType::kNssFieldName << 1) /*sort*/);
 
-            const auto localCollectionsSorted = [&] {
-                std::vector<CollectionPtr> colls;
-
-                // Get the list of local collections sorted by namespace
+            auto inconsistencies = [&] {
                 AutoGetDbForReadMaybeLockFree lockFreeReadBlock(opCtx, nss.dbName());
                 tassert(7466700, "Lock-free mode not avaialable", opCtx->isLockFreeReadsOp());
                 // Take a snapshot of the catalog;
                 auto collectionCatalog = CollectionCatalog::get(opCtx);
+
+                std::vector<CollectionPtr> localCollections;
+                // Get the list of local collections sorted by namespace
                 for (auto it = collectionCatalog->begin(opCtx, nss.dbName());
                      it != collectionCatalog->end(opCtx);
                      ++it) {
                     if (!(*it)->ns().isNormalCollection()) {
                         continue;
                     }
-                    colls.emplace_back(CollectionPtr(*it));
+                    localCollections.emplace_back(CollectionPtr(*it));
                 }
-                std::sort(colls.begin(),
-                          colls.end(),
+                std::sort(localCollections.begin(),
+                          localCollections.end(),
                           [](const CollectionPtr& prev, const CollectionPtr& next) {
                               return prev->ns() < next->ns();
                           });
-                return colls;
-            }();
 
-            // Check consistency between local metadata and configsvr metadata
-            auto inconsistencies =
-                metadata_consistency_util::checkCollectionMetadataInconsistencies(
-                    opCtx,
-                    shardId,
-                    primaryShardId,
-                    catalogClientCollections,
-                    localCollectionsSorted);
+                // Check consistency between local metadata and configsvr metadata
+                return metadata_consistency_util::checkCollectionMetadataInconsistencies(
+                    opCtx, shardId, primaryShardId, catalogClientCollections, localCollections);
+            }();
 
             auto exec = metadata_consistency_util::makeQueuedPlanExecutor(
                 opCtx, std::move(inconsistencies), nss);
