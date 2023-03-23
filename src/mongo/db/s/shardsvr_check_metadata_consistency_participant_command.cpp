@@ -87,15 +87,20 @@ public:
                 BSON(CollectionType::kNssFieldName << 1) /*sort*/);
 
             auto inconsistencies = [&] {
-                AutoGetDbForReadMaybeLockFree lockFreeReadBlock(opCtx, nss.dbName());
-                tassert(7466700, "Lock-free mode not avaialable", opCtx->isLockFreeReadsOp());
-                // Take a snapshot of the catalog;
-                auto collectionCatalog = CollectionCatalog::get(opCtx);
+                auto collCatalogSnapshot = [&] {
+                    // Lock db in mode IS while taking the collection catalog snapshot to ensure
+                    // that we serialize with non-atomic collection and index creation performed by
+                    // the MigrationDestinationManager.
+                    // Without this lock we could potentially acquire a snapshot in which a
+                    // collection have been already created by the MigrationDestinationManager but
+                    // the relative shardkey index is still missing.
+                    AutoGetDb autoDb(opCtx, nss.dbName(), MODE_IS);
+                    return CollectionCatalog::get(opCtx);
+                }();
 
                 std::vector<CollectionPtr> localCollections;
-                // Get the list of local collections sorted by namespace
-                for (auto it = collectionCatalog->begin(opCtx, nss.dbName());
-                     it != collectionCatalog->end(opCtx);
+                for (auto it = collCatalogSnapshot->begin(opCtx, nss.dbName());
+                     it != collCatalogSnapshot->end(opCtx);
                      ++it) {
                     if (!(*it)->ns().isNormalCollection()) {
                         continue;

@@ -39,6 +39,8 @@ enums:
         values:
             kUUIDMismatch: "UUIDMismatch"
             kHiddenUnshardedCollection: "HiddenUnshardedCollection"
+            kMissingShardKeyIndex: "MissingShardKeyIndex"
+            kLastShardKeyIndexMultiKey: "LastShardKeyIndexMultiKey"
     
     MetadataConsistencyCommandLevel:
         description: "Level mode of the metadata consistency command."
