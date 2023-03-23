@@ -251,13 +251,13 @@ Status waitForShardRegistryReload(OperationContext* opCtx) {
     return {ErrorCodes::ShutdownInProgress, "aborting shard loading attempt"};
 }
 
-Status preCacheMongosRoutingInfo(OperationContext* opCtx) {
+void preCacheMongosRoutingInfo(OperationContext* opCtx) {
     if (!gLoadRoutingTableOnStartup) {
-        return Status::OK();
+        return;
     }
 
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-        return Status::OK();
+        return;
     }
 
     auto grid = Grid::get(opCtx);
@@ -270,11 +270,13 @@ Status preCacheMongosRoutingInfo(OperationContext* opCtx) {
                  opCtx, db.getName(), repl::ReadConcernLevel::kMajorityReadConcern)) {
             auto resp = catalogCache->getShardedCollectionRoutingInfoWithRefresh(opCtx, coll);
             if (!resp.isOK()) {
-                return resp.getStatus();
+                LOGV2_WARNING(6203600,
+                              "Failed to warmup collection routing information",
+                              "namespace"_attr = coll,
+                              "error"_attr = redact(resp.getStatus()));
             }
         }
     }
-    return Status::OK();
 }
 
 Status preWarmConnectionPool(OperationContext* opCtx) {

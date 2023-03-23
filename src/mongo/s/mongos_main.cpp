@@ -462,9 +462,12 @@ Status initializeSharding(OperationContext* opCtx) {
         return status;
     }
 
-    status = preCacheMongosRoutingInfo(opCtx);
-    if (!status.isOK()) {
-        return status;
+    // Loading of routing information may fail. Since this is just an optimization (warmup), any
+    // failure must not prevent mongos from starting.
+    try {
+        preCacheMongosRoutingInfo(opCtx);
+    } catch (const DBException& ex) {
+        LOGV2_WARNING(6203601, "Failed to warmup routing information", "error"_attr = redact(ex));
     }
 
     status = preWarmConnectionPool(opCtx);
