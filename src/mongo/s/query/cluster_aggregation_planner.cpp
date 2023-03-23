@@ -402,6 +402,9 @@ DispatchShardPipelineResults dispatchExchangeConsumerPipeline(
     const NamespaceString& executionNss,
     Document serializedCommand,
     DispatchShardPipelineResults* shardDispatchResults) {
+    tassert(7163600,
+            "dispatchExchangeConsumerPipeline() must not be called for explain operation",
+            !expCtx->explain);
     auto opCtx = expCtx->opCtx;
 
     if (MONGO_unlikely(shardedAggregateFailToDispatchExchangeConsumerPipeline.shouldFail())) {
@@ -438,7 +441,8 @@ DispatchShardPipelineResults dispatchExchangeConsumerPipeline(
                                                                 serializedCommand,
                                                                 consumerPipelines.back(),
                                                                 boost::none, /* exchangeSpec */
-                                                                false /* needsMerge */);
+                                                                false /* needsMerge */,
+                                                                boost::none /* explain */);
 
         requests.emplace_back(shardDispatchResults->exchangeSpec->consumerShards[idx],
                               consumerCmdObj);
@@ -708,7 +712,8 @@ Status dispatchPipelineAndMerge(OperationContext* opCtx,
                                                    hasChangeStream,
                                                    startsWithDocuments,
                                                    eligibleForSampling,
-                                                   std::move(targeter.pipeline));
+                                                   std::move(targeter.pipeline),
+                                                   expCtx->explain);
 
     // If the operation is an explain, then we verify that it succeeded on all targeted
     // shards, write the results to the output builder, and return immediately.

@@ -301,11 +301,11 @@ public:
     }
 
     /**
-     * Returns true if the pipeline is eligible for query sampling. That is, it is not an explain
-     * and either it is not nested or it is nested inside $lookup, $graphLookup and $unionWith.
+     * Returns true if the pipeline is eligible for query sampling for the purpose of shard key
+     * selection metrics.
      */
     bool eligibleForSampling() const {
-        return !explain && (subPipelineDepth == 0 || inLookup || inUnionWith);
+        return !explain;
     }
 
     void setResolvedNamespaces(StringMap<ResolvedNamespace> resolvedNamespaces) {

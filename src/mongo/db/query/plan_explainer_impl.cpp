@@ -689,6 +689,9 @@ void PlanExplainerImpl::getSummaryStats(PlanSummaryStats* statsOut) const {
 
     statsOut->totalKeysExamined = 0;
     statsOut->totalDocsExamined = 0;
+    statsOut->indexesUsed.clear();
+    statsOut->collectionScans = 0;
+    statsOut->collectionScansNonTailable = 0;
 
     for (size_t i = 0; i < stages.size(); i++) {
         statsOut->totalKeysExamined +=
