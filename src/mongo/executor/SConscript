@@ -310,6 +310,7 @@ env.Library(
     target='task_executor_cursor',
     source=[
         'task_executor_cursor.cpp',
+        'task_executor_cursor_parameters.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/command_request_response',
