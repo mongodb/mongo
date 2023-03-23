@@ -40,7 +40,9 @@ public:
                      CEType /*bindsResult*/,
                      CEType /*refsResult*/) {
         CEType result = childResult;
-        for (const auto& [key, req] : node.getReqMap().conjuncts()) {
+        // TODO SERVER-74540: Handle top-level disjunction.
+        PSRExpr::visitDNF(node.getReqMap().getRoot(), [&](const PartialSchemaEntry& e) {
+            const auto& [key, req] = e;
             if (!isIntervalReqFullyOpenDNF(req.getIntervals())) {
                 auto it = _hints.find(key);
                 if (it != _hints.cend()) {
@@ -48,7 +50,7 @@ public:
                     result *= it->second;
                 }
             }
-        }
+        });
 
         return result;
     }

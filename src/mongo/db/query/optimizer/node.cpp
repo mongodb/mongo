@@ -410,6 +410,10 @@ SargableNode::SargableNode(PartialSchemaRequirements reqMap,
             _reqMap.numLeaves() <= kMaxPartialSchemaReqs);
 
     auto bindings = createSargableBindings(_reqMap);
+    tassert(7410100,
+            "SargableNode with top-level OR cannot bind",
+            bindings.empty() || PSRExpr::isSingletonDisjunction(_reqMap.getRoot()));
+
     ProjectionNameSet boundsProjectionNameSet(bindings.begin(), bindings.end());
 
     // Assert there are no perf-only binding requirements, references to internally bound

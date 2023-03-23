@@ -308,11 +308,13 @@ public:
         }
 
         // Initial first pass through the requirements map to extract information about each path.
+        // TODO SERVER-74540: Handle top-level disjunction.
         std::map<std::string, SargableConjunct> conjunctRequirements;
-        for (const auto& [key, req] : node.getReqMap().conjuncts()) {
+        PSRExpr::visitDNF(node.getReqMap().getRoot(), [&](const PartialSchemaEntry& e) {
+            const auto& [key, req] = e;
             if (req.getIsPerfOnly()) {
                 // Ignore perf-only requirements.
-                continue;
+                return;
             }
 
             const auto serializedPath = serializePath(key._path.ref());
@@ -333,7 +335,7 @@ public:
                     // We will need to estimate this interval.
                     conjunctReq.intervals.push_back(interval);
                 }
-                continue;
+                return;
             }
 
             // Get histogram from statistics if it exists, or null if not.
@@ -346,7 +348,7 @@ public:
                 sc.intervals.push_back(interval);
             }
             conjunctRequirements.emplace(serializedPath, std::move(sc));
-        }
+        });
 
         std::vector<SelectivityType> topLevelSelectivities;
         for (const auto& [serializedPath, conjunctReq] : conjunctRequirements) {

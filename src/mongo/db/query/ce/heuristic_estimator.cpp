@@ -223,10 +223,13 @@ public:
 
         SelectivityType topLevelSel{1.0};
         std::vector<SelectivityType> topLevelSelectivities;
-        for (const auto& [key, req] : node.getReqMap().conjuncts()) {
+
+        // TODO SERVER-74540: Handle top-level disjunction.
+        PSRExpr::visitDNF(node.getReqMap().getRoot(), [&](const PartialSchemaEntry& e) {
+            const auto& [key, req] = e;
             if (req.getIsPerfOnly()) {
                 // Ignore perf-only requirements.
-                continue;
+                return;
             }
 
             SelectivityType disjSel{1.0};
@@ -248,7 +251,7 @@ public:
             }
             disjSel = disjExponentialBackoff(std::move(disjSelectivities));
             topLevelSelectivities.push_back(disjSel);
-        }
+        });
 
         if (topLevelSelectivities.empty()) {
             return {1.0};

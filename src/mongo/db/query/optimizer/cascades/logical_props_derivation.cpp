@@ -102,34 +102,44 @@ static void populateDistributionPaths(const PartialSchemaRequirements& req,
  * Check that every predicate in 'reqMap' is either an equality predicate, or fully open.
  */
 static bool computeEqPredsOnly(const PartialSchemaRequirements& reqMap) {
-    PartialSchemaKeySet equalityKeys;
-    PartialSchemaKeySet fullyOpenKeys;
+    bool eqPredsOnly = true;
+    PSRExpr::visitDisjuncts(reqMap.getRoot(), [&](const PSRExpr::Node& child, const size_t) {
+        PartialSchemaKeySet equalityKeys;
+        PartialSchemaKeySet fullyOpenKeys;
 
-    for (const auto& [key, req] : reqMap.conjuncts()) {
-        const auto& intervals = req.getIntervals();
-        if (auto singularInterval = IntervalReqExpr::getSingularDNF(intervals)) {
-            if (singularInterval->isFullyOpen()) {
-                fullyOpenKeys.insert(key);
-            } else if (singularInterval->isEquality()) {
-                equalityKeys.insert(key);
-            } else {
-                // Encountered a non-equality and not-fully-open interval.
-                return false;
+        PSRExpr::visitConjuncts(child, [&](const PSRExpr::Node& atom, const size_t) {
+            PSRExpr::visitAtom(atom, [&](const PartialSchemaEntry& e) {
+                if (!eqPredsOnly) {
+                    return;
+                }
+
+                const auto& [key, req] = e;
+                const auto& intervals = req.getIntervals();
+                if (auto singularInterval = IntervalReqExpr::getSingularDNF(intervals)) {
+                    if (singularInterval->isFullyOpen()) {
+                        fullyOpenKeys.insert(key);
+                    } else if (singularInterval->isEquality()) {
+                        equalityKeys.insert(key);
+                    } else {
+                        // Encountered a non-equality and not-fully-open interval.
+                        eqPredsOnly = false;
+                    }
+                } else {
+                    // Encountered a non-trivial interval.
+                    eqPredsOnly = false;
+                }
+            });
+        });
+
+        for (const auto& key : fullyOpenKeys) {
+            if (equalityKeys.count(key) == 0) {
+                // No possible match for fully open requirement.
+                eqPredsOnly = false;
             }
-        } else {
-            // Encountered a non-trivial interval.
-            return false;
         }
-    }
+    });
 
-    for (const auto& key : fullyOpenKeys) {
-        if (equalityKeys.count(key) == 0) {
-            // No possible match for fully open requirement.
-            return false;
-        }
-    }
-
-    return true;
+    return eqPredsOnly;
 }
 
 class DeriveLogicalProperties {

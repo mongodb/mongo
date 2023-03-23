@@ -32,6 +32,7 @@
 #include "mongo/db/query/optimizer/cascades/rewriter_rules.h"
 #include "mongo/db/query/optimizer/props.h"
 #include "mongo/db/query/optimizer/reference_tracker.h"
+#include "mongo/db/query/optimizer/utils/ce_math.h"
 #include "mongo/db/query/optimizer/utils/interval_utils.h"
 #include "mongo/db/query/optimizer/utils/memo_utils.h"
 #include "mongo/db/query/optimizer/utils/reftracker_utils.h"
@@ -531,13 +532,35 @@ public:
                     // Compute the selectivity of the indexed requirements by excluding reqs tracked
                     // in 'residIndexes'.
                     if (scanGroupCE > 0.0) {
-                        for (size_t entryIndex = 0; entryIndex < reqMap.numLeaves(); entryIndex++) {
-                            if (residIndexes.count(entryIndex) == 0) {
-                                const SelectivityType sel =
-                                    partialSchemaKeyCE.at(entryIndex).second / scanGroupCE;
-                                indexPredSels.push_back(sel);
-                                indexPredSelMap.emplace(entryIndex, sel);
-                            }
+                        size_t entryIndex = 0;
+                        std::vector<SelectivityType> atomSels;
+                        std::vector<SelectivityType> conjuctionSels;
+                        PSRExpr::visitDisjuncts(
+                            reqMap.getRoot(), [&](const PSRExpr::Node& child, const size_t) {
+                                atomSels.clear();
+
+                                PSRExpr::visitConjuncts(
+                                    child, [&](const PSRExpr::Node& atom, const size_t) {
+                                        PSRExpr::visitAtom(
+                                            atom, [&](const PartialSchemaEntry& entry) {
+                                                if (residIndexes.count(entryIndex) == 0) {
+                                                    const SelectivityType sel =
+                                                        partialSchemaKeyCE.at(entryIndex).second /
+                                                        scanGroupCE;
+                                                    atomSels.push_back(sel);
+                                                    indexPredSelMap.emplace(entryIndex, sel);
+                                                }
+                                                entryIndex++;
+                                            });
+                                    });
+
+                                if (!atomSels.empty()) {
+                                    conjuctionSels.push_back(ce::conjExponentialBackoff(atomSels));
+                                }
+                            });
+
+                        if (!conjuctionSels.empty()) {
+                            indexPredSels.push_back(ce::disjExponentialBackoff(conjuctionSels));
                         }
                     }
                 }

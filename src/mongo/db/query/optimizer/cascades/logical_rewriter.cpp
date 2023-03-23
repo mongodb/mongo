@@ -1288,6 +1288,11 @@ struct ExploreConvert<SargableNode> {
             return;
         }
 
+        // SERVER-69026: Support "splitting" a top-level disjunction for index ORing.
+        if (!PSRExpr::isSingletonDisjunction(sargableNode.getReqMap().getRoot())) {
+            return;
+        }
+
         const std::string& scanDefName = indexingAvailability.getScanDefName();
         const ScanDefinition& scanDef = ctx.getMetadata()._scanDefs.at(scanDefName);
         if (scanDef.getIndexDefs().empty()) {

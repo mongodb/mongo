@@ -910,11 +910,11 @@ bool isSubsetOfPartialSchemaReq(const PartialSchemaRequirements& lhs,
     // However, we're assuming that 'rhs' has no projections.
     // If it did have projections, the result (lhs ^ rhs) would have projections
     // and wouldn't match 'lhs'.
-    for (const auto& [key, req] : rhs.conjuncts()) {
+    PSRExpr::visitAnyShape(rhs.getRoot(), [](const PartialSchemaEntry& e) {
         tassert(7155010,
                 "isSubsetOfPartialSchemaReq expects 'rhs' to have no projections",
-                !req.getBoundProjectionName());
-    }
+                !e.second.getBoundProjectionName());
+    });
 
     PartialSchemaRequirements intersection = lhs;
     const bool success = intersectPartialSchemaReq(intersection, rhs);
@@ -935,6 +935,12 @@ bool isSubsetOfPartialSchemaReq(const PartialSchemaRequirements& lhs,
 
 bool intersectPartialSchemaReq(PartialSchemaRequirements& target,
                                const PartialSchemaRequirements& source) {
+    // TODO SERVER-74539 Implement intersect for top-level disjunctions.
+    if (!PSRExpr::isSingletonDisjunction(target.getRoot()) ||
+        !PSRExpr::isSingletonDisjunction(source.getRoot())) {
+        return false;
+    }
+
     for (const auto& [key, req] : source.conjuncts()) {
         if (!intersectPartialSchemaReq(target, key, req)) {
             return false;
@@ -1219,6 +1225,12 @@ CandidateIndexes computeCandidateIndexes(PrefixId& prefixId,
                                          const ScanDefinition& scanDef,
                                          const QueryHints& hints,
                                          const ConstFoldFn& constFold) {
+    // TODO SERVER-69026 or SERVER-74539: Identify candidate indexes for reqs which are not
+    // singleton disjunctions.
+    if (!PSRExpr::isSingletonDisjunction(reqMap.getRoot())) {
+        return {};
+    }
+
     // Contains one instance for each unmatched key.
     PartialSchemaKeySet unsatisfiedKeysInitial;
 
@@ -2553,12 +2565,11 @@ PhysPlanBuilder lowerEqPrefixes(PrefixId& prefixId,
 
 bool hasProperIntervals(const PartialSchemaRequirements& reqMap) {
     // Compute if this node has any proper (not fully open) intervals.
-    for (const auto& [key, req] : reqMap.conjuncts()) {
-        if (!isIntervalReqFullyOpenDNF(req.getIntervals())) {
-            return true;
-        }
-    }
-    return false;
+    bool hasProperIntervals = false;
+    PSRExpr::visitDNF(reqMap.getRoot(), [&](const PartialSchemaEntry& e) {
+        hasProperIntervals |= !isIntervalReqFullyOpenDNF(e.second.getIntervals());
+    });
+    return hasProperIntervals;
 }
 
 }  // namespace mongo::optimizer

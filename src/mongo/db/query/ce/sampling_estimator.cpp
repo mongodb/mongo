@@ -79,7 +79,9 @@ public:
         PhysPlanBuilder result{childResult};
 
         // Retain only output bindings without applying filters.
-        for (const auto& [key, req] : node.getReqMap().conjuncts()) {
+        // TODO SERVER-74540: Handle top-level disjunction.
+        PSRExpr::visitDNF(node.getReqMap().getRoot(), [&](const PartialSchemaEntry& e) {
+            const auto& [key, req] = e;
             if (const auto& boundProjName = req.getBoundProjectionName()) {
                 lowerPartialSchemaRequirement(
                     key,
@@ -89,7 +91,7 @@ public:
                     boost::none /*residualCE*/,
                     result);
             }
-        }
+        });
         std::swap(n, result._node);
     }
 
@@ -165,11 +167,13 @@ public:
         // Estimate individual requirements separately by potentially re-using cached results.
         // Here we assume that each requirement is independent.
         // TODO: consider estimating together the entire set of requirements (but caching!)
+        // TODO SERVER-74540: Handle top-level disjunction.
         CEType result = childResult;
-        for (const auto& [key, req] : node.getReqMap().conjuncts()) {
+        PSRExpr::visitDNF(node.getReqMap().getRoot(), [&](const PartialSchemaEntry& e) {
+            const auto& [key, req] = e;
             if (req.getIsPerfOnly()) {
                 // Ignore perf-only requirements.
-                continue;
+                return;
             }
 
             if (!isIntervalReqFullyOpenDNF(req.getIntervals())) {
@@ -187,7 +191,7 @@ public:
                 result = estimateFilterCE(
                     metadata, memo, logicalProps, n, std::move(lowered._node), result);
             }
-        }
+        });
 
         return result;
     }

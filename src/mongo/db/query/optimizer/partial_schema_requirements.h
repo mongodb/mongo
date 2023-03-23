@@ -52,8 +52,7 @@ class PartialSchemaRequirements {
 public:
     using Entry = std::pair<PartialSchemaKey, PartialSchemaRequirement>;
 
-    // TODO SERVER-74101: In the follow up ticket to update callsites, remove these iterator
-    // constructs.
+    // TODO SERVER-69026: Remove these iterator constructs.
     using ConstNodeVecIter = std::vector<PSRExpr::Node>::const_iterator;
     using NodeVecIter = std::vector<PSRExpr::Node>::iterator;
 
@@ -124,7 +123,7 @@ public:
 
     PartialSchemaRequirements(PSRExpr::Node requirements);
 
-    // TODO SERVER-74101: In the follow up ticket to update callsites, remove these constructors.
+    // TODO SERVER-74539: remove these contructors.
     PartialSchemaRequirements(std::vector<Entry>);
     PartialSchemaRequirements(std::initializer_list<Entry> entries)
         : PartialSchemaRequirements(std::vector<Entry>(entries)) {}
@@ -144,7 +143,7 @@ public:
 
     /**
      * Return the number of Disjunctions under a top-level Conjunction.
-     * TODO SERVER-74101 In the follow up ticket to update callsites, remove or clarify this method.
+     * TODO SERVER-69026 Remove or clarify this method.
      */
     size_t numConjuncts() const;
 
@@ -162,7 +161,7 @@ public:
     boost::optional<std::pair<size_t, PartialSchemaRequirement>> findFirstConjunct(
         const PartialSchemaKey&) const;
 
-    // TODO SERVER-74101: Remove these methods in favor of visitDis/Conjuncts().
+    // TODO SERVER-69026: Remove these methods in favor of visitDis/Conjuncts().
     Range<true> conjuncts() const {
         tassert(7453905,
                 "Expected PartialSchemaRequirement to be a singleton disjunction",
@@ -189,7 +188,7 @@ public:
 
     /**
      * Add an entry to the first AND under a top-level OR. Asserts on non-DNF requirements.
-     * TODO SERVER-74101 In the follow up ticket to update callsites, remove or clarify this method.
+     * TODO SERVER-74539, remove or clarify this method.
      */
     void add(PartialSchemaKey, PartialSchemaRequirement);
 
