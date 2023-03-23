@@ -4,8 +4,10 @@
  *
  * @tags: [
  *   requires_sharding,
- *   # The SBE plan cache was enabled by default in 6.3.
- *   requires_fcv_63,
+ *   # This test as written assumes that we will get the same plan cache key for identical plans.
+ *   # This assumption does not hold in multiversion scenarios, where the generated plan cache key
+ *   # can change across versions.
+ *   multiversion_incompatible,
  *   # This test uses the _id index
  *   expects_explicit_underscore_id_index,
  * ]
