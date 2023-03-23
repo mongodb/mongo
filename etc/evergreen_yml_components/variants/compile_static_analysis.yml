@@ -66,7 +66,6 @@ variables:
 
 
 buildvariants:
-
 - <<: *linux-x86-dynamic-compile-params
   name: &linux-x86-dynamic-compile-required linux-x86-dynamic-compile-required
   display_name: "! Linux x86 Shared Library Compile & Static Analysis"
@@ -79,6 +78,7 @@ buildvariants:
     - name: compile_test_and_package_parallel_unittest_stream_TG
     - name: compile_test_and_package_parallel_core_stream_TG
     - name: compile_test_and_package_parallel_dbtest_stream_TG
+    - name: compile_integration_and_test_parallel_stream_TG
     - name: generate_buildid_to_debug_symbols_mapping
     - name: .lint
     - name: clang_tidy_TG
@@ -90,9 +90,6 @@ buildvariants:
     - name: server_selection_json_test_TG
       distros:
       - rhel80-large
-    - name: .integration
-      distros:
-      - rhel80-medium
 
 - <<: *generic_linux_compile_params
   name: &linux-x86-dynamic-debug-compile-required linux-x86-dynamic-debug-compile-required  # TODO: replace with Sanitizer.
@@ -220,10 +217,10 @@ buildvariants:
     - name: compile_test_and_package_parallel_unittest_stream_TG
     - name: compile_test_and_package_parallel_core_stream_TG
     - name: compile_test_and_package_parallel_dbtest_stream_TG
+    - name: compile_integration_and_test_parallel_stream_TG
     - name: generate_buildid_to_debug_symbols_mapping
     - name: server_discovery_and_monitoring_json_test_TG
     - name: server_selection_json_test_TG
-    - name: .integration
 
 - <<: *linux-arm64-dynamic-compile-params
   name: &amazon-linux2-arm64-crypt-compile amazon-linux2-arm64-crypt-compile

@@ -426,6 +426,9 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-xlarge
+  - name: compile_integration_and_test_parallel_stream_TG
+    distros:
+    - rhel80-large
   - name: test_api_version_compatibility
   - name: .aggfuzzer !.multiversion !.feature_flag_guarded
   - name: .aggregation !.multiversion !.feature_flag_guarded
@@ -441,9 +444,6 @@ buildvariants:
   - name: disk_wiredtiger
   - name: .encrypt !.multiversion
   - name: idl_tests
-  - name: .integration !.multiversion
-    distros:
-    - rhel80-xlarge
   - name: jsCore
     distros:
     - rhel80-xlarge
@@ -654,6 +654,9 @@ buildvariants:
     - name: compile_test_and_package_parallel_dbtest_stream_TG
       distros:
       - rhel80-xlarge
+    - name: compile_integration_and_test_parallel_stream_TG
+      distros:
+      - rhel80-large
     - name: test_api_version_compatibility
     - name: .aggfuzzer !.multiversion !.feature_flag_guarded
     - name: .aggregation !.multiversion !.feature_flag_guarded
@@ -669,9 +672,6 @@ buildvariants:
     - name: disk_wiredtiger
     - name: .encrypt !.multiversion
     - name: idl_tests
-    - name: .integration !.multiversion
-      distros:
-      - rhel80-xlarge
     - name: jsCore
       distros:
       - rhel80-xlarge
@@ -801,6 +801,9 @@ buildvariants:
   - name: compile_build_tools_next_TG
     distros:
     - windows-vsCurrent-xlarge
+  - name: compile_integration_and_test_no_audit_parallel_stream_TG
+    distros:
+    - windows-vsCurrent-xlarge
   - name: .aggregation !.auth !.encrypt !.feature_flag_guarded
   - name: aggregation_expression_multiversion_fuzzer_gen
   - name: aggregation_expression_optimization_fuzzer_gen
@@ -814,9 +817,6 @@ buildvariants:
   - name: disk_wiredtiger
   - name: free_monitoring
   - name: initial_sync_fuzzer_gen
-  - name: .integration !.audit
-    distros:
-    - windows-vsCurrent-large
   - name: .jscore .common !.auth !.sharding
   - name: jsCore_txns_large_txns_format
   - name: json_schema
@@ -1370,6 +1370,9 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-xlarge
+  - name: compile_integration_and_test_parallel_stream_TG
+    distros:
+    - rhel80-large
   - name: test_api_version_compatibility
   - name: .aggfuzzer !.feature_flag_guarded !.no_debug_mode
   - name: .aggregation !.feature_flag_guarded !.no_debug_mode
@@ -1394,9 +1397,6 @@ buildvariants:
   - name: .encrypt !.no_debug_mode
   - name: idl_tests
   - name: initial_sync_fuzzer_gen
-  - name: .integration
-    distros:
-    - rhel80-medium
   - name: jsCore
     distros:
     - rhel80-xlarge
@@ -2250,7 +2250,9 @@ buildvariants:
   - name: external_auth_aws
   - name: external_auth_oidc
   - name: initial_sync_fuzzer_gen
-  - name: .integration !.standalone !.audit
+  - name: compile_integration_and_test_parallel_stream_TG
+    distros:
+    - rhel80-large
   - name: .jscore .common !.sbe_only
   - name: jsCore_min_batch_repeat_queries_ese_gsm
   - name: jsCore_txns_large_txns_format
@@ -2370,7 +2372,9 @@ buildvariants:
   - name: .encrypt
   - name: free_monitoring
   - name: initial_sync_fuzzer_gen
-  - name: .integration !.audit
+  - name: compile_integration_and_test_parallel_stream_TG
+    distros:
+    - rhel80-large
   - name: .jscore .common !.sbe_only
   - name: jsCore_min_batch_repeat_queries_ese_gsm
   - name: jsCore_txns_large_txns_format
@@ -2555,6 +2559,7 @@ buildvariants:
     multiversion_edition: enterprise
   tasks:
   - name: compile_test_and_package_serial_TG
+  # - name: compile_integration_and_test_parallel_stream_TG # Not passing
   # - name: test_api_version_compatibility # Not relevant for TSAN
   # - name: burn_in_tests_gen # No burn in tests needed
   - name: check_feature_flag_tags
@@ -2584,7 +2589,6 @@ buildvariants:
   # - name: .encrypt # Not passing
   # - name: idl_tests # Not relevant for TSAN
   # - name: initial_sync_fuzzer_gen # Not passing
-  # - name: .integration # Not passing
   #   distros:
   #   - rhel80-medium
   - name: jsCore
@@ -2666,6 +2670,7 @@ buildvariants:
     compile_variant: *enterprise-rhel80-debug-complete-tsan
   tasks:
   - name: compile_test_and_package_serial_TG
+  - name: compile_integration_and_test_parallel_stream_TG
   - name: .aggfuzzer !.feature_flag_guarded
   - name: .aggregation !.feature_flag_guarded
   - name: .auth
@@ -2682,9 +2687,6 @@ buildvariants:
   - name: .config_fuzzer
   - name: .encrypt
   - name: initial_sync_fuzzer_gen
-  - name: .integration
-    distros:
-    - rhel80-medium
   - name: .jscore .common !jsCore
   - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer.
   # - name: libunwind_tests # Cant be used because tsan does not use libunwind
@@ -2814,11 +2816,13 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-build
+  - name: compile_integration_and_test_parallel_stream_TG
+    distros:
+    - rhel80-large
   - name: .aggregation !.no_async !.feature_flag_guarded
   - name: sharding_auth_gen
   - name: .sharding .causally_consistent !.wo_snapshot
   - name: .concurrency .common !.kill_terminate
-  - name: .integration !.audit
   - name: .jscore .common
   - name: noPassthrough_gen
   - name: noPassthroughWithMongod_gen
@@ -2857,11 +2861,13 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-build
+  - name: compile_integration_and_test_parallel_stream_TG
+    distros:
+    - rhel80-large
   - name: .aggregation !.no_async !.feature_flag_guarded
   - name: sharding_auth_gen
   - name: .sharding .causally_consistent !.wo_snapshot
   - name: .concurrency .common !.kill_terminate
-  - name: .integration !.audit
   - name: .jscore .common
   - name: .logical_session_cache .one_sec
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
@@ -2897,11 +2903,13 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-build
+  - name: compile_integration_and_test_parallel_stream_TG
+    distros:
+    - rhel80-large
   - name: .aggregation !.no_async !.feature_flag_guarded
   - name: sharding_auth_gen
   - name: .sharding .causally_consistent !.wo_snapshot
   - name: .concurrency .common !.kill_terminate
-  - name: .integration !.audit
   - name: .jscore .common
   - name: .logical_session_cache .one_sec
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
@@ -2942,11 +2950,13 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-build
+  - name: compile_integration_and_test_parallel_stream_TG
+    distros:
+    - rhel80-large
   - name: .aggregation !.no_async !.feature_flag_guarded
   - name: sharding_auth_gen
   - name: .sharding .causally_consistent !.wo_snapshot
   - name: .concurrency .common !.kill_terminate
-  - name: .integration !.audit
   - name: .jscore .common
   - name: .logical_session_cache .one_sec
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
@@ -2987,11 +2997,13 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - rhel80-build
+  - name: compile_integration_and_test_parallel_stream_TG
+    distros:
+    - rhel80-large
   - name: .aggregation !.no_async !.feature_flag_guarded
   - name: sharding_auth_gen
   - name: .sharding .causally_consistent !.wo_snapshot
   - name: .concurrency .common !.kill_terminate
-  - name: .integration !.audit
   - name: .jscore .common
   - name: .logical_session_cache .one_sec
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
@@ -3025,6 +3037,10 @@ buildvariants:
     distros:
     - rhel80-build
     patch_only: true
+  - name: compile_integration_and_test_no_audit_parallel_stream_TG
+    distros:
+    - rhel80-large
+    patch_only: true
   - name: .aggregation !.no_async !.feature_flag_guarded
     patch_only: true
   - name: sharding_auth_gen
@@ -3032,8 +3048,6 @@ buildvariants:
   - name: .sharding .causally_consistent !.wo_snapshot
     patch_only: true
   - name: .concurrency .common !.kill_terminate
-    patch_only: true
-  - name: .integration !.audit
     patch_only: true
   - name: .jscore .common
     patch_only: true

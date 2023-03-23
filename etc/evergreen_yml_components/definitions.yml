@@ -199,6 +199,7 @@ variables:
   - func: "send scons cedar report"
   - func: "attach report"
   - func: "attach artifacts"
+  - func: "attach local resmoke invocation"
   - func: "kill processes"
   - func: "save code coverage data"
   - func: "save mongo coredumps"
@@ -3046,6 +3047,16 @@ tasks:
       targets: archive-dbtest archive-dbtest-debug
       compiling_for_test: true
 
+- name: compile_integration_test
+  tags: []
+  depends_on:
+  - name: compile_dist_test
+  commands:
+  - func: "scons compile"
+    vars:
+      targets: install-integration-tests
+      compiling_for_test: true
+
 - name: compile_visibility_test
   tags: []
   depends_on:
@@ -4831,102 +4842,76 @@ tasks:
   name: integration_tests_standalone
   tags: ["integration", "standalone"]
   depends_on:
-  - name: archive_dist_test
+  - name: compile_integration_test
   commands:
-  - command: manifest.load
-  - func: "git get project and add git tag"
-  - func: "do setup"
-  - func: "set up win mount script"
-  - func: "generate compile expansions"  # Generate compile expansions needs to be run to mount the shared scons cache.
-  - func: "apply compile expansions"
-  - func: "scons compile"
-    vars:
-      targets: install-integration-tests
-      compiling_for_test: true
-  - func: "attach scons logs"
-  - func: "send scons cedar report"
+  - *f_expansions_write
+  - *run_diskstats
+  - *monitor_process_threads
+  - *collect_system_resource_info
+  - *collect_ulimit_info
   - func: "run tests"
+    vars:
+      install_dir: build/install/bin
 
 - <<: *task_template
   name: integration_tests_standalone_audit
   tags: ["integration", "audit"]
   depends_on:
-  - name: archive_dist_test
+  - name: compile_integration_test
   commands:
-  - command: manifest.load
-  - func: "git get project and add git tag"
-  - func: "do setup"
-  - func: "set up win mount script"
-  - func: "generate compile expansions"  # Generate compile expansions needs to be run to mount the shared scons cache.
-  - func: "apply compile expansions"
-  - func: "scons compile"
-    vars:
-      targets: install-integration-tests
-      compiling_for_test: true
-  - func: "attach scons logs"
-  - func: "send scons cedar report"
+  - *f_expansions_write
+  - *run_diskstats
+  - *monitor_process_threads
+  - *collect_system_resource_info
+  - *collect_ulimit_info
   - func: "run tests"
+    vars:
+      install_dir: build/install/bin
 
 - <<: *task_template
   name: integration_tests_replset
   tags: ["integration"]
   depends_on:
-  - name: archive_dist_test
+  - name: compile_integration_test
   commands:
-  - command: manifest.load
-  - func: "git get project and add git tag"
-  - func: "do setup"
-  - func: "set up win mount script"
-  - func: "generate compile expansions"  # Generate compile expansions needs to be run to mount the shared scons cache.
-  - func: "apply compile expansions"
-  - func: "scons compile"
-    vars:
-      targets: install-integration-tests
-      compiling_for_test: true
-  - func: "attach scons logs"
-  - func: "send scons cedar report"
+  - *f_expansions_write
+  - *run_diskstats
+  - *monitor_process_threads
+  - *collect_system_resource_info
+  - *collect_ulimit_info
   - func: "run tests"
+    vars:
+      install_dir: build/install/bin
 
 - <<: *task_template
   name: integration_tests_replset_ssl_auth
   tags: ["integration"]
   depends_on:
-  - name: archive_dist_test
+  - name: compile_integration_test
   commands:
-  - command: manifest.load
-  - func: "git get project and add git tag"
-  - func: "do setup"
-  - func: "set up win mount script"
-  - func: "generate compile expansions"  # Generate compile expansions needs to be run to mount the shared scons cache.
-  - func: "apply compile expansions"
-  - func: "scons compile"
-    vars:
-      targets: install-integration-tests
-      compiling_for_test: true
-  - func: "attach scons logs"
-  - func: "send scons cedar report"
+  - *f_expansions_write
+  - *run_diskstats
+  - *monitor_process_threads
+  - *collect_system_resource_info
+  - *collect_ulimit_info
   - func: "run tests"
+    vars:
+      install_dir: build/install/bin
 
 - <<: *task_template
   name: integration_tests_sharded
   tags: ["integration", "sharded"]
   depends_on:
-  - name: archive_dist_test
+  - name: compile_integration_test
   commands:
-  - command: manifest.load
-  - func: "git get project and add git tag"
   - *f_expansions_write
-  - func: "do setup"
-  - func: "set up win mount script"
-  - func: "generate compile expansions"  # Generate compile expansions needs to be run to mount the shared scons cache.
-  - func: "apply compile expansions"
-  - func: "scons compile"
-    vars:
-      targets: install-integration-tests
-      compiling_for_test: true
-  - func: "attach scons logs"
-  - func: "send scons cedar report"
+  - *run_diskstats
+  - *monitor_process_threads
+  - *collect_system_resource_info
+  - *collect_ulimit_info
   - func: "run tests"
+    vars:
+      install_dir: build/install/bin
 
 - <<: *task_template
   name: external_auth
@@ -8247,6 +8232,24 @@ task_groups:
   tasks:
   - build_metrics_tasks_gen
 
+- <<: *compile_task_group_template
+  name: compile_integration_and_test_parallel_stream_TG
+  tasks:
+  - compile_integration_test
+  - integration_tests_standalone
+  - integration_tests_standalone_audit
+  - integration_tests_replset
+  - integration_tests_replset_ssl_auth
+  - integration_tests_sharded
+
+- <<: *compile_task_group_template
+  name: compile_integration_and_test_no_audit_parallel_stream_TG
+  tasks:
+  - compile_integration_test
+  - integration_tests_standalone
+  - integration_tests_replset
+  - integration_tests_replset_ssl_auth
+  - integration_tests_sharded
 
 - name: clang_tidy_TG
   setup_group_can_fail_task: true

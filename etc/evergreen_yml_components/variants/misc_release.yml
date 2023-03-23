@@ -223,6 +223,9 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - amazon2-arm64-large
+  - name: compile_integration_and_test_parallel_stream_TG
+    distros:
+    - amazon2-arm64-large
   - name: test_api_version_compatibility
   - name: .aggfuzzer !.feature_flag_guarded
   - name: .aggregation !.feature_flag_guarded
@@ -244,9 +247,6 @@ buildvariants:
   - name: .encrypt
   - name: idl_tests
   - name: initial_sync_fuzzer_gen
-  - name: .integration
-    distros:
-    - amazon2-arm64-large
   - name: jsCore
     distros:
     - amazon2-arm64-large
@@ -390,6 +390,9 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - amazon2022-large
+  - name: compile_integration_and_test_parallel_stream_TG
+    distros:
+    - amazon2022-large
   - name: test_api_version_compatibility
   - name: .aggfuzzer !.multiversion
   - name: .aggregation
@@ -409,9 +412,6 @@ buildvariants:
   - name: .encrypt
   - name: idl_tests
   - name: initial_sync_fuzzer_gen
-  - name: .integration
-    distros:
-    - amazon2022-large
   - name: jsCore
     distros:
     - amazon2022-large
@@ -555,6 +555,9 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
     distros:
     - amazon2022-arm64-large
+  - name: compile_integration_and_test_parallel_stream_TG
+    distros:
+    - amazon2022-arm64-large
   - name: test_api_version_compatibility
   - name: .aggfuzzer !.feature_flag_guarded !.multiversion
   - name: .aggregation !.feature_flag_guarded
@@ -576,9 +579,6 @@ buildvariants:
   - name: .encrypt
   - name: idl_tests
   - name: initial_sync_fuzzer_gen
-  - name: .integration
-    distros:
-    - amazon2022-arm64-large
   - name: jsCore
     distros:
     - amazon2022-arm64-large
@@ -1081,6 +1081,9 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - rhel80-large
+  - name: compile_integration_and_test_parallel_stream_TG
+    distros:
+    - rhel80-large
   - name: .aggfuzzer !.feature_flag_guarded
   - name: .aggregation !.feature_flag_guarded
   - name: audit
@@ -1098,9 +1101,6 @@ buildvariants:
   - name: .encrypt
   - name: idl_tests
   - name: initial_sync_fuzzer_gen
-  - name: .integration
-    distros:
-    - rhel80-medium
   - name: .jscore .common
   - name: jsCore_min_batch_repeat_queries_ese_gsm
   - name: jsCore_txns_large_txns_format

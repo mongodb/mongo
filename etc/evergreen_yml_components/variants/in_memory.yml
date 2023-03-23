@@ -29,6 +29,9 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - rhel80-xlarge
+  - name: compile_integration_and_test_no_audit_parallel_stream_TG
+    distros:
+    - rhel80-large
   - name: .aggfuzzer .common !.feature_flag_guarded
   - name: .aggregation !.unwind !.encrypt !.feature_flag_guarded
   - name: audit
@@ -41,9 +44,6 @@ buildvariants:
     distros:
     - rhel80-medium  # Some workloads require a lot of memory, use a bigger machine for this suite.
   - name: initial_sync_fuzzer_gen
-  - name: .integration !.audit
-    distros:
-    - rhel80-medium
   - name: .jscore .common !.decimal
   - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz !.initsync
