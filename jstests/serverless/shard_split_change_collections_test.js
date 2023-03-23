@@ -43,7 +43,7 @@ donorTxnSession.getDatabase("database").collection.insertOne({_id: "tenant1_in_t
 donorTxnSession.getDatabase("database").collection.updateOne({_id: "tenant1_in_transaction_1"}, {
     $set: {updated: true}
 });
-donorTxnSession.commitTransaction_forTesting();
+donorTxnSession.commitTransaction();
 donorTxnSession.endSession();
 
 // Get the first entry from the change stream cursor and grab the resume token.
@@ -71,6 +71,10 @@ const recipientPrimary = recipientRst.getPrimary();
 
 const recipientPrimaryTenantConn = ChangeStreamMultitenantReplicaSetTest.getTenantConnection(
     recipientPrimary.host, tenantIds[0], tenantIds[0].str);
+
+// Running ChangeStreamMultitenantReplicaSetTest.getTenantConnection will create a user on the
+// primary. Await replication so that we can use the same user on secondaries.
+recipientRst.awaitReplication();
 
 const recipientSecondaryConns = recipientRst.getSecondaries().map(
     node => ChangeStreamMultitenantReplicaSetTest.getTenantConnection(

@@ -123,7 +123,7 @@ donorTxnSession1.getDatabase("database").collection.insertOne({_id: "tenant1_in_
 donorTxnSession1.getDatabase("database").collection.updateOne({_id: "tenant1_in_transaction_1"}, {
     $set: {updated: true}
 });
-donorTxnSession1.commitTransaction_forTesting();
+donorTxnSession1.commitTransaction();
 donorTxnSession1.endSession();
 
 const fpBeforeMarkingCloneSuccess =
@@ -171,11 +171,18 @@ donorSession2.getDatabase("database").collection.insertOne({_id: "tenant2_in_tra
 donorSession2.getDatabase("database").collection.updateOne({_id: "tenant2_in_transaction_1"}, {
     $set: {updated: true}
 });
-donorSession2.commitTransaction_forTesting();
+donorSession2.commitTransaction();
 
 fpBeforeMarkingCloneSuccess.off();
 
 TenantMigrationTest.assertCommitted(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
+
+const recipientPrimaryTenantConn1 = ChangeStreamMultitenantReplicaSetTest.getTenantConnection(
+    recipientPrimary.host, tenantId1, tenantId1.str);
+
+// Running ChangeStreamMultitenantReplicaSetTest.getTenantConnection will create a user on the
+// primary. Await replication so that we can use the same user on secondaries.
+recipientRst.awaitReplication();
 
 tenantIds.forEach(tenantId => {
     const donorTenantConn = ChangeStreamMultitenantReplicaSetTest.getTenantConnection(
@@ -186,15 +193,12 @@ tenantIds.forEach(tenantId => {
         jsTestLog(
             `Performing change collection validation for tenant ${tenantId} on ${recipientNode}`);
         const recipientTenantConn = ChangeStreamMultitenantReplicaSetTest.getTenantConnection(
-            recipientPrimary.host, tenantId, tenantId.str);
+            recipientNode.host, tenantId, tenantId.str);
 
         assertChangeCollectionEntries(donorChangeCollectionDocuments,
                                       getChangeCollectionDocuments(recipientTenantConn));
     });
 });
-
-const recipientPrimaryTenantConn1 = ChangeStreamMultitenantReplicaSetTest.getTenantConnection(
-    recipientPrimary.host, tenantId1, tenantId1.str);
 
 const recipientSecondaryTenantConn1 = ChangeStreamMultitenantReplicaSetTest.getTenantConnection(
     recipientRst.getSecondary().host, tenantId1, tenantId1.str);
@@ -230,6 +234,10 @@ const recipientSecondaryCursor1 =
 
 const recipientPrimaryTenantConn2 = ChangeStreamMultitenantReplicaSetTest.getTenantConnection(
     recipientPrimary.host, tenantId2, tenantId2.str);
+
+// Running ChangeStreamMultitenantReplicaSetTest.getTenantConnection will create a user on the
+// primary. Await replication so that we can use the same user on secondaries.
+recipientRst.awaitReplication();
 
 const recipientSecondaryTenantConn2 = ChangeStreamMultitenantReplicaSetTest.getTenantConnection(
     recipientRst.getSecondary().host, tenantId2, tenantId2.str);
