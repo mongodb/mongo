@@ -249,8 +249,8 @@ public:
     boost::intrusive_ptr<DocumentSource> clone(
         const boost::intrusive_ptr<ExpressionContext>& newExpCtx) const final;
 
-    bool sbeCompatible() const {
-        return _sbeCompatible;
+    SbeCompatibility sbeCompatibility() const {
+        return _sbeCompatibility;
     }
 
     const NamespaceString& getFromNs() const {
@@ -365,8 +365,8 @@ private:
     bool foreignShardedLookupAllowed() const;
 
     /**
-     * Checks conditions necessary for SBE compatibility and sets _sbeCompatible flag. Note: when
-     * optimizing the pipeline the flag might be modified.
+     * Checks conditions necessary for SBE compatibility and sets '_sbeCompatibility' flag. Note:
+     * when optimizing the pipeline the flag might be modified.
      */
     void determineSbeCompatibility();
 
@@ -406,7 +406,7 @@ private:
     bool _hasExplicitCollation = false;
 
     // Can this $lookup be pushed down into SBE?
-    bool _sbeCompatible = false;
+    SbeCompatibility _sbeCompatibility = SbeCompatibility::notCompatible;
 
     // The aggregation pipeline to perform against the '_resolvedNs' namespace. Referenced view
     // namespaces have been resolved.

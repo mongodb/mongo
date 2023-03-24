@@ -227,7 +227,7 @@ protected:
 
     void runSbeIncompatibleGroupSpecTest(const BSONObj& groupSpec,
                                          boost::intrusive_ptr<ExpressionContext>& expCtx) {
-        expCtx->sbeCompatible = true;
+        expCtx->sbeCompatibility = SbeCompatibility::fullyCompatible;
         // When we parse and optimize the 'groupSpec' to build a DocumentSourceGroup, those
         // accumulation expressions or '_id' expression that are not supported by SBE will flip the
         // 'sbeCompatible()' flag in the 'groupStage' to false.
@@ -235,12 +235,13 @@ protected:
         auto groupStage = dynamic_cast<DocumentSourceGroup*>(docSrc.get());
         ASSERT(groupStage != nullptr);
 
-        ASSERT_EQ(false, groupStage->sbeCompatible()) << "group spec: " << groupSpec;
+        auto sbeCompatible = groupStage->sbeCompatibility() != SbeCompatibility::notCompatible;
+        ASSERT_EQ(false, sbeCompatible) << "group spec: " << groupSpec;
     }
 
     void runSbeGroupCompatibleFlagTest(const std::vector<BSONObj>& groupSpecs,
                                        boost::intrusive_ptr<ExpressionContext>& expCtx) {
-        expCtx->sbeCompatible = true;
+        expCtx->sbeCompatibility = SbeCompatibility::fullyCompatible;
         for (const auto& groupSpec : groupSpecs) {
             // When we parse and optimize the groupSpec to build the DocumentSourceGroup, those
             // AccumulationExpressions or _id expression that are not supported by SBE will flip the
@@ -264,7 +265,8 @@ protected:
                 sbeGroupCompatible = false;
                 break;
             }
-            ASSERT_EQ(sbeGroupCompatible, groupStage->sbeCompatible())
+            ASSERT_EQ(sbeGroupCompatible,
+                      groupStage->sbeCompatibility() != SbeCompatibility::notCompatible)
                 << "group spec: " << groupSpec;
         }
     }

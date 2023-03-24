@@ -245,7 +245,9 @@ void visit(ABTDocumentSourceTranslationVisitorContext* visitorCtx,
     //   Currently, after joining the unwound elements, we perform a de-duplication based on _id
     //   to determine which corresponding documents match.
 
-    uassert(6624303, "$lookup needs to be SBE compatible", source.sbeCompatible());
+    uassert(6624303,
+            "$lookup needs to be SBE compatible",
+            source.sbeCompatibility() != SbeCompatibility::notCompatible);
 
     std::string scanDefName = source.getFromNs().coll().toString();
     AlgebrizerContext& ctx = visitorCtx->algCtx;

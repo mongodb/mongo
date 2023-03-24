@@ -1916,7 +1916,7 @@ StatusWithMatchExpression JSONSchemaParser::parse(
                     expCtx, "$jsonSchema", oldAnnotation, schema));
             }
         }
-        expCtx->sbeCompatible = false;
+        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
         return translation;
     } catch (const DBException& ex) {
         return {ex.toStatus()};

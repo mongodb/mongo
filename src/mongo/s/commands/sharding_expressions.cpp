@@ -449,7 +449,7 @@ ExpressionInternalIndexKey::ExpressionInternalIndexKey(ExpressionContext* expCtx
     : Expression(expCtx, {std::move(doc), std::move(spec)}),
       _doc(_children[0]),
       _spec(_children[1]) {
-    expCtx->sbeCompatible = false;
+    expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
 }
 
 boost::intrusive_ptr<Expression> ExpressionInternalIndexKey::optimize() {

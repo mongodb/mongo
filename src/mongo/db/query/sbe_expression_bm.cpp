@@ -74,7 +74,7 @@ public:
         auto expression =
             Expression::parseExpression(expCtx.get(), expressionSpec, expCtx->variablesParseState);
 
-        if (!expCtx->sbeCompatible) {
+        if (expCtx->sbeCompatibility == SbeCompatibility::notCompatible) {
             benchmarkState.SkipWithError("expression is not supported by SBE");
             return;
         }

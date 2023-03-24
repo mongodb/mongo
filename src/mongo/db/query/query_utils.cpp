@@ -63,7 +63,8 @@ bool isQuerySbeCompatible(const CollectionPtr* collection, const CanonicalQuery*
     invariant(cq);
     auto expCtx = cq->getExpCtxRaw();
     const auto& sortPattern = cq->getSortPattern();
-    const bool allExpressionsSupported = expCtx && expCtx->sbeCompatible;
+    const bool allExpressionsSupported =
+        expCtx && expCtx->sbeCompatibility != SbeCompatibility::notCompatible;
     const auto nss = cq->nss();
     const bool isNotOplog = !nss.isOplog();
     const bool isNotChangeCollection = !nss.isChangeCollection();

@@ -166,7 +166,8 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> findSbeCompatibleStage
                 break;
             }
 
-            if (groupStage->sbeCompatible() && !groupStage->doingMerge()) {
+            if (groupStage->sbeCompatibility() != SbeCompatibility::notCompatible &&
+                !groupStage->doingMerge()) {
                 stagesForPushdown.push_back(
                     std::make_unique<InnerPipelineStageImpl>(groupStage, isLastSource));
                 continue;
@@ -182,7 +183,7 @@ std::vector<std::unique_ptr<InnerPipelineStageInterface>> findSbeCompatibleStage
 
             // Note that 'lookupStage->sbeCompatible()' encodes whether the foreign collection is a
             // view.
-            if (lookupStage->sbeCompatible()) {
+            if (lookupStage->sbeCompatibility() != SbeCompatibility::notCompatible) {
                 stagesForPushdown.push_back(
                     std::make_unique<InnerPipelineStageImpl>(lookupStage, isLastSource));
                 continue;
@@ -255,7 +256,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> createCanonicalQuery(
     // Reset the 'sbeCompatible' flag before canonicalizing the 'findCommand' to potentially allow
     // SBE to execute the portion of the query that's pushed down, even if the portion of the query
     // that is not pushed down contains expressions not supported by SBE.
-    expCtx->sbeCompatible = true;
+    expCtx->sbeCompatibility = SbeCompatibility::fullyCompatible;
 
     auto cq = CanonicalQuery::canonicalize(expCtx->opCtx,
                                            std::move(findCommand),

@@ -151,8 +151,8 @@ public:
     size_t getMaxMemoryUsageBytes() const;
 
     // True if this $group can be pushed down to SBE.
-    bool sbeCompatible() const {
-        return _sbeCompatible;
+    SbeCompatibility sbeCompatibility() const {
+        return _sbeCompatibility;
     }
 
 protected:
@@ -266,7 +266,7 @@ private:
     std::pair<Value, Value> _firstPartOfNextGroup;
     Accumulators _currentAccumulators;
 
-    bool _sbeCompatible;
+    SbeCompatibility _sbeCompatibility = SbeCompatibility::notCompatible;
 };
 
 }  // namespace mongo

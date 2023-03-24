@@ -49,7 +49,7 @@ using boost::intrusive_ptr;
 AccumulationExpression parseInternalConstructStats(ExpressionContext* const expCtx,
                                                    BSONElement elem,
                                                    VariablesParseState vps) {
-    expCtx->sbeCompatible = false;
+    expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
 
     IDLParserContext parser("$_internalConstructStats");
     tassert(7261401,

@@ -416,12 +416,12 @@ bool DocumentSourceLookUp::foreignShardedLookupAllowed() const {
 }
 
 void DocumentSourceLookUp::determineSbeCompatibility() {
-    _sbeCompatible =
-        // This stage is SBE-compatible only if the context is compatible.
-        pExpCtx->sbeCompatible
+    _sbeCompatibility = pExpCtx->sbeCompatibility;
+    // This stage has the SBE compatibility as least the same as that of the expression context.
+    auto sbeCompatibleByStageConfig =
         // We currently only support lowering equi-join that uses localField/foreignField
         // syntax.
-        && !_userPipeline && _localField &&
+        !_userPipeline && _localField &&
         _foreignField
         // SBE doesn't support match-like paths with numeric components. (Note: "as" field is a
         // project-like field and numbers in it are treated as literal names of fields rather
@@ -433,6 +433,9 @@ void DocumentSourceLookUp::determineSbeCompatibility() {
         // We currently don't lower $lookup against views ('_fromNs' does not correspond to a
         // view).
         && pExpCtx->getResolvedNamespace(_fromNs).pipeline.empty();
+    if (!sbeCompatibleByStageConfig) {
+        _sbeCompatibility = SbeCompatibility::notCompatible;
+    }
 }
 
 StageConstraints DocumentSourceLookUp::constraints(Pipeline::SplitState pipeState) const {
@@ -752,7 +755,7 @@ Pipeline::SourceContainer::iterator DocumentSourceLookUp::doOptimizeAt(
         _unwindSrc = std::move(nextUnwind);
 
         // We cannot push absorbed $unwind stages into SBE.
-        _sbeCompatible = false;
+        _sbeCompatibility = SbeCompatibility::notCompatible;
         container->erase(std::next(itr));
         return itr;
     }
@@ -840,7 +843,9 @@ Pipeline::SourceContainer::iterator DocumentSourceLookUp::doOptimizeAt(
     // We can internalize the $match. This $lookup should already be marked as SBE incompatible
     // because a $match can only be internalized if an $unwind, which is SBE incompatible, was
     // absorbed as well.
-    tassert(5843701, "This $lookup cannot be compatible with SBE", !_sbeCompatible);
+    tassert(5843701,
+            "This $lookup cannot be compatible with SBE",
+            _sbeCompatibility == SbeCompatibility::notCompatible);
     if (!_matchSrc) {
         _matchSrc = nextMatch;
     } else {

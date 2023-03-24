@@ -43,7 +43,7 @@ ExpressionFunction::ExpressionFunction(ExpressionContext* const expCtx,
       _assignFirstArgToThis(assignFirstArgToThis),
       _funcSource(std::move(funcSource)),
       _lang(std::move(lang)) {
-    expCtx->sbeCompatible = false;
+    expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
 }
 
 Value ExpressionFunction::serialize(SerializationOptions options) const {

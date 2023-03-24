@@ -46,7 +46,7 @@ public:
 
     ExpressionInternalOwningShard(ExpressionContext* const expCtx)
         : ExpressionFixedArity<ExpressionInternalOwningShard, 1>(expCtx) {
-        expCtx->sbeCompatible = false;
+        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
     }
 
     Value evaluate(const Document& root, Variables* variables) const final;

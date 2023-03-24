@@ -60,6 +60,19 @@ namespace mongo {
 
 class AggregateCommandRequest;
 
+enum struct SbeCompatibility {
+    // Not implemented in SBE.
+    notCompatible,
+    // Implemented in SBE but behind the featureFlagSbeFull flag.
+    flagGuarded,
+    // Implemented in SBE and enabled by default.
+    fullyCompatible,
+};
+
+inline bool operator<(SbeCompatibility a, SbeCompatibility b) {
+    return static_cast<int>(a) < static_cast<int>(b);
+}
+
 class ExpressionContext : public RefCountable {
 public:
     struct ResolvedNamespace {
@@ -472,14 +485,13 @@ public:
     // construction.
     const bool mayDbProfile = true;
 
-    // True if all expressions which use this expression context can be translated into equivalent
-    // SBE expressions.
-    bool sbeCompatible = true;
+    // The lowest SBE compatibility level of all expressions which use this expression context.
+    SbeCompatibility sbeCompatibility = SbeCompatibility::fullyCompatible;
 
-    // True if all accumulators in the $group stage currently being parsed using this expression
-    // context can be translated into equivalent SBE expressions. This value is transient and gets
-    // reset for every $group stage we parse. Each $group stage has their per-stage flag.
-    bool sbeGroupCompatible = true;
+    // The lowest SBE compatibility level of all accumulators in the $group stage currently
+    // being parsed using this expression context. This value is transient and gets
+    // reset for every $group stage we parse. Each $group stage has its own per-stage flag.
+    SbeCompatibility sbeGroupCompatibility = SbeCompatibility::fullyCompatible;
 
     // These fields can be used in a context when API version validations were not enforced during
     // parse time (Example creating a view or validator), but needs to be enforce while querying

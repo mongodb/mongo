@@ -948,7 +948,7 @@ intrusive_ptr<ExpressionCoerceToBool> ExpressionCoerceToBool::create(
 ExpressionCoerceToBool::ExpressionCoerceToBool(ExpressionContext* const expCtx,
                                                intrusive_ptr<Expression> pExpression)
     : Expression(expCtx, {std::move(pExpression)}) {
-    expCtx->sbeCompatible = false;
+    expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
 }
 
 intrusive_ptr<Expression> ExpressionCoerceToBool::optimize() {
@@ -1643,7 +1643,7 @@ ExpressionDateFromString::ExpressionDateFromString(ExpressionContext* const expC
                   std::move(format),
                   std::move(onNull),
                   std::move(onError)}) {
-    expCtx->sbeCompatible = false;
+    expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
 }
 
 intrusive_ptr<Expression> ExpressionDateFromString::optimize() {
@@ -2750,7 +2750,7 @@ ExpressionFilter::ExpressionFilter(ExpressionContext* const expCtx,
       _varName(std::move(varName)),
       _varId(varId),
       _limit(_children.size() == 3 ? 2 : boost::optional<size_t>(boost::none)) {
-    expCtx->sbeCompatible = false;
+    expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
 }
 
 intrusive_ptr<Expression> ExpressionFilter::optimize() {
@@ -3038,7 +3038,7 @@ ExpressionMap::ExpressionMap(ExpressionContext* const expCtx,
                              intrusive_ptr<Expression> input,
                              intrusive_ptr<Expression> each)
     : Expression(expCtx, {std::move(input), std::move(each)}), _varName(varName), _varId(varId) {
-    expCtx->sbeCompatible = false;
+    expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
 }
 
 intrusive_ptr<Expression> ExpressionMap::optimize() {
@@ -3196,7 +3196,7 @@ intrusive_ptr<Expression> ExpressionMeta::parse(ExpressionContext* const expCtx,
 
 ExpressionMeta::ExpressionMeta(ExpressionContext* const expCtx, MetaType metaType)
     : Expression(expCtx), _metaType(metaType) {
-    expCtx->sbeCompatible = false;
+    expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
 }
 
 Value ExpressionMeta::serialize(SerializationOptions options) const {
@@ -3909,14 +3909,14 @@ ExpressionInternalFLEEqual::ExpressionInternalFLEEqual(ExpressionContext* const 
                                                        ConstDataRange edcToken)
     : Expression(expCtx, {std::move(field)}),
       _evaluator(serverToken, contentionFactor, {edcToken}) {
-    expCtx->sbeCompatible = false;
+    expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
 }
 
 ExpressionInternalFLEEqual::ExpressionInternalFLEEqual(ExpressionContext* const expCtx,
                                                        boost::intrusive_ptr<Expression> field,
                                                        ServerZerosEncryptionToken zerosToken)
     : Expression(expCtx, {std::move(field)}), _evaluatorV2({std::move(zerosToken)}) {
-    expCtx->sbeCompatible = false;
+    expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
 }
 
 REGISTER_STABLE_EXPRESSION(_internalFleEq, ExpressionInternalFLEEqual::parse);
@@ -4035,7 +4035,7 @@ ExpressionInternalFLEBetween::ExpressionInternalFLEBetween(ExpressionContext* co
                                                            int64_t contentionFactor,
                                                            std::vector<ConstDataRange> edcTokens)
     : Expression(expCtx, {std::move(field)}), _evaluator(serverToken, contentionFactor, edcTokens) {
-    expCtx->sbeCompatible = false;
+    expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
 }
 
 ExpressionInternalFLEBetween::ExpressionInternalFLEBetween(
@@ -4043,7 +4043,7 @@ ExpressionInternalFLEBetween::ExpressionInternalFLEBetween(
     boost::intrusive_ptr<Expression> field,
     std::vector<ServerZerosEncryptionToken> zerosTokens)
     : Expression(expCtx, {std::move(field)}), _evaluatorV2(std::move(zerosTokens)) {
-    expCtx->sbeCompatible = false;
+    expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
 }
 
 REGISTER_STABLE_EXPRESSION(_internalFleBetween, ExpressionInternalFLEBetween::parse);
@@ -7041,7 +7041,7 @@ ExpressionConvert::ExpressionConvert(ExpressionContext* const expCtx,
                                      boost::intrusive_ptr<Expression> onError,
                                      boost::intrusive_ptr<Expression> onNull)
     : Expression(expCtx, {std::move(input), std::move(to), std::move(onError), std::move(onNull)}) {
-    expCtx->sbeCompatible = false;
+    expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
 }
 
 intrusive_ptr<Expression> ExpressionConvert::parse(ExpressionContext* const expCtx,
@@ -7558,7 +7558,7 @@ REGISTER_STABLE_EXPRESSION(rand, ExpressionRandom::parse);
 static thread_local PseudoRandom threadLocalRNG(SecureRandom().nextInt64());
 
 ExpressionRandom::ExpressionRandom(ExpressionContext* const expCtx) : Expression(expCtx) {
-    expCtx->sbeCompatible = false;
+    expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
 }
 
 intrusive_ptr<Expression> ExpressionRandom::parse(ExpressionContext* const expCtx,

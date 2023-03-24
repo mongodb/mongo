@@ -1668,7 +1668,7 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
         if (lookupStage) {
             tassert(6369000,
                     "This $lookup stage should be compatible with SBE",
-                    lookupStage->sbeCompatible());
+                    lookupStage->sbeCompatibility() != SbeCompatibility::notCompatible);
             auto [strategy, idxEntry] = QueryPlannerAnalysis::determineLookupStrategy(
                 lookupStage->getFromNs(),
                 lookupStage->getForeignField()->fullPath(),

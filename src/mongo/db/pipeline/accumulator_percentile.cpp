@@ -63,7 +63,7 @@ Status AccumulatorPercentile::validatePercentileArg(const std::vector<double>& p
 AccumulationExpression AccumulatorPercentile::parseArgs(ExpressionContext* const expCtx,
                                                         BSONElement elem,
                                                         VariablesParseState vps) {
-    expCtx->sbeGroupCompatible = false;
+    expCtx->sbeGroupCompatibility = SbeCompatibility::notCompatible;
 
     uassert(7429703,
             str::stream() << "specification must be an object; found " << elem,
@@ -177,7 +177,7 @@ intrusive_ptr<AccumulatorState> AccumulatorPercentile::create(ExpressionContext*
 AccumulationExpression AccumulatorMedian::parseArgs(ExpressionContext* const expCtx,
                                                     BSONElement elem,
                                                     VariablesParseState vps) {
-    expCtx->sbeGroupCompatible = false;
+    expCtx->sbeGroupCompatibility = SbeCompatibility::notCompatible;
 
     uassert(7436100,
             str::stream() << "specification must be an object; found " << elem,
