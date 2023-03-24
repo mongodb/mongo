@@ -95,7 +95,7 @@ void QueryAnalysisOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdat
         }
     }
 
-    if (analyze_shard_key::supportsPersistingSampledQueries() && args.updateArgs->sampleId &&
+    if (analyze_shard_key::supportsPersistingSampledQueries(opCtx) && args.updateArgs->sampleId &&
         opCtx->writesAreReplicated()) {
         analyze_shard_key::QueryAnalysisWriter::get(opCtx)
             ->addDiff(*args.updateArgs->sampleId,

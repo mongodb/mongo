@@ -60,6 +60,7 @@
 #include "mongo/db/s/query_analysis_writer.h"
 #include "mongo/db/views/resolved_view.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/query_analysis_sampler_util.h"
 #include "mongo/util/database_name_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -245,15 +246,15 @@ public:
         if (parsedDistinct.isMirrored()) {
             const auto& invocation = CommandInvocation::get(opCtx);
             invocation->markMirrored();
-        }
-
-        if (analyze_shard_key::supportsPersistingSampledQueries() && parsedDistinct.getSampleId()) {
+        } else if (auto sampleId = analyze_shard_key::getOrGenerateSampleId(
+                       opCtx,
+                       nss,
+                       analyze_shard_key::SampledCommandNameEnum::kDistinct,
+                       parsedDistinct)) {
             auto cq = parsedDistinct.getQuery();
             analyze_shard_key::QueryAnalysisWriter::get(opCtx)
-                ->addDistinctQuery(*parsedDistinct.getSampleId(),
-                                   nss,
-                                   cq->getQueryObj(),
-                                   cq->getFindCommandRequest().getCollation())
+                ->addDistinctQuery(
+                    *sampleId, nss, cq->getQueryObj(), cq->getFindCommandRequest().getCollation())
                 .getAsync([](auto) {});
         }
 

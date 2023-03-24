@@ -10,13 +10,16 @@
 load("jstests/libs/catalog_shard_util.js");
 load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
 
-const shardsvrTestCases = [
+// Set this to allow sample ids to be set by an external client.
+TestData.enableTestCommands = true;
+
+const supportedTestCases = [
     {collectionExists: true, markForSampling: true, expectSampling: true},
     {collectionExists: true, markForSampling: false, expectSampling: false},
     {collectionExists: false, markForSampling: true, expectSampling: false},
 ];
 
-const nonShardsvrTestCases = [
+const unsupportedTestCases = [
     {collectionExists: true, markForSampling: true, expectSampling: false},
 ];
 
@@ -177,36 +180,18 @@ function testAggregateCmd(rst, testCases) {
     // allow the test helper to know if it should use "config" as the name for the test database.
     st.configRS.isConfigRS = true;
 
-    testFindCmd(st.rs0, shardsvrTestCases);
-    testCountCmd(st.rs0, shardsvrTestCases);
-    testDistinctCmd(st.rs0, shardsvrTestCases);
-    testAggregateCmd(st.rs0, shardsvrTestCases);
+    testFindCmd(st.rs0, supportedTestCases);
+    testCountCmd(st.rs0, supportedTestCases);
+    testDistinctCmd(st.rs0, supportedTestCases);
+    testAggregateCmd(st.rs0, supportedTestCases);
 
     const configTests =
-        CatalogShardUtil.isEnabledIgnoringFCV(st) ? shardsvrTestCases : nonShardsvrTestCases;
+        CatalogShardUtil.isEnabledIgnoringFCV(st) ? supportedTestCases : unsupportedTestCases;
     testFindCmd(st.configRS, configTests);
     testCountCmd(st.configRS, configTests);
     testDistinctCmd(st.configRS, configTests);
     testAggregateCmd(st.configRS, configTests);
 
     st.stop();
-}
-
-{
-    const rst = new ReplSetTest({
-        nodes: 2,
-        // There is no periodic job for writing sample queries on the non-shardsvr mongods but set
-        // it anyway to verify that no queries are sampled.
-        setParameter: {queryAnalysisWriterIntervalSecs}
-    });
-    rst.startSet();
-    rst.initiate();
-
-    testFindCmd(rst, nonShardsvrTestCases);
-    testCountCmd(rst, nonShardsvrTestCases);
-    testDistinctCmd(rst, nonShardsvrTestCases);
-    testAggregateCmd(rst, nonShardsvrTestCases);
-
-    rst.stopSet();
 }
 })();

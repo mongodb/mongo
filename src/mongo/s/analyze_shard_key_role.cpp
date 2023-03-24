@@ -73,9 +73,20 @@ bool supportsCoordinatingQueryAnalysis(OperationContext* opCtx, bool ignoreFCV) 
     return supportsCoordinatingQueryAnalysis(isReplEnabled(opCtx->getServiceContext()), ignoreFCV);
 }
 
-bool supportsPersistingSampledQueries(bool ignoreFCV) {
-    return isFeatureFlagEnabled(ignoreFCV) &&
-        serverGlobalParams.clusterRole == ClusterRole::ShardServer;
+bool supportsPersistingSampledQueries(bool isReplEnabled, bool ignoreFCV) {
+    if (!isFeatureFlagEnabled(ignoreFCV)) {
+        return false;
+    }
+    if (isMongos()) {
+        return false;
+    }
+    return isReplEnabled && !gMultitenancySupport &&
+        (serverGlobalParams.clusterRole == ClusterRole::ShardServer ||
+         serverGlobalParams.clusterRole == ClusterRole::None);
+}
+
+bool supportsPersistingSampledQueries(OperationContext* opCtx, bool ignoreFCV) {
+    return supportsPersistingSampledQueries(isReplEnabled(opCtx->getServiceContext()), ignoreFCV);
 }
 
 bool supportsSamplingQueries(bool isReplEnabled, bool ignoreFCV) {

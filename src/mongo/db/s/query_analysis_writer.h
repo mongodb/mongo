@@ -53,9 +53,10 @@ namespace analyze_shard_key {
  * - The buffer that stores diffs for sampled update queries and the periodic background job that
  *   inserts those diffs into the local config.sampledQueriesDiff collection.
  *
- * Currently, query sampling is only supported on a sharded cluster. So a writer must be a shardsvr
- * mongod. If the mongod is a primary, it will execute the insert commands locally. If it is a
- * secondary, it will perform the insert commands against the primary.
+ * On a sharded cluster, a writer is any shardsvr mongod in the cluster. On a standalone replica
+ * set, a writer is any mongod in the set. If the mongod is a primary, it will execute the
+ * insert commands locally. If it is a secondary, it will perform the insert commands against the
+ * primary.
  *
  * The memory usage of the buffers is controlled by the 'queryAnalysisWriterMaxMemoryUsageBytes'
  * server parameter. Upon adding a query or a diff that causes the total size of buffers to exceed
@@ -165,11 +166,20 @@ public:
                                            const BSONObj& filter,
                                            const BSONObj& collation);
 
+    ExecutorFuture<void> addUpdateQuery(const UUID& sampleId,
+                                        const write_ops::UpdateCommandRequest& updateCmd,
+                                        int opIndex);
     ExecutorFuture<void> addUpdateQuery(const write_ops::UpdateCommandRequest& updateCmd,
+                                        int opIndex);
+
+    ExecutorFuture<void> addDeleteQuery(const UUID& sampleId,
+                                        const write_ops::DeleteCommandRequest& deleteCmd,
                                         int opIndex);
     ExecutorFuture<void> addDeleteQuery(const write_ops::DeleteCommandRequest& deleteCmd,
                                         int opIndex);
 
+    ExecutorFuture<void> addFindAndModifyQuery(
+        const UUID& sampleId, const write_ops::FindAndModifyCommandRequest& findAndModifyCmd);
     ExecutorFuture<void> addFindAndModifyQuery(
         const write_ops::FindAndModifyCommandRequest& findAndModifyCmd);
 

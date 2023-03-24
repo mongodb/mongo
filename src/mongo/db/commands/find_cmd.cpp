@@ -66,6 +66,7 @@
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/query_analysis_sampler_util.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
 #include "mongo/util/fail_point.h"
@@ -472,14 +473,17 @@ public:
                             .expectedUUID(findCommand->getCollectionUUID()));
             const auto& nss = ctx->getNss();
 
-            if (analyze_shard_key::supportsPersistingSampledQueries() &&
-                findCommand->getSampleId()) {
-                analyze_shard_key::QueryAnalysisWriter::get(opCtx)
-                    ->addFindQuery(*findCommand->getSampleId(),
-                                   nss,
-                                   findCommand->getFilter(),
-                                   findCommand->getCollation())
-                    .getAsync([](auto) {});
+            if (!findCommand->getMirrored()) {
+                if (auto sampleId = analyze_shard_key::getOrGenerateSampleId(
+                        opCtx,
+                        ns(),
+                        analyze_shard_key::SampledCommandNameEnum::kFind,
+                        *findCommand)) {
+                    analyze_shard_key::QueryAnalysisWriter::get(opCtx)
+                        ->addFindQuery(
+                            *sampleId, nss, findCommand->getFilter(), findCommand->getCollation())
+                        .getAsync([](auto) {});
+                }
             }
 
             // Going forward this operation must never ignore interrupt signals while waiting for

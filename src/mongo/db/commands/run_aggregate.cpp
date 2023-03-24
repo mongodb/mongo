@@ -92,6 +92,7 @@
 #include "mongo/db/views/view.h"
 #include "mongo/db/views/view_catalog_helpers.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/query_analysis_sampler_util.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/string_map.h"
 
@@ -1025,12 +1026,14 @@ Status runAggregate(OperationContext* opCtx,
         constexpr bool alreadyOptimized = true;
         pipeline->validateCommon(alreadyOptimized);
 
-        if (analyze_shard_key::supportsPersistingSampledQueries() && request.getSampleId()) {
+        if (auto sampleId = analyze_shard_key::getOrGenerateSampleId(
+                opCtx,
+                expCtx->ns,
+                analyze_shard_key::SampledCommandNameEnum::kAggregate,
+                request)) {
             analyze_shard_key::QueryAnalysisWriter::get(opCtx)
-                ->addAggregateQuery(*request.getSampleId(),
-                                    expCtx->ns,
-                                    pipeline->getInitialQuery(),
-                                    expCtx->getCollatorBSON())
+                ->addAggregateQuery(
+                    *sampleId, expCtx->ns, pipeline->getInitialQuery(), expCtx->getCollatorBSON())
                 .getAsync([](auto) {});
         }
 

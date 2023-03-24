@@ -46,6 +46,7 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/query_analysis_writer.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/query_analysis_sampler_util.h"
 #include "mongo/util/database_name_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
@@ -255,13 +256,16 @@ public:
             invocation->markMirrored();
         }
 
-        if (analyze_shard_key::supportsPersistingSampledQueries() && request.getSampleId()) {
-            analyze_shard_key::QueryAnalysisWriter::get(opCtx)
-                ->addCountQuery(*request.getSampleId(),
-                                nss,
-                                request.getQuery(),
-                                request.getCollation().value_or(BSONObj()))
-                .getAsync([](auto) {});
+        if (!request.getMirrored()) {
+            if (auto sampleId = analyze_shard_key::getOrGenerateSampleId(
+                    opCtx, nss, analyze_shard_key::SampledCommandNameEnum::kCount, request)) {
+                analyze_shard_key::QueryAnalysisWriter::get(opCtx)
+                    ->addCountQuery(*sampleId,
+                                    nss,
+                                    request.getQuery(),
+                                    request.getCollation().value_or(BSONObj()))
+                    .getAsync([](auto) {});
+            }
         }
 
         if (ctx->getView()) {

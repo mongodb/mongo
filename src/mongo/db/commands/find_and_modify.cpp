@@ -69,6 +69,7 @@
 #include "mongo/db/update/update_util.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/query_analysis_sampler_util.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
 #include "mongo/util/log_and_backoff.h"
 
@@ -463,18 +464,11 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
         }
     }
 
-    if (analyze_shard_key::supportsPersistingSampledQueries() && req.getSampleId()) {
-        auto findAndModifyOp = req;
-
-        // If the initial query was a write without shard key, the two phase write protocol
-        // modifies the query in the write phase. In order to get correct metrics, we need to
-        // reconstruct the original query prior to sampling.
-        if (req.getOriginalQuery()) {
-            findAndModifyOp.setQuery(*req.getOriginalQuery());
-            findAndModifyOp.setCollation(req.getOriginalCollation());
-        }
+    auto sampleId = analyze_shard_key::getOrGenerateSampleId(
+        opCtx, ns(), analyze_shard_key::SampledCommandNameEnum::kFindAndModify, req);
+    if (sampleId) {
         analyze_shard_key::QueryAnalysisWriter::get(opCtx)
-            ->addFindAndModifyQuery(findAndModifyOp)
+            ->addFindAndModifyQuery(*sampleId, req)
             .getAsync([](auto) {});
     }
 
@@ -520,7 +514,7 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
                 if (opCtx->getTxnNumber()) {
                     updateRequest.setStmtIds({stmtId});
                 }
-                updateRequest.setSampleId(req.getSampleId());
+                updateRequest.setSampleId(sampleId);
 
                 updateRequest.setAllowShardKeyUpdatesWithoutFullShardKeyInQuery(
                     req.getAllowShardKeyUpdatesWithoutFullShardKeyInQuery());
@@ -563,7 +557,7 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
                                   "Caught DuplicateKey exception during findAndModify upsert",
                                   "namespace"_attr = nsString.ns());
                 } catch (const ExceptionFor<ErrorCodes::WouldChangeOwningShard>& ex) {
-                    if (analyze_shard_key::supportsPersistingSampledQueries() &&
+                    if (analyze_shard_key::supportsPersistingSampledQueries(opCtx) &&
                         req.getSampleId()) {
                         // Sample the diff before rethrowing the error since mongos will handle this
                         // update by performing a delete on the shard owning the pre-image doc and

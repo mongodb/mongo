@@ -718,7 +718,7 @@ void CommonMongodProcessInterface::_reportCurrentOpsForIdleSessions(
 
 void CommonMongodProcessInterface::_reportCurrentOpsForQueryAnalysis(
     OperationContext* opCtx, std::vector<BSONObj>* ops) const {
-    if (analyze_shard_key::supportsPersistingSampledQueries()) {
+    if (analyze_shard_key::supportsPersistingSampledQueries(opCtx)) {
         analyze_shard_key::QueryAnalysisSampleCounters::get(opCtx).reportForCurrentOp(ops);
     }
 }

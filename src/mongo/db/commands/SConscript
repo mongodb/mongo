@@ -432,6 +432,7 @@ env.Library(
         '$BUILD_DIR/mongo/executor/async_request_executor',
         '$BUILD_DIR/mongo/rpc/rewrite_state_change_errors',
         '$BUILD_DIR/mongo/s/grid',
+        '$BUILD_DIR/mongo/s/query_analysis_sampler',
         '$BUILD_DIR/mongo/util/log_and_backoff',
         '$BUILD_DIR/mongo/util/net/http_client',
         'bulk_write_command',

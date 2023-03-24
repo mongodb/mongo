@@ -261,7 +261,13 @@ public:
     }
 
     void setSampleId(boost::optional<UUID> sampleId) {
-        _sampleId = sampleId;
+        if (_sampleId) {
+            tassert(ErrorCodes::InvalidOptions,
+                    "Cannot overwrite the existing sample id for the update query",
+                    _sampleId == sampleId);
+        } else {
+            _sampleId = sampleId;
+        }
     }
 
     const boost::optional<UUID>& getSampleId() const {

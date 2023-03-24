@@ -96,6 +96,7 @@
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/query_analysis_sampler_util.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log_and_backoff.h"
@@ -409,7 +410,7 @@ bool handleError(OperationContext* opCtx,
     }
 
     if (ErrorCodes::WouldChangeOwningShard == ex.code()) {
-        if (analyze_shard_key::supportsPersistingSampledQueries() && sampleId) {
+        if (analyze_shard_key::supportsPersistingSampledQueries(opCtx) && sampleId) {
             // Sample the diff before rethrowing the error since mongos will handle this update by
             // by performing a delete on the shard owning the pre-image doc and an insert on the
             // shard owning the post-image doc. As a result, this update will not show up in the
@@ -1239,6 +1240,7 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
     const write_ops::UpdateOpEntry& op,
     LegacyRuntimeConstants runtimeConstants,
     const boost::optional<BSONObj>& letParams,
+    const boost::optional<UUID>& sampleId,
     OperationSource source,
     bool forgoOpCounterIncrements) {
     globalOpCounters.gotUpdate();
@@ -1271,6 +1273,9 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
                                ? PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY
                                : PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
     request.setSource(source);
+    if (sampleId) {
+        request.setSampleId(sampleId);
+    }
 
     size_t numAttempts = 0;
     while (true) {
@@ -1387,19 +1392,11 @@ WriteResult performUpdates(OperationContext* opCtx,
             }
         });
 
-        if (analyze_shard_key::supportsPersistingSampledQueries() && singleOp.getSampleId()) {
-            auto updateOp = wholeOp;
-
-            // If the initial query was a write without shard key, the two phase write protocol
-            // modifies the query in the write phase. In order to get correct metrics, we need to
-            // reconstruct the original query prior to sampling.
-            if (wholeOp.getOriginalQuery()) {
-                updateOp.getUpdates().front().setQ(*wholeOp.getOriginalQuery());
-                updateOp.getUpdates().front().setCollation(wholeOp.getOriginalCollation());
-            }
-
+        auto sampleId = analyze_shard_key::getOrGenerateSampleId(
+            opCtx, ns, analyze_shard_key::SampledCommandNameEnum::kUpdate, singleOp);
+        if (sampleId) {
             analyze_shard_key::QueryAnalysisWriter::get(opCtx)
-                ->addUpdateQuery(updateOp, currentOpIndex)
+                ->addUpdateQuery(*sampleId, wholeOp, currentOpIndex)
                 .getAsync([](auto) {});
         }
 
@@ -1425,6 +1422,7 @@ WriteResult performUpdates(OperationContext* opCtx,
                                                      singleOp,
                                                      runtimeConstants,
                                                      wholeOp.getLet(),
+                                                     sampleId,
                                                      source,
                                                      forgoOpCounterIncrements);
             out.results.emplace_back(reply);
@@ -1661,19 +1659,10 @@ WriteResult performDeletes(OperationContext* opCtx,
             }
         });
 
-        if (analyze_shard_key::supportsPersistingSampledQueries() && singleOp.getSampleId()) {
-            auto deleteOp = wholeOp;
-
-            // If the initial query was a write without shard key, the two phase write protocol
-            // modifies the query in the write phase. In order to get correct metrics, we need to
-            // reconstruct the original query prior to sampling.
-            if (wholeOp.getOriginalQuery()) {
-                deleteOp.getDeletes().front().setQ(*wholeOp.getOriginalQuery());
-                deleteOp.getDeletes().front().setCollation(wholeOp.getOriginalCollation());
-            }
-
+        if (auto sampleId = analyze_shard_key::getOrGenerateSampleId(
+                opCtx, ns, analyze_shard_key::SampledCommandNameEnum::kDelete, singleOp)) {
             analyze_shard_key::QueryAnalysisWriter::get(opCtx)
-                ->addDeleteQuery(deleteOp, currentOpIndex)
+                ->addDeleteQuery(*sampleId, wholeOp, currentOpIndex)
                 .getAsync([](auto) {});
         }
 

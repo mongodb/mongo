@@ -334,6 +334,7 @@ var QuerySamplingUtil = (function() {
         assertSoonSampledQueryDocuments,
         assertSoonSampledQueryDocumentsAcrossShards,
         assertNoSampledQueryDocuments,
+        clearSampledQueryCollection,
         clearSampledQueryCollectionOnAllShards,
         assertSoonSingleSampledDiffDocument,
         assertNoSampledDiffDocuments,

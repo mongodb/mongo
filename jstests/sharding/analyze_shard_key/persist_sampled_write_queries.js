@@ -10,6 +10,9 @@
 load("jstests/libs/catalog_shard_util.js");
 load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
 
+// Set this to allow sample ids to be set by an external client.
+TestData.enableTestCommands = true;
+
 const supportedTestCases = [
     {collectionExists: true, markForSampling: true, expectSampling: true},
     {collectionExists: true, markForSampling: false, expectSampling: false},
@@ -233,23 +236,5 @@ function testInsertCmd(rst) {
     testInsertCmd(st.configRS);
 
     st.stop();
-}
-
-{
-    const rst = new ReplSetTest({
-        nodes: 2,
-        // There is no periodic job for writing sample queries on the non-shardsvr mongods but set
-        // it anyway to verify that no queries are sampled.
-        setParameter: {queryAnalysisWriterIntervalSecs}
-    });
-    rst.startSet();
-    rst.initiate();
-
-    testUpdateCmd(rst, unsupportedTestCases);
-    testDeleteCmd(rst, unsupportedTestCases);
-    testFindAndModifyCmd(rst, unsupportedTestCases);
-    testInsertCmd(rst);
-
-    rst.stopSet();
 }
 })();

@@ -40,7 +40,8 @@ bool isFeatureFlagEnabled(bool ignoreFCV = false);
 bool supportsCoordinatingQueryAnalysis(bool isReplEnabled, bool ignoreFCV = false);
 bool supportsCoordinatingQueryAnalysis(OperationContext* opCtx, bool ignoreFCV = false);
 
-bool supportsPersistingSampledQueries(bool ignoreFCV = false);
+bool supportsPersistingSampledQueries(bool isReplEnabled, bool ignoreFCV = false);
+bool supportsPersistingSampledQueries(OperationContext* opCtx, bool ignoreFCV = false);
 
 bool supportsSamplingQueries(bool isReplEnabled, bool ignoreFCV = false);
 bool supportsSamplingQueries(OperationContext* opCtx, bool ignoreFCV = false);

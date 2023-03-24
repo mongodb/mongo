@@ -1,15 +1,15 @@
 /**
  * Tests that query sampling respects the sample rate configured via the 'configureQueryAnalyzer'
- * command, and that the number of queries sampled by each mongos or shardsvr mongod is
- * proportional to the number of queries it executes.
+ * command, and that the number of queries sampled by each mongos or shardsvr mongod in a sharded
+ * cluster is proportional to the number of queries it executes.
  *
  * @tags: [requires_fcv_63, featureFlagAnalyzeShardKey]
  */
 (function() {
 "use strict";
 
-load("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
-load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
+load("jstests/libs/parallelTester.js");
+load("jstests/sharding/analyze_shard_key/libs/sample_rates_common.js");
 
 // Make the periodic jobs for refreshing sample rates and writing sampled queries and diffs have a
 // period of 1 second to speed up the test.
@@ -59,94 +59,28 @@ st.ensurePrimaryShard(dbName, st.shard0.name);
 const mongosDB = st.s.getDB(dbName);
 
 // Set up the unsharded sampled collection.
-assert.commandWorked(mongosDB.getCollection(collNameSampledUnsharded).insert([{x: 0}]));
+assert.commandWorked(mongosDB.getCollection(collNameSampledUnsharded).insert([{[fieldName]: 0}]));
 
 // Set up the sharded sampled collection. Make it have three chunks:
 // shard0: [MinKey, 0]
 // shard1: [0, 1000]
 // shard1: [1000, MaxKey]
-assert.commandWorked(st.s.adminCommand({shardCollection: sampledNsSharded, key: {x: 1}}));
-assert.commandWorked(st.s.adminCommand({split: sampledNsSharded, middle: {x: 0}}));
-assert.commandWorked(st.s.adminCommand({split: sampledNsSharded, middle: {x: 1000}}));
-assert.commandWorked(
-    st.s.adminCommand({moveChunk: sampledNsSharded, find: {x: 0}, to: st.shard1.shardName}));
-assert.commandWorked(
-    st.s.adminCommand({moveChunk: sampledNsSharded, find: {x: 1000}, to: st.shard2.shardName}));
+assert.commandWorked(st.s.adminCommand({shardCollection: sampledNsSharded, key: {[fieldName]: 1}}));
+assert.commandWorked(st.s.adminCommand({split: sampledNsSharded, middle: {[fieldName]: 0}}));
+assert.commandWorked(st.s.adminCommand({split: sampledNsSharded, middle: {[fieldName]: 1000}}));
+assert.commandWorked(st.s.adminCommand(
+    {moveChunk: sampledNsSharded, find: {[fieldName]: 0}, to: st.shard1.shardName}));
+assert.commandWorked(st.s.adminCommand(
+    {moveChunk: sampledNsSharded, find: {[fieldName]: 1000}, to: st.shard2.shardName}));
 
 // Set up the non sampled collection. It needs to have at least one document. Otherwise, no nested
 // aggregate queries would be issued.
 assert.commandWorked(mongosDB.getCollection(collNameNotSampled).insert([{a: 0}]));
 
 /**
- * Tries to run randomly generated find commands against the collection 'collName' in the database
- * 'dbName' at rate 'targetNumPerSec' for 'durationSecs'. Returns the actual rate.
- */
-function runFindCmdsOnRepeat(mongosHost, dbName, collName, targetNumPerSec, durationSecs) {
-    load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
-    const mongos = new Mongo(mongosHost);
-    const db = mongos.getDB(dbName);
-    const makeCmdObjFunc = () => {
-        const xVal = AnalyzeShardKeyUtil.getRandInteger(1, 500);
-        // Use a range filter half of the time to get test coverage for targeting more than one
-        // shard in the sharded case.
-        const filter = Math.random() > 0.5 ? {x: {$gte: xVal}} : {x: xVal};
-        const collation = QuerySamplingUtil.generateRandomCollation();
-        return {find: collName, filter, collation};
-    };
-    return QuerySamplingUtil.runCmdsOnRepeat(db, makeCmdObjFunc, targetNumPerSec, durationSecs);
-}
-
-/**
- * Tries to run randomly generated delete commands against the collection 'collName' in the database
- * 'dbName' at rate 'targetNumPerSec' for 'durationSecs'. Returns the actual rate.
- */
-function runDeleteCmdsOnRepeat(mongosHost, dbName, collName, targetNumPerSec, durationSecs) {
-    load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
-    const mongos = new Mongo(mongosHost);
-    const db = mongos.getDB(dbName);
-    const makeCmdObjFunc = () => {
-        const xVal = AnalyzeShardKeyUtil.getRandInteger(1, 500);
-        // Use a range filter half of the time to get test coverage for targeting more than one
-        // shard in the sharded case.
-        const filter = Math.random() > 0.5 ? {x: {$gte: xVal}} : {x: xVal};
-        const collation = QuerySamplingUtil.generateRandomCollation();
-        return {delete: collName, deletes: [{q: filter, collation, limit: 0}]};
-    };
-    return QuerySamplingUtil.runCmdsOnRepeat(db, makeCmdObjFunc, targetNumPerSec, durationSecs);
-}
-
-/**
- * Tries to run randomly generated aggregate commands with a $lookup stage against the collections
- * 'localCollName' and 'foreignCollName' in the database 'dbName' at rate 'targetNumPerSec' for
- * 'durationSecs'. Returns the actual rate.
- */
-function runNestedAggregateCmdsOnRepeat(
-    mongosHost, dbName, localCollName, foreignCollName, targetNumPerSec, durationSecs) {
-    load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
-    const mongos = new Mongo(mongosHost);
-    const db = mongos.getDB(dbName);
-    const makeCmdObjFunc = () => {
-        const xVal = AnalyzeShardKeyUtil.getRandInteger(1, 500);
-        // Use a range filter half of the time to get test coverage for targeting more than one
-        // shard in the sharded case.
-        const filter = Math.random() > 0.5 ? {x: {$gte: xVal}} : {x: xVal};
-        const collation = QuerySamplingUtil.generateRandomCollation();
-        return {
-            aggregate: localCollName,
-            pipeline:
-                [{$lookup: {from: foreignCollName, as: "joined", pipeline: [{$match: filter}]}}],
-            collation,
-            cursor: {},
-            $readPreference: {mode: "primary"}
-        };
-    };
-    return QuerySamplingUtil.runCmdsOnRepeat(db, makeCmdObjFunc, targetNumPerSec, durationSecs);
-}
-
-/**
  * Returns the number of sampled queries by command name along with the total number.
  */
-function getSampleSize(st) {
+function getSampleSize() {
     let sampleSize = {total: 0};
 
     st._rs.forEach((rs) => {
@@ -223,7 +157,7 @@ function testQuerySampling(dbName, collNameNotSampled, collNameSampled) {
     let sampleSize;
     let prevTotal = 0;
     assert.soon(() => {
-        sampleSize = getSampleSize(st);
+        sampleSize = getSampleSize();
         if (sampleSize.total == 0 || sampleSize.total != prevTotal) {
             prevTotal = sampleSize.total;
             return false;
