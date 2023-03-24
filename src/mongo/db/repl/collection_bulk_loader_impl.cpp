@@ -57,8 +57,7 @@ CollectionBulkLoaderImpl::CollectionBulkLoaderImpl(ServiceContext::UniqueClient 
                                                    const BSONObj& idIndexSpec)
     : _client{std::move(client)},
       _opCtx{std::move(opCtx)},
-      _acquisition(
-          acquireCollectionForLocalCatalogOnlyWithPotentialDataLoss(_opCtx.get(), nss, MODE_X)),
+      _collection{_opCtx.get(), nss, MODE_X},
       _nss{nss},
       _idIndexBlock(std::make_unique<MultiIndexBlock>()),
       _secondaryIndexesBlock(std::make_unique<MultiIndexBlock>()),
@@ -83,14 +82,14 @@ Status CollectionBulkLoaderImpl::init(const std::vector<BSONObj>& secondaryIndex
         return writeConflictRetry(
             _opCtx.get(),
             "CollectionBulkLoader::init",
-            _acquisition.nss().ns(),
+            _collection.getNss().ns(),
             [&secondaryIndexSpecs, this] {
                 WriteUnitOfWork wuow(_opCtx.get());
                 // All writes in CollectionBulkLoaderImpl should be unreplicated.
                 // The opCtx is accessed indirectly through _secondaryIndexesBlock.
                 UnreplicatedWritesBlock uwb(_opCtx.get());
                 // This enforces the buildIndexes setting in the replica set configuration.
-                CollectionWriter collWriter(_opCtx.get(), &_acquisition);
+                CollectionWriter collWriter(_opCtx.get(), _collection);
                 auto indexCatalog =
                     collWriter.getWritableCollection(_opCtx.get())->getIndexCatalog();
                 auto specs = indexCatalog->removeExistingIndexesNoChecks(
@@ -153,7 +152,7 @@ Status CollectionBulkLoaderImpl::_insertDocumentsForUncappedCollection(
                     bytesInBlock += doc.objsize();
                     // This version of insert will not update any indexes.
                     const auto status = collection_internal::insertDocumentForBulkLoader(
-                        _opCtx.get(), _acquisition.getCollectionPtr(), doc, onRecordInserted);
+                        _opCtx.get(), *_collection, doc, onRecordInserted);
                     if (!status.isOK()) {
                         return status;
                     }
@@ -200,7 +199,7 @@ Status CollectionBulkLoaderImpl::_insertDocumentsForCappedCollection(
                 // For capped collections, we use regular insertDocument, which
                 // will update pre-existing indexes.
                 const auto status = collection_internal::insertDocument(
-                    _opCtx.get(), _acquisition.getCollectionPtr(), InsertStatement(doc), nullptr);
+                    _opCtx.get(), *_collection, InsertStatement(doc), nullptr);
                 if (!status.isOK()) {
                     return status;
                 }
@@ -239,24 +238,21 @@ Status CollectionBulkLoaderImpl::commit() {
         // Commit before deleting dups, so the dups will be removed from secondary indexes when
         // deleted.
         if (_secondaryIndexesBlock) {
-            auto status = _secondaryIndexesBlock->dumpInsertsFromBulk(
-                _opCtx.get(), _acquisition.getCollectionPtr());
+            auto status = _secondaryIndexesBlock->dumpInsertsFromBulk(_opCtx.get(), *_collection);
             if (!status.isOK()) {
                 return status;
             }
 
             // This should always return Status::OK() as the foreground index build doesn't install
             // an interceptor.
-            invariant(_secondaryIndexesBlock->checkConstraints(_opCtx.get(),
-                                                               _acquisition.getCollectionPtr()));
+            invariant(_secondaryIndexesBlock->checkConstraints(_opCtx.get(), *_collection));
 
             status = writeConflictRetry(
                 _opCtx.get(), "CollectionBulkLoaderImpl::commit", _nss.ns(), [this] {
                     WriteUnitOfWork wunit(_opCtx.get());
-                    CollectionWriter collWriter(_opCtx.get(), &_acquisition);
                     auto status = _secondaryIndexesBlock->commit(
                         _opCtx.get(),
-                        collWriter.getWritableCollection(_opCtx.get()),
+                        _collection.getWritableCollection(_opCtx.get()),
                         MultiIndexBlock::kNoopOnCreateEachFn,
                         MultiIndexBlock::kNoopOnCommitFn);
                     if (!status.isOK()) {
@@ -273,24 +269,20 @@ Status CollectionBulkLoaderImpl::commit() {
         if (_idIndexBlock) {
             // Do not do inside a WriteUnitOfWork (required by dumpInsertsFromBulk).
             auto status = _idIndexBlock->dumpInsertsFromBulk(
-                _opCtx.get(), _acquisition.getCollectionPtr(), [&](const RecordId& rid) {
+                _opCtx.get(), *_collection, [&](const RecordId& rid) {
                     writeConflictRetry(
                         _opCtx.get(), "CollectionBulkLoaderImpl::commit", _nss.ns(), [this, &rid] {
                             WriteUnitOfWork wunit(_opCtx.get());
 
-                            auto doc = _acquisition.getCollectionPtr()->docFor(_opCtx.get(), rid);
+                            auto doc = _collection->docFor(_opCtx.get(), rid);
 
                             // Delete the document before committing the index. If we were to delete
                             // the document after committing the index, it's possible that the we
                             // may unindex a record with the same key but a different RecordId.
-                            _acquisition.getCollectionPtr()->getRecordStore()->deleteRecord(
-                                _opCtx.get(), rid);
+                            _collection->getRecordStore()->deleteRecord(_opCtx.get(), rid);
 
-                            auto indexIt =
-                                _acquisition.getCollectionPtr()
-                                    ->getIndexCatalog()
-                                    ->getIndexIterator(_opCtx.get(),
-                                                       IndexCatalog::InclusionPolicy::kReady);
+                            auto indexIt = _collection->getIndexCatalog()->getIndexIterator(
+                                _opCtx.get(), IndexCatalog::InclusionPolicy::kReady);
                             while (auto entry = indexIt->next()) {
                                 if (entry->descriptor()->isIdIndex()) {
                                     continue;
@@ -305,7 +297,7 @@ Status CollectionBulkLoaderImpl::commit() {
                                 entry->accessMethod()->remove(
                                     _opCtx.get(),
                                     pooledBuilder,
-                                    _acquisition.getCollectionPtr(),
+                                    *_collection,
                                     doc.value(),
                                     rid,
                                     false /* logIfError */,
@@ -330,10 +322,9 @@ Status CollectionBulkLoaderImpl::commit() {
             status = writeConflictRetry(
                 _opCtx.get(), "CollectionBulkLoaderImpl::commit", _nss.ns(), [this] {
                     WriteUnitOfWork wunit(_opCtx.get());
-                    CollectionWriter collWriter(_opCtx.get(), &_acquisition);
                     auto status =
                         _idIndexBlock->commit(_opCtx.get(),
-                                              collWriter.getWritableCollection(_opCtx.get()),
+                                              _collection.getWritableCollection(_opCtx.get()),
                                               MultiIndexBlock::kNoopOnCreateEachFn,
                                               MultiIndexBlock::kNoopOnCommitFn);
                     if (!status.isOK()) {
@@ -366,14 +357,14 @@ Status CollectionBulkLoaderImpl::commit() {
 void CollectionBulkLoaderImpl::_releaseResources() {
     invariant(&cc() == _opCtx->getClient());
     if (_secondaryIndexesBlock) {
-        CollectionWriter collWriter(_opCtx.get(), &_acquisition);
+        CollectionWriter collWriter(_opCtx.get(), _collection);
         _secondaryIndexesBlock->abortIndexBuild(
             _opCtx.get(), collWriter, MultiIndexBlock::kNoopOnCleanUpFn);
         _secondaryIndexesBlock.reset();
     }
 
     if (_idIndexBlock) {
-        CollectionWriter collWriter(_opCtx.get(), &_acquisition);
+        CollectionWriter collWriter(_opCtx.get(), _collection);
         _idIndexBlock->abortIndexBuild(_opCtx.get(), collWriter, MultiIndexBlock::kNoopOnCleanUpFn);
         _idIndexBlock.reset();
     }
@@ -401,7 +392,7 @@ Status CollectionBulkLoaderImpl::_addDocumentToIndexBlocks(const BSONObj& doc,
     if (_idIndexBlock) {
         auto status = _idIndexBlock->insertSingleDocumentForInitialSyncOrRecovery(
             _opCtx.get(),
-            _acquisition.getCollectionPtr(),
+            *_collection,
             doc,
             loc,
             // This caller / code path does not have cursors to save/restore.
@@ -415,7 +406,7 @@ Status CollectionBulkLoaderImpl::_addDocumentToIndexBlocks(const BSONObj& doc,
     if (_secondaryIndexesBlock) {
         auto status = _secondaryIndexesBlock->insertSingleDocumentForInitialSyncOrRecovery(
             _opCtx.get(),
-            _acquisition.getCollectionPtr(),
+            *_collection,
             doc,
             loc,
             // This caller / code path does not have cursors to save/restore.

@@ -40,7 +40,6 @@
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
-#include "mongo/db/shard_role.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
@@ -413,6 +412,7 @@ Collection* AutoGetCollection::getWritableCollection(OperationContext* opCtx) {
 
     // Acquire writable instance if not already available
     if (!_writableColl) {
+
         auto catalog = CollectionCatalog::get(opCtx);
         _writableColl = catalog->lookupCollectionByNamespaceForMetadataWrite(opCtx, _resolvedNss);
         // Makes the internal CollectionPtr Yieldable and resets the writable Collection when
@@ -544,26 +544,6 @@ struct CollectionWriter::SharedImpl {
     std::function<Collection*()> _writableCollectionInitializer;
 };
 
-CollectionWriter::CollectionWriter(OperationContext* opCtx,
-                                   ScopedCollectionAcquisition* acquisition)
-    : _acquisition(acquisition),
-      _collection(&_storedCollection),
-      _managed(true),
-      _sharedImpl(std::make_shared<SharedImpl>(this)) {
-
-    _storedCollection = CollectionPtr(
-        CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, _acquisition->nss()));
-    _storedCollection.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, _storedCollection));
-
-    _sharedImpl->_writableCollectionInitializer = [this, opCtx]() mutable {
-        invariant(!_fence);
-        _fence = std::make_unique<ScopedLocalCatalogWriteFence>(opCtx, _acquisition);
-
-        return CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForMetadataWrite(
-            opCtx, _acquisition->nss());
-    };
-}
-
 CollectionWriter::CollectionWriter(OperationContext* opCtx, const UUID& uuid)
     : _collection(&_storedCollection),
       _managed(true),
@@ -572,7 +552,6 @@ CollectionWriter::CollectionWriter(OperationContext* opCtx, const UUID& uuid)
     _storedCollection =
         CollectionPtr(CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, uuid));
     _storedCollection.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, _storedCollection));
-
     _sharedImpl->_writableCollectionInitializer = [opCtx, uuid]() {
         return CollectionCatalog::get(opCtx)->lookupCollectionByUUIDForMetadataWrite(opCtx, uuid);
     };
@@ -582,11 +561,9 @@ CollectionWriter::CollectionWriter(OperationContext* opCtx, const NamespaceStrin
     : _collection(&_storedCollection),
       _managed(true),
       _sharedImpl(std::make_shared<SharedImpl>(this)) {
-
     _storedCollection =
         CollectionPtr(CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss));
     _storedCollection.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, _storedCollection));
-
     _sharedImpl->_writableCollectionInitializer = [opCtx, nss]() {
         return CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForMetadataWrite(opCtx,
                                                                                           nss);
@@ -597,7 +574,6 @@ CollectionWriter::CollectionWriter(OperationContext* opCtx, AutoGetCollection& a
     : _collection(&autoCollection.getCollection()),
       _managed(true),
       _sharedImpl(std::make_shared<SharedImpl>(this)) {
-
     _sharedImpl->_writableCollectionInitializer = [&autoCollection, opCtx]() {
         return autoCollection.getWritableCollection(opCtx);
     };
@@ -621,8 +597,8 @@ Collection* CollectionWriter::getWritableCollection(OperationContext* opCtx) {
     if (!_writableCollection) {
         _writableCollection = _sharedImpl->_writableCollectionInitializer();
 
-        // If we are using our stored Collection then we are not managed by an AutoGetCollection
-        // and we need to manage lifetime here.
+        // If we are using our stored Collection then we are not managed by an AutoGetCollection and
+        // we need to manage lifetime here.
         if (_managed) {
             bool usingStoredCollection = *_collection == _storedCollection;
             auto rollbackCollection =
@@ -636,7 +612,6 @@ Collection* CollectionWriter::getWritableCollection(OperationContext* opCtx) {
                 [shared = _sharedImpl](OperationContext* opCtx, boost::optional<Timestamp>) {
                     if (shared->_parent) {
                         shared->_parent->_writableCollection = nullptr;
-                        shared->_parent->_fence.reset();
 
                         // Make the stored collection yieldable again as we now operate with the
                         // same instance as is in the catalog.
@@ -647,15 +622,12 @@ Collection* CollectionWriter::getWritableCollection(OperationContext* opCtx) {
                 [shared = _sharedImpl, rollbackCollection = std::move(rollbackCollection)](
                     OperationContext* opCtx) mutable {
                     if (shared->_parent) {
-                        shared->_parent->_writableCollection = nullptr;
-                        shared->_parent->_fence.reset();
-
-                        // Restore stored collection to its previous state. The rollback
-                        // instance is already yieldable.
+                        // Restore stored collection to its previous state. The rollback instance is
+                        // already yieldable.
                         shared->_parent->_storedCollection = std::move(rollbackCollection);
+                        shared->_parent->_writableCollection = nullptr;
                     }
                 });
-
             if (usingStoredCollection) {
                 _storedCollection = CollectionPtr(_writableCollection);
             }
@@ -672,8 +644,7 @@ ReadSourceScope::ReadSourceScope(OperationContext* opCtx,
                                  RecoveryUnit::ReadSource readSource,
                                  boost::optional<Timestamp> provided)
     : _opCtx(opCtx), _originalReadSource(opCtx->recoveryUnit()->getTimestampReadSource()) {
-    // Abandoning the snapshot is unsafe when the snapshot is managed by a lock free read
-    // helper.
+    // Abandoning the snapshot is unsafe when the snapshot is managed by a lock free read helper.
     invariant(!_opCtx->isLockFreeReadsOp());
 
     if (_originalReadSource == RecoveryUnit::ReadSource::kProvided) {
@@ -685,8 +656,7 @@ ReadSourceScope::ReadSourceScope(OperationContext* opCtx,
 }
 
 ReadSourceScope::~ReadSourceScope() {
-    // Abandoning the snapshot is unsafe when the snapshot is managed by a lock free read
-    // helper.
+    // Abandoning the snapshot is unsafe when the snapshot is managed by a lock free read helper.
     invariant(!_opCtx->isLockFreeReadsOp());
 
     _opCtx->recoveryUnit()->abandonSnapshot();
