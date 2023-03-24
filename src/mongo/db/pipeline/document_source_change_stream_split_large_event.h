@@ -81,6 +81,12 @@ private:
 
     Document _popFromQueue();
 
+    /**
+     * In case of resume after split, check whether 'eventDoc' is the split event. If so, extract
+     * and return the resume token's fragment number. Otherwise, return zero.
+     */
+    size_t _handleResumeAfterSplit(const Document& eventDoc, size_t eventBsonSize);
+
     boost::optional<ResumeTokenData> _resumeAfterSplit;
     std::queue<Document> _splitEventQueue;
 };

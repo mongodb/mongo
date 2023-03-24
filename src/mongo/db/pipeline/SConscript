@@ -387,6 +387,7 @@ pipelineEnv.Library(
         '$BUILD_DIR/third_party/shim_snappy',
         'abt_utils',
         'accumulator',
+        'change_stream_helpers',
         'dependencies',
         'document_path_support',
         'document_sources_idl',
@@ -454,6 +455,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_feature_flags',
         '$BUILD_DIR/mongo/db/update/update_driver',
         '$BUILD_DIR/mongo/s/query/router_exec_stage',
+        'change_stream_helpers',
         'change_stream_preimage',
     ],
 )
@@ -524,6 +526,17 @@ env.Library(
         '$BUILD_DIR/mongo/db/shard_role',
         '$BUILD_DIR/mongo/util/periodic_runner',
     ],
+)
+
+env.Library(
+    target="change_stream_helpers",
+    source=[
+        "change_stream_helpers.cpp",
+    ],
+    LIBDEPS=[
+        "document_sources_idl",
+    ],
+    LIBDEPS_PRIVATE=[],
 )
 
 env.Library(

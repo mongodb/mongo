@@ -32,6 +32,7 @@
 
 #include "mongo/db/pipeline/document_source_change_stream_transform.h"
 
+#include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/pipeline/resume_token.h"
@@ -80,8 +81,7 @@ DocumentSourceChangeStreamTransform::DocumentSourceChangeStreamTransform(
       _isIndependentOfAnyCollection(expCtx->ns.isCollectionlessAggregateNS()) {
 
     // Extract the resume token or high-water-mark from the spec.
-    auto tokenData =
-        DocumentSourceChangeStream::resolveResumeTokenFromSpec(expCtx, _changeStreamSpec);
+    auto tokenData = change_stream::resolveResumeTokenFromSpec(expCtx, _changeStreamSpec);
 
     // Set the initialPostBatchResumeToken on the expression context.
     expCtx->initialPostBatchResumeToken = ResumeToken(tokenData).toBSON();

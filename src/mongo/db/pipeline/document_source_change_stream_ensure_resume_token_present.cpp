@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/document_source_change_stream_ensure_resume_token_present.h"
 
+#include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/change_stream_start_after_invalidate_info.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 
@@ -45,7 +46,7 @@ boost::intrusive_ptr<DocumentSourceChangeStreamEnsureResumeTokenPresent>
 DocumentSourceChangeStreamEnsureResumeTokenPresent::create(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const DocumentSourceChangeStreamSpec& spec) {
-    auto resumeToken = DocumentSourceChangeStream::resolveResumeTokenFromSpec(expCtx, spec);
+    auto resumeToken = change_stream::resolveResumeTokenFromSpec(expCtx, spec);
     tassert(5666902,
             "Expected non-high-water-mark resume token",
             !ResumeToken::isHighWaterMarkToken(resumeToken));

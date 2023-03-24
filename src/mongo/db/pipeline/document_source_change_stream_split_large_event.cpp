@@ -29,6 +29,7 @@
 
 #include "mongo/db/pipeline/document_source_change_stream_split_large_event.h"
 
+#include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/change_stream_split_event_helpers.h"
 #include "mongo/db/pipeline/document_source_change_stream_ensure_resume_token_present.h"
 #include "mongo/db/pipeline/document_source_change_stream_handle_topology_change.h"
@@ -48,7 +49,7 @@ DocumentSourceChangeStreamSplitLargeEvent::create(
     const DocumentSourceChangeStreamSpec& spec) {
     // If resuming from a split event, pass along the resume token data to DSCSSplitEvent so that it
     // can swallow fragments that precede the actual resume point.
-    auto resumeToken = DocumentSourceChangeStream::resolveResumeTokenFromSpec(expCtx, spec);
+    auto resumeToken = change_stream::resolveResumeTokenFromSpec(expCtx, spec);
     auto resumeAfterSplit =
         resumeToken.fragmentNum ? std::move(resumeToken) : boost::optional<ResumeTokenData>{};
     return new DocumentSourceChangeStreamSplitLargeEvent(expCtx, std::move(resumeAfterSplit));
@@ -76,7 +77,7 @@ DocumentSourceChangeStreamSplitLargeEvent::DocumentSourceChangeStreamSplitLargeE
     : DocumentSource(getSourceName(), expCtx), _resumeAfterSplit(std::move(resumeAfterSplit)) {
     tassert(7182801,
             "Expected a split event resume token, but found a non-split token",
-            !_resumeAfterSplit || resumeAfterSplit->fragmentNum);
+            !_resumeAfterSplit || _resumeAfterSplit->fragmentNum);
 }
 
 Value DocumentSourceChangeStreamSplitLargeEvent::serialize(SerializationOptions opts) const {
@@ -129,38 +130,29 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamSplitLargeEvent::doGetNe
     // TODO SERVER-74301: Consider 'this->pExpCtx->forPerShardCursor' here.
     auto [eventDoc, eventBsonSize] = change_stream_split_event::processChangeEventBeforeSplit(
         input.releaseDocument(), this->pExpCtx->needsMerge);
-    if (eventBsonSize <= kBSONObjMaxChangeEventSize) {
-        return std::move(eventDoc);
-    }
 
     // If we are resuming from a split event, check whether this is it. If so, extract the fragment
     // number from which we are resuming. Otherwise, we have already scanned past the resume point,
     // which implies that it may be on another shard. Continue to split this event without skipping.
-    size_t skipFirstFragments = 0;
-    if (_resumeAfterSplit) {
-        using DSCSCR = DocumentSourceChangeStreamCheckResumability;
-        auto resumeStatus = DSCSCR::compareAgainstClientResumeToken(eventDoc, *_resumeAfterSplit);
-        tassert(7182805,
-                "Observed unexpected event before resume point",
-                resumeStatus != DSCSCR::ResumeStatus::kCheckNextDoc);
-        if (resumeStatus == DSCSCR::ResumeStatus::kNeedsSplit) {
-            skipFirstFragments = *_resumeAfterSplit->fragmentNum;
-        }
-        _resumeAfterSplit.reset();
+    size_t skipFragments = _handleResumeAfterSplit(eventDoc, eventBsonSize);
+
+    // Before proceeding, check whether the event is small enough to be returned as-is.
+    if (eventBsonSize <= kBSONObjMaxChangeEventSize) {
+        return std::move(eventDoc);
     }
 
     // Split the event into N appropriately-sized fragments. Make sure to leave some space for the
     // postBatchResumeToken in the cursor response object.
     size_t tokenSize = eventDoc.metadata().getSortKey().getDocument().toBson().objsize();
     _splitEventQueue = change_stream_split_event::splitChangeEvent(
-        eventDoc, kBSONObjMaxChangeEventSize - tokenSize, skipFirstFragments);
+        eventDoc, kBSONObjMaxChangeEventSize - tokenSize, skipFragments);
 
     // If the user is resuming from a split event but supplied a pipeline which produced a different
     // split, we cannot reproduce the split point. Check if we're about to swallow all fragments.
     uassert(ErrorCodes::ChangeStreamFatalError,
             "Attempted to resume from a split event, but the resumed stream produced a different "
             "split. Ensure that the pipeline used to resume is the same as the original",
-            !(skipFirstFragments > 0 && _splitEventQueue.empty()));
+            !(skipFragments > 0 && _splitEventQueue.empty()));
     tassert(7182804,
             "Unexpected empty fragment queue after splitting a change stream event",
             !_splitEventQueue.empty());
@@ -176,6 +168,27 @@ Document DocumentSourceChangeStreamSplitLargeEvent::_popFromQueue() {
     auto nextFragment = std::move(_splitEventQueue.front());
     _splitEventQueue.pop();
     return nextFragment;
+}
+
+size_t DocumentSourceChangeStreamSplitLargeEvent::_handleResumeAfterSplit(const Document& eventDoc,
+                                                                          size_t eventBsonSize) {
+    if (!_resumeAfterSplit) {
+        return 0;
+    }
+    using DSCSCR = DocumentSourceChangeStreamCheckResumability;
+    auto resumeStatus = DSCSCR::compareAgainstClientResumeToken(eventDoc, *_resumeAfterSplit);
+    tassert(7182805,
+            "Observed unexpected event before resume point",
+            resumeStatus != DSCSCR::ResumeStatus::kCheckNextDoc);
+    uassert(ErrorCodes::ChangeStreamFatalError,
+            "Attempted to resume from a split event fragment, but the event in the resumed "
+            "stream was not large enough to be split",
+            resumeStatus != DSCSCR::ResumeStatus::kNeedsSplit ||
+                eventBsonSize > kBSONObjMaxChangeEventSize);
+    auto fragmentNum =
+        (resumeStatus == DSCSCR::ResumeStatus::kNeedsSplit ? *_resumeAfterSplit->fragmentNum : 0);
+    _resumeAfterSplit.reset();
+    return fragmentNum;
 }
 
 namespace {

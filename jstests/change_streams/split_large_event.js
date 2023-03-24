@@ -111,39 +111,6 @@ assert.commandWorked(testColl.update({_id: "bbb"}, {$set: {a: "y".repeat(kLargeS
     assert(!fullEvent.splitEvent);
 }
 
-{
-    // Test that for events which are over the size limit, $changeStreamSplitLargeEvent is required.
-    // Additionally, test that 'changeStreams.largeEventsFailed' metric is counted correctly.
-
-    const oldChangeStreamsLargeEventsFailed = getChangeStreamMetricSum("largeEventsFailed");
-
-    const csCursor = testColl.watch([], {
-        batchSize: 0,  // Ensure same behavior for replica sets and sharded clusters.
-        fullDocument: "required",
-        fullDocumentBeforeChange: "required",
-        resumeAfter: testStartToken
-    });
-    assert.throwsWithCode(() => assert.soon(() => csCursor.hasNext()),
-                          ErrorCodes.BSONObjectTooLarge);
-
-    const newChangeStreamsLargeEventsFailed = getChangeStreamMetricSum("largeEventsFailed");
-    // We will hit this exception once on each shard that encounters a large change event document.
-    const numShardsWithLargeDocs =
-        Math.min(2, FixtureHelpers.numberOfShardsForCollection(testColl));
-    assert.eq(newChangeStreamsLargeEventsFailed,
-              oldChangeStreamsLargeEventsFailed + numShardsWithLargeDocs);
-}
-
-// Open a change stream with $changeStreamSplitLargeEvent and request both pre- and post-images.
-csCursor =
-    testColl.watch([{$changeStreamSplitLargeEvent: {}}],
-                   {
-                       batchSize: 0,  // Ensure same behavior for replica sets and sharded clusters.
-                       fullDocument: "required",
-                       fullDocumentBeforeChange: "required",
-                       resumeAfter: testStartToken
-                   });
-
 /**
  * Helper function to reconstruct the fragments of a split event into the original event. The
  * fragments are expected to be the next 'expectedFragmentCount' events retrieved from the cursor.
@@ -176,54 +143,116 @@ function validateReconstructedEvent(event, expectedId) {
     assert.eq(kLargeStringSize, event.updateDescription.updatedFields.a.length);
 }
 
-const oldChangeStreamsLargeEventsSplit = getChangeStreamMetricSum("largeEventSplit");
+// We declare 'resumeTokens' array outside of the for-scope to collect and share resume tokens
+// across several test-cases.
+let resumeTokens = [];
 
-const [reconstructedEvent, resumeTokens] = reconstructSplitEvent(csCursor, 3);
-const fragmentCount = resumeTokens.length;
-validateReconstructedEvent(reconstructedEvent, "aaa");
+for (const postImageMode of ["required", "updateLookup"]) {
+    {
+        // Test that for events which are over the size limit, $changeStreamSplitLargeEvent is
+        // required. Additionally, test that 'changeStreams.largeEventsFailed' metric is counted
+        // correctly.
 
-const [reconstructedEvent2, _] = reconstructSplitEvent(csCursor, 3);
-validateReconstructedEvent(reconstructedEvent2, "bbb");
+        const oldChangeStreamsLargeEventsFailed = getChangeStreamMetricSum("largeEventsFailed");
 
-const newChangeStreamsLargeEventsSplit = getChangeStreamMetricSum("largeEventSplit");
-assert.eq(oldChangeStreamsLargeEventsSplit + 2, newChangeStreamsLargeEventsSplit);
-
-{
-    // Test that we can filter on fields that sum to more than 16MB without throwing. Note that
-    // we construct this $match as an $or of the three large fields so that pipeline optimization
-    // cannot split this $match into multiple predicates and scatter them through the pipeline.
-    const csCursor = testColl.watch(
-        [
-            {
-                $match: {
-                    $or: [
-                        {"fullDocument": {$exists: true}},
-                        {"fullDocumentBeforeChange": {$exists: true}},
-                        {"updateDescription": {$exists: true}}
-                    ]
-                }
-            },
-            {$changeStreamSplitLargeEvent: {}}
-        ],
-        {
-            fullDocument: "required",
+        const csCursor = testColl.watch([], {
+            batchSize: 0,  // Ensure same behavior for replica sets and sharded clusters.
+            fullDocument: postImageMode,
             fullDocumentBeforeChange: "required",
             resumeAfter: testStartToken
         });
-    assert.docEq(resumeTokens, reconstructSplitEvent(csCursor, 3)[1]);
-}
+        assert.throwsWithCode(() => assert.soon(() => csCursor.hasNext()),
+                              ErrorCodes.BSONObjectTooLarge);
 
-{
-    // Resume the stream from the second-last fragment and test that we see only the last fragment.
-    const csCursor = testColl.watch([{$changeStreamSplitLargeEvent: {}}], {
-        fullDocument: "required",
-        fullDocumentBeforeChange: "required",
-        resumeAfter: resumeTokens[fragmentCount - 2]
-    });
-    assert.soon(() => csCursor.hasNext());
-    const resumedEvent = csCursor.next();
-    assert.eq(resumedEvent.updateDescription.updatedFields.a.length, kLargeStringSize);
-    assert.docEq({fragment: fragmentCount, of: fragmentCount}, resumedEvent.splitEvent);
+        const newChangeStreamsLargeEventsFailed = getChangeStreamMetricSum("largeEventsFailed");
+        // We will hit this exception once on each shard that encounters a large change event
+        // document.
+        const numShardsWithLargeDocs =
+            Math.min(2, FixtureHelpers.numberOfShardsForCollection(testColl));
+        assert.eq(newChangeStreamsLargeEventsFailed,
+                  oldChangeStreamsLargeEventsFailed + numShardsWithLargeDocs);
+    }
+
+    {
+        // Test that oversized events are split into fragments and can be reassembled to form the
+        // original event, and that the largeEventSplit metric counter is correctly incremented.
+
+        const csCursor = testColl.watch(
+            [{$changeStreamSplitLargeEvent: {}}],
+            {
+                batchSize: 0,  // Ensure same behavior for replica sets and sharded clusters.
+                fullDocument: postImageMode,
+                fullDocumentBeforeChange: "required",
+                resumeAfter: testStartToken
+            });
+
+        const oldChangeStreamsLargeEventsSplit = getChangeStreamMetricSum("largeEventSplit");
+
+        var reconstructedEvent;
+        [reconstructedEvent, resumeTokens] = reconstructSplitEvent(csCursor, 3);
+        validateReconstructedEvent(reconstructedEvent, "aaa");
+
+        const [reconstructedEvent2, _] = reconstructSplitEvent(csCursor, 3);
+        validateReconstructedEvent(reconstructedEvent2, "bbb");
+
+        const newChangeStreamsLargeEventsSplit = getChangeStreamMetricSum("largeEventSplit");
+        assert.eq(oldChangeStreamsLargeEventsSplit + 2, newChangeStreamsLargeEventsSplit);
+    }
+
+    {
+        // Test that we can filter on fields that sum to more than 16MB without throwing. Note that
+        // we construct this $match as an $or of the three large fields so that pipeline
+        // optimization cannot split this $match into multiple predicates and scatter them through
+        // the pipeline.
+        const csCursor = testColl.watch(
+            [
+                {
+                    $match: {
+                        $or: [
+                            {"fullDocument": {$exists: true}},
+                            {"fullDocumentBeforeChange": {$exists: true}},
+                            {"updateDescription": {$exists: true}}
+                        ]
+                    }
+                },
+                {$changeStreamSplitLargeEvent: {}}
+            ],
+            {
+                fullDocument: postImageMode,
+                fullDocumentBeforeChange: "required",
+                resumeAfter: testStartToken
+            });
+        assert.docEq(resumeTokens, reconstructSplitEvent(csCursor, 3)[1]);
+    }
+
+    {
+        // Resume the stream from the second-last fragment and test that we see only the last
+        // fragment.
+        const csCursor = testColl.watch([{$changeStreamSplitLargeEvent: {}}], {
+            fullDocument: postImageMode,
+            fullDocumentBeforeChange: "required",
+            resumeAfter: resumeTokens[resumeTokens.length - 2]
+        });
+        assert.soon(() => csCursor.hasNext());
+        const resumedEvent = csCursor.next();
+        assert.eq(resumedEvent.updateDescription.updatedFields.a.length, kLargeStringSize);
+        assert.docEq({fragment: resumeTokens.length, of: resumeTokens.length},
+                     resumedEvent.splitEvent);
+    }
+
+    {
+        // Test that projecting out one of the large fields in the resumed pipeline changes the
+        // split such that the resume point won't be generated, and we therefore throw an exception.
+        const csCursor = testColl.watch(
+            [{$project: {"fullDocument.a": 0}}, {$changeStreamSplitLargeEvent: {}}], {
+                batchSize: 0,  // Ensure same behavior for replica sets and sharded clusters.
+                fullDocument: postImageMode,
+                fullDocumentBeforeChange: "required",
+                resumeAfter: resumeTokens[resumeTokens.length - 1]
+            });
+        assert.throwsWithCode(() => assert.soon(() => csCursor.hasNext()),
+                              ErrorCodes.ChangeStreamFatalError);
+    }
 }
 
 {
@@ -232,7 +261,7 @@ assert.eq(oldChangeStreamsLargeEventsSplit + 2, newChangeStreamsLargeEventsSplit
     assert.commandFailedWithCode(testDB.runCommand({
         aggregate: testColl.getName(),
         pipeline: [
-            {$changeStream: {resumeAfter: resumeTokens[fragmentCount - 2]}},
+            {$changeStream: {resumeAfter: resumeTokens[resumeTokens.length - 2]}},
             {$_internalInhibitOptimization: {}},
             {$changeStreamSplitLargeEvent: {}}
         ],
@@ -242,16 +271,20 @@ assert.eq(oldChangeStreamsLargeEventsSplit + 2, newChangeStreamsLargeEventsSplit
 }
 
 {
-    // Test that projecting out one of the large fields in the resumed pipeline changes the split
-    // such that the resume point won't be generated, and we therefore throw an exception.
-    const csCursor =
-        testColl.watch([{$project: {"fullDocument.a": 0}}, {$changeStreamSplitLargeEvent: {}}], {
-            batchSize: 0,  // Ensure same behavior for replica sets and sharded clusters.
-            fullDocument: "required",
-            fullDocumentBeforeChange: "required",
-            resumeAfter: resumeTokens[fragmentCount - 1]
-        });
+    // Test that resuming from a split event token without requesting pre- and post- images fails,
+    // because the resulting event is too small to be split.
+    const csCursor = testColl.watch([{$changeStreamSplitLargeEvent: {}}], {
+        batchSize: 0,  // Ensure same behavior for replica sets and sharded clusters.
+        resumeAfter: resumeTokens[resumeTokens.length - 1]
+    });
     assert.throwsWithCode(() => assert.soon(() => csCursor.hasNext()),
                           ErrorCodes.ChangeStreamFatalError);
+}
+
+{
+    // Test that resuming from split event without the $changeStreamSplitLargeEvent stage fails.
+    assert.throwsWithCode(
+        () => testColl.watch([], {resumeAfter: resumeTokens[resumeTokens.length - 2]}),
+        ErrorCodes.ChangeStreamFatalError);
 }
 }());

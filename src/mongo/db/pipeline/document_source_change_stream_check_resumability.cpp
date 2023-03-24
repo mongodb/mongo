@@ -30,6 +30,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/curop.h"
+#include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/document_source_change_stream_check_resumability.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/repl/oplog_entry.h"
@@ -137,7 +138,7 @@ DocumentSourceChangeStreamCheckResumability::DocumentSourceChangeStreamCheckResu
 intrusive_ptr<DocumentSourceChangeStreamCheckResumability>
 DocumentSourceChangeStreamCheckResumability::create(const intrusive_ptr<ExpressionContext>& expCtx,
                                                     const DocumentSourceChangeStreamSpec& spec) {
-    auto resumeToken = DocumentSourceChangeStream::resolveResumeTokenFromSpec(expCtx, spec);
+    auto resumeToken = change_stream::resolveResumeTokenFromSpec(expCtx, spec);
     return new DocumentSourceChangeStreamCheckResumability(expCtx, std::move(resumeToken));
 }
 

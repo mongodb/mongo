@@ -36,6 +36,7 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/change_stream_constants.h"
 #include "mongo/db/pipeline/change_stream_filter_helpers.h"
+#include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/change_stream_helpers_legacy.h"
 #include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_post_image.h"
@@ -234,23 +235,6 @@ std::string DocumentSourceChangeStream::regexEscapeNsForChangeStream(StringData 
     return result;
 }
 
-ResumeTokenData DocumentSourceChangeStream::resolveResumeTokenFromSpec(
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    const DocumentSourceChangeStreamSpec& spec) {
-    if (spec.getStartAfter()) {
-        return spec.getStartAfter()->getData();
-    } else if (spec.getResumeAfter()) {
-        return spec.getResumeAfter()->getData();
-    } else if (spec.getStartAtOperationTime()) {
-        return ResumeToken::makeHighWaterMarkToken(*spec.getStartAtOperationTime(),
-                                                   expCtx->changeStreamTokenVersion)
-            .getData();
-    }
-    tasserted(5666901,
-              "Expected one of 'startAfter', 'resumeAfter' or 'startAtOperationTime' to be "
-              "populated in $changeStream spec");
-}
-
 Timestamp DocumentSourceChangeStream::getStartTimeForNewStream(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     // If we do not have an explicit starting point, we should start from the latest majority
@@ -298,7 +282,7 @@ std::list<boost::intrusive_ptr<DocumentSource>> DocumentSourceChangeStream::_bui
     std::list<boost::intrusive_ptr<DocumentSource>> stages;
 
     // Obtain the resume token from the spec. This will be used when building the pipeline.
-    auto resumeToken = DocumentSourceChangeStream::resolveResumeTokenFromSpec(expCtx, spec);
+    auto resumeToken = change_stream::resolveResumeTokenFromSpec(expCtx, spec);
 
     // Unfold the $changeStream into its constituent stages and add them to the pipeline.
     stages.push_back(DocumentSourceChangeStreamOplogMatch::create(expCtx, spec));
@@ -408,7 +392,7 @@ void DocumentSourceChangeStream::assertIsLegalSpecification(
             !spec.getResumeAfter() || !spec.getStartAfter());
 
     auto resumeToken = (spec.getResumeAfter() || spec.getStartAfter())
-        ? resolveResumeTokenFromSpec(expCtx, spec)
+        ? change_stream::resolveResumeTokenFromSpec(expCtx, spec)
         : boost::optional<ResumeTokenData>();
 
     uassert(40674,

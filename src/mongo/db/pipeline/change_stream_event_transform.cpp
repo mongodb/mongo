@@ -31,6 +31,7 @@
 
 #include "mongo/db/pipeline/change_stream_document_diff_parser.h"
 #include "mongo/db/pipeline/change_stream_filter_helpers.h"
+#include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/change_stream_helpers_legacy.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/pipeline/document_path_support.h"
@@ -46,7 +47,7 @@ namespace mongo {
 namespace {
 constexpr auto checkValueType = &DocumentSourceChangeStream::checkValueType;
 constexpr auto checkValueTypeOrMissing = &DocumentSourceChangeStream::checkValueTypeOrMissing;
-constexpr auto resolveResumeToken = &DocumentSourceChangeStream::resolveResumeTokenFromSpec;
+constexpr auto resolveResumeToken = &change_stream::resolveResumeTokenFromSpec;
 
 Document copyDocExceptFields(const Document& source, const std::set<StringData>& fieldNames) {
     MutableDocument doc(source);

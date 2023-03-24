@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/change_stream_start_after_invalidate_info.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/pipeline/document_source_change_stream_check_invalidate.h"
@@ -73,7 +74,7 @@ DocumentSourceChangeStreamCheckInvalidate::create(
     const DocumentSourceChangeStreamSpec& spec) {
     // If resuming from an "invalidate" using "startAfter", pass along the resume token data to
     // DSCSCheckInvalidate to signify that another invalidate should not be generated.
-    auto resumeToken = DocumentSourceChangeStream::resolveResumeTokenFromSpec(expCtx, spec);
+    auto resumeToken = change_stream::resolveResumeTokenFromSpec(expCtx, spec);
     return new DocumentSourceChangeStreamCheckInvalidate(
         expCtx, boost::make_optional(resumeToken.fromInvalidate, std::move(resumeToken)));
 }
