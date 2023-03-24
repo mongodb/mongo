@@ -45,6 +45,7 @@
 
 namespace mongo {
 
+class DeleteRequest;
 class OpDebug;
 class ParsedUpdate;
 class PlanExecutor;
@@ -67,6 +68,17 @@ struct WriteResult {
     // In case of an error, whether the operation can continue.
     bool canContinue = true;
 };
+
+/**
+ * Returns true if the batch can continue, false to stop the batch, or throws to fail the command.
+ */
+bool handleError(OperationContext* opCtx,
+                 const DBException& ex,
+                 const NamespaceString& nss,
+                 bool ordered,
+                 bool isMultiUpdate,
+                 boost::optional<UUID> sampleId,
+                 WriteResult* out);
 
 bool getFleCrudProcessed(OperationContext* opCtx,
                          const boost::optional<EncryptionInformation>& encryptionInfo);
@@ -92,8 +104,8 @@ boost::optional<BSONObj> advanceExecutor(OperationContext* opCtx,
                                          bool isRemove);
 
 /**
- * Executes the a findAndModify, the returned document is placed into docFound (if applicable).
- * Should be called in a writeConflictRetry loop.
+ * Executes a findAndModify with remove:false, the returned document is placed into docFound (if
+ * applicable). Should be called in a writeConflictRetry loop.
  */
 UpdateResult writeConflictRetryUpsert(OperationContext* opCtx,
                                       const NamespaceString& nsString,
@@ -104,6 +116,18 @@ UpdateResult writeConflictRetryUpsert(OperationContext* opCtx,
                                       bool upsert,
                                       boost::optional<BSONObj>& docFound,
                                       ParsedUpdate* parsedUpdate);
+
+/**
+ * Executes a findAndModify with remove:true, the returned document is placed into docFound (if
+ * applicable). Should be called in a writeConflictRetry loop.
+ */
+long long writeConflictRetryRemove(OperationContext* opCtx,
+                                   const NamespaceString& nsString,
+                                   DeleteRequest* deleteRequest,
+                                   CurOp* curOp,
+                                   OpDebug* opDebug,
+                                   bool inTransaction,
+                                   boost::optional<BSONObj>& docFound);
 
 /**
  * Generates a WriteError for a given Status.

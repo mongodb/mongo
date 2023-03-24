@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/db/ops/update_result.h"
 #include <boost/optional.hpp>
 
 #include "mongo/base/status_with.h"
@@ -48,6 +47,7 @@
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/ops/parsed_delete.h"
 #include "mongo/db/ops/parsed_update.h"
+#include "mongo/db/ops/update_result.h"
 #include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/ops/write_ops_retryability.h"
 #include "mongo/db/query/collection_query_info.h"
@@ -191,15 +191,6 @@ write_ops::FindAndModifyCommandReply buildResponse(
     return result;
 }
 
-write_ops::FindAndModifyCommandReply buildResponse(const PlanExecutor* exec,
-                                                   bool isRemove,
-                                                   const boost::optional<BSONObj>& value) {
-    if (isRemove) {
-        return buildResponse(boost::none, isRemove, value);
-    }
-    return buildResponse(exec->getUpdateResult(), isRemove, value);
-}
-
 void assertCanWrite_inlock(OperationContext* opCtx, const NamespaceString& nss) {
     uassert(ErrorCodes::NotWritablePrimary,
             str::stream() << "Not primary while running findAndModify command on collection "
@@ -297,16 +288,6 @@ public:
         Reply typedRun(OperationContext* opCtx) final;
 
         void appendMirrorableRequest(BSONObjBuilder* bob) const final;
-
-    private:
-        static write_ops::FindAndModifyCommandReply writeConflictRetryRemove(
-            OperationContext* opCtx,
-            const NamespaceString& nsString,
-            const write_ops::FindAndModifyCommandRequest& request,
-            int stmtId,
-            CurOp* curOp,
-            OpDebug* opDebug,
-            bool inTransaction);
     };
 
 private:
@@ -315,81 +296,6 @@ private:
 } cmdFindAndModify;
 
 UpdateMetrics CmdFindAndModify::_updateMetrics{"findAndModify"};
-
-write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::writeConflictRetryRemove(
-    OperationContext* opCtx,
-    const NamespaceString& nsString,
-    const write_ops::FindAndModifyCommandRequest& request,
-    int stmtId,
-    CurOp* curOp,
-    OpDebug* const opDebug,
-    bool inTransaction) {
-
-    auto deleteRequest = DeleteRequest{};
-    deleteRequest.setNsString(nsString);
-    const bool isExplain = false;
-    makeDeleteRequest(opCtx, request, isExplain, &deleteRequest);
-
-    if (opCtx->getTxnNumber()) {
-        deleteRequest.setStmtId(stmtId);
-    }
-
-    ParsedDelete parsedDelete(opCtx, &deleteRequest);
-    uassertStatusOK(parsedDelete.parseRequest());
-
-    AutoGetCollection collection(opCtx, nsString, MODE_IX);
-
-    {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
-        CurOp::get(opCtx)->enter_inlock(
-            nsString, CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nsString.dbName()));
-    }
-
-    assertCanWrite_inlock(opCtx, nsString);
-
-    checkIfTransactionOnCappedColl(collection.getCollection(), inTransaction);
-
-    const auto exec = uassertStatusOK(getExecutorDelete(
-        opDebug, &collection.getCollection(), &parsedDelete, boost::none /* verbosity */));
-
-    {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
-        CurOp::get(opCtx)->setPlanSummary_inlock(exec->getPlanExplainer().getPlanSummary());
-    }
-
-    auto docFound =
-        advanceExecutor(opCtx, request, exec.get(), request.getRemove().value_or(false));
-    // Nothing after advancing the plan executor should throw a WriteConflictException,
-    // so the following bookkeeping with execution stats won't end up being done
-    // multiple times.
-
-    PlanSummaryStats summaryStats;
-    exec->getPlanExplainer().getSummaryStats(&summaryStats);
-    if (const auto& coll = collection.getCollection()) {
-        CollectionQueryInfo::get(coll).notifyOfQuery(opCtx, coll, summaryStats);
-    }
-    opDebug->setPlanSummaryMetrics(summaryStats);
-
-    // Fill out OpDebug with the number of deleted docs.
-    opDebug->additiveMetrics.ndeleted = docFound ? 1 : 0;
-
-    if (curOp->shouldDBProfile()) {
-        auto&& explainer = exec->getPlanExplainer();
-        auto&& [stats, _] = explainer.getWinningPlanStats(ExplainOptions::Verbosity::kExecStats);
-        curOp->debug().execStats = std::move(stats);
-    }
-    recordStatsForTopCommand(opCtx);
-
-    if (docFound) {
-        ResourceConsumption::DocumentUnitCounter docUnitsReturned;
-        docUnitsReturned.observeOne(docFound->objsize());
-
-        auto& metricsCollector = ResourceConsumption::MetricsCollector::get(opCtx);
-        metricsCollector.incrementDocUnitsReturned(curOp->getNS(), docUnitsReturned);
-    }
-
-    return buildResponse(exec.get(), request.getRemove().value_or(false), docFound);
-}
 
 void CmdFindAndModify::Invocation::doCheckAuthorization(OperationContext* opCtx) const {
     std::vector<Privilege> privileges;
@@ -583,8 +489,17 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
     // modify, and return the document under concurrency, if a matching document exists.
     return writeConflictRetry(opCtx, "findAndModify", nsString.ns(), [&] {
         if (req.getRemove().value_or(false)) {
-            return CmdFindAndModify::Invocation::writeConflictRetryRemove(
-                opCtx, nsString, req, stmtId, curOp, opDebug, inTransaction);
+            DeleteRequest deleteRequest;
+            makeDeleteRequest(opCtx, req, false, &deleteRequest);
+            deleteRequest.setNsString(nsString);
+            if (opCtx->getTxnNumber()) {
+                deleteRequest.setStmtId(stmtId);
+            }
+            boost::optional<BSONObj> docFound;
+            write_ops_exec::writeConflictRetryRemove(
+                opCtx, nsString, &deleteRequest, curOp, opDebug, inTransaction, docFound);
+            recordStatsForTopCommand(opCtx);
+            return buildResponse(boost::none, true /* isRemove */, docFound);
         } else {
             if (MONGO_unlikely(hangBeforeFindAndModifyPerformsUpdate.shouldFail())) {
                 CurOpFailpointHelpers::waitWhileFailPointEnabled(

@@ -43,10 +43,12 @@
 #include "mongo/db/commands/bulk_write_parser.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop_failpoint_helpers.h"
+#include "mongo/db/curop_metrics.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/not_primary_error_tracker.h"
+#include "mongo/db/ops/delete_request_gen.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/ops/parsed_update.h"
 #include "mongo/db/ops/update_request.h"
@@ -70,12 +72,16 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(hangBeforeBulkWritePerformsUpdate);
 
 using UpdateCallback = std::function<void(OperationContext*,
-                                          int,
+                                          int /* currentOpIdx */,
                                           const Status&,
                                           const boost::optional<UpdateResult>&,
-                                          const boost::optional<BSONObj>&)>;
+                                          const boost::optional<BSONObj>& /* value */)>;
 
-using DeleteCallback = std::function<void(OperationContext*, int, const SingleWriteResult&)>;
+using DeleteCallback = std::function<void(OperationContext*,
+                                          int /* currentOpIdx */,
+                                          const Status&,
+                                          long long /* nDeleted */,
+                                          const boost::optional<BSONObj>& /* value */)>;
 
 /**
  * Class representing an InsertBatch. Maintains a reference to the request and a callback function
@@ -236,7 +242,18 @@ public:
 
     void addDeleteReply(OperationContext* opCtx,
                         size_t currentOpIdx,
-                        const SingleWriteResult& write) {}
+                        const Status& status,
+                        long long nDeleted,
+                        const boost::optional<BSONObj>& value) {
+        auto replyItem = BulkWriteReplyItem(currentOpIdx, status);
+        if (status.isOK()) {
+            replyItem.setN(nDeleted);
+            if (value) {
+                replyItem.setValue(value);
+            }
+        }
+        _replies.emplace_back(replyItem);
+    }
 
     std::vector<BulkWriteReplyItem>& getReplies() {
         return _replies;
@@ -246,6 +263,48 @@ private:
     const BulkWriteCommandRequest& _req;
     std::vector<BulkWriteReplyItem> _replies;
 };
+
+void finishCurOp(OperationContext* opCtx, CurOp* curOp) {
+    try {
+        curOp->done();
+        auto executionTimeMicros = duration_cast<Microseconds>(curOp->elapsedTimeExcludingPauses());
+        curOp->debug().executionTime = executionTimeMicros;
+
+        recordCurOpMetrics(opCtx);
+        Top::get(opCtx->getServiceContext())
+            .record(opCtx,
+                    curOp->getNS(),
+                    curOp->getLogicalOp(),
+                    Top::LockType::WriteLocked,
+                    durationCount<Microseconds>(curOp->elapsedTimeExcludingPauses()),
+                    curOp->isCommand(),
+                    curOp->getReadWriteType());
+
+        if (!curOp->debug().errInfo.isOK()) {
+            LOGV2_DEBUG(
+                7276600,
+                3,
+                "Caught Assertion in bulkWrite finishCurOp. Op: {operation}, error: {error}",
+                "Caught Assertion in bulkWrite finishCurOp",
+                "operation"_attr = redact(logicalOpToString(curOp->getLogicalOp())),
+                "error"_attr = curOp->debug().errInfo.toString());
+        }
+
+        // Mark the op as complete, and log it if appropriate.
+        curOp->completeAndLogOperation(MONGO_LOGV2_DEFAULT_COMPONENT,
+                                       CollectionCatalog::get(opCtx)
+                                           ->getDatabaseProfileSettings(curOp->getNSS().dbName())
+                                           .filter);
+    } catch (const DBException& ex) {
+        // We need to ignore all errors here. We don't want a successful op to fail because of a
+        // failure to record stats. We also don't want to replace the error reported for an op that
+        // is failing.
+        LOGV2(7276601,
+              "Ignoring error from bulkWrite finishCurOp: {error}",
+              "Ignoring error from bulkWrite finishCurOp",
+              "error"_attr = redact(ex));
+    }
+}
 
 int32_t getStatementId(OperationContext* opCtx,
                        const BulkWriteCommandRequest& req,
@@ -284,15 +343,14 @@ bool handleInsertOp(OperationContext* opCtx,
 }
 
 bool handleUpdateOp(OperationContext* opCtx,
+                    CurOp* curOp,
                     const BulkWriteUpdateOp* op,
                     const BulkWriteCommandRequest& req,
                     size_t currentOpIdx,
                     UpdateCallback replyCB) noexcept {
+    const auto& nsInfo = req.getNsInfo();
+    auto idx = op->getUpdate();
     try {
-        const auto& nsInfo = req.getNsInfo();
-
-        auto idx = op->getUpdate();
-
         if (op->getMulti()) {
             uassert(ErrorCodes::InvalidOptions,
                     "May not specify both multi and return in bulkWrite command.",
@@ -307,10 +365,11 @@ bool handleUpdateOp(OperationContext* opCtx,
 
         const NamespaceString& nsString = nsInfo[idx].getNs();
         uassertStatusOK(userAllowedWriteNS(opCtx, nsString));
-        auto const curOp = CurOp::get(opCtx);
-        OpDebug* const opDebug = &curOp->debug();
+        OpDebug* opDebug = &curOp->debug();
 
         doTransactionValidationForWrites(opCtx, nsString);
+
+        const bool inTransaction = opCtx->inMultiDocumentTransaction();
 
         auto updateRequest = UpdateRequest();
         updateRequest.setNamespaceString(nsString);
@@ -333,17 +392,14 @@ bool handleUpdateOp(OperationContext* opCtx,
         }
         updateRequest.setMulti(op->getMulti());
 
-        updateRequest.setYieldPolicy(opCtx->inMultiDocumentTransaction()
-                                         ? PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY
-                                         : PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
+        updateRequest.setYieldPolicy(inTransaction ? PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY
+                                                   : PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
 
         if (req.getStmtIds()) {
             updateRequest.setStmtIds(*req.getStmtIds());
         } else if (req.getStmtId()) {
             updateRequest.setStmtIds({*req.getStmtId()});
         }
-
-        const bool inTransaction = opCtx->inMultiDocumentTransaction();
 
         // Although usually the PlanExecutor handles WCE internally, it will throw WCEs when it
         // is executing an update. This is done to ensure that we can always match,
@@ -398,19 +454,75 @@ bool handleUpdateOp(OperationContext* opCtx,
         });
     } catch (const DBException& ex) {
         replyCB(opCtx, currentOpIdx, ex.toStatus(), boost::none, boost::none);
-        return !req.getOrdered();
+        write_ops_exec::WriteResult out;
+        return write_ops_exec::handleError(
+            opCtx, ex, nsInfo[idx].getNs(), req.getOrdered(), op->getMulti(), boost::none, &out);
     }
 }
 
 bool handleDeleteOp(OperationContext* opCtx,
+                    CurOp* curOp,
                     const BulkWriteDeleteOp* op,
                     const BulkWriteCommandRequest& req,
                     size_t currentOpIdx,
                     DeleteCallback replyCB) noexcept {
-    // Perform the update operation then call replyCB with the SingleWriteResult and currentOpIdx
-    // to save the response to be used in cursor creation.
-    // see write_ops_exec::performDeletes for reference.
-    return false;
+    const auto& nsInfo = req.getNsInfo();
+    auto idx = op->getDeleteCommand();
+    try {
+        if (op->getMulti()) {
+            uassert(ErrorCodes::InvalidOptions,
+                    "May not specify both multi and return in bulkWrite command.",
+                    !op->getReturn());
+        }
+
+        if (op->getReturnFields()) {
+            uassert(ErrorCodes::InvalidOptions,
+                    "Must specify return if returnFields is provided in bulkWrite command.",
+                    op->getReturn());
+        }
+
+        const NamespaceString& nsString = nsInfo[idx].getNs();
+        uassertStatusOK(userAllowedWriteNS(opCtx, nsString));
+        OpDebug* opDebug = &curOp->debug();
+
+        doTransactionValidationForWrites(opCtx, nsString);
+
+        auto deleteRequest = DeleteRequest();
+        deleteRequest.setNsString(nsString);
+        deleteRequest.setQuery(op->getFilter());
+        deleteRequest.setProj(op->getReturnFields().value_or(BSONObj()));
+        deleteRequest.setLegacyRuntimeConstants(Variables::generateRuntimeConstants(opCtx));
+        deleteRequest.setLet(op->getLet());
+        deleteRequest.setSort(op->getSort().value_or(BSONObj()));
+        deleteRequest.setHint(op->getHint());
+        deleteRequest.setCollation(op->getCollation().value_or(BSONObj()));
+        deleteRequest.setMulti(op->getMulti());
+        deleteRequest.setReturnDeleted(op->getReturn());
+        deleteRequest.setIsExplain(false);
+
+        deleteRequest.setYieldPolicy(opCtx->inMultiDocumentTransaction()
+                                         ? PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY
+                                         : PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
+
+        if (opCtx->getTxnNumber() && req.getStmtId()) {
+            deleteRequest.setStmtId(*req.getStmtId());
+        }
+
+        const bool inTransaction = opCtx->inMultiDocumentTransaction();
+
+        return writeConflictRetry(opCtx, "bulkWriteDelete", nsString.ns(), [&] {
+            boost::optional<BSONObj> docFound;
+            auto nDeleted = write_ops_exec::writeConflictRetryRemove(
+                opCtx, nsString, &deleteRequest, curOp, opDebug, inTransaction, docFound);
+            replyCB(opCtx, currentOpIdx, Status::OK(), nDeleted, docFound);
+            return true;
+        });
+    } catch (const DBException& ex) {
+        replyCB(opCtx, currentOpIdx, ex.toStatus(), 0, boost::none);
+        write_ops_exec::WriteResult out;
+        return write_ops_exec::handleError(
+            opCtx, ex, nsInfo[idx].getNs(), req.getOrdered(), false, boost::none, &out);
+    }
 }
 
 std::vector<BulkWriteReplyItem> performWrites(OperationContext* opCtx,
@@ -439,16 +551,27 @@ std::vector<BulkWriteReplyItem> performWrites(OperationContext* opCtx,
                                  const boost::optional<BSONObj>& value) {
         responses.addUpdateReply(opCtx, currentOpIdx, status, result, value);
     };
-    auto deleteCB =
-        [&responses](OperationContext* opCtx, int currentOpIdx, const SingleWriteResult& write) {
-            responses.addDeleteReply(opCtx, currentOpIdx, write);
-        };
+    auto deleteCB = [&responses](OperationContext* opCtx,
+                                 int currentOpIdx,
+                                 const Status& status,
+                                 long long nDeleted,
+                                 const boost::optional<BSONObj>& value) {
+        responses.addDeleteReply(opCtx, currentOpIdx, status, nDeleted, value);
+    };
 
     // Create a current insert batch.
     const size_t maxBatchSize = internalInsertMaxBatchSize.load();
     auto batch = InsertBatch(req, std::min(ops.size(), maxBatchSize), insertCB);
 
     size_t idx = 0;
+
+    auto curOp = CurOp::get(opCtx);
+
+    ON_BLOCK_EXIT([&] {
+        if (curOp) {
+            finishCurOp(opCtx, &*curOp);
+        }
+    });
 
     for (; idx < ops.size(); ++idx) {
         auto op = BulkWriteCRUDOp(ops[idx]);
@@ -464,7 +587,7 @@ std::vector<BulkWriteReplyItem> performWrites(OperationContext* opCtx,
             if (!batch.flush(opCtx)) {
                 break;
             }
-            if (!handleUpdateOp(opCtx, op.getUpdate(), req, idx, updateCB)) {
+            if (!handleUpdateOp(opCtx, curOp, op.getUpdate(), req, idx, updateCB)) {
                 // Update write failed can no longer continue.
                 break;
             }
@@ -473,7 +596,7 @@ std::vector<BulkWriteReplyItem> performWrites(OperationContext* opCtx,
             if (!batch.flush(opCtx)) {
                 break;
             }
-            if (!handleDeleteOp(opCtx, op.getDelete(), req, idx, deleteCB)) {
+            if (!handleDeleteOp(opCtx, curOp, op.getDelete(), req, idx, deleteCB)) {
                 // Delete write failed can no longer continue.
                 break;
             }

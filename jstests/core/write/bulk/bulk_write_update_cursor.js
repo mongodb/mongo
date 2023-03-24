@@ -5,7 +5,7 @@
  * @tags: [
  *   assumes_against_mongod_not_mongos,
  *   not_allowed_with_security_token,
- *   # Until bulkWrite is compatible with retryable writes.
+ *   # TODO SERVER-72988: Until bulkWrite is compatible with retryable writes.
  *   requires_non_retryable_writes,
  *   # Command is not yet compatible with tenant migration.
  *   tenant_migration_incompatible,
@@ -35,7 +35,7 @@ const cursorEntryValidator = function(entry, expectedEntry) {
     assert(entry.code == expectedEntry.code);
 };
 
-// Test generic update.
+// Test generic update with no return.
 var res = db.adminCommand({
     bulkWrite: 1,
     ops: [
@@ -100,7 +100,7 @@ assert.eq("MongoDB2", coll.findOne().skey);
 
 coll.drop();
 
-// Test only updates one when multi is false with sort.
+// Test only updates one when multi is false (default value) with sort.
 res = db.adminCommand({
     bulkWrite: 1,
     ops: [
@@ -128,7 +128,7 @@ assert.sameMembers(coll.find().toArray(), [{_id: 0, skey: "MongoDB"}, {_id: 1, s
 
 coll.drop();
 
-// Test only updates one when multi is false with sort.
+// Test only updates one when multi is false (default value) with sort.
 res = db.adminCommand({
     bulkWrite: 1,
     ops: [
@@ -416,22 +416,13 @@ cursorEntryValidator(res.cursor.firstBatch[3], {ok: 1, idx: 3, nModified: 1});
 assert.docEq(res.cursor.firstBatch[3].value, {_id: 0, skey: "MongoDB2"});
 assert(!res.cursor.firstBatch[4]);
 
-var docs = [{_id: 0, skey: "MongoDB2"}, {_id: 1, skey: "MongoDB2"}, {_id: 2, skey: "MongoDB3"}];
-coll.find().forEach(function(myDoc) {
-    var found = false;
-    for (const doc of docs) {
-        try {
-            assert.docEq(myDoc, doc);
-            found = true;
-        } catch (error) {
-        }
-    }
-    assert(found);
-});
+assert.sameMembers(
+    coll.find().toArray(),
+    [{_id: 0, skey: "MongoDB2"}, {_id: 1, skey: "MongoDB2"}, {_id: 2, skey: "MongoDB3"}]);
 
 coll.drop();
 
-// Test multiple updates on same namespace
+// Test multiple updates on same namespace.
 res = db.adminCommand({
     bulkWrite: 1,
     ops: [
@@ -455,7 +446,7 @@ assert.eq("MongoDB3", coll.findOne().skey);
 
 coll.drop();
 
-// Test upsert with implicit collection creation
+// Test upsert with implicit collection creation.
 res = db.adminCommand({
     bulkWrite: 1,
     ops: [
@@ -480,7 +471,7 @@ assert(!res.cursor.firstBatch[1]);
 var coll2 = db.getCollection("coll2");
 coll2.drop();
 
-// Test write fails userAllowedWriteNS
+// Test write fails userAllowedWriteNS.
 res = db.adminCommand({
     bulkWrite: 1,
     ops: [
@@ -499,7 +490,7 @@ assert.commandWorked(res);
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 0, idx: 0, code: ErrorCodes.InvalidNamespace});
 assert(!res.cursor.firstBatch[1]);
 
-// Test update with ordered:false
+// Test update continues on error with ordered:false.
 assert.commandWorked(coll2.createIndex({x: 1}, {unique: true}));
 assert.commandWorked(coll2.insert({x: 3}));
 assert.commandWorked(coll2.insert({x: 4}));
@@ -524,5 +515,31 @@ cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, nModified: 0});
 assert.docEq(res.cursor.firstBatch[1].upserted, {index: 0, _id: 1});
 assert.docEq(res.cursor.firstBatch[1].value, {_id: 1, skey: "MongoDB2"});
 assert(!res.cursor.firstBatch[2]);
+coll.drop();
+coll2.drop();
+
+// Test update stop on error with ordered:true.
+assert.commandWorked(coll2.createIndex({x: 1}, {unique: true}));
+assert.commandWorked(coll2.insert({x: 3}));
+assert.commandWorked(coll2.insert({x: 4}));
+res = db.adminCommand({
+    bulkWrite: 1,
+    ops: [
+        {update: 0, filter: {x: 3}, updateMods: {$inc: {x: 1}}, upsert: true, return: "post"},
+        {
+            update: 1,
+            filter: {_id: 1},
+            updateMods: {$set: {skey: "MongoDB2"}},
+            upsert: true,
+            return: "post"
+        },
+        {insert: 0, document: {_id: 1, skey: "MongoDB"}},
+    ],
+    nsInfo: [{ns: "test.coll2"}, {ns: "test.coll"}],
+});
+
+cursorEntryValidator(res.cursor.firstBatch[0], {ok: 0, idx: 0, code: ErrorCodes.DuplicateKey});
+assert(!res.cursor.firstBatch[1]);
+coll.drop();
 coll2.drop();
 })();
