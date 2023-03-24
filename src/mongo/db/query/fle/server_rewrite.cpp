@@ -166,7 +166,7 @@ public:
         }
     }
     virtual ~RewriteBase(){};
-    virtual void doRewrite(FLEQueryInterface* queryImpl,
+    virtual void doRewrite(FLETagQueryInterface* queryImpl,
                            const NamespaceString& nssEsc,
                            const NamespaceString& nssEcc){};
 
@@ -188,7 +188,7 @@ public:
         : RewriteBase(toRewrite->getContext(), nss, encryptInfo), pipeline(std::move(toRewrite)) {}
 
     ~PipelineRewrite(){};
-    void doRewrite(FLEQueryInterface* queryImpl,
+    void doRewrite(FLETagQueryInterface* queryImpl,
                    const NamespaceString& nssEsc,
                    const NamespaceString& nssEcc) final {
         auto rewriter = QueryRewriter(expCtx, queryImpl, nssEsc, nssEcc);
@@ -227,7 +227,7 @@ public:
         : RewriteBase(expCtx, nss, encryptInfo), userFilter(toRewrite), _mode(mode) {}
 
     ~FilterRewrite(){};
-    void doRewrite(FLEQueryInterface* queryImpl,
+    void doRewrite(FLETagQueryInterface* queryImpl,
                    const NamespaceString& nssEsc,
                    const NamespaceString& nssEcc) final {
         rewrittenFilter =
@@ -250,6 +250,21 @@ public:
 void doFLERewriteInTxn(OperationContext* opCtx,
                        std::shared_ptr<RewriteBase> sharedBlock,
                        GetTxnCallback getTxn) {
+
+    if (gFeatureFlagFLE2ProtocolVersion2.isEnabled(serverGlobalParams.featureCompatibility)) {
+        // This code path only works if we are NOT running in a a transaction.
+        // if breaks us off of the current optctx readconcern and other settings
+        //
+        if (!opCtx->inMultiDocumentTransaction()) {
+            NamespaceString nssEsc(sharedBlock->dbName, sharedBlock->esc);
+            NamespaceString nssEcc;  // Ignored in V2
+            FLETagNoTXNQuery queryInterface(opCtx);
+
+            sharedBlock->doRewrite(&queryInterface, nssEsc, nssEcc);
+            return;
+        }
+    }
+
     auto txn = getTxn(opCtx);
     auto swCommitResult = txn->runNoThrow(
         opCtx, [sharedBlock](const txn_api::TransactionClient& txnClient, auto txnExec) {

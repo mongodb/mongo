@@ -2090,4 +2090,53 @@ std::unique_ptr<Pipeline, PipelineDeleter> processFLEPipelineS(
         opCtx, nss, encryptInfo, std::move(toRewrite), &getTransactionWithRetriesForMongoS);
 }
 
+FLETagNoTXNQuery::FLETagNoTXNQuery(OperationContext* opCtx) : _opCtx(opCtx) {}
+
+BSONObj FLETagNoTXNQuery::getById(const NamespaceString& nss, BSONElement element) {
+    invariant(false);
+    return {};
+};
+
+uint64_t FLETagNoTXNQuery::countDocuments(const NamespaceString& nss) {
+    invariant(false);
+    return 0;
+}
+
+std::vector<std::vector<FLEEdgeCountInfo>> FLETagNoTXNQuery::getTags(
+    const NamespaceString& nss,
+    const std::vector<std::vector<FLEEdgePrfBlock>>& tokensSets,
+    TagQueryType type) {
+
+    invariant(!_opCtx->inMultiDocumentTransaction());
+
+    // Pop off the current op context so we can get a fresh set of read concern settings
+    auto client = _opCtx->getServiceContext()->makeClient("FLETagNoTXNQuery");
+    AlternativeClientRegion clientRegion(client);
+    auto opCtx = cc().makeOperationContext();
+    auto as = AuthorizationSession::get(cc());
+    as->grantInternalAuthorization(opCtx.get());
+
+    GetQueryableEncryptionCountInfo getCountsCmd(nss);
+
+    const auto tenantId = nss.tenantId();
+    if (tenantId && gMultitenancySupport) {
+        getCountsCmd.setDollarTenant(tenantId);
+    }
+
+    getCountsCmd.setTokens(toTagSets(tokensSets));
+    getCountsCmd.setForInsert(type == FLEQueryInterface::TagQueryType::kInsert);
+
+    DBDirectClient directClient(opCtx.get());
+
+    auto uniqueReply = directClient.runCommand(getCountsCmd.serialize({}));
+
+    auto response = uniqueReply->getCommandReply();
+
+    auto status = getStatusFromWriteCommandReply(response);
+    uassertStatusOK(status);
+
+    auto reply = QECountInfosReply::parse(IDLParserContext("reply"), response);
+
+    return toEdgeCounts(reply.getCounts());
+}
 }  // namespace mongo

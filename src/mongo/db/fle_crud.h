@@ -49,6 +49,7 @@
 #include "mongo/s/write_ops/batched_command_response.h"
 
 namespace mongo {
+class OperationContext;
 
 /**
  * FLE Result enum
@@ -352,6 +353,26 @@ public:
 private:
     const txn_api::TransactionClient& _txnClient;
     ServiceContext* _serviceContext;
+};
+
+/**
+ * FLETagQueryInterface that does not use transaction_api.h to retrieve tags.
+ */
+class FLETagNoTXNQuery : public FLETagQueryInterface {
+public:
+    FLETagNoTXNQuery(OperationContext* opCtx);
+
+    BSONObj getById(const NamespaceString& nss, BSONElement element) final;
+
+    uint64_t countDocuments(const NamespaceString& nss) final;
+
+    std::vector<std::vector<FLEEdgeCountInfo>> getTags(
+        const NamespaceString& nss,
+        const std::vector<std::vector<FLEEdgePrfBlock>>& escDerivedFromDataTokenAndCounter,
+        FLETagQueryInterface::TagQueryType type) final;
+
+private:
+    OperationContext* _opCtx;
 };
 
 /**
