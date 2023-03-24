@@ -3,6 +3,7 @@
  * the expected points on both primaries and secondaries.
  * @tags: [
  *  uses_transactions,
+ *  requires_fcv_70,
  * ]
  */
 (function() {
