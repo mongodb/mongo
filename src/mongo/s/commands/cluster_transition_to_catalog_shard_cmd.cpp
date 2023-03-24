@@ -62,6 +62,10 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
+            uassert(7467201,
+                    "The catalog shard feature is disabled",
+                    gFeatureFlagCatalogShard.isEnabled(serverGlobalParams.featureCompatibility));
+
             ConfigsvrTransitionToCatalogShard cmdToSend;
             cmdToSend.setDbName({"admin"});
 
@@ -101,7 +105,8 @@ public:
     };
 };
 
-MONGO_REGISTER_FEATURE_FLAGGED_COMMAND(TransitionToCatalogShardCommand, gFeatureFlagCatalogShard);
+MONGO_REGISTER_FEATURE_FLAGGED_COMMAND(TransitionToCatalogShardCommand,
+                                       gFeatureFlagTransitionToCatalogShard);
 
 }  // namespace
 }  // namespace mongo

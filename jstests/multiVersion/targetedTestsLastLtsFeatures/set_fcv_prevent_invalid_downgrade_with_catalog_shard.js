@@ -6,7 +6,7 @@
  *         catalog shard cannot be created (this can occur if an FCV downgrade happens concurrently
  *         with the creation of a catalog shard).
  *
- * @tags: [featureFlagCatalogShard]
+ * @tags: [featureFlagCatalogShard, featureFlagTransitionToCatalogShard]
  */
 (function() {
 "use strict";

@@ -345,6 +345,7 @@ class ShardedClusterFixture(interface.Fixture):
             mongod_options["configsvr"] = ""
             replset_config_options["configsvr"] = True
             mongod_options["set_parameters"]["featureFlagCatalogShard"] = "true"
+            mongod_options["set_parameters"]["featureFlagTransitionToCatalogShard"] = "true"
 
             configsvr_options = self.configsvr_options.copy()
             for option, value in configsvr_options.items():

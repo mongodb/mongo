@@ -9,6 +9,13 @@ var CatalogShardUtil = (function() {
             st.configRS.getPrimary(), "CatalogShard", undefined /* user */, true /* ignoreFCV */);
     }
 
+    function isTransitionEnabledIgnoringFCV(st) {
+        return FeatureFlagUtil.isEnabled(st.configRS.getPrimary(),
+                                         "TransitionToCatalogShard",
+                                         undefined /* user */,
+                                         true /* ignoreFCV */);
+    }
+
     function transitionToDedicatedConfigServer(st, timeout) {
         if (timeout == undefined) {
             timeout = 10 * 60 * 1000;  // 10 minutes
@@ -33,6 +40,7 @@ var CatalogShardUtil = (function() {
 
     return {
         isEnabledIgnoringFCV,
+        isTransitionEnabledIgnoringFCV,
         transitionToDedicatedConfigServer,
     };
 })();

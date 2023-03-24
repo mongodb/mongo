@@ -72,6 +72,10 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
+            uassert(7467202,
+                    "The catalog shard feature is disabled",
+                    gFeatureFlagCatalogShard.isEnabled(serverGlobalParams.featureCompatibility));
+
             uassert(ErrorCodes::IllegalOperation,
                     "_configsvrTransitionToCatalogShard can only be run on config servers",
                     serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
@@ -115,7 +119,7 @@ public:
 };
 
 MONGO_REGISTER_FEATURE_FLAGGED_COMMAND(ConfigsvrTransitionToCatalogShardCommand,
-                                       gFeatureFlagCatalogShard);
+                                       gFeatureFlagTransitionToCatalogShard);
 
 }  // namespace
 }  // namespace mongo

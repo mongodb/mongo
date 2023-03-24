@@ -80,7 +80,10 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         uassert(7368401,
-                "catalog shard feature is disabled",
+                "The transition to catalog shard feature is disabled",
+                gFeatureFlagTransitionToCatalogShard.isEnabledAndIgnoreFCV());
+        uassert(7467200,
+                "The catalog shard feature is disabled",
                 gFeatureFlagCatalogShard.isEnabled(serverGlobalParams.featureCompatibility));
 
         auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();

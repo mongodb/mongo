@@ -2,7 +2,7 @@
  * Verifies a config server cannot downgrade with a collection with changeStreamPreAndPostImages
  * enabled.
  *
- * @tags: [featureFlagCatalogShard]
+ * @tags: [featureFlagCatalogShard, featureFlagTransitionToCatalogShard]
  */
 (function() {
 "use strict";
