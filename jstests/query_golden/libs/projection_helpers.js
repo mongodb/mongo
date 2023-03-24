@@ -11,9 +11,6 @@ function runProjectionsAgainstColl(coll, docs, indexes, projSpecs) {
         const pipeline = [{$project: projectionSpec}];
         jsTestLog(`Query: ${tojsononeline(pipeline)}`);
         show(coll.aggregate(pipeline));
-
-        // TODO SERVER-71071: Consider adding a loop here which runs the aggregation and hints
-        // each of the provided indexes.
     }
 }
 
