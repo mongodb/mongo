@@ -54,7 +54,12 @@ const StringDataSet kAllowedDollarPrefixedFields = {
     "$sortKey",
 
     // This is necessary for the "showRecordId" feature.
-    "$recordId"};
+    "$recordId",
+
+    // This is necessary for $search queries with a specified sort.
+    "$searchSortValues"_sd,
+    "$searchScore"_sd,
+};
 
 }  // namespace
 
