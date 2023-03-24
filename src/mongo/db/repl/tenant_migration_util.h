@@ -102,6 +102,12 @@ extern FailPoint fpBeforeAdvancingStableTimestamp;
 namespace tenant_migration_util {
 
 inline Status validateDatabasePrefix(const std::string& tenantId) {
+    const auto isValidTenantId = OID::parse(tenantId);
+    if (!isValidTenantId.isOK()) {
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Invalid tenant id format for tenant \'" << tenantId << "'");
+    }
+
     const bool isPrefixSupported =
         kUnsupportedTenantIds.find(tenantId) == kUnsupportedTenantIds.end() &&
         tenantId.find('_') == std::string::npos;

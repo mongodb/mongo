@@ -123,7 +123,7 @@ function buildTenantMigrationCmd(cmd, state) {
     });
 
     if (!isShardMergeEnabled) {
-        cmdCopy.tenantId = "testTenantId";
+        cmdCopy.tenantId = ObjectId().str;
     }
 
     return cmdCopy;
