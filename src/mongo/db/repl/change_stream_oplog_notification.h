@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/connection_string.h"
+#include "mongo/db/commands/notify_sharding_event_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/shard_id.h"
@@ -67,10 +68,6 @@ void notifyChangeStreamsOnShardCollection(
     CommitPhase commitPhase,
     const boost::optional<std::set<ShardId>>& shardIds = boost::none);
 
-void notifyChangeStreamsOnAddShard(OperationContext* opCtx,
-                                   const ShardId& shardName,
-                                   const ConnectionString& connStr);
-
 /**
  * Writes a no-op oplog entry to match the addition of a database to the sharding catalog;
  * such database may have been either created or imported into the cluster (as part of an
@@ -82,9 +79,7 @@ void notifyChangeStreamsOnAddShard(OperationContext* opCtx,
  * request, true when the addition is the result of an addShard operation.
  */
 void notifyChangeStreamsOnDatabaseAdded(OperationContext* opCtx,
-                                        const DatabaseName& dbName,
-                                        const ShardId& primaryShard,
-                                        bool isImported);
+                                        const DatabasesAdded& databasesAddedNotification);
 
 /**
  * Writes a no-op oplog entry on movePrimary event.

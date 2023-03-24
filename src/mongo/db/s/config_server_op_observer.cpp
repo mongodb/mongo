@@ -137,12 +137,18 @@ void ConfigServerOpObserver::onInserts(OperationContext* opCtx,
         }
 
         if (maxTopologyTime) {
+            // Insertions into config.shards may be done inside a transaction. This implies that the
+            // callback from onCommit can be invoked by a different thread. Since the
+            // TopologyTimeTicker is associated to the mongod instance and not to the
+            // OperationContext, we can safely obtain a reference at this point and passed it to the
+            // onCommit callback.
+            auto& topologyTicker = TopologyTimeTicker::get(opCtx);
             opCtx->recoveryUnit()->onCommit(
-                [maxTopologyTime](OperationContext* opCtx,
-                                  boost::optional<Timestamp> commitTime) mutable {
+                [&topologyTicker, maxTopologyTime](OperationContext* opCtx,
+                                                   boost::optional<Timestamp> commitTime) mutable {
                     invariant(commitTime);
-                    TopologyTimeTicker::get(opCtx).onNewLocallyCommittedTopologyTimeAvailable(
-                        *commitTime, *maxTopologyTime);
+                    topologyTicker.onNewLocallyCommittedTopologyTimeAvailable(*commitTime,
+                                                                              *maxTopologyTime);
                 });
         }
     }

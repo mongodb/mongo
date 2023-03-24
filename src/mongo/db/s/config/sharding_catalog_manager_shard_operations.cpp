@@ -62,8 +62,10 @@
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/s/add_shard_cmd_gen.h"
 #include "mongo/db/s/add_shard_util.h"
+#include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/s/sharding_util.h"
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/db/s/user_writes_critical_section_document_gen.h"
 #include "mongo/db/s/user_writes_recoverable_critical_section_service.h"
@@ -79,6 +81,7 @@
 #include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_database_gen.h"
+#include "mongo/s/catalog/type_namespace_placement_gen.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
@@ -98,6 +101,8 @@
 
 namespace mongo {
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(hangBeforeNotifyingaddShardCommitted);
 
 using CallbackHandle = executor::TaskExecutor::CallbackHandle;
 using CallbackArgs = executor::TaskExecutor::CallbackArgs;
@@ -810,71 +815,33 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
               "Going to insert new entry for shard into config.shards",
               "shardType"_attr = shardType.toString());
 
-        Status result =
-            _localCatalogClient->insertConfigDocument(opCtx,
-                                                      NamespaceString::kConfigsvrShardsNamespace,
-                                                      shardType.toBSON(),
-                                                      ShardingCatalogClient::kLocalWriteConcern);
-        if (!result.isOK()) {
-            LOGV2(21943,
-                  "Error adding shard: {shardType} err: {error}",
-                  "Error adding shard",
-                  "shardType"_attr = shardType.toBSON(),
-                  "error"_attr = result.reason());
-            return result;
+        _addShardInTransaction(opCtx, shardType, std::move(dbNamesStatus.getValue()));
+
+        // Record in changelog
+        BSONObjBuilder shardDetails;
+        shardDetails.append("name", shardType.getName());
+        shardDetails.append("host", shardConnectionString.toString());
+
+        ShardingLogging::get(opCtx)->logChange(opCtx,
+                                               "addShard",
+                                               "",
+                                               shardDetails.obj(),
+                                               ShardingCatalogClient::kMajorityWriteConcern,
+                                               _localConfigShard,
+                                               _localCatalogClient.get());
+
+        // Ensure the added shard is visible to this process.
+        shardRegistry->reload(opCtx);
+        if (!shardRegistry->getShard(opCtx, shardType.getName()).isOK()) {
+            return {ErrorCodes::OperationFailed,
+                    "Could not find shard metadata for shard after adding it. This most likely "
+                    "indicates that the shard was removed immediately after it was added."};
         }
 
-        // Add all databases which were discovered on the new shard
-        for (const auto& dbName : dbNamesStatus.getValue()) {
-            const auto now = VectorClock::get(opCtx)->getTime();
-            const auto clusterTime = now.clusterTime().asTimestamp();
+        stopMonitoringGuard.dismiss();
 
-            DatabaseType dbt(
-                dbName, shardType.getName(), DatabaseVersion(UUID::gen(), clusterTime));
-
-            {
-                const auto status = _localCatalogClient->updateConfigDocument(
-                    opCtx,
-                    NamespaceString::kConfigDatabasesNamespace,
-                    BSON(DatabaseType::kNameFieldName << dbName),
-                    dbt.toBSON(),
-                    true,
-                    ShardingCatalogClient::kLocalWriteConcern);
-                if (!status.isOK()) {
-                    LOGV2(21944,
-                          "Adding shard {connectionString} even though could not add database {db}",
-                          "Adding shard even though we could not add database",
-                          "connectionString"_attr = shardConnectionString.toString(),
-                          "db"_attr = dbName);
-                }
-            }
-        }
+        return shardType.getName();
     }
-
-    // Record in changelog
-    BSONObjBuilder shardDetails;
-    shardDetails.append("name", shardType.getName());
-    shardDetails.append("host", shardConnectionString.toString());
-
-    ShardingLogging::get(opCtx)->logChange(opCtx,
-                                           "addShard",
-                                           "",
-                                           shardDetails.obj(),
-                                           ShardingCatalogClient::kMajorityWriteConcern,
-                                           _localConfigShard,
-                                           _localCatalogClient.get());
-
-    // Ensure the added shard is visible to this process.
-    shardRegistry->reload(opCtx);
-    if (!shardRegistry->getShard(opCtx, shardType.getName()).isOK()) {
-        return {ErrorCodes::OperationFailed,
-                "Could not find shard metadata for shard after adding it. This most likely "
-                "indicates that the shard was removed immediately after it was added."};
-    }
-
-    stopMonitoringGuard.dismiss();
-
-    return shardType.getName();
 }
 
 RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
@@ -1346,6 +1313,110 @@ void ShardingCatalogManager::_standardizeClusterParameters(OperationContext* opC
     }
     _pushClusterParametersToNewShard(opCtx, shard, configSvrClusterParameterDocs);
 }
+
+void ShardingCatalogManager::_addShardInTransaction(
+    OperationContext* opCtx,
+    const ShardType& newShard,
+    std::vector<std::string>&& databasesInNewShard) {
+
+    const auto existingShardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+
+    // 1. Send out the "prepareCommit" notification
+    std::vector<DatabaseName> importedDbNames;
+    std::transform(
+        databasesInNewShard.begin(),
+        databasesInNewShard.end(),
+        std::back_inserter(importedDbNames),
+        [](const std::string& s) { return DatabaseNameUtil::deserialize(boost::none, s); });
+    DatabasesAdded notification(std::move(importedDbNames), true /*addImported*/);
+    notification.setPhase(CommitPhaseEnum::kPrepare);
+    notification.setPrimaryShard(ShardId(newShard.getName()));
+    uassertStatusOK(_notifyClusterOnNewDatabases(opCtx, notification, existingShardIds));
+
+    // 2. Set up and run the commit statements
+    // TODO SERVER-66261 newShard may be passed by reference.
+    auto transactionChain = [newShard, dbNames = std::move(databasesInNewShard)](
+                                const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+        write_ops::InsertCommandRequest insertShardEntry(NamespaceString::kConfigsvrShardsNamespace,
+                                                         {newShard.toBSON()});
+        return txnClient.runCRUDOp(insertShardEntry, {})
+            .thenRunOn(txnExec)
+            .then([&](const BatchedCommandResponse& insertShardEntryResponse) {
+                uassertStatusOK(insertShardEntryResponse.toStatus());
+                if (dbNames.empty()) {
+                    BatchedCommandResponse noOpResponse;
+                    noOpResponse.setStatus(Status::OK());
+                    noOpResponse.setN(0);
+
+                    return SemiFuture<BatchedCommandResponse>(std::move(noOpResponse));
+                }
+
+                std::vector<BSONObj> databaseEntries;
+                std::transform(dbNames.begin(),
+                               dbNames.end(),
+                               std::back_inserter(databaseEntries),
+                               [&](const std::string dbName) {
+                                   return DatabaseType(dbName,
+                                                       newShard.getName(),
+                                                       DatabaseVersion(UUID::gen(),
+                                                                       newShard.getTopologyTime()))
+                                       .toBSON();
+                               });
+                write_ops::InsertCommandRequest insertDatabaseEntries(
+                    NamespaceString::kConfigDatabasesNamespace, std::move(databaseEntries));
+                return txnClient.runCRUDOp(insertDatabaseEntries, {});
+            })
+            .thenRunOn(txnExec)
+            .then([&](const BatchedCommandResponse& insertDatabaseEntriesResponse) {
+                uassertStatusOK(insertDatabaseEntriesResponse.toStatus());
+                if (dbNames.empty()) {
+                    BatchedCommandResponse noOpResponse;
+                    noOpResponse.setStatus(Status::OK());
+                    noOpResponse.setN(0);
+
+                    return SemiFuture<BatchedCommandResponse>(std::move(noOpResponse));
+                }
+                std::vector<BSONObj> placementEntries;
+                std::transform(dbNames.begin(),
+                               dbNames.end(),
+                               std::back_inserter(placementEntries),
+                               [&](const std::string dbName) {
+                                   return NamespacePlacementType(NamespaceString(dbName),
+                                                                 newShard.getTopologyTime(),
+                                                                 {ShardId(newShard.getName())})
+                                       .toBSON();
+                               });
+                write_ops::InsertCommandRequest insertPlacementEntries(
+                    NamespaceString::kConfigsvrPlacementHistoryNamespace,
+                    std::move(placementEntries));
+                return txnClient.runCRUDOp(insertPlacementEntries, {});
+            })
+            .thenRunOn(txnExec)
+            .then([](auto insertPlacementEntriesResponse) {
+                uassertStatusOK(insertPlacementEntriesResponse.toStatus());
+            })
+            .semi();
+    };
+
+    txn_api::SyncTransactionWithRetries txn(
+        opCtx, Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(), nullptr);
+    txn.run(opCtx, transactionChain);
+
+    hangBeforeNotifyingaddShardCommitted.pauseWhileSet();
+
+    // 3. Reuse the existing notification object to also broadcast the event of successful commit.
+    notification.setPhase(CommitPhaseEnum::kSuccessful);
+    notification.setPrimaryShard(boost::none);
+    const auto notificationOutcome =
+        _notifyClusterOnNewDatabases(opCtx, notification, existingShardIds);
+    if (!notificationOutcome.isOK()) {
+        LOGV2_WARNING(7175502,
+                      "Unable to send out notification of successful import of databases "
+                      "from added shard",
+                      "err"_attr = notificationOutcome);
+    }
+}
+
 
 void ShardingCatalogManager::_removeShardInTransaction(OperationContext* opCtx,
                                                        const std::string& removedShardName,

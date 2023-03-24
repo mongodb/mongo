@@ -470,6 +470,17 @@ env.Library(
 )
 
 env.Library(
+    target='notify_sharding_event_idl',
+    source=[
+        'notify_sharding_event.idl',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
+    ],
+)
+
+env.Library(
     target='set_index_commit_quorum_idl',
     source=[
         'set_index_commit_quorum.idl',

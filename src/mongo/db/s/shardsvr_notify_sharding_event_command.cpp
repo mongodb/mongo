@@ -30,8 +30,9 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/notify_sharding_event_gen.h"
 #include "mongo/db/repl/change_stream_oplog_notification.h"
-#include "mongo/db/s/notify_event_gen.h"
+#include "mongo/db/s/sharding_state.h"
 
 namespace mongo {
 
@@ -39,10 +40,9 @@ namespace mongo {
  * This command notifies an event on the shard server. The action taken is determined by the
  * event AddShard: Add an oplog entry for the new shard.
  */
-class ShardsvrNotifyEventCommand : public TypedCommand<ShardsvrNotifyEventCommand> {
+class ShardsvrNotifyShardingEventCommand : public TypedCommand<ShardsvrNotifyShardingEventCommand> {
 public:
-    using Request = ShardsvrNotifyEventRequest;
-    using Response = OkReply;
+    using Request = ShardsvrNotifyShardingEventRequest;
 
     bool skipApiVersionCheck() const override {
         // Internal command (server to server).
@@ -61,22 +61,32 @@ public:
         return true;
     }
 
-    class Invocation : public InvocationBase {
+    class Invocation final : public InvocationBase {
     public:
         using InvocationBase::InvocationBase;
 
-        Response typedRun(OperationContext* opCtx) {
+        void typedRun(OperationContext* opCtx) {
+            uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
+            CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
+                                                          opCtx->getWriteConcern());
+
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
             uassert(ErrorCodes::IllegalOperation,
-                    "_shardsvrNotifyEvent can only run on shard servers",
+                    "_shardsvrNotifyShardingEvent can only run on shard servers",
                     serverGlobalParams.clusterRole == ClusterRole::ShardServer);
 
-            auto shardingEvent = request().getShardingEvent();
-            notifyChangeStreamsOnAddShard(
-                opCtx, shardingEvent.getShardName(), shardingEvent.getShardConnectionString());
+            switch (request().getEventType()) {
+                case EventTypeEnum::kDatabasesAdded: {
+                    const auto event = DatabasesAdded::parse(
+                        IDLParserContext("_shardsvrNotifyShardingEvent"), request().getDetails());
+                    notifyChangeStreamsOnDatabaseAdded(opCtx, event);
 
-            return Response{};
+                } break;
+
+                default:
+                    uasserted(ErrorCodes::InvalidOptions, "Unsupported sharding event type");
+            }
         }
 
     private:
@@ -97,6 +107,6 @@ public:
         }
     };
 
-} shardsvrNotifyEventCmd;
+} shardsvrNotifyShardingEventCmd;
 
 }  // namespace mongo

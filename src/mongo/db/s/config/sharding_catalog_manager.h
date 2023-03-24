@@ -32,6 +32,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/commands/notify_sharding_event_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime_with.h"
@@ -696,6 +697,14 @@ private:
                                              const BSONObj& key);
 
     /**
+     * Broadcasts a remote command to the requested list of recipient that contains the details on a
+     * new set of databases being added to the config catalog.
+     */
+    Status _notifyClusterOnNewDatabases(OperationContext* opCtx,
+                                        const DatabasesAdded& event,
+                                        const std::vector<ShardId>& recipients);
+
+    /**
      * Returns true if the zone with the given name has chunk ranges associated with it and the
      * shard with the given name is the only shard that it belongs to.
      */
@@ -753,6 +762,14 @@ private:
         std::shared_ptr<const std::vector<ChunkType>> splitChunks,
         std::shared_ptr<ChunkType> controlChunk,
         const ShardId& donorShardId);
+
+    /**
+     * Inserts new entries into the config catalog to describe the shard being added (and the
+     * databases being imported) through the internal transaction API.
+     */
+    void _addShardInTransaction(OperationContext* opCtx,
+                                const ShardType& newShard,
+                                std::vector<std::string>&& databasesInNewShard);
     /**
      * Use the internal transaction API to remove a shard.
      */

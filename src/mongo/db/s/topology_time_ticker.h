@@ -62,7 +62,7 @@ public:
     static TopologyTimeTicker& get(OperationContext* opCtx);
 
     /**
-     * Registers a new tick point <commitTime, topologyTime> on the _topologyTimeTickPoints vector.
+     * Registers a new tick point on _topologyTimeByLocalCommitTime.
      * This method is invoked from two places:
      *    - From the OpObservers when writes modify config.shards
      *    - As part of the initialization of the VectorClock on the CSRS.
@@ -75,25 +75,17 @@ public:
     void onMajorityCommitPointUpdate(ServiceContext* service, const repl::OpTime& newCommitPoint);
 
     /**
-     *  Removes from the _topologyTimeTickPoints vector any topology change that was rollbacked.
+     *  Removes from _topologyTimeByLocalCommitTime any topology change that was rollbacked.
      */
     void onReplicationRollback(const repl::OpTime& lastAppliedOpTime);
 
 private:
     Mutex _mutex = MONGO_MAKE_LATCH("TopologyTimeTicker");
     /**
-     * This class tracks some time-related information about a topology change in a sharded cluster.
-     * More specifically, the vector clock should start gossiping the new topologyTime once the
-     * commitTime is majority committed.
+     * Container that stores time-related information about a topology change in a sharded cluster.
+     * More specifically, the vector clock should start gossiping a new topologyTime once the
+     * related local commitTime is majority committed.
      */
-    struct TopologyTimeTickPoint {
-        // The time at which the write on config.shards was locally committed. Do not gossip it!
-        Timestamp commitTime;
-        // The time that was stored in config.shards. It will be gossiped once the commitTime is
-        // majority committed.
-        Timestamp topologyTime;
-    };
-
-    std::vector<TopologyTimeTickPoint> _topologyTimeTickPoints;
+    std::map<Timestamp, Timestamp> _topologyTimeByLocalCommitTime;
 };
 }  // namespace mongo

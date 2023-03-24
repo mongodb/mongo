@@ -125,26 +125,28 @@ var shardConfig = shard.getDB("config");
     // TODO SERVER-69106 adapt the test assuming that the flag will be always enabled.
     const historicalPlacementDataFeatureFlag = FeatureFlagUtil.isEnabled(
         st.configRS.getPrimary().getDB('admin'), "HistoricalPlacementShardingCatalog");
+    const sessionsOpenedByAddShardCmd = 1;
     const sessionsOpenedByShardCollectionCmd = historicalPlacementDataFeatureFlag ? 3 : 2;
+    const sessionsOpenedByDDLOps = sessionsOpenedByAddShardCmd + sessionsOpenedByShardCollectionCmd;
 
-    // We will have sessionsOpenedByShardCollectionCmd sessions because of the sessions used in the
+    // We will have sessionsOpenedByDDLOps sessions because of the sessions used in the
     // shardCollection's retryable write to shard the sessions collection. It will disappear after
     // we run the refresh function on the shard.
     assert.eq(shardConfig.system.sessions.countDocuments({}),
-              sessionsOpenedByShardCollectionCmd,
+              sessionsOpenedByDDLOps,
               "did not flush config's sessions");
 
     // Now, if we do refreshes on the other servers, their in-mem records will
     // be written to the collection.
     assert.commandWorked(shard.adminCommand({refreshLogicalSessionCacheNow: 1}));
     assert.eq(shardConfig.system.sessions.countDocuments({}),
-              sessionsOpenedByShardCollectionCmd + 1,
+              sessionsOpenedByDDLOps + 1,
               "did not flush shard's sessions");
 
     rs.awaitLastOpCommitted();
     assert.commandWorked(mongos.adminCommand({refreshLogicalSessionCacheNow: 1}));
     assert.eq(shardConfig.system.sessions.countDocuments({}),
-              sessionsOpenedByShardCollectionCmd + 3,
+              sessionsOpenedByDDLOps + 3,
               "did not flush mongos' sessions");
 }
 

@@ -372,6 +372,35 @@ function testReshardCollection() {
     assert.neq(initialCollPlacementInfo.uuid, finalCollPlacementInfo.uuid);
 }
 
+function testAddShard() {
+    // Create a new replica set and populate it with some initial DBs
+    const newReplicaSet = new ReplSetTest({name: "addedShard", nodes: 1});
+    const newShardName = 'addedShard';
+    const preExistingCollName = 'preExistingColl';
+    newReplicaSet.startSet({shardsvr: ""});
+    newReplicaSet.initiate();
+    const dbsOnNewReplicaSet = ['addShardTestDB1', 'addShardTestDB2'];
+    for (const dbName of dbsOnNewReplicaSet) {
+        const db = newReplicaSet.getPrimary().getDB(dbName);
+        assert.commandWorked(db[preExistingCollName].save({value: 1}));
+    }
+
+    // Run addShard(); pre-existing collections in the replica set should be treated as unsharded
+    // collections, while their parent DBs should appear in config.placementHistory with consistent
+    // details.
+    assert.commandWorked(st.s.adminCommand({addShard: newReplicaSet.getURL(), name: newShardName}));
+
+    for (const dbName of dbsOnNewReplicaSet) {
+        assert.eq(null, getLatestPlacementInfoFor(dbName + '.' + preExistingCollName));
+        const dbPlacementEntry = getValidatedPlacementInfoForDB(dbName);
+        assert.sameMembers([newShardName], dbPlacementEntry.shards);
+    }
+
+    // Execute the test case teardown
+    st.s.adminCommand({removeShard: newShardName});
+    newReplicaSet.stopSet();
+}
+
 // TODO SERVER-69106 remove the logic to skip the test execution
 const historicalPlacementDataFeatureFlag = FeatureFlagUtil.isEnabled(
     st.configRS.getPrimary().getDB('admin'), "HistoricalPlacementShardingCatalog");
@@ -410,7 +439,12 @@ jsTest.log(
     'Testing placement entries added by dropDatabase() over a new sharding-enabled DB with data');
 testDropDatabase('dropDatabaseDB', st.shard0.shardName);
 
+jsTest.log('Testing placement entries added by reshardCollection()');
 testReshardCollection();
+
+jsTest.log(
+    'Testing placement entries set by addShard() when existing DBs get imported into the cluster');
+testAddShard();
 
 st.stop();
 }());

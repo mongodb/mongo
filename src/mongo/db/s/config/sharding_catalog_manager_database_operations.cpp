@@ -51,6 +51,7 @@
 #include "mongo/s/shard_util.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/pcre.h"
 #include "mongo/util/pcre_util.h"
 
@@ -59,6 +60,9 @@
 
 namespace mongo {
 namespace {
+
+MONGO_FAIL_POINT_DEFINE(hangBeforeNotifyingCreateDatabaseCommitted);
+
 
 using namespace fmt::literals;
 
@@ -176,7 +180,6 @@ DatabaseType ShardingCatalogManager::createDatabase(
         DatabaseType::kNameFieldName, "^{}$"_format(pcre_util::quoteMeta(dbName)), "i");
 
     auto dbDoc = client.findOne(NamespaceString::kConfigDatabasesNamespace, queryBuilder.obj());
-    bool waitForMajorityAfterAccessingCatalog = true;
     auto const [primaryShardPtr, database] = [&] {
         if (!dbDoc.isEmpty()) {
             auto actualDb = DatabaseType::parse(IDLParserContext("DatabaseType"), dbDoc);
@@ -223,50 +226,71 @@ DatabaseType ShardingCatalogManager::createDatabase(
                   "Registering new database in sharding catalog",
                   "db"_attr = db);
 
-            if (feature_flags::gHistoricalPlacementShardingCatalog.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
-                NamespacePlacementType placementInfo(
-                    NamespaceString(dbName),
-                    clusterTime,
-                    std::vector<mongo::ShardId>{resolvedPrimaryShard->getId()});
-                withTransaction(
-                    opCtx,
-                    NamespaceString::kConfigDatabasesNamespace,
-                    [&](OperationContext* opCtx, TxnNumber txnNumber) {
-                        insertConfigDocuments(opCtx,
-                                              NamespaceString::kConfigDatabasesNamespace,
-                                              {db.toBSON()},
-                                              txnNumber);
-                        insertConfigDocuments(opCtx,
-                                              NamespaceString::kConfigsvrPlacementHistoryNamespace,
-                                              {placementInfo.toBSON()},
-                                              txnNumber);
-                    });
-
-                // Skip the wait for majority; the transaction semantics already guarantee the
-                // needed write concern.
-                waitForMajorityAfterAccessingCatalog = false;
-            } else {
-                // Do this write with majority writeConcern to guarantee that the shard sees the
-                // write when it receives the _flushDatabaseCacheUpdates.
-                uassertStatusOK(_localCatalogClient->insertConfigDocument(
-                    opCtx,
-                    NamespaceString::kConfigDatabasesNamespace,
-                    db.toBSON(),
-                    ShardingCatalogClient::kMajorityWriteConcern));
+            // The creation of a new database (and its assignation to resolvedPrimaryShard) is
+            // described by the notification of multiple events, following a 2-phase protocol:
+            // - a "prepare" notification prior to the write into config.databases will ensure that
+            // change streams will start collecting events on the new database before the first user
+            // write on one of its future collection occurs
+            // - a "commitSuccessful" notification after completing the write into config.databases
+            // will allow change streams to stop collecting events on the namespace created from
+            // shards != resolvedPrimaryShard.
+            {
+                DatabasesAdded prepareCommitEvent({DatabaseName(dbName)}, false /*areImported*/);
+                prepareCommitEvent.setPhase(CommitPhaseEnum::kPrepare);
+                prepareCommitEvent.setPrimaryShard(resolvedPrimaryShard->getId());
+                uassertStatusOK(_notifyClusterOnNewDatabases(
+                    opCtx, prepareCommitEvent, {resolvedPrimaryShard->getId()}));
             }
 
+            const auto transactionChain = [db](const txn_api::TransactionClient& txnClient,
+                                               ExecutorPtr txnExec) {
+                write_ops::InsertCommandRequest insertDatabaseEntryOp(
+                    NamespaceString::kConfigDatabasesNamespace);
+                insertDatabaseEntryOp.setDocuments({db.toBSON()});
+                return txnClient.runCRUDOp(insertDatabaseEntryOp, {})
+                    .thenRunOn(txnExec)
+                    .then([&txnClient, &txnExec, &db](
+                              const BatchedCommandResponse& insertDatabaseEntryResponse) {
+                        uassertStatusOK(insertDatabaseEntryResponse.toStatus());
+                        NamespacePlacementType placementInfo(
+                            NamespaceString(db.getName()),
+                            db.getVersion().getTimestamp(),
+                            std::vector<mongo::ShardId>{db.getPrimary()});
+                        write_ops::InsertCommandRequest insertPlacementHistoryOp(
+                            NamespaceString::kConfigsvrPlacementHistoryNamespace);
+                        insertPlacementHistoryOp.setDocuments({placementInfo.toBSON()});
+
+                        return txnClient.runCRUDOp(insertPlacementHistoryOp, {});
+                    })
+                    .thenRunOn(txnExec)
+                    .then([](const BatchedCommandResponse& insertPlacementHistoryResponse) {
+                        uassertStatusOK(insertPlacementHistoryResponse.toStatus());
+                    })
+                    .semi();
+            };
+
+            txn_api::SyncTransactionWithRetries txn(
+                opCtx,
+                Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
+                nullptr /*resourceYielder*/);
+            txn.run(opCtx, transactionChain);
+
+            hangBeforeNotifyingCreateDatabaseCommitted.pauseWhileSet();
+
+            DatabasesAdded commitCompletedEvent({DatabaseName(dbName)}, false /*areImported*/);
+            commitCompletedEvent.setPhase(CommitPhaseEnum::kSuccessful);
+            const auto notificationOutcome = _notifyClusterOnNewDatabases(
+                opCtx, commitCompletedEvent, {resolvedPrimaryShard->getId()});
+            if (!notificationOutcome.isOK()) {
+                LOGV2_WARNING(7175500,
+                              "Unable to send out notification of successful createDatabase",
+                              "db"_attr = db,
+                              "err"_attr = notificationOutcome);
+            }
             return std::make_pair(resolvedPrimaryShard, db);
         }
     }();
 
-    if (waitForMajorityAfterAccessingCatalog) {
-        WriteConcernResult unusedResult;
-        uassertStatusOK(waitForWriteConcern(opCtx,
-                                            replClient.getLastOp(),
-                                            ShardingCatalogClient::kMajorityWriteConcern,
-                                            &unusedResult));
-    }
 
     // Note, making the primary shard refresh its databaseVersion here is not required for
     // correctness, since either:

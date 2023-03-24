@@ -41,12 +41,16 @@
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/query/cursor_response.h"
+#include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/s/add_shard_cmd_gen.h"
 #include "mongo/db/s/add_shard_util.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/s/type_shard_identity.h"
+#include "mongo/db/session/logical_session_cache_noop.h"
+#include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/idl/cluster_server_parameter_common.h"
 #include "mongo/idl/cluster_server_parameter_gen.h"
 #include "mongo/idl/server_parameter_test_util.h"
@@ -90,6 +94,29 @@ protected:
         ASSERT_OK(clusterIdLoader->loadClusterId(
             operationContext(), catalogClient(), repl::ReadConcernLevel::kLocalReadConcern));
         _clusterId = clusterIdLoader->getClusterId();
+
+        // Manually instantiate the ReadWriteConcernDefaults decoration on the service
+        ReadWriteConcernDefaults::create(getServiceContext(), _lookupMock.getFetchDefaultsFn());
+        // Create config.transactions collection
+        auto opCtx = operationContext();
+        DBDirectClient client(opCtx);
+        client.createCollection(NamespaceString::kSessionTransactionsTableNamespace);
+        client.createIndexes(NamespaceString::kSessionTransactionsTableNamespace,
+                             {MongoDSessionCatalog::getConfigTxnPartialIndexSpec()});
+
+        LogicalSessionCache::set(getServiceContext(), std::make_unique<LogicalSessionCacheNoop>());
+        TransactionCoordinatorService::get(operationContext())
+            ->onShardingInitialization(operationContext(), true);
+
+        _skipShardingEventNotificationFP =
+            globalFailPointRegistry().find("shardingCatalogManagerSkipNotifyClusterOnNewDatabases");
+        _skipShardingEventNotificationFP->setMode(FailPoint::alwaysOn);
+    }
+
+    void tearDown() override {
+        _skipShardingEventNotificationFP->setMode(FailPoint::off);
+        TransactionCoordinatorService::get(operationContext())->onStepDown();
+        ConfigServerTestFixture::tearDown();
     }
 
     /**
@@ -547,6 +574,10 @@ protected:
     }
 
     OID _clusterId;
+
+    ReadWriteConcernDefaultsLookupMock _lookupMock;
+
+    FailPoint* _skipShardingEventNotificationFP;
 };
 
 TEST_F(AddShardTest, CreateShardIdentityUpsertForAddShard) {
@@ -1555,98 +1586,6 @@ TEST_F(AddShardTest, ReplicaSetExtraHostsDiscovered) {
     assertChangeWasLogged(expectedShard);
 
     checkLocalClusterParametersAfterPull();
-}
-
-TEST_F(AddShardTest, AddShardSucceedsEvenIfAddingDBsFromNewShardFails) {
-    std::unique_ptr<RemoteCommandTargeterMock> targeter(
-        std::make_unique<RemoteCommandTargeterMock>());
-    HostAndPort shardTarget("StandaloneHost:12345");
-    targeter->setConnectionStringReturnValue(ConnectionString(shardTarget));
-    targeter->setFindHostReturnValue(shardTarget);
-
-    targeterFactory()->addTargeterToReturn(ConnectionString(shardTarget), std::move(targeter));
-
-
-    std::string expectedShardName = "StandaloneShard";
-
-    // The shard doc inserted into the config.shards collection on the config server.
-    ShardType expectedShard;
-    expectedShard.setName(expectedShardName);
-    expectedShard.setHost("StandaloneHost:12345");
-    expectedShard.setState(ShardType::ShardState::kShardAware);
-
-    DatabaseType discoveredDB1(
-        "TestDB1", ShardId("StandaloneShard"), DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
-    DatabaseType discoveredDB2(
-        "TestDB2", ShardId("StandaloneShard"), DatabaseVersion(UUID::gen(), Timestamp(1, 1)));
-
-    // Enable fail point to cause all updates to fail.  Since we add the databases detected from
-    // the shard being added with upserts, but we add the shard document itself via insert, this
-    // will allow the shard to be added but prevent the databases from brought into the cluster.
-    auto failPoint = globalFailPointRegistry().find("failAllUpdates");
-    ASSERT(failPoint);
-    failPoint->setMode(FailPoint::alwaysOn);
-    ON_BLOCK_EXIT([&] { failPoint->setMode(FailPoint::off); });
-
-    auto future = launchAsync([this, &expectedShardName, &shardTarget] {
-        ThreadClient tc(getServiceContext());
-        auto opCtx = Client::getCurrent()->makeOperationContext();
-        auto shardName = assertGet(
-            ShardingCatalogManager::get(opCtx.get())
-                ->addShard(opCtx.get(), &expectedShardName, ConnectionString(shardTarget), false));
-        ASSERT_EQUALS(expectedShardName, shardName);
-    });
-
-    BSONObj commandResponse = BSON("ok" << 1 << "ismaster" << true << "maxWireVersion"
-                                        << WireVersion::LATEST_WIRE_VERSION);
-    expectIsMaster(shardTarget, commandResponse);
-
-    // Get databases list from new shard
-    expectListDatabases(
-        shardTarget,
-        std::vector<BSONObj>{BSON("name"
-                                  << "local"
-                                  << "sizeOnDisk" << 1000),
-                             BSON("name" << discoveredDB1.getName() << "sizeOnDisk" << 2000),
-                             BSON("name" << discoveredDB2.getName() << "sizeOnDisk" << 5000)});
-
-    expectCollectionDrop(
-        shardTarget, NamespaceString::createNamespaceString_forTest("config", "system.sessions"));
-
-    // The shard receives the _addShard command
-    expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);
-
-    // The shard receives a delete op to clear any leftover user_writes_critical_sections doc.
-    expectRemoveUserWritesCriticalSectionsDocs(shardTarget);
-
-    // The shard receives a find to pull all cluster parameters.
-    expectClusterParametersPullRequest(shardTarget);
-
-    // The shard receives the setFeatureCompatibilityVersion command.
-    expectSetFeatureCompatibilityVersion(
-        shardTarget, BSON("ok" << 1), operationContext()->getWriteConcern().toBSON());
-
-    // Wait for the addShard to complete before checking the config database
-    future.timed_get(kLongFutureTimeout);
-
-    // Ensure that the shard document was properly added to config.shards.
-    assertShardExists(expectedShard);
-
-    // Ensure that the databases detected from the shard were *not* added.
-    ASSERT_THROWS_CODE(catalogClient()->getDatabase(operationContext(),
-                                                    discoveredDB1.getName(),
-                                                    repl::ReadConcernLevel::kMajorityReadConcern),
-                       DBException,
-                       ErrorCodes::NamespaceNotFound);
-    ASSERT_THROWS_CODE(catalogClient()->getDatabase(operationContext(),
-                                                    discoveredDB2.getName(),
-                                                    repl::ReadConcernLevel::kMajorityReadConcern),
-                       DBException,
-                       ErrorCodes::NamespaceNotFound);
-
-    assertChangeWasLogged(expectedShard);
-
-    // We can't check local cluster parameter collection here since the update to it hangs.
 }
 
 // Tests both that trying to add a shard with the same host as an existing shard but with different

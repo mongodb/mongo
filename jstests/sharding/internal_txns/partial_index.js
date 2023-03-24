@@ -94,9 +94,14 @@ function runTest(st, alwaysCreateFeatureFlagEnabled) {
     }
 
     if (TestData.catalogShard) {
-        // A config server does internal txns, so clear the transaction table to make sure it's
-        // empty before dropping the index, otherwise it can't be recreated automatically. Disable
-        // implicit sessions we can directly write to config.transactions.
+        // A config server does internal txns, clear the transaction table to make sure it's
+        // empty before dropping the index, otherwise it can't be recreated automatically.
+
+        // Complete the setup by explicitly creating the test db (which is done through an internal
+        // txn).
+        assert.commandWorked(st.s.adminCommand({enableSharding: kDbName}));
+
+        // Disable implicit sessions we can directly write to config.transactions.
         TestData.disableImplicitSessions = true;
         assert.commandWorked(st.rs0.getPrimary().getCollection(kConfigTxnNs).remove({}));
         TestData.disableImplicitSessions = false;

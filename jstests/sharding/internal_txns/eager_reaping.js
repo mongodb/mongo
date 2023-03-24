@@ -164,7 +164,7 @@ function runTest(conn, shardConn) {
     parentLsid = {id: UUID()};
 
     runInternalTxn(conn, parentLsid);  // Non-retryable transaction.
-    assert.commandWorked(conn.getDB("test").runCommand({
+    assert.commandWorked(conn.getDB(kDbName).runCommand({
         insert: "foo",
         documents: [{x: 1}],
         lsid: parentLsid,

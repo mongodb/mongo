@@ -68,6 +68,10 @@ let db = mongos.getDB(dbName);
 let mongosConfig = mongos.getDB("config");
 let shardConfig = shardingTest.rs0.getPrimary().getDB("config");
 
+// Explicitly create the test db before clearing config.system.sessions (the DDL is committed
+// through an internal transaction).
+assert.commandWorked(mongos.adminCommand({enableSharding: dbName}));
+
 // 1. Verify that sessions expire from config.system.sessions after the timeout has passed.
 let sessionIDs = [];
 for (let i = 0; i < 5; i++) {

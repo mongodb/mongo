@@ -101,21 +101,30 @@ void notifyChangeStreamsOnShardCollection(OperationContext* opCtx,
 }
 
 void notifyChangeStreamsOnDatabaseAdded(OperationContext* opCtx,
-                                        const DatabaseName& dbName,
-                                        const ShardId& primaryShard,
-                                        bool isImported) {
-    repl::MutableOplogEntry oplogEntry;
-    oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
-    oplogEntry.setNss(NamespaceString(dbName));
-    oplogEntry.setTid(dbName.tenantId());
-    oplogEntry.setObject(BSON("msg" << BSON("enableSharding" << dbName.db())));
-    oplogEntry.setObject2(BSON("enableSharding" << dbName.db() << "primaryShard" << primaryShard
-                                                << "isImported" << isImported));
+                                        const DatabasesAdded& databasesAddedNotification) {
+    const auto& notifiedPhase = databasesAddedNotification.getPhase();
+    for (const auto& dbName : databasesAddedNotification.getNames()) {
+        repl::MutableOplogEntry oplogEntry;
+        oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
+        oplogEntry.setNss(NamespaceString(dbName));
+        oplogEntry.setTid(dbName.tenantId());
+        oplogEntry.setObject(BSON("msg" << BSON("createDatabase" << dbName.db())));
+        BSONObjBuilder o2Builder;
+        o2Builder.append("createDatabase", dbName.db());
+        if (notifiedPhase) {
+            o2Builder.append("phase", *notifiedPhase);
+            if (*notifiedPhase == CommitPhaseEnum::kPrepare) {
+                o2Builder.append("primaryShard", *databasesAddedNotification.getPrimaryShard());
+            }
+        }
 
-    oplogEntry.setOpTime(repl::OpTime());
-    oplogEntry.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
+        o2Builder.append("isImported", databasesAddedNotification.getAreImported());
+        oplogEntry.setObject2(o2Builder.obj());
+        oplogEntry.setOpTime(repl::OpTime());
+        oplogEntry.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
 
-    insertOplogEntry(opCtx, std::move(oplogEntry), "DbAddedToConfigCatalogWritesOplog");
+        insertOplogEntry(opCtx, std::move(oplogEntry), "DbAddedToConfigCatalogWritesOplog");
+    }
 }
 
 void notifyChangeStreamsOnMovePrimary(OperationContext* opCtx,
@@ -135,7 +144,4 @@ void notifyChangeStreamsOnMovePrimary(OperationContext* opCtx,
     insertOplogEntry(opCtx, std::move(oplogEntry), "MovePrimaryWritesOplog");
 }
 
-void notifyChangeStreamsOnAddShard(OperationContext* opCtx,
-                                   const ShardId& shardName,
-                                   const ConnectionString& connStr) {}
 }  // namespace mongo

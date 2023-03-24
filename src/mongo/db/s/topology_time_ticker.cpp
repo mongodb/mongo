@@ -41,10 +41,10 @@ namespace mongo {
 
 namespace {
 
-// The number of pending topologyTime tick points (stored in the _topologyTimeTickPoints vector) is
+// The number of pending topologyTime tick points (stored in _topologyTimeByLocalCommitTime) is
 // generally expected to be small (since shard topology operations should be infrequent, relative to
-// any config server replication lag).  If the size of this vector exceeds this constant (when a
-// tick point is added), then a warning (with id 4740600) will be logged.
+// any config server replication lag).  If its size exceeds this constant (when a tick point is
+// added), then a warning (with id 4740600) will be logged.
 constexpr size_t kPossiblyExcessiveNumTopologyTimeTickPoints = 3;
 
 const auto serviceDecorator = ServiceContext::declareDecoration<TopologyTimeTicker>();
@@ -79,10 +79,23 @@ void TopologyTimeTicker::onNewLocallyCommittedTopologyTimeAvailable(Timestamp co
                                                                     Timestamp topologyTime) {
     const auto numTickPoints = [&] {
         stdx::lock_guard lg(_mutex);
-        invariant(_topologyTimeTickPoints.size() == 0 ||
-                  _topologyTimeTickPoints.back().commitTime < commitTime);
-        _topologyTimeTickPoints.push_back({commitTime, topologyTime});
-        return _topologyTimeTickPoints.size();
+        bool skipCausalConsistencyCheck = [] {
+            auto opCtx = cc().getOperationContext();
+            if (!opCtx || opCtx->isEnforcingConstraints()) {
+                // Default case.
+                return false;
+            }
+
+            // The callback is being invoked within the context of an oplog application, where
+            // entries may be received in non strict order for optimisation reasons. Such case may
+            // be considered safe.
+            return true;
+        }();
+
+        invariant(skipCausalConsistencyCheck || _topologyTimeByLocalCommitTime.size() == 0 ||
+                  _topologyTimeByLocalCommitTime.crbegin()->first < commitTime);
+        _topologyTimeByLocalCommitTime.emplace(commitTime, topologyTime);
+        return _topologyTimeByLocalCommitTime.size();
     }();
 
     if (numTickPoints >= kPossiblyExcessiveNumTopologyTimeTickPoints) {
@@ -98,27 +111,24 @@ void TopologyTimeTicker::onMajorityCommitPointUpdate(ServiceContext* service,
                                                      const repl::OpTime& newCommitPoint) {
     Timestamp newMajorityTimestamp = newCommitPoint.getTimestamp();
     stdx::lock_guard lg(_mutex);
-    if (_topologyTimeTickPoints.empty())
+    if (_topologyTimeByLocalCommitTime.empty())
         return;
 
     // Looking for the first tick point that is not majority committed
     auto itFirstTickPointNonMajorityCommitted =
-        std::find_if(_topologyTimeTickPoints.begin(),
-                     _topologyTimeTickPoints.end(),
-                     [newMajorityTimestamp](const TopologyTimeTickPoint& tick) {
-                         return tick.commitTime > newMajorityTimestamp;
-                     });
+        _topologyTimeByLocalCommitTime.upper_bound(newMajorityTimestamp);
 
-    if (itFirstTickPointNonMajorityCommitted != _topologyTimeTickPoints.begin()) {
+
+    if (itFirstTickPointNonMajorityCommitted != _topologyTimeByLocalCommitTime.begin()) {
         // If some ticks were majority committed, advance the TopologyTime to the most recent one
         const auto maxMajorityCommittedTopologyTime =
-            (itFirstTickPointNonMajorityCommitted - 1)->topologyTime;
+            std::prev(itFirstTickPointNonMajorityCommitted)->second;
 
         VectorClockMutable::get(service)->tickTopologyTimeTo(
             LogicalTime(maxMajorityCommittedTopologyTime));
 
-        _topologyTimeTickPoints.erase(_topologyTimeTickPoints.begin(),
-                                      itFirstTickPointNonMajorityCommitted);
+        _topologyTimeByLocalCommitTime.erase(_topologyTimeByLocalCommitTime.begin(),
+                                             itFirstTickPointNonMajorityCommitted);
     }
 }
 
@@ -126,14 +136,10 @@ void TopologyTimeTicker::onReplicationRollback(const repl::OpTime& lastAppliedOp
     Timestamp newestTimestamp = lastAppliedOpTime.getTimestamp();
 
     stdx::lock_guard lg(_mutex);
-    auto itFirstElemToBeRemoved =
-        std::find_if(_topologyTimeTickPoints.begin(),
-                     _topologyTimeTickPoints.end(),
-                     [newestTimestamp](const TopologyTimeTickPoint& tick) {
-                         return newestTimestamp < tick.commitTime;
-                     });
+    auto itFirstElemToBeRemoved = _topologyTimeByLocalCommitTime.upper_bound(newestTimestamp);
 
-    _topologyTimeTickPoints.erase(itFirstElemToBeRemoved, _topologyTimeTickPoints.end());
+    _topologyTimeByLocalCommitTime.erase(itFirstElemToBeRemoved,
+                                         _topologyTimeByLocalCommitTime.end());
 }
 
 }  // namespace mongo
