@@ -69,13 +69,8 @@ const char* DocumentSourceMatch::getSourceName() const {
 }
 
 Value DocumentSourceMatch::serialize(SerializationOptions opts) const {
-    auto explain = opts.verbosity;
-    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
-        MONGO_UNIMPLEMENTED_TASSERT(7484325);
-    }
-
-    if (explain) {
-        return Value(DOC(getSourceName() << Document(_expression->serialize())));
+    if (opts.verbosity || opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        return Value(DOC(getSourceName() << Document(_expression->serialize(opts))));
     }
     return Value(DOC(getSourceName() << Document(getQuery())));
 }

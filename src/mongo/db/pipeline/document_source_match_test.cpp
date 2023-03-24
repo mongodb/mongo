@@ -703,5 +703,66 @@ TEST_F(DocumentSourceMatchTest, ShouldShowOptimizationsInExplainOutputWhenOptimi
         Value(expectedMatch));
 }
 
+TEST_F(DocumentSourceMatchTest, RedactionWithAnd) {
+    auto spec = fromjson(R"({
+        $match: {
+            $and: [
+                {
+                    a: 'abc'
+                },
+                {
+                    b: {
+                        $gt: 10
+                    }
+                }
+            ]
+        }})");
+    auto docSource = DocumentSourceMatch::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$match": {
+                "$and": [
+                    {
+                        "HASH<a>": {
+                            "$eq": "?"
+                        }
+                    },
+                    {
+                        "HASH<b>": {
+                            "$gt": "?"
+                        }
+                    }
+                ]
+            }
+        })",
+        redact(*docSource));
+}
+
+TEST_F(DocumentSourceMatchTest, RedactionWithExprPipeline) {
+    auto spec = fromjson(R"({
+        $match: {
+            $expr: {
+                $eq: [
+                    '$foo',
+                    '$bar'
+                ]
+            }
+        }
+    })");
+    auto docSource = DocumentSourceMatch::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$match": {
+                "$expr": {
+                    "$eq": [
+                        "$HASH<foo>",
+                        "$HASH<bar>"
+                    ]
+                }
+            }
+        })",
+        redact(*docSource));
+}
+
 }  // namespace
 }  // namespace mongo
