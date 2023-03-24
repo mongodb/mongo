@@ -424,12 +424,6 @@ public:
                                  const OplogFetcher::DocumentsInfo& info);
 
         /**
-         * Creates the oplog buffer that will be populated by donor oplog entries from the retryable
-         * writes fetching stage and oplog fetching stage.
-         */
-        void _createOplogBuffer(WithLock, OperationContext* opCtx);
-
-        /**
          * Validates the tenantIds field is consistent with the protocol given. Throws an exception
          * if there is a mismatch.
          */
@@ -695,7 +689,7 @@ public:
 
         std::unique_ptr<OplogFetcherFactory> _createOplogFetcherFn =
             std::make_unique<CreateOplogFetcherFn>();                               // (M)
-        std::unique_ptr<OplogBufferCollection> _donorOplogBuffer;                   // (M)
+        std::shared_ptr<OplogBufferCollection> _donorOplogBuffer;                   // (M)
         std::unique_ptr<DataReplicatorExternalState> _dataReplicatorExternalState;  // (M)
         std::unique_ptr<OplogFetcher> _donorOplogFetcher;                           // (M)
         std::unique_ptr<TenantAllDatabaseCloner> _tenantAllDatabaseCloner;          // (M)
