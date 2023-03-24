@@ -448,8 +448,29 @@ std::vector<ScopedCollectionOrViewAcquisition> acquireCollectionsOrViews(
         // acquireCollectionsOrViewsWithoutTakingLocks. If it throws CollectionUUIDMismatch, we
         // need to start over.
         const auto& dbName = sortedAcquisitionRequests.begin()->second.prerequisites.nss.dbName();
-        const auto dbLock = std::make_shared<Lock::DBLock>(
-            opCtx, dbName, isSharedLockMode(mode) ? MODE_IS : MODE_IX);
+        Lock::DBLockSkipOptions dbLockOptions = [&]() {
+            Lock::DBLockSkipOptions dbLockOptions;
+            dbLockOptions.skipRSTLLock =
+                std::all_of(sortedAcquisitionRequests.begin(),
+                            sortedAcquisitionRequests.end(),
+                            [](const auto& ar) {
+                                return AutoGetDb::canSkipRSTLLock(ar.second.prerequisites.nss);
+                            });
+            dbLockOptions.skipFlowControlTicket = std::all_of(
+                sortedAcquisitionRequests.begin(),
+                sortedAcquisitionRequests.end(),
+                [](const auto& ar) {
+                    return AutoGetDb::canSkipFlowControlTicket(ar.second.prerequisites.nss);
+                });
+            return dbLockOptions;
+        }();
+
+        const auto dbLock =
+            std::make_shared<Lock::DBLock>(opCtx,
+                                           dbName,
+                                           isSharedLockMode(mode) ? MODE_IS : MODE_IX,
+                                           Date_t::max(),
+                                           dbLockOptions);
 
         for (auto& ar : sortedAcquisitionRequests) {
             const auto& nss = ar.second.prerequisites.nss;

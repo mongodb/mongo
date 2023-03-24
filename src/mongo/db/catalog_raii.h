@@ -105,6 +105,9 @@ public:
 
     AutoGetDb(AutoGetDb&&) = default;
 
+    static bool canSkipRSTLLock(const NamespaceStringOrUUID& nsOrUUID);
+    static bool canSkipFlowControlTicket(const NamespaceStringOrUUID& nsOrUUID);
+
     static AutoGetDb createForAutoGetCollection(
         OperationContext* opCtx,
         const NamespaceStringOrUUID& nsOrUUID,

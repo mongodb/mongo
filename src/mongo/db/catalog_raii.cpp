@@ -149,6 +149,34 @@ AutoGetDb::AutoGetDb(OperationContext* opCtx,
     DatabaseShardingState::assertMatchingDbVersion(opCtx, _dbName);
 }
 
+bool AutoGetDb::canSkipRSTLLock(const NamespaceStringOrUUID& nsOrUUID) {
+    const auto& maybeNss = nsOrUUID.nss();
+
+    if (maybeNss) {
+        const auto& nss = *maybeNss;
+        return repl::canCollectionSkipRSTLLockAcquisition(nss);
+    }
+    return false;
+}
+
+bool AutoGetDb::canSkipFlowControlTicket(const NamespaceStringOrUUID& nsOrUUID) {
+    const auto& maybeNss = nsOrUUID.nss();
+
+    if (maybeNss) {
+        const auto& nss = *maybeNss;
+        bool notReplicated = !nss.isReplicated();
+        // TODO: Improve comment
+        //
+        // If the 'opCtx' is in a multi document transaction, pure reads on the
+        // transaction session collections would acquire the global lock in the IX
+        // mode and acquire a flow control ticket.
+        bool isTransactionCollection = nss == NamespaceString::kSessionTransactionsTableNamespace ||
+            nss == NamespaceString::kTransactionCoordinatorsNamespace;
+        return notReplicated || isTransactionCollection;
+    }
+    return false;
+}
+
 AutoGetDb AutoGetDb::createForAutoGetCollection(
     OperationContext* opCtx,
     const NamespaceStringOrUUID& nsOrUUID,
@@ -160,35 +188,10 @@ AutoGetDb AutoGetDb::createForAutoGetCollection(
 
     // Acquire the global/RSTL and all the database locks (may or may not be multiple
     // databases).
-
     Lock::DBLockSkipOptions dbLockOptions;
-    dbLockOptions.skipRSTLLock = [&] {
-        const auto& maybeNss = nsOrUUID.nss();
+    dbLockOptions.skipRSTLLock = canSkipRSTLLock(nsOrUUID);
+    dbLockOptions.skipFlowControlTicket = canSkipFlowControlTicket(nsOrUUID);
 
-        if (maybeNss) {
-            const auto& nss = *maybeNss;
-            return repl::canCollectionSkipRSTLLockAcquisition(nss);
-        }
-        return false;
-    }();
-    dbLockOptions.skipFlowControlTicket = [&nsOrUUID] {
-        const auto& maybeNss = nsOrUUID.nss();
-
-        if (maybeNss) {
-            const auto& nss = *maybeNss;
-            bool notReplicated = !nss.isReplicated();
-            // TODO: Improve comment
-            //
-            // If the 'opCtx' is in a multi document transaction, pure reads on the
-            // transaction session collections would acquire the global lock in the IX
-            // mode and acquire a flow control ticket.
-            bool isTransactionCollection =
-                nss == NamespaceString::kSessionTransactionsTableNamespace ||
-                nss == NamespaceString::kTransactionCoordinatorsNamespace;
-            return notReplicated || isTransactionCollection;
-        }
-        return false;
-    }();
     // TODO SERVER-67817 Use NamespaceStringOrUUID::db() instead.
     return AutoGetDb(opCtx,
                      nsOrUUID.nss() ? nsOrUUID.nss()->dbName() : *nsOrUUID.dbName(),
