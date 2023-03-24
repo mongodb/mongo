@@ -167,6 +167,21 @@ class MongoTidyTests(unittest.TestCase):
 
         self.run_clang_tidy()
 
+    def test_MongoTraceCheck(self):
+
+        self.write_config(
+            textwrap.dedent("""\
+                Checks: '-*,mongo-trace-check'
+                WarningsAsErrors: '*'
+                """))
+
+        self.expected_output = [
+            "Illegal use of prohibited tracing support, this is only for local development use and should not be committed. [mongo-trace-check,-warnings-as-errors]\n    TracerProvider::initialize();",
+            "Illegal use of prohibited tracing support, this is only for local development use and should not be committed. [mongo-trace-check,-warnings-as-errors]\n    TracerProvider provider = TracerProvider::get();",
+        ]
+
+        self.run_clang_tidy()
+
 
 if __name__ == '__main__':
 

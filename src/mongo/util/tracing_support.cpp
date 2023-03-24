@@ -256,13 +256,13 @@ Tracer::Tracer(std::string name,
     _factory = maker(std::move(name), this);
 }
 
-void TracerProvider::initialize(std::unique_ptr<TickSource> tickSource) {  // NOLINT
+void TracerProvider::initialize(std::unique_ptr<TickSource> tickSource) {
     auto& provider = getTraceProvider();
     invariant(!provider.has_value(), "already initialized");
     provider.emplace(TracerProvider(std::move(tickSource)));
 }
 
-TracerProvider& TracerProvider::get() {  // NOLINT
+TracerProvider& TracerProvider::get() {
     auto& provider = getTraceProvider();
     invariant(provider.has_value(), "not initialized");
     return provider.value();

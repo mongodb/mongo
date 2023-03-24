@@ -57,7 +57,6 @@ _RE_PATTERN_MONGO_POLYFILL = _make_polyfill_regex()
 _RE_MUTEX = re.compile('(^|[ ({,])stdx?::mutex[ ({]')
 _RE_ASSERT = re.compile(r'\bassert\s*\(')
 _RE_UNSTRUCTURED_LOG = re.compile(r'\blogd\s*\(')
-_RE_TRACING_SUPPORT = re.compile(r'\bTracerProvider::(get|initialize)\b')
 _RE_COLLECTION_SHARDING_RUNTIME = re.compile(r'\bCollectionShardingRuntime\b')
 _RE_RAND = re.compile(r'\b(srand\(|rand\(\))')
 
@@ -159,7 +158,6 @@ class Linter:
             self._check_for_nonmongo_assert(linenum)
             self._check_for_mongo_unstructured_log(linenum)
             self._check_for_mongo_config_header(linenum)
-            self._check_for_tracing_support(linenum)
             self._check_for_collection_sharding_runtime(linenum)
             self._check_for_rand(linenum)
             self._check_for_c_stdlib_headers(linenum)
@@ -270,13 +268,6 @@ class Linter:
         if _RE_UNSTRUCTURED_LOG.search(line) or 'doUnstructuredLogImpl' in line:
             self._error(
                 linenum, 'mongodb/unstructuredlog', 'Illegal use of unstructured logging, '
-                'this is only for local development use and should not be committed.')
-
-    def _check_for_tracing_support(self, linenum):
-        line = self.clean_lines[linenum]
-        if _RE_TRACING_SUPPORT.search(line):
-            self._error(
-                linenum, 'mongodb/tracing', 'Illegal use of tracing support, '
                 'this is only for local development use and should not be committed.')
 
     def _check_for_collection_sharding_runtime(self, linenum):

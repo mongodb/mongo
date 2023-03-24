@@ -26,43 +26,29 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
-#include "MongoCctypeCheck.h"
-#include "MongoHeaderBracketCheck.h"
-#include "MongoStdOptionalCheck.h"
-#include "MongoTraceCheck.h"
-#include "MongoUninterruptibleLockGuardCheck.h"
-#include "MongoVolatileCheck.h"
+#pragma once
 
 #include <clang-tidy/ClangTidy.h>
 #include <clang-tidy/ClangTidyCheck.h>
-#include <clang-tidy/ClangTidyModule.h>
-#include <clang-tidy/ClangTidyModuleRegistry.h>
 
-namespace mongo {
-namespace tidy {
+namespace mongo::tidy {
 
-class MongoTidyModule : public clang::tidy::ClangTidyModule {
+/**
+ * MongoTraceCheck is a custom clang-tidy check for detecting
+ * the usage of  TracerProvider::get and TracerProvider::initialize
+ * in the source code.
+ *
+ * It extends ClangTidyCheck and overrides the registerMatchers
+ * and check functions. The registerMatchers function adds matchers
+ * to identify the usage of racerProvider::get and TracerProvider::initialize,
+ * while the check function flags the matched occurrences
+ */
+class MongoTraceCheck : public clang::tidy::ClangTidyCheck {
+
 public:
-    void addCheckFactories(clang::tidy::ClangTidyCheckFactories& CheckFactories) override {
-        CheckFactories.registerCheck<MongoUninterruptibleLockGuardCheck>(
-            "mongo-uninterruptible-lock-guard-check");
-        CheckFactories.registerCheck<MongoHeaderBracketCheck>("mongo-header-bracket-check");
-        CheckFactories.registerCheck<MongoCctypeCheck>("mongo-cctype-check");
-        CheckFactories.registerCheck<MongoStdOptionalCheck>("mongo-std-optional-check");
-        CheckFactories.registerCheck<MongoVolatileCheck>("mongo-volatile-check");
-        CheckFactories.registerCheck<MongoTraceCheck>("mongo-trace-check");
-    }
+    MongoTraceCheck(clang::StringRef Name, clang::tidy::ClangTidyContext* Context);
+    void registerMatchers(clang::ast_matchers::MatchFinder* Finder) override;
+    void check(const clang::ast_matchers::MatchFinder::MatchResult& Result) override;
 };
 
-// Register the MongoTidyModule using this statically initialized variable.
-static clang::tidy::ClangTidyModuleRegistry::Add<MongoTidyModule> X("mongo-tidy-module",
-                                                                    "MongoDB custom checks.");
-
-}  // namespace tidy
-
-// This anchor is used to force the linker to link in the generated object file
-// and thus register the MongoTidyModule.
-volatile int MongoTidyModuleAnchorSource = 0;  // NOLINT
-
-}  // namespace mongo
+}  // namespace mongo::tidy
