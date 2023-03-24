@@ -1,0 +1,65 @@
+{
+	"folders": [
+		{
+			"path": ".."
+		}
+	],
+	"settings": {
+		"clangd.arguments": [
+			"--query-driver=/opt/mongodbtoolchain/v3/bin/clang++",
+			"--header-insertion=never",
+			"-j=4"
+		],
+		"clangd.checkUpdates": true,
+		"clang-format.executable": "/opt/mongodbtoolchain/v3/bin/clang-format",
+		"clang-tidy.executable": "/opt/mongodbtoolchain/v3/bin/clang-tidy",
+		"editor.codeActionsOnSave": {
+			"source.fixAll.eslint": true
+		},
+		"eslint.validate": [
+			"javascript"
+		],
+		"files.associations": {
+			"SConstruct": "python",
+			"SConscript": "python",
+			"*.idl": "yaml",
+		},
+		"files.insertFinalNewline": true,
+		"js/ts.implicitProjectConfig.target": "ES6",
+		"python.autoComplete.extraPaths": [
+			"/opt/mongodbtoolchain/v3/share/gcc-8.5.0/python",
+			"src/third_party/scons-3.1.2/scons-local-3.1.2"
+		],
+		"python.defaultInterpreterPath": "python3-venv/bin/python",
+		"python.formatting.yapfPath": "python3-venv/bin/yapf",
+		"python.formatting.provider": "yapf",
+		"python.linting.pylintEnabled": true,
+		"python.analysis.extraPaths": [
+			"/opt/mongodbtoolchain/v3/share/gcc-8.5.0/python",
+			"src/third_party/scons-3.1.2/scons-local-3.1.2"
+		],
+		"python.linting.mypyEnabled": true,
+		"python.linting.mypyPath": "python3-venv/bin/mypy",
+		"[c]": {
+			"editor.defaultFormatter": "xaver.clang-format",
+			"editor.formatOnSave": true,
+		},
+		"[cpp]": {
+			"editor.defaultFormatter": "xaver.clang-format",
+			"editor.formatOnSave": true,
+		},
+		"[javascript]": {
+			"editor.defaultFormatter": "xaver.clang-format",
+			"editor.formatOnSave": true,
+		},
+	},
+	"extensions": {
+		"recommendations": [
+			"llvm-vs-code-extensions.vscode-clangd",
+			"dbaeumer.vscode-eslint",
+			"ms-python.python",
+			"xaver.clang-format",
+			"notskm.clang-tidy"
+		]
+	}
+}
