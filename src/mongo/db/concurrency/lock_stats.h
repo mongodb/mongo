@@ -106,6 +106,7 @@ struct LockStatCounters {
     CounterType combinedWaitTimeMicros{0};
 };
 
+const ResourceId resourceIdRsOplog(RESOURCE_COLLECTION, NamespaceString::kRsOplogNamespace);
 
 /**
  * Templatized lock statistics management class, which can be specialized with atomic integers
@@ -132,7 +133,7 @@ public:
     }
 
     LockStatCountersType& get(ResourceId resId, LockMode mode) {
-        if (resId == ResourceId(RESOURCE_COLLECTION, NamespaceString::kRsOplogNamespace)) {
+        if (resId == resourceIdRsOplog) {
             return _oplogStats.modeStats[mode];
         }
 
