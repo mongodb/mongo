@@ -42,9 +42,10 @@ struct EncryptedStateCollectionsNamespaces {
 
     NamespaceString edcNss;
     NamespaceString escNss;
-    NamespaceString eccNss;
     NamespaceString ecocNss;
     NamespaceString ecocRenameNss;
+    // TODO: SERVER-73303 delete when v2 is enabled by default
+    NamespaceString eccNss;
 };
 
 /**
@@ -52,11 +53,20 @@ struct EncryptedStateCollectionsNamespaces {
  */
 void validateCompactRequest(const CompactStructuredEncryptionData& request, const Collection& edc);
 
+// TODO: SERVER-73303 delete when v2 is enabled by default
 CompactStats processFLECompact(OperationContext* opCtx,
                                const CompactStructuredEncryptionData& request,
                                GetTxnCallback getTxn,
                                const EncryptedStateCollectionsNamespaces& namespaces);
 
+void processFLECompactV2(OperationContext* opCtx,
+                         const CompactStructuredEncryptionData& request,
+                         GetTxnCallback getTxn,
+                         const EncryptedStateCollectionsNamespaces& namespaces,
+                         ECStats* escStats,
+                         ECOCStats* ecocStats);
+
+// TODO: SERVER-73303 delete when v2 is enabled by default
 /**
  * Get all unique documents in the ECOC collection in their decrypted form.
  *
@@ -69,6 +79,19 @@ stdx::unordered_set<ECOCCompactionDocument> getUniqueCompactionDocuments(
     ECOCStats* ecocStats);
 
 /**
+ * Get all unique documents in the ECOC collection in their decrypted form.
+ *
+ * Used by unit tests.
+ */
+stdx::unordered_set<ECOCCompactionDocumentV2> getUniqueCompactionDocumentsV2(
+    FLEQueryInterface* queryImpl,
+    const CompactStructuredEncryptionData& request,
+    const NamespaceString& ecocNss,
+    ECOCStats* ecocStats);
+
+
+// TODO: SERVER-73303 delete when v2 is enabled by default
+/**
  * Performs compaction of the ESC and ECC entries for the encrypted field/value pair
  * whose tokens are in the provided ECOC compaction document.
  *
@@ -79,4 +102,56 @@ void compactOneFieldValuePair(FLEQueryInterface* queryImpl,
                               const EncryptedStateCollectionsNamespaces& namespaces,
                               ECStats* escStats,
                               ECStats* eccStats);
+
+/**
+ * Performs compaction of the ESC entries for the encrypted field/value pair
+ * whose tokens are in the provided ECOC compaction document.
+ *
+ * Used by unit tests.
+ */
+void compactOneFieldValuePairV2(FLEQueryInterface* queryImpl,
+                                const ECOCCompactionDocumentV2& ecocDoc,
+                                const NamespaceString& escNss,
+                                ECStats* escStats);
+
+/**
+ * Container for the _id values of ESC entries that are slated for deletion
+ * at the end of a compact or cleanup operation.
+ */
+class FLECompactESCDeleteSet {
+public:
+    std::size_t size() const {
+        return std::accumulate(deleteIdSets.begin(),
+                               deleteIdSets.end(),
+                               std::size_t{0},
+                               [](auto& sum, auto& d) { return sum + d.size(); });
+    }
+    bool empty() const {
+        return deleteIdSets.empty();
+    }
+
+    void clear() {
+        deleteIdSets.clear();
+    }
+
+    const PrfBlock& at(size_t index) const;
+
+    std::vector<std::vector<PrfBlock>> deleteIdSets;
+};
+
+FLECompactESCDeleteSet readRandomESCNonAnchorIds(OperationContext* opCtx,
+                                                 const NamespaceString& escNss,
+                                                 size_t memoryLimit,
+                                                 ECStats* escStats);
+
+/**
+ * Deletes from the ESC collection the non-anchor documents whose _id
+ * appears in the list deleteIds
+ */
+void cleanupESCNonAnchors(OperationContext* opCtx,
+                          const NamespaceString& escNss,
+                          const FLECompactESCDeleteSet& deleteSet,
+                          size_t maxTagsPerDelete,
+                          ECStats* escStats);
+
 }  // namespace mongo

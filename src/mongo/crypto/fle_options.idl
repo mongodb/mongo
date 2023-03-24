@@ -30,7 +30,30 @@ global:
   cpp_namespace: "mongo"
 
 imports:
-  - "mongo/db/basic_types.idl"
+  - "mongo/idl/cluster_server_parameter.idl"
+
+structs:
+  FLECompactionOptions:
+    description: ""
+    inline_chained_structs: true
+    chained_structs:
+      ClusterServerParameter: clusterServerParameter
+    fields:
+      maxCompactionSize:
+        description: "Limits the total size of the set of ESC documents that will be removed by
+            each compactStructuredEncryptionData operation"
+        type: int
+        default: 268435456 # 256 MB
+        validator:
+          gt: 0
+      maxESCEntriesPerCompactionDelete:
+        description: "Limits the number of ESC non-anchor documents that will be removed by each
+            delete operation performed by the compactStructuredEncryptionData operation"
+        type: int
+        default: 350000
+        validator:
+          gt: 0
+          lte: 350000 # Limit the tags in the $in query to just under 15 MB per request
 
 server_parameters:
   unsupportedDangerousTestingFLEDiagnosticsEnabled:
@@ -39,3 +62,8 @@ server_parameters:
     cpp_vartype: bool
     cpp_varname: gUnsupportedDangerousTestingFLEDiagnosticsEnabledAtStartup
     default: false
+  fleCompactionOptions:
+    description: "Options related to compaction or cleanup operations in Queryable Encryption protocol version 2"
+    set_at: cluster
+    cpp_varname: "fleCompactionOptions"
+    cpp_vartype: FLECompactionOptions

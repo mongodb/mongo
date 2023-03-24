@@ -76,6 +76,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/auth/authprivilege',
         '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/common',
+        '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/fle_crud',
         '$BUILD_DIR/mongo/db/mongohasher',
         '$BUILD_DIR/mongo/db/ops/write_ops_parsers',

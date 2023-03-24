@@ -114,6 +114,7 @@ fleCryptoEnv.Library(
         '$BUILD_DIR/mongo/db/exec/document_value/document_value',
         '$BUILD_DIR/mongo/db/query/query_knobs',
         '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/idl/cluster_server_parameter',
         '$BUILD_DIR/mongo/shell/kms_idl',
         '$BUILD_DIR/mongo/util/testing_options',
         '$BUILD_DIR/third_party/shim_libmongocrypt',

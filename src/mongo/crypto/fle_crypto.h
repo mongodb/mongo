@@ -490,6 +490,10 @@ public:
 
     /**
      * Decrypts an anchor document (either null or non-null).
+     * If the input document is a non-null anchor, then the resulting ESCDocument.position
+     * is 0, and ESCDocument.count is the non-anchor position (cpos).
+     * If the input document is a null anchor, then ESCDocument.position is the non-zero
+     * anchor position (apos), and ESCDocument.count is the cpos.
      */
     static StatusWith<ESCDocument> decryptAnchorDocument(
         const ESCTwiceDerivedValueToken& valueToken, BSONObj& doc);
@@ -507,8 +511,8 @@ public:
      *    (x == 0) means no anchors exist.
      *    (x == null) means a null anchor exists, and no new anchors since the apos in
      *                the null anchor.
-     *    (x > 0) means only non-null anchors exist OR new non-null anchors have been added
-     *            since the last-recorded apos in the null anchor.
+     *    (x > 0) means non-null anchors exist without a null anchor OR new non-null anchors
+     *            have been added since the last-recorded apos in the null anchor.
      */
     struct EmuBinaryResult {
         boost::optional<uint64_t> cpos;
@@ -1592,6 +1596,7 @@ public:
      */
     static void validateCompactionTokens(const EncryptedFieldConfig& efc, BSONObj compactionTokens);
 
+    // TODO: SERVER-73303 delete when v2 is enabled by default
     /**
      * Merges the list of ECCDocuments so that entries whose tuple values are
      * adjacent to each other are combined into a single entry. For example,
@@ -1602,6 +1607,7 @@ public:
      */
     static std::vector<ECCDocument> mergeECCDocuments(std::vector<ECCDocument>& unmerged);
 
+    // TODO: SERVER-73303 delete when v2 is enabled by default
     /**
      * Given a list of ECCDocument, where each document is a range of
      * deleted positions, this calculates the total number of deleted

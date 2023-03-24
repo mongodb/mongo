@@ -48,7 +48,6 @@ FLEStatusSection::FLEStatusSection(TickSource* tickSource)
     ECStats zeroStats;
     ECOCStats zeroECOC;
 
-    _compactStats.setEcc(zeroStats);
     _compactStats.setEsc(zeroStats);
     _compactStats.setEcoc(zeroECOC);
 }

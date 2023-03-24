@@ -185,7 +185,9 @@ void doRenameOperation(const CompactStructuredEncryptionDataState& state,
 CompactStats doCompactOperation(const CompactStructuredEncryptionDataState& state) {
     if (state.getSkipCompact()) {
         LOGV2_DEBUG(6517005, 1, "Skipping compaction");
-        return CompactStats(ECOCStats(), ECStats(), ECStats());
+        CompactStats stats({}, {});
+        stats.setEcc({});
+        return stats;
     }
 
     EncryptedStateCollectionsNamespaces namespaces;

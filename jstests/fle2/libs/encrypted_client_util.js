@@ -397,12 +397,16 @@ var EncryptedClient = class {
 
         const checkMap = {};
 
-        // Always expect ESC and ECC collections, optionally expect ECOC.
+        // Always expect the ESC collection, optionally expect ECOC.
         // ECOC is not expected in sharded clusters.
         checkMap[baseCollInfo.options.encryptedFields.escCollection] = true;
-        checkMap[baseCollInfo.options.encryptedFields.eccCollection] = true;
         checkMap[baseCollInfo.options.encryptedFields.ecocCollection] = ecocExists;
         checkMap[baseCollInfo.options.encryptedFields.ecocCollection + ".compact"] = ecocTempExists;
+
+        // TODO: SERVER-73303 remove once v2 is enabled by default
+        if (!isFLE2ProtocolVersion2Enabled()) {
+            checkMap[baseCollInfo.options.encryptedFields.eccCollection] = true;
+        }
 
         const edb = this._edb;
         Object.keys(checkMap).forEach(function(coll) {

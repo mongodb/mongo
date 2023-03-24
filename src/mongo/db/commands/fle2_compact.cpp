@@ -34,11 +34,14 @@
 
 #include <memory>
 
+#include "mongo/bson/util/bson_extract.h"
 #include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/crypto/fle_stats.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/commands/fle2_compact_gen.h"
 #include "mongo/db/commands/server_status.h"
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/fail_point.h"
@@ -47,6 +50,9 @@
 
 
 MONGO_FAIL_POINT_DEFINE(fleCompactFailBeforeECOCRead);
+MONGO_FAIL_POINT_DEFINE(fleCompactHangBeforeESCAnchorInsert);
+
+// TODO: SERVER-73303 delete the below failpoints when v2 is enabled by default
 MONGO_FAIL_POINT_DEFINE(fleCompactHangBeforeESCPlaceholderInsert);
 MONGO_FAIL_POINT_DEFINE(fleCompactHangAfterESCPlaceholderInsert);
 MONGO_FAIL_POINT_DEFINE(fleCompactHangBeforeECCPlaceholderInsert);
@@ -54,6 +60,10 @@ MONGO_FAIL_POINT_DEFINE(fleCompactHangAfterECCPlaceholderInsert);
 
 namespace mongo {
 namespace {
+
+constexpr auto kId = "_id"_sd;
+constexpr auto kValue = "value"_sd;
+
 /**
  * Wrapper class around the IDL stats types that enables easier
  * addition to the statistics counters.
@@ -75,6 +85,12 @@ public:
     void addUpdates(std::int64_t n) {
         _stats->setUpdated(_stats->getUpdated() + n);
     }
+    void add(const IDLType& other) {
+        addReads(other.getRead());
+        addDeletes(other.getDeleted());
+        addInserts(other.getInserted());
+        addUpdates(other.getUpdated());
+    }
 
 private:
     IDLType* _stats;
@@ -88,14 +104,21 @@ template <>
 void CompactStatsCounter<ECOCStats>::addInserts(std::int64_t n) {}
 template <>
 void CompactStatsCounter<ECOCStats>::addUpdates(std::int64_t n) {}
+template <>
+void CompactStatsCounter<ECOCStats>::add(const ECOCStats& other) {
+    addReads(other.getRead());
+    addDeletes(other.getDeleted());
+}
 
 /**
  * Implementation of FLEStateCollectionReader for txn_api::TransactionClient
  */
 template <typename StatsType>
-class TxnCollectionReader : public FLEStateCollectionReader {
+class TxnCollectionReaderForCompact : public FLEStateCollectionReader {
 public:
-    TxnCollectionReader(FLEQueryInterface* queryImpl, const NamespaceString& nss, StatsType* stats)
+    TxnCollectionReaderForCompact(FLEQueryInterface* queryImpl,
+                                  const NamespaceString& nss,
+                                  StatsType* stats)
         : _queryImpl(queryImpl), _nss(nss), _stats(stats) {}
 
     uint64_t getDocumentCount() const override {
@@ -116,6 +139,7 @@ private:
     mutable CompactStatsCounter<StatsType> _stats;
 };
 
+// TODO: SERVER-73303 delete when v2 is enabled by default
 /**
  * Deletes an entry at the given position from FLECollection, using
  * the TagToken to generate the _id value for the delete query.
@@ -144,6 +168,7 @@ void deleteDocumentByPos(FLEQueryInterface* queryImpl,
     statsCtr.addDeletes(1);
 }
 
+// TODO: SERVER-73303 delete when v2 is enabled by default
 /**
  * Inserts or updates a null document in FLECollection.
  * The newNullDoc must contain the _id of the null document to update.
@@ -178,6 +203,7 @@ void upsertNullDocument(FLEQueryInterface* queryImpl,
     }
 }
 
+// TODO: SERVER-73303 delete when v2 is enabled by default
 /**
  * Deletes a document at the specified position from the ESC
  */
@@ -190,6 +216,7 @@ void deleteESCDocument(FLEQueryInterface* queryImpl,
         queryImpl, nss, pos, tagToken, escStats);
 }
 
+// TODO: SERVER-73303 delete when v2 is enabled by default
 /**
  * Deletes a document at the specified position from the ECC
  */
@@ -202,6 +229,7 @@ void deleteECCDocument(FLEQueryInterface* queryImpl,
         queryImpl, nss, pos, tagToken, eccStats);
 }
 
+// TODO: SERVER-73303 delete when v2 is enabled by default
 /**
  * Result of preparing the ESC collection for a single field/value pair
  * before compaction.
@@ -215,6 +243,7 @@ struct ESCPreCompactState {
     uint64_t pos{0};
 };
 
+// TODO: SERVER-73303 delete when v2 is enabled by default
 /**
  * Finds the upper and lower bound positions, and the current counter
  * value from the ESC collection for the given twice-derived tokens,
@@ -227,7 +256,7 @@ ESCPreCompactState prepareESCForCompaction(FLEQueryInterface* queryImpl,
                                            ECStats* escStats) {
     CompactStatsCounter<ECStats> stats(escStats);
 
-    TxnCollectionReader reader(queryImpl, nssEsc, escStats);
+    TxnCollectionReaderForCompact reader(queryImpl, nssEsc, escStats);
 
     // get the upper bound index 'pos' using binary search
     // get the lower bound index 'ipos' from the null doc, if it exists, otherwise 1
@@ -300,6 +329,7 @@ ESCPreCompactState prepareESCForCompaction(FLEQueryInterface* queryImpl,
     return state;
 }
 
+// TODO: SERVER-73303 delete when v2 is enabled by default
 /**
  * Result of preparing the ECC collection for a single field/value pair
  * before compaction.
@@ -317,6 +347,7 @@ struct ECCPreCompactState {
     bool merged{false};
 };
 
+// TODO: SERVER-73303 delete when v2 is enabled by default
 ECCPreCompactState prepareECCForCompaction(FLEQueryInterface* queryImpl,
                                            const NamespaceString& nssEcc,
                                            const ECCTwiceDerivedTagToken& tagToken,
@@ -324,7 +355,7 @@ ECCPreCompactState prepareECCForCompaction(FLEQueryInterface* queryImpl,
                                            ECStats* eccStats) {
     CompactStatsCounter<ECStats> stats(eccStats);
 
-    TxnCollectionReader reader(queryImpl, nssEcc, eccStats);
+    TxnCollectionReaderForCompact reader(queryImpl, nssEcc, eccStats);
 
     ECCPreCompactState state;
     bool flag = true;
@@ -479,6 +510,38 @@ stdx::unordered_set<ECOCCompactionDocument> getUniqueCompactionDocuments(
     return c;
 }
 
+/**
+ * Parses the compaction tokens from the compact request, and
+ * for each one, retrieves the unique entries in the ECOC collection
+ * that have been encrypted with that token. All entries are returned
+ * in a set in their decrypted form.
+ */
+stdx::unordered_set<ECOCCompactionDocumentV2> getUniqueCompactionDocumentsV2(
+    FLEQueryInterface* queryImpl,
+    const CompactStructuredEncryptionData& request,
+    const NamespaceString& ecocNss,
+    ECOCStats* ecocStats) {
+
+    CompactStatsCounter<ECOCStats> stats(ecocStats);
+
+    // Initialize a set 'C' and for each compaction token, find all entries
+    // in ECOC with matching field name. Decrypt entries and add to set 'C'.
+    stdx::unordered_set<ECOCCompactionDocumentV2> c;
+    auto compactionTokens = CompactionHelpers::parseCompactionTokens(request.getCompactionTokens());
+
+    for (auto& compactionToken : compactionTokens) {
+        auto docs = queryImpl->findDocuments(
+            ecocNss, BSON(EcocDocument::kFieldNameFieldName << compactionToken.fieldPathName));
+        stats.addReads(docs.size());
+
+        for (auto& doc : docs) {
+            auto ecocDoc = ECOCCollection::parseAndDecryptV2(doc, compactionToken.token);
+            c.insert(std::move(ecocDoc));
+        }
+    }
+    return c;
+}
+
 void compactOneFieldValuePair(FLEQueryInterface* queryImpl,
                               const ECOCCompactionDocument& ecocDoc,
                               const EncryptedStateCollectionsNamespaces& namespaces,
@@ -553,6 +616,64 @@ void compactOneFieldValuePair(FLEQueryInterface* queryImpl,
     }
 }
 
+void compactOneFieldValuePairV2(FLEQueryInterface* queryImpl,
+                                const ECOCCompactionDocumentV2& ecocDoc,
+                                const NamespaceString& escNss,
+                                ECStats* escStats) {
+    auto escTagToken = FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedTagToken(ecocDoc.esc);
+    auto escValueToken =
+        FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedValueToken(ecocDoc.esc);
+
+    CompactStatsCounter<ECStats> stats(escStats);
+    TxnCollectionReaderForCompact reader(queryImpl, escNss, escStats);
+
+    auto positions = ESCCollection::emuBinaryV2(reader, escTagToken, escValueToken);
+
+    // Handle case where cpos is none. This means that no new non-anchors have been inserted
+    // since since the last compact/cleanup.
+    // This could happen if a previous compact inserted an anchor, but the temp ECOC drop
+    // was interrupted. On restart, the compaction will run emuBinaryV2 again, but since the
+    // anchor was already inserted for this value, it may return null cpos if there have been no
+    // new insertions for that value since the first compact attempt.
+    if (!positions.cpos.has_value()) {
+        // No new non-anchors since the last compact/cleanup.
+        // There must be at least one anchor.
+        uassert(7293602,
+                "An ESC anchor document is expected but none is found",
+                !positions.apos.has_value() || positions.apos.value() > 0);
+        // the anchor with the latest cpos already exists so no more work needed
+        return;
+    }
+
+    uint64_t nextAnchorPos = 0;
+
+    if (!positions.apos.has_value()) {
+        auto r_esc = reader.getById(ESCCollection::generateNullAnchorId(escTagToken));
+
+        uassert(7293601, "ESC null anchor document not found", !r_esc.isEmpty());
+
+        auto nullAnchorDoc =
+            uassertStatusOK(ESCCollection::decryptAnchorDocument(escValueToken, r_esc));
+        nextAnchorPos = nullAnchorDoc.position + 1;
+    } else {
+        nextAnchorPos = positions.apos.value() + 1;
+    }
+
+    auto anchorDoc = ESCCollection::generateAnchorDocument(
+        escTagToken, escValueToken, nextAnchorPos, positions.cpos.value());
+    StmtId stmtId = kUninitializedStmtId;
+
+    if (MONGO_unlikely(fleCompactHangBeforeESCAnchorInsert.shouldFail())) {
+        LOGV2(7293606, "Hanging due to fleCompactHangBeforeESCAnchorInsert fail point");
+        fleCompactHangBeforeESCAnchorInsert.pauseWhileSet();
+    }
+
+    auto insertReply =
+        uassertStatusOK(queryImpl->insertDocuments(escNss, {anchorDoc}, &stmtId, true));
+    checkWriteErrors(insertReply);
+    stats.addInserts(1);
+}
+
 CompactStats processFLECompact(OperationContext* opCtx,
                                const CompactStructuredEncryptionData& request,
                                GetTxnCallback getTxn,
@@ -622,10 +743,93 @@ CompactStats processFLECompact(OperationContext* opCtx,
         uassertStatusOK(swResult.getValue().getEffectiveStatus());
     }
 
-    CompactStats stats(*ecocStats, *eccStats, *escStats);
+    CompactStats stats(*ecocStats, *escStats);
+    stats.setEcc(*eccStats);
     FLEStatusSection::get().updateCompactionStats(stats);
 
     return stats;
+}
+
+void processFLECompactV2(OperationContext* opCtx,
+                         const CompactStructuredEncryptionData& request,
+                         GetTxnCallback getTxn,
+                         const EncryptedStateCollectionsNamespaces& namespaces,
+                         ECStats* escStats,
+                         ECOCStats* ecocStats) {
+    auto innerEcocStats = std::make_shared<ECOCStats>();
+    auto innerEscStats = std::make_shared<ECStats>();
+
+    /* uniqueEcocEntries corresponds to the set 'C_f' in OST-1 */
+    auto uniqueEcocEntries = std::make_shared<stdx::unordered_set<ECOCCompactionDocumentV2>>();
+
+    if (MONGO_unlikely(fleCompactFailBeforeECOCRead.shouldFail())) {
+        uasserted(7293605, "Failed compact due to fleCompactFailBeforeECOCRead fail point");
+    }
+
+    // Read the ECOC documents in a transaction
+    {
+        std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxn(opCtx);
+
+        // The function that handles the transaction may outlive this function so we need to use
+        // shared_ptrs
+        auto argsBlock = std::make_tuple(request, namespaces.ecocRenameNss);
+        auto sharedBlock = std::make_shared<decltype(argsBlock)>(argsBlock);
+
+        auto swResult = trun->runNoThrow(
+            opCtx,
+            [sharedBlock, uniqueEcocEntries, innerEcocStats](
+                const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+                FLEQueryInterfaceImpl queryImpl(txnClient, getGlobalServiceContext());
+
+                auto [request2, ecocRenameNss] = *sharedBlock.get();
+
+                *uniqueEcocEntries = getUniqueCompactionDocumentsV2(
+                    &queryImpl, request2, ecocRenameNss, innerEcocStats.get());
+
+                return SemiFuture<void>::makeReady();
+            });
+
+        uassertStatusOK(swResult);
+        uassertStatusOK(swResult.getValue().getEffectiveStatus());
+    }
+
+    // Each entry in 'C_f' represents a unique field/value pair. For each field/value pair,
+    // compact the ESC entries for that field/value pair in one transaction.
+    for (auto& ecocDoc : *uniqueEcocEntries) {
+        // start a new transaction
+        std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxn(opCtx);
+
+        // The function that handles the transaction may outlive this function so we need to use
+        // shared_ptrs
+        auto argsBlock = std::make_tuple(ecocDoc, namespaces.escNss);
+        auto sharedBlock = std::make_shared<decltype(argsBlock)>(argsBlock);
+
+        auto swResult = trun->runNoThrow(
+            opCtx,
+            [sharedBlock, innerEscStats](const txn_api::TransactionClient& txnClient,
+                                         ExecutorPtr txnExec) {
+                FLEQueryInterfaceImpl queryImpl(txnClient, getGlobalServiceContext());
+
+                auto [ecocDoc2, escNss] = *sharedBlock.get();
+
+                compactOneFieldValuePairV2(&queryImpl, ecocDoc2, escNss, innerEscStats.get());
+
+                return SemiFuture<void>::makeReady();
+            });
+
+        uassertStatusOK(swResult);
+        uassertStatusOK(swResult.getValue().getEffectiveStatus());
+    }
+
+    // Update stats
+    if (escStats) {
+        CompactStatsCounter<ECStats> ctr(escStats);
+        ctr.add(*innerEscStats);
+    }
+    if (ecocStats) {
+        CompactStatsCounter<ECOCStats> ctr(ecocStats);
+        ctr.add(*innerEcocStats);
+    }
 }
 
 void validateCompactRequest(const CompactStructuredEncryptionData& request, const Collection& edc) {
@@ -636,6 +840,128 @@ void validateCompactRequest(const CompactStructuredEncryptionData& request, cons
     // Validate the request contains a compaction token for each encrypted field
     const auto& efc = edc.getCollectionOptions().encryptedFieldConfig.value();
     CompactionHelpers::validateCompactionTokens(efc, request.getCompactionTokens());
+}
+
+const PrfBlock& FLECompactESCDeleteSet::at(size_t index) const {
+    if (index >= size()) {
+        throw std::out_of_range("out of range");
+    }
+    for (auto& deleteSet : this->deleteIdSets) {
+        if (index < deleteSet.size()) {
+            return deleteSet.at(index);
+        }
+        index -= deleteSet.size();
+    }
+    MONGO_UNREACHABLE;
+}
+
+FLECompactESCDeleteSet readRandomESCNonAnchorIds(OperationContext* opCtx,
+                                                 const NamespaceString& escNss,
+                                                 size_t memoryLimit,
+                                                 ECStats* escStats) {
+    FLECompactESCDeleteSet deleteSet;
+
+    size_t idLimit = memoryLimit / sizeof(PrfBlock);
+    if (0 == idLimit) {
+        return deleteSet;
+    }
+
+    DBDirectClient client(opCtx);
+    AggregateCommandRequest aggCmd{escNss};
+
+    // Build an agg pipeline for fetching a set of random ESC "non-anchor" entries.
+    // Note: "Non-anchors" are entries that don't have a "value" field.
+    // pipeline: [ {$match: {value: {$exists: false}}}, {$sample: {size: idLimit}} ]
+    {
+        std::vector<BSONObj> pipeline;
+        pipeline.emplace_back(BSON("$match" << BSON(kValue << BSON("$exists" << false))));
+        pipeline.emplace_back(BSON("$sample" << BSON("size" << static_cast<int64_t>(idLimit))));
+        aggCmd.setPipeline(std::move(pipeline));
+    }
+
+    auto swCursor = DBClientCursor::fromAggregationRequest(&client, aggCmd, false, false);
+    uassertStatusOK(swCursor.getStatus());
+    auto cursor = std::move(swCursor.getValue());
+
+    uassert(7293607, "Got an invalid cursor while reading the Queryable Encryption ESC", cursor);
+
+    while (cursor->more()) {
+        auto& deleteIds = deleteSet.deleteIdSets.emplace_back();
+        deleteIds.reserve(cursor->objsLeftInBatch());
+
+        do {
+            const auto doc = cursor->nextSafe();
+            BSONElement id;
+            auto status = bsonExtractTypedField(doc, kId, BinData, &id);
+            uassertStatusOK(status);
+
+            uassert(7293604,
+                    "Found a document in ESC with _id of incorrect BinDataType",
+                    id.binDataType() == BinDataType::BinDataGeneral);
+            deleteIds.emplace_back(PrfBlockfromCDR(binDataToCDR(id)));
+        } while (cursor->moreInCurrentBatch());
+    }
+
+    if (escStats) {
+        CompactStatsCounter<ECStats> stats(escStats);
+        stats.addReads(deleteSet.size());
+    }
+
+    return deleteSet;
+}
+
+void cleanupESCNonAnchors(OperationContext* opCtx,
+                          const NamespaceString& escNss,
+                          const FLECompactESCDeleteSet& deleteSet,
+                          size_t maxTagsPerDelete,
+                          ECStats* escStats) {
+    uassert(7293611,
+            "Max number of ESC entries to delete per request cannot be zero",
+            maxTagsPerDelete > 0);
+    if (deleteSet.empty()) {
+        LOGV2_DEBUG(7293608,
+                    1,
+                    "Queryable Encryption compaction has nothing to delete from ESC",
+                    "namespace"_attr = escNss);
+        return;
+    }
+
+    DBDirectClient client(opCtx);
+    std::int64_t deleted = 0;
+
+    for (size_t idIndex = 0; idIndex < deleteSet.size();) {
+        write_ops::DeleteCommandRequest deleteRequest(escNss,
+                                                      std::vector<write_ops::DeleteOpEntry>{});
+        auto& opEntry = deleteRequest.getDeletes().emplace_back();
+        opEntry.setMulti(true);
+
+        BSONObjBuilder queryBuilder;
+        {
+            BSONObjBuilder idBuilder(queryBuilder.subobjStart(kId));
+            BSONArrayBuilder array = idBuilder.subarrayStart("$in");
+            size_t tagLimit = std::min(deleteSet.size() - idIndex, maxTagsPerDelete);
+
+            for (size_t tags = 0; tags < tagLimit; tags++) {
+                const auto& id = deleteSet.at(idIndex++);
+                array.appendBinData(id.size(), BinDataGeneral, id.data());
+            }
+        }
+        opEntry.setQ(queryBuilder.obj());
+
+        auto reply = client.remove(deleteRequest);
+        if (reply.getWriteCommandReplyBase().getWriteErrors()) {
+            LOGV2_WARNING(7293609,
+                          "Queryable Encryption compaction encountered write errors",
+                          "namespace"_attr = escNss,
+                          "reply"_attr = reply);
+        }
+        deleted += reply.getN();
+    }
+
+    if (escStats) {
+        CompactStatsCounter<ECStats> stats(escStats);
+        stats.addDeletes(deleted);
+    }
 }
 
 }  // namespace mongo

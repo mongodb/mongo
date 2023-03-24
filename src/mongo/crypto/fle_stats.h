@@ -100,8 +100,14 @@ public:
 
         _hasStats.store(true);
         accumulateStats(_compactStats.getEsc(), stats.getEsc());
-        accumulateStats(_compactStats.getEcc(), stats.getEcc());
         accumulateStats(_compactStats.getEcoc(), stats.getEcoc());
+
+        if (stats.getEcc().has_value()) {
+            if (!_compactStats.getEcc().has_value()) {
+                _compactStats.setEcc(ECStats{});
+            }
+            accumulateStats(_compactStats.getEcc().value(), stats.getEcc().value());
+        }
     }
 
 private:

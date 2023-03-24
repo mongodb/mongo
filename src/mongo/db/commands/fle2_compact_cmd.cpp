@@ -33,6 +33,8 @@
 #include "mongo/db/commands/fle2_compact.h"
 
 #include "mongo/crypto/encryption_fields_gen.h"
+#include "mongo/crypto/fle_options_gen.h"
+#include "mongo/crypto/fle_stats.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/create_collection.h"
@@ -49,6 +51,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 MONGO_FAIL_POINT_DEFINE(fleCompactHangBeforeECOCCreateUnsharded);
+MONGO_FAIL_POINT_DEFINE(fleCompactSkipECOCDropUnsharded);
 
 namespace mongo {
 namespace {
@@ -70,6 +73,8 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
     Lock::ExclusiveLock fleCompactCommandLock(opCtx, commandMutex);
 
     const auto& edcNss = request.getNamespace();
+    const bool useV1Protocol =
+        !gFeatureFlagFLE2ProtocolVersion2.isEnabled(serverGlobalParams.featureCompatibility);
 
     LOGV2(6319900, "Compacting the encrypted compaction collection", "namespace"_attr = edcNss);
 
@@ -101,11 +106,19 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
     auto ecoc = catalog->lookupCollectionByNamespace(opCtx, namespaces.ecocNss);
     auto ecocRename = catalog->lookupCollectionByNamespace(opCtx, namespaces.ecocRenameNss);
 
+    CompactStats stats({}, {});
+    FLECompactESCDeleteSet escDeleteSet;
+
+    if (useV1Protocol) {
+        stats.setEcc({});
+    }
+
     if (!ecoc && !ecocRename) {
         // nothing to compact
         LOGV2(6548306, "Skipping compaction as there is no ECOC collection to compact");
-        return CompactStats(ECOCStats(), ECStats(), ECStats());
-    } else if (ecoc && !ecocRename) {
+        return stats;
+    } else if (ecoc && !ecocRename && useV1Protocol) {
+        // TODO: SERVER-73303 delete this branch when v2 is enabled by default
         LOGV2(6319901,
               "Renaming the encrypted compaction collection",
               "ecocNss"_attr = namespaces.ecocNss,
@@ -114,6 +127,30 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
         validateAndRunRenameCollection(
             opCtx, namespaces.ecocNss, namespaces.ecocRenameNss, renameOpts);
         ecoc = nullptr;
+    } else if (ecoc && !ecocRename) {
+        // load the random set of ESC non-anchor entries to be deleted post-compact
+        // auto memoryLimit = ServerStatusSet::get
+        auto memoryLimit =
+            ServerParameterSet::getClusterParameterSet()
+                ->get<ClusterParameterWithStorage<FLECompactionOptions>>("fleCompactionOptions")
+                ->getValue(boost::none)
+                .getMaxCompactionSize();
+
+        escDeleteSet =
+            readRandomESCNonAnchorIds(opCtx, namespaces.escNss, memoryLimit, &stats.getEsc());
+
+        LOGV2(7293603,
+              "Renaming the encrypted compaction collection",
+              "ecocNss"_attr = namespaces.ecocNss,
+              "ecocRenameNss"_attr = namespaces.ecocRenameNss);
+        RenameCollectionOptions renameOpts;
+        validateAndRunRenameCollection(
+            opCtx, namespaces.ecocNss, namespaces.ecocRenameNss, renameOpts);
+        ecoc = nullptr;
+    } else {
+        LOGV2(7293610,
+              "Resuming compaction from a stale ECOC collection",
+              "namespace"_attr = namespaces.ecocRenameNss);
     }
 
     if (!ecoc) {
@@ -141,7 +178,6 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
 
     // Step 2: for each encrypted field in compactionTokens, get distinct set of entries 'C'
     // from ECOC, and for each entry in 'C', compact ESC and ECC.
-    CompactStats stats;
     {
         // acquire IS lock on the ecocRenameNss to prevent it from being dropped during compact
         AutoGetCollection tempEcocColl(opCtx, namespaces.ecocRenameNss, MODE_IS);
@@ -152,7 +188,35 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
                               << " no longer exists prior to compaction",
                 tempEcocColl.getCollection());
 
-        stats = processFLECompact(opCtx, request, &getTransactionWithRetriesForMongoD, namespaces);
+        if (useV1Protocol) {
+            // TODO: SERVER-73303 delete this branch when v2 is enabled by default
+            stats =
+                processFLECompact(opCtx, request, &getTransactionWithRetriesForMongoD, namespaces);
+        } else {
+            processFLECompactV2(opCtx,
+                                request,
+                                &getTransactionWithRetriesForMongoD,
+                                namespaces,
+                                &stats.getEsc(),
+                                &stats.getEcoc());
+        }
+    }
+
+    if (!useV1Protocol) {
+        auto tagsPerDelete =
+            ServerParameterSet::getClusterParameterSet()
+                ->get<ClusterParameterWithStorage<FLECompactionOptions>>("fleCompactionOptions")
+                ->getValue(boost::none)
+                .getMaxESCEntriesPerCompactionDelete();
+        cleanupESCNonAnchors(
+            opCtx, namespaces.escNss, escDeleteSet, tagsPerDelete, &stats.getEsc());
+        FLEStatusSection::get().updateCompactionStats(stats);
+    }
+
+    if (MONGO_unlikely(fleCompactSkipECOCDropUnsharded.shouldFail())) {
+        LOGV2(7299612,
+              "Skipping drop of ECOC temp due to fleCompactSkipECOCDropUnsharded fail point");
+        return stats;
     }
 
     // Step 3: drop the renamed ECOC collection

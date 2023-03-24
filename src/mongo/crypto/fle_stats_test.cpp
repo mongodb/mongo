@@ -57,16 +57,12 @@ public:
 protected:
     CompactStats zeroStats = CompactStats::parse(
         IDLParserContext("compactStats"),
-        BSON("ecoc" << BSON("deleted" << 0 << "read" << 0) << "ecc"
-                    << BSON("deleted" << 0 << "inserted" << 0 << "read" << 0 << "updated" << 0)
-                    << "esc"
+        BSON("ecoc" << BSON("deleted" << 0 << "read" << 0) << "esc"
                     << BSON("deleted" << 0 << "inserted" << 0 << "read" << 0 << "updated" << 0)));
 
     CompactStats compactStats = CompactStats::parse(
         IDLParserContext("compactStats"),
-        BSON("ecoc" << BSON("deleted" << 1 << "read" << 1) << "ecc"
-                    << BSON("deleted" << 1 << "inserted" << 1 << "read" << 1 << "updated" << 1)
-                    << "esc"
+        BSON("ecoc" << BSON("deleted" << 1 << "read" << 1) << "esc"
                     << BSON("deleted" << 1 << "inserted" << 1 << "read" << 1 << "updated" << 1)));
     std::unique_ptr<TickSourceMock<Milliseconds>> tickSource;
     std::unique_ptr<FLEStatusSection> instance;

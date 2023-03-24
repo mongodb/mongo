@@ -78,6 +78,8 @@ public:
         using InvocationBase::InvocationBase;
 
         Reply typedRun(OperationContext* opCtx) {
+            bool usePreview = !gFeatureFlagFLE2ProtocolVersion2.isEnabled(
+                serverGlobalParams.featureCompatibility);
 
             auto compactCoordinator =
                 [&]() -> std::shared_ptr<CompactStructuredEncryptionDataCoordinator> {
@@ -95,7 +97,11 @@ public:
             if (!compactCoordinator) {
                 // Nothing to do.
                 LOGV2(6548305, "Skipping compaction as there is no ECOC collection to compact");
-                return CompactStats({}, {}, {});
+                CompactStats stats({}, {});
+                if (usePreview) {
+                    stats.setEcc(ECStats{});
+                }
+                return stats;
             }
 
             return compactCoordinator->getResponse(opCtx);
