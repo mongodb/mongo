@@ -85,7 +85,7 @@ selector:
   - jstests/sharding/analyze_shard_key/persist_sampled_diffs.js
   - jstests/sharding/analyze_shard_key/persist_sampled_read_queries.js
   - jstests/sharding/analyze_shard_key/persist_sampled_write_queries.js
-  - jstests/sharding/analyze_shard_key/refresh_sample_rates_sharded.js
+  - jstests/sharding/analyze_shard_key/refresh_sample_rates.js
   - jstests/sharding/configsvr_metadata_commands_require_majority_write_concern.js
   - jstests/sharding/min_optime_recovery_on_successful_move_chunk_commit.js
   - jstests/sharding/read_after_optime.js

@@ -29,11 +29,25 @@
 
 #include "mongo/s/analyze_shard_key_role.h"
 
+#include "mongo/db/multitenancy_gen.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/s/analyze_shard_key_feature_flag_gen.h"
 #include "mongo/s/is_mongos.h"
 
 namespace mongo {
 namespace analyze_shard_key {
+
+namespace {
+
+bool isReplEnabled(ServiceContext* serviceContext) {
+    if (isMongos()) {
+        return false;
+    }
+    auto replCoord = repl::ReplicationCoordinator::get(serviceContext);
+    return replCoord && replCoord->isReplEnabled();
+}
+
+}  // namespace
 
 bool isFeatureFlagEnabled(bool ignoreFCV) {
     if (ignoreFCV) {
@@ -43,9 +57,20 @@ bool isFeatureFlagEnabled(bool ignoreFCV) {
         gFeatureFlagAnalyzeShardKey.isEnabled(serverGlobalParams.featureCompatibility);
 }
 
-bool supportsCoordinatingQueryAnalysis(bool ignoreFCV) {
-    return isFeatureFlagEnabled(ignoreFCV) &&
-        serverGlobalParams.clusterRole == ClusterRole::ConfigServer;
+bool supportsCoordinatingQueryAnalysis(bool isReplEnabled, bool ignoreFCV) {
+    if (!isFeatureFlagEnabled(ignoreFCV)) {
+        return false;
+    }
+    if (isMongos()) {
+        return false;
+    }
+    return isReplEnabled && !gMultitenancySupport &&
+        (serverGlobalParams.clusterRole == ClusterRole::ConfigServer ||
+         serverGlobalParams.clusterRole == ClusterRole::None);
+}
+
+bool supportsCoordinatingQueryAnalysis(OperationContext* opCtx, bool ignoreFCV) {
+    return supportsCoordinatingQueryAnalysis(isReplEnabled(opCtx->getServiceContext()), ignoreFCV);
 }
 
 bool supportsPersistingSampledQueries(bool ignoreFCV) {

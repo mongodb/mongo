@@ -1231,8 +1231,6 @@ void setUpObservers(ServiceContext* serviceContext) {
             std::make_unique<OplogWriterTransactionProxy>(std::make_unique<OplogWriterImpl>())));
         opObserverRegistry->addObserver(std::make_unique<ShardServerOpObserver>());
         opObserverRegistry->addObserver(std::make_unique<ReshardingOpObserver>());
-        opObserverRegistry->addObserver(
-            std::make_unique<analyze_shard_key::QueryAnalysisOpObserver>());
         opObserverRegistry->addObserver(std::make_unique<repl::TenantMigrationDonorOpObserver>());
         opObserverRegistry->addObserver(
             std::make_unique<repl::TenantMigrationRecipientOpObserver>());
@@ -1252,8 +1250,6 @@ void setUpObservers(ServiceContext* serviceContext) {
 
         opObserverRegistry->addObserver(std::make_unique<ConfigServerOpObserver>());
         opObserverRegistry->addObserver(std::make_unique<ReshardingOpObserver>());
-        opObserverRegistry->addObserver(
-            std::make_unique<analyze_shard_key::QueryAnalysisOpObserver>());
     }
 
     if (serverGlobalParams.clusterRole == ClusterRole::None) {
@@ -1275,6 +1271,7 @@ void setUpObservers(ServiceContext* serviceContext) {
         std::make_unique<repl::PrimaryOnlyServiceOpObserver>(serviceContext));
     opObserverRegistry->addObserver(std::make_unique<FcvOpObserver>());
     opObserverRegistry->addObserver(std::make_unique<ClusterServerParameterOpObserver>());
+    opObserverRegistry->addObserver(std::make_unique<analyze_shard_key::QueryAnalysisOpObserver>());
 
     setupFreeMonitoringOpObserver(opObserverRegistry.get());
 

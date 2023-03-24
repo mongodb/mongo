@@ -43,8 +43,9 @@ namespace analyze_shard_key {
  * Keeps track of all samplers in the cluster and assigns sample rates to each sampler based on its
  * view of the query distribution across the samplers.
  *
- * Currently, query sampling is only supported on a sharded cluster. So a sampler must be a mongos
- * or shardsvr mongod (acting as a router), and the coordinator must be the config server's primary
+ * On a sharded cluster, a sampler is any mongos or shardsvr mongod (that has acted as a
+ * router) in the cluster, and the coordinator is the config server's primary mongod. On a
+ * standalone replica set, a sampler is any mongod in the set and the coordinator is the primary
  * mongod.
  */
 class QueryAnalysisCoordinator : public ReplicaSetAwareService<QueryAnalysisCoordinator> {
@@ -103,7 +104,8 @@ public:
     void onConfigurationDelete(const BSONObj& doc);
 
     /**
-     * Creates, updates and deletes the sampler (i.e. mongos) with the given config.mongos document.
+     * On a sharded cluster, creates, updates and deletes the sampler for the mongos with the given
+     * config.mongos document.
      */
     void onSamplerInsert(const BSONObj& doc);
     void onSamplerUpdate(const BSONObj& doc);
@@ -140,7 +142,11 @@ public:
 private:
     bool shouldRegisterReplicaSetAwareService() const override final;
 
-    void onSetCurrentConfig(OperationContext* opCtx) override final {}
+    /**
+     * On a standalone replica set, creates, updates and removes samplers based on the current
+     * replica set configuration.
+     */
+    void onSetCurrentConfig(OperationContext* opCtx) override final;
 
     void onInitialDataAvailable(OperationContext* opCtx,
                                 bool isMajorityDataAvailable) override final {}

@@ -51,8 +51,8 @@ commands:
     api_version: ""
     fields:
       name:
-        description: "The unique identifier for the sampler (currently, must be the connection
-                      string of a mongos or shardsvr mongod)."
+        description: "The unique identifier for the sampler (i.e. mongos or mongod), must be set to
+                     its connection string."
         type: string
       numQueriesExecutedPerSecond:
         description: "The exponential moving average of the number of queries that the sampler

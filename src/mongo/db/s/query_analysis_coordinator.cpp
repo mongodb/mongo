@@ -33,6 +33,7 @@
 
 #include "mongo/db/catalog_shard_feature_flag_gen.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/s/analyze_shard_key_server_parameters_gen.h"
@@ -65,7 +66,7 @@ QueryAnalysisCoordinator* QueryAnalysisCoordinator::get(ServiceContext* serviceC
 bool QueryAnalysisCoordinator::shouldRegisterReplicaSetAwareService() const {
     // This is invoked when the Register above is constructed which is before FCV is set so we need
     // to ignore FCV when checking if the feature flag is enabled.
-    return supportsCoordinatingQueryAnalysis(true /* ignoreFCV */);
+    return supportsCoordinatingQueryAnalysis(true /* isReplEnabled */, true /* ignoreFCV */);
 }
 
 void QueryAnalysisCoordinator::onConfigurationInsert(const BSONObj& doc) {
@@ -141,6 +142,7 @@ void QueryAnalysisCoordinator::Sampler::resetLastNumQueriesExecutedPerSecond() {
 }
 
 void QueryAnalysisCoordinator::onSamplerInsert(const BSONObj& doc) {
+    invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
     stdx::lock_guard<Latch> lk(_mutex);
 
     auto mongosDoc = uassertStatusOK(MongosType::fromBSON(doc));
@@ -152,6 +154,7 @@ void QueryAnalysisCoordinator::onSamplerInsert(const BSONObj& doc) {
 }
 
 void QueryAnalysisCoordinator::onSamplerUpdate(const BSONObj& doc) {
+    invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
     stdx::lock_guard<Latch> lk(_mutex);
 
     auto mongosDoc = uassertStatusOK(MongosType::fromBSON(doc));
@@ -165,6 +168,7 @@ void QueryAnalysisCoordinator::onSamplerUpdate(const BSONObj& doc) {
 }
 
 void QueryAnalysisCoordinator::onSamplerDelete(const BSONObj& doc) {
+    invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
     stdx::lock_guard<Latch> lk(_mutex);
 
     auto mongosDoc = uassertStatusOK(MongosType::fromBSON(doc));
@@ -195,7 +199,7 @@ void QueryAnalysisCoordinator::onStartup(OperationContext* opCtx) {
         }
     }
 
-    {
+    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
         invariant(_samplers.empty());
 
         auto minPingTime = _getMinLastPingTime();
@@ -208,6 +212,35 @@ void QueryAnalysisCoordinator::onStartup(OperationContext* opCtx) {
             auto sampler = Sampler{mongosDoc.getName(), mongosDoc.getPing()};
             _samplers.emplace(mongosDoc.getName(), std::move(sampler));
         }
+    }
+}
+
+void QueryAnalysisCoordinator::onSetCurrentConfig(OperationContext* opCtx) {
+    if (serverGlobalParams.clusterRole == ClusterRole::None) {
+        stdx::lock_guard<Latch> lk(_mutex);
+
+        StringMap<Sampler> samplers;
+
+        auto replMembers = repl::ReplicationCoordinator::get(opCtx)->getConfig().members();
+        for (const auto& member : replMembers) {
+            if (member.isArbiter()) {
+                continue;
+            }
+
+            auto samplerName = member.getHostAndPort().toString();
+            auto now = opCtx->getServiceContext()->getFastClockSource()->now();
+            auto it = _samplers.find(samplerName);
+            if (it == _samplers.end()) {
+                // Initialize a sampler for every new data-bearing replica set member.
+                samplers.emplace(samplerName, Sampler{samplerName, now});
+            } else {
+                auto sampler = it->second;
+                sampler.setLastPingTime(now);
+                samplers.emplace(samplerName, std::move(sampler));
+            }
+        }
+
+        _samplers = std::move(samplers);
     }
 }
 

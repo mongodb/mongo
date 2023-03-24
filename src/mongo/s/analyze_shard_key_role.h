@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/operation_context.h"
 #include "mongo/platform/basic.h"
 
 namespace mongo {
@@ -36,7 +37,8 @@ namespace analyze_shard_key {
 
 bool isFeatureFlagEnabled(bool ignoreFCV = false);
 
-bool supportsCoordinatingQueryAnalysis(bool ignoreFCV = false);
+bool supportsCoordinatingQueryAnalysis(bool isReplEnabled, bool ignoreFCV = false);
+bool supportsCoordinatingQueryAnalysis(OperationContext* opCtx, bool ignoreFCV = false);
 
 bool supportsPersistingSampledQueries(bool ignoreFCV = false);
 

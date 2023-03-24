@@ -31,6 +31,7 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/query_analysis_coordinator.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/analyze_shard_key_feature_flag_gen.h"
@@ -54,10 +55,18 @@ public:
         using InvocationBase::InvocationBase;
 
         Response typedRun(OperationContext* opCtx) {
+            uassert(ErrorCodes::IllegalOperation,
+                    "_refreshQueryAnalyzerConfiguration command is not supported on a standalone "
+                    "mongod",
+                    repl::ReplicationCoordinator::get(opCtx)->isReplEnabled());
+            uassert(ErrorCodes::IllegalOperation,
+                    "_refreshQueryAnalyzerConfiguration command is not supported on a multitenant "
+                    "replica set",
+                    !gMultitenancySupport);
             uassert(
                 ErrorCodes::IllegalOperation,
-                "_refreshQueryAnalyzerConfiguration command is only supported on configsvr mongod",
-                serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+                "_refreshQueryAnalyzerConfiguration command is not supported on a shardsvr mongod",
+                !serverGlobalParams.clusterRole.isExclusivelyShardRole());
 
             auto coodinator = analyze_shard_key::QueryAnalysisCoordinator::get(opCtx);
             auto configurations = coodinator->getNewConfigurationsForSampler(
