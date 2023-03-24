@@ -747,7 +747,8 @@ Status ShardingCatalogManager::_initConfigIndexes(OperationContext* opCtx) {
 
     if (feature_flags::gGlobalIndexesShardingCatalog.isEnabled(
             serverGlobalParams.featureCompatibility)) {
-        result = sharding_util::createShardingIndexCatalogIndexes(opCtx);
+        result = sharding_util::createShardingIndexCatalogIndexes(
+            opCtx, NamespaceString::kConfigsvrIndexCatalogNamespace);
         if (!result.isOK()) {
             return result;
         }

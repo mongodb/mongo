@@ -671,7 +671,8 @@ private:
         }
 
         if (isUpgrading) {
-            _createShardingIndexCatalogIndexes(opCtx, requestedVersion);
+            _createShardingIndexCatalogIndexes(
+                opCtx, requestedVersion, NamespaceString::kShardIndexCatalogNamespace);
         }
     }
 
@@ -843,13 +844,16 @@ private:
     }
 
     void _createShardingIndexCatalogIndexes(
-        OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
+        OperationContext* opCtx,
+        const multiversion::FeatureCompatibilityVersion requestedVersion,
+        const NamespaceString& indexCatalogNss) {
         // TODO SERVER-67392: Remove once gGlobalIndexesShardingCatalog is enabled.
         const auto actualVersion = serverGlobalParams.featureCompatibility.getVersion();
         if (feature_flags::gGlobalIndexesShardingCatalog
                 .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion, actualVersion)) {
-            uassertStatusOK(sharding_util::createShardingIndexCatalogIndexes(opCtx));
-            if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
+            uassertStatusOK(
+                sharding_util::createShardingIndexCatalogIndexes(opCtx, indexCatalogNss));
+            if (indexCatalogNss == NamespaceString::kShardIndexCatalogNamespace) {
                 uassertStatusOK(sharding_util::createShardCollectionCatalogIndexes(opCtx));
             }
         }
@@ -1015,7 +1019,8 @@ private:
             // TODO SERVER-68551: Remove once 7.0 becomes last-lts
             dropDistLockCollections(opCtx);
 
-            _createShardingIndexCatalogIndexes(opCtx, requestedVersion);
+            _createShardingIndexCatalogIndexes(
+                opCtx, requestedVersion, NamespaceString::kConfigsvrIndexCatalogNamespace);
 
             // Tell the shards to complete setFCV (transition to fully upgraded)
             _sendSetFCVRequestToShards(opCtx, request, changeTimestamp, SetFCVPhaseEnum::kComplete);
@@ -1298,7 +1303,11 @@ private:
         // roles aren't mutually exclusive.
         if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
             _updateAuditConfigOnDowngrade(opCtx, requestedVersion);
-            _dropInternalShardingIndexCatalogCollection(opCtx, requestedVersion, originalVersion);
+            _dropInternalShardingIndexCatalogCollection(
+                opCtx,
+                requestedVersion,
+                originalVersion,
+                NamespaceString::kConfigsvrIndexCatalogNamespace);
             // Always abort the reshardCollection regardless of version to ensure that it will
             // run on a consistent version from start to finish. This will ensure that it will
             // be able to apply the oplog entries correctly.
@@ -1316,7 +1325,11 @@ private:
                 ShardingDDLCoordinatorService::getService(opCtx)
                     ->waitForOngoingCoordinatorsToFinish(opCtx);
             }
-            _dropInternalShardingIndexCatalogCollection(opCtx, requestedVersion, originalVersion);
+            _dropInternalShardingIndexCatalogCollection(
+                opCtx,
+                requestedVersion,
+                originalVersion,
+                NamespaceString::kShardIndexCatalogNamespace);
         } else {
             _updateAuditConfigOnDowngrade(opCtx, requestedVersion);
         }
@@ -1325,7 +1338,8 @@ private:
     void _dropInternalShardingIndexCatalogCollection(
         OperationContext* opCtx,
         const multiversion::FeatureCompatibilityVersion requestedVersion,
-        const multiversion::FeatureCompatibilityVersion originalVersion) {
+        const multiversion::FeatureCompatibilityVersion originalVersion,
+        const NamespaceString& indexCatalogNss) {
         // TODO SERVER-67392: Remove when 7.0 branches-out.
         // Coordinators that commits indexes to the csrs must be drained before this point. Older
         // FCV's must not find cluster-wide indexes.
@@ -1388,13 +1402,6 @@ private:
                 client.update(update);
             }
 
-            // TODO SERVER-75274: Drop both collections on a catalog shard enabled config server.
-            NamespaceString indexCatalogNss;
-            if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
-                indexCatalogNss = NamespaceString::kConfigsvrIndexCatalogNamespace;
-            } else {
-                indexCatalogNss = NamespaceString::kShardIndexCatalogNamespace;
-            }
             LOGV2(6280502, "Dropping global indexes collection", "nss"_attr = indexCatalogNss);
             const auto deletionStatus =
                 dropCollection(opCtx,

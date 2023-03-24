@@ -1013,7 +1013,8 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
         // (Ignore FCV check): TODO(SERVER-75389): add why FCV is ignored here.
         if (mongo::feature_flags::gGlobalIndexesShardingCatalog.isEnabledAndIgnoreFCVUnsafe()) {
             // Create indexes in config.shard.indexes if needed.
-            indexStatus = sharding_util::createShardingIndexCatalogIndexes(opCtx);
+            indexStatus = sharding_util::createShardingIndexCatalogIndexes(
+                opCtx, NamespaceString::kShardIndexCatalogNamespace);
             if (!indexStatus.isOK()) {
                 // If the node is shutting down or it lost quorum just as it was becoming primary,
                 // don't run the sharding onStepUp machinery. The onStepDown counterpart to these

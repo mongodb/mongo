@@ -212,14 +212,9 @@ Status createIndexOnCollection(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status createShardingIndexCatalogIndexes(OperationContext* opCtx) {
+Status createShardingIndexCatalogIndexes(OperationContext* opCtx,
+                                         const NamespaceString& indexCatalogNamespace) {
     bool unique = true;
-    NamespaceString indexCatalogNamespace;
-    if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
-        indexCatalogNamespace = NamespaceString::kConfigsvrIndexCatalogNamespace;
-    } else {
-        indexCatalogNamespace = NamespaceString::kShardIndexCatalogNamespace;
-    }
     auto result = createIndexOnCollection(opCtx,
                                           indexCatalogNamespace,
                                           BSON(IndexCatalogType::kCollectionUUIDFieldName
