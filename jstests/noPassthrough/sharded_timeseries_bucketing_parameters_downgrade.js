@@ -6,6 +6,7 @@
 'use strict';
 
 load("jstests/core/timeseries/libs/timeseries.js");
+load("jstests/libs/catalog_shard_util.js");
 load("jstests/libs/fail_point_util.js");
 
 const dbName = 'testDB';
@@ -25,6 +26,8 @@ function useBucketingParametersOnLowerFCV() {
     }
     assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
 
+    const isCatalogShardEnabled = CatalogShardUtil.isEnabledIgnoringFCV(st);
+
     let coll = db.getCollection(collName);
     coll.drop();
     assert.commandWorked(db.createCollection(collName, {
@@ -35,6 +38,21 @@ function useBucketingParametersOnLowerFCV() {
             bucketRoundingSeconds: 60
         }
     }));
+
+    const configDirectDb = st.configRS.getPrimary().getDB(dbName);
+    const configDirectColl = configDirectDb.getCollection(collName);
+    if (isCatalogShardEnabled) {
+        // Verify we cannot downgrade if the config server has a timeseries collection with
+        // bucketing.
+        assert.commandWorked(configDirectDb.createCollection(collName, {
+            timeseries: {
+                timeField: timeField,
+                metaField: metaField,
+                bucketMaxSpanSeconds: 60,
+                bucketRoundingSeconds: 60
+            }
+        }));
+    }
 
     // On the latestFCV, we should not be able to use collMod with incomplete bucketing parameters.
     assert.commandFailedWithCode(
@@ -47,6 +65,16 @@ function useBucketingParametersOnLowerFCV() {
 
     coll = db.getCollection(collName);
     coll.drop();
+
+    if (isCatalogShardEnabled) {
+        // We should still fail to downgrade if we have a collection on the config server with
+        // custom bucketing parameters set.
+        assert.commandFailedWithCode(
+            mongos.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}),
+            ErrorCodes.CannotDowngrade);
+
+        configDirectColl.drop();
+    }
 
     // Successfully downgrade to latest FCV.
     assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));

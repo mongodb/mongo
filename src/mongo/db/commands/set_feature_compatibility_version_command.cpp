@@ -112,7 +112,7 @@ using GenericFCV = multiversion::GenericFCV;
 MONGO_FAIL_POINT_DEFINE(failBeforeTransitioning);
 MONGO_FAIL_POINT_DEFINE(failUpgrading);
 MONGO_FAIL_POINT_DEFINE(hangWhileUpgrading);
-MONGO_FAIL_POINT_DEFINE(failBeforeSendingShardsToDowngrading);
+MONGO_FAIL_POINT_DEFINE(failBeforeSendingShardsToDowngradingOrUpgrading);
 MONGO_FAIL_POINT_DEFINE(failDowngrading);
 MONGO_FAIL_POINT_DEFINE(hangWhileDowngrading);
 MONGO_FAIL_POINT_DEFINE(hangBeforeUpdatingFcvDoc);
@@ -271,13 +271,7 @@ public:
         auto isFromConfigServer = request.getFromConfigServer().value_or(false);
 
         // Only allow one instance of setFeatureCompatibilityVersion to run at a time.
-        // Acquire the lock only when the node is exclusively the shard role or we are the config
-        // coordinator processing the request from mongos. This is done to prevent deadlock on the
-        // catalog shard when it sends the setFeatureCompatabilityVersion command to itself.
-        std::unique_ptr<Lock::ExclusiveLock> setFCVCommandLock;
-        if (!isFromConfigServer || serverGlobalParams.clusterRole.isExclusivelyShardRole()) {
-            setFCVCommandLock = std::make_unique<Lock::ExclusiveLock>(opCtx, commandMutex);
-        }
+        Lock::ExclusiveLock setFCVCommandLock(opCtx, commandMutex);
 
         const auto requestedVersion = request.getCommandParameter();
         const auto actualVersion = serverGlobalParams.featureCompatibility.getVersion();
@@ -445,6 +439,21 @@ public:
         invariant(serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading());
 
         if (!request.getPhase() || request.getPhase() == SetFCVPhaseEnum::kPrepare) {
+            if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+                if (gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV()) {
+                    // The config server may also be a shard, so have it run any shard server tasks.
+                    _shardServerPhase1Tasks(opCtx, requestedVersion);
+                }
+
+                uassert(ErrorCodes::Error(6794600),
+                        "Failing downgrade due to "
+                        "'failBeforeSendingShardsToDowngradingOrUpgrading' failpoint set",
+                        !failBeforeSendingShardsToDowngradingOrUpgrading.shouldFail());
+                // Tell the shards to enter 'start' phase of setFCV (transition to kDowngrading).
+                _sendSetFCVRequestToShards(
+                    opCtx, request, changeTimestamp, SetFCVPhaseEnum::kStart);
+            }
+
             // Any checks and actions that need to be performed before being able to downgrade needs
             // to be placed on the _prepareToUpgrade and _prepareToDowngrade functions. After the
             // prepare function complete, a node is not allowed to refuse to upgrade/downgrade.
@@ -452,6 +461,13 @@ public:
                 _prepareToUpgrade(opCtx, request, changeTimestamp);
             } else {
                 _prepareToDowngrade(opCtx, request, changeTimestamp);
+            }
+
+            if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+                // Tell the shards to enter the 'prepare' phase of setFCV (check that they will be
+                // able to upgrade or downgrade).
+                _sendSetFCVRequestToShards(
+                    opCtx, request, changeTimestamp, SetFCVPhaseEnum::kPrepare);
             }
 
             if (request.getPhase() == SetFCVPhaseEnum::kPrepare) {
@@ -604,12 +620,19 @@ private:
     // and could be done after _runDowngrade even if it failed at any point in the middle of
     // _userCollectionsUassertsForDowngrade or _internalServerCleanupForDowngrade.
     void _prepareToUpgradeActions(OperationContext* opCtx) {
-        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-            return;
-        } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
-            return;
-        } else {
+        if (serverGlobalParams.clusterRole == ClusterRole::None) {
             _cancelServerlessMigrations(opCtx);
+            return;
+        }
+
+        // Note the config server is also considered a shard, so the ConfigServer and ShardServer
+        // roles aren't mutually exclusive.
+        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+            // Config server role actions.
+        }
+
+        if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+            // Shard server role actions.
         }
     }
 
@@ -801,11 +824,6 @@ private:
     void _prepareToUpgrade(OperationContext* opCtx,
                            const SetFeatureCompatibilityVersion& request,
                            boost::optional<Timestamp> changeTimestamp) {
-        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-            // Tell the shards to enter 'start' phase of setFCV (transition to kUpgrading).
-            _sendSetFCVRequestToShards(opCtx, request, changeTimestamp, SetFCVPhaseEnum::kStart);
-        }
-
         // This helper function is for any actions that should be done before taking the FCV full
         // transition lock in S mode. It is required that the code in this helper function is
         // idempotent and could be done after _runDowngrade even if it failed at any point in the
@@ -835,12 +853,6 @@ private:
         uassert(ErrorCodes::Error(549180),
                 "Failing upgrade due to 'failUpgrading' failpoint set",
                 !failUpgrading.shouldFail());
-
-        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-            // Tell the shards to enter 'prepare' phase of setFCV (check that they will be able to
-            // upgrade).
-            _sendSetFCVRequestToShards(opCtx, request, changeTimestamp, SetFCVPhaseEnum::kPrepare);
-        }
     }
 
     // _runUpgrade performs all the metadata-changing actions of an FCV upgrade. Any new feature
@@ -883,12 +895,19 @@ private:
     // This helper function is for any actions that should be done before taking the FCV full
     // transition lock in S mode.
     void _prepareToDowngradeActions(OperationContext* opCtx) {
-        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-            return;
-        } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
-            return;
-        } else {
+        if (serverGlobalParams.clusterRole == ClusterRole::None) {
             _cancelServerlessMigrations(opCtx);
+            return;
+        }
+
+        // Note the config server is also considered a shard, so the ConfigServer and ShardServer
+        // roles aren't mutually exclusive.
+        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+            // Config server role actions.
+        }
+
+        if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+            // Shard server role actions.
         }
     }
 
@@ -921,6 +940,9 @@ private:
         invariant(serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading());
         const auto& [originalVersion, _] =
             getTransitionFCVFromAndTo(serverGlobalParams.featureCompatibility.getVersion());
+
+        // Note the config server is also considered a shard, so the ConfigServer and ShardServer
+        // roles aren't mutually exclusive.
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             if (gFeatureFlagCatalogShard.isEnabledOnTargetFCVButDisabledOnOriginalFCV(
                     requestedVersion, originalVersion)) {
@@ -959,9 +981,10 @@ private:
                             << "'",
                         !hasShardingIndexCatalogEntries);
             }
-            return;
-        } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer ||
-                   serverGlobalParams.clusterRole == ClusterRole::None) {
+        }
+
+        if (serverGlobalParams.clusterRole == ClusterRole::ShardServer ||
+            serverGlobalParams.clusterRole == ClusterRole::None) {
             if (feature_flags::gTimeseriesScalabilityImprovements
                     .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion,
                                                                   originalVersion)) {
@@ -1121,6 +1144,8 @@ private:
         const auto& [originalVersion, _] =
             getTransitionFCVFromAndTo(serverGlobalParams.featureCompatibility.getVersion());
         _cleanUpClusterParameters(opCtx, requestedVersion);
+        // Note the config server is also considered a shard, so the ConfigServer and ShardServer
+        // roles aren't mutually exclusive.
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             _dropInternalShardingIndexCatalogCollection(opCtx, requestedVersion, originalVersion);
             _removeSchemaOnConfigSettings(opCtx, requestedVersion, originalVersion);
@@ -1129,7 +1154,9 @@ private:
             // be able to apply the oplog entries correctly.
             abortAllReshardCollection(opCtx);
             _updateConfigVersionOnDowngrade(opCtx, requestedVersion, originalVersion);
-        } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+        }
+
+        if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
             // If we are downgrading to a version that doesn't support implicit translation of
             // Timeseries collection in sharding DDL Coordinators we need to drain all ongoing
             // coordinators
@@ -1140,8 +1167,6 @@ private:
                     ->waitForOngoingCoordinatorsToFinish(opCtx);
             }
             _dropInternalShardingIndexCatalogCollection(opCtx, requestedVersion, originalVersion);
-        } else {
-            return;
         }
     }
 
@@ -1155,6 +1180,8 @@ private:
         DropReply dropReply;
         if (feature_flags::gGlobalIndexesShardingCatalog
                 .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion, originalVersion)) {
+            // Note the config server is also considered a shard, so the ConfigServer and
+            // ShardServer roles aren't mutually exclusive.
             if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
                 // There cannot be any global indexes at this point, but calling
                 // clearCollectionShardingIndexCatalog removes the index version from
@@ -1187,6 +1214,7 @@ private:
                                       << causedBy(dropStatus.reason()),
                         dropStatus.isOK() || dropStatus.code() == ErrorCodes::NamespaceNotFound);
             }
+
             if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
                 LOGV2(6711906,
                       "Unset index version field in config.collections",
@@ -1207,6 +1235,7 @@ private:
                 client.update(update);
             }
 
+            // TODO SERVER-75274: Drop both collections on a catalog shard enabled config server.
             NamespaceString indexCatalogNss;
             if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
                 indexCatalogNss = NamespaceString::kConfigsvrIndexCatalogNamespace;
@@ -1261,14 +1290,6 @@ private:
                              boost::optional<Timestamp> changeTimestamp) {
         const auto requestedVersion = request.getCommandParameter();
 
-        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-            uassert(ErrorCodes::Error(6794600),
-                    "Failing downgrade due to 'failBeforeSendingShardsToDowngrading' failpoint set",
-                    !failBeforeSendingShardsToDowngrading.shouldFail());
-            // Tell the shards to enter 'start' phase of setFCV (transition to kDowngrading)
-            _sendSetFCVRequestToShards(opCtx, request, changeTimestamp, SetFCVPhaseEnum::kStart);
-        }
-
         // Any actions that should be done before taking the FCV full transition lock in S mode
         // should go in this function.
         _prepareToDowngradeActions(opCtx);
@@ -1301,12 +1322,6 @@ private:
         // this helper function can only have the CannotDowngrade error code indicating that the
         // user must manually clean up some user data in order to retry the FCV downgrade.
         _userCollectionsUassertsForDowngrade(opCtx, requestedVersion);
-
-        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-            // Tell the shards to enter 'prepare' phase of setFCV (check that they will be able to
-            // downgrade).
-            _sendSetFCVRequestToShards(opCtx, request, changeTimestamp, SetFCVPhaseEnum::kPrepare);
-        }
     }
 
     // _runDowngrade performs all the metadata-changing actions of an FCV downgrade. Any new feature

@@ -773,6 +773,12 @@ Status ShardingCatalogManager::setFeatureCompatibilityVersionOnShards(OperationC
         }
         const auto shard = shardStatus.getValue();
 
+        if (shard->isConfig()) {
+            // The config server will run shard upgrade/downgrade tasks directly instead of sending
+            // a command to itself.
+            continue;
+        }
+
         auto response = shard->runCommandWithFixedRetryAttempts(
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},

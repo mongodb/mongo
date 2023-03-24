@@ -171,14 +171,14 @@ function runShardingTest() {
 
     // 2. Test downgrading to upgraded with config in downgrading, both shards in upgraded.
     assert.commandWorked(configPrimary.adminCommand(
-        {configureFailPoint: 'failBeforeSendingShardsToDowngrading', mode: "alwaysOn"}));
+        {configureFailPoint: 'failBeforeSendingShardsToDowngradingOrUpgrading', mode: "alwaysOn"}));
     assert.commandFailed(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
     checkFCV(configPrimaryAdminDB, lastLTSFCV, lastLTSFCV);
     checkFCV(shard0PrimaryAdminDB, latestFCV);
     checkFCV(shard1PrimaryAdminDB, latestFCV);
 
     assert.commandWorked(configPrimary.adminCommand(
-        {configureFailPoint: 'failBeforeSendingShardsToDowngrading', mode: "off"}));
+        {configureFailPoint: 'failBeforeSendingShardsToDowngradingOrUpgrading', mode: "off"}));
     setFCVToLatestSharding(
         mongosAdminDB, configPrimaryAdminDB, shard0PrimaryAdminDB, shard1PrimaryAdminDB);
 
