@@ -27,9 +27,8 @@ assert.eq([], result.myRoles);
 assert.commandWorked(db.runCommand({createUser: "user", pwd: "pwd", roles: []}));
 db.auth("user", "pwd");
 
-// TODO SERVER-74264: Change the projected field name here to 'myRoles' (also in the assert).
-result = db.coll.findOne({}, {myRoles2: "$$USER_ROLES"});
-assert.eq([], result.myRoles2);
+result = db.coll.findOne({}, {myRoles: "$$USER_ROLES"});
+assert.eq([], result.myRoles);
 
 db.logout();
 
@@ -39,9 +38,8 @@ assert.commandWorked(
     db.runCommand({createUser: "user2", pwd: "pwd", roles: [{role: "read", db: dbName}]}));
 db.auth("user2", "pwd");
 
-// TODO SERVER-74264: Change the projected field name here to 'myRoles' (also in the assert).
-result = db.coll.findOne({}, {myRoles3: "$$USER_ROLES"});
-assert.eq([{_id: dbName + ".read", role: "read", db: dbName}], result.myRoles3);
+result = db.coll.findOne({}, {myRoles: "$$USER_ROLES"});
+assert.eq([{_id: dbName + ".read", role: "read", db: dbName}], result.myRoles);
 
 MongoRunner.stopMongod(mongod);
 }());
