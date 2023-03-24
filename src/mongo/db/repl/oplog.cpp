@@ -744,6 +744,22 @@ long long getNewOplogSizeBytes(OperationContext* opCtx, const ReplSettings& repl
     }
     long long fivePct = static_cast<long long>(bytes * 0.05);
     auto sz = std::max(fivePct, lowerBound);
+
+    // Round up oplog size to nearest 256 alignment. Ensures that the rollback of the 256-alignment
+    // requirement for capped collections that was removed in SERVER-67246 will not impact this
+    // important user-hidden collection. Since downgrades are blocked on this alignment check, a
+    // fresh install of the server would very likely lead to an inability to downgrade. Keeping the
+    // oplog size 256-aligned avoids this altogether.
+    long long sz_prior = sz;
+    sz += 0xff;
+    sz &= 0xffffffffffffff00LL;
+    if (sz_prior != sz) {
+        LOGV2(7421400,
+              "Oplog size is being rounded to nearest 256-byte-aligned size",
+              "oldSize"_attr = sz_prior,
+              "newSize"_attr = sz);
+    }
+
     // we use 5% of free [disk] space up to 50GB (1TB free)
     const long long upperBound = 50LL * 1024 * 1024 * 1024;
     sz = std::min(sz, upperBound);
