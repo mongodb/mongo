@@ -175,11 +175,15 @@ WiredTigerRecordStore::OplogTruncateMarkers::createOplogTruncateMarkers(Operatio
             minBytesPerTruncateMarker > 0);
 
     auto initialSetOfMarkers = CollectionTruncateMarkers::createFromExistingRecordStore(
-        opCtx, rs, minBytesPerTruncateMarker, [](const Record& record) {
+        opCtx,
+        rs,
+        minBytesPerTruncateMarker,
+        [](const Record& record) {
             BSONObj obj = record.data.toBson();
             auto wallTime = obj.hasField("wall") ? obj["wall"].Date() : obj["ts"].timestampTime();
             return RecordIdAndWallTime(record.id, wallTime);
-        });
+        },
+        numTruncateMarkersToKeep);
     LOGV2(22382,
           "WiredTiger record store oplog processing took {duration}ms",
           "WiredTiger record store oplog processing finished",

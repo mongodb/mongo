@@ -431,7 +431,8 @@ CollectionTruncateMarkers::createFromExistingRecordStore(
     OperationContext* opCtx,
     RecordStore* rs,
     int64_t minBytesPerMarker,
-    std::function<RecordIdAndWallTime(const Record&)> getRecordIdAndWallTime) {
+    std::function<RecordIdAndWallTime(const Record&)> getRecordIdAndWallTime,
+    boost::optional<int64_t> numberOfMarkersToKeepLegacy) {
 
     long long numRecords = rs->numRecords(opCtx);
     long long dataSize = rs->dataSize(opCtx);
@@ -456,7 +457,11 @@ CollectionTruncateMarkers::createFromExistingRecordStore(
 
     // If the collection doesn't contain enough records to make sampling more efficient, then scan
     // the collection to determine where to put down markers.
-    auto numMarkers = dataSize / minBytesPerMarker;
+    //
+    // Unless preserving legacy behavior, compute the number of markers which would be generated
+    // based on the estimated data size.
+    auto numMarkers = numberOfMarkersToKeepLegacy ? numberOfMarkersToKeepLegacy.get()
+                                                  : dataSize / minBytesPerMarker;
     if (numRecords <= 0 || dataSize <= 0 ||
         uint64_t(numRecords) <
             kMinSampleRatioForRandCursor * kRandomSamplesPerMarker * numMarkers) {

@@ -156,11 +156,16 @@ public:
 
     // Creates the initial set of markers. This will decide whether to perform a collection scan or
     // sampling based on the size of the collection.
+    //
+    // 'numberOfMarkersToKeepLegacy' exists solely to maintain legacy behavior of
+    // 'OplogTruncateMarkers' previously known as 'OplogStones'. It serves as the maximum number of
+    // truncate markers to keep before reclaiming the oldest truncate markers.
     static InitialSetOfMarkers createFromExistingRecordStore(
         OperationContext* opCtx,
         RecordStore* rs,
         int64_t minBytesPerMarker,
-        std::function<RecordIdAndWallTime(const Record&)> getRecordIdAndWallTime);
+        std::function<RecordIdAndWallTime(const Record&)> getRecordIdAndWallTime,
+        boost::optional<int64_t> numberOfMarkersToKeepLegacy = boost::none);
 
     // Creates the initial set of markers by fully scanning the collection. The set of markers
     // returned will have correct metrics.
