@@ -104,6 +104,7 @@
 #include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"
+#include "mongo/s/query_analysis_sampler.h"
 #include "mongo/s/shard_cannot_refresh_due_to_locks_held_exception.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
 #include "mongo/transport/hello_metrics.h"
@@ -1638,6 +1639,10 @@ void ExecCommandDatabase::_initiateCommand() {
 
     if (command->shouldAffectCommandCounter()) {
         globalOpCounters.gotCommand();
+        if (analyze_shard_key::supportsSamplingQueries(opCtx)) {
+            analyze_shard_key::QueryAnalysisSampler::get(opCtx).gotCommand(
+                request.getCommandName());
+        }
     }
 
     // Parse the 'maxTimeMS' command option, and use it to set a deadline for the operation on the

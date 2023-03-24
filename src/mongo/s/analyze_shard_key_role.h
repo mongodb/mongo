@@ -42,7 +42,9 @@ bool supportsCoordinatingQueryAnalysis(OperationContext* opCtx, bool ignoreFCV =
 
 bool supportsPersistingSampledQueries(bool ignoreFCV = false);
 
-bool supportsSamplingQueries(bool ignoreFCV = false);
+bool supportsSamplingQueries(bool isReplEnabled, bool ignoreFCV = false);
+bool supportsSamplingQueries(OperationContext* opCtx, bool ignoreFCV = false);
+bool supportsSamplingQueries(ServiceContext* serviceContext, bool ignoreFCV = false);
 
 }  // namespace analyze_shard_key
 }  // namespace mongo

@@ -314,7 +314,7 @@ void MongosProcessInterface::_reportCurrentOpsForPrimaryOnlyServices(
 
 void MongosProcessInterface::_reportCurrentOpsForQueryAnalysis(OperationContext* opCtx,
                                                                std::vector<BSONObj>* ops) const {
-    if (analyze_shard_key::supportsSamplingQueries()) {
+    if (analyze_shard_key::supportsSamplingQueries(opCtx)) {
         analyze_shard_key::QueryAnalysisSampleCounters::get(opCtx).reportForCurrentOp(ops);
     }
 }

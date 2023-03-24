@@ -67,6 +67,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         'analyze_shard_key_common',
+        'analyze_shard_key_util',
         'grid',
     ],
 )
@@ -701,6 +702,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/ops/write_ops_parsers_test_helpers',
         '$BUILD_DIR/mongo/db/pipeline/process_interface/mongos_process_interface_factory',
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
+        '$BUILD_DIR/mongo/db/repl/replmocks',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_conversion_util',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
         '$BUILD_DIR/mongo/dbtests/mocklib',

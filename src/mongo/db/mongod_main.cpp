@@ -897,6 +897,11 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
 
     LogicalSessionCache::set(serviceContext, makeLogicalSessionCacheD(kind));
 
+    if (analyze_shard_key::supportsSamplingQueries(serviceContext, true /* ignoreFCV */) &&
+        serverGlobalParams.clusterRole == ClusterRole::None) {
+        analyze_shard_key::QueryAnalysisSampler::get(serviceContext).onStartup();
+    }
+
     auto cacheLoader = std::make_unique<stats::StatsCacheLoaderImpl>();
     auto catalog = std::make_unique<stats::StatsCatalog>(serviceContext, std::move(cacheLoader));
     stats::StatsCatalog::set(serviceContext, std::move(catalog));
@@ -1388,7 +1393,7 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         lsc->joinOnShutDown();
     }
 
-    if (analyze_shard_key::supportsSamplingQueries(true /* ignoreFCV */)) {
+    if (analyze_shard_key::supportsSamplingQueries(serviceContext, true /* ignoreFCV */)) {
         LOGV2_OPTIONS(7350601, {LogComponent::kDefault}, "Shutting down the QueryAnalysisSampler");
         analyze_shard_key::QueryAnalysisSampler::get(serviceContext).onShutdown();
     }

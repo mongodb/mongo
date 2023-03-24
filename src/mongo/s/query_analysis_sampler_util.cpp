@@ -63,7 +63,7 @@ StringData adjustCmdNameCase(const StringData& cmdName) {
 boost::optional<UUID> tryGenerateSampleId(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           const SampledCommandNameEnum cmdName) {
-    return supportsSamplingQueries()
+    return supportsSamplingQueries(opCtx)
         ? QueryAnalysisSampler::get(opCtx).tryGenerateSampleId(opCtx, nss, cmdName)
         : boost::none;
 }

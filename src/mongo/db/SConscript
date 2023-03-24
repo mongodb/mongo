@@ -1043,6 +1043,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/s/query_analysis_sampler',
         'audit',
         'auth/auth',
         'auth/auth_umc',

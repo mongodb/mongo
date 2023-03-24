@@ -50,9 +50,10 @@ namespace analyze_shard_key {
  * - The rate limiters that each controls the rate at which queries against a collection are sampled
  *   on this sampler.
  *
- * Currently, query sampling is only supported on a sharded cluster. So a sampler must be a mongos
- * or a shardsvr mongod (acting as a router), and the coordinator must be the config server's
- * primary mongod.
+ * On a sharded cluster, a sampler is any mongos or shardsvr mongod (that has acted as a
+ * router) in the cluster, and the coordinator is the config server's primary mongod. On a
+ * standalone replica set, a sampler is any mongod in the set and the coordinator is the primary
+ * mongod.
  */
 class QueryAnalysisSampler final {
     QueryAnalysisSampler(const QueryAnalysisSampler&) = delete;
@@ -67,6 +68,11 @@ public:
     struct QueryStats {
         QueryStats() = default;
 
+        /**
+         * If the command is an aggregate, count or distinct command, increment its count.
+         */
+        void gotCommand(const StringData& cmdName);
+
         long long getLastTotalCount() const {
             return _lastTotalCount;
         }
@@ -79,12 +85,19 @@ public:
          * Refreshes the last total count and the last exponential moving average count. To be
          * invoked every second.
          */
-        void refreshTotalCount(long long newTotalCount);
+        void refreshTotalCount();
 
     private:
         double _calculateExponentialMovingAverage(double prevAvg, long long newVal) const;
 
         const double _smoothingFactor = gQueryAnalysisQueryStatsSmoothingFactor;
+
+        // The counts for update, delete and find are already tracked by the OpCounters.
+        long long _lastFindAndModifyQueriesCount = 0;
+        long long _lastAggregateQueriesCount = 0;
+        long long _lastCountQueriesCount = 0;
+        long long _lastDistinctQueriesCount = 0;
+
         long long _lastTotalCount = 0;
         boost::optional<double> _lastAvgCount;
     };
@@ -182,6 +195,11 @@ public:
 
     void onShutdown();
 
+    void gotCommand(const StringData& cmdName) {
+        stdx::lock_guard<Latch> lk(_mutex);
+        _queryStats.gotCommand(cmdName);
+    }
+
     /**
      * Returns a unique sample id for a query if it should be sampled, and none otherwise. Can only
      * be invoked once for each query since generating a sample id causes the number of remaining
@@ -192,8 +210,6 @@ public:
     boost::optional<UUID> tryGenerateSampleId(OperationContext* opCtx,
                                               const NamespaceString& nss,
                                               SampledCommandNameEnum cmdName);
-
-    void appendInfoForServerStatus(BSONObjBuilder* bob) const;
 
     void refreshQueryStatsForTest() {
         _refreshQueryStats();
@@ -214,8 +230,6 @@ public:
     }
 
 private:
-    long long _getTotalQueriesCount() const;
-
     void _refreshQueryStats();
 
     void _refreshConfigurations(OperationContext* opCtx);

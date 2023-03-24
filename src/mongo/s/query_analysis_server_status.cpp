@@ -42,12 +42,12 @@ public:
     QueryAnalysisServerStatus() : ServerStatusSection("queryAnalyzers") {}
 
     bool includeByDefault() const override {
-        return supportsSamplingQueries();
+        return supportsSamplingQueries(getGlobalServiceContext());
     }
 
     BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override {
-        return supportsSamplingQueries()
+        return supportsSamplingQueries(opCtx)
             ? QueryAnalysisSampleCounters::get(opCtx).reportForServerStatus()
             : BSONObj();
     }

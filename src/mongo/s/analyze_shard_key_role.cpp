@@ -78,9 +78,24 @@ bool supportsPersistingSampledQueries(bool ignoreFCV) {
         serverGlobalParams.clusterRole == ClusterRole::ShardServer;
 }
 
-bool supportsSamplingQueries(bool ignoreFCV) {
-    return isFeatureFlagEnabled(ignoreFCV) &&
-        (isMongos() || serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+bool supportsSamplingQueries(bool isReplEnabled, bool ignoreFCV) {
+    if (!isFeatureFlagEnabled(ignoreFCV)) {
+        return false;
+    }
+    if (isMongos()) {
+        return true;
+    }
+    return isReplEnabled && !gMultitenancySupport &&
+        (serverGlobalParams.clusterRole == ClusterRole::ShardServer ||
+         serverGlobalParams.clusterRole == ClusterRole::None);
+}
+
+bool supportsSamplingQueries(ServiceContext* serviceContext, bool ignoreFCV) {
+    return supportsSamplingQueries(isReplEnabled(serviceContext), ignoreFCV);
+}
+
+bool supportsSamplingQueries(OperationContext* opCtx, bool ignoreFCV) {
+    return supportsSamplingQueries(opCtx->getServiceContext(), ignoreFCV);
 }
 
 }  // namespace analyze_shard_key

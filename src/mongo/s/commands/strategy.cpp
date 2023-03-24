@@ -85,6 +85,7 @@
 #include "mongo/s/mongos_topology_coordinator.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/query/cluster_find.h"
+#include "mongo/s/query_analysis_sampler.h"
 #include "mongo/s/session_catalog_router.h"
 #include "mongo/s/shard_invalidated_for_targeting_exception.h"
 #include "mongo/s/stale_exception.h"
@@ -896,6 +897,9 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
 
     if (command->shouldAffectCommandCounter()) {
         globalOpCounters.gotCommand();
+        if (analyze_shard_key::supportsSamplingQueries(opCtx)) {
+            analyze_shard_key::QueryAnalysisSampler::get(opCtx).gotCommand(command->getName());
+        }
     }
 
     return Status::OK();
