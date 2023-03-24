@@ -46,9 +46,6 @@ std::shared_ptr<TenantMigrationDonorAccessBlocker> getDonorAccessBlockerForMigra
 std::shared_ptr<TenantMigrationRecipientAccessBlocker> getRecipientAccessBlockerForMigration(
     ServiceContext* serviceContext, const UUID& migrationId);
 
-std::shared_ptr<TenantMigrationDonorAccessBlocker> getTenantMigrationDonorAccessBlocker(
-    ServiceContext* serviceContext, StringData tenantId);
-
 std::shared_ptr<TenantMigrationRecipientAccessBlocker> getTenantMigrationRecipientAccessBlocker(
     ServiceContext* serviceContext, StringData tenantId);
 

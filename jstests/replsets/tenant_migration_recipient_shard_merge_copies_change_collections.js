@@ -176,6 +176,8 @@ donorSession2.commitTransaction();
 fpBeforeMarkingCloneSuccess.off();
 
 TenantMigrationTest.assertCommitted(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
+assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
+tenantMigrationTest.waitForMigrationGarbageCollection(migrationUuid, tenantIds[0]);
 
 const recipientPrimaryTenantConn1 = ChangeStreamMultitenantReplicaSetTest.getTenantConnection(
     recipientPrimary.host, tenantId1, tenantId1.str);
@@ -263,9 +265,6 @@ const recipientSecondaryCursor2 =
         assert.eq(changeEvent.operationType, expectedEvent.operationType);
     });
 });
-
-assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
-tenantMigrationTest.waitForMigrationGarbageCollection(migrationOpts.migrationIdString);
 
 donorRst.stopSet();
 recipientRst.stopSet();

@@ -1760,6 +1760,7 @@ if wiredtiger:
             'tenant_oplog_batcher_test.cpp',
             'vote_requester_test.cpp',
             'wait_for_majority_service_test.cpp',
+            'tenant_migration_access_blocker_registry_test.cpp',
             'tenant_migration_access_blocker_util_test.cpp',
             'tenant_migration_recipient_access_blocker_test.cpp',
             'tenant_migration_recipient_entry_helpers_test.cpp',

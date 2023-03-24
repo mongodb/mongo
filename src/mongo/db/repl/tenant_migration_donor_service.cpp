@@ -598,15 +598,19 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_updateState
                            // Start blocking writes before getting an oplog slot to guarantee no
                            // writes to the tenant's data can commit with a timestamp after the
                            // block timestamp.
-                           // TODO (SERVER-72213) we should not pass _tenantId for shard merge
-                           // since shard merge does not have a _tenantId (empty string).
-                           auto mtab = tenant_migration_access_blocker::
-                               getTenantMigrationDonorAccessBlocker(_serviceContext, _tenantId);
-                           invariant(mtab);
-                           mtab->startBlockingWrites();
+                           auto mtabVector =
+                               TenantMigrationAccessBlockerRegistry::get(_serviceContext)
+                                   .getDonorAccessBlockersForMigration(_migrationUuid);
+                           invariant(!mtabVector.empty());
+                           for (auto& mtab : mtabVector) {
+                               mtab->startBlockingWrites();
+                           }
 
-                           opCtx->recoveryUnit()->onRollback(
-                               [mtab](OperationContext*) { mtab->rollBackStartBlocking(); });
+                           opCtx->recoveryUnit()->onRollback([mtabVector](OperationContext*) {
+                               for (auto& mtab : mtabVector) {
+                                   mtab->rollBackStartBlocking();
+                               }
+                           });
                        }
 
                        // Reserve an opTime for the write.
@@ -1438,9 +1442,10 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_handleErrorOrEnterA
         status = Status(ErrorCodes::TenantMigrationAborted, "Aborted due to donorAbortMigration.");
     }
 
-    auto mtab = tenant_migration_access_blocker::getTenantMigrationDonorAccessBlocker(
-        _serviceContext, _tenantId);
-    if (!_initialDonorStateDurablePromise.getFuture().isReady() || !mtab) {
+
+    auto mtabVector = TenantMigrationAccessBlockerRegistry::get(_serviceContext)
+                          .getDonorAccessBlockersForMigration(_migrationUuid);
+    if (!_initialDonorStateDurablePromise.getFuture().isReady()) {
         // The migration failed either before or during inserting the state doc. Use the status to
         // fulfill the _initialDonorStateDurablePromise to fail the donorStartMigration command
         // immediately.

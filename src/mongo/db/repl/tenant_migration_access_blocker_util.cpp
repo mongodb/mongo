@@ -123,6 +123,75 @@ bool recoverTenantMigrationRecipientAccessBlockers(OperationContext* opCtx,
     return true;
 }
 
+bool recoverTenantMigrationDonorAccessBlockers(OperationContext* opCtx,
+                                               const TenantMigrationDonorDocument& doc) {
+    // Skip creating a TenantMigrationDonorAccessBlocker for aborted migrations that have been
+    // marked as garbage collected.
+    if (doc.getExpireAt() && doc.getState() == TenantMigrationDonorStateEnum::kAborted) {
+        return true;
+    }
+
+    std::vector<std::shared_ptr<TenantMigrationDonorAccessBlocker>> mtabVector{
+        std::make_shared<TenantMigrationDonorAccessBlocker>(opCtx->getServiceContext(),
+                                                            doc.getId())};
+
+    auto& registry = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext());
+    auto protocol = doc.getProtocol().value_or(MigrationProtocolEnum::kMultitenantMigrations);
+    switch (protocol) {
+        case MigrationProtocolEnum::kMultitenantMigrations: {
+            const auto tenantId = TenantId::parseFromString(doc.getTenantId());
+            registry.add(tenantId, mtabVector.back());
+        } break;
+        case MigrationProtocolEnum::kShardMerge:
+            invariant(doc.getTenantIds());
+            // Add global access blocker to avoid any tenant creation during shard merge.
+            registry.addGlobalDonorAccessBlocker(mtabVector.back());
+            for (const auto& tenantId : *doc.getTenantIds()) {
+                mtabVector.push_back(std::make_shared<TenantMigrationDonorAccessBlocker>(
+                    opCtx->getServiceContext(), doc.getId()));
+                registry.add(tenantId, mtabVector.back());
+            }
+            break;
+        default:
+            MONGO_UNREACHABLE;
+    }
+
+    switch (doc.getState()) {
+        case TenantMigrationDonorStateEnum::kAbortingIndexBuilds:
+        case TenantMigrationDonorStateEnum::kDataSync:
+            break;
+        case TenantMigrationDonorStateEnum::kBlocking:
+            invariant(doc.getBlockTimestamp());
+            for (auto& mtab : mtabVector) {
+                mtab->startBlockingWrites();
+                mtab->startBlockingReadsAfter(doc.getBlockTimestamp().value());
+            }
+            break;
+        case TenantMigrationDonorStateEnum::kCommitted:
+            invariant(doc.getBlockTimestamp());
+            invariant(doc.getCommitOrAbortOpTime());
+            for (auto& mtab : mtabVector) {
+                mtab->startBlockingWrites();
+                mtab->startBlockingReadsAfter(doc.getBlockTimestamp().value());
+                mtab->setCommitOpTime(opCtx, doc.getCommitOrAbortOpTime().value());
+            }
+            break;
+        case TenantMigrationDonorStateEnum::kAborted:
+            invariant(doc.getCommitOrAbortOpTime());
+            for (auto& mtab : mtabVector) {
+                if (doc.getBlockTimestamp()) {
+                    mtab->startBlockingWrites();
+                    mtab->startBlockingReadsAfter(doc.getBlockTimestamp().value());
+                }
+                mtab->setAbortOpTime(opCtx, doc.getCommitOrAbortOpTime().value());
+            }
+            break;
+        case TenantMigrationDonorStateEnum::kUninitialized:
+            MONGO_UNREACHABLE;
+    }
+    return true;
+}
+
 bool recoverShardMergeRecipientAccessBlockers(OperationContext* opCtx,
                                               const ShardMergeRecipientDocument& doc) {
     // Do not create mtab for following cases. Otherwise, we can get into potential race
@@ -182,29 +251,11 @@ std::shared_ptr<TenantMigrationRecipientAccessBlocker> getRecipientAccessBlocker
                                           TenantMigrationAccessBlocker::BlockerType::kRecipient));
 }
 
-std::shared_ptr<TenantMigrationDonorAccessBlocker> getTenantMigrationDonorAccessBlocker(
-    ServiceContext* const serviceContext, StringData tenantId) {
-
-    // TODO (SERVER-72213) we should no longer need an optional tenantId since we no longer pass
-    // an empty string for shard merge.
-    boost::optional<TenantId> tid = boost::none;
-    if (!tenantId.empty()) {
-        tid = TenantId::parseFromString(tenantId);
-    }
-    return checked_pointer_cast<TenantMigrationDonorAccessBlocker>(
-        TenantMigrationAccessBlockerRegistry::get(serviceContext)
-            .getTenantMigrationAccessBlockerForTenantId(tid, MtabType::kDonor));
-}
-
 std::shared_ptr<TenantMigrationRecipientAccessBlocker> getTenantMigrationRecipientAccessBlocker(
     ServiceContext* const serviceContext, StringData tenantId) {
 
-    // TODO (SERVER-72213) we should no longer need an optional tenantId since we no longer pass
-    // an empty string for shard merge.
-    boost::optional<TenantId> tid = boost::none;
-    if (!tenantId.empty()) {
-        tid = TenantId::parseFromString(tenantId);
-    }
+    TenantId tid = TenantId::parseFromString(tenantId);
+
     return checked_pointer_cast<TenantMigrationRecipientAccessBlocker>(
         TenantMigrationAccessBlockerRegistry::get(serviceContext)
             .getTenantMigrationAccessBlockerForTenantId(tid, MtabType::kRecipient));
@@ -478,50 +529,7 @@ void recoverTenantMigrationAccessBlockers(OperationContext* opCtx) {
         NamespaceString::kTenantMigrationDonorsNamespace);
 
     donorStore.forEach(opCtx, {}, [&](const TenantMigrationDonorDocument& doc) {
-        // Skip creating a TenantMigrationDonorAccessBlocker for aborted migrations that have been
-        // marked as garbage collected.
-        if (doc.getExpireAt() && doc.getState() == TenantMigrationDonorStateEnum::kAborted) {
-            return true;
-        }
-
-        auto mtab = std::make_shared<TenantMigrationDonorAccessBlocker>(opCtx->getServiceContext(),
-                                                                        doc.getId());
-
-        auto& registry = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext());
-        auto protocol = doc.getProtocol().value_or(MigrationProtocolEnum::kMultitenantMigrations);
-        if (protocol == MigrationProtocolEnum::kMultitenantMigrations) {
-            const auto tenantId = TenantId::parseFromString(doc.getTenantId());
-            registry.add(tenantId, mtab);
-        } else {
-            registry.add(mtab);
-        }
-
-        switch (doc.getState()) {
-            case TenantMigrationDonorStateEnum::kAbortingIndexBuilds:
-            case TenantMigrationDonorStateEnum::kDataSync:
-                break;
-            case TenantMigrationDonorStateEnum::kBlocking:
-                invariant(doc.getBlockTimestamp());
-                mtab->startBlockingWrites();
-                mtab->startBlockingReadsAfter(doc.getBlockTimestamp().value());
-                break;
-            case TenantMigrationDonorStateEnum::kCommitted:
-                invariant(doc.getBlockTimestamp());
-                mtab->startBlockingWrites();
-                mtab->startBlockingReadsAfter(doc.getBlockTimestamp().value());
-                mtab->setCommitOpTime(opCtx, doc.getCommitOrAbortOpTime().value());
-                break;
-            case TenantMigrationDonorStateEnum::kAborted:
-                if (doc.getBlockTimestamp()) {
-                    mtab->startBlockingWrites();
-                    mtab->startBlockingReadsAfter(doc.getBlockTimestamp().value());
-                }
-                mtab->setAbortOpTime(opCtx, doc.getCommitOrAbortOpTime().value());
-                break;
-            case TenantMigrationDonorStateEnum::kUninitialized:
-                MONGO_UNREACHABLE;
-        }
-        return true;
+        return recoverTenantMigrationDonorAccessBlockers(opCtx, doc);
     });
 
     // Recover TenantMigrationRecipientAccessBlockers.
@@ -530,13 +538,6 @@ void recoverTenantMigrationAccessBlockers(OperationContext* opCtx) {
 
     recipientStore.forEach(opCtx, {}, [&](const TenantMigrationRecipientDocument& doc) {
         return recoverTenantMigrationRecipientAccessBlockers(opCtx, doc);
-    });
-
-    PersistentTaskStore<ShardMergeRecipientDocument> mergeRecipientStore(
-        NamespaceString::kShardMergeRecipientsNamespace);
-
-    mergeRecipientStore.forEach(opCtx, {}, [&](const ShardMergeRecipientDocument& doc) {
-        return recoverShardMergeRecipientAccessBlockers(opCtx, doc);
     });
 
     // Recover TenantMigrationDonorAccessBlockers for ShardSplit.

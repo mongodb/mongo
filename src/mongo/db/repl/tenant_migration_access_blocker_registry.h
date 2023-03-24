@@ -124,7 +124,7 @@ public:
     /**
      * Adds an entry for mtab that will block all tenants.
      */
-    void add(std::shared_ptr<TenantMigrationAccessBlocker> mtab);
+    void addGlobalDonorAccessBlocker(std::shared_ptr<TenantMigrationDonorAccessBlocker> mtab);
 
     /**
      * Removes the entry for (tenantId, mtab)
@@ -167,10 +167,16 @@ public:
     /**
      * Return the global donor access blocker or searches through TenantMigrationAccessBlockers and
      * returns the TenantMigrationAccessBlocker that matches tenantId.
-     * TODO (SERVER-72213) No longer need to use a boost::optional for the tenantid.
      */
     std::shared_ptr<TenantMigrationAccessBlocker> getTenantMigrationAccessBlockerForTenantId(
-        const boost::optional<TenantId>& tenantId, TenantMigrationAccessBlocker::BlockerType type);
+        const TenantId& tenantId, TenantMigrationAccessBlocker::BlockerType type);
+
+    /**
+     * Return the global donor access blocker and all the donor access blockers associated with a
+     * migration.
+     */
+    std::vector<std::shared_ptr<TenantMigrationDonorAccessBlocker>>
+    getDonorAccessBlockersForMigration(const UUID& migrationId);
 
     using applyAllCallback = std::function<void(
         const TenantId& tenantId, std::shared_ptr<TenantMigrationAccessBlocker>& mtab)>;
@@ -221,10 +227,10 @@ private:
 
     void _clear(WithLock);
 
-    std::shared_ptr<TenantMigrationDonorAccessBlocker> _getAllTenantDonorAccessBlocker(
+    std::shared_ptr<TenantMigrationDonorAccessBlocker> _getGlobalTenantDonorAccessBlocker(
         WithLock) const;
 
-    std::shared_ptr<TenantMigrationDonorAccessBlocker> _getAllTenantDonorAccessBlocker(
+    std::shared_ptr<TenantMigrationDonorAccessBlocker> _getGlobalTenantDonorAccessBlocker(
         WithLock, const DatabaseName& dbName) const;
 
     mutable Mutex _mutex = MONGO_MAKE_LATCH("TenantMigrationAccessBlockerRegistry::_mutex");
