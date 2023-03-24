@@ -97,9 +97,9 @@ public:
                 }
             }
 
-            // Calculate metrics about the read and write distribution from sampled queries.
-            // Currently, query sampling is only supported on sharded clusters.
-            if (serverGlobalParams.clusterRole.isShardRole() &&
+            // Calculate metrics about the read and write distribution from sampled queries. Query
+            // sampling is not supported on multitenant replica sets.
+            if (!gMultitenancySupport &&
                 !MONGO_unlikely(
                     analyzeShardKeySkipCalcalutingReadWriteDistributionMetrics.shouldFail())) {
                 auto [readDistribution, writeDistribution] =

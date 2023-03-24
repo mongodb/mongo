@@ -147,18 +147,17 @@ function testAnalyzeShardKeyShardedCollection(st) {
     assert(coll.drop());
 }
 
+const setParameterOpts = {
+    analyzeShardKeyNumMostCommonValues: numMostCommonValues,
+    // Skip calculating the read and write distribution metrics since there are no sampled queries
+    // anyway.
+    "failpoint.analyzeShardKeySkipCalcalutingReadWriteDistributionMetrics":
+        tojson({mode: "alwaysOn"})
+};
+
 {
-    const st = new ShardingTest({
-        shards: 2,
-        rs: {
-            nodes: numNodesPerRS,
-            setParameter: {
-                "failpoint.analyzeShardKeySkipCalcalutingReadWriteDistributionMetrics":
-                    tojson({mode: "alwaysOn"}),
-                analyzeShardKeyNumMostCommonValues: numMostCommonValues
-            }
-        }
-    });
+    const st =
+        new ShardingTest({shards: 2, rs: {nodes: numNodesPerRS, setParameter: setParameterOpts}});
 
     testAnalyzeShardKeyUnshardedCollection(st.s);
     testAnalyzeShardKeyShardedCollection(st);
@@ -167,10 +166,8 @@ function testAnalyzeShardKeyShardedCollection(st) {
 }
 
 {
-    const rst = new ReplSetTest({
-        nodes: numNodesPerRS,
-        nodeOptions: {setParameter: {analyzeShardKeyNumMostCommonValues: numMostCommonValues}}
-    });
+    const rst =
+        new ReplSetTest({nodes: numNodesPerRS, nodeOptions: {setParameter: setParameterOpts}});
     rst.startSet();
     rst.initiate();
     const primary = rst.getPrimary();

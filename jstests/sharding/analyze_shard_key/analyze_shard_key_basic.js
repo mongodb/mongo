@@ -8,7 +8,14 @@
 
 load("jstests/libs/catalog_shard_util.js");
 
+const setParameterOpts = {
+    analyzeShardKeyNumRanges: 100
+};
 const dbNameBase = "testDb";
+// The sampling-based initial split policy needs 10 samples per split point so
+// 10 * analyzeShardKeyNumRanges is the minimum number of distinct shard key values that the
+// collection must have for the command to not fail to generate split points.
+const numDocs = 10 * setParameterOpts.analyzeShardKeyNumRanges;
 
 function testNonExistingCollection(testCases, tenantId) {
     const dbName = tenantId ? (tenantId + "-" + dbNameBase) : dbNameBase;
@@ -70,7 +77,11 @@ function testExistingUnshardedCollection(writeConn, testCases) {
     });
 
     // Analyze shard keys while the collection is non-empty.
-    assert.commandWorked(coll.insert([{candidateKey0: 1, candidateKey1: 1}]));
+    const docs = [];
+    for (let i = 0; i < numDocs; i++) {
+        docs.push({candidateKey0: i, candidateKey1: i});
+    }
+    assert.commandWorked(coll.insert(docs));
     testCases.forEach(testCase => {
         jsTest.log(`Running analyzeShardKey command against a non-empty unsharded collection: ${
             tojson(testCase)}`);
@@ -142,10 +153,11 @@ function testExistingShardedCollection(st, testCases) {
     });
 
     // Analyze shard keys while the collection is non-empty.
-    assert.commandWorked(coll.insert([
-        {currentKey: -1, candidateKey0: -1, candidateKey1: -1},
-        {currentKey: 1, candidateKey0: 1, candidateKey1: 1}
-    ]));
+    const docs = [];
+    for (let i = 0; i < numDocs; i++) {
+        docs.push({currentKey: -i, candidateKey0: -i, candidateKey1: -i});
+    }
+    assert.commandWorked(coll.insert(docs));
     testCases.forEach(testCase => {
         jsTest.log(`Running analyzeShardKey command against a non-empty sharded collection: ${
             tojson(testCase)}`);
@@ -194,16 +206,7 @@ function testNotSupportReadWriteConcern(writeConn, testCases) {
 }
 
 {
-    const st = new ShardingTest({
-        shards: 2,
-        rs: {
-            nodes: 2,
-            setParameter: {
-                "failpoint.analyzeShardKeySkipCalcalutingReadWriteDistributionMetrics":
-                    tojson({mode: "alwaysOn"})
-            }
-        }
-    });
+    const st = new ShardingTest({shards: 2, rs: {nodes: 2, setParameter: setParameterOpts}});
 
     assert.commandWorked(st.s.adminCommand({enableSharding: dbNameBase}));
     st.ensurePrimaryShard(dbNameBase, st.shard0.name);
@@ -236,7 +239,11 @@ function testNotSupportReadWriteConcern(writeConn, testCases) {
 }
 
 {
-    const rst = new ReplSetTest({name: jsTest.name() + "_non_multitenant", nodes: 2});
+    const rst = new ReplSetTest({
+        name: jsTest.name() + "_non_multitenant",
+        nodes: 2,
+        nodeOptions: {setParameter: setParameterOpts}
+    });
     rst.startSet();
     rst.initiate();
     const primary = rst.getPrimary();
@@ -258,7 +265,10 @@ if (!TestData.auth) {
     const rst = new ReplSetTest({
         name: jsTest.name() + "_multitenant",
         nodes: 1,
-        nodeOptions: {auth: "", setParameter: {multitenancySupport: true}}
+        nodeOptions: {
+            auth: "",
+            setParameter: Object.assign({}, setParameterOpts, {multitenancySupport: true})
+        }
     });
     rst.startSet({keyFile: "jstests/libs/key1"});
     rst.initiate();

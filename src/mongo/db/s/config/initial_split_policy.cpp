@@ -776,11 +776,20 @@ SamplingBasedSplitPolicy::_makePipelineDocumentSource(OperationContext* opCtx,
     StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
     resolvedNamespaces[ns.coll()] = {ns, std::vector<BSONObj>{}};
 
-    // Config servers don't have ShardingState enabled, so we have to manually create
-    // ShardServerProcessInterface instead of getting it from the generic factory so the pipeline
-    // can talk to the shards.
-    auto pi = std::make_shared<ShardServerProcessInterface>(
-        Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor());
+    auto pi = [&]() -> std::shared_ptr<MongoProcessInterface> {
+        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer ||
+            serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+            // For the pipeline to be dispatched to shards, the ShardServerProcessInterface must be
+            // used. However, the generic factory would only return a ShardServerProcessInterface
+            // if the mongod is a shardsvr and the connection is internal. That is, if the mongod is
+            // a configsvr or a shardsvr but connected directly, the factory would return a
+            // StandaloneProcessInterface. Given this, we need to manually crate a
+            // ShardServerProcessInterface here instead of using the generic factory.
+            return std::make_shared<ShardServerProcessInterface>(
+                Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor());
+        }
+        return MongoProcessInterface::create(opCtx);
+    }();
 
     auto expCtx = make_intrusive<ExpressionContext>(opCtx,
                                                     boost::none, /* explain */

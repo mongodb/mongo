@@ -584,8 +584,6 @@ var $config = extendWorkload($config, function($config, $super) {
                 assert.eq(metrics.writeDistribution.numWritesByRange.length,
                           this.analyzeShardKeyNumRanges);
             }
-        } else {
-            AnalyzeShardKeyUtil.assertNotContainReadWriteDistributionMetrics(metrics);
         }
     };
 

@@ -135,18 +135,18 @@ function runTest(conn) {
     });
 }
 
+const setParameterOpts = {
+    analyzeShardKeyNumMostCommonValues: numMostCommonValues,
+    // Skip calculating the read and write distribution metrics since there are no sampled queries
+    // anyway.
+    "failpoint.analyzeShardKeySkipCalcalutingReadWriteDistributionMetrics":
+        tojson({mode: "alwaysOn"})
+
+};
+
 {
-    const st = new ShardingTest({
-        shards: 1,
-        rs: {
-            nodes: numNodesPerRS,
-            setParameter: {
-                "failpoint.analyzeShardKeySkipCalcalutingReadWriteDistributionMetrics":
-                    tojson({mode: "alwaysOn"}),
-                analyzeShardKeyNumMostCommonValues: numMostCommonValues
-            }
-        }
-    });
+    const st =
+        new ShardingTest({shards: 1, rs: {nodes: numNodesPerRS, setParameter: setParameterOpts}});
 
     runTest(st.s);
 
@@ -154,10 +154,8 @@ function runTest(conn) {
 }
 
 {
-    const rst = new ReplSetTest({
-        nodes: numNodesPerRS,
-        nodeOptions: {setParameter: {analyzeShardKeyNumMostCommonValues: numMostCommonValues}}
-    });
+    const rst =
+        new ReplSetTest({nodes: numNodesPerRS, nodeOptions: {setParameter: setParameterOpts}});
     rst.startSet();
     rst.initiate();
     const primary = rst.getPrimary();

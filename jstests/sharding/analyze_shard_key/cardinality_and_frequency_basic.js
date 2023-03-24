@@ -523,18 +523,17 @@ function testAnalyzeCurrentShardKeys(st, mongodConns) {
     assert.commandWorked(db.dropDatabase());
 }
 
+const setParameterOpts = {
+    analyzeShardKeyNumMostCommonValues: numMostCommonValues,
+    // Skip calculating the read and write distribution metrics since there are no sampled queries
+    // anyway.
+    "failpoint.analyzeShardKeySkipCalcalutingReadWriteDistributionMetrics":
+        tojson({mode: "alwaysOn"})
+};
+
 {
-    const st = new ShardingTest({
-        shards: numNodesPerRS,
-        rs: {
-            nodes: 2,
-            setParameter: {
-                "failpoint.analyzeShardKeySkipCalcalutingReadWriteDistributionMetrics":
-                    tojson({mode: "alwaysOn"}),
-                analyzeShardKeyNumMostCommonValues: numMostCommonValues
-            }
-        }
-    });
+    const st =
+        new ShardingTest({shards: numNodesPerRS, rs: {nodes: 2, setParameter: setParameterOpts}});
     const mongodConns = [];
     st.rs0.nodes.forEach(node => mongodConns.push(node));
     st.rs1.nodes.forEach(node => mongodConns.push(node));
@@ -547,10 +546,8 @@ function testAnalyzeCurrentShardKeys(st, mongodConns) {
 }
 
 {
-    const rst = new ReplSetTest({
-        nodes: numNodesPerRS,
-        nodeOptions: {setParameter: {analyzeShardKeyNumMostCommonValues: numMostCommonValues}}
-    });
+    const rst =
+        new ReplSetTest({nodes: numNodesPerRS, nodeOptions: {setParameter: setParameterOpts}});
     rst.startSet();
     rst.initiate();
     const mongodConns = rst.nodes;

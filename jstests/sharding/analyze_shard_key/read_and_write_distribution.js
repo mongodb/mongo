@@ -116,15 +116,24 @@ function assertMetricsNonEmptySampleSize(actual, expected, isHashed) {
         actual.writeDistribution, expected.writeDistribution, isHashed);
 }
 
-function assertNoMetrics(actual) {
-    AnalyzeShardKeyUtil.assertNotContainReadWriteDistributionMetrics(actual);
+function assertNoConfigSplitPointsCollection(conn) {
+    assert.eq(conn.getDB("config")
+                  .getCollectionInfos({name: {$regex: "^analyzeShardKey.splitPoints."}})
+                  .length,
+              0);
+}
+
+const readCmdNames = ["find", "aggregate", "count", "distinct"];
+function isReadCmdObj(cmdObj) {
+    const cmdName = Object.keys(cmdObj)[0];
+    return readCmdNames.includes(cmdName);
 }
 
 function getRandomCount() {
     return AnalyzeShardKeyUtil.getRandInteger(1, 100);
 }
 
-function makeTestCase(collName, isShardedColl, {shardKeyField, isHashed, minVal, maxVal}) {
+function makeTestCase(collName, {shardKeyField, isHashed, minVal, maxVal}) {
     // Generate commands and populate the expected metrics.
     const cmdObjs = [];
 
@@ -344,6 +353,108 @@ function makeTestCase(collName, isShardedColl, {shardKeyField, isHashed, minVal,
     return {cmdObjs, metrics: {readDistribution, writeDistribution}};
 }
 
+/**
+ * Repeatedly runs the analyzeShardKey command until the sample size expected by the test case is
+ * reached, and returns the last metrics returned.
+ */
+function waitForSampledQueries(conn, ns, shardKey, testCase) {
+    let res;
+    let numTries = 0;
+    assert.soon(() => {
+        numTries++;
+
+        res = assert.commandWorked(conn.adminCommand({analyzeShardKey: ns, key: shardKey}));
+        const numShardKeyUpdates = res.writeDistribution.percentageOfShardKeyUpdates *
+            res.writeDistribution.sampleSize.total / 100;
+
+        if (numTries % 100 == 0) {
+            jsTest.log("Waiting for sampled queries and diffs" + tojsononeline({
+                           actual: {
+                               readSampleSize: res.readDistribution.sampleSize,
+                               writeSampleSize: res.writeDistribution.sampleSize,
+                               diffSampleSize: numShardKeyUpdates,
+                           },
+                           expected: {
+                               readSampleSize: testCase.metrics.readDistribution.sampleSize,
+                               writeSampleSize: testCase.metrics.writeDistribution.sampleSize,
+                               diffSampleSize: testCase.metrics.writeDistribution.numShardKeyUpdates
+                           }
+                       }));
+        }
+
+        return (res.readDistribution.sampleSize.total >=
+                testCase.metrics.readDistribution.sampleSize.total) &&
+            (res.writeDistribution.sampleSize.total >=
+             testCase.metrics.writeDistribution.sampleSize.total) &&
+            (numShardKeyUpdates >= testCase.metrics.writeDistribution.numShardKeyUpdates);
+    });
+
+    return res;
+}
+
+function runTest(fixture, {isShardedColl, shardKeyField, isHashed}) {
+    const dbName = "testDb";
+    const collName = isShardedColl ? "testCollSharded" : "testCollUnsharded";
+    const ns = dbName + "." + collName;
+    const shardKey = {[shardKeyField]: isHashed ? "hashed" : 1};
+    jsTest.log(`Test analyzing the shard key ${tojsononeline(shardKey)} for the collection ${ns}`);
+
+    fixture.setUpCollectionFn(dbName, collName, isShardedColl);
+
+    const coll = fixture.conn.getDB(dbName).getCollection(collName);
+
+    // Verify that the analyzeShardKey command fails while calculating the read and write
+    // distribution if the cardinality of the shard key is lower than analyzeShardKeyNumRanges.
+    assert.commandWorked(coll.insert({[shardKeyField]: 1}));
+    assert.commandFailedWithCode(fixture.conn.adminCommand({analyzeShardKey: ns, key: shardKey}),
+                                 4952606);
+
+    // Insert documents into the collection. The range of values is selected such that the
+    // documents will be distributed across all the shards if the collection is sharded.
+    const minVal = -1500;
+    const maxVal = 1500;
+    const docs = [];
+    for (let i = minVal; i < maxVal + 1; i++) {
+        docs.push({_id: i, x: i, y: i});
+    }
+    assert.commandWorked(coll.insert(docs));
+
+    // Verify that the analyzeShardKey command returns zeros for the read and write sample size
+    // when there are no sampled queries.
+    let res = assert.commandWorked(fixture.conn.adminCommand({analyzeShardKey: ns, key: shardKey}));
+    assertMetricsEmptySampleSize(res);
+
+    // Turn on query sampling and wait for sampling to become active.
+    assert.commandWorked(
+        fixture.conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", sampleRate}));
+    fixture.waitForActiveSamplingFn();
+
+    // Create and run test queries.
+    const testCase = makeTestCase(collName, {shardKeyField, isHashed, minVal, maxVal});
+
+    fixture.runCmdsFn(dbName, testCase.cmdObjs);
+
+    // Turn off query sampling and wait for sampling to become inactive. The wait is necessary for
+    // preventing the internal aggregate commands run by the analyzeShardKey commands below from
+    // getting sampled.
+    assert.commandWorked(fixture.conn.adminCommand({configureQueryAnalyzer: ns, mode: "off"}));
+    fixture.waitForInactiveSamplingFn();
+
+    res = waitForSampledQueries(fixture.conn, ns, shardKey, testCase);
+    fixture.assertNoConfigSplitPointsCollFn();
+
+    // Verify that the metrics are as expected and that the temporary collections for storing
+    // the split points have been dropped.
+    assertMetricsNonEmptySampleSize(res, testCase.metrics, isHashed);
+
+    // Drop the collection without removing its config.sampledQueries and
+    // config.sampledQueriesDiff documents to get test coverage for analyzing shard keys for a
+    // collection that has gone through multiple incarnations. That is, if the analyzeShardKey
+    // command filters those documents by ns instead of collection uuid, it would return
+    // incorrect metrics.
+    assert(coll.drop());
+}
+
 // Make the periodic jobs for refreshing sample rates and writing sampled queries and diffs have a
 // period of 1 second to speed up the test.
 const queryAnalysisSamplerConfigurationRefreshSecs = 1;
@@ -351,6 +462,14 @@ const queryAnalysisWriterIntervalSecs = 1;
 
 const sampleRate = 10000;
 const analyzeShardKeyNumRanges = 10;
+
+const mongodSetParameterOpts = {
+    queryAnalysisSamplerConfigurationRefreshSecs,
+    queryAnalysisWriterIntervalSecs,
+    analyzeShardKeyNumRanges,
+    logComponentVerbosity: tojson({sharding: 2})
+};
+const mongosSetParametersOpts = {queryAnalysisSamplerConfigurationRefreshSecs};
 
 {
     jsTest.log("Verify that on a sharded cluster the analyzeShardKey command return correct read " +
@@ -362,161 +481,64 @@ const analyzeShardKeyNumRanges = 10;
     const st = new ShardingTest({
         mongos: numMongoses,
         shards: numShards,
-        rs: {
-            nodes: 2,
-            setParameter: {
-                queryAnalysisSamplerConfigurationRefreshSecs,
-                queryAnalysisWriterIntervalSecs,
-                analyzeShardKeyNumRanges,
-                logComponentVerbosity: tojson({sharding: 2})
-            }
-        },
-        mongosOptions: {setParameter: {queryAnalysisSamplerConfigurationRefreshSecs}}
+        rs: {nodes: 2, setParameter: mongodSetParameterOpts},
+        mongosOptions: {setParameter: mongosSetParametersOpts}
     });
 
-    // Test both the sharded and unsharded case.
-    const dbName = "testDb";
-    const collNameUnsharded = "testCollUnsharded";
-    const collNameSharded = "testCollSharded";
+    const fixture = {
+        conn: st.s0,
+        setUpCollectionFn: (dbName, collName, isShardedColl) => {
+            const ns = dbName + "." + collName;
 
-    assert.commandWorked(st.s0.adminCommand({enableSharding: dbName}));
-    st.ensurePrimaryShard(dbName, st.shard0.name);
+            assert.commandWorked(st.s0.adminCommand({enableSharding: dbName}));
+            st.ensurePrimaryShard(dbName, st.shard0.name);
 
-    function runTest({isShardedColl, shardKeyField, isHashed}) {
-        const collName = isShardedColl ? collNameSharded : collNameUnsharded;
-        const ns = dbName + "." + collName;
-        const shardKey = {[shardKeyField]: isHashed ? "hashed" : 1};
-        jsTest.log(
-            `Test analyzing the shard key ${tojsononeline(shardKey)} for the collection ${ns}`);
-
-        if (isShardedColl) {
-            // Set up the sharded collection. Make it have three chunks:
-            // shard0: [MinKey, -1000]
-            // shard1: [-1000, 1000]
-            // shard2: [1000, MaxKey]
-            assert.commandWorked(st.s0.adminCommand({shardCollection: ns, key: {x: 1}}));
-            assert.commandWorked(st.s0.adminCommand({split: ns, middle: {x: -1000}}));
-            assert.commandWorked(st.s0.adminCommand({split: ns, middle: {x: 1000}}));
-            assert.commandWorked(
-                st.s0.adminCommand({moveChunk: ns, find: {x: -1000}, to: st.shard1.shardName}));
-            assert.commandWorked(
-                st.s0.adminCommand({moveChunk: ns, find: {x: 1000}, to: st.shard2.shardName}));
-        }
-
-        const mongos0Coll = st.s0.getDB(dbName).getCollection(collName);
-
-        // Verify that the analyzeShardKey command fails while calculating the read and write
-        // distribution if the cardinality of the shard key is lower than analyzeShardKeyNumRanges.
-        assert.commandWorked(mongos0Coll.insert({[shardKeyField]: 1}));
-        assert.commandFailedWithCode(st.s0.adminCommand({analyzeShardKey: ns, key: shardKey}),
-                                     4952606);
-
-        // Insert documents into the collection. The range of values is selected such that the
-        // documents will be distributed across all the shards if the collection is sharded.
-        const minVal = -1500;
-        const maxVal = 1500;
-        const docs = [];
-        for (let i = minVal; i < maxVal + 1; i++) {
-            docs.push({_id: i, x: i, y: i});
-        }
-        // Distribute the inserts equally across the mongoses so that later they are assigned
-        // roughly equal sampling rates.
-        const numDocsPerMongos = docs.length / numMongoses;
-        for (let i = 0; i < numMongoses; i++) {
-            const coll = st["s" + String(i)].getCollection(ns);
-            assert.commandWorked(
-                coll.insert(docs.slice(i * numDocsPerMongos, (i + 1) * numDocsPerMongos)));
-        }
-
-        // Verify that the analyzeShardKey command returns zeros for the read and write sample size
-        // when there are no sampled queries.
-        let res = assert.commandWorked(st.s0.adminCommand({analyzeShardKey: ns, key: shardKey}));
-        assertMetricsEmptySampleSize(res);
-
-        // Turn on query sampling and wait for sampling to become active on all mongoses.
-        sleep(1000);  // Wait for all mongoses to have refreshed their average number of queries
-                      // executed per second.
-        assert.commandWorked(
-            st.s0.adminCommand({configureQueryAnalyzer: ns, mode: "full", sampleRate}));
-        for (let i = 0; i < numMongoses; i++) {
-            QuerySamplingUtil.waitForActiveSampling(st["s" + String(i)]);
-        }
-
-        // Create and run test queries.
-        const {cmdObjs, metrics} =
-            makeTestCase(collName, isShardedColl, {shardKeyField, isHashed, minVal, maxVal});
-        for (let i = 0; i < cmdObjs.length; i++) {
-            const db = st["s" + String(i % numMongoses)].getDB(dbName);
-            assert.commandWorked(db.runCommand(cmdObjs[i]));
-        }
-
-        // Turn off query sampling and wait for sampling to become inactive on all mongoses and
-        // mongods. The wait is necessary for preventing the internal aggregate commands run by the
-        // analyzeShardKey commands below from getting sampled.
-        assert.commandWorked(st.s0.adminCommand({configureQueryAnalyzer: ns, mode: "off"}));
-        for (let i = 0; i < numMongoses; i++) {
-            QuerySamplingUtil.waitForInactiveSampling(st["s" + String(i)]);
-        }
-        QuerySamplingUtil.waitForInactiveSamplingOnAllShards(st);
-
-        // Wait for all sampled queries and diffs to get flushed to disk.
-        let numTries = 0;
-        assert.soon(() => {
-            numTries++;
-
-            res = assert.commandWorked(st.s0.adminCommand({analyzeShardKey: ns, key: shardKey}));
-            const numShardKeyUpdates = res.writeDistribution.percentageOfShardKeyUpdates *
-                res.writeDistribution.sampleSize.total / 100;
-
-            if (numTries % 100 == 0) {
-                jsTest.log("Waiting for sampled queries and diffs" + tojsononeline({
-                               actual: {
-                                   readSampleSize: res.readDistribution.sampleSize,
-                                   writeSampleSize: res.writeDistribution.sampleSize,
-                                   diffSampleSize: numShardKeyUpdates,
-                               },
-                               expected: {
-                                   readSampleSize: metrics.readDistribution.sampleSize,
-                                   writeSampleSize: metrics.writeDistribution.sampleSize,
-                                   diffSampleSize: metrics.writeDistribution.numShardKeyUpdates
-                               }
-                           }));
+            if (isShardedColl) {
+                // Set up the sharded collection. Make it have three chunks:
+                // shard0: [MinKey, -1000]
+                // shard1: [-1000, 1000]
+                // shard2: [1000, MaxKey]
+                assert.commandWorked(st.s0.adminCommand({shardCollection: ns, key: {x: 1}}));
+                assert.commandWorked(st.s0.adminCommand({split: ns, middle: {x: -1000}}));
+                assert.commandWorked(st.s0.adminCommand({split: ns, middle: {x: 1000}}));
+                assert.commandWorked(
+                    st.s0.adminCommand({moveChunk: ns, find: {x: -1000}, to: st.shard1.shardName}));
+                assert.commandWorked(
+                    st.s0.adminCommand({moveChunk: ns, find: {x: 1000}, to: st.shard2.shardName}));
             }
+        },
+        waitForActiveSamplingFn: () => {
+            for (let i = 0; i < numMongoses; i++) {
+                QuerySamplingUtil.waitForActiveSampling(st["s" + String(i)]);
+            }
+        },
+        runCmdsFn: (dbName, cmdObjs) => {
+            for (let i = 0; i < cmdObjs.length; i++) {
+                const db = st["s" + String(i % numMongoses)].getDB(dbName);
+                assert.commandWorked(db.runCommand(cmdObjs[i]));
+            }
+        },
+        waitForInactiveSamplingFn: () => {
+            for (let i = 0; i < numMongoses; i++) {
+                QuerySamplingUtil.waitForInactiveSampling(st["s" + String(i)]);
+            }
+            QuerySamplingUtil.waitForInactiveSamplingOnAllShards(st);
+        },
+        assertNoConfigSplitPointsCollFn: () => {
+            st._rs.forEach(rs => {
+                assertNoConfigSplitPointsCollection(rs.test.getPrimary());
+            });
+        }
+    };
 
-            return (res.readDistribution.sampleSize.total >=
-                    metrics.readDistribution.sampleSize.total) &&
-                (res.writeDistribution.sampleSize.total >=
-                 metrics.writeDistribution.sampleSize.total) &&
-                (numShardKeyUpdates >= metrics.writeDistribution.numShardKeyUpdates);
-        });
-
-        // Verify that the metrics are as expected and that the temporary collections for storing
-        // the split points have been dropped.
-        assertMetricsNonEmptySampleSize(res, metrics, isHashed);
-        st._rs.forEach(rs => {
-            assert.eq(rs.test.getPrimary()
-                          .getDB("config")
-                          .getCollectionInfos({name: {$regex: "^analyzeShardKey.splitPoints."}})
-                          .length,
-                      0);
-        });
-
-        // Drop the collection without removing its config.sampledQueries and
-        // config.sampledQueriesDiff documents to get test coverage for analyzing shard keys for a
-        // collection that has gone through multiple incarnations. That is, if the analyzeShardKey
-        // command filters those documents by ns instead of collection uuid, it would return
-        // incorrect metrics.
-        assert(mongos0Coll.drop());
-    }
-
-    runTest({isShardedColl: false, shardKeyField: "x", isHashed: false});
-    runTest({isShardedColl: false, shardKeyField: "x", isHashed: true});
+    runTest(fixture, {isShardedColl: false, shardKeyField: "x", isHashed: false});
+    runTest(fixture, {isShardedColl: false, shardKeyField: "x", isHashed: true});
 
     // Note that {x: 1} is the current shard key for the sharded collection being tested.
-    runTest({isShardedColl: true, shardKeyField: "x", isHashed: false});
-    runTest({isShardedColl: true, shardKeyField: "x", isHashed: true});
-    runTest({isShardedColl: true, shardKeyField: "y", isHashed: false});
-    runTest({isShardedColl: true, shardKeyField: "y", isHashed: true});
+    runTest(fixture, {isShardedColl: true, shardKeyField: "x", isHashed: false});
+    runTest(fixture, {isShardedColl: true, shardKeyField: "x", isHashed: true});
+    runTest(fixture, {isShardedColl: true, shardKeyField: "y", isHashed: false});
+    runTest(fixture, {isShardedColl: true, shardKeyField: "y", isHashed: true});
 
     st.stop();
 }
@@ -525,22 +547,39 @@ const analyzeShardKeyNumRanges = 10;
     jsTest.log("Verify that on a replica set the analyzeShardKey command doesn't return read " +
                "and write distribution metrics");
 
-    const rst =
-        new ReplSetTest({nodes: 2, setParameter: {logComponentVerbosity: tojson({sharding: 2})}});
+    const rst = new ReplSetTest({nodes: 2, nodeOptions: {setParameter: mongodSetParameterOpts}});
     rst.startSet();
     rst.initiate();
     const primary = rst.getPrimary();
 
-    const dbName = "testDb";
-    const collName = "testColl";
-    const ns = dbName + "." + collName;
-    const shardKey = {x: 1};
-    const coll = primary.getCollection(ns);
+    const fixture = {
+        conn: primary,
+        setUpCollectionFn: (dbName, collName, isShardedColl) => {
+            // No setup is needed.
+        },
+        waitForActiveSamplingFn: () => {
+            rst.nodes.forEach(node => {
+                QuerySamplingUtil.waitForActiveSampling(node);
+            });
+        },
+        runCmdsFn: (dbName, cmdObjs) => {
+            for (let i = 0; i < cmdObjs.length; i++) {
+                const node = isReadCmdObj(cmdObjs[i]) ? rst.getSecondary() : rst.getPrimary();
+                assert.commandWorked(node.getDB(dbName).runCommand(cmdObjs[i]));
+            }
+        },
+        waitForInactiveSamplingFn: () => {
+            rst.nodes.forEach(node => {
+                QuerySamplingUtil.waitForInactiveSampling(node);
+            });
+        },
+        assertNoConfigSplitPointsCollFn: () => {
+            assertNoConfigSplitPointsCollection(primary);
+        }
+    };
 
-    assert.commandWorked(coll.createIndex(shardKey));
-    assert.commandWorked(coll.insert({x: 1}));
-    const res = assert.commandWorked(primary.adminCommand({analyzeShardKey: ns, key: shardKey}));
-    assertNoMetrics(res);
+    runTest(fixture, {isShardedColl: false, shardKeyField: "x", isHashed: false});
+    runTest(fixture, {isShardedColl: false, shardKeyField: "x", isHashed: true});
 
     rst.stopSet();
 }

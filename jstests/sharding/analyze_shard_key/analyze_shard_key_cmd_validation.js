@@ -67,14 +67,14 @@ function testValidationDuringKeyCharactericsMetricsCalculation(conn, validationT
 }
 
 function testValidationDuringReadWriteDistributionMetricsCalculation(
-    mongosConn, validationTest, shardsvrConn) {
+    cmdConn, validationTest, aggConn) {
     const dbName = validationTest.dbName;
     const collName = validationTest.collName;
     const ns = dbName + "." + collName;
     jsTest.log(`Testing validation while calculating metrics about read and write distribution ${
         tojson(dbName, collName)}`);
 
-    const testDB = mongosConn.getDB(dbName);
+    const testDB = cmdConn.getDB(dbName);
     const testColl = testDB.getCollection(collName);
     // The sampling-based initial split policy needs 10 samples per split point so
     // 10 * analyzeShardKeyNumRanges is the minimum number of distinct shard key values that the
@@ -82,13 +82,12 @@ function testValidationDuringReadWriteDistributionMetricsCalculation(
     const {docs, arrayFieldName} = validationTest.makeDocuments(10 * analyzeShardKeyNumRanges);
 
     let fp = configureFailPoint(
-        shardsvrConn, "analyzeShardKeyPauseBeforeCalculatingReadWriteDistributionMetrics");
-    let analyzeShardKeyFunc = (mongosHost, ns, arrayFieldName) => {
-        const mongosConn = new Mongo(mongosHost);
-        return mongosConn.adminCommand({analyzeShardKey: ns, key: {[arrayFieldName]: 1}});
+        aggConn, "analyzeShardKeyPauseBeforeCalculatingReadWriteDistributionMetrics");
+    let analyzeShardKeyFunc = (cmdHost, ns, arrayFieldName) => {
+        const cmdConn = new Mongo(cmdHost);
+        return cmdConn.adminCommand({analyzeShardKey: ns, key: {[arrayFieldName]: 1}});
     };
-    let analyzeShardKeyThread =
-        new Thread(analyzeShardKeyFunc, mongosConn.host, ns, arrayFieldName);
+    let analyzeShardKeyThread = new Thread(analyzeShardKeyFunc, cmdConn.host, ns, arrayFieldName);
 
     // Insert the documents but set the array field to null so it passes the best-effort validation
     // at the start of the command.
@@ -107,9 +106,10 @@ function testValidationDuringReadWriteDistributionMetricsCalculation(
     assert.commandWorked(testColl.remove({}));
 }
 
+const setParameterOpts = {analyzeShardKeyNumRanges};
+
 {
-    const st =
-        new ShardingTest({shards: 1, rs: {nodes: 1, setParameter: {analyzeShardKeyNumRanges}}});
+    const st = new ShardingTest({shards: 1, rs: {nodes: 1, setParameter: setParameterOpts}});
     const shard0Primary = st.rs0.getPrimary();
     const validationTest = ValidationTest(st.s);
 
@@ -135,7 +135,7 @@ function testValidationDuringReadWriteDistributionMetricsCalculation(
 }
 
 {
-    const rst = new ReplSetTest({nodes: 1});
+    const rst = new ReplSetTest({nodes: 2, nodeOptions: {setParameter: setParameterOpts}});
     rst.startSet();
     rst.initiate();
     const primary = rst.getPrimary();
@@ -153,7 +153,11 @@ function testValidationDuringReadWriteDistributionMetricsCalculation(
     fp0.off();
     testValidationDuringKeyCharactericsMetricsCalculation(primary, validationTest);
 
+    // Enable the calculation of the metrics about the read and write distribution to test
+    // validation during that step.
     fp1.off();
+    testValidationDuringReadWriteDistributionMetricsCalculation(primary, validationTest, primary);
+
     rst.stopSet();
 }
 })();

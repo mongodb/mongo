@@ -823,13 +823,15 @@ std::pair<ReadDistributionMetrics, WriteDistributionMetrics> calculateReadWriteD
     ReadDistributionMetrics readDistributionMetrics;
     WriteDistributionMetrics writeDistributionMetrics;
 
-    auto splitPointsShardId = ShardingState::get(opCtx)->shardId();
     auto [splitPointsNss, splitPointsAfterClusterTime] =
         generateSplitPoints(opCtx, nss, collUuid, shardKey);
 
     std::vector<BSONObj> pipeline;
     DocumentSourceAnalyzeShardKeyReadWriteDistributionSpec spec(
-        shardKey, splitPointsShardId, splitPointsNss, splitPointsAfterClusterTime);
+        shardKey, splitPointsNss, splitPointsAfterClusterTime);
+    if (ShardingState::get(opCtx)->enabled()) {
+        spec.setSplitPointsShardId(ShardingState::get(opCtx)->shardId());
+    }
     pipeline.push_back(
         BSON(DocumentSourceAnalyzeShardKeyReadWriteDistribution::kStageName << spec.toBSON()));
     AggregateCommandRequest aggRequest(nss, pipeline);

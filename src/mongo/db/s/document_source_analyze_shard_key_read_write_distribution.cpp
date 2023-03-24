@@ -61,16 +61,69 @@ std::unique_ptr<CollatorInterface> getDefaultCollator(OperationContext* opCtx,
 }
 
 /**
+ * Fetches the split point documents and applies 'callbackFn' to each of the documents. On a sharded
+ * cluster, fetches the documents from the 'splitPointsShard'. On a standalone replica set, fetches
+ * the documents locally.
+ */
+void fetchSplitPoints(OperationContext* opCtx,
+                      const NamespaceString& splitPointsNss,
+                      const Timestamp& splitPointsAfterClusterTime,
+                      boost::optional<ShardId> splitPointsShard,
+                      std::function<void(const BSONObj&)> callbackFn) {
+    auto sort = BSON(AnalyzeShardKeySplitPointDocument::kSplitPointFieldName << 1);
+    auto readConcern = repl::ReadConcernArgs(LogicalTime{splitPointsAfterClusterTime},
+                                             repl::ReadConcernLevel::kLocalReadConcern);
+
+    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+        uassert(ErrorCodes::InvalidOptions,
+                "The id of the shard that contains the temporary collection storing the split "
+                "points for the shard key must be specified when running on a sharded cluster",
+                splitPointsShard);
+        auto shard =
+            uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, *splitPointsShard));
+
+        std::vector<BSONObj> pipeline;
+        pipeline.push_back(BSON("$match" << BSONObj()));
+        pipeline.push_back(BSON("$sort" << sort));
+        AggregateCommandRequest aggRequest(splitPointsNss, pipeline);
+        aggRequest.setReadConcern(readConcern.toBSONInner());
+        aggRequest.setWriteConcern(WriteConcernOptions());
+        aggRequest.setUnwrappedReadPref(ReadPreferenceSetting::get(opCtx).toContainingBSON());
+
+        uassertStatusOK(shard->runAggregation(
+            opCtx,
+            aggRequest,
+            [&](const std::vector<BSONObj>& docs, const boost::optional<BSONObj>&) -> bool {
+                for (const auto& doc : docs) {
+                    callbackFn(doc);
+                }
+                return true;
+            }));
+    } else {
+        uassertStatusOK(
+            repl::ReplicationCoordinator::get(opCtx)->waitUntilOpTimeForRead(opCtx, readConcern));
+
+        DBDirectClient client(opCtx);
+        FindCommandRequest findRequest(splitPointsNss);
+        findRequest.setSort(sort);
+        auto cursor = client.find(std::move(findRequest));
+        while (cursor->more()) {
+            callbackFn(cursor->next());
+        }
+    }
+}
+
+/**
  * Creates a CollectionRoutingInfoTargeter based on the split point documents in the
- * 'splitPointsNss' collection on the 'splitPointsShard'.
+ * 'splitPointsNss' collection.
  */
 CollectionRoutingInfoTargeter makeCollectionRoutingInfoTargeter(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const KeyPattern& shardKey,
-    ShardId splitPointsShard,
     const NamespaceString& splitPointsNss,
-    const Timestamp& splitPointsAfterClusterTime) {
+    const Timestamp& splitPointsAfterClusterTime,
+    boost::optional<ShardId> splitPointsShard) {
     std::vector<ChunkType> chunks;
 
     // This is a synthetic routing table so it doesn't matter what chunk version and shard id each
@@ -95,36 +148,20 @@ CollectionRoutingInfoTargeter makeCollectionRoutingInfoTargeter(
         lastChunkMax = chunk.getMax();
     };
 
-    auto shard =
-        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, splitPointsShard));
-
-    std::vector<BSONObj> pipeline;
-    pipeline.push_back(BSON("$match" << BSONObj()));
-    pipeline.push_back(
-        BSON("$sort" << BSON(AnalyzeShardKeySplitPointDocument::kSplitPointFieldName << 1)));
-    AggregateCommandRequest aggRequest(splitPointsNss, pipeline);
-    aggRequest.setReadConcern(BSON(repl::ReadConcernArgs::kLevelFieldName
-                                   << repl::readConcernLevels::kLocalName
-                                   << repl::ReadConcernArgs::kAfterClusterTimeFieldName
-                                   << splitPointsAfterClusterTime));
-    aggRequest.setWriteConcern(WriteConcernOptions());
-    aggRequest.setUnwrappedReadPref(ReadPreferenceSetting::get(opCtx).toContainingBSON());
-
-    uassertStatusOK(shard->runAggregation(
+    fetchSplitPoints(
         opCtx,
-        aggRequest,
-        [&](const std::vector<BSONObj>& docs, const boost::optional<BSONObj>&) -> bool {
-            for (const auto& doc : docs) {
-                auto splitPointDoc = AnalyzeShardKeySplitPointDocument::parse(
-                    IDLParserContext(
-                        DocumentSourceAnalyzeShardKeyReadWriteDistribution::kStageName),
-                    doc);
-                auto splitPoint = splitPointDoc.getSplitPoint();
-                uassertShardKeyValueNotContainArrays(splitPoint);
-                appendChunk(lastChunkMax, splitPoint);
-            }
-            return true;
-        }));
+        splitPointsNss,
+        splitPointsAfterClusterTime,
+        splitPointsShard,
+        [&](const BSONObj& doc) {
+            auto splitPointDoc = AnalyzeShardKeySplitPointDocument::parse(
+                IDLParserContext(DocumentSourceAnalyzeShardKeyReadWriteDistribution::kStageName),
+                doc);
+            auto splitPoint = splitPointDoc.getSplitPoint();
+            uassertShardKeyValueNotContainArrays(splitPoint);
+            appendChunk(lastChunkMax, splitPoint);
+        });
+
     appendChunk(lastChunkMax, shardKey.globalMax());
 
     auto routingTableHistory = RoutingTableHistory::makeNew(nss,
@@ -294,9 +331,9 @@ DocumentSource::GetNextResult DocumentSourceAnalyzeShardKeyReadWriteDistribution
     auto targeter = makeCollectionRoutingInfoTargeter(pExpCtx->opCtx,
                                                       pExpCtx->ns,
                                                       _spec.getKey(),
-                                                      _spec.getSplitPointsShardId(),
                                                       _spec.getSplitPointsNss(),
-                                                      _spec.getSplitPointsAfterClusterTime());
+                                                      _spec.getSplitPointsAfterClusterTime(),
+                                                      _spec.getSplitPointsShardId());
     ReadDistributionMetricsCalculator readDistributionCalculator(targeter);
     WriteDistributionMetricsCalculator writeDistributionCalculator(targeter);
 

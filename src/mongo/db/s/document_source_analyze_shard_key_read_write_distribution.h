@@ -46,8 +46,14 @@ public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& specElem) {
             uassert(ErrorCodes::IllegalOperation,
-                    str::stream() << kStageName << "is only suppported on a shardsvr mongod",
-                    serverGlobalParams.clusterRole.isShardRole());
+                    str::stream() << kStageName << " is not supported on a standalone mongod",
+                    repl::ReplicationCoordinator::get(getGlobalServiceContext())->isReplEnabled());
+            uassert(ErrorCodes::IllegalOperation,
+                    str::stream() << kStageName << " is not supported on a multitenant replica set",
+                    !gMultitenancySupport);
+            uassert(ErrorCodes::IllegalOperation,
+                    str::stream() << kStageName << " is not supported on a configsvr mongod",
+                    !serverGlobalParams.clusterRole.isExclusivelyConfigSvrRole());
             uassert(6875700,
                     str::stream() << kStageName
                                   << " must take a nested object but found: " << specElem,

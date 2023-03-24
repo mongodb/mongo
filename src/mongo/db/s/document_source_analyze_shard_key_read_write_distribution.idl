@@ -46,11 +46,6 @@ structs:
         type: KeyPattern
         validator:
           callback: validateShardKeyPattern
-      splitPointsShardId:
-        description: The id of the shard that the analyzeShardKey command is running on, and
-                     therefore contains the temporary collection storing the split points for the
-                     shard key.
-        type: shard_id
       splitPointsNss:
         description: The namespace of the temporary collection storing the split points.
         type: namespacestring
@@ -59,6 +54,12 @@ structs:
                      must be greater or equal to the timestamp at which the insert for the last
                      split point document occurred.
         type: timestamp
+      splitPointsShardId:
+        description: The id of the shard that the analyzeShardKey command is running on, and
+                     therefore contains the temporary collection storing the split points for the
+                     shard key. Only set when running on a sharded cluster.
+        type: shard_id
+        optional: true
 
   DocumentSourceAnalyzeShardKeyReadWriteDistributionResponse:
     description: The document that a $_analyzeShardKeyReadWriteDistribution stage outputs.
