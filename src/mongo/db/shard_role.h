@@ -51,7 +51,7 @@ struct CollectionOrViewAcquisitionRequest {
         PlacementConcern placementConcern,
         repl::ReadConcernArgs readConcern,
         AcquisitionPrerequisites::OperationType operationType,
-        AcquisitionPrerequisites::ViewMode viewMode = AcquisitionPrerequisites::kCanBeView)
+        AcquisitionPrerequisites::ViewMode viewMode = AcquisitionPrerequisites::kMustBeCollection)
         : nss(nss),
           placementConcern(placementConcern),
           readConcern(readConcern),
@@ -68,7 +68,7 @@ struct CollectionOrViewAcquisitionRequest {
         PlacementConcern placementConcern,
         repl::ReadConcernArgs readConcern,
         AcquisitionPrerequisites::OperationType operationType,
-        AcquisitionPrerequisites::ViewMode viewMode = AcquisitionPrerequisites::kCanBeView)
+        AcquisitionPrerequisites::ViewMode viewMode = AcquisitionPrerequisites::kMustBeCollection)
         : nss(nss),
           uuid(uuid),
           placementConcern(placementConcern),
@@ -85,9 +85,9 @@ struct CollectionOrViewAcquisitionRequest {
         PlacementConcern placementConcern,
         repl::ReadConcernArgs readConcern,
         AcquisitionPrerequisites::OperationType operationType,
-        AcquisitionPrerequisites::ViewMode viewMode = AcquisitionPrerequisites::kCanBeView)
-        : nss(nssOrUUID.nss()),
-          dbname(nssOrUUID.dbName()),
+        AcquisitionPrerequisites::ViewMode viewMode = AcquisitionPrerequisites::kMustBeCollection)
+        : dbname(nssOrUUID.dbName()),
+          nss(nssOrUUID.nss()),
           uuid(nssOrUUID.uuid()),
           placementConcern(placementConcern),
           readConcern(readConcern),
@@ -102,11 +102,10 @@ struct CollectionOrViewAcquisitionRequest {
         OperationContext* opCtx,
         NamespaceString nss,
         AcquisitionPrerequisites::OperationType operationType,
-        AcquisitionPrerequisites::ViewMode viewMode = AcquisitionPrerequisites::kCanBeView);
-
-    boost::optional<NamespaceString> nss;
+        AcquisitionPrerequisites::ViewMode viewMode);
 
     boost::optional<DatabaseName> dbname;
+    boost::optional<NamespaceString> nss;
     boost::optional<UUID> uuid;
 
     PlacementConcern placementConcern;
