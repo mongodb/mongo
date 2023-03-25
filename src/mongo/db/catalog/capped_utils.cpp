@@ -283,8 +283,9 @@ void convertToCapped(OperationContext* opCtx, const NamespaceString& ns, long lo
             !userInitiatedWritesAndNotPrimary);
 
     Database* const db = coll.getDb();
-    uassert(
-        ErrorCodes::NamespaceNotFound, str::stream() << "database " << dbname << " not found", db);
+    uassert(ErrorCodes::NamespaceNotFound,
+            str::stream() << "database " << dbname.toStringForErrorMsg() << " not found",
+            db);
 
     if (coll) {
         IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(coll->uuid());

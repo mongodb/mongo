@@ -131,7 +131,7 @@ public:
         Database* const db = autoColl.getDb();
         if (!db) {
             uasserted(ErrorCodes::NamespaceNotFound,
-                      str::stream() << "database " << dbName.toString() << " not found");
+                      str::stream() << "database " << dbName.toStringForErrorMsg() << " not found");
         }
 
         cloneCollectionAsCapped(opCtx, db, fromNs, toNs, size, temp);

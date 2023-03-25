@@ -64,8 +64,8 @@ namespace {
 Status _checkNssAndReplState(OperationContext* opCtx, Database* db, const DatabaseName& dbName) {
     if (!db) {
         return Status(ErrorCodes::NamespaceNotFound,
-                      str::stream()
-                          << "Could not drop database " << dbName << " because it does not exist");
+                      str::stream() << "Could not drop database " << dbName.toStringForErrorMsg()
+                                    << " because it does not exist");
     }
 
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
@@ -74,7 +74,8 @@ Status _checkNssAndReplState(OperationContext* opCtx, Database* db, const Databa
 
     if (userInitiatedWritesAndNotPrimary) {
         return Status(ErrorCodes::NotWritablePrimary,
-                      str::stream() << "Not primary while dropping database " << dbName);
+                      str::stream() << "Not primary while dropping database "
+                                    << dbName.toStringForErrorMsg());
     }
 
     return Status::OK();
@@ -139,7 +140,8 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
 
     // As of SERVER-32205, dropping the admin database is prohibited.
     uassert(ErrorCodes::IllegalOperation,
-            str::stream() << "Dropping the '" << dbName << "' database is prohibited.",
+            str::stream() << "Dropping the '" << dbName.toStringForErrorMsg()
+                          << "' database is prohibited.",
             dbName.db() != DatabaseName::kAdmin.db());
 
     {
@@ -168,8 +170,8 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
 
         if (db->isDropPending(opCtx)) {
             return Status(ErrorCodes::DatabaseDropPending,
-                          str::stream()
-                              << "The database is currently being dropped. Database: " << dbName);
+                          str::stream() << "The database is currently being dropped. Database: "
+                                        << dbName.toStringForErrorMsg());
         }
 
         LOGV2(20337,
@@ -395,8 +397,8 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
 
     if (!result.status.isOK()) {
         return result.status.withContext(str::stream()
-                                         << "dropDatabase " << dbName << " failed waiting for "
-                                         << numCollectionsToDrop
+                                         << "dropDatabase " << dbName.toStringForErrorMsg()
+                                         << " failed waiting for " << numCollectionsToDrop
                                          << " collection drop(s) (most recent drop optime: "
                                          << awaitOpTime.toString() << ") to replicate.");
     }
@@ -422,7 +424,7 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
     auto db = autoDB.getDb();
     if (!db) {
         return Status(ErrorCodes::NamespaceNotFound,
-                      str::stream() << "Could not drop database " << dbName
+                      str::stream() << "Could not drop database " << dbName.toStringForErrorMsg()
                                     << " because it does not exist after dropping "
                                     << numCollectionsToDrop << " collection(s).");
     }
@@ -433,7 +435,7 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
     if (userInitiatedWritesAndNotPrimary) {
         return Status(ErrorCodes::PrimarySteppedDown,
                       str::stream()
-                          << "Could not drop database " << dbName
+                          << "Could not drop database " << dbName.toStringForErrorMsg()
                           << " because we transitioned from PRIMARY to "
                           << replCoord->getMemberState().toString() << " while waiting for "
                           << numCollectionsToDrop << " pending collection drop(s).");

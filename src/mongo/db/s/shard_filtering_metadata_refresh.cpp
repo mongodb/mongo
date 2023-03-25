@@ -192,7 +192,8 @@ SharedSemiFuture<void> recoverRefreshDbVersion(OperationContext* opCtx,
         })
         .onCompletion([=](Status status) {
             uassert(ErrorCodes::DatabaseMetadataRefreshCanceled,
-                    str::stream() << "Canceled metadata refresh for database " << dbName,
+                    str::stream() << "Canceled metadata refresh for database "
+                                  << dbName.toStringForErrorMsg(),
                     !cancellationToken.isCanceled());
 
             if (status.isOK() || status == ErrorCodes::NamespaceNotFound) {
