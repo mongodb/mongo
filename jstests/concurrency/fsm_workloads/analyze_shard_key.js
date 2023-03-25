@@ -3,12 +3,15 @@
 /**
  * Tests that the analyzeShardKey command returns correct metrics.
  *
+ * This workload implicitly assumes that its tid range is [0, $config.threadCount). This isn't
+ * guaranteed to be true when it is run in parallel with other workloads.
  * @tags: [
  *  requires_fcv_70,
  *  featureFlagAnalyzeShardKey,
  *  featureFlagUpdateOneWithoutShardKey,
  *  uses_transactions,
- *  resource_intensive
+ *  resource_intensive,
+ *  incompatible_with_concurrency_simultaneous
  * ]
  */
 load("jstests/concurrency/fsm_libs/extend_workload.js");
