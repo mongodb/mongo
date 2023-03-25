@@ -191,7 +191,6 @@ void ShardRoleTest::setUp() {
     // Create nssShardedCollection1
     createTestCollection(opCtx(), nssShardedCollection1);
     const auto uuidShardedCollection1 = getCollectionUUID(_opCtx.get(), nssShardedCollection1);
-    installDatabaseMetadata(opCtx(), dbNameTestDb, dbVersionTestDb);
     installShardedCollectionMetadata(
         opCtx(),
         nssShardedCollection1,
@@ -228,10 +227,7 @@ TEST_F(ShardRoleTest, NamespaceOrViewAcquisitionRequestWithOpCtxTakesPlacementFr
         ScopedSetShardRole setShardRole(
             opCtx(), anotherCollection, ShardVersion::UNSHARDED(), dbVersionTestDb);
         auto acquisition = CollectionOrViewAcquisitionRequest::fromOpCtx(
-            opCtx(),
-            nss,
-            AcquisitionPrerequisites::kWrite,
-            AcquisitionPrerequisites::kMustBeCollection);
+            opCtx(), nss, AcquisitionPrerequisites::kWrite);
         ASSERT_EQ(boost::none, acquisition.placementConcern.dbVersion);
         ASSERT_EQ(boost::none, acquisition.placementConcern.shardVersion);
     }
@@ -241,10 +237,7 @@ TEST_F(ShardRoleTest, NamespaceOrViewAcquisitionRequestWithOpCtxTakesPlacementFr
         const auto shardVersion = boost::none;
         ScopedSetShardRole setShardRole(opCtx(), nss, shardVersion, dbVersion);
         auto acquisition = CollectionOrViewAcquisitionRequest::fromOpCtx(
-            opCtx(),
-            nss,
-            AcquisitionPrerequisites::kWrite,
-            AcquisitionPrerequisites::kMustBeCollection);
+            opCtx(), nss, AcquisitionPrerequisites::kWrite);
         ASSERT_EQ(dbVersion, acquisition.placementConcern.dbVersion);
         ASSERT_EQ(shardVersion, acquisition.placementConcern.shardVersion);
     }
@@ -254,10 +247,7 @@ TEST_F(ShardRoleTest, NamespaceOrViewAcquisitionRequestWithOpCtxTakesPlacementFr
         const auto shardVersion = ShardVersion::UNSHARDED();
         ScopedSetShardRole setShardRole(opCtx(), nss, shardVersion, dbVersion);
         auto acquisition = CollectionOrViewAcquisitionRequest::fromOpCtx(
-            opCtx(),
-            nss,
-            AcquisitionPrerequisites::kWrite,
-            AcquisitionPrerequisites::kMustBeCollection);
+            opCtx(), nss, AcquisitionPrerequisites::kWrite);
         ASSERT_EQ(dbVersion, acquisition.placementConcern.dbVersion);
         ASSERT_EQ(shardVersion, acquisition.placementConcern.shardVersion);
     }
@@ -267,10 +257,7 @@ TEST_F(ShardRoleTest, NamespaceOrViewAcquisitionRequestWithOpCtxTakesPlacementFr
         const auto shardVersion = shardVersionShardedCollection1;
         ScopedSetShardRole setShardRole(opCtx(), nss, shardVersion, dbVersion);
         auto acquisition = CollectionOrViewAcquisitionRequest::fromOpCtx(
-            opCtx(),
-            nss,
-            AcquisitionPrerequisites::kWrite,
-            AcquisitionPrerequisites::kMustBeCollection);
+            opCtx(), nss, AcquisitionPrerequisites::kWrite);
         ASSERT_EQ(dbVersion, acquisition.placementConcern.dbVersion);
         ASSERT_EQ(shardVersion, acquisition.placementConcern.shardVersion);
     }
@@ -598,13 +585,11 @@ TEST_F(ShardRoleTest, AcquireCollectionButItIsAView) {
                        DBException,
                        ErrorCodes::CommandNotSupportedOnView);
 
-    const auto acquisition = acquireCollectionOrView(
-        opCtx(),
-        CollectionOrViewAcquisitionRequest::fromOpCtx(opCtx(),
-                                                      nssView,
-                                                      AcquisitionPrerequisites::kWrite,
-                                                      AcquisitionPrerequisites::kCanBeView),
-        MODE_IX);
+    const auto acquisition =
+        acquireCollectionOrView(opCtx(),
+                                CollectionOrViewAcquisitionRequest::fromOpCtx(
+                                    opCtx(), nssView, AcquisitionPrerequisites::kWrite),
+                                MODE_IX);
 
     ASSERT_TRUE(std::holds_alternative<ScopedViewAcquisition>(acquisition));
     const ScopedViewAcquisition& viewAcquisition = std::get<ScopedViewAcquisition>(acquisition);
@@ -1145,13 +1130,11 @@ TEST_F(ShardRoleTest, RestoreForReadSucceedsEvenIfPlacementHasChanged) {
 }
 
 DEATH_TEST_REGEX_F(ShardRoleTest, YieldingViewAcquisitionIsForbidden, "Tripwire assertion") {
-    const auto acquisition = acquireCollectionOrView(
-        opCtx(),
-        CollectionOrViewAcquisitionRequest::fromOpCtx(opCtx(),
-                                                      nssView,
-                                                      AcquisitionPrerequisites::kWrite,
-                                                      AcquisitionPrerequisites::kCanBeView),
-        MODE_IX);
+    const auto acquisition =
+        acquireCollectionOrView(opCtx(),
+                                CollectionOrViewAcquisitionRequest::fromOpCtx(
+                                    opCtx(), nssView, AcquisitionPrerequisites::kWrite),
+                                MODE_IX);
 
     ASSERT_THROWS_CODE(
         yieldTransactionResourcesFromOperationContext(opCtx()), DBException, 7300502);
@@ -1187,6 +1170,125 @@ TEST_F(ShardRoleTest, RestoreForReadFailsIfCollectionIsNowAView) {
 }
 TEST_F(ShardRoleTest, RestoreForWriteFailsIfCollectionIsNowAView) {
     testRestoreFailsIfCollectionIsNowAView(AcquisitionPrerequisites::kWrite);
+}
+
+// ---------------------------------------------------------------------------
+// ScopedLocalCatalogWriteFence
+
+TEST_F(ShardRoleTest, ScopedLocalCatalogWriteFenceWUOWCommitWithinWriterScope) {
+    auto acquisition = acquireCollection(opCtx(),
+                                         {nssShardedCollection1,
+                                          PlacementConcern{{}, shardVersionShardedCollection1},
+                                          repl::ReadConcernArgs(),
+                                          AcquisitionPrerequisites::kRead},
+                                         MODE_X);
+    ASSERT(!acquisition.getCollectionPtr()->isTemporary());
+
+    {
+        WriteUnitOfWork wuow(opCtx());
+        CollectionWriter localCatalogWriter(opCtx(), &acquisition);
+        localCatalogWriter.getWritableCollection(opCtx())->setIsTemp(opCtx(), true);
+        wuow.commit();
+    }
+
+    ASSERT(acquisition.getCollectionPtr()->isTemporary());
+}
+
+TEST_F(ShardRoleTest, ScopedLocalCatalogWriteFenceWUOWCommitAfterWriterScope) {
+    auto acquisition = acquireCollection(opCtx(),
+                                         {nssShardedCollection1,
+                                          PlacementConcern{{}, shardVersionShardedCollection1},
+                                          repl::ReadConcernArgs(),
+                                          AcquisitionPrerequisites::kRead},
+                                         MODE_X);
+    ASSERT(!acquisition.getCollectionPtr()->isTemporary());
+
+    WriteUnitOfWork wuow(opCtx());
+    {
+        CollectionWriter localCatalogWriter(opCtx(), &acquisition);
+        localCatalogWriter.getWritableCollection(opCtx())->setIsTemp(opCtx(), true);
+    }
+    ASSERT(acquisition.getCollectionPtr()->isTemporary());
+    wuow.commit();
+    ASSERT(acquisition.getCollectionPtr()->isTemporary());
+}
+
+TEST_F(ShardRoleTest, ScopedLocalCatalogWriteFenceWUOWRollbackWithinWriterScope) {
+    auto acquisition = acquireCollection(opCtx(),
+                                         {nssShardedCollection1,
+                                          PlacementConcern{{}, shardVersionShardedCollection1},
+                                          repl::ReadConcernArgs(),
+                                          AcquisitionPrerequisites::kRead},
+                                         MODE_X);
+    ASSERT(!acquisition.getCollectionPtr()->isTemporary());
+
+    {
+        WriteUnitOfWork wuow(opCtx());
+        CollectionWriter localCatalogWriter(opCtx(), &acquisition);
+        localCatalogWriter.getWritableCollection(opCtx())->setIsTemp(opCtx(), true);
+    }
+    ASSERT(!acquisition.getCollectionPtr()->isTemporary());
+}
+
+TEST_F(ShardRoleTest, ScopedLocalCatalogWriteFenceWUOWRollbackAfterWriterScope) {
+    auto acquisition = acquireCollection(opCtx(),
+                                         {nssShardedCollection1,
+                                          PlacementConcern{{}, shardVersionShardedCollection1},
+                                          repl::ReadConcernArgs(),
+                                          AcquisitionPrerequisites::kRead},
+                                         MODE_X);
+    ASSERT(!acquisition.getCollectionPtr()->isTemporary());
+
+    {
+        WriteUnitOfWork wuow(opCtx());
+        {
+            CollectionWriter localCatalogWriter(opCtx(), &acquisition);
+            localCatalogWriter.getWritableCollection(opCtx())->setIsTemp(opCtx(), true);
+        }
+        ASSERT(acquisition.getCollectionPtr()->isTemporary());
+    }
+    ASSERT(!acquisition.getCollectionPtr()->isTemporary());
+}
+
+TEST_F(ShardRoleTest, ScopedLocalCatalogWriteFenceOutsideWUOUCommit) {
+    auto acquisition = acquireCollection(opCtx(),
+                                         {nssShardedCollection1,
+                                          PlacementConcern{{}, shardVersionShardedCollection1},
+                                          repl::ReadConcernArgs(),
+                                          AcquisitionPrerequisites::kRead},
+                                         MODE_X);
+    ASSERT(!acquisition.getCollectionPtr()->isTemporary());
+
+    {
+        CollectionWriter localCatalogWriter(opCtx(), &acquisition);
+        WriteUnitOfWork wuow(opCtx());
+        localCatalogWriter.getWritableCollection(opCtx())->setIsTemp(opCtx(), true);
+        ASSERT(localCatalogWriter->isTemporary());
+        wuow.commit();
+        ASSERT(localCatalogWriter->isTemporary());
+    }
+    ASSERT(acquisition.getCollectionPtr()->isTemporary());
+}
+
+TEST_F(ShardRoleTest, ScopedLocalCatalogWriteFenceOutsideWUOURollback) {
+    auto acquisition = acquireCollection(opCtx(),
+                                         {nssShardedCollection1,
+                                          PlacementConcern{{}, shardVersionShardedCollection1},
+                                          repl::ReadConcernArgs(),
+                                          AcquisitionPrerequisites::kRead},
+                                         MODE_X);
+    ASSERT(!acquisition.getCollectionPtr()->isTemporary());
+
+    {
+        CollectionWriter localCatalogWriter(opCtx(), &acquisition);
+        {
+            WriteUnitOfWork wuow(opCtx());
+            localCatalogWriter.getWritableCollection(opCtx())->setIsTemp(opCtx(), true);
+            ASSERT(localCatalogWriter->isTemporary());
+        }
+        ASSERT(!localCatalogWriter->isTemporary());
+    }
+    ASSERT(!acquisition.getCollectionPtr()->isTemporary());
 }
 
 }  // namespace

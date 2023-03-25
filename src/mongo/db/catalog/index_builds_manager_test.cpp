@@ -27,18 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/catalog/index_builds_manager.h"
-
 #include "mongo/db/catalog/catalog_test_fixture.h"
-#include "mongo/db/catalog_raii.h"
+#include "mongo/db/catalog/index_builds_manager.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
-
 namespace {
 
 class IndexBuildsManagerTest : public CatalogTestFixture {

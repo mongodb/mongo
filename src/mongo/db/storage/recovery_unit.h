@@ -795,7 +795,7 @@ public:
     /**
      * Exposed for debugging purposes.
      */
-    State getState() {
+    State getState() const {
         return _getState();
     }
 

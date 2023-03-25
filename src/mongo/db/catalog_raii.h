@@ -435,8 +435,20 @@ private:
  * It is safe to re-use an instance for multiple WriteUnitOfWorks or to destroy it before the active
  * WriteUnitOfWork finishes.
  */
+class ScopedCollectionAcquisition;
+class ScopedLocalCatalogWriteFence;
+
 class CollectionWriter final {
 public:
+    // This constructor indicates to the shard role subsystem that the subsequent code enteres into
+    // local DDL land and that the content of the local collection should not be trusted until it
+    // goes out of scope.
+    //
+    // See the comments on ScopedCollectionAcquisition for more details.
+    //
+    // TODO (SERVER-73766): Only this constructor should remain in use
+    CollectionWriter(OperationContext* opCtx, ScopedCollectionAcquisition* acquisition);
+
     // Gets the collection from the catalog for the provided uuid
     CollectionWriter(OperationContext* opCtx, const UUID& uuid);
     // Gets the collection from the catalog for the provided namespace string
@@ -477,6 +489,11 @@ public:
     Collection* getWritableCollection(OperationContext* opCtx);
 
 private:
+    // This group of values is only operated on for code paths that go through the
+    // `ScopedCollectionAcquisition` constructor.
+    ScopedCollectionAcquisition* _acquisition;
+    std::unique_ptr<ScopedLocalCatalogWriteFence> _fence;
+
     // If this class is instantiated with the constructors that take UUID or nss we need somewhere
     // to store the CollectionPtr used. But if it is instantiated with an AutoGetCollection then the
     // lifetime of the object is managed there. To unify the two code paths we have a pointer that

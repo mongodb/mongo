@@ -283,7 +283,7 @@ std::vector<ScopedCollectionOrViewAcquisition> acquireResolvedCollectionsOrViews
                 prerequisites.uuid = collectionPtr->uuid();
             }
 
-            const shard_role_details::AcquiredCollection& acquiredCollection =
+            shard_role_details::AcquiredCollection& acquiredCollection =
                 getOrMakeTransactionResources(opCtx).addAcquiredCollection(
                     {prerequisites,
                      std::move(acquisitionRequest.second.dbLock),
@@ -339,6 +339,13 @@ CollectionAcquisitionRequest CollectionAcquisitionRequest::fromOpCtx(
 
     return CollectionAcquisitionRequest(
         nss, {oss.getDbVersion(nss.db()), oss.getShardVersion(nss)}, readConcern, operationType);
+}
+
+const UUID& ScopedCollectionAcquisition::uuid() const {
+    invariant(exists(),
+              str::stream() << "Collection " << nss()
+                            << " doesn't exist, so its UUID cannot be obtained");
+    return *_acquiredCollection.prerequisites.uuid;
 }
 
 const ScopedCollectionDescription& ScopedCollectionAcquisition::getShardingDescription() const {
@@ -504,11 +511,13 @@ std::vector<ScopedCollectionOrViewAcquisition> acquireCollectionsOrViewsWithoutT
 
 ScopedCollectionAcquisition acquireCollectionForLocalCatalogOnlyWithPotentialDataLoss(
     OperationContext* opCtx, const NamespaceString& nss, LockMode mode) {
+    invariant(!OperationShardingState::isComingFromRouter(opCtx));
+
     auto& txnResources = getOrMakeTransactionResources(opCtx);
     txnResources.assertNoAcquiredCollections();
 
-    auto dbLock =
-        std::make_shared<Lock::DBLock>(opCtx, nss.db(), isSharedLockMode(mode) ? MODE_IS : MODE_IX);
+    auto dbLock = std::make_shared<Lock::DBLock>(
+        opCtx, nss.dbName(), isSharedLockMode(mode) ? MODE_IS : MODE_IX);
     Lock::CollectionLock collLock(opCtx, nss, mode);
 
     auto collOrView = acquireLocalCollectionOrView(
@@ -522,21 +531,54 @@ ScopedCollectionAcquisition acquireCollectionForLocalCatalogOnlyWithPotentialDat
 
     auto& coll = std::get<CollectionPtr>(collOrView);
 
-    const shard_role_details::AcquiredCollection& acquiredCollection =
-        txnResources.addAcquiredCollection(
-            {AcquisitionPrerequisites(
-                 nss,
-                 coll ? boost::optional<UUID>(coll->uuid()) : boost::none,
-                 AcquisitionPrerequisites::kLocalCatalogOnlyWithPotentialDataLoss,
-                 AcquisitionPrerequisites::OperationType::kWrite,
-                 AcquisitionPrerequisites::ViewMode::kMustBeCollection),
-             std::move(dbLock),
-             std::move(collLock),
-             boost::none,
-             boost::none,
-             std::move(coll)});
+    shard_role_details::AcquiredCollection& acquiredCollection = txnResources.addAcquiredCollection(
+        {AcquisitionPrerequisites(nss,
+                                  coll ? boost::optional<UUID>(coll->uuid()) : boost::none,
+                                  AcquisitionPrerequisites::kLocalCatalogOnlyWithPotentialDataLoss,
+                                  AcquisitionPrerequisites::OperationType::kWrite,
+                                  AcquisitionPrerequisites::ViewMode::kMustBeCollection),
+         std::move(dbLock),
+         std::move(collLock),
+         boost::none,
+         boost::none,
+         std::move(coll)});
 
     return ScopedCollectionAcquisition(opCtx, acquiredCollection);
+}
+
+ScopedLocalCatalogWriteFence::ScopedLocalCatalogWriteFence(OperationContext* opCtx,
+                                                           ScopedCollectionAcquisition* acquisition)
+    : _opCtx(opCtx), _acquiredCollection(&acquisition->_acquiredCollection) {
+    // Clear the collectionPtr from the acquisition to indicate that it should not be used until the
+    // caller is done with the DDL modifications
+    _acquiredCollection->collectionPtr = CollectionPtr();
+
+    // OnCommit, there is nothing to do because the caller is not allowed to use the collection in
+    // the scope of the ScopedLocalCatalogWriteFence and the destructor will take care of updating
+    // the acquisition to point to the latest changed value.
+    opCtx->recoveryUnit()->onRollback(
+        [acquiredCollection = _acquiredCollection](OperationContext* opCtx) mutable {
+            // OnRollback, the acquired collection must be set to reference the previously
+            // established catalog snapshot
+            _updateAcquiredLocalCollection(opCtx, acquiredCollection);
+        });
+}
+
+ScopedLocalCatalogWriteFence::~ScopedLocalCatalogWriteFence() {
+    _updateAcquiredLocalCollection(_opCtx, _acquiredCollection);
+}
+
+void ScopedLocalCatalogWriteFence::_updateAcquiredLocalCollection(
+    OperationContext* opCtx, shard_role_details::AcquiredCollection* acquiredCollection) {
+    try {
+        auto collectionOrView =
+            acquireLocalCollectionOrView(opCtx, acquiredCollection->prerequisites);
+        invariant(std::holds_alternative<CollectionPtr>(collectionOrView));
+
+        acquiredCollection->collectionPtr = std::move(std::get<CollectionPtr>(collectionOrView));
+    } catch (...) {
+        fassertFailedWithStatus(737661, exceptionToStatus());
+    }
 }
 
 YieldedTransactionResources::~YieldedTransactionResources() {
