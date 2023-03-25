@@ -2,7 +2,7 @@
  * Verifies the transitionToCatalogShard feature flag guards running the catalog shard transition
  * commands.
  *
- * @tags: [requires_fcv_63]
+ * @tags: [requires_fcv_70]
  */
 (function() {
 "use strict";

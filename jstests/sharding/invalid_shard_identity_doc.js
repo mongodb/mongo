@@ -3,8 +3,9 @@
  * allowed for the server's cluster role.
  *
  * @tags: [
- *   requires_fcv_63,
+ *   requires_fcv_70,
  *   featureFlagCatalogShard,
+ *   featureFlagTransitionToCatalogShard,
  * ]
  */
 (function() {

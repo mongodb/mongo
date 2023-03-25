@@ -243,12 +243,12 @@ TEST_F(VectorClockConfigServerTest, GossipInInternal) {
                  false,
                  transport::Session::kInternalClient);
 
-    // On config servers, gossip in from internal clients should update $clusterTime, but not
-    // $configTime or $topologyTime.
+    // On config servers, gossip in from internal clients should update $clusterTime, $configTime,
+    // and $topologyTime.
     auto afterTime = vc->getTime();
     ASSERT_EQ(afterTime.clusterTime().asTimestamp(), Timestamp(2, 2));
-    ASSERT_EQ(afterTime.configTime().asTimestamp(), configTime.asTimestamp());
-    ASSERT_EQ(afterTime.topologyTime().asTimestamp(), topologyTime.asTimestamp());
+    ASSERT_EQ(afterTime.configTime().asTimestamp(), Timestamp(2, 2));
+    ASSERT_EQ(afterTime.topologyTime().asTimestamp(), Timestamp(2, 2));
 
     vc->gossipIn(nullptr,
                  BSON("$clusterTime"
@@ -259,8 +259,20 @@ TEST_F(VectorClockConfigServerTest, GossipInInternal) {
 
     auto afterTime2 = vc->getTime();
     ASSERT_EQ(afterTime2.clusterTime().asTimestamp(), Timestamp(2, 2));
-    ASSERT_EQ(afterTime2.configTime().asTimestamp(), configTime.asTimestamp());
-    ASSERT_EQ(afterTime2.topologyTime().asTimestamp(), topologyTime.asTimestamp());
+    ASSERT_EQ(afterTime2.configTime().asTimestamp(), Timestamp(2, 2));
+    ASSERT_EQ(afterTime2.topologyTime().asTimestamp(), Timestamp(2, 2));
+
+    vc->gossipIn(nullptr,
+                 BSON("$clusterTime"
+                      << BSON("clusterTime" << Timestamp(3, 3) << "signature" << dummySignature)
+                      << "$configTime" << Timestamp(3, 3) << "$topologyTime" << Timestamp(3, 3)),
+                 false,
+                 transport::Session::kInternalClient);
+
+    auto afterTime3 = vc->getTime();
+    ASSERT_EQ(afterTime3.clusterTime().asTimestamp(), Timestamp(3, 3));
+    ASSERT_EQ(afterTime3.configTime().asTimestamp(), Timestamp(3, 3));
+    ASSERT_EQ(afterTime3.topologyTime().asTimestamp(), Timestamp(3, 3));
 }
 
 TEST_F(VectorClockConfigServerTest, GossipInExternal) {

@@ -33,9 +33,11 @@ feature_flags:
     featureFlagCatalogShard:
         description: "Feature flag for enabling shared config server/shard server cluster role"
         cpp_varname: gFeatureFlagCatalogShard
-        default: false
+        default: true
+        version: 7.0
 
     featureFlagTransitionToCatalogShard:
         description: "Feature flag for transitioning a config server in and out of catalog shard mode"
         cpp_varname: gFeatureFlagTransitionToCatalogShard
-        default: false
+        default: true
+        version: 7.0

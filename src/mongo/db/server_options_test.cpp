@@ -941,28 +941,6 @@ TEST(ClusterRole, Equality) {
 
     ASSERT_TRUE(ClusterRole(ClusterRole::ConfigServer) != ClusterRole::None);
     ASSERT_TRUE(ClusterRole(ClusterRole::ConfigServer) == ClusterRole::ConfigServer);
-    ASSERT_TRUE(ClusterRole(ClusterRole::ConfigServer) != ClusterRole::ShardServer);
-
-    ASSERT_TRUE(ClusterRole(ClusterRole::ShardServer) != ClusterRole::None);
-    ASSERT_TRUE(ClusterRole(ClusterRole::ShardServer) != ClusterRole::ConfigServer);
-    ASSERT_TRUE(ClusterRole(ClusterRole::ShardServer) == ClusterRole::ShardServer);
-
-    ASSERT_TRUE(ClusterRole(ClusterRole::ShardServer).isShardRole());
-    ASSERT_FALSE(ClusterRole(ClusterRole::ConfigServer).isShardRole());
-
-    ASSERT_TRUE(ClusterRole(ClusterRole::ShardServer).isExclusivelyShardRole());
-    ASSERT_FALSE(ClusterRole(ClusterRole::ConfigServer).isExclusivelyShardRole());
-
-    ASSERT_TRUE(ClusterRole(ClusterRole::ConfigServer).isExclusivelyConfigSvrRole());
-
-    RAIIServerParameterControllerForTest controller("featureFlagCatalogShard", true);
-
-    ASSERT_TRUE(ClusterRole(ClusterRole::None) == ClusterRole::None);
-    ASSERT_TRUE(ClusterRole(ClusterRole::None) != ClusterRole::ConfigServer);
-    ASSERT_TRUE(ClusterRole(ClusterRole::None) != ClusterRole::ShardServer);
-
-    ASSERT_TRUE(ClusterRole(ClusterRole::ConfigServer) != ClusterRole::None);
-    ASSERT_TRUE(ClusterRole(ClusterRole::ConfigServer) == ClusterRole::ConfigServer);
     ASSERT_TRUE(ClusterRole(ClusterRole::ConfigServer) == ClusterRole::ShardServer);
 
     ASSERT_TRUE(ClusterRole(ClusterRole::ShardServer) != ClusterRole::None);

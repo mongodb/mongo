@@ -526,8 +526,6 @@ TEST_F(ShardServerCatalogCacheLoaderTest, CollAndChunkTasksConsistency) {
 }
 
 TEST_F(ShardServerCatalogCacheLoaderTest, setFCVForGetChunks) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagCatalogShard", true);
-
     const auto kOriginalRole = serverGlobalParams.clusterRole;
     const auto kOriginalFCV = serverGlobalParams.featureCompatibility.getVersion();
 
@@ -592,8 +590,6 @@ TEST_F(ShardServerCatalogCacheLoaderTest, setFCVForGetChunks) {
 }
 
 TEST_F(ShardServerCatalogCacheLoaderTest, setFCVForGetDatabase) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagCatalogShard", true);
-
     const auto kOriginalRole = serverGlobalParams.clusterRole;
     const auto kOriginalFCV = serverGlobalParams.featureCompatibility.getVersion();
 

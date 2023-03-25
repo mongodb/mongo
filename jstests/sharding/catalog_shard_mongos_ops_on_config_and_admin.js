@@ -2,7 +2,7 @@
  * Tests to make sure that the mongos does not allow certain commands on the config and admin
  * databases when catalogShard is enabled.
  *
- * @tags: [featureFlagCatalogShard]
+ * @tags: [requires_fcv_70, featureFlagCatalogShard, featureFlagTransitionToCatalogShard]
  */
 (function() {
 "use strict";

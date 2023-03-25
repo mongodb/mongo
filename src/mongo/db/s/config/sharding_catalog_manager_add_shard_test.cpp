@@ -1456,7 +1456,6 @@ TEST_F(AddShardTest, SuccessfullyAddReplicaSet) {
 TEST_F(AddShardTest, SuccessfullyAddConfigShard) {
     std::unique_ptr<RemoteCommandTargeterMock> targeter(
         std::make_unique<RemoteCommandTargeterMock>());
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagCatalogShard", true);
     ConnectionString connString =
         assertGet(ConnectionString::parse("mySet/host1:12345,host2:12345"));
     targeter->setConnectionStringReturnValue(connString);

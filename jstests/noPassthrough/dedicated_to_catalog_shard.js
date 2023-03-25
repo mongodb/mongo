@@ -2,7 +2,7 @@
  * Tests catalog shard topology.
  *
  * @tags: [
- *   requires_fcv_63,
+ *   requires_fcv_70,
  *   featureFlagCatalogShard,
  *   featureFlagTransitionToCatalogShard,
  * ]

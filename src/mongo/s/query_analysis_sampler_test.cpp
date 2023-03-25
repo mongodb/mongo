@@ -514,7 +514,7 @@ TEST_F(QueryAnalysisSamplerTest, CanGetOnStandaloneReplicaSet) {
     QueryAnalysisSampler::get(operationContext());
 }
 
-DEATH_TEST_F(QueryAnalysisSamplerTest, CannotGetOnConfigServer, "invariant") {
+TEST_F(QueryAnalysisSamplerTest, CanGetOnConfigServer) {
     setUpRole(ClusterRole::ConfigServer);
     QueryAnalysisSampler::get(operationContext());
 }
