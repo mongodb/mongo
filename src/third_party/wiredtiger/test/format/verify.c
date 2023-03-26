@@ -273,7 +273,8 @@ table_verify_mirror(WT_CONNECTION *conn, TABLE *base, TABLE *table, const char *
             testutil_check(table_cursor->get_value(table_cursor, &table_value));
 
             if (base_keyno != table_keyno || base_value.size != table_value.size ||
-              memcmp(base_value.data, table_value.data, base_value.size) != 0) {
+              (table_value.size != 0 &&
+                memcmp(base_value.data, table_value.data, base_value.size) != 0)) {
                 table_mirror_fail_msg(session, checkpoint, base, base_keyno, &base_key, &base_value,
                   table, table_keyno, &table_key, &table_value, last_match);
 
