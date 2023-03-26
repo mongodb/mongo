@@ -333,5 +333,5 @@ echo '};') >> $fc
 echo
 echo "#define V_ELEMENT_COUNT $n") >> $fh
 
-sh ../../dist/s_clang_format test/format/$fc
-sh ../../dist/s_clang_format test/format/$fh
+../../dist/s_clang_format test/format/$fc
+../../dist/s_clang_format test/format/$fh
