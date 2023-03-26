@@ -79,6 +79,12 @@ config_choice(
 )
 
 config_bool(
+    ENABLE_ANTITHESIS
+    "Enable the Antithesis random library"
+    DEFAULT OFF
+)
+
+config_bool(
     WT_POSIX
     "Is a posix platform"
     DEFAULT ON
@@ -412,4 +418,8 @@ if(WT_WIN)
         # Use the multithread, static version of the run-time library.
         add_compile_options(/MT)
     endif()
+endif()
+
+if(ENABLE_ANTITHESIS)
+    add_compile_options(-fsanitize-coverage=trace-pc-guard)
 endif()

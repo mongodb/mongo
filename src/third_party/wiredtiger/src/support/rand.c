@@ -45,6 +45,9 @@
 #undef M_Z
 #define M_Z(r) r.x.z
 
+#ifdef ENABLE_ANTITHESIS
+#include "instrumentation.h"
+#endif
 /*
  * __wt_random_init --
  *     Initialize return of a 32-bit pseudo-random number.
@@ -113,6 +116,9 @@ __wt_random_init_seed(WT_SESSION_IMPL *session, WT_RAND_STATE volatile *rnd_stat
 uint32_t
 __wt_random(WT_RAND_STATE volatile *rnd_state) WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
+#ifdef ENABLE_ANTITHESIS
+    return (uint32_t)(fuzz_get_random());
+#else
     WT_RAND_STATE rnd;
     uint32_t w, z;
 
@@ -141,4 +147,5 @@ __wt_random(WT_RAND_STATE volatile *rnd_state) WT_GCC_FUNC_ATTRIBUTE((visibility
     *rnd_state = rnd;
 
     return ((z << 16) + (w & 65535));
+#endif
 }

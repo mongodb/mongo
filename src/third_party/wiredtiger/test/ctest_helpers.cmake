@@ -97,6 +97,10 @@ function(create_test_executable target)
         target_link_libraries(${target} ${CREATE_TEST_LIBS})
     endif()
 
+    if(ENABLE_ANTITHESIS)
+        target_link_libraries(${target} wt::voidstar)
+    endif()
+
     if(WT_LINUX OR WT_DARWIN)
         # Link the final test executable with a relative runpath to the
         # top-level build directory. This being the build location of the

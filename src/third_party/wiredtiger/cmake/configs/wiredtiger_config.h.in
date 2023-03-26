@@ -103,6 +103,9 @@
   #cmakedefine HAVE_LIBTCMALLOC 1
 #endif
 
+/* Define to 1 if the user has set enable antithesis. */
+#cmakedefine ENABLE_ANTITHESIS 1
+
 /* Define to 1 if you have the `z' library (-lz). */
 #cmakedefine HAVE_LIBZ 1
 

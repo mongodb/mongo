@@ -1,0 +1,13 @@
+# A reasonable configuration for stress testing.
+btree.huffman_value=0
+cache=50:100
+cache.minimum=20
+runs.rows=100000:200000
+runs.tables=3:8
+runs.threads=4:32
+runs.timer=5:8
+runs.type=row,var
+# Disable in memory while making progress on setup with Antithesis
+runs.in_memory=0
+# Always disable directio
+disk.direct_io=0
