@@ -40,7 +40,7 @@ st = new ShardingTest({catalogShard: false});
 mongosAdminDB = st.s.getDB("admin");
 
 assert.commandWorked(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
-assert.commandFailedWithCode(mongosAdminDB.runCommand({transitionToCatalogShard: 1}), 5563604);
+assert.commandFailedWithCode(mongosAdminDB.runCommand({transitionToCatalogShard: 1}), 7467202);
 
 st.stop();
 })();
