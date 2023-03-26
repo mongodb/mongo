@@ -253,6 +253,8 @@ functions:
           virtualenv -p python3 venv
           source venv/bin/activate
           pip3 install boto3
+          pip3 install azure-storage-blob
+          pip3 install google-cloud-storage
 
           # Run Python testing for all tiered tests.
           ${test_env_vars|} python3 ../test/suite/run.py -j $(nproc) ${tiered_storage_test_name}

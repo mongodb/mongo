@@ -45,8 +45,9 @@ def get_auth_token(storage_source):
         secret_key = os.getenv('aws_sdk_s3_ext_secret_key')
         if access_key and secret_key:
             auth_token = access_key + ";" + secret_key
-    if storage_source == 'azure_store': 
-        auth_token = os.getenv('AZURE_STORAGE_CONNECTION_STRING')
+    if storage_source == 'azure_store':
+        if (os.getenv('AZURE_STORAGE_CONNECTION_STRING') != None):
+            auth_token = '"' + os.getenv('AZURE_STORAGE_CONNECTION_STRING') + '"'
     if storage_source == 'gcp_store':
         auth_token = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
     return auth_token
@@ -164,7 +165,7 @@ def gen_tiered_storage_sources(random_prefix='', test_name='', tiered_only=False
             is_tiered_shared = tiered_shared,
             is_local_storage = False,
             has_cache = False,
-            auth_token = "",
+            auth_token = get_auth_token('azure_store'),
             bucket = get_bucket_name('azure_store', 0),
             bucket1 = get_bucket_name('azure_store', 1),
             bucket_prefix = generate_prefix(random_prefix, test_name),
@@ -260,22 +261,49 @@ class TieredConfigMixin:
         extlist.extension('storage_sources', self.ss_name + config)
 
     def download_objects(self, bucket_name, prefix):
-        import boto3
-        # The bucket from the storage source is expected to be a name and a region, separated by a 
-        # semi-colon. eg: 'abcd;ap-southeast-2'.
-        bucket_name, region = bucket_name.split(';')
-        
-        # Get the bucket resource and list the objects within that bucket that match the prefix for a
-        # given test.
-        s3 = boto3.resource('s3')
-        bucket = s3.Bucket(bucket_name)
-        objects = list(bucket.objects.filter(Prefix=prefix))
+        if (not self.is_tiered or self.is_local_storage):
+            return
 
         # Create a directory within the test directory to download the objects to.
-        s3_object_files_path = 's3_objects/'
-        if not os.path.exists(s3_object_files_path):
-            os.makedirs(s3_object_files_path)
+        object_files_path = 'objects/'
+        if not os.path.exists(object_files_path):
+            os.makedirs(object_files_path)
 
-        for o in objects:
-            filename = s3_object_files_path + '/' + o.key.split('/')[-1]
-            bucket.download_file(o.key, filename)
+        if (self.ss_name == 's3_store'):
+            import boto3
+            # The bucket from the storage source is expected to be a name and a region, separated by a 
+            # semi-colon. eg: 'abcd;ap-southeast-2'.
+            bucket_name, region = bucket_name.split(';')
+            
+            # Get the bucket resource and list the objects within that bucket that match the prefix for a
+            # given test.
+            s3 = boto3.resource('s3')
+            bucket = s3.Bucket(bucket_name)
+            objects = list(bucket.objects.filter(Prefix=prefix))
+
+            for o in objects:
+                file_path = object_files_path + '/' + o.key.split('/')[-1]
+                bucket.download_file(o.key, file_path)
+        elif (self.ss_name == 'gcp_store'):
+            from google.cloud import storage
+            
+            storage_client = storage.Client()
+            blobs = storage_client.list_blobs(bucket_name, prefix=prefix)
+
+            for blob in blobs:
+                file_path = object_files_path + '/' + blob.name.split('/')[-1]
+                blob.download_to_filename(file_path)
+        elif (self.ss_name == 'azure_store'):
+            from azure.storage.blob import BlobServiceClient
+
+            blob_service_client = BlobServiceClient.from_connection_string(self.auth_token) 
+            container_client = blob_service_client.get_container_client(container=bucket_name) 
+            blob_list = container_client.list_blobs(name_starts_with=prefix)
+
+            for blob in blob_list:
+                file_path = object_files_path + '/' + blob.name.split('/')[-1]
+                with open(file=file_path, mode="wb") as download_file:
+                    download_file.write(container_client.download_blob(blob.name).readall())
+        else:
+            raise Exception("Storage source does not exist within the download object function")
+
