@@ -237,6 +237,20 @@ env.Library(
 )
 
 env.Library(
+    target='pinned_connection_task_executor',
+    source=[
+        'pinned_connection_task_executor.cpp',
+    ],
+    LIBDEPS=[
+        'scoped_task_executor',
+        'task_executor_interface',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/client/async_client',
+    ],
+)
+
+env.Library(
     target='network_interface_thread_pool',
     source=[
         'network_interface_thread_pool.cpp',
@@ -356,6 +370,7 @@ env.CppUnitTest(
         'mock_network_fixture_test.cpp',
         'network_interface_mock_test.cpp',
         'network_interface_mock_test_fixture.cpp',
+        'pinned_connection_task_executor_test.cpp',
         'scoped_task_executor_test.cpp',
         'split_timer_test.cpp',
         'task_executor_cursor_test.cpp',
@@ -372,6 +387,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
         '$BUILD_DIR/mongo/s/mongos_server_parameters',
         "$BUILD_DIR/mongo/s/sharding_router_test_fixture",
+        '$BUILD_DIR/mongo/transport/message_compressor',
         '$BUILD_DIR/mongo/util/clock_source_mock',
         'async_rpc',
         'connection_pool_executor',
@@ -382,6 +398,7 @@ env.CppUnitTest(
         'network_interface_mock',
         'network_interface_tl',
         'network_test_env',
+        'pinned_connection_task_executor',
         'scoped_task_executor',
         'task_executor_cursor',
         'thread_pool_task_executor',
