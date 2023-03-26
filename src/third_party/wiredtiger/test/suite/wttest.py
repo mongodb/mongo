@@ -418,6 +418,10 @@ class WiredTigerTestCase(unittest.TestCase):
     def getTierCachePercent(self):
         return self.platform_api.getTierCachePercent()
 
+    # Return the tier storage source for this testcase, or 'dir_store' if there is none.
+    def getTierStorageSource(self):
+        return self.platform_api.getTierStorageSource()
+
     def __str__(self):
         # when running with scenarios, if the number_scenarios() method
         # is used, then each scenario is given a number, which can

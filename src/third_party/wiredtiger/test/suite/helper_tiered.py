@@ -136,7 +136,7 @@ def gen_tiered_storage_sources(random_prefix='', test_name='', tiered_only=False
             bucket_prefix2 = 'pfx2_',
             num_ops=100,
             ss_name = 'dir_store')),
-        ('s3', dict(is_tiered = True,
+        ('s3_store', dict(is_tiered = True,
             is_tiered_shared = tiered_shared,
             is_local_storage = False,
             has_cache = True,

@@ -57,24 +57,40 @@ from __future__ import print_function
 
 import os, unittest, wthooks
 from wttest import WiredTigerTestCase
+from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources
 
 # These are the hook functions that are run when particular APIs are called.
 
 # Add the local storage extension whenever we call wiredtiger_open
 def wiredtiger_open_tiered(ignored_self, args):
-    auth_token = "test_token"
 
-    # The bucket name, when it appears in configuration, is relative to the database home.
-    # Also build the path name to the bucket, including the home, so it can be created.
-    bucket = "mybucket"
-    bucketpath = bucket
-    extension_name = "dir_store"
-    prefix = "pfx-"
+    tiered_storage_sources = gen_tiered_storage_sources()
+    testcase = WiredTigerTestCase.currentTestCase()
+    extension_name = testcase.getTierStorageSource()
+
+    auth_token = None
+    bucket = None
+    prefix = None
+    valid_storage_source = False
+    # Construct the configuration string based on the storage source.
+    for storage_details in tiered_storage_sources:
+        if (testcase.getTierStorageSource() == storage_details[0]):
+            valid_storage_source = True
+            if storage_details[1].__contains__("auth_token"):
+                auth_token = storage_details[1].get("auth_token")
+                assert auth_token != None, "Bucket access keys environment variables are not set"
+            if storage_details[1].__contains__("bucket"):
+                bucket = storage_details[1].get("bucket")
+            if storage_details[1].__contains__("bucket_prefix"):
+                prefix = storage_details[1].get("bucket_prefix")
+
+    if valid_storage_source == False:
+        raise AssertionError('Invalid storage source passed in the argument.')
+
     curconfig = args[-1]
     homedir = args[0]
 
-    testcase = WiredTigerTestCase.currentTestCase()
-
+    bucketpath = bucket
     # If there is already tiered storage enabled, we shouldn't enable it here.
     # We might attempt to let the wiredtiger_open complete without alteration,
     # however, we alter several other API methods that would do weird things with
@@ -95,7 +111,7 @@ def wiredtiger_open_tiered(ignored_self, args):
         testcase._readonlyTieredTest = True
 
     if homedir != None:
-        bucketpath = os.path.join(homedir, bucketpath)
+        bucketpath = os.path.join(homedir, bucket)
     extension_libs = WiredTigerTestCase.findExtension('storage_sources', extension_name)
     if len(extension_libs) == 0:
         raise Exception(extension_name + ' storage source extension not found')
@@ -389,6 +405,7 @@ class TieredPlatformAPI(wthooks.WiredTigerHookPlatformAPI):
     def __init__(self, arg=None):
         self.tier_share_percent = 0
         self.tier_cache_percent = 0
+        self.tier_storage_source = 'dir_store'
         params = []
         if arg:
             params = [config.split('=') for config in arg.split(',')]
@@ -398,6 +415,8 @@ class TieredPlatformAPI(wthooks.WiredTigerHookPlatformAPI):
                 self.tier_share_percent = int(param_value)
             elif param_key == 'tier_populate_cache':
                 self.tier_cache_percent = int(param_value)
+            elif param_key == 'tier_storage_source':
+                self.tier_storage_source = param_value
 
     def tableExists(self, name):
         for i in range(1, 9):
@@ -417,6 +436,9 @@ class TieredPlatformAPI(wthooks.WiredTigerHookPlatformAPI):
 
     def getTierCachePercent(self):
         return self.tier_cache_percent
+
+    def getTierStorageSource(self):
+        return self.tier_storage_source
 
 # Every hook file must have a top level initialize function,
 # returning a list of WiredTigerHook objects.

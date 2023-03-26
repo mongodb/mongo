@@ -66,7 +66,7 @@ class Operation:
         return f"{self.__dict__}"
 
     def __extract_file(self, line):
-        matches = re.search('file:([\w_\.]+)', line)
+        matches = re.search('(?:(file|tiered)):([\w_\.]+)', line)
         if matches is None:
             raise Exception(f"failed to extract a filename from {line}")
         return matches.group(1)

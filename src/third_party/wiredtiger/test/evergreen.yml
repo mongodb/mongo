@@ -2238,6 +2238,27 @@ tasks:
         vars:
           unit_test_args: -v 2 --hook tiered
 
+  - name: unit-test-hook-tiered-s3
+    tags: ["python"]
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          <<: *configure_flags_tiered_storage_s3
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/cmake_build"
+          shell: bash
+          include_expansions_in_env:
+            - aws_sdk_s3_ext_access_key
+            - aws_sdk_s3_ext_secret_key
+          script: |
+            set -o errexit
+            set -o verbose
+
+            ${test_env_vars|} ${python_binary|python3} ../test/suite/run.py ${unit_test_args|-v 2} --hook tiered=tier_storage_source='s3_store' ${smp_command|} 2>&1
+
+
   - name: unit-test-hook-tiered-timestamp
     tags: ["python"]
     depends_on:
@@ -5044,6 +5065,7 @@ buildvariants:
     - name: ".tiered_unittest"
     - name: bench-tiered-push-pull-s3
     - name: csuite-timestamp-abort-test-s3
+    - name: unit-test-hook-tiered-s3
 
 - name: ubuntu2004-asan
   display_name: "! Ubuntu 20.04 ASAN"
