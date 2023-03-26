@@ -1518,8 +1518,6 @@ struct __wt_addr_copy {
 
     WT_PAGE_DELETED del; /* Fast-truncate page information */
     bool del_set;
-
-    WT_PAGE_STAT ps; /* Page information including row and byte counts */
 };
 
 /*

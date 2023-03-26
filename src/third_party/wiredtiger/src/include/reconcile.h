@@ -62,8 +62,6 @@ struct __wt_rec_chunk {
     /* For fixed-length column store, track where the time windows start and how many we have. */
     uint32_t aux_start_offset;
     uint32_t auxentries;
-
-    WT_PAGE_STAT ps;
 };
 
 /*
@@ -324,8 +322,6 @@ struct __wt_reconcile {
      */
     bool hs_clear_on_tombstone;
     WT_CURSOR *hs_cursor;
-
-    WT_PAGE_STAT ps;
 };
 
 typedef struct {

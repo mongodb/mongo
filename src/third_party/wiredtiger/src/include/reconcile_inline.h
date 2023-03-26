@@ -385,16 +385,14 @@ __wt_rec_cell_build_addr(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_ADDR *add
         WT_ASSERT(session, addr != NULL);
         val->buf.data = addr->addr;
         val->buf.size = addr->size;
-        val->cell_len = __wt_cell_pack_addr(
-          session, &val->cell, cell_type, recno, page_del, &addr->ps, ta, val->buf.size);
     } else {
         WT_ASSERT(session, addr == NULL);
         val->buf.data = vpack->data;
         val->buf.size = vpack->size;
-        val->cell_len = __wt_cell_pack_addr(
-          session, &val->cell, cell_type, recno, page_del, &vpack->ps, ta, val->buf.size);
     }
 
+    val->cell_len =
+      __wt_cell_pack_addr(session, &val->cell, cell_type, recno, page_del, ta, val->buf.size);
     val->len = val->cell_len + val->buf.size;
 }
 

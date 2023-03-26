@@ -1008,7 +1008,6 @@ __rec_split_chunk_init(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REC_CHUNK *
     /* Don't touch the key item memory, that memory is reused. */
     chunk->key.size = 0;
     chunk->entries = 0;
-    WT_PAGE_STAT_INIT(&chunk->ps);
     WT_TIME_AGGREGATE_INIT_MERGE(&chunk->ta);
 
     chunk->min_recno = WT_RECNO_OOB;
@@ -1926,13 +1925,6 @@ __rec_split_write_header(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REC_CHUNK
       __wt_process.fast_truncate_2022)
         F_SET(dsk, WT_PAGE_FT_UPDATE);
 
-    /* Set the page stat cell information flag. */
-    if (WT_PAGE_STAT_HAS_BYTE_COUNT(&chunk->ps))
-        F_SET(dsk, WT_PAGE_STAT_BYTE_COUNT);
-
-    if (WT_PAGE_STAT_HAS_ROW_COUNT(&chunk->ps))
-        F_SET(dsk, WT_PAGE_STAT_ROW_COUNT);
-
     dsk->unused = 0;
     dsk->version = WT_PAGE_VERSION_TS;
 
@@ -2123,8 +2115,6 @@ __rec_split_write(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_REC_CHUNK *chunk
     /* Make sure there's enough room for another write. */
     WT_RET(__wt_realloc_def(session, &r->multi_allocated, r->multi_next + 1, &r->multi));
     multi = &r->multi[r->multi_next++];
-
-    WT_PAGE_STAT_COPY(&multi->addr.ps, &chunk->ps);
 
     /* Initialize the address (set the addr type for the parent). */
     WT_TIME_AGGREGATE_COPY(&multi->addr.ta, &chunk->ta);
