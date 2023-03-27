@@ -99,7 +99,7 @@ public:
     }
 
     size_t getApproximateSize() const {
-        return sizeof(this) + (_indexKeyGen ? _indexKeyGen->getApproximateSize() : 0) +
+        return sizeof(*this) + (_indexKeyGen ? _indexKeyGen->getApproximateSize() : 0) +
             _sortKeyTreeRoot.getApproximateSize() + _sortSpecWithoutMeta.objsize() +
             _localObjStorage.objsize();
     }
@@ -148,7 +148,7 @@ private:
         }
 
         size_t getApproximateSize() const {
-            size_t size = sizeof(this) + name.size();
+            size_t size = sizeof(*this) + name.size();
             for (auto& c : children) {
                 size += c->getApproximateSize();
             }
