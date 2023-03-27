@@ -10,6 +10,7 @@
 (function() {
 "use strict";
 
+load("jstests/libs/feature_flag_util.js");
 load("jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js");
 
 // Make sure we're testing with no implicit session.
@@ -364,8 +365,9 @@ const testCases = [
             {_id: 1, x: xFieldValShard1_1, y: yFieldVal}
         ],
 
-        replacementDocTest: true,  // Replacement tests validate that the final replacement
-                                   // operation was only applied once.
+        replacementDocTest: true,      // Replacement tests validate that the final replacement
+                                       // operation was only applied once.
+        wouldChangeOwningShard: true,  // Can only run in retryable write or transaction.
         cmdObj: {
             update: collName,
             updates: [{q: {y: yFieldVal}, u: {x: xFieldValShard0_2, y: yFieldVal, a: setFieldVal}}]
@@ -385,9 +387,17 @@ const configurations = [
     WriteWithoutShardKeyTestUtil.Configurations.transaction
 ];
 
+const isTxnApiEnabled = FeatureFlagUtil.isEnabled(
+    st.s, "UpdateDocumentShardKeyUsingTransactionApi", undefined /* user */, true /* ignoreFCV */);
+
 configurations.forEach(config => {
     let conn = WriteWithoutShardKeyTestUtil.getClusterConnection(st, config);
     testCases.forEach(testCase => {
+        if (!isTxnApiEnabled && testCase.wouldChangeOwningShard &&
+            (config === WriteWithoutShardKeyTestUtil.Configurations.noSession ||
+             config === WriteWithoutShardKeyTestUtil.Configurations.sessionNotRetryableWrite)) {
+            return;
+        }
         WriteWithoutShardKeyTestUtil.runTestWithConfig(
             conn, testCase, config, WriteWithoutShardKeyTestUtil.OperationType.updateOne);
     });

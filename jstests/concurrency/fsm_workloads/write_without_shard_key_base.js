@@ -18,8 +18,10 @@ load('jstests/concurrency/fsm_libs/extend_workload.js');
 load('jstests/concurrency/fsm_workloads/random_moveChunk_base.js');  // for $config
 load('jstests/concurrency/fsm_workload_helpers/balancer.js');
 
-let acceptableErrors = [ErrorCodes.DuplicateKey];
+let acceptableErrors = [ErrorCodes.DuplicateKey, ErrorCodes.IllegalOperation];
 const duplicateKeyInChangeShardKeyMsg = "Failed to update document's shard key field";
+const wouldChangeOwningShardMsg =
+    "Must run update to document shard key in a transaction or as a retryable write.";
 
 var $config = extendWorkload($config, function($config, $super) {
     $config.threadCount = 10;
@@ -231,6 +233,15 @@ var $config = extendWorkload($config, function($config, $super) {
                         throw e;
                     }
                 }
+
+                // TODO: SERVER-67429 Remove this since we can run in all configurations.
+                // If we have a WouldChangeOwningShard update and we aren't running as a retryable
+                // write or in a transaction, then this is an acceptable error.
+                if (e.code === ErrorCodes.IllegalOperation) {
+                    if (!e.message.includes(wouldChangeOwningShardMsg)) {
+                        throw e;
+                    }
+                }
             } else {
                 throw e;
             }
@@ -270,6 +281,15 @@ var $config = extendWorkload($config, function($config, $super) {
                 // change during a concurrent migration.
                 if (e.code === ErrorCodes.DuplicateKey) {
                     if (!e.message.includes(duplicateKeyInChangeShardKeyMsg)) {
+                        throw e;
+                    }
+                }
+
+                // TODO: SERVER-67429 Remove this since we can run in all configurations.
+                // If we have a WouldChangeOwningShard update and we aren't running as a retryable
+                // write or in a transaction, then this is an acceptable error.
+                if (e.code === ErrorCodes.IllegalOperation) {
+                    if (!e.message.includes(wouldChangeOwningShardMsg)) {
                         throw e;
                     }
                 }

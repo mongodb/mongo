@@ -14,6 +14,7 @@
 (function() {
 "use strict";
 
+load("jstests/libs/feature_flag_util.js");
 load("jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js");
 
 // Make sure we're testing with no implicit session.
@@ -74,9 +75,18 @@ const configurations = [
     WriteWithoutShardKeyTestUtil.Configurations.transaction
 ];
 
+const isTxnApiEnabled = FeatureFlagUtil.isEnabled(
+    st.s, "UpdateDocumentShardKeyUsingTransactionApi", undefined /* user */, true /* ignoreFCV */);
+
 configurations.forEach(config => {
     let conn = WriteWithoutShardKeyTestUtil.getClusterConnection(st, config);
     testCases.forEach(testCase => {
+        if (!isTxnApiEnabled &&
+            (config === WriteWithoutShardKeyTestUtil.Configurations.noSession ||
+             config === WriteWithoutShardKeyTestUtil.Configurations.sessionNotRetryableWrite)) {
+            return;
+        }
+
         WriteWithoutShardKeyTestUtil.runTestWithConfig(conn, testCase, config, testCase.opType);
     });
 });

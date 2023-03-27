@@ -577,6 +577,11 @@ void FindAndModifyCmd::_constructResult(OperationContext* opCtx,
             handleWouldChangeOwningShardError(opCtx, shardId, nss, cmdObj, responseStatus, result);
         } else {
             // TODO SERVER-67429: Remove this branch.
+            uassert(
+                ErrorCodes::IllegalOperation,
+                "Must run update to document shard key in a transaction or as a retryable write. ",
+                txnRouter || isRetryableWrite);
+
             opCtx->setQuerySamplingOptions(QuerySamplingOptions::kOptOut);
 
             if (isRetryableWrite) {
