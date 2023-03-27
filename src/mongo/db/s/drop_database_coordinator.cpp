@@ -40,6 +40,7 @@
 #include "mongo/db/s/shard_metadata_util.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
+#include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/type_shard_database.h"
 #include "mongo/db/transaction/transaction_api.h"
@@ -345,14 +346,16 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                 // ensure we do not delete collections of a different DB
                 if (!_firstExecution &&
                     isDbAlreadyDropped(opCtx, _doc.getDatabaseVersion(), _dbName)) {
-                    // Clear the database sharding state so that all subsequent write operations
-                    // with the old database version will fail due to StaleDbVersion.
-                    // Note: because we are using an scoped critical section it could happen that
-                    // the dbversion being deleted is recovered once we return. It is a rare
-                    // occurence, but it might lead to a situation where the now former primary
-                    // will believe to still be primary.
-                    _clearDatabaseInfoOnPrimary(opCtx);
-                    _clearDatabaseInfoOnSecondaries(opCtx);
+                    if (!_isPre70Compatible()) {
+                        // Clear the database sharding state so that all subsequent write operations
+                        // with the old database version will fail due to StaleDbVersion.
+                        // Note: because we are using an scoped critical section it could happen
+                        // that the dbversion being deleted is recovered once we return. It is a
+                        // rare occurence, but it might lead to a situation where the now former
+                        // primary will believe to still be primary.
+                        _clearDatabaseInfoOnPrimary(opCtx);
+                        _clearDatabaseInfoOnSecondaries(opCtx);
+                    }
                     VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
                     return;  // skip to FlushDatabaseCacheUpdates
                 }
@@ -396,9 +399,24 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                 {
                     // Acquire the database critical section in order to disallow implicit
                     // collection creations from happening concurrently with dropDatabase
-                    const auto critSecReason = BSON("dropDatabase" << _dbName);
-                    auto scopedCritSec = ScopedDatabaseCriticalSection(
-                        opCtx, _dbName.toString(), std::move(critSecReason));
+                    boost::optional<ScopedDatabaseCriticalSection> scopedCritSec;
+                    // Only use the recoverable critical section in new versions.
+                    if (!_isPre70Compatible()) {
+                        auto recoveryService = ShardingRecoveryService::get(opCtx);
+                        recoveryService->acquireRecoverableCriticalSectionBlockWrites(
+                            opCtx,
+                            NamespaceString(_dbName),
+                            _critSecReason,
+                            ShardingCatalogClient::kLocalWriteConcern);
+                        recoveryService->promoteRecoverableCriticalSectionToBlockAlsoReads(
+                            opCtx,
+                            NamespaceString(_dbName),
+                            _critSecReason,
+                            ShardingCatalogClient::kLocalWriteConcern);
+                    } else {
+                        scopedCritSec.emplace(ScopedDatabaseCriticalSection(
+                            opCtx, _dbName.toString(), _critSecReason));
+                    }
 
                     auto dropDatabaseParticipantCmd = ShardsvrDropDatabaseParticipant();
                     dropDatabaseParticipantCmd.setDbName(_dbName);
@@ -456,6 +474,19 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                     VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
                 }
             }))
+        .then([this, executor = executor, anchor = shared_from_this()] {
+            if (!_isPre70Compatible()) {
+                auto opCtxHolder = cc().makeOperationContext();
+                auto* opCtx = opCtxHolder.get();
+                getForwardableOpMetadata().setOn(opCtx);
+                ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
+                    opCtx,
+                    NamespaceString(_dbName),
+                    _critSecReason,
+                    WriteConcerns::kMajorityWriteConcernNoTimeout,
+                    /* throwIfReasonDiffers */ false);
+            }
+        })
         .then([this, executor = executor, anchor = shared_from_this()] {
             auto opCtxHolder = cc().makeOperationContext();
             auto* opCtx = opCtxHolder.get();

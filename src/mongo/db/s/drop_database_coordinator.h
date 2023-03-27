@@ -44,7 +44,8 @@ public:
 
     DropDatabaseCoordinator(ShardingDDLCoordinatorService* service, const BSONObj& initialState)
         : RecoverableShardingDDLCoordinator(service, "DropDatabaseCoordinator", initialState),
-          _dbName(nss().db()) {}
+          _dbName(nss().db()),
+          _critSecReason(BSON("dropDatabase" << _dbName)) {}
     ~DropDatabaseCoordinator() = default;
 
     void checkIfOptionsConflict(const BSONObj& doc) const final {}
@@ -75,6 +76,8 @@ private:
     void _clearDatabaseInfoOnSecondaries(OperationContext* opCtx);
 
     StringData _dbName;
+
+    const BSONObj _critSecReason;
 };
 
 }  // namespace mongo
