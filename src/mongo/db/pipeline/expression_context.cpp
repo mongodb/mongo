@@ -244,11 +244,27 @@ void ExpressionContext::incrementAggExprCounter(StringData name) {
     }
 }
 
+void ExpressionContext::incrementGroupAccumulatorExprCounter(StringData name) {
+    if (enabledCounters && _expressionCounters) {
+        ++_expressionCounters.get().groupAccumulatorExprCountersMap[name];
+    }
+}
+
+void ExpressionContext::incrementWindowAccumulatorExprCounter(StringData name) {
+    if (enabledCounters && _expressionCounters) {
+        ++_expressionCounters.get().windowAccumulatorExprCountersMap[name];
+    }
+}
+
 void ExpressionContext::stopExpressionCounters() {
     if (enabledCounters && _expressionCounters) {
         operatorCountersMatchExpressions.mergeCounters(
             _expressionCounters.get().matchExprCountersMap);
         operatorCountersAggExpressions.mergeCounters(_expressionCounters.get().aggExprCountersMap);
+        operatorCountersGroupAccumulatorExpressions.mergeCounters(
+            _expressionCounters.get().groupAccumulatorExprCountersMap);
+        operatorCountersWindowAccumulatorExpressions.mergeCounters(
+            _expressionCounters.get().windowAccumulatorExprCountersMap);
     }
     _expressionCounters = boost::none;
 }

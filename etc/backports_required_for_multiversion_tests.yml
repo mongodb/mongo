@@ -104,6 +104,8 @@ last-continuous:
     ticket: SERVER-74124
   - test_file: jstests/core/timeseries/timeseries_filter_extended_range.js
     ticket: SERVER-69952
+  - test_file: jstests/noPassthrough/operator_counters_accumulators.js
+    ticket: SERVER-63049
   - test_file: jstests/replsets/quiesce_mode_fails_elections.js
     ticket: SERVER-72774
   suites:

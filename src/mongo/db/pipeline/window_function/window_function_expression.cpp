@@ -36,6 +36,7 @@
 #include "mongo/db/pipeline/document_source_set_window_fields_gen.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/stats/counters.h"
 
 #include "mongo/db/pipeline/window_function/partition_iterator.h"
 #include "mongo/db/pipeline/window_function/window_function_exec.h"
@@ -63,6 +64,8 @@ intrusive_ptr<Expression> Expression::parse(BSONObj obj,
         // caught as invalid arguments to the Expression parser later.
         auto parser = parserMap.find(field.fieldNameStringData());
         if (parser != parserMap.end()) {
+            auto exprName = field.fieldNameStringData();
+            expCtx->incrementWindowAccumulatorExprCounter(exprName);
             return parser->second(obj, sortBy, expCtx);
         }
     }
@@ -71,6 +74,7 @@ intrusive_ptr<Expression> Expression::parse(BSONObj obj,
 
 void Expression::registerParser(std::string functionName, Parser parser) {
     invariant(parserMap.find(functionName) == parserMap.end());
+    operatorCountersWindowAccumulatorExpressions.addCounter(functionName);
     parserMap.emplace(std::move(functionName), std::move(parser));
 }
 

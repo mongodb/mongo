@@ -58,15 +58,6 @@ namespace mongo {
 
 class AggregateCommandRequest;
 
-/**
- * The structure ExpressionCounters encapsulates counters for match, aggregate, and other
- * expression types as seen in the end-user queries.
- */
-struct ExpressionCounters {
-    StringMap<uint64_t> aggExprCountersMap;
-    StringMap<uint64_t> matchExprCountersMap;
-};
-
 class ExpressionContext : public RefCountable {
 public:
     static constexpr size_t kMaxSubPipelineViewDepth = 20;
@@ -115,6 +106,8 @@ public:
     struct ExpressionCounters {
         StringMap<uint64_t> aggExprCountersMap;
         StringMap<uint64_t> matchExprCountersMap;
+        StringMap<uint64_t> groupAccumulatorExprCountersMap;
+        StringMap<uint64_t> windowAccumulatorExprCountersMap;
     };
 
     /**
@@ -350,6 +343,16 @@ public:
      * Increment the counter for the aggregate expression with a given name.
      */
     void incrementAggExprCounter(StringData name);
+
+    /**
+     * Increment the counter for the $group accumulator expression with a given name.
+     */
+    void incrementGroupAccumulatorExprCounter(StringData name);
+
+    /**
+     * Increment the counter for the $setWindowFields accumulator expression with a given name.
+     */
+    void incrementWindowAccumulatorExprCounter(StringData name);
 
     /**
      * Merge expression counters from the current expression context into the global maps

@@ -2192,15 +2192,15 @@ MONGO_INITIALIZER_WITH_PREREQUISITES(MatchExpressionCounters,
         if (name[0] == '_' || exceptionsSet.count(name) > 0) {
             continue;
         }
-        operatorCountersMatchExpressions.addMatchExprCounter("$" + name);
+        operatorCountersMatchExpressions.addCounter("$" + name);
     }
     for (auto&& [name, fn] : *pathlessOperatorMap) {
         if (name[0] == '_' || exceptionsSet.count(name) > 0) {
             continue;
         }
-        operatorCountersMatchExpressions.addMatchExprCounter("$" + name);
+        operatorCountersMatchExpressions.addCounter("$" + name);
     }
-    operatorCountersMatchExpressions.addMatchExprCounter("$not");
+    operatorCountersMatchExpressions.addCounter("$not");
 }
 
 

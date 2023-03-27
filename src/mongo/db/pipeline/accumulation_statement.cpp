@@ -37,6 +37,7 @@
 #include "mongo/db/commands/feature_compatibility_version_documentation.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/accumulator.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
@@ -62,6 +63,7 @@ void AccumulationStatement::registerAccumulator(
             str::stream() << "Duplicate accumulator (" << name << ") registered.",
             it == parserMap.end());
     parserMap[name] = {parser, requiredMinVersion};
+    operatorCountersGroupAccumulatorExpressions.addCounter(name);
 }
 
 AccumulationStatement::Parser& AccumulationStatement::getParser(
@@ -115,6 +117,7 @@ AccumulationStatement AccumulationStatement::parseAccumulationStatement(
 
     auto&& parser =
         AccumulationStatement::getParser(accName, expCtx->maxFeatureCompatibilityVersion);
+    expCtx->incrementGroupAccumulatorExprCounter(accName);
     auto [initializer, argument, factory] = parser(expCtx, specElem, vps);
 
     return AccumulationStatement(fieldName.toString(),
