@@ -66,7 +66,6 @@ void _appendUUIDMismatchInconsistency(const ShardId& shardId,
                                       const NamespaceString& localNss,
                                       const UUID& localUUID,
                                       const UUID& UUID,
-                                      bool isLocalCollectionSharded,
                                       std::vector<MetadataInconsistencyItem>& inconsistencies) {
     MetadataInconsistencyItem val;
     val.setNs(localNss);
@@ -74,8 +73,7 @@ void _appendUUIDMismatchInconsistency(const ShardId& shardId,
     val.setShard(shardId);
     val.setInfo(BSON(kDescriptionFieldName
                      << "Found collection on non primary shard with mismatching UUID"
-                     << "localUUID" << localUUID << "UUID" << UUID
-                     << "shardThinkCollectionIsSharded" << isLocalCollectionSharded));
+                     << "localUUID" << localUUID << "UUID" << UUID));
     inconsistencies.emplace_back(std::move(val));
 }
 
@@ -237,7 +235,7 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataInconsistencies(
             const auto& UUID = itCatalogCollections->getUuid();
             if (UUID != localUUID) {
                 _appendUUIDMismatchInconsistency(
-                    shardId, localNss, localUUID, UUID, localColl.isSharded(), inconsistencies);
+                    shardId, localNss, localUUID, UUID, inconsistencies);
             }
 
             _checkShardKeyIndexInconsistencies(opCtx,
