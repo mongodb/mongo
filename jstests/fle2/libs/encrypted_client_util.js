@@ -1,4 +1,5 @@
 load("jstests/concurrency/fsm_workload_helpers/server_types.js");  // For isMongos.
+load("jstests/libs/feature_flag_util.js");
 
 /**
  * Create a FLE client that has an unencrypted and encrypted client to the same database
@@ -446,13 +447,11 @@ function isFLE2ReplicationEnabled() {
 }
 
 // TODO SERVER-67760 remove once feature flag is gone
-
 /**
  * @returns Returns true if featureFlagFLE2Range is enabled
  */
-function isFLE2RangeEnabled() {
-    return typeof (testingFLE2Range) !== "undefined" && testingFLE2Range &&
-        (TestData == undefined || TestData.setParameters.featureFlagFLE2Range);
+function isFLE2RangeEnabled(db) {
+    return FeatureFlagUtil.isPresentAndEnabled(db, "FLE2Range");
 }
 
 /**
