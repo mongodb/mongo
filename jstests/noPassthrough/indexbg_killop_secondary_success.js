@@ -19,11 +19,20 @@ const rst = new ReplSetTest({
     nodes: [
         {},
         {
-            // Lower the primary, but allow the secondary to vote and participate in commitQuorum.
+            // Lower priority than the primary, but allow the secondary to vote and participate in
+            // commitQuorum.
             rsConfig: {
                 priority: 0,
             },
             slowms: 30000,  // Don't log slow operations on secondary. See SERVER-44821.
+        },
+        {
+            // The arbiter prevents the primary from stepping down in the case where the secondary
+            // is restarting due to the (expected) unclean shutdown. Note that the arbiter doesn't
+            // participate in the commitQuorum.
+            rsConfig: {
+                arbiterOnly: true,
+            },
         },
     ]
 });
