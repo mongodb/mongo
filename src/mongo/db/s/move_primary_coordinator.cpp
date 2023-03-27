@@ -149,10 +149,12 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
     return ExecutorFuture<void>(**executor)
         .then(_buildPhaseHandler(
             Phase::kClone,
-            [this, executor = executor, anchor = shared_from_this()] {
+            [this, anchor = shared_from_this()] {
                 const auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
+
+                const auto& toShardId = _doc.getToShardId();
 
                 if (!_firstExecution) {
                     // The `_shardsvrCloneCatalogData` command to request the recipient to clone the
@@ -162,14 +164,14 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
 
                     uasserted(
                         7120202,
-                        "movePrimary operation on database {} failed cloning data to recipient"_format(
-                            _dbName.toString()));
+                        "movePrimary operation on database {} failed cloning data to recipient {}"_format(
+                            _dbName.toString(), toShardId.toString()));
                 }
 
                 LOGV2(7120201,
                       "Running movePrimary operation",
                       "db"_attr = _dbName,
-                      "to"_attr = _doc.getToShardId());
+                      "to"_attr = toShardId);
 
                 logChange(opCtx, "start");
 
@@ -192,14 +194,8 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
                 _doc.setCollectionsToClone(collectionsToClone);
                 _updateStateDocument(opCtx, StateDoc(_doc));
 
-                const auto cloneResponse = cloneDataToRecipient(opCtx);
-                const auto cloneStatus = Shard::CommandResponse::getEffectiveStatus(cloneResponse);
-                if (!cloneStatus.isOK() || !checkClonedData(cloneResponse.getValue())) {
-                    uasserted(
-                        cloneStatus.isOK() ? 7120204 : cloneStatus.code(),
-                        "movePrimary operation on database {} failed cloning data to recipient"_format(
-                            _dbName.toString()));
-                }
+                const auto& clonedCollections = cloneDataToRecipient(opCtx);
+                assertClonedData(clonedCollections);
 
                 // TODO (SERVER-71566): Temporary solution to cover the case of stepping down before
                 // actually entering the `kCatchup` phase.
@@ -214,7 +210,7 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
                                      blockWrites(opCtx);
                                  }))
         .then(_buildPhaseHandler(Phase::kEnterCriticalSection,
-                                 [this, executor = executor, anchor = shared_from_this()] {
+                                 [this, executor, anchor = shared_from_this()] {
                                      const auto opCtxHolder = cc().makeOperationContext();
                                      auto* opCtx = opCtxHolder.get();
                                      getForwardableOpMetadata().setOn(opCtx);
@@ -265,7 +261,7 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
                                      dropStaleDataOnDonor(opCtx);
                                  }))
         .then(_buildPhaseHandler(Phase::kExitCriticalSection,
-                                 [this, executor = executor, anchor = shared_from_this()] {
+                                 [this, executor, anchor = shared_from_this()] {
                                      const auto opCtxHolder = cc().makeOperationContext();
                                      auto* opCtx = opCtxHolder.get();
                                      getForwardableOpMetadata().setOn(opCtx);
@@ -422,9 +418,11 @@ std::vector<NamespaceString> MovePrimaryCoordinator::getUnshardedCollections(
 
 void MovePrimaryCoordinator::assertNoOrphanedDataOnRecipient(
     OperationContext* opCtx, const std::vector<NamespaceString>& collectionsToClone) const {
+    const auto& toShardId = _doc.getToShardId();
+
     auto allCollections = [&] {
         const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-        const auto toShard = uassertStatusOK(shardRegistry->getShard(opCtx, _doc.getToShardId()));
+        const auto toShard = uassertStatusOK(shardRegistry->getShard(opCtx, toShardId));
 
         const auto listCommand = [&] {
             BSONObjBuilder commandBuilder;
@@ -453,20 +451,23 @@ void MovePrimaryCoordinator::assertNoOrphanedDataOnRecipient(
 
     for (const auto& nss : collectionsToClone) {
         uassert(ErrorCodes::NamespaceExists,
-                "Found orphaned collection {} on recipient"_format(nss.toString()),
+                "Found orphaned collection {} on recipient {}"_format(nss.toString(),
+                                                                      toShardId.toString()),
                 !std::binary_search(allCollections.cbegin(), allCollections.cend(), nss));
     };
 }
 
-StatusWith<Shard::CommandResponse> MovePrimaryCoordinator::cloneDataToRecipient(
+std::vector<NamespaceString> MovePrimaryCoordinator::cloneDataToRecipient(
     OperationContext* opCtx) const {
     // Enable write blocking bypass to allow cloning of catalog data even if writes are disallowed.
     WriteBlockBypass::get(opCtx).set(true);
 
+    const auto& toShardId = _doc.getToShardId();
+
     const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
     const auto fromShard =
         uassertStatusOK(shardRegistry->getShard(opCtx, ShardingState::get(opCtx)->shardId()));
-    const auto toShard = uassertStatusOK(shardRegistry->getShard(opCtx, _doc.getToShardId()));
+    const auto toShard = uassertStatusOK(shardRegistry->getShard(opCtx, toShardId));
 
     const auto cloneCommand = [&] {
         BSONObjBuilder commandBuilder;
@@ -475,20 +476,21 @@ StatusWith<Shard::CommandResponse> MovePrimaryCoordinator::cloneDataToRecipient(
         return CommandHelpers::appendMajorityWriteConcern(commandBuilder.obj());
     }();
 
-    return toShard->runCommand(opCtx,
-                               ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                               DatabaseName::kAdmin.toString(),
-                               cloneCommand,
-                               Shard::RetryPolicy::kNoRetry);
-}
+    const auto cloneResponse =
+        toShard->runCommand(opCtx,
+                            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                            DatabaseName::kAdmin.db(),
+                            cloneCommand,
+                            Shard::RetryPolicy::kNoRetry);
 
-bool MovePrimaryCoordinator::checkClonedData(Shard::CommandResponse cloneResponse) const {
-    invariant(_doc.getCollectionsToClone());
-    const auto& collectionToClone = *_doc.getCollectionsToClone();
+    uassertStatusOKWithContext(
+        Shard::CommandResponse::getEffectiveStatus(cloneResponse),
+        "movePrimary operation on database {} failed to clone data to recipient {}"_format(
+            _dbName.toString(), toShardId.toString()));
 
     const auto clonedCollections = [&] {
         std::vector<NamespaceString> colls;
-        for (const auto& bsonElem : cloneResponse.response["clonedColls"].Obj()) {
+        for (const auto& bsonElem : cloneResponse.getValue().response["clonedColls"].Obj()) {
             if (bsonElem.type() == String) {
                 colls.push_back(NamespaceString(bsonElem.String()));
             }
@@ -497,10 +499,21 @@ bool MovePrimaryCoordinator::checkClonedData(Shard::CommandResponse cloneRespons
         std::sort(colls.begin(), colls.end());
         return colls;
     }();
+    return clonedCollections;
+}
 
-    return collectionToClone.size() == clonedCollections.size() &&
-        std::equal(
-               collectionToClone.cbegin(), collectionToClone.cend(), clonedCollections.cbegin());
+void MovePrimaryCoordinator::assertClonedData(
+    const std::vector<NamespaceString>& clonedCollections) const {
+    invariant(_doc.getCollectionsToClone());
+    const auto& collectionToClone = *_doc.getCollectionsToClone();
+
+    uassert(7118501,
+            "Error cloning data in movePrimary: the list of actually cloned collections doesn't "
+            "match the list of collections to close",
+            collectionToClone.size() == clonedCollections.size() &&
+                std::equal(collectionToClone.cbegin(),
+                           collectionToClone.cend(),
+                           clonedCollections.cbegin()));
 }
 
 void MovePrimaryCoordinator::commitMetadataToConfig(
@@ -640,9 +653,11 @@ void MovePrimaryCoordinator::enterCriticalSectionOnRecipient(OperationContext* o
         return command.addFields(getCurrentSession().toBSON());
     }();
 
+    const auto& toShardId = _doc.getToShardId();
+
     const auto enterCriticalSectionResponse = [&] {
         const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-        const auto toShard = uassertStatusOK(shardRegistry->getShard(opCtx, _doc.getToShardId()));
+        const auto toShard = uassertStatusOK(shardRegistry->getShard(opCtx, toShardId));
 
         return toShard->runCommandWithFixedRetryAttempts(
             opCtx,
@@ -654,8 +669,8 @@ void MovePrimaryCoordinator::enterCriticalSectionOnRecipient(OperationContext* o
 
     uassertStatusOKWithContext(
         Shard::CommandResponse::getEffectiveStatus(enterCriticalSectionResponse),
-        "movePrimary operation on database {} failed to block read/write operations on recipient"_format(
-            _dbName.toString()));
+        "movePrimary operation on database {} failed to block read/write operations on recipient {}"_format(
+            _dbName.toString(), toShardId.toString()));
 }
 
 void MovePrimaryCoordinator::exitCriticalSectionOnRecipient(OperationContext* opCtx) const {
@@ -668,9 +683,11 @@ void MovePrimaryCoordinator::exitCriticalSectionOnRecipient(OperationContext* op
         return command.addFields(getCurrentSession().toBSON());
     }();
 
+    const auto& toShardId = _doc.getToShardId();
+
     const auto exitCriticalSectionResponse = [&] {
         const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-        const auto toShard = uassertStatusOK(shardRegistry->getShard(opCtx, _doc.getToShardId()));
+        const auto toShard = uassertStatusOK(shardRegistry->getShard(opCtx, toShardId));
 
         return toShard->runCommandWithFixedRetryAttempts(
             opCtx,
@@ -682,8 +699,8 @@ void MovePrimaryCoordinator::exitCriticalSectionOnRecipient(OperationContext* op
 
     uassertStatusOKWithContext(
         Shard::CommandResponse::getEffectiveStatus(exitCriticalSectionResponse),
-        "movePrimary operation on database {} failed to unblock read/write operations on recipient"_format(
-            _dbName.toString()));
+        "movePrimary operation on database {} failed to unblock read/write operations on recipient {}"_format(
+            _dbName.toString(), toShardId.toString()));
 }
 
 }  // namespace mongo

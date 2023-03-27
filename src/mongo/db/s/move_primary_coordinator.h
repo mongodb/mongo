@@ -85,16 +85,15 @@ private:
     /**
      * Requests to the recipient to clone all the collections of the given database currently owned
      * by this shard. Once the cloning is complete, the recipient returns the list of the actually
-     * cloned collections as part of the response.
+     * cloned collections.
      */
-    StatusWith<Shard::CommandResponse> cloneDataToRecipient(OperationContext* opCtx) const;
+    std::vector<NamespaceString> cloneDataToRecipient(OperationContext* opCtx) const;
 
     /**
-     * Returns `true` whether the list of actually cloned collections (returned by the cloning
-     * command response) matches the list of collection to clone (persisted in the coordinator
-     * document), `false` otherwise.
+     * Ensures that the list of actually cloned collections (returned by the cloning command)
+     * matches the list of collections to clone (persisted in the coordinator document).
      */
-    bool checkClonedData(Shard::CommandResponse cloneResponse) const;
+    void assertClonedData(const std::vector<NamespaceString>& clonedCollections) const;
 
     /**
      * Commits the new primary shard for the given database to the config server. The database
