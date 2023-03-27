@@ -126,8 +126,14 @@ PlanStage::StageState TimeseriesModifyStage::_writeToTimeseriesBuckets(
     } else {
         auto timeseriesOptions = collection()->getTimeseriesOptions();
         auto metaFieldName = timeseriesOptions->getMetaField();
-        auto metadata =
-            metaFieldName ? unchangedMeasurements[0].getField(*metaFieldName).wrap() : BSONObj();
+        auto metadata = [&] {
+            if (!metaFieldName) {  // Collection has no metadata field.
+                return BSONObj();
+            }
+            // Look for the metadata field on this bucket and return it if present.
+            auto metaField = unchangedMeasurements[0].getField(*metaFieldName);
+            return metaField ? metaField.wrap() : BSONObj();
+        }();
         auto replaceBucket =
             timeseries::makeNewDocumentForWrite(bucketId,
                                                 unchangedMeasurements,
@@ -147,9 +153,9 @@ PlanStage::StageState TimeseriesModifyStage::_writeToTimeseriesBuckets(
     }
     _specificStats.measurementsDeleted += deletedMeasurements.size();
 
-    // As restoreState may restore (recreate) cursors, cursors are tied to the transaction in which
-    // they are created, and a WriteUnitOfWork is a transaction, make sure to restore the state
-    // outside of the WriteUnitOfWork.
+    // As restoreState may restore (recreate) cursors, cursors are tied to the
+    // transaction in which they are created, and a WriteUnitOfWork is a transaction,
+    // make sure to restore the state outside of the WriteUnitOfWork.
     return handlePlanStageYield(
         expCtx(),
         "TimeseriesModifyStage restoreState",
@@ -159,8 +165,9 @@ PlanStage::StageState TimeseriesModifyStage::_writeToTimeseriesBuckets(
             return PlanStage::NEED_TIME;
         },
         // yieldHandler
-        // Note we don't need to retry anything in this case since the delete already was committed.
-        // However, we still need to return the deleted document (if it was requested).
+        // Note we don't need to retry anything in this case since the delete already
+        // was committed. However, we still need to return the deleted document (if it
+        // was requested).
         // TODO SERVER-73089 for findAndModify we need to return the deleted doc.
         [&] { /* noop */ });
 }
@@ -169,9 +176,9 @@ template <typename F>
 std::pair<boost::optional<PlanStage::StageState>, bool>
 TimeseriesModifyStage::_checkIfWritingToOrphanedBucket(ScopeGuard<F>& bucketFreer,
                                                        WorkingSetID id) {
-    // If we are in explain mode, we do not need to check if the bucket is orphaned since we're not
-    // writing to bucket. If we are migrating a bucket, we also do not need to check if the bucket
-    // is not writable and just return it.
+    // If we are in explain mode, we do not need to check if the bucket is orphaned since
+    // we're not writing to bucket. If we are migrating a bucket, we also do not need to
+    // check if the bucket is not writable and just return it.
     if (_params->isExplain || _params->fromMigrate) {
         return {boost::none, _params->fromMigrate};
     }
@@ -199,8 +206,9 @@ PlanStage::StageState TimeseriesModifyStage::_getNextBucket(WorkingSetID& id) {
         _retryBucketId = WorkingSet::INVALID_ID;
     }
 
-    // We may not have an up-to-date bucket for this RecordId. Fetch it and ensure that it still
-    // exists and matches our bucket-level predicate if it is not believed to be up-to-date.
+    // We may not have an up-to-date bucket for this RecordId. Fetch it and ensure that it
+    // still exists and matches our bucket-level predicate if it is not believed to be
+    // up-to-date.
     bool docStillMatches;
 
     const auto status = handlePlanStageYield(
@@ -252,16 +260,16 @@ PlanStage::StageState TimeseriesModifyStage::doWork(WorkingSetID* out) {
         return status;
     }
 
-    // We want to free this member when we return because we either have an owned copy of the bucket
-    // for normal write and write to orphan cases, or we skip the bucket.
+    // We want to free this member when we return because we either have an owned copy of
+    // the bucket for normal write and write to orphan cases, or we skip the bucket.
     ScopeGuard bucketFreer([&] { _ws->free(id); });
 
     auto member = _ws->get(id);
     tassert(7459100, "Expected a RecordId from the child stage", member->hasRecordId());
 
-    // Determine if we are writing to an orphaned bucket - such writes should be excluded from
-    // user-visible change stream events. This will be achieved later by setting 'fromMigrate' flag
-    // when calling performAtomicWrites().
+    // Determine if we are writing to an orphaned bucket - such writes should be excluded
+    // from user-visible change stream events. This will be achieved later by setting
+    // 'fromMigrate' flag when calling performAtomicWrites().
     auto [immediateReturnStageState, bucketFromMigrate] =
         _checkIfWritingToOrphanedBucket(bucketFreer, id);
     if (immediateReturnStageState) {
