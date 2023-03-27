@@ -34,7 +34,8 @@ imports:
 
 structs:
   FLECompactionOptions:
-    description: ""
+    description: "Options related to compaction or cleanup operations in Queryable Encryption
+        protocol version 2"
     inline_chained_structs: true
     chained_structs:
       ClusterServerParameter: clusterServerParameter
@@ -63,7 +64,8 @@ server_parameters:
     cpp_varname: gUnsupportedDangerousTestingFLEDiagnosticsEnabledAtStartup
     default: false
   fleCompactionOptions:
-    description: "Options related to compaction or cleanup operations in Queryable Encryption protocol version 2"
+    description: "Options related to compaction or cleanup operations in Queryable Encryption
+        protocol version 2"
     set_at: cluster
     cpp_varname: "fleCompactionOptions"
     cpp_vartype: FLECompactionOptions

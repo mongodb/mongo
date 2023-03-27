@@ -130,7 +130,6 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
         ecoc = nullptr;
     } else if (ecoc && !ecocRename) {
         // load the random set of ESC non-anchor entries to be deleted post-compact
-        // auto memoryLimit = ServerStatusSet::get
         auto memoryLimit =
             ServerParameterSet::getClusterParameterSet()
                 ->get<ClusterParameterWithStorage<FLECompactionOptions>>("fleCompactionOptions")

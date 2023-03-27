@@ -124,7 +124,7 @@ public:
         return std::accumulate(deleteIdSets.begin(),
                                deleteIdSets.end(),
                                std::size_t{0},
-                               [](auto& sum, auto& d) { return sum + d.size(); });
+                               [](const auto& sum, auto& d) { return sum + d.size(); });
     }
     bool empty() const {
         return deleteIdSets.empty();
