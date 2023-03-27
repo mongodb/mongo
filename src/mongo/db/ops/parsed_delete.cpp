@@ -220,6 +220,9 @@ std::unique_ptr<CanonicalQuery> ParsedDelete::releaseParsedQuery() {
 }
 
 void ParsedDelete::setCollator(std::unique_ptr<CollatorInterface> collator) {
+    if (_timeseriesDeleteDetails && _timeseriesDeleteDetails->_residualExpr) {
+        _timeseriesDeleteDetails->_residualExpr->setCollator(collator.get());
+    }
     if (_canonicalQuery) {
         _canonicalQuery->setCollator(std::move(collator));
     } else {
