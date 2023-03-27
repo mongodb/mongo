@@ -181,7 +181,52 @@ class MongoTidyTests(unittest.TestCase):
         ]
 
         self.run_clang_tidy()
+        
+    def test_MongoStdAtomicCheck(self):
 
+        self.write_config(
+            textwrap.dedent("""\
+                Checks: '-*,mongo-std-atomic-check'
+                WarningsAsErrors: '*'
+                """))
+
+        self.expected_output = [
+            "Illegal use of prohibited std::atomic<T>, use AtomicWord<T> or other types from \"mongo/platform/atomic_word.h\" [mongo-std-atomic-check,-warnings-as-errors]\nstd::atomic<int> atomic_var;",
+            "Illegal use of prohibited std::atomic<T>, use AtomicWord<T> or other types from \"mongo/platform/atomic_word.h\" [mongo-std-atomic-check,-warnings-as-errors]\n    std::atomic<int> field_decl;",
+        ]
+
+        self.run_clang_tidy()
+
+    def test_MongoMutexCheck(self):
+
+        self.write_config(
+            textwrap.dedent("""\
+                Checks: '-*,mongo-mutex-check,mongo-std-atomic-check'
+                WarningsAsErrors: '*'
+                """))
+
+        self.expected_output = [
+            "Illegal use of prohibited stdx::mutex, use mongo::Mutex from mongo/platform/mutex.h instead. [mongo-mutex-check,-warnings-as-errors]\nstdx::mutex stdxmutex_vardecl;",
+            "Illegal use of prohibited stdx::mutex, use mongo::Mutex from mongo/platform/mutex.h instead. [mongo-mutex-check,-warnings-as-errors]\nstd::mutex stdmutex_vardecl;",
+            "Illegal use of prohibited stdx::mutex, use mongo::Mutex from mongo/platform/mutex.h instead. [mongo-mutex-check,-warnings-as-errors]\n    std::mutex stdmutex_fileddecl;",
+            "Illegal use of prohibited stdx::mutex, use mongo::Mutex from mongo/platform/mutex.h instead. [mongo-mutex-check,-warnings-as-errors]\n    stdx::mutex stdxmutex_fileddecl;",
+        ]
+
+        self.run_clang_tidy()
+
+    def test_MongoAssertCheck(self):
+
+        self.write_config(
+            textwrap.dedent("""\
+                Checks: '-*,mongo-assert-check'
+                WarningsAsErrors: '*'
+                """))
+
+        self.expected_output = [
+            "error: Illegal use of the bare assert function, use a function from assert_util.h instead",
+        ]
+
+        self.run_clang_tidy()
 
 if __name__ == '__main__':
 

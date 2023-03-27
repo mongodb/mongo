@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "MongoStdOptionalCheck.h"
+#include "MongoStdAtomicCheck.h"
 #include "MongoTidyUtils.h"
 
 #include <iostream>
@@ -37,35 +37,26 @@ namespace mongo::tidy {
 using namespace clang;
 using namespace clang::ast_matchers;
 
-MongoStdOptionalCheck::MongoStdOptionalCheck(StringRef Name, clang::tidy::ClangTidyContext* Context)
+MongoStdAtomicCheck::MongoStdAtomicCheck(StringRef Name, clang::tidy::ClangTidyContext* Context)
     : ClangTidyCheck(Name, Context) {}
 
-void MongoStdOptionalCheck::registerMatchers(ast_matchers::MatchFinder* Finder) {
-
-    // match using std::optional;
-    Finder->addMatcher(usingDecl(hasAnyUsingShadowDecl(hasTargetDecl(
-                                     allOf(hasName("optional"), isFromStdNamespace()))))
-                           .bind("decl_optional"),
-                       this);
+void MongoStdAtomicCheck::registerMatchers(ast_matchers::MatchFinder* Finder) {
 
     // match parameter decl, variable Decl, Field Decl, Reference Decl, Template Decl regarding
-    // std::optional
-    Finder->addMatcher(loc(templateSpecializationType(hasDeclaration(
-                               namedDecl(hasName("optional"), isFromStdNamespace()))))
-                           .bind("loc_optional"),
+    // std::atomic
+    Finder->addMatcher(loc(templateSpecializationType(
+                               hasDeclaration(namedDecl(hasName("atomic"), isFromStdNamespace()))))
+                           .bind("loc_atomic"),
                        this);
 }
 
-void MongoStdOptionalCheck::check(const ast_matchers::MatchFinder::MatchResult& Result) {
+void MongoStdAtomicCheck::check(const ast_matchers::MatchFinder::MatchResult& Result) {
 
-    const auto* decl_match = Result.Nodes.getNodeAs<UsingDecl>("decl_optional");
-    const auto* loc_match = Result.Nodes.getNodeAs<TypeLoc>("loc_optional");
-
-    if (decl_match) {
-        diag(decl_match->getBeginLoc(), "Use of std::optional, use boost::optional instead. ");
-    }
-    if (loc_match && !loc_match->getBeginLoc().isInvalid()) {
-        diag(loc_match->getBeginLoc(), "Use of std::optional, use boost::optional instead. ");
+    const auto* loc_match = Result.Nodes.getNodeAs<TypeLoc>("loc_atomic");
+    if (loc_match) {
+        diag(loc_match->getBeginLoc(),
+             "Illegal use of prohibited std::atomic<T>, use AtomicWord<T> or other types from "
+             "\"mongo/platform/atomic_word.h\"");
     }
 }
 

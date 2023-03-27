@@ -27,8 +27,11 @@
  *    it in the license file.
  */
 
+#include "MongoAssertCheck.h"
 #include "MongoCctypeCheck.h"
 #include "MongoHeaderBracketCheck.h"
+#include "MongoMutexCheck.h"
+#include "MongoStdAtomicCheck.h"
 #include "MongoStdOptionalCheck.h"
 #include "MongoTraceCheck.h"
 #include "MongoUninterruptibleLockGuardCheck.h"
@@ -52,6 +55,9 @@ public:
         CheckFactories.registerCheck<MongoStdOptionalCheck>("mongo-std-optional-check");
         CheckFactories.registerCheck<MongoVolatileCheck>("mongo-volatile-check");
         CheckFactories.registerCheck<MongoTraceCheck>("mongo-trace-check");
+        CheckFactories.registerCheck<MongoStdAtomicCheck>("mongo-std-atomic-check");
+        CheckFactories.registerCheck<MongoMutexCheck>("mongo-mutex-check");
+        CheckFactories.registerCheck<MongoAssertCheck>("mongo-assert-check");
     }
 };
 

@@ -60,7 +60,7 @@ private:
 
         BackendTraits(boost::shared_ptr<backend_t> backend) : _backend(std::move(backend)) {}
         boost::shared_ptr<backend_t> _backend;
-        backend_mutex_type _mutex;
+        backend_mutex_type _mutex;  // NOLINT(mongo-mutex-check)
         std::function<bool(boost::log::attribute_value_set const&)> _filter;
     };
 

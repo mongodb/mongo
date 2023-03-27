@@ -26,47 +26,25 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#pragma once
 
-#include "MongoStdOptionalCheck.h"
-#include "MongoTidyUtils.h"
-
-#include <iostream>
+#include <clang-tidy/ClangTidy.h>
+#include <clang-tidy/ClangTidyCheck.h>
 
 namespace mongo::tidy {
 
-using namespace clang;
-using namespace clang::ast_matchers;
+/**
+ * check for usage of std::atomic
+ * Overrides the default registerMatchers function to add matcher to match the
+ * usage of std::atomic. overrides the default check function to
+ * flag the uses of std::atomic to enforce our commitment to boost::atomic
+ */
+class MongoStdAtomicCheck : public clang::tidy::ClangTidyCheck {
 
-MongoStdOptionalCheck::MongoStdOptionalCheck(StringRef Name, clang::tidy::ClangTidyContext* Context)
-    : ClangTidyCheck(Name, Context) {}
-
-void MongoStdOptionalCheck::registerMatchers(ast_matchers::MatchFinder* Finder) {
-
-    // match using std::optional;
-    Finder->addMatcher(usingDecl(hasAnyUsingShadowDecl(hasTargetDecl(
-                                     allOf(hasName("optional"), isFromStdNamespace()))))
-                           .bind("decl_optional"),
-                       this);
-
-    // match parameter decl, variable Decl, Field Decl, Reference Decl, Template Decl regarding
-    // std::optional
-    Finder->addMatcher(loc(templateSpecializationType(hasDeclaration(
-                               namedDecl(hasName("optional"), isFromStdNamespace()))))
-                           .bind("loc_optional"),
-                       this);
-}
-
-void MongoStdOptionalCheck::check(const ast_matchers::MatchFinder::MatchResult& Result) {
-
-    const auto* decl_match = Result.Nodes.getNodeAs<UsingDecl>("decl_optional");
-    const auto* loc_match = Result.Nodes.getNodeAs<TypeLoc>("loc_optional");
-
-    if (decl_match) {
-        diag(decl_match->getBeginLoc(), "Use of std::optional, use boost::optional instead. ");
-    }
-    if (loc_match && !loc_match->getBeginLoc().isInvalid()) {
-        diag(loc_match->getBeginLoc(), "Use of std::optional, use boost::optional instead. ");
-    }
-}
+public:
+    MongoStdAtomicCheck(clang::StringRef Name, clang::tidy::ClangTidyContext* Context);
+    void registerMatchers(clang::ast_matchers::MatchFinder* Finder) override;
+    void check(const clang::ast_matchers::MatchFinder::MatchResult& Result) override;
+};
 
 }  // namespace mongo::tidy

@@ -109,7 +109,7 @@ class BSONLexer;
 #include <typeinfo>
 #ifndef YY_ASSERT
 #include <cassert>
-#define YY_ASSERT assert
+#define YY_ASSERT assert  // NOLINT(mongo-assert-check)
 #endif
 
 

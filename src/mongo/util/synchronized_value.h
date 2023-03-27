@@ -183,8 +183,8 @@ public:
     }
 
 private:
-    value_type _value;  ///< guarded by _mutex
-    mutable mutex_type _mutex = mutex_policy_type::construct();
+    value_type _value;                                           ///< guarded by _mutex
+    mutable mutex_type _mutex = mutex_policy_type::construct();  // NOLINT(mongo-mutex-check)
 };
 
 }  // namespace mongo
