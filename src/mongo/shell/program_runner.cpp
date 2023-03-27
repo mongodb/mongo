@@ -391,8 +391,17 @@ ProgramRunner::ProgramRunner(BSONObj args, BSONObj env, bool isMongo, ProgramReg
     bool isMongoqProgram = isMongo &&
         (string("mongoqd") == programName ||
          programName.string().compare(0, prefix.size(), prefix) == 0);
+    prefix = "mongotmock-";
+    bool isMongotMockProgram = isMongo &&
+        (string("mongotmock") == programName ||
+         programName.string().compare(0, prefix.size(), prefix) == 0);
 
-    parseName(isMongo, isMongodProgram, isMongosProgram, isMongoqProgram, programName);
+    parseName(isMongo,
+              isMongodProgram,
+              isMongosProgram,
+              isMongoqProgram,
+              isMongotMockProgram,
+              programName);
 
     _argv.push_back(programPath.string());
 
@@ -776,6 +785,7 @@ void ProgramRunner::parseName(bool isMongo,
                               bool isMongodProgram,
                               bool isMongosProgram,
                               bool isMongoqProgram,
+                              bool isMongotMockProgram,
                               const boost::filesystem::path& programName) {
     if (!isMongo) {
         _name = "sh";
@@ -785,6 +795,8 @@ void ProgramRunner::parseName(bool isMongo,
         _name = "s";
     } else if (isMongoqProgram) {
         _name = "q";
+    } else if (isMongotMockProgram) {
+        _name = "tm";
     } else if (programName == "mongobridge") {
         _name = "b";
     } else {

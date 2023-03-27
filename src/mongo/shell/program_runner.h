@@ -164,6 +164,7 @@ private:
                    bool isMongodProgram,
                    bool isMongosProgram,
                    bool isMongoqProgram,
+                   bool isMongotMockProgram,
                    const boost::filesystem::path& programName);
     void parseArgs(BSONObj args, bool isMongo, bool isMongodProgram);
 
