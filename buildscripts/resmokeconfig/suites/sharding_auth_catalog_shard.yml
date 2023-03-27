@@ -52,7 +52,4 @@ executor:
           keyFile: *keyFile
           keyFileData: *keyFileData
           roleGraphInvalidationIsFatal: true
-          # TODO (SERVER-74534): Enable the metadata consistency check when it will work with
-          # co-located configsvr.
-          skipCheckMetadataConsistency: true
       nodb: ''

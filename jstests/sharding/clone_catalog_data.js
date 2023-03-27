@@ -3,10 +3,6 @@
 // Test that the 'cloneCatalogData' command works correctly.
 // Eventually, _shardsvrMovePrimary will use this command.
 
-// Do not check metadata consistency as unsharded collections are cloned to non-primary shards for
-// testing purposes.
-TestData.skipCheckMetadataConsistency = true;
-
 (() => {
     load("jstests/libs/catalog_shard_util.js");
 

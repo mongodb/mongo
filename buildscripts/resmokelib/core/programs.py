@@ -238,9 +238,6 @@ def mongo_shell_program(logger, executable=None, connection_string=None, filenam
     if "eval" in kwargs:
         eval_sb.append(str(kwargs.pop("eval")))
 
-    # Load a callback to check that the cluster-wide metadata is consistent.
-    eval_sb.append("load('jstests/libs/override_methods/check_metadata_consistency.js');")
-
     # Load this file to allow a callback to validate collections before shutting down mongod.
     eval_sb.append("load('jstests/libs/override_methods/validate_collections_on_shutdown.js');")
 

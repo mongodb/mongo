@@ -511,7 +511,6 @@ var ShardingTest = function(params) {
     };
 
     this.stop = function(opts = {}) {
-        this.checkMetadataConsistency();
         this.checkUUIDsConsistentAcrossCluster();
         this.checkIndexesConsistentAcrossCluster();
         this.checkOrphansAreDeleted();
@@ -1908,11 +1907,6 @@ var ShardingTest = function(params) {
 
         self.waitForShardingInitialized();
     }
-};
-
-// Stub for a hook to check that the cluster-wide metadata is consistent.
-ShardingTest.prototype.checkMetadataConsistency = function() {
-    print("Unhooked checkMetadataConsistency function");
 };
 
 // Stub for a hook to check that collection UUIDs are consistent across shards and the config
