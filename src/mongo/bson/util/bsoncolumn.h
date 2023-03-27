@@ -137,7 +137,7 @@ public:
         // Current control byte on iterator position
         const char* _control;
 
-        // End of BSONColumn memory block, we may not dereference any memory passed this.
+        // End of BSONColumn memory block, we may not dereference any memory past this.
         const char* _end;
 
         // Helper to create Simple8b decoding iterators for 64bit and 128bit value types.
@@ -262,6 +262,13 @@ public:
     StringData name() const {
         return _name;
     }
+
+    // Scans the compressed BSON Column format to efficiently determine if the
+    // column contains an element of type `elementType`.
+    // Because it is marked const, it always iterates over the entire column.
+    //
+    // TODO SERVER-74926: add interleaved support
+    bool contains_forTest(BSONType elementType) const;
 
 private:
     /**

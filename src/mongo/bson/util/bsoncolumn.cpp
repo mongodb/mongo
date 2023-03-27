@@ -891,6 +891,43 @@ size_t BSONColumn::size() {
     return _decompressed.size();
 }
 
+bool BSONColumn::contains_forTest(BSONType elementType) const {
+    const char* byteIter = _binary;
+    const char* columnEnd = _binary + _size;
+
+    uint8_t control;
+    while (byteIter != columnEnd) {
+        control = static_cast<uint8_t>(*byteIter);
+        if (Iterator::_isLiteral(control)) {
+            BSONElement literalElem(byteIter, 1, -1);
+            if (control == elementType) {
+                return true;
+            } else if (control == BSONType::EOO) {
+                // TODO: check for valid encoding
+                // reached end of column
+                return false;
+            }
+
+            byteIter += literalElem.size();
+        } else if (Iterator::_isInterleavedStart(*byteIter)) {
+
+            // TODO SERVER-74926 add interleaved support
+            uasserted(6580401,
+                      "Interleaved mode not yet supported for BSONColumn::contains_forTest.");
+        } else { /* Simple-8b Delta Block */
+            uint8_t numBlocks = Iterator::_numSimple8bBlocks(control);
+            int simple8bBlockSize = sizeof(uint64_t) * numBlocks;
+            uassert(
+                6580400, "Invalid BSON Column encoding", byteIter + simple8bBlockSize < columnEnd);
+
+            // skip simple8b control blocks
+            byteIter += simple8bBlockSize;
+        }
+    }
+
+    return false;
+}
+
 void BSONColumn::DecodingStartPosition::setIfLarger(size_t index, const char* control) {
     if (_index < index) {
         _control = control;

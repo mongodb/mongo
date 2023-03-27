@@ -33,7 +33,6 @@
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/base64.h"
 
-
 namespace mongo {
 namespace {
 
@@ -526,6 +525,263 @@ TEST_F(BSONColumnTest, Empty) {
     auto binData = cb.finalize();
     verifyBinary(binData, expected);
     verifyDecompression(binData, {});
+}
+
+TEST_F(BSONColumnTest, ContainsScalarInt32SimpleCompressed) {
+    BSONColumnBuilder cb;
+
+    // Column should have several scalar values of same type
+    // -> 32-bit Ints
+    auto elemInt32_0 = createElementInt32(100);
+    auto elemInt32_1 = createElementInt32(101);
+    cb.append(elemInt32_0);
+    cb.append(elemInt32_0);
+    cb.append(elemInt32_1);
+    auto binData = cb.finalize();
+
+    // Recreate cb "manually" to create the BSONColumn class, so as to
+    // test BSONColumn::contains_forTest
+    BufBuilder colBuf;
+    appendLiteral(colBuf, elemInt32_0);
+    appendSimple8bControl(colBuf, 0b1000, 0b0000);  // Control = 1, CountOfSimple8b's = 0+1
+    std::vector<boost::optional<uint64_t>> v{deltaInt32(elemInt32_0, elemInt32_0),
+                                             deltaInt32(elemInt32_1, elemInt32_0)};
+    appendSimple8bBlocks64(colBuf, v, 1);
+    appendEOO(colBuf);
+    BSONColumn col(createBSONColumn(colBuf.buf(), colBuf.len()));
+
+    ASSERT_EQ(col.contains_forTest(BSONType::NumberInt), true);
+    ASSERT_EQ(col.contains_forTest(BSONType::NumberLong), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::NumberDouble), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::Array), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::bsonTimestamp), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::String), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::Object), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::jstOID), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::Bool), false);
+
+    verifyBinary(binData, colBuf);
+}
+
+TEST_F(BSONColumnTest, ContainsScalarInt64SimpleCompressed) {
+    BSONColumnBuilder cb;
+
+    // Column should have several scalar values of same type
+    // -> 64-bit Ints
+    auto elemInt64_0 = createElementInt64(100);
+    auto elemInt64_1 = createElementInt64(101);
+    cb.append(elemInt64_0);
+    cb.append(elemInt64_0);
+    cb.append(elemInt64_1);
+    auto binData = cb.finalize();
+
+    // Recreate cb "manually" to create the BSONColumn class, so as to
+    // test BSONColumn::contains_forTest
+    BufBuilder colBuf;
+    appendLiteral(colBuf, elemInt64_0);
+    appendSimple8bControl(colBuf, 0b1000, 0b0000);  // Control = 1, CountOfSimple8b's = 0+1
+    std::vector<boost::optional<uint64_t>> v{deltaInt64(elemInt64_0, elemInt64_0),
+                                             deltaInt64(elemInt64_1, elemInt64_0)};
+    appendSimple8bBlocks64(colBuf, v, 1);
+    appendEOO(colBuf);
+    BSONColumn col(createBSONColumn(colBuf.buf(), colBuf.len()));
+
+    ASSERT_EQ(col.contains_forTest(BSONType::NumberInt), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::NumberLong), true);
+    ASSERT_EQ(col.contains_forTest(BSONType::NumberDouble), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::Array), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::bsonTimestamp), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::String), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::Object), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::jstOID), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::Bool), false);
+
+    verifyBinary(binData, colBuf);
+}
+
+TEST_F(BSONColumnTest, ContainsScalarDoubleSimpleCompressed) {
+    BSONColumnBuilder cb;
+
+    // Column should have several scalar values of same type
+    // -> Double
+    auto elemDouble_0 = createElementDouble(100);
+    auto elemDouble_1 = createElementDouble(101);
+    cb.append(elemDouble_0);
+    cb.append(elemDouble_0);
+    cb.append(elemDouble_1);
+    auto binData = cb.finalize();
+
+    // Recreate cb "manually" to create the BSONColumn class, so as to
+    // test BSONColumn::contains_forTest
+    BufBuilder colBuf;
+    appendLiteral(colBuf, elemDouble_0);
+    appendSimple8bControl(
+        colBuf, 0b1001, 0b0000);  // Control = 1001 (double only, scale=0), CountOfSimple8b's = 0+1
+    std::vector<boost::optional<uint64_t>> v{deltaDouble(elemDouble_0, elemDouble_0, 1),
+                                             deltaDouble(elemDouble_1, elemDouble_0, 1)};
+    appendSimple8bBlocks64(colBuf, v, 1);
+    appendEOO(colBuf);
+    BSONColumn col(createBSONColumn(colBuf.buf(), colBuf.len()));
+
+    ASSERT_EQ(col.contains_forTest(BSONType::NumberInt), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::NumberLong), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::NumberDouble), true);
+    ASSERT_EQ(col.contains_forTest(BSONType::Array), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::bsonTimestamp), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::String), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::Object), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::jstOID), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::Bool), false);
+
+    verifyBinary(binData, colBuf);
+}
+
+TEST_F(BSONColumnTest, ContainsScalarTimestampSimpleCompressed) {
+    BSONColumnBuilder cb;
+
+    // Column should have several scalar values of same type
+    // -> Timestamp
+    auto elemTimestamp_0 = createTimestamp(Timestamp(0));
+    auto elemTimestamp_1 = createTimestamp(Timestamp(1));
+    cb.append(elemTimestamp_0);
+    cb.append(elemTimestamp_0);
+    cb.append(elemTimestamp_1);
+    auto binData = cb.finalize();
+
+    // Recreate cb "manually" to create the BSONColumn class, so as to
+    // test BSONColumn::contains_forTest
+    BufBuilder colBuf;
+    appendLiteral(colBuf, elemTimestamp_0);
+    appendSimple8bControl(colBuf, 0b1000, 0b0000);
+    std::vector<boost::optional<uint64_t>> expectedDeltaOfDeltas{
+        deltaOfDeltaTimestamp(elemTimestamp_0, elemTimestamp_0),
+        deltaOfDeltaTimestamp(elemTimestamp_1, elemTimestamp_0)};
+    appendSimple8bBlocks64(colBuf, expectedDeltaOfDeltas, 1);
+    appendEOO(colBuf);
+    BSONColumn col(createBSONColumn(colBuf.buf(), colBuf.len()));
+
+    ASSERT_EQ(col.contains_forTest(BSONType::NumberInt), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::NumberLong), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::NumberDouble), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::Array), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::bsonTimestamp), true);
+    ASSERT_EQ(col.contains_forTest(BSONType::String), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::Object), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::jstOID), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::Bool), false);
+
+    verifyBinary(binData, colBuf);
+}
+
+TEST_F(BSONColumnTest, ContainsScalarStringSimpleCompressed) {
+    BSONColumnBuilder cb;
+
+    // Column should have several scalar values of same type
+    // -> String
+    auto elemString_0 = createElementString("hello");
+    auto elemString_1 = createElementString("hellp");
+    cb.append(elemString_0);
+    cb.append(elemString_1);
+    auto binData = cb.finalize();
+
+    // Recreate cb "manually" to create the BSONColumn class, so as to
+    // test BSONColumn::contains_forTest
+    BufBuilder colBuf;
+    appendLiteral(colBuf, elemString_0);
+    appendSimple8bControl(colBuf, 0b1000, 0b0000);  // Control = 1, CountOfSimple8b's = 0+1
+    appendSimple8bBlock128(colBuf, deltaString(elemString_1, elemString_0));
+    appendEOO(colBuf);
+    BSONColumn col(createBSONColumn(colBuf.buf(), colBuf.len()));
+
+    ASSERT_EQ(col.contains_forTest(BSONType::NumberInt), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::NumberLong), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::NumberDouble), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::Array), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::bsonTimestamp), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::String), true);
+    ASSERT_EQ(col.contains_forTest(BSONType::Object), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::jstOID), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::Bool), false);
+
+    verifyBinary(binData, colBuf);
+}
+
+TEST_F(BSONColumnTest, ContainsScalarObjectIDSimpleCompressed) {
+    BSONColumnBuilder cb;
+
+    // Column should have several scalar values of same type
+    // -> ObjectID
+    auto elemObjectID_0 = createObjectId(OID("112233445566778899AABBCC"));
+    auto elemObjectID_1 = createObjectId(OID("112233445566778899AABBCD"));
+    cb.append(elemObjectID_0);
+    cb.append(elemObjectID_0);
+    cb.append(elemObjectID_1);
+    auto binData = cb.finalize();
+
+    // Recreate cb "manually" to create the BSONColumn class, so as to
+    // test BSONColumn::contains_forTest
+    BufBuilder colBuf;
+    appendLiteral(colBuf, elemObjectID_0);
+    appendSimple8bControl(colBuf, 0b1000, 0b0000);  // Control = 1, CountOfSimple8b's = 0+1
+
+    std::vector<boost::optional<uint64_t>> v{
+        // Don't encode first value.
+        // For second value, set prevprev to prev.
+        // => (val, prev, prev)
+        deltaOfDeltaObjectId(elemObjectID_0, elemObjectID_0, elemObjectID_0),
+        // steady state => (val, prev, prevprev)
+        deltaOfDeltaObjectId(elemObjectID_1, elemObjectID_0, elemObjectID_0)};
+    appendSimple8bBlocks64(colBuf, v, 1);
+    appendEOO(colBuf);
+    BSONColumn col(createBSONColumn(colBuf.buf(), colBuf.len()));
+
+    ASSERT_EQ(col.contains_forTest(BSONType::NumberInt), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::NumberLong), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::NumberDouble), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::Array), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::bsonTimestamp), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::String), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::Object), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::jstOID), true);
+    ASSERT_EQ(col.contains_forTest(BSONType::Bool), false);
+
+    verifyBinary(binData, colBuf);
+}
+
+TEST_F(BSONColumnTest, ContainsScalarBoolSimpleCompressed) {
+    BSONColumnBuilder cb;
+
+    // Column should have several scalar values of same type
+    // -> Bool
+    auto elemBool_0 = createBool(true);
+    auto elemBool_1 = createBool(false);
+    cb.append(elemBool_0);
+    cb.append(elemBool_0);
+    cb.append(elemBool_1);
+    auto binData = cb.finalize();
+
+    // Recreate cb "manually" to create the BSONColumn class, so as to
+    // test BSONColumn::contains_forTest
+    BufBuilder colBuf;
+    appendLiteral(colBuf, elemBool_0);
+    appendSimple8bControl(colBuf, 0b1000, 0b0000);  // Control = 1, CountOfSimple8b's = 0+1
+    std::vector<boost::optional<uint64_t>> v{deltaBool(elemBool_0, elemBool_0),
+                                             deltaBool(elemBool_1, elemBool_0)};
+    appendSimple8bBlocks64(colBuf, v, 1);
+    appendEOO(colBuf);
+    BSONColumn col(createBSONColumn(colBuf.buf(), colBuf.len()));
+
+    ASSERT_EQ(col.contains_forTest(BSONType::NumberInt), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::NumberLong), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::NumberDouble), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::Array), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::bsonTimestamp), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::String), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::Object), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::jstOID), false);
+    ASSERT_EQ(col.contains_forTest(BSONType::Bool), true);
+
+    verifyBinary(binData, colBuf);
 }
 
 TEST_F(BSONColumnTest, BasicValue) {
