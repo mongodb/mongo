@@ -686,6 +686,21 @@ long long retrieveNumOrphansFromRecipient(OperationContext* opCtx,
     return numOrphanDocsElem.safeNumberLong();
 }
 
+boost::optional<KeyPattern> getShardKeyPatternFromRangeDeletionTask(
+    OperationContext* opCtx, const MigrationCoordinatorDocument& migrationInfo) {
+    DBDirectClient client(opCtx);
+    FindCommandRequest findCommand(NamespaceString::kRangeDeletionNamespace);
+    findCommand.setFilter(BSON("_id" << migrationInfo.getId()));
+    auto cursor = client.find(std::move(findCommand));
+    if (!cursor->more()) {
+        // If the range deletion task doesn't exist then the migration must have been aborted, so
+        // we won't need the shard key pattern anyways.
+        return boost::none;
+    }
+    auto rdt = RangeDeletionTask::parse(IDLParserContext("MigrationRecovery"), cursor->next());
+    return rdt.getKeyPattern();
+}
+
 void notifyChangeStreamsOnRecipientFirstChunk(OperationContext* opCtx,
                                               const NamespaceString& collNss,
                                               const ShardId& fromShardId,
@@ -1014,6 +1029,7 @@ void recoverMigrationCoordinations(OperationContext* opCtx,
 
             if (doc.getDecision()) {
                 // The decision is already known.
+                coordinator.setShardKeyPattern(getShardKeyPatternFromRangeDeletionTask(opCtx, doc));
                 coordinator.completeMigration(opCtx);
                 return true;
             }
@@ -1110,6 +1126,7 @@ void recoverMigrationCoordinations(OperationContext* opCtx,
                 }
             }
 
+            coordinator.setShardKeyPattern(KeyPattern(currentMetadata.getKeyPattern()));
             coordinator.completeMigration(opCtx);
             setFilteringMetadata();
             return true;

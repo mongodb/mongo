@@ -110,6 +110,10 @@ TxnNumber MigrationCoordinator::getTxnNumber() const {
     return _migrationInfo.getTxnNumber();
 }
 
+void MigrationCoordinator::setShardKeyPattern(const boost::optional<KeyPattern>& shardKeyPattern) {
+    _shardKeyPattern = shardKeyPattern;
+}
+
 void MigrationCoordinator::startMigration(OperationContext* opCtx) {
     LOGV2_DEBUG(
         23889, 2, "Persisting migration coordinator doc", "migrationDoc"_attr = _migrationInfo);
@@ -250,6 +254,10 @@ SharedSemiFuture<void> MigrationCoordinator::_commitMigrationOnDonorAndRecipient
                                    _waitForDelete ? CleanWhenEnum::kNow : CleanWhenEnum::kDelayed);
     const auto currentTime = VectorClock::get(opCtx)->getTime();
     deletionTask.setTimestamp(currentTime.clusterTime().asTimestamp());
+    // In multiversion migration recovery scenarios, we may not have the key pattern.
+    if (_shardKeyPattern) {
+        deletionTask.setKeyPattern(*_shardKeyPattern);
+    }
 
     if (!feature_flags::gRangeDeleterService.isEnabledAndIgnoreFCV()) {
         LOGV2_DEBUG(23897,

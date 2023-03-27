@@ -169,6 +169,12 @@ long long retrieveNumOrphansFromRecipient(OperationContext* opCtx,
                                           const MigrationCoordinatorDocument& migrationInfo);
 
 /**
+ * Retrieves the shard key pattern from the local range deletion task.
+ */
+boost::optional<KeyPattern> getShardKeyPatternFromRangeDeletionTask(
+    OperationContext* opCtx, const MigrationCoordinatorDocument& migrationInfo);
+
+/**
  * Updates the migration coordinator document to set the decision field to "committed" and waits for
  * majority writeConcern.
  */

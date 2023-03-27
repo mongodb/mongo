@@ -66,6 +66,12 @@ public:
     TxnNumber getTxnNumber() const;
 
     /**
+     * Sets the shard key pattern on the coordinator. Needs to be called by migration recovery to
+     * allow the range deletion task to access the shard key pattern.
+     */
+    void setShardKeyPattern(const boost::optional<KeyPattern>& shardKeyPattern);
+
+    /**
      * Initializes persistent state required to ensure that orphaned ranges are properly handled,
      * even after failover, by doing the following:
      *
