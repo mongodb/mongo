@@ -464,6 +464,33 @@ boost::optional<IndexEntry> createExpandedIndexEntry(const IndexEntry& wildcardI
                      wildcardFieldPos);
     return entry;
 }
+
+/**
+ * Determines if an expanded index entry can satisfy a query on a wildcard field with a FETCH
+ * (for e.g., it may only be able to answer a query on the prefix if the wildcard field is being
+ * queried with an incompatible $not predicate).
+ *
+ * Note: we could just use 'index.keyPattern' here for this check, but then we would have to iterate
+ * through the entire pattern to get to the field at 'wildcardPos'.
+ */
+bool canOnlyAnswerWildcardPrefixQuery(const IndexEntry& index, const IndexBounds& bounds) {
+    tassert(7444000, "Expected a wildcard index.", index.type == INDEX_WILDCARD);
+    tassert(7444001,
+            "A wildcard index should always have a virtual $_path field at wildcardFieldPos - 1.",
+            bounds.fields[index.wildcardFieldPos - 1].name == "$_path"_sd);
+
+    if (index.wildcardFieldPos == 1) {
+        // This is either a single-field wildcard index, or a compound wildcard index without a
+        // prefix.
+        return false;
+    }
+
+    // If the index entry was not expanded to include a second $_path field, we cannot answer a
+    // query on a wildcard field with an IXSCAN + FETCH if the predicate itself is, for e.g. an
+    // ineligible $not query, because we won't retrieve documents where the wildcard field is
+    // missing from the IXSCAN.
+    return bounds.fields[index.wildcardFieldPos].name != "$_path"_sd;
+}
 }  // namespace
 
 void expandWildcardIndexEntry(const IndexEntry& wildcardIndex,
@@ -548,23 +575,19 @@ void expandWildcardIndexEntry(const IndexEntry& wildcardIndex,
     }
 }
 
-bool canOnlyAnswerWildcardPrefixQuery(const IndexEntry& index, const IndexBounds& bounds) {
-    tassert(7444000, "Expected a wildcard index.", index.type == INDEX_WILDCARD);
-    tassert(7444001,
-            "A wildcard index should always have a virtual $_path field at wildcardFieldPos - 1.",
-            bounds.fields[index.wildcardFieldPos - 1].name == "$_path"_sd);
-
-    if (index.wildcardFieldPos == 1) {
-        // This is either a single-field wildcard index, or a compound wildcard index without a
-        // prefix.
+bool canOnlyAnswerWildcardPrefixQuery(
+    const std::vector<std::unique_ptr<QuerySolutionNode>>& ixscanNodes) {
+    return std::any_of(ixscanNodes.begin(), ixscanNodes.end(), [](const auto& node) {
+        if (node->getType() == StageType::STAGE_IXSCAN) {
+            const auto* ixScanNode = static_cast<IndexScanNode*>(node.get());
+            const auto& index = ixScanNode->index;
+            if (index.type == INDEX_WILDCARD &&
+                canOnlyAnswerWildcardPrefixQuery(index, ixScanNode->bounds)) {
+                return true;
+            }
+        }
         return false;
-    }
-
-    // If the index entry was not expanded to include a second $_path field, we cannot answer a
-    // query on a wildcard field with an IXSCAN + FETCH if the predicate itself is, for e.g. an
-    // ineligible $not query, because we won't retrieve documents where the wildcard field is
-    // missing from the IXSCAN.
-    return bounds.fields[index.wildcardFieldPos].name != "$_path"_sd;
+    });
 }
 
 BoundsTightness translateWildcardIndexBoundsAndTightness(
