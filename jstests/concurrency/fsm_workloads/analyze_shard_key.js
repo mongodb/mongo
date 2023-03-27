@@ -226,25 +226,7 @@ var $config = extendWorkload($config, function($config, $super) {
 
         assert.commandWorked(
             db.runCommand({createIndexes: collName, indexes: this.shardKeyOptions.indexSpecs}));
-
-        if (cluster.isSharded()) {
-            // Distribute the inserts across the mongoses since the traffic distribution determines
-            // the sample rate distribution when query sampling starts.
-            const numDocsPerMongos = Math.floor(docs.length / this.numMongoses);
-
-            let mongosIndex = 0;
-            cluster.executeOnMongosNodes((adminDb) => {
-                const startIndex = mongosIndex * numDocsPerMongos;
-                const endIndex = (mongosIndex + 1) * numDocsPerMongos;
-                assert.commandWorked(adminDb.getSiblingDB(db.getName()).runCommand({
-                    insert: collName,
-                    documents: docs.slice(startIndex, endIndex)
-                }));
-                mongosIndex++;
-            });
-        } else {
-            assert.commandWorked(db.runCommand({insert: collName, documents: docs}));
-        }
+        assert.commandWorked(db.runCommand({insert: collName, documents: docs}));
 
         // Wait for the documents to get replicated to all nodes so that a analyzeShardKey command
         // runs immediately after this can assert on the metrics regardless of which nodes it
@@ -542,51 +524,46 @@ var $config = extendWorkload($config, function($config, $super) {
      * Verifies that the metrics about the read and write distribution are within acceptable ranges.
      */
     $config.data.assertReadWriteDistributionMetrics = function assertReadWriteDistributionMetrics(
-        db, metrics, isFinal) {
-        // TODO (SERVER-75228): Make analyzeShardKey concurrency workload also validate read and
-        // write distribution metrics when running on replica sets
-        if (isMongos(db)) {
-            AnalyzeShardKeyUtil.assertContainReadWriteDistributionMetrics(metrics);
+        metrics, isFinal) {
+        AnalyzeShardKeyUtil.assertContainReadWriteDistributionMetrics(metrics);
 
-            let assertReadMetricsDiff = (actual, expected) => {
-                const maxDiff = isFinal ? this.finalReadDistributionMetricsMaxDiff
-                                        : this.intermediateReadDistributionMetricsMaxDiff;
-                assert.lt(Math.abs(actual - expected), maxDiff, {actual, expected});
-            };
-            let assertWriteMetricsDiff = (actual, expected) => {
-                const maxDiff = isFinal ? this.finalWriteDistributionMetricsMaxDiff
-                                        : this.intermediateWriteDistributionMetricsMaxDiff;
-                assert.lt(Math.abs(actual - expected), maxDiff, {actual, expected});
-            };
+        let assertReadMetricsDiff = (actual, expected) => {
+            const maxDiff = isFinal ? this.finalReadDistributionMetricsMaxDiff
+                                    : this.intermediateReadDistributionMetricsMaxDiff;
+            assert.lt(Math.abs(actual - expected), maxDiff, {actual, expected});
+        };
+        let assertWriteMetricsDiff = (actual, expected) => {
+            const maxDiff = isFinal ? this.finalWriteDistributionMetricsMaxDiff
+                                    : this.intermediateWriteDistributionMetricsMaxDiff;
+            assert.lt(Math.abs(actual - expected), maxDiff, {actual, expected});
+        };
 
-            if (metrics.readDistribution.sampleSize.total > this.numSampledQueriesThreshold) {
-                assertReadMetricsDiff(metrics.readDistribution.percentageOfSingleShardReads,
-                                      this.readDistribution.percentageOfSingleShardReads);
-                assertReadMetricsDiff(metrics.readDistribution.percentageOfMultiShardReads,
-                                      this.readDistribution.percentageOfMultiShardReads);
-                assertReadMetricsDiff(metrics.readDistribution.percentageOfScatterGatherReads,
-                                      this.readDistribution.percentageOfScatterGatherReads);
-                assert.eq(metrics.readDistribution.numReadsByRange.length,
-                          this.analyzeShardKeyNumRanges);
-            }
-            if (metrics.writeDistribution.sampleSize.total > this.numSampledQueriesThreshold) {
-                assertWriteMetricsDiff(metrics.writeDistribution.percentageOfSingleShardWrites,
-                                       this.writeDistribution.percentageOfSingleShardWrites);
-                assertWriteMetricsDiff(metrics.writeDistribution.percentageOfMultiShardWrites,
-                                       this.writeDistribution.percentageOfMultiShardWrites);
-                assertWriteMetricsDiff(metrics.writeDistribution.percentageOfScatterGatherWrites,
-                                       this.writeDistribution.percentageOfScatterGatherWrites);
-                assertWriteMetricsDiff(metrics.writeDistribution.percentageOfShardKeyUpdates,
-                                       this.writeDistribution.percentageOfShardKeyUpdates);
-                assertWriteMetricsDiff(
-                    metrics.writeDistribution.percentageOfSingleWritesWithoutShardKey,
-                    this.writeDistribution.percentageOfSingleWritesWithoutShardKey);
-                assertWriteMetricsDiff(
-                    metrics.writeDistribution.percentageOfMultiWritesWithoutShardKey,
-                    this.writeDistribution.percentageOfMultiWritesWithoutShardKey);
-                assert.eq(metrics.writeDistribution.numWritesByRange.length,
-                          this.analyzeShardKeyNumRanges);
-            }
+        if (metrics.readDistribution.sampleSize.total > this.numSampledQueriesThreshold) {
+            assertReadMetricsDiff(metrics.readDistribution.percentageOfSingleShardReads,
+                                  this.readDistribution.percentageOfSingleShardReads);
+            assertReadMetricsDiff(metrics.readDistribution.percentageOfMultiShardReads,
+                                  this.readDistribution.percentageOfMultiShardReads);
+            assertReadMetricsDiff(metrics.readDistribution.percentageOfScatterGatherReads,
+                                  this.readDistribution.percentageOfScatterGatherReads);
+            assert.eq(metrics.readDistribution.numReadsByRange.length,
+                      this.analyzeShardKeyNumRanges);
+        }
+        if (metrics.writeDistribution.sampleSize.total > this.numSampledQueriesThreshold) {
+            assertWriteMetricsDiff(metrics.writeDistribution.percentageOfSingleShardWrites,
+                                   this.writeDistribution.percentageOfSingleShardWrites);
+            assertWriteMetricsDiff(metrics.writeDistribution.percentageOfMultiShardWrites,
+                                   this.writeDistribution.percentageOfMultiShardWrites);
+            assertWriteMetricsDiff(metrics.writeDistribution.percentageOfScatterGatherWrites,
+                                   this.writeDistribution.percentageOfScatterGatherWrites);
+            assertWriteMetricsDiff(metrics.writeDistribution.percentageOfShardKeyUpdates,
+                                   this.writeDistribution.percentageOfShardKeyUpdates);
+            assertWriteMetricsDiff(
+                metrics.writeDistribution.percentageOfSingleWritesWithoutShardKey,
+                this.writeDistribution.percentageOfSingleWritesWithoutShardKey);
+            assertWriteMetricsDiff(metrics.writeDistribution.percentageOfMultiWritesWithoutShardKey,
+                                   this.writeDistribution.percentageOfMultiWritesWithoutShardKey);
+            assert.eq(metrics.writeDistribution.numWritesByRange.length,
+                      this.analyzeShardKeyNumRanges);
         }
     };
 
@@ -681,9 +658,7 @@ var $config = extendWorkload($config, function($config, $super) {
         // Force all mongoses and mongods to only sample queries that are explicitly marked
         // as eligible for sampling.
         if (cluster.isSharded) {
-            this.numMongoses = 0;
             cluster.executeOnMongosNodes((adminDb) => {
-                this.numMongoses++;
                 configureFailPoint(adminDb,
                                    "queryAnalysisSamplerFilterByComment",
                                    {comment: this.eligibleForSamplingComment});
@@ -732,7 +707,7 @@ var $config = extendWorkload($config, function($config, $super) {
         const metrics = res.cursor.firstBatch[0].metrics;
         print("Doing final validation of read and write distribution metrics " +
               tojson(this.truncateAnalyzeShardKeyResponseForLogging(metrics)));
-        this.assertReadWriteDistributionMetrics(db, metrics, true /* isFinal */);
+        this.assertReadWriteDistributionMetrics(metrics, true /* isFinal */);
     };
 
     $config.states.init = function init(db, collName) {
@@ -749,7 +724,7 @@ var $config = extendWorkload($config, function($config, $super) {
             print("Metrics: " +
                   tojsononeline({res: this.truncateAnalyzeShardKeyResponseForLogging(res)}));
             this.assertKeyCharacteristicsMetrics(res);
-            this.assertReadWriteDistributionMetrics(db, res, false /* isFinal */);
+            this.assertReadWriteDistributionMetrics(res, false /* isFinal */);
             // Persist the metrics so we can do the final validation during teardown.
             assert.commandWorked(
                 db[this.metricsCollName].update({_id: this.metricsDocId},
