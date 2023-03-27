@@ -394,8 +394,8 @@ buildvariants:
     distros:
     - amazon2022-large
   - name: test_api_version_compatibility
-  - name: .aggfuzzer !.multiversion
-  - name: .aggregation
+  - name: .aggfuzzer !.feature_flag_guarded !.multiversion
+  - name: .aggregation !.feature_flag_guarded
   - name: audit
   - name: .auth !.multiversion
   - name: .causally_consistent !.sharding
@@ -415,7 +415,7 @@ buildvariants:
   - name: jsCore
     distros:
     - amazon2022-large
-  - name: .jscore .common !jsCore
+  - name: .jscore .common !jsCore !.feature_flag_guarded
   - name: jsCore_txns_large_txns_format
   - name: json_schema
   - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer.
@@ -1502,7 +1502,7 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - rhel90-arm64-large
-  - name: .aggfuzzer !.multiversion
+  - name: .aggfuzzer !.feature_flag_guarded !.multiversion
   - name: audit
   - name: auth_audit_gen
   - name: auth_gen
