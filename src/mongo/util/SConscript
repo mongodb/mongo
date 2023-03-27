@@ -92,6 +92,7 @@ env.SConscript(
     dirs=[
         'cmdline_utils',
         'concurrency',
+        'immutable',
         'net',
         'options_parser',
         'version',

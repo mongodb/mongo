@@ -25,6 +25,8 @@ selector:
   - build/install/bin/abt_translation_bm*
   # These benchmarks are being run as part of the benchmarks_streams.yml test suite.
   - build/install/bin/streams_operator_dag_bm*
+  # These benchmarks are only run when modifying or upgrading the immutable library.
+  - build/install/bin/absl_comparison_bm*
 
 
 executor:
