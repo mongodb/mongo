@@ -268,7 +268,7 @@ void finishCurOp(OperationContext* opCtx, CurOp* curOp) {
     try {
         curOp->done();
         auto executionTimeMicros = duration_cast<Microseconds>(curOp->elapsedTimeExcludingPauses());
-        curOp->debug().executionTime = executionTimeMicros;
+        curOp->debug().additiveMetrics.executionTime = executionTimeMicros;
 
         recordCurOpMetrics(opCtx);
         Top::get(opCtx->getServiceContext())

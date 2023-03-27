@@ -106,10 +106,6 @@ public:
 
     boost::optional<uint32_t> getQueryHash() const final;
 
-    std::uint64_t getNBatches() const final;
-
-    void incNBatches() final;
-
     /**
      * Returns false unless the mock cursor has been fully iterated.
      */

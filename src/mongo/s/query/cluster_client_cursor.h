@@ -214,19 +214,19 @@ public:
     /**
      * Returns the number of batches returned by this cursor.
      */
-    virtual std::uint64_t getNBatches() const = 0;
+    std::uint64_t getNBatches() const {
+        return _metrics.nBatches.value_or(0);
+    }
 
     /**
      * Increment the number of batches returned so far by one.
      */
-    virtual void incNBatches() = 0;
+    void incNBatches() {
+        _metrics.incrementNBatches();
+    }
 
-    void incrementCursorMetrics(OpDebug::AdditiveMetrics newMetrics,
-                                uint64_t newExecutionTime,
-                                uint64_t newDocsReturned) {
+    void incrementCursorMetrics(OpDebug::AdditiveMetrics newMetrics) {
         _metrics.add(newMetrics);
-        _queryExecMicros += newExecutionTime;
-        _docsReturned += newDocsReturned;
     }
 
     //
@@ -254,9 +254,8 @@ public:
     }
 
 protected:
-    // Metrics used for telemetry. TODO SERVER-73933 consider merging more into '_metrics'
-    uint64_t _queryExecMicros = 0;
-    uint64_t _docsReturned = 0;
+    // Metrics that are accumulated over the lifetime of the cursor, incremented with each getMore.
+    // Useful for diagnostics like telemetry.
     OpDebug::AdditiveMetrics _metrics;
 
 private:

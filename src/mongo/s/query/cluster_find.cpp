@@ -441,9 +441,10 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
         cursorState = ClusterCursorManager::CursorState::Exhausted;
     }
 
+    auto&& opDebug = CurOp::get(opCtx)->debug();
     // Fill out query exec properties.
-    CurOp::get(opCtx)->debug().nShards = ccc->getNumRemotes();
-    CurOp::get(opCtx)->debug().nreturned = results->size();
+    opDebug.nShards = ccc->getNumRemotes();
+    opDebug.additiveMetrics.nBatches = 1;
 
     // If the caller wants to know whether the cursor returned partial results, set it here.
     if (partialResultsReturned) {
@@ -454,12 +455,12 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
     // If the cursor is exhausted, then there are no more results to return and we don't need to
     // allocate a cursor id.
     if (cursorState == ClusterCursorManager::CursorState::Exhausted) {
-        CurOp::get(opCtx)->debug().cursorExhausted = true;
+        opDebug.cursorExhausted = true;
 
         if (shardIds.size() > 0) {
             updateNumHostsTargetedMetrics(opCtx, cm, shardIds.size());
         }
-        collectTelemetryMongos(opCtx, ccc->getOriginatingCommand());
+        collectTelemetryMongos(opCtx, ccc->getOriginatingCommand(), results->size());
         return CursorId(0);
     }
 
@@ -470,14 +471,13 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
         ? ClusterCursorManager::CursorLifetime::Immortal
         : ClusterCursorManager::CursorLifetime::Mortal;
     auto authUser = AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserName();
-    ccc->incNBatches();
-    collectTelemetryMongos(opCtx, ccc);
+    collectTelemetryMongos(opCtx, ccc, results->size());
 
     auto cursorId = uassertStatusOK(cursorManager->registerCursor(
         opCtx, ccc.releaseCursor(), query.nss(), cursorType, cursorLifetime, authUser));
 
     // Record the cursorID in CurOp.
-    CurOp::get(opCtx)->debug().cursorid = cursorId;
+    opDebug.cursorid = cursorId;
 
     if (shardIds.size() > 0) {
         updateNumHostsTargetedMetrics(opCtx, cm, shardIds.size());
@@ -931,14 +931,14 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
         postBatchResumeToken = pinnedCursor.getValue()->getPostBatchResumeToken();
     }
 
+    auto&& opDebug = CurOp::get(opCtx)->debug();
     // Set nReturned and whether the cursor has been exhausted.
-    CurOp::get(opCtx)->debug().cursorExhausted = (idToReturn == 0);
-    CurOp::get(opCtx)->debug().nreturned = batch.size();
+    opDebug.cursorExhausted = (idToReturn == 0);
+    opDebug.additiveMetrics.nBatches = 1;
 
     const bool partialResultsReturned = pinnedCursor.getValue()->partialResultsReturned();
     pinnedCursor.getValue()->setLeftoverMaxTimeMicros(opCtx->getRemainingMaxTimeMicros());
-    pinnedCursor.getValue()->incNBatches();
-    collectTelemetryMongos(opCtx, pinnedCursor.getValue());
+    collectTelemetryMongos(opCtx, pinnedCursor.getValue(), batch.size());
 
     // Upon successful completion, transfer ownership of the cursor back to the cursor manager. If
     // the cursor has been exhausted, the cursor manager will clean it up for us.

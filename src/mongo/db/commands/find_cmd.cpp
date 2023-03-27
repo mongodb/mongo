@@ -612,7 +612,7 @@ public:
                 // there is no ClientCursor id, and then return.
                 const long long numResults = 0;
                 const CursorId cursorId = 0;
-                endQueryOp(opCtx, collection, *exec, numResults, cursorId);
+                endQueryOp(opCtx, collection, *exec, numResults, boost::none, cmdObj);
                 auto bodyBuilder = result->getBodyBuilder();
                 appendCursorResponseObject(cursorId, nss, BSONArray(), boost::none, &bodyBuilder);
                 return;
@@ -712,11 +712,9 @@ public:
                     pinnedCursor.getCursor()->setLeftoverMaxTimeMicros(
                         opCtx->getRemainingMaxTimeMicros());
                 }
-                pinnedCursor.getCursor()->setNReturnedSoFar(numResults);
-                pinnedCursor.getCursor()->incNBatches();
 
                 // Fill out curop based on the results.
-                endQueryOp(opCtx, collection, *cursorExec, numResults, cursorId);
+                endQueryOp(opCtx, collection, *cursorExec, numResults, pinnedCursor, cmdObj);
 
                 if (stashResourcesForGetMore) {
                     // Collect storage stats now before we stash the recovery unit. These stats are
@@ -730,13 +728,11 @@ public:
                     CurOp::get(opCtx)->debug().storageStats =
                         opCtx->recoveryUnit()->computeOperationStatisticsSinceLastCall();
                 }
-                collectTelemetryMongod(opCtx, pinnedCursor);
             } else {
-                endQueryOp(opCtx, collection, *exec, numResults, cursorId);
+                endQueryOp(opCtx, collection, *exec, numResults, boost::none, cmdObj);
                 // We want to destroy executor as soon as possible to release any resources locks it
                 // may hold.
                 exec.reset();
-                collectTelemetryMongod(opCtx, cmdObj);
             }
 
             // Generate the response object to send to the client.

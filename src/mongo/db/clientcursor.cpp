@@ -157,8 +157,11 @@ void ClientCursor::dispose(OperationContext* opCtx, boost::optional<Date_t> now)
     }
 
     if (_telemetryStoreKey && opCtx) {
-        telemetry::writeTelemetry(
-            opCtx, _telemetryStoreKey, getOriginatingCommandObj(), _queryExecMicros, _docsReturned);
+        telemetry::writeTelemetry(opCtx,
+                                  _telemetryStoreKey,
+                                  getOriginatingCommandObj(),
+                                  _metrics.executionTime.value_or(Microseconds{0}).count(),
+                                  _metrics.nreturned.value_or(0));
     }
 
     if (now) {
@@ -170,7 +173,7 @@ void ClientCursor::dispose(OperationContext* opCtx, boost::optional<Date_t> now)
         cursorStatsOpenNoTimeout.decrement();
     }
 
-    if (_nBatchesReturned > 1) {
+    if (_metrics.nBatches && *_metrics.nBatches > 1) {
         cursorStatsMoreThanOneBatch.increment();
     }
 
@@ -185,7 +188,7 @@ GenericCursor ClientCursor::toGenericCursor() const {
     GenericCursor gc;
     gc.setCursorId(cursorid());
     gc.setNs(nss());
-    gc.setNDocsReturned(_nReturnedSoFar);
+    gc.setNDocsReturned(_metrics.nreturned.value_or(0));
     gc.setTailable(isTailable());
     gc.setAwaitData(isAwaitData());
     gc.setNoCursorTimeout(isNoTimeout());
@@ -388,28 +391,29 @@ void startClientCursorMonitor() {
     getClientCursorMonitor(getGlobalServiceContext()).go();
 }
 
-void collectTelemetryMongod(OperationContext* opCtx, ClientCursorPin& pinnedCursor) {
-    auto&& opDebug = CurOp::get(opCtx)->debug();
-
-    // We have to use `elapsedTimeExcludingPauses` to count execution time since
-    // additiveMetrics.queryExecMicros isn't set until curOp is closing out.
-    pinnedCursor->incrementCursorMetrics(opDebug.additiveMetrics,
-                                         CurOp::get(opCtx)->elapsedTimeExcludingPauses().count(),
-                                         opDebug.nreturned);
+void collectTelemetryMongod(OperationContext* opCtx,
+                            ClientCursorPin& pinnedCursor,
+                            long long nreturned) {
+    auto curOp = CurOp::get(opCtx);
+    telemetry::collectMetricsOnOpDebug(curOp, nreturned);
+    pinnedCursor->incrementCursorMetrics(curOp->debug().additiveMetrics);
 }
 
-void collectTelemetryMongod(OperationContext* opCtx, const BSONObj& originatingCommand) {
-    auto&& opDebug = CurOp::get(opCtx)->debug();
+void collectTelemetryMongod(OperationContext* opCtx,
+                            const BSONObj& originatingCommand,
+                            long long nreturned) {
+    auto curOp = CurOp::get(opCtx);
+    telemetry::collectMetricsOnOpDebug(curOp, nreturned);
+
     // If we haven't registered a cursor to prepare for getMore requests, we record
     // telemetry directly.
-    //
-    // We have to use `elapsedTimeExcludingPauses` to count execution time since
-    // additiveMetrics.queryExecMicros isn't set until curOp is closing out.
-    telemetry::writeTelemetry(opCtx,
-                              opDebug.telemetryStoreKey,
-                              originatingCommand,
-                              CurOp::get(opCtx)->elapsedTimeExcludingPauses().count(),
-                              opDebug.nreturned);
+    auto& opDebug = curOp->debug();
+    telemetry::writeTelemetry(
+        opCtx,
+        opDebug.telemetryStoreKey,
+        originatingCommand,
+        opDebug.additiveMetrics.executionTime.value_or(Microseconds{0}).count(),
+        opDebug.additiveMetrics.nreturned.value_or(0));
 }
 
 }  // namespace mongo

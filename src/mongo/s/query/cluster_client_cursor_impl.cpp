@@ -99,7 +99,7 @@ ClusterClientCursorImpl::ClusterClientCursorImpl(OperationContext* opCtx,
 }
 
 ClusterClientCursorImpl::~ClusterClientCursorImpl() {
-    if (_nBatchesReturned > 1)
+    if (_metrics.nBatches && *_metrics.nBatches > 1)
         mongosCursorStatsMoreThanOneBatch.increment();
 }
 
@@ -138,8 +138,11 @@ void ClusterClientCursorImpl::kill(OperationContext* opCtx) {
     }
 
     if (_telemetryStoreKey && opCtx) {
-        telemetry::writeTelemetry(
-            opCtx, _telemetryStoreKey, getOriginatingCommand(), _queryExecMicros, _docsReturned);
+        telemetry::writeTelemetry(opCtx,
+                                  _telemetryStoreKey,
+                                  getOriginatingCommand(),
+                                  _metrics.executionTime.value_or(Microseconds{0}).count(),
+                                  _metrics.nreturned.value_or(0));
     }
 
     _root->kill(opCtx);
@@ -231,14 +234,6 @@ void ClusterClientCursorImpl::setLastUseDate(Date_t now) {
 
 boost::optional<uint32_t> ClusterClientCursorImpl::getQueryHash() const {
     return _queryHash;
-}
-
-std::uint64_t ClusterClientCursorImpl::getNBatches() const {
-    return _nBatchesReturned;
-}
-
-void ClusterClientCursorImpl::incNBatches() {
-    ++_nBatchesReturned;
 }
 
 APIParameters ClusterClientCursorImpl::getAPIParameters() const {

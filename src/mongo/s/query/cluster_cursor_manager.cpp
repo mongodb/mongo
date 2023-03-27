@@ -588,36 +588,37 @@ StatusWith<ClusterClientCursorGuard> ClusterCursorManager::_detachCursor(WithLoc
     return std::move(cursor);
 }
 
-void collectTelemetryMongos(OperationContext* opCtx, const BSONObj& originatingCommand) {
-    auto&& opDebug = CurOp::get(opCtx)->debug();
+void collectTelemetryMongos(OperationContext* opCtx,
+                            const BSONObj& originatingCommand,
+                            long long nreturned) {
+    auto curOp = CurOp::get(opCtx);
+    telemetry::collectMetricsOnOpDebug(curOp, nreturned);
+
     // If we haven't registered a cursor to prepare for getMore requests, we record
     // telemetry directly.
-    //
-    // We have to use `elapsedTimeExcludingPauses` to count execution time since
-    // additiveMetrics.queryExecMicros isn't set until curOp is closing out.
-    telemetry::writeTelemetry(opCtx,
-                              opDebug.telemetryStoreKey,
-                              originatingCommand,
-                              CurOp::get(opCtx)->elapsedTimeExcludingPauses().count(),
-                              opDebug.nreturned);
+    auto&& opDebug = CurOp::get(opCtx)->debug();
+    telemetry::writeTelemetry(
+        opCtx,
+        opDebug.telemetryStoreKey,
+        originatingCommand,
+        opDebug.additiveMetrics.executionTime.value_or(Microseconds{0}).count(),
+        opDebug.additiveMetrics.nreturned.value_or(0));
 }
 
-void collectTelemetryMongos(OperationContext* opCtx, ClusterClientCursorGuard& cursor) {
-    auto&& opDebug = CurOp::get(opCtx)->debug();
-    // We have to use `elapsedTimeExcludingPauses` to count execution time since
-    // additiveMetrics.queryExecMicros isn't set until curOp is closing out.
-    cursor->incrementCursorMetrics(opDebug.additiveMetrics,
-                                   CurOp::get(opCtx)->elapsedTimeExcludingPauses().count(),
-                                   opDebug.nreturned);
+void collectTelemetryMongos(OperationContext* opCtx,
+                            ClusterClientCursorGuard& cursor,
+                            long long nreturned) {
+    auto curOp = CurOp::get(opCtx);
+    telemetry::collectMetricsOnOpDebug(curOp, nreturned);
+    cursor->incrementCursorMetrics(curOp->debug().additiveMetrics);
 }
 
-void collectTelemetryMongos(OperationContext* opCtx, ClusterCursorManager::PinnedCursor& cursor) {
-    auto&& opDebug = CurOp::get(opCtx)->debug();
-    // We have to use `elapsedTimeExcludingPauses` to count execution time since
-    // additiveMetrics.queryExecMicros isn't set until curOp is closing out.
-    cursor->incrementCursorMetrics(opDebug.additiveMetrics,
-                                   CurOp::get(opCtx)->elapsedTimeExcludingPauses().count(),
-                                   opDebug.nreturned);
+void collectTelemetryMongos(OperationContext* opCtx,
+                            ClusterCursorManager::PinnedCursor& cursor,
+                            long long nreturned) {
+    auto curOp = CurOp::get(opCtx);
+    telemetry::collectMetricsOnOpDebug(curOp, nreturned);
+    cursor->incrementCursorMetrics(curOp->debug().additiveMetrics);
 }
 
 }  // namespace mongo

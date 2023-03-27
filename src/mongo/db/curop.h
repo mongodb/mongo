@@ -67,8 +67,10 @@ struct PlanSummaryStats;
 class OpDebug {
 public:
     /**
-     * Holds counters for execution statistics that are meaningful both for multi-statement
-     * transactions and for individual operations outside of a transaction.
+     * Holds counters for execution statistics that can be accumulated by one or more operations.
+     * They're accumulated as we go for a single operation, but are also extracted and stored
+     * externally if they need to be accumulated across multiple operations (which have multiple
+     * CurOps), including for cursors and multi-statement transactions.
      */
     class AdditiveMetrics {
     public:
@@ -121,6 +123,16 @@ public:
         void incrementKeysDeleted(long long n);
 
         /**
+         * Increments nreturned by n.
+         */
+        void incrementNreturned(long long n);
+
+        /**
+         * Increments nBatches by 1.
+         */
+        void incrementNBatches();
+
+        /**
          * Increments ninserted by n.
          */
         void incrementNinserted(long long n);
@@ -134,6 +146,11 @@ public:
          * Increments prepareReadConflicts by n.
          */
         void incrementPrepareReadConflicts(long long n);
+
+        /**
+         * Increments executionTime by n.
+         */
+        void incrementExecutionTime(Microseconds n);
 
         /**
          * Generates a string showing all non-empty fields. For every non-empty field field1,
@@ -150,6 +167,10 @@ public:
 
         // Number of records that match the query.
         boost::optional<long long> nMatched;
+        // Number of records returned so far.
+        boost::optional<long long> nreturned;
+        // Number of batches returned so far.
+        boost::optional<long long> nBatches;
         // Number of records written (no no-ops).
         boost::optional<long long> nModified;
         boost::optional<long long> ninserted;
@@ -170,6 +191,9 @@ public:
         AtomicWord<long long> prepareReadConflicts{0};
         AtomicWord<long long> writeConflicts{0};
         AtomicWord<long long> temporarilyUnavailableErrors{0};
+
+        // Amount of time spent executing a query.
+        boost::optional<Microseconds> executionTime;
     };
 
     OpDebug() = default;
@@ -292,14 +316,10 @@ public:
     // after optimizations.
     Microseconds planningTime{0};
 
-    // response info
-    Microseconds executionTime{0};
-
     // Amount of CPU time used by this thread. Will remain zero if this platform does not support
     // this feature.
     Nanoseconds cpuTime{0};
 
-    long long nreturned{-1};
     int responseLength{-1};
 
     // Shard targeting info.
@@ -343,7 +363,9 @@ public:
     // Used to track the amount of time spent waiting for a response from remote operations.
     boost::optional<Microseconds> remoteOpWaitTime;
 
-    // Stores additive metrics.
+    // Stores the current operation's count of these metrics. If they are needed to be accumulated
+    // elsewhere, they should be extracted by another aggregator (like the ClientCursor) to ensure
+    // these only ever reflect just this CurOp's consumption.
     AdditiveMetrics additiveMetrics;
 
     // Stores storage statistics.

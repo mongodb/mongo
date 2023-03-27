@@ -107,19 +107,27 @@ void endQueryOp(OperationContext* opCtx,
                 const CollectionPtr& collection,
                 const PlanExecutor& exec,
                 long long numResults,
-                CursorId cursorId) {
+                boost::optional<ClientCursorPin&> cursor,
+                const BSONObj& cmdObj) {
     auto curOp = CurOp::get(opCtx);
 
-    // Fill out basic CurOp query exec properties.
-    curOp->debug().nreturned = numResults;
-    curOp->debug().cursorid = (0 == cursorId ? -1 : cursorId);
-    curOp->debug().cursorExhausted = (0 == cursorId);
+    // Fill out basic CurOp query exec properties. More metrics (nreturned and executionTime)
+    // are collected within collectTelemetryMongod.
+    curOp->debug().cursorid = (cursor.has_value() ? cursor->getCursor()->cursorid() : -1);
+    curOp->debug().cursorExhausted = !cursor.has_value();
+    curOp->debug().additiveMetrics.nBatches = 1;
 
     // Fill out CurOp based on explain summary statistics.
     PlanSummaryStats summaryStats;
     auto&& explainer = exec.getPlanExplainer();
     explainer.getSummaryStats(&summaryStats);
     curOp->debug().setPlanSummaryMetrics(summaryStats);
+
+    if (cursor) {
+        collectTelemetryMongod(opCtx, *cursor, numResults);
+    } else {
+        collectTelemetryMongod(opCtx, cmdObj, numResults);
+    }
 
     if (collection) {
         CollectionQueryInfo::get(collection).notifyOfQuery(opCtx, collection, summaryStats);

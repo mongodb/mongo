@@ -73,6 +73,7 @@ void endQueryOp(OperationContext* opCtx,
                 const CollectionPtr& collection,
                 const PlanExecutor& exec,
                 long long numResults,
-                CursorId cursorId);
+                boost::optional<ClientCursorPin&> cursor,
+                const BSONObj& cmdObj);
 
 }  // namespace mongo

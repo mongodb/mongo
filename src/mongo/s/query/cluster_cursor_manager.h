@@ -594,12 +594,19 @@ private:
 };
 
 /**
- * Aggregates telemetry for the current operation via metrics stored on opDebug. If a cursor is
- * provided (via ClusterClientCursorGuard or ClusterCursorManager::PinnedCursor), metrics are
- * aggregated on the cursor; otherwise, metrics are written directly to the telemetry store.
+ * Record metrics for the current operation on opDebug and aggregates those metrics for telemetry
+ * use. If a cursor is provided (via ClusterClientCursorGuard or
+ * ClusterCursorManager::PinnedCursor), metrics are aggregated on the cursor; otherwise, metrics are
+ * written directly to the telemetry store.
  */
-void collectTelemetryMongos(OperationContext* opCtx, const BSONObj& originatingCommand);
-void collectTelemetryMongos(OperationContext* opCtx, ClusterClientCursorGuard& cursor);
-void collectTelemetryMongos(OperationContext* opCtx, ClusterCursorManager::PinnedCursor& cursor);
+void collectTelemetryMongos(OperationContext* opCtx,
+                            const BSONObj& originatingCommand,
+                            long long nreturned);
+void collectTelemetryMongos(OperationContext* opCtx,
+                            ClusterClientCursorGuard& cursor,
+                            long long nreturned);
+void collectTelemetryMongos(OperationContext* opCtx,
+                            ClusterCursorManager::PinnedCursor& cursor,
+                            long long nreturned);
 
 }  // namespace mongo

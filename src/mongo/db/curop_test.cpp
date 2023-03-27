@@ -65,6 +65,10 @@ TEST(CurOpTest, AddingAdditiveMetricsObjectsTogetherShouldAddFieldsTogether) {
     additiveMetricsToAdd.docsExamined = 2;
     currentAdditiveMetrics.nMatched = 5;
     additiveMetricsToAdd.nMatched = 5;
+    currentAdditiveMetrics.nreturned = 10;
+    additiveMetricsToAdd.nreturned = 5;
+    currentAdditiveMetrics.nBatches = 2;
+    additiveMetricsToAdd.nBatches = 1;
     currentAdditiveMetrics.nModified = 3;
     additiveMetricsToAdd.nModified = 1;
     currentAdditiveMetrics.ninserted = 4;
@@ -77,6 +81,8 @@ TEST(CurOpTest, AddingAdditiveMetricsObjectsTogetherShouldAddFieldsTogether) {
     additiveMetricsToAdd.keysInserted = 5;
     currentAdditiveMetrics.keysDeleted = 4;
     additiveMetricsToAdd.keysDeleted = 2;
+    currentAdditiveMetrics.executionTime = Microseconds{200};
+    additiveMetricsToAdd.executionTime = Microseconds{80};
     currentAdditiveMetrics.prepareReadConflicts.store(1);
     additiveMetricsToAdd.prepareReadConflicts.store(5);
     currentAdditiveMetrics.writeConflicts.store(7);
@@ -94,6 +100,10 @@ TEST(CurOpTest, AddingAdditiveMetricsObjectsTogetherShouldAddFieldsTogether) {
               *additiveMetricsBeforeAdd.docsExamined + *additiveMetricsToAdd.docsExamined);
     ASSERT_EQ(*currentAdditiveMetrics.nMatched,
               *additiveMetricsBeforeAdd.nMatched + *additiveMetricsToAdd.nMatched);
+    ASSERT_EQ(*currentAdditiveMetrics.nreturned,
+              *additiveMetricsBeforeAdd.nreturned + *additiveMetricsToAdd.nreturned);
+    ASSERT_EQ(*currentAdditiveMetrics.nBatches,
+              *additiveMetricsBeforeAdd.nBatches + *additiveMetricsToAdd.nBatches);
     ASSERT_EQ(*currentAdditiveMetrics.nModified,
               *additiveMetricsBeforeAdd.nModified + *additiveMetricsToAdd.nModified);
     ASSERT_EQ(*currentAdditiveMetrics.ninserted,
@@ -106,6 +116,8 @@ TEST(CurOpTest, AddingAdditiveMetricsObjectsTogetherShouldAddFieldsTogether) {
               *additiveMetricsBeforeAdd.keysInserted + *additiveMetricsToAdd.keysInserted);
     ASSERT_EQ(*currentAdditiveMetrics.keysDeleted,
               *additiveMetricsBeforeAdd.keysDeleted + *additiveMetricsToAdd.keysDeleted);
+    ASSERT_EQ(*currentAdditiveMetrics.executionTime,
+              *additiveMetricsBeforeAdd.executionTime + *additiveMetricsToAdd.executionTime);
     ASSERT_EQ(currentAdditiveMetrics.prepareReadConflicts.load(),
               additiveMetricsBeforeAdd.prepareReadConflicts.load() +
                   additiveMetricsToAdd.prepareReadConflicts.load());
@@ -121,6 +133,8 @@ TEST(CurOpTest, AddingUninitializedAdditiveMetricsFieldsShouldBeTreatedAsZero) {
     // Initialize field values for both AdditiveMetrics objects.
     additiveMetricsToAdd.keysExamined = 5;
     currentAdditiveMetrics.docsExamined = 4;
+    currentAdditiveMetrics.nreturned = 2;
+    additiveMetricsToAdd.nBatches = 1;
     currentAdditiveMetrics.nModified = 3;
     additiveMetricsToAdd.ninserted = 0;
     currentAdditiveMetrics.keysInserted = 6;
@@ -145,6 +159,14 @@ TEST(CurOpTest, AddingUninitializedAdditiveMetricsFieldsShouldBeTreatedAsZero) {
     // should be treated as zero.
     ASSERT_EQ(*currentAdditiveMetrics.docsExamined, *additiveMetricsBeforeAdd.docsExamined);
 
+    // The 'nreturned' field for the AdditiveMetrics object to add was not initialized, so it
+    // should be treated as zero.
+    ASSERT_EQ(*currentAdditiveMetrics.nreturned, *additiveMetricsBeforeAdd.nreturned);
+
+    // The 'nBatches' field for the current AdditiveMetrics object was not initialized, so it
+    // should be treated as zero.
+    ASSERT_EQ(*currentAdditiveMetrics.nBatches, *additiveMetricsToAdd.nBatches);
+
     // The 'nMatched' field for both the current AdditiveMetrics object and the AdditiveMetrics
     // object to add were not initialized, so nMatched should still be uninitialized after the add.
     ASSERT_EQ(currentAdditiveMetrics.nMatched, boost::none);
@@ -152,6 +174,11 @@ TEST(CurOpTest, AddingUninitializedAdditiveMetricsFieldsShouldBeTreatedAsZero) {
     // The 'nUpserted' field for both the current AdditiveMetrics object and the AdditiveMetrics
     // object to add were not initialized, so nUpserted should still be uninitialized after the add.
     ASSERT_EQ(currentAdditiveMetrics.nUpserted, boost::none);
+
+    // The 'executionTime' field for both the current AdditiveMetrics object and the AdditiveMetrics
+    // object to add were not initialized, so executionTime should still be uninitialized after the
+    // add.
+    ASSERT_EQ(currentAdditiveMetrics.executionTime, boost::none);
 
     // The following field values should have changed after adding.
     ASSERT_EQ(*currentAdditiveMetrics.keysInserted,
@@ -173,6 +200,8 @@ TEST(CurOpTest, AdditiveMetricsFieldsShouldIncrementByN) {
     additiveMetrics.writeConflicts.store(1);
     additiveMetrics.keysInserted = 2;
     additiveMetrics.prepareReadConflicts.store(6);
+    additiveMetrics.nreturned = 3;
+    additiveMetrics.executionTime = Microseconds{160};
 
     // Increment the fields.
     additiveMetrics.incrementWriteConflicts(1);
@@ -181,6 +210,9 @@ TEST(CurOpTest, AdditiveMetricsFieldsShouldIncrementByN) {
     additiveMetrics.incrementNinserted(3);
     additiveMetrics.incrementNUpserted(6);
     additiveMetrics.incrementPrepareReadConflicts(2);
+    additiveMetrics.incrementNreturned(2);
+    additiveMetrics.incrementNBatches();
+    additiveMetrics.incrementExecutionTime(Microseconds{120});
 
     ASSERT_EQ(additiveMetrics.writeConflicts.load(), 2);
     ASSERT_EQ(*additiveMetrics.keysInserted, 7);
@@ -188,6 +220,9 @@ TEST(CurOpTest, AdditiveMetricsFieldsShouldIncrementByN) {
     ASSERT_EQ(*additiveMetrics.ninserted, 3);
     ASSERT_EQ(*additiveMetrics.nUpserted, 6);
     ASSERT_EQ(additiveMetrics.prepareReadConflicts.load(), 8);
+    ASSERT_EQ(*additiveMetrics.nreturned, 5);
+    ASSERT_EQ(*additiveMetrics.nBatches, 1);
+    ASSERT_EQ(*additiveMetrics.executionTime, Microseconds{280});
 }
 
 TEST(CurOpTest, OptionalAdditiveMetricsNotDisplayedIfUninitialized) {

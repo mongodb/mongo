@@ -204,37 +204,25 @@ public:
      * Increments the cursor's tracked number of query results returned so far by 'n'.
      */
     void incNReturnedSoFar(std::uint64_t n) {
-        _nReturnedSoFar += n;
+        _metrics.incrementNreturned(n);
     }
 
-    /**
-     * Sets the cursor's tracked number of query results returned so far to 'n'.
-     */
-    void setNReturnedSoFar(std::uint64_t n) {
-        invariant(n >= _nReturnedSoFar);
-        _nReturnedSoFar = n;
-    }
-
-    void incrementCursorMetrics(OpDebug::AdditiveMetrics newMetrics,
-                                uint64_t newExecutionTime,
-                                uint64_t newDocsReturned) {
+    void incrementCursorMetrics(OpDebug::AdditiveMetrics newMetrics) {
         _metrics.add(newMetrics);
-        _queryExecMicros += newExecutionTime;
-        _docsReturned += newDocsReturned;
     }
 
     /**
      * Returns the number of batches returned by this cursor so far.
      */
     std::uint64_t getNBatches() const {
-        return _nBatchesReturned;
+        return _metrics.nBatches.value_or(0);
     }
 
     /**
      * Increments the number of batches returned so far by one.
      */
     void incNBatches() {
-        ++_nBatchesReturned;
+        _metrics.incrementNBatches();
     }
 
     Date_t getLastUseDate() const {
@@ -397,13 +385,6 @@ private:
     // an error to use a ClientCursor once it has been disposed.
     bool _disposed = false;
 
-    // Tracks the number of results returned by this cursor so far. Tracked only as debugging info
-    // for display in $currentOp output.
-    std::uint64_t _nReturnedSoFar = 0;
-
-    // Tracks the number of batches returned by this cursor so far.
-    std::uint64_t _nBatchesReturned = 0;
-
     // Holds an owned copy of the command specification received from the client.
     const BSONObj _originatingCommand;
 
@@ -461,9 +442,8 @@ private:
     // The shape of the original query serialized with readConcern, application name, and namespace.
     // If boost::none, telemetry should not be collected for this cursor.
     boost::optional<BSONObj> _telemetryStoreKey;
-    // Metrics used for telemetry. TODO SERVER-73933 consider merging more into '_metrics'
-    uint64_t _queryExecMicros = 0;
-    uint64_t _docsReturned = 0;
+    // Metrics that are accumulated over the lifetime of the cursor, incremented with each getMore.
+    // Useful for diagnostics like telemetry.
     OpDebug::AdditiveMetrics _metrics;
 
     // The client OperationKey associated with this cursor.
@@ -594,11 +574,13 @@ void startClientCursorMonitor();
 
 
 /**
- * Aggregates telemetry for the current operation via metrics stored on opDebug. If a cursor pin is
- * provided, metrics are aggregated on the cursor; otherwise, metrics are written directly to the
- * telemetry store.
+ * Records certain metrics for the current operation on OpDebug and aggregates those metrics for
+ * telemetry use. If a cursor pin is provided, metrics are aggregated on the cursor; otherwise,
+ * metrics are written directly to the telemetry store.
  */
-void collectTelemetryMongod(OperationContext* opCtx, ClientCursorPin& cursor);
-void collectTelemetryMongod(OperationContext* opCtx, const BSONObj& originatingCommand);
+void collectTelemetryMongod(OperationContext* opCtx, ClientCursorPin& cursor, long long nreturned);
+void collectTelemetryMongod(OperationContext* opCtx,
+                            const BSONObj& originatingCommand,
+                            long long nreturned);
 
 }  // namespace mongo

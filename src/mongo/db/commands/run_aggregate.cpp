@@ -1182,12 +1182,11 @@ Status runAggregate(OperationContext* opCtx,
         PlanSummaryStats stats;
         planExplainer.getSummaryStats(&stats);
         curOp->debug().setPlanSummaryMetrics(stats);
-        curOp->debug().nreturned = stats.nReturned;
 
         if (keepCursor) {
-            collectTelemetryMongod(opCtx, pins[0]);
+            collectTelemetryMongod(opCtx, pins[0], stats.nReturned);
         } else {
-            collectTelemetryMongod(opCtx, cmdObj);
+            collectTelemetryMongod(opCtx, cmdObj, stats.nReturned);
         }
 
         // For an optimized away pipeline, signal the cache that a query operation has completed.

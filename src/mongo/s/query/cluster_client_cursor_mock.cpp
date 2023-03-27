@@ -91,14 +91,6 @@ long long ClusterClientCursorMock::getNumReturnedSoFar() const {
     return _numReturnedSoFar;
 }
 
-std::uint64_t ClusterClientCursorMock::getNBatches() const {
-    return _nBatchesReturned;
-}
-
-void ClusterClientCursorMock::incNBatches() {
-    ++_nBatchesReturned;
-}
-
 Date_t ClusterClientCursorMock::getCreatedDate() const {
     return _createdDate;
 }
