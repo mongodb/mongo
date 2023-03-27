@@ -113,7 +113,7 @@ public:
                     "Unauthorized",
                     AuthorizationSession::get(opCtx->getClient())
                         ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                           ActionType::transitionToCatalogShard));
+                                                           ActionType::internal));
         }
     };
 };

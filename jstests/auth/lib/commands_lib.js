@@ -55,7 +55,7 @@ Add "skipSharded: true" if you want to run the test only ony in a non-sharded co
 4) skipUnlessSharded
 
 Add "skipUnlessSharded: true" if you want to run the test only in sharded
-configuration.
+configuration. The command in the test will be run on a mongos.
 
 5) skipUnlessReplicaSet
 Add "skipUnlessReplicaSet: true" if you want to run the test only when replica sets are in use.
@@ -418,6 +418,41 @@ export const authCommandsLib = {
                 runOnDb: adminDbName,
                 roles: roles_clusterManager,
                 privileges: [{resource: {cluster: true}, actions: ["addShard"]}],
+                expectFail: true
+              },
+              {runOnDb: firstDbName, roles: {}},
+              {runOnDb: secondDbName, roles: {}}
+          ]
+        },
+        {
+          testname: 'transitionToCatalogShard',
+          command: {transitionToCatalogShard: 1},
+          skipUnlessSharded: true,
+          skipTest: (conn) => {
+            return !TestData.setParameters.featureFlagCatalogShard;
+          },
+          testcases: [
+            {
+              runOnDb: adminDbName, 
+              roles: roles_clusterManager, 
+              privileges: [{resource: {cluster: true}, actions: ["transitionToCatalogShard"]}]
+            },
+            {runOnDb: firstDbName, roles: {}},
+            {runOnDb: secondDbName, roles: {}}
+          ]
+        },
+        {
+          testname: "_configsvrTransitionToCatalogShard",
+          command: {_configsvrTransitionToCatalogShard: 1},
+          skipSharded: true,
+          skipTest: (conn) => {
+            return !TestData.setParameters.featureFlagCatalogShard;
+          },
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                roles: {__system: 1},
+                privileges: [{resource: {cluster: true}, actions: ["internal"]}],
                 expectFail: true
               },
               {runOnDb: firstDbName, roles: {}},
@@ -5911,6 +5946,36 @@ export const authCommandsLib = {
                 runOnDb: adminDbName,
                 roles: roles_clusterManager,
                 privileges: [{resource: {cluster: true}, actions: ["removeShard"]}],
+                expectFail: true
+              },
+              {runOnDb: firstDbName, roles: {}},
+              {runOnDb: secondDbName, roles: {}}
+          ]
+        },
+        {
+          testname: "transitionToDedicatedConfigServer",
+          command: { transitionToDedicatedConfigServer: 1 },
+          skipUnlessSharded: true,
+          testcases: [
+            {
+              runOnDb: adminDbName, 
+              roles: roles_clusterManager, 
+              expectFail: true, 
+              privileges: [{resource: {cluster: true}, actions: ["transitionToDedicatedConfigServer"]}]
+            },
+            {runOnDb: firstDbName, roles: {}},
+            {runOnDb: secondDbName, roles: {}},
+          ]
+        },
+        {
+          testname: "_configsvrTransitionToDedicatedConfigServer",
+          command: {_configsvrTransitionToDedicatedConfigServer: 1},
+          skipSharded: true,
+          testcases: [
+              {
+                runOnDb: adminDbName,
+                roles: {__system: 1},
+                privileges: [{resource: {cluster: true}, actions: ["internal"]}],
                 expectFail: true
               },
               {runOnDb: firstDbName, roles: {}},
