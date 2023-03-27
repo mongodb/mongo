@@ -1748,6 +1748,15 @@ flag and tell the storage engine that the [`initialDataTimestamp`](#replication-
 is the node's last applied OpTime. Finally, the `InitialSyncer` shuts down and the
 `ReplicationCoordinator` starts steady state replication.
 
+#### Code References
+- [ReplicationCoordinator starts initial sync if the node is started up without any data](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L887)
+- [Follow this flowchart for initial sync call stack.](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/initial_syncer.h#L278)
+- [Initial syncer uses AllDatabaseCloner/DatabaseCloner/CollectionCloner to clone data from sync source, where the state transition is defined in runStages().](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/base_cloner.cpp#L268)
+- [AllDatabaseCloner creates and runs each DatabaseCloner in its post stage.](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/all_database_cloner.cpp#L263)
+- [DatabaseCloner creates and runs each CollectionCloner in its post stage.](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/database_cloner.cpp#L137)
+- [InitialSyncer uses RollbackChecker to check if there is a rollback on sync source during initial sync.](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/initial_syncer.cpp#L2014)
+- [Set lastApplied OpTime as initialDataTimestamp to storage engine after initial sync finishes.](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/initial_syncer.cpp#L586-L590)
+- [Start steady state replication after initial sync completes.](https://github.com/mongodb/mongo/blob/r6.2.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L847)
 # File Copy Based Initial Sync
 
 File Copy Based Initial Sync (FCBIS) is an initial sync method implemented by
