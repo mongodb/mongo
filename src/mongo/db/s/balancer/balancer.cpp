@@ -758,13 +758,7 @@ void Balancer::_mainThread() {
                 }
 
                 // Collect and apply up-to-date configuration values on the cluster collections.
-                {
-                    OperationContext* ctx = opCtx.get();
-                    auto allCollections = Grid::get(ctx)->catalogClient()->getCollections(ctx, {});
-                    for (const auto& coll : allCollections) {
-                        _defragmentationPolicy->startCollectionDefragmentation(ctx, coll);
-                    }
-                }
+                _defragmentationPolicy->startCollectionDefragmentations(opCtx.get());
 
                 Status status = _splitChunksIfNeeded(opCtx.get());
                 if (!status.isOK()) {
