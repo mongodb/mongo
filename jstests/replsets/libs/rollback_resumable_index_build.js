@@ -200,7 +200,7 @@ const RollbackResumableIndexBuildTest = class {
                     // Wait for the index build to be aborted for rollback.
                     checkLog.containsJson(db.getMongo(), 465611, {
                         buildUUID: function(uuid) {
-                            return uuid["uuid"]["$uuid"] === buildUUID;
+                            return uuid && uuid["uuid"]["$uuid"] === buildUUID;
                         }
                     });
 
@@ -226,7 +226,7 @@ const RollbackResumableIndexBuildTest = class {
         for (const buildUUID of buildUUIDs) {
             checkLog.containsJson(originalPrimary, 20347, {
                 buildUUID: function(uuid) {
-                    return uuid["uuid"]["$uuid"] === buildUUID;
+                    return uuid && uuid["uuid"]["$uuid"] === buildUUID;
                 }
             });
         }
@@ -299,7 +299,7 @@ const RollbackResumableIndexBuildTest = class {
         // Ensure that the index build restarted, rather than resumed.
         checkLog.containsJson(originalPrimary, 20660, {
             buildUUID: function(uuid) {
-                return uuid["uuid"]["$uuid"] === testInfo.buildUUIDs[0];
+                return uuid && uuid["uuid"]["$uuid"] === testInfo.buildUUIDs[0];
             }
         });
         assert(!checkLog.checkContainsOnceJson(originalPrimary, 4841700));

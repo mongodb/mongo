@@ -348,7 +348,7 @@ const ResumableIndexBuildTest = class {
                 for (const buildUUID of failPoint.data.buildUUIDs) {
                     checkLog.containsJson(conn, failPoint.logIdWithBuildUUID, {
                         buildUUID: function(uuid) {
-                            return uuid["uuid"]["$uuid"] === buildUUID;
+                            return uuid && uuid["uuid"]["$uuid"] === buildUUID;
                         }
                     });
                 }
@@ -436,7 +436,8 @@ const ResumableIndexBuildTest = class {
         for (const indexName of indexNamesFlat) {
             checkLog.containsJson(primary, 4940900, {
                 buildUUID: function(uuid) {
-                    return uuid["uuid"]["$uuid"] ===
+                    return uuid &&
+                        uuid["uuid"]["$uuid"] ===
                         extractUUIDFromObject(indexes[indexName].buildUUID);
                 }
             });
@@ -482,7 +483,7 @@ const ResumableIndexBuildTest = class {
         for (const buildUUID of buildUUIDs) {
             checkLog.containsJson(conn, 20663, {
                 buildUUID: function(uuid) {
-                    return uuid["uuid"]["$uuid"] === buildUUID;
+                    return uuid && uuid["uuid"]["$uuid"] === buildUUID;
                 },
                 namespace: coll.getFullName()
             });
@@ -631,7 +632,7 @@ const ResumableIndexBuildTest = class {
             // Ensure that the resume info contains the correct phase to resume from.
             checkLog.containsJson(conn, 4841700, {
                 buildUUID: function(uuid) {
-                    return uuid["uuid"]["$uuid"] === buildUUIDs[i];
+                    return uuid && uuid["uuid"]["$uuid"] === buildUUIDs[i];
                 },
                 details: function(details) {
                     return details.phase ===
@@ -646,7 +647,7 @@ const ResumableIndexBuildTest = class {
                 // location.
                 checkLog.containsJson(conn, 20391, {
                     buildUUID: function(uuid) {
-                        return uuid["uuid"]["$uuid"] === buildUUIDs[i];
+                        return uuid && uuid["uuid"]["$uuid"] === buildUUIDs[i];
                     },
                     totalRecords: resumeCheck.numScannedAfterResume
                 });
@@ -655,7 +656,7 @@ const ResumableIndexBuildTest = class {
                 // completed before being interrupted for shutdown.
                 assert(!checkLog.checkContainsOnceJson(conn, resumeCheck.skippedPhaseLogID, {
                     buildUUID: function(uuid) {
-                        return uuid["uuid"]["$uuid"] === buildUUIDs[i];
+                        return uuid && uuid["uuid"]["$uuid"] === buildUUIDs[i];
                     }
                 }),
                        "Found log " + resumeCheck.skippedPhaseLogID + " for index build " +
@@ -965,7 +966,7 @@ const ResumableIndexBuildTest = class {
         } else {
             checkLog.containsJson(primary, 4841701, {
                 buildUUID: function(uuid) {
-                    return uuid["uuid"]["$uuid"] === buildUUID;
+                    return uuid && uuid["uuid"]["$uuid"] === buildUUID;
                 }
             });
         }
@@ -1048,7 +1049,7 @@ const ResumableIndexBuildTest = class {
 
         // Ensure that the resume info contains the correct phase to resume from.
         const equalsBuildUUID = function(uuid) {
-            return uuid["uuid"]["$uuid"] === buildUUID;
+            return uuid && uuid["uuid"]["$uuid"] === buildUUID;
         };
         checkLog.containsJson(primary, 4841700, {
             buildUUID: equalsBuildUUID,
