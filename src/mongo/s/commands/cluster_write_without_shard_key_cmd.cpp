@@ -58,6 +58,7 @@ BSONObj _createCmdObj(OperationContext* opCtx,
             "_clusterWriteWithoutShardKey can only be run against sharded collections.",
             cri.cm.isSharded());
     const auto shardVersion = cri.getShardVersion(shardId);
+    BSONObjBuilder queryBuilder(targetDocId);
 
     // Parse into OpMsgRequest to append the $db field, which is required for command
     // parsing.
@@ -67,6 +68,11 @@ BSONObj _createCmdObj(OperationContext* opCtx,
     if (commandName == write_ops::UpdateCommandRequest::kCommandName) {
         auto updateRequest = write_ops::UpdateCommandRequest::parse(
             IDLParserContext("_clusterWriteWithoutShardKeyForUpdate"), opMsgRequest.body);
+
+        // The targeted query constructed should contain the targetDocId and the original query in
+        // case the original query has importance in terms of the operation being applied, such as
+        // using the positional operator ($) to modify an inner array element.
+        queryBuilder.appendElementsUnique(updateRequest.getUpdates().front().getQ());
 
         // The original query and collation are sent along with the modified command for the
         // purposes of query sampling.
@@ -86,11 +92,7 @@ BSONObj _createCmdObj(OperationContext* opCtx,
                      .front()
                      .getAllowShardKeyUpdatesWithoutFullShardKeyInQuery());
         updateRequest.getUpdates().front().setAllowShardKeyUpdatesWithoutFullShardKeyInQuery(true);
-
-        updateRequest.getUpdates().front().setQ(targetDocId);
-
-        // Unset the collation because targeting by _id uses default collation.
-        updateRequest.getUpdates().front().setCollation(boost::none);
+        updateRequest.getUpdates().front().setQ(queryBuilder.obj());
 
         auto batchedCommandRequest = BatchedCommandRequest(updateRequest);
         batchedCommandRequest.setShardVersion(shardVersion);
@@ -98,6 +100,11 @@ BSONObj _createCmdObj(OperationContext* opCtx,
     } else if (commandName == write_ops::DeleteCommandRequest::kCommandName) {
         auto deleteRequest = write_ops::DeleteCommandRequest::parse(
             IDLParserContext("_clusterWriteWithoutShardKeyForDelete"), opMsgRequest.body);
+
+        // The targeted query constructed should contain the targetDocId and the original query in
+        // case the original query has importance in terms of the operation being applied, such as
+        // using the positional operator ($) to modify an inner array element.
+        queryBuilder.appendElementsUnique(deleteRequest.getDeletes().front().getQ());
 
         // The original query and collation are sent along with the modified command for the
         // purposes of query sampling.
@@ -110,10 +117,8 @@ BSONObj _createCmdObj(OperationContext* opCtx,
             deleteRequest.setWriteCommandRequestBase(writeCommandRequestBase);
         }
 
-        deleteRequest.getDeletes().front().setQ(targetDocId);
+        deleteRequest.getDeletes().front().setQ(queryBuilder.obj());
 
-        // Unset the collation because targeting by _id uses default collation.
-        deleteRequest.getDeletes().front().setCollation(boost::none);
 
         auto batchedCommandRequest = BatchedCommandRequest(deleteRequest);
         batchedCommandRequest.setShardVersion(shardVersion);
@@ -122,6 +127,11 @@ BSONObj _createCmdObj(OperationContext* opCtx,
                commandName == write_ops::FindAndModifyCommandRequest::kCommandAlias) {
         auto findAndModifyRequest = write_ops::FindAndModifyCommandRequest::parse(
             IDLParserContext("_clusterWriteWithoutShardKeyForFindAndModify"), opMsgRequest.body);
+
+        // The targeted query constructed should contain the targetDocId and the original query in
+        // case the original query has importance in terms of the operation being applied, such as
+        // using the positional operator ($) to modify an inner array element.
+        queryBuilder.appendElementsUnique(findAndModifyRequest.getQuery());
 
         // The original query and collation are sent along with the modified command for the
         // purposes of query sampling.
@@ -135,11 +145,8 @@ BSONObj _createCmdObj(OperationContext* opCtx,
                 "$_allowShardKeyUpdatesWithoutFullShardKeyInQuery is an internal parameter",
                 !findAndModifyRequest.getAllowShardKeyUpdatesWithoutFullShardKeyInQuery());
         findAndModifyRequest.setAllowShardKeyUpdatesWithoutFullShardKeyInQuery(true);
+        findAndModifyRequest.setQuery(queryBuilder.obj());
 
-        findAndModifyRequest.setQuery(targetDocId);
-
-        // Unset the collation because targeting by _id uses default collation.
-        findAndModifyRequest.setCollation(boost::none);
 
         // Drop the writeConcern as it cannot be specified for commands run in internal
         // transactions. This object will be used to construct the command request used by
