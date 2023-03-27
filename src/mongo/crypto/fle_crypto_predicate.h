@@ -86,7 +86,7 @@ public:
 private:
     PrfBlock _serverToken;
     std::vector<PrfBlock> _edcTokens;
-    int64_t _contentionFactor;
+    int64_t _contentionFactor{0};
     stdx::unordered_set<PrfBlock> _cachedEDCTokens;
 };
 

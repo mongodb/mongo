@@ -5867,7 +5867,7 @@ bool EncryptedPredicateEvaluatorV2::evaluate(
 
     uassert(7399501, "Invalid encrypted indexed field", subSubType == indexedValueType);
 
-    auto metadataBlocks = extractMetadataBlocks(data);
+    std::vector<ConstDataRange> metadataBlocks = extractMetadataBlocks(data);
 
     for (const auto& zeroDecryptionToken : _zerosDecryptionTokens) {
         for (auto metadataBlock : metadataBlocks) {
