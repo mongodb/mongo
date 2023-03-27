@@ -2187,7 +2187,7 @@ tasks:
         vars:
           unit_test_args: -v 2 --zstd
 
-  - name: unit-test-long
+  - name: unit-test-extra-long
     tags: ["python"]
     depends_on:
     - name: compile
@@ -2195,9 +2195,9 @@ tasks:
       - func: "fetch artifacts"
       - func: "unit test"
         vars:
-          unit_test_args: -v 2 --long
+          unit_test_args: -v 2 --extra-long
 
-  - name: unit-test-long-nonstandalone
+  - name: unit-test-extra-long-nonstandalone
     tags: ["python", "python-nonstandalone"]
     depends_on:
     - name: compile-nonstandalone
@@ -2207,7 +2207,7 @@ tasks:
           dependent_task: compile-nonstandalone
       - func: "unit test"
         vars:
-          unit_test_args: -v 2 --long --hook nonstandalone
+          unit_test_args: -v 2 --extra-long --hook nonstandalone
 
   - name: unit-linux-no-ftruncate-test
     tags: ["python"]
@@ -5044,7 +5044,7 @@ buildvariants:
     - name: spinlock-pthread-adaptive-test
     - name: ftruncate-test
     - name: long-test
-    - name: unit-test-long
+    - name: unit-test-extra-long
       distros: ubuntu2004-large
     - name: static-wt-build-test
     - name: linux-directio
@@ -5060,7 +5060,7 @@ buildvariants:
     - name: compile-nonstandalone
     - name: make-check-nonstandalone
     - name: unit-test-nonstandalone
-    - name: unit-test-long-nonstandalone
+    - name: unit-test-extra-long-nonstandalone
       distros: ubuntu2004-large
     - name: ".data-validation-stress-test-nonstandalone"
     - name: unittest-assertions
@@ -5361,7 +5361,7 @@ buildvariants:
     - name: syscall-linux
     - name: checkpoint-filetypes-test
     - name: unit-test-zstd
-    - name: unit-test-long
+    - name: unit-test-extra-long
       distros: rhel80-large
     - name: spinlock-gcc-test
     - name: spinlock-pthread-adaptive-test
@@ -5545,7 +5545,7 @@ buildvariants:
     - name: linux-directio
     - name: checkpoint-filetypes-test
     - name: unit-test-zstd
-    - name: unit-test-long
+    - name: unit-test-extra-long
       distros: ubuntu2004-arm64-large
     - name: spinlock-gcc-test
     - name: spinlock-pthread-adaptive-test
@@ -5558,7 +5558,7 @@ buildvariants:
     - name: compile-nonstandalone
     - name: make-check-nonstandalone
     - name: unit-test-nonstandalone
-    - name: unit-test-long-nonstandalone
+    - name: unit-test-extra-long-nonstandalone
       distros: ubuntu2004-arm64-large
     - name: memory-model-test
       batchtime: 40320 # 28 days
@@ -5591,7 +5591,7 @@ buildvariants:
     - name: linux-directio
     - name: checkpoint-filetypes-test
     - name: unit-test-zstd
-    - name: unit-test-long
+    - name: unit-test-extra-long
       distros: amazon2-arm64-large
     - name: spinlock-gcc-test
     - name: spinlock-pthread-adaptive-test
@@ -5603,7 +5603,7 @@ buildvariants:
     - name: compile-nonstandalone
     - name: make-check-nonstandalone
     - name: unit-test-nonstandalone
-    - name: unit-test-long-nonstandalone
+    - name: unit-test-extra-long-nonstandalone
       distros: amazon2-arm64-large
 
 - name: infrequent-checks

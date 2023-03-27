@@ -32,7 +32,7 @@
 import time
 import wiredtiger, wttest
 
-@wttest.longtest('lot of delays')
+@wttest.extralongtest('lot of delays')
 class test_sweep05(wttest.WiredTigerTestCase):
     '''
     Test detection of sessions without recent session sweep.

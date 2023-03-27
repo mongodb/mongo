@@ -308,8 +308,8 @@ class WiredTigerTestCase(unittest.TestCase):
     @staticmethod
     def globalSetup(preserveFiles = False, removeAtStart = True, useTimestamp = False,
                     gdbSub = False, lldbSub = False, verbose = 1, builddir = None, dirarg = None,
-                    longtest = False, zstdtest = False, ignoreStdout = False, seedw = 0, seedz = 0, 
-                    hookmgr = None, ss_random_prefix = 0, timeout = 0):
+                    longtest = False, extralongtest = False, zstdtest = False, ignoreStdout = False,
+                    seedw = 0, seedz = 0, hookmgr = None, ss_random_prefix = 0, timeout = 0):
         WiredTigerTestCase._preserveFiles = preserveFiles
         d = 'WT_TEST' if dirarg == None else dirarg
         if useTimestamp:
@@ -327,6 +327,7 @@ class WiredTigerTestCase(unittest.TestCase):
         WiredTigerTestCase._gdbSubprocess = gdbSub
         WiredTigerTestCase._lldbSubprocess = lldbSub
         WiredTigerTestCase._longtest = longtest
+        WiredTigerTestCase._extralongtest = extralongtest
         WiredTigerTestCase._zstdtest = zstdtest
         WiredTigerTestCase._verbose = verbose
         WiredTigerTestCase._ignoreStdout = ignoreStdout
@@ -1149,6 +1150,19 @@ def longtest(description):
         return func
     if not WiredTigerTestCase._longtest:
         return unittest.skip(description + ' (enable with --long)')
+    else:
+        return runit_decorator
+
+def extralongtest(description):
+    """
+    Used as a function decorator, for example, @wttest.extralongtest("description").
+    The decorator indicates that this test function should only be included
+    when running the test suite with the --extra-long option.
+    """
+    def runit_decorator(func):
+        return func
+    if not WiredTigerTestCase._extralongtest:
+        return unittest.skip(description + ' (enable with --extra-long)')
     else:
         return runit_decorator
 

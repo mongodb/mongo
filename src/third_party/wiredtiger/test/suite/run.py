@@ -121,7 +121,8 @@ Options:\n\
   -h      | --help               show this message\n\
           | --hook name[=arg]    set up hooks from hook_<name>.py, with optional arg\n\
   -j N    | --parallel N         run all tests in parallel using N processes\n\
-  -l      | --long               run the entire test suite\n\
+  -l      | --long               run nearly the entire test suite except tests tagged extralongtest\n\
+  -xl     | --extra-long         run the entire test suite\n\
           | --noremove           do not remove WT_TEST or -D target before run\n\
   -p      | --preserve           preserve output files in WT_TEST/<testname>\n\
   -r N    | --random-sample N    randomly sort scenarios to be run, then\n\
@@ -347,7 +348,7 @@ def error(exitval, prefix, msg):
 
 if __name__ == '__main__':
     # Turn numbers and ranges into test module names
-    preserve = timestamp = debug = dryRun = gdbSub = lldbSub = longtest = zstdtest = ignoreStdout = False
+    preserve = timestamp = debug = dryRun = gdbSub = lldbSub = longtest = zstdtest = ignoreStdout = extralongtest = False
     removeAtStart = True
     asan = False
     parallel = 0
@@ -424,6 +425,10 @@ if __name__ == '__main__':
                 continue
             if option == '-long' or option == 'l':
                 longtest = True
+                continue
+            if option == '-extra-long' or option == 'xl':
+                longtest = True
+                extralongtest = True
                 continue
             if option == '-zstd' or option == 'z':
                 zstdtest = True
@@ -591,9 +596,9 @@ if __name__ == '__main__':
     # All global variables should be set before any test classes are loaded.
     # That way, verbose printing can be done at the class definition level.
     wttest.WiredTigerTestCase.globalSetup(preserve, removeAtStart, timestamp, gdbSub, lldbSub,
-                                          verbose, wt_builddir, dirarg, longtest, zstdtest,
-                                          ignoreStdout, seedw, seedz, hookmgr, ss_random_prefix,
-                                          timeout)
+                                          verbose, wt_builddir, dirarg, longtest, extralongtest, 
+                                          zstdtest, ignoreStdout, seedw, seedz, hookmgr, 
+                                          ss_random_prefix, timeout)
 
     # Without any tests listed as arguments, do discovery
     if len(testargs) == 0:
@@ -651,10 +656,10 @@ if __name__ == '__main__':
                     hugetests.add(name)    # warn for too many scenarios
             return (s, test.simpleName())  # sort by scenario number first
         all_tests = sorted(tests, key = get_sort_keys)
-        if not longtest:
+        if not (longtest or extralongtest):
             for name in hugetests:
                 print("WARNING: huge test " + name + " has > 1000 scenarios.\n" +
-                      "That is only appropriate when using the --long option.\n" +
+                      "That is only appropriate when using the --long or --extra-long option.\n" +
                       "The number of scenarios for the test should be pruned")
 
         # At this point we have an ordered list of all the tests.
