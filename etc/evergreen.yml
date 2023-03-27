@@ -2683,7 +2683,7 @@ buildvariants:
   - name: .concurrency !.large !.ubsan !.no_txns !.debug_only !.compute_mode
   - name: .concurrency .large !.ubsan !.no_txns !.debug_only !.compute_mode
     distros:
-    - rhel80-medium
+    - rhel80-large
   - name: .config_fuzzer
   - name: .encrypt
   - name: initial_sync_fuzzer_gen

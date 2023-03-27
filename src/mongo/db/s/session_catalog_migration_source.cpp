@@ -317,6 +317,8 @@ bool SessionCatalogMigrationSource::inCatchupPhase() {
 
 int64_t SessionCatalogMigrationSource::untransferredCatchUpDataSize() {
     invariant(inCatchupPhase());
+
+    stdx::lock_guard<Latch> _lk(_newOplogMutex);
     return _newWriteOpTimeList.size() * _averageSessionDocSize;
 }
 
