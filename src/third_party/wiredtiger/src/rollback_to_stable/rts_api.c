@@ -89,8 +89,10 @@ __rollback_to_stable_int(WT_SESSION_IMPL *session, bool no_ckpt)
     WT_ERR(__wt_rts_btree_apply_all(session, rollback_timestamp));
 
     /* Rollback the global durable timestamp to the stable timestamp. */
-    txn_global->has_durable_timestamp = txn_global->has_stable_timestamp;
-    txn_global->durable_timestamp = txn_global->stable_timestamp;
+    if (!dryrun) {
+        txn_global->has_durable_timestamp = txn_global->has_stable_timestamp;
+        txn_global->durable_timestamp = txn_global->stable_timestamp;
+    }
     __rts_assert_timestamps_unchanged(session, pinned_timestamp, rollback_timestamp);
 
     /*

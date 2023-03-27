@@ -55,6 +55,7 @@ lock_txn_global_read_count
 lock_txn_global_wait_application
 lock_txn_global_wait_internal
 lock_txn_global_write_count
+txn_rts_upd_aborted_dryrun
 UNUSED_STAT_FIELDS
 
 echo "$search"
