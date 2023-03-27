@@ -596,6 +596,62 @@ private:
     boost::intrusive_ptr<Expression> _output;
 };
 
+template <typename TAccumulator>
+class ExpressionFromAccumulatorQuantile : public Expression {
+public:
+    explicit ExpressionFromAccumulatorQuantile(ExpressionContext* const expCtx,
+                                               std::vector<double>& ps,
+                                               boost::intrusive_ptr<Expression> input,
+                                               int32_t algo)
+        : Expression(expCtx, {input}), _ps(ps), _input(input), _algo(algo) {
+        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+    }
+
+    const char* getOpName() const {
+        return TAccumulator::kName.rawData();
+    }
+
+    Value serialize(SerializationOptions options) const final {
+        MutableDocument md;
+        TAccumulator::serializeHelper(_input, options, _ps, _algo, md);
+        return Value(DOC(getOpName() << md.freeze()));
+    }
+
+    Value evaluate(const Document& root, Variables* variables) const final {
+        // TODO SERVER-75144: investigate performance for this implementation
+        TAccumulator accum(this->getExpressionContext(), _ps, _algo);
+
+        // Verify that '_input' produces an array and pass each element to 'process'.
+        auto input = _input->evaluate(root, variables);
+        if (input.isArray()) {
+            uassert(7436202,
+                    "Input to $percentile or $median cannot be an empty array.",
+                    input.getArray().size() > 0);
+            for (const auto& item : input.getArray()) {
+                accum.process(item, false /* merging */);
+            }
+        } else {
+            accum.process(input, false /* merging */);
+        }
+
+        return accum.getValue(false /* toBeMerged */);
+    }
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
+
+
+private:
+    std::vector<double> _ps;
+    boost::intrusive_ptr<Expression> _input;
+    int32_t _algo;
+};
+
 /**
  * Inherit from this class if your expression takes exactly one numeric argument.
  */

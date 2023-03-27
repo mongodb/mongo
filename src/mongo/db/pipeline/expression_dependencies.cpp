@@ -168,6 +168,8 @@ public:
     void visit(const ExpressionFromAccumulator<AccumulatorMin>*) {}
     void visit(const ExpressionFromAccumulatorN<AccumulatorMaxN>*) {}
     void visit(const ExpressionFromAccumulatorN<AccumulatorMinN>*) {}
+    void visit(const ExpressionFromAccumulatorQuantile<AccumulatorMedian>*) {}
+    void visit(const ExpressionFromAccumulatorQuantile<AccumulatorPercentile>*) {}
     void visit(const ExpressionFromAccumulator<AccumulatorStdDevPop>*) {}
     void visit(const ExpressionFromAccumulator<AccumulatorStdDevSamp>*) {}
     void visit(const ExpressionFromAccumulator<AccumulatorSum>*) {}

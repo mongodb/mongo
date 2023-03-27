@@ -36,6 +36,7 @@
 #include "mongo/db/pipeline/abt/utils.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/accumulator_multi.h"
+#include "mongo/db/pipeline/accumulator_percentile.h"
 #include "mongo/db/pipeline/expression_walker.h"
 #include "mongo/db/query/optimizer/utils/path_utils.h"
 
@@ -701,6 +702,15 @@ public:
     }
 
     void visit(const ExpressionFromAccumulatorN<AccumulatorMinN>* expr) override final {
+        unsupportedExpression(expr->getOpName());
+    }
+
+    void visit(const ExpressionFromAccumulatorQuantile<AccumulatorMedian>* expr) override final {
+        unsupportedExpression(expr->getOpName());
+    }
+
+    void visit(
+        const ExpressionFromAccumulatorQuantile<AccumulatorPercentile>* expr) override final {
         unsupportedExpression(expr->getOpName());
     }
 

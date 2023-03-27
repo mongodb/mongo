@@ -70,6 +70,7 @@
 #include "mongo/db/pipeline/abt/document_source_visitor.h"
 #include "mongo/db/pipeline/abt/match_expression_visitor.h"
 #include "mongo/db/pipeline/abt/utils.h"
+#include "mongo/db/pipeline/accumulator_percentile.h"
 #include "mongo/db/pipeline/document_source_bucket_auto.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_post_image.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_pre_image.h"
@@ -886,6 +887,15 @@ public:
     }
 
     void visit(const ExpressionFromAccumulatorN<AccumulatorMinN>* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionFromAccumulatorQuantile<AccumulatorMedian>* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(
+        const ExpressionFromAccumulatorQuantile<AccumulatorPercentile>* expr) override final {
         unsupportedExpression();
     }
 

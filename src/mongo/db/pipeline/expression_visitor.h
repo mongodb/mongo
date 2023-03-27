@@ -180,6 +180,8 @@ class AccumulatorMax;
 class AccumulatorMin;
 class AccumulatorMaxN;
 class AccumulatorMinN;
+class AccumulatorMedian;
+class AccumulatorPercentile;
 class AccumulatorStdDevPop;
 class AccumulatorStdDevSamp;
 class AccumulatorSum;
@@ -192,6 +194,9 @@ template <typename AccumulatorState>
 class ExpressionFromAccumulator;
 template <typename AccumulatorN>
 class ExpressionFromAccumulatorN;
+
+template <typename TAccumulator>
+class ExpressionFromAccumulatorQuantile;
 
 /**
  * This is a base class to allow for traversal of an aggregation expression tree. It implements the
@@ -352,6 +357,12 @@ public:
         expression_walker::MaybeConstPtr<IsConst, ExpressionFromAccumulatorN<AccumulatorMaxN>>) = 0;
     virtual void visit(
         expression_walker::MaybeConstPtr<IsConst, ExpressionFromAccumulatorN<AccumulatorMinN>>) = 0;
+    virtual void visit(
+        expression_walker::MaybeConstPtr<IsConst,
+                                         ExpressionFromAccumulatorQuantile<AccumulatorMedian>>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<
+                       IsConst,
+                       ExpressionFromAccumulatorQuantile<AccumulatorPercentile>>) = 0;
     virtual void visit(
         expression_walker::MaybeConstPtr<IsConst,
                                          ExpressionFromAccumulator<AccumulatorStdDevPop>>) = 0;
@@ -528,6 +539,8 @@ struct SelectiveConstExpressionVisitorBase : public ExpressionConstVisitor {
     void visit(const ExpressionFromAccumulatorN<AccumulatorLastN>*) override {}
     void visit(const ExpressionFromAccumulatorN<AccumulatorMaxN>*) override {}
     void visit(const ExpressionFromAccumulatorN<AccumulatorMinN>*) override {}
+    void visit(const ExpressionFromAccumulatorQuantile<AccumulatorMedian>*) override {}
+    void visit(const ExpressionFromAccumulatorQuantile<AccumulatorPercentile>*) override {}
     void visit(const ExpressionFromAccumulator<AccumulatorStdDevPop>*) override {}
     void visit(const ExpressionFromAccumulator<AccumulatorStdDevSamp>*) override {}
     void visit(const ExpressionFromAccumulator<AccumulatorSum>*) override {}

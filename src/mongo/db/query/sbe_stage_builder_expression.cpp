@@ -37,6 +37,7 @@
 #include "mongo/db/exec/sbe/values/arith_common.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/accumulator_multi.h"
+#include "mongo/db/pipeline/accumulator_percentile.h"
 #include "mongo/db/pipeline/expression_visitor.h"
 #include "mongo/db/pipeline/expression_walker.h"
 #include "mongo/db/query/expression_walker.h"
@@ -396,6 +397,8 @@ public:
     void visit(const ExpressionFromAccumulatorN<AccumulatorLastN>* expr) final {}
     void visit(const ExpressionFromAccumulatorN<AccumulatorMaxN>* expr) final {}
     void visit(const ExpressionFromAccumulatorN<AccumulatorMinN>* expr) final {}
+    void visit(const ExpressionFromAccumulatorQuantile<AccumulatorMedian>* expr) final {}
+    void visit(const ExpressionFromAccumulatorQuantile<AccumulatorPercentile>* expr) final {}
     void visit(const ExpressionFromAccumulator<AccumulatorStdDevPop>* expr) final {}
     void visit(const ExpressionFromAccumulator<AccumulatorStdDevSamp>* expr) final {}
     void visit(const ExpressionFromAccumulator<AccumulatorSum>* expr) final {}
@@ -570,6 +573,8 @@ public:
     void visit(const ExpressionFromAccumulatorN<AccumulatorLastN>* expr) final {}
     void visit(const ExpressionFromAccumulatorN<AccumulatorMaxN>* expr) final {}
     void visit(const ExpressionFromAccumulatorN<AccumulatorMinN>* expr) final {}
+    void visit(const ExpressionFromAccumulatorQuantile<AccumulatorMedian>* expr) final {}
+    void visit(const ExpressionFromAccumulatorQuantile<AccumulatorPercentile>* expr) final {}
     void visit(const ExpressionFromAccumulator<AccumulatorStdDevPop>* expr) final {}
     void visit(const ExpressionFromAccumulator<AccumulatorStdDevSamp>* expr) final {}
     void visit(const ExpressionFromAccumulator<AccumulatorSum>* expr) final {}
@@ -3109,6 +3114,12 @@ public:
         unsupportedExpression(expr->getOpName());
     }
     void visit(const ExpressionFromAccumulatorN<AccumulatorMinN>* expr) final {
+        unsupportedExpression(expr->getOpName());
+    }
+    void visit(const ExpressionFromAccumulatorQuantile<AccumulatorMedian>* expr) final {
+        unsupportedExpression(expr->getOpName());
+    }
+    void visit(const ExpressionFromAccumulatorQuantile<AccumulatorPercentile>* expr) final {
         unsupportedExpression(expr->getOpName());
     }
     void visit(const ExpressionFromAccumulator<AccumulatorStdDevPop>* expr) final {
