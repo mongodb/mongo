@@ -5,7 +5,7 @@
 //   # mapReduce does not support afterClusterTime.
 //   does_not_support_causal_consistency,
 //   does_not_support_stepdowns,
-//   requires_fcv_63,
+//   requires_fcv_70,
 //   requires_profiling,
 //   uses_map_reduce_with_temp_collections,
 // ]

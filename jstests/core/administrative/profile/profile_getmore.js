@@ -3,7 +3,7 @@
 //   not_allowed_with_security_token,
 //   does_not_support_stepdowns,
 //   requires_getmore,
-//   requires_fcv_63,
+//   requires_fcv_70,
 //   requires_profiling,
 //   cqf_incompatible,
 // ]

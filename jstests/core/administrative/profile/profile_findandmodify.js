@@ -4,7 +4,7 @@
 //   not_allowed_with_security_token,
 //   # Asserts on the number of index keys modified.
 //   assumes_no_implicit_index_creation,
-//   requires_fcv_63,
+//   requires_fcv_70,
 //   requires_profiling,
 // ]
 
