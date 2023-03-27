@@ -283,7 +283,9 @@ function makeTestCase(collName, {shardKeyField, isHashed, minVal, maxVal}) {
             // This is a shard key update.
             findAndModify: collName,
             query: {[shardKeyField]: minVal++},
-            update: {$inc: {[shardKeyField]: 1}}
+            update: {$inc: {[shardKeyField]: 1}},
+            lsid: {id: UUID()},
+            txnNumber: NumberLong(1)
         });
         writeDistribution.sampleSize.findAndModify++;
         writeDistribution.sampleSize.total++;

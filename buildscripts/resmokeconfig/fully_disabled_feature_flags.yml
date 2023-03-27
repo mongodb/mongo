@@ -12,3 +12,4 @@
 # Disable the feature flag for parallelizing prepared transaction application until most of the
 # codebase can run in this mode.
 - featureFlagApplyPreparedTxnsInParallel
+- featureFlagUpdateDocumentShardKeyUsingTransactionApi

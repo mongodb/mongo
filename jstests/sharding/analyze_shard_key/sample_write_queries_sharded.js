@@ -141,7 +141,8 @@ const expectedSampledQueryDocs = [];
         let : {var1: 1},
     };
 
-    assert.commandWorked(mongosDB.runCommand(originalCmdObj1));
+    assert.commandWorked(mongosDB.runCommand(
+        Object.assign({}, originalCmdObj1, {lsid: {id: UUID()}, txnNumber: NumberLong(1)})));
     assert.neq(mongosColl.findOne({x: 999, y: -1, z: [-1], v: -1}), null);
 
     expectedSampledQueryDocs.push({
@@ -259,7 +260,8 @@ const expectedSampledQueryDocs = [];
     const diff1 = {x: 'u', y: 'u'};
     const shardNames1 = [st.rs1.name];
 
-    assert.commandWorked(mongosDB.runCommand(originalCmdObj1));
+    assert.commandWorked(mongosDB.runCommand(
+        Object.assign({}, originalCmdObj1, {lsid: {id: UUID()}, txnNumber: NumberLong(1)})));
     assert.neq(mongosColl.findOne({x: 1006, y: -6, z: [6, 0, 6]}), null);
 
     expectedSampledQueryDocs.push({
