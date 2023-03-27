@@ -618,6 +618,7 @@ DepsTracker Pipeline::getDependenciesForContainer(
     // us to call 'deps.setNeedsMetadata()' without throwing.
     DepsTracker deps(unavailableMetadata.get_value_or(DepsTracker::kNoMetadata));
 
+    OrderedPathSet generatedPaths;
     bool hasUnsupportedStage = false;
     bool knowAllFields = false;
     bool knowAllMeta = false;
@@ -637,10 +638,23 @@ DepsTracker Pipeline::getDependenciesForContainer(
         // If we ever saw an unsupported stage, don't bother continuing to track field and metadata
         // deps: we already have to assume the pipeline depends on everything.
         if (!hasUnsupportedStage && !knowAllFields) {
-            deps.fields.insert(localDeps.fields.begin(), localDeps.fields.end());
+            for (const auto& field : localDeps.fields) {
+                // If a field was generated within the pipeline, we don't need to count it as a
+                // dependency of the pipeline as a whole when it is used in later stages.
+                if (!expression::containsDependency({field}, generatedPaths)) {
+                    deps.fields.emplace(field);
+                }
+            }
             if (localDeps.needWholeDocument)
                 deps.needWholeDocument = true;
             knowAllFields = status & DepsTracker::State::EXHAUSTIVE_FIELDS;
+
+            // Check if this stage modifies any fields that we should track for use by later stages.
+            auto localGeneratedPaths = source->getModifiedPaths();
+            if (localGeneratedPaths.type == DocumentSource::GetModPathsReturn::Type::kFiniteSet) {
+                auto newPathNames = localGeneratedPaths.getNewNames();
+                generatedPaths.insert(newPathNames.begin(), newPathNames.end());
+            }
         }
 
         if (!hasUnsupportedStage && !knowAllMeta) {

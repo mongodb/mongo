@@ -4968,6 +4968,95 @@ TEST_F(PipelineDependenciesTest, ShouldNotRequireTextScoreIfAvailableButDefinite
     ASSERT_FALSE(depsTracker.getNeedsMetadata(DocumentMetadataFields::kTextScore));
 }
 
+
+class DocumentSourceProducerConsumer : public DocumentSourceDependencyDummy {
+public:
+    DocumentSourceProducerConsumer(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                   OrderedPathSet&& dependencies,
+                                   OrderedPathSet&& generated,
+                                   DepsTracker::State depsState)
+        : DocumentSourceDependencyDummy(expCtx),
+          _dependencies(std::move(dependencies)),
+          _generated(std::move(generated)),
+          _depsState(depsState) {}
+    DepsTracker::State getDependencies(DepsTracker* deps) const final {
+        deps->fields = _dependencies;
+        return _depsState;
+    }
+
+    GetModPathsReturn getModifiedPaths() const final {
+        auto generated = _generated;
+        return {GetModPathsReturn::Type::kFiniteSet, std::move(generated), {}};
+    }
+
+    static boost::intrusive_ptr<DocumentSourceProducerConsumer> create(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        OrderedPathSet&& dependencies,
+        OrderedPathSet&& generated,
+        DepsTracker::State depsState = DepsTracker::State::SEE_NEXT) {
+        return new DocumentSourceProducerConsumer(
+            expCtx, std::move(dependencies), std::move(generated), depsState);
+    }
+
+private:
+    OrderedPathSet _dependencies;
+    OrderedPathSet _generated;
+    DepsTracker::State _depsState;
+};
+
+TEST_F(PipelineDependenciesTest, ShouldNotReturnDependenciesOnGeneratedPaths) {
+    auto ctx = getExpCtx();
+    auto needsAProducesBC = DocumentSourceProducerConsumer::create(ctx, {"a"}, {"b", "c"});
+    auto needsCDProducesE = DocumentSourceProducerConsumer::create(ctx, {"c", "d"}, {"e"});
+    auto needsBE = DocumentSourceProducerConsumer::create(
+        ctx, {"b", "e"}, {}, DepsTracker::State::EXHAUSTIVE_ALL);
+    auto pipeline = Pipeline::create({needsAProducesBC, needsCDProducesE, needsBE}, ctx);
+
+    auto depsTracker = pipeline->getDependencies(DepsTracker::kAllMetadata);
+    ASSERT_FALSE(depsTracker.needWholeDocument);
+    ASSERT_FALSE(depsTracker.getNeedsMetadata(DocumentMetadataFields::kTextScore));
+
+    // b, c, and e are generated within the pipeline so we should not request any of them. a and d
+    // are non-generated dependencies.
+    ASSERT_EQ(depsTracker.fields.size(), 2UL);
+    ASSERT_EQ(depsTracker.fields.count("a"), 1UL);
+    ASSERT_EQ(depsTracker.fields.count("d"), 1UL);
+}
+
+TEST_F(PipelineDependenciesTest, ShouldNotReturnDependenciesOnGeneratedPathsWithSubPathReferences) {
+    auto ctx = getExpCtx();
+    auto producer = DocumentSourceProducerConsumer::create(ctx, {}, {"a", "b", "c"});
+    auto consumer = DocumentSourceProducerConsumer::create(
+        ctx, {"aa", "b.b.b", "c.b", "d.b"}, {}, DepsTracker::State::EXHAUSTIVE_ALL);
+    auto pipeline = Pipeline::create({producer, consumer}, ctx);
+
+    auto depsTracker = pipeline->getDependencies(DepsTracker::kAllMetadata);
+    ASSERT_FALSE(depsTracker.needWholeDocument);
+    ASSERT_FALSE(depsTracker.getNeedsMetadata(DocumentMetadataFields::kTextScore));
+
+    // 'a', 'b', and 'c' are generated within the pipeline so we should not request any of them.
+    // 'aa' and 'd.b' are non-generated dependencies.
+    ASSERT_EQ(depsTracker.fields.size(), 2UL);
+    ASSERT_EQ(depsTracker.fields.count("aa"), 1UL);
+    ASSERT_EQ(depsTracker.fields.count("d.b"), 1UL);
+}
+
+TEST_F(PipelineDependenciesTest, PathModifiedWithoutNameChangeShouldStillBeADependency) {
+    auto ctx = getExpCtx();
+    auto producer = DocumentSourceProducerConsumer::create(ctx, {"a"}, {"a"});
+    auto consumer =
+        DocumentSourceProducerConsumer::create(ctx, {"a"}, {}, DepsTracker::State::EXHAUSTIVE_ALL);
+    auto pipeline = Pipeline::create({producer, consumer}, ctx);
+
+    auto depsTracker = pipeline->getDependencies(DepsTracker::kAllMetadata);
+    ASSERT_FALSE(depsTracker.needWholeDocument);
+    ASSERT_FALSE(depsTracker.getNeedsMetadata(DocumentMetadataFields::kTextScore));
+
+    // 'a' is both consumed by and modified within the same stage in the pipeline, so we need to
+    // request it.
+    ASSERT_EQ(depsTracker.fields.size(), 1UL);
+    ASSERT_EQ(depsTracker.fields.count("a"), 1UL);
+}
 }  // namespace Dependencies
 
 namespace {

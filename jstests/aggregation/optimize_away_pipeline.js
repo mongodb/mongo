@@ -721,7 +721,7 @@ assertPipelineUsesAggregation({
 explain = coll.explain().aggregate(pipeline);
 projStage = getAggPlanStage(explain, "PROJECTION_SIMPLE");
 assert.neq(null, projStage, explain);
-assertTransformByShape({a: 1, b: 1, _id: 0}, projStage.transformBy, explain);
+assertTransformByShape({b: 1, _id: 0}, projStage.transformBy, explain);
 
 // Test that an exclusion projection at the front of the pipeline is pushed down if there is no
 // finite dependency set.

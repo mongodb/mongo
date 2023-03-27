@@ -235,8 +235,7 @@ assertExplainBehaviorAndCorrectResults(
     // $_internalUnpackBucket can use dependency analysis to unpack only certain needed fields.
     {
         windowSort: {"attributes.sensor": 1, "time": 1},
-        inExcludeSpec:
-            {include: ["_id", "attributes", "time", "temperature", "firstTemp", "lastTemp"]}
+        inExcludeSpec: {include: ["_id", "attributes", "time", "temperature"]}
     },
     [
         {_id: 0, firstTemp: 55, lastTemp: 51},
@@ -264,7 +263,7 @@ assertExplainBehaviorAndCorrectResults(
     // can use dependency analysis to unpack only certain needed fields.
     {
         windowSort: {"language": 1, "_id": 1},
-        inExcludeSpec: {include: ["_id", "language", "sensorsSoFar", "attributes"]}
+        inExcludeSpec: {include: ["_id", "language", "attributes"]}
     },
     [
         {_id: 0, sensorsSoFar: ["S1"]},
@@ -289,7 +288,7 @@ assertExplainBehaviorAndCorrectResults(
     // certain needed fields.
     {
         bucketSort: {"meta.sensor": 1},
-        inExcludeSpec: {include: ["_id", "attributes", "contributions", "total"]}
+        inExcludeSpec: {include: ["_id", "attributes", "contributions"]}
     },
     [
         {_id: 2, percentOfTotal: 20 / 40},
@@ -319,7 +318,7 @@ assertExplainBehaviorAndCorrectResults(
     // TODO SERVER-56419: Add a check for bucketFilter once $match can be pushed down.
     {
         windowSort: {"attributes.sensor": 1, "contributions": -1},
-        inExcludeSpec: {include: ["_id", "attributes", "contributions", "rank"]}
+        inExcludeSpec: {include: ["_id", "attributes", "contributions"]}
     },
     [
         {_id: 2, rank: 1},

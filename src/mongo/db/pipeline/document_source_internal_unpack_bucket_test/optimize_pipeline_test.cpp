@@ -730,8 +730,8 @@ TEST_F(OptimizePipeline, PushDownAddFieldsDoNotInternalizeProjection) {
     auto serialized = pipeline->serializeToBson();
     ASSERT_EQ(4u, serialized.size());
     ASSERT_BSONOBJ_EQ(fromjson("{$addFields: {device: '$meta.a'}}"), serialized[0]);
-    ASSERT_BSONOBJ_EQ(fromjson("{$_internalUnpackBucket: { include: ['_id', 'device', 'x', 'y', "
-                               "'z'], timeField: 'time', metaField: 'myMeta', "
+    ASSERT_BSONOBJ_EQ(fromjson("{$_internalUnpackBucket: { include: ['_id', 'device', 'x', 'y'"
+                               "], timeField: 'time', metaField: 'myMeta', "
                                "bucketMaxSpanSeconds: 3600, computedMetaProjFields: ['device']}}"),
                       serialized[1]);
     ASSERT_BSONOBJ_EQ(fromjson("{$addFields: {z: {$add : ['$x', '$y']}}}"), serialized[2]);
