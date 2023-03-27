@@ -136,7 +136,7 @@ Status validateIsNotInDbs(const NamespaceString& ns,
     if (std::find(disallowedDbs.begin(), disallowedDbs.end(), ns.dbName()) != disallowedDbs.end()) {
         return {ErrorCodes::InvalidOptions,
                 str::stream() << optionName << " collection option is not supported on the "
-                              << ns.dbName().toStringForErrorMsg() << " database"};
+                              << ns.db() << " database"};
     }
 
     return Status::OK();

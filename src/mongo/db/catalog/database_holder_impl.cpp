@@ -48,7 +48,7 @@ namespace mongo {
 Database* DatabaseHolderImpl::getDb(OperationContext* opCtx, const DatabaseName& dbName) const {
     uassert(
         13280,
-        "invalid db name: " + dbName.toStringForErrorMsg(),
+        "invalid db name: " + dbName.db(),
         NamespaceString::validDBName(dbName.db(), NamespaceString::DollarInDbNameBehavior::Allow));
 
     invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_IS) ||
@@ -66,7 +66,7 @@ Database* DatabaseHolderImpl::getDb(OperationContext* opCtx, const DatabaseName&
 bool DatabaseHolderImpl::dbExists(OperationContext* opCtx, const DatabaseName& dbName) const {
     uassert(
         6198702,
-        "invalid db name: " + dbName.toStringForErrorMsg(),
+        "invalid db name: " + dbName.db(),
         NamespaceString::validDBName(dbName.db(), NamespaceString::DollarInDbNameBehavior::Allow));
     stdx::lock_guard<SimpleMutex> lk(_m);
     auto it = _dbs.find(dbName);
@@ -105,7 +105,7 @@ Database* DatabaseHolderImpl::openDb(OperationContext* opCtx,
                                      bool* justCreated) {
     uassert(
         6198701,
-        "invalid db name: " + dbName.toStringForErrorMsg(),
+        "invalid db name: " + dbName.db(),
         NamespaceString::validDBName(dbName.db(), NamespaceString::DollarInDbNameBehavior::Allow));
     invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_IX));
 
@@ -134,8 +134,8 @@ Database* DatabaseHolderImpl::openDb(OperationContext* opCtx,
     auto duplicates = _getNamesWithConflictingCasing_inlock(dbName);
     uassert(ErrorCodes::DatabaseDifferCase,
             str::stream() << "db already exists with different case already have: ["
-                          << (*duplicates.cbegin()) << "] trying to create ["
-                          << dbName.toStringForErrorMsg() << "]",
+                          << (*duplicates.cbegin()) << "] trying to create [" << dbName.toString()
+                          << "]",
             duplicates.empty());
 
     // Do the catalog lookup and database creation outside of the scoped lock, because these may
@@ -231,7 +231,7 @@ void DatabaseHolderImpl::dropDb(OperationContext* opCtx, Database* db) {
 void DatabaseHolderImpl::close(OperationContext* opCtx, const DatabaseName& dbName) {
     uassert(
         6198700,
-        "invalid db name: " + dbName.toStringForErrorMsg(),
+        "invalid db name: " + dbName.db(),
         NamespaceString::validDBName(dbName.db(), NamespaceString::DollarInDbNameBehavior::Allow));
     invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_X));
 

@@ -568,7 +568,7 @@ void CommandHelpers::canUseTransactions(const NamespaceString& nss,
     const auto dbName = nss.dbName();
 
     uassert(ErrorCodes::OperationNotSupportedInTransaction,
-            str::stream() << "Cannot run command against the '" << dbName.toStringForErrorMsg()
+            str::stream() << "Cannot run command against the '" << dbName
                           << "' database in a transaction.",
             dbName.db() != DatabaseName::kLocal.db());
 
@@ -876,11 +876,10 @@ void CommandInvocation::checkAuthorization(OperationContext* opCtx,
                 namespace mmb = mutablebson;
                 mmb::Document cmdToLog(request.body, mmb::Document::kInPlaceDisabled);
                 c->snipForLogging(&cmdToLog);
-                auto dbName = DatabaseNameUtil::deserialize(request.getValidatedTenantId(),
-                                                            request.getDatabase());
+                auto dbname = request.getDatabase();
                 uasserted(ErrorCodes::Unauthorized,
-                          str::stream() << "not authorized on " << dbName.toStringForErrorMsg()
-                                        << " to execute command " << redact(cmdToLog.getObject()));
+                          str::stream() << "not authorized on " << dbname << " to execute command "
+                                        << redact(cmdToLog.getObject()));
             }
         }
     } catch (const DBException& e) {

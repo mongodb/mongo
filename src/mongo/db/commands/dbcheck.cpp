@@ -201,9 +201,7 @@ std::unique_ptr<DbCheckRun> fullDatabaseRun(OperationContext* opCtx,
             dbName.db() != "local");
 
     AutoGetDb agd(opCtx, dbName, MODE_IS);
-    uassert(ErrorCodes::NamespaceNotFound,
-            "Database " + dbName.toStringForErrorMsg() + " not found",
-            agd.getDb());
+    uassert(ErrorCodes::NamespaceNotFound, "Database " + dbName.db() + " not found", agd.getDb());
 
     uassert(6769501, "dbCheck no longer supports snapshotRead:false", invocation.getSnapshotRead());
 

@@ -1748,8 +1748,8 @@ NamespaceString CollectionCatalog::resolveNamespaceStringOrUUID(
             resolvedNss && resolvedNss->isValid());
 
     uassert(ErrorCodes::NamespaceNotFound,
-            str::stream() << "UUID: " << nsOrUUID.toString() << " specified in provided db name: "
-                          << nsOrUUID.dbName()->toStringForErrorMsg()
+            str::stream() << "UUID: " << nsOrUUID.toString()
+                          << " specified in provided db name: " << nsOrUUID.dbname()
                           << " resolved to a collection in a different database, resolved nss: "
                           << *resolvedNss,
             resolvedNss->dbName() == nsOrUUID.dbName());

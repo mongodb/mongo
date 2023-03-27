@@ -178,19 +178,18 @@ void DatabaseShardingState::assertMatchingDbVersion(OperationContext* opCtx,
                                                 : ShardingMigrationCriticalSection::kRead);
         uassert(
             StaleDbRoutingVersion(dbName.toString(), receivedVersion, boost::none, critSecSignal),
-            str::stream() << "The critical section for the database "
-                          << dbName.toStringForErrorMsg()
+            str::stream() << "The critical section for the database " << dbName
                           << " is acquired with reason: " << scopedDss->getCriticalSectionReason(),
             !critSecSignal);
     }
 
     const auto wantedVersion = scopedDss->getDbVersion(opCtx);
     uassert(StaleDbRoutingVersion(dbName.toString(), receivedVersion, boost::none),
-            str::stream() << "No cached info for the database " << dbName.toStringForErrorMsg(),
+            str::stream() << "No cached info for the database " << dbName,
             wantedVersion);
 
     uassert(StaleDbRoutingVersion(dbName.toString(), receivedVersion, *wantedVersion),
-            str::stream() << "Version mismatch for the database " << dbName.toStringForErrorMsg(),
+            str::stream() << "Version mismatch for the database " << dbName,
             receivedVersion == *wantedVersion);
 }
 
@@ -205,8 +204,7 @@ void DatabaseShardingState::assertIsPrimaryShardForDb(OperationContext* opCtx,
     }
 
     uassert(ErrorCodes::IllegalOperation,
-            str::stream() << "Received request without the version for the database "
-                          << dbName.toStringForErrorMsg(),
+            str::stream() << "Received request without the version for the database " << dbName,
             OperationShardingState::get(opCtx).hasDbVersion());
 
     Lock::DBLock dbLock(opCtx, dbName, MODE_IS);
@@ -216,9 +214,8 @@ void DatabaseShardingState::assertIsPrimaryShardForDb(OperationContext* opCtx,
     const auto primaryShardId = scopedDss->_dbInfo->getPrimary();
     const auto thisShardId = ShardingState::get(opCtx)->shardId();
     uassert(ErrorCodes::IllegalOperation,
-            str::stream() << "This is not the primary shard for the database "
-                          << dbName.toStringForErrorMsg() << ". Expected: " << primaryShardId
-                          << " Actual: " << thisShardId,
+            str::stream() << "This is not the primary shard for the database " << dbName
+                          << ". Expected: " << primaryShardId << " Actual: " << thisShardId,
             primaryShardId == thisShardId);
 }
 

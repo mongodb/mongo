@@ -153,16 +153,6 @@ public:
         return _dbString;
     }
 
-    /**
-     * This function should only be used when logging a db name in an error message.
-     */
-    std::string toStringForErrorMsg() const {
-        if (_tenantId)
-            return str::stream() << *_tenantId << '_' << _dbString;
-
-        return _dbString;
-    }
-
     bool equalCaseInsensitive(const DatabaseName& other) const {
         return (_tenantId == other._tenantId) && boost::iequals(toString(), other.toString());
     }

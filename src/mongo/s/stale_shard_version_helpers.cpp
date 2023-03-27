@@ -66,8 +66,7 @@ void checkErrorStatusAndMaxRetries(const Status& status,
             error_details::ErrorExtraInfoForImpl<ErrorCodes::StaleDbVersion>::type>();
         invariant(staleInfo->getDb() == nss.db(),
                   str::stream() << "StaleDbVersion error on unexpected database. Expected "
-                                << nss.dbName().toStringForErrorMsg() << ", received "
-                                << staleInfo->getDb());
+                                << nss.db() << ", received " << staleInfo->getDb());
 
         // If the database version is stale, refresh its entry in the catalog cache.
         catalogCache->onStaleDatabaseVersion(staleInfo->getDb(), staleInfo->getVersionWanted());

@@ -116,7 +116,7 @@ void CreateCollectionTest::validateValidator(const std::string& validatorStr,
         AutoGetCollection autoColl(opCtx.get(), newNss, MODE_IX);
         auto db = autoColl.ensureDbExists(opCtx.get());
         ASSERT_TRUE(db) << "Cannot create collection " << newNss << " because database "
-                        << newNss.dbName().toStringForErrorMsg() << " does not exist.";
+                        << newNss.db() << " does not exist.";
 
         WriteUnitOfWork wuow(opCtx.get());
         const auto status =

@@ -167,7 +167,7 @@ std::unique_ptr<CommandInvocation> CmdExplain::parse(OperationContext* opCtx,
         IDLParserContext(ExplainCommandRequest::kCommandName,
                          APIParameters::get(opCtx).getAPIStrict().value_or(false)),
         request);
-    auto const dbName = cmdObj.getDbName();
+    std::string dbname = cmdObj.getDbName().toString();
     ExplainOptions::Verbosity verbosity = cmdObj.getVerbosity();
     auto explainedObj = cmdObj.getCommandParameter();
 
@@ -179,13 +179,10 @@ std::unique_ptr<CommandInvocation> CmdExplain::parse(OperationContext* opCtx,
     }
 
     if (auto innerDb = explainedObj["$db"]) {
-        auto innerDbName =
-            DatabaseNameUtil::deserialize(dbName.tenantId(), innerDb.checkAndGetStringData());
         uassert(ErrorCodes::InvalidNamespace,
-                str::stream() << "Mismatched $db in explain command. Expected "
-                              << dbName.toStringForErrorMsg() << " but got "
-                              << innerDbName.toStringForErrorMsg(),
-                innerDb.checkAndGetStringData() == dbName.toString());
+                str::stream() << "Mismatched $db in explain command. Expected " << dbname
+                              << " but got " << innerDb.checkAndGetStringData(),
+                innerDb.checkAndGetStringData() == dbname);
     }
     auto explainedCommand = CommandHelpers::findCommand(explainedObj.firstElementFieldName());
     uassert(ErrorCodes::CommandNotFound,
@@ -193,8 +190,8 @@ std::unique_ptr<CommandInvocation> CmdExplain::parse(OperationContext* opCtx,
                           << explainedObj.firstElementFieldName(),
             explainedCommand);
     auto innerRequest =
-        std::make_unique<OpMsgRequest>(OpMsgRequestBuilder::createWithValidatedTenancyScope(
-            dbName, request.validatedTenancyScope, explainedObj));
+        std::make_unique<OpMsgRequest>(OpMsgRequest::fromDBAndBody(dbname, explainedObj));
+    innerRequest->validatedTenancyScope = request.validatedTenancyScope;
     auto innerInvocation = explainedCommand->parseForExplain(opCtx, *innerRequest, verbosity);
     return std::make_unique<Invocation>(
         this, request, std::move(verbosity), std::move(innerRequest), std::move(innerInvocation));

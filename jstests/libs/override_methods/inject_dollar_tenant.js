@@ -6,11 +6,6 @@
 'use strict';
 
 load("jstests/libs/override_methods/override_helpers.js");  // For 'OverrideHelpers'.
-load(
-    "jstests/libs/override_methods/tenant_aware_response_checker.js");  // For
-                                                                        // `assertExpectedDbNameInResponse`
-                                                                        // and
-                                                                        // `updateDbNamesInResponse`.
 
 const kTenantId = ObjectId(TestData.tenant);
 
@@ -21,10 +16,6 @@ function runCommandWithDollarTenant(
     const cmdToRun = Object.assign({}, cmdObj, {"$tenant": kTenantId});
     // Actually run the provided command.
     let res = originalRunCommand.apply(conn, makeRunCommandArgs(cmdToRun));
-
-    const prefixedDbName = kTenantId + "_" + dbName;
-    assertExpectedDbNameInResponse(res, dbName, prefixedDbName);
-    updateDbNamesInResponse(res, dbName, prefixedDbName);
     return res;
 }
 
