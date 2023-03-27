@@ -55,7 +55,6 @@ bool InternalSchemaUniqueItemsMatchExpression::equivalent(const MatchExpression*
 
 BSONObj InternalSchemaUniqueItemsMatchExpression::getSerializedRightHandSide(
     SerializationOptions opts) const {
-    // TODO SERVER-73678 respect 'replacementForLiteralArgs.'
     BSONObjBuilder bob;
     bob.append(kName, true);
     return bob.obj();

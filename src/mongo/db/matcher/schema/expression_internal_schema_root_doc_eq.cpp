@@ -49,9 +49,8 @@ void InternalSchemaRootDocEqMatchExpression::debugString(StringBuilder& debug,
 
 void InternalSchemaRootDocEqMatchExpression::serialize(BSONObjBuilder* out,
                                                        SerializationOptions opts) const {
-    // TODO SERVER-73678 respect 'opts.'
     BSONObjBuilder subObj(out->subobjStart(kName));
-    subObj.appendElements(_rhsObj);
+    opts.redactObjToBuilder(&subObj, _rhsObj);
     subObj.doneFast();
 }
 

@@ -64,9 +64,17 @@ void InternalSchemaEqMatchExpression::debugString(StringBuilder& debug,
 
 BSONObj InternalSchemaEqMatchExpression::getSerializedRightHandSide(
     SerializationOptions opts) const {
-    // TODO SERVER-73678 respect 'replacementForLiteralArgs.'
     BSONObjBuilder eqObj;
-    eqObj.appendAs(_rhsElem, kName);
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        tassert(7367800,
+                str::stream() << "Expected _rhsElem to be an object in " << kName,
+                _rhsElem.type() == BSONType::Object);
+        BSONObjBuilder exprSpec(eqObj.subobjStart(kName));
+        opts.redactObjToBuilder(&exprSpec, _rhsElem.Obj());
+        exprSpec.done();
+    } else {
+        eqObj.appendAs(_rhsElem, kName);
+    }
     return eqObj.obj();
 }
 

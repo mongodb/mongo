@@ -123,20 +123,27 @@ bool InternalSchemaAllowedPropertiesMatchExpression::_matchesBSONObj(const BSONO
 
 void InternalSchemaAllowedPropertiesMatchExpression::serialize(BSONObjBuilder* builder,
                                                                SerializationOptions opts) const {
-    // TODO SERVER-73678 respect 'opts'.
     BSONObjBuilder expressionBuilder(
         builder->subobjStart(InternalSchemaAllowedPropertiesMatchExpression::kName));
 
     std::vector<StringData> sortedProperties(_properties.begin(), _properties.end());
     std::sort(sortedProperties.begin(), sortedProperties.end());
-    expressionBuilder.append("properties", sortedProperties);
-
-    expressionBuilder.append("namePlaceholder", _namePlaceholder);
+    if (opts.replacementForLiteralArgs) {
+        expressionBuilder.append("properties", opts.replacementForLiteralArgs.get());
+        expressionBuilder.append("namePlaceholder", opts.replacementForLiteralArgs.get());
+    } else {
+        expressionBuilder.append("properties", sortedProperties);
+        expressionBuilder.append("namePlaceholder", _namePlaceholder);
+    }
 
     BSONArrayBuilder patternPropertiesBuilder(expressionBuilder.subarrayStart("patternProperties"));
     for (auto&& item : _patternProperties) {
         BSONObjBuilder itemBuilder(patternPropertiesBuilder.subobjStart());
-        itemBuilder.appendRegex("regex", item.first.rawRegex);
+        if (opts.replacementForLiteralArgs) {
+            itemBuilder.appendRegex("regex", opts.replacementForLiteralArgs.get());
+        } else {
+            itemBuilder.appendRegex("regex", item.first.rawRegex);
+        }
 
         BSONObjBuilder subexpressionBuilder(itemBuilder.subobjStart("expression"));
         item.second->getFilter()->serialize(&subexpressionBuilder, opts);
