@@ -77,7 +77,10 @@ var $config = (function() {
                 db.adminCommand({movePrimary: db.getName(), to: shardId}), [
                     ErrorCodes.ConflictingOperationInProgress,
                     // The cloning phase has failed (e.g. as a result of a stepdown). When a failure
-                    // occurs at this phase, the movePrimary operation does not recover.
+                    // occurs at this phase, the movePrimary operation does not recover. Either of
+                    // the following error codes could be seen depending on if the failover was on
+                    // the donor or recipient node.
+                    ErrorCodes.MovePrimaryAborted,
                     7120202
                 ]);
         },

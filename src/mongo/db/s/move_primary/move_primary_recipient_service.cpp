@@ -189,7 +189,8 @@ SemiFuture<void> MovePrimaryRecipientService::MovePrimaryRecipient::run(
 
     // We would like to abort in all cases where there is a failover and we have not yet reached
     // kPrepared state to maintain correctness of movePrimary operation across upgrades/downgrades
-    // in binary versions with feature parity in online movePrimary implementation.
+    // in binary versions with feature parity in online movePrimary implementation. The offline
+    // cloner is not resumable after failovers.
     auto shouldAbort = [&] {
         if (!_useOnlineCloner()) {
             stdx::lock_guard<Latch> lg(_mutex);
@@ -317,6 +318,7 @@ MovePrimaryRecipientService::MovePrimaryRecipient::_transitionToCloningStateAndC
                 MovePrimaryRecipientDocument::kStateFieldName,
                 MovePrimaryRecipientState_serializer(MovePrimaryRecipientStateEnum::kCloning));
             _transitionStateMachine(MovePrimaryRecipientStateEnum::kCloning);
+            // TODO SERVER-75872: Refactor this logic after integrating online cloner.
             _cloneDataFromDonor(opCtx.get());
         })
         .onTransientError([](const Status& status) {
@@ -554,7 +556,8 @@ MovePrimaryRecipientService::MovePrimaryRecipient::_transitionToDoneStateAndFini
                     movePrimaryRecipientPauseBeforeDeletingStateDoc.pauseWhileSetAndNotCanceled(
                         opCtx.get(), _ctHolder->getStepdownToken());
                     _removeRecipientDocument(opCtx.get());
-                });
+                })
+                .then([this, executor] { return _waitForMajority(executor); });
         })
         .onTransientError([](const Status& status) {})
         .onUnrecoverableError([](const Status& status) {
@@ -805,6 +808,9 @@ MovePrimaryRecipientService::MovePrimaryRecipient::_transitionToInitializingStat
 
 ExecutorFuture<void> MovePrimaryRecipientService::MovePrimaryRecipient::_initializeForCloningState(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+    if (_checkInvalidStateTransition(MovePrimaryRecipientStateEnum::kCloning)) {
+        return ExecutorFuture(**executor);
+    }
     return _retryingCancelableOpCtxFactory
         ->withAutomaticRetry([this, executor](const auto& factory) {
             auto opCtx = factory.makeOperationContext(Client::getCurrent());

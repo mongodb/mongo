@@ -167,7 +167,9 @@ const $config = (function() {
                     // Due to a stepdown of the donor during the cloning phase, the movePrimary
                     // operation failed. It is not automatically recovered, but any orphaned data on
                     // the recipient has been deleted.
-                    7120202
+                    7120202,
+                    // Same as the above, but due to a stepdown of the recipient.
+                    ErrorCodes.MovePrimaryAborted
                 ]);
         },
         checkDatabaseMetadataConsistency: function(db, collName, connCache) {

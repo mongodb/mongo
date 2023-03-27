@@ -44,11 +44,21 @@
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/db/write_block_bypass.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/move_primary/move_primary_feature_flag_gen.h"
 #include "mongo/s/request_types/move_primary_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
+
+namespace {
+
+bool useOnlineCloner() {
+    return move_primary::gFeatureFlagOnlineMovePrimaryLifecycle.isEnabled(
+        serverGlobalParams.featureCompatibility);
+}
+
+}  // namespace
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeCloningData);
 
@@ -139,6 +149,10 @@ ExecutorFuture<void> MovePrimaryCoordinator::_runImpl(
                     "Requested primary shard {} is draining"_format(toShardId.toString()),
                     !toShardEntry.getDraining());
 
+            if (useOnlineCloner() && !_firstExecution) {
+                recoverOnlineCloner(opCtx);
+            }
+
             return runMovePrimaryWorkflow(executor, token);
         });
 }
@@ -149,7 +163,7 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
     return ExecutorFuture<void>(**executor)
         .then(_buildPhaseHandler(
             Phase::kClone,
-            [this, anchor = shared_from_this()] {
+            [this, token, anchor = shared_from_this()] {
                 const auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
@@ -188,26 +202,30 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
                     hangBeforeCloningData.pauseWhileSet(opCtx);
                 }
 
-                const auto& collectionsToClone = getUnshardedCollections(opCtx);
-                assertNoOrphanedDataOnRecipient(opCtx, collectionsToClone);
-
-                _doc.setCollectionsToClone(collectionsToClone);
-                _updateStateDocument(opCtx, StateDoc(_doc));
-
-                const auto& clonedCollections = cloneDataToRecipient(opCtx);
-                assertClonedData(clonedCollections);
+                if (useOnlineCloner()) {
+                    if (!_onlineCloner) {
+                        createOnlineCloner(opCtx);
+                    }
+                    cloneDataUntilReadyForCatchup(opCtx, token);
+                } else {
+                    cloneDataLegacy(opCtx);
+                }
 
                 // TODO (SERVER-71566): Temporary solution to cover the case of stepping down before
                 // actually entering the `kCatchup` phase.
                 blockWrites(opCtx);
             }))
         .then(_buildPhaseHandler(Phase::kCatchup,
-                                 [this, anchor = shared_from_this()] {
+                                 [this, token, anchor = shared_from_this()] {
                                      const auto opCtxHolder = cc().makeOperationContext();
                                      auto* opCtx = opCtxHolder.get();
                                      getForwardableOpMetadata().setOn(opCtx);
 
                                      blockWrites(opCtx);
+                                     if (useOnlineCloner()) {
+                                         informOnlineClonerOfBlockingWrites(opCtx);
+                                         waitUntilOnlineClonerPrepared(token);
+                                     }
                                  }))
         .then(_buildPhaseHandler(Phase::kEnterCriticalSection,
                                  [this, executor, anchor = shared_from_this()] {
@@ -226,7 +244,9 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
                                      }
 
                                      blockReads(opCtx);
-                                     enterCriticalSectionOnRecipient(opCtx);
+                                     if (!useOnlineCloner()) {
+                                         enterCriticalSectionOnRecipient(opCtx);
+                                     }
                                  }))
         .then(_buildPhaseHandler(
             Phase::kCommit,
@@ -261,7 +281,7 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
                                      dropStaleDataOnDonor(opCtx);
                                  }))
         .then(_buildPhaseHandler(Phase::kExitCriticalSection,
-                                 [this, executor, anchor = shared_from_this()] {
+                                 [this, executor, token, anchor = shared_from_this()] {
                                      const auto opCtxHolder = cc().makeOperationContext();
                                      auto* opCtx = opCtxHolder.get();
                                      getForwardableOpMetadata().setOn(opCtx);
@@ -277,7 +297,11 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
                                      }
 
                                      unblockReadsAndWrites(opCtx);
-                                     exitCriticalSectionOnRecipient(opCtx);
+                                     if (useOnlineCloner()) {
+                                         cleanupOnlineCloner(opCtx, token);
+                                     } else {
+                                         exitCriticalSectionOnRecipient(opCtx);
+                                     }
 
                                      LOGV2(7120206,
                                            "Completed movePrimary operation",
@@ -292,7 +316,8 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
             getForwardableOpMetadata().setOn(opCtx);
 
             const auto& failedPhase = _doc.getPhase();
-            if (failedPhase == Phase::kClone || status == ErrorCodes::ShardNotFound) {
+            if (_onlineCloner || failedPhase == Phase::kClone ||
+                status == ErrorCodes::ShardNotFound) {
                 LOGV2_DEBUG(7392900,
                             1,
                             "Triggering movePrimary cleanup",
@@ -306,12 +331,70 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
         });
 }
 
+bool MovePrimaryCoordinator::onlineClonerPossiblyNeverCreated() const {
+    // Either the first run of this service, or failed over before online cloner persisted its
+    // state document.
+    auto phase = _doc.getPhase();
+    return phase <= Phase::kClone;
+}
+
+bool MovePrimaryCoordinator::onlineClonerPossiblyCleanedUp() const {
+    // Could have failed over between the online cloner deleting its state document and the
+    // coordinator deleting its state document.
+    auto phase = _doc.getPhase();
+    return phase == Phase::kExitCriticalSection || getAbortReason();
+}
+
+bool MovePrimaryCoordinator::onlineClonerAllowedToBeMissing() const {
+    return onlineClonerPossiblyNeverCreated() || onlineClonerPossiblyCleanedUp();
+}
+
+void MovePrimaryCoordinator::recoverOnlineCloner(OperationContext* opCtx) {
+    _onlineCloner = MovePrimaryDonor::get(opCtx, _dbName, _doc.getToShardId());
+    if (_onlineCloner) {
+        return;
+    }
+    invariant(onlineClonerAllowedToBeMissing());
+}
+
+void MovePrimaryCoordinator::createOnlineCloner(OperationContext* opCtx) {
+    invariant(onlineClonerPossiblyNeverCreated());
+    _onlineCloner = MovePrimaryDonor::create(opCtx, _dbName, _doc.getToShardId());
+}
+
+void MovePrimaryCoordinator::cloneDataUntilReadyForCatchup(OperationContext* opCtx,
+                                                           const CancellationToken& token) {
+    future_util::withCancellation(_onlineCloner->getReadyToBlockWritesFuture(), token).get();
+}
+
+void MovePrimaryCoordinator::cloneDataLegacy(OperationContext* opCtx) {
+    const auto& collectionsToClone = getUnshardedCollections(opCtx);
+    assertNoOrphanedDataOnRecipient(opCtx, collectionsToClone);
+
+    _doc.setCollectionsToClone(collectionsToClone);
+    _updateStateDocument(opCtx, StateDoc(_doc));
+
+    const auto& clonedCollections = cloneDataToRecipient(opCtx);
+    assertClonedData(clonedCollections);
+}
+
+void MovePrimaryCoordinator::informOnlineClonerOfBlockingWrites(OperationContext* opCtx) {
+    auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
+    replClient.setLastOpToSystemLastOpTime(opCtx);
+    const auto latestOpTime = replClient.getLastOp();
+    _onlineCloner->onBeganBlockingWrites(latestOpTime.getTimestamp());
+}
+
+void MovePrimaryCoordinator::waitUntilOnlineClonerPrepared(const CancellationToken& token) {
+    future_util::withCancellation(_onlineCloner->getDecisionFuture(), token).get();
+}
+
 ExecutorFuture<void> MovePrimaryCoordinator::_cleanupOnAbort(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token,
     const Status& status) noexcept {
     return ExecutorFuture<void>(**executor)
-        .then([this, executor, status, anchor = shared_from_this()] {
+        .then([this, executor, token, status, anchor = shared_from_this()] {
             const auto opCtxHolder = cc().makeOperationContext();
             auto* opCtx = opCtxHolder.get();
             getForwardableOpMetadata().setOn(opCtx);
@@ -320,46 +403,75 @@ ExecutorFuture<void> MovePrimaryCoordinator::_cleanupOnAbort(
             _performNoopRetryableWriteOnAllShardsAndConfigsvr(
                 opCtx, getCurrentSession(), **executor);
 
-            const auto& failedPhase = _doc.getPhase();
-            const auto& toShardId = _doc.getToShardId();
-
-            if (failedPhase <= Phase::kCommit) {
-                // A non-retryable error occurred before the new primary shard was actually
-                // committed, so any cloned data on the recipient must be dropped.
-
-                try {
-                    // Even if the error is `ShardNotFound`, the recipient may still be in draining
-                    // mode, so try to drop any orphaned data anyway.
-                    dropOrphanedDataOnRecipient(opCtx, executor);
-                } catch (const ExceptionFor<ErrorCodes::ShardNotFound>&) {
-                    LOGV2_INFO(7392901,
-                               "Failed to remove orphaned data on recipient as it has been removed",
-                               logAttrs(_dbName),
-                               "to"_attr = toShardId);
-                }
-            }
-
-            unblockReadsAndWrites(opCtx);
-            try {
-                // Even if the error is `ShardNotFound`, the recipient may still be in draining
-                // mode, so try to exit the critical section anyway.
-                exitCriticalSectionOnRecipient(opCtx);
-            } catch (const ExceptionFor<ErrorCodes::ShardNotFound>&) {
-                LOGV2_INFO(7392902,
-                           "Failed to exit critical section on recipient as it has been removed",
-                           logAttrs(_dbName),
-                           "to"_attr = toShardId);
+            if (useOnlineCloner()) {
+                cleanupOnAbortWithOnlineCloner(opCtx, token, status);
+            } else {
+                cleanupOnAbortWithoutOnlineCloner(opCtx, executor);
             }
 
             LOGV2_ERROR(7392903,
                         "Failed movePrimary operation",
                         logAttrs(_dbName),
-                        "to"_attr = toShardId,
-                        "phase"_attr = serializePhase(failedPhase),
+                        "to"_attr = _doc.getToShardId(),
+                        "phase"_attr = serializePhase(_doc.getPhase()),
                         "error"_attr = redact(status));
 
             logChange(opCtx, "error", status);
         });
+}
+
+void MovePrimaryCoordinator::cleanupOnAbortWithoutOnlineCloner(
+    OperationContext* opCtx, std::shared_ptr<executor::ScopedTaskExecutor> executor) {
+    const auto& failedPhase = _doc.getPhase();
+    const auto& toShardId = _doc.getToShardId();
+
+    if (failedPhase <= Phase::kCommit) {
+        // A non-retryable error occurred before the new primary shard was actually
+        // committed, so any cloned data on the recipient must be dropped.
+
+        try {
+            // Even if the error is `ShardNotFound`, the recipient may still be in draining
+            // mode, so try to drop any orphaned data anyway.
+            dropOrphanedDataOnRecipient(opCtx, executor);
+        } catch (const ExceptionFor<ErrorCodes::ShardNotFound>&) {
+            LOGV2_INFO(7392901,
+                       "Failed to remove orphaned data on recipient as it has been removed",
+                       logAttrs(_dbName),
+                       "to"_attr = toShardId);
+        }
+    }
+
+    unblockReadsAndWrites(opCtx);
+    try {
+        // Even if the error is `ShardNotFound`, the recipient may still be in draining
+        // mode, so try to exit the critical section anyway.
+        exitCriticalSectionOnRecipient(opCtx);
+    } catch (const ExceptionFor<ErrorCodes::ShardNotFound>&) {
+        LOGV2_INFO(7392902,
+                   "Failed to exit critical section on recipient as it has been removed",
+                   logAttrs(_dbName),
+                   "to"_attr = toShardId);
+    }
+}
+
+void MovePrimaryCoordinator::cleanupOnlineCloner(OperationContext* opCtx,
+                                                 const CancellationToken& token) {
+    if (!_onlineCloner) {
+        return;
+    }
+    _onlineCloner->onReadyToForget();
+    future_util::withCancellation(_onlineCloner->getCompletionFuture(), token).wait();
+}
+
+void MovePrimaryCoordinator::cleanupOnAbortWithOnlineCloner(OperationContext* opCtx,
+                                                            const CancellationToken& token,
+                                                            const Status& status) {
+    unblockReadsAndWrites(opCtx);
+    if (!_onlineCloner) {
+        return;
+    }
+    _onlineCloner->abort(status);
+    cleanupOnlineCloner(opCtx, token);
 }
 
 void MovePrimaryCoordinator::logChange(OperationContext* opCtx,
@@ -376,7 +488,7 @@ void MovePrimaryCoordinator::logChange(OperationContext* opCtx,
 }
 
 std::vector<NamespaceString> MovePrimaryCoordinator::getUnshardedCollections(
-    OperationContext* opCtx) {
+    OperationContext* opCtx) const {
     const auto allCollections = [&] {
         DBDirectClient dbClient(opCtx);
         const auto collInfos =
@@ -579,8 +691,14 @@ void MovePrimaryCoordinator::dropStaleDataOnDonor(OperationContext* opCtx) const
     WriteBlockBypass::get(opCtx).set(true);
 
     DBDirectClient dbClient(opCtx);
-    invariant(_doc.getCollectionsToClone());
-    for (const auto& nss : *_doc.getCollectionsToClone()) {
+    auto unshardedCollections = [this, opCtx] {
+        if (useOnlineCloner()) {
+            return getUnshardedCollections(opCtx);
+        }
+        invariant(_doc.getCollectionsToClone());
+        return *_doc.getCollectionsToClone();
+    }();
+    for (const auto& nss : unshardedCollections) {
         const auto dropStatus = [&] {
             BSONObj dropResult;
             dbClient.runCommand(_dbName, BSON("drop" << nss.coll()), dropResult);
