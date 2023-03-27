@@ -1002,9 +1002,12 @@ const Collection* CollectionCatalog::_openCollectionAtLatestByNamespaceOrUUID(
                                     latestCollection ? latestCollection : pendingCollection,
                                     /*readTimestamp=*/boost::none,
                                     durableCatalogEntry.get());
-    invariant(compatibleCollection);
-    openedCollections.store(
-        compatibleCollection, compatibleCollection->ns(), compatibleCollection->uuid());
+
+    // This may nullptr if the collection was not instantiated successfully. This is the case when
+    // timestamps aren't used (e.g. standalone mode) even though the durable catalog entry was
+    // found. When timestamps aren't used, the drop pending reaper immediately drops idents which
+    // may be needed to instantiate this collection.
+    openedCollections.store(compatibleCollection, nss, uuid);
     return compatibleCollection.get();
 }
 
