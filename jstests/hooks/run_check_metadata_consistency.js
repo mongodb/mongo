@@ -1,8 +1,8 @@
 'use strict';
 
 (function() {
-load('jstests/libs/check_metadata_consistency_helpers.js');  // For check implementation.
-load('jstests/libs/fixture_helpers.js');                     // For isMongos().
+load('jstests/libs/check_metadata_consistency_helpers.js');  // For MetadataConsistencyChecker.
+load('jstests/libs/fixture_helpers.js');                     // For FixtureHelpers.
 
 assert.neq(typeof db, 'undefined', 'No `db` object, is the shell connected to a server?');
 

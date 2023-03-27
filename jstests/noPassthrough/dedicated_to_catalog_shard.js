@@ -7,6 +7,11 @@
  *   featureFlagTransitionToCatalogShard,
  * ]
  */
+
+// TODO (SERVER-74534): Enable the metadata consistency check when it will work with co-located
+// configsvr.
+TestData.skipCheckMetadataConsistency = true;
+
 (function() {
 "use strict";
 
