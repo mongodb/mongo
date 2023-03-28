@@ -243,7 +243,7 @@ void DatabaseHolderImpl::close(OperationContext* opCtx, const DatabaseName& dbNa
     }
     auto db = it->second;
 
-    LOGV2_DEBUG(20311, 2, "DatabaseHolder::close", "db"_attr = dbName);
+    LOGV2_DEBUG(20311, 2, "DatabaseHolder::close", logAttrs(dbName));
 
     CollectionCatalog::write(
         opCtx, [&](CollectionCatalog& catalog) { catalog.onCloseDatabase(opCtx, dbName); });

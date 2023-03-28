@@ -82,7 +82,7 @@ ExecutorFuture<void> MovePrimaryCoordinatorNoResilient::_runImpl(
             // same name.
             shardRegistry->reload(opCtx);
 
-            const auto& dbName = nss().db();
+            const auto& dbName = nss().dbName().db();
             const auto& toShard =
                 uassertStatusOK(shardRegistry->getShard(opCtx, _doc.getToShardId()));
 
@@ -90,7 +90,7 @@ ExecutorFuture<void> MovePrimaryCoordinatorNoResilient::_runImpl(
             if (selfShardId == toShard->getId()) {
                 LOGV2(5275803,
                       "Database already on the requested primary shard",
-                      "db"_attr = dbName,
+                      logAttrs(nss().dbName()),
                       "shardId"_attr = _doc.getToShardId());
                 // The database primary is already the `to` shard
                 return;
@@ -114,7 +114,7 @@ ExecutorFuture<void> MovePrimaryCoordinatorNoResilient::_runImpl(
         .onError([this, anchor = shared_from_this()](const Status& status) {
             LOGV2_ERROR(5275804,
                         "Error running move primary",
-                        "database"_attr = nss().db(),
+                        "database"_attr = nss().dbName(),
                         "to"_attr = _doc.getToShardId(),
                         "error"_attr = redact(status));
 

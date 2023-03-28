@@ -71,8 +71,7 @@ void reopenAllDatabasesAndReloadCollectionCatalog(OperationContext* opCtx,
     auto databaseHolder = DatabaseHolder::get(opCtx);
     std::vector<DatabaseName> databasesToOpen = storageEngine->listDatabases();
     for (auto&& dbName : databasesToOpen) {
-        LOGV2_FOR_RECOVERY(
-            23992, 1, "openCatalog: dbholder reopening database", "db"_attr = dbName);
+        LOGV2_FOR_RECOVERY(23992, 1, "openCatalog: dbholder reopening database", logAttrs(dbName));
         auto db = databaseHolder->openDb(opCtx, dbName);
         invariant(db, str::stream() << "failed to reopen database " << dbName.toString());
         for (auto&& collNss : catalogWriter.value()->getAllCollectionNamesFromDb(opCtx, dbName)) {

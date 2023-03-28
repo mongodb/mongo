@@ -499,7 +499,7 @@ Status checkIfCanBuildIndex(OperationContext* opCtx, const DatabaseName& dbName)
         if (MONGO_unlikely(haveCheckedIfIndexBuildableDuringTenantMigration.shouldFail())) {
             LOGV2(5835300,
                   "haveCheckedIfIndexBuildableDuringTenantMigration failpoint enabled",
-                  "db"_attr = dbName,
+                  logAttrs(dbName),
                   "status"_attr = status);
         }
 

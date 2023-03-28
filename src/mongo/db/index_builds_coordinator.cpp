@@ -213,7 +213,7 @@ void removeIndexBuildEntryAfterCommitOrAbort(OperationContext* opCtx,
                             "Failed to remove index build from system collection",
                             "buildUUID"_attr = replState.buildUUID,
                             "collectionUUID"_attr = replState.collectionUUID,
-                            "db"_attr = replState.dbName,
+                            logAttrs(replState.dbName),
                             "indexNames"_attr = replState.indexNames,
                             "indexSpecs"_attr = replState.indexSpecs,
                             "error"_attr = status);
@@ -861,7 +861,7 @@ void IndexBuildsCoordinator::_abortTenantIndexBuilds(
             LOGV2(4886204,
                   "Index build: failed to abort index build for tenant migration",
                   "buildUUID"_attr = replState->buildUUID,
-                  "db"_attr = replState->dbName,
+                  logAttrs(replState->dbName),
                   "collectionUUID"_attr = replState->collectionUUID,
                   "buildAction"_attr = indexBuildActionStr);
             buildsWaitingToFinish.push_back(replState);
@@ -871,7 +871,7 @@ void IndexBuildsCoordinator::_abortTenantIndexBuilds(
         LOGV2(6221600,
               "Waiting on the index build to unregister before continuing the tenant migration.",
               "buildUUID"_attr = replState->buildUUID,
-              "db"_attr = replState->dbName,
+              logAttrs(replState->dbName),
               "collectionUUID"_attr = replState->collectionUUID,
               "buildAction"_attr = indexBuildActionStr);
         awaitNoIndexBuildInProgressForCollection(
@@ -988,7 +988,7 @@ void IndexBuildsCoordinator::abortUserIndexBuildsForUserWriteBlocking(OperationC
                   "Index build: failed to abort index build for write blocking, will wait for "
                   "completion instead",
                   "buildUUID"_attr = replState->buildUUID,
-                  "db"_attr = replState->dbName,
+                  logAttrs(replState->dbName),
                   "collectionUUID"_attr = replState->collectionUUID);
             buildsWaitingToFinish.push_back(replState);
         }
@@ -1001,7 +1001,7 @@ void IndexBuildsCoordinator::abortUserIndexBuildsForUserWriteBlocking(OperationC
         LOGV2(6511602,
               "Waiting on index build to finish for user write blocking",
               "buildUUID"_attr = replState->buildUUID,
-              "db"_attr = replState->dbName,
+              logAttrs(replState->dbName),
               "collectionUUID"_attr = replState->collectionUUID);
         awaitNoIndexBuildInProgressForCollection(
             opCtx, replState->collectionUUID, replState->protocol);
@@ -3231,7 +3231,7 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
                         "Index build failed while not primary",
                         "buildUUID"_attr = replState->buildUUID,
                         "collectionUUID"_attr = replState->collectionUUID,
-                        "db"_attr = replState->dbName,
+                        logAttrs(replState->dbName),
                         "error"_attr = status);
         }
 

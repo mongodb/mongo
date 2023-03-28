@@ -243,7 +243,7 @@ public:
                             "Found document",
                             "doc"_attr = doc,
                             "shouldRestore"_attr = shouldRestore,
-                            "db"_attr = coll->ns().db().toString(),
+                            logAttrs(coll->ns().dbName()),
                             "docNss"_attr = docNss);
 
                 if (shouldRestore == ShouldRestoreDocument::kYes ||
@@ -255,7 +255,7 @@ public:
                 LOGV2_DEBUG(6938702,
                             1,
                             "Deleting collection that was not restored",
-                            "db"_attr = coll->ns().db().toString(),
+                            logAttrs(coll->ns().dbName()),
                             "uuid"_attr = coll->uuid(),
                             "_id"_attr = doc.getField("_id"));
                 NamespaceStringOrUUID nssOrUUID(coll->ns().db().toString(), coll->uuid());
@@ -304,7 +304,7 @@ public:
                                 "Found document",
                                 "doc"_attr = doc,
                                 "shouldRestore"_attr = shouldRestore,
-                                "db"_attr = coll->ns().db().toString(),
+                                logAttrs(coll->ns().dbName()),
                                 "dbNss"_attr = dbNss.toString());
 
                     if (shouldRestore) {
@@ -316,7 +316,7 @@ public:
                     LOGV2_DEBUG(6938703,
                                 1,
                                 "Deleting database that was not restored",
-                                "db"_attr = coll->ns().db().toString(),
+                                logAttrs(coll->ns().dbName()),
                                 "uuid"_attr = coll->uuid(),
                                 "_id"_attr = doc.getField("_id"));
                     NamespaceStringOrUUID nssOrUUID(coll->ns().db().toString(), coll->uuid());

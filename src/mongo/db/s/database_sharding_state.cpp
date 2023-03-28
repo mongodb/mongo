@@ -224,7 +224,7 @@ void DatabaseShardingState::setDbInfo(OperationContext* opCtx, const DatabaseTyp
 
     LOGV2(7286900,
           "Setting this node's cached database info",
-          "db"_attr = _dbName,
+          logAttrs(_dbName),
           "dbVersion"_attr = dbInfo.getVersion());
     _dbInfo.emplace(dbInfo);
 }
@@ -236,7 +236,7 @@ void DatabaseShardingState::clearDbInfo(OperationContext* opCtx, bool cancelOngo
         _cancelDbMetadataRefresh();
     }
 
-    LOGV2(7286901, "Clearing this node's cached database info", "db"_attr = _dbName);
+    LOGV2(7286901, "Clearing this node's cached database info", logAttrs(_dbName));
     _dbInfo = boost::none;
 }
 

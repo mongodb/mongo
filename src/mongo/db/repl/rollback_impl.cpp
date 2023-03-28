@@ -372,7 +372,7 @@ void RollbackImpl::_stopAndWaitForIndexBuilds(OperationContext* opCtx) {
     // complete.
     std::vector<DatabaseName> dbNames(dbs.begin(), dbs.end());
     LOGV2(21595, "Waiting for all background operations to complete before starting rollback");
-    for (auto dbName : dbNames) {
+    for (const auto& dbName : dbNames) {
         auto numInProg = IndexBuildsCoordinator::get(opCtx)->numInProgForDb(dbName);
         if (numInProg > 0) {
             LOGV2_DEBUG(21596,
@@ -381,7 +381,7 @@ void RollbackImpl::_stopAndWaitForIndexBuilds(OperationContext* opCtx) {
                         "background operations to complete on database '{db}'",
                         "Waiting for background operations to complete",
                         "numBackgroundOperationsInProgress"_attr = numInProg,
-                        "db"_attr = dbName);
+                        logAttrs(dbName));
             IndexBuildsCoordinator::get(opCtx)->awaitNoBgOpInProgForDb(opCtx, dbName);
         }
     }

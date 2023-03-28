@@ -2265,7 +2265,7 @@ Status applyCommand_inlock(OperationContext* opCtx,
                             1,
                             "Conflicting DDL operation encountered during initial sync; "
                             "aborting index build and retrying",
-                            "db"_attr = nss.db());
+                            logAttrs(nss.dbName()));
                 break;
             }
             case ErrorCodes::BackgroundOperationInProgressForNamespace: {
@@ -2308,7 +2308,7 @@ Status applyCommand_inlock(OperationContext* opCtx,
                                 "application",
                                 "Failed command during oplog application",
                                 "command"_attr = redact(o),
-                                "db"_attr = nss.db(),
+                                logAttrs(nss.dbName()),
                                 "error"_attr = status);
                     return status;
                 }
@@ -2317,7 +2317,7 @@ Status applyCommand_inlock(OperationContext* opCtx,
                     status.code() != ErrorCodes::IndexNotFound) {
                     LOGV2_WARNING(2170000,
                                   "Acceptable error during oplog application",
-                                  "db"_attr = nss.db(),
+                                  logAttrs(nss.dbName()),
                                   "error"_attr = status,
                                   "oplogEntry"_attr = redact(op->toBSONForLogging()));
                     opCounters->gotAcceptableErrorInCommand();
@@ -2325,7 +2325,7 @@ Status applyCommand_inlock(OperationContext* opCtx,
                     LOGV2_DEBUG(51776,
                                 1,
                                 "Acceptable error during oplog application",
-                                "db"_attr = nss.db(),
+                                logAttrs(nss.dbName()),
                                 "error"_attr = status,
                                 "oplogEntry"_attr = redact(op->toBSONForLogging()));
                 }

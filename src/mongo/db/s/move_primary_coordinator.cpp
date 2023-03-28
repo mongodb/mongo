@@ -111,7 +111,7 @@ ExecutorFuture<void> MovePrimaryCoordinator::_runImpl(
             if (toShardId == ShardingState::get(opCtx)->shardId()) {
                 LOGV2(7120200,
                       "Database already on requested primary shard",
-                      "db"_attr = _dbName,
+                      logAttrs(_dbName),
                       "to"_attr = toShardId);
 
                 return ExecutorFuture<void>(**executor);
@@ -170,7 +170,7 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
 
                 LOGV2(7120201,
                       "Running movePrimary operation",
-                      "db"_attr = _dbName,
+                      logAttrs(_dbName),
                       "to"_attr = toShardId);
 
                 logChange(opCtx, "start");
@@ -281,7 +281,7 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
 
                                      LOGV2(7120206,
                                            "Completed movePrimary operation",
-                                           "db"_attr = _dbName,
+                                           logAttrs(_dbName),
                                            "to"_attr = _doc.getToShardId());
 
                                      logChange(opCtx, "end");
@@ -296,7 +296,7 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
                 LOGV2_DEBUG(7392900,
                             1,
                             "Triggering movePrimary cleanup",
-                            "db"_attr = _dbName,
+                            logAttrs(_dbName),
                             "to"_attr = _doc.getToShardId(),
                             "phase"_attr = serializePhase(failedPhase),
                             "error"_attr = redact(status));
@@ -334,7 +334,7 @@ ExecutorFuture<void> MovePrimaryCoordinator::_cleanupOnAbort(
                 } catch (const ExceptionFor<ErrorCodes::ShardNotFound>&) {
                     LOGV2_INFO(7392901,
                                "Failed to remove orphaned data on recipient as it has been removed",
-                               "db"_attr = _dbName,
+                               logAttrs(_dbName),
                                "to"_attr = toShardId);
                 }
             }
@@ -347,13 +347,13 @@ ExecutorFuture<void> MovePrimaryCoordinator::_cleanupOnAbort(
             } catch (const ExceptionFor<ErrorCodes::ShardNotFound>&) {
                 LOGV2_INFO(7392902,
                            "Failed to exit critical section on recipient as it has been removed",
-                           "db"_attr = _dbName,
+                           logAttrs(_dbName),
                            "to"_attr = toShardId);
             }
 
             LOGV2_ERROR(7392903,
                         "Failed movePrimary operation",
-                        "db"_attr = _dbName,
+                        logAttrs(_dbName),
                         "to"_attr = toShardId,
                         "phase"_attr = serializePhase(failedPhase),
                         "error"_attr = redact(status));

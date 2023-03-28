@@ -68,7 +68,7 @@ auto removeEmptyDirectory =
         boost::filesystem::remove(storageEngine->getFilesystemPathForDb(dbName), ec);
 
         if (!ec) {
-            LOGV2(4888200, "Removed empty database directory", "db"_attr = dbName.toString());
+            LOGV2(4888200, "Removed empty database directory", logAttrs(dbName));
         } else if (collectionCatalog->begin(nullptr, dbName) == collectionCatalog->end(nullptr)) {
             // It is possible for a new collection to be created in the database between when we
             // check whether the database is empty and actually attempting to remove the directory.
@@ -79,7 +79,7 @@ auto removeEmptyDirectory =
             LOGV2_DEBUG(4888201,
                         1,
                         "Failed to remove database directory",
-                        "db"_attr = dbName.toString(),
+                        logAttrs(dbName),
                         "error"_attr = ec.message());
         }
     };

@@ -153,6 +153,14 @@ public:
         return _dbString;
     }
 
+    /**
+     * Method to be used only when logging a DatabaseName in a log message.
+     * It is called anytime a DatabaseName is logged by logAttrs or otherwise.
+     */
+    friend std::string toStringForLogging(const DatabaseName& dbName) {
+        return dbName.toStringWithTenantId();
+    }
+
     bool equalCaseInsensitive(const DatabaseName& other) const {
         return (_tenantId == other._tenantId) && boost::iequals(toString(), other.toString());
     }
@@ -198,7 +206,7 @@ public:
     }
 
     friend auto logAttrs(const DatabaseName& obj) {
-        return "databaseName"_attr = obj;
+        return "db"_attr = obj;
     }
 
 private:

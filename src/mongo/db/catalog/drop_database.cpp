@@ -122,7 +122,7 @@ void _finishDropDatabase(OperationContext* opCtx,
         LOGV2(20336,
               "dropDatabase {dbName} - finished, dropped {numCollections} collection(s)",
               "dropDatabase",
-              "db"_attr = dbName,
+              logAttrs(dbName),
               "numCollectionsDropped"_attr = numCollections);
     });
 }
@@ -172,10 +172,8 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
                               << "The database is currently being dropped. Database: " << dbName);
         }
 
-        LOGV2(20337,
-              "dropDatabase {dbName} - starting",
-              "dropDatabase - starting",
-              "db"_attr = dbName);
+        LOGV2(
+            20337, "dropDatabase {dbName} - starting", "dropDatabase - starting", logAttrs(dbName));
         db->setDropPending(opCtx, true);
 
         // If Database::dropCollectionEventIfSystem() fails, we should reset the drop-pending state
@@ -245,7 +243,7 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
             LOGV2(7193700,
                   "dropDatabase {dbName} - dropping collection: {nss}",
                   "dropDatabase - dropping collection",
-                  "db"_attr = dbName,
+                  logAttrs(dbName),
                   "namespace"_attr = nss);
 
             writeConflictRetry(opCtx, "dropDatabase_views_collection", nss.ns(), [&] {
@@ -272,7 +270,7 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
             LOGV2(20338,
                   "dropDatabase {dbName} - dropping collection: {nss}",
                   "dropDatabase - dropping collection",
-                  "db"_attr = dbName,
+                  logAttrs(dbName),
                   "namespace"_attr = nss);
 
             if (nss.isDropPendingNamespace() && replCoord->isReplEnabled() &&
@@ -280,7 +278,7 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
                 LOGV2(20339,
                       "dropDatabase {dbName} - found drop-pending collection: {nss}",
                       "dropDatabase - found drop-pending collection",
-                      "db"_attr = dbName,
+                      logAttrs(dbName),
                       "namespace"_attr = nss);
                 latestDropPendingOpTime = std::max(
                     latestDropPendingOpTime, uassertStatusOK(nss.getDropPendingNamespaceOpTime()));
@@ -373,7 +371,7 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
           "{dropDatabaseWriteConcern}. Dropping {numCollectionsToDrop} collection(s), with "
           "last collection drop at {latestDropPendingOpTime}",
           "dropDatabase waiting for replication and dropping collections",
-          "db"_attr = dbName,
+          logAttrs(dbName),
           "awaitOpTime"_attr = awaitOpTime,
           "dropDatabaseWriteConcern"_attr = dropDatabaseWriteConcern.toBSON(),
           "numCollectionsToDrop"_attr = numCollectionsToDrop,
@@ -387,7 +385,7 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
               "dropDatabase {dbName} waiting for {awaitOpTime} to be replicated at "
               "{userWriteConcern}",
               "dropDatabase waiting for replication",
-              "db"_attr = dbName,
+              logAttrs(dbName),
               "awaitOpTime"_attr = awaitOpTime,
               "writeConcern"_attr = userWriteConcern.toBSON());
         result = replCoord->awaitReplication(opCtx, awaitOpTime, userWriteConcern);
@@ -405,7 +403,7 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
           "dropDatabase {dbName} - successfully dropped {numCollectionsToDrop} collection(s) "
           "(most recent drop optime: {awaitOpTime}) after {result_duration}. dropping database",
           "dropDatabase - successfully dropped collections",
-          "db"_attr = dbName,
+          logAttrs(dbName),
           "numCollectionsDropped"_attr = numCollectionsToDrop,
           "mostRecentDropOpTime"_attr = awaitOpTime,
           "duration"_attr = result.duration);

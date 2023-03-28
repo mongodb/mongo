@@ -162,10 +162,8 @@ void DatabaseImpl::init(OperationContext* const opCtx) {
     Status status = validateDBName(_name.db());
 
     if (!status.isOK()) {
-        LOGV2_WARNING(20325,
-                      "tried to open invalid db: {name}",
-                      "Tried to open invalid db",
-                      "db"_attr = _name);
+        LOGV2_WARNING(
+            20325, "tried to open invalid db: {name}", "Tried to open invalid db", logAttrs(_name));
         uasserted(10028, status.toString());
     }
 
@@ -245,7 +243,7 @@ void DatabaseImpl::init(OperationContext* const opCtx) {
         } catch (const ExceptionFor<ErrorCodes::InvalidViewDefinition>& e) {
             LOGV2_WARNING(6260805,
                           "Failed to access the view catalog during restore",
-                          "db"_attr = _name,
+                          logAttrs(_name),
                           "reason"_attr = e.reason());
         }
     }

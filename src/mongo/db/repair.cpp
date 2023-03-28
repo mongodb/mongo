@@ -146,7 +146,7 @@ Status repairDatabase(OperationContext* opCtx, StorageEngine* engine, const Data
     invariant(opCtx->lockState()->isW());
     invariant(dbName.db().find('.') == std::string::npos);
 
-    LOGV2(21029, "repairDatabase", "db"_attr = dbName);
+    LOGV2(21029, "repairDatabase", logAttrs(dbName));
 
 
     opCtx->checkForInterrupt();
@@ -163,7 +163,7 @@ Status repairDatabase(OperationContext* opCtx, StorageEngine* engine, const Data
         LOGV2_FATAL_CONTINUE(21030,
                              "Failed to repair database {dbName}: {status_reason}",
                              "Failed to repair database",
-                             "db"_attr = dbName,
+                             logAttrs(dbName),
                              "error"_attr = status);
     }
 

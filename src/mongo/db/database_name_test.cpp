@@ -30,8 +30,11 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/logv2/log.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo {
 namespace {
@@ -151,5 +154,23 @@ TEST(DatabaseNameTest, VerifyCompareFunction) {
     ASSERT(dbn3a != dbn1a);
     ASSERT(dbn1a != dbn2a);
 }
+
+TEST(DatabaseNameTest, CheckDatabaseNameLogAttrs) {
+    TenantId tenantId(OID::gen());
+    DatabaseName dbWithTenant(tenantId, "myLongDbName");
+    startCapturingLogMessages();
+    LOGV2(7448500, "Msg db:", logAttrs(dbWithTenant));
+
+    ASSERT_EQUALS(1,
+                  countBSONFormatLogLinesIsSubset(
+                      BSON("attr" << BSON("db" << dbWithTenant.toStringWithTenantId()))));
+
+    LOGV2(7448501, "Msg database:", "database"_attr = dbWithTenant);
+    ASSERT_EQUALS(1,
+                  countBSONFormatLogLinesIsSubset(
+                      BSON("attr" << BSON("database" << dbWithTenant.toStringWithTenantId()))));
+    stopCapturingLogMessages();
+}
+
 }  // namespace
 }  // namespace mongo

@@ -75,7 +75,7 @@ bool joinDbVersionOperation(OperationContext* opCtx,
         LOGV2_DEBUG(6697201,
                     2,
                     "Waiting for exit from the critical section",
-                    "db"_attr = (**scopedDss)->getDbName(),
+                    logAttrs((**scopedDss)->getDbName()),
                     "reason"_attr = (**scopedDss)->getCriticalSectionReason());
 
         scopedDss->reset();
@@ -89,7 +89,7 @@ bool joinDbVersionOperation(OperationContext* opCtx,
         LOGV2_DEBUG(6697202,
                     2,
                     "Waiting for completion of another database metadata refresh",
-                    "db"_attr = (**scopedDss)->getDbName());
+                    logAttrs((**scopedDss)->getDbName()));
 
         scopedDss->reset();
         dbLock->reset();
@@ -142,7 +142,7 @@ Status refreshDbMetadata(OperationContext* opCtx,
             LOGV2_DEBUG(7079300,
                         2,
                         "Skip setting cached database metadata as there are no updates",
-                        "db"_attr = dbName,
+                        logAttrs(dbName),
                         "cachedDbVersion"_attr = *cachedDbVersion,
                         "refreshedDbVersion"_attr = swDbMetadata.getValue()->getVersion());
 
@@ -186,7 +186,7 @@ SharedSemiFuture<void> recoverRefreshDbVersion(OperationContext* opCtx,
             // Forward `users` and `roles` attributes from the original request.
             forwardableOpMetadata.setOn(opCtx);
 
-            LOGV2_DEBUG(6697203, 2, "Started database metadata refresh", "db"_attr = dbName);
+            LOGV2_DEBUG(6697203, 2, "Started database metadata refresh", logAttrs(dbName));
 
             return refreshDbMetadata(opCtx, dbName, cancellationToken);
         })
@@ -196,11 +196,11 @@ SharedSemiFuture<void> recoverRefreshDbVersion(OperationContext* opCtx,
                     !cancellationToken.isCanceled());
 
             if (status.isOK() || status == ErrorCodes::NamespaceNotFound) {
-                LOGV2(6697204, "Refreshed database metadata", "db"_attr = dbName);
+                LOGV2(6697204, "Refreshed database metadata", logAttrs(dbName));
             } else {
                 LOGV2_ERROR(6697205,
                             "Failed database metadata refresh",
-                            "db"_attr = dbName,
+                            logAttrs(dbName),
                             "error"_attr = redact(status));
             }
         })

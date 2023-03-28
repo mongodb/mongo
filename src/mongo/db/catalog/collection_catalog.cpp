@@ -780,7 +780,7 @@ void CollectionCatalog::reloadViews(OperationContext* opCtx, const DatabaseName&
         return;
     }
 
-    LOGV2_DEBUG(22546, 1, "Reloading view catalog for database", "db"_attr = dbName.toString());
+    LOGV2_DEBUG(22546, 1, "Reloading view catalog for database", logAttrs(dbName));
 
     ViewsForDatabase viewsForDb;
     auto status = viewsForDb.reload(opCtx, CollectionPtr(_lookupSystemViews(opCtx, dbName)));

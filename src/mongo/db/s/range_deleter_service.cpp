@@ -162,7 +162,7 @@ void RangeDeleterService::ReadyRangeDeletionsProcessor::_runRangeDeletions() {
         }
 
         auto task = _queue.front();
-        const auto dbName = task.getNss().db();
+        const auto dbName = task.getNss().dbName();
         const auto collectionUuid = task.getCollectionUuid();
         const auto range = task.getRange();
         const auto optKeyPattern = task.getKeyPattern();

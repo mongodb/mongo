@@ -686,7 +686,7 @@ void IndexBuildsCoordinatorMongod::_signalPrimaryForAbortAndWaitForExternalAbort
     LOGV2(7419402,
           "Index build: signaling primary to abort index build",
           "buildUUID"_attr = replState->buildUUID,
-          "db"_attr = replState->dbName,
+          logAttrs(replState->dbName),
           "collectionUUID"_attr = replState->collectionUUID,
           "reason"_attr = abortStatus);
     replState->requestAbortFromPrimary(abortStatus);

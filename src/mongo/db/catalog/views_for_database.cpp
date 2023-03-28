@@ -123,7 +123,7 @@ Status ViewsForDatabase::reload(OperationContext* opCtx, const CollectionPtr& sy
             !status.isOK()) {
             LOGV2(22547,
                   "Could not load view catalog for database",
-                  "db"_attr = systemViews->ns().dbName(),
+                  logAttrs(systemViews->ns().dbName()),
                   "error"_attr = status);
 
             return status;
@@ -169,8 +169,7 @@ Status ViewsForDatabase::insert(OperationContext* opCtx,
     }
 
     if (auto status = _upsertIntoMap(opCtx, std::move(view)); !status.isOK()) {
-        LOGV2(
-            5387000, "Could not insert view", "db"_attr = viewName.dbName(), "error"_attr = status);
+        LOGV2(5387000, "Could not insert view", logAttrs(viewName.dbName()), "error"_attr = status);
         return status;
     }
 

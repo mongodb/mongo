@@ -69,7 +69,7 @@ void KillOpCmdBase::reportSuccessfulCompletion(OperationContext* opCtx,
         }
     }
 
-    attr.add("db", dbName.db());
+    attr.add("db", dbName);
     attr.add("command", cmdObj);
 
     LOGV2(558700, "Successful killOp", attr);

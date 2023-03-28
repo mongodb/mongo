@@ -251,7 +251,7 @@ void AllDatabaseCloner::postStage() {
                             1,
                             "Skipping the recording of initial sync data size metrics due "
                             "to failure in the 'dbStats' command",
-                            "db"_attr = dbName,
+                            logAttrs(dbName),
                             "status"_attr = status);
             }
         }

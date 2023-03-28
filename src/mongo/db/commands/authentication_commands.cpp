@@ -283,7 +283,7 @@ AuthenticateReply authCommand(OperationContext* opCtx,
                     "client"_attr = client->getRemote(),
                     "mechanism"_attr = mechanism,
                     "user"_attr = user,
-                    "db"_attr = dbname);
+                    logAttrs(dbname));
     }
 
     session->metrics()->restart();

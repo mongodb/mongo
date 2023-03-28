@@ -1133,7 +1133,7 @@ void ReplicationCoordinatorExternalStateImpl::_dropAllTempCollections(OperationC
                     2,
                     "Removing temporary collections from {db}",
                     "Removing temporary collections",
-                    "db"_attr = dbName);
+                    logAttrs(dbName));
         Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
         clearTempCollections(opCtx, dbName);
     }
