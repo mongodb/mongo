@@ -127,6 +127,7 @@ void createOplog(OperationContext* opCtx);
  * end and generates insert oplog entries based on the augmented oplogEntryTemplate with the "ts",
  * "t", "o", "prevOpTime" and "stmtId" fields replaced by the content of each InsertStatement
  * defined by the begin-end range.
+ * @param fromMigrate: a list of 'fromMigrate' values for the inserts.
  *
  */
 std::vector<OpTime> logInsertOps(
@@ -134,6 +135,7 @@ std::vector<OpTime> logInsertOps(
     MutableOplogEntry* oplogEntryTemplate,
     std::vector<InsertStatement>::const_iterator begin,
     std::vector<InsertStatement>::const_iterator end,
+    std::vector<bool> fromMigrate,
     std::function<boost::optional<ShardId>(const BSONObj& doc)> getDestinedRecipientFn,
     const CollectionPtr& collectionPtr);
 

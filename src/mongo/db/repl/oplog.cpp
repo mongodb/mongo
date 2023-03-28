@@ -547,9 +547,12 @@ std::vector<OpTime> logInsertOps(
     MutableOplogEntry* oplogEntryTemplate,
     std::vector<InsertStatement>::const_iterator begin,
     std::vector<InsertStatement>::const_iterator end,
+    std::vector<bool> fromMigrate,
     std::function<boost::optional<ShardId>(const BSONObj& doc)> getDestinedRecipientFn,
     const CollectionPtr& collectionPtr) {
     invariant(begin != end);
+    invariant(std::distance(fromMigrate.begin(), fromMigrate.end()) == std::distance(begin, end),
+              oplogEntryTemplate->toReplOperation().toBSON().toString());
 
     // If this oplog entry is from a tenant migration, include the tenant migration
     // UUID.
@@ -597,6 +600,7 @@ std::vector<OpTime> logInsertOps(
         oplogEntry.setObject2(docKey);
         oplogEntry.setOpTime(insertStatementOplogSlot);
         oplogEntry.setDestinedRecipient(getDestinedRecipientFn(begin[i].doc));
+        oplogEntry.setFromMigrateIfTrue(fromMigrate[i]);
         addDestinedRecipient.execute([&](const BSONObj& data) {
             auto recipient = data["destinedRecipient"].String();
             oplogEntry.setDestinedRecipient(boost::make_optional<ShardId>({recipient}));
