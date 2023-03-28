@@ -131,6 +131,11 @@ std::set<std::string> KVDropPendingIdentReaper::getAllIdentNames() const {
     return identNames;
 }
 
+size_t KVDropPendingIdentReaper::getNumIdents() const {
+    stdx::lock_guard<Latch> lock(_mutex);
+    return _dropPendingIdents.size();
+};
+
 void KVDropPendingIdentReaper::dropIdentsOlderThan(OperationContext* opCtx, const Timestamp& ts) {
     DropPendingIdents toDrop;
     {

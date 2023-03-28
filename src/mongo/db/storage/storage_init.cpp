@@ -65,8 +65,7 @@ public:
                        ? *oldestRequiredTimestampForCrashRecovery
                        : Timestamp());
         bob.append("supportsPendingDrops", engine->supportsPendingDrops());
-        bob.append("dropPendingIdents",
-                   static_cast<long long>(engine->getDropPendingIdents().size()));
+        bob.append("dropPendingIdents", static_cast<long long>(engine->getNumDropPendingIdents()));
         bob.append("supportsSnapshotReadConcern", engine->supportsReadConcernSnapshot());
         bob.append("readOnly", !opCtx->getServiceContext()->userWritesAllowed());
         bob.append("persistent", !engine->isEphemeral());

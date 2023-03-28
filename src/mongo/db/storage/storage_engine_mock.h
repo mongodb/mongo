@@ -167,6 +167,9 @@ public:
     std::set<std::string> getDropPendingIdents() const final {
         return {};
     }
+    size_t getNumDropPendingIdents() const final {
+        return 0;
+    }
     void addDropPendingIdent(const Timestamp& dropTimestamp,
                              std::shared_ptr<Ident> ident,
                              DropIdentCallback&& onDrop) final {}

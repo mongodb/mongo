@@ -437,6 +437,11 @@ public:
     virtual std::set<std::string> getDropPendingIdents() const = 0;
 
     /**
+     * Returns the number of drop pending idents inside the storage engine.
+     */
+    virtual size_t getNumDropPendingIdents() const = 0;
+
+    /**
      * Clears list of drop-pending idents in the storage engine.
      * Used primarily by rollback after recovering to a stable timestamp.
      */

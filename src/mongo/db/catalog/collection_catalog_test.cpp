@@ -1821,14 +1821,14 @@ TEST_F(CollectionCatalogTimestampTest, OpenExistingCollectionWithReaper) {
     dropCollection(opCtx.get(), nss, dropCollectionTs);
 
     {
-        ASSERT_EQ(1, storageEngine->getDropPendingIdents().size());
+        ASSERT_EQ(1, storageEngine->getNumDropPendingIdents());
         ASSERT_EQ(coll->getRecordStore()->getSharedIdent()->getIdent(),
                   *storageEngine->getDropPendingIdents().begin());
 
         // Ident is not expired and should not be removed.
         storageEngine->dropIdentsOlderThan(opCtx.get(), Timestamp::max());
 
-        ASSERT_EQ(1, storageEngine->getDropPendingIdents().size());
+        ASSERT_EQ(1, storageEngine->getNumDropPendingIdents());
         ASSERT_EQ(coll->getRecordStore()->getSharedIdent()->getIdent(),
                   *storageEngine->getDropPendingIdents().begin());
     }
@@ -1850,7 +1850,7 @@ TEST_F(CollectionCatalogTimestampTest, OpenExistingCollectionWithReaper) {
         opCtx->recoveryUnit()->abandonSnapshot();
 
         storageEngine->dropIdentsOlderThan(opCtx.get(), Timestamp::max());
-        ASSERT_EQ(0, storageEngine->getDropPendingIdents().size());
+        ASSERT_EQ(0, storageEngine->getNumDropPendingIdents());
 
         // Now we fail to open the collection as the ident has been removed.
         OneOffRead oor(opCtx.get(), createCollectionTs);
@@ -1885,26 +1885,26 @@ TEST_F(CollectionCatalogTimestampTest, OpenNewCollectionWithReaper) {
                               ->establishConsistentCollection(opCtx.get(), nss, createCollectionTs);
         ASSERT(openedColl);
 
-        ASSERT_EQ(1, storageEngine->getDropPendingIdents().size());
+        ASSERT_EQ(1, storageEngine->getNumDropPendingIdents());
         ASSERT_EQ(openedColl->getRecordStore()->getSharedIdent()->getIdent(),
                   *storageEngine->getDropPendingIdents().begin());
 
         // Ident is marked as in use and it should not be removed.
         storageEngine->dropIdentsOlderThan(opCtx.get(), Timestamp::max());
 
-        ASSERT_EQ(1, storageEngine->getDropPendingIdents().size());
+        ASSERT_EQ(1, storageEngine->getNumDropPendingIdents());
         ASSERT_EQ(openedColl->getRecordStore()->getSharedIdent()->getIdent(),
                   *storageEngine->getDropPendingIdents().begin());
     }
 
     {
         // Run the ident reaper before opening the collection.
-        ASSERT_EQ(1, storageEngine->getDropPendingIdents().size());
+        ASSERT_EQ(1, storageEngine->getNumDropPendingIdents());
 
         // The dropToken is expired as the ident is no longer in use.
         storageEngine->dropIdentsOlderThan(opCtx.get(), Timestamp::max());
 
-        ASSERT_EQ(0, storageEngine->getDropPendingIdents().size());
+        ASSERT_EQ(0, storageEngine->getNumDropPendingIdents());
 
         // Now we fail to open the collection as the ident has been removed.
         OneOffRead oor(opCtx.get(), createCollectionTs);
@@ -1952,7 +1952,7 @@ TEST_F(CollectionCatalogTimestampTest, OpenExistingCollectionAndIndexesWithReape
     dropCollection(opCtx.get(), nss, dropCollectionTs);
 
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    ASSERT_EQ(3, storageEngine->getDropPendingIdents().size());
+    ASSERT_EQ(3, storageEngine->getNumDropPendingIdents());
 
     {
         // Open the collection using shared state before any index drops.
@@ -1967,7 +1967,7 @@ TEST_F(CollectionCatalogTimestampTest, OpenExistingCollectionAndIndexesWithReape
 
         // All idents are marked as in use and none should be removed.
         storageEngine->dropIdentsOlderThan(opCtx.get(), Timestamp::max());
-        ASSERT_EQ(3, storageEngine->getDropPendingIdents().size());
+        ASSERT_EQ(3, storageEngine->getNumDropPendingIdents());
     }
 
     {
@@ -1989,7 +1989,7 @@ TEST_F(CollectionCatalogTimestampTest, OpenExistingCollectionAndIndexesWithReape
         // Only the collection and 'y' index idents are marked as in use. The 'x' index ident will
         // be removed.
         storageEngine->dropIdentsOlderThan(opCtx.get(), Timestamp::max());
-        ASSERT_EQ(2, storageEngine->getDropPendingIdents().size());
+        ASSERT_EQ(2, storageEngine->getNumDropPendingIdents());
     }
 
     {
@@ -2013,7 +2013,7 @@ TEST_F(CollectionCatalogTimestampTest, OpenExistingCollectionAndIndexesWithReape
         ASSERT(!CollectionCatalog::get(opCtx.get())
                     ->establishConsistentCollection(opCtx.get(), nss, createIndexTs));
 
-        ASSERT_EQ(2, storageEngine->getDropPendingIdents().size());
+        ASSERT_EQ(2, storageEngine->getNumDropPendingIdents());
     }
 
     {
@@ -2021,7 +2021,7 @@ TEST_F(CollectionCatalogTimestampTest, OpenExistingCollectionAndIndexesWithReape
         catalog.reset();
 
         storageEngine->dropIdentsOlderThan(opCtx.get(), Timestamp::max());
-        ASSERT_EQ(0, storageEngine->getDropPendingIdents().size());
+        ASSERT_EQ(0, storageEngine->getNumDropPendingIdents());
 
         // All idents are removed so opening the collection before any indexes were created should
         // fail.
@@ -2065,7 +2065,7 @@ TEST_F(CollectionCatalogTimestampTest, OpenNewCollectionAndIndexesWithReaper) {
     dropCollection(opCtx.get(), nss, dropCollectionTs);
 
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    ASSERT_EQ(3, storageEngine->getDropPendingIdents().size());
+    ASSERT_EQ(3, storageEngine->getNumDropPendingIdents());
 
     {
         // Open the collection before any index drops.
@@ -2079,7 +2079,7 @@ TEST_F(CollectionCatalogTimestampTest, OpenNewCollectionAndIndexesWithReaper) {
 
         // All idents are marked as in use and none should be removed.
         storageEngine->dropIdentsOlderThan(opCtx.get(), Timestamp::max());
-        ASSERT_EQ(3, storageEngine->getDropPendingIdents().size());
+        ASSERT_EQ(3, storageEngine->getNumDropPendingIdents());
     }
 
     {
@@ -2099,7 +2099,7 @@ TEST_F(CollectionCatalogTimestampTest, OpenNewCollectionAndIndexesWithReaper) {
 
         // The 'x' index ident will be removed.
         storageEngine->dropIdentsOlderThan(opCtx.get(), Timestamp::max());
-        ASSERT_EQ(2, storageEngine->getDropPendingIdents().size());
+        ASSERT_EQ(2, storageEngine->getNumDropPendingIdents());
     }
 
     {
@@ -2122,13 +2122,13 @@ TEST_F(CollectionCatalogTimestampTest, OpenNewCollectionAndIndexesWithReaper) {
         ASSERT(!CollectionCatalog::get(opCtx.get())
                     ->establishConsistentCollection(opCtx.get(), nss, createIndexTs));
 
-        ASSERT_EQ(2, storageEngine->getDropPendingIdents().size());
+        ASSERT_EQ(2, storageEngine->getNumDropPendingIdents());
     }
 
     {
         // Drop all remaining idents and try to open the collection. This should fail.
         storageEngine->dropIdentsOlderThan(opCtx.get(), Timestamp::max());
-        ASSERT_EQ(0, storageEngine->getDropPendingIdents().size());
+        ASSERT_EQ(0, storageEngine->getNumDropPendingIdents());
 
         OneOffRead oor(opCtx.get(), createCollectionTs);
 

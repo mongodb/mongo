@@ -351,6 +351,10 @@ public:
         return _dropPendingIdentReaper.getAllIdentNames();
     }
 
+    size_t getNumDropPendingIdents() const override {
+        return _dropPendingIdentReaper.getNumIdents();
+    }
+
     int64_t sizeOnDiskForDb(OperationContext* opCtx, const DatabaseName& dbName) override;
 
     bool isUsingDirectoryPerDb() const override {

@@ -105,6 +105,11 @@ public:
     std::set<std::string> getAllIdentNames() const;
 
     /**
+     * Returns the number of drop-pending idents.
+     */
+    size_t getNumIdents() const;
+
+    /**
      * Notifies this class that the storage engine has advanced its oldest timestamp.
      * Drops all unreferenced drop-pending idents with drop timestamps before 'ts', as well as all
      * unreferenced idents with Timestamp::min() drop timestamps (untimestamped on standalones).
