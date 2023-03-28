@@ -4,12 +4,9 @@
  * We have a restart in the test with some stored values that must be preserved so it cannot run in
  * inMemory variants
  *
- * TODO SERVER-74447: Verify cluster parameters added to dedicated config server work correctly
- * when config is added as a shard.
  * @tags: [
  *   does_not_support_stepdowns,
  *   requires_persistence,
- *   temporary_catalog_shard_incompatible,
  *  ]
  */
 (function() {
@@ -17,6 +14,8 @@
 
 load('jstests/libs/fail_point_util.js');
 load('jstests/sharding/libs/remove_shard_util.js');
+load("jstests/libs/catalog_shard_util.js");
+load('jstests/replsets/rslib.js');
 
 const clusterParameter1Value = {
     intData: 42
@@ -211,126 +210,210 @@ const checkClusterParameters =
     st.stop();
 }
 
-{
-    const st2 = new ShardingTest({mongos: 1, shards: 0, name: 'second_cluster'});
+if (!TestData.catalogShard) {
+    {
+        const st2 = new ShardingTest({mongos: 1, shards: 0, name: 'second_cluster'});
 
-    const newShard2Name = 'newShard2';
-    const newShard2 = new ReplSetTest({name: newShard2Name, nodes: 1});
-    newShard2.startSet();
-    newShard2.initiate();
+        const newShard2Name = 'newShard2';
+        const newShard2 = new ReplSetTest({name: newShard2Name, nodes: 1});
+        newShard2.startSet();
+        newShard2.initiate();
 
+        {
+            jsTestLog(
+                'Check that on replica set to sharded cluster transition parameters added in RS are synced in the cluster.');
+            assert.commandWorked(
+                newShard2.getPrimary().adminCommand({setClusterParameter: clusterParameter1}));
+
+            newShard2.restart(0, {shardsvr: ''});
+            newShard2.awaitNodesAgreeOnPrimary();
+
+            // After restarting a node with --shardsvr it should not accept setClusterParameter
+            // commands.
+            assert.commandFailedWithCode(
+                newShard2.getPrimary().adminCommand({setClusterParameter: clusterParameter3}),
+                ErrorCodes.NotImplemented);
+
+            checkClusterParameters(clusterParameter1Name,
+                                   clusterParameter1Value,
+                                   newShard2.getPrimary(),
+                                   newShard2.getPrimary(),
+                                   false);
+
+            assert.commandWorked(
+                st2.s.adminCommand({addShard: newShard2.getURL(), name: newShard2Name}));
+
+            // After adding the shard there must be only one cluster parameter: the one set on the
+            // rs clusterParameter1.
+            checkClusterParameters(clusterParameter1Name,
+                                   clusterParameter1Value,
+                                   st2.configRS.getPrimary(),
+                                   newShard2.getPrimary());
+
+            assert.eq(1,
+                      newShard2.getPrimary()
+                          .getCollection('config.clusterParameters')
+                          .countDocuments({}));
+            assert.eq(1,
+                      st2.configRS.getPrimary()
+                          .getCollection('config.clusterParameters')
+                          .countDocuments({}));
+        }
+
+        {
+            jsTestLog('Check that parameters added in cluster overwrite custom RS parameters.');
+
+            const newShard3Name = 'newShard3';
+            const newShard3 = new ReplSetTest({name: newShard3Name, nodes: 1});
+            newShard3.startSet();
+            newShard3.initiate();
+
+            assert.commandWorked(
+                newShard3.getPrimary().adminCommand({setClusterParameter: clusterParameter2}));
+
+            newShard3.restart(0, {shardsvr: ''});
+            newShard3.awaitNodesAgreeOnPrimary();
+
+            checkClusterParameters(clusterParameter2Name,
+                                   clusterParameter2Value,
+                                   newShard3.getPrimary(),
+                                   newShard3.getPrimary());
+
+            assert.commandWorked(
+                st2.s.adminCommand({addShard: newShard3.getURL(), name: newShard3Name}));
+
+            // After adding the shard there must be only one cluster parameter: the one set on the
+            // cluster clusterParameter1.
+            checkClusterParameters(clusterParameter1Name,
+                                   clusterParameter1Value,
+                                   st2.configRS.getPrimary(),
+                                   newShard3.getPrimary());
+            assert.eq(
+                0, newShard3.getPrimary().getCollection('config.clusterParameters').countDocuments({
+                    _id: clusterParameter2Name
+                }));
+
+            // Well behaved test, remove shard and stop the set.
+            removeShard(st2, newShard3Name);
+
+            newShard3.stopSet();
+        }
+
+        newShard2.stopSet();
+
+        st2.stop();
+    }
     {
         jsTestLog(
-            'Check that on replica set to sharded cluster transition parameters added in RS are synced in the cluster.');
-        assert.commandWorked(
-            newShard2.getPrimary().adminCommand({setClusterParameter: clusterParameter1}));
+            'Check that parameters added in an empty cluster overwrite custom RS parameters.');
 
-        newShard2.restart(0, {shardsvr: ''});
-        newShard2.awaitNodesAgreeOnPrimary();
+        const st3 = new ShardingTest({mongos: 1, shards: 0, name: 'third_cluster'});
 
-        // After restarting a node with --shardsvr it should not accept setClusterParameter
-        // commands.
-        assert.commandFailedWithCode(
-            newShard2.getPrimary().adminCommand({setClusterParameter: clusterParameter3}),
-            ErrorCodes.NotImplemented);
+        st3.s.adminCommand({setClusterParameter: clusterParameter1});
 
-        checkClusterParameters(clusterParameter1Name,
-                               clusterParameter1Value,
-                               newShard2.getPrimary(),
-                               newShard2.getPrimary(),
-                               false);
+        const newShard4Name = 'newShard2';
+        const newShard4 = new ReplSetTest({name: newShard4Name, nodes: 1});
+        newShard4.startSet();
+        newShard4.initiate();
 
-        assert.commandWorked(
-            st2.s.adminCommand({addShard: newShard2.getURL(), name: newShard2Name}));
+        newShard4.getPrimary().adminCommand({setClusterParameter: clusterParameter2});
 
-        // After adding the shard there must be only one cluster parameter: the one set on the rs
-        // clusterParameter1.
-        checkClusterParameters(clusterParameter1Name,
-                               clusterParameter1Value,
-                               st2.configRS.getPrimary(),
-                               newShard2.getPrimary());
-
-        assert.eq(
-            1, newShard2.getPrimary().getCollection('config.clusterParameters').countDocuments({}));
-        assert.eq(
-            1,
-            st2.configRS.getPrimary().getCollection('config.clusterParameters').countDocuments({}));
-    }
-
-    {
-        jsTestLog('Check that parameters added in cluster overwrite custom RS parameters.');
-
-        const newShard3Name = 'newShard3';
-        const newShard3 = new ReplSetTest({name: newShard3Name, nodes: 1});
-        newShard3.startSet();
-        newShard3.initiate();
-
-        assert.commandWorked(
-            newShard3.getPrimary().adminCommand({setClusterParameter: clusterParameter2}));
-
-        newShard3.restart(0, {shardsvr: ''});
-        newShard3.awaitNodesAgreeOnPrimary();
+        newShard4.restart(0, {shardsvr: ''});
+        newShard4.awaitNodesAgreeOnPrimary();
 
         checkClusterParameters(clusterParameter2Name,
                                clusterParameter2Value,
-                               newShard3.getPrimary(),
-                               newShard3.getPrimary());
+                               newShard4.getPrimary(),
+                               newShard4.getPrimary());
 
         assert.commandWorked(
-            st2.s.adminCommand({addShard: newShard3.getURL(), name: newShard3Name}));
+            st3.s.adminCommand({addShard: newShard4.getURL(), name: newShard4Name}));
 
-        // After adding the shard there must be only one cluster parameter: the one set on the
-        // cluster clusterParameter1.
         checkClusterParameters(clusterParameter1Name,
                                clusterParameter1Value,
-                               st2.configRS.getPrimary(),
-                               newShard3.getPrimary());
+                               st3.configRS.getPrimary(),
+                               newShard4.getPrimary());
+
+        newShard4.stopSet();
+
+        st3.stop();
+    }
+} else {
+    // In catalog shard mode
+    {
+        jsTestLog('Check that RS which transitions to a catalog shard keeps cluster params.');
+
+        const catalogShardName = 'catalogShard';
+        const catalogShard = new ReplSetTest({
+            name: catalogShardName,
+            nodes: 1,
+            nodeOptions: {setParameter: {skipShardingConfigurationChecks: true}}
+        });
+        catalogShard.startSet();
+        catalogShard.initiate();
+
+        catalogShard.getPrimary().adminCommand({setClusterParameter: clusterParameter2});
+
+        var cfg = catalogShard.getReplSetConfigFromNode();
+        cfg.configsvr = true;
+        reconfig(catalogShard, cfg);
+
+        catalogShard.restart(
+            0, {configsvr: '', setParameter: {skipShardingConfigurationChecks: false}});
+        catalogShard.awaitNodesAgreeOnPrimary();
+
+        // Cluster params should still exist.
+        checkClusterParameters(clusterParameter2Name,
+                               clusterParameter2Value,
+                               catalogShard.getPrimary(),
+                               catalogShard.getPrimary());
+
+        var mongos = MongoRunner.runMongos({configdb: catalogShard.getURL()});
+        assert.commandWorked(mongos.adminCommand({transitionToCatalogShard: 1}));
+        checkClusterParameters(clusterParameter2Name,
+                               clusterParameter2Value,
+                               catalogShard.getPrimary(),
+                               catalogShard.getPrimary());
+
+        // Catalog shard should not accept cluster parameters set directly on it.
+        assert.commandFailedWithCode(
+            catalogShard.getPrimary().adminCommand({setClusterParameter: clusterParameter3}),
+            ErrorCodes.NotImplemented);
+
+        jsTestLog(
+            'Check that parameters added in a catalog shard cluster overwrite custom RS parameters.');
+
+        const newShard5Name = 'newShard5';
+        const newShard5 = new ReplSetTest({name: newShard5Name, nodes: 1});
+        newShard5.startSet();
+        newShard5.initiate();
+
+        newShard5.getPrimary().adminCommand({setClusterParameter: clusterParameter1});
+
+        newShard5.restart(0, {shardsvr: ''});
+        newShard5.awaitNodesAgreeOnPrimary();
+
+        checkClusterParameters(clusterParameter1Name,
+                               clusterParameter1Value,
+                               newShard5.getPrimary(),
+                               newShard5.getPrimary());
+
+        assert.commandWorked(
+            mongos.adminCommand({addShard: newShard5.getURL(), name: newShard5Name}));
+
+        checkClusterParameters(clusterParameter2Name,
+                               clusterParameter2Value,
+                               catalogShard.getPrimary(),
+                               newShard5.getPrimary());
+
         assert.eq(0,
-                  newShard3.getPrimary().getCollection('config.clusterParameters').countDocuments({
-                      _id: clusterParameter2Name
+                  newShard5.getPrimary().getCollection('config.clusterParameters').countDocuments({
+                      _id: clusterParameter1Name
                   }));
 
-        // Well behaved test, remove shard and stop the set.
-        removeShard(st2, newShard3Name);
-
-        newShard3.stopSet();
+        MongoRunner.stopMongos(mongos);
+        newShard5.stopSet();
+        catalogShard.stopSet();
     }
-
-    newShard2.stopSet();
-
-    st2.stop();
-}
-{
-    jsTestLog('Check that parameters added in an empty cluster overwrite custom RS parameters.');
-
-    const st3 = new ShardingTest({mongos: 1, shards: 0, name: 'third_cluster'});
-
-    st3.s.adminCommand({setClusterParameter: clusterParameter1});
-
-    const newShard4Name = 'newShard2';
-    const newShard4 = new ReplSetTest({name: newShard4Name, nodes: 1});
-    newShard4.startSet();
-    newShard4.initiate();
-
-    newShard4.getPrimary().adminCommand({setClusterParameter: clusterParameter2});
-
-    newShard4.restart(0, {shardsvr: ''});
-    newShard4.awaitNodesAgreeOnPrimary();
-
-    checkClusterParameters(clusterParameter2Name,
-                           clusterParameter2Value,
-                           newShard4.getPrimary(),
-                           newShard4.getPrimary());
-
-    assert.commandWorked(st3.s.adminCommand({addShard: newShard4.getURL(), name: newShard4Name}));
-
-    checkClusterParameters(clusterParameter1Name,
-                           clusterParameter1Value,
-                           st3.configRS.getPrimary(),
-                           newShard4.getPrimary());
-
-    newShard4.stopSet();
-
-    st3.stop();
 }
 })();
