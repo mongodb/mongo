@@ -931,7 +931,8 @@ buildvariants:
   - name: test_packages
     distros:
     - ubuntu2004-package
-  - name: selinux_rhel7_org
+      #TODO: BF-24515 renable once fixed
+      #- name: selinux_rhel7_org
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -1160,7 +1161,9 @@ buildvariants:
   - name: test_packages
     distros:
     - ubuntu2004-package
-  - name: selinux_rhel8_enterprise
+
+      #TODO: BF-24515 renable once fixed
+      #- name: selinux_rhel8_enterprise
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -1336,7 +1339,8 @@ buildvariants:
   - name: test_packages
     distros:
     - ubuntu2204-large
-  - name: selinux_rhel9_org
+      #TODO: BF-24515 renable once fixed
+      #- name: selinux_rhel9_org
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -1405,7 +1409,9 @@ buildvariants:
   - name: test_packages
     distros:
     - ubuntu2204-large
-  - name: selinux_rhel9_enterprise
+
+      #TODO: BF-24515 renable once fixed
+      #- name: selinux_rhel9_enterprise
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 

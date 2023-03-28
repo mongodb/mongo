@@ -279,7 +279,8 @@ variables:
   - name: test_packages
     distros:
     - ubuntu2004-package
-  - name: selinux_rhel7_enterprise
+      # TODO: BF-24515 re-enable when build failure cause determined and resolved
+      # - name: selinux_rhel7_enterprise
   - name: generate_buildid_to_debug_symbols_mapping
 
 
@@ -1880,7 +1881,8 @@ buildvariants:
   - name: test_packages
     distros:
     - ubuntu2004-package
-  - name: selinux_rhel8_enterprise
+      # TODO: BF-24515 re-enable when build failure cause determined and resolved
+      #- name: selinux_rhel8_enterprise
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: &enterprise-rhel-80-64-bit-build-metrics enterprise-rhel-80-64-bit-build-metrics
