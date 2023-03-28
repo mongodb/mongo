@@ -153,6 +153,8 @@ all:
   ticket: SERVER-68434
 - test_file: jstests/sharding/shard_keys_with_dollar_sign.js
   ticket: SERVER-74124
+- test_file: jstests/core/map_reduce_subplanning.js
+  ticket: SERVER-74131
 suites:
   change_streams_multiversion: null
   concurrency_replication_multiversion: null

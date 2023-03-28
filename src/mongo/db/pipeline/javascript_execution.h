@@ -104,11 +104,8 @@ public:
      * Injects the given function 'emitFn' as a native JS function named 'emit', callable from
      * user-defined functions.
      */
-    void injectEmitIfNecessary(NativeFunction emitFn, void* data) {
-        if (!_emitCreated) {
-            _scope->injectNative("emit", emitFn, data);
-            _emitCreated = true;
-        }
+    void injectEmit(NativeFunction emitFn, void* data) {
+        _scope->injectNative("emit", emitFn, data);
     }
 
     Scope* getScope() {
@@ -118,7 +115,6 @@ public:
 private:
     BSONObj _scopeVars;
     std::unique_ptr<Scope> _scope;
-    bool _emitCreated = false;
     bool _storedProceduresLoaded = false;
     int _fnCallTimeoutMillis;
 
