@@ -140,19 +140,27 @@ boost::optional<Document> DocumentSourceChangeStreamAddPreImage::lookupPreImage(
 }
 
 Value DocumentSourceChangeStreamAddPreImage::serialize(SerializationOptions opts) const {
-    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
-        MONGO_UNIMPLEMENTED_TASSERT(7484362);
+    BSONObjBuilder builder;
+    if (opts.verbosity) {
+        BSONObjBuilder sub(builder.subobjStart(DocumentSourceChangeStream::kStageName));
+        sub.append("stage"_sd, kStageName);
+        opts.serializeLiteralValue(
+                FullDocumentBeforeChangeMode_serializer(_fullDocumentBeforeChangeMode))
+            .addToBsonObj(&sub, kFullDocumentBeforeChangeFieldName);
+        sub.done();
+    } else {
+        BSONObjBuilder sub(builder.subobjStart(kStageName));
+        if (opts.replacementForLiteralArgs) {
+            sub.append(
+                DocumentSourceChangeStreamAddPreImageSpec::kFullDocumentBeforeChangeFieldName,
+                *opts.replacementForLiteralArgs);
+        } else {
+            DocumentSourceChangeStreamAddPreImageSpec(_fullDocumentBeforeChangeMode)
+                .serialize(&sub);
+        }
+        sub.done();
     }
-
-    return opts.verbosity
-        ? Value(Document{
-              {DocumentSourceChangeStream::kStageName,
-               Document{{"stage"_sd, "internalAddPreImage"_sd},
-                        {"fullDocumentBeforeChange"_sd,
-                         FullDocumentBeforeChangeMode_serializer(_fullDocumentBeforeChangeMode)}}}})
-        : Value(Document{
-              {kStageName,
-               DocumentSourceChangeStreamAddPreImageSpec(_fullDocumentBeforeChangeMode).toBSON()}});
+    return Value(builder.obj());
 }
 
 std::string DocumentSourceChangeStreamAddPreImage::makePreImageNotFoundErrorMsg(

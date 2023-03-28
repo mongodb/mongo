@@ -212,19 +212,25 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamCheckResumability::doGet
 }
 
 Value DocumentSourceChangeStreamCheckResumability::serialize(SerializationOptions opts) const {
-    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
-        MONGO_UNIMPLEMENTED_TASSERT(7484360);
+    BSONObjBuilder builder;
+    if (opts.verbosity) {
+        BSONObjBuilder sub(builder.subobjStart(DocumentSourceChangeStream::kStageName));
+        sub.append("stage"_sd, kStageName);
+        opts.serializeLiteralValue(ResumeToken(_tokenFromClient).toDocument().toBson())
+            .addToBsonObj(&sub, "resumeToken"_sd);
+        sub.done();
+    } else {
+        BSONObjBuilder sub(builder.subobjStart(kStageName));
+        if (opts.replacementForLiteralArgs) {
+            sub.append(DocumentSourceChangeStreamCheckResumabilitySpec::kResumeTokenFieldName,
+                       *opts.replacementForLiteralArgs);
+        } else {
+            DocumentSourceChangeStreamCheckResumabilitySpec(ResumeToken(_tokenFromClient))
+                .serialize(&sub);
+        }
+        sub.done();
     }
-
-    return opts.verbosity
-        ? Value(DOC(DocumentSourceChangeStream::kStageName
-                    << DOC("stage"
-                           << "internalCheckResumability"_sd
-                           << "resumeToken" << ResumeToken(_tokenFromClient).toDocument())))
-        : Value(Document{
-              {DocumentSourceChangeStreamCheckResumability::kStageName,
-               DocumentSourceChangeStreamCheckResumabilitySpec(ResumeToken(_tokenFromClient))
-                   .toBSON()}});
+    return Value(builder.obj());
 }
 
 }  // namespace mongo

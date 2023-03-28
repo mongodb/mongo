@@ -105,19 +105,119 @@ StageConstraints DocumentSourceChangeStreamTransform::constraints(
     return constraints;
 }
 
+namespace {
+
+template <typename T>
+void serializeSpecField(BSONObjBuilder* builder,
+                        SerializationOptions opts,
+                        const StringData& fieldName,
+                        const boost::optional<T>& value) {
+    if (value) {
+        opts.serializeLiteralValue((*value).toBSON()).addToBsonObj(builder, fieldName);
+    }
+}
+
+template <>
+void serializeSpecField(BSONObjBuilder* builder,
+                        SerializationOptions opts,
+                        const StringData& fieldName,
+                        const boost::optional<Timestamp>& value) {
+    if (value) {
+        opts.serializeLiteralValue(*value).addToBsonObj(builder, fieldName);
+    }
+}
+
+template <typename T>
+void serializeSpecField(BSONObjBuilder* builder,
+                        SerializationOptions opts,
+                        const StringData& fieldName,
+                        const T& value) {
+    opts.serializeLiteralValue(value).addToBsonObj(builder, fieldName);
+}
+
+template <>
+void serializeSpecField(BSONObjBuilder* builder,
+                        SerializationOptions opts,
+                        const StringData& fieldName,
+                        const mongo::OptionalBool& value) {
+    if (value.has_value()) {
+        if (opts.replacementForLiteralArgs) {
+            builder->append(fieldName, *opts.replacementForLiteralArgs);
+        } else {
+            value.serializeToBSON(fieldName, builder);
+        }
+    }
+}
+
+void serializeSpec(const DocumentSourceChangeStreamSpec& spec,
+                   SerializationOptions opts,
+                   BSONObjBuilder* builder) {
+    serializeSpecField(builder,
+                       opts,
+                       DocumentSourceChangeStreamSpec::kResumeAfterFieldName,
+                       spec.getResumeAfter());
+    serializeSpecField(
+        builder, opts, DocumentSourceChangeStreamSpec::kStartAfterFieldName, spec.getStartAfter());
+    serializeSpecField(builder,
+                       opts,
+                       DocumentSourceChangeStreamSpec::kStartAtOperationTimeFieldName,
+                       spec.getStartAtOperationTime());
+    serializeSpecField(builder,
+                       opts,
+                       DocumentSourceChangeStreamSpec::kFullDocumentFieldName,
+                       ::mongo::FullDocumentMode_serializer(spec.getFullDocument()));
+    serializeSpecField(
+        builder,
+        opts,
+        DocumentSourceChangeStreamSpec::kFullDocumentBeforeChangeFieldName,
+        ::mongo::FullDocumentBeforeChangeMode_serializer(spec.getFullDocumentBeforeChange()));
+    serializeSpecField(builder,
+                       opts,
+                       DocumentSourceChangeStreamSpec::kAllChangesForClusterFieldName,
+                       spec.getAllChangesForCluster());
+    serializeSpecField(builder,
+                       opts,
+                       DocumentSourceChangeStreamSpec::kShowMigrationEventsFieldName,
+                       spec.getShowMigrationEvents());
+    serializeSpecField(builder,
+                       opts,
+                       DocumentSourceChangeStreamSpec::kShowSystemEventsFieldName,
+                       spec.getShowSystemEvents());
+    serializeSpecField(builder,
+                       opts,
+                       DocumentSourceChangeStreamSpec::kAllowToRunOnConfigDBFieldName,
+                       spec.getAllowToRunOnConfigDB());
+    serializeSpecField(builder,
+                       opts,
+                       DocumentSourceChangeStreamSpec::kAllowToRunOnSystemNSFieldName,
+                       spec.getAllowToRunOnSystemNS());
+    serializeSpecField(builder,
+                       opts,
+                       DocumentSourceChangeStreamSpec::kShowExpandedEventsFieldName,
+                       spec.getShowExpandedEvents());
+    serializeSpecField(builder,
+                       opts,
+                       DocumentSourceChangeStreamSpec::kShowRawUpdateDescriptionFieldName,
+                       spec.getShowRawUpdateDescription());
+}
+
+}  // namespace
+
 Value DocumentSourceChangeStreamTransform::serialize(SerializationOptions opts) const {
-    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
-        MONGO_UNIMPLEMENTED_TASSERT(7484354);
-    }
-
+    BSONObjBuilder builder;
     if (opts.verbosity) {
-        return Value(Document{{DocumentSourceChangeStream::kStageName,
-                               Document{{"stage"_sd, "internalTransform"_sd},
-                                        {"options"_sd, _changeStreamSpec.toBSON()}}}});
+        BSONObjBuilder sub(builder.subobjStart(DocumentSourceChangeStream::kStageName));
+        sub.append("stage"_sd, kStageName);
+        BSONObjBuilder options(sub.subobjStart("options"_sd));
+        serializeSpec(_changeStreamSpec, opts, &options);
+        options.done();
+        sub.done();
+    } else {
+        BSONObjBuilder sub(builder.subobjStart(kStageName));
+        serializeSpec(_changeStreamSpec, opts, &sub);
+        sub.done();
     }
-
-    return Value(
-        Document{{DocumentSourceChangeStreamTransform::kStageName, _changeStreamSpec.toBSON()}});
+    return Value(builder.obj());
 }
 
 DepsTracker::State DocumentSourceChangeStreamTransform::getDependencies(DepsTracker* deps) const {

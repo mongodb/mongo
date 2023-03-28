@@ -182,20 +182,27 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamCheckInvalidate::doGetNe
 }
 
 Value DocumentSourceChangeStreamCheckInvalidate::serialize(SerializationOptions opts) const {
-    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
-        MONGO_UNIMPLEMENTED_TASSERT(7484361);
-    }
-
+    BSONObjBuilder builder;
     if (opts.verbosity) {
-        return Value(Document{{DocumentSourceChangeStream::kStageName,
-                               Document{{"stage"_sd, "internalCheckInvalidate"_sd}}}});
+        BSONObjBuilder sub(builder.subobjStart(DocumentSourceChangeStream::kStageName));
+        sub.append("stage"_sd, kStageName);
+        sub.done();
+    } else {
+        BSONObjBuilder sub(builder.subobjStart(kStageName));
+        if (_startAfterInvalidate) {
+            if (opts.replacementForLiteralArgs) {
+                sub.append(
+                    DocumentSourceChangeStreamCheckInvalidateSpec::kStartAfterInvalidateFieldName,
+                    *opts.replacementForLiteralArgs);
+            } else {
+                DocumentSourceChangeStreamCheckInvalidateSpec spec;
+                spec.setStartAfterInvalidate(ResumeToken(*_startAfterInvalidate));
+                spec.serialize(&sub);
+            }
+        }
+        sub.done();
     }
-
-    DocumentSourceChangeStreamCheckInvalidateSpec spec;
-    if (_startAfterInvalidate) {
-        spec.setStartAfterInvalidate(ResumeToken(*_startAfterInvalidate));
-    }
-    return Value(Document{{DocumentSourceChangeStreamCheckInvalidate::kStageName, spec.toBSON()}});
+    return Value(builder.obj());
 }
 
 }  // namespace mongo

@@ -154,18 +154,20 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamEnsureResumeTokenPresent
 
 Value DocumentSourceChangeStreamEnsureResumeTokenPresent::serialize(
     SerializationOptions opts) const {
-    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
-        MONGO_UNIMPLEMENTED_TASSERT(7484358);
-    }
-
-    // We only serialize this stage in the context of explain.
+    BSONObjBuilder builder;
     if (opts.verbosity) {
-        return Value(DOC(DocumentSourceChangeStream::kStageName
-                         << DOC("stage"
-                                << "internalEnsureResumeTokenPresent"_sd
-                                << "resumeToken" << ResumeToken(_tokenFromClient).toDocument())));
+        BSONObjBuilder sub(builder.subobjStart(DocumentSourceChangeStream::kStageName));
+        sub.append("stage"_sd, kStageName);
+        opts.serializeLiteralValue(ResumeToken(_tokenFromClient).toDocument())
+            .addToBsonObj(&sub, "resumeToken"_sd);
+        sub.done();
+    } else {
+        BSONObjBuilder sub(builder.subobjStart(kStageName));
+        opts.serializeLiteralValue(ResumeToken(_tokenFromClient).toDocument())
+            .addToBsonObj(&sub, "resumeToken"_sd);
+        sub.done();
     }
-    MONGO_UNREACHABLE_TASSERT(5467611);
+    return Value(builder.obj());
 }
 
 }  // namespace mongo
