@@ -224,8 +224,6 @@ void loadCWWCFromConfigServerForReplication(OperationContext* opCtx) {
         // Cluster wide read/write concern in a sharded cluster lives on the config server, so a
         // config server node's local cache will be correct and explicitly checking for a default
         // write concern via remote command is unnecessary.
-        //
-        // TODO SERVER-72696: Verify this when updating CWWC logic for a catalog shard.
         return;
     }
 
