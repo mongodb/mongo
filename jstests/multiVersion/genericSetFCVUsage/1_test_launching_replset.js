@@ -45,41 +45,42 @@ for (let versions of [["last-lts", "latest"], ["last-continuous", "latest"]]) {
     rst.stopSet();
 }
 
-// TODO(SERVER-61100): Re-enable this test.
-if (true) {
-    jsTestLog("Skipping test as it is currently disabled.");
+if (MongoRunner.areBinVersionsTheSame("last-continuous", "last-lts")) {
+    jsTest.log("Skipping test because 'last-continuous' == 'last-lts'");
     return;
 }
 
 for (let versions of [["last-lts", "last-continuous"], ["last-continuous", "last-lts"]]) {
     jsTestLog("Testing mixed versions: " + tojson(versions));
 
-    try {
-        var rst = new ReplSetTest({nodes: 2});
-        rst.startSet({binVersion: versions});
-        rst.initiate();
-    } catch (e) {
-        if (e instanceof Error) {
-            if (e.message.includes(
-                    "Can only specify one of 'last-lts' and 'last-continuous' in binVersion, not both.")) {
-                continue;
-            }
-        }
-        throw e;
-    }
-    assert(
-        MongoRunner.areBinVersionsTheSame("last-continuous", "last-lts"),
-        "Should have thrown error in creating ReplSetTest because can only specify one of 'last-lts' and 'last-continuous' in binVersion, not both.");
+    var rst = new ReplSetTest({nodes: 2});
+    rst.startSet({binVersion: versions});
+    let err = assert.throws(() => rst.initiate());
+    assert(err.message.includes(
+               "Can only specify one of 'last-lts' and 'last-continuous' in binVersion, not both."),
+           err);
+    rst.stopSet();
+}
 
-    var nodes = rst.nodes;
+for (let versions of [["last-lts", "last-continuous"], ["last-continuous", "last-lts"]]) {
+    jsTestLog("Testing mixed versions: " + tojson(versions));
 
-    // Make sure we have hosts of all the different versions
-    var versionsFound = [];
-    for (var j = 0; j < nodes.length; j++)
-        versionsFound.push(nodes[j].getBinVersion());
+    const rst = new ReplSetTest({
+        nodes: [
+            {
+                binVersion: versions[0],
+            },
+            {
+                binVersion: versions[1],
+            },
+        ]
+    });
+    rst.startSet();
 
-    assert.allBinVersions(versions, versionsFound);
-
+    let err = assert.throws(() => rst.initiate());
+    assert(err.message.includes(
+               "Can only specify one of 'last-lts' and 'last-continuous' in binVersion, not both."),
+           err);
     rst.stopSet();
 }
 
