@@ -89,13 +89,8 @@ std::set<ShardId> getShardsToTarget(OperationContext* opCtx,
             CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collation));
     }
     auto expCtx = make_intrusive<ExpressionContext>(opCtx, std::move(collator), nss);
-    getShardIdsForQuery(expCtx,
-                        query,
-                        collation,
-                        cm,
-                        &allShardsContainingChunksForNs,
-                        nullptr /* chunkRanges */,
-                        nullptr /* targetMinKeyToMaxKey */);
+    getShardIdsForQuery(
+        expCtx, query, collation, cm, &allShardsContainingChunksForNs, nullptr /* info */);
 
     // We must either get a subset of shards to target in the case of a partial shard key or we must
     // target all shards.

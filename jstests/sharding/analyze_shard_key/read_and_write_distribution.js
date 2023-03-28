@@ -257,7 +257,7 @@ function makeTestCase(collName, {shardKeyField, isHashed, minVal, maxVal}) {
             update: collName,
             updates: [
                 {q: {[shardKeyField]: getNextVal()}, u: {$set: {z: 0}}},
-                {q: {[shardKeyField]: getNextVal()}, u: {$set: {z: 0}}}
+                {q: {$expr: {$eq: ["$" + shardKeyField, getNextVal()]}}, u: [{$set: {z: 0}}]}
             ]
         });
         writeDistribution.sampleSize.update += 2;

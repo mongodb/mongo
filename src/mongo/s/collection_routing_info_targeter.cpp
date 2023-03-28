@@ -68,6 +68,7 @@ constexpr auto kIdFieldName = "_id"_sd;
 const ShardKeyPattern kVirtualIdShardKey(BSON(kIdFieldName << 1));
 
 using UpdateType = write_ops::UpdateModification::Type;
+using shard_key_pattern_query_util::QueryTargetingInfo;
 
 // Tracks the number of {multi:false} updates with an exact match on _id that are broadcasted to
 // multiple shards.
@@ -667,8 +668,12 @@ StatusWith<std::vector<ShardEndpoint>> CollectionRoutingInfoTargeter::_targetQue
     }
 
     std::set<ShardId> shardIds;
+    QueryTargetingInfo info;
     try {
-        getShardIdsForQuery(expCtx, query, collation, _cri.cm, &shardIds, chunkRanges);
+        getShardIdsForQuery(expCtx, query, collation, _cri.cm, &shardIds, &info);
+        if (chunkRanges) {
+            chunkRanges->swap(info.chunkRanges);
+        }
     } catch (const DBException& ex) {
         return ex.toStatus();
     }

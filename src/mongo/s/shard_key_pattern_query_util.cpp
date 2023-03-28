@@ -44,6 +44,7 @@ namespace mongo {
 namespace {
 
 using pathsupport::EqualityMatches;
+using shard_key_pattern_query_util::QueryTargetingInfo;
 
 // Maximum number of intervals produced by $in queries
 constexpr size_t kMaxFlattenedInCombinations = 4000000;
@@ -404,10 +405,9 @@ void getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> expCtx,
                          const BSONObj& collation,
                          const ChunkManager& cm,
                          std::set<ShardId>* shardIds,
-                         std::set<ChunkRange>* chunkRanges,
-                         bool* targetMinKeyToMaxKey) {
-    if (chunkRanges) {
-        invariant(chunkRanges->empty());
+                         QueryTargetingInfo* info) {
+    if (info) {
+        invariant(info->chunkRanges.empty());
     }
 
     auto findCommand = std::make_unique<FindCommandRequest>(cm.getNss());
@@ -437,11 +437,9 @@ void getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> expCtx,
         try {
             auto chunk = cm.findIntersectingChunk(shardKeyToFind, collation);
             shardIds->insert(chunk.getShardId());
-            if (chunkRanges) {
-                chunkRanges->insert(chunk.getRange());
-            }
-            if (targetMinKeyToMaxKey) {
-                *targetMinKeyToMaxKey = false;
+            if (info) {
+                info->desc = QueryTargetingInfo::Description::kSingleKey;
+                info->chunkRanges.insert(chunk.getRange());
             }
             return;
         } catch (const DBException&) {
@@ -468,12 +466,7 @@ void getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> expCtx,
         const auto& min = it->first;
         const auto& max = it->second;
 
-        cm.getShardIdsForRange(min, max, shardIds, chunkRanges);
-
-        if (targetMinKeyToMaxKey && ChunkMap::allElementsAreOfType(MinKey, min) &&
-            ChunkMap::allElementsAreOfType(MaxKey, max)) {
-            *targetMinKeyToMaxKey = true;
-        }
+        cm.getShardIdsForRange(min, max, shardIds, info ? &info->chunkRanges : nullptr);
 
         // Once we know we need to visit all shards no need to keep looping.
         // However, this optimization does not apply when we are reading from a snapshot
@@ -491,14 +484,28 @@ void getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> expCtx,
     if (shardIds->empty()) {
         cm.forEachChunk([&](const Chunk& chunk) {
             shardIds->insert(chunk.getShardId());
-            if (chunkRanges) {
-                chunkRanges->insert(chunk.getRange());
-            }
-            if (targetMinKeyToMaxKey) {
-                *targetMinKeyToMaxKey = false;
+            if (info) {
+                info->chunkRanges.insert(chunk.getRange());
             }
             return false;
         });
+    }
+
+    if (info) {
+        info->desc = [&] {
+            if (ranges.size() == 1) {
+                auto min = ranges.begin()->first;
+                auto max = ranges.begin()->second;
+                if (SimpleBSONObjComparator::kInstance.evaluate(min == max)) {
+                    return QueryTargetingInfo::Description::kSingleKey;
+                }
+                if (ChunkMap::allElementsAreOfType(MinKey, min) &&
+                    ChunkMap::allElementsAreOfType(MaxKey, max)) {
+                    return QueryTargetingInfo::Description::kMinKeyToMaxKey;
+                }
+            }
+            return QueryTargetingInfo::Description::kMultipleKeys;
+        }();
     }
 }
 

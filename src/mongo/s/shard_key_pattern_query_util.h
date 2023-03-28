@@ -108,20 +108,29 @@ BoundList flattenBounds(const ShardKeyPattern& shardKeyPattern, const IndexBound
  */
 IndexBounds getIndexBoundsForQuery(const BSONObj& key, const CanonicalQuery& canonicalQuery);
 
+namespace shard_key_pattern_query_util {
+
+struct QueryTargetingInfo {
+    enum Description { kSingleKey, kMultipleKeys, kMinKeyToMaxKey };
+
+    Description desc;
+    std::set<ChunkRange> chunkRanges;
+};
+
+}  // namespace shard_key_pattern_query_util
+
 /**
- * Finds the shard IDs for a given filter and collation. If collation is empty, we use the
- * collection default collation for targeting.
- *
- * If 'chunkRanges' is not null, populates it with ChunkRanges that would be targeted by the query.
- * If 'targetMinKeyToMaxKey' is not null, sets it to true if the query targets the entire shard key
- * space.
+ * Populates 'shardIds' with the shard ids for a query with given filter and collation. If the
+ * collation is empty, it uses the collection default collation for targeting. If 'info' is not
+ * null, populates it with the ChunkRanges that the query targets and a description about whether
+ * the query targets a single shard key value, multiple but not all shard key values or all shard
+ * key values.
  */
 void getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> expCtx,
                          const BSONObj& query,
                          const BSONObj& collation,
                          const ChunkManager& cm,
                          std::set<ShardId>* shardIds,
-                         std::set<ChunkRange>* chunkRanges = nullptr,
-                         bool* targetMinKeyToMaxKey = nullptr);
+                         shard_key_pattern_query_util::QueryTargetingInfo* info = nullptr);
 
 }  // namespace mongo

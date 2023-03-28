@@ -43,6 +43,8 @@
 namespace mongo {
 namespace {
 
+using shard_key_pattern_query_util::QueryTargetingInfo;
+
 const NamespaceString kNss = NamespaceString::createNamespaceString_forTest("TestDB", "TestColl");
 
 class ChunkManagerQueryTest : public CatalogCacheTestFixture {
@@ -70,7 +72,7 @@ protected:
                       const BSONObj& query,
                       const BSONObj& queryCollation,
                       const std::set<ShardId>& expectedShardIds,
-                      bool expectTargetMinKeyToMaxKey) {
+                      QueryTargetingInfo expectedQueryTargetingInfo) {
         const ShardKeyPattern shardKeyPattern(shardKey);
         auto chunkManager =
             makeCollectionRoutingInfo(
@@ -78,8 +80,7 @@ protected:
                 .cm;
 
         std::set<ShardId> shardIds;
-        std::set<ChunkRange> chunkRanges;
-        bool targetMinKeyToMaxKey = false;
+        QueryTargetingInfo info;
 
         auto&& cif = [&]() {
             if (queryCollation.isEmpty()) {
@@ -91,15 +92,10 @@ protected:
         }();
         auto expCtx =
             make_intrusive<ExpressionContextForTest>(operationContext(), kNss, std::move(cif));
-        getShardIdsForQuery(expCtx,
-                            query,
-                            queryCollation,
-                            chunkManager,
-                            &shardIds,
-                            &chunkRanges,
-                            &targetMinKeyToMaxKey);
+        getShardIdsForQuery(expCtx, query, queryCollation, chunkManager, &shardIds, &info);
         _assertShardIdsMatch(expectedShardIds, shardIds);
-        ASSERT_EQ(expectTargetMinKeyToMaxKey, targetMinKeyToMaxKey);
+        // The test coverage for chunk ranges is in CollectionRoutingInfoTargeterTest.
+        ASSERT_EQ(expectedQueryTargetingInfo.desc, info.desc);
     }
 
 private:
@@ -147,7 +143,6 @@ TEST_F(ChunkManagerQueryTest, GetShardIdsForRangeMinAndMaxAreTheSameAtLastChunkM
 }
 
 TEST_F(ChunkManagerQueryTest, EmptyQuerySingleShard) {
-    bool expectTargetMinKeyToMaxKey = true;
     runQueryTest(BSON("a" << 1),
                  nullptr,
                  false,
@@ -155,11 +150,10 @@ TEST_F(ChunkManagerQueryTest, EmptyQuerySingleShard) {
                  BSONObj(),
                  BSONObj(),
                  {ShardId("0")},
-                 expectTargetMinKeyToMaxKey);
+                 {QueryTargetingInfo::Description::kMinKeyToMaxKey, {}});
 }
 
 TEST_F(ChunkManagerQueryTest, EmptyQueryMultiShard) {
-    bool expectTargetMinKeyToMaxKey = true;
     runQueryTest(BSON("a" << 1),
                  nullptr,
                  false,
@@ -172,11 +166,10 @@ TEST_F(ChunkManagerQueryTest, EmptyQueryMultiShard) {
                  BSONObj(),
                  BSONObj(),
                  {ShardId("0"), ShardId("1"), ShardId("2"), ShardId("3")},
-                 expectTargetMinKeyToMaxKey);
+                 {QueryTargetingInfo::Description::kMinKeyToMaxKey, {}});
 }
 
 TEST_F(ChunkManagerQueryTest, UniversalRangeMultiShard) {
-    bool expectTargetMinKeyToMaxKey = true;
     runQueryTest(BSON("a" << 1),
                  nullptr,
                  false,
@@ -189,11 +182,10 @@ TEST_F(ChunkManagerQueryTest, UniversalRangeMultiShard) {
                  BSON("b" << 1),
                  BSONObj(),
                  {ShardId("0"), ShardId("1"), ShardId("2"), ShardId("3")},
-                 expectTargetMinKeyToMaxKey);
+                 {QueryTargetingInfo::Description::kMinKeyToMaxKey, {}});
 }
 
 TEST_F(ChunkManagerQueryTest, EqualityRangeSingleShard) {
-    bool expectTargetMinKeyToMaxKey = false;
     runQueryTest(BSON("a" << 1),
                  nullptr,
                  false,
@@ -202,11 +194,10 @@ TEST_F(ChunkManagerQueryTest, EqualityRangeSingleShard) {
                       << "x"),
                  BSONObj(),
                  {ShardId("0")},
-                 expectTargetMinKeyToMaxKey);
+                 {QueryTargetingInfo::Description::kSingleKey, {}});
 }
 
 TEST_F(ChunkManagerQueryTest, EqualityRangeMultiShard) {
-    bool expectTargetMinKeyToMaxKey = false;
     runQueryTest(BSON("a" << 1),
                  nullptr,
                  false,
@@ -220,11 +211,10 @@ TEST_F(ChunkManagerQueryTest, EqualityRangeMultiShard) {
                       << "y"),
                  BSONObj(),
                  {ShardId("2")},
-                 expectTargetMinKeyToMaxKey);
+                 {QueryTargetingInfo::Description::kSingleKey, {}});
 }
 
 TEST_F(ChunkManagerQueryTest, SetRangeMultiShard) {
-    bool expectTargetMinKeyToMaxKey = false;
     runQueryTest(BSON("a" << 1),
                  nullptr,
                  false,
@@ -237,11 +227,10 @@ TEST_F(ChunkManagerQueryTest, SetRangeMultiShard) {
                  fromjson("{a:{$in:['u','y']}}"),
                  BSONObj(),
                  {ShardId("0"), ShardId("2")},
-                 expectTargetMinKeyToMaxKey);
+                 {QueryTargetingInfo::Description::kMultipleKeys, {}});
 }
 
 TEST_F(ChunkManagerQueryTest, GTRangeMultiShard) {
-    bool expectTargetMinKeyToMaxKey = false;
     runQueryTest(BSON("a" << 1),
                  nullptr,
                  false,
@@ -254,11 +243,10 @@ TEST_F(ChunkManagerQueryTest, GTRangeMultiShard) {
                  BSON("a" << GT << "x"),
                  BSONObj(),
                  {ShardId("1"), ShardId("2"), ShardId("3")},
-                 expectTargetMinKeyToMaxKey);
+                 {QueryTargetingInfo::Description::kMultipleKeys, {}});
 }
 
 TEST_F(ChunkManagerQueryTest, GTERangeMultiShard) {
-    bool expectTargetMinKeyToMaxKey = false;
     runQueryTest(BSON("a" << 1),
                  nullptr,
                  false,
@@ -271,13 +259,12 @@ TEST_F(ChunkManagerQueryTest, GTERangeMultiShard) {
                  BSON("a" << GTE << "x"),
                  BSONObj(),
                  {ShardId("1"), ShardId("2"), ShardId("3")},
-                 expectTargetMinKeyToMaxKey);
+                 {QueryTargetingInfo::Description::kMultipleKeys, {}});
 }
 
 TEST_F(ChunkManagerQueryTest, LTRangeMultiShard) {
     // NOTE (SERVER-4791): It isn't actually necessary to return shard 2 because its lowest key is
     // "y", which is excluded from the query
-    bool expectTargetMinKeyToMaxKey = false;
     runQueryTest(BSON("a" << 1),
                  nullptr,
                  false,
@@ -290,11 +277,10 @@ TEST_F(ChunkManagerQueryTest, LTRangeMultiShard) {
                  BSON("a" << LT << "y"),
                  BSONObj(),
                  {ShardId("0"), ShardId("1"), ShardId("2")},
-                 expectTargetMinKeyToMaxKey);
+                 {QueryTargetingInfo::Description::kMultipleKeys, {}});
 }
 
 TEST_F(ChunkManagerQueryTest, LTERangeMultiShard) {
-    bool expectTargetMinKeyToMaxKey = false;
     runQueryTest(BSON("a" << 1),
                  nullptr,
                  false,
@@ -307,11 +293,10 @@ TEST_F(ChunkManagerQueryTest, LTERangeMultiShard) {
                  BSON("a" << LTE << "y"),
                  BSONObj(),
                  {ShardId("0"), ShardId("1"), ShardId("2")},
-                 expectTargetMinKeyToMaxKey);
+                 {QueryTargetingInfo::Description::kMultipleKeys, {}});
 }
 
 TEST_F(ChunkManagerQueryTest, OrEqualities) {
-    bool expectTargetMinKeyToMaxKey = false;
     runQueryTest(BSON("a" << 1),
                  nullptr,
                  false,
@@ -324,11 +309,10 @@ TEST_F(ChunkManagerQueryTest, OrEqualities) {
                  fromjson("{$or:[{a:'u'},{a:'y'}]}"),
                  BSONObj(),
                  {ShardId("0"), ShardId("2")},
-                 expectTargetMinKeyToMaxKey);
+                 {QueryTargetingInfo::Description::kMultipleKeys, {}});
 }
 
 TEST_F(ChunkManagerQueryTest, OrEqualityInequality) {
-    bool expectTargetMinKeyToMaxKey = false;
     runQueryTest(BSON("a" << 1),
                  nullptr,
                  false,
@@ -341,11 +325,10 @@ TEST_F(ChunkManagerQueryTest, OrEqualityInequality) {
                  fromjson("{$or:[{a:'u'},{a:{$gte:'y'}}]}"),
                  BSONObj(),
                  {ShardId("0"), ShardId("2"), ShardId("3")},
-                 expectTargetMinKeyToMaxKey);
+                 {QueryTargetingInfo::Description::kMultipleKeys, {}});
 }
 
 TEST_F(ChunkManagerQueryTest, OrEqualityInequalityUnhelpful) {
-    bool expectTargetMinKeyToMaxKey = true;
     runQueryTest(BSON("a" << 1),
                  nullptr,
                  false,
@@ -358,11 +341,10 @@ TEST_F(ChunkManagerQueryTest, OrEqualityInequalityUnhelpful) {
                  fromjson("{$or:[{a:'u'},{a:{$gte:'zz'}},{}]}"),
                  BSONObj(),
                  {ShardId("0"), ShardId("1"), ShardId("2"), ShardId("3")},
-                 expectTargetMinKeyToMaxKey);
+                 {QueryTargetingInfo::Description::kMinKeyToMaxKey, {}});
 }
 
 TEST_F(ChunkManagerQueryTest, UnsatisfiableRangeSingleShard) {
-    bool expectTargetMinKeyToMaxKey = false;
     runQueryTest(BSON("a" << 1),
                  nullptr,
                  false,
@@ -370,11 +352,10 @@ TEST_F(ChunkManagerQueryTest, UnsatisfiableRangeSingleShard) {
                  BSON("a" << GT << "x" << LT << "x"),
                  BSONObj(),
                  {ShardId("0")},
-                 expectTargetMinKeyToMaxKey);
+                 {QueryTargetingInfo::Description::kMultipleKeys, {}});
 }
 
 TEST_F(ChunkManagerQueryTest, UnsatisfiableRangeMultiShard) {
-    bool expectTargetMinKeyToMaxKey = false;
     runQueryTest(BSON("a" << 1),
                  nullptr,
                  false,
@@ -387,11 +368,10 @@ TEST_F(ChunkManagerQueryTest, UnsatisfiableRangeMultiShard) {
                  BSON("a" << GT << "x" << LT << "x"),
                  BSONObj(),
                  {ShardId("0")},
-                 expectTargetMinKeyToMaxKey);
+                 {QueryTargetingInfo::Description::kMultipleKeys, {}});
 }
 
 TEST_F(ChunkManagerQueryTest, EqualityThenUnsatisfiable) {
-    bool expectTargetMinKeyToMaxKey = false;
     runQueryTest(BSON("a" << 1 << "b" << 1),
                  nullptr,
                  false,
@@ -404,11 +384,10 @@ TEST_F(ChunkManagerQueryTest, EqualityThenUnsatisfiable) {
                  BSON("a" << 1 << "b" << GT << 4 << LT << 4),
                  BSONObj(),
                  {ShardId("0")},
-                 expectTargetMinKeyToMaxKey);
+                 {QueryTargetingInfo::Description::kMultipleKeys, {}});
 }
 
 TEST_F(ChunkManagerQueryTest, InequalityThenUnsatisfiable) {
-    bool expectTargetMinKeyToMaxKey = false;
     runQueryTest(BSON("a" << 1 << "b" << 1),
                  nullptr,
                  false,
@@ -421,11 +400,10 @@ TEST_F(ChunkManagerQueryTest, InequalityThenUnsatisfiable) {
                  BSON("a" << GT << 1 << "b" << GT << 4 << LT << 4),
                  BSONObj(),
                  {ShardId("0")},
-                 expectTargetMinKeyToMaxKey);
+                 {QueryTargetingInfo::Description::kMultipleKeys, {}});
 }
 
 TEST_F(ChunkManagerQueryTest, OrEqualityUnsatisfiableInequality) {
-    bool expectTargetMinKeyToMaxKey = false;
     runQueryTest(BSON("a" << 1),
                  nullptr,
                  false,
@@ -438,11 +416,10 @@ TEST_F(ChunkManagerQueryTest, OrEqualityUnsatisfiableInequality) {
                  fromjson("{$or:[{a:'x'},{a:{$gt:'u',$lt:'u'}},{a:{$gte:'y'}}]}"),
                  BSONObj(),
                  {ShardId("1"), ShardId("2"), ShardId("3")},
-                 expectTargetMinKeyToMaxKey);
+                 {QueryTargetingInfo::Description::kMultipleKeys, {}});
 }
 
 TEST_F(ChunkManagerQueryTest, InMultiShard) {
-    bool expectTargetMinKeyToMaxKey = false;
     runQueryTest(BSON("a" << 1 << "b" << 1),
                  nullptr,
                  false,
@@ -451,11 +428,10 @@ TEST_F(ChunkManagerQueryTest, InMultiShard) {
                           << BSON("$in" << BSON_ARRAY(0 << 5 << 25))),
                  BSONObj(),
                  {ShardId("0"), ShardId("1"), ShardId("2")},
-                 expectTargetMinKeyToMaxKey);
+                 {QueryTargetingInfo::Description::kMultipleKeys, {}});
 }
 
 TEST_F(ChunkManagerQueryTest, CollationStringsMultiShard) {
-    bool expectTargetMinKeyToMaxKey = true;
     runQueryTest(BSON("a" << 1),
                  nullptr,
                  false,
@@ -470,11 +446,10 @@ TEST_F(ChunkManagerQueryTest, CollationStringsMultiShard) {
                  BSON("locale"
                       << "mock_reverse_string"),
                  {ShardId("0"), ShardId("1"), ShardId("2"), ShardId("3")},
-                 expectTargetMinKeyToMaxKey);
+                 {QueryTargetingInfo::Description::kMinKeyToMaxKey, {}});
 }
 
 TEST_F(ChunkManagerQueryTest, DefaultCollationStringsMultiShard) {
-    bool expectTargetMinKeyToMaxKey = true;
     runQueryTest(
         BSON("a" << 1),
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString),
@@ -490,11 +465,10 @@ TEST_F(ChunkManagerQueryTest, DefaultCollationStringsMultiShard) {
         BSON("locale"
              << "mock_reverse_string"),
         {ShardId("0"), ShardId("1"), ShardId("2"), ShardId("3")},
-        expectTargetMinKeyToMaxKey);
+        {QueryTargetingInfo::Description::kMinKeyToMaxKey, {}});
 }
 
 TEST_F(ChunkManagerQueryTest, SimpleCollationStringsMultiShard) {
-    bool expectTargetMinKeyToMaxKey = false;
     runQueryTest(
         BSON("a" << 1),
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString),
@@ -510,11 +484,10 @@ TEST_F(ChunkManagerQueryTest, SimpleCollationStringsMultiShard) {
         BSON("locale"
              << "simple"),
         {ShardId("2")},
-        expectTargetMinKeyToMaxKey);
+        {QueryTargetingInfo::Description::kSingleKey, {}});
 }
 
 TEST_F(ChunkManagerQueryTest, CollationNumbersMultiShard) {
-    bool expectTargetMinKeyToMaxKey = false;
     runQueryTest(
         BSON("a" << 1),
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString),
@@ -529,11 +502,10 @@ TEST_F(ChunkManagerQueryTest, CollationNumbersMultiShard) {
         BSON("locale"
              << "mock_reverse_string"),
         {ShardId("0")},
-        expectTargetMinKeyToMaxKey);
+        {QueryTargetingInfo::Description::kSingleKey, {}});
 }
 
 TEST_F(ChunkManagerQueryTest, DefaultCollationNumbersMultiShard) {
-    bool expectTargetMinKeyToMaxKey = false;
     runQueryTest(
         BSON("a" << 1),
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString),
@@ -547,11 +519,10 @@ TEST_F(ChunkManagerQueryTest, DefaultCollationNumbersMultiShard) {
         BSON("a" << 5),
         BSONObj(),
         {ShardId("0")},
-        expectTargetMinKeyToMaxKey);
+        {QueryTargetingInfo::Description::kSingleKey, {}});
 }
 
 TEST_F(ChunkManagerQueryTest, SimpleCollationNumbersMultiShard) {
-    bool expectTargetMinKeyToMaxKey = false;
     runQueryTest(
         BSON("a" << 1),
         std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString),
@@ -566,7 +537,7 @@ TEST_F(ChunkManagerQueryTest, SimpleCollationNumbersMultiShard) {
         BSON("locale"
              << "simple"),
         {ShardId("0")},
-        expectTargetMinKeyToMaxKey);
+        {QueryTargetingInfo::Description::kSingleKey, {}});
 }
 
 TEST_F(ChunkManagerQueryTest, SnapshotQueryWithMoreShardsThanLatestMetadata) {
@@ -615,13 +586,8 @@ TEST_F(ChunkManagerQueryTest, SnapshotQueryWithMoreShardsThanLatestMetadata) {
 
     const auto expCtx = make_intrusive<ExpressionContextForTest>();
     shardIds.clear();
-    getShardIdsForQuery(expCtx,
-                        BSON("x" << BSON("$gt" << -20)),
-                        {},
-                        chunkManager,
-                        &shardIds,
-                        nullptr /* chunkRanges */,
-                        nullptr /* targetMinKeyToMaxKey */);
+    getShardIdsForQuery(
+        expCtx, BSON("x" << BSON("$gt" << -20)), {}, chunkManager, &shardIds, nullptr /* info */);
     ASSERT_EQ(2, shardIds.size());
 }
 

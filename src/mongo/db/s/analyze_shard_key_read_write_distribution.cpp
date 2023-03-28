@@ -48,40 +48,6 @@
 namespace mongo {
 namespace analyze_shard_key {
 
-namespace {
-
-/**
- * Returns true if the query that specifies the given collation against the collection with the
- * given default collator has simple collation.
- */
-bool hasSimpleCollation(const CollatorInterface* defaultCollator, const BSONObj& collation) {
-    if (collation.isEmpty()) {
-        return !defaultCollator;
-    }
-    return SimpleBSONObjComparator::kInstance.evaluate(collation == CollationSpec::kSimpleSpec);
-}
-
-/**
- * Returns true if the given shard key contains any collatable fields (ones that can be affected in
- * comparison or sort order by collation).
- */
-bool shardKeyHasCollatableType(const ShardKeyPattern& shardKeyPattern, const BSONObj& shardKey) {
-    for (const BSONElement& elt : shardKey) {
-        if (CollationIndexKey::isCollatableType(elt.type())) {
-            return true;
-        }
-        if (shardKeyPattern.isHashedPattern() &&
-            shardKeyPattern.getHashedField().fieldNameStringData() == elt.fieldNameStringData()) {
-            // If the field is specified as "hashed" in the shard key pattern, then the hash value
-            // could have come from a collatable type.
-            return true;
-        }
-    }
-    return false;
-}
-
-}  // namespace
-
 template <typename DistributionMetricsType, typename SampleSizeType>
 DistributionMetricsType
 DistributionMetricsCalculator<DistributionMetricsType, SampleSizeType>::_getMetrics() const {
@@ -106,23 +72,13 @@ DistributionMetricsCalculator<DistributionMetricsType, SampleSizeType>::_getMetr
 }
 
 template <typename DistributionMetricsType, typename SampleSizeType>
-BSONObj
-DistributionMetricsCalculator<DistributionMetricsType, SampleSizeType>::_incrementMetricsForQuery(
+QueryTargetingInfo
+DistributionMetricsCalculator<DistributionMetricsType, SampleSizeType>::_getTargetingInfoForQuery(
     OperationContext* opCtx,
-    const BSONObj& primaryFilter,
+    const BSONObj& filter,
     const BSONObj& collation,
-    const BSONObj& secondaryFilter,
-    const boost::optional<LegacyRuntimeConstants>& runtimeConstants,
-    const boost::optional<BSONObj>& letParameters) {
-    auto filter = primaryFilter;
-    auto shardKey = uassertStatusOK(extractShardKeyFromBasicQuery(
-        opCtx, _targeter.getNS(), _getShardKeyPattern(), primaryFilter));
-    if (shardKey.isEmpty() && !secondaryFilter.isEmpty()) {
-        shardKey = _getShardKeyPattern().extractShardKeyFromDoc(secondaryFilter);
-        filter = shardKey;
-    }
-
-    // Increment metrics about range targeting.
+    const boost::optional<BSONObj>& letParameters,
+    const boost::optional<LegacyRuntimeConstants>& runtimeConstants) {
     auto&& cif = [&]() {
         if (collation.isEmpty()) {
             return std::unique_ptr<CollatorInterface>{};
@@ -131,48 +87,51 @@ DistributionMetricsCalculator<DistributionMetricsType, SampleSizeType>::_increme
             CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collation));
     }();
     auto expCtx = make_intrusive<ExpressionContext>(
-        opCtx, std::move(cif), _getChunkManager().getNss(), runtimeConstants, letParameters);
+        opCtx,
+        std::move(cif),
+        _getChunkManager().getNss(),
+        runtimeConstants.value_or(Variables::generateRuntimeConstants(opCtx)),
+        letParameters);
 
     std::set<ShardId> shardIds;  // This is not used.
-    std::set<ChunkRange> chunkRanges;
-    bool targetMinkeyToMaxKey = false;
-    getShardIdsForQuery(expCtx,
-                        filter,
-                        collation,
-                        _getChunkManager(),
-                        &shardIds,
-                        &chunkRanges,
-                        &targetMinkeyToMaxKey);
-    _incrementNumByRanges(chunkRanges);
+    QueryTargetingInfo info;
+    getShardIdsForQuery(expCtx, filter, collation, _getChunkManager(), &shardIds, &info);
 
-    // Increment metrics about sharding targeting.
-    if (!shardKey.isEmpty()) {
-        // This query filters by shard key equality. If the query has a simple collation or the
-        // shard key doesn't contain a collatable field, then there is only one matching shard key
-        // value so the query is guaranteed to target only one shard. Otherwise, the number of
-        // shards that it targets depend on how the matching shard key values are distributed among
-        // shards. Given this, pessimistically classify it as targeting to multiple shards.
-        invariant(!targetMinkeyToMaxKey);
-        if (hasSimpleCollation(_getDefaultCollator(), collation) ||
-            !shardKeyHasCollatableType(_getShardKeyPattern(), shardKey)) {
+    return info;
+}
+
+template <typename DistributionMetricsType, typename SampleSizeType>
+void DistributionMetricsCalculator<DistributionMetricsType, SampleSizeType>::
+    _incrementMetricsForQuery(const QueryTargetingInfo& info) {
+    // Increment metrics about range targeting.
+    _incrementNumByRanges(info.chunkRanges);
+
+    // Increment metrics about shard targeting.
+    switch (info.desc) {
+        case QueryTargetingInfo::Description::kSingleKey: {
             _incrementNumSingleShard();
-            invariant(chunkRanges.size() == 1U);
-        } else {
-            _incrementNumMultiShard();
+            tassert(7531200,
+                    "Found a point query that targets multiple chunks",
+                    info.chunkRanges.size() == 1U);
+            break;
         }
-    } else if (targetMinkeyToMaxKey) {
-        // This query targets the entire shard key space. Therefore, it always targets all
-        // shards and chunks.
-        _incrementNumScatterGather();
-        invariant((int)chunkRanges.size() == _getChunkManager().numChunks());
-    } else {
-        // This query targets a subset of the shard key space. Therefore, the number of shards
-        // that it targets depends on how the matching shard key ranges are distributed among
-        // shards. Given this, pessimistically classify it as targeting to multiple shards.
-        _incrementNumMultiShard();
+        case QueryTargetingInfo::Description::kMultipleKeys: {
+            // This query targets a subset of the shard key space. Therefore, the number of shards
+            // that it targets depends on how the matching shard key ranges are distributed among
+            // shards. Given this, pessimistically classify it as targeting to multiple shards.
+            _incrementNumMultiShard();
+            break;
+        }
+        case QueryTargetingInfo::Description::kMinKeyToMaxKey: {
+            // This query targets the entire shard key space. Therefore, it always targets all
+            // shards and chunks.
+            _incrementNumScatterGather();
+            invariant((int)info.chunkRanges.size() == _getChunkManager().numChunks());
+            break;
+        }
+        default:
+            MONGO_UNREACHABLE;
     }
-
-    return shardKey;
 }
 
 ReadSampleSize ReadDistributionMetricsCalculator::_getSampleSize() const {
@@ -210,7 +169,8 @@ void ReadDistributionMetricsCalculator::addQuery(OperationContext* opCtx,
 
     auto cmd = SampledReadCommand::parse(IDLParserContext("ReadDistributionMetricsCalculator"),
                                          doc.getCmd());
-    _incrementMetricsForQuery(opCtx, cmd.getFilter(), cmd.getCollation());
+    auto info = _getTargetingInfoForQuery(opCtx, cmd.getFilter(), cmd.getCollation());
+    _incrementMetricsForQuery(info);
 }
 
 WriteSampleSize WriteDistributionMetricsCalculator::_getSampleSize() const {
@@ -269,16 +229,18 @@ void WriteDistributionMetricsCalculator::_addUpdateQuery(
     OperationContext* opCtx, const write_ops::UpdateCommandRequest& cmd) {
     for (const auto& updateOp : cmd.getUpdates()) {
         _numUpdate++;
-        auto primaryFilter = updateOp.getQ();
         auto collation = write_ops::collationOf(updateOp);
-        // If this is a non-upsert replacement update, the replacement document can be used as a
-        // filter.
-        auto secondaryFilter = [&] {
+        auto info = _getTargetingInfoForQuery(
+            opCtx, updateOp.getQ(), collation, cmd.getLet(), cmd.getLegacyRuntimeConstants());
+
+        if (info.desc != QueryTargetingInfo::Description::kSingleKey) {
+            // If this is a non-upsert replacement update, the replacement document can be used as
+            // the filter.
             auto isReplacementUpdate = !updateOp.getUpsert() &&
                 updateOp.getU().type() == write_ops::UpdateModification::Type::kReplacement;
             auto isExactIdQuery = [&] {
                 return CollectionRoutingInfoTargeter::isExactIdQuery(
-                    opCtx, cmd.getNamespace(), primaryFilter, collation, _getChunkManager());
+                    opCtx, cmd.getNamespace(), updateOp.getQ(), collation, _getChunkManager());
             };
 
             // Currently, targeting by replacement document is only done when an updateOne without
@@ -287,17 +249,13 @@ void WriteDistributionMetricsCalculator::_addUpdateQuery(
                 (!feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
                      serverGlobalParams.featureCompatibility) ||
                  isExactIdQuery())) {
-                return updateOp.getU().getUpdateReplacement();
+                auto filter = _getShardKeyPattern().extractShardKeyFromDoc(
+                    updateOp.getU().getUpdateReplacement());
+                info = _getTargetingInfoForQuery(
+                    opCtx, filter, collation, cmd.getLet(), cmd.getLegacyRuntimeConstants());
             }
-            return BSONObj();
-        }();
-        _incrementMetricsForQuery(opCtx,
-                                  primaryFilter,
-                                  secondaryFilter,
-                                  collation,
-                                  updateOp.getMulti(),
-                                  cmd.getLegacyRuntimeConstants(),
-                                  cmd.getLet());
+        }
+        _incrementMetricsForQuery(info, updateOp.getMulti());
     }
 }
 
@@ -305,44 +263,30 @@ void WriteDistributionMetricsCalculator::_addDeleteQuery(
     OperationContext* opCtx, const write_ops::DeleteCommandRequest& cmd) {
     for (const auto& deleteOp : cmd.getDeletes()) {
         _numDelete++;
-        auto primaryFilter = deleteOp.getQ();
-        auto secondaryFilter = BSONObj();
-        _incrementMetricsForQuery(opCtx,
-                                  primaryFilter,
-                                  secondaryFilter,
-                                  write_ops::collationOf(deleteOp),
-                                  deleteOp.getMulti(),
-                                  cmd.getLegacyRuntimeConstants(),
-                                  cmd.getLet());
+        auto info = _getTargetingInfoForQuery(opCtx,
+                                              deleteOp.getQ(),
+                                              write_ops::collationOf(deleteOp),
+                                              cmd.getLet(),
+                                              cmd.getLegacyRuntimeConstants());
+        _incrementMetricsForQuery(info, deleteOp.getMulti());
     }
 }
 
 void WriteDistributionMetricsCalculator::_addFindAndModifyQuery(
     OperationContext* opCtx, const write_ops::FindAndModifyCommandRequest& cmd) {
     _numFindAndModify++;
-    auto primaryFilter = cmd.getQuery();
-    auto secondaryFilter = BSONObj();
-    _incrementMetricsForQuery(opCtx,
-                              primaryFilter,
-                              secondaryFilter,
-                              cmd.getCollation().value_or(BSONObj()),
-                              false /* isMulti */,
-                              cmd.getLegacyRuntimeConstants(),
-                              cmd.getLet());
+    auto info = _getTargetingInfoForQuery(opCtx,
+                                          cmd.getQuery(),
+                                          cmd.getCollation().value_or(BSONObj()),
+                                          cmd.getLet(),
+                                          cmd.getLegacyRuntimeConstants());
+    _incrementMetricsForQuery(info, false /* isMulti */);
 }
 
-void WriteDistributionMetricsCalculator::_incrementMetricsForQuery(
-    OperationContext* opCtx,
-    const BSONObj& primaryFilter,
-    const BSONObj& secondaryFilter,
-    const BSONObj& collation,
-    bool isMulti,
-    const boost::optional<LegacyRuntimeConstants>& runtimeConstants,
-    const boost::optional<BSONObj>& letParameters) {
-    auto shardKey = DistributionMetricsCalculator::_incrementMetricsForQuery(
-        opCtx, primaryFilter, collation, secondaryFilter, runtimeConstants, letParameters);
-
-    if (shardKey.isEmpty()) {
+void WriteDistributionMetricsCalculator::_incrementMetricsForQuery(const QueryTargetingInfo& info,
+                                                                   bool isMulti) {
+    DistributionMetricsCalculator::_incrementMetricsForQuery(info);
+    if (info.desc != QueryTargetingInfo::Description::kSingleKey) {
         // Increment metrics about writes without shard key.
         if (isMulti) {
             _incrementNumMultiWritesWithoutShardKey();

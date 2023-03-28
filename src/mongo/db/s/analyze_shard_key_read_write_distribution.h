@@ -36,9 +36,14 @@
 #include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/s/analyze_shard_key_util.h"
 #include "mongo/s/collection_routing_info_targeter.h"
+#include "mongo/s/shard_key_pattern_query_util.h"
 
 namespace mongo {
 namespace analyze_shard_key {
+
+namespace {
+using QueryTargetingInfo = shard_key_pattern_query_util::QueryTargetingInfo;
+}
 
 /**
  * The utility class for calculating read or write distribution metrics for sampled queries against
@@ -98,20 +103,21 @@ protected:
     }
 
     /**
-     * The helper for 'addQuery'. Increments the metrics for the query with the given filter(s),
-     * collation, run-time contants and let parameters. The secondary filter is only applicable to
-     * non-upsert replacement updates, and the run-time constants and let parameters are only
-     * applicable to writes.
-     *
-     * If the query filters by shard key equality, returns the shard key value.
+     * The helper used by 'addQuery' to get the targeting info for a query with the given filter,
+     * collation, let parameters and runtime contants.
      */
-    BSONObj _incrementMetricsForQuery(
+    QueryTargetingInfo _getTargetingInfoForQuery(
         OperationContext* opCtx,
-        const BSONObj& primaryfilter,
+        const BSONObj& filter,
         const BSONObj& collation,
-        const BSONObj& secondaryFilter = BSONObj(),
-        const boost::optional<LegacyRuntimeConstants>& runtimeConstants = boost::none,
-        const boost::optional<BSONObj>& letParameters = boost::none);
+        const boost::optional<BSONObj>& letParameters = boost::none,
+        const boost::optional<LegacyRuntimeConstants>& runtimeConstants = boost::none);
+
+    /**
+     * The helper used by 'addQuery' to increment the metrics for a query with the given targeting
+     * info.
+     */
+    void _incrementMetricsForQuery(const QueryTargetingInfo& info);
 
     const ChunkManager& _getChunkManager() const {
         return _targeter.getRoutingInfo().cm;
@@ -199,13 +205,7 @@ private:
         _numMultiWritesWithoutShardKey++;
     }
 
-    void _incrementMetricsForQuery(OperationContext* opCtx,
-                                   const BSONObj& primaryFilter,
-                                   const BSONObj& secondaryFilter,
-                                   const BSONObj& collation,
-                                   bool isMulti,
-                                   const boost::optional<LegacyRuntimeConstants>& runtimeConstants,
-                                   const boost::optional<BSONObj>& letParameters);
+    void _incrementMetricsForQuery(const QueryTargetingInfo& info, bool isMulti);
 
     int64_t _numUpdate = 0;
     int64_t _numDelete = 0;
