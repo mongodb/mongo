@@ -324,6 +324,8 @@ last-continuous:
     ticket: SERVER-73482
   - test_file: jstests/replsets/session_cache_refresh_write_error_fail.js
     ticket: SERVER-73229
+  - test_file: jstests/noPassthrough/ttl_operation_metrics_multi_dbs.js
+    ticket: SERVER-75277
   suites: null
 last-lts:
   all:
@@ -719,4 +721,6 @@ last-lts:
     ticket: SERVER-73482
   - test_file: jstests/replsets/session_cache_refresh_write_error_fail.js
     ticket: SERVER-73229
+  - test_file: jstests/noPassthrough/ttl_operation_metrics_multi_dbs.js
+    ticket: SERVER-75277
   suites: null

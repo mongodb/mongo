@@ -211,6 +211,12 @@ void ResourceConsumption::OperationMetrics::toBson(BSONObjBuilder* builder) cons
     }
 }
 
+BSONObj ResourceConsumption::OperationMetrics::toBson() const {
+    BSONObjBuilder builder;
+    toBson(&builder);
+    return builder.obj();
+}
+
 void ResourceConsumption::OperationMetrics::toBsonNonZeroFields(BSONObjBuilder* builder) const {
     appendNonZeroMetric(builder, kDocBytesRead, readMetrics.docsRead.bytes());
     appendNonZeroMetric(builder, kDocUnitsRead, readMetrics.docsRead.units());
@@ -328,6 +334,11 @@ void ResourceConsumption::MetricsCollector::beginScopedCollecting(OperationConte
     _collecting = ScopedCollectionState::kInScopeCollecting;
     _hasCollectedMetrics = true;
 
+    // We must clear the metrics here to ensure we do not accumulate metrics from previous scoped
+    // collections. Note that we can't clear metrics in endScopedCollecting() because consumers
+    // expect metrics to be available after a scoped collection period has ended.
+    _metrics = {};
+
     // The OperationCPUTimer may be nullptr on unsupported systems.
     _metrics.cpuTimer = OperationCPUTimer::get(opCtx);
     if (_metrics.cpuTimer) {
@@ -407,6 +418,12 @@ void ResourceConsumption::merge(OperationContext* opCtx,
                                 const std::string& dbName,
                                 const OperationMetrics& metrics) {
     invariant(!dbName.empty());
+
+    LOGV2_DEBUG(7527700,
+                1,
+                "ResourceConsumption::merge",
+                "dbName"_attr = dbName,
+                "metrics"_attr = metrics.toBson());
 
     // All metrics over the duration of this operation will be attributed to the current state, even
     // if it ran accross state transitions.

@@ -219,6 +219,7 @@ public:
          * Reports all metrics on a BSONObjBuilder.
          */
         void toBson(BSONObjBuilder* builder) const;
+        BSONObj toBson() const;
 
         /**
          * Reports metrics on a BSONObjBuilder. Only non-zero fields are reported.
@@ -280,7 +281,8 @@ public:
         static MetricsCollector& get(OperationContext* opCtx);
 
         /**
-         * When called, resource consumption metrics should be recorded for this operation.
+         * When called, resource consumption metrics should be recorded for this operation. Clears
+         * any metrics from previous collection periods.
          */
         void beginScopedCollecting(OperationContext* opCtx, const std::string& dbName);
 
