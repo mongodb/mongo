@@ -83,6 +83,7 @@ parameters:
 variables:
 
 - &batchtime_one_day 1440
+- &batchtime_two_day 2880
 - &batchtime_one_week 10080
 - &batchtime_one_year 525600
 
@@ -7205,7 +7206,7 @@ buildvariants:
 - &linux-64-debug-required-template
   name: linux-64-debug-required
   display_name: "! Shared Library Linux DEBUG"
-  batchtime: *batchtime_one_week
+  batchtime: *batchtime_two_day
   run_on:
   - rhel80-medium
   expansions:
@@ -8115,7 +8116,7 @@ buildvariants:
 - &enterprise-windows-required-template
   name: enterprise-windows-required
   display_name: "! Enterprise Windows"
-  batchtime: *batchtime_one_week
+  batchtime: *batchtime_two_day
   modules:
   - enterprise
   run_on:
@@ -8882,7 +8883,7 @@ buildvariants:
 - &enterprise-rhel-80-64-bit-dynamic-backport-feature-flags-required-template
   name: enterprise-rhel-80-64-bit-dynamic-backport-feature-flags-required
   display_name: "! Shared Library Enterprise RHEL 8.0 (Backport Feature Flags)"
-  batchtime: *batchtime_one_week
+  batchtime: *batchtime_two_day
   modules:
     - enterprise
   run_on:
