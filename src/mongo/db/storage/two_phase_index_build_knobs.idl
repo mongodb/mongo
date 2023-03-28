@@ -73,7 +73,7 @@ server_parameters:
     set_at: [ startup, runtime ]
     cpp_vartype: AtomicWord<long long>
     cpp_varname: gIndexBuildMinAvailableDiskSpaceMB
-    default: 100
+    default: 500
     validator:
       gte: 0
       # This is equal to std::numeric_limits<int64_t>::max() / (1024 * 1024)

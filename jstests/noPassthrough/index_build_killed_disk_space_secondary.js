@@ -53,10 +53,10 @@ const createIdx = IndexBuildTest.startIndexBuild(
     primary, primaryColl.getFullName(), {a: 1}, null, [ErrorCodes.IndexBuildAborted]);
 IndexBuildTest.waitForIndexBuildToStart(secondaryDB);
 
-// Default indexBuildMinAvailableDiskSpaceMB is 100 MB.
-// Simulate a remaining disk space of 50MB on the secondary node.
+// Default indexBuildMinAvailableDiskSpaceMB is 500 MB.
+// Simulate a remaining disk space of 450MB on the secondary node.
 const simulateDiskSpaceFp =
-    configureFailPoint(secondaryDB, 'simulateAvailableDiskSpace', {bytes: 50 * 1024 * 1024});
+    configureFailPoint(secondaryDB, 'simulateAvailableDiskSpace', {bytes: 450 * 1024 * 1024});
 
 jsTestLog("Waiting for the disk space monitor to take action on secondary");
 assert.soon(() => {

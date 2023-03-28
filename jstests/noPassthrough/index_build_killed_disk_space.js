@@ -42,9 +42,10 @@ const createIdx = IndexBuildTest.startIndexBuild(
     primary, primaryColl.getFullName(), {a: 1}, null, [ErrorCodes.Interrupted]);
 IndexBuildTest.waitForIndexBuildToStart(primaryDB, primaryColl.getName(), 'a_1');
 
-// Default indexBuildMinAvailableDiskSpaceMB is 100 MB.
+// Default indexBuildMinAvailableDiskSpaceMB is 500 MB.
+// Simulate a remaining disk space of 450MB.
 const simulateDiskSpaceFp =
-    configureFailPoint(primaryDB, 'simulateAvailableDiskSpace', {bytes: 50 * 1024 * 1024});
+    configureFailPoint(primaryDB, 'simulateAvailableDiskSpace', {bytes: 450 * 1024 * 1024});
 
 jsTestLog("Waiting for the disk space monitor to take action");
 assert.soon(() => {
