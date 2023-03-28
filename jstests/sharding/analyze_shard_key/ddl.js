@@ -24,13 +24,20 @@ const numDocs = 10 * analyzeShardKeyNumRanges;
 // the deletes that will occur as part of renaming, dropping, recreating and emptying the
 // collection.
 const analyzeShardKeyTestCases = [
-    {operationType: "rename", expectedErrCodes: [ErrorCodes.NamespaceNotFound, 4952606]},
-    {operationType: "drop", expectedErrCodes: [ErrorCodes.NamespaceNotFound, 4952606]},
+    {
+        operationType: "rename",
+        expectedErrCodes: [ErrorCodes.NamespaceNotFound, ErrorCodes.QueryPlanKilled, 4952606]
+    },
+    {
+        operationType: "drop",
+        expectedErrCodes: [ErrorCodes.NamespaceNotFound, ErrorCodes.QueryPlanKilled, 4952606]
+    },
     {
         operationType: "recreate",
         expectedErrCodes: [
             ErrorCodes.NamespaceNotFound,
             ErrorCodes.CollectionUUIDMismatch,
+            ErrorCodes.QueryPlanKilled,
             ErrorCodes.IllegalOperation,
             4952606
         ]
