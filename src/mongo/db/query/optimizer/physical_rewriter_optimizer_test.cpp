@@ -4734,48 +4734,6 @@ TEST(PhysRewriter, DisjunctiveEqsConsolidatedIntoEqMember) {
         optimized);
 }
 
-
-TEST(PhysRewriter, KeepBoundsForNothingCheck) {
-    using namespace properties;
-
-    ABT root =
-        NodeBuilder{}
-            .root("root")
-            .filter(_evalf(
-                _get("a", _traverse1(_composea(_cmp("Gt", "0"_cint64), _cmp("Lt", "20"_cint64)))),
-                "root"_var))
-            .finish(_scan("root", "c1"));
-
-    auto prefixId = PrefixId::createForTests();
-    auto phaseManager = makePhaseManager(
-        {OptPhase::MemoSubstitutionPhase,
-         OptPhase::MemoExplorationPhase,
-         OptPhase::MemoImplementationPhase},
-        prefixId,
-        {{{"c1", createScanDef({}, {})}}},
-        boost::none /*costModel*/,
-        {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
-
-    ABT optimized = root;
-    phaseManager.optimize(optimized);
-    ASSERT_EQ(2, phaseManager.getMemo().getStats()._physPlanExplorationCount);
-
-    // sbe::nothing will not pass the (Minkey, Maxkey) check. Check that we don't get rid of it.
-    ASSERT_EXPLAIN_V2_AUTO(
-        "Root [{root}]\n"
-        "Filter []\n"
-        "|   EvalFilter []\n"
-        "|   |   Variable [evalTemp_0]\n"
-        "|   PathTraverse [1]\n"
-        "|   PathComposeM []\n"
-        "|   |   PathCompare [Lt]\n"
-        "|   |   Const [maxKey]\n"
-        "|   PathCompare [Gt]\n"
-        "|   Const [minKey]\n"
-        "PhysicalScan [{'<root>': root, 'a': evalTemp_0}, c1]\n",
-        optimized);
-}
-
 TEST(PhysRewriter, EqMemberSargable) {
     using namespace properties;
 

@@ -69,9 +69,9 @@ void constFoldInterval(IntervalRequirement& interval, const ConstFoldFn& constFo
 
 // Returns true if the interval can be proven to be empty. If no conclusion can be made, or the
 // interval is provably not empty, returns false.
-static bool isIntervalEmpty(const IntervalRequirement& interval, const ConstFoldFn& constFold) {
-    if (interval.getLowBound().getBound() == Constant::maxKey() ||
-        interval.getHighBound().getBound() == Constant::minKey()) {
+bool isIntervalEmpty(const IntervalRequirement& interval, const ConstFoldFn& constFold) {
+    if (interval.getLowBound() == BoundRequirement{false, Constant::maxKey()} ||
+        interval.getHighBound() == BoundRequirement{false, Constant::minKey()}) {
         return true;
     }
     const auto boundsCmp =

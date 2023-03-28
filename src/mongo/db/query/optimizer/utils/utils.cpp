@@ -743,13 +743,21 @@ bool simplifyPartialSchemaReqPaths(const boost::optional<ProjectionName>& scanPr
     PSRExpr::Builder resultReqs;
     resultReqs.pushDisj();
 
+    // TODO SERVER-73827 The builder should track trivially true/false correctly.
+    // If any one conjunction is empty, the overall disjunction is trivially true.
+    bool hasEmptyConjunction = false;
+
     PSRExpr::visitDisjuncts(reqMap.getRoot(), [&](const PSRExpr::Node& disjunct, size_t) {
         resultReqs.pushConj();
         boost::optional<std::pair<PartialSchemaKey, PartialSchemaRequirement>> prevEntry;
 
+        // Track whether this conjunction has any arguments.
+        bool hasAnyConjunct = false;
+
         const auto nextEntryFn = [&](PartialSchemaKey newKey, const PartialSchemaRequirement& req) {
             resultReqs.atom(std::move(prevEntry->first), std::move(prevEntry->second));
             prevEntry.reset({std::move(newKey), req});
+            hasAnyConjunct = true;
         };
 
         // Simplify paths by eliminating unnecessary Traverse elements.
@@ -817,12 +825,28 @@ bool simplifyPartialSchemaReqPaths(const boost::optional<ProjectionName>& scanPr
         });
         if (prevEntry) {
             resultReqs.atom(std::move(prevEntry->first), std::move(prevEntry->second));
+            hasAnyConjunct = true;
         }
 
         resultReqs.pop();
+        if (!hasAnyConjunct) {
+            hasEmptyConjunction = true;
+        }
     });
 
-    PartialSchemaRequirements newReqs{std::move(*resultReqs.finish())};
+    boost::optional<PSRExpr::Node> builderResult = resultReqs.finish();
+    if (!builderResult) {
+        // TODO SERVER-73827 The builder should track trivially true/false correctly.
+        if (hasEmptyConjunction) {
+            // We have an empty conjunction -> trivially true.
+            reqMap = PartialSchemaRequirements{};
+            return false;
+        } else {
+            // We have an empty disjunction -> trivially false.
+            return true;
+        }
+    }
+    PartialSchemaRequirements newReqs{std::move(*builderResult)};
 
     if (constFold) {
         // Intersect and normalize intervals.

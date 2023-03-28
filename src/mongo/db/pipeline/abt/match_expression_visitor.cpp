@@ -581,15 +581,20 @@ private:
         }
 
         if (shouldGeneratePath(expr)) {
-            if (tag == sbe::value::TypeTags::Array || tag == sbe::value::TypeTags::MinKey ||
-                tag == sbe::value::TypeTags::MaxKey) {
+            if (tag == sbe::value::TypeTags::Array ||
+                (op != Operations::Eq &&
+                 (tag == sbe::value::TypeTags::MinKey || tag == sbe::value::TypeTags::MaxKey))) {
                 // The behavior of PathTraverse when it encounters an array is to apply its subpath
-                // to every element of the array and not the array itself. When an expression is
-                // comparing a field to an array, minKey or maxKey constant, we need to ensure that
-                // these comparisons happen to every element of the array and the array itself.
+                // to every element of the array and not the array itself. When we do a comparison
+                // to an array, or an inequality comparison to minKey/maxKey, we need to ensure
+                // that these comparisons happen to every element of the array and the array itself.
+                //
                 // For example:
-                // find({a: [1]}) matches {a: [1]} and {a: [[1]]}
-                // find({a: {$gt: MinKey()}}) matches {a: []}
+                // find({a: [1]})
+                //   matches {a: [1]} and {a: [[1]]}
+                // find({a: {$gt: MinKey()}})
+                //   matches {a: []} and {a: [MinKey()]}
+                //   but not {a: MinKey()}
                 result = make<PathComposeA>(make<PathTraverse>(PathTraverse::kSingleLevel, result),
                                             result);
             } else {

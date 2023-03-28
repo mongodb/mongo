@@ -1009,5 +1009,81 @@ TEST(BoolExprBuilder, Builder1) {
     }
 }
 
+TEST(IntervalSimplification, SimplifyMinKey) {
+    auto interval = IntervalRequirement{
+        {true, Constant::minKey()},
+        {true, Constant::minKey()},
+    };
+    ASSERT_TRUE(interval.isEquality());
+
+    IntervalReqExpr::Node original = IntervalReqExpr::makeSingularDNF(interval);
+    ASSERT_STR_EQ_AUTO(  // NOLINT (test auto-update)
+        "{{{=Const [minKey]}}}\n",
+        ExplainGenerator::explainIntervalExpr(original));
+
+    auto result = simplifyDNFIntervals(original, ConstEval::constFold);
+    ASSERT_TRUE(result);
+    ASSERT_STR_EQ_AUTO(  // NOLINT (test auto-update)
+        "{{{=Const [minKey]}}}\n",
+        ExplainGenerator::explainIntervalExpr(*result));
+
+    ASSERT_EQ(*result, original);
+}
+
+TEST(IntervalSimplification, IsIntervalEmpty) {
+    auto isEmpty = [&](IntervalRequirement interval) {
+        return isIntervalEmpty(interval, ConstEval::constFold);
+    };
+    // Equality intervals are never empty.
+    ASSERT_FALSE(isEmpty({{true, Constant::minKey()}, {true, Constant::minKey()}}));
+    ASSERT_FALSE(isEmpty({{true, Constant::maxKey()}, {true, Constant::maxKey()}}));
+    ASSERT_FALSE(isEmpty({{true, Constant::int32(5)}, {true, Constant::int32(5)}}));
+    ASSERT_FALSE(isEmpty({{true, make<Variable>("x")}, {true, make<Variable>("x")}}));
+
+    // With equal endpoints, where one or both is exclusive, the interval is empty.
+    ASSERT_TRUE(isEmpty({{false, Constant::minKey()}, {true, Constant::minKey()}}));
+    ASSERT_TRUE(isEmpty({{false, Constant::maxKey()}, {true, Constant::maxKey()}}));
+    ASSERT_TRUE(isEmpty({{false, Constant::int32(5)}, {true, Constant::int32(5)}}));
+
+    ASSERT_TRUE(isEmpty({{true, Constant::minKey()}, {false, Constant::minKey()}}));
+    ASSERT_TRUE(isEmpty({{true, Constant::maxKey()}, {false, Constant::maxKey()}}));
+    ASSERT_TRUE(isEmpty({{true, Constant::int32(5)}, {false, Constant::int32(5)}}));
+
+    ASSERT_TRUE(isEmpty({{false, Constant::minKey()}, {false, Constant::minKey()}}));
+    ASSERT_TRUE(isEmpty({{false, Constant::maxKey()}, {false, Constant::maxKey()}}));
+    ASSERT_TRUE(isEmpty({{false, Constant::int32(5)}, {false, Constant::int32(5)}}));
+
+    // However, we only detect equal constants, not equal expressions in general,
+    // so we fail to detect that these intervals are empty.
+    ASSERT_FALSE(isEmpty({{false, make<Variable>("x")}, {true, make<Variable>("x")}}));
+    ASSERT_FALSE(isEmpty({{true, make<Variable>("x")}, {false, make<Variable>("x")}}));
+    ASSERT_FALSE(isEmpty({{false, make<Variable>("x")}, {false, make<Variable>("x")}}));
+
+    // When the bounds are inside-out, the interval is empty, regardless of inclusivity.
+    ASSERT_TRUE(isEmpty({{false, Constant::int32(5)}, {false, Constant::int32(3)}}));
+    ASSERT_TRUE(isEmpty({{false, Constant::int32(5)}, {true, Constant::int32(3)}}));
+    ASSERT_TRUE(isEmpty({{true, Constant::int32(5)}, {false, Constant::int32(3)}}));
+    ASSERT_TRUE(isEmpty({{true, Constant::int32(5)}, {true, Constant::int32(3)}}));
+
+
+    // With an unknown endpoints, we usually can't prove the interval is empty.
+    ASSERT_FALSE(isEmpty({{false, make<Variable>("x")}, {false, make<Variable>("y")}}));
+    ASSERT_FALSE(isEmpty({{false, make<Variable>("x")}, {false, Constant::int32(5)}}));
+
+    // An exception is Lt MinKey or Gt MaxKey. These are empty regardless of the other bound.
+    ASSERT_TRUE(isEmpty({{false, make<Variable>("x")}, {false, Constant::minKey()}}));
+    ASSERT_TRUE(isEmpty({{false, Constant::maxKey()}, {false, make<Variable>("x")}}));
+    // But this is only valid when it's an exclusive bound. MinKey and MaxKey are normal values that
+    // can appear in a collection or query.
+    ASSERT_FALSE(isEmpty({{false, make<Variable>("x")}, {true, Constant::minKey()}}));
+    ASSERT_FALSE(isEmpty({{true, Constant::maxKey()}, {false, make<Variable>("x")}}));
+
+    // Intervals that go from minKey to maxKey are never empty, regardless of inclusivity.
+    ASSERT_FALSE(isEmpty({{false, Constant::minKey()}, {false, Constant::maxKey()}}));
+    ASSERT_FALSE(isEmpty({{false, Constant::minKey()}, {true, Constant::maxKey()}}));
+    ASSERT_FALSE(isEmpty({{true, Constant::minKey()}, {false, Constant::maxKey()}}));
+    ASSERT_FALSE(isEmpty({{true, Constant::minKey()}, {true, Constant::maxKey()}}));
+}
+
 }  // namespace
 }  // namespace mongo::optimizer

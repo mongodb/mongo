@@ -135,4 +135,9 @@ boost::optional<ABT> coerceIntervalToPathCompareEqMember(const IntervalReqExpr::
  */
 bool isSimpleRange(const CompoundIntervalReqExpr::Node& interval);
 
+/**
+ * Returns true if after constant folding we can tell the interval never returns true.
+ */
+bool isIntervalEmpty(const IntervalRequirement& interval, const ConstFoldFn& constFold);
+
 }  // namespace mongo::optimizer

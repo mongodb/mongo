@@ -907,11 +907,7 @@ public:
         maybePrintProps(printer, node);
         printer.separator(" [");
         printBooleanFlag(printer, "hasRID", node.getHasRID());
-        printer.fieldName("hasRID")
-            .print(node.getHasRID())
-            .fieldName("arraySize")
-            .print(node.getArraySize())
-            .separator("]");
+        printer.fieldName("arraySize").print(node.getArraySize()).separator("]");
         nodeCEPropsPrint(printer, n, node);
         printer.fieldName("values", ExplainVersion::V3)
             .print(valuePrinter)

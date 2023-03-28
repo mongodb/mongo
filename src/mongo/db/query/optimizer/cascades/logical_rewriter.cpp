@@ -664,16 +664,6 @@ static void convertFilterToSargableNode(ABT::reference_type node,
         return true;
     });
 
-    if (conversion->_reqMap.isNoop()) {
-        // If the filter has no constraints after removing no-ops, then replace with its child. We
-        // need to copy the child since we hold it by reference from the memo, and during
-        // subtitution the current group will be erased.
-
-        ABT newNode = filterNode.getChild();
-        ctx.addNode(newNode, true /*substitute*/);
-        return;
-    }
-
     ProjectionRenames projectionRenames_unused;
     const bool hasEmptyInterval = simplifyPartialSchemaReqPaths(scanProjName,
                                                                 scanDef.getMultikeynessTrie(),
@@ -690,6 +680,15 @@ static void convertFilterToSargableNode(ABT::reference_type node,
     }
     if (conversion->_reqMap.numLeaves() > SargableNode::kMaxPartialSchemaReqs) {
         // Too many requirements.
+        return;
+    }
+    if (conversion->_reqMap.isNoop()) {
+        // If the filter has no constraints after removing no-ops, then replace with its child. We
+        // need to copy the child since we hold it by reference from the memo, and during
+        // subtitution the current group will be erased.
+
+        ABT newNode = filterNode.getChild();
+        ctx.addNode(newNode, true /*substitute*/);
         return;
     }
 
