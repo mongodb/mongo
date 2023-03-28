@@ -550,7 +550,7 @@ std::vector<OpTime> logInsertOps(
     std::function<boost::optional<ShardId>(const BSONObj& doc)> getDestinedRecipientFn,
     const CollectionPtr& collectionPtr) {
     invariant(begin != end);
-    oplogEntryTemplate->setOpType(repl::OpTypeEnum::kInsert);
+
     // If this oplog entry is from a tenant migration, include the tenant migration
     // UUID.
     const auto& recipientInfo = tenantMigrationInfo(opCtx);

@@ -658,10 +658,14 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
                 return shardingWriteRouter.getReshardingDestinedRecipient(doc);
             };
 
+        // Ensure well-formed embedded ReplOperation for logging.
+        // This means setting optype, nss, and object at the minimum.
         MutableOplogEntry oplogEntryTemplate;
+        oplogEntryTemplate.setOpType(repl::OpTypeEnum::kInsert);
         oplogEntryTemplate.setTid(nss.tenantId());
         oplogEntryTemplate.setNss(nss);
         oplogEntryTemplate.setUuid(uuid);
+        oplogEntryTemplate.setObject({});
         oplogEntryTemplate.setFromMigrateIfTrue(fromMigrate);
         Date_t lastWriteDate = getWallClockTimeForOpLog(opCtx);
         oplogEntryTemplate.setWallClockTime(lastWriteDate);
