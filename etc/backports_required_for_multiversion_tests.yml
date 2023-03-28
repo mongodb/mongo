@@ -108,6 +108,8 @@ last-continuous:
     ticket: SERVER-63049
   - test_file: jstests/replsets/quiesce_mode_fails_elections.js
     ticket: SERVER-72774
+  - test_file: jstests/core/map_reduce_subplanning.js
+    ticket: SERVER-74131
   suites:
     change_streams_multiversion_passthrough: null
     change_streams_sharded_collections_multiversion_passthrough: null
@@ -309,6 +311,8 @@ last-lts:
     ticket: SERVER-69952
   - test_file: jstests/replsets/quiesce_mode_fails_elections.js
     ticket: SERVER-72774
+  - test_file: jstests/core/map_reduce_subplanning.js
+    ticket: SERVER-74131
   suites:
     change_streams_multiversion_passthrough: null
     change_streams_sharded_collections_multiversion_passthrough: null
