@@ -120,6 +120,7 @@ using std::string;
 using std::stringstream;
 using std::unique_ptr;
 using std::vector;
+using namespace std::string_literals;
 
 using IndexVersion = IndexDescriptor::IndexVersion;
 
@@ -1348,6 +1349,8 @@ void writeChangeStreamPreImage(OperationContext* opCtx,
 
 constexpr StringData OplogApplication::kInitialSyncOplogApplicationMode;
 constexpr StringData OplogApplication::kRecoveringOplogApplicationMode;
+constexpr StringData OplogApplication::kStableRecoveringOplogApplicationMode;
+constexpr StringData OplogApplication::kUnstableRecoveringOplogApplicationMode;
 constexpr StringData OplogApplication::kSecondaryOplogApplicationMode;
 constexpr StringData OplogApplication::kApplyOpsCmdOplogApplicationMode;
 
@@ -1355,8 +1358,10 @@ StringData OplogApplication::modeToString(OplogApplication::Mode mode) {
     switch (mode) {
         case OplogApplication::Mode::kInitialSync:
             return OplogApplication::kInitialSyncOplogApplicationMode;
-        case OplogApplication::Mode::kRecovering:
-            return OplogApplication::kRecoveringOplogApplicationMode;
+        case OplogApplication::Mode::kUnstableRecovering:
+            return OplogApplication::kUnstableRecoveringOplogApplicationMode;
+        case OplogApplication::Mode::kStableRecovering:
+            return OplogApplication::kStableRecoveringOplogApplicationMode;
         case OplogApplication::Mode::kSecondary:
             return OplogApplication::kSecondaryOplogApplicationMode;
         case OplogApplication::Mode::kApplyOpsCmd:
@@ -1369,7 +1374,9 @@ StatusWith<OplogApplication::Mode> OplogApplication::parseMode(const std::string
     if (mode == OplogApplication::kInitialSyncOplogApplicationMode) {
         return OplogApplication::Mode::kInitialSync;
     } else if (mode == OplogApplication::kRecoveringOplogApplicationMode) {
-        return OplogApplication::Mode::kRecovering;
+        // This only being used in applyOps command which is controlled by the client, so it should
+        // be unstable.
+        return OplogApplication::Mode::kUnstableRecovering;
     } else if (mode == OplogApplication::kSecondaryOplogApplicationMode) {
         return OplogApplication::Mode::kSecondary;
     } else if (mode == OplogApplication::kApplyOpsCmdOplogApplicationMode) {
@@ -1379,6 +1386,33 @@ StatusWith<OplogApplication::Mode> OplogApplication::parseMode(const std::string
                       str::stream() << "Invalid oplog application mode provided: " << mode);
     }
     MONGO_UNREACHABLE;
+}
+
+void OplogApplication::checkOnOplogFailureForRecovery(OperationContext* opCtx,
+                                                      const mongo::BSONObj& oplogEntry,
+                                                      const std::string& errorMsg) {
+    const bool isReplicaSet =
+        repl::ReplicationCoordinator::get(opCtx->getServiceContext())->getReplicationMode() ==
+        repl::ReplicationCoordinator::modeReplSet;
+    // Relax the constraints of oplog application if the node is not a replica set member.
+    if (!isReplicaSet) {
+        return;
+    }
+
+    // Only fassert in test environment.
+    if (getTestCommandsEnabled()) {
+        LOGV2_FATAL(5415000,
+                    "Error applying operation while recovering from stable "
+                    "checkpoint. This can lead to data corruption.",
+                    "oplogEntry"_attr = oplogEntry,
+                    "error"_attr = errorMsg);
+    } else {
+        LOGV2_WARNING(5415001,
+                      "Error applying operation while recovering from stable "
+                      "checkpoint. This can lead to data corruption.",
+                      "oplogEntry"_attr = oplogEntry,
+                      "error"_attr = errorMsg);
+    }
 }
 
 // @return failure status if an update should have happened and the document DNE.
@@ -1416,20 +1450,30 @@ Status applyOperation_inlock(OperationContext* opCtx,
         return Status::OK();
     }
 
+    const bool inStableRecovery = mode == OplogApplication::Mode::kStableRecovering;
     NamespaceString requestNss;
     CollectionPtr collection;
     if (auto uuid = op.getUuid()) {
         auto catalog = CollectionCatalog::get(opCtx);
         collection = CollectionPtr(catalog->lookupCollectionByUUID(opCtx, uuid.value()));
+        if (!collection && inStableRecovery) {
+            repl::OplogApplication::checkOnOplogFailureForRecovery(
+                opCtx,
+                redact(opOrGroupedInserts.toBSON()),
+                str::stream()
+                    << "(NamespaceNotFound): Failed to apply operation due to missing collection ("
+                    << uuid.value() << ")");
+        }
+
         // Invalidate the image collection if collectionUUID does not resolve and this op returns
         // a preimage or postimage. We only expect this to happen when in kInitialSync mode but
-        // this can sometimes occur in kRecovering mode during rollback-via-refetch. In either case
+        // this can sometimes occur in recovering mode during rollback-via-refetch. In either case
         // we want to do image invalidation.
         if (!collection && op.getNeedsRetryImage()) {
             tassert(735200,
                     "mode should be in initialSync or recovering",
                     mode == OplogApplication::Mode::kInitialSync ||
-                        mode == OplogApplication::Mode::kRecovering);
+                        OplogApplication::inRecovering(mode));
             writeConflictRetry(opCtx, "applyOps_imageInvalidation", op.getNss().toString(), [&] {
                 WriteUnitOfWork wuow(opCtx);
                 bool upsertConfigImage = true;
@@ -1509,7 +1553,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 case ReplicationCoordinator::modeNone: {
                     // Only assign timestamps on standalones during replication recovery when
                     // started with the 'recoverFromOplogAsStandalone' flag.
-                    return mode == OplogApplication::Mode::kRecovering;
+                    return OplogApplication::inRecovering(mode);
                 }
             }
         }
@@ -1528,8 +1572,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
         // correct pre-image for them.
         return collection && collection->isChangeStreamPreAndPostImagesEnabled() &&
             isDataConsistent &&
-            (mode == OplogApplication::Mode::kRecovering ||
-             mode == OplogApplication::Mode::kSecondary) &&
+            (OplogApplication::inRecovering(mode) || mode == OplogApplication::Mode::kSecondary) &&
             !op.getFromMigrate().get_value_or(false) &&
             !requestNss.isTemporaryReshardingCollection();
     };
@@ -1674,6 +1717,9 @@ Status applyOperation_inlock(OperationContext* opCtx,
                             if (oplogApplicationEnforcesSteadyStateConstraints) {
                                 return status;
                             }
+                        } else if (inStableRecovery) {
+                            repl::OplogApplication::checkOnOplogFailureForRecovery(
+                                opCtx, redact(op.toBSONForLogging()), redact(status));
                         }
                         // Continue to the next block to retry the operation as an upsert.
                         needToDoUpsert = true;
@@ -1931,6 +1977,10 @@ Status applyOperation_inlock(OperationContext* opCtx,
             });
 
             if (!status.isOK()) {
+                if (inStableRecovery) {
+                    repl::OplogApplication::checkOnOplogFailureForRecovery(
+                        opCtx, redact(op.toBSONForLogging()), redact(status));
+                }
                 return status;
             }
 
@@ -2012,6 +2062,16 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     writeChangeStreamPreImage(opCtx, collection, op, *(result.requestedPreImage));
                 }
 
+                if (result.nDeleted == 0 && inStableRecovery) {
+                    repl::OplogApplication::checkOnOplogFailureForRecovery(
+                        opCtx,
+                        redact(op.toBSONForLogging()),
+                        !collection ? str::stream()
+                                << "(NamespaceNotFound): Failed to apply operation due "
+                                   "to missing collection ("
+                                << requestNss << ")"
+                                    : "Applied a delete which did not delete anything."s);
+                }
                 // It is legal for a delete operation on the pre-images collection to delete zero
                 // documents - pre-image collections are not guaranteed to contain the same set of
                 // documents at all times.
@@ -2213,7 +2273,7 @@ Status applyCommand_inlock(OperationContext* opCtx,
             case ReplicationCoordinator::modeNone: {
                 // Only assign timestamps on standalones during replication recovery when
                 // started with 'recoverFromOplogAsStandalone'.
-                return mode == OplogApplication::Mode::kRecovering;
+                return OplogApplication::inRecovering(mode);
             }
         }
         MONGO_UNREACHABLE;
