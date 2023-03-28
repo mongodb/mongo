@@ -767,4 +767,65 @@ TEST_F(ResourceConsumptionMetricsTest, PauseMetricsCollectorBlock) {
     ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.cursorSeeks, 1);
 }
 
+TEST_F(ResourceConsumptionMetricsTest, ResetMetricsBetweenCollection) {
+    auto& globalResourceConsumption = ResourceConsumption::get(getServiceContext());
+    auto& operationMetrics = ResourceConsumption::MetricsCollector::get(_opCtx.get());
+
+    {
+        ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get(), "db1");
+
+        operationMetrics.incrementOneDocRead("", 2);
+        operationMetrics.incrementOneIdxEntryRead("", 4);
+        operationMetrics.incrementKeysSorted(8);
+        operationMetrics.incrementSorterSpills(16);
+        operationMetrics.incrementDocUnitsReturned("", makeDocUnits(32));
+        operationMetrics.incrementOneCursorSeek("");
+    }
+
+    auto metricsCopy = globalResourceConsumption.getAndClearDbMetrics();
+    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.docsRead.bytes(), 2);
+    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.docsRead.units(), 1);
+    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.idxEntriesRead.bytes(), 4);
+    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.idxEntriesRead.units(), 1);
+    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.keysSorted, 8);
+    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.sorterSpills, 16);
+    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.docsReturned.bytes(), 32);
+    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.docsReturned.units(), 1);
+    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.cursorSeeks, 1);
+
+    // We expect this metrics collection to wipe out the metrics from the previous one.
+    {
+        ResourceConsumption::ScopedMetricsCollector scope(_opCtx.get(), "db2");
+        operationMetrics.incrementOneDocRead("", 64);
+        operationMetrics.incrementOneIdxEntryRead("", 128);
+        operationMetrics.incrementKeysSorted(256);
+        operationMetrics.incrementSorterSpills(512);
+        operationMetrics.incrementDocUnitsReturned("", makeDocUnits(1024));
+        operationMetrics.incrementOneCursorSeek("");
+    }
+
+    metricsCopy = globalResourceConsumption.getDbMetrics();
+
+    // We should not have any of the metrics from the first collection.
+    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.docsRead.bytes(), 0);
+    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.docsRead.units(), 0);
+    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.idxEntriesRead.bytes(), 0);
+    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.idxEntriesRead.units(), 0);
+    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.keysSorted, 0);
+    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.sorterSpills, 0);
+    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.docsReturned.bytes(), 0);
+    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.docsReturned.units(), 0);
+    ASSERT_EQ(metricsCopy["db1"].primaryReadMetrics.cursorSeeks, 0);
+
+    ASSERT_EQ(metricsCopy["db2"].primaryReadMetrics.docsRead.bytes(), 64);
+    ASSERT_EQ(metricsCopy["db2"].primaryReadMetrics.docsRead.units(), 1);
+    ASSERT_EQ(metricsCopy["db2"].primaryReadMetrics.idxEntriesRead.bytes(), 128);
+    ASSERT_EQ(metricsCopy["db2"].primaryReadMetrics.idxEntriesRead.units(), 8);
+    ASSERT_EQ(metricsCopy["db2"].primaryReadMetrics.keysSorted, 256);
+    ASSERT_EQ(metricsCopy["db2"].primaryReadMetrics.sorterSpills, 512);
+    ASSERT_EQ(metricsCopy["db2"].primaryReadMetrics.docsReturned.bytes(), 1024);
+    ASSERT_EQ(metricsCopy["db2"].primaryReadMetrics.docsReturned.units(), 8);
+    ASSERT_EQ(metricsCopy["db2"].primaryReadMetrics.cursorSeeks, 1);
+}
+
 }  // namespace mongo
