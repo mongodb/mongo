@@ -110,6 +110,8 @@ last-continuous:
     ticket: SERVER-72774
   - test_file: jstests/core/map_reduce_subplanning.js
     ticket: SERVER-74131
+  - test_file: jstests/sharding/resharding_interrupt_before_create_state_machine.js
+    ticket: SERVER-74647
   suites:
     change_streams_multiversion_passthrough: null
     change_streams_sharded_collections_multiversion_passthrough: null
@@ -313,6 +315,8 @@ last-lts:
     ticket: SERVER-72774
   - test_file: jstests/core/map_reduce_subplanning.js
     ticket: SERVER-74131
+  - test_file: jstests/sharding/resharding_interrupt_before_create_state_machine.js
+    ticket: SERVER-74647
   suites:
     change_streams_multiversion_passthrough: null
     change_streams_sharded_collections_multiversion_passthrough: null

@@ -51,9 +51,34 @@ using DonorStateMachine = ReshardingDonorService::DonorStateMachine;
 using RecipientStateMachine = ReshardingRecipientService::RecipientStateMachine;
 
 namespace {
+MONGO_FAIL_POINT_DEFINE(reshardingInterruptAfterInsertStateMachineDocument);
+
 using namespace fmt::literals;
 
 const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
+
+template <class StateMachine, class ReshardingDocument>
+void ensureStateDocumentInserted(OperationContext* opCtx, const ReshardingDocument& doc) {
+    try {
+        StateMachine::insertStateDocument(opCtx, doc);
+    } catch (const ExceptionFor<ErrorCodes::DuplicateKey>& ex) {
+        // It's possible that the state document was already previously inserted in the following
+        // cases:
+        // 1. The document was inserted previously, but the opCtx was interrupted before the
+        // state machine was started in-memory with getOrCreate(), e.g. due to a chunk migration
+        // (see SERVER-74647)
+        // 2. Similar to the ErrorCategory::NotPrimaryError clause below, it is
+        // theoretically possible for a series of stepdowns and step-ups to lead a scenario where a
+        // stale but now re-elected primary attempts to insert the state document when another node
+        // which was primary had already done so. Again, rather than attempt to prevent replica set
+        // member state transitions during the shard version refresh, we instead swallow the
+        // DuplicateKey exception. This is safe because PrimaryOnlyService::onStepUp() will have
+        // constructed a new instance of the resharding state machine.
+        auto dupeKeyInfo = ex.extraInfo<DuplicateKeyErrorInfo>();
+        invariant(dupeKeyInfo->getDuplicatedKeyValue().binaryEqual(
+            BSON("_id" << doc.getReshardingUUID())));
+    }
+}
 
 /*
  * Creates a ReshardingStateMachine if this node is primary and the ReshardingStateMachine doesn't
@@ -67,7 +92,10 @@ void createReshardingStateMachine(OperationContext* opCtx, const ReshardingDocum
         // Inserting the resharding state document must happen synchronously with the shard version
         // refresh for the w:majority wait from the resharding coordinator to mean that this replica
         // set shard cannot forget about being a participant.
-        StateMachine::insertStateDocument(opCtx, doc);
+        ensureStateDocumentInserted<StateMachine>(opCtx, doc);
+
+        reshardingInterruptAfterInsertStateMachineDocument.execute(
+            [&opCtx](const BSONObj& data) { opCtx->markKilled(); });
 
         auto registry = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext());
         auto service = registry->lookupServiceByName(Service::kServiceName);
@@ -82,17 +110,6 @@ void createReshardingStateMachine(OperationContext* opCtx, const ReshardingDocum
         // secondary (or primary which stepped down) must do for an active resharding operation upon
         // refreshing its shard version. The primary is solely responsible for advancing the
         // participant state as a result of the shard version refresh.
-    } catch (const ExceptionFor<ErrorCodes::DuplicateKey>& ex) {
-        // Similar to the ErrorCategory::NotPrimaryError clause above, it is theoretically possible
-        // for a series of stepdowns and step-ups to lead a scenario where a stale but now
-        // re-elected primary attempts to insert the state document when another node which was
-        // primary had already done so. Again, rather than attempt to prevent replica set member
-        // state transitions during the shard version refresh, we instead swallow the DuplicateKey
-        // exception. This is safe because PrimaryOnlyService::onStepUp() will have constructed a
-        // new instance of the resharding state machine.
-        auto dupeKeyInfo = ex.extraInfo<DuplicateKeyErrorInfo>();
-        invariant(dupeKeyInfo->getDuplicatedKeyValue().binaryEqual(
-            BSON("_id" << doc.getReshardingUUID())));
     }
 }
 
