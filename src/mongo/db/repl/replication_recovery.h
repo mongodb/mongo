@@ -52,9 +52,12 @@ public:
     /**
      * Recovers the data on disk from the oplog. If the provided stable timestamp is not "none",
      * this function assumes the data reflects that timestamp.
+     * Returns the provided stable timestamp. If the provided stable timestamp is "none", this
+     * function might try to ask storage for the last stable timestamp if it exists before doing
+     * recovery which will be returned after performing successful recovery.
      */
-    virtual void recoverFromOplog(OperationContext* opCtx,
-                                  boost::optional<Timestamp> stableTimestamp) = 0;
+    virtual boost::optional<Timestamp> recoverFromOplog(
+        OperationContext* opCtx, boost::optional<Timestamp> stableTimestamp) = 0;
 
     /**
      *  Recovers the data on disk from the oplog and puts the node in readOnly mode. If
@@ -77,8 +80,8 @@ public:
     ReplicationRecoveryImpl(StorageInterface* storageInterface,
                             ReplicationConsistencyMarkers* consistencyMarkers);
 
-    void recoverFromOplog(OperationContext* opCtx,
-                          boost::optional<Timestamp> stableTimestamp) override;
+    boost::optional<Timestamp> recoverFromOplog(
+        OperationContext* opCtx, boost::optional<Timestamp> stableTimestamp) override;
 
     void recoverFromOplogAsStandalone(OperationContext* opCtx) override;
 
