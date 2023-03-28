@@ -40,7 +40,7 @@ APIVersionMetrics& APIVersionMetrics::get(ServiceContext* svc) {
     return handle(svc);
 }
 
-void APIVersionMetrics::update(std::string appName, const APIParameters& apiParams) {
+void APIVersionMetrics::update(const std::string& appName, const APIParameters& apiParams) {
     Date_t now = getGlobalServiceContext()->getFastClockSource()->now();
     stdx::lock_guard<Latch> lk(_mutex);
     if (apiParams.getAPIVersion()) {

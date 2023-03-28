@@ -1520,7 +1520,7 @@ void ExecCommandDatabase::_initiateCommand() {
     BSONElement maxTimeMSOpOnlyField;
     BSONElement helpField;
 
-    StringMap<int> topLevelFields;
+    StringDataSet topLevelFields(8);
     for (auto&& element : request.body) {
         StringData fieldName = element.fieldNameStringData();
         if (fieldName == query_request_helper::cmdOptionMaxTimeMS) {
@@ -1543,7 +1543,7 @@ void ExecCommandDatabase::_initiateCommand() {
         uassert(ErrorCodes::FailedToParse,
                 str::stream() << "Parsed command object contains duplicate top level key: "
                               << fieldName,
-                topLevelFields[fieldName]++ == 0);
+                topLevelFields.insert(fieldName).second);
     }
 
     if (CommandHelpers::isHelpRequest(helpField)) {
