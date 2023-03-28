@@ -186,6 +186,15 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                             "databases",
                             fromNss.db() == toNss.db() ||
                                 (!_doc.getExpectedSourceUUID() && !_doc.getExpectedTargetUUID()));
+
+                    uassert(ErrorCodes::IllegalOperation,
+                            "Can't rename a collection in the config database",
+                            !fromNss.isConfigDB());
+
+                    uassert(ErrorCodes::IllegalOperation,
+                            "Can't rename a collection in the admin database",
+                            !fromNss.isAdminDB());
+
                     {
                         AutoGetCollection coll{
                             opCtx,
