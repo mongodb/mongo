@@ -162,26 +162,58 @@ const mongosDbChangeStream = db.watch([], {showSystemEvents: true});
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 (function testBroadcastedDeleteOnOrphanedBuckets() {
-    jsTest.log('A broadcasted delete of a single document generates a delete event');
+    jsTest.log(
+        'A broadcasted delete of a single measurement generates a replace event of a bucket');
 
     // Sends a broadcasted delete (query on non-shardkey field) on a single measurement to all the
     // shards.
-    assert.commandFailedWithCode(mongosColl.remove({_id: 4}), ErrorCodes.InvalidOptions);
+    assert.commandWorked(mongosColl.remove({_id: 4}));
 
-    // TODO SERVER-74899: The broadcasted delete is not supported yet on a sharded cluster. As soon
-    // as we support it we should add this test case. See
-    // CollectionRoutingInfoTargeter::targetDelete() for details.
+    // The document is hosted by the second shard and the replace event is notified because a single
+    // measurement is deleted from the containing bucket. The first shard still hosts the orphaned
+    // document but no additional event must be notified.
+    assert.soon(() => mongosDbChangeStream.hasNext(), 'A replace event of a bucket is expected');
+    const change = mongosDbChangeStream.next();
+    assert.eq(change.operationType, 'replace', change);
+    assertNoChanges(mongosDbChangeStream);
+
+    // The orphaned bucket on the first shard have not been updated, unlike the mongos collection.
+    assert.eq(null, mongosColl.findOne({_id: 4}), mongosColl.find().toArray());
+    const shard0Bucket = st.shard0.getCollection(sysCollNS).findOne({meta: 0});
+    assert.eq(0, shard0Bucket.meta, shard0Bucket);
+    assert.eq(4, shard0Bucket.control.min._id, shard0Bucket);
+    assert.eq(4, shard0Bucket.control.max._id, shard0Bucket);
+    assert.eq(40, shard0Bucket.control.min.f, shard0Bucket);
+    assert.eq(40, shard0Bucket.control.max.f, shard0Bucket);
+    assert.eq(4, shard0Bucket.data._id[0], shard0Bucket);
+    assert.eq(40, shard0Bucket.data.f[0], shard0Bucket);
 })();
 
 (function testBroadcastedMultiDeleteOnOrphanedBuckets() {
-    jsTest.log('A broadcasted delete of multi-documents generates more delete events');
+    jsTest.log('A broadcasted delete of multi-documents generates a delete event of a bucket');
 
     // Sends a broadcasted delete (query on non-shardkey field) on two documents to all the shards.
-    assert.commandFailedWithCode(mongosColl.remove({f: 50}), ErrorCodes.InvalidOptions);
+    assert.commandWorked(mongosColl.remove({f: 50}));
 
-    // TODO SERVER-74899: The broadcasted delete is not supported yet on a sharded cluster. As soon
-    // as we support it we should add this test case. See
-    // CollectionRoutingInfoTargeter::targetDelete() for details.
+    // The documents are hosted by the second shard and a bucket delete event is notified because
+    // the all measurements are deleted from the bucket. The first shard still hosts the orphaned
+    // documents but no additional event must be notified.
+    assert.soon(() => mongosDbChangeStream.hasNext(), 'A delete event of a bucket is expected');
+    const change = mongosDbChangeStream.next();
+    assert.eq(change.operationType, 'delete', change);
+    assertNoChanges(mongosDbChangeStream);
+
+    // The orphaned bucket on first shard have not been removed, unlike the mongos collection.
+    assert.eq(null, mongosColl.findOne({_id: 6}), mongosColl.find().toArray());
+    assert.eq(null, mongosColl.findOne({_id: 7}), mongosColl.find().toArray());
+    const shard0Bucket = st.shard0.getCollection(sysCollNS).findOne({meta: 2});
+    assert.eq(2, shard0Bucket.meta, shard0Bucket);
+    assert.eq(6, shard0Bucket.control.min._id, shard0Bucket);
+    assert.eq(7, shard0Bucket.control.max._id, shard0Bucket);
+    assert.eq(50, shard0Bucket.control.min.f, shard0Bucket);
+    assert.eq(50, shard0Bucket.control.max.f, shard0Bucket);
+    assert.eq(6, shard0Bucket.data._id[0], shard0Bucket);
+    assert.eq(50, shard0Bucket.data.f[0], shard0Bucket);
 })();
 
 suspendRangeDeletionShard0.off();
