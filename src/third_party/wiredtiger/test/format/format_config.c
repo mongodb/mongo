@@ -1414,7 +1414,7 @@ config_tiered_storage(void)
         if (GV(TIERED_STORAGE_FLUSH_FREQUENCY) > 0)
             config_single(NULL, "checkpoint=on", false);
 
-        /* FIXME-WT-8727: Salvage and verify are not yet supported for tiered storage. */
+        /* FIXME-PM-2530: Salvage and verify are not yet supported for tiered storage. */
         config_off(NULL, "ops.salvage");
         config_off(NULL, "ops.verify");
 
