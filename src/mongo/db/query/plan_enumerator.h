@@ -244,7 +244,7 @@ private:
          * Returns true if 'totalEnumerated' matches the total number of expected plans for this
          * assignment.
          */
-        bool shouldResetBeforeProceeding(size_t totalEnumerated) const;
+        bool shouldResetBeforeProceeding(size_t totalEnumerated, size_t orLimit) const;
 
         /**
          * Returns true if each sub node is at the same iterationCount.
