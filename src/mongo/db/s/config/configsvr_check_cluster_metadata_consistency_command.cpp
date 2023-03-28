@@ -30,11 +30,73 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/metadata_consistency_util.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 
 namespace mongo {
 namespace {
+
+std::vector<MetadataInconsistencyItem> getHiddenCollectionsInconsistencies(
+    OperationContext* opCtx) {
+    static const auto rawPipelineStages = [] {
+        auto rawPipelineBSON = fromjson(R"({pipeline: [
+            {
+                $addFields: {
+                    dbName: {
+                        $arrayElemAt: [{
+                            $split: ['$_id', '.']
+                        }, 0]
+                    }
+                }
+            },
+            {
+                $match: {
+                    dbName: {
+                        $ne: 'config'
+                    }
+                }
+            },
+            {
+                $lookup: {
+                    from: 'databases',
+                    localField: 'dbName',
+                    foreignField: '_id',
+                    as: 'db'
+                }
+            },
+            {
+                $match: {
+                    db: []
+                }
+            }
+        ]})");
+        return parsePipelineFromBSON(rawPipelineBSON.firstElement());
+    }();
+
+    AggregateCommandRequest hiddenCollAggRequest{NamespaceString::kConfigsvrCollectionsNamespace,
+                                                 rawPipelineStages};
+    const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
+    auto rawHiddenColls = catalogClient->runCatalogAggregation(
+        opCtx, hiddenCollAggRequest, {repl::ReadConcernLevel::kSnapshotReadConcern});
+
+    std::vector<MetadataInconsistencyItem> inconsistencies;
+    inconsistencies.reserve(rawHiddenColls.size());
+    for (auto&& rawHiddenColl : rawHiddenColls) {
+        CollectionType coll{rawHiddenColl};
+        MetadataInconsistencyItem inco;
+        inco.setNs(coll.getNss());
+        inco.setType(MetadataInconsistencyTypeEnum::kHiddenShardedCollection);
+        inco.setShard(ShardId::kConfigServerId);
+        inco.setInfo(BSON(metadata_consistency_util::kDescriptionFieldName
+                          << "Found sharded collection but relative database does not exist"
+                          << "collection" << coll.toBSON()));
+        inconsistencies.emplace_back(std::move(inco));
+    }
+    return inconsistencies;
+}
 
 class ConfigsvrCheckClusterMetadataConsistencyCommand final
     : public TypedCommand<ConfigsvrCheckClusterMetadataConsistencyCommand> {
@@ -52,7 +114,7 @@ public:
     }
 
     bool adminOnly() const override {
-        return false;
+        return true;
     }
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
@@ -64,18 +126,46 @@ public:
         using InvocationBase::InvocationBase;
 
         Response typedRun(OperationContext* opCtx) {
-            const auto nss = ns();
+            uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
+            opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
-            CursorInitialReply resp;
-            InitialResponseCursor initRespCursor{std::vector<mongo::BSONObj>()};
-            initRespCursor.setResponseCursorBase({0LL /* cursorId */, nss});
-            resp.setCursor(std::move(initRespCursor));
-            return resp;
+            std::vector<MetadataInconsistencyItem> inconsistencies;
+
+            auto hiddenCollectionsIncon = getHiddenCollectionsInconsistencies(opCtx);
+            inconsistencies.insert(inconsistencies.end(),
+                                   std::make_move_iterator(hiddenCollectionsIncon.begin()),
+                                   std::make_move_iterator(hiddenCollectionsIncon.end()));
+
+            auto exec = metadata_consistency_util::makeQueuedPlanExecutor(
+                opCtx, std::move(inconsistencies), ns());
+
+            ClientCursorParams cursorParams{
+                std::move(exec),
+                ns(),
+                AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserName(),
+                APIParameters::get(opCtx),
+                opCtx->getWriteConcern(),
+                repl::ReadConcernArgs::get(opCtx),
+                ReadPreferenceSetting::get(opCtx),
+                request().toBSON({}),
+                {Privilege(ResourcePattern::forClusterResource(), ActionType::internal)}};
+
+            const auto batchSize = [&]() -> long long {
+                const auto& cursorOpts = request().getCursor();
+                if (cursorOpts && cursorOpts->getBatchSize()) {
+                    return *cursorOpts->getBatchSize();
+                } else {
+                    return query_request_helper::kDefaultBatchSize;
+                }
+            }();
+
+            return metadata_consistency_util::createInitialCursorReplyMongod(
+                opCtx, std::move(cursorParams), batchSize);
         }
 
     private:
         NamespaceString ns() const override {
-            return request().getNamespace();
+            return NamespaceString{request().getDbName()};
         }
 
         bool supportsWriteConcern() const override {

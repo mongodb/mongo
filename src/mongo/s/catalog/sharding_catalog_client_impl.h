@@ -64,6 +64,12 @@ public:
                                                    const CollectionType& coll,
                                                    bool upsert);
 
+    std::vector<BSONObj> runCatalogAggregation(
+        OperationContext* opCtx,
+        AggregateCommandRequest& aggRequest,
+        const repl::ReadConcernArgs& readConcern,
+        const Milliseconds& maxTimeout = Shard::kDefaultConfigCommandTimeout) override;
+
     DatabaseType getDatabase(OperationContext* opCtx,
                              StringData db,
                              repl::ReadConcernLevel readConcernLevel) override;

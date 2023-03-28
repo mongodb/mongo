@@ -124,8 +124,8 @@ public:
             }
 
             // Send a request to the configsvr to check cluster metadata consistency.
-            ConfigsvrCheckClusterMetadataConsistency configsvrRequest{nss};
-            configsvrRequest.setDbName(nss.db());
+            ConfigsvrCheckClusterMetadataConsistency configsvrRequest;
+            configsvrRequest.setDbName(DatabaseName::kAdmin);
             configsvrRequest.setCursor(request().getCursor());
             requests.emplace_back(ShardId::kConfigServerId, configsvrRequest.toBSON({}));
 

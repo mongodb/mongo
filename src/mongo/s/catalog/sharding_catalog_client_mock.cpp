@@ -45,6 +45,14 @@ ShardingCatalogClientMock::ShardingCatalogClientMock() = default;
 
 ShardingCatalogClientMock::~ShardingCatalogClientMock() = default;
 
+std::vector<BSONObj> ShardingCatalogClientMock::runCatalogAggregation(
+    OperationContext* opCtx,
+    AggregateCommandRequest& aggRequest,
+    const repl::ReadConcernArgs& readConcern,
+    const Milliseconds& maxTimeout) {
+    uasserted(ErrorCodes::InternalError, "Method not implemented");
+}
+
 DatabaseType ShardingCatalogClientMock::getDatabase(OperationContext* opCtx,
                                                     StringData db,
                                                     repl::ReadConcernLevel readConcernLevel) {

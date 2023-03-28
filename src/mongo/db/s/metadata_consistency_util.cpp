@@ -45,7 +45,6 @@ namespace mongo {
 namespace metadata_consistency_util {
 
 namespace {
-constexpr StringData kDescriptionFieldName = "description"_sd;
 
 void _appendHiddenUnshardedCollectionInconsistency(
     const ShardId& shardId,

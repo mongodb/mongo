@@ -41,6 +41,11 @@ public:
     ShardingCatalogClientMock();
     ~ShardingCatalogClientMock();
 
+    std::vector<BSONObj> runCatalogAggregation(OperationContext* opCtx,
+                                               AggregateCommandRequest& aggRequest,
+                                               const repl::ReadConcernArgs& readConcern,
+                                               const Milliseconds& maxTimeout) override;
+
     DatabaseType getDatabase(OperationContext* opCtx,
                              StringData db,
                              repl::ReadConcernLevel readConcernLevel) override;

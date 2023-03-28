@@ -172,6 +172,46 @@ function getNewDb() {
     db.dropDatabase();
 })();
 
+(function testHiddenShardedCollections() {
+    const kSourceCollName = "coll";
+    const db1 = getNewDb();
+    const coll1 = db1[kSourceCollName];
+    const db2 = getNewDb();
+    const coll2 = db2[kSourceCollName];
+
+    // Create two sharded collections in two different databases
+    st.shardColl(coll1, {skey: 1});
+    st.shardColl(coll2, {skey: 1});
+
+    // Check that there are no inconsistencies so far
+    let inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
+    assert.eq(0, inconsistencies.length);
+
+    // Remove db1 so that coll1 became hidden
+    assert.commandWorked(mongos.getDB('config').databases.deleteOne({_id: db1.getName()}));
+
+    inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
+    assert.eq(1, inconsistencies.length);
+    assert.eq("HiddenShardedCollection", inconsistencies[0].type);
+    assert.eq(coll1.getFullName(), inconsistencies[0].ns);
+
+    // Remove db2 so that coll2 also became hidden
+    assert.commandWorked(mongos.getDB('config').databases.deleteOne({_id: db2.getName()}));
+
+    inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
+    assert.eq(2, inconsistencies.length);
+    assert.eq("HiddenShardedCollection", inconsistencies[0].type);
+    assert.eq(coll1.getFullName(), inconsistencies[0].ns);
+    assert.eq("HiddenShardedCollection", inconsistencies[1].type);
+    assert.eq(coll2.getFullName(), inconsistencies[1].ns);
+
+    // Clean up the database to pass the hooks that detect inconsistencies
+    db1.dropDatabase();
+    db2.dropDatabase();
+    inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
+    assert.eq(0, inconsistencies.length);
+})();
+
 (function testClusterLevelMode() {
     const db_HiddenUnshardedCollection1 = getNewDb();
     const db_HiddenUnshardedCollection2 = getNewDb();

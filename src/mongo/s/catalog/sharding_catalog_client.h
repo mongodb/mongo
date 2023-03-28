@@ -41,6 +41,7 @@
 #include "mongo/s/catalog/type_index_catalog.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/chunk_version.h"
+#include "mongo/s/client/shard.h"
 #include "mongo/s/index_version.h"
 #include "mongo/s/request_types/get_historical_placement_info_gen.h"
 
@@ -87,6 +88,12 @@ public:
     static const WriteConcernOptions kLocalWriteConcern;
 
     virtual ~ShardingCatalogClient() = default;
+
+    virtual std::vector<BSONObj> runCatalogAggregation(
+        OperationContext* opCtx,
+        AggregateCommandRequest& aggRequest,
+        const repl::ReadConcernArgs& readConcern,
+        const Milliseconds& maxTimeout = Shard::kDefaultConfigCommandTimeout) = 0;
 
     /**
      * Retrieves the metadata for a given database, if it exists.

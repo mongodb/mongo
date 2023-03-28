@@ -552,8 +552,7 @@ commands:
                         consistency."
           command_name: _configsvrCheckClusterMetadataConsistency
           cpp_name: ConfigsvrCheckClusterMetadataConsistency
-          namespace: concatenate_with_db
-          allow_global_collection_name: true
+          namespace: ignored
           api_version: ""
           reply_type: CursorInitialReply
           strict: false

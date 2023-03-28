@@ -319,91 +319,12 @@ AggregateCommandRequest makeCollectionAndIndexesAggregation(OperationContext* op
     return AggregateCommandRequest(CollectionType::ConfigNS, std::move(serializedPipeline));
 }
 
-std::vector<BSONObj> runCatalogAggregation(OperationContext* opCtx,
-                                           std::shared_ptr<Shard> configShard,
-                                           AggregateCommandRequest& aggRequest,
-                                           const repl::ReadConcernArgs& readConcern,
-                                           const Milliseconds& maxTimeout) {
-    // Reads on the config server may run on any node in its replica set. Such reads use the config
-    // time as an afterClusterTime token, but config time is only inclusive of majority committed
-    // data, so we should not use a weaker read concern. Note if the local node is a config server,
-    // it can use these concerns safely with a ShardLocal, which would require relaxing this
-    // invariant.
-    invariant(readConcern.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern ||
-                  readConcern.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern ||
-                  readConcern.getLevel() == repl::ReadConcernLevel::kLinearizableReadConcern,
-              str::stream() << "Disallowed read concern: " << readConcern.toBSONInner());
-
-    aggRequest.setReadConcern(readConcern.toBSONInner());
-    aggRequest.setWriteConcern(WriteConcernOptions());
-
-    const auto readPref = [&]() -> ReadPreferenceSetting {
-        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
-            !gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV()) {
-            // When the feature flag is on, the config server may read from any node in its replica
-            // set, so we should use the typical config server read preference.
-            return {};
-        }
-
-        const auto vcTime = VectorClock::get(opCtx)->getTime();
-        ReadPreferenceSetting readPref{kConfigReadSelector};
-        readPref.minClusterTime = vcTime.configTime().asTimestamp();
-        return readPref;
-    }();
-
-    aggRequest.setUnwrappedReadPref(readPref.toContainingBSON());
-
-    if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
-        // Don't use a timeout on the config server to guarantee it can always refresh.
-        const Milliseconds maxTimeMS = std::min(opCtx->getRemainingMaxTimeMillis(), maxTimeout);
-        aggRequest.setMaxTimeMS(durationCount<Milliseconds>(maxTimeMS));
-    }
-
-    // Run the aggregation
-    std::vector<BSONObj> aggResult;
-    auto callback = [&aggResult](const std::vector<BSONObj>& batch,
-                                 const boost::optional<BSONObj>& postBatchResumeToken) {
-        aggResult.insert(aggResult.end(),
-                         std::make_move_iterator(batch.begin()),
-                         std::make_move_iterator(batch.end()));
-        return true;
-    };
-
-    for (int retry = 1; retry <= kMaxWriteRetry; retry++) {
-        const Status status = configShard->runAggregation(opCtx, aggRequest, callback);
-        if (retry < kMaxWriteRetry &&
-            configShard->isRetriableError(status.code(), Shard::RetryPolicy::kIdempotent)) {
-            aggResult.clear();
-            continue;
-        }
-        uassertStatusOK(status);
-        break;
-    }
-
-    return aggResult;
-}
-
 }  // namespace
 
 ShardingCatalogClientImpl::ShardingCatalogClientImpl(std::shared_ptr<Shard> overrideConfigShard)
     : _overrideConfigShard(std::move(overrideConfigShard)) {}
 
 ShardingCatalogClientImpl::~ShardingCatalogClientImpl() = default;
-
-Status ShardingCatalogClientImpl::updateShardingCatalogEntryForCollection(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    const CollectionType& coll,
-    const bool upsert) {
-    auto status = _updateConfigDocument(opCtx,
-                                        CollectionType::ConfigNS,
-                                        BSON(CollectionType::kNssFieldName << nss.ns()),
-                                        coll.toBSON(),
-                                        upsert,
-                                        ShardingCatalogClient::kMajorityWriteConcern,
-                                        Shard::kDefaultConfigCommandTimeout);
-    return status.getStatus().withContext(str::stream() << "Collection metadata write failed");
-}
 
 DatabaseType ShardingCatalogClientImpl::getDatabase(OperationContext* opCtx,
                                                     StringData dbName,
@@ -511,6 +432,71 @@ HistoricalPlacement ShardingCatalogClientImpl::_fetchPlacementMetadata(
         IDLParserContext("ShardingCatalogClient"), remoteResponse.response);
 
     return placementDetails.getHistoricalPlacement();
+}
+
+std::vector<BSONObj> ShardingCatalogClientImpl::runCatalogAggregation(
+    OperationContext* opCtx,
+    AggregateCommandRequest& aggRequest,
+    const repl::ReadConcernArgs& readConcern,
+    const Milliseconds& maxTimeout) {
+    // Reads on the config server may run on any node in its replica set. Such reads use the config
+    // time as an afterClusterTime token, but config time is only inclusive of majority committed
+    // data, so we should not use a weaker read concern. Note if the local node is a config server,
+    // it can use these concerns safely with a ShardLocal, which would require relaxing this
+    // invariant.
+    invariant(readConcern.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern ||
+                  readConcern.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern ||
+                  readConcern.getLevel() == repl::ReadConcernLevel::kLinearizableReadConcern,
+              str::stream() << "Disallowed read concern: " << readConcern.toBSONInner());
+
+    aggRequest.setReadConcern(readConcern.toBSONInner());
+    aggRequest.setWriteConcern(WriteConcernOptions());
+
+    const auto readPref = [&]() -> ReadPreferenceSetting {
+        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
+            !gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV()) {
+            // When the feature flag is on, the config server may read from any node in its replica
+            // set, so we should use the typical config server read preference.
+            return {};
+        }
+
+        const auto vcTime = VectorClock::get(opCtx)->getTime();
+        ReadPreferenceSetting readPref{kConfigReadSelector};
+        readPref.minClusterTime = vcTime.configTime().asTimestamp();
+        return readPref;
+    }();
+
+    aggRequest.setUnwrappedReadPref(readPref.toContainingBSON());
+
+    if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
+        // Don't use a timeout on the config server to guarantee it can always refresh.
+        const Milliseconds maxTimeMS = std::min(opCtx->getRemainingMaxTimeMillis(), maxTimeout);
+        aggRequest.setMaxTimeMS(durationCount<Milliseconds>(maxTimeMS));
+    }
+
+    // Run the aggregation
+    std::vector<BSONObj> aggResult;
+    auto callback = [&aggResult](const std::vector<BSONObj>& batch,
+                                 const boost::optional<BSONObj>& postBatchResumeToken) {
+        aggResult.insert(aggResult.end(),
+                         std::make_move_iterator(batch.begin()),
+                         std::make_move_iterator(batch.end()));
+        return true;
+    };
+
+    const auto configShard = _getConfigShard(opCtx);
+    for (int retry = 1; retry <= kMaxWriteRetry; retry++) {
+        const Status status = configShard->runAggregation(opCtx, aggRequest, callback);
+        if (retry < kMaxWriteRetry &&
+            configShard->isRetriableError(status.code(), Shard::RetryPolicy::kIdempotent)) {
+            aggResult.clear();
+            continue;
+        }
+        uassertStatusOK(status);
+        break;
+    }
+
+    return aggResult;
 }
 
 CollectionType ShardingCatalogClientImpl::getCollection(OperationContext* opCtx,
@@ -735,12 +721,8 @@ std::pair<CollectionType, std::vector<ChunkType>> ShardingCatalogClientImpl::get
     const repl::ReadConcernArgs& readConcern) {
     auto aggRequest = makeCollectionAndChunksAggregation(opCtx, nss, sinceVersion);
 
-    std::vector<BSONObj> aggResult =
-        runCatalogAggregation(opCtx,
-                              _getConfigShard(opCtx),
-                              aggRequest,
-                              readConcern,
-                              Milliseconds(gFindChunksOnConfigTimeoutMS.load()));
+    std::vector<BSONObj> aggResult = runCatalogAggregation(
+        opCtx, aggRequest, readConcern, Milliseconds(gFindChunksOnConfigTimeoutMS.load()));
 
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << "Collection " << nss.ns() << " not found",
@@ -795,11 +777,7 @@ ShardingCatalogClientImpl::getCollectionAndShardingIndexCatalogEntries(
     OperationContext* opCtx, const NamespaceString& nss, const repl::ReadConcernArgs& readConcern) {
     auto aggRequest = makeCollectionAndIndexesAggregation(opCtx, nss);
 
-    std::vector<BSONObj> aggResult = runCatalogAggregation(opCtx,
-                                                           _getConfigShard(opCtx),
-                                                           aggRequest,
-                                                           readConcern,
-                                                           Shard::kDefaultConfigCommandTimeout);
+    std::vector<BSONObj> aggResult = runCatalogAggregation(opCtx, aggRequest, readConcern);
 
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << "Collection " << nss.ns() << " not found",
@@ -900,11 +878,7 @@ std::vector<NamespaceString> ShardingCatalogClientImpl::getAllNssThatHaveZonesFo
         }
     }();
 
-    auto aggResult = runCatalogAggregation(opCtx,
-                                           Grid::get(opCtx)->shardRegistry()->getConfigShard(),
-                                           aggRequest,
-                                           readConcern,
-                                           Shard::kDefaultConfigCommandTimeout);
+    auto aggResult = runCatalogAggregation(opCtx, aggRequest, readConcern);
 
     // Parse the result
     std::vector<NamespaceString> nssList;
@@ -1544,8 +1518,7 @@ HistoricalPlacement ShardingCatalogClientImpl::getHistoricalPlacement(
         }
     }();
 
-    auto aggrResult = runCatalogAggregation(
-        opCtx, configShard, aggRequest, readConcern, Shard::kDefaultConfigCommandTimeout);
+    auto aggrResult = runCatalogAggregation(opCtx, aggRequest, readConcern);
 
     auto extractShardIds = [](const BSONObj& obj, const std::string& pipelineName) {
         // each sub-pipeline of $facet produces an array with a single element containing a 'shards'
