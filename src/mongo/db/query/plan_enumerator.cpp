@@ -1666,8 +1666,8 @@ bool PlanEnumerator::LockstepOrAssignment::allIdentical() const {
     return true;
 }
 
-bool PlanEnumerator::LockstepOrAssignment::shouldResetBeforeProceeding(
-    size_t totalEnumerated) const {
+bool PlanEnumerator::LockstepOrAssignment::shouldResetBeforeProceeding(size_t totalEnumerated,
+                                                                       size_t orLimit) const {
     if (totalEnumerated == 0 || !exhaustedLockstepIteration) {
         return false;
     }
@@ -1677,7 +1677,12 @@ bool PlanEnumerator::LockstepOrAssignment::shouldResetBeforeProceeding(
         if (!subnode.maxIterCount) {
             return false;  // Haven't yet looped over this child entirely, not ready yet.
         }
-        totalPossibleEnumerations *= subnode.maxIterCount.get();
+        totalPossibleEnumerations *= subnode.maxIterCount.value();
+        // If 'totalPossibleEnumerations' reaches the limit, we can just shortcut it. Otherwise,
+        // 'totalPossibleEnumerations' could overflow if we have a large $or.
+        if (totalPossibleEnumerations >= orLimit) {
+            return false;
+        }
     }
 
     // If we're able to compute a total number expected enumerations, we must have already cycled
@@ -1714,7 +1719,7 @@ bool PlanEnumerator::_nextMemoForLockstepOrAssignment(
         }
         // Edge case: if every child has only one option available, we are already finished
         // enumerating.
-        if (assignment->shouldResetBeforeProceeding(assignment->totalEnumerated)) {
+        if (assignment->shouldResetBeforeProceeding(assignment->totalEnumerated, _orLimit)) {
             assignment->exhaustedLockstepIteration = false;
             return true;  // We're back at the beginning, no need to reset.
         }
@@ -1753,7 +1758,7 @@ bool PlanEnumerator::_nextMemoForLockstepOrAssignment(
     // This special ordering is tricky to reset. Because it iterates the sub nodes in such a
     // unique order, it can be difficult to know when it has actually finished iterating. Our
     // strategy is just to compute a total and go back to the beginning once we hit that total.
-    if (!assignment->shouldResetBeforeProceeding(assignment->totalEnumerated)) {
+    if (!assignment->shouldResetBeforeProceeding(assignment->totalEnumerated, _orLimit)) {
         return false;
     }
     // Reset!

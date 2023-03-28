@@ -2388,6 +2388,32 @@ TEST_F(QueryPlannerTest, LockstepOrEnumerationSanityCheckTwoChildrenTwoIndexesEa
         "{ixscan: {pattern: {a: 1, c: 1}}}}}}}");
 }
 
+TEST_F(QueryPlannerTest, TotalPossibleLockstepOrEnumerationReachesTheOrLimit) {
+    params.options =
+        QueryPlannerParams::NO_TABLE_SCAN | QueryPlannerParams::ENUMERATE_OR_CHILDREN_LOCKSTEP;
+    addIndex(BSON("a" << 1 << "b" << 1));
+    addIndex(BSON("a" << 1 << "c" << 1));
+
+    BSONArrayBuilder orBuilder;
+    // This max number has a value of 65 in order to potentillay triger any overflow of the possible
+    // enumeration count, because each predicate in $or has two possible indexes, allowing for 2^65
+    // possible enumerations.
+    const int maxPredicates = 65;
+    for (int i = 0; i < maxPredicates; i++) {
+        orBuilder.append(BSON("b" << i << "c" << i));
+    }
+
+    auto cmd = BSON("find"
+                    << "testns"
+                    << "filter" << BSON("a" << 1 << "$or" << orBuilder.arr()));
+
+    // Ensure that the query runs fine.
+    runQueryAsCommand(cmd);
+
+    // internalQueryMaxOrSolutions.load() + 2.
+    assertNumSolutions(12U);
+}
+
 // Test that we enumerate the expected plans with the special parameter set. In this test we have
 // two branches of an $or, each with one possible indexed solution.
 TEST_F(QueryPlannerTest, LockstepOrEnumerationSanityCheckTwoChildrenOneIndexEach) {
