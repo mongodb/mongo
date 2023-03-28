@@ -130,19 +130,20 @@ void onShardMergeRecipientsNssInsert(OperationContext* opCtx,
                 ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
                     .acquireLock(ServerlessOperationLockRegistry::LockType::kMergeRecipient,
                                  migrationId);
+                opCtx->recoveryUnit()->onRollback([migrationId](OperationContext* opCtx) {
+                    ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
+                        .releaseLock(ServerlessOperationLockRegistry::LockType::kMergeRecipient,
+                                     migrationId);
+                });
 
                 auto mtab = std::make_shared<TenantMigrationRecipientAccessBlocker>(
                     opCtx->getServiceContext(), migrationId);
                 TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
                     .add(recipientStateDoc.getTenantIds(), mtab);
-
                 opCtx->recoveryUnit()->onRollback([migrationId](OperationContext* opCtx) {
                     TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
                         .removeAccessBlockersForMigration(
                             migrationId, TenantMigrationAccessBlocker::BlockerType::kRecipient);
-                    ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
-                        .releaseLock(ServerlessOperationLockRegistry::LockType::kMergeRecipient,
-                                     migrationId);
                 });
 
                 opCtx->recoveryUnit()->onCommit([migrationId](OperationContext* opCtx, auto _) {

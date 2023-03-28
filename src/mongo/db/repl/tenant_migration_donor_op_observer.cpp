@@ -58,6 +58,11 @@ void onTransitionToAbortingIndexBuilds(OperationContext* opCtx,
     ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
         .acquireLock(ServerlessOperationLockRegistry::LockType::kTenantDonor,
                      donorStateDoc.getId());
+    opCtx->recoveryUnit()->onRollback(
+        [migrationId = donorStateDoc.getId()](OperationContext* opCtx) {
+            ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
+                .releaseLock(ServerlessOperationLockRegistry::LockType::kTenantDonor, migrationId);
+        });
 
     auto mtab = std::make_shared<TenantMigrationDonorAccessBlocker>(opCtx->getServiceContext(),
                                                                     donorStateDoc.getId());
@@ -65,19 +70,6 @@ void onTransitionToAbortingIndexBuilds(OperationContext* opCtx,
         MigrationProtocolEnum::kMultitenantMigrations) {
         const auto tenantId = TenantId::parseFromString(donorStateDoc.getTenantId());
         TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext()).add(tenantId, mtab);
-
-        if (opCtx->writesAreReplicated()) {
-            // onRollback is not registered on secondaries since secondaries should not fail to
-            // apply the write.
-            opCtx->recoveryUnit()->onRollback(
-                [migrationId = donorStateDoc.getId(), tenantId](OperationContext* opCtx) {
-                    TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                        .remove(tenantId, TenantMigrationAccessBlocker::BlockerType::kDonor);
-                    ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
-                        .releaseLock(ServerlessOperationLockRegistry::LockType::kTenantDonor,
-                                     migrationId);
-                });
-        }
     } else {
         tassert(6448702,
                 "Bad protocol",
@@ -93,20 +85,13 @@ void onTransitionToAbortingIndexBuilds(OperationContext* opCtx,
                          std::make_shared<TenantMigrationDonorAccessBlocker>(
                              opCtx->getServiceContext(), donorStateDoc.getId()));
         }
-
-        if (opCtx->writesAreReplicated()) {
-            // onRollback is not registered on secondaries since secondaries should not fail to
-            // apply the write.
-            opCtx->recoveryUnit()->onRollback([donorStateDoc](OperationContext* opCtx) {
-                TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-                    .removeAccessBlockersForMigration(
-                        donorStateDoc.getId(), TenantMigrationAccessBlocker::BlockerType::kDonor);
-                ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
-                    .releaseLock(ServerlessOperationLockRegistry::LockType::kTenantDonor,
-                                 donorStateDoc.getId());
-            });
-        }
     }
+
+    opCtx->recoveryUnit()->onRollback([donorStateDoc](OperationContext* opCtx) {
+        TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+            .removeAccessBlockersForMigration(donorStateDoc.getId(),
+                                              TenantMigrationAccessBlocker::BlockerType::kDonor);
+    });
 }
 
 /**
