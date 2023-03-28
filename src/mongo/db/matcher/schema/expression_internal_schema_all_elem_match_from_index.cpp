@@ -78,10 +78,13 @@ void InternalSchemaAllElemMatchFromIndexMatchExpression::debugString(StringBuild
 
 BSONObj InternalSchemaAllElemMatchFromIndexMatchExpression::getSerializedRightHandSide(
     SerializationOptions opts) const {
-    // TODO SERVER-73678 respect 'replacementForLiteralArgs'.
     BSONObjBuilder allElemMatchBob;
     BSONArrayBuilder subArray(allElemMatchBob.subarrayStart(kName));
-    subArray.append(_index);
+    if (opts.replacementForLiteralArgs) {
+        subArray.append(opts.replacementForLiteralArgs.get());
+    } else {
+        subArray.append(_index);
+    }
     {
         BSONObjBuilder eBuilder(subArray.subobjStart());
         _expression->getFilter()->serialize(&eBuilder, opts);

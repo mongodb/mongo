@@ -37,7 +37,16 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/matcher/matcher.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_all_elem_match_from_index.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_cond.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_eq.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_fmod.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_max_items.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_max_length.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_max_properties.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_min_items.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_min_length.h"
+#include "mongo/db/matcher/schema/expression_internal_schema_min_properties.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -1846,5 +1855,275 @@ TEST(SerializeInternalBinDataSubType, ExpressionBinDataSubTypeSerializesCorrectl
     ASSERT_TRUE(original.matches(obj));
 }
 
+std::string redactFieldNameForTest(StringData s) {
+    return str::stream() << "HASH(" << s << ")";
+}
+TEST(SerializeInternalSchema, AllowedPropertiesRedactsCorrectly) {
+
+    auto query = fromjson(
+        "{$_internalSchemaAllowedProperties: {properties: ['a', 'b'],"
+        "namePlaceholder: 'i', patternProperties: [], otherwise: {i: 0}}}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto objMatch = MatchExpressionParser::parse(query, expCtx);
+    ASSERT_OK(objMatch.getStatus());
+
+    SerializationOptions opts;
+    opts.redactFieldNames = true;
+    opts.redactFieldNamesStrategy = redactFieldNameForTest;
+    opts.replacementForLiteralArgs = "?";
+
+    ASSERT_BSONOBJ_EQ(
+        fromjson(
+            "{ $_internalSchemaAllowedProperties: { properties: \"?\", namePlaceholder: \"?\", "
+            "patternProperties: [], otherwise: { \"HASH(i)\": { $eq: \"?\" } } } }"),
+        objMatch.getValue()->serialize(opts));
+}
+
+/**
+ * Helper function for parsing and creating MatchExpressions.
+ */
+std::unique_ptr<InternalSchemaCondMatchExpression> createCondMatchExpression(BSONObj condition,
+                                                                             BSONObj thenBranch,
+                                                                             BSONObj elseBranch) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto conditionExpr = MatchExpressionParser::parse(condition, expCtx);
+    ASSERT_OK(conditionExpr.getStatus());
+    auto thenBranchExpr = MatchExpressionParser::parse(thenBranch, expCtx);
+    ASSERT_OK(thenBranchExpr.getStatus());
+    auto elseBranchExpr = MatchExpressionParser::parse(elseBranch, expCtx);
+
+    std::array<std::unique_ptr<MatchExpression>, 3> expressions = {
+        {std::move(conditionExpr.getValue()),
+         std::move(thenBranchExpr.getValue()),
+         std::move(elseBranchExpr.getValue())}};
+
+    auto cond = std::make_unique<InternalSchemaCondMatchExpression>(std::move(expressions));
+
+    return cond;
+}
+
+TEST(SerializeInternalSchema, CondMatchRedactsCorrectly) {
+    SerializationOptions opts;
+    opts.redactFieldNames = true;
+    opts.replacementForLiteralArgs = "?";
+    opts.redactFieldNamesStrategy = redactFieldNameForTest;
+    auto conditionQuery = BSON("age" << BSON("$lt" << 18));
+    auto thenQuery = BSON("job"
+                          << "student");
+    auto elseQuery = BSON("job"
+                          << "engineer");
+    auto cond = createCondMatchExpression(conditionQuery, thenQuery, elseQuery);
+    BSONObjBuilder bob;
+    cond->serialize(&bob, opts);
+    auto expectedResult =
+        BSON("$_internalSchemaCond" << BSON_ARRAY(BSON("HASH(age)" << BSON("$lt"
+                                                                           << "?"))
+                                                  << BSON("HASH(job)" << BSON("$eq"
+                                                                              << "?"))
+                                                  << BSON("HASH(job)" << BSON("$eq"
+                                                                              << "?"))));
+    ASSERT_BSONOBJ_EQ(expectedResult, bob.done());
+}
+
+TEST(SerializeInternalSchema, FmodMatchRedactsCorrectly) {
+    InternalSchemaFmodMatchExpression m("a"_sd, Decimal128(1.7), Decimal128(2));
+    SerializationOptions opts;
+    opts.replacementForLiteralArgs = "?";
+    BSONObjBuilder bob;
+    m.serialize(&bob, opts);
+    ASSERT_BSONOBJ_EQ(BSON("a" << BSON("$_internalSchemaFmod" << BSON_ARRAY("?"
+                                                                            << "?"))),
+                      bob.done());
+}
+
+TEST(SerializeInternalSchema, MatchArrayIndexRedactsCorrectly) {
+    auto query = fromjson(
+        "{foo: {$_internalSchemaMatchArrayIndex:"
+        "{index: 0, namePlaceholder: 'i', expression: {i: {$type: 'number'}}}}}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto objMatch = MatchExpressionParser::parse(query, expCtx);
+    ASSERT_OK(objMatch.getStatus());
+
+    BSONObjBuilder bob;
+    SerializationOptions opts;
+    opts.redactFieldNames = true;
+    opts.redactFieldNamesStrategy = redactFieldNameForTest;
+    opts.replacementForLiteralArgs = "?";
+    objMatch.getValue()->serialize(&bob, opts);
+
+    ASSERT_BSONOBJ_EQ(bob.done(),
+                      BSON("HASH(foo)" << BSON("$_internalSchemaMatchArrayIndex"
+                                               << BSON("index"
+                                                       << "?"
+                                                       << "namePlaceholder"
+                                                       << "HASH(i)"
+                                                       << "expression"
+                                                       << BSON("HASH(i)" << BSON("$type"
+                                                                                 << "?"))))));
+}
+
+TEST(SerializeInternalSchema, MaxItemsRedactsCorrectly) {
+    InternalSchemaMaxItemsMatchExpression maxItems("a.b"_sd, 2);
+    SerializationOptions opts;
+    opts.redactFieldNames = true;
+    opts.replacementForLiteralArgs = "?";
+    opts.redactFieldNamesStrategy = redactFieldNameForTest;
+
+    ASSERT_BSONOBJ_EQ(maxItems.getSerializedRightHandSide(opts),
+                      BSON("$_internalSchemaMaxItems"
+                           << "?"));
+}
+
+TEST(SerializeInternalSchema, MaxLengthRedactsCorrectly) {
+    InternalSchemaMaxLengthMatchExpression maxLength("a"_sd, 2);
+    SerializationOptions opts;
+    opts.replacementForLiteralArgs = "?";
+    ASSERT_BSONOBJ_EQ(maxLength.getSerializedRightHandSide(opts),
+                      BSON("$_internalSchemaMaxLength"
+                           << "?"));
+}
+
+TEST(SerializeInternalSchema, MinItemsRedactsCorrectly) {
+    InternalSchemaMinItemsMatchExpression minItems("a.b"_sd, 2);
+    SerializationOptions opts;
+    opts.redactFieldNames = true;
+    opts.replacementForLiteralArgs = "?";
+    opts.redactFieldNamesStrategy = redactFieldNameForTest;
+
+    ASSERT_BSONOBJ_EQ(minItems.getSerializedRightHandSide(opts),
+                      BSON("$_internalSchemaMinItems"
+                           << "?"));
+}
+
+TEST(SerializeInternalSchema, MinLengthRedactsCorrectly) {
+    InternalSchemaMinLengthMatchExpression minLength("a"_sd, 2);
+    SerializationOptions opts;
+    opts.replacementForLiteralArgs = "?";
+    ASSERT_BSONOBJ_EQ(minLength.getSerializedRightHandSide(opts),
+                      BSON("$_internalSchemaMinLength"
+                           << "?"));
+}
+
+TEST(SerializeInternalSchema, MinPropertiesRedactsCorrectly) {
+    InternalSchemaMinPropertiesMatchExpression minProperties(5);
+    SerializationOptions opts;
+    opts.replacementForLiteralArgs = "?";
+
+    BSONObjBuilder bob;
+    minProperties.serialize(&bob, opts);
+    ASSERT_BSONOBJ_EQ(bob.done(),
+                      BSON("$_internalSchemaMinProperties"
+                           << "?"));
+}
+
+TEST(SerializeInternalSchema, ObjectMatchRedactsCorrectly) {
+    SerializationOptions opts;
+    opts.redactFieldNames = true;
+    opts.redactFieldNamesStrategy = redactFieldNameForTest;
+    opts.replacementForLiteralArgs = "?";
+    auto query = fromjson(
+        "    {a: {$_internalSchemaObjectMatch: {"
+        "        c: {$eq: 3}"
+        "    }}}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto objMatch = MatchExpressionParser::parse(query, expCtx);
+    ASSERT_OK(objMatch.getStatus());
+
+    ASSERT_BSONOBJ_EQ(
+        objMatch.getValue()->serialize(opts),
+        BSON("HASH(a)" << BSON("$_internalSchemaObjectMatch" << BSON("HASH(c)" << BSON("$eq"
+                                                                                       << "?")))));
+}
+
+TEST(SerializeInternalSchema, RootDocEqRedactsCorrectly) {
+    auto query = fromjson("{$_internalSchemaRootDocEq: {a:1, b: {c: 1, d: [1]}}}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    SerializationOptions opts;
+    opts.redactFieldNames = true;
+    opts.redactFieldNamesStrategy = redactFieldNameForTest;
+    opts.replacementForLiteralArgs = "?";
+    auto objMatch = MatchExpressionParser::parse(query, expCtx);
+    ASSERT_OK(objMatch.getStatus());
+
+    ASSERT_BSONOBJ_EQ(
+        objMatch.getValue()->serialize(opts),
+        BSON("$_internalSchemaRootDocEq" << BSON("HASH(a)"
+                                                 << "?"
+                                                 << "HASH(b)"
+                                                 << BSON("HASH(c)"
+                                                         << "?"
+                                                         << "HASH(d)" << BSON_ARRAY("?")))));
+}
+
+TEST(SerializeInternalSchema, BinDataEncryptedTypeRedactsCorrectly) {
+    MatcherTypeSet typeSet;
+    typeSet.bsonTypes.insert(BSONType::String);
+    typeSet.bsonTypes.insert(BSONType::Date);
+    InternalSchemaBinDataEncryptedTypeExpression e("a"_sd, std::move(typeSet));
+    SerializationOptions opts;
+    opts.replacementForLiteralArgs = "?";
+    ASSERT_BSONOBJ_EQ(BSON("$_internalSchemaBinDataEncryptedType"
+                           << "?"),
+                      e.getSerializedRightHandSide(opts));
+}
+
+TEST(SerializeInternalSchema, BinDataFLE2EncryptedTypeRedactsCorrectly) {
+    InternalSchemaBinDataFLE2EncryptedTypeExpression e("ssn"_sd, BSONType::String);
+    SerializationOptions opts;
+    opts.replacementForLiteralArgs = "?";
+    ASSERT_BSONOBJ_EQ(BSON("$_internalSchemaBinDataFLE2EncryptedType"
+                           << "?"),
+                      e.getSerializedRightHandSide(opts));
+}
+
+TEST(SerializesInternalSchema, MaxPropertiesRedactsCorrectly) {
+    InternalSchemaMaxPropertiesMatchExpression maxProperties(5);
+    SerializationOptions opts;
+    opts.replacementForLiteralArgs = "?";
+
+    BSONObjBuilder bob;
+    maxProperties.serialize(&bob, opts);
+    ASSERT_BSONOBJ_EQ(bob.done(),
+                      BSON("$_internalSchemaMaxProperties"
+                           << "?"));
+}
+
+TEST(SerializesInternalSchema, EqRedactsCorrectly) {
+    SerializationOptions opts;
+    opts.redactFieldNamesStrategy = redactFieldNameForTest;
+    opts.redactFieldNames = true;
+    opts.replacementForLiteralArgs = "?";
+    auto query = fromjson("{$_internalSchemaEq: {a:1, b: {c: 1, d: [1]}}}");
+    BSONObjBuilder bob;
+    InternalSchemaEqMatchExpression e("a"_sd, query.firstElement());
+    e.serialize(&bob, opts);
+    ASSERT_BSONOBJ_EQ(bob.done(),
+                      BSON("HASH(a)" << BSON("$_internalSchemaEq"
+                                             << BSON("HASH(a)"
+                                                     << "?"
+                                                     << "HASH(b)"
+                                                     << BSON("HASH(c)"
+                                                             << "?"
+                                                             << "HASH(d)" << BSON_ARRAY("?"))))));
+}
+
+TEST(InternalSchemaAllElemMatchFromIndexMatchExpression, RedactsExpressionCorrectly) {
+    auto query = fromjson("{a: {$_internalSchemaAllElemMatchFromIndex: [2, {a: {$lt: 5}}]}}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto expr = MatchExpressionParser::parse(query, expCtx);
+    ASSERT_OK(expr.getStatus());
+    auto elemMatchExpr = dynamic_cast<const InternalSchemaAllElemMatchFromIndexMatchExpression*>(
+        expr.getValue().get());
+
+    SerializationOptions opts;
+    opts.redactFieldNames = true;
+    opts.redactFieldNamesStrategy = redactFieldNameForTest;
+    opts.replacementForLiteralArgs = "?";
+
+    ASSERT_BSONOBJ_EQ(BSON("$_internalSchemaAllElemMatchFromIndex"
+                           << BSON_ARRAY("?" << BSON("HASH(a)" << BSON("$lt"
+                                                                       << "?")))),
+                      elemMatchExpr->getSerializedRightHandSide(opts));
+}
 }  // namespace
 }  // namespace mongo

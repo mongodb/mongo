@@ -2390,12 +2390,7 @@ Value ExpressionObject::serialize(SerializationOptions options) const {
     }
     MutableDocument outputDoc;
     for (auto&& pair : _expressions) {
-        if (options.redactFieldNames) {
-            outputDoc.addField(options.redactFieldNamesStrategy(pair.first),
-                               pair.second->serialize(options));
-        } else {
-            outputDoc.addField(pair.first, pair.second->serialize(options));
-        }
+        outputDoc.addField(options.serializeFieldName(pair.first), pair.second->serialize(options));
     }
     return outputDoc.freezeToValue();
 }

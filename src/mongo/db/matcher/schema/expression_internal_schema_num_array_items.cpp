@@ -52,9 +52,12 @@ void InternalSchemaNumArrayItemsMatchExpression::debugString(StringBuilder& debu
 
 BSONObj InternalSchemaNumArrayItemsMatchExpression::getSerializedRightHandSide(
     SerializationOptions opts) const {
-    // TODO SERVER-73678 respect 'replacementForLiteralArgs'.
     BSONObjBuilder objBuilder;
-    objBuilder.append(_name, _numItems);
+    if (opts.replacementForLiteralArgs) {
+        objBuilder.append(_name, opts.replacementForLiteralArgs.get());
+    } else {
+        objBuilder.append(_name, _numItems);
+    }
     return objBuilder.obj();
 }
 

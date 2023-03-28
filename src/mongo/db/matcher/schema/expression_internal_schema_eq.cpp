@@ -64,8 +64,18 @@ void InternalSchemaEqMatchExpression::debugString(StringBuilder& debug,
 
 BSONObj InternalSchemaEqMatchExpression::getSerializedRightHandSide(
     SerializationOptions opts) const {
-    // TODO SERVER-73678 respect 'replacementForLiteralArgs.'
     BSONObjBuilder eqObj;
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        if (_rhsElem.isABSONObj()) {
+            BSONObjBuilder exprSpec(eqObj.subobjStart(kName));
+            opts.redactObjToBuilder(&exprSpec, _rhsElem.Obj());
+            exprSpec.done();
+            return eqObj.obj();
+        } else if (opts.replacementForLiteralArgs) {
+            // If the element is not an object it must be a literal.
+            return BSON(kName << opts.replacementForLiteralArgs.get());
+        }
+    }
     eqObj.appendAs(_rhsElem, kName);
     return eqObj.obj();
 }

@@ -77,8 +77,11 @@ public:
     }
 
     BSONObj getSerializedRightHandSide(SerializationOptions opts) const final {
-        // TODO SERVER-73678 respect 'replacementForLiteralArgs'.
         BSONObjBuilder subBuilder;
+        if (opts.replacementForLiteralArgs) {
+            subBuilder.append(name(), opts.replacementForLiteralArgs.get());
+            return subBuilder.obj();
+        }
         BSONArrayBuilder arrBuilder(subBuilder.subarrayStart(name()));
         _typeSet.toBSONArray(&arrBuilder);
         arrBuilder.doneFast();
@@ -244,9 +247,12 @@ public:
     }
 
     BSONObj getSerializedRightHandSide(SerializationOptions opts) const final {
-        // TODO SERVER-73678 respect 'replacementForLiteralArgs'.
         BSONObjBuilder bob;
-        bob.append(name(), _binDataSubType);
+        if (opts.replacementForLiteralArgs) {
+            bob.append(name(), opts.replacementForLiteralArgs.get());
+        } else {
+            bob.append(name(), _binDataSubType);
+        }
         return bob.obj();
     }
 
