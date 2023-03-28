@@ -159,6 +159,12 @@ public:
     }
 
     void serialize(BSONObjBuilder* out, SerializationOptions opts) const override {
+        // TODO SERVER-73678 do we need to pass 'includePath' or other options to
+        // `getSerializedRightHandSide()` here? I don't think we need 'includePath' for
+        // LeafMatchExpression subclasses, but the class comment on PathMatchExpression leaves me a
+        // bit confused over 'includePath' semantics here. Before we changed anything for query
+        // shape, it looks like 'includePath' was not forwarded through, so it's either not needed
+        // or there was a pre-existing bug.
         auto&& rhs = getSerializedRightHandSide(opts);
         if (opts.includePath) {
             if (opts.redactFieldNames) {

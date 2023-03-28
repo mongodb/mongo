@@ -52,12 +52,9 @@ void InternalSchemaStrLengthMatchExpression::debugString(StringBuilder& debug,
 
 BSONObj InternalSchemaStrLengthMatchExpression::getSerializedRightHandSide(
     SerializationOptions opts) const {
+    // TODO SERVER-73678 respect 'replacementForLiteralArgs'.
     BSONObjBuilder objBuilder;
-    if (opts.replacementForLiteralArgs) {
-        objBuilder.append(opts.serializeFieldName(_name), opts.replacementForLiteralArgs.get());
-    } else {
-        objBuilder.append(opts.serializeFieldName(_name), _strLen);
-    }
+    objBuilder.append(_name, _strLen);
     return objBuilder.obj();
 }
 

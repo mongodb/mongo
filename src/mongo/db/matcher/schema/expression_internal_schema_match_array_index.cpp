@@ -68,20 +68,12 @@ bool InternalSchemaMatchArrayIndexMatchExpression::equivalent(const MatchExpress
 
 BSONObj InternalSchemaMatchArrayIndexMatchExpression::getSerializedRightHandSide(
     SerializationOptions opts) const {
+    // TODO SERVER-73678 respect 'replacementForLiteralArgs'.
     BSONObjBuilder objBuilder;
     {
         BSONObjBuilder matchArrayElemSubobj(objBuilder.subobjStart(kName));
-        if (opts.replacementForLiteralArgs) {
-            matchArrayElemSubobj.append("index", opts.replacementForLiteralArgs.get());
-        } else {
-            matchArrayElemSubobj.append("index", _index);
-        }
-        if (auto placeHolder = _expression->getPlaceholder()) {
-            matchArrayElemSubobj.append("namePlaceholder",
-                                        opts.serializeFieldName(placeHolder.get()));
-        } else {
-            matchArrayElemSubobj.append("namePlaceholder", "");
-        }
+        matchArrayElemSubobj.append("index", _index);
+        matchArrayElemSubobj.append("namePlaceholder", _expression->getPlaceholder().value_or(""));
         {
             BSONObjBuilder subexprSubObj(matchArrayElemSubobj.subobjStart("expression"));
             _expression->getFilter()->serialize(&subexprSubObj, opts);

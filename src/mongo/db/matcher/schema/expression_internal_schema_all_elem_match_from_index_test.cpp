@@ -136,5 +136,6 @@ DEATH_TEST_REGEX(InternalSchemaAllElemMatchFromIndexMatchExpression,
     ASSERT_EQ(objMatch.getValue()->numChildren(), 1);
     ASSERT_THROWS_CODE(objMatch.getValue()->getChild(1), AssertionException, 6400200);
 }
+
 }  // namespace
 }  // namespace mongo
