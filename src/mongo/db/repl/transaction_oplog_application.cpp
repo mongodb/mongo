@@ -89,9 +89,26 @@ Status _applyOperationsForTransaction(OperationContext* opCtx,
             }
         } catch (const DBException& ex) {
             // Ignore NamespaceNotFound errors if we are in initial sync or recovering mode.
+            // During recovery we reconsutuct prepared transactions at the end after applying all
+            // the oplogs, so 'NamespaceNotFound' error shouldn't be hit whether it is a stable or
+            // unstable recovery. However we have some scenarios when this error should be skipped:
+            //  1- This code path can be called while applying commit oplog during unstable recovery
+            //     when 'startupRecoveryForRestore' is set.
+            //  2- During selective backup:
+            //     - During restore when 'recoverFromOplogAsStandalone' is set which is usually be
+            //       done in a stable recovery mode.
+            //     - After the restore finished as the standalone node started with the flag
+            //       'takeUnstableCheckpointOnShutdown' so after restarting the node as a replica
+            //       set member it will go through unstable recovery.
             const bool ignoreException = ex.code() == ErrorCodes::NamespaceNotFound &&
                 (oplogApplicationMode == repl::OplogApplication::Mode::kInitialSync ||
-                 oplogApplicationMode == repl::OplogApplication::Mode::kRecovering);
+                 repl::OplogApplication::inRecovering(oplogApplicationMode));
+
+            if (ex.code() == ErrorCodes::NamespaceNotFound &&
+                oplogApplicationMode == repl::OplogApplication::Mode::kStableRecovering) {
+                repl::OplogApplication::checkOnOplogFailureForRecovery(
+                    opCtx, redact(op.toBSONForLogging()), redact(ex));
+            }
 
             if (!ignoreException) {
                 LOGV2_DEBUG(
@@ -131,7 +148,7 @@ Status _applyTransactionFromOplogChain(OperationContext* opCtx,
                                        repl::OplogApplication::Mode mode,
                                        Timestamp commitTimestamp,
                                        Timestamp durableTimestamp) {
-    invariant(mode == repl::OplogApplication::Mode::kRecovering);
+    invariant(repl::OplogApplication::inRecovering(mode));
 
     auto ops = readTransactionOperationsFromOplogChain(opCtx, entry, {});
 
@@ -190,7 +207,8 @@ Status applyCommitTransaction(OperationContext* opCtx,
     invariant(commitCommand.getCommitTimestamp());
 
     switch (mode) {
-        case repl::OplogApplication::Mode::kRecovering: {
+        case repl::OplogApplication::Mode::kUnstableRecovering:
+        case repl::OplogApplication::Mode::kStableRecovering: {
             return _applyTransactionFromOplogChain(opCtx,
                                                    entry,
                                                    mode,
@@ -237,7 +255,8 @@ Status applyAbortTransaction(OperationContext* opCtx,
                              const OplogEntry& entry,
                              repl::OplogApplication::Mode mode) {
     switch (mode) {
-        case repl::OplogApplication::Mode::kRecovering: {
+        case repl::OplogApplication::Mode::kUnstableRecovering:
+        case repl::OplogApplication::Mode::kStableRecovering: {
             // We don't put transactions into the prepare state until the end of recovery,
             // so there is no transaction to abort.
             return Status::OK();
@@ -389,7 +408,7 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
     // The prepare time of the transaction is set explicitly below.
     auto ops = readTransactionOperationsFromOplogChain(opCtx, entry, {});
 
-    if (mode == repl::OplogApplication::Mode::kRecovering ||
+    if (repl::OplogApplication::inRecovering(mode) ||
         mode == repl::OplogApplication::Mode::kInitialSync) {
         // We might replay a prepared transaction behind oldest timestamp.  Note that since this is
         // scoped to the storage transaction, and readTransactionOperationsFromOplogChain implicitly
@@ -466,7 +485,7 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
 
         // Set this in case the application of any ops need to use the prepare timestamp of this
         // transaction. It should be cleared automatically when the transaction finishes.
-        if (mode == repl::OplogApplication::Mode::kRecovering ||
+        if (repl::OplogApplication::inRecovering(mode) ||
             mode == repl::OplogApplication::Mode::kInitialSync) {
             txnParticipant.setPrepareOpTimeForRecovery(opCtx, entry.getOpTime());
         }
@@ -549,7 +568,8 @@ Status applyPrepareTransaction(OperationContext* opCtx,
                                const OplogEntry& entry,
                                repl::OplogApplication::Mode mode) {
     switch (mode) {
-        case repl::OplogApplication::Mode::kRecovering: {
+        case repl::OplogApplication::Mode::kUnstableRecovering:
+        case repl::OplogApplication::Mode::kStableRecovering: {
             if (!serverGlobalParams.enableMajorityReadConcern) {
                 LOGV2_ERROR(
                     21850,
