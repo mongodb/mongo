@@ -31,12 +31,14 @@
 
 #include "mongo/base/shim.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/role_name.h"
 #include "mongo/embedded/not_implemented.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace embedded {
 namespace {
+const std::set<RoleName> kEmptyRoleNameSet;
 
 class Impl : public UserNameIterator::Impl {
     bool more() const override {
@@ -99,7 +101,7 @@ public:
     }
 
     RoleNameIterator getAuthenticatedRoleNames() override {
-        UASSERT_NOT_IMPLEMENTED;
+        return makeRoleNameIteratorForContainer(kEmptyRoleNameSet);
     }
 
     void grantInternalAuthorization(Client* client) override {
@@ -196,7 +198,7 @@ public:
     }
 
     bool isImpersonating() const override {
-        UASSERT_NOT_IMPLEMENTED;
+        return false;
     }
 
     Status checkCursorSessionPrivilege(OperationContext*,
@@ -230,10 +232,6 @@ public:
 
     bool isExpired() const override {
         return false;
-    }
-
-    BSONArray getUserRoles() override {
-        UASSERT_NOT_IMPLEMENTED;
     }
 
 protected:

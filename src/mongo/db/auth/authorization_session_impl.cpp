@@ -1144,23 +1144,4 @@ bool AuthorizationSessionImpl::isExpired() const {
     return _expiredUserName.has_value();
 }
 
-BSONArray AuthorizationSessionImpl::getUserRoles() {
-    std::vector roleNames = isImpersonating() ? _impersonatedRoleNames : _authenticatedRoleNames;
-
-    BSONArrayBuilder builder;
-    for (const auto& roleName : roleNames) {
-        std::string db = roleName.getDatabaseName().db();
-        std::string role = roleName.getRole();
-
-        BSONObjBuilder bob;
-        bob.append("_id", db + "." + role);
-        bob.append("role", role);
-        bob.append("db", db);
-
-        builder.append(bob.obj());
-    }
-
-    return builder.arr();
-}
-
 }  // namespace mongo

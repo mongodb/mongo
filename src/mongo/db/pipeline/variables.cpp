@@ -360,20 +360,23 @@ LegacyRuntimeConstants Variables::transitionalExtractRuntimeConstants() const {
 }
 
 void Variables::defineUserRoles(OperationContext* opCtx) {
-    auto userRoles = BSONArray{};
-    try {
-        // If the authorization session exists for the client, get the user roles.
-        auto authorizationSession = AuthorizationSession::get(opCtx->getClient());
-        userRoles = authorizationSession->getUserRoles();
-    } catch (const DBException& ex) {
-        // ErrorCodes::NotImplemented would be encountered here when we are running the embedded
-        // library.
-        // TODO SERVER-70429: Remove the check for ErrorCodes::NotImplemented.
-        if (ex.code() != ErrorCodes::NotImplemented) {
-            throw;
-        }
+    auto* as = AuthorizationSession::get(opCtx->getClient());
+
+    auto roleNames =
+        as->isImpersonating() ? as->getImpersonatedRoleNames() : as->getAuthenticatedRoleNames();
+    // Marshall current effective user roles into an array of
+    // {_id: ..., db: ..., role: ...} objects for the $$USER_ROLES variable.
+    BSONArrayBuilder builder;
+    for (; roleNames.more(); roleNames.next()) {
+        BSONObjBuilder bob(builder.subobjStart());
+
+        bob.append("_id"_sd, roleNames->getUnambiguousName());
+        bob.append("role"_sd, roleNames->getRole());
+        bob.append("db"_sd, roleNames->getDB());
+        bob.doneFast();
     }
-    _definitions[kUserRolesId] = {Value(std::move(userRoles)), true /* isConst */};
+
+    _definitions[kUserRolesId] = {Value(builder.arr()), true /* isConst */};
 }
 
 Variables::Id VariablesParseState::defineVariable(StringData name) {

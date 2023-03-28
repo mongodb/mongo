@@ -313,15 +313,6 @@ public:
     // isAuthenticated() is also expected to return false.
     virtual bool isExpired() const = 0;
 
-    // Returns the role names of the impersonated user, or if there isn't one, those of the
-    // authenticated user. Each element in the returned array is an object of the form
-    // {
-    //      _id: <concatenation of 'db' field and 'role' field>
-    //      role: <role name>
-    //      db: <database on which the user has the above role>
-    // }
-    virtual BSONArray getUserRoles() = 0;
-
 protected:
     virtual std::tuple<boost::optional<UserName>*, std::vector<RoleName>*> _getImpersonations() = 0;
 };
