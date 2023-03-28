@@ -262,26 +262,6 @@ public:
              const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        // Always wait for at least majority writeConcern to ensure all writes involved in the
-        // upgrade process cannot be rolled back. There is currently no mechanism to specify a
-        // default writeConcern, so we manually call waitForWriteConcern upon exiting this command.
-        //
-        // TODO SERVER-25778: replace this with the general mechanism for specifying a default
-        // writeConcern.
-        ON_BLOCK_EXIT([&] {
-            WriteConcernResult res;
-            auto waitForWCStatus = waitForWriteConcern(
-                opCtx,
-                repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp(),
-                WriteConcernOptions(
-                    repl::ReplSetConfig::kMajorityWriteConcernModeName,
-                    WriteConcernOptions::SyncMode::UNSET,
-                    // Propagate the user's wTimeout if one was given. Default is kNoTimeout.
-                    opCtx->getWriteConcern().wTimeout),
-                &res);
-            CommandHelpers::appendCommandWCStatus(result, waitForWCStatus, res);
-        });
-
         // Ensure that this operation will be killed by the RstlKillOpThread during step-up or
         // stepdown.
         opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
@@ -302,9 +282,49 @@ public:
         const auto requestedVersion = request.getCommandParameter();
         const auto actualVersion = serverGlobalParams.featureCompatibility.getVersion();
 
+        auto isConfirmed = request.getConfirm().value_or(false);
+        // TODO (SERVER-74398): Remove this flag once 7.0 is last LTS.
+        if (mongo::repl::requireConfirmInSetFcv) {
+            const auto upgradeMsg =
+                "Once you have upgraded to {}, you will not be able to downgrade FCV and binary version without support assistance. Please re-run this command with 'confirm: true' to acknowledge this and continue with the FCV upgrade."_format(
+                    multiversion::toString(requestedVersion));
+            const auto downgradeMsg =
+                "Once you have downgraded the FCV, if you choose to downgrade the binary version, "
+                "it will require support assistance. Please re-run this command with 'confirm: "
+                "true' to acknowledge this and continue with the FCV downgrade.";
+            uassert(7369100,
+                    (requestedVersion > actualVersion ? upgradeMsg : downgradeMsg),
+                    // If the request is from a config svr, skip requiring the 'confirm: true'
+                    // parameter.
+                    (isFromConfigServer || isConfirmed));
+        }
+
+        // Always wait for at least majority writeConcern to ensure all writes involved in the
+        // upgrade/downgrade process cannot be rolled back. There is currently no mechanism to
+        // specify a default writeConcern, so we manually call waitForWriteConcern upon exiting this
+        // command.
+        //
+        // TODO SERVER-25778: replace this with the general mechanism for specifying a default
+        // writeConcern.
+        ON_BLOCK_EXIT([&] {
+            WriteConcernResult res;
+            auto waitForWCStatus = waitForWriteConcern(
+                opCtx,
+                repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp(),
+                WriteConcernOptions(
+                    repl::ReplSetConfig::kMajorityWriteConcernModeName,
+                    WriteConcernOptions::SyncMode::UNSET,
+                    // Propagate the user's wTimeout if one was given. Default is kNoTimeout.
+                    opCtx->getWriteConcern().wTimeout),
+                &res);
+            CommandHelpers::appendCommandWCStatus(result, waitForWCStatus, res);
+        });
+
         if (requestedVersion == actualVersion) {
             // Set the client's last opTime to the system last opTime so no-ops wait for
-            // writeConcern.
+            // writeConcern. This will wait for any previous setFCV disk writes to be majority
+            // committed before returning to the user, if the previous setFCV command had updated
+            // the FCV but encountered failover afterwards.
             repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
 
             // TODO SERVER-72796: Remove once gGlobalIndexesShardingCatalog is enabled.

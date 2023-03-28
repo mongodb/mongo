@@ -665,3 +665,4 @@ def _add_testing_set_parameters(suite_set_parameters):
     suite_set_parameters.setdefault("testingDiagnosticsEnabled", True)
     suite_set_parameters.setdefault("enableTestCommands", True)
     suite_set_parameters.setdefault("disableTransitionFromLatestToLastContinuous", False)
+    suite_set_parameters.setdefault("requireConfirmInSetFcv", False)

@@ -63,6 +63,7 @@ DEFAULT_CRASH_METHOD = "internal"
 DEFAULT_TEST_LOOPS = 15
 DEFAULT_SEED_DOC_NUM = 10_000
 DEFAULT_MONGOD_OPTIONS = ("--setParameter enableTestCommands=1"
+                          " --setParameter requireConfirmInSetFcv=false"
                           " --setParameter logComponentVerbosity='{storage:{recovery:2}}'"
                           " --storageEngine wiredTiger"
                           " --wiredTigerEngineConfigString 'debug_mode=[table_logging=true]'")

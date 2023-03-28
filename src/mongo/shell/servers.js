@@ -710,16 +710,26 @@ MongoRunner.mongodOptions = function(opts = {}) {
 
     opts.pathOpts = Object.merge(opts.pathOpts, {dbpath: opts.dbpath});
 
-    // TODO (SERVER-74847): Remove this transition once we remove testing around
-    // downgrading from latest to last continuous.
     opts.setParameter = opts.setParameter || {};
     if (jsTestOptions().enableTestCommands && typeof opts.setParameter !== "string") {
+        // TODO (SERVER-74847): Remove this transition once we remove testing around
+        // downgrading from latest to last continuous.
         if (jsTestOptions().setParameters &&
             jsTestOptions().setParameters.disableTransitionFromLatestToLastContinuous) {
             opts.setParameter["disableTransitionFromLatestToLastContinuous"] =
                 jsTestOptions().setParameters.disableTransitionFromLatestToLastContinuous;
         } else {
             opts.setParameter["disableTransitionFromLatestToLastContinuous"] = false;
+        }
+
+        // TODO (SERVER-74398): Remove special handling of 'confirm: true' once we no longer run
+        // suites with v6.X. We disable this check by default now so that we can pass suites
+        // without individually handling each multiversion test running on old binaries.
+        if (jsTestOptions().setParameters && jsTestOptions().setParameters.requireConfirmInSetFcv) {
+            opts.setParameter["requireConfirmInSetFcv"] =
+                jsTestOptions().setParameters.requireConfirmInSetFcv;
+        } else {
+            opts.setParameter["requireConfirmInSetFcv"] = false;
         }
     }
 
@@ -739,6 +749,7 @@ MongoRunner.mongodOptions = function(opts = {}) {
         opts, "internalQueryDisableExclusionProjectionFastPath", "6.2.0");
     _removeSetParameterIfBeforeVersion(
         opts, "disableTransitionFromLatestToLastContinuous", "7.0.0");
+    _removeSetParameterIfBeforeVersion(opts, "requireConfirmInSetFcv", "7.0.0");
 
     if (!opts.logFile && opts.useLogFiles) {
         opts.logFile = opts.dbpath + "/mongod.log";

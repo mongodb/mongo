@@ -371,6 +371,7 @@ def _add_testing_set_parameters(suite_set_parameters):
     """
     suite_set_parameters.setdefault("testingDiagnosticsEnabled", True)
     suite_set_parameters.setdefault("enableTestCommands", True)
+    suite_set_parameters.setdefault("requireConfirmInSetFcv", False)
     # The exact file location is on a per-process basis, so it'll have to be determined when the process gets spun up.
     # Set it to true for now as a placeholder that will error if no further processing is done.
     # The placeholder is needed so older versions don't have this option won't have this value set.

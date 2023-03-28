@@ -93,7 +93,8 @@ class DatabaseInstance:
         version = (await self.client.admin.command(
             {'getParameter': 1,
              'featureFlagCommonQueryFramework': 1}))['featureFlagCommonQueryFramework']['version']
-        await self.client.admin.command({'setFeatureCompatibilityVersion': version})
+        await self.client.admin.command(
+            {'setFeatureCompatibilityVersion': version, 'confirm': True})
 
         await self.client.admin.command(
             {'configureFailPoint': 'enableExplainInBonsai', 'mode': 'alwaysOn'})

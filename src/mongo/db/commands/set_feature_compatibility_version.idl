@@ -58,6 +58,16 @@ commands:
         api_version: ""
         type: fcv_string
         fields:
+            confirm:
+                description: "A required parameter that ensures that the user is
+                              upgrading/downgrading with support assistance. Internal setFCV
+                              commands issue from the config svr will not require this parameter.
+                              If this parameter is not specified from a user command, the setFCV
+                              command will error out. This parameter is declared optional so that
+                              we can provide the user with a custom error message if it is not
+                              specified."
+                type: safeBool
+                optional: true
             fromConfigServer:
                 description: "A boolean that indicates whether the command is being requested by a
                               config server. Normally FCV upgrades between last-lts and anything

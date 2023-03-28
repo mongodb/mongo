@@ -611,6 +611,17 @@ server_parameters:
         cpp_varname: enableReconfigRollbackCommittedWritesCheck
         default: true
 
+    # TODO (SERVER-74398): Remove special handling of 'confirm: true' in setFCV.
+    requireConfirmInSetFcv:
+        description: >-
+            Determines if we must specify 'confirm: true' in the setFCV command. Enabled by default.
+            Test-only.
+        test_only: true
+        set_at: startup
+        cpp_vartype: bool
+        cpp_varname: requireConfirmInSetFcv
+        default: true
+
     initialSyncMethod:
         description: >-
             Specifies which method of initial sync to use. Valid options are: fileCopyBased,
