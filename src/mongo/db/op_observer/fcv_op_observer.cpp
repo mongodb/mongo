@@ -165,7 +165,8 @@ void FcvOpObserver::onInserts(OperationContext* opCtx,
                               const CollectionPtr& coll,
                               std::vector<InsertStatement>::const_iterator first,
                               std::vector<InsertStatement>::const_iterator last,
-                              bool fromMigrate) {
+                              std::vector<bool> fromMigrate,
+                              bool defaultFromMigrate) {
     if (coll->ns().isServerConfigurationCollection()) {
         for (auto it = first; it != last; it++) {
             _onInsertOrUpdate(opCtx, it->doc);

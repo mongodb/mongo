@@ -109,7 +109,8 @@ void ConfigServerOpObserver::onInserts(OperationContext* opCtx,
                                        const CollectionPtr& coll,
                                        std::vector<InsertStatement>::const_iterator begin,
                                        std::vector<InsertStatement>::const_iterator end,
-                                       bool fromMigrate) {
+                                       std::vector<bool> fromMigrate,
+                                       bool defaultFromMigrate) {
     if (coll->ns().isServerConfigurationCollection()) {
         auto idElement = begin->doc["_id"];
         if (idElement.type() == BSONType::String &&

@@ -106,7 +106,12 @@ protected:
         deleteArgs.fromMigrate = fromMigrate;
         if (shouldSucceed) {
             try {
-                opObserver.onInserts(opCtx, *autoColl, inserts.begin(), inserts.end(), fromMigrate);
+                opObserver.onInserts(opCtx,
+                                     *autoColl,
+                                     inserts.begin(),
+                                     inserts.end(),
+                                     /*fromMigrate=*/std::vector<bool>(inserts.size(), fromMigrate),
+                                     /*defaultFromMigrate=*/fromMigrate);
                 opObserver.onUpdate(opCtx, updateArgs);
                 opObserver.onDelete(opCtx, *autoColl, StmtId(), deleteArgs);
             } catch (...) {
@@ -115,7 +120,12 @@ protected:
             }
         } else {
             ASSERT_THROWS(
-                opObserver.onInserts(opCtx, *autoColl, inserts.begin(), inserts.end(), fromMigrate),
+                opObserver.onInserts(opCtx,
+                                     *autoColl,
+                                     inserts.begin(),
+                                     inserts.end(),
+                                     /*fromMigrate=*/std::vector<bool>(inserts.size(), fromMigrate),
+                                     /*defaultFromMigrate=*/fromMigrate),
                 AssertionException);
             ASSERT_THROWS(opObserver.onUpdate(opCtx, updateArgs), AssertionException);
             ASSERT_THROWS(opObserver.onDelete(opCtx, *autoColl, StmtId(), deleteArgs),

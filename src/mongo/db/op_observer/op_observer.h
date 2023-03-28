@@ -176,11 +176,21 @@ public:
                                    const Status& cause,
                                    bool fromMigrate) = 0;
 
+    /**
+     * 'fromMigrate' array contains settings for each insert operation and takes into
+     * account orphan documents.
+     * 'defaultFromMigrate' is the initial 'fromMigrate' value for the 'fromMigrate' array
+     * and is intended to be forwarded to downstream subsystems that expect a single
+     * 'fromMigrate' to describe the entire set of inserts.
+     * Examples: ShardServerOpObserver, UserWriteBlockModeOpObserver, and
+     * OpObserverShardingImpl::shardObserveInsertsOp().
+     */
     virtual void onInserts(OperationContext* opCtx,
                            const CollectionPtr& coll,
                            std::vector<InsertStatement>::const_iterator begin,
                            std::vector<InsertStatement>::const_iterator end,
-                           bool fromMigrate) = 0;
+                           std::vector<bool> fromMigrate,
+                           bool defaultFromMigrate) = 0;
 
     virtual void onInsertGlobalIndexKey(OperationContext* opCtx,
                                         const NamespaceString& globalIndexNss,

@@ -254,7 +254,12 @@ TEST_F(DocumentKeyStateTest, CheckDBVersion) {
 
     // OpObserver calls
     auto onInsert = [&]() {
-        opObserver.onInserts(opCtx, *autoColl, toInsert.begin(), toInsert.end(), fromMigrate);
+        opObserver.onInserts(opCtx,
+                             *autoColl,
+                             toInsert.begin(),
+                             toInsert.end(),
+                             /*fromMigrate=*/std::vector<bool>(toInsert.size(), fromMigrate),
+                             /*defaultFromMigrate=*/fromMigrate);
     };
     auto onUpdate = [&]() {
         opObserver.onUpdate(opCtx, update);

@@ -95,7 +95,12 @@ protected:
         {
             AutoGetCollection autoColl(_opCtx.get(), _nss, MODE_IX);
             WriteUnitOfWork wow(_opCtx.get());
-            _observer->onInserts(_opCtx.get(), *autoColl, inserts.begin(), inserts.end(), false);
+            _observer->onInserts(_opCtx.get(),
+                                 *autoColl,
+                                 inserts.begin(),
+                                 inserts.end(),
+                                 /*fromMigrate=*/std::vector<bool>(inserts.size(), false),
+                                 /*defaultFromMigrate=*/false);
             wow.commit();
         }
 
@@ -212,7 +217,12 @@ TEST_F(ShardSplitDonorOpObserverTest, InsertWrongType) {
 
     AutoGetCollection autoColl(_opCtx.get(), _nss, MODE_IX);
     ASSERT_THROWS_CODE(
-        _observer->onInserts(_opCtx.get(), *autoColl, inserts1.begin(), inserts1.end(), false),
+        _observer->onInserts(_opCtx.get(),
+                             *autoColl,
+                             inserts1.begin(),
+                             inserts1.end(),
+                             /*fromMigrate=*/std::vector<bool>(inserts1.size(), false),
+                             /*defaultFromMigrate=*/false),
         DBException,
         ErrorCodes::TypeMismatch);
 }
@@ -251,7 +261,12 @@ TEST_F(ShardSplitDonorOpObserverTest, InsertValidAbortedDocument) {
     {
         AutoGetCollection autoColl(_opCtx.get(), _nss, MODE_IX);
         WriteUnitOfWork wow(_opCtx.get());
-        _observer->onInserts(_opCtx.get(), *autoColl, inserts.begin(), inserts.end(), false);
+        _observer->onInserts(_opCtx.get(),
+                             *autoColl,
+                             inserts.begin(),
+                             inserts.end(),
+                             /*fromMigrate=*/std::vector<bool>(inserts.size(), false),
+                             /*defaultFromMigrate=*/false);
         wow.commit();
     }
 

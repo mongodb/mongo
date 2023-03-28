@@ -574,8 +574,12 @@ TEST_F(ShardingRecoveryServiceTestOnSecondary, BlockAndUnblockOperationsOnDataba
 
         WriteUnitOfWork wuow(opCtx());
         AutoGetDb db(opCtx(), dbName.dbName(), MODE_IX);
-        opObserver().onInserts(
-            opCtx(), criticalSectionColl(), inserts.begin(), inserts.end(), false);
+        opObserver().onInserts(opCtx(),
+                               criticalSectionColl(),
+                               inserts.begin(),
+                               inserts.end(),
+                               /*fromMigrate=*/std::vector<bool>(inserts.size(), false),
+                               /*defaultFromMigrate=*/false);
         wuow.commit();
     }
 
@@ -639,8 +643,12 @@ TEST_F(ShardingRecoveryServiceTestOnSecondary, BlockAndUnblockOperationsOnCollec
 
         WriteUnitOfWork wuow(opCtx());
         AutoGetCollection coll(opCtx(), collNss, MODE_IX);
-        opObserver().onInserts(
-            opCtx(), criticalSectionColl(), inserts.begin(), inserts.end(), false);
+        opObserver().onInserts(opCtx(),
+                               criticalSectionColl(),
+                               inserts.begin(),
+                               inserts.end(),
+                               /*fromMigrate=*/std::vector<bool>(inserts.size(), false),
+                               /*defaultFromMigrate=*/false);
         wuow.commit();
     }
 

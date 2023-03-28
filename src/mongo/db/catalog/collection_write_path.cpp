@@ -230,7 +230,12 @@ Status insertDocumentsImpl(OperationContext* opCtx,
 
     if (!nss.isImplicitlyReplicated()) {
         opCtx->getServiceContext()->getOpObserver()->onInserts(
-            opCtx, collection, begin, end, fromMigrate);
+            opCtx,
+            collection,
+            begin,
+            end,
+            /*fromMigrate=*/std::vector<bool>(std::distance(begin, end), fromMigrate),
+            /*defaultFromMigrate=*/fromMigrate);
     }
 
     cappedDeleteUntilBelowConfiguredMaximum(opCtx, collection, records.begin()->id);
@@ -295,7 +300,12 @@ Status insertDocumentForBulkLoader(OperationContext* opCtx,
     inserts.emplace_back(kUninitializedStmtId, doc, slot);
 
     opCtx->getServiceContext()->getOpObserver()->onInserts(
-        opCtx, collection, inserts.begin(), inserts.end(), false);
+        opCtx,
+        collection,
+        inserts.begin(),
+        inserts.end(),
+        /*fromMigrate=*/std::vector<bool>(inserts.size(), false),
+        /*defaultFromMigrate=*/false);
 
     cappedDeleteUntilBelowConfiguredMaximum(opCtx, collection, loc.getValue());
 

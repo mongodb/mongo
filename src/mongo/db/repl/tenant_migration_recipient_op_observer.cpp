@@ -205,7 +205,8 @@ void TenantMigrationRecipientOpObserver::onInserts(
     const CollectionPtr& coll,
     std::vector<InsertStatement>::const_iterator first,
     std::vector<InsertStatement>::const_iterator last,
-    bool fromMigrate) {
+    std::vector<bool> fromMigrate,
+    bool defaultFromMigrate) {
     if (coll->ns() == NamespaceString::kTenantMigrationRecipientsNamespace &&
         !tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         for (auto it = first; it != last; it++) {

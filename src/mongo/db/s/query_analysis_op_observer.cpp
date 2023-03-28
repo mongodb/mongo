@@ -50,7 +50,8 @@ void QueryAnalysisOpObserver::onInserts(OperationContext* opCtx,
                                         const CollectionPtr& coll,
                                         std::vector<InsertStatement>::const_iterator begin,
                                         std::vector<InsertStatement>::const_iterator end,
-                                        bool fromMigrate) {
+                                        std::vector<bool> fromMigrate,
+                                        bool defaultFromMigrate) {
     if (analyze_shard_key::supportsCoordinatingQueryAnalysis(opCtx)) {
         if (coll->ns() == NamespaceString::kConfigQueryAnalyzersNamespace) {
             for (auto it = begin; it != end; ++it) {

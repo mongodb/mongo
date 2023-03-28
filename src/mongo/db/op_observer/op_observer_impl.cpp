@@ -571,6 +571,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
                                const CollectionPtr& coll,
                                std::vector<InsertStatement>::const_iterator first,
                                std::vector<InsertStatement>::const_iterator last,
+                               std::vector<bool> fromMigrate,
                                bool defaultFromMigrate) {
     auto txnParticipant = TransactionParticipant::get(opCtx);
     const bool inMultiDocumentTransaction =
@@ -670,7 +671,6 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         Date_t lastWriteDate = getWallClockTimeForOpLog(opCtx);
         oplogEntryTemplate.setWallClockTime(lastWriteDate);
 
-        std::vector<bool> fromMigrate(std::distance(first, last), defaultFromMigrate);
         opTimeList = _oplogWriter->logInsertOps(opCtx,
                                                 &oplogEntryTemplate,
                                                 first,

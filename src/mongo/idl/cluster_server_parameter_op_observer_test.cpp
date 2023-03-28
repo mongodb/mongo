@@ -73,8 +73,12 @@ public:
         WriteUnitOfWork wuow(opCtx.get());
 
         AutoGetCollection autoColl(opCtx.get(), nss, MODE_IX);
-        observer.onInserts(
-            opCtx.get(), *autoColl, stmts.cbegin(), stmts.cend(), false /* fromMigrate */);
+        observer.onInserts(opCtx.get(),
+                           *autoColl,
+                           stmts.cbegin(),
+                           stmts.cend(),
+                           /*fromMigrate=*/std::vector<bool>(stmts.size(), false),
+                           /*defaultFromMigrate=*/false);
         if (commit)
             wuow.commit();
     }

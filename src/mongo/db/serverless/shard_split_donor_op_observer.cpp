@@ -310,7 +310,8 @@ void ShardSplitDonorOpObserver::onInserts(OperationContext* opCtx,
                                           const CollectionPtr& coll,
                                           std::vector<InsertStatement>::const_iterator first,
                                           std::vector<InsertStatement>::const_iterator last,
-                                          bool fromMigrate) {
+                                          std::vector<bool> fromMigrate,
+                                          bool defaultFromMigrate) {
     if (coll->ns() != NamespaceString::kShardSplitDonorsNamespace ||
         tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
         return;

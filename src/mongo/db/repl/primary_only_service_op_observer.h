@@ -97,7 +97,8 @@ public:
                    const CollectionPtr& coll,
                    std::vector<InsertStatement>::const_iterator first,
                    std::vector<InsertStatement>::const_iterator last,
-                   bool fromMigrate) final {}
+                   std::vector<bool> fromMigrate,
+                   bool defaultFromMigrate) final {}
 
     void onInsertGlobalIndexKey(OperationContext* opCtx,
                                 const NamespaceString& globalIndexNss,

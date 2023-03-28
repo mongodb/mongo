@@ -197,7 +197,12 @@ protected:
         OpObserverRegistry opObserver;
         opObserver.addObserver(
             std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
-        opObserver.onInserts(opCtx, *autoColl, insert.begin(), insert.end(), false);
+        opObserver.onInserts(opCtx,
+                             *autoColl,
+                             insert.begin(),
+                             insert.end(),
+                             /*fromMigrate=*/std::vector<bool>(insert.size(), false),
+                             /*defaultFromMigrate=*/false);
         wuow.commit();
     }
 };

@@ -104,7 +104,8 @@ public:
                    const CollectionPtr& coll,
                    std::vector<InsertStatement>::const_iterator begin,
                    std::vector<InsertStatement>::const_iterator end,
-                   bool fromMigrate) override;
+                   std::vector<bool> fromMigrate,
+                   bool defaultFromMigrate) override;
 
     void onCreateCollection(OperationContext* opCtx,
                             const CollectionPtr& coll,
@@ -211,7 +212,8 @@ void OpObserverMock::onInserts(OperationContext* opCtx,
                                const CollectionPtr& coll,
                                std::vector<InsertStatement>::const_iterator begin,
                                std::vector<InsertStatement>::const_iterator end,
-                               bool fromMigrate) {
+                               std::vector<bool> fromMigrate,
+                               bool defaultFromMigrate) {
     if (onInsertsThrows) {
         uasserted(ErrorCodes::OperationFailed, "insert failed");
     }
@@ -220,7 +222,7 @@ void OpObserverMock::onInserts(OperationContext* opCtx,
         opCtx->lockState()->isDbLockedForMode(coll->ns().dbName(), MODE_X);
 
     _logOp(opCtx, coll->ns(), "inserts");
-    OpObserverNoop::onInserts(opCtx, coll, begin, end, fromMigrate);
+    OpObserverNoop::onInserts(opCtx, coll, begin, end, std::move(fromMigrate), defaultFromMigrate);
 }
 
 void OpObserverMock::onCreateCollection(OperationContext* opCtx,
