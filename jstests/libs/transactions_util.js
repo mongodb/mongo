@@ -109,7 +109,8 @@ var TransactionsUtil = (function() {
 
     // Runs a function 'func()' in a transaction on database 'db'. Invokes function
     // 'beforeTransactionFunc()' before the transaction (can be used to get references to
-    // collections etc.).
+    // collections etc.). Ensures that the transaction is successfully committed, by retrying the
+    // function 'func' in case of the transaction being aborted until the timeout is hit.
     //
     // Function 'beforeTransactionFunc(db, session)' accepts database in session 'db' and the
     // session 'session'.
@@ -120,9 +121,18 @@ var TransactionsUtil = (function() {
         const session = db.getMongo().startSession();
         const sessionDb = session.getDatabase(db.getName());
         const state = beforeTransactionFunc(sessionDb, session);
-        session.startTransaction(transactionOptions);
-        func(sessionDb, state);
-        return session.commitTransaction_forTesting();
+        let commandResponse;
+        assert.soon(() => {
+            session.startTransaction(transactionOptions);
+            func(sessionDb, state);
+            try {
+                commandResponse = assert.commandWorked(session.commitTransaction_forTesting());
+                return true;
+            } catch {
+                return false;
+            }
+        });
+        return commandResponse;
     }
 
     return {
