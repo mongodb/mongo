@@ -45,9 +45,9 @@ std::vector<repl::OpTime> OplogWriterImpl::logInsertOps(
     repl::MutableOplogEntry* oplogEntryTemplate,
     std::vector<InsertStatement>::const_iterator begin,
     std::vector<InsertStatement>::const_iterator end,
+    std::vector<bool> fromMigrate,
     std::function<boost::optional<ShardId>(const BSONObj& doc)> getDestinedRecipientFn,
     const CollectionPtr& collectionPtr) {
-    std::vector<bool> fromMigrate(std::distance(begin, end), false);
     return repl::logInsertOps(opCtx,
                               oplogEntryTemplate,
                               begin,

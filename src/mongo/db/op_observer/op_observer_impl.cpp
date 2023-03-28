@@ -571,7 +571,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
                                const CollectionPtr& coll,
                                std::vector<InsertStatement>::const_iterator first,
                                std::vector<InsertStatement>::const_iterator last,
-                               bool fromMigrate) {
+                               bool defaultFromMigrate) {
     auto txnParticipant = TransactionParticipant::get(opCtx);
     const bool inMultiDocumentTransaction =
         txnParticipant && opCtx->writesAreReplicated() && txnParticipant.transactionIsOpen();
@@ -588,7 +588,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
     const bool inBatchedWrite = batchedWriteContext.writesAreBatched();
 
     if (inBatchedWrite) {
-        invariant(!fromMigrate);
+        invariant(!defaultFromMigrate);
 
         write_stage_common::PreWriteFilter preWriteFilter(opCtx, nss);
 
@@ -614,7 +614,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
             batchedWriteContext.addBatchedOperation(opCtx, operation);
         }
     } else if (inMultiDocumentTransaction) {
-        invariant(!fromMigrate);
+        invariant(!defaultFromMigrate);
 
         // Do not add writes to the profile collection to the list of transaction operations, since
         // these are done outside the transaction. There is no top-level WriteUnitOfWork when we are
@@ -666,12 +666,18 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         oplogEntryTemplate.setNss(nss);
         oplogEntryTemplate.setUuid(uuid);
         oplogEntryTemplate.setObject({});
-        oplogEntryTemplate.setFromMigrateIfTrue(fromMigrate);
+        oplogEntryTemplate.setFromMigrateIfTrue(defaultFromMigrate);
         Date_t lastWriteDate = getWallClockTimeForOpLog(opCtx);
         oplogEntryTemplate.setWallClockTime(lastWriteDate);
 
-        opTimeList = _oplogWriter->logInsertOps(
-            opCtx, &oplogEntryTemplate, first, last, getDestinedRecipientFn, coll);
+        std::vector<bool> fromMigrate(std::distance(first, last), defaultFromMigrate);
+        opTimeList = _oplogWriter->logInsertOps(opCtx,
+                                                &oplogEntryTemplate,
+                                                first,
+                                                last,
+                                                std::move(fromMigrate),
+                                                getDestinedRecipientFn,
+                                                coll);
         if (!opTimeList.empty())
             lastOpTime = opTimeList.back();
 
@@ -697,7 +703,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
                           last,
                           opTimeList,
                           shardingWriteRouter,
-                          fromMigrate,
+                          defaultFromMigrate,
                           inMultiDocumentTransaction);
 
     if (nss.coll() == "system.js") {

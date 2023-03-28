@@ -80,6 +80,7 @@ public:
         repl::MutableOplogEntry* oplogEntryTemplate,
         std::vector<InsertStatement>::const_iterator begin,
         std::vector<InsertStatement>::const_iterator end,
+        std::vector<bool> fromMigrate,
         std::function<boost::optional<ShardId>(const BSONObj& doc)> getDestinedRecipientFn,
         const CollectionPtr& collectionPtr) = 0;
 
