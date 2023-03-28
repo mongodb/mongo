@@ -257,8 +257,8 @@ function runTest(collConfig, reqConfig, insert) {
 
         // Currently, we do not support queries on non-meta fields for delete commands.
         delete failingDeleteCommand.isTimeseriesNamespace;
-        // TODO (SERVER-66393): Remove this test.
-        if (!FeatureFlagUtil.isPresentAndEnabled(mainDB, "TimeseriesUpdatesDeletesSupport")) {
+        // TODO (SERVER-75379): Remove this test.
+        if (!FeatureFlagUtil.isPresentAndEnabled(mainDB, "TimeseriesDeletesSupport")) {
             for (let additionalField of [timeField, 'randomFieldWhichShouldNotBeHere']) {
                 // JavaScript does not have a reliable way to perform deep copy of an object. So
                 // instead of copying delete query each time, we just set and unset additional

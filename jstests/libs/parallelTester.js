@@ -261,9 +261,12 @@ if (typeof _threadInject != "undefined") {
             // TODO (SERVER-66393): Remove this exclusion once the feature flag is enabled by
             // default.
             "timeseries/timeseries_update_multi.js",
+            "timeseries/timeseries_update_one.js",
+
+            // TODO (SERVER-75379): Remove this exclusion once the feature flag is enabled by
+            // default.
             "timeseries/timeseries_delete_multi.js",
             "timeseries/timeseries_delete_one.js",
-            "timeseries/timeseries_update_one.js",
             "timeseries/timeseries_delete_collation.js",
             "timeseries/timeseries_delete_compressed_buckets.js",
         ]);

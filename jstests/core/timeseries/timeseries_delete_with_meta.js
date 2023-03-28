@@ -29,9 +29,9 @@ assert.commandWorked(testDB.dropDatabase());
 const coll = testDB.getCollection('t');
 const timeFieldName = "time";
 const metaFieldName = "tag";
-// TODO (SERVER-66393): Remove the feature flag checking and related test cases.
+// TODO (SERVER-75379): Remove the feature flag checking and related test cases.
 const isArbitraryDeleteEnabled =
-    FeatureFlagUtil.isPresentAndEnabled(testDB, "TimeseriesUpdatesDeletesSupport");
+    FeatureFlagUtil.isPresentAndEnabled(testDB, "TimeseriesDeletesSupport");
 
 TimeseriesTest.run((insert) => {
     const testDelete = function(

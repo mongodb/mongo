@@ -1522,7 +1522,7 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
                     *timeseriesOptions, request.getHint())));
         }
 
-        if (!feature_flags::gTimeseriesUpdatesDeletesSupport.isEnabled(
+        if (!feature_flags::gTimeseriesDeletesSupport.isEnabled(
                 serverGlobalParams.featureCompatibility)) {
             uassert(
                 ErrorCodes::InvalidOptions,

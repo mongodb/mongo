@@ -522,13 +522,13 @@ BSONObj getBucketLevelPredicateForRouting(const BSONObj& originalQuery,
         // 'limit:0', we will not delete any extra documents.
         //
         // TODO SERVER-73087 / SERVER-75160: Move this block into the if
-        // gTimeseriesUpdatesDeletesSupport is not enabled block as soon as we implement either one
+        // gTimeseriesDeletesSupport is not enabled block as soon as we implement either one
         // of SERVER-73087 and SERVER-75160. As of now, this block is common, irrespective of the
         // feature flag value.
         return BSONObj();
     }
 
-    if (!feature_flags::gTimeseriesUpdatesDeletesSupport.isEnabled(
+    if (!feature_flags::gTimeseriesDeletesSupport.isEnabled(
             serverGlobalParams.featureCompatibility)) {
         // Translate the delete query into a query on the time-series collection's underlying
         // buckets collection.

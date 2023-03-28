@@ -213,9 +213,13 @@ feature_flags:
         description: Feature flag to enable internal writes to use the transactionally replicated WriteUnitOfWork API by default.
         cpp_varname: gFeatureFlagInternalWritesAreReplicatedTransactionally
         default: false
-    featureFlagTimeseriesUpdatesDeletesSupport:
-        description: "Enable support for arbitrary updates and deletes on time-series collections"
-        cpp_varname: feature_flags::gTimeseriesUpdatesDeletesSupport
+    featureFlagTimeseriesDeletesSupport:
+        description: "Enable support for arbitrary deletes on time-series collections"
+        cpp_varname: feature_flags::gTimeseriesDeletesSupport
+        default: false
+    featureFlagTimeseriesUpdatesSupport:
+        description: "Enable support for arbitrary updates on time-series collections"
+        cpp_varname: feature_flags::gTimeseriesUpdatesSupport
         default: false
     featureFlagIndexBuildGracefulErrorHandling:
         description: "Enable index build error handling improvements"

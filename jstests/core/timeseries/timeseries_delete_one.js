@@ -4,7 +4,7 @@
  * @tags: [
  *   # We need a timeseries collection.
  *   requires_timeseries,
- *   featureFlagTimeseriesUpdatesDeletesSupport,
+ *   featureFlagTimeseriesDeletesSupport,
  *   # TODO SERVER-73682: Enable this test.
  *   __TEMPORARILY_DISABLED__,
  * ]

@@ -4,7 +4,7 @@
  *
  * @tags: [
  *   requires_replication,
- *   featureFlagTimeseriesUpdatesDeletesSupport,
+ *   featureFlagTimeseriesDeletesSupport,
  * ]
  */
 

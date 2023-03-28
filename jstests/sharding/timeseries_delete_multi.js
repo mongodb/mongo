@@ -7,11 +7,8 @@
  *   requires_fcv_70,
  *   # To avoid burn-in tests in in-memory build variants
  *   requires_persistence,
- *   featureFlagTimeseriesUpdatesDeletesSupport,
+ *   featureFlagTimeseriesDeletesSupport,
  * ]
- *
- * TODO SERVER-66393: Remove the 'featureFlagTimeseriesUpdatesDeletesSupport' tag as soon as we
- * enable the feature by default.
  */
 
 (function() {

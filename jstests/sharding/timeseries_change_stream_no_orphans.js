@@ -11,7 +11,7 @@
  *   requires_fcv_70,
  *   # To avoid burn-in tests in in-memory build variants
  *   requires_persistence,
- *   featureFlagTimeseriesUpdatesDeletesSupport,
+ *   featureFlagTimeseriesDeletesSupport,
  * ]
  */
 (function() {

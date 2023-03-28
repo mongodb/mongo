@@ -6,9 +6,7 @@
  *   # We need a timeseries collection.
  *   requires_timeseries,
  *   requires_non_retryable_writes,
- *   featureFlagTimeseriesUpdatesDeletesSupport,
- *   # TODO SERVER-74899: Remove this tag.
- *   assumes_against_mongod_not_mongos
+ *   featureFlagTimeseriesDeletesSupport,
  * ]
  */
 

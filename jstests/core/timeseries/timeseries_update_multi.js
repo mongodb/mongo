@@ -6,7 +6,7 @@
  *   requires_multi_updates,
  *   # We need a timeseries collection.
  *   requires_timeseries,
- *   featureFlagTimeseriesUpdatesDeletesSupport,
+ *   featureFlagTimeseriesUpdatesSupport,
  *   # TODO (SERVER-73454): Re-enable the tests.
  *   __TEMPORARILY_DISABLED__,
  * ]
