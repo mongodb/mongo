@@ -1329,6 +1329,35 @@ env.Library(
 )
 
 env.Library(
+    target='working_set_common',
+    source=[
+        'exec/working_set_common.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog/health_log_interface',
+        '$BUILD_DIR/mongo/db/exec/working_set',
+        '$BUILD_DIR/mongo/db/index/index_access_method',
+        '$BUILD_DIR/mongo/db/storage/execution_context',
+        'server_base',
+    ],
+)
+
+env.Library(
+    target='write_stage_common',
+    source=[
+        'exec/write_stage_common.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/exec/document_value/document_value',
+        '$BUILD_DIR/mongo/db/exec/working_set',
+        'server_base',
+        'shard_filterer',
+        'shard_role_api',
+        'working_set_common',
+    ],
+)
+
+env.Library(
     target='query_exec',
     source=[
         'clientcursor.cpp',
@@ -1380,8 +1409,6 @@ env.Library(
         'exec/unpack_timeseries_bucket.cpp',
         'exec/update_stage.cpp',
         'exec/upsert_stage.cpp',
-        'exec/working_set_common.cpp',
-        'exec/write_stage_common.cpp',
         'ops/delete_request.idl',
         'ops/parsed_delete.cpp',
         'ops/update_result.cpp',
@@ -1506,6 +1533,8 @@ env.Library(
         '$BUILD_DIR/mongo/db/timeseries/timeseries_write_util',
         'not_primary_error_tracker',
         'record_id_helpers',
+        'working_set_common',
+        'write_stage_common',
     ],
 )
 
