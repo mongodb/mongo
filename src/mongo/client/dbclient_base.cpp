@@ -253,7 +253,7 @@ std::tuple<bool, DBClientBase*> DBClientBase::runCommandWithTarget(const Databas
     // requestBuilder is a legacyRequest builder. Not sure what the best
     // way to get around that is without breaking the abstraction.
     auto request = _upconvertRequest(dbName, cmd, options);
-    auto result = runCommandWithTarget(request);
+    auto result = runCommandWithTarget(std::move(request));
 
     info = result.first->getCommandReply().getOwned();
     return std::make_tuple(isOk(info), result.second);
@@ -266,7 +266,7 @@ std::tuple<bool, std::shared_ptr<DBClientBase>> DBClientBase::runCommandWithTarg
     std::shared_ptr<DBClientBase> me,
     int options) {
     auto request = _upconvertRequest(dbName, cmd, options);
-    auto result = runCommandWithTarget(request, std::move(me));
+    auto result = runCommandWithTarget(std::move(request), std::move(me));
 
     info = result.first->getCommandReply().getOwned();
     return std::make_tuple(isOk(info), result.second);

@@ -167,11 +167,9 @@ Future<void> CommandHelpers::runCommandInvocation(std::shared_ptr<RequestExecuti
                                                   std::shared_ptr<CommandInvocation> invocation,
                                                   bool useDedicatedThread) {
     if (useDedicatedThread)
-        return makeReadyFutureWith([opCtx = rec->getOpCtx(),
-                                    request = rec->getRequest(),
-                                    invocation = invocation.get(),
-                                    replyBuilder = rec->getReplyBuilder()] {
-            runCommandInvocation(opCtx, request, invocation, replyBuilder);
+        return makeReadyFutureWith([rec = std::move(rec), invocation = std::move(invocation)] {
+            runCommandInvocation(
+                rec->getOpCtx(), rec->getRequest(), invocation.get(), rec->getReplyBuilder());
         });
     return runCommandInvocationAsync(std::move(rec), std::move(invocation));
 }
