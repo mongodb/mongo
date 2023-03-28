@@ -32,6 +32,13 @@
 #include "mongo/db/storage/ticketholder_monitor.h"
 
 namespace mongo::execution_control {
+namespace throughput_probing {
+
+Status validateInitialConcurrency(int32_t concurrency, const boost::optional<TenantId>&);
+Status validateMinConcurrency(int32_t concurrency, const boost::optional<TenantId>&);
+Status validateMaxConcurrency(int32_t concurrency, const boost::optional<TenantId>&);
+
+}  // namespace throughput_probing
 
 /**
  * Adjusts the level of concurrency on the read and write ticket holders by probing up/down and
@@ -48,10 +55,6 @@ public:
     virtual void appendStats(BSONObjBuilder& builder) const override;
 
 private:
-    // TODO (SERVER-71286): Replace constants with server parameters.
-    static constexpr int kMinConcurrency = 5;
-    static constexpr int kMaxConcurrency = 128;
-
     enum class ProbingState {
         kStable,
         kUp,

@@ -35,17 +35,61 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 namespace mongo::execution_control {
+namespace throughput_probing {
+
+Status validateInitialConcurrency(int32_t concurrency, const boost::optional<TenantId>&) {
+    if (concurrency < gMinConcurrency) {
+        return {ErrorCodes::BadValue,
+                "Throughput probing initial concurrency cannot be less than minimum concurrency"};
+    }
+
+    if (concurrency > gMaxConcurrency.load()) {
+        return {
+            ErrorCodes::BadValue,
+            "Throughput probing initial concurrency cannot be greater than maximum concurrency"};
+    }
+
+    return Status::OK();
+}
+
+Status validateMinConcurrency(int32_t concurrency, const boost::optional<TenantId>&) {
+    if (concurrency < 1) {
+        return {ErrorCodes::BadValue,
+                "Throughput probing minimum concurrency cannot be less than 1"};
+    }
+
+    if (concurrency > gMaxConcurrency.load()) {
+        return {
+            ErrorCodes::BadValue,
+            "Throughput probing minimum concurrency cannot be greater than maximum concurrency"};
+    }
+
+    return Status::OK();
+}
+
+Status validateMaxConcurrency(int32_t concurrency, const boost::optional<TenantId>&) {
+    if (concurrency < gMinConcurrency) {
+        return {ErrorCodes::BadValue,
+                "Throughput probing maximum concurrency cannot be less than minimum concurrency"};
+    }
+
+    return Status::OK();
+}
+
+}  // namespace throughput_probing
+
+using namespace throughput_probing;
 
 ThroughputProbing::ThroughputProbing(ServiceContext* svcCtx,
                                      TicketHolder* readTicketHolder,
                                      TicketHolder* writeTicketHolder,
                                      Milliseconds interval)
     : TicketHolderMonitor(svcCtx, readTicketHolder, writeTicketHolder, interval),
-      _stableConcurrency(throughput_probing::gInitialConcurrency
-                             ? throughput_probing::gInitialConcurrency
+      _stableConcurrency(gInitialConcurrency
+                             ? gInitialConcurrency
                              : std::clamp(static_cast<int32_t>(ProcessInfo::getNumCores()),
-                                          kMinConcurrency,
-                                          kMaxConcurrency)) {
+                                          gMinConcurrency,
+                                          gMaxConcurrency.load())) {
     _readTicketHolder->resize(_stableConcurrency);
     _writeTicketHolder->resize(_stableConcurrency);
 }
@@ -89,17 +133,16 @@ void ThroughputProbing::_probeStable(double throughput) {
     auto outof = _readTicketHolder->outof();
     auto peakUsed = std::max(_readTicketHolder->getAndResetPeakUsed(),
                              _writeTicketHolder->getAndResetPeakUsed());
-    if (outof < kMaxConcurrency && peakUsed >= outof) {
+    if (outof < gMaxConcurrency.load() && peakUsed >= outof) {
         // At least one of the ticket pools is exhausted, so try increasing concurrency.
         _state = ProbingState::kUp;
-        _setConcurrency(
-            std::lround(_stableConcurrency * (1 + throughput_probing::gStepMultiple.load())));
-    } else if (_readTicketHolder->used() > kMinConcurrency ||
-               _writeTicketHolder->used() > kMinConcurrency) {
+        _setConcurrency(std::ceil(_stableConcurrency * (1 + gStepMultiple.load())));
+    } else if (_readTicketHolder->used() > gMinConcurrency ||
+               _writeTicketHolder->used() > gMinConcurrency) {
         // Neither of the ticket pools are exhausted, so try decreasing concurrency to just below
         // the current level of usage.
         _state = ProbingState::kDown;
-        _setConcurrency(std::lround(peakUsed * (1 - throughput_probing::gStepMultiple.load())));
+        _setConcurrency(std::floor(peakUsed * (1 - gStepMultiple.load())));
     }
 }
 
@@ -117,12 +160,11 @@ void ThroughputProbing::_probeUp(double throughput) {
         _state = ProbingState::kStable;
         _stableThroughput = throughput;
         _stableConcurrency = concurrency;
-    } else if (_readTicketHolder->outof() > kMinConcurrency) {
+    } else if (_readTicketHolder->outof() > gMinConcurrency) {
         // Increasing concurrency did not cause throughput to increase, so try decreasing
         // concurrency instead.
         _state = ProbingState::kDown;
-        _setConcurrency(
-            std::lround(_stableConcurrency * (1 - throughput_probing::gStepMultiple.load())));
+        _setConcurrency(std::floor(_stableConcurrency * (1 - gStepMultiple.load())));
     }
 }
 
@@ -149,7 +191,7 @@ void ThroughputProbing::_probeDown(double throughput) {
 }
 
 void ThroughputProbing::_setConcurrency(int32_t concurrency) {
-    concurrency = std::clamp(concurrency, kMinConcurrency, kMaxConcurrency);
+    concurrency = std::clamp(concurrency, gMinConcurrency, gMaxConcurrency.load());
     _readTicketHolder->resize(concurrency);
     _writeTicketHolder->resize(concurrency);
 
