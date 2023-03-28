@@ -39,7 +39,6 @@
 #include "mongo/db/repl/tenant_all_database_cloner.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
 #include "mongo/db/repl/tenant_oplog_applier.h"
-#include "mongo/db/repl/tenant_oplog_applier_progress_gen.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/util/time_support.h"
 
@@ -484,10 +483,7 @@ public:
         /*
          * Traverse backwards through the oplog to find the optime which tenant oplog application
          * should resume from. The oplog applier should resume applying entries that have a greater
-         * optime than the returned value. Note, this is currently only used as a fallback for if
-         * _getStoredTenantOplogApplierProgress returns no results in order to preserve backwards
-         * compatibility and avoid the reapplication of noop entries. This can be removed after
-         * all Serverless nodes are running the new progress collection-aware version of the code.
+         * optime than the returned value.
          */
         OpTime _getOplogResumeApplyingDonorOptime(const OpTime& cloneFinishedRecipientOpTime) const;
 

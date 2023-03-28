@@ -240,11 +240,6 @@ NamespaceString NamespaceString::makeDummyNamespace(const boost::optional<Tenant
     return NamespaceString(tenantId, DatabaseName::kConfig.db(), "dummy.namespace");
 }
 
-NamespaceString NamespaceString::makeTenantOplogApplierProgressNSS(const UUID& migrationUUID) {
-    return NamespaceString(DatabaseName::kConfig,
-                           NamespaceString::kTenantOplogApplierProgressPrefix +
-                               migrationUUID.toString());
-}
 
 std::string NamespaceString::getSisterNS(StringData local) const {
     verify(local.size() && local[0] != '.');

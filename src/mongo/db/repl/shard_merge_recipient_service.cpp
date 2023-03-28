@@ -2112,18 +2112,15 @@ void ShardMergeRecipientService::Instance::_startOplogApplier() {
     invariant(startApplyingDonorOpTime);
     const auto& cloneFinishedRecipientOpTime = _stateDoc.getCloneFinishedRecipientOpTime();
     invariant(cloneFinishedRecipientOpTime);
-    invariant(!cloneFinishedRecipientOpTime->isNull());
 
     _tenantOplogApplier = std::make_shared<TenantOplogApplier>(_migrationUuid,
                                                                MigrationProtocolEnum::kShardMerge,
                                                                boost::none,
-                                                               boost::none,
                                                                *startApplyingDonorOpTime,
                                                                _donorOplogBuffer.get(),
                                                                **_scopedExecutor,
-                                                               _writerPool.get(),
-                                                               *cloneFinishedRecipientOpTime,
-                                                               false);
+                                                               _writerPool.get());
+    _tenantOplogApplier->setCloneFinishedRecipientOpTime(*cloneFinishedRecipientOpTime);
 
     LOGV2_DEBUG(7339750,
                 1,
