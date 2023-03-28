@@ -17,6 +17,7 @@
  * 4) Signal new readers that will be received after the global lock is released.
  * 5) Initiate step down while queue is working its way down to ensure there is a mix of
  *     enqueued readers from the global X lock and new readers initiated afterwards.
+ * <<Should have deadlocked by now for this scenario>>
  * 6) Stop Readers.
  */
 (function() {
@@ -29,10 +30,9 @@ const replTest = new ReplSetTest({
     nodes: 1,
     nodeOptions: {
         setParameter: {
-            // This test seeks the minimum amount of concurrency to force ticket exhaustion
-            // storageEngineConcurrencyAdjustmentAlgorithm: "",
+            // This test seeks the minimum amount of concurrency to force ticket exhaustion.
             wiredTigerConcurrentReadTransactions: 5,
-            // Make yielding more common
+            // Make yielding more common.
             internalQueryExecYieldPeriodMS: 1,
             internalQueryExecYieldIterations: 1
         }
@@ -48,9 +48,6 @@ TestData.collName = collName;
 
 function queuedLongReadsFunc(id) {
     jsTestLog("Starting Queued Reader [" + id + "]");
-    const session = db.getMongo().startSession();
-    const sessionDb = session.getDatabase(TestData.dbName);
-    const sessionColl = sessionDb[TestData.collName];
 
     try {
         for (let i = 0;
@@ -77,9 +74,6 @@ function queuedLongReadsFunc(id) {
 
 function newLongReadsFunc(id) {
     jsTestLog("Starting New Reader [" + id + "]");
-    const session = db.getMongo().startSession();
-    const sessionDb = session.getDatabase(TestData.dbName);
-    const sessionColl = sessionDb[TestData.collName];
 
     // Coordinate all readers to begin at the same time
     assert.soon(() => db.getSiblingDB(TestData.dbName).timing_coordination.findOne({
@@ -115,11 +109,12 @@ function runStepDown() {
     let stats = db.runCommand({serverStatus: 1});
     jsTestLog(stats.locks);
     jsTestLog(stats.wiredTiger.concurrentTransactions);
-    assert.commandWorked(primaryAdmin.runCommand({"replSetStepDown": 20, "force": true}));
+    assert.commandWorked(primaryAdmin.runCommand({"replSetStepDown": 5, "force": true}));
 
     // Wait until the primary transitioned to SECONDARY state.
     replTest.waitForState(primary, ReplSetTest.State.SECONDARY);
 
+    // Enforce the replSetStepDown timer.
     sleep(5000);
 
     jsTestLog("Making old primary eligible to be re-elected.");
