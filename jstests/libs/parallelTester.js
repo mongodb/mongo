@@ -265,6 +265,7 @@ if (typeof _threadInject != "undefined") {
             "timeseries/timeseries_delete_one.js",
             "timeseries/timeseries_update_one.js",
             "timeseries/timeseries_delete_collation.js",
+            "timeseries/timeseries_delete_compressed_buckets.js",
         ]);
 
         // Get files, including files in subdirectories.
