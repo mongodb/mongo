@@ -179,13 +179,11 @@ StageConstraints DocumentSourceFindAndModifyImageLookup::constraints(
 }
 
 Value DocumentSourceFindAndModifyImageLookup::serialize(SerializationOptions opts) const {
-    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
-        MONGO_UNIMPLEMENTED_TASSERT(7484346);
-    }
-    return Value(
-        Document{{kStageName,
-                  Value(Document{{kIncludeCommitTransactionTimestampFieldName,
-                                  _includeCommitTransactionTimestamp ? Value(true) : Value()}})}});
+    return Value(Document{
+        {kStageName,
+         Value(Document{
+             {kIncludeCommitTransactionTimestampFieldName,
+              _includeCommitTransactionTimestamp ? opts.serializeLiteralValue(true) : Value()}})}});
 }
 
 DepsTracker::State DocumentSourceFindAndModifyImageLookup::getDependencies(

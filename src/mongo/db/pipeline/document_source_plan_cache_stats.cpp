@@ -59,11 +59,10 @@ DocumentSourcePlanCacheStats::DocumentSourcePlanCacheStats(
 
 void DocumentSourcePlanCacheStats::serializeToArray(std::vector<Value>& array,
                                                     SerializationOptions opts) const {
-    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
-        MONGO_UNIMPLEMENTED_TASSERT(7484320);
-    }
-
     if (opts.verbosity) {
+        tassert(7513100,
+                "$planCacheStats is not equipped to serialize in explain mode with redaction on",
+                !opts.redactFieldNames && !opts.replacementForLiteralArgs);
         array.push_back(Value{
             Document{{kStageName,
                       Document{{"match"_sd,
@@ -71,7 +70,7 @@ void DocumentSourcePlanCacheStats::serializeToArray(std::vector<Value>& array,
     } else {
         array.push_back(Value{Document{{kStageName, Document{}}}});
         if (_absorbedMatch) {
-            _absorbedMatch->serializeToArray(array);
+            _absorbedMatch->serializeToArray(array, opts);
         }
     }
 }

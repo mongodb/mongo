@@ -61,43 +61,44 @@ REGISTER_DOCUMENT_SOURCE(geoNear,
                          AllowedWithApiStrict::kAlways);
 
 Value DocumentSourceGeoNear::serialize(SerializationOptions opts) const {
-    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
-        MONGO_UNIMPLEMENTED_TASSERT(7484345);
-    }
-
     MutableDocument result;
 
     if (keyFieldPath) {
-        result.setField(kKeyFieldName, Value(keyFieldPath->fullPath()));
+        result.setField(kKeyFieldName, Value(keyFieldPath->redactedFullPath(opts)));
     }
 
     auto nearValue = [&]() -> Value {
         if (auto constGeometry = dynamic_cast<ExpressionConstant*>(_nearGeometry.get());
             constGeometry) {
-            return constGeometry->getValue();
+            return opts.serializeLiteralValue(constGeometry->getValue());
         } else {
             return _nearGeometry->serialize(opts);
         }
     }();
     result.setField("near", nearValue);
-    result.setField("distanceField", Value(distanceField->fullPath()));
+    result.setField("distanceField", Value(distanceField->redactedFullPath(opts)));
 
     if (maxDistance) {
-        result.setField("maxDistance", Value(*maxDistance));
+        result.setField("maxDistance", opts.serializeLiteralValue(*maxDistance));
     }
 
     if (minDistance) {
-        result.setField("minDistance", Value(*minDistance));
+        result.setField("minDistance", opts.serializeLiteralValue(*minDistance));
     }
 
-    result.setField("query", Value(query));
-    result.setField("spherical", Value(spherical));
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        auto matchExpr = uassertStatusOK(MatchExpressionParser::parse(query, pExpCtx));
+        result.setField("query", Value(matchExpr->serialize(opts)));
+    } else {
+        result.setField("query", Value(query));
+    }
+    result.setField("spherical", opts.serializeLiteralValue(spherical));
     if (distanceMultiplier) {
-        result.setField("distanceMultiplier", Value(*distanceMultiplier));
+        result.setField("distanceMultiplier", opts.serializeLiteralValue(*distanceMultiplier));
     }
 
     if (includeLocs)
-        result.setField("includeLocs", Value(includeLocs->fullPath()));
+        result.setField("includeLocs", Value(includeLocs->redactedFullPath(opts)));
 
     return Value(DOC(getSourceName() << result.freeze()));
 }

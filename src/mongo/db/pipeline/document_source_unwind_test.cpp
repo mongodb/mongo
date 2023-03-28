@@ -817,6 +817,26 @@ TEST_F(UnwindStageTest, ShouldRejectUnrecognizedOption) {
                        28811);
 }
 
+TEST_F(UnwindStageTest, Redaction) {
+    auto spec = fromjson(R"({
+        $unwind: {
+            path: "$foo.bar",
+            includeArrayIndex: "foo.baz",
+            preserveNullAndEmptyArrays: true
+        }
+    })");
+    auto docSource = DocumentSourceUnwind::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$unwind": {
+                "path": "$HASH<foo>.HASH<bar>",
+                "preserveNullAndEmptyArrays": "?",
+                "includeArrayIndex": "HASH<foo>.HASH<baz>"
+            }
+        })",
+        redact(*docSource));
+}
+
 class All : public OldStyleSuiteSpecification {
 public:
     All() : OldStyleSuiteSpecification("DocumentSourceUnwindTests") {}

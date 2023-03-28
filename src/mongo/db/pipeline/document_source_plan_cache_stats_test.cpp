@@ -145,6 +145,37 @@ TEST_F(DocumentSourcePlanCacheStatsTest, SerializesSuccessfullyAfterAbsorbingMat
                       serialized[0].getDocument().toBson());
 }
 
+TEST_F(DocumentSourcePlanCacheStatsTest, RedactsSuccessfullyAfterAbsorbingMatch) {
+    const auto specObj = fromjson("{$planCacheStats: {}}");
+    auto planCacheStats =
+        DocumentSourcePlanCacheStats::createFromBson(specObj.firstElement(), getExpCtx());
+    auto match = DocumentSourceMatch::create(fromjson("{foo: 'bar'}"), getExpCtx());
+    auto pipeline = Pipeline::create({planCacheStats, match}, getExpCtx());
+    ASSERT_EQ(2u, pipeline->getSources().size());
+
+    SerializationOptions options;
+    options.replacementForLiteralArgs = "?";
+    options.redactFieldNamesStrategy = [](StringData s) -> std::string {
+        return str::stream() << "HASH<" << s << ">";
+    };
+    options.redactFieldNames = true;
+
+    pipeline->optimizePipeline();
+    ASSERT_EQ(1u, pipeline->getSources().size());
+    std::vector<Value> serialized;
+    pipeline->getSources().front()->serializeToArray(serialized, options);
+    ASSERT_EQ(2u, serialized.size());
+
+    ASSERT_BSONOBJ_EQ(specObj, serialized[0].getDocument().toBson());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$match": {
+                "HASH<foo>": { "$eq": "?" }
+            }
+        })",
+        serialized[1].getDocument().toBson().getOwned());
+}
+
 TEST_F(DocumentSourcePlanCacheStatsTest, ReturnsImmediateEOFWithEmptyPlanCache) {
     getExpCtx()->mongoProcessInterface =
         std::make_shared<PlanCacheStatsMongoProcessInterface>(std::vector<BSONObj>{});

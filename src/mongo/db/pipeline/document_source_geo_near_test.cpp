@@ -111,5 +111,104 @@ TEST_F(DocumentSourceGeoNearTest, CanParseAndSerializeKeyField) {
                                        {"spherical", false}}}}}};
     ASSERT_VALUE_EQ(expectedSerialization, serialized[0]);
 }
+
+TEST_F(DocumentSourceGeoNearTest, RedactionWithGeoJSONPoint) {
+    auto spec = fromjson(R"({
+        $geoNear: {
+            distanceField: "a",
+            maxDistance: 2,
+            minDistance: 1,
+            near: {
+                type: "Point",
+                coordinates: [ -23.484, 28.3913 ]
+            },
+            query: { foo : "bar" },
+            spherical: true
+        }
+    })");
+    auto docSource = DocumentSourceGeoNear::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$geoNear": {
+                "near": {
+                    "$const": "?"
+                },
+                "distanceField": "HASH<a>",
+                "maxDistance": "?",
+                "minDistance": "?",
+                "query": {
+                    "HASH<foo>": {
+                        "$eq": "?"
+                    }
+                },
+                "spherical": "?"
+            }
+        })",
+        redact(*docSource));
+}
+
+TEST_F(DocumentSourceGeoNearTest, RedactionWithGeoJSONLineString) {
+    auto spec = fromjson(R"({
+        $geoNear: {
+            distanceField: "a",
+            near: {
+                type: "LineString",
+                coordinates: [[0,0], [-1,-1]]
+            },
+            minDistance: 0.5
+        }
+    })");
+    auto docSource = DocumentSourceGeoNear::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$geoNear": {
+                "near": {
+                    "$const": "?"
+                },
+                "distanceField": "HASH<a>",
+                "minDistance": "?",
+                "query": {},
+                "spherical": "?"
+            }
+        })",
+        redact(*docSource));
+}
+
+TEST_F(DocumentSourceGeoNearTest, RedactionWithLegacyCoordinates) {
+    auto spec = fromjson(R"({
+        $geoNear: {
+            distanceField: "foo",
+            distanceMultiplier: 3.14,
+            includeLocs: "bar.baz",
+            near: [10, 10],
+            key: "z",
+            query: {
+                a : { $gt: 10 }
+            },
+            spherical: false
+        }
+    })");
+    auto docSource = DocumentSourceGeoNear::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$geoNear": {
+                "key": "HASH<z>",
+                "near": {
+                    "$const": "?"
+                },
+                "distanceField": "HASH<foo>",
+                "query": {
+                    "HASH<a>": {
+                        "$gt": "?"
+                    }
+                },
+                "spherical": "?",
+                "distanceMultiplier": "?",
+                "includeLocs": "HASH<bar>.HASH<baz>"
+            }
+        })",
+        redact(*docSource));
+}
+
 }  // namespace
 }  // namespace mongo

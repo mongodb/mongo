@@ -166,6 +166,9 @@ FieldPath FieldPath::concat(const FieldPath& tail) const {
 }
 
 std::string FieldPath::redactedFullPath(SerializationOptions opts) const {
+    if (!opts.redactFieldNames) {
+        return fullPath();
+    }
     std::stringstream redacted;
     for (size_t i = 0; i < getPathLength(); ++i) {
         if (i > 0) {

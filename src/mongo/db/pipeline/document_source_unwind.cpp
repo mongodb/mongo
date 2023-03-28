@@ -294,15 +294,12 @@ Pipeline::SourceContainer::iterator DocumentSourceUnwind::doOptimizeAt(
 }
 
 Value DocumentSourceUnwind::serialize(SerializationOptions opts) const {
-    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
-        MONGO_UNIMPLEMENTED_TASSERT(7484306);
-    }
-
-    return Value(DOC(getSourceName() << DOC(
-                         "path" << _unwindPath.fullPathWithPrefix() << "preserveNullAndEmptyArrays"
-                                << (_preserveNullAndEmptyArrays ? Value(true) : Value())
-                                << "includeArrayIndex"
-                                << (_indexPath ? Value((*_indexPath).fullPath()) : Value()))));
+    return Value(DOC(
+        getSourceName() << DOC(
+            "path" << _unwindPath.redactedFullPathWithPrefix(opts) << "preserveNullAndEmptyArrays"
+                   << (_preserveNullAndEmptyArrays ? opts.serializeLiteralValue(true) : Value())
+                   << "includeArrayIndex"
+                   << (_indexPath ? Value((*_indexPath).redactedFullPath(opts)) : Value()))));
 }
 
 DepsTracker::State DocumentSourceUnwind::getDependencies(DepsTracker* deps) const {
