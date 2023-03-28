@@ -42,7 +42,7 @@ void TicketHolderTestFixture::setUp() {
 }
 
 void TicketHolderTestFixture::basicTimeout(OperationContext* opCtx,
-                                           std::unique_ptr<TicketHolderWithQueueingStats> holder) {
+                                           std::unique_ptr<TicketHolder> holder) {
     ASSERT_EQ(holder->used(), 0);
     ASSERT_EQ(holder->available(), 1);
     ASSERT_EQ(holder->outof(), 1);
@@ -68,7 +68,7 @@ void TicketHolderTestFixture::basicTimeout(OperationContext* opCtx,
 }
 
 void TicketHolderTestFixture::resizeTest(OperationContext* opCtx,
-                                         std::unique_ptr<TicketHolderWithQueueingStats> holder,
+                                         std::unique_ptr<TicketHolder> holder,
                                          TickSourceMock<Microseconds>* tickSource) {
     Stats stats(holder.get());
 
@@ -131,6 +131,27 @@ void TicketHolderTestFixture::resizeTest(OperationContext* opCtx,
     ASSERT_EQ(holder->used(), 5);
     ASSERT_EQ(holder->outof(), 5);
     ASSERT_FALSE(holder->waitForTicketUntil(opCtx, &admCtx, Date_t::now() + Milliseconds(1)));
+}
+
+void TicketHolderTestFixture::interruptTest(OperationContext* opCtx,
+                                            std::unique_ptr<TicketHolder> holder) {
+    holder->resize(0);
+
+    auto waiter = stdx::thread([&]() {
+        AdmissionContext admCtx;
+        ASSERT_THROWS_CODE(holder->waitForTicketUntil(opCtx, &admCtx, Date_t::max()),
+                           DBException,
+                           ErrorCodes::Interrupted);
+    });
+
+    while (!holder->queued()) {
+    }
+
+    ASSERT_EQ(holder->used(), 0);
+    ASSERT_EQ(holder->available(), 0);
+
+    opCtx->markKilled();
+    waiter.join();
 }
 
 }  // namespace mongo

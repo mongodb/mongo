@@ -45,7 +45,7 @@
 namespace mongo {
 namespace {
 
-static int kTickets = 128;
+static int kTickets = 32;
 static int kThreadMin = 16;
 static int kThreadMax = 1024;
 static int kLowPriorityAdmissionBypassThreshold = 100;
@@ -183,6 +183,7 @@ void BM_acquireAndRelease(benchmark::State& state) {
 BENCHMARK_TEMPLATE(BM_acquireAndRelease, SemaphoreTicketHolder, AdmissionsPriority::kNormal)
     ->Threads(kThreadMin)
     ->Threads(kTickets)
+    ->Threads(128)
     ->Threads(kThreadMax);
 
 // TODO SERVER-72616: Remove ifdefs once PriorityTicketHolder is available cross-platform.
@@ -191,6 +192,7 @@ BENCHMARK_TEMPLATE(BM_acquireAndRelease, SemaphoreTicketHolder, AdmissionsPriori
 BENCHMARK_TEMPLATE(BM_acquireAndRelease, PriorityTicketHolder, AdmissionsPriority::kNormal)
     ->Threads(kThreadMin)
     ->Threads(kTickets)
+    ->Threads(128)
     ->Threads(kThreadMax);
 
 // Low priority operations are expected to take longer to acquire a ticket because they are forced
@@ -198,6 +200,7 @@ BENCHMARK_TEMPLATE(BM_acquireAndRelease, PriorityTicketHolder, AdmissionsPriorit
 BENCHMARK_TEMPLATE(BM_acquireAndRelease, PriorityTicketHolder, AdmissionsPriority::kLow)
     ->Threads(kThreadMin)
     ->Threads(kTickets)
+    ->Threads(128)
     ->Threads(kThreadMax);
 
 // This benchmark is intended for comparisons between different iterations of the
@@ -209,6 +212,7 @@ BENCHMARK_TEMPLATE(BM_acquireAndRelease, PriorityTicketHolder, AdmissionsPriorit
 BENCHMARK_TEMPLATE(BM_acquireAndRelease, PriorityTicketHolder, AdmissionsPriority::kNormalAndLow)
     ->Threads(kThreadMin)
     ->Threads(kTickets)
+    ->Threads(128)
     ->Threads(kThreadMax);
 
 #endif

@@ -82,7 +82,7 @@ void tsFromDate(const Date_t& deadline, struct timespec& ts) {
 }  // namespace
 
 SemaphoreTicketHolder::SemaphoreTicketHolder(int numTickets, ServiceContext* serviceContext)
-    : TicketHolderWithQueueingStats(numTickets, serviceContext) {
+    : TicketHolder(numTickets, serviceContext) {
     check(sem_init(&_sem, 0, numTickets));
 }
 
@@ -160,7 +160,7 @@ void SemaphoreTicketHolder::_resize(int32_t newSize, int32_t oldSize) noexcept {
 #else
 
 SemaphoreTicketHolder::SemaphoreTicketHolder(int32_t numTickets, ServiceContext* svcCtx)
-    : TicketHolderWithQueueingStats(numTickets, svcCtx), _numTickets(numTickets) {}
+    : TicketHolder(numTickets, svcCtx), _numTickets(numTickets) {}
 
 SemaphoreTicketHolder::~SemaphoreTicketHolder() = default;
 

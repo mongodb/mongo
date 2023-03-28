@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2022-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,17 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/util/concurrency/ticket_broker.h"
-#include "mongo/logv2/log.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/util/errno_util.h"
-
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
+#include "ticket_pool.h"
 
 // TODO SERVER-72616: Remove futex usage from this class in favour of atomic waits.
 #include <linux/futex.h> /* Definition of FUTEX_* constants */
 #include <sys/syscall.h> /* Definition of SYS_* constants */
 #include <unistd.h>
+
+#include "mongo/logv2/log.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/util/errno_util.h"
 
 namespace mongo {
 namespace {
@@ -108,115 +111,87 @@ static void atomic_notify_one(AtomicWord<uint32_t>& atomic) noexcept {
 }
 }  // namespace
 
-TicketBroker::TicketBroker() : _queueBegin(nullptr), _queueEnd(nullptr), _numQueued(0) {}
+TicketPool::TicketPool(int numTickets, std::unique_ptr<TicketQueue> queue)
+    : _available(numTickets), _queued(0), _waiters(std::move(queue)) {}
 
-void TicketBroker::_registerAsWaiter(const stdx::unique_lock<stdx::mutex>& growthLock,
-                                     Node& node) noexcept {
-    // We register the node.
-    _numQueued.fetchAndAdd(1);
-
-    if (_queueBegin == nullptr) {
-        // If the list is empty we are the first node.
-        _queueBegin = &node;
-        _queueEnd = &node;
-    } else {
-        // Otherwise we're the new end and must link the preceding node to us, and us to the
-        // preceding node.
-        _queueEnd->next = &node;
-        node.previous = _queueEnd;
-        _queueEnd = &node;
+bool TicketPool::tryAcquire() {
+    auto available = _available.load();
+    bool gotTicket = false;
+    while (available > 0 && !gotTicket) {
+        gotTicket = _available.compareAndSwap(&available, available - 1);
     }
+    return gotTicket;
 }
 
-void TicketBroker::_unregisterAsWaiter(const stdx::unique_lock<stdx::mutex>& growthLock,
-                                       Node& node) noexcept {
-    // We've been unregistered by a ticket transfer, nothing to do as the transferer already removed
-    // us.
-    if (node.futexWord.load() != 0) {
-        return;
-    }
+bool TicketPool::acquire(AdmissionContext* admCtx, Date_t deadline) {
+    auto waiter = std::make_shared<TicketWaiter>();
+    waiter->context = admCtx;
 
-    auto previousLength = _numQueued.fetchAndSubtract(1);
-    // If there was only 1 node it was us, the queue will now be empty.
-    if (previousLength == 1) {
-        _queueBegin = _queueEnd = nullptr;
-        return;
-    }
-    // If the beginning of the linked list is this node we advance it to the next element.
-    if (_queueBegin == &node) {
-        _queueBegin = node.next;
-        node.next->previous = nullptr;
-        return;
-    }
-
-    // If the end of the queue is this node, then the new end is the preceding node.
-    if (_queueEnd == &node) {
-        _queueEnd = node.previous;
-        node.previous->next = nullptr;
-        return;
-    }
-
-    // Otherwise we're in the middle of the list. Preceding and successive nodes must be updated
-    // accordingly.
-    node.previous->next = node.next;
-    node.next->previous = node.previous;
-}
-
-TicketBroker::WaitingResult TicketBroker::attemptWaitForTicketUntil(
-    stdx::unique_lock<stdx::mutex> growthLock, Date_t until) noexcept {
-    // Stack allocate the node of the linked list, this approach lets us ignore heap memory in
-    // favour of stack memory which is dramatically cheaper. Care must be taken to ensure that there
-    // are no references left in the queue to this node once returning from the method.
-    //
-    // If std::promise didn't perform a heap allocation we could use it here.
-    Node node;
-
-    // We add ourselves as a waiter, we are still holding the lock here.
-    _registerAsWaiter(growthLock, node);
-
-    // Finished modifying the linked list, the lock can be released now.
-    growthLock.unlock();
-
-    // We now wait until obtaining the notification via the futex word.
-    auto waitResult = atomic_wait(node.futexWord, 0, until);
-    bool hasTimedOut = waitResult == stdx::cv_status::timeout;
-
-    if (hasTimedOut) {
-        // Timing out implies that the node must be removed from the list, block list modifications
-        // to prevent segmentation faults.
-        growthLock.lock();
-        _unregisterAsWaiter(growthLock, node);
-        growthLock.unlock();
-    }
-
-    // If we haven't timed out it means that the ticket has been transferred to our node. The
-    // transfer method removes the node from the linked list, so there's no cleanup to be done.
-
-    auto hasTicket = node.futexWord.load() != 0;
-
-    return TicketBroker::WaitingResult{hasTimedOut, hasTicket};
-}
-
-bool TicketBroker::attemptToTransferTicket(
-    const stdx::unique_lock<stdx::mutex>& growthLock) noexcept {
-    // We can only transfer a ticket if there is a thread waiting for it.
-    if (_numQueued.load() > 0) {
-        _numQueued.fetchAndSubtract(1);
-
-        // We notify the first element in the queue. To avoid race conditions we first remove the
-        // node and then notify the waiting thread. Doing the opposite risks a segmentation fault if
-        // the node gets deallocated before we remove it from the list.
-        auto node = _queueBegin;
-        _queueBegin = node->next;
-        if (_queueBegin) {
-            // Next node isn't empty, we must inform it that it's first in line.
-            _queueBegin->previous = nullptr;
+    {
+        stdx::unique_lock<Mutex> lk(_mutex);
+        // It is important to check for a ticket one more time before queueing, as a ticket may have
+        // just become available.
+        if (tryAcquire()) {
+            return true;
         }
-        auto& futexAtomic = node->futexWord;
-        futexAtomic.store(1);
-        // We've transferred a ticket and removed the node from the list, inform the waiting thread
-        // that it can proceed.
-        atomic_notify_one(futexAtomic);
+        _queued.addAndFetch(1);
+        _waiters->push(waiter);
+    }
+
+    auto res = atomic_wait(waiter->futexWord, TicketWaiter::State::Waiting, deadline);
+    if (res == stdx::cv_status::timeout) {
+        // If we timed out, we need to invalidate ourselves, but ensure that we take a ticket if
+        // it was given.
+        auto state = static_cast<uint32_t>(TicketWaiter::State::Waiting);
+        if (waiter->futexWord.compareAndSwap(&state, TicketWaiter::State::TimedOut)) {
+            // Successfully set outselves to timed out so nobody tries to give us a ticket.
+            return false;
+        } else {
+            // We were given a ticket anyways. We must take it.
+            invariant(state == TicketWaiter::State::Acquired);
+            return true;
+        }
+    }
+    invariant(waiter->futexWord.load() == TicketWaiter::State::Acquired);
+    return true;
+}
+
+std::shared_ptr<TicketWaiter> TicketPool::_popWaiterOrAddTicketToPool() {
+    stdx::unique_lock<Mutex> lock(_mutex);
+    if (_waiters->empty()) {
+        // We need to ensure we add the ticket back to the pool while holding the mutex. This
+        // prevents a soon-to-be waiter from missing an available ticket. Otherwise, we could
+        // leave a waiter in the queue without ever waking it.
+        _available.addAndFetch(1);
+        return nullptr;
+    }
+    auto waiter = _waiters->pop();
+    _queued.subtractAndFetch(1);
+    return waiter;
+}
+
+void TicketPool::_release() {
+    while (auto waiter = _popWaiterOrAddTicketToPool()) {
+        auto state = static_cast<uint32_t>(TicketWaiter::State::Waiting);
+        if (waiter->futexWord.compareAndSwap(&state, TicketWaiter::State::Acquired)) {
+            atomic_notify_one(waiter->futexWord);
+            return;
+        } else {
+            // We raced with the waiter timing out, so we didn't transfer the ticket. Try again.
+            invariant(state == TicketWaiter::State::TimedOut);
+        }
+    }
+}
+
+void TicketPool::release() {
+    _release();
+}
+
+bool TicketPool::releaseIfWaiters() {
+    // This is prone to race conditions, but is intended as a fast-path to avoid taking the mutex
+    // unnecessarily.
+    if (_queued.load()) {
+        _release();
         return true;
     }
     return false;

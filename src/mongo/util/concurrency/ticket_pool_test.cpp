@@ -35,7 +35,7 @@
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/concurrency/ticket_broker.h"
+#include "mongo/util/concurrency/ticket_pool.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/timer.h"
 
@@ -76,55 +76,37 @@ static inline const Milliseconds kSleepTime{1};
         }                                                                                        \
     }
 
-TEST(TicketBrokerTest, BasicTimeout) {
-    TicketBroker broker;
-
-    stdx::mutex brokerMutex;  // NOLINT
+TEST(TicketPoolTest, BasicTimeout) {
+    TicketPool pool(0, std::make_unique<FifoTicketQueue>());
 
     {
-        stdx::unique_lock lk(brokerMutex);
-        auto result =
-            broker.attemptWaitForTicketUntil(std::move(lk), Date_t::now() + Milliseconds{10});
-        ASSERT_FALSE(result.hasTicket);
-        ASSERT_TRUE(result.hasTimedOut);
+        AdmissionContext ctx;
+        ASSERT_FALSE(pool.acquire(&ctx, Date_t::now() + Milliseconds{10}));
     }
 
     {
-        stdx::unique_lock lk(brokerMutex);
-        auto result = broker.attemptWaitForTicketUntil(std::move(lk), Date_t::min());
-        ASSERT_FALSE(result.hasTicket);
-        ASSERT_TRUE(result.hasTimedOut);
+        AdmissionContext admCtx;
+        ASSERT_FALSE(pool.acquire(&admCtx, Date_t::min()));
     }
 }
 
-TEST(TicketBrokerTest, HandOverWorks) {
-    TicketBroker broker;
-
-    stdx::mutex brokerMutex;  // NOLINT
+TEST(TicketPoolTest, HandOverWorks) {
+    TicketPool pool(0, std::make_unique<FifoTicketQueue>());
 
     {
-        {
-            stdx::unique_lock growthLock(brokerMutex);
-            ASSERT_FALSE(broker.attemptToTransferTicket(growthLock));
-        }
+        ASSERT_FALSE(pool.tryAcquire());
 
         stdx::thread waitingThread([&] {
-            stdx::unique_lock lk(brokerMutex);
-            auto result =
-                broker.attemptWaitForTicketUntil(std::move(lk), Date_t::now() + Seconds{10});
-            ASSERT_TRUE(result.hasTicket);
-            ASSERT_FALSE(result.hasTimedOut);
+            AdmissionContext ctx;
+            ASSERT_TRUE(pool.acquire(&ctx, Date_t::now() + Seconds{10}));
         });
 
         assertSoon([&] {
-            ASSERT_SOON_EXP(broker.waitingThreadsRelaxed() == 1);
+            ASSERT_SOON_EXP(pool.queued() == 1);
             return true;
         });
 
-        {
-            stdx::unique_lock growthLock(brokerMutex);
-            ASSERT_TRUE(broker.attemptToTransferTicket(growthLock));
-        }
+        { ASSERT_TRUE(pool.releaseIfWaiters()); }
 
         waitingThread.join();
     }
@@ -136,23 +118,19 @@ TEST(TicketBrokerTest, HandOverWorks) {
 
         for (int i = 0; i < threadsToTest; i++) {
             threads.emplace_back([&] {
-                stdx::unique_lock lk(brokerMutex);
-                auto result =
-                    broker.attemptWaitForTicketUntil(std::move(lk), Date_t::now() + Seconds{10});
-                ASSERT_TRUE(result.hasTicket);
-                ASSERT_FALSE(result.hasTimedOut);
+                AdmissionContext ctx;
+                ASSERT_TRUE(pool.acquire(&ctx, Date_t::now() + Seconds{10}));
                 pendingThreads.subtractAndFetch(1);
             });
         }
 
         assertSoon([&] {
-            ASSERT_SOON_EXP(broker.waitingThreadsRelaxed() == 10);
+            ASSERT_SOON_EXP(pool.queued() == 10);
             return true;
         });
 
         for (int i = 1; i <= threadsToTest; i++) {
-            stdx::unique_lock growthLock(brokerMutex);
-            ASSERT_TRUE(broker.attemptToTransferTicket(growthLock));
+            ASSERT_TRUE(pool.releaseIfWaiters());
             assertSoon([&] {
                 ASSERT_SOON_EXP(pendingThreads.load() == threadsToTest - i);
                 return true;

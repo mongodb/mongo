@@ -140,7 +140,7 @@ Status TicketHolderManager::updateConcurrentReadTransactions(const int32_t& newR
 Status TicketHolderManager::updateLowPriorityAdmissionBypassThreshold(
     const int32_t& newBypassThreshold) {
     if (auto client = Client::getCurrent()) {
-        // TODO SERVER-72616: Remove the ifdef once TicketBroker is implemented in a cross-platform
+        // TODO SERVER-72616: Remove the ifdef once TicketPool is implemented in a cross-platform
         // manner.
 #ifdef __linux__
         auto ticketHolderManager = TicketHolderManager::get(client->getServiceContext());

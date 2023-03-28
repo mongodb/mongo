@@ -46,7 +46,7 @@
 
 namespace mongo {
 
-class SemaphoreTicketHolder final : public TicketHolderWithQueueingStats {
+class SemaphoreTicketHolder final : public TicketHolder {
 public:
     explicit SemaphoreTicketHolder(int numTickets, ServiceContext* serviceContext);
     ~SemaphoreTicketHolder() override final;

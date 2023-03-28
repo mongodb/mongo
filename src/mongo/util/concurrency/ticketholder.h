@@ -53,25 +53,27 @@ class TicketHolder {
     friend class Ticket;
 
 public:
+    TicketHolder(int32_t numTickets, ServiceContext* svcCtx)
+        : _outof(numTickets), _serviceContext(svcCtx){};
     virtual ~TicketHolder(){};
 
     /**
      * Adjusts the total number of tickets allocated for the ticket pool to 'newSize'.
      */
-    virtual void resize(int32_t newSize) noexcept {};
+    virtual void resize(int32_t newSize) noexcept;
 
     /**
      * Attempts to acquire a ticket without blocking.
-     * Returns a boolean indicating whether the operation was successful or not.
+     * Returns a ticket if one is available, and boost::none otherwise.
      */
-    virtual boost::optional<Ticket> tryAcquire(AdmissionContext* admCtx) = 0;
+    virtual boost::optional<Ticket> tryAcquire(AdmissionContext* admCtx);
 
     /**
      * Attempts to acquire a ticket. Blocks until a ticket is acquired or the OperationContext
      * 'opCtx' is killed, throwing an AssertionException. If no OperationContext is provided, then
      * the operation is uninterruptible.
      */
-    virtual Ticket waitForTicket(OperationContext* opCtx, AdmissionContext* admCtx) = 0;
+    virtual Ticket waitForTicket(OperationContext* opCtx, AdmissionContext* admCtx);
 
     /**
      * Attempts to acquire a ticket within a deadline, 'until'. Returns 'true' if a ticket is
@@ -81,9 +83,26 @@ public:
      */
     virtual boost::optional<Ticket> waitForTicketUntil(OperationContext* opCtx,
                                                        AdmissionContext* admCtx,
-                                                       Date_t until) = 0;
+                                                       Date_t until);
 
-    virtual void appendStats(BSONObjBuilder& b) const = 0;
+    /**
+     * The total number of tickets allotted to the ticket pool.
+     */
+    virtual int32_t outof() const {
+        return _outof.loadRelaxed();
+    }
+
+    /**
+     * Instantaneous number of tickets that are checked out by an operation.
+     */
+    virtual int32_t used() const {
+        return outof() - available();
+    }
+
+    /**
+     * Peak number of tickets checked out at once since the previous time this function was called.
+     */
+    virtual int32_t getAndResetPeakUsed();
 
     /**
      * 'Immediate' admissions don't need to acquire or wait for a ticket. However, they should
@@ -91,71 +110,8 @@ public:
      *
      * Increments the count of 'immediate' priority admissions reported.
      */
-    virtual void reportImmediatePriorityAdmission() = 0;
-
-    /**
-     * Instantaneous number of tickets 'available' (not checked out by an operation) in the ticket
-     * pool.
-     */
-    virtual int32_t available() const = 0;
-
-    /**
-     * Instantaneous number of tickets that are checked out by an operation.
-     */
-    virtual int32_t used() const = 0;
-
-    /**
-     * Peak number of tickets checked out at once since the previous time this function was called.
-     */
-    virtual int32_t getAndResetPeakUsed() = 0;
-
-    /**
-     * The total number of tickets allotted to the ticket pool.
-     */
-    virtual int32_t outof() const = 0;
-
-    /**
-     * The total number of operations that acquired a ticket, completed their work, and released the
-     * ticket.
-     */
-    virtual int64_t numFinishedProcessing() const = 0;
-
-private:
-    /**
-     * Releases a ticket back into the ticketing pool.
-     */
-    virtual void _releaseToTicketPool(AdmissionContext* admCtx) noexcept = 0;
-};
-
-/**
- * A ticketholder which manages both aggregate and policy specific queueing statistics.
- */
-class TicketHolderWithQueueingStats : public TicketHolder {
-public:
-    TicketHolderWithQueueingStats(int32_t numTickets, ServiceContext* svcCtx)
-        : _outof(numTickets), _serviceContext(svcCtx){};
-
-    ~TicketHolderWithQueueingStats() override{};
-
-    boost::optional<Ticket> tryAcquire(AdmissionContext* admCtx) override;
-
-    Ticket waitForTicket(OperationContext* opCtx, AdmissionContext* admCtx) override;
-
-    boost::optional<Ticket> waitForTicketUntil(OperationContext* opCtx,
-                                               AdmissionContext* admCtx,
-                                               Date_t until) override;
-
-    /**
-     * Adjusts the total number of tickets allocated for the ticket pool to 'newSize'.
-     */
-    void resize(int32_t newSize) noexcept override;
-
-    int32_t used() const override {
-        return outof() - available();
-    }
-
-    int32_t outof() const override {
-        return _outof.loadRelaxed();
+    virtual void reportImmediatePriorityAdmission() {
+        _immediatePriorityAdmissionsCount.fetchAndAdd(1);
     }
 
     /**
@@ -166,11 +122,27 @@ public:
         return _immediatePriorityAdmissionsCount.loadRelaxed();
     }
 
-    void reportImmediatePriorityAdmission() override final {
-        _immediatePriorityAdmissionsCount.fetchAndAdd(1);
-    }
+    virtual void appendStats(BSONObjBuilder& b) const;
 
-    void appendStats(BSONObjBuilder& b) const override;
+    /**
+     * Instantaneous number of tickets 'available' (not checked out by an operation) in the ticket
+     * pool.
+     */
+    virtual int32_t available() const = 0;
+
+    /**
+     * Instantaneous number of operations waiting in queue for a ticket.
+     *
+     * TODO SERVER-74082: Once the SemaphoreTicketHolder is removed, consider changing this metric
+     * to int32_t.
+     */
+    virtual int64_t queued() const = 0;
+
+    /**
+     * The total number of operations that acquired a ticket, completed their work, and released the
+     * ticket.
+     */
+    virtual int64_t numFinishedProcessing() const = 0;
 
     /**
      * Statistics for queueing mechanisms in the TicketHolder implementations. The term "Queue" is a
@@ -188,18 +160,13 @@ public:
         AtomicWord<std::int64_t> totalTimeQueuedMicros{0};
     };
 
-    int32_t getAndResetPeakUsed() override;
-
-    /**
-     * Instantaneous number of operations waiting in queue for a ticket.
-     *
-     * TODO SERVER-74082: Once the SemaphoreTicketHolder is removed, consider changing this metric
-     * to int32_t.
-     */
-    virtual int64_t queued() const = 0;
-
 private:
-    void _releaseToTicketPool(AdmissionContext* admCtx) noexcept override final;
+    /**
+     * Releases a ticket back into the ticketing pool.
+     */
+    virtual void _releaseToTicketPool(AdmissionContext* admCtx) noexcept;
+
+    virtual void _releaseToTicketPoolImpl(AdmissionContext* admCtx) noexcept = 0;
 
     virtual boost::optional<Ticket> _tryAcquireImpl(AdmissionContext* admCtx) = 0;
 
@@ -207,11 +174,9 @@ private:
                                                             AdmissionContext* admCtx,
                                                             Date_t until) = 0;
 
-    virtual void _appendImplStats(BSONObjBuilder& b) const = 0;
+    virtual void _appendImplStats(BSONObjBuilder& b) const {}
 
-    virtual void _releaseToTicketPoolImpl(AdmissionContext* admCtx) noexcept = 0;
-
-    virtual void _resize(int32_t newSize, int32_t oldSize) noexcept = 0;
+    virtual void _resize(int32_t newSize, int32_t oldSize) noexcept {}
 
     /**
      * Fetches the queueing statistics corresponding to the 'admCtx'. All statistics that are queue
@@ -221,8 +186,8 @@ private:
 
     void _updatePeakUsed();
 
-    Mutex _resizeMutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(2),
-                                          "TicketHolderWithQueueingStats::_resizeMutex");
+    Mutex _resizeMutex =
+        MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(2), "TicketHolder::_resizeMutex");
     AtomicWord<int32_t> _outof;
     AtomicWord<int32_t> _peakUsed;
     AtomicWord<std::int64_t> _immediatePriorityAdmissionsCount;
@@ -238,6 +203,8 @@ protected:
 
 class MockTicketHolder : public TicketHolder {
 public:
+    MockTicketHolder() : TicketHolder(0, nullptr) {}
+
     void resize(int32_t newSize) noexcept override {
         _outof = newSize;
     }
@@ -274,15 +241,32 @@ public:
         _outof = outof;
     }
 
+    int64_t queued() const override {
+        return 0;
+    }
+
     int64_t numFinishedProcessing() const override {
         return _numFinishedProcessing;
     }
+
     void setNumFinishedProcessing(int32_t numFinishedProcessing) {
         _numFinishedProcessing = numFinishedProcessing;
     }
 
 private:
-    void _releaseToTicketPool(AdmissionContext*) noexcept override {}
+    void _releaseToTicketPoolImpl(AdmissionContext* admCtx) noexcept override {}
+
+    boost::optional<Ticket> _tryAcquireImpl(AdmissionContext* admCtx) override;
+
+    boost::optional<Ticket> _waitForTicketUntilImpl(OperationContext* opCtx,
+                                                    AdmissionContext* admCtx,
+                                                    Date_t until) override;
+
+    QueueStats& _getQueueStatsToUse(const AdmissionContext* admCtx) noexcept override {
+        return _stats;
+    }
+
+    QueueStats _stats;
 
     int32_t _used = 0;
     int32_t _peakUsed = 0;
@@ -296,7 +280,6 @@ private:
  */
 class Ticket {
     friend class TicketHolder;
-    friend class TicketHolderWithQueueingStats;
     friend class SemaphoreTicketHolder;
     friend class PriorityTicketHolder;
     friend class MockTicketHolder;

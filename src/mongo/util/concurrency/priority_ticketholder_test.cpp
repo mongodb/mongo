@@ -33,6 +33,7 @@
 #include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/concurrency/priority_ticketholder.h"
 #include "mongo/util/concurrency/ticketholder_test_fixture.h"
+#include "mongo/util/periodic_runner_factory.h"
 #include "mongo/util/tick_source_mock.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -75,31 +76,42 @@ void assertSoon(std::function<bool()> predicate, Milliseconds timeout = kWaitTim
     }
 }
 
-class PriorityTicketHolderTest : public TicketHolderTestFixture {};
+class PriorityTicketHolderTest : public TicketHolderTestFixture {
+public:
+    void setUp() override {
+        TicketHolderTestFixture::setUp();
+
+        auto tickSource = std::make_unique<TickSourceMock<Microseconds>>();
+        _tickSource = tickSource.get();
+        getServiceContext()->setTickSource(std::move(tickSource));
+    }
+
+    TickSourceMock<Microseconds>* getTickSource() {
+        return _tickSource;
+    }
+
+private:
+    TickSourceMock<Microseconds>* _tickSource;
+};
 
 TEST_F(PriorityTicketHolderTest, BasicTimeoutPriority) {
-    ServiceContext serviceContext;
-    serviceContext.setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
     basicTimeout(_opCtx.get(),
-                 std::make_unique<PriorityTicketHolder>(
-                     1, kDefaultLowPriorityAdmissionBypassThreshold, &serviceContext));
+                 std::make_unique<PriorityTicketHolder>(1 /* tickets */,
+                                                        kDefaultLowPriorityAdmissionBypassThreshold,
+                                                        getServiceContext()));
 }
 
 TEST_F(PriorityTicketHolderTest, ResizeStatsPriority) {
-    ServiceContext serviceContext;
-    serviceContext.setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
-    auto tickSource = dynamic_cast<TickSourceMock<Microseconds>*>(serviceContext.getTickSource());
-
     resizeTest(_opCtx.get(),
-               std::make_unique<PriorityTicketHolder>(
-                   1, kDefaultLowPriorityAdmissionBypassThreshold, &serviceContext),
-               tickSource);
+               std::make_unique<PriorityTicketHolder>(1 /* tickets */,
+                                                      kDefaultLowPriorityAdmissionBypassThreshold,
+                                                      getServiceContext()),
+               getTickSource());
 }
 
 TEST_F(PriorityTicketHolderTest, PriorityTwoQueuedOperations) {
-    ServiceContext serviceContext;
-    serviceContext.setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
-    PriorityTicketHolder holder(1, kDefaultLowPriorityAdmissionBypassThreshold, &serviceContext);
+    PriorityTicketHolder holder(
+        1 /* tickets */, kDefaultLowPriorityAdmissionBypassThreshold, getServiceContext());
 
     Stats stats(&holder);
 
@@ -170,9 +182,8 @@ TEST_F(PriorityTicketHolderTest, PriorityTwoQueuedOperations) {
 
 
 TEST_F(PriorityTicketHolderTest, OnlyLowPriorityOps) {
-    ServiceContext serviceContext;
-    serviceContext.setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
-    PriorityTicketHolder holder(1, kDefaultLowPriorityAdmissionBypassThreshold, &serviceContext);
+    PriorityTicketHolder holder(
+        1 /* tickets */, kDefaultLowPriorityAdmissionBypassThreshold, getServiceContext());
     Stats stats(&holder);
 
     // This mutex is to avoid data race conditions between checking for the ticket state and setting
@@ -289,9 +300,8 @@ TEST_F(PriorityTicketHolderTest, OnlyLowPriorityOps) {
 }
 
 TEST_F(PriorityTicketHolderTest, PriorityTwoNormalOneLowQueuedOperations) {
-    ServiceContext serviceContext;
-    serviceContext.setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
-    PriorityTicketHolder holder(1, kDefaultLowPriorityAdmissionBypassThreshold, &serviceContext);
+    PriorityTicketHolder holder(
+        1 /* tickets */, kDefaultLowPriorityAdmissionBypassThreshold, getServiceContext());
     Stats stats(&holder);
 
     {
@@ -377,10 +387,8 @@ TEST_F(PriorityTicketHolderTest, PriorityTwoNormalOneLowQueuedOperations) {
 }
 
 TEST_F(PriorityTicketHolderTest, PriorityBasicMetrics) {
-    ServiceContext serviceContext;
-    serviceContext.setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
-    auto tickSource = dynamic_cast<TickSourceMock<Microseconds>*>(serviceContext.getTickSource());
-    PriorityTicketHolder holder(1, kDefaultLowPriorityAdmissionBypassThreshold, &serviceContext);
+    PriorityTicketHolder holder(
+        1 /* tickets */, kDefaultLowPriorityAdmissionBypassThreshold, getServiceContext());
     Stats stats(&holder);
 
     MockAdmission lowPriorityAdmission(this->getServiceContext(), AdmissionContext::Priority::kLow);
@@ -416,7 +424,7 @@ TEST_F(PriorityTicketHolderTest, PriorityBasicMetrics) {
         });
     }
 
-    tickSource->advance(Microseconds(100));
+    getTickSource()->advance(Microseconds(100));
     lowPriorityAdmission.ticket.reset();
 
     while (holder.queued() > 0) {
@@ -424,7 +432,7 @@ TEST_F(PriorityTicketHolderTest, PriorityBasicMetrics) {
     }
 
     barrierAcquiredTicket.countDownAndWait();
-    tickSource->advance(Microseconds(200));
+    getTickSource()->advance(Microseconds(200));
     barrierReleaseTicket.countDownAndWait();
 
     waiting.join();
@@ -473,10 +481,8 @@ TEST_F(PriorityTicketHolderTest, PriorityBasicMetrics) {
 }
 
 TEST_F(PriorityTicketHolderTest, PriorityCanceled) {
-    ServiceContext serviceContext;
-    serviceContext.setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
-    auto tickSource = dynamic_cast<TickSourceMock<Microseconds>*>(serviceContext.getTickSource());
-    PriorityTicketHolder holder(1, kDefaultLowPriorityAdmissionBypassThreshold, &serviceContext);
+    PriorityTicketHolder holder(
+        1 /* tickets */, kDefaultLowPriorityAdmissionBypassThreshold, getServiceContext());
     Stats stats(&holder);
     {
         MockAdmission lowPriorityAdmission(this->getServiceContext(),
@@ -497,7 +503,7 @@ TEST_F(PriorityTicketHolderTest, PriorityCanceled) {
             // Wait for thread to take ticket.
         }
 
-        tickSource->advance(Microseconds(100));
+        getTickSource()->advance(Microseconds(100));
         waiting.join();
     }
 
@@ -532,10 +538,8 @@ TEST_F(PriorityTicketHolderTest, PriorityCanceled) {
 }
 
 TEST_F(PriorityTicketHolderTest, LowPriorityExpedited) {
-    ServiceContext serviceContext;
-    serviceContext.setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
     auto lowPriorityBypassThreshold = 2;
-    PriorityTicketHolder holder(1, lowPriorityBypassThreshold, &serviceContext);
+    PriorityTicketHolder holder(1 /* tickets */, lowPriorityBypassThreshold, getServiceContext());
     Stats stats(&holder);
 
     // Use the GlobalServiceContext to create MockAdmissions.
@@ -617,4 +621,10 @@ TEST_F(PriorityTicketHolderTest, LowPriorityExpedited) {
     ASSERT_EQ(normalPriorityStats.getIntField("newAdmissions"), queuedNormalAdmissionsCount + 1);
     ASSERT_EQ(normalPriorityStats.getIntField("canceled"), 0);
 }
+
+TEST_F(PriorityTicketHolderTest, Interruption) {
+    interruptTest(_opCtx.get(),
+                  std::make_unique<PriorityTicketHolder>(1 /* tickets */, 0, getServiceContext()));
+}
+
 }  // namespace

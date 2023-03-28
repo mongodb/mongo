@@ -36,42 +36,62 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/concurrency/mutex.h"
-#include "mongo/util/concurrency/ticket_broker.h"
+#include "mongo/util/concurrency/ticket_pool.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
 
+namespace {
+enum class QueueType : unsigned int { kLowPriority = 0, kNormalPriority = 1, NumQueues = 2 };
+
+}  // namespace
+
 class Ticket;
+
 /**
- * A ticketholder implementation that centralises all ticket acquisition/releases.  Waiters will get
- * placed in a specific internal queue according to some logic.  Releasers will wake up a waiter
- * from a group chosen according to some logic.
- *
- * MODIFICATIONS TO THIS CLASS MUST BE ACCOMPANIED BY AN UPDATE OF
- * src/mongo/tla_plus/PriorityTicketHolder/MCPriorityTicketHolder.tla TO ENSURE IT IS CORRECT
+ * This SimplePriorityTicketQueue implements a queue policy that separates normal and low priority
+ * operations into separate queues. Normal priority operations are always scheduled ahead of low
+ * priority ones, except when a positive lowPriorityBypassThreshold is provided. This parameter
+ * specifies how often a waiting low-priority operation should skip the queue and be scheduled ahead
+ * of waiting normal priority operations.
  */
-class PriorityTicketHolder : public TicketHolderWithQueueingStats {
+class SimplePriorityTicketQueue : public TicketQueue {
 public:
-    explicit PriorityTicketHolder(int32_t numTickets,
-                                  int32_t lowPriorityBypassThreshold,
-                                  ServiceContext* serviceContext);
-    ~PriorityTicketHolder() override{};
+    SimplePriorityTicketQueue(int lowPriorityBypassThreshold)
+        : _lowPriorityBypassThreshold(lowPriorityBypassThreshold) {}
 
-    int32_t available() const override final {
-        return _ticketsAvailable.load();
-    };
-
-    int64_t queued() const override final {
-        int64_t result = 0;
-        for (const auto& queue : _brokers) {
-            result += queue.waitingThreadsRelaxed();
-        }
-        return result;
+    bool empty() const final {
+        return _normal.empty() && _low.empty();
     }
 
-    int64_t numFinishedProcessing() const override final;
+    void push(std::shared_ptr<TicketWaiter> val) final {
+        if (val->context->getPriority() == AdmissionContext::Priority::kLow) {
+            _low.push(std::move(val));
+            return;
+        }
+        invariant(val->context->getPriority() == AdmissionContext::Priority::kNormal);
+        _normal.push(std::move(val));
+    }
+
+    std::shared_ptr<TicketWaiter> pop() final {
+        if (!_normal.empty() && !_low.empty() && _lowPriorityBypassThreshold.load() > 0 &&
+            _lowPriorityBypassCount.fetchAndAdd(1) % _lowPriorityBypassThreshold.load() == 0) {
+            auto front = std::move(_low.front());
+            _low.pop();
+            _expeditedLowPriorityAdmissions.addAndFetch(1);
+            return front;
+        }
+        if (!_normal.empty()) {
+            auto front = std::move(_normal.front());
+            _normal.pop();
+            return front;
+        }
+        auto front = std::move(_low.front());
+        _low.pop();
+        return front;
+    }
 
     /**
      * Number of times low priority operations are expedited for ticket admission over normal
@@ -87,13 +107,61 @@ public:
      */
     std::int64_t bypassed() const {
         return _lowPriorityBypassCount.loadRelaxed();
-    };
+    }
 
-    void updateLowPriorityAdmissionBypassThreshold(const int32_t& newBypassThreshold);
+    void updateLowPriorityAdmissionBypassThreshold(int32_t newBypassThreshold) {
+        _lowPriorityBypassThreshold.store(newBypassThreshold);
+    }
 
 private:
-    enum class QueueType : unsigned int { kLowPriority = 0, kNormalPriority = 1, NumQueues = 2 };
+    /**
+     * Limits the number times the low priority queue is non-empty and bypassed in favor of the
+     * normal priority queue for the next ticket admission.
+     */
+    AtomicWord<std::int32_t> _lowPriorityBypassThreshold;
 
+    /**
+     * Number of times ticket admission is expedited for low priority operations.
+     */
+    AtomicWord<std::int64_t> _expeditedLowPriorityAdmissions{0};
+
+    /**
+     * Counts the number of times normal operations are dequeued over operations queued in the low
+     * priority queue. We explicitly use an unsigned type here because rollover is desired.
+     */
+    AtomicWord<std::uint64_t> _lowPriorityBypassCount{0};
+
+    std::queue<std::shared_ptr<TicketWaiter>> _normal;
+    std::queue<std::shared_ptr<TicketWaiter>> _low;
+};
+
+/**
+ * A PriorityTicketHolder supports queueing and prioritization of operations based on
+ * AdmissionContext::Priority.
+ *
+ * MODIFICATIONS TO THIS CLASS MUST BE ACCOMPANIED BY AN UPDATE OF
+ * src/mongo/tla_plus/PriorityTicketHolder/MCPriorityTicketHolder.tla TO ENSURE IT IS CORRECT
+ */
+class PriorityTicketHolder : public TicketHolder {
+public:
+    explicit PriorityTicketHolder(int32_t numTickets,
+                                  int32_t lowPriorityBypassThreshold,
+                                  ServiceContext* serviceContext);
+    ~PriorityTicketHolder() override{};
+
+    int32_t available() const override final;
+
+    int64_t queued() const override final;
+
+    int64_t numFinishedProcessing() const override final;
+
+    std::int64_t expedited() const;
+
+    std::int64_t bypassed() const;
+
+    void updateLowPriorityAdmissionBypassThreshold(int32_t newBypassThreshold);
+
+private:
     boost::optional<Ticket> _tryAcquireImpl(AdmissionContext* admCtx) override final;
 
     boost::optional<Ticket> _waitForTicketUntilImpl(OperationContext* opCtx,
@@ -108,39 +176,6 @@ private:
 
     void _appendImplStats(BSONObjBuilder& b) const override final;
 
-    bool _tryAcquireTicket();
-
-    TicketBroker::WaitingResult _attemptToAcquireTicket(TicketBroker& ticketBroker,
-                                                        Date_t deadline,
-                                                        Milliseconds maxWaitTime);
-
-    /**
-     * Wakes up a waiting thread (if it exists) and hands-over the current ticket.
-     * Implementors MUST wake at least one waiting thread if at least one thread is waiting in any
-     * of the brokers. In other words, attemptToTransferTicket on each non-empty TicketBroker must
-     * be called until either it returns true at least once or has been called on all brokers.
-     *
-     * Care must be taken to ensure that only CPU-bound work is performed here and it doesn't block.
-     * We risk stalling all other operations otherwise.
-     *
-     * When called the following invariants will be held:
-     * - Successive checks to the number of waiting threads in a TicketBroker will always be <= the
-     * previous value. That is, no new waiters can come in.
-     * - Calling TicketBroker::attemptToTransferTicket will always return false if it has previously
-     * returned false. Successive calls can change the result from true to false, but never the
-     * reverse.
-     */
-    bool _dequeueWaitingThread(const stdx::unique_lock<stdx::mutex>& growthLock);
-
-    static unsigned int _enumToInt(QueueType queueType) {
-        return static_cast<unsigned int>(queueType);
-    }
-
-    TicketBroker& _getBroker(QueueType queueType) {
-        return _brokers[_enumToInt(queueType)];
-    }
-
-
     static QueueType _getQueueType(const AdmissionContext* admCtx) {
         auto priority = admCtx->getPriority();
         switch (priority) {
@@ -153,35 +188,14 @@ private:
         }
     }
 
-    // This mutex is meant to be used in order to grow the queue or to prevent it from doing so.
-    //
-    // We use an stdx::mutex here because we want to minimize overhead as much as possible. Using a
-    // normal mongo::Mutex would add some unnecessary metrics counters. Additionally we need this
-    // type as it is part of the TicketBroker API in order to avoid misuse.
-    stdx::mutex _growthMutex;  // NOLINT
+    static unsigned int _enumToInt(QueueType queueType) {
+        return static_cast<std::underlying_type_t<QueueType>>(queueType);
+    }
 
-    std::array<TicketBroker, static_cast<unsigned int>(QueueType::NumQueues)> _brokers;
     std::array<QueueStats, static_cast<unsigned int>(QueueType::NumQueues)> _stats;
 
-    /**
-     * Limits the number times the low priority queue is non-empty and bypassed in favor of the
-     * normal priority queue for the next ticket admission.
-     *
-     * Updates must be done under the _growthMutex.
-     */
-    int32_t _lowPriorityBypassThreshold;
+    std::unique_ptr<TicketPool> _pool;
 
-    /**
-     * Counts the number of times normal operations are dequeued over operations queued in the low
-     * priority queue. We explicitly use an unsigned type here because rollover is desired.
-     */
-    AtomicWord<std::uint64_t> _lowPriorityBypassCount{0};
-
-    /**
-     * Number of times ticket admission is expedited for low priority operations.
-     */
-    AtomicWord<std::int64_t> _expeditedLowPriorityAdmissions{0};
-    AtomicWord<int32_t> _ticketsAvailable;
     ServiceContext* _serviceContext;
 };
 }  // namespace mongo

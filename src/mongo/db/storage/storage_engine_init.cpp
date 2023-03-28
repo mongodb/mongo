@@ -182,7 +182,7 @@ StorageEngine::LastShutdownState initializeStorageEngine(OperationContext* opCtx
             // using futex calls. As this hasn't been implemented in non-Linux platforms we fallback
             // to the existing semaphore implementation even if the feature flag is enabled.
             //
-            // TODO SERVER-72616: Remove the ifdefs once TicketBroker is implemented with atomic
+            // TODO SERVER-72616: Remove the ifdefs once TicketPool is implemented with atomic
             // wait.
             ticketHolderManager = std::make_unique<TicketHolderManager>(
                 svcCtx,

@@ -380,8 +380,6 @@ void LockerImpl::reacquireTicket(OperationContext* opCtx) {
 }
 
 bool LockerImpl::_acquireTicket(OperationContext* opCtx, LockMode mode, Date_t deadline) {
-    _admCtx.setLockMode(mode);
-
     // Upon startup, the holder is not guaranteed to be initialized.
     auto holder = _ticketHolderManager ? _ticketHolderManager->getTicketHolder(mode) : nullptr;
     const bool reader = isSharedLockMode(mode);
@@ -392,17 +390,13 @@ bool LockerImpl::_acquireTicket(OperationContext* opCtx, LockMode mode, Date_t d
         // MODE_X is exclusive of all other locks, thus acquiring a ticket is unnecessary.
         _clientState.store(reader ? kQueuedReader : kQueuedWriter);
         // If the ticket wait is interrupted, restore the state of the client.
-        ScopeGuard restoreStateOnErrorGuard([&] {
-            _clientState.store(kInactive);
-            _admCtx.setLockMode(MODE_NONE);
-        });
+        ScopeGuard restoreStateOnErrorGuard([&] { _clientState.store(kInactive); });
 
         // Acquiring a ticket is a potentially blocking operation. This must not be called after a
         // transaction timestamp has been set, indicating this transaction has created an oplog
         // hole.
         invariant(!opCtx->recoveryUnit()->isTimestamped());
 
-        _admCtx.setLockMode(mode);
         if (auto ticket = holder->waitForTicketUntil(
                 _uninterruptibleLocksRequested ? nullptr : opCtx, &_admCtx, deadline)) {
             _ticket = std::move(*ticket);
@@ -1112,7 +1106,6 @@ void LockerImpl::releaseTicket() {
 
 void LockerImpl::_releaseTicket() {
     _ticket.reset();
-    _admCtx.setLockMode(MODE_NONE);
     _clientState.store(kInactive);
 }
 

@@ -28,6 +28,7 @@
  */
 
 #include "mongo/util/concurrency/admission_context.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

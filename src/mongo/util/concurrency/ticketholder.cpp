@@ -43,7 +43,7 @@ namespace mongo {
 
 namespace {
 void updateQueueStatsOnRelease(ServiceContext* serviceContext,
-                               TicketHolderWithQueueingStats::QueueStats& queueStats,
+                               TicketHolder::QueueStats& queueStats,
                                AdmissionContext* admCtx) {
     queueStats.totalFinishedProcessing.fetchAndAddRelaxed(1);
     auto startTime = admCtx->getStartProcessingTime();
@@ -53,7 +53,7 @@ void updateQueueStatsOnRelease(ServiceContext* serviceContext,
 }
 
 void updateQueueStatsOnTicketAcquisition(ServiceContext* serviceContext,
-                                         TicketHolderWithQueueingStats::QueueStats& queueStats,
+                                         TicketHolder::QueueStats& queueStats,
                                          AdmissionContext* admCtx) {
     if (admCtx->getAdmissions() == 0) {
         queueStats.totalNewAdmissions.fetchAndAddRelaxed(1);
@@ -63,34 +63,34 @@ void updateQueueStatsOnTicketAcquisition(ServiceContext* serviceContext,
 }
 }  // namespace
 
-void TicketHolderWithQueueingStats::resize(int32_t newSize) noexcept {
+void TicketHolder::resize(int32_t newSize) noexcept {
     stdx::lock_guard<Latch> lk(_resizeMutex);
 
     _resize(newSize, _outof.load());
     _outof.store(newSize);
 }
 
-void TicketHolderWithQueueingStats::appendStats(BSONObjBuilder& b) const {
+void TicketHolder::appendStats(BSONObjBuilder& b) const {
     b.append("out", used());
     b.append("available", available());
     b.append("totalTickets", outof());
+    b.append("immediatePriorityAdmissionsCount", getImmediatePriorityAdmissionsCount());
     _appendImplStats(b);
 }
 
-void TicketHolderWithQueueingStats::_releaseToTicketPool(AdmissionContext* admCtx) noexcept {
+void TicketHolder::_releaseToTicketPool(AdmissionContext* admCtx) noexcept {
     auto& queueStats = _getQueueStatsToUse(admCtx);
     updateQueueStatsOnRelease(_serviceContext, queueStats, admCtx);
     _releaseToTicketPoolImpl(admCtx);
 }
 
-Ticket TicketHolderWithQueueingStats::waitForTicket(OperationContext* opCtx,
-                                                    AdmissionContext* admCtx) {
+Ticket TicketHolder::waitForTicket(OperationContext* opCtx, AdmissionContext* admCtx) {
     auto res = waitForTicketUntil(opCtx, admCtx, Date_t::max());
     invariant(res);
     return std::move(*res);
 }
 
-boost::optional<Ticket> TicketHolderWithQueueingStats::tryAcquire(AdmissionContext* admCtx) {
+boost::optional<Ticket> TicketHolder::tryAcquire(AdmissionContext* admCtx) {
     // 'kImmediate' operations should always bypass the ticketing system.
     invariant(admCtx && admCtx->getPriority() != AdmissionContext::Priority::kImmediate);
     auto ticket = _tryAcquireImpl(admCtx);
@@ -104,9 +104,9 @@ boost::optional<Ticket> TicketHolderWithQueueingStats::tryAcquire(AdmissionConte
 }
 
 
-boost::optional<Ticket> TicketHolderWithQueueingStats::waitForTicketUntil(OperationContext* opCtx,
-                                                                          AdmissionContext* admCtx,
-                                                                          Date_t until) {
+boost::optional<Ticket> TicketHolder::waitForTicketUntil(OperationContext* opCtx,
+                                                         AdmissionContext* admCtx,
+                                                         Date_t until) {
     invariant(admCtx && admCtx->getPriority() != AdmissionContext::Priority::kImmediate);
 
     // Attempt a quick acquisition first.
@@ -145,11 +145,11 @@ boost::optional<Ticket> TicketHolderWithQueueingStats::waitForTicketUntil(Operat
     }
 }
 
-int32_t TicketHolderWithQueueingStats::getAndResetPeakUsed() {
+int32_t TicketHolder::getAndResetPeakUsed() {
     return _peakUsed.swap(used());
 }
 
-void TicketHolderWithQueueingStats::_updatePeakUsed() {
+void TicketHolder::_updatePeakUsed() {
     if (!feature_flags::gFeatureFlagExecutionControl.isEnabledAndIgnoreFCV()) {
         return;
     }
@@ -161,8 +161,7 @@ void TicketHolderWithQueueingStats::_updatePeakUsed() {
     }
 }
 
-void TicketHolderWithQueueingStats::_appendCommonQueueImplStats(BSONObjBuilder& b,
-                                                                const QueueStats& stats) const {
+void TicketHolder::_appendCommonQueueImplStats(BSONObjBuilder& b, const QueueStats& stats) const {
     auto removed = stats.totalRemovedQueue.loadRelaxed();
     auto added = stats.totalAddedQueue.loadRelaxed();
 
@@ -193,6 +192,16 @@ boost::optional<Ticket> MockTicketHolder::waitForTicketUntil(OperationContext*,
                                                              AdmissionContext*,
                                                              Date_t) {
     return {};
+}
+
+boost::optional<Ticket> MockTicketHolder::_tryAcquireImpl(AdmissionContext* admCtx) {
+    return boost::none;
+}
+
+boost::optional<Ticket> MockTicketHolder::_waitForTicketUntilImpl(OperationContext* opCtx,
+                                                                  AdmissionContext* admCtx,
+                                                                  Date_t until) {
+    return boost::none;
 }
 
 void MockTicketHolder::setUsed(int32_t used) {

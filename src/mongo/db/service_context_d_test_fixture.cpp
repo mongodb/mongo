@@ -140,6 +140,7 @@ ServiceContextMongoDTest::ServiceContextMongoDTest(Options options)
     // for faster startup.
     auto opCtx = serviceContext->makeOperationContext(getClient());
     initializeStorageEngine(opCtx.get(), options._initFlags);
+
     StorageControl::startStorageControls(serviceContext, true /*forTestOnly*/);
 
     DatabaseHolder::set(serviceContext, std::make_unique<DatabaseHolderImpl>());

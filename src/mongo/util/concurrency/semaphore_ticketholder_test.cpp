@@ -50,4 +50,12 @@ TEST_F(SemaphoreTicketHolderTest, ResizeStatsSemaphore) {
     resizeTest(
         _opCtx.get(), std::make_unique<SemaphoreTicketHolder>(1, &serviceContext), tickSource);
 }
+
+TEST_F(SemaphoreTicketHolderTest, Interruption) {
+    ServiceContext serviceContext;
+    serviceContext.setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
+    interruptTest(_opCtx.get(),
+                  std::make_unique<SemaphoreTicketHolder>(1 /* tickets */, getServiceContext()));
+}
+
 }  // namespace

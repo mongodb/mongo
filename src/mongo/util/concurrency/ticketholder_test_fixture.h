@@ -47,22 +47,27 @@ namespace mongo {
  * target the legacy SemaphoreTicketHolder.
  */
 class TicketHolderTestFixture : public ServiceContextTest {
+public:
     void setUp() override;
 
 protected:
     class Stats;
     struct MockAdmission;
 
-    void basicTimeout(OperationContext* opCtx,
-                      std::unique_ptr<TicketHolderWithQueueingStats> holder);
+    void basicTimeout(OperationContext* opCtx, std::unique_ptr<TicketHolder> holder);
 
     /**
      * Tests that TicketHolder::resize() does not impact metrics outside of those related to the
      * number of tickets available(), used(), and outof().
      */
     void resizeTest(OperationContext* opCtx,
-                    std::unique_ptr<TicketHolderWithQueueingStats> holder,
+                    std::unique_ptr<TicketHolder> holder,
                     TickSourceMock<Microseconds>* tickSource);
+
+    /**
+     * Tests that ticket acquisition is interruptible.
+     */
+    void interruptTest(OperationContext* opCtx, std::unique_ptr<TicketHolder> holder);
 
     ServiceContext::UniqueClient _client;
     ServiceContext::UniqueOperationContext _opCtx;

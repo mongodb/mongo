@@ -28,7 +28,7 @@
  */
 #pragma once
 
-#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/base/string_data.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/tick_source.h"
 
@@ -84,14 +84,6 @@ public:
         return admissions.loadRelaxed();
     }
 
-    void setLockMode(LockMode lockMode) {
-        _lockMode.store(lockMode);
-    }
-
-    LockMode getLockMode() const {
-        return _lockMode.loadRelaxed();
-    }
-
     void setPriority(Priority priority) {
         _priority.store(priority);
     }
@@ -108,7 +100,6 @@ private:
     // semantics.
     AtomicWord<TickSource::Tick> _startProcessingTime{0};
     AtomicWord<int32_t> admissions{0};
-    AtomicWord<LockMode> _lockMode{LockMode::MODE_NONE};
     AtomicWord<Priority> _priority{Priority::kNormal};
 };
 

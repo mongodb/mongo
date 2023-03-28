@@ -1580,15 +1580,14 @@ When resources are limited, its important to prioritize which operations are adm
 
 If the server is not under load (there are tickets available for the global lock request mode), then tickets are handed out immediately, regardless of admission priority. Otherwise, operations wait until a ticket is available.
 
-Operations waiting for a ticket are assigned to a TicketBroker according to their priority. There are two TicketBrokers, one manages low priority operations, the other normal priority operations.
-![](diagrams/TicketHolder_Request.svg)
+Operations waiting for a ticket are assigned to a TicketQueue according to their priority. There are two queues, one manages low priority operations, the other normal priority operations.
 When a ticket is released to the PriorityTicketHolder, the default behavior for the PriorityTicketHolder is as follows:
-1. Attempt a ticket transfer through the normal priority TicketBroker. If unsuccessful (e.g there are no normal priority operations waiting for a ticket), continue to (2)
-2. Attempt a ticket transfer through the the low priority TicketBroker
+1. Attempt a ticket transfer through the normal priority TicketQueue. If unsuccessful (e.g there are no normal priority operations waiting for a ticket), continue to (2)
+2. Attempt a ticket transfer through the the low priority TicketQueue
 3. If no transfer can be made, return the ticket to the general ticket pool
 
 #### Preventing Low Priority Operations from Falling too Far Behind
-If a server is consistently under load, and ticket transfers were always made through the normal priority TicketBroker first, then operations assigned to the low priority TicketBroker could starve. To remedy this, `lowPriorityAdmissionBypassThreshold` limits the number of consecutive ticket transfers to the normal priority TicketBroker before a ticket transfer is issued through the low priority TicketBroker.
+If a server is consistently under load, and ticket transfers were always made through the normal priority TicketQueue first, then operations assigned to the low priority TicketQueue could starve. To remedy this, `lowPriorityAdmissionBypassThreshold` limits the number of consecutive ticket transfers to the normal priority TicketQueue before a ticket transfer is issued through the low priority TicketQueue.
 
 ## Flow Control
 
