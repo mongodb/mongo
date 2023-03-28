@@ -127,7 +127,7 @@ public:
         // `config.collections` collection. This count must only be appended when serverStatus is
         // invoked on the config server.
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-            AutoGetCollectionForReadLockFree autoColl(opCtx, CollectionType::ConfigNS);
+            AutoGetCollectionForRead autoColl(opCtx, CollectionType::ConfigNS);
             const auto& collection = autoColl.getCollection();
             const auto numShardedCollections = collection ? collection->numRecords(opCtx) : 0;
             result.append("numShardedCollections", numShardedCollections);
