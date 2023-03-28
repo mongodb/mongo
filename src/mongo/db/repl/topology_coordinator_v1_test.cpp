@@ -5523,6 +5523,51 @@ TEST_F(TopoCoordTest, NodeDoesntDoCatchupTakeoverIfTermNumbersSayPrimaryCaughtUp
                            "primary, and therefore cannot call for catchup takeover");
 }
 
+// Test for the bug described in SERVER-48958 where we would schedule a catchup takeover for a node
+// with priority 0.
+TEST_F(TopoCoordTest, NodeWontScheduleCatchupTakeoverIfPriorityZero) {
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version" << 5 << "members"
+                      << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                               << "host1:27017"
+                                               << "priority" << 0)
+                                    << BSON("_id" << 2 << "host"
+                                                  << "host2:27017"))
+                      << "protocolVersion" << 1),
+                 0);
+
+    // Make ourselves the priority:0 secondary.
+    setSelfMemberState(MemberState::RS_SECONDARY);
+    OpTime currentOptime(Timestamp(200, 1), 0);
+    topoCoordSetMyLastAppliedOpTime(currentOptime, Date_t(), false);
+
+    // Start a new term for the new primary.
+    ASSERT(TopologyCoordinator::UpdateTermResult::kUpdatedTerm ==
+           getTopoCoord().updateTerm(1, now()));
+    ASSERT_EQUALS(1, getTopoCoord().getTerm());
+
+    // Create and process a mock heartbeat response from the primary indicating it is behind.
+    ReplSetHeartbeatResponse hbResp = ReplSetHeartbeatResponse();
+    hbResp.setState(MemberState::RS_PRIMARY);
+    OpTime behindOptime(Timestamp(100, 1), 0);
+    Date_t behindWallTime = Date_t() + Seconds(behindOptime.getSecs());
+    hbResp.setAppliedOpTimeAndWallTime({behindOptime, behindWallTime});
+    hbResp.setTerm(1);
+
+    Date_t firstRequestDate = unittest::assertGet(dateFromISOString("2014-08-29T13:00Z"));
+    getTopoCoord().prepareHeartbeatRequestV1(firstRequestDate, "rs0", HostAndPort("host2:27017"));
+
+    auto action =
+        getTopoCoord().processHeartbeatResponse(firstRequestDate + Milliseconds(1000),
+                                                Milliseconds(999),
+                                                HostAndPort("host2:27017"),
+                                                StatusWith<ReplSetHeartbeatResponse>(hbResp));
+    // Even though we are fresher than the primary we do not schedule a catchup takeover
+    // since we are priority:0.
+    ASSERT_EQ(action.getAction(), HeartbeatResponseAction::makeNoAction().getAction());
+}
+
 TEST_F(TopoCoordTest, StepDownAttemptFailsWhenNotPrimary) {
     updateConfig(BSON("_id"
                       << "rs0"

@@ -1533,6 +1533,13 @@ HeartbeatResponseAction TopologyCoordinator::_shouldTakeOverPrimary(int updatedC
         return HeartbeatResponseAction::makeNoAction();
     }
 
+    // A priority 0 node cannot win an election. Even if the priority changed via reconfig to make
+    // the node eligible by the time a takeover scheduled here would happen, we would end up
+    // canceling that takeover due to the reconfig.
+    if (_selfConfig().getPriority() <= 0) {
+        return HeartbeatResponseAction::makeNoAction();
+    }
+
     // Don't schedule catchup takeover if catchup takeover or primary catchup is disabled.
     const bool catchupTakeoverDisabled =
         ReplSetConfig::kCatchUpDisabled == _rsConfig.getCatchUpTimeoutPeriod() ||
