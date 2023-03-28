@@ -89,6 +89,7 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
             params.resumeAfterRecordId = csn->resumeAfterRecordId;
             params.stopApplyingFilterAfterFirstMatch = csn->stopApplyingFilterAfterFirstMatch;
             params.boundInclusion = csn->boundInclusion;
+            params.lowPriority = csn->lowPriority;
             return std::make_unique<CollectionScan>(
                 expCtx, _collection, params, _ws, csn->filter.get());
         }

@@ -115,6 +115,9 @@ struct CollectionScanParams {
     // Whether or not to return EOF and stop further scanning once MatchExpression evaluates to
     // false. Can only be set to true if the MatchExpression is present.
     bool shouldReturnEofOnFilterMismatch = false;
+
+    // Whether the collection scan should have low storage admission priority.
+    bool lowPriority = false;
 };
 
 }  // namespace mongo

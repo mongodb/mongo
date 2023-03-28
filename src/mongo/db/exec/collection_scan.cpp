@@ -135,7 +135,13 @@ CollectionScan::CollectionScan(ExpressionContext* expCtx,
 
 PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
     if (_commonStats.isEOF) {
+        _priority.reset();
         return PlanStage::IS_EOF;
+    }
+
+    if (_params.lowPriority && !_priority && opCtx()->getClient()->isFromUserConnection() &&
+        opCtx()->lockState()->shouldWaitForTicket()) {
+        _priority.emplace(opCtx()->lockState(), AdmissionContext::Priority::kLow);
     }
 
     boost::optional<Record> record;
@@ -252,6 +258,7 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
         if (_params.shouldTrackLatestOplogTimestamp && collection()->ns().isChangeCollection()) {
             setLatestOplogEntryTimestampToReadTimestamp();
         }
+        _priority.reset();
         return PlanStage::IS_EOF;
     }
 
@@ -461,9 +468,15 @@ void CollectionScan::doRestoreStateRequiresCollection() {
 void CollectionScan::doDetachFromOperationContext() {
     if (_cursor)
         _cursor->detachFromOperationContext();
+
+    _priority.reset();
 }
 
 void CollectionScan::doReattachToOperationContext() {
+    if (_params.lowPriority && opCtx()->getClient()->isFromUserConnection() &&
+        opCtx()->lockState()->shouldWaitForTicket()) {
+        _priority.emplace(opCtx()->lockState(), AdmissionContext::Priority::kLow);
+    }
     if (_cursor)
         _cursor->reattachToOperationContext(opCtx());
 }

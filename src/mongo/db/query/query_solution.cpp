@@ -352,6 +352,7 @@ std::unique_ptr<QuerySolutionNode> CollectionScanNode::clone() const {
     copy->shouldWaitForOplogVisibility = this->shouldWaitForOplogVisibility;
     copy->clusteredIndex = this->clusteredIndex;
     copy->hasCompatibleCollation = this->hasCompatibleCollation;
+    copy->lowPriority = this->lowPriority;
     return copy;
 }
 

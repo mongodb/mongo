@@ -523,7 +523,6 @@ public:
      * This will set the admission priority for the ticket mechanism.
      */
     void setAdmissionPriority(AdmissionContext::Priority priority) {
-        invariant(isNoop() || getClientState() == Locker::ClientState::kInactive);
         _admCtx.setPriority(priority);
     }
 

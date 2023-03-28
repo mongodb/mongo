@@ -110,6 +110,7 @@ public:
               PlanYieldPolicy* yieldPolicy,
               PlanNodeId nodeId,
               ScanCallbacks scanCallbacks,
+              bool lowPriority = false,
               bool useRandomCursor = false,
               bool participateInTrialRunTracking = true);
 
@@ -231,6 +232,10 @@ private:
 
     RecordId _key;
     bool _firstGetNext{false};
+
+    // Whether the scan should have low storage admission priority.
+    bool _lowPriority;
+    boost::optional<ScopedAdmissionPriorityForLock> _priority;
 
     ScanStats _specificStats;
 

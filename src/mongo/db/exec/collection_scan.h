@@ -142,6 +142,8 @@ private:
     // on EOF we advance this timestamp to the latest timestamp in the global oplog.
     Timestamp _latestOplogEntryTimestamp;
 
+    boost::optional<ScopedAdmissionPriorityForLock> _priority;
+
     // Stats
     CollectionScanStats _specificStats;
 };

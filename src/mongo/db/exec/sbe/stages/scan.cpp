@@ -58,6 +58,7 @@ ScanStage::ScanStage(UUID collectionUuid,
                      PlanYieldPolicy* yieldPolicy,
                      PlanNodeId nodeId,
                      ScanCallbacks scanCallbacks,
+                     bool lowPriority,
                      bool useRandomCursor,
                      bool participateInTrialRunTracking)
     : PlanStage(
@@ -75,7 +76,8 @@ ScanStage::ScanStage(UUID collectionUuid,
       _seekKeySlot(seekKeySlot),
       _forward(forward),
       _scanCallbacks(std::move(scanCallbacks)),
-      _useRandomCursor(useRandomCursor) {
+      _useRandomCursor(useRandomCursor),
+      _lowPriority(lowPriority) {
     invariant(_fields.size() == _vars.size());
     invariant(!_seekKeySlot || _forward);
     tassert(5567202,
@@ -108,6 +110,7 @@ std::unique_ptr<PlanStage> ScanStage::clone() const {
                                        _yieldPolicy,
                                        _commonStats.nodeId,
                                        _scanCallbacks,
+                                       _lowPriority,
                                        _useRandomCursor,
                                        _participateInTrialRunTracking);
 }
@@ -306,9 +309,14 @@ void ScanStage::doDetachFromOperationContext() {
     if (auto cursor = getActiveCursor()) {
         cursor->detachFromOperationContext();
     }
+    _priority.reset();
 }
 
 void ScanStage::doAttachToOperationContext(OperationContext* opCtx) {
+    if (_lowPriority && _open && opCtx->getClient()->isFromUserConnection() &&
+        opCtx->lockState()->shouldWaitForTicket()) {
+        _priority.emplace(opCtx->lockState(), AdmissionContext::Priority::kLow);
+    }
     if (auto cursor = getActiveCursor()) {
         cursor->reattachToOperationContext(opCtx);
     }
@@ -408,6 +416,11 @@ value::OwnedValueAccessor* ScanStage::getFieldAccessor(StringData name, size_t o
 PlanState ScanStage::getNext() {
     auto optTimer(getOptTimer(_opCtx));
 
+    if (_lowPriority && !_priority && _opCtx->getClient()->isFromUserConnection() &&
+        _opCtx->lockState()->shouldWaitForTicket()) {
+        _priority.emplace(_opCtx->lockState(), AdmissionContext::Priority::kLow);
+    }
+
     // We are about to call next() on a storage cursor so do not bother saving our internal state in
     // case it yields as the state will be completely overwritten after the next() call.
     disableSlotAccess();
@@ -449,6 +462,7 @@ PlanState ScanStage::getNext() {
                                                            _key,
                                                            *_collName);
         }
+        _priority.reset();
         return trackPlanState(PlanState::IS_EOF);
     }
 
@@ -456,6 +470,7 @@ PlanState ScanStage::getNext() {
     if (_scanCallbacks.indexKeyConsistencyCheckCallBack &&
         !_scanCallbacks.indexKeyConsistencyCheckCallBack(
             _opCtx, _snapshotIdAccessor, _indexIdAccessor, _indexKeyAccessor, _coll, *nextRecord)) {
+        _priority.reset();
         return trackPlanState(PlanState::IS_EOF);
     }
 
@@ -562,6 +577,7 @@ void ScanStage::close() {
     _cursor.reset();
     _randomCursor.reset();
     _coll.reset();
+    _priority.reset();
     _open = false;
 }
 
@@ -650,6 +666,10 @@ std::vector<DebugPrinter::Block> ScanStage::debugPrint() const {
 
     if (_useRandomCursor) {
         DebugPrinter::addKeyword(ret, "random");
+    }
+
+    if (_lowPriority) {
+        DebugPrinter::addKeyword(ret, "lowPriority");
     }
 
     ret.emplace_back(DebugPrinter::Block("[`"));

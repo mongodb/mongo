@@ -620,7 +620,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
                                             forward,
                                             yieldPolicy,
                                             csn->nodeId(),
-                                            std::move(callbacks));
+                                            std::move(callbacks),
+                                            csn->lowPriority);
 
     if (seekRecordIdSlot) {
         stage = buildResumeFromRecordIdSubtree(state,

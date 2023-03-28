@@ -1090,6 +1090,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const PhysicalScanNode& n,
                                           nullptr /*yieldPolicy*/,
                                           planNodeId,
                                           callbacks,
+                                          false, /* lowPriority */
                                           _scanOrder == ScanOrder::Random);
     } else {
         tasserted(6624355, "Unknown scan type.");

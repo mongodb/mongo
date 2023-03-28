@@ -503,6 +503,9 @@ struct CollectionScanNode : public QuerySolutionNodeWithSortSet {
 
     // Once the first matching document is found, assume that all documents after it must match.
     bool stopApplyingFilterAfterFirstMatch = false;
+
+    // Whether the collection scan should have low storage admission priority.
+    bool lowPriority = false;
 };
 
 struct ColumnIndexScanNode : public QuerySolutionNode {
