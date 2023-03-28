@@ -556,6 +556,22 @@ functions:
         for i in $(seq ${times|1}); do
           ${test_env_vars|} ./format.sh ${smp_command|} ${format_test_script_args|} 2>&1
         done
+  "format test tiered":
+    command: shell.exec
+    params:
+      working_dir: "wiredtiger/cmake_build/test/format"
+      script: |
+        # To make sure we have plenty of flush_tier calls, we set the flush frequency high
+        # and the time between checkpoints low. We specify only using tables, as that's the
+        # only kind of URI that participates in tiered storage.
+        set -o errexit
+        set -o verbose
+        format_args="tiered_storage.storage_source=dir_store tiered_storage.flush_frequency=60 checkpoint.wait=15 runs.source=table runs.timer=10"
+        for i in $(seq ${times}); do
+          echo Iteration $i/${times}
+          rm -rf RUNDIR
+          ./t $format_args ${extra_args}
+        done
   "many dbs test":
     command: shell.exec
     params:
@@ -3999,6 +4015,19 @@ tasks:
         vars:
           times: 5
 
+  - name: format-tiered-test
+    # Set 2.5 hour timeout (60 * 60 * 2.5)
+    exec_timeout_secs: 9000
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          <<: *configure_flags_with_builtins
+          CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v4_gcc.cmake
+      - func: "format test tiered"
+        vars:
+          times: 10
+
   - name: many-collection-test
     commands:
       - command: timeout.update
@@ -5223,6 +5252,8 @@ buildvariants:
     - name: ".stress-test-no-barrier-nonstandalone"
     - name: format-abort-recovery-stress-test-nonstandalone
     - name: format-predictable-test
+    # FIXME-WT-10822
+    # - name: format-tiered-test
 
 # When running the Python tests on this variant tcmalloc must be preloaded otherwise the wiredtiger library
 # fails to load and resolve its dependency.

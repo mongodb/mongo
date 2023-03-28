@@ -222,13 +222,12 @@ typedef struct {
  *     Callback from inside the WiredTiger library.
  */
 static void
-snap_verify_callback(int ret, void *arg)
+snap_verify_callback(WT_CURSOR *cursor, int ret, void *arg)
 {
     SEARCH_CALLBACK *callback;
     SNAP_OPS *snap;
     TABLE *table;
     TINFO *tinfo;
-    WT_CURSOR *cursor;
     WT_ITEM *key, *value;
     uint64_t keyno;
     uint8_t bitv;
@@ -239,10 +238,17 @@ snap_verify_callback(int ret, void *arg)
         return;
 
     callback = arg;
+
+    /*
+     * It's possible that our cursor operation triggered another internal cursor operation (on the
+     * history store or metadata). Make sure it's the cursor we started with.
+     */
+    if (cursor != callback->cursor)
+        return;
+
     snap = callback->snap;
     table = callback->table;
     tinfo = callback->tinfo;
-    cursor = callback->cursor;
     key = callback->key;
     keyno = callback->keyno;
 

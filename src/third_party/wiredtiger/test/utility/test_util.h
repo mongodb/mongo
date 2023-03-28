@@ -65,15 +65,15 @@
 #define DIR_STORE "dir_store"
 #define S3_STORE "s3_store"
 
-#define TESTUTIL_ENV_CONFIG_TIERED                   \
-    ",tiered_storage=(bucket=%s"                     \
-    ",bucket_prefix=pfx-,local_retention=%d,name=%s" \
+#define TESTUTIL_ENV_CONFIG_TIERED                 \
+    ",tiered_storage=(bucket=%s"                   \
+    ",bucket_prefix=pfx-,local_retention=%" PRIu32 \
+    ",name=%s"                                     \
     ",auth_token=%s)"
 #define TESTUTIL_ENV_CONFIG_TIERED_EXT                                         \
-    ",extensions=(%s/ext/storage_sources/%s/"                                  \
-    "libwiredtiger_%s.so=(early_load=true,"                                    \
+    "\"%s/ext/storage_sources/%s/libwiredtiger_%s.so\"=("                      \
     "config=\"(delay_ms=%" PRIu64 ",error_ms=%" PRIu64 ",force_delay=%" PRIu64 \
-    ",force_error=%" PRIu64 ",verbose=0)\"))"
+    ",force_error=%" PRIu64 ",verbose=0)\")"
 #define TESTUTIL_ENV_CONFIG_REC \
     ",log=(recover=on,remove=false),statistics=(all),statistics_log=(json,on_close,wait=1)"
 #define TESTUTIL_ENV_CONFIG_COMPAT ",compatibility=(release=\"2.9\")"
@@ -103,20 +103,23 @@ typedef struct {
     uint64_t data_seed;      /* Random seed for data ops */
     uint64_t extra_seed;     /* Random seed for extra ops */
 
-    uint64_t delay_ms;    /* Average length of delay when simulated */
-    uint64_t error_ms;    /* Average length of delay when simulated */
-    uint64_t force_delay; /* Force a simulated network delay every N operations */
-    uint64_t force_error; /* Force a simulated network error every N operations */
+    uint64_t delay_ms;        /* Average length of delay when simulated */
+    uint64_t error_ms;        /* Average length of delay when simulated */
+    uint64_t force_delay;     /* Force a simulated network delay every N operations */
+    uint64_t force_error;     /* Force a simulated network error every N operations */
+    uint32_t local_retention; /* Local retention for tiered storage */
 
 #define TESTUTIL_SEED_FORMAT "-PSD%" PRIu64 ",E%" PRIu64
 
+    bool absolute_bucket_dir;  /* Use an absolute bucket path when it is a directory */
     bool compat;               /* Compatibility */
     bool do_data_ops;          /* Have schema ops use data */
     bool inmem;                /* In-memory */
+    bool make_bucket_dir;      /* Create bucket when it is a directory */
     bool preserve;             /* Don't remove files on exit */
+    bool tiered_begun;         /* Tiered storage ready */
     bool tiered_storage;       /* Configure tiered storage */
     bool verbose;              /* Run in verbose mode */
-    bool tiered_begun;         /* Tiered storage ready */
     uint64_t nrecords;         /* Number of records */
     uint64_t nops;             /* Number of operations */
     uint64_t nthreads;         /* Number of threads */
@@ -469,6 +472,7 @@ void testutil_wiredtiger_open(
 void testutil_tiered_begin(TEST_OPTS *);
 void testutil_tiered_flush_complete(TEST_OPTS *, WT_SESSION *, void *);
 void testutil_tiered_sleep(TEST_OPTS *, WT_SESSION *, uint64_t, bool *);
+void testutil_tiered_storage_configuration(TEST_OPTS *, char *, size_t, char *, size_t);
 uint64_t testutil_time_us(WT_SESSION *);
 void testutil_verify_src_backup(WT_CONNECTION *, const char *, const char *, char *);
 void testutil_work_dir_from_path(char *, size_t, const char *);

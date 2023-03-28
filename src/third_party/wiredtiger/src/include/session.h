@@ -63,7 +63,7 @@ struct __wt_session_impl {
 
     void *lang_private; /* Language specific private storage */
 
-    void (*format_private)(int, void *); /* Format test program private callback. */
+    void (*format_private)(WT_CURSOR *, int, void *); /* Format test program private callback. */
     void *format_private_arg;
 
     u_int active; /* Non-zero if the session is in-use */

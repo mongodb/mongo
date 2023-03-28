@@ -101,3 +101,71 @@ testutil_tiered_flush_complete(TEST_OPTS *opts, WT_SESSION *session, void *arg)
     now = testutil_time_us(session);
     opts->tiered_flush_next_us = now + opts->tiered_flush_interval_us;
 }
+
+/*
+ * testutil_tiered_storage_configuration --
+ *     Set up tiered storage configuration.
+ */
+void
+testutil_tiered_storage_configuration(
+  TEST_OPTS *opts, char *tiered_cfg, size_t tiered_cfg_size, char *ext_cfg, size_t ext_cfg_size)
+{
+    char auth_token[256];
+    char cwd[256], dir[256];
+    const char *s3_access_key, *s3_secret_key, *s3_bucket_name;
+
+    s3_bucket_name = NULL;
+    auth_token[0] = '\0';
+
+    if (opts->tiered_storage) {
+        if (!testutil_is_dir_store(opts)) {
+            s3_access_key = getenv("aws_sdk_s3_ext_access_key");
+            s3_secret_key = getenv("aws_sdk_s3_ext_secret_key");
+            s3_bucket_name = getenv("WT_S3_EXT_BUCKET");
+
+            if (s3_access_key == NULL || s3_secret_key == NULL)
+                testutil_die(EINVAL, "AWS S3 access key or secret key is not set");
+
+            /*
+             * By default the S3 bucket name is S3_DEFAULT_BUCKET_NAME, but it can be overridden
+             * with environment variables.
+             */
+            if (s3_bucket_name == NULL)
+                s3_bucket_name = S3_DEFAULT_BUCKET_NAME;
+
+            testutil_check(
+              __wt_snprintf(auth_token, sizeof(auth_token), "%s;%s", s3_access_key, s3_secret_key));
+        }
+        testutil_check(__wt_snprintf(ext_cfg, ext_cfg_size, TESTUTIL_ENV_CONFIG_TIERED_EXT,
+          opts->build_dir, opts->tiered_storage_source, opts->tiered_storage_source, opts->delay_ms,
+          opts->error_ms, opts->force_delay, opts->force_error));
+
+        if (testutil_is_dir_store(opts)) {
+            if (opts->absolute_bucket_dir) {
+                if (opts->home[0] == '/')
+                    testutil_check(
+                      __wt_snprintf(dir, sizeof(dir), "%s/%s", opts->home, DIR_STORE_BUCKET_NAME));
+                else {
+                    if (getcwd(cwd, sizeof(cwd)) == NULL)
+                        testutil_die(ENOENT, "No such directory");
+                    testutil_check(__wt_snprintf(
+                      dir, sizeof(dir), "%s/%s/%s", cwd, opts->home, DIR_STORE_BUCKET_NAME));
+                }
+            } else
+                testutil_check(__wt_snprintf(dir, sizeof(dir), "%s", DIR_STORE_BUCKET_NAME));
+        }
+        testutil_check(__wt_snprintf(tiered_cfg, tiered_cfg_size, TESTUTIL_ENV_CONFIG_TIERED,
+          testutil_is_dir_store(opts) ? dir : s3_bucket_name, opts->local_retention,
+          opts->tiered_storage_source, auth_token));
+        if (testutil_is_dir_store(opts) && opts->make_bucket_dir) {
+            testutil_check(
+              __wt_snprintf(dir, sizeof(dir), "%s/%s", opts->home, DIR_STORE_BUCKET_NAME));
+            testutil_check(mkdir(dir, 0777));
+        }
+
+    } else {
+        testutil_check(__wt_snprintf(ext_cfg, ext_cfg_size, "\"\""));
+        testutil_assert(tiered_cfg_size > 0);
+        tiered_cfg[0] = '\0';
+    }
+}

@@ -251,6 +251,52 @@ configure_debug_mode(char **p, size_t max)
 }
 
 /*
+ * configure_tiered_storage --
+ *     Configure tiered storage settings for opening a connection.
+ */
+static void
+configure_tiered_storage(const char *home, char **p, size_t max, char *ext_cfg, size_t ext_cfg_size)
+{
+    TEST_OPTS opts;
+    char tiered_cfg[1024];
+
+    if (!g.tiered_storage_config) {
+        testutil_assert(ext_cfg_size > 0);
+        ext_cfg[0] = '\0';
+        return;
+    }
+
+    memset(&opts, 0, sizeof(opts));
+    opts.tiered_storage = true;
+
+    /*
+     * We need to cast these values. Normally, testutil allocates and fills these strings based on
+     * command line arguments and frees them when done. Format doesn't use the standard test command
+     * line parser and doesn't rely on testutil to free anything in this struct. We're only using
+     * the options struct on a temporary basis to help create the tiered storage configuration.
+     */
+    opts.tiered_storage_source = (char *)GVS(TIERED_STORAGE_STORAGE_SOURCE);
+    opts.home = (char *)home;
+    opts.build_dir = (char *)BUILDDIR;
+
+    /*
+     * Have testutil create the bucket directory for us when using the directory store.
+     */
+    opts.make_bucket_dir = true;
+
+    /*
+     * Use an absolute path for the bucket directory when using the directory store. Then we can
+     * create copies of the home directory to be used for backup, and we'll be able to find the
+     * bucket.
+     */
+    opts.absolute_bucket_dir = true;
+
+    testutil_tiered_storage_configuration(
+      &opts, tiered_cfg, sizeof(tiered_cfg), ext_cfg, ext_cfg_size);
+    CONFIG_APPEND(*p, ",%s", tiered_cfg);
+}
+
+/*
  * create_database --
  *     Create a WiredTiger database.
  */
@@ -259,7 +305,7 @@ create_database(const char *home, WT_CONNECTION **connp)
 {
     WT_CONNECTION *conn;
     size_t max;
-    char config[8 * 1024], *p;
+    char config[8 * 1024], *p, tiered_ext_cfg[1024];
     const char *s, *sources;
 
     p = config;
@@ -349,13 +395,24 @@ create_database(const char *home, WT_CONNECTION **connp)
     /* Optional debug mode. */
     configure_debug_mode(&p, max);
 
+    /* Optional tiered storage. */
+    configure_tiered_storage(home, &p, max, tiered_ext_cfg, sizeof(tiered_ext_cfg));
+
+#define EXTENSION_PATH(path) (access((path), R_OK) == 0 ? (path) : "")
+
     /* Extensions. */
-    CONFIG_APPEND(p, ",extensions=[\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],",
-      REVERSE_PATH, access(LZ4_PATH, R_OK) == 0 ? LZ4_PATH : "",
-      access(ROTN_PATH, R_OK) == 0 ? ROTN_PATH : "",
-      access(SNAPPY_PATH, R_OK) == 0 ? SNAPPY_PATH : "",
-      access(ZLIB_PATH, R_OK) == 0 ? ZLIB_PATH : "", access(ZSTD_PATH, R_OK) == 0 ? ZSTD_PATH : "",
-      access(SODIUM_PATH, R_OK) == 0 ? SODIUM_PATH : "");
+    CONFIG_APPEND(p,
+      ",extensions=["
+      "\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", %s],",
+      /* Collators. */
+      REVERSE_PATH,
+      /* Compressors. */
+      EXTENSION_PATH(LZ4_PATH), EXTENSION_PATH(SNAPPY_PATH), EXTENSION_PATH(ZLIB_PATH),
+      EXTENSION_PATH(ZSTD_PATH),
+      /* Encryptors. */
+      EXTENSION_PATH(ROTN_PATH), EXTENSION_PATH(SODIUM_PATH),
+      /* Storage source. */
+      tiered_ext_cfg);
 
     /*
      * Put configuration file configuration options second to last. Put command line configuration
@@ -679,10 +736,15 @@ wts_stats(void)
     wt_wrap_open_session(conn, &sap, NULL, &session);
     stats_data_print(session, "statistics:", fp);
 
-    /* Data source statistics. */
-    args.fp = fp;
-    args.session = session;
-    tables_apply(stats_data_source, &args);
+    /*
+     * Data source statistics.
+     *     FIXME-WT-9785: Statistics cursors on tiered storage objects are not yet supported.
+     */
+    if (!g.tiered_storage_config) {
+        args.fp = fp;
+        args.session = session;
+        tables_apply(stats_data_source, &args);
+    }
 
     wt_wrap_close_session(session);
 

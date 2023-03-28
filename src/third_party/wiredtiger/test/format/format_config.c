@@ -52,6 +52,7 @@ static void config_off(TABLE *, const char *);
 static void config_off_all(const char *);
 static void config_pct(TABLE *);
 static void config_statistics(void);
+static void config_tiered_storage(void);
 static void config_transaction(void);
 static bool config_var(TABLE *);
 
@@ -485,6 +486,7 @@ config_run(void)
     tables_apply(config_table, NULL); /* Configure the tables. */
 
     /* Order can be important, don't shuffle without careful consideration. */
+    config_tiered_storage();                         /* Tiered storage */
     config_transaction();                            /* Transactions */
     config_backup_incr();                            /* Incremental backup */
     config_checkpoint();                             /* Checkpoints */
@@ -1387,6 +1389,47 @@ config_statistics(void)
 }
 
 /*
+ * config_tiered_storage --
+ *     Tiered storage configuration.
+ */
+static void
+config_tiered_storage(void)
+{
+    const char *storage_source;
+
+    storage_source = GVS(TIERED_STORAGE_STORAGE_SOURCE);
+
+    /*
+     * FIXME-WT-9934 If we ever allow tiered storage to be run only locally but with switching
+     * objects, then none becomes a valid option with tiered storage enabled.
+     */
+    g.tiered_storage_config =
+      (strcmp(storage_source, "off") != 0 && strcmp(storage_source, "none") != 0);
+    if (g.tiered_storage_config) {
+        /* Tiered storage requires timestamps. */
+        config_off(NULL, "transaction.implicit");
+        config_single(NULL, "transaction.timestamps=on", true);
+
+        /* If we are flushing, we need a checkpoint thread. */
+        if (GV(TIERED_STORAGE_FLUSH_FREQUENCY) > 0)
+            config_single(NULL, "checkpoint=on", false);
+
+        /* FIXME-WT-8727: Salvage and verify are not yet supported for tiered storage. */
+        config_off(NULL, "ops.salvage");
+        config_off(NULL, "ops.verify");
+
+        /* FIXME-PM-2532: Backup is not yet supported for tiered tables. */
+        config_off(NULL, "backup");
+        config_off(NULL, "backup.incremental");
+
+        /* FIXME-PM-2538: Compact is not yet supported for tiered tables. */
+        config_off(NULL, "ops.compaction");
+    } else
+        /* Never try flush to tiered storage unless running with tiered storage. */
+        config_single(NULL, "tiered_storage.flush_frequency=0", true);
+}
+
+/*
  * config_transaction --
  *     Transaction configuration.
  */
@@ -1395,7 +1438,7 @@ config_transaction(void)
 {
     /* Predictable replay requires timestamps. */
     if (GV(RUNS_PREDICTABLE_REPLAY)) {
-        config_single(NULL, "transaction.implicit=0", false);
+        config_off(NULL, "transaction.implicit");
         config_single(NULL, "transaction.timestamps=on", true);
     }
 

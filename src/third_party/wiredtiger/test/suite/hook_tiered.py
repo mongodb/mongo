@@ -185,6 +185,7 @@ def session_checkpoint_replace(orig_session_checkpoint, session_self, config):
 
 # Called to replace Session.compact
 def session_compact_replace(orig_session_compact, session_self, uri, config):
+    # FIXME-PM-2538
     # Compact isn't implemented for tiered tables.  Only call it if this can't be the uri
     # of a tiered table.  Note this isn't a precise match for when we did/didn't create
     # a tiered table, but we don't have the create config around to check.

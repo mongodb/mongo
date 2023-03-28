@@ -520,41 +520,16 @@ void
 testutil_wiredtiger_open(TEST_OPTS *opts, const char *home, const char *config,
   WT_EVENT_HANDLER *event_handler, WT_CONNECTION **connectionp, bool rerun, bool benchmarkrun)
 {
-    char auth_token[256], buf[1024], tiered_ext_cfg[512];
-    const char *s3_access_key, *s3_secret_key, *s3_bucket_name;
+    char buf[1024], tiered_cfg[512], tiered_ext_cfg[512];
 
-    s3_bucket_name = NULL;
-    auth_token[0] = '\0';
-    if (opts->tiered_storage) {
-        if (!testutil_is_dir_store(opts)) {
-            s3_access_key = getenv("aws_sdk_s3_ext_access_key");
-            s3_secret_key = getenv("aws_sdk_s3_ext_secret_key");
-            s3_bucket_name = getenv("WT_S3_EXT_BUCKET");
+    opts->local_retention = benchmarkrun ? 0 : 2;
+    testutil_tiered_storage_configuration(
+      opts, tiered_cfg, sizeof(tiered_cfg), tiered_ext_cfg, sizeof(tiered_ext_cfg));
 
-            if (s3_access_key == NULL || s3_secret_key == NULL)
-                testutil_die(EINVAL, "AWS S3 access key or secret key is not set");
+    testutil_check(__wt_snprintf(buf, sizeof(buf), "%s%s%s%s,extensions=[%s]",
+      config == NULL ? "" : config, (rerun ? TESTUTIL_ENV_CONFIG_REC : ""),
+      (opts->compat ? TESTUTIL_ENV_CONFIG_COMPAT : ""), tiered_cfg, tiered_ext_cfg));
 
-            /*
-             * By default the S3 bucket name is S3_DEFAULT_BUCKET_NAME, but it can be overridden
-             * with environment variables.
-             */
-            if (s3_bucket_name == NULL)
-                s3_bucket_name = S3_DEFAULT_BUCKET_NAME;
-
-            testutil_check(
-              __wt_snprintf(auth_token, sizeof(auth_token), "%s;%s", s3_access_key, s3_secret_key));
-        }
-        testutil_check(__wt_snprintf(tiered_ext_cfg, sizeof(tiered_ext_cfg),
-          TESTUTIL_ENV_CONFIG_TIERED_EXT TESTUTIL_ENV_CONFIG_TIERED, opts->build_dir,
-          opts->tiered_storage_source, opts->tiered_storage_source, opts->delay_ms, opts->error_ms,
-          opts->force_delay, opts->force_error,
-          testutil_is_dir_store(opts) ? DIR_STORE_BUCKET_NAME : s3_bucket_name,
-          benchmarkrun ? 0 : 2, opts->tiered_storage_source, auth_token));
-    }
-
-    testutil_check(__wt_snprintf(buf, sizeof(buf), "%s%s%s%s", config == NULL ? "" : config,
-      (rerun ? TESTUTIL_ENV_CONFIG_REC : ""), (opts->compat ? TESTUTIL_ENV_CONFIG_COMPAT : ""),
-      (opts->tiered_storage ? tiered_ext_cfg : "")));
     if (opts->verbose)
         printf("wiredtiger_open configuration: %s\n", buf);
     testutil_check(wiredtiger_open(home, event_handler, buf, connectionp));

@@ -68,7 +68,7 @@ checkpoint(void *arg)
     u_int counter, secs;
     char config_buf[64];
     const char *ckpt_config, *ckpt_vrfy_name;
-    bool backup_locked, named_checkpoints;
+    bool backup_locked, flush_tier, named_checkpoints;
 
     (void)arg;
 
@@ -79,6 +79,10 @@ checkpoint(void *arg)
     wt_wrap_open_session(conn, &sap, NULL, &session);
 
     named_checkpoints = !g.lsm_config;
+    /* FIXME-WT-10771 Named checkpoints are not yet allowed with tiered storage. */
+    if (g.tiered_storage_config)
+        named_checkpoints = false;
+
     for (secs = mmrand(&g.extra_rnd, 1, 10); !g.workers_finished;) {
         if (secs > 0) {
             __wt_sleep(1, 0);
@@ -95,7 +99,15 @@ checkpoint(void *arg)
         ckpt_config = NULL;
         ckpt_vrfy_name = "WiredTigerCheckpoint";
         backup_locked = false;
-        if (named_checkpoints)
+
+        /*
+         * Use checkpoint with flush_tier as often as configured. Don't mix with named checkpoints,
+         * we're not interested in testing that combination.
+         */
+        flush_tier = (mmrand(&g.extra_rnd, 1, 100) <= GV(TIERED_STORAGE_FLUSH_FREQUENCY));
+        if (flush_tier)
+            ckpt_config = "flush_tier=(enabled)";
+        else if (named_checkpoints)
             switch (mmrand(&g.extra_rnd, 1, 20)) {
             case 1:
                 /*

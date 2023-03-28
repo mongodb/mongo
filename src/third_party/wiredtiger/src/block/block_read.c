@@ -163,7 +163,12 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, uin
     WT_STAT_CONN_INCRV(session, block_byte_read, size);
 
     /* Swap file handles if reading from a different object. */
+
     if (block->objectid != objectid)
+        /*
+         * Format has a private callback that is called when a search completes. Part of getting a
+         * data handle may involve metadata searching, and we don't want that to interfere.
+         */
         WT_RET(__wt_blkcache_get_handle(session, block, objectid, &block));
 
     /*
