@@ -90,7 +90,7 @@ workload_manager::run()
             logger::log_msg(LOG_INFO,
               "workload_manager: Creating " + std::to_string(it.thread_count) + " " +
                 type_string(it.type) + " threads.");
-        /* Create a synchronisation object to provide to the thread workers. */
+        /* Create a synchronization object to provide to the thread workers. */
         std::shared_ptr<barrier> barrier_ptr = std::make_shared<barrier>(it.thread_count);
         for (size_t i = 0; i < it.thread_count && _running; ++i) {
             thread_worker *tc = new thread_worker(thread_id++, it.type, it.config,

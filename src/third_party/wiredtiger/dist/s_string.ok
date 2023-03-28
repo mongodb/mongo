@@ -118,6 +118,7 @@ ETIME
 ETIMEDOUT
 EVICTSERVER
 EXTLIST
+EXTSUBPATH
 Encryptor
 Encryptors
 Enqueue
@@ -161,6 +162,7 @@ GetFileSizeEx
 GetLastError
 GetModuleHandleExW
 GetProcAddress
+Getters
 HANDLEOPS
 HFS
 HOTBACKUP
@@ -237,6 +239,7 @@ MoveFileExW
 MultiByteToWideChar
 Multithreaded
 Mutex
+Mutexes
 MySecret
 NNN
 NOLINT
@@ -347,6 +350,7 @@ Subdirectory
 TAILQ
 TCMalloc
 TESTUTIL
+TID
 TMP
 TODO
 TORTIOUS
@@ -373,6 +377,7 @@ UTF
 UltraSparc
 Unbuffered
 Unencrypted
+Unhandled
 UnixLib
 UnlockFile
 Unmap
@@ -402,6 +407,7 @@ Wduplicated
 WeakHashLen
 Werror
 Wformat
+Whitespaces
 WideCharToMultiByte
 WinNT
 WiredTiger
@@ -454,6 +460,7 @@ atomicity
 atou
 auth
 autocommit
+autoconf
 auxheader
 auximage
 auxincr
@@ -462,6 +469,8 @@ bInheritHandle
 backoff
 bal
 basecfg
+bb
+bba
 bbb
 bbuilddir
 bcr
@@ -499,6 +508,7 @@ buf
 bufsz
 builddir
 builtins
+bursty
 bytestring
 byteswap
 byvalue
@@ -564,6 +574,8 @@ copydoc
 countp
 cp
 cplusplus
+cpp
+cppsuite
 cpuid
 crc
 crypto
@@ -628,6 +640,7 @@ desc
 designator
 dest
 destSize
+destructor
 dev
 dh
 dhandle
@@ -757,6 +770,7 @@ getone
 getones
 getopt
 getraw
+getters
 gettime
 gettimeofday
 getv
@@ -937,6 +951,7 @@ mmap
 mmrand
 mn
 mnt
+mongod
 mrs
 msecs
 msg
@@ -1056,6 +1071,7 @@ printlog
 priv
 proc
 progname
+programmatically
 ps
 psp
 pthread
@@ -1123,6 +1139,7 @@ sH
 sHQ
 sanitizer
 sanitizers
+scalable
 scr
 sd
 sdk
@@ -1200,6 +1217,7 @@ syscrypto
 sysinfo
 sz
 t's
+tIf
 tV
 tablename
 td
@@ -1227,6 +1245,7 @@ transactionally
 trecno
 trk
 trk's
+trun
 trunc
 truncations
 trylock
@@ -1290,6 +1309,7 @@ vN
 vPodir
 vW
 va
+validator
 valuep
 valuev
 vanishingly
@@ -1351,4 +1371,5 @@ zstd
 zstd's
 zu
 zyxwvutsrqponmlkjihgfedcba
+zz
 zzz

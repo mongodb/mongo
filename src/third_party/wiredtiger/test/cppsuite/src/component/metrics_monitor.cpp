@@ -143,7 +143,7 @@ metrics_monitor::finish()
         int64_t stat_value = std::stoi(stat->get_value_str(_cursor));
 
         if (stat_value < stat_min || stat_value > stat_max) {
-            const std::string error_string = "metrics_monitor: Postrun stat \"" + stat_name +
+            const std::string error_string = "metrics_monitor: Post-run stat \"" + stat_name +
               "\" was outside of the specified limits. Min=" + std::to_string(stat_min) +
               " Max=" + std::to_string(stat_max) + " Actual=" + std::to_string(stat_value);
             logger::log_msg(LOG_ERROR, error_string);
