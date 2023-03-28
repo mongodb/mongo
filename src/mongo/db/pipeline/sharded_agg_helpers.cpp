@@ -1557,13 +1557,8 @@ StatusWith<CollectionRoutingInfo> getExecutionNsRoutingInfo(OperationContext* op
     // a collection before its enclosing database is created. However, if there are no shards
     // present, then $changeStream should immediately return an empty cursor just as other
     // aggregations do when the database does not exist.
-    //
-    // Note despite config.collections always being unsharded, to support $shardedDataDistribution
-    // we always take the shard targeting path. The collection must only exist on the config server,
-    // so even if there are no shards, the query can still succeed and we shouldn't return
-    // ShardNotFound.
     const auto shardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
-    if (shardIds.empty() && execNss != NamespaceString::kConfigsvrCollectionsNamespace) {
+    if (shardIds.empty()) {
         return {ErrorCodes::ShardNotFound, "No shards are present in the cluster"};
     }
 
@@ -1644,7 +1639,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(
             auto pipelineToTarget = pipeline->clone();
 
             if (!cm.isSharded() &&
-                (gFeatureFlagCatalogShard.isEnabled(serverGlobalParams.featureCompatibility) ||
+                // TODO SERVER-75391: Remove this condition.
+                (serverGlobalParams.clusterRole == ClusterRole::ConfigServer ||
                  expCtx->ns != NamespaceString::kConfigsvrCollectionsNamespace)) {
                 // If the collection is unsharded and we are on the primary, we should be able to
                 // do a local read. The primary may be moved right after the primary shard check,
@@ -1654,9 +1650,9 @@ std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(
                 // There is the case where we are in config.collections (collection unsharded) and
                 // we want to broadcast to all shards for the $shardedDataDistribution pipeline. In
                 // this case we don't want to do a local read and we must target the config servers.
-                // If the catalog shard feature flag is enabled in the current FCV, read locally
-                // because all nodes in the cluster should be running a recent enough binary so only
-                // the config server will be targeted for the pipeline.
+                // In 7.0, only the config server will be targeted for this collection, but in a
+                // mixed version cluster, an older binary mongos may still target a shard, so if the
+                // current node is not the config server, we force remote targeting.
                 try {
                     auto expectUnshardedCollection(
                         expCtx->mongoProcessInterface->expectUnshardedCollectionInScope(

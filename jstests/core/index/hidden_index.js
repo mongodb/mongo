@@ -133,11 +133,9 @@ assert.eq(idxSpec.hidden, true);
 const systemColl = db.getSiblingDB("admin").system.version;
 assert.commandWorked(systemColl.createIndex({a: 1}));
 // The collMod command throws NoShardingEnabled on DDL coordinator implementation and BadValue on
-// old implementation. When the config server supports catalog shard mode, it fails with
-// ShardingStateNotInitialized.
-assert.commandFailedWithCode(
-    systemColl.hideIndex("a_1"),
-    [ErrorCodes.NoShardingEnabled, ErrorCodes.BadValue, ErrorCodes.ShardingStateNotInitialized]);
+// old implementation.
+assert.commandFailedWithCode(systemColl.hideIndex("a_1"),
+                             [ErrorCodes.NoShardingEnabled, ErrorCodes.BadValue]);
 assert.commandFailedWithCode(systemColl.createIndex({a: 1}, {hidden: true}), 2);
 
 // Can't hide the '_id' index.

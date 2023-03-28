@@ -432,19 +432,10 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
     }
 
     // Is it a config server?
-    if (resIsMaster.hasField("configsvr")) {
-        if (!isCatalogShard) {
-            return {ErrorCodes::OperationFailed,
-                    str::stream() << "Cannot add " << connectionString.toString()
-                                  << " as a shard since it is a config server"};
-        }
-
-        auto ourSetName = repl::ReplicationCoordinator::get(opCtx)->getSettings().ourSetName();
-        if (providedSetName != ourSetName) {
-            return {ErrorCodes::OperationFailed,
-                    str::stream() << "Cannot add " << connectionString.toString()
-                                  << " as a catalog shard since it is a different config server"};
-        }
+    if (resIsMaster.hasField("configsvr") && !isCatalogShard) {
+        return {ErrorCodes::OperationFailed,
+                str::stream() << "Cannot add " << connectionString.toString()
+                              << " as a shard since it is a config server"};
     }
 
     if (resIsMaster.hasField(HelloCommandReply::kIsImplicitDefaultMajorityWCFieldName) &&

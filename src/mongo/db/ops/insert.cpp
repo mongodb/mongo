@@ -206,8 +206,7 @@ Status userAllowedCreateNS(OperationContext* opCtx, const NamespaceString& ns) {
                       str::stream() << "Invalid collection name: " << ns.coll());
     }
 
-    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer && !ns.isOnInternalDb() &&
-        !ShardingState::get(opCtx)->enabled()) {
+    if (serverGlobalParams.clusterRole.isExclusivelyConfigSvrRole() && !ns.isOnInternalDb()) {
         return Status(ErrorCodes::InvalidNamespace,
                       str::stream()
                           << "Can't create user databases on a dedicated --configsvr instance "
