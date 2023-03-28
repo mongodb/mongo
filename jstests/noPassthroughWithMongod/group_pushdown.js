@@ -450,6 +450,17 @@ assertResultsMatchWithAndWithoutPushdown(
     [{"_id": 1, o: 1}],
     1);
 
+// The second $group does not have top-level fields.
+assertResultsMatchWithAndWithoutPushdown(
+    coll,
+    [
+        {$group: {_id: {a: "$item", b: "$quantity"}, price: {$avg: "$price"}}},
+        {$group: {_id: {a: "$_id.a", b: "$_id.b"}, price: {$sum: "$price"}}},
+        {$group: {_id: '', price: {$avg: "$price"}}}
+    ],
+    [{"_id": "", "price": 10}],
+    3);
+
 // Run a group with a supported $stdDevSamp accumultor and check that it gets pushed down.
 assertGroupPushdown(coll,
                     [{$group: {_id: "$item", s: {$stdDevSamp: "$quantity"}}}],

@@ -2563,7 +2563,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     const auto& accStmts = groupNode->accumulators;
     auto childStageType = childNode->getType();
 
-    auto childReqs = reqs.copy();
+    auto childReqs = reqs.copy().set(kResult);
     if (childStageType == StageType::STAGE_GROUP && areAllFieldPathsOptimizable(idExpr, accStmts)) {
         // Does not ask the GROUP child for the result slot to avoid unnecessary materialization if
         // all fields are top-level fields. See the end of this function. For example, GROUP - GROUP
