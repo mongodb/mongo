@@ -20,6 +20,17 @@ edition="${multiversion_edition}"
 platform="${multiversion_platform}"
 architecture="${multiversion_architecture}"
 
+if [ -z "${multiversion_skip_install_for_40}" ]; then
+  db-contrib-tool setup-repro-env \
+    --installDir /data/install \
+    --linkDir /data/multiversion \
+    --edition $edition \
+    --platform $platform \
+    --architecture $architecture \
+    --debug \
+    4.0
+fi
+
 # The platform and architecture for how some of the binaries are reported in
 # https://downloads.mongodb.org/full.json changed between MongoDB 4.0 and MongoDB 4.2.
 # Certain build variants define additional multiversion_*_42_or_later expansions in order to
