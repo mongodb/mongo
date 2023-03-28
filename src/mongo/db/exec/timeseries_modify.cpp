@@ -51,10 +51,16 @@ TimeseriesModifyStage::TimeseriesModifyStage(ExpressionContext* expCtx,
       _bucketUnpacker{std::move(bucketUnpacker)},
       _residualPredicate(std::move(residualPredicate)),
       _preWriteFilter(opCtx(), coll->ns()) {
+    tassert(7308200,
+            "multi is true and no residual predicate was specified",
+            _isDeleteOne() || _residualPredicate);
     _children.emplace_back(std::move(child));
 }
 
 bool TimeseriesModifyStage::isEOF() {
+    if (_isDeleteOne() && _specificStats.measurementsDeleted > 0) {
+        return true;
+    }
     return child()->isEOF() && _retryBucketId == WorkingSet::INVALID_ID;
 }
 
@@ -275,7 +281,10 @@ PlanStage::StageState TimeseriesModifyStage::doWork(WorkingSetID* out) {
 
     while (_bucketUnpacker.hasNext()) {
         auto measurement = _bucketUnpacker.getNext().toBson();
-        if (_residualPredicate->matchesBSON(measurement)) {
+        // We should stop deleting measurements once we hit the limit of one in the not multi case.
+        bool shouldContinueDeleting = _isDeleteMulti() || deletedMeasurements.empty();
+        if (shouldContinueDeleting &&
+            (!_residualPredicate || _residualPredicate->matchesBSON(measurement))) {
             deletedMeasurements.push_back(measurement);
         } else {
             unchangedMeasurements.push_back(measurement);

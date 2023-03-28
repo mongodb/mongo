@@ -1983,7 +1983,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
         !deleteStageParams->numStatsForDoc;
 
     auto expCtxRaw = cq->getExpCtxRaw();
-    if (parsedDelete->getResidualExpr()) {
+    if (parsedDelete->isEligibleForArbitraryTimeseriesDelete()) {
         // Checks if the delete is on a time-series collection and cannot run on bucket documents
         // directly.
         root = std::make_unique<TimeseriesModifyStage>(

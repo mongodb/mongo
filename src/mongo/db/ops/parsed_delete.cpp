@@ -107,10 +107,6 @@ Status ParsedDelete::splitOutBucketMatchExpression(const ExtensionsCallback& ext
     auto& details = _timeseriesDeleteDetails;
     const auto& timeseriesOptions = details->_timeseriesOptions;
 
-    uassert(ErrorCodes::IllegalOperation,
-            "Cannot perform a non-multi delete on a time-series collection",
-            _request->getMulti());
-
     auto swMatchExpr =
         MatchExpressionParser::parse(_request->getQuery(),
                                      _expCtx,
@@ -229,6 +225,10 @@ void ParsedDelete::setCollator(std::unique_ptr<CollatorInterface> collator) {
     } else {
         _expCtx->setCollator(std::move(collator));
     }
+}
+
+bool ParsedDelete::isEligibleForArbitraryTimeseriesDelete() const {
+    return _timeseriesDeleteDetails && (getResidualExpr() || !_request->getMulti());
 }
 
 }  // namespace mongo

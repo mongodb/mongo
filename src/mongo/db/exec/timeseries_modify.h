@@ -69,6 +69,14 @@ public:
 
     PlanStage::StageState doWork(WorkingSetID* id);
 
+    bool _isDeleteMulti() {
+        return _params->isMulti;
+    }
+
+    bool _isDeleteOne() {
+        return !_isDeleteMulti();
+    }
+
 protected:
     void doSaveStateRequiresCollection() final {
         _preWriteFilter.saveState();
@@ -112,7 +120,8 @@ private:
     BucketUnpacker _bucketUnpacker;
 
     // Determines the measurements to delete from this bucket, and by inverse, those to keep
-    // unmodified.
+    // unmodified. This predicate can be null if we have a meta-only or empty predicate on singleton
+    // deletes or updates.
     std::unique_ptr<MatchExpression> _residualPredicate;
 
     /**

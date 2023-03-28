@@ -30,7 +30,7 @@ function testDelete({initialDocList, deleteList, resultDocList, nDeleted}) {
     assert.commandWorked(testDB.createCollection(
         coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
 
-    assert.commandWorked(coll.insert(coll, initialDocList));
+    assert.commandWorked(coll.insert(initialDocList));
 
     const deleteCommand = {delete: coll.getName(), deletes: deleteList};
     const res = assert.commandWorked(testDB.runCommand(deleteCommand));

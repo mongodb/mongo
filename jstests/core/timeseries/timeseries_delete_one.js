@@ -96,6 +96,7 @@ const doc7_c_f106 = {
 
 // Query on the 'f' field leads to zero measurement delete.
 (function testZeroMeasurementDelete() {
+    jsTestLog("Running testZeroMeasurementDelete()");
     testDeleteOne({
         initialDocList: [doc1_a_nofields, doc4_b_f103, doc6_c_f105],
         filter: {f: 17},
@@ -106,6 +107,7 @@ const doc7_c_f106 = {
 
 // Query on the 'f' field leads to a partial bucket delete.
 (function testPartialBucketDelete() {
+    jsTestLog("Running testPartialBucketDelete()");
     testDeleteOne({
         initialDocList: [doc1_a_nofields, doc2_a_f101, doc3_a_f102],
         filter: {f: 101},
@@ -116,6 +118,7 @@ const doc7_c_f106 = {
 
 // Query on the 'f' field leads to a full (single document) bucket delete.
 (function testFullBucketDelete() {
+    jsTestLog("Running testFullBucketDelete()");
     testDeleteOne({
         initialDocList: [doc2_a_f101],
         filter: {f: 101},
@@ -126,6 +129,7 @@ const doc7_c_f106 = {
 
 // Query on the 'tag' field matches all docs and deletes one.
 (function testMatchFullBucketOnlyDeletesOne() {
+    jsTestLog("Running testMatchFullBucketOnlyDeletesOne()");
     testDeleteOne({
         initialDocList: [doc1_a_nofields, doc2_a_f101, doc3_a_f102],
         filter: {[metaFieldName]: "A"},
@@ -134,8 +138,20 @@ const doc7_c_f106 = {
     });
 })();
 
+// Query on the 'tag' and metric field.
+(function testMetaAndMetricFilterOnlyDeletesOne() {
+    jsTestLog("Running testMetaAndMetricFilterOnlyDeletesOne()");
+    testDeleteOne({
+        initialDocList: [doc1_a_nofields, doc2_a_f101, doc3_a_f102],
+        filter: {[metaFieldName]: "A", f: {$gt: 100}},
+        // Don't validate exact results as we could delete any doc.
+        nDeleted: 1,
+    });
+})();
+
 // Query on the 'f' field matches docs in multiple buckets but only deletes from one.
 (function testMatchMultiBucketOnlyDeletesOne() {
+    jsTestLog("Running testMatchMultiBucketOnlyDeletesOne()");
     testDeleteOne({
         initialDocList: [
             doc1_a_nofields,
@@ -154,6 +170,7 @@ const doc7_c_f106 = {
 
 // Empty filter matches all docs but only deletes one.
 (function testEmptyFilterOnlyDeletesOne() {
+    jsTestLog("Running testEmptyFilterOnlyDeletesOne()");
     testDeleteOne({
         initialDocList: [
             doc1_a_nofields,

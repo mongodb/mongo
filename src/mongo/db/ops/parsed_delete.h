@@ -152,6 +152,12 @@ public:
                                         : nullptr;
     }
 
+    /**
+     * Returns true when we are performing multi deletes using a residual predicate on a time-series
+     * collection or when performing singleton deletes on a time-series collection.
+     */
+    bool isEligibleForArbitraryTimeseriesDelete() const;
+
 private:
     // Transactional context.  Not owned by us.
     OperationContext* _opCtx;
