@@ -42,6 +42,7 @@ ignore:
 variables:
 
 - &batchtime_one_day 1440
+- &batchtime_two_day 2880
 - &batchtime_one_week 10080
 - &batchtime_one_year 525600
 
@@ -8775,7 +8776,7 @@ buildvariants:
 - &linux-64-debug-template
   name: linux-64-debug
   display_name: "! Linux DEBUG"
-  batchtime: *batchtime_one_week
+  batchtime: *batchtime_two_day
   run_on:
   - rhel62-large
   expansions:
@@ -9696,7 +9697,7 @@ buildvariants:
 
 - name: enterprise-windows-required
   display_name: "! Enterprise Windows"
-  batchtime: *batchtime_one_week
+  batchtime: *batchtime_two_day
   modules:
   - enterprise
   run_on:
@@ -10113,7 +10114,7 @@ buildvariants:
 
 - name: enterprise-rhel-62-64-bit
   display_name: "! Enterprise RHEL 6.2"
-  batchtime: *batchtime_one_week
+  batchtime: *batchtime_two_day
   modules:
   - enterprise
   run_on:
@@ -10681,7 +10682,7 @@ buildvariants:
 - &enterprise-rhel-70-64-bit-template
   name: enterprise-rhel-70-64-bit
   display_name: "! Enterprise RHEL 7.0"
-  batchtime: *batchtime_one_week
+  batchtime: *batchtime_two_day
   modules:
   - enterprise
   run_on:
@@ -12142,7 +12143,7 @@ buildvariants:
 
 - name: ubuntu1804-debug-aubsan-lite
   display_name: "! {A,UB}SAN Enterprise Ubuntu 18.04 DEBUG"
-  batchtime: *batchtime_one_week
+  batchtime: *batchtime_two_day
   modules:
   - enterprise
   run_on:
