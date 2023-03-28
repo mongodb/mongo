@@ -124,6 +124,7 @@ env.Library(
         'accumulator_sum.cpp',
         'map_reduce_options.idl',
         'percentile_algo_sort_and_rank.cpp',
+        'percentile_algo_tdigest.cpp',
         'window_function/window_bounds.cpp',
         'window_function/window_function_covariance.cpp',
         'window_function/window_function_count.cpp',
@@ -746,6 +747,26 @@ env.CppUnitTest(
     ],
 )
 
+env.CppUnitTest(
+    target='db_percentile_algo_test',
+    source=[
+        'percentile_algo_tdigest_test.cpp',
+    ],
+    LIBDEPS=[
+        'accumulator',
+    ],
+)
+
+env.Benchmark(
+    target='percentile_algo_bm',
+    source=[
+        'percentile_algo_bm_fixture.cpp',
+    ],
+    LIBDEPS=[
+        'accumulator',
+    ],
+)
+
 bmEnv = env.Clone()
 bmEnv.InjectThirdParty(libraries=["benchmark"])
 
@@ -768,7 +789,8 @@ env.Benchmark(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
-        '$BUILD_DIR/mongo/db/query_expressions', '$BUILD_DIR/mongo/db/service_context_test_fixture',
-        'expression_bm_fixture'
+        '$BUILD_DIR/mongo/db/query_expressions',
+        '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        'expression_bm_fixture',
     ],
 )

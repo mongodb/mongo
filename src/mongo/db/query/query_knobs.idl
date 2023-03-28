@@ -1143,6 +1143,16 @@ server_parameters:
     cpp_vartype: AtomicWord<bool>
     default: true
 
+  internalQueryTdigestDelta:
+    description: "Compaction parameter the for t-digest algorithm."
+    set_at: [ startup, runtime ]
+    cpp_varname: internalQueryTdigestDelta
+    cpp_vartype: AtomicWord<int>
+    default: 1000
+    validator:
+      gte: 0
+      lte: 100000 # arbitrary, just to set an upper limit on the amount of memory used by t-digest
+
   internalQueryAutoParameterizationMaxParameterCount:
     description: "The maximum numbers of parameters that query auto-parameterization can extract from a query. 
      If auto parameterizating a query would result in a greater number of parameters than the limit, 

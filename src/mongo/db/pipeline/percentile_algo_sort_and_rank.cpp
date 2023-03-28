@@ -76,7 +76,7 @@ public:
         return _accumulatedValues[rank];
     }
 
-    long memUsageBytes() final {
+    long memUsageBytes() const final {
         return _accumulatedValues.capacity() * sizeof(double);
     }
 
@@ -121,6 +121,10 @@ public:
         _accumulatedValues.swap(temp);
     }
 };
+
+std::unique_ptr<PercentileAlgorithm> createDiscreteSortAndRank() {
+    return std::make_unique<DiscreteSortAndRank>();
+}
 
 std::unique_ptr<PercentileAlgorithm> createDiscreteSortAndRankParallelClassic() {
     return std::make_unique<DiscreteSortAndRankParallelClassic>();

@@ -66,7 +66,7 @@ struct PercentileAlgorithm {
     /*
      * The owner might need a rough estimate of how much memory the algorithm is using.
      */
-    virtual long memUsageBytes() = 0;
+    virtual long memUsageBytes() const = 0;
 };
 
 /**
@@ -83,6 +83,8 @@ struct PartialPercentile {
 /**
  * Factory methods for instantiating concrete algorithms.
  */
+std::unique_ptr<PercentileAlgorithm> createDiscreteSortAndRank();
 std::unique_ptr<PercentileAlgorithm> createDiscreteSortAndRankParallelClassic();
+std::unique_ptr<PercentileAlgorithm> createTDigest();
 
 }  // namespace mongo

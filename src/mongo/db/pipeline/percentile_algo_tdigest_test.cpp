@@ -1,0 +1,1112 @@
+/**
+ *    Copyright (C) 2023-present MongoDB, Inc.
+ *
+ *    This program is free software: you can redistribute it and/or modify
+ *    it under the terms of the Server Side Public License, version 1,
+ *    as published by MongoDB, Inc.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    Server Side Public License for more details.
+ *
+ *    You should have received a copy of the Server Side Public License
+ *    along with this program. If not, see
+ *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the Server Side Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */
+
+#include <algorithm>
+#include <boost/random/exponential_distribution.hpp>
+#include <boost/random/normal_distribution.hpp>
+#include <boost/random/uniform_real_distribution.hpp>
+#include <limits>
+#include <random>
+
+#include "mongo/db/pipeline/percentile_algo_tdigest.h"
+
+#include "mongo/logv2/log.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/unittest.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
+namespace mongo {
+namespace {
+
+const double epsilon = 0.000'000'001;
+using Centroid = TDigest::Centroid;
+using std::vector;
+
+void assertIsOrdered(const TDigest& digest, const std::string& tag) {
+    const auto& centroids = digest.centroids();
+    if (centroids.size() == 0) {
+        return;
+    }
+    for (size_t i = 1; i < centroids.size(); ++i) {
+        if (centroids[i - 1].mean > centroids[i].mean) {
+            std::cout.precision(32);
+            std::cout << "centroids out of order: " << centroids[i - 1].mean << ","
+                      << centroids[i].mean << std::endl;
+        }
+        ASSERT_LTE(centroids[i - 1].mean, centroids[i].mean)
+            << tag << " Centroids are not ordered at: " << i;
+    }
+}
+
+void assertConformsToScaling(const TDigest& digest,
+                             TDigest::ScalingFunction k,
+                             int delta,
+                             const std::string& tag) {
+    const auto& centroids = digest.centroids();
+    const int64_t n = digest.n();
+
+    double w = 0;
+    double q = 0;
+    double kPrev = k(q, delta);
+    for (const Centroid& c : centroids) {
+        double qNext = (w + c.weight) / n;
+        double kNext = k(qNext, delta);
+        if (c.weight > 1) {
+            ASSERT_LTE(kNext - kPrev, 1.0 + epsilon)
+                << tag << ": Scaling violation at centroid with weight " << c.weight
+                << ", prev weights add up to: " << w;
+        }
+        q = qNext;
+        kPrev = kNext;
+        w += c.weight;
+    }
+}
+
+void assertIsValid(const TDigest& digest,
+                   TDigest::ScalingFunction k,
+                   int delta,
+                   const std::string& tag) {
+    assertIsOrdered(digest, tag);
+    assertConformsToScaling(digest, k, delta, tag);
+}
+
+// Yes, a binary search could be faster, but it's not worth doing it here.
+int computeRank(const vector<double>& sorted, double value) {
+    for (size_t i = 0; i < sorted.size(); ++i) {
+        if (value <= sorted[i]) {
+            return i;
+        }
+    }
+    ASSERT(false) << value << " is larger than the max input " << sorted.back();
+    return -1;
+}
+
+// t-digest doesn't guarantee accuracy error bounds (there exists inputs for which the error can
+// be arbitrary large), however, for already sorted inputs the error does have the upper bound
+// and for most "normal" inputs it's not that far off. Note: the error is defined in terms of
+// _rank_.
+void assertExpectedAccuracy(const vector<double>& sorted,
+                            TDigest& digest,
+                            vector<double> percentiles,
+                            double accuracyError,
+                            const char* msg) {
+    for (double p : percentiles) {
+        const double trueRank = p * sorted.size();
+        // If there are duplicates in the data, the true rank is a range of values so we need to
+        // find its lower and upper bounds.
+        int lowerTrueRank = static_cast<int>(std::floor(trueRank));
+        const double val = sorted[lowerTrueRank];
+        while (lowerTrueRank > 0 && sorted[lowerTrueRank - 1] == val) {
+            lowerTrueRank--;
+        }
+        int upperTrueRank = static_cast<int>(std::floor(trueRank));
+        while (upperTrueRank + 1 < static_cast<int>(sorted.size()) &&
+               sorted[upperTrueRank + 1] == val) {
+            upperTrueRank++;
+        }
+
+        const double computedPercentile = digest.computePercentile(p).value();
+
+        ASSERT_GTE(computedPercentile, sorted.front())
+            << msg << " computed percentile " << computedPercentile << " for " << p
+            << " is smaller than the min value " << sorted.front();
+        ASSERT_LTE(computedPercentile, sorted.back())
+            << msg << " computed percentile " << computedPercentile << " for " << p
+            << " is larger than the max value " << sorted.back();
+
+        const int rank = computeRank(sorted, computedPercentile);
+
+        ASSERT_LTE(lowerTrueRank - accuracyError * sorted.size(), rank)
+            << msg << " computed percentile " << computedPercentile << " for " << p
+            << " is not accurate. Its computed rank " << rank << " is less than lower true rank "
+            << lowerTrueRank << " by " << lowerTrueRank - rank;
+
+        ASSERT_LTE(rank, upperTrueRank + accuracyError * sorted.size())
+            << msg << " computed percentile " << computedPercentile << " for " << p
+            << " is not accurate. Its computed rank " << rank << " is greater than upper true rank "
+            << upperTrueRank << " by " << rank - upperTrueRank;
+    }
+}
+
+/*==================================================================================================
+  Tests with fixed datasets.
+==================================================================================================*/
+/**
+ * For the GetPercentile_* tests the scaling function and delta don't matter as the tests create
+ * fully formed digests.
+ */
+TEST(TDigestTest, GetPercentile_Empty) {
+    TDigest digest(TDigest::k1_limit, 100);
+    ASSERT(!digest.computePercentile(0.2));
+}
+
+TEST(TDigestTest, GetPercentile_SingleCentroid_SinglePoint) {
+    TDigest digest(42.0, 42.0, {{1, 42.0}}, nullptr /* k1_limit */, 1 /* delta */);
+    ASSERT_EQ(42.0, digest.computePercentile(0.1));
+    ASSERT_EQ(42.0, digest.computePercentile(0.5));
+    ASSERT_EQ(42.0, digest.computePercentile(0.9));
+}
+
+// Our t-digest computes accurate minimum.
+TEST(TDigestTest, GetPercentile_SingleCentroid_Min) {
+    TDigest digest(1.0, 5.0, {{10, 3.7}}, nullptr /* k1_limit */, 1 /* delta */);
+    ASSERT_EQ(1.0, digest.computePercentile(0));
+}
+
+// Our t-digest computes accurate maximum.
+TEST(TDigestTest, GetPercentile_SingleCentroid_Max) {
+    TDigest digest(1.0, 5.0, {{10, 3.7}}, nullptr /* k1_limit */, 1 /* delta */);
+    ASSERT_EQ(5.0, digest.computePercentile(1));
+}
+
+// On a single centroid that could be interpreted as representing evenly distributed data between
+// min and max, t-digest should be computing "continuous percentiles".
+TEST(TDigestTest, GetPercentile_SingleCentroid_EvenlyDistributed) {
+    vector<double> inputs;
+    inputs.reserve(100);
+    for (int i = 0; i < 100; ++i) {
+        inputs.push_back(i + 1.0);
+    }
+
+    TDigest digest(1.0, 100.0, {{100, (1.0 + 100.0) / 2}}, nullptr /* k1_limit */, 1 /* delta */);
+
+    for (int i = 1; i < 100; ++i) {
+        const double p = i * 0.01;
+        const double res = digest.computePercentile(p).value();
+        ASSERT_APPROX_EQUAL(inputs[i - 1] * p + inputs[i] * (1 - p), res, epsilon) << p;
+    }
+}
+
+// Single-point centroids should yield accurate discrete percentiles, even if the rest of the data
+// distribution isn't "even".
+TEST(TDigestTest, GetPercentile_SinglePointCentroids) {
+    TDigest digest(1,      // min
+                   10000,  // max
+                   {
+                       {1, 1},
+                       {1, 2},
+                       {1, 3},
+                       {37, 10.0},
+                       {44, 18.0},
+                       {13, 80.0},
+                       {1, 800.0},
+                       {1, 900.0},
+                       {1, 10000.0},
+                   },  // 100 datapoints total
+                   nullptr /* k1_limit */,
+                   1 /* delta */);
+
+    ASSERT_EQ(2.0, digest.computePercentile(0.02));
+    ASSERT_EQ(800.0, digest.computePercentile(0.98));
+}
+
+/**
+ * Tests with the special double inputs. The scaling function doesn't matter for these tests but
+ * using a smaller delta to exercise compacting of centroids.
+ */
+TEST(TDigestTest, Incorporate_Infinities) {
+    const int delta = 50;
+    const double inf = std::numeric_limits<double>::infinity();
+
+    // Setup the data as 1000 evenly distributed "normal values", 200 positive infinities, and
+    // 300 negative infinities.
+    vector<double> inputs(1500);
+    for (size_t i = 0; i < 300; ++i) {
+        inputs[i] = -inf;
+    }
+    std::iota(inputs.begin() + 300, inputs.begin() + 1300, 1.0);  // {1, 2, ..., 1000}
+    for (size_t i = 1300; i < 1500; ++i) {
+        inputs[i] = inf;
+    }
+    vector<double> sorted = inputs;  // sorted by creation
+    auto seed = time(nullptr);
+    LOGV2(7429511, "{seed}", "Duplicates_two_clusters", "seed"_attr = seed);
+    std::shuffle(inputs.begin(), inputs.end(), std::mt19937(seed));
+
+    TDigest d{TDigest::k0_limit, delta};
+    for (double val : inputs) {
+        d.incorporate(val);
+    }
+    d.flushBuffer();
+    assertIsValid(d, TDigest::k0, delta, "Incorporate_Infinities");
+
+    ASSERT_EQ(inputs.size(), d.n() + d.negInfCount() + d.posInfCount()) << "n of digest: " << d;
+    ASSERT_EQ(-inf, d.min()) << "min of digest: " << d;
+    ASSERT_EQ(inf, d.max()) << "max of digest: " << d;
+
+    // 300 out of 1500 values are negative infinities
+    ASSERT_EQ(-inf, *d.computePercentile(0.001)) << "p = 0.1 from digest: " << d;
+    ASSERT_EQ(-inf, *d.computePercentile(0.1)) << "p = 0.1 from digest: " << d;
+    ASSERT_EQ(-inf, *d.computePercentile(0.2)) << "p = 0.2 from digest: " << d;
+
+    assertExpectedAccuracy(sorted,
+                           d,
+                           {0.3, 0.5, 0.8} /* percentiles */,
+                           20.0 /* accuracyError */,
+                           "Incorporate_Infinities");
+
+    // 200 out of 1500 values are positive infinities
+    ASSERT_EQ(inf, *d.computePercentile(1 - 2.0 / 15)) << "p = 1 - 2/15 from digest: " << d;
+    ASSERT_EQ(inf, *d.computePercentile(0.9)) << "p = 0.1 from digest: " << d;
+    ASSERT_EQ(inf, *d.computePercentile(0.999)) << "p = 0.2 from digest: " << d;
+}
+
+TEST(TDigestTest, Incorporate_Nan_ShouldSkip) {
+    const int delta = 50;
+
+    vector<double> inputs(1000);
+    std::iota(inputs.begin(), inputs.end(), 1.0);  // {1, 2, ..., 1000}
+
+    TDigest oracle{TDigest::k0_limit, delta};
+    oracle.incorporate(inputs);
+
+    // Add NaN value into the dataset.
+    inputs.insert(inputs.begin() + 500, std::numeric_limits<double>::quiet_NaN());
+
+    TDigest d{TDigest::k0_limit, delta};
+    d.incorporate(std::numeric_limits<double>::quiet_NaN());
+    d.incorporate(inputs);
+    d.flushBuffer();
+    assertIsValid(d, TDigest::k0, delta, "Incorporate_Nan_ShouldSkip");
+
+    ASSERT_EQ(oracle.n(), d.n()) << "n of digest: " << d;
+    ASSERT_EQ(oracle.min(), d.min()) << "min of digest: " << d;
+    ASSERT_EQ(oracle.max(), d.max()) << "max of digest: " << d;
+
+    ASSERT_EQ(*oracle.computePercentile(0.1), *d.computePercentile(0.1))
+        << "p = 0.1 from digest: " << d;
+    ASSERT_EQ(*oracle.computePercentile(0.5), *d.computePercentile(0.5))
+        << "p = 0.5 from digest: " << d;
+    ASSERT_EQ(*oracle.computePercentile(0.9), *d.computePercentile(0.9))
+        << "p = 0.9 from digest: " << d;
+}
+
+TEST(TDigestTest, Incorporate_Great_And_Small) {
+    const int delta = 50;
+
+    // Create a dataset consisting of four groups of values (large/small refer to the abs value):
+    vector<double> inputs(1000);
+    // 1. large negative numbers
+    inputs[0] = std::numeric_limits<double>::lowest();
+    for (size_t i = 1; i < 250; ++i) {
+        inputs[i] = std::nextafter(inputs[i - 1] /* from */, -1.0 /* to */);
+    }
+    // 2. small negative numbers
+    inputs[250] = -0.0;
+    for (size_t i = 251; i < 500; ++i) {
+        inputs[i] = std::nextafter(inputs[i - 1] /* from */, -1.0 /* to */);
+    }
+    // 3. small positive numbers
+    inputs[500] = 0.0;
+    for (size_t i = 501; i < 750; ++i) {
+        inputs[i] = std::nextafter(inputs[i - 1] /* from */, 1.0 /* to */);
+    }
+    // 4. large positive numbers
+    inputs[750] = std::numeric_limits<double>::max();
+    for (size_t i = 751; i < 1000; ++i) {
+        inputs[i] = std::nextafter(inputs[i - 1] /* from */, 1.0 /* to */);
+    }
+    vector<double> sorted = inputs;
+    std::sort(sorted.begin(), sorted.end());
+
+    auto seed = time(nullptr);
+    LOGV2(7429512, "{seed}", "Incorporate_Great_And_Small", "seed"_attr = seed);
+    std::shuffle(inputs.begin(), inputs.end(), std::mt19937(seed));
+
+    TDigest d{TDigest::k0_limit, delta};
+    d.incorporate(std::numeric_limits<double>::quiet_NaN());
+    for (double val : inputs) {
+        d.incorporate(val);
+    }
+    d.flushBuffer();
+    assertIsValid(d, TDigest::k0, delta, "Incorporate_Great_And_Small");
+
+    ASSERT_EQ(inputs.size(), d.n()) << "n of digest: " << d;
+    ASSERT_EQ(sorted.front(), d.min()) << "min of digest: " << d;
+    ASSERT_EQ(sorted.back(), d.max()) << "max of digest: " << d;
+
+    assertExpectedAccuracy(sorted,
+                           d,
+                           {0.1, 0.4, 0.5, 0.6, 0.9} /* percentiles */,
+                           20.0 /* accuracyError */,
+                           "Incorporate_Great_And_Small");
+}
+
+/**
+ * The following set of tests checks the workings of merging data into a digest. They use a simpler
+ * k0 = delta*q/2 scaling function as it's easier to reason about the resulting centroids.
+ *
+ * For k0 = delta*q/2 size of a centroid cannot excede 2*n/delta and for a fully compacted digest
+ * the number of centroids cannot exceed 2*delta (and has to be at least delta/2).
+ */
+void assertSameCentroids(const std::vector<Centroid>& expected, const TDigest& d) {
+    const auto& cs = d.centroids();
+    ASSERT_EQ(expected.size(), cs.size()) << "number of centroids in digest: " << d;
+    for (size_t i = 0; i < cs.size(); ++i) {
+        ASSERT_EQ(expected[i].weight, cs[i].weight)
+            << "weight check: centroid " << cs[i] << " in digest: " << d;
+        ASSERT_APPROX_EQUAL(expected[i].mean, cs[i].mean, epsilon)
+            << "mean check: centroid " << cs[i] << " in digest: " << d;
+    }
+}
+
+TEST(TDigestTest, IncorporateBatch_k0) {
+    const int delta = 10;
+
+    vector<double> batch1(21);  // one extra item to dodge the floating point precision issues
+    std::iota(batch1.begin(), batch1.end(), 1.0);  // {1, 2, ..., 21}
+
+    TDigest d{TDigest::k0_limit, delta};
+    d.incorporate(batch1);
+    d.flushBuffer();
+
+    ASSERT_EQ(batch1.front(), d.min()) << "min of digest: " << d;
+    ASSERT_EQ(batch1.back(), d.max()) << "max of digest: " << d;
+    ASSERT_EQ(batch1.size(), d.n()) << "n of digest: " << d;
+
+    assertSameCentroids({{4, 2.5}, {4, 6.5}, {4, 10.5}, {4, 14.5}, {4, 18.5}, {1, 21}}, d);
+}
+
+TEST(TDigestTest, Merge_TailData_k0) {
+    const int delta = 10;
+
+    TDigest d{1,                                                               // min
+              21,                                                              // max
+              {{4, 2.5}, {4, 6.5}, {4, 10.5}, {4, 14.5}, {4, 18.5}, {1, 21}},  // centroids
+              TDigest::k0_limit,
+              delta};
+    const int64_t nOld = d.n();
+    const double minOld = d.min();
+
+    // Add to the digest data that is larger than any of the already accumulated points.
+    vector<double> data(10);
+    std::iota(data.begin(), data.end(), d.max() + 1);  // {22, 23, ..., 31}
+
+    d.incorporate(data);
+    d.flushBuffer();
+
+    ASSERT_EQ(minOld, d.min()) << "min of digest: " << d;
+    ASSERT_EQ(data.back(), d.max()) << "max of digest: " << d;
+    ASSERT_EQ(nOld + data.size(), d.n()) << "n of digest: " << d;
+
+    // Because the data in the second batch is sorted higher than the existing data, none of the
+    // previously created centroids except the very last one can be merged (because the max weight
+    // is 6 but the fully compacted centroids after the first batch all have size of 4).
+    assertSameCentroids({{4, 2.5}, {4, 6.5}, {4, 10.5}, {4, 14.5}, {5, 19}, {6, 24.5}, {4, 29.5}},
+                        d);
+}
+
+TEST(TDigestTest, Merge_HeadData_k0) {
+    const int delta = 10;
+
+    TDigest d{1,                                                               // min
+              21,                                                              // max
+              {{4, 2.5}, {4, 6.5}, {4, 10.5}, {4, 14.5}, {4, 18.5}, {1, 21}},  // centroids
+              TDigest::k0_limit,
+              delta};
+    const int64_t nOld = d.n();
+    const double maxOld = d.max();
+
+    // Add to the digest data that is smaller than any of the already accumulated points.
+    vector<double> data(10);
+    std::iota(data.begin(), data.end(), d.min() - 10.0);  // {-9, -8, ..., 0}
+
+    d.incorporate(data);
+    d.flushBuffer();
+
+    ASSERT_EQ(data.front(), d.min()) << "min after the second batch";
+    ASSERT_EQ(maxOld, d.max()) << "max after the second batch";
+    ASSERT_EQ(nOld + data.size(), d.n()) << "n after the second batch";
+
+    // Because the data in the second batch is sorted lower than the existing data, none of the
+    // previously created centroids can be merged (because the max weight is 6 but the fully
+    // compacted centroids after the first batch all have size of 4).
+    assertSameCentroids({{6, -6.5}, {4, -1.5}, {4, 2.5}, {4, 6.5}, {4, 10.5}, {4, 14.5}, {5, 19}},
+                        d);
+}
+
+TEST(TDigestTest, Merge_MixedData_k0) {
+    const int delta = 10;
+
+    TDigest d{1,                                                               // min
+              21,                                                              // max
+              {{4, 2.5}, {4, 6.5}, {4, 10.5}, {4, 14.5}, {4, 18.5}, {1, 21}},  // centroids
+              TDigest::k0_limit,
+              delta};
+    const int64_t nOld = d.n();
+    const double minOld = d.min();
+    const double maxOld = d.max();
+
+    // Use inputs that land between the current centroids of the digest. Note: more than 3
+    // additional inputs would allow the centroids of bigger sizes.
+    d.incorporate({4.5, 8.5, 12.5});
+    d.flushBuffer();
+
+    ASSERT_EQ(minOld, d.min()) << "min after the first batch";
+    ASSERT_EQ(maxOld, d.max()) << "max after the first batch";
+    ASSERT_EQ(nOld + 3, d.n()) << "n after the first batch";
+
+    assertSameCentroids({{4, 2.5},
+                         {1, 4.5},
+                         {4, 6.5},
+                         {1, 8.5},
+                         {4, 10.5},
+                         {1, 12.5},
+                         {4, 14.5},
+                         {4, 18.5},
+                         {1, 21}},
+                        d);
+
+    // Incorporating more data would increase the bound on centroid size to 6 and cause compaction.
+    d.incorporate({16.5, 22, 23, 24, 25, 26, 27});
+    d.flushBuffer();
+    ASSERT_EQ(31, d.n()) << "n after the second batch";
+    assertSameCentroids({{5, 2.9}, {5, 6.9}, {5, 10.9}, {5, 14.9}, {5, 19}, {6, 24.5}}, d);
+}
+
+/**
+ * The following tests checks merging of two digests. They use a simpler k0 = delta*q/2 scaling
+ * function as it's easier to reason about the resulting centroids. Notice, that the results of
+ * merging two digests aren't necessarily the same as when merging data into a digest.
+ *
+ * For k0 = delta*q/2 size of a centroid cannot exceed 2*n/delta and for a fully compacted digest
+ * the number of centroids cannot exceed 2*delta (and has to be at least delta/2).
+ */
+TEST(TDigestTest, Merge_DigestsOrdered_k0) {
+    const int delta = 10;
+
+    TDigest d{1,                                                               // min
+              21,                                                              // max
+              {{4, 2.5}, {4, 6.5}, {4, 10.5}, {4, 14.5}, {4, 18.5}, {1, 21}},  // centroids
+              TDigest::k0_limit,
+              delta};
+    const int64_t nOld = d.n();
+    const double minOld = d.min();
+
+    const TDigest other{
+        22,                                                              // min
+        31,                                                              // max
+        {{2, 22.5}, {2, 24.5}, {1, 26}, {2, 27.5}, {2, 29.5}, {1, 31}},  // centroids
+        TDigest::k0_limit,
+        delta};
+
+    d.merge(other);
+
+    ASSERT_EQ(minOld, d.min()) << "min of digest: " << d;
+    ASSERT_EQ(other.max(), d.max()) << "max of digest: " << d;
+    ASSERT_EQ(nOld + other.n(), d.n()) << "n of digest: " << d;
+
+    assertSameCentroids({{4, 2.5}, {4, 6.5}, {4, 10.5}, {4, 14.5}, {5, 19}, {5, 24}, {5, 29}}, d);
+}
+
+TEST(TDigestTest, Merge_DigestsMixed_k0) {
+    const int delta = 10;
+
+    TDigest d{1,                                                               // min
+              21,                                                              // max
+              {{4, 2.5}, {4, 6.5}, {4, 10.5}, {4, 14.5}, {4, 18.5}, {1, 21}},  // centroids
+              TDigest::k0_limit,
+              delta};
+    const int64_t nOld = d.n();
+    const double minOld = d.min();
+
+    const TDigest other{4.5,                                                            // min
+                        27,                                                             // max
+                        {{2, 6.5}, {2, 14.5}, {1, 22}, {2, 23.5}, {2, 25.5}, {1, 27}},  // centroids
+                        TDigest::k0_limit,
+                        delta};
+
+    d.merge(other);
+
+    ASSERT_EQ(minOld, d.min()) << "min of digest: " << d;
+    ASSERT_EQ(other.max(), d.max()) << "max of digest: " << d;
+    ASSERT_EQ(nOld + other.n(), d.n()) << "n of digest: " << d;
+
+    assertSameCentroids({{4, 2.5}, {6, 6.5}, {4, 10.5}, {6, 14.5}, {5, 19}, {6, 24.5}}, d);
+}
+
+/**
+ * The following test doesn't add coverage but is meant to illustrate the difference between scaling
+ * functions.
+ */
+TEST(TDigestTest, ScalingFunctionEffect) {
+    const int delta = 20;
+
+    vector<double> inputs(101);
+    std::iota(inputs.begin(), inputs.end(), 1.0);  // {1, 2, ..., 101}
+
+    TDigest d_k0{TDigest::k0_limit, delta};
+    d_k0.incorporate(inputs);
+    d_k0.flushBuffer();
+
+    TDigest d_k1{TDigest::k1_limit, delta};
+    d_k1.incorporate(inputs);
+    d_k1.flushBuffer();
+
+    TDigest d_k2{TDigest::k2_limit, delta};
+    d_k2.incorporate(inputs);
+    d_k2.flushBuffer();
+
+    // k0 attempts to split data into centroids of equal weights.
+    assertSameCentroids({{10, 5.5},
+                         {10, 15.5},
+                         {10, 25.5},
+                         {10, 35.5},
+                         {10, 45.5},
+                         {10, 55.5},
+                         {10, 65.5},
+                         {10, 75.5},
+                         {10, 85.5},
+                         {10, 95.5},
+                         {1, 101}},
+                        d_k0);
+
+    // k1 is biased to create smaller centroids at the extremes of the data.
+    assertSameCentroids({{2, 1.5},
+                         {6, 5.5},
+                         {10, 13.5},
+                         {13, 25},
+                         {15, 39},
+                         {15, 54},
+                         {14, 68.5},
+                         {12, 81.5},
+                         {8, 91.5},
+                         {5, 98},
+                         {1, 101}},
+                        d_k1);
+
+    // k2 is also biased with the same asymptotic characteristics at 0 and 1 as k1 and is cheaper
+    // to compute (but it has higher upper bound on the number of number of centroids).
+    assertSameCentroids({{1, 1},    {1, 2},    {2, 3.5},  {3, 6},  {4, 9.5},  {5, 14},   {6, 19.5},
+                         {7, 26},   {8, 33.5}, {9, 42},   {9, 51}, {9, 60},   {8, 68.5}, {7, 76},
+                         {6, 82.5}, {5, 88},   {4, 92.5}, {3, 96}, {2, 98.5}, {1, 100},  {1, 101}},
+                        d_k2);
+}
+
+/**
+ * Until there are enough inputs, t-digest has to keep a centroid per input point, which means they
+ * are strictly sorted and the computed percentiles are precise. However, the threshold on the
+ * number of the inputs depends on the scaling function and delta.
+ */
+constexpr size_t dataSize = 100;
+void runTestOnSmallDataset(TDigest& d) {
+    vector<double> data(dataSize);
+    std::iota(data.begin(), data.end(), 1.0);
+
+    d.incorporate(data);
+    d.flushBuffer();
+
+    ASSERT_EQ(data.size(), d.centroids().size()) << "number of centroids in " << d;
+    // Spot-check a few percentiles.
+    ASSERT_EQ(8, d.computePercentile(0.08).value()) << "p = 0.08 from " << d;
+    ASSERT_EQ(42, d.computePercentile(0.42).value()) << "p = 0.42 from " << d;
+    ASSERT_EQ(71, d.computePercentile(0.705).value()) << "p = 0.705 from " << d;
+    ASSERT_EQ(99, d.computePercentile(0.99).value()) << "p = 0.99 from " << d;
+    ASSERT_EQ(100, d.computePercentile(0.9999).value()) << "p = 0.9999 from " << d;
+}
+TEST(TDigestTest, PreciseOnSmallDataset_k0) {
+    TDigest d{TDigest::k0_limit, dataSize + 1 /* delta */};
+    runTestOnSmallDataset(d);
+}
+TEST(TDigestTest, PreciseOnSmallDataset_k1) {
+    TDigest d{TDigest::k1_limit, dataSize * 2 /* delta */};
+    runTestOnSmallDataset(d);
+}
+TEST(TDigestTest, PreciseOnSmallDataset_k2) {
+    TDigest d{TDigest::k2_limit, dataSize * 2 /* delta */};
+    runTestOnSmallDataset(d);
+}
+
+/*==================================================================================================
+  Tests with various data distributions.
+==================================================================================================*/
+
+// Generates n * dupes values using provided distribution. The dupes can be either kept together or
+// spread across the whole generated dataset. NB: when data is fed to t-digest the algorithm fills
+// and then sorts a buffer so spreading the duplicates within distances comparable to the
+// buffer-size doesn't serve any purpose.
+template <typename TDist>
+vector<double> generateData(TDist& dist,
+                            size_t n,
+                            size_t dupes = 1,
+                            bool keepDupesTogether = true) {
+    auto seed = time(nullptr);
+    LOGV2(7429513, "{seed}", "generateData", "seed"_attr = seed);
+    std::mt19937 generator(seed);
+
+    vector<double> inputs;
+    inputs.reserve(n * dupes);
+
+    for (size_t i = 0; i < n; ++i) {
+        auto val = dist(generator);
+        inputs.push_back(val);
+        if (keepDupesTogether) {
+            for (size_t j = 1; j < dupes; ++j) {
+                inputs.push_back(val);
+            }
+        }
+    }
+    if (!keepDupesTogether && dupes > 1) {
+        // duplicate 'inputs' the requested number of times.
+        vector<double> temp = inputs;
+        for (size_t j = 1; j < dupes; ++j) {
+            std::shuffle(inputs.begin(), inputs.end(), generator);
+            temp.insert(temp.end(), inputs.begin(), inputs.end());
+        }
+        inputs.swap(temp);
+    }
+    return inputs;
+}
+
+typedef vector<double> (*DataGenerator)(size_t, size_t, bool);
+
+// Generates 'n' values in [0, 100] range with uniform distribution.
+vector<double> generateUniform(size_t n, size_t dupes, bool keepDupesTogether) {
+    boost::random::uniform_real_distribution<double> dist(0 /* min */, 100 /* max */);
+    return generateData(dist, n, dupes, keepDupesTogether);
+}
+
+// Generates 'n' values from normal distribution with mean = 0.0 and sigma = 0.5.
+vector<double> generateNormal(size_t n, size_t dupes, bool keepDupesTogether) {
+    boost::random::normal_distribution<double> dist(0.0 /* mean */, 0.5 /* sigma */);
+    return generateData(dist, n, dupes, keepDupesTogether);
+}
+
+// Generates 'n' values from exponential distribution with lambda = 1.0: p(x)=lambda*e^(-lambda*x).
+vector<double> generateExponential(size_t n, size_t dupes, bool keepDupesTogether) {
+    boost::random::exponential_distribution<double> dist(1.0 /* lambda */);
+    return generateData(dist, n, dupes, keepDupesTogether);
+}
+
+/*
+ * The following tests generate datasets with 10,000 values. The accuracy 0.00ab means that the
+ * rank of the computed percentile cannot differ from the true rank by more than |ab|. T-digest does
+ * not guarantee error bounds, the accuracy numbers here are empirical.
+ *
+ * These tests also indirectly validate the merging and compacting with a more complex scaling
+ * function.
+ *
+ * We run two separate tests for each distribution because t-digest with k2 scaling function should
+ * be more accurate for the extreme percentiles.
+ */
+
+void runTestWithDataGenerator(TDigest::ScalingFunction k_limit,
+                              TDigest::ScalingFunction k,
+                              DataGenerator dg,
+                              const vector<double>& percentiles,
+                              double accuracy,
+                              const char* msg) {
+    vector<double> inputs = dg(10'000 /* nUnique */, 1 /* dupes */, true /* keepDupesTogether*/);
+
+    const int delta = 100;
+    TDigest digest(k_limit, delta);
+    for (auto val : inputs) {
+        digest.incorporate(val);
+    }
+    digest.flushBuffer();
+    assertIsValid(digest, k, delta, msg);
+
+    ASSERT_EQ(inputs.size(), digest.n());
+    ASSERT_LTE(digest.centroids().size(), 2 * (k(1, delta) - k(0, delta)))
+        << "Upper bound on the number of centroids";
+
+    std::sort(inputs.begin(), inputs.end());
+    assertExpectedAccuracy(inputs, digest, percentiles, accuracy, msg);
+}
+
+TEST(TDigestTest, UniformDistribution_Mid) {
+    const vector<double> percentiles = {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9};
+    runTestWithDataGenerator(TDigest::k2_limit,
+                             TDigest::k2,
+                             generateUniform,
+                             percentiles,
+                             0.0050 /* accuracy */,
+                             "Uniform distribution mid");
+}
+TEST(TDigestTest, UniformDistribution_Extr) {
+    const vector<double> percentiles = {0.0001, 0.001, 0.01, 0.99, 0.999, 0.9999};
+    runTestWithDataGenerator(TDigest::k2_limit,
+                             TDigest::k2,
+                             generateUniform,
+                             percentiles,
+                             0.0010 /* accuracy */,
+                             "Uniform distribution extr");
+}
+
+TEST(TDigestTest, NormalDistribution_Mid) {
+    const vector<double> percentiles = {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9};
+    runTestWithDataGenerator(TDigest::k2_limit,
+                             TDigest::k2,
+                             generateNormal,
+                             percentiles,
+                             0.0050 /* accuracy */,
+                             "Normal distribution mid");
+}
+TEST(TDigestTest, NormalDistribution_Extr) {
+    const vector<double> percentiles = {0.0001, 0.001, 0.01, 0.99, 0.999, 0.9999};
+    runTestWithDataGenerator(TDigest::k2_limit,
+                             TDigest::k2,
+                             generateNormal,
+                             percentiles,
+                             0.0010 /* accuracy */,
+                             "Normal distribution extr");
+}
+
+TEST(TDigestTest, ExponentialDistribution_Mid) {
+    const vector<double> percentiles = {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9};
+    runTestWithDataGenerator(TDigest::k2_limit,
+                             TDigest::k2,
+                             generateExponential,
+                             percentiles,
+                             0.0050 /* accuracy */,
+                             "Exponential distribution mid");
+}
+TEST(TDigestTest, ExponentialDistribution_Extr) {
+    const vector<double> percentiles = {0.0001, 0.001, 0.01, 0.99, 0.999, 0.9999};
+    runTestWithDataGenerator(TDigest::k2_limit,
+                             TDigest::k2,
+                             generateExponential,
+                             percentiles,
+                             0.0010 /* accuracy */,
+                             "Exponential distribution extr");
+}
+
+/**
+ * For the median, k0 should yield as good accuracy as k2. Unfortunately, on any given dataset a
+ * particular digest might get (un)lucky so we cannot directly compare the accuracy of k0 vs k2. But
+ * we can check that the accuracy error is similar to the tests above that use k2.
+ */
+TEST(TDigestTest, Median_k0) {
+    runTestWithDataGenerator(TDigest::k0_limit,
+                             TDigest::k0,
+                             generateUniform,
+                             {0.5},
+                             0.0050 /* accuracy */,
+                             "Uniform distribution median with k0");
+    runTestWithDataGenerator(TDigest::k0_limit,
+                             TDigest::k0,
+                             generateNormal,
+                             {0.5},
+                             0.0050 /* accuracy */,
+                             "Normal distribution median with k0");
+    runTestWithDataGenerator(TDigest::k0_limit,
+                             TDigest::k0,
+                             generateExponential,
+                             {0.5},
+                             0.0050 /* accuracy */,
+                             "Exponential distribution median with k0");
+}
+
+/**
+ * Tests distributions with duplicated data.
+ */
+void runTestWithDuplicatesInData(DataGenerator dg,
+                                 size_t n,
+                                 size_t dupes,
+                                 bool keepDupesTogether,
+                                 const vector<double>& percentiles,
+                                 double accuracy,
+                                 const char* msg) {
+    const int delta = 100;
+    vector<double> inputs = dg(n, dupes, keepDupesTogether);
+
+    TDigest digest(TDigest::k2_limit, delta);
+    for (auto val : inputs) {
+        digest.incorporate(val);
+    }
+    digest.flushBuffer();
+    assertIsValid(digest, TDigest::k2, delta, msg);
+
+    ASSERT_EQ(inputs.size(), digest.n());
+    ASSERT_LTE(digest.centroids().size(), 2 * (TDigest::k2(1, delta) - TDigest::k2(0, delta)))
+        << "Upper bound on the number of centroids";
+
+    std::sort(inputs.begin(), inputs.end());
+    assertExpectedAccuracy(inputs, digest, percentiles, accuracy, msg);
+}
+TEST(TDigestTest, Duplicates_uniform_mid) {
+    const vector<double> percentiles = {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9};
+
+    runTestWithDuplicatesInData(generateUniform,
+                                1000 /* nUnique*/,
+                                10 /* dupes */,
+                                false /* keepDupesTogether*/,
+                                percentiles,
+                                0.0100 /* accuracy */,
+                                "Uniform distribution with shuffled dupes mid (1000x10)");
+    runTestWithDuplicatesInData(generateUniform,
+                                1000 /* nUnique*/,
+                                10 /* dupes */,
+                                true /* keepDupesTogether*/,
+                                percentiles,
+                                0.0100 /* accuracy */,
+                                "Uniform distribution with clustered dupes mid (1000x10)");
+
+    runTestWithDuplicatesInData(generateUniform,
+                                100 /* nUnique*/,
+                                100 /* dupes */,
+                                false /* keepDupesTogether*/,
+                                percentiles,
+                                0.0100 /* accuracy */,
+                                "Uniform distribution with shuffled dupes mid (100x100)");
+    runTestWithDuplicatesInData(generateUniform,
+                                1000 /* nUnique*/,
+                                10 /* dupes */,
+                                true /* keepDupesTogether*/,
+                                percentiles,
+                                0.0100 /* accuracy */,
+                                "Uniform distribution with clustered dupes mid (100x100)");
+}
+TEST(TDigestTest, Duplicates_uniform_extr) {
+    const vector<double> percentiles = {0.0001, 0.001, 0.01, 0.99, 0.999, 0.9999};
+
+    runTestWithDuplicatesInData(generateUniform,
+                                1000 /* nUnique*/,
+                                10 /* dupes */,
+                                false /* keepDupesTogether*/,
+                                percentiles,
+                                0.0050 /* accuracy */,
+                                "Uniform distribution with shuffled dupes extr (1000x10)");
+    runTestWithDuplicatesInData(generateUniform,
+                                1000 /* nUnique*/,
+                                10 /* dupes */,
+                                true /* keepDupesTogether*/,
+                                percentiles,
+                                0.0050 /* accuracy */,
+                                "Uniform distribution with clustered dupes extr (1000x10)");
+
+    runTestWithDuplicatesInData(generateUniform,
+                                100 /* nUnique*/,
+                                100 /* dupes */,
+                                false /* keepDupesTogether*/,
+                                percentiles,
+                                0.0050 /* accuracy */,
+                                "Uniform distribution with shuffled dupes extr (100x100)");
+    runTestWithDuplicatesInData(generateUniform,
+                                1000 /* nUnique*/,
+                                10 /* dupes */,
+                                true /* keepDupesTogether*/,
+                                percentiles,
+                                0.0050 /* accuracy */,
+                                "Uniform distribution with clustered dupes extr (100x100)");
+}
+TEST(TDigestTest, Duplicates_all) {
+    const int delta = 100;
+    const vector<double> inputs(10'000, 42);
+
+    TDigest digest(TDigest::k2_limit, delta);
+    for (auto val : inputs) {
+        digest.incorporate(val);
+    }
+    digest.flushBuffer();
+    assertIsValid(digest, TDigest::k2, delta, "All duplicates");
+    assertExpectedAccuracy(inputs,
+                           digest,
+                           {0.0001, 0.001, 0.01, 0.99, 0.999, 0.9999} /* percentiles */,
+                           0.0001 /* accuracy */,
+                           "All duplicates extr");
+    assertExpectedAccuracy(inputs,
+                           digest,
+                           {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9} /* percentiles */,
+                           0.0001 /* accuracy */,
+                           "All duplicates mid");
+}
+TEST(TDigestTest, Duplicates_two_clusters) {
+    const int delta = 100;
+    vector<double> sorted(10'000, 0);
+    for (size_t i = 0; i < 0.8 * sorted.size(); i++) {
+        sorted[i] = 17;
+    }
+    for (size_t i = 0.8 * sorted.size(); i < sorted.size(); i++) {
+        sorted[i] = 42;
+    }
+    vector<double> inputs = sorted;
+    auto seed = time(nullptr);
+    LOGV2(7429514, "{seed}", "Duplicates_two_clusters", "seed"_attr = seed);
+    std::shuffle(inputs.begin(), inputs.end(), std::mt19937(seed));
+
+    TDigest digest(TDigest::k2_limit, delta);
+    for (auto val : inputs) {
+        digest.incorporate(val);
+    }
+    digest.flushBuffer();
+    assertIsValid(digest, TDigest::k2, delta, "Duplicates_two_clusters");
+    assertExpectedAccuracy(sorted,
+                           digest,
+                           {0.0001, 0.001, 0.01, 0.99, 0.999, 0.9999} /* percentiles */,
+                           0.0001 /* accuracy */,
+                           "Duplicates two clusters extr");
+    assertExpectedAccuracy(sorted,
+                           digest,
+                           {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9} /* percentiles */,
+                           0.0010 /* accuracy */,
+                           "Duplicates two clusters mid");
+}
+TEST(TDigestTest, Frankenstein_distribution) {
+    vector<vector<double>> chunks = {
+        generateNormal(1000, 1, true),       // 1000
+        generateNormal(200, 5, true),        // 1000
+        generateNormal(100, 10, true),       // 1000
+        generateNormal(50, 20, true),        // 1000
+        generateNormal(25, 40, true),        // 1000
+        generateUniform(2000, 1, true),      // 3000
+        generateUniform(10, 100, true),      // 1000
+        generateUniform(5, 200, true),       // 1000
+        generateExponential(1000, 1, true),  // 1000
+    };
+    vector<double> inputs;
+    inputs.reserve(10'000);
+    for (const auto& chunk : chunks) {
+        inputs.insert(inputs.end(), chunk.begin(), chunk.end());
+    }
+    std::shuffle(inputs.begin(), inputs.end(), std::mt19937(2023 /*seed*/));
+
+    const int delta = 100;
+    TDigest digest(TDigest::k2_limit, delta);
+    for (auto val : inputs) {
+        digest.incorporate(val);
+    }
+    digest.flushBuffer();
+    assertIsValid(digest, TDigest::k2, delta, "Frankenstein distribution");
+
+    ASSERT_EQ(inputs.size(), digest.n());
+
+    // For k2 the upper bound on the number of centroids is 2*delta
+    ASSERT_LTE(digest.centroids().size(), 2 * delta) << "Upper bound on the number of centroids";
+
+    std::sort(inputs.begin(), inputs.end());
+    assertExpectedAccuracy(inputs,
+                           digest,
+                           {0.0001, 0.001, 0.01, 0.99, 0.999, 0.9999},
+                           0.0050,
+                           "Frankenstein distribution extr");
+    assertExpectedAccuracy(inputs,
+                           digest,
+                           {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9},
+                           0.0100,
+                           "Frankenstein distribution mid");
+}
+
+/**
+ * The tests below were used to assess accuracy of t-digest on datasets of size 1e6 and 1e7 over
+ * multiple iterations. We'd like to keep the tests alive to be able to repeat the experiments in
+ * the future if we decide to tune t-digest further. However, for running as part of unit tests the
+ * number of iterations and the dataset size have been set to lower values.
+ */
+vector<int> computeError(vector<double> sorted,
+                         TDigest& digest,
+                         const vector<double>& percentiles) {
+    vector<int> errors;
+    errors.reserve(percentiles.size());
+    for (double p : percentiles) {
+        const double computedPercentile = digest.computePercentile(p).value();
+        for (size_t i = 0; i < sorted.size(); ++i) {
+            if (computedPercentile <= sorted[i]) {
+                const double rank = p * sorted.size();
+                errors.push_back(std::abs(i - rank));
+                break;
+            }
+        }
+    }
+    return errors;
+}
+
+constexpr int nIterations = 1;
+constexpr int nUnique = 100'000;
+std::pair<vector<vector<int>> /*errors*/, vector<int> /*# centroids*/> generateAccuracyStats(
+    DataGenerator dg,
+    TDigest::ScalingFunction k_limit,
+    const vector<double>& deltas,
+    const vector<double>& percentiles) {
+    vector<vector<int>> errors(deltas.size(), vector<int>(percentiles.size(), 0));
+    vector<int> n_centroids(deltas.size(), 0);
+
+    for (int i = 0; i < nIterations; ++i) {
+        std::cout << "*** iteration " << i << std::endl;
+        vector<double> data = dg(nUnique, 1 /* dupes */, false /* keepDupesTogether */);
+        vector<double> sorted = data;
+        std::sort(sorted.begin(), sorted.end());
+
+        for (size_t di = 0; di < deltas.size(); di++) {
+            TDigest digest(k_limit, deltas[di]);
+            for (auto val : data) {
+                digest.incorporate(val);
+            }
+            digest.flushBuffer();
+            assertIsValid(digest, TDigest::k2, deltas[di], std::to_string(deltas[di]));
+
+            auto errors_single_iter = computeError(sorted, digest, percentiles);
+            for (size_t ei = 0; ei < errors_single_iter.size(); ei++) {
+                errors[di][ei] += errors_single_iter[ei];
+            }
+
+            // For one of the iterations let's assess the amount of overlap between the centroids.
+            // Two centroids overlap if the max of the left one is greater than the min of the right
+            // one. From the empirical review it seems unlikely for a centroid to overlap with more
+            // than 20 others, so we'll limit the loop to that.
+            const auto& cs = digest.centroids();
+            n_centroids[di] += cs.size();
+        }
+    }
+    return std::make_pair(errors, n_centroids);
+}
+
+void runAccuracyTest(DataGenerator dg) {
+    const vector<double> deltas = {
+        100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 2000, 3000, 4000, 5000, 6000, 7000};
+    const vector<double> percentiles = {
+        0.00001, 0.0001, 0.001, 0.01, 0.1, 0.5, 0.9, 0.99, 0.999, 0.9999, 0.99999};
+
+    const auto& [abs_errors, n_centroids] =
+        generateAccuracyStats(dg, TDigest::k2_limit, deltas, percentiles);
+
+    for (double p : percentiles)
+        std::cout << p << ",";
+    std::cout << "# centroids" << std::endl;
+    for (size_t di = 0; di < deltas.size(); di++) {
+        std::cout << deltas[di] << ",";
+        for (size_t ei = 0; ei < percentiles.size(); ei++) {
+            std::cout << abs_errors[di][ei] / static_cast<double>(nIterations) << ",";
+        }
+        std::cout << n_centroids[di] / static_cast<double>(nIterations) << std::endl;
+    }
+}
+
+TEST(TDigestTest, AccuracyStats_uniform) {
+    runAccuracyTest(generateUniform);
+}
+TEST(TDigestTest, AccuracyStats_normal) {
+    runAccuracyTest(generateNormal);
+}
+TEST(TDigestTest, AccuracyStats_exp) {
+    runAccuracyTest(generateExponential);
+}
+}  // namespace
+}  // namespace mongo
