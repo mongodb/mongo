@@ -141,11 +141,14 @@ Value ExpressionInternalJsEmit::evaluate(const Document& root, Variables* variab
     ExpressionContext* expCtx = getExpressionContext();
 
     auto jsExec = expCtx->getJsExecWithScope();
-    // Inject the native "emit" function to be called from the user-defined map function. This
-    // particular Expression/ExpressionContext may be reattached to a new OperationContext (and thus
-    // a new JS Scope) when used across getMore operations, so this method will handle that case for
-    // us by only injecting if we haven't already.
-    jsExec->injectEmitIfNecessary(emitFromJS, &_emitState);
+
+    // Inject the native "emit" function to be called from the user-defined map function.
+    //
+    // We reinject this function on every invocation of evaluate(), because there is a single
+    // JsExecution instance for the OperationContext, which may be shared by multiple aggregation
+    // pipelines and we need to ensure that the injected function still points to the valid
+    // contextual data ('_emitState').
+    jsExec->injectEmit(emitFromJS, &_emitState);
 
     // Although inefficient to "create" a new function every time we evaluate, this will usually end
     // up being a simple cache lookup. This is needed because the JS Scope may have been recreated
