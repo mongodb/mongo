@@ -68,10 +68,25 @@ if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
 
     assert.commandWorked(testColl2.insert({x: 1, _id: 1}));
     assert.commandWorked(testColl2.insert({x: -1, _id: 0}));
-    let updateRes = assert.commandWorked(testColl2.update({}, {$set: {x: 2}}, {multi: false}));
-    assert.eq(1, updateRes.nMatched);
-    assert.eq(1, updateRes.nModified);
-    assert.eq(testColl2.find({x: 2}).itcount(), 1);
+
+    // TODO: SERVER-67429 Remove this try/catch since we can run in all configurations.
+    // If we have a WouldChangeOwningShard update and we aren't running as a retryable
+    // write or in a transaction, then this is an acceptable error.
+    let updateRes;
+    try {
+        updateRes = testColl2.update({}, {$set: {x: 2}}, {multi: false});
+        assert.commandWorked(updateRes);
+        assert.eq(1, updateRes.nMatched);
+        assert.eq(1, updateRes.nModified);
+        assert.eq(testColl2.find({x: 2}).itcount(), 1);
+    } catch (e) {
+        // If a WouldChangeOwningShard update is performed not as a retryable write or in a
+        // transaction, expect an error.
+        assert.eq(updateRes.getWriteError().code, ErrorCodes.IllegalOperation);
+        assert.eq(
+            updateRes.getWriteError().errmsg,
+            "Must run update to document shard key in a transaction or as a retryable write.");
+    }
 
     // Shouldn't increment the metrics for unsharded collection.
     assert.commandWorked(unshardedColl.update({_id: "missing"}, {$set: {a: 1}}, {multi: false}));

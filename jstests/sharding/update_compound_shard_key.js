@@ -180,10 +180,25 @@ if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
 
     assert.commandWorked(testColl.insert({x: 1, _id: 1}));
     assert.commandWorked(testColl.insert({x: -1, _id: 0}));
-    let updateRes = assert.commandWorked(testColl.update({}, {x: 110, y: 55, z: 3, a: 110}, false));
-    assert.eq(1, updateRes.nMatched);
-    assert.eq(1, updateRes.nModified);
-    assert.eq(testColl.find({x: 110, y: 55, z: 3, a: 110}).itcount(), 1);
+
+    // TODO: SERVER-67429 Remove this try/catch since we can run in all configurations.
+    // If we have a WouldChangeOwningShard update and we aren't running as a retryable
+    // write or in a transaction, then this is an acceptable error.
+    let updateRes;
+    try {
+        updateRes = testColl.update({}, {x: 110, y: 55, z: 3, a: 110}, false);
+        assert.commandWorked(updateRes);
+        assert.eq(1, updateRes.nMatched);
+        assert.eq(1, updateRes.nModified);
+        assert.eq(testColl.find({x: 110, y: 55, z: 3, a: 110}).itcount(), 1);
+    } catch (err) {
+        // If a WouldChangeOwningShard update is performed not as a retryable write or in a
+        // transaction, expect an error.
+        assert.eq(updateRes.getWriteError().code, ErrorCodes.IllegalOperation);
+        assert.eq(
+            updateRes.getWriteError().errmsg,
+            "Must run update to document shard key in a transaction or as a retryable write.");
+    }
 
 } else {
     // When query matches a doc and fails to update because shard key needs to be updated.
