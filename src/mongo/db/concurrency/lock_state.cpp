@@ -822,9 +822,17 @@ void LockerImpl::restoreLockState(OperationContext* opCtx, const Locker::LockSna
     }
 
     std::vector<OneLock>::const_iterator it = state.locks.begin();
-    // If we locked the PBWM, it must be locked before the resourceIdGlobal and
-    // resourceIdReplicationStateTransitionLock resources.
+    // If we locked the PBWM, it must be locked before the
+    // resourceIdFeatureCompatibilityVersion, resourceIdReplicationStateTransitionLock, and
+    // resourceIdGlobal resources.
     if (it != state.locks.end() && it->resourceId == resourceIdParallelBatchWriterMode) {
+        lock(opCtx, it->resourceId, it->mode);
+        it++;
+    }
+
+    // If we locked the FCV lock, it must be locked before the
+    // resourceIdReplicationStateTransitionLock and resourceIdGlobal resources.
+    if (it != state.locks.end() && it->resourceId == resourceIdFeatureCompatibilityVersion) {
         lock(opCtx, it->resourceId, it->mode);
         it++;
     }
@@ -837,6 +845,8 @@ void LockerImpl::restoreLockState(OperationContext* opCtx, const Locker::LockSna
 
     lockGlobal(opCtx, state.globalMode);
     for (; it != state.locks.end(); it++) {
+        // Ensures we don't acquire locks out of order which can lead to deadlock.
+        invariant(it->resourceId.getType() != ResourceType::RESOURCE_GLOBAL);
         lock(opCtx, it->resourceId, it->mode);
     }
     invariant(_modeForTicket != MODE_NONE);
