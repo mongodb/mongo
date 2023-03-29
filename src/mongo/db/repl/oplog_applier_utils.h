@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/repl/insert_group.h"
+#include "mongo/stdx/unordered_map.h"
 
 namespace mongo {
 class CollatorInterface;
@@ -50,10 +51,10 @@ public:
     };
 
     CollectionProperties getCollectionProperties(OperationContext* opCtx,
-                                                 const StringMapHashedKey& ns);
+                                                 const NamespaceString& nss);
 
 private:
-    StringMap<CollectionProperties> _cache;
+    stdx::unordered_map<NamespaceString, CollectionProperties> _cache;
 };
 
 /**

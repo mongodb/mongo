@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include <absl/hash/hash.h>
 
 #include "mongo/db/catalog_raii.h"
 #include "mongo/platform/basic.h"
@@ -57,20 +58,19 @@ namespace mongo {
 namespace repl {
 CachedCollectionProperties::CollectionProperties
 CachedCollectionProperties::getCollectionProperties(OperationContext* opCtx,
-                                                    const StringMapHashedKey& ns) {
-    auto it = _cache.find(ns);
+                                                    const NamespaceString& nss) {
+    auto it = _cache.find(nss);
     if (it != _cache.end()) {
         return it->second;
     }
 
     CollectionProperties collProperties;
-    if (auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
-            opCtx, NamespaceString(ns.key()))) {
+    if (auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss)) {
         collProperties.isCapped = collection->isCapped();
         collProperties.isClustered = collection->isClustered();
         collProperties.collator = collection->getDefaultCollator();
     }
-    _cache[ns] = collProperties;
+    _cache[nss] = collProperties;
     return collProperties;
 }
 
@@ -126,11 +126,11 @@ uint32_t getWriterId(OperationContext* opCtx,
     // Reduce the hash from 64bit down to 32bit, just to allow combinations with murmur3 later
     // on. Bit depth not important, we end up just doing integer modulo with this in the end.
     // The hash function should provide entropy in the lower bits as it's used in hash tables.
-    auto hashedNs = StringMapHasher().hashed_key(nss.ns());
-    auto hash = static_cast<uint32_t>(hashedNs.hash());
+    auto hashedNs = absl::Hash<NamespaceString>{}(nss);
+    auto hash = static_cast<uint32_t>(hashedNs);
 
     if (op->isCrudOpType()) {
-        auto collProperties = collPropertiesCache->getCollectionProperties(opCtx, hashedNs);
+        auto collProperties = collPropertiesCache->getCollectionProperties(opCtx, nss);
         processCrudOp(opCtx, op, &hash, collProperties);
     }
 
