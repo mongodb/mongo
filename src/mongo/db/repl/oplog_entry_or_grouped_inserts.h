@@ -37,25 +37,41 @@ namespace mongo {
 namespace repl {
 
 enum class ApplicationInstruction {
+    // Apply a normal oplog entry.
     applyOplogEntry,
-    applySplitPrepareOp,
-    applySplitCommitOrAbortOp,
+    // Apply a prepared txn that is split from a top-level txn.
+    applySplitPreparedTxnOp,
+    // Apply a top-level prepared txn that can have multiple splits.
+    applyTopLevelPreparedTxnOp,
 };
 
 struct ApplierOperation {
     const OplogEntry* op;
     ApplicationInstruction instruction;
     boost::optional<const InternalSessionPool::Session&> subSession;
-    boost::optional<std::vector<const OplogEntry*>> splitPrepareOps;
+    boost::optional<std::vector<const OplogEntry*>> preparedTxnOps;
 
     ApplierOperation(const OplogEntry* op,
                      ApplicationInstruction instruction = ApplicationInstruction::applyOplogEntry,
                      boost::optional<const InternalSessionPool::Session&> subSession = boost::none,
-                     boost::optional<std::vector<const OplogEntry*>> splitPrepareOps = boost::none)
+                     boost::optional<std::vector<const OplogEntry*>> preparedTxnOps = boost::none)
         : op(op),
           instruction(instruction),
           subSession(subSession),
-          splitPrepareOps(splitPrepareOps) {}
+          preparedTxnOps(preparedTxnOps) {}
+
+    ApplierOperation(const OplogEntry* op,
+                     ApplicationInstruction instruction,
+                     const std::vector<OplogEntry>& preparedTxnOps)
+        : op(op), instruction(instruction) {
+
+        this->preparedTxnOps.emplace();
+        this->preparedTxnOps->reserve(preparedTxnOps.size());
+        std::transform(preparedTxnOps.begin(),
+                       preparedTxnOps.end(),
+                       std::back_inserter(*this->preparedTxnOps),
+                       [](const auto& op) -> const OplogEntry* { return &op; });
+    }
 
     const OplogEntry* operator->() const {
         return op;

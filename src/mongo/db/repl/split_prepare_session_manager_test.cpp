@@ -108,6 +108,29 @@ TEST_F(SplitPrepareSessionManagerTest, SplitSessionsBasic) {
     ASSERT_EQ(false, _splitSessManager->isSessionSplit(topLevelSessId2, txnNumber2));
 }
 
+TEST_F(SplitPrepareSessionManagerTest, SplitSessionsAndReleaseAll) {
+    const auto& topLevelSessId1 = makeSystemLogicalSessionId();
+    const auto& topLevelSessId2 = makeSystemLogicalSessionId();
+    const TxnNumber txnNumber1(100), txnNumber2(200);
+    const std::vector<uint32_t> requesterIds1{1, 3, 5};
+    const std::vector<uint32_t> requesterIds2{2, 4, 6};
+
+    const auto& sessInfos1 =
+        _splitSessManager->splitSession(topLevelSessId1, txnNumber1, requesterIds1);
+    const auto& sessInfos2 =
+        _splitSessManager->splitSession(topLevelSessId2, txnNumber2, requesterIds2);
+    ASSERT_EQ(requesterIds1.size(), sessInfos1.size());
+    ASSERT_EQ(requesterIds2.size(), sessInfos2.size());
+
+    ASSERT_EQ(true, _splitSessManager->isSessionSplit(topLevelSessId1, txnNumber1));
+    ASSERT_EQ(true, _splitSessManager->isSessionSplit(topLevelSessId2, txnNumber2));
+
+    _splitSessManager->releaseAllSplitSessions();
+
+    ASSERT_EQ(false, _splitSessManager->isSessionSplit(topLevelSessId1, txnNumber1));
+    ASSERT_EQ(false, _splitSessManager->isSessionSplit(topLevelSessId2, txnNumber2));
+}
+
 DEATH_TEST_F(SplitPrepareSessionManagerTest, SplitAlreadySplitSessions, "invariant") {
     const auto& topLevelSessId = makeSystemLogicalSessionId();
     const TxnNumber txnNumber(100);

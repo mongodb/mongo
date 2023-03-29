@@ -79,6 +79,36 @@ std::vector<OplogEntry> _copyOps(const std::vector<const OplogEntry*>& ops) {
     return res;
 }
 
+// Returns all the committed statement IDs from the transaction operations if the transaction is
+// a retryable internal transcation.
+template <typename Operation>
+boost::optional<std::vector<StmtId>> _getCommittedStmtIds(const LogicalSessionId& lsid,
+                                                          const std::vector<Operation>& txnOps) {
+    // The template type 'Operation' is expected to be either 'OplogEntry'
+    // or 'OplogEntry*', so these functions are used to convert it to the
+    // latter regardless of which one is the instantiated
+    struct OpConverter {
+        static const OplogEntry* asPtr(const OplogEntry& op) {
+            return &op;
+        }
+        static const OplogEntry* asPtr(const OplogEntry* op) {
+            return op;
+        }
+    };
+
+    // Only retryable internal transactions need to deal with statement IDs.
+    if (isInternalSessionForRetryableWrite(lsid)) {
+        std::vector<StmtId> committedStmtIds;
+        for (const auto& op : txnOps) {
+            const auto& stmtIds = OpConverter::asPtr(op)->getStatementIds();
+            committedStmtIds.insert(committedStmtIds.end(), stmtIds.begin(), stmtIds.end());
+        }
+        return committedStmtIds;
+    }
+
+    return boost::none;
+}
+
 // Apply the oplog entries for a prepare or a prepared commit during recovery/initial sync.
 Status _applyOperationsForTransaction(OperationContext* opCtx,
                                       const std::vector<OplogEntry>& txnOps,
@@ -298,19 +328,26 @@ Status applyCommitTransaction(OperationContext* opCtx,
             uasserted(50987, "commitTransaction is only used internally by secondaries.");
         }
         case repl::OplogApplication::Mode::kSecondary: {
-            // Checkout the session and apply non-split commit op.
-            if (op.instruction == repl::ApplicationInstruction::applyOplogEntry) {
-                return _applyCommitTransaction(
-                    opCtx, *op, *op->getSessionId(), *op->getTxnNumber(), commitTimestamp);
+            switch (op.instruction) {
+                case repl::ApplicationInstruction::applyOplogEntry:
+                case repl::ApplicationInstruction::applyTopLevelPreparedTxnOp: {
+                    // Checkout the session and apply non-split or top-level commit op.
+                    invariant(!op.subSession);
+                    invariant(!op.preparedTxnOps);
+                    return _applyCommitTransaction(
+                        opCtx, *op, *op->getSessionId(), *op->getTxnNumber(), commitTimestamp);
+                }
+                case repl::ApplicationInstruction::applySplitPreparedTxnOp: {
+                    // Checkout the session and apply split commit op.
+                    invariant(op.subSession);
+                    invariant(!op.preparedTxnOps);
+                    return _applyCommitTransaction(opCtx,
+                                                   *op,
+                                                   (*op.subSession).getSessionId(),
+                                                   (*op.subSession).getTxnNumber(),
+                                                   commitTimestamp);
+                }
             }
-            // Checkout the session and apply split commit op.
-            invariant(op.instruction == repl::ApplicationInstruction::applySplitCommitOrAbortOp);
-            invariant(op.subSession);
-            return _applyCommitTransaction(opCtx,
-                                           *op,
-                                           (*op.subSession).getSessionId(),
-                                           (*op.subSession).getTxnNumber(),
-                                           commitTimestamp);
         }
     }
     MONGO_UNREACHABLE;
@@ -336,15 +373,25 @@ Status applyAbortTransaction(OperationContext* opCtx,
             uasserted(50972, "abortTransaction is only used internally by secondaries.");
         }
         case repl::OplogApplication::Mode::kSecondary: {
-            // Checkout the session and apply non-split abort op.
-            if (op.instruction == repl::ApplicationInstruction::applyOplogEntry) {
-                return _applyAbortTransaction(opCtx, *op, *op->getSessionId(), *op->getTxnNumber());
+            switch (op.instruction) {
+                case repl::ApplicationInstruction::applyOplogEntry:
+                case repl::ApplicationInstruction::applyTopLevelPreparedTxnOp: {
+                    // Checkout the session and apply non-split or top-level abort op.
+                    invariant(!op.subSession);
+                    invariant(!op.preparedTxnOps);
+                    return _applyAbortTransaction(
+                        opCtx, *op, *op->getSessionId(), *op->getTxnNumber());
+                }
+                case repl::ApplicationInstruction::applySplitPreparedTxnOp: {
+                    // Checkout the session and apply split abort op.
+                    invariant(op.subSession);
+                    invariant(!op.preparedTxnOps);
+                    return _applyAbortTransaction(opCtx,
+                                                  *op,
+                                                  (*op.subSession).getSessionId(),
+                                                  (*op.subSession).getTxnNumber());
+                }
             }
-            // Checkout the session and apply split abort op.
-            invariant(op.instruction == repl::ApplicationInstruction::applySplitCommitOrAbortOp);
-            invariant(op.subSession);
-            return _applyAbortTransaction(
-                opCtx, *op, (*op.subSession).getSessionId(), (*op.subSession).getTxnNumber());
         }
     }
     MONGO_UNREACHABLE;
@@ -367,16 +414,17 @@ std::pair<std::vector<OplogEntry>, bool> _readTransactionOperationsFromOplogChai
     // ops are in order of increasing timestamp.
     const auto oldestEntryInBatch = cachedOps.empty() ? lastEntryInTxn : *cachedOps.front();
 
-    // The lastEntryWrittenToOplogOpTime is the OpTime of the latest entry for this transaction
-    // which is expected to be present in the oplog.  It is the entry before the first cachedOp,
-    // unless there are no cachedOps in which case it is the entry before the commit or prepare.
+    // The lastEntryWrittenToOplogOpTime is the OpTime of the latest entry for this
+    // transaction which is expected to be present in the oplog.  It is the entry
+    // before the first cachedOp, unless there are no cachedOps in which case it is
+    // the entry before the commit or prepare.
     const auto lastEntryWrittenToOplogOpTime = oldestEntryInBatch.getPrevWriteOpTimeInTransaction();
     invariant(lastEntryWrittenToOplogOpTime < lastEntryInTxn.getOpTime());
 
     TransactionHistoryIterator iter(lastEntryWrittenToOplogOpTime.value());
 
-    // If we started with a prepared commit, we want to forget about that operation and move onto
-    // the prepare.
+    // If we started with a prepared commit, we want to forget about that operation
+    // and move onto the prepare.
     auto prepareOrUnpreparedCommit = lastEntryInTxn;
     if (lastEntryInTxn.isPreparedCommit()) {
         // A prepared-commit must be in its own batch and thus have no cached ops.
@@ -386,30 +434,31 @@ std::pair<std::vector<OplogEntry>, bool> _readTransactionOperationsFromOplogChai
     }
     invariant(prepareOrUnpreparedCommit.getCommandType() == OplogEntry::CommandType::kApplyOps);
 
-    // The non-DurableReplOperation fields of the extracted transaction operations will match those
-    // of the lastEntryInTxn. For a prepared commit, this will include the commit oplog entry's
-    // 'ts' field, which is what we want.
+    // The non-DurableReplOperation fields of the extracted transaction operations
+    // will match those of the lastEntryInTxn. For a prepared commit, this will
+    // include the commit oplog entry's 'ts' field, which is what we want.
     auto lastEntryInTxnObj = lastEntryInTxn.getEntry().toBSON();
 
-    // First retrieve and transform the ops from the oplog, which will be retrieved in reverse
-    // order.
+    // First retrieve and transform the ops from the oplog, which will be retrieved
+    // in reverse order.
     while (iter.hasNext()) {
         const auto& operationEntry = iter.nextFatalOnErrors(opCtx);
         invariant(operationEntry.isPartialTransaction());
         auto prevOpsEnd = ops.size();
         repl::ApplyOps::extractOperationsTo(operationEntry, lastEntryInTxnObj, &ops);
 
-        // Because BSONArrays do not have fast way of determining size without iterating through
-        // them, and we also have no way of knowing how many oplog entries are in a transaction
-        // without iterating, reversing each applyOps and then reversing the whole array is
-        // about as good as we can do to get the entire thing in chronological order.  Fortunately
-        // STL arrays of BSON objects should be fast to reverse (just pointer copies).
+        // Because BSONArrays do not have fast way of determining size without
+        // iterating through them, and we also have no way of knowing how many oplog
+        // entries are in a transaction without iterating, reversing each applyOps
+        // and then reversing the whole array is about as good as we can do to get
+        // the entire thing in chronological order.  Fortunately STL arrays of BSON
+        // objects should be fast to reverse (just pointer copies).
         std::reverse(ops.begin() + prevOpsEnd, ops.end());
     }
     std::reverse(ops.begin(), ops.end());
 
-    // Next retrieve and transform the ops from the current batch, which are in increasing timestamp
-    // order.
+    // Next retrieve and transform the ops from the current batch, which are in
+    // increasing timestamp order.
     for (auto* cachedOp : cachedOps) {
         const auto& operationEntry = *cachedOp;
         invariant(operationEntry.isPartialTransaction());
@@ -419,8 +468,8 @@ std::pair<std::vector<OplogEntry>, bool> _readTransactionOperationsFromOplogChai
     // Reconstruct the operations from the prepare or unprepared commit oplog entry.
     repl::ApplyOps::extractOperationsTo(prepareOrUnpreparedCommit, lastEntryInTxnObj, &ops);
 
-    // It is safe to assume that any commands inside `ops` are real commands to be applied, as
-    // opposed to auxiliary commands such as "commit" and "abort".
+    // It is safe to assume that any commands inside `ops` are real commands to be
+    // applied, as opposed to auxiliary commands such as "commit" and "abort".
     if (checkForCommands) {
         for (auto&& op : ops) {
             if (op.isCommand()) {
@@ -451,29 +500,35 @@ std::pair<std::vector<OplogEntry>, bool> readTransactionOperationsFromOplogChain
 
 namespace {
 /**
- * This is the part of applyPrepareTransaction which is common to steady state, initial sync and
- * recovery oplog application.
+ * This is the part of applyPrepareTransaction which is common to steady state, initial
+ * sync and recovery oplog application.
+ *
+ * Note: when this is called to apply a split prepared transaction, the txnOps here represents
+ * a subset of all the ops in the transaction, but when being called by a top-level prepared
+ * transaction, it's just an empty array. Future changes that depend on transaction operations
+ * should be careful about the differences.
  */
 Status _applyPrepareTransaction(OperationContext* opCtx,
                                 const OplogEntry& prepareOp,
                                 const LogicalSessionId& lsid,
                                 TxnNumber txnNumber,
                                 const std::vector<OplogEntry>& txnOps,
-                                repl::OplogApplication::Mode mode) {
+                                repl::OplogApplication::Mode mode,
+                                boost::optional<std::vector<StmtId>> stmtIds = boost::none) {
 
-    // Block application of prepare oplog entries on secondaries when a concurrent background index
-    // build is running.
-    // This will prevent hybrid index builds from corrupting an index on secondary nodes if a
-    // prepared transaction becomes prepared during a build but commits after the index build
-    // commits.
-    // When two-phase index builds are in use, this is both unnecessary and unsafe. Due to locking,
-    // we can guarantee that a transaction prepared on a primary during an index build will always
-    // commit before that index build completes. Because two-phase index builds replicate start and
-    // commit oplog entries, it will never be possible to replicate a prepared transaction, commit
-    // an index build, then commit the transaction, the bug described above.
-    // This blocking behavior can also introduce a deadlock with two-phase index builds on
-    // a secondary if a prepared transaction blocks on an index build, but the index build can't
-    // re-acquire its X lock because of the transaction.
+    // Block application of prepare oplog entries on secondaries when a concurrent
+    // background index build is running. This will prevent hybrid index builds from
+    // corrupting an index on secondary nodes if a prepared transaction becomes prepared
+    // during a build but commits after the index build commits. When two-phase index
+    // builds are in use, this is both unnecessary and unsafe. Due to locking, we can
+    // guarantee that a transaction prepared on a primary during an index build will
+    // always commit before that index build completes. Because two-phase index builds
+    // replicate start and commit oplog entries, it will never be possible to replicate
+    // a prepared transaction, commit an index build, then commit the transaction, the
+    // bug described above. This blocking behavior can also introduce a deadlock with
+    // two-phase index builds on a secondary if a prepared transaction blocks on an
+    // index build, but the index build can't re-acquire its X lock because of the
+    // transaction.
     for (const auto& op : txnOps) {
         if (op.getOpType() == repl::OpTypeEnum::kNoop) {
             continue;
@@ -501,28 +556,31 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
         }
         opCtx->setInMultiDocumentTransaction();
     }
-    // This opCtx can be used to apply later operations in the batch, clean up before reusing.
+    // This opCtx can be used to apply later operations in the batch, clean up before
+    // reusing.
     ON_BLOCK_EXIT([opCtx]() {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         opCtx->resetMultiDocumentTransactionState();
     });
 
     return writeConflictRetry(opCtx, "applying prepare transaction", prepareOp.getNss().ns(), [&] {
-        // The write on transaction table may be applied concurrently, so refreshing state
-        // from disk may read that write, causing starting a new transaction on an existing
-        // txnNumber. Thus, we start a new transaction without refreshing state from disk.
+        // The write on transaction table may be applied concurrently, so refreshing
+        // state from disk may read that write, causing starting a new transaction
+        // on an existing txnNumber. Thus, we start a new transaction without
+        // refreshing state from disk.
         hangBeforeSessionCheckOutForApplyPrepare.pauseWhileSet();
         auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
         auto sessionCheckout = mongoDSessionCatalog->checkOutSessionWithoutRefresh(opCtx);
         auto txnParticipant = TransactionParticipant::get(opCtx);
 
-        // We reset the recovery unit on retries, so make sure that we set the necessary states.
+        // We reset the recovery unit on retries, so make sure that we set the
+        // necessary states.
 
-        // When querying indexes, we return the record matching the key if it exists, or an
-        // adjacent document. This means that it is possible for us to hit a prepare conflict
-        // if we query for an incomplete key and an adjacent key is prepared.
-        // We ignore prepare conflicts on recovering nodes because they may encounter prepare
-        // conflicts that did not occur on the primary.
+        // When querying indexes, we return the record matching the key if it exists,
+        // or an adjacent document. This means that it is possible for us to hit a
+        // prepare conflict if we query for an incomplete key and an adjacent key is
+        // prepared. We ignore prepare conflicts on recovering nodes because they may
+        // may encounter prepare conflicts that did not occur on the primary.
         opCtx->recoveryUnit()->setPrepareConflictBehavior(
             PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
         // We might replay a prepared transaction behind oldest timestamp.
@@ -531,10 +589,11 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
             opCtx->recoveryUnit()->setRoundUpPreparedTimestamps(true);
         }
 
-        // Release the WUOW, transaction lock resources and abort storage transaction so that the
-        // writeConflictRetry loop will be able to retry applying transactional ops on WCE error.
+        // Release WUOW, transaction lock resources and abort storage transaction
+        // so that the writeConflictRetry loop will be able to retry applying the
+        // transactional ops on WCE error.
         ScopeGuard abortOnError([&txnParticipant, opCtx] {
-            // Abort the transaction and invalidate the session it is associated with.
+            // Abort transaction and invalidate the session it is associated with.
             txnParticipant.abortTransaction(opCtx);
             txnParticipant.invalidate(opCtx);
         });
@@ -542,8 +601,8 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
         // Starts the WUOW.
         txnParticipant.unstashTransactionResources(opCtx, "prepareTransaction");
 
-        // Set this in case the application of any ops need to use the prepare timestamp of this
-        // transaction. It should be cleared automatically when the transaction finishes.
+        // Set this in case the application of any ops needs to use the prepare timestamp
+        // of this transaction. It should be cleared automatically when the txn finishes.
         if (repl::OplogApplication::inRecovering(mode) ||
             mode == repl::OplogApplication::Mode::kInitialSync) {
             txnParticipant.setPrepareOpTimeForRecovery(opCtx, prepareOp.getOpTime());
@@ -551,13 +610,12 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
 
         auto status = _applyOperationsForTransaction(opCtx, txnOps, mode);
 
-        if (opCtx->isRetryableWrite()) {
-            for (const auto& op : txnOps) {
-                if (!op.getStatementIds().empty()) {
-                    txnParticipant.addCommittedStmtIds(
-                        opCtx, op.getStatementIds(), prepareOp.getOpTime());
-                }
-            }
+        // Add committed statement IDs if this is a retryable internal transaction.
+        // They are used when this node becomes primary to avoid re-executing
+        // committed txn statements.
+        const auto& committedStmtIds = stmtIds ? stmtIds : _getCommittedStmtIds(lsid, txnOps);
+        if (committedStmtIds) {
+            txnParticipant.addCommittedStmtIds(opCtx, *committedStmtIds, prepareOp.getOpTime());
         }
 
         if (MONGO_unlikely(applyPrepareTxnOpsFailsWithWriteConflict.shouldFail())) {
@@ -581,7 +639,6 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
 
         auto opObserver = opCtx->getServiceContext()->getOpObserver();
         invariant(opObserver);
-        // TODO (SERVER-73119): Investigate if this should only be called in top-level txn.
         opObserver->onTransactionPrepareNonPrimary(opCtx, txnOps, prepareOp.getOpTime());
 
         // Prepare transaction success.
@@ -603,9 +660,9 @@ void _reconstructPreparedTransaction(OperationContext* opCtx,
     // Snapshot transaction can never conflict with the PBWM lock.
     opCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
 
-    // The operations here are reconstructed at their prepare time. However, that time will
-    // be ignored because there is an outer write unit of work during their application.
-    // The prepare time of the transaction is set explicitly below.
+    // The operations here are reconstructed at their prepare time. However, that time
+    // will be ignored because there is an outer write unit of work during their
+    // application. The prepare time of the transaction is set explicitly below.
     auto ops = readTransactionOperationsFromOplogChain(opCtx, prepareOp, {});
 
     // Checks out the session, applies the operations and prepares the transaction.
@@ -615,10 +672,11 @@ void _reconstructPreparedTransaction(OperationContext* opCtx,
 }  // namespace
 
 /**
- * Make sure that if we are in replication recovery, we don't apply the prepare transaction oplog
- * entry until we either see a commit transaction oplog entry or are at the very end of recovery.
- * Otherwise, only apply the prepare transaction oplog entry if we are a secondary. We shouldn't get
- * here for initial sync and applyOps should error.
+ * Make sure that if we are in replication recovery, we don't apply the prepare
+ * transaction oplog entry until we either see a commit transaction oplog entry or are
+ * at the very end of recovery. Otherwise, only apply the prepare transaction oplog
+ * entry if we are a secondary. We shouldn't get here for initial sync and applyOps
+ * should error.
  */
 Status applyPrepareTransaction(OperationContext* opCtx,
                                const ApplierOperation& op,
@@ -627,21 +685,23 @@ Status applyPrepareTransaction(OperationContext* opCtx,
         case repl::OplogApplication::Mode::kUnstableRecovering:
         case repl::OplogApplication::Mode::kStableRecovering: {
             if (!serverGlobalParams.enableMajorityReadConcern) {
-                LOGV2_ERROR(
-                    21850,
-                    "Cannot replay a prepared transaction when 'enableMajorityReadConcern' is "
-                    "set to false. Restart the server with --enableMajorityReadConcern=true "
-                    "to complete recovery");
+                LOGV2_ERROR(21850,
+                            "Cannot replay a prepared transaction when "
+                            "'enableMajorityReadConcern' is "
+                            "set to false. Restart the server with "
+                            "--enableMajorityReadConcern=true "
+                            "to complete recovery");
                 fassertFailed(51146);
             }
 
-            // Don't apply the operations from the prepared transaction until either we see a commit
-            // transaction oplog entry during recovery or are at the end of recovery.
+            // Don't apply the operations from the prepared transaction until either we
+            // see a commit transaction oplog entry during recovery or are at the end of
+            // recovery.
             return Status::OK();
         }
         case repl::OplogApplication::Mode::kInitialSync: {
-            // Initial sync should never apply 'prepareTransaction' since it unpacks committed
-            // transactions onto various applier threads at commit time.
+            // Initial sync should never apply 'prepareTransaction' since it unpacks
+            // committed transactions onto various applier threads at commit time.
             MONGO_UNREACHABLE;
         }
         case repl::OplogApplication::Mode::kApplyOpsCmd: {
@@ -650,23 +710,47 @@ Status applyPrepareTransaction(OperationContext* opCtx,
                       "prepare applyOps oplog entry is only used internally by secondaries.");
         }
         case repl::OplogApplication::Mode::kSecondary: {
-            // Checkout the session and apply non-split prepare op.
-            // TODO (SERVER-70578): This can no longer happen once the feature flag is removed.
-            if (op.instruction == repl::ApplicationInstruction::applyOplogEntry) {
-                auto ops = readTransactionOperationsFromOplogChain(opCtx, *op, {});
-                return _applyPrepareTransaction(
-                    opCtx, *op, *op->getSessionId(), *op->getTxnNumber(), ops, mode);
+            switch (op.instruction) {
+                case repl::ApplicationInstruction::applyOplogEntry: {
+                    // Checkout the session and apply non-split prepare op.
+                    // TODO (SERVER-70578): This can no longer happen once the feature flag
+                    // is removed.
+                    invariant(!op.subSession);
+                    invariant(!op.preparedTxnOps);
+                    auto ops = readTransactionOperationsFromOplogChain(opCtx, *op, {});
+                    return _applyPrepareTransaction(
+                        opCtx, *op, *op->getSessionId(), *op->getTxnNumber(), ops, mode);
+                }
+                case repl::ApplicationInstruction::applySplitPreparedTxnOp: {
+                    // Checkout the session and apply split prepare op.
+                    invariant(op.subSession);
+                    invariant(op.preparedTxnOps);
+                    return _applyPrepareTransaction(opCtx,
+                                                    *op,
+                                                    (*op.subSession).getSessionId(),
+                                                    (*op.subSession).getTxnNumber(),
+                                                    _copyOps(*op.preparedTxnOps),
+                                                    repl::OplogApplication::Mode::kSecondary);
+                }
+                case repl::ApplicationInstruction::applyTopLevelPreparedTxnOp: {
+                    // Checkout the session and apply top-level prepare op.
+                    invariant(!op.subSession);
+                    invariant(op.preparedTxnOps);
+                    const auto& txnOps = *op.preparedTxnOps;
+                    // For a top-level transaction, the actual transaction operations should've
+                    // already been applied by its split transactions. So here we just pass it
+                    // an empty array of transaction operations. However if this is a retryable
+                    // internal transaction, we need to pass the committed statement IDs.
+                    auto stmtIds = _getCommittedStmtIds(*op->getSessionId(), txnOps);
+                    return _applyPrepareTransaction(opCtx,
+                                                    *op,
+                                                    *op->getSessionId(),
+                                                    *op->getTxnNumber(),
+                                                    {},
+                                                    mode,
+                                                    std::move(stmtIds));
+                }
             }
-            // Checkout the session and apply split prepare op.
-            invariant(op.instruction == repl::ApplicationInstruction::applySplitPrepareOp);
-            invariant(op.subSession);
-            invariant(op.splitPrepareOps);
-            return _applyPrepareTransaction(opCtx,
-                                            *op,
-                                            (*op.subSession).getSessionId(),
-                                            (*op.subSession).getTxnNumber(),
-                                            _copyOps(*op.splitPrepareOps),
-                                            repl::OplogApplication::Mode::kSecondary);
         }
     }
     MONGO_UNREACHABLE;
@@ -688,7 +772,8 @@ void reconstructPreparedTransactions(OperationContext* opCtx, repl::OplogApplica
                                << "prepared"));
     const auto cursor = client.find(std::move(findRequest));
 
-    // Iterate over each entry in the transactions table that has a prepared transaction.
+    // Iterate over each entry in the transactions table that has a prepared
+    // transaction.
     while (cursor->more()) {
         const auto txnRecordObj = cursor->next();
         const auto txnRecord = SessionTxnRecord::parse(
@@ -696,7 +781,8 @@ void reconstructPreparedTransactions(OperationContext* opCtx, repl::OplogApplica
 
         invariant(txnRecord.getState() == DurableTxnStateEnum::kPrepared);
 
-        // Get the prepareTransaction oplog entry corresponding to this transactions table entry.
+        // Get the prepareTransaction oplog entry corresponding to this transactions
+        // table entry.
         const auto prepareOpTime = txnRecord.getLastWriteOpTime();
         invariant(!prepareOpTime.isNull());
         TransactionHistoryIterator iter(prepareOpTime);
@@ -704,8 +790,8 @@ void reconstructPreparedTransactions(OperationContext* opCtx, repl::OplogApplica
         auto prepareOplogEntry = iter.nextFatalOnErrors(opCtx);
 
         {
-            // Make a new opCtx so that we can set the lsid when applying the prepare transaction
-            // oplog entry.
+            // Make a new opCtx so that we can set the lsid when applying the prepare
+            // transaction oplog entry.
             auto newClient =
                 opCtx->getServiceContext()->makeClient("reconstruct-prepared-transactions");
 

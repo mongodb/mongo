@@ -87,27 +87,8 @@ public:
     static void stableSortByNamespace(std::vector<ApplierOperation>* ops);
 
     /**
-     * Updates a CRUD op's hash and isForCappedCollection field if necessary.
-     */
-    static void processCrudOp(
-        OperationContext* opCtx,
-        OplogEntry* op,
-        uint32_t* hash,
-        const CachedCollectionProperties::CollectionProperties& collProperties);
-
-
-    /**
      * Adds a single oplog entry to the appropriate writer vector. Returns the index of the
      * writer vector the entry was written to.
-     */
-    static uint32_t addToWriterVector(OperationContext* opCtx,
-                                      OplogEntry* op,
-                                      std::vector<std::vector<const OplogEntry*>>* writerVectors,
-                                      CachedCollectionProperties* collPropertiesCache,
-                                      boost::optional<uint32_t> forceWriterId = boost::none);
-
-    /**
-     * Same as above, except that the type of ops in the writer vectors are different.
      */
     static uint32_t addToWriterVector(OperationContext* opCtx,
                                       OplogEntry* op,
@@ -140,7 +121,7 @@ public:
      * writer vector 2: [
      *     ApplierOperation{
      *         op: prepareOp,
-     *         instruction: applySplitPrepareOp,
+     *         instruction: applySplitPreparedTxnOp,
      *         subSession: <split_session_id_1>,
      *         splitPrepareOps: [ crud_op_1, crud_op_3 ],
      *     },
@@ -152,7 +133,7 @@ public:
      * writer vector 4: [
      *     ApplierOperation{
      *         op: prepareOp,
-     *         instruction: applySplitPrepareOp,
+     *         instruction: applySplitPreparedTxnOp,
      *         subSession: <split_session_id_2>,
      *         splitPrepareOps: [ crud_op_2, crud_op_4 ],
      *     },
@@ -168,7 +149,7 @@ public:
      *     // The splitPrepareOps list is made empty, which we can still correctly apply.
      *     ApplierOperation{
      *         op: <original_prepare_op>,
-     *         instruction: applySplitPrepareOp,
+     *         instruction: applySplitPreparedTxnOp,
      *         subSession: <split_session_id_1>,
      *         splitPrepareOps: [ ],
      *     },
@@ -191,7 +172,7 @@ public:
      * writer vector 2: [
      *     ApplierOperation{
      *         op: commitOrAbortOp,
-     *         instruction: applySplitCommitOrAbortOp,
+     *         instruction: applySplitPreparedTxnOp,
      *         subSession: <split_session_id_1>,
      *         splitPrepareOps: [ ],
      *     },
@@ -203,7 +184,7 @@ public:
      * writer vector 4: [
      *     ApplierOperation{
      *         op: commitOrAbortOp,
-     *         instruction: applySplitCommitOrAbortOp,
+     *         instruction: applySplitPreparedTxnOp,
      *         subSession: <split_session_id_2>,
      *         splitPrepareOps: [ ],
      *     },

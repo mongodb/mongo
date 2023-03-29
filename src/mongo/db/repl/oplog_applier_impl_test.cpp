@@ -5123,7 +5123,7 @@ protected:
             opTime, _cmdNss, command, lsid, TxnNumber(txnNumber), {StmtId(0)}, prevOpTime);
     }
 
-    int filterConfigTransactionsEntryFromWriterVectors(WriterVectors& writerVectors) {
+    int filterConfigTransactionsEntriesFromWriterVectors(WriterVectors& writerVectors) {
         int txnTableOps = 0;
         for (auto& vector : writerVectors) {
             for (auto it = vector.begin(); it != vector.end();) {
@@ -5136,6 +5136,21 @@ protected:
             }
         }
         return txnTableOps;
+    }
+
+    int filterTopLevelTxnEntriesFromWriterVectors(WriterVectors& writerVectors) {
+        int topLevelTxnOps = 0;
+        for (auto& vector : writerVectors) {
+            for (auto it = vector.begin(); it != vector.end();) {
+                if ((*it).instruction == ApplicationInstruction::applyTopLevelPreparedTxnOp) {
+                    topLevelTxnOps++;
+                    it = vector.erase(it);
+                } else {
+                    ++it;
+                }
+            }
+        }
+        return topLevelTxnOps;
     }
 
 protected:
@@ -5182,24 +5197,28 @@ TEST_F(PreparedTxnSplitTest, MultiplePrepareTxnsInSameBatch) {
         _opCtx.get(), &prepareOps, &prepareWriterVectors, &derivedPrepareOps);
 
     // Verify the config.transactions collection got one entry for each prepared transaction.
-    int txnTableOps = filterConfigTransactionsEntryFromWriterVectors(prepareWriterVectors);
+    int txnTableOps = filterConfigTransactionsEntriesFromWriterVectors(prepareWriterVectors);
     ASSERT_EQ(2, txnTableOps);
+
+    // Verify each top-level transaction has a corresponding prepare entry in the writerVectors.
+    int topLevelTxnOps = filterTopLevelTxnEntriesFromWriterVectors(prepareWriterVectors);
+    ASSERT_EQ(2, topLevelTxnOps);
 
     // Verify each writer has been assigned operations for both prepared transactions.
     for (auto& writer : prepareWriterVectors) {
         ASSERT_EQ(2, writer.size());
 
-        ASSERT_EQ(ApplicationInstruction::applySplitPrepareOp, writer[0].instruction);
+        ASSERT_EQ(ApplicationInstruction::applySplitPreparedTxnOp, writer[0].instruction);
         ASSERT_TRUE(writer[0]->shouldPrepare());
         ASSERT_NE(boost::none, writer[0].subSession);
-        ASSERT_NE(boost::none, writer[0].splitPrepareOps);
-        ASSERT_FALSE(writer[0].splitPrepareOps->empty());
+        ASSERT_NE(boost::none, writer[0].preparedTxnOps);
+        ASSERT_FALSE(writer[0].preparedTxnOps->empty());
 
-        ASSERT_EQ(ApplicationInstruction::applySplitPrepareOp, writer[1].instruction);
+        ASSERT_EQ(ApplicationInstruction::applySplitPreparedTxnOp, writer[1].instruction);
         ASSERT_TRUE(writer[1]->shouldPrepare());
         ASSERT_NE(boost::none, writer[1].subSession);
-        ASSERT_NE(boost::none, writer[1].splitPrepareOps);
-        ASSERT_FALSE(writer[1].splitPrepareOps->empty());
+        ASSERT_NE(boost::none, writer[1].preparedTxnOps);
+        ASSERT_FALSE(writer[1].preparedTxnOps->empty());
 
         ASSERT_NE(writer[0].subSession->getSessionId(), writer[1].subSession->getSessionId());
     }
@@ -5219,8 +5238,12 @@ TEST_F(PreparedTxnSplitTest, MultiplePrepareTxnsInSameBatch) {
         _opCtx.get(), &commitOps, &commitWriterVectors, &derivedCommitOps);
 
     // Verify the config.transactions collection got one entry for each commit/abort op.
-    txnTableOps = filterConfigTransactionsEntryFromWriterVectors(commitWriterVectors);
+    txnTableOps = filterConfigTransactionsEntriesFromWriterVectors(commitWriterVectors);
     ASSERT_EQ(2, txnTableOps);
+
+    // Verify each top-level transaction has a corresponding commit entry in the writerVectors.
+    topLevelTxnOps = filterTopLevelTxnEntriesFromWriterVectors(commitWriterVectors);
+    ASSERT_EQ(2, topLevelTxnOps);
 
     // Verify each writer has been assigned a split commit and abort op.
     for (size_t i = 0; i < commitWriterVectors.size(); ++i) {
@@ -5230,17 +5253,17 @@ TEST_F(PreparedTxnSplitTest, MultiplePrepareTxnsInSameBatch) {
         ASSERT_EQ(2, commitWriter.size());
         ASSERT_EQ(2, prepareWriter.size());
 
-        ASSERT_EQ(ApplicationInstruction::applySplitCommitOrAbortOp, commitWriter[0].instruction);
+        ASSERT_EQ(ApplicationInstruction::applySplitPreparedTxnOp, commitWriter[0].instruction);
         ASSERT_TRUE(commitWriter[0]->isPreparedCommit());
         ASSERT_EQ(prepareWriter[0].subSession->getSessionId(),
                   commitWriter[0].subSession->getSessionId());
-        ASSERT_EQ(boost::none, commitWriter[0].splitPrepareOps);
+        ASSERT_EQ(boost::none, commitWriter[0].preparedTxnOps);
 
-        ASSERT_EQ(ApplicationInstruction::applySplitCommitOrAbortOp, commitWriter[1].instruction);
+        ASSERT_EQ(ApplicationInstruction::applySplitPreparedTxnOp, commitWriter[1].instruction);
         ASSERT_EQ(prepareWriter[1].subSession->getSessionId(),
                   commitWriter[1].subSession->getSessionId());
         ASSERT_NE(boost::none, commitWriter[1].subSession);
-        ASSERT_EQ(boost::none, commitWriter[1].splitPrepareOps);
+        ASSERT_EQ(boost::none, commitWriter[1].preparedTxnOps);
 
         ASSERT_NE(commitWriter[0].subSession->getSessionId(),
                   commitWriter[1].subSession->getSessionId());
@@ -5259,8 +5282,12 @@ TEST_F(PreparedTxnSplitTest, SingleEmptyPrepareTransaction) {
         _opCtx.get(), &prepareOps, &prepareWriterVectors, &derivedPrepareOps);
 
     // Verify the config.transactions collection got an entry for the empty prepared transaction.
-    int txnTableOps = filterConfigTransactionsEntryFromWriterVectors(prepareWriterVectors);
+    int txnTableOps = filterConfigTransactionsEntriesFromWriterVectors(prepareWriterVectors);
     ASSERT_EQ(1, txnTableOps);
+
+    // Verify each top-level transaction has a corresponding prepare entry in the writerVectors.
+    int topLevelTxnOps = filterTopLevelTxnEntriesFromWriterVectors(prepareWriterVectors);
+    ASSERT_EQ(1, topLevelTxnOps);
 
     // Verify exactly one writer has been assigned operation for the empty prepared transaction.
     boost::optional<uint32_t> writerId;
@@ -5270,11 +5297,11 @@ TEST_F(PreparedTxnSplitTest, SingleEmptyPrepareTransaction) {
         if (writer.size() == 1) {
             ASSERT_EQ(boost::none, writerId);
             writerId = i;
-            ASSERT_EQ(ApplicationInstruction::applySplitPrepareOp, writer[0].instruction);
+            ASSERT_EQ(ApplicationInstruction::applySplitPreparedTxnOp, writer[0].instruction);
             ASSERT_TRUE(writer[0]->shouldPrepare());
             ASSERT_NE(boost::none, writer[0].subSession);
-            ASSERT_NE(boost::none, writer[0].splitPrepareOps);
-            ASSERT_TRUE(writer[0].splitPrepareOps->empty());
+            ASSERT_NE(boost::none, writer[0].preparedTxnOps);
+            ASSERT_TRUE(writer[0].preparedTxnOps->empty());
         }
     }
 
@@ -5290,25 +5317,28 @@ TEST_F(PreparedTxnSplitTest, SingleEmptyPrepareTransaction) {
         _opCtx.get(), &commitOps, &commitWriterVectors, &derivedCommitOps);
 
     // Verify the config.transactions collection got an entry for the commit op.
-    txnTableOps = filterConfigTransactionsEntryFromWriterVectors(commitWriterVectors);
+    txnTableOps = filterConfigTransactionsEntriesFromWriterVectors(commitWriterVectors);
     ASSERT_EQ(1, txnTableOps);
+
+    // Verify each top-level transaction has a corresponding commit entry in the writerVectors.
+    topLevelTxnOps = filterTopLevelTxnEntriesFromWriterVectors(commitWriterVectors);
+    ASSERT_EQ(1, topLevelTxnOps);
 
     // Verify exactly one writer has been assigned a split commit op.
     for (size_t i = 0; i < commitWriterVectors.size(); ++i) {
-        auto& commitwriter = commitWriterVectors[i];
+        auto& commitWriter = commitWriterVectors[i];
         auto& prepareWriter = prepareWriterVectors[i];
-        ASSERT_LTE(commitwriter.size(), 1);
+        ASSERT_LTE(commitWriter.size(), 1);
         ASSERT_LTE(prepareWriter.size(), 1);
-        ASSERT_EQ(prepareWriter.size(), commitwriter.size());
+        ASSERT_EQ(prepareWriter.size(), commitWriter.size());
 
-        if (commitwriter.size() == 1) {
+        if (commitWriter.size() == 1) {
             ASSERT_EQ(writerId.get(), i);
-            ASSERT_EQ(ApplicationInstruction::applySplitCommitOrAbortOp,
-                      commitwriter[0].instruction);
-            ASSERT_TRUE(commitwriter[0]->isPreparedCommit());
+            ASSERT_EQ(ApplicationInstruction::applySplitPreparedTxnOp, commitWriter[0].instruction);
+            ASSERT_TRUE(commitWriter[0]->isPreparedCommit());
             ASSERT_EQ(prepareWriter[0].subSession->getSessionId(),
-                      commitwriter[0].subSession->getSessionId());
-            ASSERT_EQ(boost::none, commitwriter[0].splitPrepareOps);
+                      commitWriter[0].subSession->getSessionId());
+            ASSERT_EQ(boost::none, commitWriter[0].preparedTxnOps);
         }
     }
 }

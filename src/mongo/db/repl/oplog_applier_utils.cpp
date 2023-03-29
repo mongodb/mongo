@@ -74,11 +74,14 @@ CachedCollectionProperties::getCollectionProperties(OperationContext* opCtx,
     return collProperties;
 }
 
-void OplogApplierUtils::processCrudOp(
-    OperationContext* opCtx,
-    OplogEntry* op,
-    uint32_t* hash,
-    const CachedCollectionProperties::CollectionProperties& collProperties) {
+namespace {
+/**
+ * Updates a CRUD op's hash and isForCappedCollection field if necessary.
+ */
+void processCrudOp(OperationContext* opCtx,
+                   OplogEntry* op,
+                   uint32_t* hash,
+                   const CachedCollectionProperties::CollectionProperties& collProperties) {
     // Include the _id of the document in the hash so we get parallelism even if all writes are to a
     // single collection.
     //
@@ -107,6 +110,10 @@ void OplogApplierUtils::processCrudOp(
     }
 }
 
+/**
+ * Returns the ID of the writer thread that this op will be assigned to, determined by the
+ * namespace string (and document key if exists) of the op.
+ */
 uint32_t getWriterId(OperationContext* opCtx,
                      OplogEntry* op,
                      CachedCollectionProperties* collPropertiesCache,
@@ -124,39 +131,72 @@ uint32_t getWriterId(OperationContext* opCtx,
 
     if (op->isCrudOpType()) {
         auto collProperties = collPropertiesCache->getCollectionProperties(opCtx, hashedNs);
-        OplogApplierUtils::processCrudOp(opCtx, op, &hash, collProperties);
+        processCrudOp(opCtx, op, &hash, collProperties);
     }
 
     return (forceWriterId ? *forceWriterId : hash) % numWriters;
 }
 
-template <typename Operation>
-uint32_t addToWriterVectorImpl(OperationContext* opCtx,
-                               OplogEntry* op,
+/**
+ * Returns the ID of the writer thread that this op will be assigned to, determined by the
+ * session ID of the op.
+ */
+uint32_t getWriterIdBySessionId(OplogEntry* op, uint32_t numWriters) {
+    LogicalSessionIdHash lsidHasher;
+
+    invariant(op->getSessionId());
+    auto hash = static_cast<uint32_t>(lsidHasher(*op->getSessionId()));
+
+    return hash % numWriters;
+}
+
+/**
+ * Adds an op to the writer vector of the given writer ID. The variadic arguments will be
+ * forwarded to the writer vector to in-place construct the op.
+ */
+template <typename Operation, typename... Args>
+uint32_t addToWriterVectorImpl(uint32_t writerId,
                                std::vector<std::vector<Operation>>* writerVectors,
-                               CachedCollectionProperties* collPropertiesCache,
-                               boost::optional<uint32_t> forceWriterId = boost::none) {
-    auto writerId =
-        getWriterId(opCtx, op, collPropertiesCache, writerVectors->size(), forceWriterId);
+                               Args&&... args) {
     auto& writer = (*writerVectors)[writerId];
 
     if (writer.empty()) {
         // Skip a few growth rounds.
         writer.reserve(8);
     }
-    writer.emplace_back(op);
+    writer.emplace_back(std::forward<Args>(args)...);
 
     return writerId;
 }
 
-uint32_t OplogApplierUtils::addToWriterVector(
-    OperationContext* opCtx,
-    OplogEntry* op,
-    std::vector<std::vector<const OplogEntry*>>* writerVectors,
-    CachedCollectionProperties* collPropertiesCache,
-    boost::optional<uint32_t> forceWriterId) {
-    return addToWriterVectorImpl(opCtx, op, writerVectors, collPropertiesCache, forceWriterId);
+/**
+ * Adds the top-level prepareTransaction op to the writerVectors.
+ */
+void addTopLevelPrepare(OperationContext* opCtx,
+                        OplogEntry* prepareOp,
+                        std::vector<OplogEntry>* derivedOps,
+                        std::vector<std::vector<ApplierOperation>>* writerVectors) {
+    auto writerId = getWriterIdBySessionId(prepareOp, writerVectors->size());
+    addToWriterVectorImpl(writerId,
+                          writerVectors,
+                          prepareOp,
+                          ApplicationInstruction::applyTopLevelPreparedTxnOp,
+                          *derivedOps);
 }
+
+/**
+ * Adds the top-level commitTransaction or AbortTransaction op to the writerVectors.
+ */
+void addTopLevelCommitOrAbort(OperationContext* opCtx,
+                              OplogEntry* commitOrAbortOp,
+                              std::vector<std::vector<ApplierOperation>>* writerVectors) {
+    auto writerId = getWriterIdBySessionId(commitOrAbortOp, writerVectors->size());
+    addToWriterVectorImpl(writerId,
+                          writerVectors,
+                          commitOrAbortOp,
+                          ApplicationInstruction::applyTopLevelPreparedTxnOp);
+}
+}  // namespace
 
 uint32_t OplogApplierUtils::addToWriterVector(
     OperationContext* opCtx,
@@ -164,13 +204,12 @@ uint32_t OplogApplierUtils::addToWriterVector(
     std::vector<std::vector<ApplierOperation>>* writerVectors,
     CachedCollectionProperties* collPropertiesCache,
     boost::optional<uint32_t> forceWriterId) {
-    return addToWriterVectorImpl(opCtx, op, writerVectors, collPropertiesCache, forceWriterId);
+    auto writerId =
+        getWriterId(opCtx, op, collPropertiesCache, writerVectors->size(), forceWriterId);
+    return addToWriterVectorImpl(writerId, writerVectors, op);
 }
 
 void OplogApplierUtils::stableSortByNamespace(std::vector<ApplierOperation>* ops) {
-    auto isPreparedTxnCommand = [](const ApplierOperation& op) {
-        return op->isPreparedCommit() || op->isPreparedAbort() || op->shouldPrepare();
-    };
     auto nssComparator = [](const ApplierOperation& l, const ApplierOperation& r) {
         if (l->getNss().isCommand()) {
             if (r->getNss().isCommand())
@@ -190,7 +229,7 @@ void OplogApplierUtils::stableSortByNamespace(std::vector<ApplierOperation>* ops
     for (size_t start = 0, end = 0; end <= ops->size(); ++end) {
         // The end iterator acts as a dummy prepared transaction command, so we would
         // also sort the ops after the last real one encountered.
-        if (end == ops->size() || isPreparedTxnCommand(ops->at(end))) {
+        if (end == ops->size() || ops->at(end)->isPreparedTransactionCommand()) {
             std::stable_sort(ops->begin() + start, ops->begin() + end, nssComparator);
             start = end + 1;
         }
@@ -230,45 +269,54 @@ void OplogApplierUtils::addDerivedPrepares(
         return sessions;
     };
 
-    // For empty (read-only) prepares, we use the namespace of the original prepare oplog entry
-    // (admin.$cmd) to decide which writer thread to apply it, and assigned it a split session.
-    // The reason that we also split an empty prepare instead of treating it as some standalone
-    // prepare op (as the prepares in initial sync or recovery mode) is so that we can keep a
-    // logical invariant that all prepares in secondary mode are split, and thus we can apply
-    // empty and non-empty prepares in the same way.
     if (derivedOps->empty()) {
+        // For empty (read-only) prepares, we use the namespace of the original prepare oplog entry
+        // (admin.$cmd) to decide which writer thread to apply it, and assigned it a split session.
+        // The reason that we also split an empty prepare instead of treating it as some standalone
+        // prepare op (as the prepares in initial sync or recovery mode) is so that we can keep a
+        // logical invariant that all prepares in secondary mode are split, and thus we can apply
+        // empty and non-empty prepares in the same way.
         auto writerId = getWriterId(opCtx, prepareOp, collPropertiesCache, writerVectors->size());
         const auto& sessionInfos = splitSessFunc({writerId});
-        (*writerVectors)[writerId].emplace_back(prepareOp,
-                                                ApplicationInstruction::applySplitPrepareOp,
-                                                sessionInfos[0].session,
-                                                std::vector<const OplogEntry*>{});
-        return;
-    }
+        addToWriterVectorImpl(writerId,
+                              writerVectors,
+                              prepareOp,
+                              ApplicationInstruction::applySplitPreparedTxnOp,
+                              sessionInfos[0].session,
+                              std::vector<const OplogEntry*>{});
+    } else {
+        // For non-empty prepares, the namespace of each derived op in the transaction is used to
+        // decide which writer thread to apply it. We first add all the derived ops to a buffer
+        // writer vector in order to get all the writer threads needed to apply this transaction.
+        // We then acquire that number of split sessions and assign each writer thread a unique
+        // split session when moving the ops to the real writer vector.
+        std::set<uint32_t> writerIds;
+        std::vector<std::vector<const OplogEntry*>> bufWriterVectors(writerVectors->size());
+        for (auto&& op : *derivedOps) {
+            auto writerId = getWriterId(opCtx, &op, collPropertiesCache, writerVectors->size());
+            addToWriterVectorImpl(writerId, &bufWriterVectors, &op);
+            writerIds.emplace(writerId);
+        }
 
-    // For non-empty prepares, the namespace of each derived op in the transaction is used to
-    // decide which writer thread to apply it. We first add all the derived ops to a buffer
-    // writer vector in order to get all the writer threads needed to apply this transaction.
-    // We then acquire that number of split sessions and assign each writer thread a unique
-    // split session when moving the ops to the real writer vector.
-    std::set<uint32_t> writerIds;
-    std::vector<std::vector<const OplogEntry*>> bufWriterVectors(writerVectors->size());
-    for (auto&& op : *derivedOps) {
-        auto writerId = addToWriterVector(opCtx, &op, &bufWriterVectors, collPropertiesCache);
-        writerIds.emplace(writerId);
-    }
-
-    const auto& sessionInfos = splitSessFunc({writerIds.begin(), writerIds.end()});
-    for (size_t i = 0, j = 0; i < bufWriterVectors.size(); ++i) {
-        auto& bufWriter = bufWriterVectors[i];
-        auto& realWriter = (*writerVectors)[i];
-        if (!bufWriter.empty()) {
-            realWriter.emplace_back(prepareOp,
-                                    ApplicationInstruction::applySplitPrepareOp,
-                                    sessionInfos[j++].session,
-                                    std::move(bufWriter));
+        const auto& sessionInfos = splitSessFunc({writerIds.begin(), writerIds.end()});
+        for (size_t i = 0, j = 0; i < bufWriterVectors.size(); ++i) {
+            auto& bufWriter = bufWriterVectors[i];
+            if (!bufWriter.empty()) {
+                addToWriterVectorImpl(i,
+                                      writerVectors,
+                                      prepareOp,
+                                      ApplicationInstruction::applySplitPreparedTxnOp,
+                                      sessionInfos[j++].session,
+                                      std::move(bufWriter));
+            }
         }
     }
+
+    // Add the top-level transaction to the writerVectors. Applying split transactions would
+    // update the TransactionParticipant states of the split sessions, however we must also
+    // update the TransactionParticipant states of the original (i.e. top-level) session in
+    // case later this node becomes a primary.
+    addTopLevelPrepare(opCtx, prepareOp, derivedOps, writerVectors);
 }
 
 void OplogApplierUtils::addDerivedCommitsOrAborts(
@@ -292,10 +340,18 @@ void OplogApplierUtils::addDerivedCommitsOrAborts(
     // When this commit refers to a split prepare, we split the commit and add them
     // to the writers that have been assigned split prepare ops.
     for (const auto& sessInfo : *sessionInfos) {
-        auto& writer = (*writerVectors)[sessInfo.requesterId];
-        writer.emplace_back(
-            commitOrAbortOp, ApplicationInstruction::applySplitCommitOrAbortOp, sessInfo.session);
+        addToWriterVectorImpl(sessInfo.requesterId,
+                              writerVectors,
+                              commitOrAbortOp,
+                              ApplicationInstruction::applySplitPreparedTxnOp,
+                              sessInfo.session);
     }
+
+    // Add the top-level transaction to the writerVectors. Applying split transactions would
+    // update the TransactionParticipant states of the split sessions, however we must also
+    // update the TransactionParticipant states of the original (i.e. top-level) session in
+    // case later this node becomes a primary.
+    addTopLevelCommitOrAbort(opCtx, commitOrAbortOp, writerVectors);
 }
 
 NamespaceString OplogApplierUtils::parseUUIDOrNs(OperationContext* opCtx,

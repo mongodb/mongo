@@ -112,9 +112,9 @@ Status finishAndLogApply(OperationContext* opCtx,
 }
 
 void _addOplogChainOpsToWriterVectors(OperationContext* opCtx,
+                                      OplogEntry* op,
                                       std::vector<OplogEntry*>* partialTxnList,
                                       std::vector<std::vector<OplogEntry>>* derivedOps,
-                                      OplogEntry* op,
                                       std::vector<std::vector<ApplierOperation>>* writerVectors,
                                       CachedCollectionProperties* collPropertiesCache) {
     auto [txnOps, shouldSerialize] =
@@ -175,6 +175,32 @@ Status _insertDocumentsToOplogAndChangeCollections(
     return Status::OK();
 }
 
+void _setOplogApplicationWorkerOpCtxStates(OperationContext* opCtx) {
+    // Do not enforce constraints.
+    opCtx->setEnforceConstraints(false);
+
+    // Since we swap the locker in stash / unstash transaction resources,
+    // ShouldNotConflictWithSecondaryBatchApplicationBlock will touch the locker that has been
+    // destroyed by unstash in its destructor. Thus we set the flag explicitly.
+    opCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
+
+    // When querying indexes, we return the record matching the key if it exists, or an adjacent
+    // document. This means that it is possible for us to hit a prepare conflict if we query for an
+    // incomplete key and an adjacent key is prepared.
+    // We ignore prepare conflicts on secondaries because they may encounter prepare conflicts that
+    // did not occur on the primary.
+    opCtx->recoveryUnit()->setPrepareConflictBehavior(
+        PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
+
+    // Applying an Oplog batch is crucial to the stability of the Replica Set. We
+    // mark it as having Immediate priority so that it skips waiting for ticket
+    // acquisition and flow control.
+    opCtx->lockState()->setAdmissionPriority(AdmissionContext::Priority::kImmediate);
+
+    // Ensure future transactions read without a timestamp.
+    invariant(RecoveryUnit::ReadSource::kNoTimestamp ==
+              opCtx->recoveryUnit()->getTimestampReadSource());
+}
 }  // namespace
 
 
@@ -494,7 +520,6 @@ void scheduleWritesToOplogAndChangeCollection(OperationContext* opCtx,
         return;
     }
 
-
     const size_t numOplogThreads = writerPool->getStats().options.maxThreads;
     const size_t numOpsPerThread = ops.size() / numOplogThreads;
     for (size_t thread = 0; thread < numOplogThreads; thread++) {
@@ -557,7 +582,7 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
 
         std::vector<std::vector<ApplierOperation>> writerVectors(
             _writerPool->getStats().options.maxThreads);
-        fillWriterVectors(opCtx, &ops, &writerVectors, &derivedOps);
+        _fillWriterVectors(opCtx, &ops, &writerVectors, &derivedOps);
 
         // Wait for writes to finish before applying ops.
         _writerPool->waitForIdle();
@@ -584,7 +609,7 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
             std::vector<Status> statusVector(_writerPool->getStats().options.maxThreads,
                                              Status::OK());
             // Doles out all the work to the writer pool threads. writerVectors is not modified,
-            // but  applyOplogBatchPerWorker will modify the vectors that it contains.
+            // but applyOplogBatchPerWorker will modify the vectors that it contains.
             invariant(writerVectors.size() == statusVector.size());
             for (size_t i = 0; i < writerVectors.size(); i++) {
                 if (writerVectors[i].empty())
@@ -596,16 +621,7 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
                                        &multikeyVector = multikeyVector.at(i),
                                        isDataConsistent = isDataConsistent](auto scheduleStatus) {
                     invariant(scheduleStatus);
-
                     auto opCtx = cc().makeOperationContext();
-
-                    // Applying an Oplog batch is crucial to the stability of the Replica Set. We
-                    // mark it as having Immediate priority so that it skips waiting for ticket
-                    // acquisition and flow control.
-                    opCtx->lockState()->setAdmissionPriority(
-                        AdmissionContext::Priority::kImmediate);
-
-                    opCtx->setEnforceConstraints(false);
 
                     status = opCtx->runWithoutInterruptionExceptAtGlobalShutdown([&] {
                         return applyOplogBatchPerWorker(
@@ -635,6 +651,15 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
                         "error"_attr = redact(status));
                     return status;
                 }
+            }
+        }
+
+        // Release the split sessions if the top-level transaction is committed or aborted.
+        auto splitSessManager = _replCoord->getSplitPrepareSessionManager();
+        for (const auto& op : ops) {
+            if ((op.isPreparedCommit() || op.isPreparedAbort()) &&
+                splitSessManager->isSessionSplit(*op.getSessionId(), *op.getTxnNumber())) {
+                splitSessManager->releaseSplitSessions(*op.getSessionId(), *op.getTxnNumber());
             }
         }
     }
@@ -786,7 +811,6 @@ void OplogApplierImpl::_deriveOpsAndFillWriterVectors(
 
         // Extract applyOps operations and fill writers with extracted operations.
         if (op.isTerminalApplyOps()) {
-            auto logicalSessionId = op.getSessionId();
             // applyOps entries generated by a transaction must have a prevOpTime.
             if (auto prevOpTime = op.getPrevWriteOpTimeInTransaction()) {
                 // On commit of unprepared transactions, get transactional operations from the
@@ -794,7 +818,7 @@ void OplogApplierImpl::_deriveOpsAndFillWriterVectors(
                 // Flush partialTxnList operations for current transaction.
                 auto* partialTxnList = getPartialTxnList(op);
                 _addOplogChainOpsToWriterVectors(
-                    opCtx, partialTxnList, derivedOps, &op, writerVectors, &collPropertiesCache);
+                    opCtx, &op, partialTxnList, derivedOps, writerVectors, &collPropertiesCache);
                 invariant(partialTxnList->empty(), op.toStringForLogging());
             } else {
                 // The applyOps entry was not generated as part of a transaction.
@@ -812,14 +836,13 @@ void OplogApplierImpl::_deriveOpsAndFillWriterVectors(
             continue;
         }
 
-        if (repl::feature_flags::gApplyPreparedTxnsInParallel.isEnabled(
-                serverGlobalParams.featureCompatibility)) {
+        if (repl::feature_flags::gApplyPreparedTxnsInParallel.isEnabledAndIgnoreFCV()) {
             // Prepare entries in secondary mode do not come in their own batch, extract applyOps
             // operations and fill writers with the extracted operations.
             if (op.shouldPrepare() && (getOptions().mode == OplogApplication::Mode::kSecondary)) {
                 auto* partialTxnList = getPartialTxnList(op);
                 _addOplogChainOpsToWriterVectors(
-                    opCtx, partialTxnList, derivedOps, &op, writerVectors, &collPropertiesCache);
+                    opCtx, &op, partialTxnList, derivedOps, writerVectors, &collPropertiesCache);
                 continue;
             }
 
@@ -839,7 +862,7 @@ void OplogApplierImpl::_deriveOpsAndFillWriterVectors(
         if (op.isPreparedCommit() && (getOptions().mode == OplogApplication::Mode::kInitialSync)) {
             auto* partialTxnList = getPartialTxnList(op);
             _addOplogChainOpsToWriterVectors(
-                opCtx, partialTxnList, derivedOps, &op, writerVectors, &collPropertiesCache);
+                opCtx, &op, partialTxnList, derivedOps, writerVectors, &collPropertiesCache);
             invariant(partialTxnList->empty(), op.toStringForLogging());
             continue;
         }
@@ -848,12 +871,11 @@ void OplogApplierImpl::_deriveOpsAndFillWriterVectors(
     }
 }
 
-void OplogApplierImpl::fillWriterVectors(
+void OplogApplierImpl::_fillWriterVectors(
     OperationContext* opCtx,
     std::vector<OplogEntry>* ops,
     std::vector<std::vector<ApplierOperation>>* writerVectors,
     std::vector<std::vector<OplogEntry>>* derivedOps) noexcept {
-
     SessionUpdateTracker sessionUpdateTracker;
     _deriveOpsAndFillWriterVectors(opCtx, ops, writerVectors, derivedOps, &sessionUpdateTracker);
 
@@ -870,7 +892,7 @@ void OplogApplierImpl::fillWriterVectors_forTest(
     std::vector<OplogEntry>* ops,
     std::vector<std::vector<ApplierOperation>>* writerVectors,
     std::vector<std::vector<OplogEntry>>* derivedOps) noexcept {
-    fillWriterVectors(opCtx, ops, writerVectors, derivedOps);
+    _fillWriterVectors(opCtx, ops, writerVectors, derivedOps);
 }
 
 Status applyOplogEntryOrGroupedInserts(OperationContext* opCtx,
@@ -930,22 +952,7 @@ Status OplogApplierImpl::applyOplogBatchPerWorker(OperationContext* opCtx,
                                                   WorkerMultikeyPathInfo* workerMultikeyPathInfo,
                                                   const bool isDataConsistent) {
     UnreplicatedWritesBlock uwb(opCtx);
-    // Since we swap the locker in stash / unstash transaction resources,
-    // ShouldNotConflictWithSecondaryBatchApplicationBlock will touch the locker that has been
-    // destroyed by unstash in its destructor. Thus we set the flag explicitly.
-    opCtx->lockState()->setShouldConflictWithSecondaryBatchApplication(false);
-
-    // Ensure future transactions read without a timestamp.
-    invariant(RecoveryUnit::ReadSource::kNoTimestamp ==
-              opCtx->recoveryUnit()->getTimestampReadSource());
-
-    // When querying indexes, we return the record matching the key if it exists, or an adjacent
-    // document. This means that it is possible for us to hit a prepare conflict if we query for an
-    // incomplete key and an adjacent key is prepared.
-    // We ignore prepare conflicts on secondaries because they may encounter prepare conflicts that
-    // did not occur on the primary.
-    opCtx->recoveryUnit()->setPrepareConflictBehavior(
-        PrepareConflictBehavior::kIgnoreConflictsAllowWrites);
+    _setOplogApplicationWorkerOpCtxStates(opCtx);
 
     {  // Ensure that the MultikeyPathTracker stops tracking paths.
         ON_BLOCK_EXIT([opCtx] { MultikeyPathTracker::get(opCtx).stopTrackingMultikeyPathInfo(); });

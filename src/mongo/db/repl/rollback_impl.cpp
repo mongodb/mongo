@@ -564,6 +564,12 @@ void RollbackImpl::_runPhaseFromAbortToReconstructPreparedTxns(
     // abortPreparedTransactionForRollback() on any txnParticipant with a prepared transaction.
     killSessionsAbortAllPreparedTransactions(opCtx);
 
+    // Top-level prepared transactions could have been split during secondary oplog application.
+    // killSessionsAbortAllPreparedTransactions iterates the session catalog and aborts all the
+    // split transactions as well as the top-level transactions. After that we need to release
+    // all the split sessions tracked by SplitPrepareSessionManager.
+    _replicationCoordinator->getSplitPrepareSessionManager()->releaseAllSplitSessions();
+
     // Ask the record store for the pre-rollback counts of any collections whose counts will
     // change and create a map with the adjusted counts for post-rollback. While finding the
     // common point, we keep track of how much each collection's count will change during the

@@ -579,6 +579,14 @@ public:
     }
 
     /**
+     * Returns if this is a prepared transaction command oplog entry, i.e. prepareTransaction,
+     * commitTransaction or abortTransaction.
+     */
+    bool isPreparedTransactionCommand() const {
+        return isCommand() && (isPreparedCommit() || isPreparedAbort() || shouldPrepare());
+    }
+
+    /**
      * Returns whether the oplog entry represents an applyOps which is a self-contained atomic
      * operation, or the last applyOps of an unprepared transaction, as opposed to part of a
      * prepared transaction or a non-final applyOps in a transaction.
@@ -776,6 +784,7 @@ public:
     bool isEndOfLargeTransaction() const;
     bool isPreparedCommit() const;
     bool isPreparedAbort() const;
+    bool isPreparedTransactionCommand() const;
     bool isTerminalApplyOps() const;
     bool isSingleOplogEntryTransaction() const;
     bool isSingleOplogEntryTransactionWithCommand() const;

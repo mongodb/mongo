@@ -107,6 +107,11 @@ private:
                                         std::vector<std::vector<OplogEntry>>* derivedOps,
                                         SessionUpdateTracker* sessionUpdateTracker) noexcept;
 
+    void _fillWriterVectors(OperationContext* opCtx,
+                            std::vector<OplogEntry>* ops,
+                            std::vector<std::vector<ApplierOperation>>* writerVectors,
+                            std::vector<std::vector<OplogEntry>>* derivedOps) noexcept;
+
     // Not owned by us.
     ReplicationCoordinator* const _replCoord;
 
@@ -121,11 +126,6 @@ private:
     // Used to determine which operations should be applied during initial sync. If this is null,
     // we will apply all operations that were fetched.
     OpTime _beginApplyingOpTime = OpTime();
-
-    void fillWriterVectors(OperationContext* opCtx,
-                           std::vector<OplogEntry>* ops,
-                           std::vector<std::vector<ApplierOperation>>* writerVectors,
-                           std::vector<std::vector<OplogEntry>>* derivedOps) noexcept;
 
 protected:
     // Marked as protected for use in unit tests.

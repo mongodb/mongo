@@ -9,7 +9,4 @@
 # released create the transactions collection index and is only meant to be enabled adhoc, so only
 # its targeted tests should enable it.
 - featureFlagAlwaysCreateConfigTransactionsPartialIndexOnStepUp
-# Disable the feature flag for parallelizing prepared transaction application until most of the
-# codebase can run in this mode.
-- featureFlagApplyPreparedTxnsInParallel
 - featureFlagUpdateDocumentShardKeyUsingTransactionApi

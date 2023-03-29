@@ -110,5 +110,17 @@ void SplitPrepareSessionManager::releaseSplitSessions(const LogicalSessionId& se
     _splitSessionMap.erase(it);
 }
 
+void SplitPrepareSessionManager::releaseAllSplitSessions() {
+    stdx::lock_guard<Latch> lk(_mutex);
+
+    for (const auto& entry : _splitSessionMap) {
+        for (const auto& sessInfo : entry.second.second) {
+            _sessionPool->release(sessInfo.session);
+        }
+    }
+
+    _splitSessionMap.clear();
+}
+
 }  // namespace repl
 }  // namespace mongo

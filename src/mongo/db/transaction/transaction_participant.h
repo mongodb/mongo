@@ -872,7 +872,7 @@ public:
         void _abortActiveTransaction(OperationContext* opCtx,
                                      TransactionState::StateSet expectedStates);
 
-        // Aborts a "split prepared" transction. Prepared transactions processed on secondaries may
+        // Aborts a "split prepared" transaction. Prepared transactions processed on secondaries may
         // split the storage writes into multiple RecoveryUnits. This method will be invoked by a
         // primary such that it looks for all recovery units and aborts them.
         void _abortSplitPreparedTxnOnPrimary(OperationContext* opCtx,

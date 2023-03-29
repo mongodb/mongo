@@ -113,6 +113,11 @@ public:
      */
     void releaseSplitSessions(const LogicalSessionId& sessionId, TxnNumber txnNumber);
 
+    /**
+     * Release and remove all the tracked split sessions.
+     */
+    void releaseAllSplitSessions();
+
 private:
     // Guards access to member variables.
     mutable Mutex _mutex = MONGO_MAKE_LATCH("SplitPrepareSessionManager::_mutex");

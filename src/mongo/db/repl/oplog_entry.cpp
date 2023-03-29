@@ -785,6 +785,10 @@ bool OplogEntry::isPreparedAbort() const {
     return _entry.isPreparedAbort();
 }
 
+bool OplogEntry::isPreparedTransactionCommand() const {
+    return _entry.isPreparedTransactionCommand();
+}
+
 bool OplogEntry::isTerminalApplyOps() const {
     return _entry.isTerminalApplyOps();
 }

@@ -2175,7 +2175,8 @@ void TransactionParticipant::Participant::_abortActiveTransaction(
     // If this is a split-prepared transaction, cascade the abort.
     auto* splitPrepareManager =
         repl::ReplicationCoordinator::get(opCtx)->getSplitPrepareSessionManager();
-    if (splitPrepareManager->isSessionSplit(_sessionId(),
+    if (opCtx->writesAreReplicated() &&
+        splitPrepareManager->isSessionSplit(_sessionId(),
                                             o().activeTxnNumberAndRetryCounter.getTxnNumber())) {
         _abortSplitPreparedTxnOnPrimary(opCtx,
                                         splitPrepareManager,
