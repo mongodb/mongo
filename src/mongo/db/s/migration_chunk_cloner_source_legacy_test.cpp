@@ -617,7 +617,6 @@ protected:
                 timestamp,
                 boost::none /* timeseriesFields */,
                 boost::none /* resharding Fields */,
-                boost::none /* chunkSizeBytes */,
                 true,
                 {ChunkType{uuid,
                            ChunkRange{BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY)},

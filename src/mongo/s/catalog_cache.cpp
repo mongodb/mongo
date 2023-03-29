@@ -110,23 +110,6 @@ std::shared_ptr<RoutingTableHistory> createUpdatedRoutingTableHistory(
         return existingHistory->optRt;
     }
 
-    const auto maxChunkSize = [&]() -> boost::optional<uint64_t> {
-        if (!collectionAndChunks.allowAutoSplit) {
-            // maxChunkSize = 0 is an invalid chunkSize so we use it to detect noAutoSplit
-            // on the steady-state path in incrementChunkOnInsertOrUpdate(...)
-            return 0;
-        }
-        if (collectionAndChunks.maxChunkSizeBytes) {
-            tassert(7032312,
-                    fmt::format("Invalid maxChunkSizeBytes value {} for collection '{}'",
-                                nss.toString(),
-                                collectionAndChunks.maxChunkSizeBytes.value()),
-                    collectionAndChunks.maxChunkSizeBytes.value() > 0);
-            return uint64_t(*collectionAndChunks.maxChunkSizeBytes);
-        }
-        return boost::none;
-    }();
-
     auto newRoutingHistory = [&] {
         // If we have routing info already and it's for the same collection, we're updating.
         // Otherwise, we are making a whole new routing table.
@@ -135,7 +118,6 @@ std::shared_ptr<RoutingTableHistory> createUpdatedRoutingTableHistory(
                 {collectionAndChunks.epoch, collectionAndChunks.timestamp})) {
             return existingHistory->optRt->makeUpdated(collectionAndChunks.timeseriesFields,
                                                        collectionAndChunks.reshardingFields,
-                                                       maxChunkSize,
                                                        collectionAndChunks.allowMigrations,
                                                        collectionAndChunks.changedChunks);
         }
@@ -158,7 +140,6 @@ std::shared_ptr<RoutingTableHistory> createUpdatedRoutingTableHistory(
                                             collectionAndChunks.timestamp,
                                             collectionAndChunks.timeseriesFields,
                                             std::move(collectionAndChunks.reshardingFields),
-                                            maxChunkSize,
                                             collectionAndChunks.allowMigrations,
                                             collectionAndChunks.changedChunks);
     }();

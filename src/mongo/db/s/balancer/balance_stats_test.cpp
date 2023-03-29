@@ -59,7 +59,6 @@ public:
                                                                 _timestamp,   // timestamp
                                                                 boost::none,  // time series fields
                                                                 boost::none,  // resharding fields
-                                                                boost::none,  // chunk size bytes
                                                                 true,         // allowMigration
                                                                 chunks);
 

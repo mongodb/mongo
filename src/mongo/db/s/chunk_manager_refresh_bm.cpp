@@ -87,8 +87,7 @@ CollectionMetadata makeChunkManagerWithShardSelector(int nShards,
                                            collEpoch,
                                            Timestamp(1, 0),
                                            boost::none /* timeseriesFields */,
-                                           boost::none,
-                                           boost::none /* chunkSizeBytes */,
+                                           boost::none /* reshardingFields */,
                                            true,
                                            chunks);
     return CollectionMetadata(ChunkManager(ShardId("Shard0"),
@@ -121,7 +120,7 @@ MONGO_COMPILER_NOINLINE auto makeChunkManagerWithOptimalBalancedDistribution(int
 MONGO_COMPILER_NOINLINE auto runIncrementalUpdate(const CollectionMetadata& cm,
                                                   const std::vector<ChunkType>& newChunks) {
     auto rt = cm.getChunkManager()->getRoutingTableHistory_ForTest().makeUpdated(
-        boost::none /* timeseriesFields */, boost::none, boost::none, true, newChunks);
+        boost::none /* timeseriesFields */, boost::none /* reshardingFields */, true, newChunks);
     return CollectionMetadata(ChunkManager(ShardId("shard0"),
                                            DatabaseVersion(UUID::gen(), Timestamp(1, 0)),
                                            makeStandaloneRoutingTableHistory(std::move(rt)),
@@ -180,8 +179,7 @@ auto BM_FullBuildOfChunkManager(benchmark::State& state, ShardSelectorFn selectS
                                                collEpoch,
                                                Timestamp(1, 0),
                                                boost::none /* timeseriesFields */,
-                                               boost::none,
-                                               boost::none /* chunkSizeBytes */,
+                                               boost::none /* reshardingFields */,
                                                true,
                                                chunks);
         benchmark::DoNotOptimize(

@@ -74,8 +74,7 @@ protected:
             epoch,
             Timestamp(1, 1),
             timeseriesFields,
-            boost::none,
-            boost::none,
+            boost::none /* reshardingFields */,
             true,
             [&] {
                 ChunkVersion version({epoch, Timestamp(1, 1)}, {1, 0});

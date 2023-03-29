@@ -147,16 +147,13 @@ public:
     BSONObj getDefaultCollation() const {
         return CollectionTypeBase::getDefaultCollation().get_value_or(BSONObj());
     }
-    void setDefaultCollation(const BSONObj& defaultCollation);
 
     void setMaxChunkSizeBytes(int64_t value);
 
+    void setDefaultCollation(const BSONObj& defaultCollation);
+
     bool getDefragmentCollection() const {
         return CollectionTypeBase::getDefragmentCollection().get_value_or(false);
-    }
-
-    bool getAllowAutoSplit() const {
-        return !getNoAutoSplit().get_value_or(false);
     }
 
     bool getAllowBalance() const {

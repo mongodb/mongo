@@ -74,8 +74,6 @@ CollectionAndChangedChunks getChangedChunks(OperationContext* opCtx,
                                       coll.getUnique(),
                                       coll.getTimeseriesFields(),
                                       coll.getReshardingFields(),
-                                      coll.getMaxChunkSizeBytes(),
-                                      coll.getAllowAutoSplit(),
                                       coll.getAllowMigrations(),
                                       std::move(collAndChunks.second)};
 }

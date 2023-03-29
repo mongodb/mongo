@@ -95,7 +95,6 @@ public:
                                                Timestamp(1, 1),
                                                boost::none /* timeseriesFields */,
                                                boost::none /* reshardingFields */,
-                                               boost::none /* chunkSizeBytes */,
                                                true /* allowMigrations */,
                                                chunks);
         IndexCatalogTypeMap shardingIndexesCatalogMap;

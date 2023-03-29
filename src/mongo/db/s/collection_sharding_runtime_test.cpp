@@ -84,8 +84,8 @@ protected:
                                                          epoch,
                                                          timestamp,
                                                          boost::none /* timeseriesFields */,
-                                                         boost::none,
-                                                         boost::none /* chunkSizeBytes */,
+                                                         boost::none /* reshardingFields */,
+
                                                          true,
                                                          {std::move(chunk)})),
                         boost::none);

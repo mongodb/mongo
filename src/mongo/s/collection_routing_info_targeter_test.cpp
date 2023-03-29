@@ -261,7 +261,6 @@ ChunkManager makeCustomChunkManager(const ShardKeyPattern& shardKeyPattern,
                                                             timestamp,
                                                             boost::none,  // time series fields
                                                             boost::none,  // resharding fields
-                                                            boost::none,  // chunk size bytes
                                                             true,         // allowMigration
                                                             chunks);
 

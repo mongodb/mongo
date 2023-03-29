@@ -95,8 +95,8 @@ protected:
             epoch,
             Timestamp(1, 1),
             boost::none /* timeseriesFields */,
-            boost::none,
-            boost::none /* chunkSizeBytes */,
+            boost::none /* reshardingFields */,
+
             true,
             {ChunkType{uuid, range, ChunkVersion({epoch, Timestamp(1, 1)}, {1, 0}), kOtherShard}});
 
@@ -149,8 +149,11 @@ protected:
                                  chunkVersion,
                                  kOtherShard);
 
-        auto rt = cm->getRoutingTableHistory_ForTest().makeUpdated(
-            boost::none /* timeseriesFields */, boost::none, boost::none, true, splitChunks);
+        auto rt =
+            cm->getRoutingTableHistory_ForTest().makeUpdated(boost::none /* timeseriesFields */,
+                                                             boost::none /* reshardingFields */,
+                                                             true,
+                                                             splitChunks);
 
         return CollectionMetadata(ChunkManager(cm->dbPrimary(),
                                                cm->dbVersion(),
@@ -176,8 +179,7 @@ protected:
 
         auto rt = cm->getRoutingTableHistory_ForTest().makeUpdated(
             boost::none /* timeseriesFields */,
-            boost::none,
-            boost::none,
+            boost::none /* reshardingFields */,
             true,
             {ChunkType(metadata.getUUID(), ChunkRange(minKey, maxKey), chunkVersion, kOtherShard)});
 

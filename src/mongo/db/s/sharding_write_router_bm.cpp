@@ -126,7 +126,6 @@ std::pair<std::vector<mongo::ChunkType>, mongo::ChunkManager> createChunks(
                                                      collTimestamp,
                                                      boost::none /* timeseriesFields */,
                                                      reshardingFields, /* reshardingFields */
-                                                     boost::none /* chunkSizeBytes */,
                                                      true,
                                                      chunks)),
                     boost::none);

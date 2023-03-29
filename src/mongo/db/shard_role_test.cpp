@@ -100,7 +100,6 @@ void installShardedCollectionMetadata(OperationContext* opCtx,
                                            timestamp,
                                            boost::none /* timeseriesFields */,
                                            boost::none /* resharding Fields */,
-                                           boost::none /* chunkSizeBytes */,
                                            true /* allowMigrations */,
                                            chunks);
 

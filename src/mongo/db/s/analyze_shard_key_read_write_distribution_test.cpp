@@ -119,7 +119,6 @@ protected:
                                          timestamp,
                                          boost::none /* timeseriesFields */,
                                          boost::none /* reshardingFields */,
-                                         boost::none /* maxChunkSizeBytes */,
                                          true /* allowMigrations */,
                                          chunks);
 

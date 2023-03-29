@@ -116,15 +116,6 @@ structs:
                               collection is the temporary resharding collection."
                 type: TypeCollectionReshardingFields
                 optional: true
-            maxChunkSizeBytes: 
-                type: safeInt64
-                description: "Max chunk size in bytes."
-                optional: true
-            allowAutoSplit: 
-                type: bool
-                description: "Specifies whether the auto-splitter should be running or not for this
-                              collection."
-                default: true
             allowMigrations:
                 cpp_name: pre50CompatibleAllowMigrations
                 type: bool
