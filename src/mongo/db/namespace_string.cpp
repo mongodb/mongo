@@ -217,6 +217,11 @@ NamespaceString NamespaceString::makeGlobalIndexNSS(const UUID& id) {
                            NamespaceString::kGlobalIndexCollectionPrefix + id.toString());
 }
 
+NamespaceString NamespaceString::makeMovePrimaryOplogBufferNSS(const UUID& migrationId) {
+    return NamespaceString(DatabaseName::kConfig,
+                           "movePrimaryOplogBuffer." + migrationId.toString());
+}
+
 NamespaceString NamespaceString::makePreImageCollectionNSS(
     const boost::optional<TenantId>& tenantId) {
     return NamespaceString{tenantId, DatabaseName::kConfig.db(), kPreImagesCollectionName};

@@ -55,7 +55,8 @@ enums:
         description: "The state of a movePrimary operation on the recipient side."
         type: string
         values:
-            kUninitialized: "uninitialized"
+            kUnused: "unused"
+            kInitializing: "initializing"
             kCloning: "cloning"
             kApplying: "applying"
             kBlocking: "blocking"
@@ -106,7 +107,7 @@ structs:
             state:
                 type: MovePrimaryRecipientState
                 description: "The state of the recipient during an in progress movePrimary operation."
-                default: kUninitialized
+                default: kUnused
             startApplyingDonorOpTime:
                 description: >-
                     Populated during data sync; the donor's operation time when the data
@@ -130,13 +131,6 @@ structs:
                     Populated during data sync; the recipient operation time when the data
                     cloning finishes.
                 type: optime
-                optional: true
-            recipientPrimaryStartingFCV:
-                description: >-
-                    The featureCompatibilityVersion of the recipient as recorded at the beginning
-                    of a migration attempt. Implicitly includes information on current upgrade or
-                    downgrade state.
-                type: fcv_string
                 optional: true
             completedUpdatingTransactionsBeforeStartOpTime:
                 description: >-

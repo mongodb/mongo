@@ -30,6 +30,9 @@
 #include "mongo/db/s/move_primary/move_primary_recipient_service.h"
 
 #include "mongo/db/s/move_primary/move_primary_util.h"
+#include "mongo/db/s/sharding_recovery_service.h"
+#include "mongo/executor/scoped_task_executor.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/str.h"
 #include <boost/none.hpp>
 
@@ -43,13 +46,16 @@
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/move_primary/move_primary_oplog_applier_progress_gen.h"
 #include "mongo/db/s/move_primary/move_primary_server_parameters_gen.h"
 #include "mongo/db/s/move_primary/move_primary_state_machine_gen.h"
+#include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/move_primary/move_primary_feature_flag_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_util.h"
@@ -58,14 +64,14 @@
 
 namespace mongo {
 
+MONGO_FAIL_POINT_DEFINE(movePrimaryRecipientPauseBeforeRunning);
 MONGO_FAIL_POINT_DEFINE(movePrimaryRecipientPauseAfterInsertingStateDoc);
-MONGO_FAIL_POINT_DEFINE(movePrimaryRecipientPauseAfterTransitionToCloningState);
-
-namespace {
-
-const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
-
-}  // namespace
+MONGO_FAIL_POINT_DEFINE(movePrimaryRecipientPauseAfterCloningState);
+MONGO_FAIL_POINT_DEFINE(movePrimaryRecipientPauseAfterApplyingState);
+MONGO_FAIL_POINT_DEFINE(movePrimaryRecipientPauseAfterBlockingState);
+MONGO_FAIL_POINT_DEFINE(movePrimaryRecipientPauseAfterPreparedState);
+MONGO_FAIL_POINT_DEFINE(movePrimaryRecipientPauseBeforeDeletingStateDoc);
+MONGO_FAIL_POINT_DEFINE(movePrimaryRecipientPauseBeforeCompletion);
 
 MovePrimaryRecipientService::MovePrimaryRecipientService(ServiceContext* serviceContext)
     : repl::PrimaryOnlyService(serviceContext), _serviceContext(serviceContext) {}
@@ -131,8 +137,11 @@ MovePrimaryRecipientService::MovePrimaryRecipient::MovePrimaryRecipient(
           return options;
       }())),
       _startApplyingDonorOpTime(recipientDoc.getStartApplyingDonorOpTime()),
+      _criticalSectionReason(BSON("reason"
+                                  << "Entering kPrepared state at MovePrimaryRecipientService"
+                                  << "operationInfo" << _metadata.toBSON())),
+      _resumedAfterFailover(recipientDoc.getState() > MovePrimaryRecipientStateEnum::kUnused),
       _state(recipientDoc.getState()){};
-
 
 void MovePrimaryRecipientService::MovePrimaryRecipient::checkIfOptionsConflict(
     const BSONObj& stateDoc) const {
@@ -157,93 +166,430 @@ MovePrimaryRecipientExternalStateImpl::sendCommandToShards(
 
 SemiFuture<void> MovePrimaryRecipientService::MovePrimaryRecipient::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
-    const CancellationToken& token) noexcept {
-    // (Generic FCV reference): This FCV check should exist across LTS binary versions.
-    if (serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading()) {
-        LOGV2(7271200, "Aborting movePrimary as the recipient is upgrading or downgrading");
+    const CancellationToken& stepDownToken) noexcept {
+
+    movePrimaryRecipientPauseBeforeRunning.pauseWhileSet();
+
+    // We would like to abort in all cases where there is a failover and we have not yet reached
+    // kPrepared state to maintain correctness of movePrimary operation across upgrades/downgrades
+    // in binary versions with feature parity in online movePrimary implementation.
+    auto shouldAbort = [&] {
+        if (!_useOnlineCloner()) {
+            stdx::lock_guard<Latch> lg(_mutex);
+            if (_resumedAfterFailover && _canAbort(lg)) {
+                return true;
+            }
+        }
+        return false;
+    }();
+
+    // Synchronize abort() called from a different thread before _ctHolder is initialized.
+    auto abortCalled = [&] {
+        stdx::lock_guard<Latch> lg(_mutex);
+        _ctHolder = std::make_unique<RecipientCancellationTokenHolder>(std::move(stepDownToken));
+        return _abortCalled;
+    }();
+
+    if (abortCalled || shouldAbort) {
+        abort();
     }
+
     _markKilledExecutor->startup();
-    _retryingCancelableOpCtxFactory.emplace(token, _markKilledExecutor);
+    _retryingCancelableOpCtxFactory.emplace(_ctHolder->getAbortToken(), _markKilledExecutor);
 
     return ExecutorFuture(**executor)
-        .then([this, token, executor] { return _persistRecipientDoc(executor, token); })
-        .then([this, self = shared_from_this()] {
+        .then([this, executor] { return _transitionToInitializingState(executor); })
+        .then([this] {
             {
                 stdx::lock_guard<Latch> lg(_mutex);
                 move_primary_util::ensureFulfilledPromise(lg, _recipientDocDurablePromise);
             }
-            movePrimaryRecipientPauseAfterInsertingStateDoc.pauseWhileSet();
+            auto opCtxHolder = cc().makeOperationContext();
+            auto opCtx = opCtxHolder.get();
+            movePrimaryRecipientPauseAfterInsertingStateDoc.pauseWhileSetAndNotCanceled(
+                opCtx, _ctHolder->getStepdownToken());
         })
-        .then([this, self = shared_from_this(), executor, token] {
-            return _initializeForCloningState(executor, token);
+        .then([this, executor] { return _initializeForCloningState(executor); })
+        .then([this, executor] { return _transitionToCloningState(executor); })
+        .then([this, executor] { return _transitionToApplyingState(executor); })
+        .then([this, executor] {
+            return _transitionToBlockingStateAndAcquireCriticalSection(executor);
         })
-        .then([this, self = shared_from_this(), executor, token] {
-            return _transitionToCloningState(executor, token);
+        .then([this, executor] { return _transitionToPreparedState(executor); })
+        .then([this, executor] {
+            auto forgetMigrationFuture = ([&] {
+                stdx::lock_guard<Latch> lg(_mutex);
+                return _forgetMigrationPromise.getFuture();
+            })();
+
+            return future_util::withCancellation(std::move(forgetMigrationFuture),
+                                                 _ctHolder->getAbortToken())
+                .thenRunOn(**executor)
+                .then([this, executor] {
+                    return _transitionToDoneStateAndFinishMovePrimaryOp(executor);
+                });
         })
-        .then([this, self = shared_from_this(), executor, token] {
-            return _transitionToApplyingState(executor, token);
+        .onError([this, executor](Status status) {
+            if (_ctHolder->isAborted()) {
+                _retryingCancelableOpCtxFactory.emplace(_ctHolder->getStepdownToken(),
+                                                        _markKilledExecutor);
+                LOGV2(7307002,
+                      "Recipient aborting movePrimary operation",
+                      "metadata"_attr = _metadata,
+                      "error"_attr = status);
+                return _transitionToAbortedStateAndCleanupOrphanedData(executor).then(
+                    [this, executor] {
+                        return _transitionToDoneStateAndFinishMovePrimaryOp(executor);
+                    });
+            }
+            return ExecutorFuture<void>(**executor, status);
+        })
+        .thenRunOn(_recipientService->getInstanceCleanupExecutor())
+        .onCompletion([this, self = shared_from_this()](Status status) {
+            if (!status.isOK()) {
+                LOGV2(7307003,
+                      "Recipient encountered error during movePrimary operation",
+                      "metadata"_attr = _metadata,
+                      "error"_attr = status);
+            }
+            _ensureUnfulfilledPromisesError(status);
+            movePrimaryRecipientPauseBeforeCompletion.pauseWhileSet();
         })
         .semi();
 }
 
+void MovePrimaryRecipientService::MovePrimaryRecipient::abort() {
+    stdx::lock_guard<Latch> lg(_mutex);
+    _abortCalled = true;
+    if (_ctHolder) {
+        _ctHolder->abort();
+    }
+}
+
 ExecutorFuture<void> MovePrimaryRecipientService::MovePrimaryRecipient::_transitionToCloningState(
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor, const CancellationToken& token) {
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     return _retryingCancelableOpCtxFactory
-        ->withAutomaticRetry([this, token, executor](const auto& factory) {
-            return ExecutorFuture(**executor).then([this, token, executor, factory] {
-                auto opCtx = factory.makeOperationContext(Client::getCurrent());
+        ->withAutomaticRetry([this, executor](const auto& factory) {
+            if (_checkInvalidStateTransition(MovePrimaryRecipientStateEnum::kCloning)) {
+                return;
+            }
+            auto opCtx = factory.makeOperationContext(Client::getCurrent());
+            _updateRecipientDocument(
+                opCtx.get(),
+                MovePrimaryRecipientDocument::kStateFieldName,
+                MovePrimaryRecipientState_serializer(MovePrimaryRecipientStateEnum::kCloning));
+            _transitionStateMachine(MovePrimaryRecipientStateEnum::kCloning);
+        })
+        .onTransientError([](const Status& status) {
+            LOGV2(7307000,
+                  "MovePrimaryRecipient encountered transient error in _transitionToCloningState",
+                  "error"_attr = redact(status));
+        })
+        .onUnrecoverableError([this](const Status& status) {
+            LOGV2_ERROR(7306911,
+                        "Recipient encountered unrecoverable error in _transitionToCloningState",
+                        "_metadata"_attr = _metadata,
+                        "_error"_attr = status);
+            abort();
+        })
+        .until<Status>([](const Status& status) { return status.isOK(); })
+        .on(**executor, _ctHolder->getAbortToken())
+        .onCompletion([this, executor](Status status) {
+            return _waitForMajority(executor).then([this] {
                 {
                     stdx::lock_guard<Latch> lg(_mutex);
-
-                    if (_state > MovePrimaryRecipientStateEnum::kUninitialized) {
-                        return;
-                    }
-
-                    _transitionStateMachine(lg, MovePrimaryRecipientStateEnum::kCloning);
+                    move_primary_util::ensureFulfilledPromise(lg, _dataClonePromise);
                 }
-                _updateRecipientDocumentState(opCtx.get(), MovePrimaryRecipientStateEnum::kCloning);
+                auto opCtxHolder = cc().makeOperationContext();
+                auto opCtx = opCtxHolder.get();
+                movePrimaryRecipientPauseAfterCloningState.pauseWhileSetAndNotCanceled(
+                    opCtx, _ctHolder->getStepdownToken());
             });
-        })
-        .onTransientError([](const Status& status) {})
-        .onUnrecoverableError([](const Status& status) {})
-        .until<Status>([](const Status& status) { return status.isOK(); })
-        .on(**executor, token)
-        .onCompletion([this, self = shared_from_this(), executor, token](Status status) {
-            {
-                stdx::lock_guard<Latch> lg(_mutex);
-                move_primary_util::ensureFulfilledPromise(lg, _recipientDataClonePromise);
-            }
-            movePrimaryRecipientPauseAfterTransitionToCloningState.pauseWhileSet();
         });
 }
 
 ExecutorFuture<void> MovePrimaryRecipientService::MovePrimaryRecipient::_transitionToApplyingState(
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor, const CancellationToken& token) {
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     return _retryingCancelableOpCtxFactory
-        ->withAutomaticRetry([this, token, executor](const auto& factory) {
-            auto opCtx = factory.makeOperationContext(Client::getCurrent());
-            {
-                stdx::lock_guard<Latch> lg(_mutex);
-
-                if (_state > MovePrimaryRecipientStateEnum::kCloning) {
-                    return;
-                }
-                _transitionStateMachine(lg, MovePrimaryRecipientStateEnum::kApplying);
+        ->withAutomaticRetry([this, executor](const auto& factory) {
+            if (_checkInvalidStateTransition(MovePrimaryRecipientStateEnum::kApplying)) {
+                return ExecutorFuture<void>(**executor);
             }
-            _updateRecipientDocumentState(opCtx.get(), MovePrimaryRecipientStateEnum::kApplying);
+            auto opCtx = factory.makeOperationContext(Client::getCurrent());
+            _updateRecipientDocument(
+                opCtx.get(),
+                MovePrimaryRecipientDocument::kStateFieldName,
+                MovePrimaryRecipientState_serializer(MovePrimaryRecipientStateEnum::kApplying));
+            _transitionStateMachine(MovePrimaryRecipientStateEnum::kApplying);
+            return ExecutorFuture<void>(**executor);
+        })
+        .onTransientError([](const Status& status) {})
+        .onUnrecoverableError([this](const Status& status) {
+            LOGV2_ERROR(7306912,
+                        "Recipient encountered unrecoverable error in _transitionToApplyingState",
+                        "_metadata"_attr = _metadata,
+                        "_error"_attr = status);
+            abort();
+        })
+        .until<Status>([](const Status& status) { return status.isOK(); })
+        .on(**executor, _ctHolder->getAbortToken())
+        .onCompletion([this, executor](Status status) {
+            return _waitForMajority(executor).then([this] {
+                auto opCtxHolder = cc().makeOperationContext();
+                auto opCtx = opCtxHolder.get();
+                movePrimaryRecipientPauseAfterApplyingState.pauseWhileSetAndNotCanceled(
+                    opCtx, _ctHolder->getStepdownToken());
+            });
+        });
+}
+
+ExecutorFuture<void> MovePrimaryRecipientService::MovePrimaryRecipient::
+    _transitionToBlockingStateAndAcquireCriticalSection(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+    return _retryingCancelableOpCtxFactory
+        ->withAutomaticRetry([this, executor](const auto& factory) {
+            return ExecutorFuture<void>(**executor)
+                .then([this, factory, executor] {
+                    if (_checkInvalidStateTransition(MovePrimaryRecipientStateEnum::kBlocking)) {
+                        return;
+                    }
+                    auto opCtx = factory.makeOperationContext(Client::getCurrent());
+                    _updateRecipientDocument(opCtx.get(),
+                                             MovePrimaryRecipientDocument::kStateFieldName,
+                                             MovePrimaryRecipientState_serializer(
+                                                 MovePrimaryRecipientStateEnum::kBlocking));
+                    _transitionStateMachine(MovePrimaryRecipientStateEnum::kBlocking);
+                })
+                .then([this, factory, executor] {
+                    auto opCtx = factory.makeOperationContext(Client::getCurrent());
+                    ShardingRecoveryService::get(opCtx.get())
+                        ->acquireRecoverableCriticalSectionBlockWrites(
+                            opCtx.get(),
+                            _metadata.getDatabaseName(),
+                            _criticalSectionReason,
+                            ShardingCatalogClient::kLocalWriteConcern);
+                    ShardingRecoveryService::get(opCtx.get())
+                        ->promoteRecoverableCriticalSectionToBlockAlsoReads(
+                            opCtx.get(),
+                            _metadata.getDatabaseName(),
+                            _criticalSectionReason,
+                            ShardingCatalogClient::kLocalWriteConcern);
+                });
+        })
+        .onTransientError([](const Status& status) {})
+        .onUnrecoverableError([this](const Status& status) {
+            LOGV2_ERROR(7306900,
+                        "Recipient encountered unrecoverable error in "
+                        "_transitionToBlockingStateAndAcquireCriticalSection",
+                        "_metadata"_attr = _metadata,
+                        "_error"_attr = status);
+            abort();
+        })
+        .until<Status>([](const Status& status) { return status.isOK(); })
+        .on(**executor, _ctHolder->getAbortToken())
+        .onCompletion([this, executor](Status status) {
+            return _waitForMajority(executor).then([this] {
+                auto opCtxHolder = cc().makeOperationContext();
+                auto opCtx = opCtxHolder.get();
+                movePrimaryRecipientPauseAfterBlockingState.pauseWhileSetAndNotCanceled(
+                    opCtx, _ctHolder->getStepdownToken());
+            });
+        });
+}
+
+ExecutorFuture<void> MovePrimaryRecipientService::MovePrimaryRecipient::_transitionToPreparedState(
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+    return _retryingCancelableOpCtxFactory
+        ->withAutomaticRetry([this, executor](const auto& factory) {
+            if (_checkInvalidStateTransition(MovePrimaryRecipientStateEnum::kPrepared)) {
+                return;
+            }
+            auto opCtx = factory.makeOperationContext(Client::getCurrent());
+            _updateRecipientDocument(
+                opCtx.get(),
+                MovePrimaryRecipientDocument::kStateFieldName,
+                MovePrimaryRecipientState_serializer(MovePrimaryRecipientStateEnum::kPrepared));
+            _transitionStateMachine(MovePrimaryRecipientStateEnum::kPrepared);
+        })
+        .onTransientError([](const Status& status) {})
+        .onUnrecoverableError([this](const Status& status) {
+            LOGV2_ERROR(7306910,
+                        "Recipient encountered unrecoverable error in _transitionToPreparedState",
+                        "_metadata"_attr = _metadata,
+                        "_error"_attr = status);
+            abort();
+        })
+        .until<Status>([](const Status& status) { return status.isOK(); })
+        .on(**executor, _ctHolder->getAbortToken())
+        .onCompletion([this, executor](Status status) {
+            return _waitForMajority(executor).then([this] {
+                {
+                    stdx::lock_guard<Latch> lg(_mutex);
+                    move_primary_util::ensureFulfilledPromise(lg, _preparedPromise);
+                }
+
+                auto opCtxHolder = cc().makeOperationContext();
+                auto opCtx = opCtxHolder.get();
+                movePrimaryRecipientPauseAfterPreparedState.pauseWhileSetAndNotCanceled(
+                    opCtx, _ctHolder->getStepdownToken());
+            });
+        });
+}
+
+ExecutorFuture<void>
+MovePrimaryRecipientService::MovePrimaryRecipient::_transitionToAbortedStateAndCleanupOrphanedData(
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+    return _retryingCancelableOpCtxFactory
+        ->withAutomaticRetry([this, executor](const auto& factory) {
+            return ExecutorFuture(**executor)
+                .then([this, factory] {
+                    auto opCtx = factory.makeOperationContext(Client::getCurrent());
+                    _updateRecipientDocument(opCtx.get(),
+                                             MovePrimaryRecipientDocument::kStateFieldName,
+                                             MovePrimaryRecipientState_serializer(
+                                                 MovePrimaryRecipientStateEnum::kAborted));
+                    _transitionStateMachine(MovePrimaryRecipientStateEnum::kAborted);
+                })
+                .then([] {
+                    // cleanup orphaned data by calling cloner's method
+                });
         })
         .onTransientError([](const Status& status) {})
         .onUnrecoverableError([](const Status& status) {})
         .until<Status>([](const Status& status) { return status.isOK(); })
-        .on(**executor, token);
+        .on(**executor, _ctHolder->getStepdownToken())
+        .onCompletion([this, self = shared_from_this(), executor](Status status) {
+            return _waitForMajority(executor).then([this, executor, status] {
+                if (!status.isOK()) {
+                    LOGV2(7307001,
+                          "MovePrimaryRecipient encountered error in "
+                          "_transitionToAbortedStateAndCleanupOrphanedData",
+                          "error"_attr = status);
+                }
+                // Intentionally return OK status after logging as the abort is best effort.
+                return ExecutorFuture<void>(**executor, Status::OK());
+            });
+        });
+}
+
+ExecutorFuture<void>
+MovePrimaryRecipientService::MovePrimaryRecipient::_transitionToDoneStateAndFinishMovePrimaryOp(
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+    _retryingCancelableOpCtxFactory.emplace(_ctHolder->getStepdownToken(), _markKilledExecutor);
+    return _retryingCancelableOpCtxFactory
+        ->withAutomaticRetry([this, executor](const auto& factory) {
+            return ExecutorFuture<void>(**executor)
+                .then([this, factory, executor] {
+                    auto opCtx = factory.makeOperationContext(Client::getCurrent());
+                    if (_checkInvalidStateTransition(MovePrimaryRecipientStateEnum::kDone)) {
+                        return;
+                    }
+
+                    _updateRecipientDocument(
+                        opCtx.get(),
+                        MovePrimaryRecipientDocument::kStateFieldName,
+                        MovePrimaryRecipientState_serializer(MovePrimaryRecipientStateEnum::kDone));
+                    _transitionStateMachine(MovePrimaryRecipientStateEnum::kDone);
+                })
+                .then([this, factory, executor] {
+                    auto opCtx = factory.makeOperationContext(Client::getCurrent());
+                    _cleanUpOperationMetadata(opCtx.get(), executor);
+                })
+                .then([this, factory, executor] {
+                    auto opCtx = factory.makeOperationContext(Client::getCurrent());
+                    ShardingRecoveryService::get(opCtx.get())
+                        ->releaseRecoverableCriticalSection(
+                            opCtx.get(),
+                            _metadata.getDatabaseName(),
+                            _criticalSectionReason,
+                            ShardingCatalogClient::kLocalWriteConcern);
+                    movePrimaryRecipientPauseBeforeDeletingStateDoc.pauseWhileSetAndNotCanceled(
+                        opCtx.get(), _ctHolder->getStepdownToken());
+                    _removeRecipientDocument(opCtx.get());
+                })
+                .then([this, self = shared_from_this()] {
+                    stdx::lock_guard<Latch> lg(_mutex);
+                    move_primary_util::ensureFulfilledPromise(lg, _completionPromise);
+                });
+        })
+        .onTransientError([](const Status& status) {})
+        .onUnrecoverableError([](const Status& status) {
+            LOGV2(7306901,
+                  "Received unrecoverable error in _transitionToDoneStateAndFinishMovePrimaryOp",
+                  "error"_attr = status);
+        })
+        .until<Status>([](const Status& status) { return status.isOK(); })
+        .on(**executor, _ctHolder->getStepdownToken())
+        .onCompletion([this, executor](Status status) {
+            if (_ctHolder->isAborted()) {
+                // Override status code to aborted after logging the original error
+                status = {ErrorCodes::MovePrimaryAborted, "movePrimary operation aborted"};
+            }
+            return _waitForMajority(executor).then(
+                [this, executor, status] { return ExecutorFuture<void>(**executor, status); });
+        });
+}
+
+void MovePrimaryRecipientService::MovePrimaryRecipient::_cleanUpOperationMetadata(
+    OperationContext* opCtx, const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+    // Drop temp oplog buffer
+    resharding::data_copy::ensureCollectionDropped(
+        opCtx, NamespaceString::makeMovePrimaryOplogBufferNSS(_metadata.get_id()));
+
+    // Drop oplog applier progress document
+    PersistentTaskStore<MovePrimaryOplogApplierProgress> store(
+        NamespaceString::kMovePrimaryApplierProgressNamespace);
+    store.remove(opCtx,
+                 BSON(MovePrimaryRecipientDocument::k_idFieldName << _metadata.get_id()),
+                 WriteConcerns::kLocalWriteConcern);
+}
+
+void MovePrimaryRecipientService::MovePrimaryRecipient::_removeRecipientDocument(
+    OperationContext* opCtx) {
+    // Delete state document
+    PersistentTaskStore<MovePrimaryRecipientDocument> store(
+        NamespaceString::kMovePrimaryRecipientNamespace);
+    store.remove(opCtx,
+                 BSON(MovePrimaryRecipientDocument::k_idFieldName << _metadata.get_id()),
+                 WriteConcerns::kLocalWriteConcern);
+    LOGV2(7306902, "Removed recipient document for movePrimary op", "metadata"_attr = _metadata);
+}
+
+SharedSemiFuture<void>
+MovePrimaryRecipientService::MovePrimaryRecipient::onReceiveForgetMigration() {
+    stdx::lock_guard<Latch> lg(_mutex);
+    move_primary_util::ensureFulfilledPromise(lg, _forgetMigrationPromise);
+    return _completionPromise.getFuture();
+}
+
+SharedSemiFuture<void> MovePrimaryRecipientService::MovePrimaryRecipient::onReceiveSyncData(
+    Timestamp blockTimestamp) {
+    return _preparedPromise.getFuture();
+}
+
+void MovePrimaryRecipientService::MovePrimaryRecipient::_ensureUnfulfilledPromisesError(
+    Status status) {
+    stdx::lock_guard<Latch> lg(_mutex);
+    if (!_recipientDocDurablePromise.getFuture().isReady()) {
+        _recipientDocDurablePromise.setError(status);
+    }
+    if (!_dataClonePromise.getFuture().isReady()) {
+        _dataClonePromise.setError(status);
+    }
+    if (!_preparedPromise.getFuture().isReady()) {
+        _preparedPromise.setError(status);
+    }
+    if (!_forgetMigrationPromise.getFuture().isReady()) {
+        _forgetMigrationPromise.setError(status);
+    }
+    if (!_completionPromise.getFuture().isReady()) {
+        _completionPromise.setError(status);
+    }
 }
 
 void MovePrimaryRecipientService::MovePrimaryRecipient::_transitionStateMachine(
-    WithLock, MovePrimaryRecipientStateEnum newState) {
-    // This can happen during a retry of AsyncTry loop.
-    if (newState == _state) {
-        return;
-    }
+    MovePrimaryRecipientStateEnum newState) {
+    stdx::lock_guard<Latch> lg(_mutex);
     invariant(newState > _state);
 
     std::swap(_state, newState);
@@ -256,32 +602,48 @@ void MovePrimaryRecipientService::MovePrimaryRecipient::_transitionStateMachine(
           "fromShard"_attr = _metadata.getShardName());
 }
 
-ExecutorFuture<void> MovePrimaryRecipientService::MovePrimaryRecipient::_persistRecipientDoc(
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor, const CancellationToken& token) {
-    return ExecutorFuture(**executor).then([this, token, executor] {
-        {
-            stdx::lock_guard<Latch> lg(_mutex);
-
-            if (_state > MovePrimaryRecipientStateEnum::kUninitialized) {
+ExecutorFuture<void>
+MovePrimaryRecipientService::MovePrimaryRecipient::_transitionToInitializingState(
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
+    return _retryingCancelableOpCtxFactory
+        ->withAutomaticRetry([this, executor](const auto& factory) {
+            if (_resumedAfterFailover) {
                 return;
             }
-        }
-        auto opCtxHolder = cc().makeOperationContext();
-        auto opCtx = opCtxHolder.get();
+            auto opCtxHolder = cc().makeOperationContext();
+            auto opCtx = opCtxHolder.get();
 
-        MovePrimaryRecipientDocument recipientDoc;
-        recipientDoc.setMetadata(_metadata);
-        recipientDoc.setState(MovePrimaryRecipientStateEnum::kCloning);
-        recipientDoc.setStartAt(_serviceContext->getPreciseClockSource()->now());
+            MovePrimaryRecipientDocument recipientDoc;
+            recipientDoc.setMetadata(_metadata);
+            recipientDoc.setState(MovePrimaryRecipientStateEnum::kInitializing);
+            recipientDoc.setStartAt(_serviceContext->getPreciseClockSource()->now());
 
-        PersistentTaskStore<MovePrimaryRecipientDocument> store(
-            NamespaceString::kMovePrimaryRecipientNamespace);
-        store.add(opCtx, recipientDoc, WriteConcerns::kMajorityWriteConcernNoTimeout);
-    });
+            PersistentTaskStore<MovePrimaryRecipientDocument> store(
+                NamespaceString::kMovePrimaryRecipientNamespace);
+            store.add(opCtx, recipientDoc, WriteConcerns::kLocalWriteConcern);
+
+            _transitionStateMachine(MovePrimaryRecipientStateEnum::kInitializing);
+        })
+        .onTransientError([](const Status& status) {})
+        .onUnrecoverableError([this](const Status& status) {
+            LOGV2(7306800,
+                  "Received unrecoverable error in _transitionToInitializingState",
+                  "error"_attr = status);
+            abort();
+        })
+        .until<Status>([](const Status& status) { return status.isOK(); })
+        .on(**executor, _ctHolder->getAbortToken())
+        .onCompletion([this, executor](Status status) {
+            return _waitForMajority(executor).then([this] {
+                LOGV2(7306903,
+                      "MovePrimaryRecipient persisted state doc",
+                      "metadata"_attr = _metadata);
+            });
+        });
 }
 
 ExecutorFuture<void> MovePrimaryRecipientService::MovePrimaryRecipient::_initializeForCloningState(
-    const std::shared_ptr<executor::ScopedTaskExecutor>& executor, const CancellationToken& token) {
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     return _retryingCancelableOpCtxFactory
         ->withAutomaticRetry([this, executor](const auto& factory) {
             auto opCtx = factory.makeOperationContext(Client::getCurrent());
@@ -295,13 +657,14 @@ ExecutorFuture<void> MovePrimaryRecipientService::MovePrimaryRecipient::_initial
                 _startApplyingDonorOpTime.get().toBSON());
         })
         .onTransientError([](const Status& status) {})
-        .onUnrecoverableError([](const Status& status) {
-            LOGV2(7306800,
+        .onUnrecoverableError([this](const Status& status) {
+            LOGV2(7306801,
                   "Received unrecoverable error while initializing for cloning state",
                   "error"_attr = status);
+            abort();
         })
         .until<Status>([](const Status& status) { return status.isOK(); })
-        .on(**executor, token);
+        .on(**executor, _ctHolder->getAbortToken());
 }
 
 template <class T>
@@ -320,14 +683,7 @@ void MovePrimaryRecipientService::MovePrimaryRecipient::_updateRecipientDocument
     store.update(opCtx,
                  BSON(MovePrimaryRecipientDocument::k_idFieldName << _metadata.get_id()),
                  updateBuilder.done(),
-                 WriteConcerns::kMajorityWriteConcernNoTimeout);
-}
-
-void MovePrimaryRecipientService::MovePrimaryRecipient::_updateRecipientDocumentState(
-    OperationContext* opCtx, MovePrimaryRecipientStateEnum state) {
-    _updateRecipientDocument(opCtx,
-                             MovePrimaryRecipientDocument::kStateFieldName,
-                             MovePrimaryRecipientState_serializer(state));
+                 WriteConcerns::kLocalWriteConcern);
 }
 
 repl::OpTime MovePrimaryRecipientService::MovePrimaryRecipient::_getStartApplyingDonorOpTime(
@@ -366,7 +722,23 @@ MovePrimaryRecipientService::MovePrimaryRecipient::_getShardedCollectionsFromCon
     return shardedColls;
 }
 
-void MovePrimaryRecipientService::MovePrimaryRecipient::interrupt(Status status) {}
+bool MovePrimaryRecipientService::MovePrimaryRecipient::_checkInvalidStateTransition(
+    MovePrimaryRecipientStateEnum newState) {
+    stdx::lock_guard<Latch> lg(_mutex);
+    return newState <= _state;
+}
+
+ExecutorFuture<void> MovePrimaryRecipientService::MovePrimaryRecipient::_waitForMajority(
+    std::shared_ptr<executor::ScopedTaskExecutor> executor) {
+    return ExecutorFuture<void>(**executor).then([this] {
+        auto opCtxHolder = cc().makeOperationContext();
+        auto opCtx = opCtxHolder.get();
+        repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+        auto clientOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
+        return WaitForMajorityService::get(_serviceContext)
+            .waitUntilMajority(std::move(clientOpTime), _ctHolder->getStepdownToken());
+    });
+}
 
 boost::optional<BSONObj> MovePrimaryRecipientService::MovePrimaryRecipient::reportForCurrentOp(
     MongoProcessInterface::CurrentOpConnectionsMode connMode,
@@ -380,6 +752,14 @@ NamespaceString MovePrimaryRecipientService::MovePrimaryRecipient::getDatabaseNa
 
 UUID MovePrimaryRecipientService::MovePrimaryRecipient::getMigrationId() const {
     return _metadata.get_id();
+}
+
+bool MovePrimaryRecipientService::MovePrimaryRecipient::_canAbort(WithLock) const {
+    return _state < MovePrimaryRecipientStateEnum::kPrepared;
+}
+
+bool MovePrimaryRecipientService::MovePrimaryRecipient::_useOnlineCloner() const {
+    return false;
 }
 
 }  // namespace mongo

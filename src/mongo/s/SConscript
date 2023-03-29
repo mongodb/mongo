@@ -225,6 +225,7 @@ env.Library(
         'index_version.cpp',
         'index_version.idl',
         'mongod_and_mongos_server_parameters.idl',
+        'move_primary/move_primary_feature_flag.idl',
         'refresh_query_analyzer_configuration_cmd.idl',
         'request_types/abort_reshard_collection.idl',
         'request_types/add_shard_request_type.cpp',

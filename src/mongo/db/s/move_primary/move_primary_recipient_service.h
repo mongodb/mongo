@@ -34,6 +34,7 @@
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/s/move_primary/move_primary_recipient_cmds_gen.h"
 #include "mongo/db/s/resharding/resharding_future_util.h"
+#include "mongo/executor/scoped_task_executor.h"
 #include "mongo/s/async_requests_sender.h"
 #include <boost/optional.hpp>
 #include <memory>
@@ -73,6 +74,65 @@ public:
         const BSONObj& command,
         const std::vector<ShardId>& shardIds,
         const std::shared_ptr<executor::TaskExecutor>& executor) override;
+};
+
+class RecipientCancellationTokenHolder {
+public:
+    RecipientCancellationTokenHolder(CancellationToken stepdownToken)
+        : _stepdownToken(stepdownToken),
+          _abortSource(CancellationSource(stepdownToken)),
+          _abortToken(_abortSource.token()) {}
+
+    /**
+     * Returns whether any token has been canceled.
+     */
+    bool isCanceled() {
+        return _stepdownToken.isCanceled() || _abortToken.isCanceled();
+    }
+
+    /**
+     * Returns true if an abort was triggered by user or if the recipient decided to abort the
+     * operation.
+     */
+    bool isAborted() {
+        return !_stepdownToken.isCanceled() && _abortToken.isCanceled();
+    }
+
+    /**
+     * Returns whether the stepdownToken has been canceled, indicating that the shard's underlying
+     * replica set node is stepping down or shutting down.
+     */
+    bool isSteppingOrShuttingDown() {
+        return _stepdownToken.isCanceled();
+    }
+
+    /**
+     * Cancels the source created by this class, in order to indicate to holders of the abortToken
+     * that the movePrimary operation has been aborted.
+     */
+    void abort() {
+        _abortSource.cancel();
+    }
+
+    const CancellationToken& getStepdownToken() {
+        return _stepdownToken;
+    }
+
+    const CancellationToken& getAbortToken() {
+        return _abortToken;
+    }
+
+private:
+    // The token passed in by the PrimaryOnlyService runner that is canceled when this shard's
+    // underlying replica set node is stepping down or shutting down.
+    CancellationToken _stepdownToken;
+
+    // The source created by inheriting from the stepdown token.
+    CancellationSource _abortSource;
+
+    // The token to wait on in cases where a user wants to wait on either a movePrimary operation
+    // being aborted or the replica set node stepping/shutting down.
+    CancellationToken _abortToken;
 };
 
 /**
@@ -117,25 +177,48 @@ public:
         SemiFuture<void> run(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                              const CancellationToken& token) noexcept final;
 
-        /*
-         * Interrupts the running instance and cause the completion future to complete with
-         * 'status'.
+        /**
+         * This service relies on the stepdown token passed to run method of base class and hence
+         * ignores the interrupts.
          */
-        void interrupt(Status status) override;
+        void interrupt(Status status) override{};
 
         /**
-         * Returns a Future that will be resolved when the recipient doc is persisted on disk.
+         * Aborts the ongoing movePrimary operation which may be user initiated.
+         */
+        void abort();
+
+        /**
+         * Returns a Future that will be resolved when _recipientDocDurablePromise is fulfilled.
          */
         SharedSemiFuture<void> getRecipientDocDurableFuture() const {
             return _recipientDocDurablePromise.getFuture();
         }
 
         /**
-         * Returns a Future that will be resolved when the instance successfully clones documents.
+         * Returns a Future that will be resolved when the _dataClonePromise is fulfilled.
          */
-        SharedSemiFuture<void> getRecipientDataClonedFuture() const {
-            return _recipientDataClonePromise.getFuture();
+        SharedSemiFuture<void> getDataClonedFuture() const {
+            return _dataClonePromise.getFuture();
         }
+
+        /**
+         * Returns a Future that will be resolved when the recipient instance finishes movePrimary
+         * op.
+         */
+        SharedSemiFuture<void> getCompletionFuture() const {
+            return _completionPromise.getFuture();
+        }
+
+        /**
+         * Fulfills _forgetMigrationPromise and returns future from _completionPromise.
+         */
+        SharedSemiFuture<void> onReceiveForgetMigration();
+
+        /**
+         * Returns Future that will be resolved when the _preparedPromise is fulfilled.
+         */
+        SharedSemiFuture<void> onReceiveSyncData(Timestamp blockTimestamp);
 
         /**
          * Report MovePrimaryRecipientService Instances in currentOp().
@@ -151,36 +234,63 @@ public:
         UUID getMigrationId() const;
 
     private:
-        ExecutorFuture<void> _transitionToCloningState(
-            const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-            const CancellationToken& token);
+        ExecutorFuture<void> _transitionToInitializingState(
+            const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
-        ExecutorFuture<void> _persistRecipientDoc(
-            const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-            const CancellationToken& token);
+        ExecutorFuture<void> _transitionToCloningState(
+            const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
         ExecutorFuture<void> _initializeForCloningState(
-            const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-            const CancellationToken& token);
+            const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
         ExecutorFuture<void> _transitionToApplyingState(
-            const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-            const CancellationToken& token);
+            const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+
+        ExecutorFuture<void> _transitionToBlockingStateAndAcquireCriticalSection(
+            const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+
+        ExecutorFuture<void> _transitionToPreparedState(
+            const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+
+        ExecutorFuture<void> _transitionToAbortedStateAndCleanupOrphanedData(
+            const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+
+        ExecutorFuture<void> _transitionToDoneStateAndFinishMovePrimaryOp(
+            const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+
+        void _cleanUpOperationMetadata(
+            OperationContext* opCtx, const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+
+        void _removeRecipientDocument(OperationContext* opCtx);
+
+        void _ensureUnfulfilledPromisesError(Status status);
 
         std::vector<NamespaceString> _getShardedCollectionsFromConfigSvr(
             OperationContext* opCtx) const;
 
-        void _transitionStateMachine(WithLock, MovePrimaryRecipientStateEnum newState);
+        void _transitionStateMachine(MovePrimaryRecipientStateEnum newState);
 
         template <class T>
         void _updateRecipientDocument(OperationContext* opCtx,
                                       const StringData& fieldName,
                                       T value);
-        void _updateRecipientDocumentState(OperationContext* opCtx,
-                                           MovePrimaryRecipientStateEnum state);
 
         repl::OpTime _getStartApplyingDonorOpTime(
             OperationContext* opCtx, const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+
+        bool _checkInvalidStateTransition(MovePrimaryRecipientStateEnum newState);
+
+        bool _canAbort(WithLock) const;
+
+        bool _useOnlineCloner() const;
+
+        /**
+         * Waits for majority write concern for client's last applied opTime. Cancels on stepDown.
+         * This is needed after each state transition completes in future chain because disk updates
+         * are done with kLocalWriteConcern in the _retryingCancelableOpCtxFactory retry loops.
+         */
+        ExecutorFuture<void> _waitForMajority(
+            std::shared_ptr<executor::ScopedTaskExecutor> executor);
 
         const NamespaceString _stateDocumentNS = NamespaceString::kMovePrimaryRecipientNamespace;
 
@@ -203,8 +313,19 @@ public:
 
         std::vector<NamespaceString> _shardedColls;
 
+        const BSONObj _criticalSectionReason;
+
+        const bool _resumedAfterFailover;
+
         // To synchronize operations on mutable states below.
         Mutex _mutex = MONGO_MAKE_LATCH("MovePrimaryRecipient::_mutex");
+
+        // Used to catch the case when abort is called from a different thread around the time run()
+        // is called.
+        bool _abortCalled{false};
+
+        // Holds the cancellation tokens relevant to the MovePrimaryRecipientService.
+        std::unique_ptr<RecipientCancellationTokenHolder> _ctHolder;
 
         MovePrimaryRecipientStateEnum _state;
 
@@ -213,10 +334,22 @@ public:
 
         // Promise that is resolved when the recipient successfully clones documents and transitions
         // to kApplying state.
-        SharedPromise<void> _recipientDataClonePromise;
+        SharedPromise<void> _dataClonePromise;
+
+        // Promise that is resolved when the recipient successfully applies oplog entries till
+        // blockTimestamp from donor and enters kPrepared state
+        SharedPromise<void> _preparedPromise;
+
+        // Promise that is resolved when the recipient receives movePrimaryRecipientForgetMigration.
+        SharedPromise<void> _forgetMigrationPromise;
+
+        // Promise that is resolved when all the needed work for movePrimary op is completed at the
+        // recipient for a successful or unsuccessful operation both.
+        SharedPromise<void> _completionPromise;
     };
 
 protected:
+    static constexpr StringData movePrimaryOpLogBufferPrefix = "movePrimaryOplogBuffer"_sd;
     ServiceContext* const _serviceContext;
 };
 

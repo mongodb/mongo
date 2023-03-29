@@ -31,6 +31,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/repl/primary_only_service_op_observer.h"
 #include "mongo/db/repl/primary_only_service_test_fixture.h"
@@ -39,20 +40,37 @@
 #include "mongo/db/s/move_primary/move_primary_recipient_cmds_gen.h"
 #include "mongo/db/s/move_primary/move_primary_recipient_service.h"
 #include "mongo/db/s/move_primary/move_primary_state_machine_gen.h"
+#include "mongo/db/s/resharding/resharding_service_test_helpers.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/s/sharding_mongod_test_fixture.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/executor/remote_command_request.h"
+#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/catalog/sharding_catalog_client_mock.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/config_server_catalog_cache_loader.h"
 #include "mongo/s/sharding_router_test_fixture.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/util/fail_point.h"
 #include <memory>
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
 
 namespace {
+
+using MovePrimaryRecipientStateTransitionController =
+    resharding_service_test_helpers::StateTransitionController<MovePrimaryRecipientStateEnum>;
+using OpObserverForTest = resharding_service_test_helpers::StateTransitionControllerOpObserver<
+    MovePrimaryRecipientStateEnum,
+    MovePrimaryRecipientDocument>;
+using PauseDuringStateTransition =
+    resharding_service_test_helpers::PauseDuringStateTransitions<MovePrimaryRecipientStateEnum>;
+
 const std::vector<ShardType> kShardList = {ShardType("shard0", "host0"),
                                            ShardType("shard1", "host1")};
 
@@ -87,7 +105,7 @@ public:
     std::shared_ptr<PrimaryOnlyService::Instance> constructInstance(
         BSONObj initialStateDoc) override {
         auto recipientStateDoc = MovePrimaryRecipientDocument::parse(
-            IDLParserContext("MovePrimaryRecipientService::constructInstance"),
+            IDLParserContext("MovePrimaryRecipientServiceForTest::constructInstance"),
             std::move(initialStateDoc));
 
         return std::make_shared<MovePrimaryRecipientService::MovePrimaryRecipient>(
@@ -103,8 +121,8 @@ class MovePrimaryRecipientServiceTest : public ShardServerTestFixture {
     void setUp() override {
         ShardServerTestFixture::setUp();
 
-        auto serviceContext = getServiceContext();
-        WaitForMajorityService::get(serviceContext).startup(serviceContext);
+        _serviceCtx = getServiceContext();
+        WaitForMajorityService::get(_serviceCtx).startup(_serviceCtx);
 
         auto opCtx = operationContext();
 
@@ -115,25 +133,42 @@ class MovePrimaryRecipientServiceTest : public ShardServerTestFixture {
             shardTargeter->setFindHostReturnValue(makeHostAndPort(shardType.getName()));
         }
 
-        _opObserverRegistry = checked_cast<OpObserverRegistry*>(serviceContext->getOpObserver());
+        _controller = std::make_shared<MovePrimaryRecipientStateTransitionController>();
+
+        _opObserverRegistry = checked_cast<OpObserverRegistry*>(_serviceCtx->getOpObserver());
 
         invariant(_opObserverRegistry);
 
         _opObserverRegistry->addObserver(
-            std::make_unique<repl::PrimaryOnlyServiceOpObserver>(serviceContext));
+            std::make_unique<repl::PrimaryOnlyServiceOpObserver>(_serviceCtx));
 
-        _registry = repl::PrimaryOnlyServiceRegistry::get(serviceContext);
-        auto service = std::make_unique<MovePrimaryRecipientServiceForTest>(serviceContext);
+        _opObserverRegistry->addObserver(std::make_unique<OpObserverForTest>(
+            _controller,
+            NamespaceString::kMovePrimaryRecipientNamespace,
+            [](const MovePrimaryRecipientDocument& stateDoc) { return stateDoc.getState(); }));
+
+        _registry = repl::PrimaryOnlyServiceRegistry::get(_serviceCtx);
+        auto service = std::make_unique<MovePrimaryRecipientServiceForTest>(_serviceCtx);
+
         auto serviceName = service->getServiceName();
         _registry->registerService(std::move(service));
 
         _service = _registry->lookupServiceByName(serviceName);
 
+
         _registry->onStartup(opCtx);
-        stepUpPOS();
+        _stepUpPOS();
     }
 
-    void stepUpPOS() {
+    void tearDown() override {
+        globalFailPointRegistry().disableAllFailpoints();
+        WaitForMajorityService::get(getServiceContext()).shutDown();
+        _registry->onShutdown();
+
+        ShardServerTestFixture::tearDown();
+    }
+
+    void _stepUpPOS() {
         auto opCtx = operationContext();
         auto replCoord = repl::ReplicationCoordinator::get(getServiceContext());
         WriteUnitOfWork wuow{operationContext()};
@@ -143,14 +178,6 @@ class MovePrimaryRecipientServiceTest : public ShardServerTestFixture {
         replCoord->setMyLastAppliedOpTimeAndWallTime({newOpTime, {}});
 
         _registry->onStepUpComplete(opCtx, _term);
-    }
-
-    void tearDown() override {
-        globalFailPointRegistry().disableAllFailpoints();
-        WaitForMajorityService::get(getServiceContext()).shutDown();
-        _registry->onShutdown();
-
-        ShardServerTestFixture::tearDown();
     }
 
     std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient() override {
@@ -204,27 +231,116 @@ protected:
         return doc;
     }
 
-    MovePrimaryRecipientDocument getRecipientDoc(OperationContext* opCtx) {
+    MovePrimaryRecipientDocument getRecipientDoc(OperationContext* opCtx, UUID migrationId) {
         DBDirectClient client(opCtx);
-        auto doc = client.findOne(NamespaceString::kMovePrimaryRecipientNamespace, BSONObj{});
+        auto doc = client.findOne(NamespaceString::kMovePrimaryRecipientNamespace,
+                                  BSON("_id" << migrationId));
+        ASSERT_FALSE(doc.isEmpty());
         return MovePrimaryRecipientDocument::parse(
             IDLParserContext("MovePrimaryRecipientServiceTest::getRecipientDoc"), doc);
+    }
+
+    std::shared_ptr<MovePrimaryRecipientService::MovePrimaryRecipient> lookupRecipient(
+        OperationContext* opCtx, repl::PrimaryOnlyService::InstanceID instanceId) {
+        auto recipientOpt =
+            MovePrimaryRecipientService::MovePrimaryRecipient::lookup(opCtx, _service, instanceId);
+        return recipientOpt ? recipientOpt.get() : nullptr;
+    }
+
+    void waitUntilDocDeleted(OperationContext* opCtx, NamespaceString nss, UUID migrationId) {
+        DBDirectClient client(opCtx);
+        int cnt = 1000;
+        while (cnt--) {
+            DBDirectClient client(opCtx);
+            auto recipientDoc = client.findOne(nss, BSON("_id" << migrationId));
+            if (recipientDoc.isEmpty()) {
+                return;
+            }
+
+            sleepmillis(60);
+        }
+        FAIL(str::stream() << "Timed out waiting for delete of doc with migrationId: "
+                           << migrationId);
     }
 
     OpObserverRegistry* _opObserverRegistry = nullptr;
     repl::PrimaryOnlyServiceRegistry* _registry = nullptr;
     repl::PrimaryOnlyService* _service = nullptr;
+    std::shared_ptr<MovePrimaryRecipientStateTransitionController> _controller;
+    ServiceContext* _serviceCtx = nullptr;
     long long _term = 0;
 };
 
-TEST_F(MovePrimaryRecipientServiceTest, MovePrimaryRecipientInstanceCreation) {
+TEST_F(MovePrimaryRecipientServiceTest, CanRunToCompletion) {
     auto doc = createRecipientDoc();
     auto opCtx = operationContext();
 
-    auto instance = MovePrimaryRecipientService::MovePrimaryRecipient::getOrCreate(
+    auto recipient = MovePrimaryRecipientService::MovePrimaryRecipient::getOrCreate(
+        opCtx, _service, doc.toBSON());
+    auto future = recipient->onReceiveForgetMigration();
+    future.get(opCtx);
+}
+
+TEST_F(MovePrimaryRecipientServiceTest, TransitionsThroughEachStateInRunToCompletion) {
+    const std::vector<MovePrimaryRecipientStateEnum> recipientStates{
+        MovePrimaryRecipientStateEnum::kInitializing,
+        MovePrimaryRecipientStateEnum::kCloning,
+        MovePrimaryRecipientStateEnum::kApplying,
+        MovePrimaryRecipientStateEnum::kBlocking,
+        MovePrimaryRecipientStateEnum::kPrepared,
+        MovePrimaryRecipientStateEnum::kDone};
+
+    const std::vector<std::pair<MovePrimaryRecipientStateEnum, std::string>> stateFPNames{
+        {MovePrimaryRecipientStateEnum::kInitializing,
+         "movePrimaryRecipientPauseAfterInsertingStateDoc"},
+        {MovePrimaryRecipientStateEnum::kCloning, "movePrimaryRecipientPauseAfterCloningState"},
+        {MovePrimaryRecipientStateEnum::kApplying, "movePrimaryRecipientPauseAfterApplyingState"},
+        {MovePrimaryRecipientStateEnum::kBlocking, "movePrimaryRecipientPauseAfterBlockingState"},
+        {MovePrimaryRecipientStateEnum::kPrepared, "movePrimaryRecipientPauseAfterPreparedState"},
+        {MovePrimaryRecipientStateEnum::kDone, "movePrimaryRecipientPauseBeforeDeletingStateDoc"}};
+
+    std::map<MovePrimaryRecipientStateEnum, std::pair<FailPoint*, int>> stateFailPointMap;
+
+    PauseDuringStateTransition guard(_controller.get(), recipientStates);
+
+    for (const auto& stateFPName : stateFPNames) {
+        auto state = stateFPName.first;
+        auto fp = globalFailPointRegistry().find(stateFPName.second);
+        auto cnt = fp->setMode(FailPoint::alwaysOn, 0);
+        stateFailPointMap[state] = {fp, cnt};
+    }
+
+    auto movePrimaryRecipientPauseBeforeCompletion =
+        globalFailPointRegistry().find("movePrimaryRecipientPauseBeforeCompletion");
+    auto timesEnteredPauseBeforeCompletionFailPoint =
+        movePrimaryRecipientPauseBeforeCompletion->setMode(FailPoint::alwaysOn, 0);
+
+    auto doc = createRecipientDoc();
+    auto opCtx = operationContext();
+
+    auto recipient = MovePrimaryRecipientService::MovePrimaryRecipient::getOrCreate(
         opCtx, _service, doc.toBSON());
 
-    ASSERT(instance.get());
+    for (const auto& stateFPName : stateFPNames) {
+        auto state = stateFPName.first;
+        guard.wait(state);
+        guard.unset(state);
+        auto fp = stateFailPointMap[state].first;
+        auto cnt = stateFailPointMap[state].second;
+        fp->waitForTimesEntered(cnt + 1);
+        fp->setMode(FailPoint::off, 0);
+
+        if (state == MovePrimaryRecipientStateEnum::kPrepared) {
+            (void)recipient->onReceiveForgetMigration();
+        }
+    }
+
+    movePrimaryRecipientPauseBeforeCompletion->waitForTimesEntered(
+        timesEnteredPauseBeforeCompletionFailPoint + 1);
+
+    recipient->getCompletionFuture().get();
+    movePrimaryRecipientPauseBeforeCompletion->setMode(FailPoint::off, 0);
+    waitUntilDocDeleted(opCtx, NamespaceString::kMovePrimaryRecipientNamespace, doc.get_id());
 }
 
 TEST_F(MovePrimaryRecipientServiceTest, PersistsStateDocument) {
@@ -245,7 +361,7 @@ TEST_F(MovePrimaryRecipientServiceTest, PersistsStateDocument) {
     ASSERT_EQ(doc.get_id(), instance->getMigrationId());
     ASSERT(instance->getRecipientDocDurableFuture().isReady());
 
-    auto persistedDoc = getRecipientDoc(opCtx);
+    auto persistedDoc = getRecipientDoc(opCtx, doc.get_id());
     ASSERT_BSONOBJ_EQ(persistedDoc.getMetadata().toBSON(), doc.getMetadata().toBSON());
 
     movePrimaryRecipientPauseAfterInsertingStateDoc->setMode(FailPoint::off, 0);
@@ -313,29 +429,236 @@ TEST_F(MovePrimaryRecipientServiceTest, ThrowsWithConflictingOptions) {
     movePrimaryRecipientPauseAfterInsertingStateDoc->setMode(FailPoint::off, 0);
 }
 
-TEST_F(MovePrimaryRecipientServiceTest, CanTransitionTokCloningState) {
+TEST_F(MovePrimaryRecipientServiceTest, CanAbortBeforePersistingStateDoc) {
     auto doc = createRecipientDoc();
 
-    auto movePrimaryRecipientPauseAfterTransitionToCloningState =
-        globalFailPointRegistry().find("movePrimaryRecipientPauseAfterTransitionToCloningState");
-    auto timesEnteredFailPoint =
-        movePrimaryRecipientPauseAfterTransitionToCloningState->setMode(FailPoint::alwaysOn, 0);
+    auto movePrimaryRecipientPauseBeforeRunning =
+        globalFailPointRegistry().find("movePrimaryRecipientPauseBeforeRunning");
+    auto timesEnteredPauseBeforeRunningFailPoint =
+        movePrimaryRecipientPauseBeforeRunning->setMode(FailPoint::alwaysOn, 0);
+
+    auto movePrimaryRecipientPauseBeforeCompletion =
+        globalFailPointRegistry().find("movePrimaryRecipientPauseBeforeCompletion");
+    auto timesEnteredPauseBeforeCompletionFailPoint =
+        movePrimaryRecipientPauseBeforeCompletion->setMode(FailPoint::alwaysOn, 0);
 
     auto opCtx = operationContext();
     auto instance = MovePrimaryRecipientService::MovePrimaryRecipient::getOrCreate(
         opCtx, _service, doc.toBSON());
 
-    movePrimaryRecipientPauseAfterTransitionToCloningState->waitForTimesEntered(
-        timesEnteredFailPoint + 1);
+    movePrimaryRecipientPauseBeforeRunning->waitForTimesEntered(
+        timesEnteredPauseBeforeRunningFailPoint + 1);
 
-    ASSERT(instance->getRecipientDocDurableFuture().isReady());
-    ASSERT(instance->getRecipientDataClonedFuture().isReady());
+    instance->abort();
+    movePrimaryRecipientPauseBeforeRunning->setMode(FailPoint::off, 0);
 
-    auto persistedDoc = getRecipientDoc(opCtx);
-    ASSERT_EQ(persistedDoc.getState(), MovePrimaryRecipientStateEnum::kCloning);
-    ASSERT(persistedDoc.getStartApplyingDonorOpTime().is_initialized());
+    movePrimaryRecipientPauseBeforeCompletion->waitForTimesEntered(
+        timesEnteredPauseBeforeCompletionFailPoint + 1);
 
-    movePrimaryRecipientPauseAfterTransitionToCloningState->setMode(FailPoint::off, 0);
+    ASSERT(instance->getCompletionFuture().isReady());
+    ASSERT(!instance->getCompletionFuture().getNoThrow().isOK());
+}
+
+TEST_F(MovePrimaryRecipientServiceTest, FulfillsDataClonedFutureAfterCloning) {
+    auto movePrimaryRecipientPauseAfterCloningState =
+        globalFailPointRegistry().find("movePrimaryRecipientPauseAfterCloningState");
+    auto timesEnteredPauseAfterCloningStateFailPoint =
+        movePrimaryRecipientPauseAfterCloningState->setMode(FailPoint::alwaysOn, 0);
+
+    auto doc = createRecipientDoc();
+    auto opCtx = operationContext();
+
+    auto recipient = MovePrimaryRecipientService::MovePrimaryRecipient::getOrCreate(
+        opCtx, _service, doc.toBSON());
+
+    movePrimaryRecipientPauseAfterCloningState->waitForTimesEntered(
+        timesEnteredPauseAfterCloningStateFailPoint + 1);
+
+    auto dataClonedFuture = recipient->getDataClonedFuture();
+    ASSERT_TRUE(dataClonedFuture.getNoThrow(opCtx).isOK());
+
+    movePrimaryRecipientPauseAfterCloningState->setMode(FailPoint::off, 0);
+
+    ASSERT_TRUE(recipient->onReceiveForgetMigration().getNoThrow(opCtx).isOK());
+}
+
+TEST_F(MovePrimaryRecipientServiceTest, CanAbortInEachAbortableState) {
+    // Tests that the movePrimary op aborts in the states below when asked to abort.
+    const std::vector<std::pair<MovePrimaryRecipientStateEnum, std::string>> stateFPNames{
+        {MovePrimaryRecipientStateEnum::kInitializing,
+         "movePrimaryRecipientPauseAfterInsertingStateDoc"},
+        {MovePrimaryRecipientStateEnum::kCloning, "movePrimaryRecipientPauseAfterCloningState"},
+        {MovePrimaryRecipientStateEnum::kApplying, "movePrimaryRecipientPauseAfterApplyingState"},
+        {MovePrimaryRecipientStateEnum::kBlocking, "movePrimaryRecipientPauseAfterBlockingState"},
+        {MovePrimaryRecipientStateEnum::kPrepared, "movePrimaryRecipientPauseAfterPreparedState"}};
+
+    for (const auto& stateFPNamePair : stateFPNames) {
+        PauseDuringStateTransition stateTransitionsGuard{_controller.get(),
+                                                         MovePrimaryRecipientStateEnum::kAborted};
+        const auto& state = stateFPNamePair.first;
+        auto fp = globalFailPointRegistry().find(stateFPNamePair.second);
+
+        auto cnt = fp->setMode(FailPoint::alwaysOn, 0);
+
+        auto doc = createRecipientDoc();
+
+        auto opCtx = operationContext();
+
+        auto movePrimaryRecipientPauseBeforeCompletion =
+            globalFailPointRegistry().find("movePrimaryRecipientPauseBeforeCompletion");
+        auto timesEnteredPauseBeforeCompletionFailPoint =
+            movePrimaryRecipientPauseBeforeCompletion->setMode(FailPoint::alwaysOn, 0);
+
+        auto recipient = MovePrimaryRecipientService::MovePrimaryRecipient::getOrCreate(
+            opCtx, _service, doc.toBSON());
+
+        auto instanceId = BSON("_id" << recipient->getMigrationId());
+
+        ASSERT_FALSE(recipient->getCompletionFuture().isReady());
+
+        LOGV2(7306904, "Running CanAbortInEachAbortableState", "state"_attr = state);
+
+        fp->waitForTimesEntered(cnt + 1);
+
+        recipient->abort();
+
+        fp->setMode(FailPoint::off, 0);
+
+        stateTransitionsGuard.wait(MovePrimaryRecipientStateEnum::kAborted);
+        stateTransitionsGuard.unset(MovePrimaryRecipientStateEnum::kAborted);
+
+        movePrimaryRecipientPauseBeforeCompletion->waitForTimesEntered(
+            timesEnteredPauseBeforeCompletionFailPoint + 1);
+
+        recipient->getCompletionFuture().get();
+        movePrimaryRecipientPauseBeforeCompletion->setMode(FailPoint::off, 0);
+
+        recipient.reset();
+
+        waitUntilDocDeleted(opCtx, NamespaceString::kMovePrimaryRecipientNamespace, doc.get_id());
+
+        _service->releaseInstance(instanceId, Status::OK());
+
+        LOGV2(7306905, "Finished running CanAbortInEachAbortableState", "state"_attr = state);
+    }
+}
+
+TEST_F(MovePrimaryRecipientServiceTest, StepUpStepDownEachPersistedStateLifecycleFlagEnabled) {
+    // Tests that the movePrimary op aborts on stepdown-stepup for first four states and goes to
+    // completion for the rest of the states below.
+    const std::vector<std::pair<MovePrimaryRecipientStateEnum, std::string>> stateFPNames{
+        {MovePrimaryRecipientStateEnum::kInitializing,
+         "movePrimaryRecipientPauseAfterInsertingStateDoc"},
+        {MovePrimaryRecipientStateEnum::kCloning, "movePrimaryRecipientPauseAfterCloningState"},
+        {MovePrimaryRecipientStateEnum::kApplying, "movePrimaryRecipientPauseAfterApplyingState"},
+        {MovePrimaryRecipientStateEnum::kBlocking, "movePrimaryRecipientPauseAfterBlockingState"},
+        {MovePrimaryRecipientStateEnum::kPrepared, "movePrimaryRecipientPauseAfterPreparedState"},
+        {MovePrimaryRecipientStateEnum::kDone, "movePrimaryRecipientPauseBeforeDeletingStateDoc"}};
+
+    for (const auto& stateFPNamePair : stateFPNames) {
+        PauseDuringStateTransition stateTransitionsGuard{_controller.get(),
+                                                         MovePrimaryRecipientStateEnum::kAborted};
+        const auto& state = stateFPNamePair.first;
+        auto fp = globalFailPointRegistry().find(stateFPNamePair.second);
+
+        auto doc = createRecipientDoc();
+
+        auto opCtx = operationContext();
+
+        auto movePrimaryRecipientPauseBeforeCompletion =
+            globalFailPointRegistry().find("movePrimaryRecipientPauseBeforeCompletion");
+        auto timesEnteredPauseBeforeCompletionFailPoint =
+            movePrimaryRecipientPauseBeforeCompletion->setMode(FailPoint::alwaysOn, 0);
+
+        auto cnt = fp->setMode(FailPoint::alwaysOn, 0);
+
+        auto recipient = MovePrimaryRecipientService::MovePrimaryRecipient::getOrCreate(
+            opCtx, _service, doc.toBSON());
+
+        auto instanceId = BSON("_id" << recipient->getMigrationId());
+
+        ASSERT_FALSE(recipient->getCompletionFuture().isReady());
+
+        LOGV2(7306906,
+              "Running StepUpStepDownEachPersistedStateLifecycleFlagEnabled",
+              "stepdown"_attr = state);
+
+        if (state == MovePrimaryRecipientStateEnum::kDone) {
+            (void)recipient->onReceiveForgetMigration();
+        }
+
+        fp->waitForTimesEntered(cnt + 1);
+
+        stepDown(_serviceCtx, _registry);
+
+        fp->setMode(FailPoint::off, 0);
+
+        movePrimaryRecipientPauseBeforeCompletion->waitForTimesEntered(
+            timesEnteredPauseBeforeCompletionFailPoint + 1);
+        ASSERT_EQ(recipient->getCompletionFuture().getNoThrow(), ErrorCodes::CallbackCanceled);
+        movePrimaryRecipientPauseBeforeCompletion->setMode(FailPoint::off, 0);
+
+        stepUp(opCtx, _serviceCtx, _registry, _term);
+
+        recipient = lookupRecipient(opCtx, instanceId);
+
+        if (state < MovePrimaryRecipientStateEnum::kPrepared) {
+            stateTransitionsGuard.wait(MovePrimaryRecipientStateEnum::kAborted);
+            stateTransitionsGuard.unset(MovePrimaryRecipientStateEnum::kAborted);
+        } else {
+            stateTransitionsGuard.unset(MovePrimaryRecipientStateEnum::kAborted);
+            (void)recipient->onReceiveForgetMigration();
+        }
+
+        recipient->getCompletionFuture().get();
+
+        recipient.reset();
+
+        waitUntilDocDeleted(opCtx, NamespaceString::kMovePrimaryRecipientNamespace, doc.get_id());
+
+        _service->releaseInstance(instanceId, Status::OK());
+
+        LOGV2(7306907,
+              "Finished running StepUpStepDownEachPersistedStateLifecycleFlagEnabled",
+              "stepdown"_attr = state);
+    }
+}
+
+TEST_F(MovePrimaryRecipientServiceTest, CleansUpPersistedMetadataOnCompletion) {
+    auto doc = createRecipientDoc();
+    auto opCtx = operationContext();
+
+    auto recipient = MovePrimaryRecipientService::MovePrimaryRecipient::getOrCreate(
+        opCtx, _service, doc.toBSON());
+    auto future = recipient->onReceiveForgetMigration();
+    future.get(opCtx);
+    waitUntilDocDeleted(opCtx, NamespaceString::kMovePrimaryRecipientNamespace, doc.get_id());
+    waitUntilDocDeleted(opCtx, NamespaceString::kMovePrimaryApplierProgressNamespace, doc.get_id());
+    waitUntilDocDeleted(
+        opCtx, NamespaceString::makeMovePrimaryOplogBufferNSS(doc.get_id()), doc.get_id());
+}
+
+TEST_F(MovePrimaryRecipientServiceTest, OnReceiveSyncData) {
+    auto movePrimaryRecipientPauseAfterPreparedState =
+        globalFailPointRegistry().find("movePrimaryRecipientPauseAfterPreparedState");
+    auto timesEnteredPauseAfterPreparedStateFailPoint =
+        movePrimaryRecipientPauseAfterPreparedState->setMode(FailPoint::alwaysOn, 0);
+
+    auto doc = createRecipientDoc();
+    auto opCtx = operationContext();
+
+    auto recipient = MovePrimaryRecipientService::MovePrimaryRecipient::getOrCreate(
+        opCtx, _service, doc.toBSON());
+
+    movePrimaryRecipientPauseAfterPreparedState->waitForTimesEntered(
+        timesEnteredPauseAfterPreparedStateFailPoint + 1);
+
+    auto preparedFuture = recipient->onReceiveSyncData(Timestamp());
+    ASSERT_TRUE(preparedFuture.getNoThrow(opCtx).isOK());
+
+    movePrimaryRecipientPauseAfterPreparedState->setMode(FailPoint::off, 0);
+
+    ASSERT_TRUE(recipient->onReceiveForgetMigration().getNoThrow(opCtx).isOK());
 }
 
 }  // namespace mongo

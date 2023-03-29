@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/repl/primary_only_service.h"
 #include <memory>
 
 #include "mongo/db/service_context_d_test_fixture.h"
@@ -83,6 +84,13 @@ protected:
     repl::PrimaryOnlyService* _service = nullptr;
     long long _term = 0;
 };
+
+void stepUp(OperationContext* opCtx,
+            ServiceContext* serviceCtx,
+            repl::PrimaryOnlyServiceRegistry* registry,
+            long long& term);
+
+void stepDown(ServiceContext* serviceCtx, repl::PrimaryOnlyServiceRegistry* registry);
 
 }  // namespace repl
 }  // namespace mongo

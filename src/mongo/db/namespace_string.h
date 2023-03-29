@@ -364,6 +364,11 @@ public:
     static NamespaceString makeBulkWriteNSS();
 
     /**
+     * Constructs the oplog buffer NamespaceString for the given migration id for movePrimary op.
+     */
+    static NamespaceString makeMovePrimaryOplogBufferNSS(const UUID& migrationId);
+
+    /**
      * Constructs the oplog buffer NamespaceString for the given UUID and donor shardId.
      */
     static NamespaceString makeReshardingLocalOplogBufferNSS(const UUID& existingUUID,

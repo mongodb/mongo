@@ -523,6 +523,8 @@ error_codes:
     # reserve an error code. It can be returned by a remote search index management server.
     - {code: 396, name: IndexInformationTooLarge}
 
+    - {code: 397, name: MovePrimaryAborted}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)

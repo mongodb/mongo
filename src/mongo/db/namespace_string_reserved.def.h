@@ -87,6 +87,11 @@ NSS_CONSTANT(kMigrationRecipientsNamespace, DatabaseName::kConfig, "migrationRec
 // Namespace for storing the persisted state of movePrimary operation recipients.
 NSS_CONSTANT(kMovePrimaryRecipientNamespace, DatabaseName::kConfig, "movePrimaryRecipients"_sd)
 
+// Namespace for storing the oplog applier progress of movePrimary operations at recipient.
+NSS_CONSTANT(kMovePrimaryApplierProgressNamespace,
+             DatabaseName::kConfig,
+             "movePrimaryRecipients.applierProgress"_sd)
+
 // Namespace for storing the persisted state of movePrimary operation donors.
 NSS_CONSTANT(kMovePrimaryDonorNamespace, DatabaseName::kConfig, "movePrimaryDonors"_sd)
 
