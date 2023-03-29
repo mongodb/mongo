@@ -38,8 +38,11 @@
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/plan_executor_factory.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/shard_key_index_util.h"
+#include "mongo/logv2/log.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
 namespace metadata_consistency_util {
@@ -111,15 +114,71 @@ void _checkShardKeyIndexInconsistencies(OperationContext* opCtx,
                                         const BSONObj& shardKey,
                                         const CollectionPtr& localColl,
                                         std::vector<MetadataInconsistencyItem>& inconsistencies) {
-    // Check that the collection has an index that supports the shard key. If so, check that
-    // exists an index that supports the shard key and is not multikey.
-    if (!findShardKeyPrefixedIndex(opCtx, localColl, shardKey, false /*requireSingleKey*/)) {
-        _appendMissingShardKeyIndexInconsistency(
-            shardId, localColl->ns(), shardKey, inconsistencies);
-    } else if (!findShardKeyPrefixedIndex(opCtx, localColl, shardKey, true /*requireSingleKey*/)) {
-        _appendShardKeyIndexMultiKeyInconsistency(
-            shardId, localColl->ns(), shardKey, inconsistencies);
+    const auto performChecks = [&](const CollectionPtr& localColl,
+                                   std::vector<MetadataInconsistencyItem>& inconsistencies) {
+        // Check that the collection has an index that supports the shard key. If so, check that
+        // exists an index that supports the shard key and is not multikey.
+        if (!findShardKeyPrefixedIndex(opCtx, localColl, shardKey, false /*requireSingleKey*/)) {
+            _appendMissingShardKeyIndexInconsistency(
+                shardId, localColl->ns(), shardKey, inconsistencies);
+        } else if (!findShardKeyPrefixedIndex(
+                       opCtx, localColl, shardKey, true /*requireSingleKey*/)) {
+            _appendShardKeyIndexMultiKeyInconsistency(
+                shardId, localColl->ns(), shardKey, inconsistencies);
+        }
+    };
+
+    std::vector<MetadataInconsistencyItem> tmpInconsistencies;
+
+    // Shards that do not own any chunks do not partecipate in the creation of new indexes, so they
+    // could potentially miss any indexes created after they no longer own chunks. Thus we first
+    // perform a check optimistically without taking collection lock, if missing indexes are found
+    // we check under the collection lock if this shard currently own any chunk and re-execute again
+    // the checks under the lock to ensure stability of the ShardVersion.
+    performChecks(localColl, tmpInconsistencies);
+
+    if (!tmpInconsistencies.size()) {
+        // No index inconsistencies found
+        return;
     }
+
+    // Pessimistic check under collection lock to serialize with chunk migration commit.
+    AutoGetCollection ac(opCtx, nss, MODE_IS);
+    tassert(7531700,
+            str::stream() << "Collection unexpectedly disappeared while holding database DDL lock: "
+                          << nss,
+            ac);
+
+    const auto scopedCsr =
+        CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
+    auto optCollDescr = scopedCsr->getCurrentMetadataIfKnown();
+    if (!optCollDescr) {
+        LOGV2_DEBUG(7531701,
+                    1,
+                    "Ignoring index inconsistencies because collection metadata is unknown",
+                    logAttrs(nss),
+                    "inconsistencies"_attr = tmpInconsistencies);
+        return;
+    }
+
+    tassert(7531702,
+            str::stream()
+                << "Collection unexpectedly became unsharded while holding database DDL lock: "
+                << nss,
+            optCollDescr->isSharded());
+
+    if (!optCollDescr->currentShardHasAnyChunks()) {
+        LOGV2_DEBUG(7531703,
+                    1,
+                    "Ignoring index inconsistencies because shard does not own any chunk for "
+                    "this collection",
+                    logAttrs(nss),
+                    "inconsistencies"_attr = tmpInconsistencies);
+        return;
+    }
+
+    tmpInconsistencies.clear();
+    performChecks(*ac, inconsistencies);
 }
 }  // namespace
 
