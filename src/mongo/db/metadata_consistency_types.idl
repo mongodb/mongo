@@ -41,7 +41,6 @@ enums:
             kHiddenUnshardedCollection: "HiddenUnshardedCollection"
             kHiddenShardedCollection: "HiddenShardedCollection" 
             kMissingShardKeyIndex: "MissingShardKeyIndex"
-            kLastShardKeyIndexMultiKey: "LastShardKeyIndexMultiKey"
 
     MetadataConsistencyCommandLevel:
         description: "Level mode of the metadata consistency command."

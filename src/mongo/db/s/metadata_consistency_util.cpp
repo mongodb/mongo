@@ -93,21 +93,6 @@ void _appendMissingShardKeyIndexInconsistency(
     inconsistencies.emplace_back(val);
 }
 
-void _appendShardKeyIndexMultiKeyInconsistency(
-    const ShardId& shardId,
-    const NamespaceString& localNss,
-    const BSONObj& shardKey,
-    std::vector<MetadataInconsistencyItem>& inconsistencies) {
-    MetadataInconsistencyItem val;
-    val.setNs(localNss);
-    val.setType(MetadataInconsistencyTypeEnum::kLastShardKeyIndexMultiKey);
-    val.setShard(shardId);
-    val.setInfo(BSON(kDescriptionFieldName
-                     << "The only remaining index compatible with shard key is multikey"
-                     << "shardKey" << shardKey));
-    inconsistencies.emplace_back(val);
-}
-
 void _checkShardKeyIndexInconsistencies(OperationContext* opCtx,
                                         const NamespaceString& nss,
                                         const ShardId& shardId,
@@ -120,10 +105,6 @@ void _checkShardKeyIndexInconsistencies(OperationContext* opCtx,
         // exists an index that supports the shard key and is not multikey.
         if (!findShardKeyPrefixedIndex(opCtx, localColl, shardKey, false /*requireSingleKey*/)) {
             _appendMissingShardKeyIndexInconsistency(
-                shardId, localColl->ns(), shardKey, inconsistencies);
-        } else if (!findShardKeyPrefixedIndex(
-                       opCtx, localColl, shardKey, true /*requireSingleKey*/)) {
-            _appendShardKeyIndexMultiKeyInconsistency(
                 shardId, localColl->ns(), shardKey, inconsistencies);
         }
     };

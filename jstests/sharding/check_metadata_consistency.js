@@ -144,34 +144,6 @@ function getNewDb() {
     db.dropDatabase();
 })();
 
-(function testLastShardKeyIndexMultiKeyInconsistency() {
-    const db = getNewDb();
-    const kSourceCollName = "coll";
-
-    // Create a multikey index compatible with the shard key
-    assert.commandWorked(mongos.getDB(db.getName()).coll.insert({skey: 1, a: [1, 2]}));
-    assert.commandWorked(mongos.getDB(db.getName()).coll.createIndex({skey: 1, a: 1}));
-
-    // Create an index compatible the shard key
-    assert.commandWorked(mongos.getDB(db.getName()).coll.createIndex({skey: 1}));
-
-    st.shardColl(
-        kSourceCollName, {skey: 1}, {skey: 0}, {skey: 1}, db.getName(), true /* waitForDelete */);
-
-    // Connect directly to shards to bypass the mongos checks for dropping the non-multikey index
-    assert.commandWorked(st.shard0.getDB(db.getName()).coll.dropIndex({skey: 1}));
-    assert.commandWorked(st.shard1.getDB(db.getName()).coll.dropIndex({skey: 1}));
-
-    // Database level mode command
-    const inconsistencies = db.checkMetadataConsistency().toArray();
-    assert.eq(2, inconsistencies.length);
-    assert.eq("LastShardKeyIndexMultiKey", inconsistencies[0].type);
-    assert.eq("LastShardKeyIndexMultiKey", inconsistencies[1].type);
-
-    // Clean up the database to pass the hooks that detect inconsistencies
-    db.dropDatabase();
-})();
-
 (function testHiddenShardedCollections() {
     const kSourceCollName = "coll";
     const db1 = getNewDb();
