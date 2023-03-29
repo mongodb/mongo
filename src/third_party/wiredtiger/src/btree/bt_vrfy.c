@@ -187,13 +187,13 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
     size_t root_addr_size;
     uint8_t root_addr[WT_BTREE_MAX_ADDR_COOKIE];
     const char *name;
-    bool bm_start, quit;
+    bool bm_start, quit, skip_hs;
 
     btree = S2BT(session);
     bm = btree->bm;
     ckptbase = NULL;
     name = session->dhandle->name;
-    bm_start = false;
+    bm_start = quit = skip_hs = false;
 
     WT_CLEAR(_vstuff);
     vs = &_vstuff;
@@ -225,6 +225,13 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
     /* Inform the underlying block manager we're verifying. */
     WT_ERR(bm->verify_start(bm, session, ckptbase, cfg));
     bm_start = true;
+
+    /*
+     * Skip the history store explicit call if we're performing a metadata verification. The
+     * metadata file is verified before we verify the history store, and it makes no sense to verify
+     * the history store against itself.
+     */
+    skip_hs = strcmp(name, WT_METAFILE_URI) == 0 || strcmp(name, WT_HS_URI) == 0;
 
     /* Loop through the file's checkpoints, verifying each one. */
     WT_CKPT_FOREACH (ckptbase, ckpt) {
@@ -269,6 +276,19 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
             /* Verify the tree. */
             WT_WITH_PAGE_INDEX(
               session, ret = __verify_tree(session, &btree->root, &addr_unpack, vs));
+
+            /*
+             * The checkpoints are in time-order, so the last one in the list is the most recent. If
+             * this is the most recent checkpoint, verify the history store against it.
+             */
+            if (ret == 0 && (ckpt + 1)->name == NULL && !skip_hs) {
+                WT_TRET(__wt_hs_verify_one(session, btree->id));
+                /*
+                 * We cannot error out here. If we got an error verifying the history store, we need
+                 * to follow through with reacquiring the exclusive call below. We'll error out
+                 * after that and unloading this checkpoint.
+                 */
+            }
 
             /*
              * If the read_corrupt mode was turned on, we may have continued traversing and
@@ -843,6 +863,7 @@ static int
 __verify_key_hs(
   WT_SESSION_IMPL *session, WT_ITEM *tmp1, wt_timestamp_t newer_start_ts, WT_VSTUFF *vs)
 {
+/* FIXME-WT-10779 - Enable the history store validation. */
 #ifdef WT_VERIFY_VALIDATE_HISTORY_STORE
     WT_BTREE *btree;
     WT_CURSOR *hs_cursor;
