@@ -211,9 +211,6 @@ int32_t SemaphoreTicketHolder::available() const {
 
 bool SemaphoreTicketHolder::_tryAcquire() {
     if (_numTickets <= 0) {
-        if (_numTickets < 0) {
-            std::cerr << "DISASTER! in TicketHolder" << std::endl;
-        }
         return false;
     }
     _numTickets--;
