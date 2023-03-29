@@ -337,15 +337,12 @@ void PinnedConnectionTaskExecutor::join() {
     }
     invariant(_state == State::joinRequired || _state == State::joining);
     _state = State::joining;
-    if (_requestQueue.empty()) {
-        _state = State::shutdownComplete;
-        return;
-    }
-    // If the _requestQueue isn't empty, there must still be some thread
-    // doing networking, which will observe the cancellations we did above.
-    invariant(_isDoingNetworking);
+
     _requestQueueEmptyCV.wait(lk,
                               [this]() { return _requestQueue.empty() && !_isDoingNetworking; });
+
+    _executor->join();
+
     _state = State::shutdownComplete;
     return;
 }
