@@ -73,6 +73,7 @@ struct SSLParams {
     std::string sslCipherConfig;                // --tlsCipherConfig
     std::string sslCipherSuiteConfig;           // --tlsCipherSuiteConfig
     std::string clusterAuthX509ExtensionValue;  // --tlsClusterAuthX509ExtensionValue
+    std::string clusterAuthX509Attributes;      // --tlsClusterAuthX509Attributes
 
     boost::optional<TLSCATrusts> tlsCATrusts;  // --setParameter tlsCATrusts
 

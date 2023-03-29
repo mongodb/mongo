@@ -372,6 +372,81 @@ certs:
     <<: *server_pem_extensions
     mongoClusterMembership: foo
 
+- name: 'server_title_foo.pem'
+  description: Server certificate including the title attribute set to foo.
+  Subject:
+    CN: 'server'
+    title: 'foo'
+  extensions:
+    subjectAltName:
+        DNS: localhost
+        IP: 127.0.0.1
+
+- name: 'server_title_bar.pem'
+  description: Server certificate including the title attribute set to bar.
+  Subject:
+    CN: 'server'
+    title: 'bar'
+  extensions:
+    subjectAltName:
+        DNS: localhost
+        IP: 127.0.0.1
+
+- name: 'cluster_title_foo.pem'
+  description: >-
+    Alternate certificate for intracluster auth including the title attribute set to foo.
+  Subject:
+    CN: 'clustertest'
+    title: 'foo'
+  extensions:
+    subjectAltName:
+      DNS: localhost
+      IP: 127.0.0.1
+
+- name: 'server_title_foo_no_o_ou_dc.pem'
+  description: Server certificate including the title attribute set to foo without O, OU, or DC.
+  explicit_subject: true
+  Subject:
+    CN: 'server'
+    title: 'foo'
+    C: 'US'
+    ST: 'New York'
+    L: 'New York City'
+  extensions:
+    subjectAltName:
+        DNS: localhost
+        IP: 127.0.0.1
+
+- name: 'server_title_bar_no_o_ou_dc.pem'
+  description: Server certificate including the title attribute set to bar without O, OU, or DC.
+  explicit_subject: true
+  Subject:
+    CN: 'server'
+    title: 'bar'
+    C: 'US'
+    ST: 'New York'
+    L: 'New York City'
+  extensions:
+    subjectAltName:
+        DNS: localhost
+        IP: 127.0.0.1
+
+- name: 'cluster_title_foo_no_o_ou_dc.pem'
+  description: >-
+    Alternate certificate for intracluster auth including the title attribute set to foo
+    without O, OU, or DC.
+  explicit_subject: true
+  Subject:
+    CN: 'clustertest'
+    title: 'foo'
+    C: 'US'
+    ST: 'New York'
+    L: 'New York City'
+  extensions:
+    subjectAltName:
+      DNS: localhost
+      IP: 127.0.0.1
+
 # For tenant migration testing.
 - name: 'rs0.pem'
   description: General purpose server certificate file.

@@ -446,6 +446,14 @@ std::string removeFQDNRoot(std::string name);
 std::string escapeRfc2253(StringData str);
 
 /**
+ * Generates a new SSLX509Name containing only the attributes requested in filteredAttributes.
+ * Note that multi-valued RDNs will be preserved if any of the attributes in the RDN are specified
+ * in filteredAttributes.
+ */
+SSLX509Name filterClusterDN(const SSLX509Name& fullClusterDN,
+                            const stdx::unordered_set<std::string>& filterAttributes);
+
+/**
  * Parse a DN from a string per RFC 4514
  */
 StatusWith<SSLX509Name> parseDN(StringData str);

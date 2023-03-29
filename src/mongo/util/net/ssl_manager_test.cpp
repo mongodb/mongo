@@ -42,6 +42,7 @@
 
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/net/ssl_types.h"
 
 #if MONGO_CONFIG_SSL_PROVIDER == MONGO_CONFIG_SSL_PROVIDER_OPENSSL
 #include "mongo/util/net/dh_openssl.h"
@@ -423,6 +424,105 @@ FlattenedX509Name flattenX509Name(const SSLX509Name& name) {
 
     return ret;
 }
+
+TEST(SSLManager, FilterClusterDN) {
+    static const stdx::unordered_set<std::string> defaultMatchingAttributes = {
+        "0.9.2342.19200300.100.1.25",  // DC
+        "2.5.4.10",                    // O
+        "2.5.4.11",                    // OU
+    };
+    std::vector<std::pair<std::string, std::string>> tests = {
+        // Single-valued RDNs.
+        {"CN=server,OU=Kernel,O=MongoDB,DC=example,L=New York City,ST=New York,C=US",
+         "OU=Kernel,O=MongoDB,DC=example"},
+        // Multi-valued RDN.
+        {"CN=server+OU=Kernel,O=MongoDB,L=New York City,ST=New York,C=US", "OU=Kernel,O=MongoDB"},
+        // Multiple DC attributes.
+        {"CN=server,OU=Kernel,O=MongoDB,DC=example,DC=net,L=New York City,ST=New York,C=US",
+         "OU=Kernel,O=MongoDB,DC=example,DC=net"},
+    };
+
+    for (const auto& test : tests) {
+        LOGV2(7498900, "Testing DN: ", "test_first"_attr = test.first);
+        auto swUnfilteredDN = parseDN(test.first);
+        auto swExpectedFilteredDN = parseDN(test.second);
+
+        ASSERT_OK(swUnfilteredDN.getStatus());
+        ASSERT_OK(swExpectedFilteredDN.getStatus());
+        ASSERT_OK(swUnfilteredDN.getValue().normalizeStrings());
+        ASSERT_OK(swExpectedFilteredDN.getValue().normalizeStrings());
+
+        auto actualFilteredDN =
+            filterClusterDN(swUnfilteredDN.getValue(), defaultMatchingAttributes);
+        ASSERT_TRUE(actualFilteredDN == swExpectedFilteredDN.getValue());
+    }
+};
+
+TEST(SSLManager, DNContains) {
+    // Checks if the second RDN is contained by the first (order does not matter).
+    // The bool is the expected value.
+    std::vector<std::tuple<std::string, std::string, bool>> tests = {
+        // Single-valued RDNs positive case.
+        {"CN=server,OU=Kernel,O=MongoDB,DC=example,L=New York City,ST=New York,C=US",
+         "CN=server,L=New York City,ST=New York,C=US",
+         true},
+        // Single-valued RDNs mismatched value.
+        {"CN=server,OU=Kernel,O=MongoDB,DC=example,L=New York City,ST=New York,C=US",
+         "CN=server,L=Yonkers,ST=New York,C=US",
+         false},
+        // Single-valued RDNs missing attribute.
+        {"CN=server,OU=Kernel,O=MongoDB,DC=example,ST=New York,C=US",
+         "CN=server,L=Yonkers,ST=New York,C=US",
+         false},
+        // Multi-valued RDN negative case (attribute value mismatch).
+        {"CN=server,OU=Kernel,O=MongoDB,L=New York City+ST=New York,C=US",
+         "CN=server,L=Yonkers+ST=New York",
+         false},
+        // Multi-valued RDN negative case (matching attributes in single-value RDNs, first RDN needs
+        // to be filtered beforehand).
+        {"CN=server,OU=Kernel,O=MongoDB,L=New York City+ST=New York,C=US",
+         "CN=server,L=New York City",
+         false},
+        // Multi-valued RDN negative case (input DN has attributes in single-value RDNs while match
+        // expects multi-valued RDN).
+        {"CN=server,OU=Kernel,O=MongoDB,L=New York City,ST=New York,C=US",
+         "CN=server,L=New York City+ST=New York",
+         false},
+        // Multi-valued RDN positive case (full multi-valued RDN present in second).
+        {"CN=server,OU=Kernel,O=MongoDB,L=New York City+ST=New York,C=US",
+         "CN=server,L=New York City+ST=New York",
+         true},
+        // Multiple attributes positive case (order should not matter).
+        {"CN=server,OU=Kernel,O=MongoDB,DC=net,DC=example,L=New York City,ST=New York,C=US",
+         "OU=Kernel,O=MongoDB,DC=example,DC=net",
+         true},
+        // Multiple attributes positive case (missing in second, but should not matter).
+        {"CN=server,OU=Kernel,O=MongoDB,DC=example,DC=net,L=New York City,ST=New York,C=US",
+         "OU=Kernel,O=MongoDB,DC=example",
+         true},
+        // Multiple attributes negative case (missing in first).
+        {"CN=server,OU=Kernel,O=MongoDB,DC=example,L=New York City,ST=New York,C=US",
+         "OU=Kernel,O=MongoDB,DC=example,DC=net",
+         false},
+    };
+
+    for (const auto& test : tests) {
+        LOGV2(7498901, "Testing DN: ", "test_first"_attr = std::get<0>(test));
+        auto swExternalDN = parseDN(std::get<0>(test));
+        auto swMatchPatternDN = parseDN(std::get<1>(test));
+
+        ASSERT_OK(swExternalDN.getStatus());
+        ASSERT_OK(swMatchPatternDN.getStatus());
+
+        auto externalDN = swExternalDN.getValue();
+        auto matchPatternDN = swMatchPatternDN.getValue();
+
+        ASSERT_OK(externalDN.normalizeStrings());
+        ASSERT_OK(matchPatternDN.normalizeStrings());
+
+        ASSERT_EQ(externalDN.contains(matchPatternDN), std::get<2>(test));
+    }
+};
 
 TEST(SSLManager, DNParsingAndNormalization) {
     std::vector<std::pair<std::string, FlattenedX509Name>> tests = {

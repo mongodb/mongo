@@ -254,6 +254,17 @@ MONGO_STARTUP_OPTIONS_POST(SSLServerOptions)(InitializerContext*) {
             params["net.tls.clusterAuthX509.extensionValue"].as<std::string>();
     }
 
+    if (params.count("net.tls.clusterAuthX509.attributes")) {
+        uassert(ErrorCodes::BadValue,
+                "Unknown configuration option 'net.tls.clusterAuthX509.attributes'",
+                gFeatureFlagConfigurableX509ClusterAuthn.isEnabledAndIgnoreFCV());
+        uassert(ErrorCodes::BadValue,
+                "Cannot set clusterAuthX509.attributes when clusterAuthMode does not allow X.509",
+                clusterAuthMode.allowsX509());
+        sslGlobalParams.clusterAuthX509Attributes =
+            params["net.tls.clusterAuthX509.attributes"].as<std::string>();
+    }
+
     if (sslGlobalParams.sslMode.load() == SSLParams::SSLMode_allowSSL) {
         // allowSSL and x509 is valid only when we are transitioning to auth.
         if (clusterAuthMode.sendsX509() && !serverGlobalParams.transitionToAuth) {

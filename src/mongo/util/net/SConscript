@@ -263,6 +263,7 @@ if get_option('ssl') == 'on':
             'network',
             'ssl_manager',
             'ssl_options_server',
+            'ssl_types',
         ],
     )
 

@@ -34,6 +34,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/synchronized_value.h"
 
 namespace mongo {
 
@@ -65,7 +66,7 @@ public:
     explicit SSLX509Name(std::vector<std::vector<Entry>> entries) : _entries(std::move(entries)) {}
 
     /**
-     * Retreive the first instance of the value for a given OID in this name.
+     * Retrieve the first instance of the value for a given OID in this name.
      * Returns ErrorCodes::KeyNotFound if the OID does not exist.
      */
     StatusWith<std::string> getOID(StringData oid) const;
@@ -97,6 +98,12 @@ public:
      */
     Status normalizeStrings();
 
+    /**
+     * A SSLX509Name is said to contain another SSLX509Name if it contains all of the other
+     * SSLX509Name's entries.
+     */
+    bool contains(const SSLX509Name& other) const;
+
 private:
     std::vector<std::vector<Entry>> _entries;
 };
@@ -115,6 +122,11 @@ public:
     bool isClusterMember(SSLX509Name subjectName) const;
     void getServerStatusBSON(BSONObjBuilder*) const;
     Status setServerSubjectName(SSLX509Name name);
+    Status setClusterAuthX509Attributes();
+
+    const boost::optional<SSLX509Name>& getClusterAuthX509Attributes() {
+        return _clusterAuthX509Attributes;
+    }
 
     const SSLX509Name& serverSubjectName() const {
         return _serverSubjectName;
@@ -126,7 +138,9 @@ public:
 
 private:
     SSLX509Name _serverSubjectName;
-    std::vector<SSLX509Name::Entry> _canonicalServerSubjectName;
+
+    // DN provided via tlsClusterAuthX509.attributes.
+    boost::optional<SSLX509Name> _clusterAuthX509Attributes;
 };
 
 }  // namespace mongo
