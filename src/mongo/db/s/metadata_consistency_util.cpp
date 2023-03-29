@@ -115,7 +115,7 @@ CheckMetadataConsistencyResponseCursor _makeCursor(
                                                     nss));
 
     std::vector<MetadataInconsistencyItem> firstBatch;
-    size_t bytesBuffered = 0;
+    FindCommon::BSONArrayResponseSizeTracker responseSizeTracker;
     for (long long objCount = 0; objCount < batchSize; objCount++) {
         BSONObj nextDoc;
         PlanExecutor::ExecState state = exec->getNext(&nextDoc, nullptr);
@@ -126,15 +126,14 @@ CheckMetadataConsistencyResponseCursor _makeCursor(
 
         // If we can't fit this result inside the current batch, then we stash it for
         // later.
-        if (!FindCommon::haveSpaceForNext(nextDoc, objCount, bytesBuffered)) {
+        if (!responseSizeTracker.haveSpaceForNext(nextDoc)) {
             exec->stashResult(nextDoc);
             break;
         }
 
-        const auto objsize = nextDoc.objsize();
+        responseSizeTracker.add(nextDoc);
         firstBatch.push_back(MetadataInconsistencyItem::parseOwned(
             IDLParserContext("MetadataInconsistencyItem"), std::move(nextDoc)));
-        bytesBuffered += objsize;
     }
 
     if (exec->isEOF()) {
