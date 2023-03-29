@@ -95,12 +95,6 @@ public:
                   const WriteConcernOptions& wc,
                   boost::optional<OID> targetEpoch) override;
 
-    Status insertTimeseries(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                            const NamespaceString& ns,
-                            std::vector<BSONObj>&& objs,
-                            const WriteConcernOptions& wc,
-                            boost::optional<OID> targetEpoch) override;
-
     StatusWith<UpdateResult> update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                     const NamespaceString& ns,
                                     BatchedObjects&& batch,
@@ -115,18 +109,12 @@ public:
         const NamespaceString& targetNs,
         bool dropTarget,
         bool stayTemp,
-        bool allowBuckets,
         const BSONObj& originalCollectionOptions,
         const std::list<BSONObj>& originalIndexes) override;
 
     void createCollection(OperationContext* opCtx,
                           const DatabaseName& dbName,
                           const BSONObj& cmdObj) override;
-
-    void createTimeseries(OperationContext* opCtx,
-                          const NamespaceString& ns,
-                          const BSONObj& options,
-                          bool createView) override;
 
     void dropCollection(OperationContext* opCtx, const NamespaceString& collection) override;
 

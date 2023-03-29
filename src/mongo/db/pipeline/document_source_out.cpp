@@ -37,7 +37,6 @@
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/pipeline/document_path_support.h"
-#include "mongo/db/timeseries/catalog_helper.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/destructor_guard.h"
@@ -62,13 +61,7 @@ DocumentSourceOut::~DocumentSourceOut() {
         // Make sure we drop the temp collection if anything goes wrong. Errors are ignored
         // here because nothing can be done about them. Additionally, if this fails and the
         // collection is left behind, it will be cleaned up next time the server is started.
-
-        // If creating a time-series collection, we must drop the "real" buckets collection, if
-        // anything goes wrong creating the view.
-
-        // If creating a time-series collection, '_tempNs' is translated to include the
-        // "system.buckets" prefix.
-        if (_tempNs.size() || (_timeseries && !_timeseriesViewCreated)) {
+        if (_tempNs.size()) {
             auto cleanupClient =
                 pExpCtx->opCtx->getServiceContext()->makeClient("$out_replace_coll_cleanup");
 
@@ -85,92 +78,52 @@ DocumentSourceOut::~DocumentSourceOut() {
 
             DocumentSourceWriteBlock writeBlock(cleanupOpCtx.get());
 
-            auto deleteNs = _tempNs.size() ? _tempNs : makeBucketNsIfTimeseries(getOutputNs());
-            pExpCtx->mongoProcessInterface->dropCollection(cleanupOpCtx.get(), deleteNs);
+            pExpCtx->mongoProcessInterface->dropCollection(cleanupOpCtx.get(), _tempNs);
         });
 }
 
-DocumentSourceOutSpec DocumentSourceOut::parseOutSpecAndResolveTargetNamespace(
-    const BSONElement& spec, const DatabaseName& defaultDB) {
-    DocumentSourceOutSpec outSpec;
+NamespaceString DocumentSourceOut::parseNsFromElem(const BSONElement& spec,
+                                                   const DatabaseName& defaultDB) {
     if (spec.type() == BSONType::String) {
-        outSpec.setColl(spec.valueStringData());
-        outSpec.setDb(defaultDB.db());
+        return NamespaceString(defaultDB, spec.valueStringData());
     } else if (spec.type() == BSONType::Object) {
-        outSpec = mongo::DocumentSourceOutSpec::parse(IDLParserContext(kStageName),
-                                                      spec.embeddedObject());
+        auto nsObj = spec.Obj();
+        uassert(16994,
+                str::stream() << "If an object is passed to " << kStageName
+                              << " it must have exactly 2 fields: 'db' and 'coll'",
+                nsObj.nFields() == 2 && nsObj.hasField("coll") && nsObj.hasField("db"));
+        return NamespaceString(defaultDB.tenantId(), nsObj["db"].String(), nsObj["coll"].String());
     } else {
         uassert(16990,
                 "{} only supports a string or object argument, but found {}"_format(
                     kStageName, typeName(spec.type())),
                 spec.type() == BSONType::String);
     }
-
-    return outSpec;
-}
-
-NamespaceString DocumentSourceOut::makeBucketNsIfTimeseries(const NamespaceString& ns) {
-    return _timeseries ? ns.makeTimeseriesBucketsNamespace() : ns;
+    MONGO_UNREACHABLE;
 }
 
 std::unique_ptr<DocumentSourceOut::LiteParsed> DocumentSourceOut::LiteParsed::parse(
     const NamespaceString& nss, const BSONElement& spec) {
-    auto outSpec = parseOutSpecAndResolveTargetNamespace(spec, nss.dbName());
-    NamespaceString targetNss =
-        NamespaceString(nss.dbName().tenantId(), outSpec.getDb(), outSpec.getColl());
 
+    NamespaceString targetNss = parseNsFromElem(spec, nss.dbName());
     uassert(ErrorCodes::InvalidNamespace,
             "Invalid {} target namespace, {}"_format(kStageName, targetNss.ns()),
             targetNss.isValid());
     return std::make_unique<DocumentSourceOut::LiteParsed>(spec.fieldName(), std::move(targetNss));
 }
 
-void DocumentSourceOut::validateTimeseries() {
-    const NamespaceString& outNs = getOutputNs();
-    if (!_timeseries) {
-        return;
-    }
-    // check if a time-series collection already exists in that namespace.
-    auto timeseriesOpts = mongo::timeseries::getTimeseriesOptions(pExpCtx->opCtx, outNs, true);
-    if (timeseriesOpts) {
-        uassert(7268701,
-                "Time field inputted does not match the time field of the existing time-series "
-                "collection.",
-                _timeseries->getTimeField() == timeseriesOpts->getTimeField());
-        uassert(7268702,
-                "Meta field inputted does not match the time field of the existing time-series "
-                "collection.",
-                !_timeseries->getMetaField() ||
-                    _timeseries->getMetaField() == timeseriesOpts->getMetaField());
-    } else {
-        // if a time-series collection doesn't exist, the namespace should not have a
-        // collection nor a conflicting view.
-        // Hold reference to the catalog for collection lookup without locks to be safe.
-        auto catalog = CollectionCatalog::get(pExpCtx->opCtx);
-        auto collection = catalog->lookupCollectionByNamespace(pExpCtx->opCtx, outNs);
-        uassert(7268700,
-                "Cannot create a time-series collection from a non time-series collection.",
-                !collection);
-        auto view = catalog->lookupView(pExpCtx->opCtx, outNs);
-        uassert(
-            7268703, "Cannot create a time-series collection from a non time-series view.", !view);
-    }
-}
-
 void DocumentSourceOut::initialize() {
     DocumentSourceWriteBlock writeBlock(pExpCtx->opCtx);
 
-    const NamespaceString& outputNs = makeBucketNsIfTimeseries(getOutputNs());
-
-    // We will write all results into a temporary collection, then rename the temporary
-    // collection to be the target collection once we are done. Note that this temporary
-    // collection name is used by MongoMirror and thus should not be changed without
-    // consultation.
-    _tempNs = NamespaceString(getOutputNs().tenantId(),
-                              str::stream() << getOutputNs().dbName().toString() << ".tmp.agg_out."
+    const auto& outputNs = getOutputNs();
+    // We will write all results into a temporary collection, then rename the temporary collection
+    // to be the target collection once we are done.
+    // Note that this temporary collection name is used by MongoMirror and thus should not be
+    // changed without consultation.
+    _tempNs = NamespaceString(outputNs.tenantId(),
+                              str::stream() << outputNs.dbName().toString() << ".tmp.agg_out."
                                             << UUID::gen());
 
-    validateTimeseries();
     // Save the original collection options and index specs so we can check they didn't change
     // during computation.
     _originalOutOptions =
@@ -192,19 +145,10 @@ void DocumentSourceOut::initialize() {
         cmd << "create" << _tempNs.coll();
         cmd << "temp" << true;
         cmd.appendElementsUnique(_originalOutOptions);
-        if (_timeseries) {
-            cmd << DocumentSourceOutSpec::kTimeseriesFieldName << _timeseries->toBSON();
-            pExpCtx->mongoProcessInterface->createTimeseries(
-                pExpCtx->opCtx, _tempNs, cmd.done(), false);
-        } else {
-            pExpCtx->mongoProcessInterface->createCollection(
-                pExpCtx->opCtx, _tempNs.dbName(), cmd.done());
-        }
-    }
 
-    // After creating the tmp collection we should update '_tempNs' to represent the buckets
-    // collection if the collection is time-series.
-    _tempNs = makeBucketNsIfTimeseries(_tempNs);
+        pExpCtx->mongoProcessInterface->createCollection(
+            pExpCtx->opCtx, _tempNs.dbName(), cmd.done());
+    }
 
     CurOpFailpointHelpers::waitWhileFailPointEnabled(
         &outWaitAfterTempCollectionCreation,
@@ -233,38 +177,22 @@ void DocumentSourceOut::initialize() {
 void DocumentSourceOut::finalize() {
     DocumentSourceWriteBlock writeBlock(pExpCtx->opCtx);
 
-    // If the collection is timeseries, must rename to the "real" buckets collection
-    const NamespaceString& outputNs = makeBucketNsIfTimeseries(getOutputNs());
-
-    pExpCtx->mongoProcessInterface->renameIfOptionsAndIndexesHaveNotChanged(
-        pExpCtx->opCtx,
-        _tempNs,
-        outputNs,
-        true /* dropTarget */,
-        false /* stayTemp */,
-        _timeseries ? true : false /* allowBuckets */,
-        _originalOutOptions,
-        _originalIndexes);
+    const auto& outputNs = getOutputNs();
+    pExpCtx->mongoProcessInterface->renameIfOptionsAndIndexesHaveNotChanged(pExpCtx->opCtx,
+                                                                            _tempNs,
+                                                                            outputNs,
+                                                                            true /* dropTarget */,
+                                                                            false /* stayTemp */,
+                                                                            _originalOutOptions,
+                                                                            _originalIndexes);
 
     // The rename succeeded, so the temp collection no longer exists.
     _tempNs = {};
-
-    // If the collection is timeseries, try to create the view.
-    if (_timeseries) {
-        BSONObjBuilder cmd;
-        cmd << DocumentSourceOutSpec::kTimeseriesFieldName << _timeseries->toBSON();
-        pExpCtx->mongoProcessInterface->createTimeseries(
-            pExpCtx->opCtx, getOutputNs(), cmd.done(), true);
-    }
-
-    // Creating the view succeeded, so the boolean should be set to true.
-    _timeseriesViewCreated = true;
 }
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceOut::create(
-    NamespaceString outputNs,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    boost::optional<TimeseriesOptions> timeseries) {
+    NamespaceString outputNs, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+
     uassert(ErrorCodes::OperationNotSupportedInTransaction,
             "{} cannot be used in a transaction"_format(kStageName),
             !expCtx->opCtx->inMultiDocumentTransaction());
@@ -280,15 +208,14 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceOut::create(
     uassert(31321,
             "Can't {} to internal database: {}"_format(kStageName, outputNs.db()),
             !outputNs.isOnInternalDb());
-    return new DocumentSourceOut(std::move(outputNs), std::move(timeseries), expCtx);
+
+    return new DocumentSourceOut(std::move(outputNs), expCtx);
 }
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceOut::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    auto outSpec = parseOutSpecAndResolveTargetNamespace(elem, expCtx->ns.dbName());
-    NamespaceString targetNss =
-        NamespaceString(expCtx->ns.dbName().tenantId(), outSpec.getDb(), outSpec.getColl());
-    return create(std::move(targetNss), expCtx, std::move(outSpec.getTimeseries()));
+    auto targetNS = parseNsFromElem(elem, expCtx->ns.dbName());
+    return create(targetNS, expCtx);
 }
 
 Value DocumentSourceOut::serialize(SerializationOptions opts) const {
@@ -297,11 +224,8 @@ Value DocumentSourceOut::serialize(SerializationOptions opts) const {
     }
 
     // Do not include the tenantId in the serialized 'outputNs'.
-    return Value(Document{{getSourceName(),
-                           Document{{"db", _outputNs.dbName().db()},
-                                    {"coll", _outputNs.coll()},
-                                    {DocumentSourceOutSpec::kTimeseriesFieldName,
-                                     _timeseries ? Value(_timeseries->toBSON()) : Value()}}}});
+    return Value(
+        DOC(kStageName << DOC("db" << _outputNs.dbName().db() << "coll" << _outputNs.coll())));
 }
 
 void DocumentSourceOut::waitWhileFailPointEnabled() {
@@ -310,9 +234,8 @@ void DocumentSourceOut::waitWhileFailPointEnabled() {
         pExpCtx->opCtx,
         "hangWhileBuildingDocumentSourceOutBatch",
         []() {
-            LOGV2(
-                20902,
-                "Hanging aggregation due to  'hangWhileBuildingDocumentSourceOutBatch' failpoint");
+            LOGV2(20902,
+                  "Hanging aggregation due to 'hangWhileBuildingDocumentSourceOutBatch' failpoint");
         });
 }
 

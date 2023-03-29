@@ -930,8 +930,7 @@ Status runAggregate(OperationContext* opCtx,
                                           resolvedView.getNamespace(),
                                           ShardVersion::UNSHARDED() /* shardVersion */,
                                           boost::none /* databaseVersion */);
-            }
-
+            };
             uassert(std::move(resolvedView),
                     "Explain of a resolved view must be executed by mongos",
                     !ShardingState::get(opCtx)->enabled() || !request.getExplain());
