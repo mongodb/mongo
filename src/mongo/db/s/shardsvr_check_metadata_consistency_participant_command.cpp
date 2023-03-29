@@ -102,10 +102,11 @@ public:
                 for (auto it = collCatalogSnapshot->begin(opCtx, nss.dbName());
                      it != collCatalogSnapshot->end(opCtx);
                      ++it) {
-                    if (!(*it)->ns().isNormalCollection()) {
+                    const auto coll = *it;
+                    if (!coll || !coll->ns().isNormalCollection()) {
                         continue;
                     }
-                    localCollections.emplace_back(CollectionPtr(*it));
+                    localCollections.emplace_back(CollectionPtr(coll));
                 }
                 std::sort(localCollections.begin(),
                           localCollections.end(),
