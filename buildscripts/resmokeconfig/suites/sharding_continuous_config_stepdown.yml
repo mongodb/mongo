@@ -71,6 +71,7 @@ selector:
   - jstests/sharding/printShardingStatus.js
   - jstests/sharding/refresh_sessions.js
   - jstests/sharding/shard_collection_existing_zones.js
+  - jstests/sharding/catalog_shard_mongos_ops_on_config_and_admin.js
   # Balancer writes (direct write to config database with no retries)
   - jstests/sharding/convert_to_and_from_sharded.js
   - jstests/sharding/remove2.js
