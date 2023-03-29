@@ -2678,38 +2678,6 @@ buildvariants:
     tasks: *classic_engine_1nodereplset_tasks
 
 
-  - name: linux-standalone-telemetry
-    display_name: Linux Standalone (Telemetry)
-    cron: "0 0 * * 0,2,3,4,5" # Run it every day except Saturday and Monday.
-    modules: *modules
-    expansions:
-      mongodb_setup: standalone-telemetry
-      infrastructure_provisioning: single
-      platform: linux
-      project_dir: *project_dir
-      authentication: enabled
-      storageEngine: wiredTiger
-    run_on:
-      - "rhel70-perf-single"
-    depends_on: *_compile_amazon2
-    tasks: *classic_engine_tasks
-
-  - name: linux-1-node-replSet-telemetry
-    display_name: Linux 1-Node ReplSet (Telemetry)
-    cron: "0 0 * * 0,2,3,4,5" # Run it every day except Saturday and Monday.
-    modules: *modules
-    expansions:
-      mongodb_setup: single-replica-telemetry
-      infrastructure_provisioning: single
-      platform: linux
-      project_dir: *project_dir
-      authentication: enabled
-      storageEngine: wiredTiger
-    run_on:
-      - "rhel70-perf-single"
-    depends_on: *_compile_amazon2
-    tasks: *classic_engine_1nodereplset_tasks
-
   - name: linux-1-node-replSet.2022-11
     display_name: Linux 1-Node ReplSet 2022-11
     cron: "0 0 * * 4"  # 00:00 on Thursday
