@@ -318,12 +318,15 @@ public:
     /**
      * Helpers to serialize a pipeline.
      */
-    std::vector<Value> serialize(
-        boost::optional<ExplainOptions::Verbosity> explain = boost::none) const;
+    std::vector<Value> serialize(boost::optional<ExplainOptions::Verbosity> explain) const;
+    std::vector<Value> serialize(boost::optional<SerializationOptions> opts = boost::none) const;
+    std::vector<BSONObj> serializeToBson(boost::optional<ExplainOptions::Verbosity> explain) const;
     std::vector<BSONObj> serializeToBson(
-        boost::optional<ExplainOptions::Verbosity> explain = boost::none) const;
+        boost::optional<SerializationOptions> opts = boost::none) const;
     static std::vector<Value> serializeContainer(
-        const SourceContainer& container, boost::optional<ExplainOptions::Verbosity> = boost::none);
+        const SourceContainer& container, boost::optional<ExplainOptions::Verbosity> explain);
+    static std::vector<Value> serializeContainer(
+        const SourceContainer& container, boost::optional<SerializationOptions> opts = boost::none);
 
     // The initial source is special since it varies between mongos and mongod.
     void addInitialSource(boost::intrusive_ptr<DocumentSource> source);

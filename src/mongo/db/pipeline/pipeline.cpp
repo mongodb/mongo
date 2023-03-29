@@ -514,20 +514,48 @@ stdx::unordered_set<NamespaceString> Pipeline::getInvolvedCollections() const {
 }
 
 vector<Value> Pipeline::serializeContainer(const SourceContainer& container,
+                                           boost::optional<SerializationOptions> opts) {
+    vector<Value> serializedSources;
+    for (auto&& source : container) {
+        source->serializeToArray(serializedSources, opts ? opts.get() : SerializationOptions());
+    }
+    return serializedSources;
+}
+
+vector<Value> Pipeline::serializeContainer(const SourceContainer& container,
                                            boost::optional<ExplainOptions::Verbosity> explain) {
+    // TODO SERVER-75139 Remove this function once all calls have been removed.
     vector<Value> serializedSources;
     for (auto&& source : container) {
         source->serializeToArray(serializedSources, explain);
     }
     return serializedSources;
 }
+
 vector<Value> Pipeline::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
-    return serializeContainer(_sources, explain);
+    // TODO SERVER-75139 Remove this function once all calls have been removed.
+    return serializeContainer(_sources, {explain});
+}
+
+vector<Value> Pipeline::serialize(boost::optional<SerializationOptions> opts) const {
+    return serializeContainer(_sources, opts);
 }
 
 vector<BSONObj> Pipeline::serializeToBson(
     boost::optional<ExplainOptions::Verbosity> explain) const {
     const auto serialized = serialize(explain);
+    std::vector<BSONObj> asBson;
+    asBson.reserve(serialized.size());
+    for (auto&& stage : serialized) {
+        invariant(stage.getType() == BSONType::Object);
+        asBson.push_back(stage.getDocument().toBson());
+    }
+    return asBson;
+}
+
+vector<BSONObj> Pipeline::serializeToBson(boost::optional<SerializationOptions> opts) const {
+    // TODO SERVER-75139 Remove this function once all calls have been removed.
+    const auto serialized = serialize(opts);
     std::vector<BSONObj> asBson;
     asBson.reserve(serialized.size());
     for (auto&& stage : serialized) {
