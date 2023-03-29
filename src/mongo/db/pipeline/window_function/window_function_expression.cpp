@@ -47,6 +47,7 @@
 #include "mongo/db/pipeline/window_function/window_function_first_last_n.h"
 #include "mongo/db/pipeline/window_function/window_function_min_max.h"
 #include "mongo/db/pipeline/window_function/window_function_n_traits.h"
+#include "mongo/db/pipeline/window_function/window_function_percentile.h"
 #include "mongo/db/pipeline/window_function/window_function_top_bottom_n.h"
 
 using boost::intrusive_ptr;
@@ -79,6 +80,17 @@ REGISTER_STABLE_WINDOW_FUNCTION(
     (ExpressionN<WindowFunctionBottom,
                  AccumulatorTopBottomN<TopBottomSense::kBottom, true>>::parse));
 
+REGISTER_WINDOW_FUNCTION_WITH_FEATURE_FLAG(
+    percentile,
+    (window_function::ExpressionQuantile<AccumulatorPercentile>::parse),
+    feature_flags::gFeatureFlagApproxPercentiles,
+    AllowedWithApiStrict::kNeverInVersion1);
+
+REGISTER_WINDOW_FUNCTION_WITH_FEATURE_FLAG(
+    median,
+    (window_function::ExpressionQuantile<AccumulatorMedian>::parse),
+    feature_flags::gFeatureFlagApproxPercentiles,
+    AllowedWithApiStrict::kNeverInVersion1);
 StringMap<Expression::ExpressionParserRegistration> Expression::parserMap;
 
 intrusive_ptr<Expression> Expression::parse(BSONObj obj,
@@ -235,13 +247,10 @@ boost::intrusive_ptr<Expression> ExpressionFirstLast::parse(
         auto argName = arg.fieldNameStringData();
         if (argName == kWindowArg) {
             uassert(ErrorCodes::FailedToParse,
-                    "'window' field must be an object",
-                    obj[kWindowArg].type() == BSONType::Object);
-            uassert(ErrorCodes::FailedToParse,
                     str::stream() << "saw multiple 'window' fields in '" << accumulatorName
                                   << "' expression",
                     bounds == boost::none);
-            bounds = WindowBounds::parse(arg.embeddedObject(), sortBy, expCtx);
+            bounds = WindowBounds::parse(arg, sortBy, expCtx);
         } else if (argName == StringData(accumulatorName)) {
             input = ::mongo::Expression::parseOperand(expCtx, arg, expCtx->variablesParseState);
 
@@ -365,12 +374,9 @@ boost::intrusive_ptr<Expression> ExpressionN<WindowFunctionN, AccumulatorNType>:
             }
         } else if (fieldName == kWindowArg) {
             uassert(ErrorCodes::FailedToParse,
-                    "'window' field must be an object",
-                    obj[kWindowArg].type() == BSONType::Object);
-            uassert(ErrorCodes::FailedToParse,
                     str::stream() << "saw multiple 'window' fields in '" << name << "' expression",
                     bounds == boost::none);
-            bounds = WindowBounds::parse(elem.embeddedObject(), sortBy, expCtx);
+            bounds = WindowBounds::parse(elem, sortBy, expCtx);
         } else {
             uasserted(ErrorCodes::FailedToParse,
                       str::stream() << name << " got unexpected argument: " << fieldName);
@@ -392,6 +398,74 @@ boost::intrusive_ptr<Expression> ExpressionN<WindowFunctionN, AccumulatorNType>:
         std::move(nExpr),
         std::move(innerSortPattern));
 }
+
+template <typename AccumulatorTType>
+boost::intrusive_ptr<Expression> ExpressionQuantile<AccumulatorTType>::parse(
+    BSONObj obj, const boost::optional<SortPattern>& sortBy, ExpressionContext* expCtx) {
+
+    std::vector<double> ps;
+    int32_t algoType = -1;
+    boost::intrusive_ptr<::mongo::Expression> outputExpr;
+    boost::intrusive_ptr<::mongo::Expression> initializeExpr;  // need for serializer.
+    boost::optional<WindowBounds> bounds = WindowBounds::defaultBounds();
+    auto name = AccumulatorTType::kName;
+    for (auto&& elem : obj) {
+        auto fieldName = elem.fieldNameStringData();
+        if (fieldName == name) {
+            uassert(ErrorCodes::FailedToParse,
+                    str::stream() << "saw multiple specifications for '" << name << "expression ",
+                    !(initializeExpr || outputExpr));
+            auto accExpr = AccumulatorTType::parseArgs(expCtx, elem, expCtx->variablesParseState);
+            outputExpr = std::move(accExpr.argument);
+            initializeExpr = std::move(accExpr.initializer);
+
+            // Retrieve the values of 'ps' and 'algoType' from the accumulator's IDL parser.
+            std::tie(ps, algoType) = AccumulatorTType::parsePercentileAndAlgoType(elem);
+        } else if (fieldName == kWindowArg) {
+            bounds = WindowBounds::parse(elem, sortBy, expCtx);
+        } else {
+            uasserted(ErrorCodes::FailedToParse,
+                      str::stream() << name << " got unexpected argument: " << fieldName);
+        }
+    }
+
+    tassert(7455900,
+            str::stream() << "missing accumulator specification for " << name,
+            initializeExpr && outputExpr && !ps.empty() && algoType != -1);
+
+    return make_intrusive<ExpressionQuantile>(
+        expCtx, std::string(name), std::move(outputExpr), initializeExpr, *bounds, ps, algoType);
+}
+
+template <typename AccumulatorTType>
+Value ExpressionQuantile<AccumulatorTType>::serialize(SerializationOptions opts) const {
+    MutableDocument result;
+
+    MutableDocument md;
+    AccumulatorTType::serializeHelper(_input, opts, _ps, _algoType, md);
+    result[AccumulatorTType::kName] = md.freezeToValue();
+
+    MutableDocument windowField;
+    _bounds.serialize(windowField, opts);
+    result[kWindowArg] = windowField.freezeToValue();
+    return result.freezeToValue();
+}
+
+template <typename AccumulatorTType>
+std::unique_ptr<WindowFunctionState> ExpressionQuantile<AccumulatorTType>::buildRemovable() const {
+    if (AccumulatorTType::kName == AccumulatorMedian::kName) {
+        return WindowFunctionMedian::create(_expCtx);
+    } else {
+        return WindowFunctionPercentile::create(_expCtx, _ps);
+    }
+}
+
+template <typename AccumulatorTType>
+boost::intrusive_ptr<AccumulatorState> ExpressionQuantile<AccumulatorTType>::buildAccumulatorOnly()
+    const {
+    return AccumulatorTType::create(_expCtx, _ps, _algoType);
+}
+
 
 MONGO_INITIALIZER_GROUP(BeginWindowFunctionRegistration,
                         ("default"),

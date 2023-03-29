@@ -97,6 +97,13 @@ AccumulationExpression AccumulatorPercentile::parseArgs(ExpressionContext* const
             "$percentile"_sd /*name*/};
 }
 
+std::pair<std::vector<double> /*ps*/, int32_t /*algoType*/>
+AccumulatorPercentile::parsePercentileAndAlgoType(BSONElement elem) {
+    auto spec = AccumulatorPercentileSpec::parse(IDLParserContext(kName), elem.Obj());
+    return std::pair<std::vector<double>, int32_t>(spec.getP(),
+                                                   static_cast<int32_t>(spec.getAlgorithm()));
+}
+
 boost::intrusive_ptr<Expression> AccumulatorPercentile::parseExpression(
     ExpressionContext* const expCtx, BSONElement elem, VariablesParseState vps) {
     expCtx->sbeGroupCompatibility = SbeCompatibility::notCompatible;
@@ -126,6 +133,12 @@ void AccumulatorPercentile::processInternal(const Value& input, bool merging) {
     }
     _algo->incorporate(input.coerceToDouble());
     _memUsageBytes = sizeof(*this) + _algo->memUsageBytes();
+    // TODO SERVER-75115 confirm that $percentile can spill and remove uassert.
+    uassert(
+        ErrorCodes::ExceededMemoryLimit,
+        str::stream() << "$percentile used too much memory and cannot spill to disk.Memory limit: "
+                      << _maxMemUsageBytes << " bytes" << _maxMemUsageBytes,
+        static_cast<long long>(_memUsageBytes) < _maxMemUsageBytes);
 }
 
 Value AccumulatorPercentile::getValue(bool toBeMerged) {
@@ -168,7 +181,8 @@ AccumulatorPercentile::AccumulatorPercentile(ExpressionContext* const expCtx,
     : AccumulatorState(expCtx),
       _percentiles(ps),
       _algo(createPercentileAlgorithm(algoType)),
-      _algoType(algoType) {
+      _algoType(algoType),
+      _maxMemUsageBytes(internalDocumentSourceSetWindowFieldsMaxMemoryBytes.load()) {
     _memUsageBytes = sizeof(*this) + _algo->memUsageBytes();
 }
 
@@ -226,7 +240,7 @@ AccumulationExpression AccumulatorMedian::parseArgs(ExpressionContext* const exp
     PercentileAlgorithmTypeEnum algoType = spec.getAlgorithm();
 
     auto factory = [expCtx, algoType] {
-        return AccumulatorMedian::create(expCtx, static_cast<int32_t>(algoType));
+        return AccumulatorMedian::create(expCtx, {} /* unused */, static_cast<int32_t>(algoType));
     };
 
     return {ExpressionConstant::create(expCtx, Value(BSONNULL)) /*initializer*/,
@@ -235,6 +249,12 @@ AccumulationExpression AccumulatorMedian::parseArgs(ExpressionContext* const exp
             "$ median"_sd /*name*/};
 }
 
+std::pair<std::vector<double> /*ps*/, int32_t /*algoType*/>
+AccumulatorMedian::parsePercentileAndAlgoType(BSONElement elem) {
+    auto spec = AccumulatorMedianSpec::parse(IDLParserContext(kName), elem.Obj());
+    return std::pair<std::vector<double>, int32_t>({0.5},
+                                                   static_cast<int32_t>(spec.getAlgorithm()));
+}
 boost::intrusive_ptr<Expression> AccumulatorMedian::parseExpression(ExpressionContext* const expCtx,
                                                                     BSONElement elem,
                                                                     VariablesParseState vps) {
@@ -260,6 +280,7 @@ AccumulatorMedian::AccumulatorMedian(ExpressionContext* expCtx,
     : AccumulatorPercentile(expCtx, {0.5} /* ps */, algoType){};
 
 intrusive_ptr<AccumulatorState> AccumulatorMedian::create(ExpressionContext* expCtx,
+                                                          const std::vector<double>& /* unused */,
                                                           int32_t algoType) {
     return new AccumulatorMedian(expCtx, {} /* unused */, algoType);
 }

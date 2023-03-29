@@ -41,11 +41,7 @@ boost::intrusive_ptr<window_function::Expression> parseCountWindowFunction(
     for (const auto& arg : obj) {
         auto argName = arg.fieldNameStringData();
         if (argName == Expression::kWindowArg) {
-            uassert(ErrorCodes::FailedToParse,
-                    "'window' field must be an object",
-                    arg.type() == BSONType::Object);
-
-            bounds = WindowBounds::parse(arg.embeddedObject(), sortBy, expCtx);
+            bounds = WindowBounds::parse(arg, sortBy, expCtx);
         } else if (Expression::isFunction(argName)) {
             uassert(ErrorCodes::FailedToParse,
                     "Cannot specify multiple functions in window function spec",

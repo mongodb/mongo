@@ -79,6 +79,12 @@ public:
      */
     void reset() final;
 
+    /*
+     * Necessary for supporting $percentile as window functions.
+     */
+    static std::pair<std::vector<double> /*ps*/, int32_t /*algoType*/> parsePercentileAndAlgoType(
+        BSONElement elem);
+
     /**
      * Serializes this accumulator to a valid MQL accumulation statement that would be legal
      * inside a $group. When executing on a sharded cluster, the result of this function will be
@@ -110,6 +116,9 @@ protected:
     // TODO SERVER-74894: This should have been 'PercentileAlgorithmTypeEnum' but the generated
     // header from the IDL includes this header, creating a dependency.
     const int32_t _algoType;
+
+    // TODO SERVER-75115 potentially remove this.
+    long long _maxMemUsageBytes;
 };
 
 /*
@@ -135,6 +144,7 @@ public:
                                                             VariablesParseState vps);
 
     static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx,
+                                                         const std::vector<double>& unused,
                                                          int32_t algoType);
 
     /**
@@ -146,6 +156,11 @@ public:
                       const std::vector<double>& unused,
                       int32_t algoType);
 
+    /*
+     * Necessary for supporting $median as window functions.
+     */
+    static std::pair<std::vector<double> /*ps*/, int32_t /*algoType*/> parsePercentileAndAlgoType(
+        BSONElement elem);
     /**
      * Modify the base-class implementation to return a single value rather than a single-element
      * array.

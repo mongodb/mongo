@@ -33,6 +33,7 @@
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/accumulator_for_window_functions.h"
 #include "mongo/db/pipeline/accumulator_multi.h"
+#include "mongo/db/pipeline/accumulator_percentile.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_set_window_fields_gen.h"
 #include "mongo/db/pipeline/expression_dependencies.h"
@@ -236,10 +237,7 @@ public:
         for (const auto& arg : obj) {
             auto argName = arg.fieldNameStringData();
             if (argName == kWindowArg) {
-                uassert(ErrorCodes::FailedToParse,
-                        "'window' field must be an object",
-                        arg.type() == BSONType::Object);
-                bounds = WindowBounds::parse(arg.embeddedObject(), sortBy, expCtx);
+                bounds = WindowBounds::parse(arg, sortBy, expCtx);
             } else if (isFunction(argName)) {
                 uassert(ErrorCodes::FailedToParse,
                         "Cannot specify two functions in window function spec",
@@ -356,10 +354,7 @@ public:
         for (const auto& arg : obj) {
             auto argName = arg.fieldNameStringData();
             if (argName == kWindowArg) {
-                uassert(ErrorCodes::FailedToParse,
-                        "'window' field must be an object",
-                        obj[kWindowArg].type() == BSONType::Object);
-                bounds = WindowBounds::parse(arg.embeddedObject(), sortBy, expCtx);
+                bounds = WindowBounds::parse(arg, sortBy, expCtx);
             } else if (isFunction(argName)) {
                 uassert(ErrorCodes::FailedToParse,
                         "Cannot specify two functions in window function spec",
@@ -420,12 +415,11 @@ public:
         }
 
         // Rank based accumulators use the sort by expression as the input.
-        uassert(
-            5371602,
-            str::stream()
-                << accumulatorName
-                << " must be specified with a top level sortBy expression with exactly one element",
-            sortBy && sortBy->isSingleElementKey());
+        uassert(5371602,
+                str::stream() << accumulatorName
+                              << " must be specified with a top level sortBy expression with "
+                                 "exactly one element",
+                sortBy && sortBy->isSingleElementKey());
         auto sortPatternPart = sortBy.get()[0];
         if (sortPatternPart.fieldPath) {
             auto sortExpression = ExpressionFieldPath::createPathFromString(
@@ -630,10 +624,7 @@ public:
         for (const auto& arg : obj) {
             auto argName = arg.fieldNameStringData();
             if (argName == kWindowArg) {
-                uassert(ErrorCodes::FailedToParse,
-                        "'window' field must be an object",
-                        obj[kWindowArg].type() == BSONType::Object);
-                bounds = WindowBounds::parse(arg.embeddedObject(), sortBy, expCtx);
+                bounds = WindowBounds::parse(arg, sortBy, expCtx);
             } else if (argName == "$derivative"_sd) {
                 derivativeArgs = arg;
             } else {
@@ -710,12 +701,9 @@ public:
             auto argName = arg.fieldNameStringData();
             if (argName == kWindowArg) {
                 uassert(ErrorCodes::FailedToParse,
-                        "'window' field must be an object",
-                        obj[kWindowArg].type() == BSONType::Object);
-                uassert(ErrorCodes::FailedToParse,
                         "There can be only one 'window' field for $integral",
                         bounds == boost::none);
-                bounds = WindowBounds::parse(arg.embeddedObject(), sortBy, expCtx);
+                bounds = WindowBounds::parse(arg, sortBy, expCtx);
             } else if (argName == "$integral"_sd) {
                 integralArgs = arg;
             } else {
@@ -801,12 +789,11 @@ public:
                 str::stream() << "'window' field is not allowed in " << accumulatorName,
                 windowFieldMissing);
 
-        uassert(
-            605001,
-            str::stream()
-                << accumulatorName
-                << " must be specified with a top level sortBy expression with exactly one element",
-            sortBy && sortBy->isSingleElementKey());
+        uassert(605001,
+                str::stream() << accumulatorName
+                              << " must be specified with a top level sortBy expression with "
+                                 "exactly one element",
+                sortBy && sortBy->isSingleElementKey());
 
         return make_intrusive<ExpressionLinearFill>(
             expCtx, accumulatorName->toString(), std::move(input), std::move(bounds));
@@ -944,4 +931,36 @@ public:
     boost::intrusive_ptr<::mongo::Expression> nExpr;
     boost::optional<SortPattern> sortPattern;
 };
+
+template <typename AccumulatorTType>
+class ExpressionQuantile : public Expression {
+public:
+    static boost::intrusive_ptr<Expression> parse(BSONObj obj,
+                                                  const boost::optional<SortPattern>& sortBy,
+                                                  ExpressionContext* expCtx);
+
+    ExpressionQuantile(ExpressionContext* expCtx,
+                       std::string accumulatorName,
+                       boost::intrusive_ptr<::mongo::Expression> input,
+                       boost::intrusive_ptr<::mongo::Expression> initializeExpr,
+                       WindowBounds bounds,
+                       std::vector<double> ps,
+                       int32_t algoType)
+        : Expression(expCtx, std::move(accumulatorName), std::move(input), std::move(bounds)),
+          _ps(std::move(ps)),
+          _algoType(algoType),
+          _intializeExpr(std::move(initializeExpr)) {}
+
+    Value serialize(SerializationOptions opts) const final;
+
+    boost::intrusive_ptr<AccumulatorState> buildAccumulatorOnly() const final;
+
+    std::unique_ptr<WindowFunctionState> buildRemovable() const final;
+
+private:
+    std::vector<double> _ps;
+    int32_t _algoType;
+    boost::intrusive_ptr<::mongo::Expression> _intializeExpr;
+};
+
 }  // namespace mongo::window_function

@@ -346,9 +346,9 @@ DEATH_TEST_F(PartitionIteratorTest, SingleConsumerEndpointPolicy, "Requested exp
     const auto mock = DocumentSourceMock::createForTest(docs, getExpCtx());
     auto accessor = makeEndpointAccessor(mock, boost::none);
     // Mock a window with documents [1, 2].
-    auto bounds = WindowBounds::parse(BSON("documents" << BSON_ARRAY(1 << 2)),
-                                      SortPattern(BSON("a" << 1), getExpCtx()),
-                                      getExpCtx().get());
+    auto windowObj = BSON("window" << BSON("documents" << BSON_ARRAY(1 << 2)));
+    auto bounds = WindowBounds::parse(
+        windowObj.firstElement(), SortPattern(BSON("a" << 1), getExpCtx()), getExpCtx().get());
     // Retrieving the endpoints triggers the expiration, with the assumption that all documents
     // below the lower bound are not needed.
     auto endpoints = accessor.getEndpoints(bounds);
@@ -377,12 +377,12 @@ DEATH_TEST_F(PartitionIteratorTest, MultipleConsumerEndpointPolicy, "Requested e
     // be (newCurrent - 2).
     auto lookBehindAccessor = makeEndpointAccessor(mock, boost::none);
     auto lookAheadAccessor = makeEndpointAccessor(mock, boost::none);
-    auto negBounds = WindowBounds::parse(BSON("documents" << BSON_ARRAY(-1 << 0)),
-                                         SortPattern(BSON("a" << 1), getExpCtx()),
-                                         getExpCtx().get());
-    auto posBounds = WindowBounds::parse(BSON("documents" << BSON_ARRAY(0 << 1)),
-                                         SortPattern(BSON("a" << 1), getExpCtx()),
-                                         getExpCtx().get());
+    auto windowObj = BSON("window" << BSON("documents" << BSON_ARRAY(-1 << 0)));
+    auto negBounds = WindowBounds::parse(
+        windowObj.firstElement(), SortPattern(BSON("a" << 1), getExpCtx()), getExpCtx().get());
+    windowObj = BSON("window" << BSON("documents" << BSON_ARRAY(0 << 1)));
+    auto posBounds = WindowBounds::parse(
+        windowObj.firstElement(), SortPattern(BSON("a" << 1), getExpCtx()), getExpCtx().get());
 
     auto endpoints = lookBehindAccessor.getEndpoints(negBounds);
     ASSERT_DOCUMENT_EQ(docs[0].getDocument(), *lookBehindAccessor[endpoints->first]);
@@ -426,9 +426,9 @@ DEATH_TEST_F(PartitionIteratorTest,
         PartitionIterator(getExpCtx().get(), mock.get(), &_tracker, boost::none, boost::none);
     auto accessor = PartitionAccessor(&partIter, PartitionAccessor::Policy::kRightEndpoint);
     // Use a window of 'documents: [-2, -1]'.
-    auto bounds = WindowBounds::parse(BSON("documents" << BSON_ARRAY(-2 << -1)),
-                                      SortPattern(BSON("a" << 1), getExpCtx()),
-                                      getExpCtx().get());
+    auto windowObj = BSON("window" << BSON("documents" << BSON_ARRAY(-2 << -1)));
+    auto bounds = WindowBounds::parse(
+        windowObj.firstElement(), SortPattern(BSON("a" << 1), getExpCtx()), getExpCtx().get());
 
     // Advance until {a: 3} is the current document.
     partIter.advance();
@@ -460,9 +460,9 @@ DEATH_TEST_F(PartitionIteratorTest, MixedPolicy, "Requested expired document") {
     auto endpointAccessor = makeEndpointAccessor(mock, boost::none);
     auto defaultAccessor = makeDefaultAccessor(mock, boost::none);
     // Mock a window with documents [1, 2].
-    auto bounds = WindowBounds::parse(BSON("documents" << BSON_ARRAY(1 << 2)),
-                                      SortPattern(BSON("a" << 1), getExpCtx()),
-                                      getExpCtx().get());
+    auto windowObj = BSON("window" << BSON("documents" << BSON_ARRAY(1 << 2)));
+    auto bounds = WindowBounds::parse(
+        windowObj.firstElement(), SortPattern(BSON("a" << 1), getExpCtx()), getExpCtx().get());
 
     // Before advancing, ensure that both accessors expire the first document.
     auto endpoints = endpointAccessor.getEndpoints(bounds);
