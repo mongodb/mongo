@@ -168,7 +168,13 @@ TEST(TDigestTest, GetPercentile_Empty) {
 }
 
 TEST(TDigestTest, GetPercentile_SingleCentroid_SinglePoint) {
-    TDigest digest(42.0, 42.0, {{1, 42.0}}, nullptr /* k1_limit */, 1 /* delta */);
+    TDigest digest(0,     // negInfCount
+                   0,     // posInfCount
+                   42.0,  // min
+                   42.0,  // max
+                   {{1, 42.0}},
+                   nullptr /* k1_limit */,
+                   1 /* delta */);
     ASSERT_EQ(42.0, digest.computePercentile(0.1));
     ASSERT_EQ(42.0, digest.computePercentile(0.5));
     ASSERT_EQ(42.0, digest.computePercentile(0.9));
@@ -176,13 +182,25 @@ TEST(TDigestTest, GetPercentile_SingleCentroid_SinglePoint) {
 
 // Our t-digest computes accurate minimum.
 TEST(TDigestTest, GetPercentile_SingleCentroid_Min) {
-    TDigest digest(1.0, 5.0, {{10, 3.7}}, nullptr /* k1_limit */, 1 /* delta */);
+    TDigest digest(0,    // negInfCount
+                   0,    // posInfCount
+                   1.0,  // min
+                   5.0,  // max
+                   {{10, 3.7}},
+                   nullptr /* k1_limit */,
+                   1 /* delta */);
     ASSERT_EQ(1.0, digest.computePercentile(0));
 }
 
 // Our t-digest computes accurate maximum.
 TEST(TDigestTest, GetPercentile_SingleCentroid_Max) {
-    TDigest digest(1.0, 5.0, {{10, 3.7}}, nullptr /* k1_limit */, 1 /* delta */);
+    TDigest digest(0,    // negInfCount
+                   0,    // posInfCount
+                   1.0,  // min
+                   5.0,  // max
+                   {{10, 3.7}},
+                   nullptr /* k1_limit */,
+                   1 /* delta */);
     ASSERT_EQ(5.0, digest.computePercentile(1));
 }
 
@@ -195,7 +213,13 @@ TEST(TDigestTest, GetPercentile_SingleCentroid_EvenlyDistributed) {
         inputs.push_back(i + 1.0);
     }
 
-    TDigest digest(1.0, 100.0, {{100, (1.0 + 100.0) / 2}}, nullptr /* k1_limit */, 1 /* delta */);
+    TDigest digest(0,      // negInfCount
+                   0,      // posInfCount
+                   1.0,    // min
+                   100.0,  // max
+                   {{100, (1.0 + 100.0) / 2}},
+                   nullptr /* k1_limit */,
+                   1 /* delta */);
 
     for (int i = 1; i < 100; ++i) {
         const double p = i * 0.01;
@@ -207,7 +231,9 @@ TEST(TDigestTest, GetPercentile_SingleCentroid_EvenlyDistributed) {
 // Single-point centroids should yield accurate discrete percentiles, even if the rest of the data
 // distribution isn't "even".
 TEST(TDigestTest, GetPercentile_SinglePointCentroids) {
-    TDigest digest(1,      // min
+    TDigest digest(0,      // negInfCount
+                   0,      // posInfCount
+                   1,      // min
                    10000,  // max
                    {
                        {1, 1},
@@ -231,7 +257,45 @@ TEST(TDigestTest, GetPercentile_SinglePointCentroids) {
  * Tests with the special double inputs. The scaling function doesn't matter for these tests but
  * using a smaller delta to exercise compacting of centroids.
  */
-TEST(TDigestTest, Incorporate_Infinities) {
+TEST(TDigestTest, Incorporate_OnlyInfinities) {
+    const int delta = 50;  // doesn't really matter in this test as no centroids are created
+    const double inf = std::numeric_limits<double>::infinity();
+
+    // Setup the data as 70 negative infinities, and 30 positive infinities.
+    vector<double> inputs(100);
+    for (size_t i = 0; i < 70; ++i) {
+        inputs[i] = -inf;
+    }
+    for (size_t i = 70; i < 100; ++i) {
+        inputs[i] = inf;
+    }
+    auto seed = time(nullptr);
+    LOGV2(7429515, "{seed}", "Duplicates_two_clusters", "seed"_attr = seed);
+    std::shuffle(inputs.begin(), inputs.end(), std::mt19937(seed));
+
+    TDigest d{TDigest::k0_limit, delta};
+    for (double val : inputs) {
+        d.incorporate(val);
+    }
+    d.flushBuffer();
+    assertIsValid(d, TDigest::k0, delta, "Incorporate_OnlyInfinities");
+
+    ASSERT_EQ(inputs.size(), d.n() + d.negInfCount() + d.posInfCount()) << "n of digest: " << d;
+    ASSERT_EQ(-inf, d.min()) << "min of digest: " << d;
+    ASSERT_EQ(inf, d.max()) << "max of digest: " << d;
+
+    // 70 out of 100 values are negative infinities
+    ASSERT_EQ(-inf, *d.computePercentile(0.001)) << "p = 0.001 from digest: " << d;
+    ASSERT_EQ(-inf, *d.computePercentile(0.1)) << "p = 0.1 from digest: " << d;
+    ASSERT_EQ(-inf, *d.computePercentile(0.7)) << "p = 0.7 from digest: " << d;
+
+    // 30 out of 100 values are positive infinities
+    ASSERT_EQ(inf, *d.computePercentile(0.8)) << "p = 0.8 from digest: " << d;
+    ASSERT_EQ(inf, *d.computePercentile(0.9)) << "p = 0.9 from digest: " << d;
+    ASSERT_EQ(inf, *d.computePercentile(0.999)) << "p = 0.999 from digest: " << d;
+}
+
+TEST(TDigestTest, Incorporate_WithInfinities) {
     const int delta = 50;
     const double inf = std::numeric_limits<double>::infinity();
 
@@ -255,27 +319,27 @@ TEST(TDigestTest, Incorporate_Infinities) {
         d.incorporate(val);
     }
     d.flushBuffer();
-    assertIsValid(d, TDigest::k0, delta, "Incorporate_Infinities");
+    assertIsValid(d, TDigest::k0, delta, "Incorporate_WithInfinities");
 
     ASSERT_EQ(inputs.size(), d.n() + d.negInfCount() + d.posInfCount()) << "n of digest: " << d;
     ASSERT_EQ(-inf, d.min()) << "min of digest: " << d;
     ASSERT_EQ(inf, d.max()) << "max of digest: " << d;
 
     // 300 out of 1500 values are negative infinities
-    ASSERT_EQ(-inf, *d.computePercentile(0.001)) << "p = 0.1 from digest: " << d;
+    ASSERT_EQ(-inf, *d.computePercentile(0.001)) << "p = 0.001 from digest: " << d;
     ASSERT_EQ(-inf, *d.computePercentile(0.1)) << "p = 0.1 from digest: " << d;
     ASSERT_EQ(-inf, *d.computePercentile(0.2)) << "p = 0.2 from digest: " << d;
 
     assertExpectedAccuracy(sorted,
                            d,
                            {0.3, 0.5, 0.8} /* percentiles */,
-                           20.0 /* accuracyError */,
+                           0.020 /* accuracyError */,
                            "Incorporate_Infinities");
 
     // 200 out of 1500 values are positive infinities
     ASSERT_EQ(inf, *d.computePercentile(1 - 2.0 / 15)) << "p = 1 - 2/15 from digest: " << d;
-    ASSERT_EQ(inf, *d.computePercentile(0.9)) << "p = 0.1 from digest: " << d;
-    ASSERT_EQ(inf, *d.computePercentile(0.999)) << "p = 0.2 from digest: " << d;
+    ASSERT_EQ(inf, *d.computePercentile(0.9)) << "p = 0.9 from digest: " << d;
+    ASSERT_EQ(inf, *d.computePercentile(0.999)) << "p = 0.999 from digest: " << d;
 }
 
 TEST(TDigestTest, Incorporate_Nan_ShouldSkip) {
@@ -355,7 +419,7 @@ TEST(TDigestTest, Incorporate_Great_And_Small) {
     assertExpectedAccuracy(sorted,
                            d,
                            {0.1, 0.4, 0.5, 0.6, 0.9} /* percentiles */,
-                           20.0 /* accuracyError */,
+                           0.020 /* accuracyError */,
                            "Incorporate_Great_And_Small");
 }
 
@@ -397,7 +461,9 @@ TEST(TDigestTest, IncorporateBatch_k0) {
 TEST(TDigestTest, Merge_TailData_k0) {
     const int delta = 10;
 
-    TDigest d{1,                                                               // min
+    TDigest d{0,                                                               // negInfCount
+              0,                                                               // posInfCount
+              1,                                                               // min
               21,                                                              // max
               {{4, 2.5}, {4, 6.5}, {4, 10.5}, {4, 14.5}, {4, 18.5}, {1, 21}},  // centroids
               TDigest::k0_limit,
@@ -426,7 +492,9 @@ TEST(TDigestTest, Merge_TailData_k0) {
 TEST(TDigestTest, Merge_HeadData_k0) {
     const int delta = 10;
 
-    TDigest d{1,                                                               // min
+    TDigest d{0,                                                               // negInfCount
+              0,                                                               // posInfCount
+              1,                                                               // min
               21,                                                              // max
               {{4, 2.5}, {4, 6.5}, {4, 10.5}, {4, 14.5}, {4, 18.5}, {1, 21}},  // centroids
               TDigest::k0_limit,
@@ -455,7 +523,9 @@ TEST(TDigestTest, Merge_HeadData_k0) {
 TEST(TDigestTest, Merge_MixedData_k0) {
     const int delta = 10;
 
-    TDigest d{1,                                                               // min
+    TDigest d{0,                                                               // negInfCount
+              0,                                                               // posInfCount
+              1,                                                               // min
               21,                                                              // max
               {{4, 2.5}, {4, 6.5}, {4, 10.5}, {4, 14.5}, {4, 18.5}, {1, 21}},  // centroids
               TDigest::k0_limit,
@@ -502,7 +572,9 @@ TEST(TDigestTest, Merge_MixedData_k0) {
 TEST(TDigestTest, Merge_DigestsOrdered_k0) {
     const int delta = 10;
 
-    TDigest d{1,                                                               // min
+    TDigest d{0,                                                               // negInfCount
+              0,                                                               // posInfCount
+              1,                                                               // min
               21,                                                              // max
               {{4, 2.5}, {4, 6.5}, {4, 10.5}, {4, 14.5}, {4, 18.5}, {1, 21}},  // centroids
               TDigest::k0_limit,
@@ -511,6 +583,8 @@ TEST(TDigestTest, Merge_DigestsOrdered_k0) {
     const double minOld = d.min();
 
     const TDigest other{
+        0,                                                               // negInfCount
+        0,                                                               // posInfCount
         22,                                                              // min
         31,                                                              // max
         {{2, 22.5}, {2, 24.5}, {1, 26}, {2, 27.5}, {2, 29.5}, {1, 31}},  // centroids
@@ -529,7 +603,9 @@ TEST(TDigestTest, Merge_DigestsOrdered_k0) {
 TEST(TDigestTest, Merge_DigestsMixed_k0) {
     const int delta = 10;
 
-    TDigest d{1,                                                               // min
+    TDigest d{0,                                                               // negInfCount
+              0,                                                               // posInfCount
+              1,                                                               // min
               21,                                                              // max
               {{4, 2.5}, {4, 6.5}, {4, 10.5}, {4, 14.5}, {4, 18.5}, {1, 21}},  // centroids
               TDigest::k0_limit,
@@ -537,8 +613,10 @@ TEST(TDigestTest, Merge_DigestsMixed_k0) {
     const int64_t nOld = d.n();
     const double minOld = d.min();
 
-    const TDigest other{4.5,                                                            // min
-                        27,                                                             // max
+    const TDigest other{0,    // negInfCount
+                        0,    // posInfCount
+                        4.5,  // min
+                        27,   // max
                         {{2, 6.5}, {2, 14.5}, {1, 22}, {2, 23.5}, {2, 25.5}, {1, 27}},  // centroids
                         TDigest::k0_limit,
                         delta};

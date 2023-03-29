@@ -85,7 +85,7 @@ public:
      * the datapoints (the 'weight' of the centroid) and the average of their values (the 'mean').
      */
     struct Centroid {
-        Centroid(int64_t w, double m) : weight(w), mean(m) {}
+        Centroid(double w, double m) : weight(w), mean(m) {}
 
         // The computation below ensures that the interpolated mean is within the bounds of the
         // source means so long as the source weights aren't wildly imbalanced.
@@ -196,12 +196,11 @@ public:
     // Creates an empty digest.
     explicit TDigest(ScalingFunction k_limit, int delta);
 
-    // Creates a digest consisting of one centroid per input. The inputs must be sorted.
-    explicit TDigest(const std::vector<double>& sorted, ScalingFunction k_limit, int delta);
-
-    // Blindly creates a digest from the provided parts. It's the responsibility of the caller to
-    // ensure the resulting digest is valid. Used for testing.
-    explicit TDigest(double min,
+    // Creates a digest from the provided parts. It's the responsibility of the caller to
+    // ensure the resulting digest is valid.
+    explicit TDigest(int64_t negInfCount,
+                     int64_t posInfCount,
+                     double min,
                      double max,
                      std::vector<Centroid> centroids,
                      ScalingFunction k_limit,
@@ -219,7 +218,8 @@ public:
     // formalize the exact criteria for mergeability.
     void merge(const TDigest& other);
 
-    // The input is assumed to be already sorted and isn't checked.
+    // The input is assumed to be already sorted and not contain NaN or Infinity values. Neither of
+    // the assumptions are checked.
     void merge(const std::vector<double>& sorted);
 
     // Sorts data in the pending buffer and merges it with the prior centroids.
@@ -237,14 +237,14 @@ public:
     int64_t n() const {
         return _n;
     }
-    int64_t posInfCount() const {
-        return _posInfCount;
-    }
     int64_t negInfCount() const {
         return _negInfCount;
     }
+    int64_t posInfCount() const {
+        return _posInfCount;
+    }
 
-private:
+protected:
     // The sizes of centroids are controlled by the scaling function and, conceptually, the
     // algorithm can be implemented using k() alone. However, the scaling functions that allow for
     // more accuracy of extreme percentiles are expensive to compute and the runtime can be

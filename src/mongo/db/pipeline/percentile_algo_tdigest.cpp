@@ -36,36 +36,30 @@
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
+
+std::unique_ptr<PercentileAlgorithm> createTDigest() {
+    return std::make_unique<TDigest>(TDigest::k2_limit, internalQueryTdigestDelta.load());
+}
+
 using Centroid = TDigest::Centroid;
 using std::vector;
 
 TDigest::TDigest(ScalingFunction k_limit, int delta)
     : _k_limit(k_limit), _delta(delta), _maxBufferSize(bufferCoeff * delta) {}
 
-TDigest::TDigest(const vector<double>& sorted, ScalingFunction k_limit, int delta)
-    : _k_limit(k_limit), _delta(delta), _maxBufferSize(bufferCoeff * delta) {
-    if (sorted.empty()) {
-        return;
-    }
-
-    _centroids.reserve(sorted.size());
-    _min = sorted.front();
-    _max = sorted.back();
-    _n = sorted.size();
-
-    // The paper calls for combining duplicate values into the same centroid, but with many
-    // duplicates that might violate the scaling function... so let's not do it.
-    for (double val : sorted) {
-        _centroids.emplace_back(1, val);
-    }
-}
-
-TDigest::TDigest(
-    double min, double max, vector<Centroid> centroids, ScalingFunction k_limit, int delta)
+TDigest::TDigest(int64_t negInfCount,
+                 int64_t posInfCount,
+                 double min,
+                 double max,
+                 vector<Centroid> centroids,
+                 ScalingFunction k_limit,
+                 int delta)
     : _k_limit(k_limit),
       _delta(delta),
       _maxBufferSize(bufferCoeff * delta),
       _n(0),
+      _negInfCount(negInfCount),
+      _posInfCount(posInfCount),
       _min(min),
       _max(max) {
     _centroids.swap(centroids);
@@ -100,9 +94,18 @@ void TDigest::incorporate(double input) {
 void TDigest::incorporate(const vector<double>& inputs) {
     _buffer.reserve(_buffer.size() + inputs.size());
     for (double v : inputs) {
-        if (!std::isnan(v)) {
-            _buffer.push_back((v));
+        if (std::isnan(v)) {
+            continue;
         }
+        if (std::isinf(v)) {
+            if (v < 0) {
+                _negInfCount++;
+            } else {
+                _posInfCount++;
+            }
+            continue;
+        }
+        _buffer.push_back((v));
     }
     if (_buffer.size() >= _maxBufferSize) {
         flushBuffer();
@@ -128,7 +131,7 @@ boost::optional<double> TDigest::computePercentile(double p) {
         flushBuffer();
     }
 
-    if (_centroids.empty()) {
+    if (_centroids.empty() && _negInfCount == 0 && _posInfCount == 0) {
         return boost::none;
     }
 
@@ -301,13 +304,15 @@ void TDigest::merge(const TDigest& other) {
             _k_limit == other._k_limit && _delta == other._delta);
     tassert(7429505, "Cannot merge a digest with itself", &other != this);
 
+    _n += other._n;
+    _negInfCount += other._negInfCount;
+    _posInfCount += other._posInfCount;
+    _min = std::min(_min, other._min);
+    _max = std::max(_max, other._max);
+
     if (other.centroids().empty()) {
         return;
     }
-
-    _n += other._n;
-    _min = std::min(_min, other._min);
-    _max = std::max(_max, other._max);
 
     const vector<Centroid>& c1 = _centroids;
     const vector<Centroid>& c2 = other._centroids;
@@ -380,10 +385,6 @@ std::ostream& operator<<(std::ostream& os, const TDigest& digest) {
 std::ostream& operator<<(std::ostream& os, const Centroid& centroid) {
     os << " {w: " << centroid.weight << " , m: " << centroid.mean << "}";
     return os;
-}
-
-std::unique_ptr<PercentileAlgorithm> createTDigest() {
-    return std::make_unique<TDigest>(TDigest::k2_limit, internalQueryTdigestDelta.load());
 }
 
 }  // namespace mongo

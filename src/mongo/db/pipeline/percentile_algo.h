@@ -86,5 +86,6 @@ struct PartialPercentile {
 std::unique_ptr<PercentileAlgorithm> createDiscreteSortAndRank();
 std::unique_ptr<PercentileAlgorithm> createDiscreteSortAndRankParallelClassic();
 std::unique_ptr<PercentileAlgorithm> createTDigest();
+std::unique_ptr<PercentileAlgorithm> createTDigestParallelClassic();
 
 }  // namespace mongo
