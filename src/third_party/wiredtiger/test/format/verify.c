@@ -150,7 +150,7 @@ table_verify_mirror(WT_CONNECTION *conn, TABLE *base, TABLE *table, const char *
     WT_SESSION *session;
     uint64_t base_id, base_keyno, last_match, table_id, table_keyno, rows;
     uint8_t base_bitv, table_bitv;
-    u_int failures, i;
+    u_int failures, i, last_failures;
     int base_ret, table_ret;
     char buf[256], tagbuf[128];
 
@@ -192,6 +192,7 @@ table_verify_mirror(WT_CONNECTION *conn, TABLE *base, TABLE *table, const char *
     trace_msg(session, "%s: start", buf);
 
     for (failures = 0, rows = 1; rows <= TV(RUNS_ROWS); ++rows) {
+        last_failures = failures;
         switch (base->type) {
         case FIX:
             testutil_assert(base->type != FIX);
@@ -319,7 +320,13 @@ page_dump:
         if (checkpoint == NULL &&
           ((rows < (5 * WT_THOUSAND) && rows % 10 == 0) || rows % (5 * WT_THOUSAND) == 0))
             track(buf, rows);
-        last_match = base_keyno;
+        /*
+         * Failures in methods using record numbers may match on the key even after reset. Only
+         * update the last successful matched key if we didn't have a failure or at least one table
+         * is not using record numbers.
+         */
+        if (last_failures == failures && (base->type == ROW || table->type == ROW))
+            last_match = base_keyno;
     }
     testutil_assert(failures == 0);
 
