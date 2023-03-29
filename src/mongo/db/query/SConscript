@@ -253,6 +253,7 @@ env.CppUnitTest(
         "cursor_response_test.cpp",
         "explain_options_test.cpp",
         "find_and_modify_request_test.cpp",
+        "find_common_test.cpp",
         "get_executor_test.cpp",
         "getmore_request_test.cpp",
         "hint_parser_test.cpp",

@@ -95,4 +95,18 @@ void FindCommon::waitInFindBeforeMakingBatch(OperationContext* opCtx, const Cano
                                                      /* checkForInterrupt = */ false,
                                                      cq.nss());
 }
+
+bool FindCommon::BSONArrayResponseSizeTracker::haveSpaceForNext(const BSONObj& document) {
+    return FindCommon::haveSpaceForNext(document, _numberOfDocuments, _bsonArraySizeInBytes);
+}
+void FindCommon::BSONArrayResponseSizeTracker::add(const BSONObj& document) {
+    dassert(haveSpaceForNext(document));
+    ++_numberOfDocuments;
+    _bsonArraySizeInBytes += (document.objsize() + kPerDocumentOverheadBytesUpperBound);
+}
+
+// Upper bound of BSON array element overhead. The overhead is 1 byte/doc for the type + 1 byte/doc
+// for the field name's null terminator + 1 byte per digit of the maximum array index value.
+const size_t FindCommon::BSONArrayResponseSizeTracker::kPerDocumentOverheadBytesUpperBound{
+    2 + std::to_string(BSONObjMaxUserSize / BSONObj::kMinBSONLength).length()};
 }  // namespace mongo
