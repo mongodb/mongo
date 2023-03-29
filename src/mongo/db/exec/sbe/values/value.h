@@ -561,6 +561,10 @@ public:
         return _values.end();
     }
 
+    void erase(const_iterator pos) {
+        _values.erase(pos);
+    }
+
     template <class T1, class Hash1, class Eq1, class Allocator1>
     friend bool operator==(const DeepEqualityHashSet<T1, Hash1, Eq1, Allocator1>& lhs,
                            const DeepEqualityHashSet<T1, Hash1, Eq1, Allocator1>& rhs) {
@@ -852,6 +856,15 @@ public:
         return _vals[idx];
     }
 
+    auto& values() const noexcept {
+        return _vals;
+    }
+
+    auto& values() noexcept {
+        return _vals;
+    }
+
+
     // The in-place update of arrays is allowed only in very limited set of contexts (e.g. when
     // arrays are used in an accumulator slot). The owner of the array must guarantee that no other
     // component can observe the value being updated.
@@ -912,6 +925,10 @@ public:
     bool push_back(TypeTags tag, Value val);
 
     auto& values() const noexcept {
+        return _values;
+    }
+
+    auto& values() noexcept {
         return _values;
     }
 

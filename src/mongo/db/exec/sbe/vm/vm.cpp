@@ -2070,8 +2070,9 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinKeepFields(Arity
             auto sv = bson::fieldNameAndLength(be);
 
             if (keepFieldsSet.count(sv) == 1) {
-                auto [tag, val] = bson::convertFrom<false>(be, end, sv.size());
-                obj->push_back(sv, tag, val);
+                auto [tag, val] = bson::convertFrom<true>(be, end, sv.size());
+                auto [copyTag, copyVal] = value::copyValue(tag, val);
+                obj->push_back(sv, copyTag, copyVal);
             }
 
             be = bson::advance(be, sv.size());
@@ -3916,12 +3917,10 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggConcatArraysC
     auto [tagNewArray, valNewArray] = newArr->getAt(static_cast<size_t>(AggArrayWithSize::kValues));
     tassert(7039519, "expected value of type 'Array'", tagNewArray == value::TypeTags::Array);
 
-    value::arrayForEach(tagNewArray, valNewArray, [&](value::TypeTags elTag, value::Value elVal) {
-        // TODO SERVER-71952: Since 'valNewArray' is owned here, in the future
-        // we could avoid this copy by moving the element out of the array.
-        auto [copyTag, copyVal] = value::copyValue(elTag, elVal);
-        accArr->push_back(copyTag, copyVal);
-    });
+    value::arrayForEach<true>(
+        tagNewArray, valNewArray, [&](value::TypeTags elTag, value::Value elVal) {
+            accArr->push_back(elTag, elVal);
+        });
 
 
     accumulatorGuard.reset();
@@ -4253,8 +4252,8 @@ FastTuple<bool, value::TypeTags, value::Value> setIntersection(
     return {true, resTag, resVal};
 }
 
-value::ValueSetType valueToSetHelper(const value::TypeTags& tag,
-                                     const value::Value& value,
+value::ValueSetType valueToSetHelper(value::TypeTags tag,
+                                     value::Value value,
                                      const CollatorInterface* collator) {
     value::ValueSetType setValues(0, value::ValueHash(collator), value::ValueEq(collator));
     value::arrayForEach(tag, value, [&](value::TypeTags elemTag, value::Value elemVal) {
@@ -4407,23 +4406,22 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::aggSetUnionCappedImpl(
         7039525, "expected value of type 'ArraySet'", tagNewValSet == value::TypeTags::ArraySet);
 
 
-    value::arrayForEach(tagNewValSet, valNewValSet, [&](value::TypeTags elTag, value::Value elVal) {
-        int elemSize = value::getApproximateSize(elTag, elVal);
-        // TODO SERVER-71952: Since 'valNewValSet' is owned here, in the future we could avoid this
-        // copy by moving the element out of the array.
-        auto [copyTag, copyVal] = value::copyValue(elTag, elVal);
-        bool inserted = accArrSet->push_back(copyTag, copyVal);
+    value::arrayForEach<true>(
+        tagNewValSet, valNewValSet, [&](value::TypeTags elTag, value::Value elVal) {
+            int elemSize = value::getApproximateSize(elTag, elVal);
+            bool inserted = accArrSet->push_back(elTag, elVal);
 
-        if (inserted) {
-            currentSize += elemSize;
-            if (currentSize >= static_cast<int64_t>(sizeCap)) {
-                uasserted(ErrorCodes::ExceededMemoryLimit,
-                          str::stream() << "Used too much memory for a single array. Memory limit: "
-                                        << sizeCap << ". Current set has " << accArrSet->size()
-                                        << " elements and is " << currentSize << " bytes.");
+            if (inserted) {
+                currentSize += elemSize;
+                if (currentSize >= static_cast<int64_t>(sizeCap)) {
+                    uasserted(ErrorCodes::ExceededMemoryLimit,
+                              str::stream()
+                                  << "Used too much memory for a single array. Memory limit: "
+                                  << sizeCap << ". Current set has " << accArrSet->size()
+                                  << " elements and is " << currentSize << " bytes.");
+                }
             }
-        }
-    });
+        });
 
     // Update the accumulator with the new total size.
     accArray->setAt(static_cast<size_t>(AggArrayWithSize::kSizeOfValues),

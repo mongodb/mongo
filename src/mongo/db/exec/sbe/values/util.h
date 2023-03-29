@@ -81,7 +81,7 @@ bool arrayAny(TypeTags tag, Value val, const Cb& cb) {
 /*
  * Invokes callback on each element of the given array.
  */
-template <class Cb>
+template <bool MoveOrCopy = false, typename Cb>
 void arrayForEach(TypeTags tag, Value val, const Cb& cb) {
     if (tag == TypeTags::bsonArray) {
         auto bson = getRawPointerView(val);
@@ -93,18 +93,35 @@ void arrayForEach(TypeTags tag, Value val, const Cb& cb) {
             size_t keySize = TinyStrHelpers::strlen(fieldName);
             auto [elemTag, elemVal] = bson::convertFrom<true>(cur, end, keySize);
 
+            if constexpr (MoveOrCopy) {
+                std::tie(elemTag, elemVal) = value::copyValue(elemTag, elemVal);
+            }
+
             cb(elemTag, elemVal);
             cur = bson::advance(cur, keySize);
         }
     } else if (tag == TypeTags::Array) {
         auto array = getArrayView(val);
-        for (size_t i = 0; i < array->size(); ++i) {
-            auto [t, v] = array->getAt(i);
+        for (auto& tv : array->values()) {
+            auto [t, v] = tv;
+            if constexpr (MoveOrCopy) {
+                tv.first = value::TypeTags::Nothing;
+                tv.second = 0;
+            }
             cb(t, v);
+        }
+        if constexpr (MoveOrCopy) {
+            array->values().clear();
         }
     } else if (tag == TypeTags::ArraySet) {
         auto arraySet = getArraySetView(val);
-        for (auto [t, v] : arraySet->values()) {
+        for (auto it = arraySet->values().begin(); it != arraySet->values().end();) {
+            auto [t, v] = *it;
+            if constexpr (MoveOrCopy) {
+                arraySet->values().erase(it++);
+            } else {
+                ++it;
+            }
             cb(t, v);
         }
     } else {
