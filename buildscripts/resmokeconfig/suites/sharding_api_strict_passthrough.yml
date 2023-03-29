@@ -7,8 +7,7 @@ selector:
   - jstests/sharding/auth_repl.js
   - jstests/sharding/auth_secondaryok_routing.js
   - jstests/sharding/auth_sharding_cmd_metadata.js
-  # TODO SERVER-70207: Uncomment once ticket is complete.
-  # - jstests/sharding/change_stream_update_lookup_collation.js
+  - jstests/sharding/change_stream_update_lookup_collation.js
   - jstests/sharding/count_config_servers.js
   - jstests/sharding/hash_crud.js
   - jstests/sharding/internal_txns/end_sessions.js

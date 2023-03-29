@@ -241,6 +241,15 @@ public:
     bool allowedInTransactions() const final {
         return true;
     }
+
+    // In the current implementation of the Stable API, sub-operations run under a command in the
+    // Stable API where a client specifies {apiStrict: true} are expected to also be Stable API
+    // compliant, when they technically should not be. To satisfy this requirement,
+    // this command is marked as part of the Stable API, but is not truly a part of
+    // it, since it is an internal-only command.
+    const std::set<std::string>& apiVersions() const {
+        return kApiVersions1;
+    }
 };
 
 MONGO_REGISTER_FEATURE_FLAGGED_COMMAND(ClusterWriteWithoutShardKeyCmd,

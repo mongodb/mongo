@@ -157,6 +157,8 @@ def remove_skipped_commands(command_sets: Dict[str, Set[str]]):
         "testDeprecationInVersion2",
         # Idl specifies the command_name as hello.
         "isMaster",
+        "_clusterQueryWithoutShardKey",  # Is internal only command.
+        "_clusterWriteWithoutShardKey",  # Is internal only command.
     }
 
     for key in command_sets.keys():

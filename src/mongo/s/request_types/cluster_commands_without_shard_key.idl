@@ -44,14 +44,17 @@ structs:
           found."
         type: object
         optional: true
+        stability: internal
       shardId: 
         description: "The shard id of the target shard."
         type: string
         optional: true
+        stability: internal
       upsertRequired:
         description: "True if the targetDoc should be upserted."
         type: bool
         default: false
+        stability: internal
   clusterWriteWithoutShardKeyResponse: 
     description: "The response for the '_clusterWriteWithoutShardKeyFind' command."
     is_command_reply: true
@@ -60,9 +63,11 @@ structs:
       response:
         description: "Response of the write command."
         type: object
+        stability: internal
       shardId:
         description: "The shard id of the target shard for the write."
         type: string
+        stability: internal
 commands:
   _clusterQueryWithoutShardKey:
     command_name: _clusterQueryWithoutShardKey
@@ -71,12 +76,21 @@ commands:
       "An internal command used to broadcast a query to all shards for updates/deletes
       /findAndModifies that do not provide a shard key."
     namespace: ignored
-    api_version: ""
+    api_version: "1" # This is an internal command that is run as a sub-operation to an 
+                     # update/delete/findAndModify without shard key. In the current implementation 
+                     # of the Stable API, sub-operations run under a command in the Stable API where 
+                     # a client specifies {apiStrict: true} are expected to also be Stable API 
+                     # compliant, when they technically should not be. To satisfy this requirement, 
+                     # this command is marked as part of the Stable API, but is not truly a part of 
+                     # it, since it is an internal-only command.
+    access_check: 
+      none: true
     reply_type: clusterQueryWithoutShardKeyResponse
     fields:
       writeCmd:
         description: "The original write command."
         type: object
+        stability: internal
   _clusterWriteWithoutShardKey:
     command_name: _clusterWriteWithoutShardKey
     cpp_name: ClusterWriteWithoutShardKey
@@ -84,15 +98,26 @@ commands:
       "An internal command used to target an update/delete/findAndModify command to a 
       specific shard using a shardId."
     namespace: ignored
-    api_version: ""
+    api_version: "1" # This is an internal command that is run as a sub-operation to an 
+                     # update/delete/findAndModify without shard key. In the current implementation 
+                     # of the Stable API, sub-operations run under a command in the Stable API where 
+                     # a client specifies {apiStrict: true} are expected to also be Stable API 
+                     # compliant, when they technically should not be. To satisfy this requirement, 
+                     # this command is marked as part of the Stable API, but is not truly a part of 
+                     # it, since it is an internal-only command.
+    access_check:
+      none: true
     reply_type: clusterWriteWithoutShardKeyResponse
     fields:
       writeCmd:
         description: "The original write command."
         type: object
+        stability: internal
       shardId:
         description: "The shard id of the target shard for the write."
         type: string
+        stability: internal
       targetDocId:
         description: "The _id value of the target document"
         type: object
+        stability: internal
