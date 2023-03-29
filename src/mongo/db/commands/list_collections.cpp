@@ -351,7 +351,8 @@ public:
                 if (DatabaseHolder::get(opCtx)->dbExists(opCtx, dbName)) {
                     if (auto collNames = _getExactNameMatches(matcher.get())) {
                         for (auto&& collName : *collNames) {
-                            auto nss = NamespaceString(dbName, collName);
+                            auto nss =
+                                NamespaceStringUtil::parseNamespaceFromRequest(dbName, collName);
 
                             // Only validate on a per-collection basis if the user requested
                             // a list of authorized collections

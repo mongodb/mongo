@@ -1091,7 +1091,7 @@ TEST_F(DurableCatalogImplTest, Idx1) {
         WriteUnitOfWork uow(opCtx);
 
         BSONCollectionCatalogEntry::MetaData md;
-        md.nss = NamespaceString(boost::none, "a.b");
+        md.nss = NamespaceString::createNamespaceString_forTest(boost::none, "a.b");
 
         BSONCollectionCatalogEntry::IndexMetaData imd;
         imd.spec = BSON("name"
@@ -1125,7 +1125,7 @@ TEST_F(DurableCatalogImplTest, Idx1) {
         WriteUnitOfWork uow(opCtx);
 
         BSONCollectionCatalogEntry::MetaData md;
-        md.nss = NamespaceString(boost::none, "a.b");
+        md.nss = NamespaceString::createNamespaceString_forTest(boost::none, "a.b");
         putMetaData(opCtx, catalog.get(), catalogId, md);  // remove index
 
         BSONCollectionCatalogEntry::IndexMetaData imd;
@@ -1181,7 +1181,7 @@ TEST_F(DurableCatalogImplTest, DirectoryPerDb1) {
         WriteUnitOfWork uow(opCtx);
 
         BSONCollectionCatalogEntry::MetaData md;
-        md.nss = NamespaceString(boost::none, "a.b");
+        md.nss = NamespaceString::createNamespaceString_forTest(boost::none, "a.b");
 
         BSONCollectionCatalogEntry::IndexMetaData imd;
         imd.spec = BSON("name"
@@ -1233,7 +1233,7 @@ TEST_F(DurableCatalogImplTest, Split1) {
         WriteUnitOfWork uow(opCtx);
 
         BSONCollectionCatalogEntry::MetaData md;
-        md.nss = NamespaceString(boost::none, "a.b");
+        md.nss = NamespaceString::createNamespaceString_forTest(boost::none, "a.b");
 
         BSONCollectionCatalogEntry::IndexMetaData imd;
         imd.spec = BSON("name"
@@ -1285,7 +1285,7 @@ TEST_F(DurableCatalogImplTest, DirectoryPerAndSplit1) {
         WriteUnitOfWork uow(opCtx);
 
         BSONCollectionCatalogEntry::MetaData md;
-        md.nss = NamespaceString(boost::none, "a.b");
+        md.nss = NamespaceString::createNamespaceString_forTest(boost::none, "a.b");
 
         BSONCollectionCatalogEntry::IndexMetaData imd;
         imd.spec = BSON("name"
@@ -1383,7 +1383,7 @@ TEST_F(DurableCatalogImplTest, EntryIncludesTenantIdInMultitenantEnv) {
     // entry.
     RecordId catalogId;
     auto tenantId = TenantId(OID::gen());
-    const NamespaceString nss = NamespaceString(tenantId, "a.b");
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest(tenantId, "a.b");
     {
         auto clientAndCtx = makeClientAndCtx("opCtx");
         auto opCtx = clientAndCtx.opCtx();

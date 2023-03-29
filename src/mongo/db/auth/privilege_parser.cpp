@@ -500,8 +500,9 @@ Status ParsedPrivilege::parsedPrivilegeToPrivilege(const ParsedPrivilege& parsed
     } else {
         if (parsedResource.isDbSet() && !parsedResource.getDb().empty()) {
             if (parsedResource.isCollectionSet() && !parsedResource.getCollection().empty()) {
-                resource = ResourcePattern::forExactNamespace(NamespaceString(
-                    boost::none, parsedResource.getDb(), parsedResource.getCollection()));
+                resource = ResourcePattern::forExactNamespace(
+                    NamespaceString::createNamespaceStringForAuth(
+                        boost::none, parsedResource.getDb(), parsedResource.getCollection()));
             } else {
                 resource = ResourcePattern::forDatabaseName(parsedResource.getDb());
             }

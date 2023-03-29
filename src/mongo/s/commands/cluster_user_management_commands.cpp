@@ -174,9 +174,10 @@ public:
         NamespaceString ns() const override {
             const auto& cmd = request();
             if constexpr (hasGetCmdParamStringData<RequestT>) {
-                return NamespaceString(cmd.getDbName(), cmd.getCommandParameter());
+                return NamespaceStringUtil::parseNamespaceFromRequest(cmd.getDbName(),
+                                                                      cmd.getCommandParameter());
             } else {
-                return NamespaceString(cmd.getDbName(), "");
+                return NamespaceString(cmd.getDbName());
             }
         }
     };
@@ -264,7 +265,7 @@ public:
         }
 
         NamespaceString ns() const override {
-            return NamespaceString(request().getDbName(), "");
+            return NamespaceString(request().getDbName());
         }
     };
 
@@ -299,7 +300,7 @@ public:
         }
 
         NamespaceString ns() const override {
-            return NamespaceString(request().getDbName(), "");
+            return NamespaceString(request().getDbName());
         }
     };
 

@@ -189,6 +189,10 @@ NamespaceString NamespaceString::makeSystemDotViewsNamespace(const DatabaseName&
     return NamespaceString(dbName, kSystemDotViewsCollectionName);
 }
 
+NamespaceString NamespaceString::makeSystemDotProfileNamespace(const DatabaseName& dbName) {
+    return NamespaceString(dbName, kSystemDotProfileCollectionName);
+}
+
 NamespaceString NamespaceString::makeListCollectionsNSS(const DatabaseName& dbName) {
     NamespaceString nss(dbName, listCollectionsCursorCol);
     dassert(nss.isValid());
@@ -198,6 +202,10 @@ NamespaceString NamespaceString::makeListCollectionsNSS(const DatabaseName& dbNa
 
 NamespaceString NamespaceString::makeGlobalConfigCollection(StringData collName) {
     return NamespaceString(DatabaseName::kConfig, collName);
+}
+
+NamespaceString NamespaceString::makeLocalCollection(StringData collName) {
+    return NamespaceString(DatabaseName::kLocal, collName);
 }
 
 NamespaceString NamespaceString::makeCollectionlessAggregateNSS(const DatabaseName& dbName) {
@@ -241,10 +249,23 @@ NamespaceString NamespaceString::makeReshardingLocalConflictStashNSS(
                                donorShardId);
 }
 
+NamespaceString NamespaceString::makeTenantUsersCollection(
+    const boost::optional<TenantId>& tenantId) {
+    return NamespaceString(tenantId, DatabaseName::kAdmin.db(), NamespaceString::kSystemUsers);
+}
+
+NamespaceString NamespaceString::makeTenantRolesCollection(
+    const boost::optional<TenantId>& tenantId) {
+    return NamespaceString(tenantId, DatabaseName::kAdmin.db(), NamespaceString::kSystemRoles);
+}
+
+NamespaceString NamespaceString::makeCommandNamespace(const DatabaseName& dbName) {
+    return NamespaceString(dbName, "$cmd");
+}
+
 NamespaceString NamespaceString::makeDummyNamespace(const boost::optional<TenantId>& tenantId) {
     return NamespaceString(tenantId, DatabaseName::kConfig.db(), "dummy.namespace");
 }
-
 
 std::string NamespaceString::getSisterNS(StringData local) const {
     verify(local.size() && local[0] != '.');

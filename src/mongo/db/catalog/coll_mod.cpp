@@ -838,7 +838,7 @@ Status _collModInternal(OperationContext* opCtx,
                 view->setPipeline(*cmd.getPipeline());
 
             if (!viewOn.empty())
-                view->setViewOn(NamespaceString(dbName, viewOn));
+                view->setViewOn(NamespaceStringUtil::parseNamespaceFromRequest(dbName, viewOn));
 
             BSONArrayBuilder pipeline;
             for (auto& item : view->pipeline()) {

@@ -47,6 +47,8 @@
 #include "mongo/util/uuid.h"
 
 namespace mongo {
+class NamespaceStringUtil;
+class IDLParserContext;
 
 class NamespaceString {
 public:
@@ -208,23 +210,6 @@ public:
     NamespaceString() = default;
 
     /**
-     * Constructs a NamespaceString from the fully qualified namespace named in "ns" and the
-     * tenantId. "ns" is NOT expected to contain the tenantId.
-     */
-    explicit NamespaceString(boost::optional<TenantId> tenantId, StringData ns) {
-        _dotIndex = ns.find(".");
-
-        uassert(ErrorCodes::InvalidNamespace,
-                "namespaces cannot have embedded null characters",
-                ns.find('\0') == std::string::npos);
-
-        StringData db = ns.substr(0, _dotIndex);
-        _dbName = DatabaseName(std::move(tenantId), db);
-        _ns = ns.toString();
-    }
-
-
-    /**
      * Constructs a NamespaceString for the given database.
      */
     explicit NamespaceString(DatabaseName dbName) : _dbName(std::move(dbName)), _ns(_dbName.db()) {}
@@ -233,37 +218,6 @@ public:
     // to pass tenantId explicitly
     explicit NamespaceString(StringData ns, boost::optional<TenantId> tenantId = boost::none)
         : NamespaceString(std::move(tenantId), ns) {}
-
-    /**
-     * Constructs a NamespaceString for the given database and collection names.
-     * "dbName" must not contain a ".", and "collectionName" must not start with one.
-     */
-    NamespaceString(DatabaseName dbName, StringData collectionName)
-        : _dbName(std::move(dbName)), _ns(str::stream() << _dbName.db() << '.' << collectionName) {
-        const auto& db = _dbName.db();
-
-        uassert(ErrorCodes::InvalidNamespace,
-                "'.' is an invalid character in the database name: " + db,
-                db.find('.') == std::string::npos);
-        uassert(ErrorCodes::InvalidNamespace,
-                "Collection names cannot start with '.': " + collectionName,
-                collectionName.empty() || collectionName[0] != '.');
-
-        _dotIndex = db.size();
-        dassert(_ns[_dotIndex] == '.');
-
-        uassert(ErrorCodes::InvalidNamespace,
-                "namespaces cannot have embedded null characters",
-                _ns.find('\0') == std::string::npos);
-    }
-
-    /**
-     * Constructs a NamespaceString for the given db name, collection name, and tenantId.
-     * "db" must not contain a ".", and "collectionName" must not start with one. "dbName" is
-     * NOT expected to contain a tenantId.
-     */
-    NamespaceString(boost::optional<TenantId> tenantId, StringData db, StringData collectionName)
-        : NamespaceString(DatabaseName(std::move(tenantId), db), collectionName) {}
 
     // TODO SERVER-65920 Remove this constructor once all constructor call sites have been updated
     // to pass tenantId explicitly
@@ -284,6 +238,11 @@ public:
      * Constructs a NamespaceString in the global config db, "config.<collName>".
      */
     static NamespaceString makeGlobalConfigCollection(StringData collName);
+
+    /**
+     * Constructs a NamespaceString in the local db, "local.<collName>".
+     */
+    static NamespaceString makeLocalCollection(StringData collName);
 
     /**
      * These functions construct a NamespaceString without checking for presence of TenantId.
@@ -316,6 +275,24 @@ public:
                                                          StringData db,
                                                          StringData coll) {
         return NamespaceString(tenantId, db, coll);
+    }
+
+    /**
+     * These functions construct a NamespaceString without checking for presence of TenantId. These
+     * must only be used by auth systems which are not yet tenant aware.
+     *
+     * TODO SERVER-74896 Remove this function. Any remaining call sites must be changed to use a
+     * function on NamespaceStringUtil.
+     */
+    static NamespaceString createNamespaceStringForAuth(const boost::optional<TenantId>& tenantId,
+                                                        StringData db,
+                                                        StringData coll) {
+        return NamespaceString(tenantId, db, coll);
+    }
+
+    static NamespaceString createNamespaceStringForAuth(const boost::optional<TenantId>& tenantId,
+                                                        StringData ns) {
+        return NamespaceString(tenantId, ns);
     }
 
     /**
@@ -358,6 +335,11 @@ public:
     static NamespaceString makeSystemDotViewsNamespace(const DatabaseName& dbName);
 
     /**
+     * Constructs the system.profile NamespaceString for the specified DatabaseName.
+     */
+    static NamespaceString makeSystemDotProfileNamespace(const DatabaseName& dbName);
+
+    /**
      * Constructs a NamespaceString representing a BulkWrite namespace. The format for this
      * namespace is admin.$cmd.bulkWrite".
      */
@@ -379,6 +361,23 @@ public:
      */
     static NamespaceString makeReshardingLocalConflictStashNSS(const UUID& existingUUID,
                                                                const std::string& donorShardId);
+
+    /**
+     * Constructs the tenant-specific admin.system.users NamespaceString for the given tenant,
+     * "tenant_admin.system.users".
+     */
+    static NamespaceString makeTenantUsersCollection(const boost::optional<TenantId>& tenantId);
+
+    /**
+     * Constructs the tenant-specific admin.system.roles NamespaceString for the given tenant,
+     * "tenant_admin.system.roles".
+     */
+    static NamespaceString makeTenantRolesCollection(const boost::optional<TenantId>& tenantId);
+
+    /**
+     * Constructs the command NamespaceString, "<dbName>.$cmd".
+     */
+    static NamespaceString makeCommandNamespace(const DatabaseName& dbName);
 
     /**
      * Constructs a dummy NamespaceString, "<tenantId>.config.dummy.namespace", to be used where a
@@ -467,6 +466,10 @@ public:
     }
     bool isSystemDotViews() const {
         return coll() == kSystemDotViewsCollectionName;
+    }
+    static bool resolvesToSystemDotViews(StringData ns) {
+        auto nss = NamespaceString(boost::none, ns);
+        return nss.isSystemDotViews();
     }
     bool isSystemDotJavascript() const {
         return coll() == kSystemDotJavascriptCollectionName;
@@ -768,6 +771,64 @@ public:
     }
 
 private:
+    friend NamespaceStringUtil;
+    // TODO SERVER-74897 IDLParserContext should no longer be a friend once IDL generated commands
+    // call into NamespaceStringUtil directly to construct NamespaceStrings.
+    friend IDLParserContext;
+
+    /**
+     * In order to construct NamespaceString objects, use NamespaceStringUtil. The functions
+     * on NamespaceStringUtil make assertions necessary when running in Serverless.
+     */
+
+    /**
+     * Constructs a NamespaceString from the fully qualified namespace named in "ns" and the
+     * tenantId. "ns" is NOT expected to contain the tenantId.
+     */
+    explicit NamespaceString(boost::optional<TenantId> tenantId, StringData ns) {
+        _dotIndex = ns.find(".");
+
+        uassert(ErrorCodes::InvalidNamespace,
+                "namespaces cannot have embedded null characters",
+                ns.find('\0') == std::string::npos);
+
+        StringData db = ns.substr(0, _dotIndex);
+        _dbName = DatabaseName(std::move(tenantId), db);
+        _ns = ns.toString();
+    }
+
+    /**
+     * Constructs a NamespaceString for the given database and collection names.
+     * "dbName" must not contain a ".", and "collectionName" must not start with one.
+     */
+    NamespaceString(DatabaseName dbName, StringData collectionName)
+        : _dbName(std::move(dbName)), _ns(str::stream() << _dbName.db() << '.' << collectionName) {
+        const auto& db = _dbName.db();
+
+        uassert(ErrorCodes::InvalidNamespace,
+                "'.' is an invalid character in the database name: " + db,
+                db.find('.') == std::string::npos);
+        uassert(ErrorCodes::InvalidNamespace,
+                "Collection names cannot start with '.': " + collectionName,
+                collectionName.empty() || collectionName[0] != '.');
+
+        _dotIndex = db.size();
+        dassert(_ns[_dotIndex] == '.');
+
+        uassert(ErrorCodes::InvalidNamespace,
+                "namespaces cannot have embedded null characters",
+                _ns.find('\0') == std::string::npos);
+    }
+
+    /**
+     * Constructs a NamespaceString for the given db name, collection name, and tenantId.
+     * "db" must not contain a ".", and "collectionName" must not start with one. "db" is
+     * NOT expected to contain a tenantId.
+     */
+    NamespaceString(boost::optional<TenantId> tenantId, StringData db, StringData collectionName)
+        : NamespaceString(DatabaseName(std::move(tenantId), db), collectionName) {}
+
+
     std::tuple<const boost::optional<TenantId>&, const std::string&> _lens() const {
         return std::tie(tenantId(), ns());
     }

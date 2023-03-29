@@ -691,7 +691,8 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
                     opCtx,
                     NamespaceStringUtil::deserialize(nss.dbName().tenantId(),
                                                      it->doc.getStringField("_id")),
-                    {nss.dbName(), it->doc.getStringField("viewOn")},
+                    NamespaceStringUtil::parseNamespaceFromDoc(nss.dbName(),
+                                                               it->doc.getStringField("viewOn")),
                     BSONArray{it->doc.getObjectField("pipeline")},
                     view_catalog_helpers::validatePipeline,
                     it->doc.getObjectField("collation"),
@@ -1282,7 +1283,7 @@ void OpObserverImpl::onDropDatabase(OperationContext* opCtx, const DatabaseName&
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
 
     oplogEntry.setTid(dbName.tenantId());
-    oplogEntry.setNss({dbName, "$cmd"});
+    oplogEntry.setNss(NamespaceString::makeCommandNamespace(dbName));
     oplogEntry.setObject(BSON("dropDatabase" << 1));
     auto opTime =
         logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _oplogWriter.get());
@@ -1538,7 +1539,7 @@ void OpObserverImpl::onApplyOps(OperationContext* opCtx,
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
 
     oplogEntry.setTid(dbName.tenantId());
-    oplogEntry.setNss({dbName, "$cmd"});
+    oplogEntry.setNss(NamespaceString::makeCommandNamespace(dbName));
     oplogEntry.setObject(applyOpCmd);
     logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _oplogWriter.get());
 }

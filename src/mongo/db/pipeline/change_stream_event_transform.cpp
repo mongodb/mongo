@@ -243,7 +243,8 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
                 operationType = DocumentSourceChangeStream::kDropCollectionOpType;
 
                 // The "o.drop" field will contain the actual collection name.
-                nss = NamespaceString(nss.dbName(), nssField.getStringData());
+                nss = NamespaceStringUtil::parseNamespaceFromDoc(nss.dbName(),
+                                                                 nssField.getStringData());
             } else if (auto nssField = oField.getField("renameCollection"); !nssField.missing()) {
                 operationType = DocumentSourceChangeStream::kRenameCollectionOpType;
 
@@ -270,32 +271,37 @@ Document ChangeStreamDefaultEventTransformation::applyTransformation(const Docum
 
                 // Extract the database name from the namespace field and leave the collection name
                 // empty.
-                nss = NamespaceString(nss.tenantId(), nss.dbName().db());
+                nss = NamespaceString(nss.dbName());
             } else if (auto nssField = oField.getField("create"); !nssField.missing()) {
                 operationType = DocumentSourceChangeStream::kCreateOpType;
-                nss = NamespaceString(nss.dbName(), nssField.getStringData());
+                nss = NamespaceStringUtil::parseNamespaceFromDoc(nss.dbName(),
+                                                                 nssField.getStringData());
                 operationDescription = Value(copyDocExceptFields(oField, {"create"_sd}));
             } else if (auto nssField = oField.getField("createIndexes"); !nssField.missing()) {
                 operationType = DocumentSourceChangeStream::kCreateIndexesOpType;
-                nss = NamespaceString(nss.dbName(), nssField.getStringData());
+                nss = NamespaceStringUtil::parseNamespaceFromDoc(nss.dbName(),
+                                                                 nssField.getStringData());
                 // Wrap the index spec in an "indexes" array for consistency with commitIndexBuild.
                 auto indexSpec = Value(copyDocExceptFields(oField, {"createIndexes"_sd}));
                 operationDescription = Value(Document{{"indexes", std::vector<Value>{indexSpec}}});
             } else if (auto nssField = oField.getField("commitIndexBuild"); !nssField.missing()) {
                 operationType = DocumentSourceChangeStream::kCreateIndexesOpType;
-                nss = NamespaceString(nss.dbName(), nssField.getStringData());
+                nss = NamespaceStringUtil::parseNamespaceFromDoc(nss.dbName(),
+                                                                 nssField.getStringData());
                 operationDescription = Value(Document{{"indexes", oField.getField("indexes")}});
             } else if (auto nssField = oField.getField("dropIndexes"); !nssField.missing()) {
                 const auto o2Field = input[repl::OplogEntry::kObject2FieldName].getDocument();
                 operationType = DocumentSourceChangeStream::kDropIndexesOpType;
-                nss = NamespaceString(nss.dbName(), nssField.getStringData());
+                nss = NamespaceStringUtil::parseNamespaceFromDoc(nss.dbName(),
+                                                                 nssField.getStringData());
                 // Wrap the index spec in an "indexes" array for consistency with createIndexes
                 // and commitIndexBuild.
                 auto indexSpec = Value(copyDocExceptFields(o2Field, {"dropIndexes"_sd}));
                 operationDescription = Value(Document{{"indexes", std::vector<Value>{indexSpec}}});
             } else if (auto nssField = oField.getField("collMod"); !nssField.missing()) {
                 operationType = DocumentSourceChangeStream::kModifyOpType;
-                nss = NamespaceString(nss.dbName(), nssField.getStringData());
+                nss = NamespaceStringUtil::parseNamespaceFromDoc(nss.dbName(),
+                                                                 nssField.getStringData());
                 operationDescription = Value(copyDocExceptFields(oField, {"collMod"_sd}));
 
                 const auto o2Field = input[repl::OplogEntry::kObject2FieldName].getDocument();
@@ -552,13 +558,14 @@ ChangeStreamEventTransformer::ChangeStreamEventTransformer(
 
 ChangeStreamEventTransformation* ChangeStreamEventTransformer::getBuilder(
     const Document& oplog) const {
-    // 'nss' is only used here determine which type of transformation to use. This is not dependent
-    // on the tenantId, so it is safe to ignore the tenantId in the oplog entry. It is useful to
-    // avoid extracting the tenantId because we must make this determination for every change stream
-    // event, and the check should therefore be as optimized as possible.
-    auto nss = NamespaceString(boost::none, oplog[repl::OplogEntry::kNssFieldName].getStringData());
+    // The nss from the entry is only used here determine which type of transformation to use. This
+    // is not dependent on the tenantId, so it is safe to ignore the tenantId in the oplog entry.
+    // It is useful to avoid extracting the tenantId because we must make this determination for
+    // every change stream event, and the check should therefore be as optimized as possible.
 
-    if (!_isSingleCollStream && nss.isSystemDotViews()) {
+    if (!_isSingleCollStream &&
+        NamespaceString::resolvesToSystemDotViews(
+            oplog[repl::OplogEntry::kNssFieldName].getStringData())) {
         return _viewNsEventBuilder.get();
     }
     return _defaultEventBuilder.get();

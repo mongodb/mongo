@@ -152,7 +152,7 @@ void ReplicaSetNodeProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
 void ReplicaSetNodeProcessInterface::createCollection(OperationContext* opCtx,
                                                       const DatabaseName& dbName,
                                                       const BSONObj& cmdObj) {
-    NamespaceString dbNs = NamespaceString(dbName, StringData(""));
+    NamespaceString dbNs = NamespaceString(dbName);
     if (_canWriteLocally(opCtx, dbNs)) {
         return NonShardServerProcessInterface::createCollection(opCtx, dbName, cmdObj);
     }

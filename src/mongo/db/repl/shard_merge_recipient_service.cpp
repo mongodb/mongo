@@ -97,7 +97,8 @@ constexpr int kCheckpointTsBackupCursorErrorCode = 6929900;
 constexpr int kCloseCursorBeforeOpenErrorCode = 50886;
 
 NamespaceString getOplogBufferNs(const UUID& migrationUUID) {
-    return NamespaceString(DatabaseName::kConfig, kOplogBufferPrefix + migrationUUID.toString());
+    return NamespaceString::makeGlobalConfigCollection(kOplogBufferPrefix +
+                                                       migrationUUID.toString());
 }
 
 boost::intrusive_ptr<ExpressionContext> makeExpressionContext(OperationContext* opCtx) {

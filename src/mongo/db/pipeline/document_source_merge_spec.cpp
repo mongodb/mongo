@@ -53,7 +53,7 @@ NamespaceString mergeTargetNssParseFromBSON(boost::optional<TenantId> tenantId,
         uassert(5786800,
                 "{} 'into' field cannot be an empty string"_format(DocumentSourceMerge::kStageName),
                 !elem.valueStringData().empty());
-        return NamespaceString(tenantId, "", elem.valueStringData());
+        return NamespaceStringUtil::parseNamespaceFromRequest(tenantId, "", elem.valueStringData());
     }
     auto spec = NamespaceSpec::parse(
         IDLParserContext(
@@ -65,7 +65,8 @@ NamespaceString mergeTargetNssParseFromBSON(boost::optional<TenantId> tenantId,
                 DocumentSourceMerge::kStageName),
             coll && !coll->empty());
 
-    return {spec.getDb().value_or(DatabaseName(tenantId, "")), *coll};
+    return NamespaceStringUtil::parseNamespaceFromRequest(
+        spec.getDb().value_or(DatabaseName(tenantId, "")), *coll);
 }
 
 void mergeTargetNssSerializeToBSON(const NamespaceString& targetNss,

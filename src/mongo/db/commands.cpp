@@ -297,7 +297,8 @@ NamespaceString CommandHelpers::parseNsCollectionRequired(const DatabaseName& db
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "collection name has invalid type " << typeName(first.type()),
             first.canonicalType() == canonicalizeBSONType(mongo::String));
-    const NamespaceString nss(dbName, first.valueStringData());
+    const NamespaceString nss(
+        NamespaceStringUtil::parseNamespaceFromRequest(dbName, first.valueStringData()));
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "Invalid namespace specified '" << nss.ns() << "'",
             nss.isValid());
@@ -328,7 +329,8 @@ NamespaceString CommandHelpers::parseNsFromCommand(const DatabaseName& dbName,
     BSONElement first = cmdObj.firstElement();
     if (first.type() != mongo::String)
         return NamespaceString(dbName);
-    return NamespaceString(dbName, cmdObj.firstElement().valueStringData());
+    return NamespaceStringUtil::parseNamespaceFromRequest(dbName,
+                                                          cmdObj.firstElement().valueStringData());
 }
 
 ResourcePattern CommandHelpers::resourcePatternForNamespace(const std::string& ns) {

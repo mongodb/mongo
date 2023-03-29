@@ -1049,8 +1049,8 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
         case OpType::FINDONE: {
             BSONObj fixedQuery = fixQuery(this->query, *state->bsonTemplateEvaluator);
             BSONObj result;
-            auto findCommand =
-                std::make_unique<FindCommandRequest>(NamespaceString(this->tenantId, this->ns));
+            auto findCommand = std::make_unique<FindCommandRequest>(
+                NamespaceString::createNamespaceString_forTest(this->tenantId, this->ns));
             findCommand->setFilter(fixedQuery);
             findCommand->setProjection(this->projection);
             findCommand->setLimit(1LL);
@@ -1137,8 +1137,8 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
             uassert(
                 28824, "cannot use 'options' in combination with read commands", !this->options);
 
-            auto findCommand =
-                std::make_unique<FindCommandRequest>(NamespaceString(this->tenantId, this->ns));
+            auto findCommand = std::make_unique<FindCommandRequest>(
+                NamespaceString::createNamespaceString_forTest(this->tenantId, this->ns));
             findCommand->setFilter(fixedQuery);
             findCommand->setProjection(this->projection);
             if (this->skip) {
@@ -1337,14 +1337,16 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
                 22801, 5, "Result from benchRun thread [safe remove]", "result"_attr = result);
         } break;
         case OpType::CREATEINDEX:
-            conn->createIndex(NamespaceString(this->tenantId, this->ns),
-                              this->key,
-                              boost::none /* writeConcernObj */);
+            conn->createIndex(
+                NamespaceString::createNamespaceString_forTest(this->tenantId, this->ns),
+                this->key,
+                boost::none /* writeConcernObj */);
             break;
         case OpType::DROPINDEX:
-            conn->dropIndex(NamespaceString(this->tenantId, this->ns),
-                            this->key,
-                            boost::none /* writeConcernObj */);
+            conn->dropIndex(
+                NamespaceString::createNamespaceString_forTest(this->tenantId, this->ns),
+                this->key,
+                boost::none /* writeConcernObj */);
             break;
         case OpType::LET: {
             BSONObjBuilder templateBuilder;

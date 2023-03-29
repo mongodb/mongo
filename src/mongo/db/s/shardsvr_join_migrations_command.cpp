@@ -83,7 +83,7 @@ public:
         static constexpr char kRegistryLockReason[] = "Running _shardsvrJoinMigrations";
 
         NamespaceString ns() const override {
-            return {request().getDbName(), ""};
+            return NamespaceString(request().getDbName());
         }
 
         bool supportsWriteConcern() const override {

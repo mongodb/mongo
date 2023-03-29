@@ -60,7 +60,8 @@ const std::string kTestNs = "testDb.testColl";
 
 class CollectionClonerTest : public InitialSyncClonerTestFixture {
 public:
-    CollectionClonerTest() : _nss(boost::none, kTestNs) {}
+    CollectionClonerTest()
+        : _nss(NamespaceString::createNamespaceString_forTest(boost::none, kTestNs)) {}
 
 protected:
     void setUp() override {
@@ -1013,7 +1014,8 @@ TEST_F(CollectionClonerTestResumable, ResumableQueryTwoResumes) {
 
 class CollectionClonerMultitenancyTest : public CollectionClonerTestResumable {
 public:
-    CollectionClonerMultitenancyTest() : _nss(TenantId(OID::gen()), kTestNs) {}
+    CollectionClonerMultitenancyTest()
+        : _nss(NamespaceString::createNamespaceString_forTest(TenantId(OID::gen()), kTestNs)) {}
 
 protected:
     void setUp() final {

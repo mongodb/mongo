@@ -258,7 +258,7 @@ StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingInd
     long long bytesRemoved = 0;
 
     const NamespaceString lostAndFoundNss =
-        NamespaceString(DatabaseName::kLocal, "lost_and_found." + coll->uuid().toString());
+        NamespaceString::makeLocalCollection("lost_and_found." + coll->uuid().toString());
 
     // Delete duplicate record and insert it into local lost and found.
     Status status = [&] {

@@ -89,7 +89,8 @@ StringBuilder& operator<<(StringBuilder& sb, const CollectionState& state);
 
 class IdempotencyTest : public OplogApplierImplTest {
 public:
-    IdempotencyTest() : _nss(boost::none, "test.foo") {
+    IdempotencyTest()
+        : _nss(NamespaceString::createNamespaceString_forTest(boost::none, "test.foo")) {
         globalFailPointRegistry()
             .find("doUntimestampedWritesForIdempotencyTests")
             ->setMode(FailPoint::alwaysOn);

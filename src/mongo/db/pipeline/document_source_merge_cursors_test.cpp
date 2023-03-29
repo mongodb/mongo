@@ -83,7 +83,8 @@ const CursorId kExhaustedCursorID = 0;
 
 class DocumentSourceMergeCursorsTest : public ShardingTestFixture {
 public:
-    DocumentSourceMergeCursorsTest() : _nss(boost::none, kMergeCursorNsStr) {
+    DocumentSourceMergeCursorsTest()
+        : _nss(NamespaceString::createNamespaceString_forTest(boost::none, kMergeCursorNsStr)) {
         TimeZoneDatabase::set(getServiceContext(), std::make_unique<TimeZoneDatabase>());
     }
 

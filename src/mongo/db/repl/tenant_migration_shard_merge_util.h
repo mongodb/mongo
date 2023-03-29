@@ -58,7 +58,8 @@ inline bool isDonatedFilesCollection(const NamespaceString& ns) {
 }
 
 inline NamespaceString getDonatedFilesNs(const UUID& migrationUUID) {
-    return NamespaceString(DatabaseName::kConfig, kDonatedFilesPrefix + migrationUUID.toString());
+    return NamespaceString::makeGlobalConfigCollection(kDonatedFilesPrefix +
+                                                       migrationUUID.toString());
 }
 
 inline boost::filesystem::path fileClonerTempDir(const UUID& migrationId) {

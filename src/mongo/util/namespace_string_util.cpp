@@ -92,4 +92,68 @@ NamespaceString NamespaceStringUtil::deserialize(boost::optional<TenantId> tenan
     return nss;
 }
 
+NamespaceString NamespaceStringUtil::parseNamespaceFromRequest(
+    const boost::optional<TenantId>& tenantId, StringData ns) {
+    return deserialize(tenantId, ns);
+}
+
+NamespaceString NamespaceStringUtil::parseNamespaceFromRequest(
+    const boost::optional<TenantId>& tenantId, StringData db, StringData coll) {
+    if (coll.empty())
+        return deserialize(tenantId, db);
+
+    uassert(ErrorCodes::InvalidNamespace,
+            "Collection names cannot start with '.': " + coll,
+            coll[0] != '.');
+
+    return deserialize(tenantId, str::stream() << db << "." << coll);
+}
+
+NamespaceString NamespaceStringUtil::parseNamespaceFromRequest(const DatabaseName& dbName,
+                                                               StringData coll) {
+    if (coll.empty()) {
+        return NamespaceString(dbName);
+    }
+
+    uassert(ErrorCodes::InvalidNamespace,
+            "Collection names cannot start with '.': " + coll,
+            coll[0] != '.');
+
+    return deserialize(dbName.tenantId(), str::stream() << dbName.db() << "." << coll);
+}
+
+NamespaceString NamespaceStringUtil::parseNamespaceFromDoc(
+    const boost::optional<TenantId>& tenantId, StringData ns) {
+    return deserialize(tenantId, ns);
+}
+
+NamespaceString NamespaceStringUtil::parseNamespaceFromDoc(
+    const boost::optional<TenantId>& tenantId, StringData db, StringData coll) {
+    if (coll.empty())
+        return deserialize(tenantId, db);
+
+    uassert(ErrorCodes::InvalidNamespace,
+            "Collection names cannot start with '.': " + coll,
+            coll[0] != '.');
+
+    return deserialize(tenantId, str::stream() << db << "." << coll);
+}
+
+NamespaceString NamespaceStringUtil::parseNamespaceFromDoc(const DatabaseName& dbName,
+                                                           StringData coll) {
+    if (coll.empty())
+        return NamespaceString(dbName);
+
+    uassert(ErrorCodes::InvalidNamespace,
+            "Collection names cannot start with '.': " + coll,
+            coll[0] != '.');
+
+    return deserialize(dbName.tenantId(), str::stream() << dbName.db() << "." << coll);
+}
+
+NamespaceString NamespaceStringUtil::parseNamespaceFromResponse(const DatabaseName& dbName,
+                                                                StringData coll) {
+    return parseNamespaceFromDoc(dbName, coll);
+}
+
 }  // namespace mongo

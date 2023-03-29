@@ -134,8 +134,9 @@ public:
                 }
 
                 if (validateCmdRequest.getCollection()) {
-                    if (!_validateNamespace(
-                            opCtx, NamespaceString(dbName, *validateCmdRequest.getCollection()))) {
+                    if (!_validateNamespace(opCtx,
+                                            NamespaceStringUtil::parseNamespaceFromRequest(
+                                                dbName, *validateCmdRequest.getCollection()))) {
                         return;
                     }
                     continue;

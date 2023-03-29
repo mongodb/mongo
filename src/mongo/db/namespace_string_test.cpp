@@ -375,21 +375,32 @@ TEST(NamespaceStringTest, CompareNSSWithTenantId) {
     TenantId tenantIdMin(OID("000000000000000000000000"));
     TenantId tenantIdMax(OID::max());
 
-    ASSERT(NamespaceString(tenantIdMin, "foo.bar") == NamespaceString(tenantIdMin, "foo.bar"));
+    ASSERT(NamespaceString::createNamespaceString_forTest(tenantIdMin, "foo.bar") ==
+           NamespaceString::createNamespaceString_forTest(tenantIdMin, "foo.bar"));
 
-    ASSERT(NamespaceString(tenantIdMin, "foo.bar") != NamespaceString(tenantIdMax, "foo.bar"));
-    ASSERT(NamespaceString(tenantIdMin, "foo.bar") != NamespaceString(tenantIdMin, "zoo.bar"));
+    ASSERT(NamespaceString::createNamespaceString_forTest(tenantIdMin, "foo.bar") !=
+           NamespaceString::createNamespaceString_forTest(tenantIdMax, "foo.bar"));
+    ASSERT(NamespaceString::createNamespaceString_forTest(tenantIdMin, "foo.bar") !=
+           NamespaceString::createNamespaceString_forTest(tenantIdMin, "zoo.bar"));
 
-    ASSERT(NamespaceString(tenantIdMin, "foo.bar") < NamespaceString(tenantIdMax, "foo.bar"));
-    ASSERT(NamespaceString(tenantIdMin, "foo.bar") < NamespaceString(tenantIdMin, "zoo.bar"));
-    ASSERT(NamespaceString(tenantIdMin, "zoo.bar") < NamespaceString(tenantIdMax, "foo.bar"));
+    ASSERT(NamespaceString::createNamespaceString_forTest(tenantIdMin, "foo.bar") <
+           NamespaceString::createNamespaceString_forTest(tenantIdMax, "foo.bar"));
+    ASSERT(NamespaceString::createNamespaceString_forTest(tenantIdMin, "foo.bar") <
+           NamespaceString::createNamespaceString_forTest(tenantIdMin, "zoo.bar"));
+    ASSERT(NamespaceString::createNamespaceString_forTest(tenantIdMin, "zoo.bar") <
+           NamespaceString::createNamespaceString_forTest(tenantIdMax, "foo.bar"));
 
-    ASSERT(NamespaceString(tenantIdMax, "foo.bar") > NamespaceString(tenantIdMin, "foo.bar"));
-    ASSERT(NamespaceString(tenantIdMin, "zoo.bar") > NamespaceString(tenantIdMin, "foo.bar"));
-    ASSERT(NamespaceString(tenantIdMax, "foo.bar") > NamespaceString(tenantIdMin, "zoo.bar"));
+    ASSERT(NamespaceString::createNamespaceString_forTest(tenantIdMax, "foo.bar") >
+           NamespaceString::createNamespaceString_forTest(tenantIdMin, "foo.bar"));
+    ASSERT(NamespaceString::createNamespaceString_forTest(tenantIdMin, "zoo.bar") >
+           NamespaceString::createNamespaceString_forTest(tenantIdMin, "foo.bar"));
+    ASSERT(NamespaceString::createNamespaceString_forTest(tenantIdMax, "foo.bar") >
+           NamespaceString::createNamespaceString_forTest(tenantIdMin, "zoo.bar"));
 
-    ASSERT(NamespaceString(tenantIdMin, "foo.bar") <= NamespaceString(tenantIdMin, "foo.bar"));
-    ASSERT(NamespaceString(tenantIdMin, "foo.bar") >= NamespaceString(tenantIdMin, "foo.bar"));
+    ASSERT(NamespaceString::createNamespaceString_forTest(tenantIdMin, "foo.bar") <=
+           NamespaceString::createNamespaceString_forTest(tenantIdMin, "foo.bar"));
+    ASSERT(NamespaceString::createNamespaceString_forTest(tenantIdMin, "foo.bar") >=
+           NamespaceString::createNamespaceString_forTest(tenantIdMin, "foo.bar"));
 }
 
 }  // namespace

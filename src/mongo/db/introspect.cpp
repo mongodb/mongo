@@ -112,8 +112,7 @@ void profile(OperationContext* opCtx, NetworkOp op) {
             opCtx->getClient()->swapLockState(std::move(oldCtxLocker));
         });
         AlternativeClientRegion acr(newClient);
-        const auto dbProfilingNS =
-            NamespaceString(ns.dbName(), NamespaceString::kSystemDotProfileCollectionName);
+        const auto dbProfilingNS = NamespaceString::makeSystemDotProfileNamespace(ns.dbName());
         AutoGetCollection autoColl(newCtx.get(), dbProfilingNS, MODE_IX);
         Database* const db = autoColl.getDb();
         if (!db) {
@@ -149,8 +148,7 @@ void profile(OperationContext* opCtx, NetworkOp op) {
 Status createProfileCollection(OperationContext* opCtx, Database* db) {
     invariant(opCtx->lockState()->isDbLockedForMode(db->name(), MODE_IX));
 
-    const auto dbProfilingNS =
-        NamespaceString(db->name(), NamespaceString::kSystemDotProfileCollectionName);
+    const auto dbProfilingNS = NamespaceString::makeSystemDotProfileNamespace(db->name());
 
     // Checking the collection exists must also be done in the WCE retry loop. Only retrying
     // collection creation would endlessly throw errors because the collection exists: must check

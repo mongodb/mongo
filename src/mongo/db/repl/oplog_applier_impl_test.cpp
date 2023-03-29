@@ -1685,8 +1685,8 @@ class MultiOplogEntryOplogApplierImplTestMultitenant : public OplogApplierImplTe
 public:
     MultiOplogEntryOplogApplierImplTestMultitenant()
         : _tenantId(OID::gen()),
-          _nss(_tenantId, "test.preptxn"),
-          _cmdNss(_tenantId, "admin", "$cmd"),
+          _nss(NamespaceString::createNamespaceString_forTest(_tenantId, "test.preptxn")),
+          _cmdNss(NamespaceString::createNamespaceString_forTest(_tenantId, "admin", "$cmd")),
           _txnNum(1) {}
 
 protected:

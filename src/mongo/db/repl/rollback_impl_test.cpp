@@ -2068,8 +2068,8 @@ TEST_F(RollbackImplObserverInfoTest,
     RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
 
     boost::optional<TenantId> tid(OID::gen());
-    auto fromNss = NamespaceString(tid, "test", "source");
-    auto toNss = NamespaceString(tid, "test", "dest");
+    auto fromNss = NamespaceString::createNamespaceString_forTest(tid, "test", "source");
+    auto toNss = NamespaceString::createNamespaceString_forTest(tid, "test", "dest");
 
     auto cmdObj = BSON("renameCollection" << NamespaceStringUtil::serialize(fromNss) << "to"
                                           << NamespaceStringUtil::serialize(toNss));
@@ -2089,8 +2089,8 @@ TEST_F(RollbackImplObserverInfoTest,
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
 
     boost::optional<TenantId> tid(OID::gen());
-    auto fromNss = NamespaceString(tid, "test", "source");
-    auto toNss = NamespaceString(tid, "test", "dest");
+    auto fromNss = NamespaceString::createNamespaceString_forTest(tid, "test", "source");
+    auto toNss = NamespaceString::createNamespaceString_forTest(tid, "test", "dest");
 
     auto cmdObj = BSON("renameCollection" << NamespaceStringUtil::serialize(fromNss) << "to"
                                           << NamespaceStringUtil::serialize(toNss));

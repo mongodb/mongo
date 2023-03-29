@@ -77,6 +77,26 @@ public:
         boost::optional<TenantId> tenantId,
         StringData ns,
         const SerializationContext& context = SerializationContext());
+
+    static NamespaceString parseNamespaceFromRequest(const boost::optional<TenantId>& tenantId,
+                                                     StringData ns);
+
+    static NamespaceString parseNamespaceFromRequest(const boost::optional<TenantId>& tenantId,
+                                                     StringData db,
+                                                     StringData coll);
+
+    static NamespaceString parseNamespaceFromRequest(const DatabaseName& dbName, StringData coll);
+
+    static NamespaceString parseNamespaceFromDoc(const boost::optional<TenantId>& tenantId,
+                                                 StringData ns);
+
+    static NamespaceString parseNamespaceFromDoc(const boost::optional<TenantId>& tenantId,
+                                                 StringData db,
+                                                 StringData coll);
+
+    static NamespaceString parseNamespaceFromDoc(const DatabaseName& dbName, StringData coll);
+
+    static NamespaceString parseNamespaceFromResponse(const DatabaseName& dbName, StringData coll);
 };
 
 }  // namespace mongo

@@ -42,7 +42,9 @@ ViewDefinition::ViewDefinition(const DatabaseName& dbName,
                                StringData viewOnName,
                                const BSONObj& pipeline,
                                std::unique_ptr<CollatorInterface> collator)
-    : _viewNss(dbName, viewName), _viewOnNss(dbName, viewOnName), _collator(std::move(collator)) {
+    : _viewNss(NamespaceStringUtil::parseNamespaceFromDoc(dbName, viewName)),
+      _viewOnNss(NamespaceStringUtil::parseNamespaceFromDoc(dbName, viewOnName)),
+      _collator(std::move(collator)) {
     for (BSONElement e : pipeline) {
         _pipeline.push_back(e.Obj().getOwned());
     }

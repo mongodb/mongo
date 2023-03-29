@@ -322,7 +322,8 @@ public:
         Invocation(Command* cmd, const OpMsgRequest& request)
             : CommandInvocation(cmd),
               _cmd(GetMoreCommandRequest::parse(IDLParserContext{"getMore"}, request)) {
-            NamespaceString nss(_cmd.getDbName(), _cmd.getCollection());
+            NamespaceString nss(NamespaceStringUtil::parseNamespaceFromRequest(
+                _cmd.getDbName(), _cmd.getCollection()));
             uassert(ErrorCodes::InvalidNamespace,
                     str::stream() << "Invalid namespace for getMore: " << nss.ns(),
                     nss.isValid());
@@ -347,7 +348,8 @@ public:
         }
 
         NamespaceString ns() const override {
-            return NamespaceString(_cmd.getDbName(), _cmd.getCollection());
+            return NamespaceStringUtil::parseNamespaceFromRequest(_cmd.getDbName(),
+                                                                  _cmd.getCollection());
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {
@@ -481,7 +483,8 @@ public:
             // the stats twice.
             boost::optional<AutoGetCollectionForReadMaybeLockFree> readLock;
             boost::optional<AutoStatsTracker> statsTracker;
-            NamespaceString nss(_cmd.getDbName(), _cmd.getCollection());
+            NamespaceString nss(NamespaceStringUtil::parseNamespaceFromRequest(
+                _cmd.getDbName(), _cmd.getCollection()));
 
             const bool disableAwaitDataFailpointActive =
                 MONGO_unlikely(disableAwaitDataForGetMoreCmd.shouldFail());

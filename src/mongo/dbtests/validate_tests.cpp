@@ -2192,8 +2192,8 @@ public:
 
             // Verify the older duplicate document appears in the lost-and-found as expected.
             {
-                const NamespaceString lostAndFoundNss = NamespaceString(
-                    DatabaseName::kLocal, "lost_and_found." + coll()->uuid().toString());
+                const NamespaceString lostAndFoundNss = NamespaceString::makeLocalCollection(
+                    "lost_and_found." + coll()->uuid().toString());
                 AutoGetCollectionForRead autoColl(&_opCtx, lostAndFoundNss);
                 Snapshotted<BSONObj> result;
                 ASSERT(autoColl.getCollection()->findDoc(&_opCtx, RecordId(1), &result));
@@ -2451,8 +2451,8 @@ public:
 
             // Verify the older document appears in the lost-and-found as expected.
             {
-                const NamespaceString lostAndFoundNss = NamespaceString(
-                    DatabaseName::kLocal, "lost_and_found." + coll()->uuid().toString());
+                const NamespaceString lostAndFoundNss = NamespaceString::makeLocalCollection(
+                    "lost_and_found." + coll()->uuid().toString());
                 AutoGetCollectionForRead autoColl(&_opCtx, lostAndFoundNss);
                 Snapshotted<BSONObj> result;
                 ASSERT(autoColl.getCollection()->findDoc(&_opCtx, RecordId(1), &result));
@@ -2794,8 +2794,8 @@ public:
 
             // Verify the older duplicate document appears in the lost-and-found as expected.
             {
-                const NamespaceString lostAndFoundNss = NamespaceString(
-                    DatabaseName::kLocal, "lost_and_found." + coll()->uuid().toString());
+                const NamespaceString lostAndFoundNss = NamespaceString::makeLocalCollection(
+                    "lost_and_found." + coll()->uuid().toString());
                 AutoGetCollectionForRead autoColl(&_opCtx, lostAndFoundNss);
                 Snapshotted<BSONObj> result;
                 ASSERT(autoColl.getCollection()->findDoc(&_opCtx, RecordId(1), &result));

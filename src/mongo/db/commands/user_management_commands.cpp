@@ -225,7 +225,7 @@ Status checkOkayToGrantPrivilegesToRole(const RoleName& role, const PrivilegeVec
 
 NamespaceString usersNSS(const boost::optional<TenantId>& tenant) {
     if (tenant) {
-        return NamespaceString(tenant, DatabaseName::kAdmin.db(), NamespaceString::kSystemUsers);
+        return NamespaceString::makeTenantUsersCollection(tenant);
     } else {
         return NamespaceString::kAdminUsersNamespace;
     }
@@ -233,7 +233,7 @@ NamespaceString usersNSS(const boost::optional<TenantId>& tenant) {
 
 NamespaceString rolesNSS(const boost::optional<TenantId>& tenant) {
     if (tenant) {
-        return NamespaceString(tenant, DatabaseName::kAdmin.db(), NamespaceString::kSystemRoles);
+        return NamespaceString::makeTenantRolesCollection(tenant);
     } else {
         return NamespaceString::kAdminRolesNamespace;
     }
@@ -961,9 +961,10 @@ public:
         NamespaceString ns() const final {
             const auto& cmd = request();
             if constexpr (hasGetCmdParamStringData<RequestT>) {
-                return NamespaceString(cmd.getDbName(), cmd.getCommandParameter());
+                return NamespaceStringUtil::parseNamespaceFromRequest(cmd.getDbName(),
+                                                                      cmd.getCommandParameter());
             }
-            return NamespaceString(cmd.getDbName(), "");
+            return NamespaceString(cmd.getDbName());
         }
     };
 
@@ -2138,7 +2139,7 @@ public:
         }
 
         NamespaceString ns() const final {
-            return NamespaceString(request().getDbName(), "");
+            return NamespaceString(request().getDbName());
         }
     };
 

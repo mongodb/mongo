@@ -112,7 +112,8 @@ NamespaceString DocumentSourceChangeStreamAddPostImage::assertValidNamespace(
             .getDocument();
     auto dbName = assertFieldHasType(namespaceObject, "db"_sd, BSONType::String);
     auto collectionName = assertFieldHasType(namespaceObject, "coll"_sd, BSONType::String);
-    NamespaceString nss(pExpCtx->ns.tenantId(), dbName.getString(), collectionName.getString());
+    NamespaceString nss(NamespaceStringUtil::parseNamespaceFromDoc(
+        pExpCtx->ns.tenantId(), dbName.getString(), collectionName.getString()));
 
     // Change streams on an entire database only need to verify that the database names match. If
     // the database is 'admin', then this is a cluster-wide $changeStream and we are permitted to

@@ -255,9 +255,7 @@ public:
         }
 
         NamespaceString ns() const final {
-            const auto& tenant = request().getDbName().tenantId();
-            const auto& nss = request().getCommandParameter();
-            return NamespaceString(tenant, nss.db(), nss.coll());
+            return request().getCommandParameter();
         }
 
         Reply typedRun(OperationContext* opCtx) {

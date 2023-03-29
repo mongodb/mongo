@@ -150,7 +150,7 @@ public:
             return false;
         }
         NamespaceString ns() const {
-            return NamespaceString(request().getDbName(), "");
+            return NamespaceString(request().getDbName());
         }
     };
 
@@ -225,7 +225,7 @@ public:
             return false;
         }
         NamespaceString ns() const {
-            return NamespaceString(request().getDbName(), "");
+            return NamespaceString(request().getDbName());
         }
     };
 
@@ -309,7 +309,7 @@ public:
             return false;
         }
         NamespaceString ns() const {
-            return NamespaceString(request().getDbName(), "");
+            return NamespaceString(request().getDbName());
         }
     };
 

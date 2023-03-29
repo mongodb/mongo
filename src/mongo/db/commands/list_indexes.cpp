@@ -233,7 +233,7 @@ public:
             auto nss = request().getNamespaceOrUUID();
             if (nss.uuid()) {
                 // UUID requires opCtx to resolve, settle on just the dbname.
-                return NamespaceString(request().getDbName(), "");
+                return NamespaceString(request().getDbName());
             }
             invariant(nss.nss());
             return nss.nss().value();

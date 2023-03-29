@@ -614,7 +614,8 @@ void processFieldsForInsertV1(FLEQueryInterface* queryImpl,
                               int32_t* pStmtId,
                               bool bypassDocumentValidation) {
 
-    const NamespaceString nssEsc(edcNss.dbName(), efc.getEscCollection().value());
+    const NamespaceString nssEsc = NamespaceStringUtil::parseNamespaceFromRequest(
+        edcNss.dbName(), efc.getEscCollection().value());
 
     auto docCount = queryImpl->countDocuments(nssEsc);
 
@@ -676,7 +677,8 @@ void processFieldsForInsertV1(FLEQueryInterface* queryImpl,
             checkWriteErrors(escInsertReply);
 
 
-            const NamespaceString nssEcoc(edcNss.dbName(), efc.getEcocCollection().value());
+            const NamespaceString nssEcoc = NamespaceStringUtil::parseNamespaceFromRequest(
+                edcNss.dbName(), efc.getEcocCollection().value());
 
             // TODO - should we make this a batch of ECOC updates?
             const auto ecocInsertReply = uassertStatusOK(queryImpl->insertDocuments(
@@ -708,12 +710,12 @@ void processFieldsForInsertV2(FLEQueryInterface* queryImpl,
                               const EncryptedFieldConfig& efc,
                               int32_t* pStmtId,
                               bool bypassDocumentValidation) {
-
     if (serverPayload.empty()) {
         return;
     }
 
-    const NamespaceString nssEsc(edcNss.dbName(), efc.getEscCollection().value());
+    const NamespaceString nssEsc = NamespaceStringUtil::parseNamespaceFromRequest(
+        edcNss.dbName(), efc.getEscCollection().value());
 
     uint32_t totalTokens = 0;
 
@@ -775,7 +777,8 @@ void processFieldsForInsertV2(FLEQueryInterface* queryImpl,
         uassertStatusOK(queryImpl->insertDocuments(nssEsc, escDocuments, pStmtId, true));
     checkWriteErrors(escInsertReply);
 
-    NamespaceString nssEcoc(edcNss.dbName(), efc.getEcocCollection().value());
+    NamespaceString nssEcoc = NamespaceStringUtil::parseNamespaceFromRequest(
+        edcNss.dbName(), efc.getEcocCollection().value());
     std::vector<BSONObj> ecocDocuments;
     ecocDocuments.reserve(totalTokens);
 
@@ -864,7 +867,8 @@ void processRemovedFieldsHelper(FLEQueryInterface* queryImpl,
         true));
     checkWriteErrors(eccInsertReply);
 
-    const NamespaceString nssEcoc(edcNss.dbName(), efc.getEcocCollection().value());
+    const NamespaceString nssEcoc = NamespaceStringUtil::parseNamespaceFromRequest(
+        edcNss.dbName(), efc.getEcocCollection().value());
 
     // TODO - make this a batch of ECOC updates?
     EncryptedStateCollectionTokens tokens(esc, ecc);
@@ -884,7 +888,8 @@ void processRemovedFields(FLEQueryInterface* queryImpl,
                           const std::vector<EDCIndexedFields>& deletedFields,
                           int32_t* pStmtId) {
 
-    const NamespaceString eccNss(edcNss.dbName(), efc.getEccCollection().value());
+    const NamespaceString eccNss = NamespaceStringUtil::parseNamespaceFromRequest(
+        edcNss.dbName(), efc.getEccCollection().value());
 
     auto docCount = queryImpl->countDocuments(eccNss);
 

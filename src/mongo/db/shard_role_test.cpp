@@ -960,7 +960,8 @@ TEST_F(ShardRoleTest, RestoreWithShardVersionIgnored) {
 
 void ShardRoleTest::testRestoreFailsIfCollectionBecomesCreated(
     AcquisitionPrerequisites::OperationType operationType) {
-    NamespaceString nss(dbNameTestDb, "NonExistentCollectionWhichWillBeCreated");
+    NamespaceString nss(NamespaceString::createNamespaceString_forTest(
+        dbNameTestDb, "NonExistentCollectionWhichWillBeCreated"));
 
     const auto acquisition = acquireCollection(
         opCtx(), CollectionAcquisitionRequest::fromOpCtx(opCtx(), nss, operationType), MODE_IX);

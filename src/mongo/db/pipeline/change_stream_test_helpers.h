@@ -42,7 +42,8 @@
 namespace mongo::change_stream_test_helper {
 static const Timestamp kDefaultTs(100, 1);
 static const repl::OpTime kDefaultOpTime(kDefaultTs, 1);
-static const NamespaceString nss(boost::none, "unittests.change_stream");
+static const NamespaceString nss =
+    NamespaceString::createNamespaceString_forTest(boost::none, "unittests.change_stream");
 static const BSONObj kDefaultSpec = fromjson("{$changeStream: {}}");
 static const BSONObj kShowExpandedEventsSpec =
     fromjson("{$changeStream: {showExpandedEvents: true}}");

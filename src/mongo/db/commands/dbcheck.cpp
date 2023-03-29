@@ -156,7 +156,8 @@ using DbCheckRun = std::vector<DbCheckCollectionInfo>;
 std::unique_ptr<DbCheckRun> singleCollectionRun(OperationContext* opCtx,
                                                 const DatabaseName& dbName,
                                                 const DbCheckSingleInvocation& invocation) {
-    NamespaceString nss(dbName, invocation.getColl());
+    NamespaceString nss(
+        NamespaceStringUtil::parseNamespaceFromRequest(dbName, invocation.getColl()));
     AutoGetCollectionForRead agc(opCtx, nss);
 
     uassert(ErrorCodes::NamespaceNotFound,

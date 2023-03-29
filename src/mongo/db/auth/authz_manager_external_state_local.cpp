@@ -105,11 +105,11 @@ Status AuthzManagerExternalStateLocal::getStoredAuthorizationVersion(OperationCo
 namespace {
 
 NamespaceString getUsersCollection(const boost::optional<TenantId>& tenant) {
-    return NamespaceString(tenant, DatabaseName::kAdmin.db(), NamespaceString::kSystemUsers);
+    return NamespaceString::makeTenantUsersCollection(tenant);
 }
 
 NamespaceString getRolesCollection(const boost::optional<TenantId>& tenant) {
-    return NamespaceString(tenant, DatabaseName::kAdmin.db(), NamespaceString::kSystemRoles);
+    return NamespaceString::makeTenantRolesCollection(tenant);
 }
 
 void serializeResolvedRoles(BSONObjBuilder* user,
@@ -253,10 +253,8 @@ void handleAuthLocalGetUserFailPoint(const std::vector<RoleName>& directRoles) {
 Status AuthzManagerExternalStateLocal::hasAnyUserDocuments(
     OperationContext* opCtx, const boost::optional<TenantId>& tenantId) {
     BSONObj userBSONObj;
-    return findOne(opCtx,
-                   NamespaceString(tenantId, NamespaceString::kAdminUsersNamespace.ns()),
-                   BSONObj(),
-                   &userBSONObj);
+    return findOne(
+        opCtx, NamespaceString::makeTenantUsersCollection(tenantId), BSONObj(), &userBSONObj);
 }
 
 // If tenantId is none, we're checking whether to enable localhost auth bypass which by definition

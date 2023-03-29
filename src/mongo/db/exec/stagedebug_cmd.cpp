@@ -140,7 +140,8 @@ public:
             return false;
         }
 
-        const NamespaceString nss(dbName, collElt.String());
+        const NamespaceString nss(
+            NamespaceStringUtil::parseNamespaceFromRequest(dbName, collElt.String()));
         uassert(ErrorCodes::InvalidNamespace,
                 str::stream() << nss.toString() << " is not a valid namespace",
                 nss.isValid());

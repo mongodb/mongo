@@ -12,6 +12,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/collation/collator_factory_interface',
+        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
     ],
 )
 

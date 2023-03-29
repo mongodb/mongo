@@ -1995,9 +1995,8 @@ void curOpCommandSetup(OperationContext* opCtx, const OpMsgRequest& request) {
 
     // We construct a legacy $cmd namespace so we can fill in curOp using
     // the existing logic that existed for OP_QUERY commands
-    NamespaceString nss(
-        DatabaseNameUtil::deserialize(request.getValidatedTenantId(), request.getDatabase()),
-        "$cmd");
+    NamespaceString nss(NamespaceString::makeCommandNamespace(
+        DatabaseNameUtil::deserialize(request.getValidatedTenantId(), request.getDatabase())));
 
     stdx::lock_guard<Client> lk(*opCtx->getClient());
     curop->setNS_inlock(nss);

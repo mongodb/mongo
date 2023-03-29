@@ -127,12 +127,14 @@ std::unique_ptr<DocumentSourceUnionWith::LiteParsed> DocumentSourceUnionWith::Li
     NamespaceString unionNss;
     boost::optional<LiteParsedPipeline> liteParsedPipeline;
     if (spec.type() == BSONType::String) {
-        unionNss = NamespaceString(nss.dbName(), spec.valueStringData());
+        unionNss =
+            NamespaceStringUtil::parseNamespaceFromRequest(nss.dbName(), spec.valueStringData());
     } else {
         auto unionWithSpec =
             UnionWithSpec::parse(IDLParserContext(kStageName), spec.embeddedObject());
         if (unionWithSpec.getColl()) {
-            unionNss = NamespaceString(nss.dbName(), *unionWithSpec.getColl());
+            unionNss = NamespaceStringUtil::parseNamespaceFromRequest(nss.dbName(),
+                                                                      *unionWithSpec.getColl());
         } else {
             // If no collection specified, it must have $documents as first field in pipeline.
             validateUnionWithCollectionlessPipeline(unionWithSpec.getPipeline());
@@ -185,12 +187,14 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceUnionWith::createFromBson(
     NamespaceString unionNss;
     std::vector<BSONObj> pipeline;
     if (elem.type() == BSONType::String) {
-        unionNss = NamespaceString(expCtx->ns.dbName(), elem.valueStringData());
+        unionNss = NamespaceStringUtil::parseNamespaceFromRequest(expCtx->ns.dbName(),
+                                                                  elem.valueStringData());
     } else {
         auto unionWithSpec =
             UnionWithSpec::parse(IDLParserContext(kStageName), elem.embeddedObject());
         if (unionWithSpec.getColl()) {
-            unionNss = NamespaceString(expCtx->ns.dbName(), *unionWithSpec.getColl());
+            unionNss = NamespaceStringUtil::parseNamespaceFromRequest(expCtx->ns.dbName(),
+                                                                      *unionWithSpec.getColl());
         } else {
             // if no collection specified, it must have $documents as first field in pipeline
             validateUnionWithCollectionlessPipeline(unionWithSpec.getPipeline());

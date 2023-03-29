@@ -402,15 +402,13 @@ const testColl = testDb.getCollection(kCollName);
         "collMod": kCollName,
         "index": {"keyPattern": {c: 1}, expireAfterSeconds: 100},
     });
-    assert.commandFailedWithCode(res, ErrorCodes.NamespaceNotFound);
-    // TODO SERVER-73025 Uncomment out this conditional below, and remove the assertion above in
-    // favor of the assertion in the conditional.
-    /* if (featureFlagRequireTenantId) {
-        assert.commandFailedWithCode(res, 7005300);
+    if (featureFlagRequireTenantId) {
+        // When the feature flag is enabled, the server will assert that all requests contain a
+        // tenantId.
+        assert.commandFailedWithCode(res, 6972100);
     } else {
         assert.commandFailedWithCode(res, ErrorCodes.NamespaceNotFound);
     }
-    */
 
     // Modify the index with the tenantId
     res = assert.commandWorked(testDb.runCommand({

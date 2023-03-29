@@ -212,9 +212,8 @@ void KeyStringIndexConsistency::repairIndexEntries(OperationContext* opCtx,
                                     << " missing index entries.");
     }
     if (results->numDocumentsMovedToLostAndFound > 0) {
-        const NamespaceString lostAndFoundNss =
-            NamespaceString(DatabaseName::kLocal,
-                            "lost_and_found." + _validateState->getCollection()->uuid().toString());
+        const NamespaceString lostAndFoundNss = NamespaceString::makeLocalCollection(
+            "lost_and_found." + _validateState->getCollection()->uuid().toString());
         results->warnings.push_back(str::stream()
                                     << "Removed " << results->numDocumentsMovedToLostAndFound
                                     << " duplicate documents to resolve "

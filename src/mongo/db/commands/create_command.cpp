@@ -115,7 +115,8 @@ void checkCollectionOptions(OperationContext* opCtx,
         MONGO_UNREACHABLE;
     }
 
-    auto fullNewNamespace = NamespaceString(ns.dbName(), options.viewOn);
+    auto fullNewNamespace =
+        NamespaceStringUtil::parseNamespaceFromRequest(ns.dbName(), options.viewOn);
     uassert(ErrorCodes::NamespaceExists,
             str::stream() << "namespace " << ns.ns() << " already exists, but is a view on "
                           << view->viewOn() << " rather than " << fullNewNamespace,

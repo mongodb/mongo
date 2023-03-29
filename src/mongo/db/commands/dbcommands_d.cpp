@@ -165,7 +165,7 @@ protected:
         // Accessing system.profile collection should not conflict with oplog application.
         ShouldNotConflictWithSecondaryBatchApplicationBlock shouldNotConflictBlock(
             opCtx->lockState());
-        NamespaceString nss{dbName, NamespaceString::kSystemDotProfileCollectionName};
+        NamespaceString nss(NamespaceString::makeSystemDotProfileNamespace(dbName));
         AutoGetCollection ctx(opCtx, nss, dbMode);
         Database* db = ctx.getDb();
 
@@ -236,7 +236,7 @@ public:
         if (collectionName.empty())
             collectionName = "fs";
         collectionName += ".chunks";
-        return NamespaceString(dbName, collectionName);
+        return NamespaceStringUtil::parseNamespaceFromRequest(dbName, collectionName);
     }
 
     Status checkAuthForOperation(OperationContext* opCtx,

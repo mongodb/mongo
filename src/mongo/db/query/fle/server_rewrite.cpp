@@ -256,7 +256,8 @@ void doFLERewriteInTxn(OperationContext* opCtx,
         // if breaks us off of the current optctx readconcern and other settings
         //
         if (!opCtx->inMultiDocumentTransaction()) {
-            NamespaceString nssEsc(sharedBlock->dbName, sharedBlock->esc);
+            NamespaceString nssEsc(NamespaceStringUtil::parseNamespaceFromRequest(
+                sharedBlock->dbName, sharedBlock->esc));
             NamespaceString nssEcc;  // Ignored in V2
             FLETagNoTXNQuery queryInterface(opCtx);
 
@@ -268,17 +269,18 @@ void doFLERewriteInTxn(OperationContext* opCtx,
     auto txn = getTxn(opCtx);
     auto swCommitResult = txn->runNoThrow(
         opCtx, [sharedBlock](const txn_api::TransactionClient& txnClient, auto txnExec) {
-            NamespaceString nssEsc(sharedBlock->dbName, sharedBlock->esc);
+            NamespaceString nssEsc(NamespaceStringUtil::parseNamespaceFromRequest(
+                sharedBlock->dbName, sharedBlock->esc));
 
             // Construct FLE rewriter from the transaction client and encryptionInformation.
             auto queryInterface = FLEQueryInterfaceImpl(txnClient, getGlobalServiceContext());
 
             // Rewrite the MatchExpression.
             if (sharedBlock->ecc) {
-                sharedBlock->doRewrite(
-                    &queryInterface,
-                    nssEsc,
-                    NamespaceString(sharedBlock->dbName, sharedBlock->ecc.get()));
+                sharedBlock->doRewrite(&queryInterface,
+                                       nssEsc,
+                                       NamespaceStringUtil::parseNamespaceFromRequest(
+                                           sharedBlock->dbName, sharedBlock->ecc.get()));
             } else {
                 sharedBlock->doRewrite(&queryInterface, nssEsc);
             }
@@ -298,10 +300,12 @@ BSONObj rewriteEncryptedFilterInsideTxn(FLETagQueryInterface* queryImpl,
                                         boost::intrusive_ptr<ExpressionContext> expCtx,
                                         BSONObj filter,
                                         EncryptedCollScanModeAllowed mode) {
-    NamespaceString nssEsc(dbName, efc.getEscCollection().value());
+    NamespaceString nssEsc(
+        NamespaceStringUtil::parseNamespaceFromRequest(dbName, efc.getEscCollection().value()));
 
     if (!gFeatureFlagFLE2ProtocolVersion2.isEnabled(serverGlobalParams.featureCompatibility)) {
-        NamespaceString nssEcc(dbName, efc.getEccCollection().value());
+        NamespaceString nssEcc(
+            NamespaceStringUtil::parseNamespaceFromRequest(dbName, efc.getEccCollection().value()));
         return rewriteEncryptedFilter(queryImpl, nssEsc, nssEcc, expCtx, filter, mode);
     }
 

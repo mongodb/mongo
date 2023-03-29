@@ -892,7 +892,8 @@ TEST_F(DocumentSourceGraphLookupServerlessTest,
     auto tenantId = expCtx->ns.tenantId();
     ASSERT(tenantId);
 
-    NamespaceString graphLookupNs(expCtx->ns.dbName(), "foo");
+    NamespaceString graphLookupNs(
+        NamespaceString::createNamespaceString_forTest(expCtx->ns.dbName(), "foo"));
     expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
         {graphLookupNs.coll().toString(), {graphLookupNs, std::vector<BSONObj>()}}});
 
