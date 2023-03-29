@@ -739,6 +739,7 @@ enum class Builtin : uint8_t {
     dateTrunc,
     internalLeast,     // helper functions for computation of sort keys
     internalGreatest,  // helper functions for computation of sort keys
+    year,
 };
 
 std::string builtinToString(Builtin b);
@@ -1241,9 +1242,17 @@ private:
                                                                     value::Value dateValue,
                                                                     value::TypeTags timezoneTag,
                                                                     value::Value timezoneValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericDayOfYear(value::TypeTags dateTag,
+                                                                    value::Value dateValue,
+                                                                    value::TypeTags timezoneTag,
+                                                                    value::Value timezoneValue);
     FastTuple<bool, value::TypeTags, value::Value> genericDayOfMonth(value::TypeTags timezoneDBTag,
                                                                      value::Value timezoneDBValue,
                                                                      value::TypeTags dateTag,
+                                                                     value::Value dateValue,
+                                                                     value::TypeTags timezoneTag,
+                                                                     value::Value timezoneValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericDayOfMonth(value::TypeTags dateTag,
                                                                      value::Value dateValue,
                                                                      value::TypeTags timezoneTag,
                                                                      value::Value timezoneValue);
@@ -1253,6 +1262,20 @@ private:
                                                                     value::Value dateValue,
                                                                     value::TypeTags timezoneTag,
                                                                     value::Value timezoneValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericDayOfWeek(value::TypeTags dateTag,
+                                                                    value::Value dateValue,
+                                                                    value::TypeTags timezoneTag,
+                                                                    value::Value timezoneValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericYear(value::TypeTags timezoneDBTag,
+                                                               value::Value timezoneDBValue,
+                                                               value::TypeTags dateTag,
+                                                               value::Value dateValue,
+                                                               value::TypeTags timezoneTag,
+                                                               value::Value timezoneValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericYear(value::TypeTags dateTag,
+                                                               value::Value dateValue,
+                                                               value::TypeTags timezoneTag,
+                                                               value::Value timezoneValue);
     FastTuple<bool, value::TypeTags, value::Value> genericNewKeyString(
         ArityType arity, CollatorInterface* collator = nullptr);
     FastTuple<bool, value::TypeTags, value::Value> dateTrunc(value::TypeTags dateTag,
@@ -1400,6 +1423,7 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinDateTrunc(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinMinMaxFromArray(ArityType arity,
                                                                           Builtin f);
+    FastTuple<bool, value::TypeTags, value::Value> builtinYear(ArityType arity);
 
     FastTuple<bool, value::TypeTags, value::Value> dispatchBuiltin(Builtin f, ArityType arity);
 

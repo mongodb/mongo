@@ -530,9 +530,12 @@ std::unique_ptr<timelib_time, TimeZone::TimelibTimeDeleter> TimeZone::getTimelib
     Date_t date) const {
     auto time = createTimelibTime();
 
-    timelib_unixtime2gmt(time.get(), seconds(date));
-    adjustTimeZone(time.get());
-    timelib_unixtime2local(time.get(), seconds(date));
+    if (isUtcZone()) {
+        timelib_unixtime2gmt(time.get(), seconds(date));
+    } else {
+        adjustTimeZone(time.get());
+        timelib_unixtime2local(time.get(), seconds(date));
+    }
 
     return time;
 }

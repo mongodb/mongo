@@ -697,6 +697,11 @@ int getApproximateSize(TypeTags tag, Value val) {
             // This type points to a block of memory that it doesn't own, so we don't acccount
             // for the size of this block of memory here.
             break;
+        case TypeTags::timeZone:
+            // The timezone obj stores an offset counter, and a pointer to a timelib struct
+            // which it doesn't own, so we don't need to account for the timelib obj.
+            result += sizeof(TimeZone);
+            break;
         case TypeTags::jsFunction:
             result += getJsFunctionView(val)->getApproximateSize();
             break;

@@ -148,6 +148,11 @@ std::pair<TypeTags, Value> makeCopyPcreRegex(const pcre::Regex& regex) {
     return {TypeTags::pcreRegex, bitcastFrom<pcre::Regex*>(regexCopy.release())};
 }
 
+std::pair<TypeTags, Value> makeCopyTimeZone(const TimeZone& tz) {
+    auto tzCopy = std::make_unique<TimeZone>(tz);
+    return {TypeTags::timeZone, bitcastFrom<TimeZone*>(tzCopy.release())};
+}
+
 KeyString::Value SortSpec::generateSortKey(const BSONObj& obj, const CollatorInterface* collator) {
     _sortKeyGen.setCollator(collator);
     return _sortKeyGen.computeSortKeyString(obj);
@@ -380,6 +385,9 @@ void releaseValueDeep(TypeTags tag, Value val) noexcept {
         case TypeTags::indexBounds:
             delete getIndexBoundsView(val);
             break;
+        case TypeTags::timeZone:
+            delete getTimeZoneView(val);
+            break;
         default:
             break;
     }
@@ -606,6 +614,11 @@ std::size_t hashValue(TypeTags tag, Value val, const CollatorInterface* collator
             return hashCombine(
                 hashCombine(hashInit(), abslHash(cws.code)),
                 hashValue(TypeTags::bsonObject, bitcastFrom<const char*>(cws.scope)));
+        }
+        case TypeTags::timeZone: {
+            auto timezone = getTimeZoneView(val);
+            return hashCombine(hashCombine(hashInit(), abslHash(timezone->getTzInfo())),
+                               abslHash(timezone->getUtcOffset().count()));
         }
         default:
             break;

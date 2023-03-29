@@ -81,6 +81,24 @@ assertArrayEq({
     ]
 });
 
+// Test with constant timezone
+res = coll.aggregate({
+              $project: {
+                  _id: 0,
+                  dayOfYear: {$dayOfYear: {date: "$date", timezone: "-0400"}},
+                  dayOfMonth: {$dayOfMonth: {date: "$date", timezone: "-0400"}},
+                  dayOfWeek: {$dayOfWeek: {date: "$date", timezone: "-0400"}},
+              }
+          })
+          .toArray();
+assertArrayEq({
+    actual: res,
+    expected: [
+        {dayOfYear: 13, dayOfMonth: 13, dayOfWeek: 5},
+        {dayOfYear: 310, dayOfMonth: 6, dayOfWeek: 6},
+    ]
+});
+
 //
 // Error Code tests.
 //

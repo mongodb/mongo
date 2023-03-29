@@ -335,4 +335,37 @@ pipeline = {
     $project: {date: {'$dateToParts': {date: "$date", "timezone": "DoesNot/Exist"}}}
 };
 assertErrorCode(coll, pipeline, 40485);
+
+// Given a date, executes an aggregation command which requires the server to convert this date to
+// its parts in a timezone-aware fashion. Returns the resulting document containing the date parts.
+function runDateToPartsExpression(inputDate, timezone) {
+    const results =
+        coll.aggregate(
+                [{$project: {_id: 0, out: {$dateToParts: {date: inputDate, timezone: timezone}}}}])
+            .toArray();
+    assert.eq(results.length, 1, results);
+    return results[0].out;
+}
+
+// Test that the time zone info is up to date as of the 2019c IANA tz db release. In 2019, Brazil
+// abolished its daylight savings time. In recent years prior to 2019, Brazil would change from
+// UTC-3 to UTC-2, typically starting in October or November and ending in February. Here we test
+// that dates in December and January use UTC-2 in 2017 and 2018, but use UTC-3 in 2019 and 2020 for
+// the Sao Paulo timezone.
+assert.eq({year: 2017, month: 12, day: 15, hour: 8, minute: 0, second: 0, millisecond: 0},
+          runDateToPartsExpression(ISODate("2017-12-15T10:00:00.000Z"), "America/Sao_Paulo"));
+assert.eq({year: 2018, month: 1, day: 15, hour: 8, minute: 0, second: 0, millisecond: 0},
+          runDateToPartsExpression(ISODate("2018-01-15T10:00:00.000Z"), "America/Sao_Paulo"));
+assert.eq({year: 2018, month: 12, day: 15, hour: 8, minute: 0, second: 0, millisecond: 0},
+          runDateToPartsExpression(ISODate("2018-12-15T10:00:00.000Z"), "America/Sao_Paulo"));
+assert.eq({year: 2019, month: 1, day: 15, hour: 8, minute: 0, second: 0, millisecond: 0},
+          runDateToPartsExpression(ISODate("2019-01-15T10:00:00.000Z"), "America/Sao_Paulo"));
+assert.eq({year: 2019, month: 12, day: 15, hour: 7, minute: 0, second: 0, millisecond: 0},
+          runDateToPartsExpression(ISODate("2019-12-15T10:00:00.000Z"), "America/Sao_Paulo"));
+assert.eq({year: 2020, month: 1, day: 15, hour: 7, minute: 0, second: 0, millisecond: 0},
+          runDateToPartsExpression(ISODate("2020-01-15T10:00:00.000Z"), "America/Sao_Paulo"));
+assert.eq({year: 2020, month: 12, day: 15, hour: 7, minute: 0, second: 0, millisecond: 0},
+          runDateToPartsExpression(ISODate("2020-12-15T10:00:00.000Z"), "America/Sao_Paulo"));
+assert.eq({year: 2021, month: 1, day: 15, hour: 7, minute: 0, second: 0, millisecond: 0},
+          runDateToPartsExpression(ISODate("2021-01-15T10:00:00.000Z"), "America/Sao_Paulo"));
 })();

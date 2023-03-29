@@ -3378,33 +3378,63 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinIsoDateToParts(A
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDayOfYear(ArityType arity) {
-    invariant(arity == 3);
+    invariant(arity == 3 || arity == 2);
 
-    auto [timezoneDBOwn, timezoneDBTag, timezoneDBValue] = getFromStack(0);
-    auto [dateOwn, dateTag, dateValue] = getFromStack(1);
-    auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(2);
-    return genericDayOfYear(
-        timezoneDBTag, timezoneDBValue, dateTag, dateValue, timezoneTag, timezoneValue);
+    auto [dateOwn, dateTag, dateValue] = getFromStack(0);
+    if (arity == 3) {
+        auto [timezoneDBOwn, timezoneDBTag, timezoneDBValue] = getFromStack(1);
+        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(2);
+        return genericDayOfYear(
+            timezoneDBTag, timezoneDBValue, dateTag, dateValue, timezoneTag, timezoneValue);
+    } else {
+        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(1);
+        return genericDayOfYear(dateTag, dateValue, timezoneTag, timezoneValue);
+    }
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDayOfMonth(ArityType arity) {
-    invariant(arity == 3);
+    invariant(arity == 3 || arity == 2);
 
-    auto [timezoneDBOwn, timezoneDBTag, timezoneDBValue] = getFromStack(0);
-    auto [dateOwn, dateTag, dateValue] = getFromStack(1);
-    auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(2);
-    return genericDayOfMonth(
-        timezoneDBTag, timezoneDBValue, dateTag, dateValue, timezoneTag, timezoneValue);
+    auto [dateOwn, dateTag, dateValue] = getFromStack(0);
+    if (arity == 3) {
+        auto [timezoneDBOwn, timezoneDBTag, timezoneDBValue] = getFromStack(1);
+        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(2);
+        return genericDayOfMonth(
+            timezoneDBTag, timezoneDBValue, dateTag, dateValue, timezoneTag, timezoneValue);
+    } else {
+        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(1);
+        return genericDayOfMonth(dateTag, dateValue, timezoneTag, timezoneValue);
+    }
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDayOfWeek(ArityType arity) {
-    invariant(arity == 3);
+    invariant(arity == 3 || arity == 2);
 
-    auto [timezoneDBOwn, timezoneDBTag, timezoneDBValue] = getFromStack(0);
-    auto [dateOwn, dateTag, dateValue] = getFromStack(1);
-    auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(2);
-    return genericDayOfWeek(
-        timezoneDBTag, timezoneDBValue, dateTag, dateValue, timezoneTag, timezoneValue);
+    auto [dateOwn, dateTag, dateValue] = getFromStack(0);
+    if (arity == 3) {
+        auto [timezoneDBOwn, timezoneDBTag, timezoneDBValue] = getFromStack(1);
+        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(2);
+        return genericDayOfWeek(
+            timezoneDBTag, timezoneDBValue, dateTag, dateValue, timezoneTag, timezoneValue);
+    } else {
+        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(1);
+        return genericDayOfWeek(dateTag, dateValue, timezoneTag, timezoneValue);
+    }
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinYear(ArityType arity) {
+    invariant(arity == 3 || arity == 2);
+
+    auto [dateOwn, dateTag, dateValue] = getFromStack(0);
+    if (arity == 3) {
+        auto [timezoneDBOwn, timezoneDBTag, timezoneDBValue] = getFromStack(1);
+        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(2);
+        return genericYear(
+            timezoneDBTag, timezoneDBValue, dateTag, dateValue, timezoneTag, timezoneValue);
+    } else {
+        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(1);
+        return genericYear(dateTag, dateValue, timezoneTag, timezoneValue);
+    }
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinBitTestPosition(ArityType arity) {
@@ -5709,6 +5739,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
         case Builtin::internalLeast:
         case Builtin::internalGreatest:
             return builtinMinMaxFromArray(arity, f);
+        case Builtin::year:
+            return builtinYear(arity);
     }
 
     MONGO_UNREACHABLE;

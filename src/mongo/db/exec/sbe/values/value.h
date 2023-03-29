@@ -69,6 +69,8 @@ class Value;
 
 class TimeZoneDatabase;
 
+class TimeZone;
+
 class JsFunction;
 
 namespace sbe {
@@ -195,6 +197,9 @@ enum class TypeTags : uint8_t {
 
     // Pointer to a IndexBounds object.
     indexBounds,
+
+    // Pointer to a timezone object
+    timeZone,
 };
 
 inline constexpr bool isNumber(TypeTags tag) noexcept {
@@ -237,6 +242,10 @@ inline constexpr bool isPcreRegex(TypeTags tag) noexcept {
 
 inline constexpr bool isBsonRegex(TypeTags tag) noexcept {
     return tag == TypeTags::bsonRegex;
+}
+
+inline constexpr bool isTimeZone(TypeTags tag) noexcept {
+    return tag == TypeTags::timeZone;
 }
 
 inline constexpr bool isStringOrSymbol(TypeTags tag) noexcept {
@@ -1235,6 +1244,8 @@ std::pair<TypeTags, Value> makeNewPcreRegex(StringData pattern, StringData optio
 
 std::pair<TypeTags, Value> makeCopyPcreRegex(const pcre::Regex& regex);
 
+std::pair<TypeTags, Value> makeCopyTimeZone(const TimeZone& tz);
+
 inline pcre::Regex* getPcreRegexView(Value val) noexcept {
     return reinterpret_cast<pcre::Regex*>(val);
 }
@@ -1277,6 +1288,10 @@ inline SortKeyComponentVector* getSortKeyComponentVectorView(Value v) noexcept {
 
 inline sbe::value::CsiCell* getCsiCellView(Value val) noexcept {
     return reinterpret_cast<sbe::value::CsiCell*>(val);
+}
+
+inline TimeZone* getTimeZoneView(Value val) noexcept {
+    return reinterpret_cast<TimeZone*>(val);
 }
 
 /**
@@ -1489,6 +1504,8 @@ inline std::pair<TypeTags, Value> copyValue(TypeTags tag, Value val) {
             return makeCopyCollator(*getCollatorView(val));
         case TypeTags::indexBounds:
             return makeCopyIndexBounds(*getIndexBoundsView(val));
+        case TypeTags::timeZone:
+            return makeCopyTimeZone(*getTimeZoneView(val));
         default:
             break;
     }

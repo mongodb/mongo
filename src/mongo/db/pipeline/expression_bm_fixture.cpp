@@ -563,6 +563,59 @@ void ExpressionBenchmarkFixture::benchmarkDateTruncEvaluateYear1NewYorkValue2100
                             state);
 }
 
+void ExpressionBenchmarkFixture::benchmarkYearNoTZ(benchmark::State& state) {
+    testDateExpressionWithConstantTimezone(
+        "$year", Date_t::fromMillisSinceEpoch(1893466800000LL) /* year 2030*/, boost::none, state);
+}
+
+void ExpressionBenchmarkFixture::benchmarkYearConstTzUTC(benchmark::State& state) {
+    testDateExpressionWithConstantTimezone(
+        "$year",
+        Date_t::fromMillisSinceEpoch(1893466800000LL) /* year 2030*/,
+        std::string{"UTC"},
+        state);
+}
+
+void ExpressionBenchmarkFixture::benchmarkYearConstTzUTCMinus0700(benchmark::State& state) {
+    testDateExpressionWithConstantTimezone(
+        "$year",
+        Date_t::fromMillisSinceEpoch(1583924825000LL) /* year 2020*/,
+        std::string{"-07:00"},
+        state);
+}
+
+void ExpressionBenchmarkFixture::benchmarkYearConstTzNewYork(benchmark::State& state) {
+    testDateExpressionWithConstantTimezone(
+        "$year",
+        Date_t::fromMillisSinceEpoch(4108446425000LL) /* year 2100*/,
+        std::string{"America/New_York"},
+        state);
+}
+
+void ExpressionBenchmarkFixture::benchmarkYearUTC(benchmark::State& state) {
+    testDateExpressionWithVariableTimezone(
+        "$year",
+        Date_t::fromMillisSinceEpoch(1893466800000LL) /* year 2030*/,
+        std::string{"UTC"},
+        state);
+}
+
+void ExpressionBenchmarkFixture::benchmarkYearUTCMinus0700(benchmark::State& state) {
+    testDateExpressionWithVariableTimezone(
+        "$year",
+        Date_t::fromMillisSinceEpoch(1583924825000LL) /* year 2020*/,
+        std::string{"-07:00"},
+        state);
+}
+
+void ExpressionBenchmarkFixture::benchmarkYearNewYork(benchmark::State& state) {
+    testDateExpressionWithVariableTimezone(
+        "$year",
+        Date_t::fromMillisSinceEpoch(4108446425000LL) /* year 2100*/,
+        std::string{"America/New_York"},
+        state);
+}
+
 /**
  * Tests performance of $getField expression.
  */
@@ -1042,6 +1095,33 @@ void ExpressionBenchmarkFixture::testDateAddExpression(long long startDate,
         BSON("$dateAdd" << objBuilder.obj()),
         state,
         std::vector<Document>(1, {{"startDate"_sd, Date_t::fromMillisSinceEpoch(startDate)}}));
+}
+
+void ExpressionBenchmarkFixture::testDateExpressionWithConstantTimezone(
+    std::string exprName,
+    Date_t date,
+    boost::optional<std::string> timezone,
+    benchmark::State& state) {
+    BSONObjBuilder objBuilder;
+    objBuilder << "date"
+               << "$date";
+    if (timezone) {
+        objBuilder << "timezone" << *timezone;
+    }
+    benchmarkExpression(
+        BSON(exprName << objBuilder.obj()), state, std::vector<Document>(1, {{"date"_sd, date}}));
+}
+
+void ExpressionBenchmarkFixture::testDateExpressionWithVariableTimezone(
+    std::string exprName, Date_t date, boost::optional<std::string> tz, benchmark::State& state) {
+    BSONObjBuilder objBuilder;
+    objBuilder << "date"
+               << "$date"
+               << "timezone"
+               << "$timezone";
+    benchmarkExpression(BSON(exprName << objBuilder.obj()),
+                        state,
+                        std::vector<Document>(1, {{"date"_sd, date}, {"timezone"_sd, *tz}}));
 }
 
 void ExpressionBenchmarkFixture::testDateFromStringExpression(std::string dateString,

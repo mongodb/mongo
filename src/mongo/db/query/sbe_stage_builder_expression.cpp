@@ -3057,13 +3057,13 @@ public:
         generateTrigonometricExpression("radiansToDegrees");
     }
     void visit(const ExpressionDayOfMonth* expr) final {
-        generateDayOfExpression("dayOfMonth", expr);
+        generateDateExpressionAcceptingTimeZone("dayOfMonth", expr);
     }
     void visit(const ExpressionDayOfWeek* expr) final {
-        generateDayOfExpression("dayOfWeek", expr);
+        generateDateExpressionAcceptingTimeZone("dayOfWeek", expr);
     }
     void visit(const ExpressionDayOfYear* expr) final {
-        generateDayOfExpression("dayOfYear", expr);
+        generateDateExpressionAcceptingTimeZone("dayOfYear", expr);
     }
     void visit(const ExpressionHour* expr) final {
         unsupportedExpression("$hour");
@@ -3093,7 +3093,7 @@ public:
         unsupportedExpression("$isoWeek");
     }
     void visit(const ExpressionYear* expr) final {
-        unsupportedExpression("$year");
+        generateDateExpressionAcceptingTimeZone("year", expr);
     }
     void visit(const ExpressionFromAccumulator<AccumulatorAvg>* expr) final {
         unsupportedExpression(expr->getOpName());
@@ -3284,49 +3284,90 @@ private:
                                                                  std::move(defaultExpr)));
     }
 
-    void generateDayOfExpression(StringData exprName, const Expression* expr) {
+    void generateDateExpressionAcceptingTimeZone(StringData exprName, const Expression* expr) {
         auto children = expr->getChildren();
         invariant(children.size() == 2);
 
-        auto dateName = makeLocalVariableName(_context->state.frameId(), 0);
-        auto timezoneName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto timezoneExpression =
+            children[1] ? _context->popABTExpr() : optimizer::Constant::str("UTC"_sd);
+        auto dateExpression = _context->popABTExpr();
 
-        auto timezone = children[1] ? _context->popABTExpr() : optimizer::Constant::str("UTC"_sd);
-        auto date = _context->popABTExpr();
+        // Local bind to hold the date expression result
+        auto dateName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto dateVar = makeVariable(dateName);
 
         auto timeZoneDBSlot = _context->state.data->env->getSlot("timeZoneDB"_sd);
-        auto timeZoneDBName = _context->registerVariable(timeZoneDBSlot);
 
-        // Check that each argument exists, is not null, and is the correct type.
-        auto totalDayOfFunc = buildABTMultiBranchConditional(
-            ABTCaseValuePair{generateABTNullOrMissing(timezoneName), optimizer::Constant::null()},
-            ABTCaseValuePair{generateABTNonStringCheck(timezoneName),
-                             makeABTFail(ErrorCodes::Error{7157908},
-                                         str::stream() << "$" << exprName.toString()
-                                                       << " timezone must be a string")},
-            ABTCaseValuePair{makeNot(makeABTFunction("isTimezone",
-                                                     makeVariable(timeZoneDBName),
-                                                     makeVariable(timezoneName))),
-                             makeABTFail(ErrorCodes::Error{7157909},
-                                         str::stream() << "$" << exprName.toString()
-                                                       << " timezone must be a valid timezone")},
-            ABTCaseValuePair{generateABTNullOrMissing(dateName), optimizer::Constant::null()},
-            ABTCaseValuePair{makeNot(makeABTFunction("typeMatch",
-                                                     makeVariable(dateName),
-                                                     optimizer::Constant::int32(dateTypeMask()))),
-                             makeABTFail(ErrorCodes::Error{7157910},
-                                         str::stream() << "$" << exprName.toString()
-                                                       << " date must have a format of a date")},
-            makeABTFunction(exprName.toString(),
-                            makeVariable(timeZoneDBName),
-                            makeVariable(dateName),
-                            makeVariable(timezoneName)));
+        // Set parameters for an invocation of the built-in function.
+        optimizer::ABTVector arguments;
+        arguments.push_back(dateVar);
+
+        // Create expressions to check that each argument to the function exists, is not
+        // null, and is of the correct type.
+        std::vector<ABTCaseValuePair> inputValidationCases;
+
+        // Return null if any of the parameters is either null or missing.
+        inputValidationCases.push_back(generateABTReturnNullIfNullOrMissing(dateVar));
+        inputValidationCases.push_back(generateABTReturnNullIfNullOrMissing(timezoneExpression));
+
+        // "timezone" parameter validation.
+        if (timezoneExpression.is<optimizer::Constant>()) {
+            auto [timezoneTag, timezoneVal] = timezoneExpression.cast<optimizer::Constant>()->get();
+            auto [timezoneDBTag, timezoneDBVal] =
+                _context->state.data->env->getAccessor(timeZoneDBSlot)->getViewOfValue();
+            auto timezoneDB = sbe::value::getTimeZoneDBView(timezoneDBVal);
+            uassert(5157900,
+                    str::stream() << "$" << exprName.toString()
+                                  << " parameter 'timezone' must be a string",
+                    sbe::value::isString(timezoneTag));
+            uassert(5157901,
+                    str::stream() << "$" << exprName.toString()
+                                  << " parameter 'timezone' must be a valid timezone",
+                    sbe::vm::isValidTimezone(timezoneTag, timezoneVal, timezoneDB));
+            auto [timezoneObjTag, timezoneObjVal] = sbe::value::makeCopyTimeZone(
+                sbe::vm::getTimezone(timezoneTag, timezoneVal, timezoneDB));
+            auto timezoneConst =
+                optimizer::make<optimizer::Constant>(timezoneObjTag, timezoneObjVal);
+            arguments.push_back(std::move(timezoneConst));
+        } else {
+            auto timeZoneDBName = _context->registerVariable(timeZoneDBSlot);
+            auto timeZoneDBVar = makeVariable(timeZoneDBName);
+            inputValidationCases.emplace_back(
+                generateABTNonStringCheck(timezoneExpression),
+                makeABTFail(ErrorCodes::Error{5157902},
+                            str::stream() << "$" << exprName.toString()
+                                          << " parameter 'timezone' must be a string"));
+            inputValidationCases.emplace_back(
+                makeNot(makeABTFunction("isTimezone", timeZoneDBVar, timezoneExpression)),
+                makeABTFail(ErrorCodes::Error{5157903},
+                            str::stream() << "$" << exprName.toString()
+                                          << " parameter 'timezone' must be a valid timezone"));
+            arguments.push_back(std::move(timeZoneDBVar));
+            arguments.push_back(std::move(timezoneExpression));
+        }
+
+        // Create an expression to invoke the built-in function.
+        auto funcCall =
+            optimizer::make<optimizer::FunctionCall>(exprName.toString(), std::move(arguments));
+        auto funcName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto funcVar = makeVariable(funcName);
+
+
+        // "date" parameter validation.
+        inputValidationCases.emplace_back(generateABTFailIfNotCoercibleToDate(
+            std::move(dateVar), ErrorCodes::Error{5157904}, std::move(exprName), "date"_sd));
 
         pushABT(optimizer::make<optimizer::Let>(
             std::move(dateName),
-            std::move(date),
+            std::move(dateExpression),
             optimizer::make<optimizer::Let>(
-                std::move(timezoneName), std::move(timezone), std::move(totalDayOfFunc))));
+                std::move(funcName),
+                std::move(funcCall),
+                optimizer::make<optimizer::If>(
+                    makeABTFunction("exists", funcVar),
+                    std::move(funcVar),
+                    buildABTMultiBranchConditionalFromCaseValuePairs(
+                        std::move(inputValidationCases), optimizer::Constant::nothing())))));
     }
 
     /**

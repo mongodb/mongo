@@ -405,4 +405,14 @@ TEST(WriteValueToStream, BSONCodeWScopeTest) {
     ASSERT_EQUALS(expectedString, oss.str());
 }
 
+TEST(WriteValueToStream, TimezoneTest) {
+    auto timezone = TimeZoneDatabase::utcZone();
+    auto value = value::makeCopyTimeZone(timezone);
+    std::ostringstream oss;
+    writeToStream(oss, value);
+    auto expectedString = "TimeZone(UTC)";
+    ASSERT_EQUALS(expectedString, oss.str());
+    value::releaseValue(value.first, value.second);
+}
+
 }  // namespace mongo::sbe

@@ -107,6 +107,14 @@ public:
     void benchmarkDateTruncEvaluateYear1UTCValue2020(benchmark::State& state);
     void benchmarkDateTruncEvaluateYear1NewYorkValue2100(benchmark::State& state);
 
+    void benchmarkYearNoTZ(benchmark::State& state);
+    void benchmarkYearConstTzUTC(benchmark::State& state);
+    void benchmarkYearConstTzUTCMinus0700(benchmark::State& state);
+    void benchmarkYearConstTzNewYork(benchmark::State& state);
+    void benchmarkYearUTC(benchmark::State& state);
+    void benchmarkYearUTCMinus0700(benchmark::State& state);
+    void benchmarkYearNewYork(benchmark::State& state);
+
     void benchmarkGetFieldEvaluateExpression(benchmark::State& state);
     void benchmarkGetFieldEvaluateShortSyntaxExpression(benchmark::State& state);
     void benchmarkGetFieldNestedExpression(benchmark::State& state);
@@ -161,6 +169,14 @@ private:
                                long long amount,
                                boost::optional<std::string> timezone,
                                benchmark::State& state);
+    void testDateExpressionWithVariableTimezone(std::string exprName,
+                                                Date_t date,
+                                                boost::optional<std::string> timezone,
+                                                benchmark::State& state);
+    void testDateExpressionWithConstantTimezone(std::string exprName,
+                                                Date_t date,
+                                                boost::optional<std::string> timezone,
+                                                benchmark::State& state);
     void testDateFromStringExpression(std::string dateString,
                                       boost::optional<std::string> timezone,
                                       boost::optional<std::string> format,
@@ -317,7 +333,34 @@ private:
     (benchmark::State & state) {                                                \
         benchmarkDateTruncEvaluateYear1NewYorkValue2100(state);                 \
     }                                                                           \
-                                                                                \
+    BENCHMARK_F(Fixture, YearNoTZ)                                              \
+    (benchmark::State & state) {                                                \
+        benchmarkYearNoTZ(state);                                               \
+    }                                                                           \
+    BENCHMARK_F(Fixture, YearConstTzUTC)                                        \
+    (benchmark::State & state) {                                                \
+        benchmarkYearConstTzUTC(state);                                         \
+    }                                                                           \
+    BENCHMARK_F(Fixture, YearConstTzUTCMinus0700)                               \
+    (benchmark::State & state) {                                                \
+        benchmarkYearConstTzUTCMinus0700(state);                                \
+    }                                                                           \
+    BENCHMARK_F(Fixture, YearConstTzNewYork)                                    \
+    (benchmark::State & state) {                                                \
+        benchmarkYearConstTzNewYork(state);                                     \
+    }                                                                           \
+    BENCHMARK_F(Fixture, YearUTC)                                               \
+    (benchmark::State & state) {                                                \
+        benchmarkYearUTC(state);                                                \
+    }                                                                           \
+    BENCHMARK_F(Fixture, YearUTCMinus0700)                                      \
+    (benchmark::State & state) {                                                \
+        benchmarkYearUTCMinus0700(state);                                       \
+    }                                                                           \
+    BENCHMARK_F(Fixture, YearNewYork)                                           \
+    (benchmark::State & state) {                                                \
+        benchmarkYearNewYork(state);                                            \
+    }                                                                           \
     BENCHMARK_F(Fixture, GetFieldEvaluateExpression)                            \
     (benchmark::State & state) {                                                \
         benchmarkGetFieldEvaluateExpression(state);                             \

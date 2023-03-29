@@ -1505,6 +1505,10 @@ bool maybeQueryIsColumnScanEligible(OperationContext* opCtx,
  * 'featureFlagSbeFull' being set; false otherwise.
  */
 bool shouldUseRegularSbe(const CanonicalQuery& cq) {
+    if (cq.getExpCtx()->sbeCompatibility != SbeCompatibility::fullyCompatible) {
+        return false;
+    }
+
     const auto* proj = cq.getProj();
 
     // Disallow projections which use expressions.
