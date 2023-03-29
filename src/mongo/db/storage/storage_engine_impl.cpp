@@ -1343,8 +1343,7 @@ void StorageEngineImpl::TimestampMonitor::_startup() {
                 throw;
             }
         },
-        Seconds(1),
-        false /*isKillableByStepdown*/);
+        Seconds(1));
 
     _job = _periodicRunner->makeJob(std::move(job));
     _job.start();

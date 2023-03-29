@@ -335,6 +335,9 @@ void PrimaryOnlyService::startup(OperationContext* opCtx) {
         auto client = Client::getCurrent();
         AuthorizationSession::get(*client)->grantInternalAuthorization(&cc());
 
+        stdx::lock_guard<Client> lk(*client);
+        client->setSystemOperationKillableByStepdown(lk);
+
         // Associate this Client with this PrimaryOnlyService
         primaryOnlyServiceStateForClient(client).primaryOnlyService = this;
     };

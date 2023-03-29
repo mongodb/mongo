@@ -130,6 +130,11 @@ public:
         executor::ThreadPoolMock::Options threadPoolOptions;
         threadPoolOptions.onCreateThread = [] {
             Client::initThread("TestReshardingDonorOplogIterator");
+            auto& client = cc();
+            {
+                stdx::lock_guard<Client> lk(client);
+                client.setSystemOperationKillableByStepdown(lk);
+            }
         };
 
         auto executor = executor::makeThreadPoolTestExecutor(
@@ -170,6 +175,8 @@ public:
 
     ServiceContext::UniqueClient makeKillableClient() {
         auto client = getServiceContext()->makeClient("ReshardingDonorOplogIterator");
+        stdx::lock_guard<Client> lk(*client);
+        client->setSystemOperationKillableByStepdown(lk);
         return client;
     }
 

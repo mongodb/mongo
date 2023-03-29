@@ -60,14 +60,8 @@ public:
     using JobAnchor = PeriodicJobAnchor;
 
     struct PeriodicJob {
-        PeriodicJob(std::string name,
-                    Job callable,
-                    Milliseconds period,
-                    bool isKillableByStepdown = false)
-            : name(std::move(name)),
-              job(std::move(callable)),
-              interval(period),
-              isKillableByStepdown(isKillableByStepdown) {}
+        PeriodicJob(std::string name, Job callable, Milliseconds period)
+            : name(std::move(name)), job(std::move(callable)), interval(period) {}
 
         /**
          * name of the job
@@ -83,11 +77,6 @@ public:
          * An interval at which the job should be run.
          */
         Milliseconds interval;
-
-        /**
-         * Whether this job is killable during stepdown.
-         */
-        bool isKillableByStepdown;
     };
 
     /**

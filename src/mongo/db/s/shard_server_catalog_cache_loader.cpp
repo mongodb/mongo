@@ -455,13 +455,6 @@ SemiFuture<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::getChunksS
             ThreadClient tc("ShardServerCatalogCacheLoader::getChunksSince",
                             getGlobalServiceContext());
             auto context = _contexts.makeOperationContext(*tc);
-
-            // TODO(SERVER-74658): Please revisit if this thread could be made killable.
-            {
-                stdx::lock_guard<Client> lk(*tc.get());
-                tc.get()->setSystemOperationUnKillableByStepdown(lk);
-            }
-
             {
                 // We may have missed an OperationContextGroup interrupt since this operation
                 // began but before the OperationContext was added to the group. So we'll check
@@ -502,12 +495,6 @@ SemiFuture<DatabaseType> ShardServerCatalogCacheLoader::getDatabase(StringData d
             ThreadClient tc("ShardServerCatalogCacheLoader::getDatabase",
                             getGlobalServiceContext());
             auto context = _contexts.makeOperationContext(*tc);
-
-            // TODO(SERVER-74658): Please revisit if this thread could be made killable.
-            {
-                stdx::lock_guard<Client> lk(*tc.get());
-                tc.get()->setSystemOperationUnKillableByStepdown(lk);
-            }
 
             {
                 // We may have missed an OperationContextGroup interrupt since this operation began
@@ -1063,12 +1050,6 @@ void ShardServerCatalogCacheLoader::_runCollAndChunksTasks(const NamespaceString
                     getGlobalServiceContext());
     auto context = _contexts.makeOperationContext(*tc);
 
-    // TODO(SERVER-74658): Please revisit if this thread could be made killable.
-    {
-        stdx::lock_guard<Client> lk(*tc.get());
-        tc.get()->setSystemOperationUnKillableByStepdown(lk);
-    }
-
     if (MONGO_unlikely(hangCollectionFlush.shouldFail())) {
         LOGV2(5710200, "Hit hangCollectionFlush failpoint");
         hangCollectionFlush.pauseWhileSet(context.opCtx());
@@ -1150,12 +1131,6 @@ void ShardServerCatalogCacheLoader::_runDbTasks(StringData dbName) {
 
     if (MONGO_unlikely(hangDatabaseFlush.shouldFail())) {
         hangDatabaseFlush.pauseWhileSet(context.opCtx());
-    }
-
-    // TODO(SERVER-74658): Please revisit if this thread could be made killable.
-    {
-        stdx::lock_guard<Client> lk(*tc.get());
-        tc.get()->setSystemOperationUnKillableByStepdown(lk);
     }
 
     bool taskFinished = false;

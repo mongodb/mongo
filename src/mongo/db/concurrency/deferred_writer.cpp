@@ -154,6 +154,9 @@ void DeferredWriter::startup(std::string workerName) {
     options.maxThreads = 1;
     options.onCreateThread = [](const std::string& name) {
         Client::initThread(name);
+
+        stdx::lock_guard<Client> lk(cc());
+        cc().setSystemOperationKillableByStepdown(lk);
     };
     _pool = std::make_unique<ThreadPool>(options);
     _pool->startup();

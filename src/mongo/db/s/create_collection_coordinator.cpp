@@ -320,6 +320,10 @@ void insertChunks(OperationContext* opCtx,
     {
         auto newClient =
             opCtx->getServiceContext()->makeClient("CreateCollectionCoordinator::insertChunks");
+        {
+            stdx::lock_guard<Client> lk(*newClient.get());
+            newClient->setSystemOperationKillableByStepdown(lk);
+        }
 
         AlternativeClientRegion acr(newClient);
         auto executor =

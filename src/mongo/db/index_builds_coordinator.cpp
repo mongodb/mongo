@@ -2499,13 +2499,6 @@ namespace {
 template <typename Func>
 void runOnAlternateContext(OperationContext* opCtx, std::string name, Func func) {
     auto newClient = opCtx->getServiceContext()->makeClient(name);
-
-    // TODO(SERVER-74657): Please revisit if this thread could be made killable.
-    {
-        stdx::lock_guard<Client> lk(*newClient.get());
-        newClient.get()->setSystemOperationUnKillableByStepdown(lk);
-    }
-
     AlternativeClientRegion acr(newClient);
     const auto newCtx = cc().makeOperationContext();
     func(newCtx.get());

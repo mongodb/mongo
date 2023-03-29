@@ -91,9 +91,6 @@ ThreadPool::Options makeDefaultThreadPoolOptions() {
     // Ensure all threads have a client.
     options.onCreateThread = [](const std::string& threadName) {
         Client::initThread(threadName.c_str());
-
-        stdx::lock_guard<Client> lk(cc());
-        cc().setSystemOperationUnKillableByStepdown(lk);
     };
 
     return options;

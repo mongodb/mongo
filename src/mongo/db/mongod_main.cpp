@@ -1153,9 +1153,6 @@ auto makeReplicaSetNodeExecutor(ServiceContext* serviceContext) {
     tpOptions.maxThreads = ThreadPool::Options::kUnlimited;
     tpOptions.onCreateThread = [](const std::string& threadName) {
         Client::initThread(threadName.c_str());
-
-        stdx::lock_guard<Client> lk(cc());
-        cc().setSystemOperationUnKillableByStepdown(lk);
     };
     auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
     hookList->addHook(std::make_unique<rpc::VectorClockMetadataHook>(serviceContext));
@@ -1172,9 +1169,6 @@ auto makeReplicationExecutor(ServiceContext* serviceContext) {
     tpOptions.maxThreads = 50;
     tpOptions.onCreateThread = [](const std::string& threadName) {
         Client::initThread(threadName.c_str());
-
-        stdx::lock_guard<Client> lk(cc());
-        cc().setSystemOperationUnKillableByStepdown(lk);
     };
     auto hookList = std::make_unique<rpc::EgressMetadataHookList>();
     hookList->addHook(std::make_unique<rpc::VectorClockMetadataHook>(serviceContext));
@@ -1311,12 +1305,8 @@ MONGO_INITIALIZER_GENERAL(setSSLManagerType, (), ("SSLManager"))
 void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     // This client initiation pattern is only to be used here, with plans to eliminate this pattern
     // down the line.
-    if (!haveClient()) {
+    if (!haveClient())
         Client::initThread(getThreadName());
-
-        stdx::lock_guard<Client> lk(cc());
-        cc().setSystemOperationUnKillableByStepdown(lk);
-    }
 
     auto const client = Client::getCurrent();
     auto const serviceContext = client->getServiceContext();
