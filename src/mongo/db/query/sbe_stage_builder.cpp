@@ -46,6 +46,7 @@
 #include "mongo/db/exec/sbe/stages/sorted_merge.h"
 #include "mongo/db/exec/sbe/stages/union.h"
 #include "mongo/db/exec/sbe/stages/unique.h"
+#include "mongo/db/exec/sbe/values/makeobj_spec.h"
 #include "mongo/db/exec/sbe/values/sort_spec.h"
 #include "mongo/db/exec/shard_filterer.h"
 #include "mongo/db/fts/fts_index_format.h"
@@ -202,8 +203,8 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
                 "Setting shard filterer slot on un-sharded collection",
                 collection.isSharded());
 
-        auto shardFiltererFactory = std::make_unique<ShardFiltererFactoryImpl>(collection);
-        auto shardFilterer = shardFiltererFactory->makeShardFilterer(opCtx);
+        ShardFiltererFactoryImpl shardFiltererFactory(collection);
+        auto shardFilterer = shardFiltererFactory.makeShardFilterer(opCtx);
         env->resetSlot(*shardFiltererSlot,
                        sbe::value::TypeTags::shardFilterer,
                        sbe::value::bitcastFrom<ShardFilterer*>(shardFilterer.release()),
@@ -2788,26 +2789,6 @@ SlotBasedStageBuilder::makeUnionForTailableCollScan(const QuerySolutionNode* roo
     return {std::move(unionStage), std::move(outputs)};
 }
 
-namespace {
-/**
- * Given an SBE subtree 'childStage' which computes the shard key and puts it into the given
- * 'shardKeySlot', augments the SBE plan to actually perform shard filtering. Namely, a FilterStage
- * is added at the root of the tree whose filter expression uses 'shardFiltererSlot' to determine
- * whether the shard key value in 'shardKeySlot' belongs to an owned range or not.
- */
-auto buildShardFilterGivenShardKeySlot(sbe::value::SlotId shardKeySlot,
-                                       std::unique_ptr<sbe::PlanStage> childStage,
-                                       sbe::value::SlotId shardFiltererSlot,
-                                       PlanNodeId nodeId) {
-    auto shardFilterFn = makeFunction("shardFilter",
-                                      sbe::makeE<sbe::EVariable>(shardFiltererSlot),
-                                      sbe::makeE<sbe::EVariable>(shardKeySlot));
-
-    return sbe::makeS<sbe::FilterStage<false>>(
-        std::move(childStage), std::move(shardFilterFn), nodeId);
-}
-}  // namespace
-
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots>
 SlotBasedStageBuilder::buildShardFilterCovered(const QuerySolutionNode* root,
                                                const PlanStageReqs& reqs) {
@@ -2854,11 +2835,9 @@ SlotBasedStageBuilder::buildShardFilterCovered(const QuerySolutionNode* root,
                                    ShardKeyPattern::isHashedPatternEl(ixPatternElt));
     }
 
-    // Build a project stage to deal with hashed shard keys. This step *could* be skipped if we're
-    // dealing with non-hashed sharding, but it's done this way for sake of simplicity.
-    sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projections;
-    sbe::value::SlotVector fieldSlots;
+    // Build expressions to create shard key fields and deal with hashed shard keys.
     std::vector<std::string> projectFields;
+    sbe::EExpression::Vector projectValues;
     for (auto&& shardKeyPatternElt : shardKeyPattern) {
         auto it = indexKeyPatternMap.find(shardKeyPatternElt.fieldNameStringData());
         tassert(5562303, "Could not find element", it != indexKeyPatternMap.end());
@@ -2884,32 +2863,34 @@ SlotBasedStageBuilder::buildShardFilterCovered(const QuerySolutionNode* root,
             elem = makeFunction("shardHash"_sd, std::move(elem));
         }
 
-        fieldSlots.push_back(_slotIdGenerator.generate());
         projectFields.push_back(shardKeyPatternElt.fieldName());
-        projections.emplace(fieldSlots.back(), std::move(elem));
+        projectValues.push_back(std::move(elem));
     }
 
-    auto projectStage = sbe::makeS<sbe::ProjectStage>(
-        std::move(stage), std::move(projections), filterNode->nodeId());
+    // Build an expression that creates a shard key object.
+    auto makeObjSpec =
+        makeConstant(sbe::value::TypeTags::makeObjSpec,
+                     sbe::value::bitcastFrom<sbe::value::MakeObjSpec*>(
+                         new sbe::value::MakeObjSpec(sbe::value::MakeObjSpec::FieldBehavior::drop,
+                                                     {} /* fields */,
+                                                     std::move(projectFields))));
+    auto makeObjRoot = makeConstant(sbe::value::TypeTags::Nothing, 0);
+    sbe::EExpression::Vector makeObjArgs;
+    makeObjArgs.reserve(2 + projectValues.size());
+    makeObjArgs.push_back(std::move(makeObjSpec));
+    makeObjArgs.push_back(std::move(makeObjRoot));
+    std::move(projectValues.begin(), projectValues.end(), std::back_inserter(makeObjArgs));
 
-    auto shardKeySlot = _slotIdGenerator.generate();
-    auto mkObjStage = sbe::makeS<sbe::MakeBsonObjStage>(std::move(projectStage),
-                                                        shardKeySlot,
-                                                        boost::none,
-                                                        boost::none,
-                                                        std::vector<std::string>{},
-                                                        std::move(projectFields),
-                                                        fieldSlots,
-                                                        true,
-                                                        false,
-                                                        filterNode->nodeId());
-
-    auto filterStage = buildShardFilterGivenShardKeySlot(
-        shardKeySlot, std::move(mkObjStage), shardFiltererSlot, filterNode->nodeId());
+    auto shardKeyExpression = sbe::makeE<sbe::EFunction>("makeBsonObj", std::move(makeObjArgs));
+    auto shardFilterExpression = makeFunction("shardFilter",
+                                              sbe::makeE<sbe::EVariable>(shardFiltererSlot),
+                                              std::move(shardKeyExpression));
 
     outputs.clearNonRequiredSlots(reqs);
 
-    return {std::move(filterStage), std::move(outputs)};
+    return {sbe::makeS<sbe::FilterStage<false>>(
+                std::move(stage), std::move(shardFilterExpression), root->nodeId()),
+            std::move(outputs)};
 }
 
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildShardFilter(
@@ -2931,7 +2912,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         return buildShardFilterCovered(root, reqs);
     }
 
-    auto childReqs = reqs.copy().set(kResult);
+    auto childReqs = reqs.copy();
 
     // If we're sharded make sure that we don't return data that isn't owned by the shard. This
     // situation can occur when pending documents from in-progress migrations are inserted and when
@@ -2945,72 +2926,91 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto shardFiltererSlot = _data.env->registerSlot(
         "shardFilterer"_sd, sbe::value::TypeTags::Nothing, 0, false, &_slotIdGenerator);
 
+    // Request slots for top level shard key fields and cache parsed key path.
+    std::vector<sbe::MatchPath> shardKeyPaths;
+    std::vector<bool> shardKeyHashed;
+    for (auto&& shardKeyElt : shardKeyPattern) {
+        shardKeyPaths.emplace_back(shardKeyElt.fieldNameStringData());
+        shardKeyHashed.push_back(ShardKeyPattern::isHashedPatternEl(shardKeyElt));
+        childReqs.set(std::make_pair(PlanStageSlots::kField, shardKeyPaths.back().getPart(0)));
+    }
+
     auto [stage, outputs] = build(child, childReqs);
 
     // Build an expression to extract the shard key from the document based on the shard key
     // pattern. To do this, we iterate over the shard key pattern parts and build nested 'getField'
     // expressions. This will handle single-element paths, and dotted paths for each shard key part.
-    sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projections;
-    sbe::value::SlotVector fieldSlots;
     std::vector<std::string> projectFields;
-    std::unique_ptr<sbe::EExpression> bindShardKeyPart;
+    sbe::EExpression::Vector projectValues;
 
-    for (auto&& keyPatternElem : shardKeyPattern) {
-        auto fieldRef = sbe::MatchPath{keyPatternElem.fieldNameStringData()};
-        fieldSlots.push_back(_slotIdGenerator.generate());
-        projectFields.push_back(fieldRef.dottedField().toString());
+    auto projectFrameId = _frameIdGenerator.generate();
 
-        auto currentFieldSlot = sbe::makeE<sbe::EVariable>(outputs.get(kResult));
-        auto shardKeyBinding =
-            generateShardKeyBinding(fieldRef, _frameIdGenerator, std::move(currentFieldSlot), 0);
+    projectFields.reserve(shardKeyPaths.size());
+    projectValues.reserve(shardKeyPaths.size());
+    for (size_t i = 0; i < shardKeyPaths.size(); ++i) {
+        const auto& fieldRef = shardKeyPaths[i];
+
+        auto shardKeyBinding = sbe::makeE<sbe::EVariable>(
+            outputs.get(std::make_pair(PlanStageSlots::kField, fieldRef.getPart(0))));
+        if (fieldRef.numParts() == 1) {
+            shardKeyBinding = makeFillEmptyNull(std::move(shardKeyBinding));
+        } else {
+            shardKeyBinding = sbe::makeE<sbe::EIf>(
+                makeFunction("exists"_sd, shardKeyBinding->clone()),
+                sbe::makeE<sbe::EIf>(
+                    makeFunction("isArray"_sd, shardKeyBinding->clone()),
+                    shardKeyBinding->clone(),
+                    generateShardKeyBinding(
+                        fieldRef, _frameIdGenerator, shardKeyBinding->clone(), 1 /*level*/)),
+                sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0));
+        }
 
         // If this is a hashed shard key then compute the hash value.
-        if (ShardKeyPattern::isHashedPatternEl(keyPatternElem)) {
+        if (shardKeyHashed[i]) {
             shardKeyBinding = makeFunction("shardHash"_sd, std::move(shardKeyBinding));
         }
 
-        projections.emplace(fieldSlots.back(), std::move(shardKeyBinding));
+        projectFields.push_back(fieldRef.dottedField().toString());
+        projectValues.push_back(std::move(shardKeyBinding));
     }
 
-    auto shardKeySlot{_slotIdGenerator.generate()};
-
-    // Build an object which will hold a flattened shard key from the projections above.
-    auto shardKeyObjStage = sbe::makeS<sbe::MakeBsonObjStage>(
-        sbe::makeS<sbe::ProjectStage>(std::move(stage), std::move(projections), root->nodeId()),
-        shardKeySlot,
-        boost::none,
-        boost::none,
-        std::vector<std::string>{},
-        std::move(projectFields),
-        fieldSlots,
-        true,
-        false,
-        root->nodeId());
-
-    // Build a project stage that checks if any of the fieldSlots for the shard key parts are an
-    // Array which is represented by Nothing.
-    invariant(fieldSlots.size() > 0);
-    auto arrayChecks = makeNot(sbe::makeE<sbe::EFunction>(
-        "exists", sbe::makeEs(sbe::makeE<sbe::EVariable>(fieldSlots[0]))));
-    for (size_t ind = 1; ind < fieldSlots.size(); ++ind) {
-        arrayChecks = makeBinaryOp(
-            sbe::EPrimBinary::Op::logicOr,
-            std::move(arrayChecks),
-            makeNot(makeFunction("exists", sbe::makeE<sbe::EVariable>(fieldSlots[ind]))));
+    // Build an expression that checks if any of the projectValues for the shard key parts are
+    // arrays.
+    auto arrayChecks = sbe::makeE<sbe::EFunction>(
+        "isArray", sbe::makeEs(sbe::makeE<sbe::EVariable>(projectFrameId, 0)));
+    for (size_t ind = 1; ind < projectValues.size(); ++ind) {
+        arrayChecks =
+            makeBinaryOp(sbe::EPrimBinary::Op::logicOr,
+                         std::move(arrayChecks),
+                         makeFunction("isArray", sbe::makeE<sbe::EVariable>(projectFrameId, ind)));
     }
-    arrayChecks = sbe::makeE<sbe::EIf>(std::move(arrayChecks),
-                                       sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Nothing, 0),
-                                       sbe::makeE<sbe::EVariable>(shardKeySlot));
+    auto makeObjSpec = makeConstant(
+        sbe::value::TypeTags::makeObjSpec,
+        sbe::value::bitcastFrom<sbe::value::MakeObjSpec*>(new sbe::value::MakeObjSpec(
+            sbe::value::MakeObjSpec::FieldBehavior::drop, {}, std::move(projectFields))));
+    auto makeObjRoot = makeConstant(sbe::value::TypeTags::Nothing, 0);
+    sbe::EExpression::Vector makeObjArgs;
+    makeObjArgs.reserve(2 + projectValues.size());
+    makeObjArgs.push_back(std::move(makeObjSpec));
+    makeObjArgs.push_back(std::move(makeObjRoot));
+    for (size_t ind = 0; ind < projectValues.size(); ++ind) {
+        makeObjArgs.push_back(sbe::makeE<sbe::EVariable>(projectFrameId, ind));
+    }
+    auto shardKeyExpression =
+        sbe::makeE<sbe::EIf>(std::move(arrayChecks),
+                             sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Nothing, 0),
+                             sbe::makeE<sbe::EFunction>("makeBsonObj", std::move(makeObjArgs)));
 
-    auto finalShardKeySlot{_slotIdGenerator.generate()};
-
-    auto finalShardKeyObjStage = makeProjectStage(
-        std::move(shardKeyObjStage), root->nodeId(), finalShardKeySlot, std::move(arrayChecks));
-
-    return {
-        buildShardFilterGivenShardKeySlot(
-            finalShardKeySlot, std::move(finalShardKeyObjStage), shardFiltererSlot, root->nodeId()),
-        std::move(outputs)};
+    auto shardFilterExpression =
+        sbe::makeE<sbe::ELocalBind>(projectFrameId,
+                                    std::move(projectValues),
+                                    makeFunction("shardFilter",
+                                                 sbe::makeE<sbe::EVariable>(shardFiltererSlot),
+                                                 std::move(shardKeyExpression)));
+    outputs.clearNonRequiredSlots(reqs);
+    return {sbe::makeS<sbe::FilterStage<false>>(
+                std::move(stage), std::move(shardFilterExpression), root->nodeId()),
+            std::move(outputs)};
 }
 
 const CollectionPtr& SlotBasedStageBuilder::getCurrentCollection(const PlanStageReqs& reqs) const {

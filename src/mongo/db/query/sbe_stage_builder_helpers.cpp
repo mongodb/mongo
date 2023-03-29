@@ -292,14 +292,6 @@ std::unique_ptr<sbe::EExpression> makeFillEmptyUndefined(std::unique_ptr<sbe::EE
                         sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::bsonUndefined, 0));
 }
 
-std::unique_ptr<sbe::EExpression> makeNothingArrayCheck(
-    std::unique_ptr<sbe::EExpression> isArrayInput, std::unique_ptr<sbe::EExpression> otherwise) {
-    using namespace std::literals;
-    return sbe::makeE<sbe::EIf>(makeFunction("isArray"_sd, std::move(isArrayInput)),
-                                sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Nothing, 0),
-                                std::move(otherwise));
-}
-
 std::unique_ptr<sbe::EExpression> generateShardKeyBinding(
     const sbe::MatchPath& keyPatternField,
     sbe::value::FrameIdGenerator& frameIdGenerator,
@@ -315,10 +307,7 @@ std::unique_ptr<sbe::EExpression> generateShardKeyBinding(
     if (level == keyPatternField.numParts() - 1) {
         auto frameId = frameIdGenerator.generate();
         auto bindSlot = sbe::makeE<sbe::EVariable>(frameId, 0);
-        return sbe::makeE<sbe::ELocalBind>(
-            frameId,
-            sbe::makeEs(makeGetFieldKeyPattern(std::move(inputExpr))),
-            makeNothingArrayCheck(bindSlot->clone(), bindSlot->clone()));
+        return makeGetFieldKeyPattern(std::move(inputExpr));
     }
 
     auto frameId = frameIdGenerator.generate();
@@ -328,8 +317,10 @@ std::unique_ptr<sbe::EExpression> generateShardKeyBinding(
 
     return sbe::makeE<sbe::ELocalBind>(
         frameId,
-        sbe::makeEs(makeGetFieldKeyPattern(inputExpr->clone())),
-        makeNothingArrayCheck(nextSlot->clone(), std::move(shardKeyBinding)));
+        sbe::makeEs(makeGetFieldKeyPattern(std::move(inputExpr))),
+        sbe::makeE<sbe::EIf>(makeFunction("isArray"_sd, nextSlot->clone()),
+                             nextSlot->clone(),
+                             std::move(shardKeyBinding)));
 }
 
 EvalStage makeLimitCoScanStage(PlanNodeId planNodeId, long long limit) {

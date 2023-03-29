@@ -250,12 +250,6 @@ std::unique_ptr<sbe::EExpression> makeFillEmptyNull(std::unique_ptr<sbe::EExpres
 std::unique_ptr<sbe::EExpression> makeFillEmptyUndefined(std::unique_ptr<sbe::EExpression> e);
 
 /**
- * Check if expression returns an array and return Nothing if so. Otherwise, return the expression.
- */
-std::unique_ptr<sbe::EExpression> makeNothingArrayCheck(
-    std::unique_ptr<sbe::EExpression> isArrayInput, std::unique_ptr<sbe::EExpression> otherwise);
-
-/**
  * Makes "newObj" function from variadic parameter pack of 'FieldPair' which is a pair of a field
  * name and field expression.
  */
@@ -320,14 +314,14 @@ std::unique_ptr<sbe::EExpression> makeNewObjFunction(FieldPair field, Ts... fiel
 /**
  * Creates an expression to extract a shard key part from inputExpr. The generated expression is a
  * let binding that binds a getField expression to extract the shard key part value from the
- * inputExpr. The entire let binding evaluates to a constant expression carrying the Nothing value
- * if the binding is an array. Otherwise, it evaluates to a fillEmpty null expression. Here is an
- * example expression generated from this function for a shard key pattern {'a.b': 1}:
+ * inputExpr. If the binding is an array, the array is returned. This is done so caller can check
+ * for array and generate an empty shard key. Here is an example expression generated from this
+ * function for a shard key pattern {'a.b.c': 1}:
  *
- * let [l1.0 = getField (s1, "a")]
- *   if (isArray (l1.0), NOTHING,
- *     let [l2.0 = getField (l1.0, "b")]
- *       if (isArray (l2.0), NOTHING, fillEmpty (l2.0, null)))
+ * let [l1.0 = getField (s1, "a") ?: null]
+ *   if (isArray (l1.0), l1.0,
+ *     let [l2.0 = getField (l1.0, "b") ?: null]
+ *       if (isArray (l2.0), l2.0, getField (l2.0, "c") ?: null))
  */
 std::unique_ptr<sbe::EExpression> generateShardKeyBinding(
     const sbe::MatchPath& keyPatternField,

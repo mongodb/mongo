@@ -5154,7 +5154,6 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSortKeyComponent
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinMakeBsonObj(ArityType arity) {
-    invariant(arity >= 2);
     tassert(6897002,
             str::stream() << "Unsupported number of arguments passed to makeBsonObj(): " << arity,
             arity >= 2);
