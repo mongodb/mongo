@@ -204,7 +204,9 @@ void _removeDatabaseFromCatalog(OperationContext* opCtx, StringData dbName) {
     // twice.
     if (db) {
         auto databaseHolder = DatabaseHolder::get(opCtx);
+        WriteUnitOfWork wuow(opCtx);
         databaseHolder->dropDb(opCtx, db);
+        wuow.commit();
     }
 }
 

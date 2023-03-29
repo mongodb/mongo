@@ -407,7 +407,9 @@ Status StorageInterfaceImpl::dropReplicatedDatabases(OperationContext* opCtx) {
         }
         writeConflictRetry(opCtx, "dropReplicatedDatabases", dbName.toString(), [&] {
             if (auto db = databaseHolder->getDb(opCtx, dbName)) {
+                WriteUnitOfWork wuow(opCtx);
                 databaseHolder->dropDb(opCtx, db);
+                wuow.commit();
             } else {
                 // This is needed since dropDatabase can't be rolled back.
                 // This is safe be replaced by "invariant(db);dropDatabase(opCtx, db);" once fixed.

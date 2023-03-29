@@ -51,7 +51,9 @@ void dropDatabase(OperationContext* opCtx, const NamespaceString& nss) {
     auto db = databaseHolder->getDb(opCtx, nss.dbName());
 
     if (db) {
+        WriteUnitOfWork wuow(opCtx);
         databaseHolder->dropDb(opCtx, db);
+        wuow.commit();
     }
 }
 

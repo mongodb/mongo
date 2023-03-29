@@ -58,6 +58,7 @@ namespace mongo {
 MONGO_FAIL_POINT_DEFINE(dropDatabaseHangAfterAllCollectionsDrop);
 MONGO_FAIL_POINT_DEFINE(dropDatabaseHangBeforeInMemoryDrop);
 MONGO_FAIL_POINT_DEFINE(dropDatabaseHangAfterWaitingForIndexBuilds);
+MONGO_FAIL_POINT_DEFINE(throwWriteConflictExceptionDuringDropDatabase);
 
 namespace {
 
@@ -117,14 +118,15 @@ void _finishDropDatabase(OperationContext* opCtx,
         databaseHolder->dropDb(opCtx, db);
         dropPendingGuard.dismiss();
 
-        wunit.commit();
+        if (MONGO_unlikely(throwWriteConflictExceptionDuringDropDatabase.shouldFail())) {
+            throwWriteConflictException(
+                "Write conflict due to throwWriteConflictExceptionDuringDropDatabase fail point");
+        }
 
-        LOGV2(20336,
-              "dropDatabase {dbName} - finished, dropped {numCollections} collection(s)",
-              "dropDatabase",
-              logAttrs(dbName),
-              "numCollectionsDropped"_attr = numCollections);
+        wunit.commit();
     });
+
+    LOGV2(20336, "dropDatabase", logAttrs(dbName), "numCollectionsDropped"_attr = numCollections);
 }
 
 Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool abortIndexBuilds) {

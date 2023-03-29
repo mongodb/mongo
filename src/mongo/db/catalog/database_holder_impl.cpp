@@ -169,6 +169,7 @@ Database* DatabaseHolderImpl::openDb(OperationContext* opCtx,
 
 void DatabaseHolderImpl::dropDb(OperationContext* opCtx, Database* db) {
     invariant(db);
+    invariant(opCtx->lockState()->inAWriteUnitOfWork());
 
     // Store the name so we have if for after the db object is deleted
     auto name = db->name();
@@ -220,7 +221,13 @@ void DatabaseHolderImpl::dropDb(OperationContext* opCtx, Database* db) {
     // Clean up the in-memory database state.
     CollectionCatalog::write(
         opCtx, [&](CollectionCatalog& catalog) { catalog.clearDatabaseProfileSettings(name); });
-    close(opCtx, name);
+
+    // close() is called as part of the onCommit handler as it frees the memory pointed to by 'db'.
+    // We need to keep this memory valid until the transaction successfully commits.
+    opCtx->recoveryUnit()->onCommit(
+        [this, name = name](OperationContext* opCtx, boost::optional<Timestamp>) {
+            close(opCtx, name);
+        });
 
     auto const storageEngine = serviceContext->getStorageEngine();
     writeConflictRetry(opCtx, "dropDatabase", name.toString(), [&] {
