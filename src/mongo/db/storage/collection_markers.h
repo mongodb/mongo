@@ -240,7 +240,7 @@ protected:
         return _markers;
     }
 
-    void pokeReclaimThreadIfNeeded(OperationContext* opCtx);
+    void pokeReclaimThread(OperationContext* opCtx);
 
     Marker& createNewMarker(const RecordId& lastRecord, Date_t wallTime);
 };

@@ -261,7 +261,7 @@ void WiredTigerRecordStore::OplogTruncateMarkers::adjust(OperationContext* opCtx
     size_t numTruncateMarkersToKeep = std::min(
         kMaxTruncateMarkersToKeep, std::max(kMinTruncateMarkersToKeep, numTruncateMarkers));
     setMinBytesPerMarker(maxSize / numTruncateMarkersToKeep);
-    pokeReclaimThreadIfNeeded(opCtx);
+    pokeReclaimThread(opCtx);
 }
 
 StatusWith<std::string> WiredTigerRecordStore::parseOptionsField(const BSONObj options) {

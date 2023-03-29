@@ -156,7 +156,7 @@ void CollectionTruncateMarkers::createNewMarkerIfNeeded(OperationContext* opCtx,
                 "wallTime"_attr = marker.wallTime,
                 "numMarkers"_attr = _markers.size());
 
-    pokeReclaimThreadIfNeeded(opCtx);
+    pokeReclaimThread(opCtx);
 }
 
 
@@ -233,10 +233,8 @@ void CollectionTruncateMarkers::setMinBytesPerMarker(int64_t size) {
 }
 
 
-void CollectionTruncateMarkers::pokeReclaimThreadIfNeeded(OperationContext* opCtx) {
-    if (_hasExcessMarkers(opCtx)) {
-        _reclaimCv.notify_one();
-    }
+void CollectionTruncateMarkers::pokeReclaimThread(OperationContext* opCtx) {
+    _reclaimCv.notify_one();
 }
 
 CollectionTruncateMarkers::InitialSetOfMarkers CollectionTruncateMarkers::createMarkersByScanning(
@@ -565,7 +563,7 @@ void CollectionTruncateMarkersWithPartialExpiration::createPartialMarkerIfNecess
                     "lastRecord"_attr = marker.lastRecord,
                     "wallTime"_attr = marker.wallTime,
                     "numMarkers"_attr = _markers.size());
-        pokeReclaimThreadIfNeeded(opCtx);
+        pokeReclaimThread(opCtx);
     }
 }
 
