@@ -93,7 +93,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/db/stats/server_read_concern_write_concern_metrics',
         '$BUILD_DIR/mongo/db/transaction/transaction',
-        '$BUILD_DIR/mongo/db/write_stage_common',
         '$BUILD_DIR/mongo/rpc/command_status',
         '$BUILD_DIR/mongo/s/common_s',
         '$BUILD_DIR/mongo/util/namespace_string_database_name_util',

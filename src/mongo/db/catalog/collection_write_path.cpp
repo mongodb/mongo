@@ -35,7 +35,9 @@
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/local_oplog_info.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/exec/write_stage_common.h"
 #include "mongo/db/op_observer/op_observer.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/logv2/log.h"
@@ -96,6 +98,61 @@ std::vector<OplogSlot> reserveOplogSlotsForRetryableFindAndModify(OperationConte
     auto slots = oplogInfo->getNextOpTimes(opCtx, 2);
     uassertStatusOK(opCtx->recoveryUnit()->setTimestamp(slots.back().getTimestamp()));
     return slots;
+}
+
+/**
+ * Returns an array of 'fromMigrate' values for a range of insert operations.
+ * The 'fromMigrate' oplog entry field is used to identify operations that are a result
+ * of chunk migration and should not generate change stream events.
+ * Accepts a default 'fromMigrate' value that determines if there is a need to check
+ * each insert operation individually.
+ * See SERVER-62581 and SERVER-65858.
+ */
+std::vector<bool> makeFromMigrateForInserts(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const std::vector<InsertStatement>::const_iterator begin,
+    const std::vector<InsertStatement>::const_iterator end,
+    bool defaultFromMigrate) {
+    auto count = std::distance(begin, end);
+    std::vector fromMigrate(count, defaultFromMigrate);
+    if (defaultFromMigrate) {
+        return fromMigrate;
+    }
+
+    // 'fromMigrate' is an oplog entry field. If we do not need to write this operation to
+    // the oplog, there is no reason to proceed with the orphan document check.
+    if (repl::ReplicationCoordinator::get(opCtx)->isOplogDisabledFor(opCtx, nss)) {
+        return fromMigrate;
+    }
+
+    // Overriding the 'fromMigrate' flag makes sense only for requests coming from clients
+    // directly connected to shards.
+    if (OperationShardingState::isComingFromRouter(opCtx)) {
+        return fromMigrate;
+    }
+
+    // This is used to check whether the write should be performed, and if so, any other
+    // behavior that should be done as part of the write (e.g. skipping it because it affects an
+    // orphan document).
+    write_stage_common::PreWriteFilter preWriteFilter(opCtx, nss);
+
+    for (decltype(count) i = 0; i < count; i++) {
+        auto& insertStmt = begin[i];
+        if (preWriteFilter.computeAction(Document(insertStmt.doc)) ==
+            write_stage_common::PreWriteFilter::Action::kWriteAsFromMigrate) {
+            LOGV2_DEBUG(7458900,
+                        3,
+                        "Marking insert operation of orphan document with the 'fromMigrate' flag "
+                        "to prevent a wrong change stream event",
+                        "namespace"_attr = nss,
+                        "document"_attr = insertStmt.doc);
+
+            fromMigrate[i] = true;
+        }
+    }
+
+    return fromMigrate;
 }
 
 Status insertDocumentsImpl(OperationContext* opCtx,
@@ -234,7 +291,7 @@ Status insertDocumentsImpl(OperationContext* opCtx,
             collection,
             begin,
             end,
-            /*fromMigrate=*/std::vector<bool>(std::distance(begin, end), fromMigrate),
+            /*fromMigrate=*/makeFromMigrateForInserts(opCtx, nss, begin, end, fromMigrate),
             /*defaultFromMigrate=*/fromMigrate);
     }
 

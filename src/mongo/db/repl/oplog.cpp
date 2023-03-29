@@ -65,7 +65,6 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/exec/write_stage_common.h"
 #include "mongo/db/global_index.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -579,8 +578,6 @@ std::vector<OpTime> logInsertOps(
     AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kLogOp);
     auto oplogInfo = oplogWrite.getOplogInfo();
 
-    write_stage_common::PreWriteFilter preWriteFilter(opCtx, nss);
-
     WriteUnitOfWork wuow(opCtx);
 
     std::vector<OpTime> opTimes(count);
@@ -601,7 +598,6 @@ std::vector<OpTime> logInsertOps(
         oplogEntry.setObject2(docKey);
         oplogEntry.setOpTime(insertStatementOplogSlot);
         oplogEntry.setDestinedRecipient(getDestinedRecipientFn(begin[i].doc));
-        oplogEntry.setFromMigrateIfTrue(fromMigrate[i]);
         addDestinedRecipient.execute([&](const BSONObj& data) {
             auto recipient = data["destinedRecipient"].String();
             oplogEntry.setDestinedRecipient(boost::make_optional<ShardId>({recipient}));
@@ -611,20 +607,8 @@ std::vector<OpTime> logInsertOps(
         if (i > 0)
             oplogLink.prevOpTime = opTimes[i - 1];
 
-        // Direct inserts to shards of orphan documents should not generate change stream events.
-        if (!oplogEntry.getFromMigrate().value_or(false) &&
-            !OperationShardingState::isComingFromRouter(opCtx) &&
-            preWriteFilter.computeAction(Document(begin[i].doc)) ==
-                write_stage_common::PreWriteFilter::Action::kWriteAsFromMigrate) {
-            LOGV2_DEBUG(6258100,
-                        3,
-                        "Marking insert operation of orphan document with the 'fromMigrate' flag "
-                        "to prevent a wrong change stream event",
-                        "namespace"_attr = nss,
-                        "document"_attr = begin[i].doc);
+        oplogEntry.setFromMigrateIfTrue(fromMigrate[i]);
 
-            oplogEntry.setFromMigrate(true);
-        }
         appendOplogEntryChainInfo(opCtx, &oplogEntry, &oplogLink, begin[i].stmtIds);
 
         opTimes[i] = insertStatementOplogSlot;

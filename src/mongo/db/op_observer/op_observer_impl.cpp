@@ -48,7 +48,6 @@
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/create_indexes_gen.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/exec/write_stage_common.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/keys_collection_document_gen.h"
 #include "mongo/db/logical_time_validator.h"
@@ -591,26 +590,13 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
     if (inBatchedWrite) {
         invariant(!defaultFromMigrate);
 
-        write_stage_common::PreWriteFilter preWriteFilter(opCtx, nss);
-
         for (auto iter = first; iter != last; iter++) {
             const auto docKey = repl::getDocumentKey(opCtx, coll, iter->doc).getShardKeyAndId();
             auto operation = MutableOplogEntry::makeInsertOperation(nss, uuid, iter->doc, docKey);
             operation.setDestinedRecipient(
                 shardingWriteRouter.getReshardingDestinedRecipient(iter->doc));
 
-            if (!OperationShardingState::isComingFromRouter(opCtx) &&
-                preWriteFilter.computeAction(Document(iter->doc)) ==
-                    write_stage_common::PreWriteFilter::Action::kWriteAsFromMigrate) {
-                LOGV2_DEBUG(6585800,
-                            3,
-                            "Marking insert operation of orphan document with the 'fromMigrate' "
-                            "flag to prevent a wrong change stream event",
-                            "namespace"_attr = nss,
-                            "document"_attr = iter->doc);
-
-                operation.setFromMigrate(true);
-            }
+            operation.setFromMigrateIfTrue(fromMigrate[std::distance(first, iter)]);
 
             batchedWriteContext.addBatchedOperation(opCtx, operation);
         }
@@ -627,7 +613,6 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
 
         const bool inRetryableInternalTransaction =
             isInternalSessionForRetryableWrite(*opCtx->getLogicalSessionId());
-        write_stage_common::PreWriteFilter preWriteFilter(opCtx, nss);
 
         for (auto iter = first; iter != last; iter++) {
             const auto docKey = repl::getDocumentKey(opCtx, coll, iter->doc).getShardKeyAndId();
@@ -638,18 +623,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
             operation.setDestinedRecipient(
                 shardingWriteRouter.getReshardingDestinedRecipient(iter->doc));
 
-            if (!OperationShardingState::isComingFromRouter(opCtx) &&
-                preWriteFilter.computeAction(Document(iter->doc)) ==
-                    write_stage_common::PreWriteFilter::Action::kWriteAsFromMigrate) {
-                LOGV2_DEBUG(6585801,
-                            3,
-                            "Marking insert operation of orphan document with the 'fromMigrate' "
-                            "flag to prevent a wrong change stream event",
-                            "namespace"_attr = nss,
-                            "document"_attr = iter->doc);
-
-                operation.setFromMigrate(true);
-            }
+            operation.setFromMigrateIfTrue(fromMigrate[std::distance(first, iter)]);
 
             txnParticipant.addTransactionOperation(opCtx, operation);
         }
