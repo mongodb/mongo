@@ -465,9 +465,9 @@ void _validateCatalogEntry(OperationContext* opCtx,
         const IndexCatalogEntry* indexEntry = indexIt->next();
         const std::string indexName = indexEntry->descriptor()->indexName();
 
-        Status status =
-            index_key_validate::validateIndexSpec(opCtx, indexEntry->descriptor()->infoObj())
-                .getStatus();
+        Status status = index_key_validate::validateIndexSpec(
+                            opCtx, indexEntry->descriptor()->infoObj(), true /* inCollValidation */)
+                            .getStatus();
         if (!status.isOK()) {
             results->valid = false;
             results->errors.push_back(

@@ -83,16 +83,28 @@ static std::set<StringData> allowedFieldNames = {
 
 /**
  * Checks if the key is valid for building an index according to the validation rules for the given
- * index version.
+ * index version. If 'inCollValidation' is true we skip checking FCV for compound wildcard indexes
+ * validation.
+ *
+ * TODO SERVER-68303: Consider removing 'inCollValidation' flag when 'CompoundWildcardIndexes'
+ * feature flag is removed.
  */
-Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion indexVersion);
+Status validateKeyPattern(const BSONObj& key,
+                          IndexDescriptor::IndexVersion indexVersion,
+                          bool inCollValidation = false);
 
 /**
  * Validates the index specification 'indexSpec' and returns an equivalent index specification that
  * has any missing attributes filled in. If the index specification is malformed, then an error
- * status is returned.
+ * status is returned. If 'inCollValidation' is true we skip checking FCV for compound wildcard
+ * indexes validation.
+ *
+ * TODO SERVER-68303: Consider removing 'inCollValidation' flag when 'CompoundWildcardIndexes'
+ * feature flag is removed.
  */
-StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& indexSpec);
+StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx,
+                                      const BSONObj& indexSpec,
+                                      bool inCollValidation = false);
 
 /**
  * Returns a new index spec with any unknown field names removed from 'indexSpec'.

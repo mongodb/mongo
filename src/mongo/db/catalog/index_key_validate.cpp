@@ -133,7 +133,9 @@ BSONObj buildRepairedIndexSpec(
 }
 }  // namespace
 
-Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion indexVersion) {
+Status validateKeyPattern(const BSONObj& key,
+                          IndexDescriptor::IndexVersion indexVersion,
+                          bool inCollValidation) {
     const ErrorCodes::Error code = ErrorCodes::CannotCreateIndex;
 
     if (key.objsize() > 2048)
@@ -154,7 +156,7 @@ Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion inde
 
     auto compoundWildcardIndexesAllowed =
         feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabledAndIgnoreFCV();
-    if (serverGlobalParams.featureCompatibility.isVersionInitialized()) {
+    if (serverGlobalParams.featureCompatibility.isVersionInitialized() && !inCollValidation) {
         compoundWildcardIndexesAllowed =
             feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabled(
                 serverGlobalParams.featureCompatibility);
@@ -330,7 +332,9 @@ BSONObj repairIndexSpec(const NamespaceString& ns,
     return buildRepairedIndexSpec(ns, indexSpec, allowedFieldNames, fixIndexSpecFn);
 }
 
-StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& indexSpec) {
+StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx,
+                                      const BSONObj& indexSpec,
+                                      bool inCollValidation) {
     bool hasKeyPatternField = false;
     bool hasIndexNameField = false;
     bool hasNamespaceField = false;
@@ -383,8 +387,8 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& in
 
             // Here we always validate the key pattern according to the most recent rules, in order
             // to enforce that all new indexes have well-formed key patterns.
-            Status keyPatternValidateStatus =
-                validateKeyPattern(keyPattern, IndexDescriptor::kLatestIndexVersion);
+            Status keyPatternValidateStatus = validateKeyPattern(
+                keyPattern, IndexDescriptor::kLatestIndexVersion, inCollValidation);
             if (!keyPatternValidateStatus.isOK()) {
                 return keyPatternValidateStatus;
             }
@@ -729,8 +733,10 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& in
     }
 
     if (hasOriginalSpecField) {
-        StatusWith<BSONObj> modifiedOriginalSpec = validateIndexSpec(
-            opCtx, indexSpec.getObjectField(IndexDescriptor::kOriginalSpecFieldName));
+        StatusWith<BSONObj> modifiedOriginalSpec =
+            validateIndexSpec(opCtx,
+                              indexSpec.getObjectField(IndexDescriptor::kOriginalSpecFieldName),
+                              inCollValidation);
         if (!modifiedOriginalSpec.isOK()) {
             return modifiedOriginalSpec.getStatus();
         }
