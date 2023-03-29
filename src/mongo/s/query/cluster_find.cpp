@@ -83,11 +83,6 @@ static const BSONObj kSortKeyMetaProjection = BSON("$meta"
                                                    << "sortKey");
 static const BSONObj kGeoNearDistanceMetaProjection = BSON("$meta"
                                                            << "geoNearDistance");
-// We must allow some amount of overhead per result document, since when we make a cursor response
-// the documents are elements of a BSONArray. The overhead is 1 byte/doc for the type + 1 byte/doc
-// for the field name's null terminator + 1 byte per digit in the array index. The index can be no
-// more than 8 decimal digits since the response is at most 16MB, and 16 * 1024 * 1024 < 1 * 10^8.
-static const int kPerDocumentOverheadBytesUpperBound = 10;
 
 const char kFindCmdName[] = "find";
 
@@ -339,7 +334,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
     FindCommon::waitInFindBeforeMakingBatch(opCtx, query);
 
     auto cursorState = ClusterCursorManager::CursorState::NotExhausted;
-    size_t bytesBuffered = 0;
+    FindCommon::BSONArrayResponseSizeTracker responseSizeTracker;
 
     // This loop will not result in actually calling getMore against shards, but just loading
     // results from the initial batches (that were obtained while establishing cursors) into
@@ -362,14 +357,13 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
 
         // If adding this object will cause us to exceed the message size limit, then we stash it
         // for later.
-        if (!FindCommon::haveSpaceForNext(nextObj, results->size(), bytesBuffered)) {
+        if (!responseSizeTracker.haveSpaceForNext(nextObj)) {
             ccc->queueResult(nextObj);
             break;
         }
 
-        // Add doc to the batch. Account for the space overhead associated with returning this doc
-        // inside a BSON array.
-        bytesBuffered += (nextObj.objsize() + kPerDocumentOverheadBytesUpperBound);
+        // Add doc to the batch.
+        responseSizeTracker.add(nextObj);
         results->push_back(std::move(nextObj));
     }
 
@@ -768,7 +762,7 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
     }
 
     std::vector<BSONObj> batch;
-    size_t bytesBuffered = 0;
+    FindCommon::BSONArrayResponseSizeTracker responseSizeTracker;
     long long batchSize = cmd.getBatchSize().value_or(0);
     auto cursorState = ClusterCursorManager::CursorState::NotExhausted;
     BSONObj postBatchResumeToken;
@@ -821,8 +815,7 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
             break;
         }
 
-        if (!FindCommon::haveSpaceForNext(
-                *next.getValue().getResult(), batch.size(), bytesBuffered)) {
+        if (!responseSizeTracker.haveSpaceForNext(*next.getValue().getResult())) {
             pinnedCursor.getValue()->queueResult(*next.getValue().getResult());
             stashedResult = true;
             break;
@@ -831,10 +824,8 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
         // As soon as we get a result, this operation no longer waits.
         awaitDataState(opCtx).shouldWaitForInserts = false;
 
-        // Add doc to the batch. Account for the space overhead associated with returning this doc
-        // inside a BSON array.
-        bytesBuffered +=
-            (next.getValue().getResult()->objsize() + kPerDocumentOverheadBytesUpperBound);
+        // Add doc to the batch.
+        responseSizeTracker.add(*next.getValue().getResult());
         batch.push_back(std::move(*next.getValue().getResult()));
 
         // Update the postBatchResumeToken. For non-$changeStream aggregations, this will be empty.
