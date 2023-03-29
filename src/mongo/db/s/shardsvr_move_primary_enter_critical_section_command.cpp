@@ -31,6 +31,7 @@
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/transaction/transaction_participant.h"
@@ -78,6 +79,11 @@ public:
                 const auto& dbName = request().getCommandParameter();
                 const auto& csReason = request().getReason();
 
+                // Waiting for the critical section on the database to complete is necessary to
+                // avoid the risk of invariant by attempting to enter the critical section as a
+                // dropDatabase operation may have already entered it.
+                waitForCriticalSectionToComplete(opCtx, dbName);
+
                 ShardingRecoveryService::get(newOpCtx.get())
                     ->acquireRecoverableCriticalSectionBlockWrites(
                         newOpCtx.get(),
@@ -118,6 +124,21 @@ public:
                     AuthorizationSession::get(opCtx->getClient())
                         ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
                                                            ActionType::internal));
+        }
+
+        void waitForCriticalSectionToComplete(OperationContext* opCtx, const DatabaseName& dbName) {
+            boost::optional<SharedSemiFuture<void>> criticalSectionSignal = [&]() {
+                Lock::DBLock dbLock(opCtx, dbName, MODE_IS);
+                const auto scopedDss =
+                    DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, dbName);
+
+                return scopedDss->getCriticalSectionSignal(
+                    ShardingMigrationCriticalSection::kWrite);
+            }();
+
+            if (criticalSectionSignal) {
+                criticalSectionSignal->get(opCtx);
+            }
         }
     };
 
