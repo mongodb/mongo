@@ -31,7 +31,8 @@
 #include <sys/wait.h>
 #endif
 
-#ifdef __linux__
+#if defined(__APPLE__) || defined(__linux__)
+#include <dirent.h>
 #include <libgen.h>
 #endif
 
@@ -290,6 +291,59 @@ testutil_copy_data(const char *dir)
       "rm -rf ../%s.SAVE && mkdir ../%s.SAVE && cp -rp * ../%s.SAVE", dir, dir, dir));
     if ((status = system(buf)) < 0)
         testutil_die(status, "system: %s", buf);
+}
+
+/*
+ * testutil_copy_data_opt --
+ *     Copy the data to a backup folder. Directories and files with the specified "readonly prefix"
+ *     will be hard-linked instead of copied for efficiency on supported platforms.
+ */
+void
+testutil_copy_data_opt(const char *dir, const char *readonly_prefix)
+{
+#if defined(__APPLE__) || defined(__linux__)
+    struct dirent *e;
+    char to_copy[2048];
+    char to_link[2048];
+    DIR *d;
+
+    to_copy[0] = '\0';
+    to_link[0] = '\0';
+
+    testutil_system("rm -rf ../%s.SAVE && mkdir ../%s.SAVE", dir, dir);
+
+    testutil_assert_errno((d = opendir(".")) != NULL);
+    while ((e = readdir(d)) != NULL) {
+        if (e->d_name[0] == '.')
+            continue;
+
+        if (readonly_prefix != NULL &&
+          strncmp(e->d_name, readonly_prefix, strlen(readonly_prefix)) == 0) {
+            if (strlen(to_link) + strlen(e->d_name) + 2 >= sizeof(to_link)) {
+                testutil_system("cp -rp -l %s ../%s.SAVE", to_link, dir);
+                to_link[0] = '\0';
+            }
+            strcat(to_link, " ");
+            strcat(to_link, e->d_name);
+        } else {
+            if (strlen(to_copy) + strlen(e->d_name) + 2 >= sizeof(to_copy)) {
+                testutil_system("cp -rp %s ../%s.SAVE", to_copy, dir);
+                to_copy[0] = '\0';
+            }
+            strcat(to_copy, " ");
+            strcat(to_copy, e->d_name);
+        }
+    }
+    testutil_check(closedir(d));
+
+    if (to_copy[0] != '\0')
+        testutil_system("cp -rp %s ../%s.SAVE", to_copy, dir);
+    if (to_link[0] != '\0')
+        testutil_system("cp -rp -l %s ../%s.SAVE", to_link, dir);
+#else
+    WT_UNUSED(readonly_prefix);
+    testutil_copy_data(dir);
+#endif
 }
 
 /*
