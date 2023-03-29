@@ -368,7 +368,7 @@ TEST_F(CollectionMarkersTest, ScanningMarkerCreation) {
         AutoGetCollection coll(opCtx.get(), collNs, MODE_IS);
 
         auto result = CollectionTruncateMarkers::createMarkersByScanning(
-            opCtx.get(), coll->getRecordStore(), kMinBytes, [](const Record& record) {
+            opCtx.get(), coll->getRecordStore(), collNs, kMinBytes, [](const Record& record) {
                 return CollectionTruncateMarkers::RecordIdAndWallTime{record.id, Date_t::now()};
             });
         ASSERT_EQ(result.leftoverRecordsBytes, kElementSize);
@@ -412,7 +412,11 @@ TEST_F(CollectionMarkersTest, SamplingMarkerCreation) {
         auto kRecordsPerMarker = totalRecords / kNumMarkers;
 
         auto result = CollectionTruncateMarkers::createFromExistingRecordStore(
-            opCtx.get(), coll->getRecordStore(), kMinBytesPerMarker, [](const Record& record) {
+            opCtx.get(),
+            coll->getRecordStore(),
+            collNs,
+            kMinBytesPerMarker,
+            [](const Record& record) {
                 return CollectionTruncateMarkers::RecordIdAndWallTime{record.id, Date_t::now()};
             });
 

@@ -945,7 +945,7 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_NoMarkersGeneratedFromScann
 
     // Initialize the truncate markers.
     ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-    wtrs->postConstructorInit(opCtx.get());
+    wtrs->postConstructorInit(opCtx.get(), NamespaceString::kRsOplogNamespace);
 
     auto oplogTruncateMarkers = wtrs->oplogTruncateMarkers();
     ASSERT_FALSE(oplogTruncateMarkers->processedBySampling());
@@ -991,7 +991,7 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_Duplicates) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         wtrs->setNumRecords(1024 * 1024);
         wtrs->setDataSize(1024 * 1024 * 1024);
-        wtrs->postConstructorInit(opCtx.get());
+        wtrs->postConstructorInit(opCtx.get(), NamespaceString::kRsOplogNamespace);
     }
 
     auto oplogTruncateMarkers = wtrs->oplogTruncateMarkers();
@@ -1289,6 +1289,7 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
 
     WiredTigerRecordStore::Params params;
     params.nss = nss;
+    params.uuid = boost::none;
     params.ident = ns;
     params.engineName = kWiredTigerEngineName;
     params.isCapped = false;
@@ -1302,7 +1303,7 @@ TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
 
     const auto wtKvEngine = dynamic_cast<WiredTigerKVEngine*>(harnessHelper->getEngine());
     auto rs = std::make_unique<StandardWiredTigerRecordStore>(wtKvEngine, opCtx.get(), params);
-    rs->postConstructorInit(opCtx.get());
+    rs->postConstructorInit(opCtx.get(), nss);
 
     const auto id = StringData{"1"};
     const auto rid = RecordId(id.rawData(), id.size());

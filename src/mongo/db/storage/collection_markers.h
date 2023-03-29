@@ -163,6 +163,7 @@ public:
     static InitialSetOfMarkers createFromExistingRecordStore(
         OperationContext* opCtx,
         RecordStore* rs,
+        const NamespaceString& ns,
         int64_t minBytesPerMarker,
         std::function<RecordIdAndWallTime(const Record&)> getRecordIdAndWallTime,
         boost::optional<int64_t> numberOfMarkersToKeepLegacy = boost::none);
@@ -172,6 +173,7 @@ public:
     static InitialSetOfMarkers createMarkersByScanning(
         OperationContext* opCtx,
         RecordStore* rs,
+        const NamespaceString& ns,
         int64_t minBytesPerMarker,
         std::function<RecordIdAndWallTime(const Record&)> getRecordIdAndWallTime);
 
@@ -181,6 +183,7 @@ public:
     static InitialSetOfMarkers createMarkersBySampling(
         OperationContext* opCtx,
         RecordStore* rs,
+        const NamespaceString& ns,
         int64_t estimatedRecordsPerMarker,
         int64_t estimatedBytesPerMarker,
         std::function<RecordIdAndWallTime(const Record&)> getRecordIdAndWallTime);

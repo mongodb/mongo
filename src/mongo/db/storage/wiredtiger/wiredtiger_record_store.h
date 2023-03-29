@@ -105,6 +105,7 @@ public:
 
     struct Params {
         NamespaceString nss;
+        boost::optional<UUID> uuid;
         std::string ident;
         std::string engineName;
         bool isCapped;
@@ -124,7 +125,8 @@ public:
 
     virtual ~WiredTigerRecordStore();
 
-    virtual void postConstructorInit(OperationContext* opCtx);
+    // Pass in NamespaceString, it is not possible to resolve the UUID to NamespaceString yet.
+    virtual void postConstructorInit(OperationContext* opCtx, const NamespaceString& ns);
 
     // name of the RecordStore implementation
     virtual const char* name() const;
@@ -224,6 +226,8 @@ public:
     uint64_t tableId() const {
         return _tableId;
     }
+
+    std::string ns(OperationContext* opCtx) const final;
 
     /*
      * Check the size information for this RecordStore. This function opens a cursor on the
@@ -435,7 +439,7 @@ protected:
     const bool _forward;
     const bool _isOplog;
     const bool _isCapped;
-    const NamespaceString _ns;
+    const boost::optional<UUID> _uuid;
     bool _skipNextAdvance = false;
     bool _eof = false;
     bool _hasRestored = true;

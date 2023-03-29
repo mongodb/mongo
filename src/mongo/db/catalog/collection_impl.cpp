@@ -1322,7 +1322,6 @@ Status CollectionImpl::rename(OperationContext* opCtx, const NamespaceString& ns
 
     _metadata = std::move(metadata);
     _ns = std::move(nss);
-    _shared->_recordStore.get()->setNs(_ns);
     return status;
 }
 

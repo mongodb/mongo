@@ -101,14 +101,15 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newRecordStore(
     params.forceUpdateWithFullDocument = collOptions.timeseries != boost::none;
 
     auto ret = std::make_unique<StandardWiredTigerRecordStore>(&_engine, opCtx.get(), params);
-    ret->postConstructorInit(opCtx.get());
+    ret->postConstructorInit(opCtx.get(), nss);
     return std::move(ret);
 }
 
 std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newOplogRecordStore() {
     auto ret = newOplogRecordStoreNoInit();
     ServiceContext::UniqueOperationContext opCtx(newOperationContext());
-    dynamic_cast<WiredTigerRecordStore*>(ret.get())->postConstructorInit(opCtx.get());
+    dynamic_cast<WiredTigerRecordStore*>(ret.get())->postConstructorInit(
+        opCtx.get(), NamespaceString::kRsOplogNamespace);
     return ret;
 }
 

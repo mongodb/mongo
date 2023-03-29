@@ -240,12 +240,13 @@ void CollectionTruncateMarkers::pokeReclaimThread(OperationContext* opCtx) {
 CollectionTruncateMarkers::InitialSetOfMarkers CollectionTruncateMarkers::createMarkersByScanning(
     OperationContext* opCtx,
     RecordStore* rs,
+    const NamespaceString& ns,
     int64_t minBytesPerMarker,
     std::function<RecordIdAndWallTime(const Record&)> getRecordIdAndWallTime) {
     auto startTime = curTimeMicros64();
     LOGV2_INFO(7393212,
                "Scanning collection to determine where to place markers for truncation",
-               "namespace"_attr = rs->ns());
+               "namespace"_attr = ns);
 
     int64_t numRecords = 0;
     int64_t dataSize = 0;
@@ -290,6 +291,7 @@ CollectionTruncateMarkers::InitialSetOfMarkers CollectionTruncateMarkers::create
 CollectionTruncateMarkers::InitialSetOfMarkers CollectionTruncateMarkers::createMarkersBySampling(
     OperationContext* opCtx,
     RecordStore* rs,
+    const NamespaceString& ns,
     int64_t estimatedRecordsPerMarker,
     int64_t estimatedBytesPerMarker,
     std::function<RecordIdAndWallTime(const Record&)> getRecordIdAndWallTime) {
@@ -297,7 +299,7 @@ CollectionTruncateMarkers::InitialSetOfMarkers CollectionTruncateMarkers::create
 
     LOGV2_INFO(7393210,
                "Sampling the collection to determine where to place markers for truncation",
-               "namespace"_attr = rs->ns());
+               "namespace"_attr = ns);
     RecordId earliestRecordId, latestRecordId;
 
     {
@@ -311,9 +313,9 @@ CollectionTruncateMarkers::InitialSetOfMarkers CollectionTruncateMarkers::create
             LOGV2(7393209,
                   "Failed to determine the earliest recordId, falling back to scanning the "
                   "collection",
-                  "namespace"_attr = rs->ns());
+                  "namespace"_attr = ns);
             return CollectionTruncateMarkers::createMarkersByScanning(
-                opCtx, rs, estimatedBytesPerMarker, std::move(getRecordIdAndWallTime));
+                opCtx, rs, ns, estimatedBytesPerMarker, std::move(getRecordIdAndWallTime));
         }
         earliestRecordId = record->id;
     }
@@ -329,16 +331,16 @@ CollectionTruncateMarkers::InitialSetOfMarkers CollectionTruncateMarkers::create
             LOGV2(
                 7393208,
                 "Failed to determine the latest recordId, falling back to scanning the collection",
-                "namespace"_attr = rs->ns());
+                "namespace"_attr = ns);
             return CollectionTruncateMarkers::createMarkersByScanning(
-                opCtx, rs, estimatedBytesPerMarker, std::move(getRecordIdAndWallTime));
+                opCtx, rs, ns, estimatedBytesPerMarker, std::move(getRecordIdAndWallTime));
         }
         latestRecordId = record->id;
     }
 
     LOGV2(7393207,
           "Sampling from the collection to determine where to place markers for truncation",
-          "namespace"_attr = rs->ns(),
+          "namespace"_attr = ns,
           "from"_attr = earliestRecordId,
           "to"_attr = latestRecordId);
 
@@ -350,7 +352,7 @@ CollectionTruncateMarkers::InitialSetOfMarkers CollectionTruncateMarkers::create
 
     LOGV2(7393216,
           "Taking samples and assuming each collection section contains equal amounts",
-          "namespace"_attr = rs->ns(),
+          "namespace"_attr = ns,
           "numSamples"_attr = numSamples,
           "containsNumRecords"_attr = estimatedRecordsPerMarker,
           "containsNumBytes"_attr = estimatedBytesPerMarker);
@@ -373,9 +375,9 @@ CollectionTruncateMarkers::InitialSetOfMarkers CollectionTruncateMarkers::create
             // case.
             LOGV2(7393206,
                   "Failed to get enough random samples, falling back to scanning the collection",
-                  "namespace"_attr = rs->ns());
+                  "namespace"_attr = ns);
             return CollectionTruncateMarkers::createMarkersByScanning(
-                opCtx, rs, estimatedBytesPerMarker, std::move(getRecordIdAndWallTime));
+                opCtx, rs, ns, estimatedBytesPerMarker, std::move(getRecordIdAndWallTime));
         }
 
         collectionEstimates.emplace_back(getRecordIdAndWallTime(*record));
@@ -384,7 +386,7 @@ CollectionTruncateMarkers::InitialSetOfMarkers CollectionTruncateMarkers::create
             lastProgressTimer.elapsed() >= Seconds(samplingLogIntervalSeconds)) {
             LOGV2(7393217,
                   "Collection sampling progress",
-                  "namespace"_attr = rs->ns(),
+                  "namespace"_attr = ns,
                   "completed"_attr = (i + 1),
                   "total"_attr = numSamples);
             lastProgressTimer.reset();
@@ -394,7 +396,7 @@ CollectionTruncateMarkers::InitialSetOfMarkers CollectionTruncateMarkers::create
         collectionEstimates.begin(),
         collectionEstimates.end(),
         [](const RecordIdAndWallTime& a, const RecordIdAndWallTime& b) { return a.id < b.id; });
-    LOGV2(7393205, "Collection sampling complete", "namespace"_attr = rs->ns());
+    LOGV2(7393205, "Collection sampling complete", "namespace"_attr = ns);
 
     std::deque<Marker> markers;
     for (int i = 1; i <= wholeMarkers; ++i) {
@@ -406,7 +408,7 @@ CollectionTruncateMarkers::InitialSetOfMarkers CollectionTruncateMarkers::create
         LOGV2_DEBUG(7393204,
                     1,
                     "Marking entry as a potential future truncation point",
-                    "namespace"_attr = rs->ns(),
+                    "namespace"_attr = ns,
                     "wall"_attr = wallTime,
                     "ts"_attr = id);
 
@@ -428,6 +430,7 @@ CollectionTruncateMarkers::InitialSetOfMarkers
 CollectionTruncateMarkers::createFromExistingRecordStore(
     OperationContext* opCtx,
     RecordStore* rs,
+    const NamespaceString& ns,
     int64_t minBytesPerMarker,
     std::function<RecordIdAndWallTime(const Record&)> getRecordIdAndWallTime,
     boost::optional<int64_t> numberOfMarkersToKeepLegacy) {
@@ -464,7 +467,7 @@ CollectionTruncateMarkers::createFromExistingRecordStore(
         uint64_t(numRecords) <
             kMinSampleRatioForRandCursor * kRandomSamplesPerMarker * numMarkers) {
         return CollectionTruncateMarkers::createMarkersByScanning(
-            opCtx, rs, minBytesPerMarker, std::move(getRecordIdAndWallTime));
+            opCtx, rs, ns, minBytesPerMarker, std::move(getRecordIdAndWallTime));
     }
 
     // Use the collection's average record size to estimate the number of records in each marker,
@@ -475,6 +478,7 @@ CollectionTruncateMarkers::createFromExistingRecordStore(
 
     return CollectionTruncateMarkers::createMarkersBySampling(opCtx,
                                                               rs,
+                                                              ns,
                                                               (int64_t)estimatedRecordsPerMarker,
                                                               (int64_t)estimatedBytesPerMarker,
                                                               std::move(getRecordIdAndWallTime));

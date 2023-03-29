@@ -40,11 +40,12 @@ void validateWriteAllowed(OperationContext* opCtx) {
             "Cannot execute a write operation in read-only mode",
             !opCtx->readOnly());
 }
+
 }  // namespace
 
-RecordStore::RecordStore(StringData ns, StringData identName, bool isCapped)
+RecordStore::RecordStore(boost::optional<UUID> uuid, StringData identName, bool isCapped)
     : _ident(std::make_shared<Ident>(identName.toString())),
-      _ns(ns.toString()),
+      _uuid(uuid),
       _cappedInsertNotifier(isCapped ? std::make_shared<CappedInsertNotifier>() : nullptr) {}
 
 void RecordStore::deleteRecord(OperationContext* opCtx, const RecordId& dl) {

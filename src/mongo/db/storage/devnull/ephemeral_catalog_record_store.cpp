@@ -262,10 +262,11 @@ private:
 //
 
 EphemeralForTestRecordStore::EphemeralForTestRecordStore(StringData ns,
+                                                         boost::optional<UUID> uuid,
                                                          StringData identName,
                                                          std::shared_ptr<void>* dataInOut,
                                                          bool isCapped)
-    : RecordStore(ns, identName, isCapped),
+    : RecordStore(uuid, identName, isCapped),
       _isCapped(isCapped),
       _data(*dataInOut ? static_cast<Data*>(dataInOut->get())
                        : new Data(ns, NamespaceString::oplog(ns))) {
@@ -291,7 +292,7 @@ const EphemeralForTestRecordStore::EphemeralForTestRecord* EphemeralForTestRecor
         LOGV2_ERROR(
             23720,
             "EphemeralForTestRecordStore::recordFor cannot find record for {namespace}:{loc}",
-            logAttrs(NamespaceString(ns())),
+            logAttrs(NamespaceString(_data->ns)),
             "loc"_attr = loc);
     }
     invariant(it != _data->records.end());
@@ -305,7 +306,7 @@ EphemeralForTestRecordStore::EphemeralForTestRecord* EphemeralForTestRecordStore
         LOGV2_ERROR(
             23721,
             "EphemeralForTestRecordStore::recordFor cannot find record for {namespace}:{loc}",
-            logAttrs(NamespaceString(ns())),
+            logAttrs(NamespaceString(_data->ns)),
             "loc"_attr = loc);
     }
     invariant(it != _data->records.end());

@@ -289,7 +289,7 @@ class RecordStore {
     RecordStore& operator=(const RecordStore&) = delete;
 
 public:
-    RecordStore(StringData ns, StringData identName, bool isCapped);
+    RecordStore(boost::optional<UUID> uuid, StringData identName, bool isCapped);
     virtual ~RecordStore() {}
 
     // META
@@ -297,16 +297,12 @@ public:
     // name of the RecordStore implementation
     virtual const char* name() const = 0;
 
-    const std::string& ns() const {
-        return _ns;
-    }
-
-    void setNs(NamespaceString ns) {
-        _ns = ns.ns();
+    boost::optional<UUID> uuid() const {
+        return _uuid;
     }
 
     bool isTemp() const {
-        return ns().size() == 0;
+        return !_uuid.has_value();
     }
 
     std::shared_ptr<Ident> getSharedIdent() const {
@@ -320,6 +316,11 @@ public:
     void setIdent(std::shared_ptr<Ident> newIdent) {
         _ident = std::move(newIdent);
     }
+
+    /**
+     * Get the namespace this RecordStore is associated with.
+     */
+    virtual std::string ns(OperationContext* opCtx) const = 0;
 
     /**
      * The key format for this RecordStore's RecordIds.
@@ -408,7 +409,8 @@ public:
     RecordData dataFor(OperationContext* opCtx, const RecordId& loc) const {
         RecordData data;
         invariant(findRecord(opCtx, loc, &data),
-                  str::stream() << "Didn't find RecordId " << loc << " in record store " << ns());
+                  str::stream() << "Didn't find RecordId " << loc << " in record store "
+                                << ns(opCtx));
         return data;
     }
 
@@ -770,7 +772,7 @@ protected:
 
     std::shared_ptr<Ident> _ident;
 
-    std::string _ns;
+    boost::optional<UUID> _uuid;
 
     std::shared_ptr<CappedInsertNotifier> _cappedInsertNotifier;
 };

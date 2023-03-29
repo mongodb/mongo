@@ -52,16 +52,5 @@ TEST(RecordStoreTestHarness, RecordStoreName) {
     }
 }
 
-// Verify that the namespace of the record store is nonempty.
-TEST(RecordStoreTestHarness, Namespace) {
-    const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
-
-    {
-        string ns = rs->ns();
-        ASSERT(ns[0] != '\0');
-    }
-}
-
 }  // namespace
 }  // namespace mongo

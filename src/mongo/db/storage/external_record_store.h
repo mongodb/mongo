@@ -37,7 +37,9 @@
 namespace mongo {
 class ExternalRecordStore : public RecordStore {
 public:
-    ExternalRecordStore(StringData ns, const VirtualCollectionOptions& vopts);
+    ExternalRecordStore(StringData ns,
+                        boost::optional<UUID> uuid,
+                        const VirtualCollectionOptions& vopts);
 
     const VirtualCollectionOptions& getOptions() const {
         return _vopts;
@@ -49,6 +51,10 @@ public:
 
     bool isTemp() const {
         return true;
+    }
+
+    std::string ns(OperationContext* opCtx) const final {
+        return _ns;
     }
 
     KeyFormat keyFormat() const final {
@@ -161,5 +167,6 @@ private:
     }
 
     VirtualCollectionOptions _vopts;
+    std::string _ns;
 };
 }  // namespace mongo

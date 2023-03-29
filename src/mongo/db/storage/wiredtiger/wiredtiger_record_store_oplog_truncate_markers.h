@@ -70,7 +70,7 @@ public:
     RecordId firstRecord;
 
     static WiredTigerRecordStore::OplogTruncateMarkers createOplogTruncateMarkers(
-        OperationContext* opCtx, WiredTigerRecordStore* rs);
+        OperationContext* opCtx, WiredTigerRecordStore* rs, const NamespaceString& ns);
     //
     // The following methods are public only for use in tests.
     //

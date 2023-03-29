@@ -57,6 +57,6 @@ std::shared_ptr<Collection> VirtualCollectionImpl::make(OperationContext* opCtx,
                                                         const CollectionOptions& options,
                                                         const VirtualCollectionOptions& vopts) {
     return std::make_shared<VirtualCollectionImpl>(
-        opCtx, nss, options, std::make_unique<ExternalRecordStore>(nss.ns(), vopts));
+        opCtx, nss, options, std::make_unique<ExternalRecordStore>(nss.ns(), options.uuid, vopts));
 }
 }  // namespace mongo
