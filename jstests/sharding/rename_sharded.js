@@ -276,4 +276,37 @@ const mongos = st.s0;
     }));
 }
 
+// Rename between DBs after movePrimary works correctly
+{
+    // TODO SERVER-72796 remove this check once v7.0 branches out
+    const fcvDoc =
+        st.configRS.getPrimary().adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
+    if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, '7.0') >= 0) {
+        const db0Name = 'testMovePrimaryWithRenameDB0';
+        const db1Name = 'testMovePrimaryWithRenameDB1';
+        const collOnDB0 = db0Name + '.from';
+        const collOnDB1 = db1Name + '.to';
+        assert.commandWorked(
+            mongos.adminCommand({enablesharding: db0Name, primaryShard: st.shard0.shardName}));
+        assert.commandWorked(
+            mongos.adminCommand({enablesharding: db1Name, primaryShard: st.shard0.shardName}));
+
+        mongos.getCollection(collOnDB0).insert({a: 0});
+
+        assert.commandWorked(mongos.adminCommand({movePrimary: db0Name, to: st.shard1.name}));
+        assert.commandWorked(mongos.adminCommand({movePrimary: db1Name, to: st.shard1.name}));
+        assert.commandWorked(mongos.adminCommand({
+            renameCollection: collOnDB0,
+            to: collOnDB1,
+        }));
+
+        assert.commandWorked(mongos.adminCommand({movePrimary: db0Name, to: st.shard0.name}));
+        assert.commandWorked(mongos.adminCommand({movePrimary: db1Name, to: st.shard0.name}));
+        assert.commandWorked(mongos.adminCommand({
+            renameCollection: collOnDB1,
+            to: collOnDB0,
+        }));
+    }
+}
+
 st.stop();
