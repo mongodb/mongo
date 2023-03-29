@@ -888,6 +888,7 @@ dump_explore_bookmark_save(WT_CURSOR *cursor, char **bookmarks)
 {
     WT_DECL_RET;
     WT_SESSION *session;
+    size_t key_size;
     uint64_t i;
     const char *key;
 
@@ -904,9 +905,10 @@ dump_explore_bookmark_save(WT_CURSOR *cursor, char **bookmarks)
     for (i = 0; i < MAX_BOOKMARKS; ++i) {
         if (bookmarks[i] != NULL)
             continue;
-        if ((bookmarks[i] = malloc(strlen(key))) == NULL)
+        key_size = strlen(key) + 1;
+        if ((bookmarks[i] = malloc(key_size)) == NULL)
             return (util_err(session, errno, NULL));
-        strcpy(bookmarks[i], key);
+        memmove(bookmarks[i], key, key_size);
         printf("Added bookmark %" PRIu64 ": %s.\n", i, key);
         break;
     }
@@ -974,7 +976,7 @@ dump_explore(WT_CURSOR *cursor, const char *uri, bool reverse, bool pretty, bool
     WT_SESSION *session;
     WT_SESSION_IMPL *session_impl;
     uint64_t bookmark_index, window;
-    int i, exact, num_args;
+    int i, num_args;
     char *args[MAX_ARGS], *bookmarks[MAX_BOOKMARKS];
     char *first_arg, user_input[ARG_BUF_SIZE], *current_arg;
     const char *key, *value;
@@ -983,7 +985,6 @@ dump_explore(WT_CURSOR *cursor, const char *uri, bool reverse, bool pretty, bool
     session = cursor->session;
     session_impl = (WT_SESSION_IMPL *)session;
     once = search_near = false;
-    i = exact = num_args = 0;
     bookmark_index = window = 0;
     memset(args, 0, sizeof(args));
     memset(bookmarks, 0, sizeof(bookmarks));
@@ -995,7 +996,7 @@ dump_explore(WT_CURSOR *cursor, const char *uri, bool reverse, bool pretty, bool
 
     while (ret == 0) {
         i = num_args = 0;
-        if (fgets(user_input, MAX_ARGS, stdin) == NULL) {
+        if (fgets(user_input, sizeof(user_input), stdin) == NULL) {
             if (!feof(stdin))
                 continue;
             goto err;
@@ -1014,7 +1015,7 @@ dump_explore(WT_CURSOR *cursor, const char *uri, bool reverse, bool pretty, bool
         while (current_arg != NULL) {
             if ((args[i] = malloc(ARG_BUF_SIZE)) == NULL)
                 WT_ERR(util_err(session, errno, NULL));
-            strcpy(args[i++], current_arg);
+            memmove(args[i++], current_arg, strlen(current_arg) + 1);
             ++num_args;
             current_arg = strtok(NULL, " ");
         }
