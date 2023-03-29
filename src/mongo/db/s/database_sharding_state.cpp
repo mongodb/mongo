@@ -195,8 +195,7 @@ void DatabaseShardingState::assertMatchingDbVersion(OperationContext* opCtx,
 
 void DatabaseShardingState::assertIsPrimaryShardForDb(OperationContext* opCtx,
                                                       const DatabaseName& dbName) {
-    if (dbName == DatabaseName::kConfig) {
-        // TODO (SERVER-72488): Include the admin database.
+    if (dbName == DatabaseName::kConfig || dbName == DatabaseName::kAdmin) {
         uassert(7393700,
                 "The config server is the primary shard for database: {}"_format(dbName.toString()),
                 serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
