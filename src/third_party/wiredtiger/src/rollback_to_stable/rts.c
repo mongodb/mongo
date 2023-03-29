@@ -143,7 +143,15 @@ __wt_rts_btree_apply_all(WT_SESSION_IMPL *session, wt_timestamp_t rollback_times
     }
     WT_ERR_NOTFOUND_OK(ret, false);
 
-    if (F_ISSET(S2C(session), WT_CONN_RECOVERING))
+    /*
+     * Performing eviction in parallel to a checkpoint can lead to situation where the history store
+     * have more updates than its corresponding data store. Performing history store cleanup at the
+     * end can able to remove any such unstable updates that are written to the history store.
+     *
+     * Do not perform the final pass on the history store in an in-memory configuration as it
+     * doesn't exist.
+     */
+    if (!F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
         WT_ERR(__wt_rts_history_final_pass(session, rollback_timestamp));
 
 err:
