@@ -89,7 +89,7 @@ public:
     // This max may be exceeded by epsilon for output documents that approach the maximum user
     // document size. That is, if we must return a BSONObjMaxUserSize document, then the total
     // response size will be BSONObjMaxUserSize plus the amount of size required for the message
-    // header and the cursor response "envelope". (The envolope contains namespace and cursor id
+    // header and the cursor response "envelope". (The envelope contains namespace and cursor id
     // info.)
     static const int kMaxBytesToReturnToClientAtOnce = BSONObjMaxUserSize;
 
@@ -128,6 +128,32 @@ public:
      * failpoint is active.
      */
     static void waitInFindBeforeMakingBatch(OperationContext* opCtx, const CanonicalQuery& cq);
+
+    /**
+     * Tracker of a size of a server response presented as a BSON array. Facilitates limiting the
+     * server response size to 16MB + certain epsilon. Accounts for array element and it's overhead
+     * size. Does not account for response "envelope" size.
+     */
+    class BSONArrayResponseSizeTracker {
+        // Upper bound of BSON array element overhead.
+        static const size_t kPerDocumentOverheadBytesUpperBound;
+
+    public:
+        /**
+         * Returns true only if 'document' can be added to the BSON array without violating the
+         * overall response size limit or if it is the first document.
+         */
+        bool haveSpaceForNext(const BSONObj& document);
+
+        /**
+         * Records that 'document' was added to the response.
+         */
+        void add(const BSONObj& document);
+
+    private:
+        std::size_t _numberOfDocuments{0};
+        std::size_t _bsonArraySizeInBytes{0};
+    };
 };
 
 }  // namespace mongo

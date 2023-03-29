@@ -270,7 +270,7 @@ public:
                                             nss));
 
             std::vector<mongo::ListIndexesReplyItem> firstBatch;
-            int bytesBuffered = 0;
+            FindCommon::BSONArrayResponseSizeTracker responseSizeTracker;
             for (long long objCount = 0; objCount < batchSize; objCount++) {
                 BSONObj nextDoc;
                 PlanExecutor::ExecState state = exec->getNext(&nextDoc, nullptr);
@@ -282,7 +282,7 @@ public:
 
                 // If we can't fit this result inside the current batch, then we stash it for
                 // later.
-                if (!FindCommon::haveSpaceForNext(nextDoc, objCount, bytesBuffered)) {
+                if (!responseSizeTracker.haveSpaceForNext(nextDoc)) {
                     exec->enqueue(nextDoc);
                     break;
                 }
@@ -301,7 +301,7 @@ public:
                                           nextDoc.toString(),
                                           exc.toString()));
                 }
-                bytesBuffered += nextDoc.objsize();
+                responseSizeTracker.add(nextDoc);
             }
 
             if (exec->isEOF()) {
