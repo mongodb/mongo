@@ -86,10 +86,6 @@ public:
             CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
                                                           opCtx->getWriteConcern());
 
-            if (fromNss.db() != toNss.db()) {
-                sharding_ddl_util::checkDbPrimariesOnTheSameShard(opCtx, fromNss, toNss);
-            }
-
             validateNamespacesForRenameCollection(opCtx, fromNss, toNss);
 
             auto coordinatorDoc = RenameCollectionCoordinatorDocument();
