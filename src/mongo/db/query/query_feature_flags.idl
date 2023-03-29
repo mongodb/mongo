@@ -149,4 +149,5 @@ feature_flags:
     featureFlagShardedSearchCustomSort:
       description: "Feature flag to enable user specified sort for sharded $search queries."
       cpp_varname: gFeatureFlagShardedSearchCustomSort
-      default: false
+      default: true
+      version: 6.0
