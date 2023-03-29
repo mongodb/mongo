@@ -3066,31 +3066,31 @@ public:
         generateDateExpressionAcceptingTimeZone("dayOfYear", expr);
     }
     void visit(const ExpressionHour* expr) final {
-        unsupportedExpression("$hour");
+        generateDateExpressionAcceptingTimeZone("hour", expr);
     }
     void visit(const ExpressionMillisecond* expr) final {
-        unsupportedExpression("$millisecond");
+        generateDateExpressionAcceptingTimeZone("millisecond", expr);
     }
     void visit(const ExpressionMinute* expr) final {
-        unsupportedExpression("$minute");
+        generateDateExpressionAcceptingTimeZone("minute", expr);
     }
     void visit(const ExpressionMonth* expr) final {
-        unsupportedExpression("$month");
+        generateDateExpressionAcceptingTimeZone("month", expr);
     }
     void visit(const ExpressionSecond* expr) final {
-        unsupportedExpression("$second");
+        generateDateExpressionAcceptingTimeZone("second", expr);
     }
     void visit(const ExpressionWeek* expr) final {
-        unsupportedExpression("$week");
+        generateDateExpressionAcceptingTimeZone("week", expr);
     }
     void visit(const ExpressionIsoWeekYear* expr) final {
-        unsupportedExpression("$isoWeekYear");
+        generateDateExpressionAcceptingTimeZone("isoWeekYear", expr);
     }
     void visit(const ExpressionIsoDayOfWeek* expr) final {
-        unsupportedExpression("$isoDayOfWeek");
+        generateDateExpressionAcceptingTimeZone("isoDayOfWeek", expr);
     }
     void visit(const ExpressionIsoWeek* expr) final {
-        unsupportedExpression("$isoWeek");
+        generateDateExpressionAcceptingTimeZone("isoWeek", expr);
     }
     void visit(const ExpressionYear* expr) final {
         generateDateExpressionAcceptingTimeZone("year", expr);

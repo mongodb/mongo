@@ -125,6 +125,87 @@ struct Year {
         result = timezone.dateParts(date).year;
     }
 };
+
+/**
+ * The month operation used by genericExtractFromDate.
+ */
+struct Month {
+    static void doOperation(const Date_t& date, const TimeZone& timezone, int32_t& result) {
+        result = timezone.dateParts(date).month;
+    }
+};
+
+/**
+ * The hour operation used by genericExtractFromDate.
+ */
+struct Hour {
+    static void doOperation(const Date_t& date, const TimeZone& timezone, int32_t& result) {
+        result = timezone.dateParts(date).hour;
+    }
+};
+
+/**
+ * The minute operation used by genericExtractFromDate.
+ */
+struct Minute {
+    static void doOperation(const Date_t& date, const TimeZone& timezone, int32_t& result) {
+        result = timezone.dateParts(date).minute;
+    }
+};
+
+/**
+ * The second operation used by genericExtractFromDate.
+ */
+struct Second {
+    static void doOperation(const Date_t& date, const TimeZone& timezone, int32_t& result) {
+        result = timezone.dateParts(date).second;
+    }
+};
+
+/**
+ * The millisecond operation used by genericExtractFromDate.
+ */
+struct Millisecond {
+    static void doOperation(const Date_t& date, const TimeZone& timezone, int32_t& result) {
+        result = timezone.dateParts(date).millisecond;
+    }
+};
+
+/**
+ * The week operation used by genericExtractFromDate.
+ */
+struct Week {
+    static void doOperation(const Date_t& date, const TimeZone& timezone, int32_t& result) {
+        result = timezone.week(date);
+    }
+};
+
+/**
+ * The ISOWeekYear operation used by genericExtractFromDate.
+ */
+struct ISOWeekYear {
+    static void doOperation(const Date_t& date, const TimeZone& timezone, int32_t& result) {
+        result = timezone.isoYear(date);
+    }
+};
+
+/**
+ * The ISODayOfWeek operation used by genericExtractFromDate.
+ */
+struct ISODayOfWeek {
+    static void doOperation(const Date_t& date, const TimeZone& timezone, int32_t& result) {
+        result = timezone.isoDayOfWeek(date);
+    }
+};
+
+/**
+ * The ISOWeek operation used by genericExtractFromDate.
+ */
+struct ISOWeek {
+    static void doOperation(const Date_t& date, const TimeZone& timezone, int32_t& result) {
+        result = timezone.isoWeek(date);
+    }
+};
 }  // namespace
 
 /**
@@ -269,6 +350,177 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericYear(value::Type
         dateTag, dateValue, timezoneTag, timezoneValue);
 }
 
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericMonth(value::TypeTags timezoneDBTag,
+                                                                      value::Value timezoneDBValue,
+                                                                      value::TypeTags dateTag,
+                                                                      value::Value dateValue,
+                                                                      value::TypeTags timezoneTag,
+                                                                      value::Value timezoneValue) {
+    return genericDateExpressionAcceptingTimeZone<Month>(
+        timezoneDBTag, timezoneDBValue, dateTag, dateValue, timezoneTag, timezoneValue);
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericMonth(value::TypeTags dateTag,
+                                                                      value::Value dateValue,
+                                                                      value::TypeTags timezoneTag,
+                                                                      value::Value timezoneValue) {
+    return genericDateExpressionAcceptingTimeZone<Month>(
+        dateTag, dateValue, timezoneTag, timezoneValue);
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericHour(value::TypeTags timezoneDBTag,
+                                                                     value::Value timezoneDBValue,
+                                                                     value::TypeTags dateTag,
+                                                                     value::Value dateValue,
+                                                                     value::TypeTags timezoneTag,
+                                                                     value::Value timezoneValue) {
+    return genericDateExpressionAcceptingTimeZone<Hour>(
+        timezoneDBTag, timezoneDBValue, dateTag, dateValue, timezoneTag, timezoneValue);
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericHour(value::TypeTags dateTag,
+                                                                     value::Value dateValue,
+                                                                     value::TypeTags timezoneTag,
+                                                                     value::Value timezoneValue) {
+    return genericDateExpressionAcceptingTimeZone<Hour>(
+        dateTag, dateValue, timezoneTag, timezoneValue);
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericMinute(
+    value::TypeTags timezoneDBTag,
+    value::Value timezoneDBValue,
+    value::TypeTags dateTag,
+    value::Value dateValue,
+    value::TypeTags timezoneTag,
+    value::Value timezoneValue) {
+    return genericDateExpressionAcceptingTimeZone<Minute>(
+        timezoneDBTag, timezoneDBValue, dateTag, dateValue, timezoneTag, timezoneValue);
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericMinute(value::TypeTags dateTag,
+                                                                       value::Value dateValue,
+                                                                       value::TypeTags timezoneTag,
+                                                                       value::Value timezoneValue) {
+    return genericDateExpressionAcceptingTimeZone<Minute>(
+        dateTag, dateValue, timezoneTag, timezoneValue);
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericSecond(
+    value::TypeTags timezoneDBTag,
+    value::Value timezoneDBValue,
+    value::TypeTags dateTag,
+    value::Value dateValue,
+    value::TypeTags timezoneTag,
+    value::Value timezoneValue) {
+    return genericDateExpressionAcceptingTimeZone<Second>(
+        timezoneDBTag, timezoneDBValue, dateTag, dateValue, timezoneTag, timezoneValue);
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericSecond(value::TypeTags dateTag,
+                                                                       value::Value dateValue,
+                                                                       value::TypeTags timezoneTag,
+                                                                       value::Value timezoneValue) {
+    return genericDateExpressionAcceptingTimeZone<Second>(
+        dateTag, dateValue, timezoneTag, timezoneValue);
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericMillisecond(
+    value::TypeTags timezoneDBTag,
+    value::Value timezoneDBValue,
+    value::TypeTags dateTag,
+    value::Value dateValue,
+    value::TypeTags timezoneTag,
+    value::Value timezoneValue) {
+    return genericDateExpressionAcceptingTimeZone<Millisecond>(
+        timezoneDBTag, timezoneDBValue, dateTag, dateValue, timezoneTag, timezoneValue);
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericMillisecond(
+    value::TypeTags dateTag,
+    value::Value dateValue,
+    value::TypeTags timezoneTag,
+    value::Value timezoneValue) {
+    return genericDateExpressionAcceptingTimeZone<Millisecond>(
+        dateTag, dateValue, timezoneTag, timezoneValue);
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericWeek(value::TypeTags timezoneDBTag,
+                                                                     value::Value timezoneDBValue,
+                                                                     value::TypeTags dateTag,
+                                                                     value::Value dateValue,
+                                                                     value::TypeTags timezoneTag,
+                                                                     value::Value timezoneValue) {
+    return genericDateExpressionAcceptingTimeZone<Week>(
+        timezoneDBTag, timezoneDBValue, dateTag, dateValue, timezoneTag, timezoneValue);
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericWeek(value::TypeTags dateTag,
+                                                                     value::Value dateValue,
+                                                                     value::TypeTags timezoneTag,
+                                                                     value::Value timezoneValue) {
+    return genericDateExpressionAcceptingTimeZone<Week>(
+        dateTag, dateValue, timezoneTag, timezoneValue);
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericISOWeekYear(
+    value::TypeTags timezoneDBTag,
+    value::Value timezoneDBValue,
+    value::TypeTags dateTag,
+    value::Value dateValue,
+    value::TypeTags timezoneTag,
+    value::Value timezoneValue) {
+    return genericDateExpressionAcceptingTimeZone<ISOWeekYear>(
+        timezoneDBTag, timezoneDBValue, dateTag, dateValue, timezoneTag, timezoneValue);
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericISOWeekYear(
+    value::TypeTags dateTag,
+    value::Value dateValue,
+    value::TypeTags timezoneTag,
+    value::Value timezoneValue) {
+    return genericDateExpressionAcceptingTimeZone<ISOWeekYear>(
+        dateTag, dateValue, timezoneTag, timezoneValue);
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericISODayOfWeek(
+    value::TypeTags timezoneDBTag,
+    value::Value timezoneDBValue,
+    value::TypeTags dateTag,
+    value::Value dateValue,
+    value::TypeTags timezoneTag,
+    value::Value timezoneValue) {
+    return genericDateExpressionAcceptingTimeZone<ISODayOfWeek>(
+        timezoneDBTag, timezoneDBValue, dateTag, dateValue, timezoneTag, timezoneValue);
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericISODayOfWeek(
+    value::TypeTags dateTag,
+    value::Value dateValue,
+    value::TypeTags timezoneTag,
+    value::Value timezoneValue) {
+    return genericDateExpressionAcceptingTimeZone<ISODayOfWeek>(
+        dateTag, dateValue, timezoneTag, timezoneValue);
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericISOWeek(
+    value::TypeTags timezoneDBTag,
+    value::Value timezoneDBValue,
+    value::TypeTags dateTag,
+    value::Value dateValue,
+    value::TypeTags timezoneTag,
+    value::Value timezoneValue) {
+    return genericDateExpressionAcceptingTimeZone<ISOWeek>(
+        timezoneDBTag, timezoneDBValue, dateTag, dateValue, timezoneTag, timezoneValue);
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericISOWeek(
+    value::TypeTags dateTag,
+    value::Value dateValue,
+    value::TypeTags timezoneTag,
+    value::Value timezoneValue) {
+    return genericDateExpressionAcceptingTimeZone<ISOWeek>(
+        dateTag, dateValue, timezoneTag, timezoneValue);
+}
 }  // namespace vm
 }  // namespace sbe
 }  // namespace mongo

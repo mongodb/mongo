@@ -115,6 +115,78 @@ public:
     void benchmarkYearUTCMinus0700(benchmark::State& state);
     void benchmarkYearNewYork(benchmark::State& state);
 
+    void benchmarkMonthNoTZ(benchmark::State& state);
+    void benchmarkMonthConstTzUTC(benchmark::State& state);
+    void benchmarkMonthConstTzUTCMinus0700(benchmark::State& state);
+    void benchmarkMonthConstTzNewYork(benchmark::State& state);
+    void benchmarkMonthUTC(benchmark::State& state);
+    void benchmarkMonthUTCMinus0700(benchmark::State& state);
+    void benchmarkMonthNewYork(benchmark::State& state);
+
+    void benchmarkHourNoTZ(benchmark::State& state);
+    void benchmarkHourConstTzUTC(benchmark::State& state);
+    void benchmarkHourConstTzUTCMinus0700(benchmark::State& state);
+    void benchmarkHourConstTzNewYork(benchmark::State& state);
+    void benchmarkHourUTC(benchmark::State& state);
+    void benchmarkHourUTCMinus0700(benchmark::State& state);
+    void benchmarkHourNewYork(benchmark::State& state);
+
+    void benchmarkMinuteNoTZ(benchmark::State& state);
+    void benchmarkMinuteConstTzUTC(benchmark::State& state);
+    void benchmarkMinuteConstTzUTCMinus0700(benchmark::State& state);
+    void benchmarkMinuteConstTzNewYork(benchmark::State& state);
+    void benchmarkMinuteUTC(benchmark::State& state);
+    void benchmarkMinuteUTCMinus0700(benchmark::State& state);
+    void benchmarkMinuteNewYork(benchmark::State& state);
+
+    void benchmarkSecondNoTZ(benchmark::State& state);
+    void benchmarkSecondConstTzUTC(benchmark::State& state);
+    void benchmarkSecondConstTzUTCMinus0700(benchmark::State& state);
+    void benchmarkSecondConstTzNewYork(benchmark::State& state);
+    void benchmarkSecondUTC(benchmark::State& state);
+    void benchmarkSecondUTCMinus0700(benchmark::State& state);
+    void benchmarkSecondNewYork(benchmark::State& state);
+
+    void benchmarkMillisecondNoTZ(benchmark::State& state);
+    void benchmarkMillisecondConstTzUTC(benchmark::State& state);
+    void benchmarkMillisecondConstTzUTCMinus0700(benchmark::State& state);
+    void benchmarkMillisecondConstTzNewYork(benchmark::State& state);
+    void benchmarkMillisecondUTC(benchmark::State& state);
+    void benchmarkMillisecondUTCMinus0700(benchmark::State& state);
+    void benchmarkMillisecondNewYork(benchmark::State& state);
+
+    void benchmarkWeekNoTZ(benchmark::State& state);
+    void benchmarkWeekConstTzUTC(benchmark::State& state);
+    void benchmarkWeekConstTzUTCMinus0700(benchmark::State& state);
+    void benchmarkWeekConstTzNewYork(benchmark::State& state);
+    void benchmarkWeekUTC(benchmark::State& state);
+    void benchmarkWeekUTCMinus0700(benchmark::State& state);
+    void benchmarkWeekNewYork(benchmark::State& state);
+
+    void benchmarkISOWeekYearNoTZ(benchmark::State& state);
+    void benchmarkISOWeekYearConstTzUTC(benchmark::State& state);
+    void benchmarkISOWeekYearConstTzUTCMinus0700(benchmark::State& state);
+    void benchmarkISOWeekYearConstTzNewYork(benchmark::State& state);
+    void benchmarkISOWeekYearUTC(benchmark::State& state);
+    void benchmarkISOWeekYearUTCMinus0700(benchmark::State& state);
+    void benchmarkISOWeekYearNewYork(benchmark::State& state);
+
+    void benchmarkISODayOfWeekNoTZ(benchmark::State& state);
+    void benchmarkISODayOfWeekConstTzUTC(benchmark::State& state);
+    void benchmarkISODayOfWeekConstTzUTCMinus0700(benchmark::State& state);
+    void benchmarkISODayOfWeekConstTzNewYork(benchmark::State& state);
+    void benchmarkISODayOfWeekUTC(benchmark::State& state);
+    void benchmarkISODayOfWeekUTCMinus0700(benchmark::State& state);
+    void benchmarkISODayOfWeekNewYork(benchmark::State& state);
+
+    void benchmarkISOWeekNoTZ(benchmark::State& state);
+    void benchmarkISOWeekConstTzUTC(benchmark::State& state);
+    void benchmarkISOWeekConstTzUTCMinus0700(benchmark::State& state);
+    void benchmarkISOWeekConstTzNewYork(benchmark::State& state);
+    void benchmarkISOWeekUTC(benchmark::State& state);
+    void benchmarkISOWeekUTCMinus0700(benchmark::State& state);
+    void benchmarkISOWeekNewYork(benchmark::State& state);
+
     void benchmarkGetFieldEvaluateExpression(benchmark::State& state);
     void benchmarkGetFieldEvaluateShortSyntaxExpression(benchmark::State& state);
     void benchmarkGetFieldNestedExpression(benchmark::State& state);
@@ -360,6 +432,258 @@ private:
     BENCHMARK_F(Fixture, YearNewYork)                                           \
     (benchmark::State & state) {                                                \
         benchmarkYearNewYork(state);                                            \
+    }                                                                           \
+    BENCHMARK_F(Fixture, MonthNoTZ)                                             \
+    (benchmark::State & state) {                                                \
+        benchmarkMonthNoTZ(state);                                              \
+    }                                                                           \
+    BENCHMARK_F(Fixture, MonthConstTzUTC)                                       \
+    (benchmark::State & state) {                                                \
+        benchmarkMonthConstTzUTC(state);                                        \
+    }                                                                           \
+    BENCHMARK_F(Fixture, MonthConstTzUTCMinus0700)                              \
+    (benchmark::State & state) {                                                \
+        benchmarkMonthConstTzUTCMinus0700(state);                               \
+    }                                                                           \
+    BENCHMARK_F(Fixture, MonthConstTzNewYork)                                   \
+    (benchmark::State & state) {                                                \
+        benchmarkMonthConstTzNewYork(state);                                    \
+    }                                                                           \
+    BENCHMARK_F(Fixture, MonthUTC)                                              \
+    (benchmark::State & state) {                                                \
+        benchmarkMonthUTC(state);                                               \
+    }                                                                           \
+    BENCHMARK_F(Fixture, MonthUTCMinus0700)                                     \
+    (benchmark::State & state) {                                                \
+        benchmarkMonthUTCMinus0700(state);                                      \
+    }                                                                           \
+    BENCHMARK_F(Fixture, MonthNewYork)                                          \
+    (benchmark::State & state) {                                                \
+        benchmarkMonthNewYork(state);                                           \
+    }                                                                           \
+    BENCHMARK_F(Fixture, HourNoTZ)                                              \
+    (benchmark::State & state) {                                                \
+        benchmarkHourNoTZ(state);                                               \
+    }                                                                           \
+    BENCHMARK_F(Fixture, HourConstTzUTC)                                        \
+    (benchmark::State & state) {                                                \
+        benchmarkHourConstTzUTC(state);                                         \
+    }                                                                           \
+    BENCHMARK_F(Fixture, HourConstTzUTCMinus0700)                               \
+    (benchmark::State & state) {                                                \
+        benchmarkHourConstTzUTCMinus0700(state);                                \
+    }                                                                           \
+    BENCHMARK_F(Fixture, HourConstTzNewYork)                                    \
+    (benchmark::State & state) {                                                \
+        benchmarkHourConstTzNewYork(state);                                     \
+    }                                                                           \
+    BENCHMARK_F(Fixture, HourUTC)                                               \
+    (benchmark::State & state) {                                                \
+        benchmarkHourUTC(state);                                                \
+    }                                                                           \
+    BENCHMARK_F(Fixture, HourUTCMinus0700)                                      \
+    (benchmark::State & state) {                                                \
+        benchmarkHourUTCMinus0700(state);                                       \
+    }                                                                           \
+    BENCHMARK_F(Fixture, HourNewYork)                                           \
+    (benchmark::State & state) {                                                \
+        benchmarkHourNewYork(state);                                            \
+    }                                                                           \
+    BENCHMARK_F(Fixture, MinuteNoTZ)                                            \
+    (benchmark::State & state) {                                                \
+        benchmarkMinuteNoTZ(state);                                             \
+    }                                                                           \
+    BENCHMARK_F(Fixture, MinuteConstTzUTC)                                      \
+    (benchmark::State & state) {                                                \
+        benchmarkMinuteConstTzUTC(state);                                       \
+    }                                                                           \
+    BENCHMARK_F(Fixture, MinuteConstTzUTCMinus0700)                             \
+    (benchmark::State & state) {                                                \
+        benchmarkMinuteConstTzUTCMinus0700(state);                              \
+    }                                                                           \
+    BENCHMARK_F(Fixture, MinuteConstTzNewYork)                                  \
+    (benchmark::State & state) {                                                \
+        benchmarkMinuteConstTzNewYork(state);                                   \
+    }                                                                           \
+    BENCHMARK_F(Fixture, MinuteUTC)                                             \
+    (benchmark::State & state) {                                                \
+        benchmarkMinuteUTC(state);                                              \
+    }                                                                           \
+    BENCHMARK_F(Fixture, MinuteUTCMinus0700)                                    \
+    (benchmark::State & state) {                                                \
+        benchmarkMinuteUTCMinus0700(state);                                     \
+    }                                                                           \
+    BENCHMARK_F(Fixture, MinuteNewYork)                                         \
+    (benchmark::State & state) {                                                \
+        benchmarkMinuteNewYork(state);                                          \
+    }                                                                           \
+    BENCHMARK_F(Fixture, SecondNoTZ)                                            \
+    (benchmark::State & state) {                                                \
+        benchmarkSecondNoTZ(state);                                             \
+    }                                                                           \
+    BENCHMARK_F(Fixture, SecondConstTzUTC)                                      \
+    (benchmark::State & state) {                                                \
+        benchmarkSecondConstTzUTC(state);                                       \
+    }                                                                           \
+    BENCHMARK_F(Fixture, SecondConstTzUTCMinus0700)                             \
+    (benchmark::State & state) {                                                \
+        benchmarkSecondConstTzUTCMinus0700(state);                              \
+    }                                                                           \
+    BENCHMARK_F(Fixture, SecondConstTzNewYork)                                  \
+    (benchmark::State & state) {                                                \
+        benchmarkSecondConstTzNewYork(state);                                   \
+    }                                                                           \
+    BENCHMARK_F(Fixture, SecondUTC)                                             \
+    (benchmark::State & state) {                                                \
+        benchmarkSecondUTC(state);                                              \
+    }                                                                           \
+    BENCHMARK_F(Fixture, SecondUTCMinus0700)                                    \
+    (benchmark::State & state) {                                                \
+        benchmarkSecondUTCMinus0700(state);                                     \
+    }                                                                           \
+    BENCHMARK_F(Fixture, SecondNewYork)                                         \
+    (benchmark::State & state) {                                                \
+        benchmarkSecondNewYork(state);                                          \
+    }                                                                           \
+    BENCHMARK_F(Fixture, MillisecondNoTZ)                                       \
+    (benchmark::State & state) {                                                \
+        benchmarkMillisecondNoTZ(state);                                        \
+    }                                                                           \
+    BENCHMARK_F(Fixture, MillisecondConstTzUTC)                                 \
+    (benchmark::State & state) {                                                \
+        benchmarkMillisecondConstTzUTC(state);                                  \
+    }                                                                           \
+    BENCHMARK_F(Fixture, MillisecondConstTzUTCMinus0700)                        \
+    (benchmark::State & state) {                                                \
+        benchmarkMillisecondConstTzUTCMinus0700(state);                         \
+    }                                                                           \
+    BENCHMARK_F(Fixture, MillisecondConstTzNewYork)                             \
+    (benchmark::State & state) {                                                \
+        benchmarkMillisecondConstTzNewYork(state);                              \
+    }                                                                           \
+    BENCHMARK_F(Fixture, MillisecondUTC)                                        \
+    (benchmark::State & state) {                                                \
+        benchmarkMillisecondUTC(state);                                         \
+    }                                                                           \
+    BENCHMARK_F(Fixture, MillisecondUTCMinus0700)                               \
+    (benchmark::State & state) {                                                \
+        benchmarkMillisecondUTCMinus0700(state);                                \
+    }                                                                           \
+    BENCHMARK_F(Fixture, MillisecondNewYork)                                    \
+    (benchmark::State & state) {                                                \
+        benchmarkMillisecondNewYork(state);                                     \
+    }                                                                           \
+    BENCHMARK_F(Fixture, WeekNoTZ)                                              \
+    (benchmark::State & state) {                                                \
+        benchmarkWeekNoTZ(state);                                               \
+    }                                                                           \
+    BENCHMARK_F(Fixture, WeekConstTzUTC)                                        \
+    (benchmark::State & state) {                                                \
+        benchmarkWeekConstTzUTC(state);                                         \
+    }                                                                           \
+    BENCHMARK_F(Fixture, WeekConstTzUTCMinus0700)                               \
+    (benchmark::State & state) {                                                \
+        benchmarkWeekConstTzUTCMinus0700(state);                                \
+    }                                                                           \
+    BENCHMARK_F(Fixture, WeekConstTzNewYork)                                    \
+    (benchmark::State & state) {                                                \
+        benchmarkWeekConstTzNewYork(state);                                     \
+    }                                                                           \
+    BENCHMARK_F(Fixture, WeekUTC)                                               \
+    (benchmark::State & state) {                                                \
+        benchmarkWeekUTC(state);                                                \
+    }                                                                           \
+    BENCHMARK_F(Fixture, WeekUTCMinus0700)                                      \
+    (benchmark::State & state) {                                                \
+        benchmarkWeekUTCMinus0700(state);                                       \
+    }                                                                           \
+    BENCHMARK_F(Fixture, WeekNewYork)                                           \
+    (benchmark::State & state) {                                                \
+        benchmarkWeekNewYork(state);                                            \
+    }                                                                           \
+    BENCHMARK_F(Fixture, ISOWeekYearNoTZ)                                       \
+    (benchmark::State & state) {                                                \
+        benchmarkISOWeekYearNoTZ(state);                                        \
+    }                                                                           \
+    BENCHMARK_F(Fixture, ISOWeekYearConstTzUTC)                                 \
+    (benchmark::State & state) {                                                \
+        benchmarkISOWeekYearConstTzUTC(state);                                  \
+    }                                                                           \
+    BENCHMARK_F(Fixture, ISOWeekYearConstTzUTCMinus0700)                        \
+    (benchmark::State & state) {                                                \
+        benchmarkISOWeekYearConstTzUTCMinus0700(state);                         \
+    }                                                                           \
+    BENCHMARK_F(Fixture, ISOWeekYearConstTzNewYork)                             \
+    (benchmark::State & state) {                                                \
+        benchmarkISOWeekYearConstTzNewYork(state);                              \
+    }                                                                           \
+    BENCHMARK_F(Fixture, ISOWeekYearUTC)                                        \
+    (benchmark::State & state) {                                                \
+        benchmarkISOWeekYearUTC(state);                                         \
+    }                                                                           \
+    BENCHMARK_F(Fixture, ISOWeekYearUTCMinus0700)                               \
+    (benchmark::State & state) {                                                \
+        benchmarkISOWeekYearUTCMinus0700(state);                                \
+    }                                                                           \
+    BENCHMARK_F(Fixture, ISOWeekYearNewYork)                                    \
+    (benchmark::State & state) {                                                \
+        benchmarkISOWeekYearNewYork(state);                                     \
+    }                                                                           \
+    BENCHMARK_F(Fixture, ISODayOfWeekNoTZ)                                      \
+    (benchmark::State & state) {                                                \
+        benchmarkISODayOfWeekNoTZ(state);                                       \
+    }                                                                           \
+    BENCHMARK_F(Fixture, ISODayOfWeekConstTzUTC)                                \
+    (benchmark::State & state) {                                                \
+        benchmarkISODayOfWeekConstTzUTC(state);                                 \
+    }                                                                           \
+    BENCHMARK_F(Fixture, ISODayOfWeekConstTzUTCMinus0700)                       \
+    (benchmark::State & state) {                                                \
+        benchmarkISODayOfWeekConstTzUTCMinus0700(state);                        \
+    }                                                                           \
+    BENCHMARK_F(Fixture, ISODayOfWeekConstTzNewYork)                            \
+    (benchmark::State & state) {                                                \
+        benchmarkISODayOfWeekConstTzNewYork(state);                             \
+    }                                                                           \
+    BENCHMARK_F(Fixture, ISODayOfWeekUTC)                                       \
+    (benchmark::State & state) {                                                \
+        benchmarkISODayOfWeekUTC(state);                                        \
+    }                                                                           \
+    BENCHMARK_F(Fixture, ISODayOfWeekUTCMinus0700)                              \
+    (benchmark::State & state) {                                                \
+        benchmarkISODayOfWeekUTCMinus0700(state);                               \
+    }                                                                           \
+    BENCHMARK_F(Fixture, ISODayOfWeekNewYork)                                   \
+    (benchmark::State & state) {                                                \
+        benchmarkISODayOfWeekNewYork(state);                                    \
+    }                                                                           \
+    BENCHMARK_F(Fixture, ISOWeekNoTZ)                                           \
+    (benchmark::State & state) {                                                \
+        benchmarkISOWeekNoTZ(state);                                            \
+    }                                                                           \
+    BENCHMARK_F(Fixture, ISOWeekConstTzUTC)                                     \
+    (benchmark::State & state) {                                                \
+        benchmarkISOWeekConstTzUTC(state);                                      \
+    }                                                                           \
+    BENCHMARK_F(Fixture, ISOWeekConstTzUTCMinus0700)                            \
+    (benchmark::State & state) {                                                \
+        benchmarkISOWeekConstTzUTCMinus0700(state);                             \
+    }                                                                           \
+    BENCHMARK_F(Fixture, ISOWeekConstTzNewYork)                                 \
+    (benchmark::State & state) {                                                \
+        benchmarkISOWeekConstTzNewYork(state);                                  \
+    }                                                                           \
+    BENCHMARK_F(Fixture, ISOWeekUTC)                                            \
+    (benchmark::State & state) {                                                \
+        benchmarkISOWeekUTC(state);                                             \
+    }                                                                           \
+    BENCHMARK_F(Fixture, ISOWeekUTCMinus0700)                                   \
+    (benchmark::State & state) {                                                \
+        benchmarkISOWeekUTCMinus0700(state);                                    \
+    }                                                                           \
+    BENCHMARK_F(Fixture, ISOWeekNewYork)                                        \
+    (benchmark::State & state) {                                                \
+        benchmarkISOWeekNewYork(state);                                         \
     }                                                                           \
     BENCHMARK_F(Fixture, GetFieldEvaluateExpression)                            \
     (benchmark::State & state) {                                                \

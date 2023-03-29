@@ -740,6 +740,15 @@ enum class Builtin : uint8_t {
     internalLeast,     // helper functions for computation of sort keys
     internalGreatest,  // helper functions for computation of sort keys
     year,
+    month,
+    hour,
+    minute,
+    second,
+    millisecond,
+    week,
+    isoWeekYear,
+    isoDayOfWeek,
+    isoWeek,
 };
 
 std::string builtinToString(Builtin b);
@@ -1277,6 +1286,97 @@ private:
                                                                value::Value dateValue,
                                                                value::TypeTags timezoneTag,
                                                                value::Value timezoneValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericMonth(value::TypeTags timezoneDBTag,
+                                                                value::Value timezoneDBValue,
+                                                                value::TypeTags dateTag,
+                                                                value::Value dateValue,
+                                                                value::TypeTags timezoneTag,
+                                                                value::Value timezoneValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericMonth(value::TypeTags dateTag,
+                                                                value::Value dateValue,
+                                                                value::TypeTags timezoneTag,
+                                                                value::Value timezoneValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericHour(value::TypeTags timezoneDBTag,
+                                                               value::Value timezoneDBValue,
+                                                               value::TypeTags dateTag,
+                                                               value::Value dateValue,
+                                                               value::TypeTags timezoneTag,
+                                                               value::Value timezoneValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericHour(value::TypeTags dateTag,
+                                                               value::Value dateValue,
+                                                               value::TypeTags timezoneTag,
+                                                               value::Value timezoneValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericMinute(value::TypeTags timezoneDBTag,
+                                                                 value::Value timezoneDBValue,
+                                                                 value::TypeTags dateTag,
+                                                                 value::Value dateValue,
+                                                                 value::TypeTags timezoneTag,
+                                                                 value::Value timezoneValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericMinute(value::TypeTags dateTag,
+                                                                 value::Value dateValue,
+                                                                 value::TypeTags timezoneTag,
+                                                                 value::Value timezoneValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericSecond(value::TypeTags timezoneDBTag,
+                                                                 value::Value timezoneDBValue,
+                                                                 value::TypeTags dateTag,
+                                                                 value::Value dateValue,
+                                                                 value::TypeTags timezoneTag,
+                                                                 value::Value timezoneValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericSecond(value::TypeTags dateTag,
+                                                                 value::Value dateValue,
+                                                                 value::TypeTags timezoneTag,
+                                                                 value::Value timezoneValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericMillisecond(value::TypeTags timezoneDBTag,
+                                                                      value::Value timezoneDBValue,
+                                                                      value::TypeTags dateTag,
+                                                                      value::Value dateValue,
+                                                                      value::TypeTags timezoneTag,
+                                                                      value::Value timezoneValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericMillisecond(value::TypeTags dateTag,
+                                                                      value::Value dateValue,
+                                                                      value::TypeTags timezoneTag,
+                                                                      value::Value timezoneValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericWeek(value::TypeTags timezoneDBTag,
+                                                               value::Value timezoneDBValue,
+                                                               value::TypeTags dateTag,
+                                                               value::Value dateValue,
+                                                               value::TypeTags timezoneTag,
+                                                               value::Value timezoneValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericWeek(value::TypeTags dateTag,
+                                                               value::Value dateValue,
+                                                               value::TypeTags timezoneTag,
+                                                               value::Value timezoneValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericISOWeekYear(value::TypeTags timezoneDBTag,
+                                                                      value::Value timezoneDBValue,
+                                                                      value::TypeTags dateTag,
+                                                                      value::Value dateValue,
+                                                                      value::TypeTags timezoneTag,
+                                                                      value::Value timezoneValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericISOWeekYear(value::TypeTags dateTag,
+                                                                      value::Value dateValue,
+                                                                      value::TypeTags timezoneTag,
+                                                                      value::Value timezoneValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericISODayOfWeek(
+        value::TypeTags timezoneDBTag,
+        value::Value timezoneDBValue,
+        value::TypeTags dateTag,
+        value::Value dateValue,
+        value::TypeTags timezoneTag,
+        value::Value timezoneValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericISODayOfWeek(value::TypeTags dateTag,
+                                                                       value::Value dateValue,
+                                                                       value::TypeTags timezoneTag,
+                                                                       value::Value timezoneValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericISOWeek(value::TypeTags timezoneDBTag,
+                                                                  value::Value timezoneDBValue,
+                                                                  value::TypeTags dateTag,
+                                                                  value::Value dateValue,
+                                                                  value::TypeTags timezoneTag,
+                                                                  value::Value timezoneValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericISOWeek(value::TypeTags dateTag,
+                                                                  value::Value dateValue,
+                                                                  value::TypeTags timezoneTag,
+                                                                  value::Value timezoneValue);
     FastTuple<bool, value::TypeTags, value::Value> genericNewKeyString(
         ArityType arity, CollatorInterface* collator = nullptr);
     FastTuple<bool, value::TypeTags, value::Value> dateTrunc(value::TypeTags dateTag,
@@ -1431,6 +1531,15 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinMinMaxFromArray(ArityType arity,
                                                                           Builtin f);
     FastTuple<bool, value::TypeTags, value::Value> builtinYear(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinMonth(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinHour(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinMinute(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinSecond(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinMillisecond(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinWeek(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinISOWeekYear(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinISODayOfWeek(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinISOWeek(ArityType arity);
 
     FastTuple<bool, value::TypeTags, value::Value> dispatchBuiltin(Builtin f, ArityType arity);
 

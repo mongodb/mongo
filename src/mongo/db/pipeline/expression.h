@@ -2089,7 +2089,8 @@ public:
                             boost::intrusive_ptr<Expression> timeZone = nullptr)
         : DateExpressionAcceptingTimeZone<ExpressionHour>(
               expCtx, "$hour", std::move(date), std::move(timeZone)) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        expCtx->sbeCompatibility =
+            std::min(expCtx->sbeCompatibility, SbeCompatibility::flagGuarded);
     }
 
     Value evaluateDate(Date_t date, const TimeZone& timeZone) const final {
@@ -2490,7 +2491,8 @@ public:
                                    boost::intrusive_ptr<Expression> timeZone = nullptr)
         : DateExpressionAcceptingTimeZone<ExpressionMillisecond>(
               expCtx, "$millisecond", std::move(date), std::move(timeZone)) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        expCtx->sbeCompatibility =
+            std::min(expCtx->sbeCompatibility, SbeCompatibility::flagGuarded);
     }
 
     Value evaluateDate(Date_t date, const TimeZone& timeZone) const final {
@@ -2514,7 +2516,8 @@ public:
                               boost::intrusive_ptr<Expression> timeZone = nullptr)
         : DateExpressionAcceptingTimeZone<ExpressionMinute>(
               expCtx, "$minute", std::move(date), std::move(timeZone)) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        expCtx->sbeCompatibility =
+            std::min(expCtx->sbeCompatibility, SbeCompatibility::flagGuarded);
     }
 
     Value evaluateDate(Date_t date, const TimeZone& timeZone) const final {
@@ -2600,7 +2603,8 @@ public:
                              boost::intrusive_ptr<Expression> timeZone = nullptr)
         : DateExpressionAcceptingTimeZone<ExpressionMonth>(
               expCtx, "$month", std::move(date), std::move(timeZone)) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        expCtx->sbeCompatibility =
+            std::min(expCtx->sbeCompatibility, SbeCompatibility::flagGuarded);
     }
 
     Value evaluateDate(Date_t date, const TimeZone& timeZone) const final {
@@ -2897,7 +2901,8 @@ public:
                      boost::intrusive_ptr<Expression> timeZone = nullptr)
         : DateExpressionAcceptingTimeZone<ExpressionSecond>(
               expCtx, "$second", std::move(date), std::move(timeZone)) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        expCtx->sbeCompatibility =
+            std::min(expCtx->sbeCompatibility, SbeCompatibility::flagGuarded);
     }
 
     Value evaluateDate(Date_t date, const TimeZone& timeZone) const final {
@@ -3683,7 +3688,8 @@ public:
                    boost::intrusive_ptr<Expression> timeZone = nullptr)
         : DateExpressionAcceptingTimeZone<ExpressionWeek>(
               expCtx, "$week", std::move(date), std::move(timeZone)) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        expCtx->sbeCompatibility =
+            std::min(expCtx->sbeCompatibility, SbeCompatibility::flagGuarded);
     }
 
     Value evaluateDate(Date_t date, const TimeZone& timeZone) const final {
@@ -3707,7 +3713,8 @@ public:
                           boost::intrusive_ptr<Expression> timeZone = nullptr)
         : DateExpressionAcceptingTimeZone<ExpressionIsoWeekYear>(
               expCtx, "$isoWeekYear", std::move(date), std::move(timeZone)) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        expCtx->sbeCompatibility =
+            std::min(expCtx->sbeCompatibility, SbeCompatibility::flagGuarded);
     }
 
     Value evaluateDate(Date_t date, const TimeZone& timeZone) const final {
@@ -3732,7 +3739,8 @@ public:
                            boost::intrusive_ptr<Expression> timeZone = nullptr)
         : DateExpressionAcceptingTimeZone<ExpressionIsoDayOfWeek>(
               expCtx, "$isoDayOfWeek", std::move(date), std::move(timeZone)) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        expCtx->sbeCompatibility =
+            std::min(expCtx->sbeCompatibility, SbeCompatibility::flagGuarded);
     }
 
     Value evaluateDate(Date_t date, const TimeZone& timeZone) const final {
@@ -3756,7 +3764,8 @@ public:
                       boost::intrusive_ptr<Expression> timeZone = nullptr)
         : DateExpressionAcceptingTimeZone<ExpressionIsoWeek>(
               expCtx, "$isoWeek", std::move(date), std::move(timeZone)) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        expCtx->sbeCompatibility =
+            std::min(expCtx->sbeCompatibility, SbeCompatibility::flagGuarded);
     }
 
     Value evaluateDate(Date_t date, const TimeZone& timeZone) const final {

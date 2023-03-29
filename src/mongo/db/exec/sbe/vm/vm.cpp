@@ -3438,6 +3438,141 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinYear(ArityType a
     }
 }
 
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinMonth(ArityType arity) {
+    invariant(arity == 3 || arity == 2);
+
+    auto [dateOwn, dateTag, dateValue] = getFromStack(0);
+    if (arity == 3) {
+        auto [timezoneDBOwn, timezoneDBTag, timezoneDBValue] = getFromStack(1);
+        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(2);
+        return genericMonth(
+            timezoneDBTag, timezoneDBValue, dateTag, dateValue, timezoneTag, timezoneValue);
+    } else {
+        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(1);
+        return genericMonth(dateTag, dateValue, timezoneTag, timezoneValue);
+    }
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinHour(ArityType arity) {
+    invariant(arity == 3 || arity == 2);
+
+    auto [dateOwn, dateTag, dateValue] = getFromStack(0);
+    if (arity == 3) {
+        auto [timezoneDBOwn, timezoneDBTag, timezoneDBValue] = getFromStack(1);
+        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(2);
+        return genericHour(
+            timezoneDBTag, timezoneDBValue, dateTag, dateValue, timezoneTag, timezoneValue);
+    } else {
+        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(1);
+        return genericHour(dateTag, dateValue, timezoneTag, timezoneValue);
+    }
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinMinute(ArityType arity) {
+    invariant(arity == 3 || arity == 2);
+
+    auto [dateOwn, dateTag, dateValue] = getFromStack(0);
+    if (arity == 3) {
+        auto [timezoneDBOwn, timezoneDBTag, timezoneDBValue] = getFromStack(1);
+        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(2);
+        return genericMinute(
+            timezoneDBTag, timezoneDBValue, dateTag, dateValue, timezoneTag, timezoneValue);
+    } else {
+        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(1);
+        return genericMinute(dateTag, dateValue, timezoneTag, timezoneValue);
+    }
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSecond(ArityType arity) {
+    invariant(arity == 3 || arity == 2);
+
+    auto [dateOwn, dateTag, dateValue] = getFromStack(0);
+    if (arity == 3) {
+        auto [timezoneDBOwn, timezoneDBTag, timezoneDBValue] = getFromStack(1);
+        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(2);
+        return genericSecond(
+            timezoneDBTag, timezoneDBValue, dateTag, dateValue, timezoneTag, timezoneValue);
+    } else {
+        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(1);
+        return genericSecond(dateTag, dateValue, timezoneTag, timezoneValue);
+    }
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinMillisecond(ArityType arity) {
+    invariant(arity == 3 || arity == 2);
+
+    auto [dateOwn, dateTag, dateValue] = getFromStack(0);
+    if (arity == 3) {
+        auto [timezoneDBOwn, timezoneDBTag, timezoneDBValue] = getFromStack(1);
+        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(2);
+        return genericMillisecond(
+            timezoneDBTag, timezoneDBValue, dateTag, dateValue, timezoneTag, timezoneValue);
+    } else {
+        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(1);
+        return genericMillisecond(dateTag, dateValue, timezoneTag, timezoneValue);
+    }
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinWeek(ArityType arity) {
+    invariant(arity == 3 || arity == 2);
+
+    auto [dateOwn, dateTag, dateValue] = getFromStack(0);
+    if (arity == 3) {
+        auto [timezoneDBOwn, timezoneDBTag, timezoneDBValue] = getFromStack(1);
+        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(2);
+        return genericWeek(
+            timezoneDBTag, timezoneDBValue, dateTag, dateValue, timezoneTag, timezoneValue);
+    } else {
+        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(1);
+        return genericWeek(dateTag, dateValue, timezoneTag, timezoneValue);
+    }
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinISOWeekYear(ArityType arity) {
+    invariant(arity == 3 || arity == 2);
+
+    auto [dateOwn, dateTag, dateValue] = getFromStack(0);
+    if (arity == 3) {
+        auto [timezoneDBOwn, timezoneDBTag, timezoneDBValue] = getFromStack(1);
+        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(2);
+        return genericISOWeekYear(
+            timezoneDBTag, timezoneDBValue, dateTag, dateValue, timezoneTag, timezoneValue);
+    } else {
+        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(1);
+        return genericISOWeekYear(dateTag, dateValue, timezoneTag, timezoneValue);
+    }
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinISODayOfWeek(ArityType arity) {
+    invariant(arity == 3 || arity == 2);
+
+    auto [dateOwn, dateTag, dateValue] = getFromStack(0);
+    if (arity == 3) {
+        auto [timezoneDBOwn, timezoneDBTag, timezoneDBValue] = getFromStack(1);
+        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(2);
+        return genericISODayOfWeek(
+            timezoneDBTag, timezoneDBValue, dateTag, dateValue, timezoneTag, timezoneValue);
+    } else {
+        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(1);
+        return genericISODayOfWeek(dateTag, dateValue, timezoneTag, timezoneValue);
+    }
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinISOWeek(ArityType arity) {
+    invariant(arity == 3 || arity == 2);
+
+    auto [dateOwn, dateTag, dateValue] = getFromStack(0);
+    if (arity == 3) {
+        auto [timezoneDBOwn, timezoneDBTag, timezoneDBValue] = getFromStack(1);
+        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(2);
+        return genericISOWeek(
+            timezoneDBTag, timezoneDBValue, dateTag, dateValue, timezoneTag, timezoneValue);
+    } else {
+        auto [timezoneOwn, timezoneTag, timezoneValue] = getFromStack(1);
+        return genericISOWeek(dateTag, dateValue, timezoneTag, timezoneValue);
+    }
+}
+
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinBitTestPosition(ArityType arity) {
     invariant(arity == 3);
 
@@ -5866,6 +6001,24 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinMinMaxFromArray(arity, f);
         case Builtin::year:
             return builtinYear(arity);
+        case Builtin::month:
+            return builtinMonth(arity);
+        case Builtin::hour:
+            return builtinHour(arity);
+        case Builtin::minute:
+            return builtinMinute(arity);
+        case Builtin::second:
+            return builtinSecond(arity);
+        case Builtin::millisecond:
+            return builtinMillisecond(arity);
+        case Builtin::week:
+            return builtinWeek(arity);
+        case Builtin::isoWeekYear:
+            return builtinISOWeekYear(arity);
+        case Builtin::isoDayOfWeek:
+            return builtinISODayOfWeek(arity);
+        case Builtin::isoWeek:
+            return builtinISOWeek(arity);
     }
 
     MONGO_UNREACHABLE;
@@ -6112,6 +6265,26 @@ std::string builtinToString(Builtin b) {
             return "internalLeast";
         case Builtin::internalGreatest:
             return "internalGreatest";
+        case Builtin::year:
+            return "year";
+        case Builtin::month:
+            return "month";
+        case Builtin::hour:
+            return "hour";
+        case Builtin::minute:
+            return "minute";
+        case Builtin::second:
+            return "second";
+        case Builtin::millisecond:
+            return "millisecond";
+        case Builtin::week:
+            return "week";
+        case Builtin::isoWeekYear:
+            return "isoWeekYear";
+        case Builtin::isoDayOfWeek:
+            return "isoDayOfWeek";
+        case Builtin::isoWeek:
+            return "isoWeek";
         default:
             MONGO_UNREACHABLE;
     }

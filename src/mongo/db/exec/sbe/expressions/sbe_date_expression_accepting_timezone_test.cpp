@@ -308,4 +308,516 @@ TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicYear) {
     runAndAssertNothing(compiledYear.get());
 }
 
+TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicMonth) {
+    value::OwnedValueAccessor timezoneDBAccessor;
+    auto timezoneDBSlot = bindAccessor(&timezoneDBAccessor);
+    value::OwnedValueAccessor dateAccessor;
+    auto dateSlot = bindAccessor(&dateAccessor);
+    value::OwnedValueAccessor timezoneAccessor;
+    auto timezoneSlot = bindAccessor(&timezoneAccessor);
+
+    auto monthExpr = sbe::makeE<sbe::EFunction>("month",
+                                                sbe::makeEs(makeE<EVariable>(dateSlot),
+                                                            makeE<EVariable>(timezoneDBSlot),
+                                                            makeE<EVariable>(timezoneSlot)));
+    auto compiledMonth = compileExpression(*monthExpr);
+
+    // Test $month returns the correct value.
+    auto tzdb = std::make_unique<TimeZoneDatabase>();
+    timezoneDBAccessor.reset(
+        false, value::TypeTags::timeZoneDB, value::bitcastFrom<TimeZoneDatabase*>(tzdb.get()));
+    dateAccessor.reset(
+        value::TypeTags::Date,
+        value::bitcastFrom<int64_t>(
+            kDefaultTimeZone.createFromDateParts(1996, 7, 18, 10, 10, 10, 0).toMillisSinceEpoch()));
+    auto [timezoneTag, timezoneVal] = value::makeNewString("UTC");
+    timezoneAccessor.reset(timezoneTag, timezoneVal);
+    runAndAssertExpression(compiledMonth.get(), 7);
+
+    // Test $month returns Nothing with invalid date.
+    dateAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(42));
+    runAndAssertNothing(compiledMonth.get());
+
+    // Test $month returns Nothing with invalid timezone.
+    dateAccessor.reset(value::TypeTags::Date, value::bitcastFrom<int64_t>(21929999));
+    timezoneAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(42));
+    runAndAssertNothing(compiledMonth.get());
+
+    // Test $month returns Nothing with invalid timezoneDB.
+    timezoneAccessor.reset(timezoneTag, timezoneVal);
+    timezoneDBAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(42));
+    runAndAssertNothing(compiledMonth.get());
+
+    // Test $month with constant timezone
+    value::OwnedValueAccessor timezoneObjAccessor;
+    auto timezoneObjSlot = bindAccessor(&timezoneObjAccessor);
+    monthExpr = sbe::makeE<sbe::EFunction>(
+        "month", sbe::makeEs(makeE<EVariable>(dateSlot), makeE<EVariable>(timezoneObjSlot)));
+    compiledMonth = compileExpression(*monthExpr);
+
+    dateAccessor.reset(
+        value::TypeTags::Date,
+        value::bitcastFrom<int64_t>(
+            kDefaultTimeZone.createFromDateParts(1996, 7, 18, 10, 10, 10, 0).toMillisSinceEpoch()));
+    auto timezone = tzdb->utcZone();
+    timezoneObjAccessor.reset(
+        false, value::TypeTags::timeZone, value::bitcastFrom<TimeZone*>(&timezone));
+    runAndAssertExpression(compiledMonth.get(), 7);
+}
+
+TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicHour) {
+    value::OwnedValueAccessor timezoneDBAccessor;
+    auto timezoneDBSlot = bindAccessor(&timezoneDBAccessor);
+    value::OwnedValueAccessor dateAccessor;
+    auto dateSlot = bindAccessor(&dateAccessor);
+    value::OwnedValueAccessor timezoneAccessor;
+    auto timezoneSlot = bindAccessor(&timezoneAccessor);
+
+    auto hourExpr = sbe::makeE<sbe::EFunction>("hour",
+                                               sbe::makeEs(makeE<EVariable>(dateSlot),
+                                                           makeE<EVariable>(timezoneDBSlot),
+                                                           makeE<EVariable>(timezoneSlot)));
+    auto compiledHour = compileExpression(*hourExpr);
+
+    // Test $hour returns the correct value.
+    auto tzdb = std::make_unique<TimeZoneDatabase>();
+    timezoneDBAccessor.reset(
+        false, value::TypeTags::timeZoneDB, value::bitcastFrom<TimeZoneDatabase*>(tzdb.get()));
+    dateAccessor.reset(value::TypeTags::Date,
+                       value::bitcastFrom<int64_t>(
+                           kDefaultTimeZone.createFromDateParts(1996, 7, 18, 10, 11, 12, 123)
+                               .toMillisSinceEpoch()));
+    auto [timezoneTag, timezoneVal] = value::makeNewString("UTC");
+    timezoneAccessor.reset(timezoneTag, timezoneVal);
+    runAndAssertExpression(compiledHour.get(), 10);
+
+    // Test $hour returns Nothing with invalid date.
+    dateAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(42));
+    runAndAssertNothing(compiledHour.get());
+
+    // Test $hour returns Nothing with invalid timezone.
+    dateAccessor.reset(value::TypeTags::Date, value::bitcastFrom<int64_t>(21929999));
+    timezoneAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(42));
+    runAndAssertNothing(compiledHour.get());
+
+    // Test $hour returns Nothing with invalid timezoneDB.
+    timezoneAccessor.reset(timezoneTag, timezoneVal);
+    timezoneDBAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(42));
+    runAndAssertNothing(compiledHour.get());
+
+    // Test $hour with constant timezone
+    value::OwnedValueAccessor timezoneObjAccessor;
+    auto timezoneObjSlot = bindAccessor(&timezoneObjAccessor);
+    hourExpr = sbe::makeE<sbe::EFunction>(
+        "hour", sbe::makeEs(makeE<EVariable>(dateSlot), makeE<EVariable>(timezoneObjSlot)));
+    compiledHour = compileExpression(*hourExpr);
+
+    dateAccessor.reset(value::TypeTags::Date,
+                       value::bitcastFrom<int64_t>(
+                           kDefaultTimeZone.createFromDateParts(1996, 7, 18, 10, 11, 12, 123)
+                               .toMillisSinceEpoch()));
+    auto timezone = tzdb->utcZone();
+    timezoneObjAccessor.reset(
+        false, value::TypeTags::timeZone, value::bitcastFrom<TimeZone*>(&timezone));
+    runAndAssertExpression(compiledHour.get(), 10);
+}
+
+TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicMinute) {
+    value::OwnedValueAccessor timezoneDBAccessor;
+    auto timezoneDBSlot = bindAccessor(&timezoneDBAccessor);
+    value::OwnedValueAccessor dateAccessor;
+    auto dateSlot = bindAccessor(&dateAccessor);
+    value::OwnedValueAccessor timezoneAccessor;
+    auto timezoneSlot = bindAccessor(&timezoneAccessor);
+
+    auto minuteExpr = sbe::makeE<sbe::EFunction>("minute",
+                                                 sbe::makeEs(makeE<EVariable>(dateSlot),
+                                                             makeE<EVariable>(timezoneDBSlot),
+                                                             makeE<EVariable>(timezoneSlot)));
+    auto compiledMinute = compileExpression(*minuteExpr);
+
+    // Test $minute returns the correct value.
+    auto tzdb = std::make_unique<TimeZoneDatabase>();
+    timezoneDBAccessor.reset(
+        false, value::TypeTags::timeZoneDB, value::bitcastFrom<TimeZoneDatabase*>(tzdb.get()));
+    dateAccessor.reset(value::TypeTags::Date,
+                       value::bitcastFrom<int64_t>(
+                           kDefaultTimeZone.createFromDateParts(1996, 7, 18, 10, 11, 12, 123)
+                               .toMillisSinceEpoch()));
+    auto [timezoneTag, timezoneVal] = value::makeNewString("UTC");
+    timezoneAccessor.reset(timezoneTag, timezoneVal);
+    runAndAssertExpression(compiledMinute.get(), 11);
+
+    // Test $minute returns Nothing with invalid date.
+    dateAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(42));
+    runAndAssertNothing(compiledMinute.get());
+
+    // Test $minute returns Nothing with invalid timezone.
+    dateAccessor.reset(value::TypeTags::Date, value::bitcastFrom<int64_t>(21929999));
+    timezoneAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(42));
+    runAndAssertNothing(compiledMinute.get());
+
+    // Test $minute returns Nothing with invalid timezoneDB.
+    timezoneAccessor.reset(timezoneTag, timezoneVal);
+    timezoneDBAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(42));
+    runAndAssertNothing(compiledMinute.get());
+
+    // Test $minute with constant timezone
+    value::OwnedValueAccessor timezoneObjAccessor;
+    auto timezoneObjSlot = bindAccessor(&timezoneObjAccessor);
+    minuteExpr = sbe::makeE<sbe::EFunction>(
+        "minute", sbe::makeEs(makeE<EVariable>(dateSlot), makeE<EVariable>(timezoneObjSlot)));
+    compiledMinute = compileExpression(*minuteExpr);
+
+    dateAccessor.reset(value::TypeTags::Date,
+                       value::bitcastFrom<int64_t>(
+                           kDefaultTimeZone.createFromDateParts(1996, 7, 18, 10, 11, 12, 123)
+                               .toMillisSinceEpoch()));
+    auto timezone = tzdb->utcZone();
+    timezoneObjAccessor.reset(
+        false, value::TypeTags::timeZone, value::bitcastFrom<TimeZone*>(&timezone));
+    runAndAssertExpression(compiledMinute.get(), 11);
+}
+
+TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicSecond) {
+    value::OwnedValueAccessor timezoneDBAccessor;
+    auto timezoneDBSlot = bindAccessor(&timezoneDBAccessor);
+    value::OwnedValueAccessor dateAccessor;
+    auto dateSlot = bindAccessor(&dateAccessor);
+    value::OwnedValueAccessor timezoneAccessor;
+    auto timezoneSlot = bindAccessor(&timezoneAccessor);
+
+    auto secondExpr = sbe::makeE<sbe::EFunction>("second",
+                                                 sbe::makeEs(makeE<EVariable>(dateSlot),
+                                                             makeE<EVariable>(timezoneDBSlot),
+                                                             makeE<EVariable>(timezoneSlot)));
+    auto compiledSecond = compileExpression(*secondExpr);
+
+    // Test $second returns the correct value.
+    auto tzdb = std::make_unique<TimeZoneDatabase>();
+    timezoneDBAccessor.reset(
+        false, value::TypeTags::timeZoneDB, value::bitcastFrom<TimeZoneDatabase*>(tzdb.get()));
+    dateAccessor.reset(value::TypeTags::Date,
+                       value::bitcastFrom<int64_t>(
+                           kDefaultTimeZone.createFromDateParts(1996, 7, 18, 10, 11, 12, 123)
+                               .toMillisSinceEpoch()));
+    auto [timezoneTag, timezoneVal] = value::makeNewString("UTC");
+    timezoneAccessor.reset(timezoneTag, timezoneVal);
+    runAndAssertExpression(compiledSecond.get(), 12);
+
+    // Test $second returns Nothing with invalid date.
+    dateAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(42));
+    runAndAssertNothing(compiledSecond.get());
+
+    // Test $second returns Nothing with invalid timezone.
+    dateAccessor.reset(value::TypeTags::Date, value::bitcastFrom<int64_t>(21929999));
+    timezoneAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(42));
+    runAndAssertNothing(compiledSecond.get());
+
+    // Test $second returns Nothing with invalid timezoneDB.
+    timezoneAccessor.reset(timezoneTag, timezoneVal);
+    timezoneDBAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(42));
+    runAndAssertNothing(compiledSecond.get());
+
+    // Test $second with constant timezone
+    value::OwnedValueAccessor timezoneObjAccessor;
+    auto timezoneObjSlot = bindAccessor(&timezoneObjAccessor);
+    secondExpr = sbe::makeE<sbe::EFunction>(
+        "second", sbe::makeEs(makeE<EVariable>(dateSlot), makeE<EVariable>(timezoneObjSlot)));
+    compiledSecond = compileExpression(*secondExpr);
+
+    dateAccessor.reset(value::TypeTags::Date,
+                       value::bitcastFrom<int64_t>(
+                           kDefaultTimeZone.createFromDateParts(1996, 7, 18, 10, 11, 12, 123)
+                               .toMillisSinceEpoch()));
+    auto timezone = tzdb->utcZone();
+    timezoneObjAccessor.reset(
+        false, value::TypeTags::timeZone, value::bitcastFrom<TimeZone*>(&timezone));
+    runAndAssertExpression(compiledSecond.get(), 12);
+}
+
+TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicMillisecond) {
+    value::OwnedValueAccessor timezoneDBAccessor;
+    auto timezoneDBSlot = bindAccessor(&timezoneDBAccessor);
+    value::OwnedValueAccessor dateAccessor;
+    auto dateSlot = bindAccessor(&dateAccessor);
+    value::OwnedValueAccessor timezoneAccessor;
+    auto timezoneSlot = bindAccessor(&timezoneAccessor);
+
+    auto millisecondExpr = sbe::makeE<sbe::EFunction>("millisecond",
+                                                      sbe::makeEs(makeE<EVariable>(dateSlot),
+                                                                  makeE<EVariable>(timezoneDBSlot),
+                                                                  makeE<EVariable>(timezoneSlot)));
+    auto compiledMillisecond = compileExpression(*millisecondExpr);
+
+    // Test $millisecond returns the correct value.
+    auto tzdb = std::make_unique<TimeZoneDatabase>();
+    timezoneDBAccessor.reset(
+        false, value::TypeTags::timeZoneDB, value::bitcastFrom<TimeZoneDatabase*>(tzdb.get()));
+    dateAccessor.reset(value::TypeTags::Date,
+                       value::bitcastFrom<int64_t>(
+                           kDefaultTimeZone.createFromDateParts(1996, 7, 18, 10, 11, 12, 123)
+                               .toMillisSinceEpoch()));
+    auto [timezoneTag, timezoneVal] = value::makeNewString("UTC");
+    timezoneAccessor.reset(timezoneTag, timezoneVal);
+    runAndAssertExpression(compiledMillisecond.get(), 123);
+
+    // Test $millisecond returns Nothing with invalid date.
+    dateAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(42));
+    runAndAssertNothing(compiledMillisecond.get());
+
+    // Test $millisecond returns Nothing with invalid timezone.
+    dateAccessor.reset(value::TypeTags::Date, value::bitcastFrom<int64_t>(21929999));
+    timezoneAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(42));
+    runAndAssertNothing(compiledMillisecond.get());
+
+    // Test $millisecond returns Nothing with invalid timezoneDB.
+    timezoneAccessor.reset(timezoneTag, timezoneVal);
+    timezoneDBAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(42));
+    runAndAssertNothing(compiledMillisecond.get());
+
+    // Test $millisecond with constant timezone
+    value::OwnedValueAccessor timezoneObjAccessor;
+    auto timezoneObjSlot = bindAccessor(&timezoneObjAccessor);
+    millisecondExpr = sbe::makeE<sbe::EFunction>(
+        "millisecond", sbe::makeEs(makeE<EVariable>(dateSlot), makeE<EVariable>(timezoneObjSlot)));
+    compiledMillisecond = compileExpression(*millisecondExpr);
+
+    dateAccessor.reset(value::TypeTags::Date,
+                       value::bitcastFrom<int64_t>(
+                           kDefaultTimeZone.createFromDateParts(1996, 7, 18, 10, 11, 12, 123)
+                               .toMillisSinceEpoch()));
+    auto timezone = tzdb->utcZone();
+    timezoneObjAccessor.reset(
+        false, value::TypeTags::timeZone, value::bitcastFrom<TimeZone*>(&timezone));
+    runAndAssertExpression(compiledMillisecond.get(), 123);
+}
+
+TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicWeek) {
+    value::OwnedValueAccessor timezoneDBAccessor;
+    auto timezoneDBSlot = bindAccessor(&timezoneDBAccessor);
+    value::OwnedValueAccessor dateAccessor;
+    auto dateSlot = bindAccessor(&dateAccessor);
+    value::OwnedValueAccessor timezoneAccessor;
+    auto timezoneSlot = bindAccessor(&timezoneAccessor);
+
+    auto weekExpr = sbe::makeE<sbe::EFunction>("week",
+                                               sbe::makeEs(makeE<EVariable>(dateSlot),
+                                                           makeE<EVariable>(timezoneDBSlot),
+                                                           makeE<EVariable>(timezoneSlot)));
+    auto compiledWeek = compileExpression(*weekExpr);
+
+    // Test $week returns the correct value.
+    auto tzdb = std::make_unique<TimeZoneDatabase>();
+    timezoneDBAccessor.reset(
+        false, value::TypeTags::timeZoneDB, value::bitcastFrom<TimeZoneDatabase*>(tzdb.get()));
+    dateAccessor.reset(value::TypeTags::Date,
+                       value::bitcastFrom<int64_t>(
+                           kDefaultTimeZone.createFromDateParts(1996, 1, 1, 10, 11, 12, 123)
+                               .toMillisSinceEpoch()));
+    auto [timezoneTag, timezoneVal] = value::makeNewString("UTC");
+    timezoneAccessor.reset(timezoneTag, timezoneVal);
+    runAndAssertExpression(compiledWeek.get(), 0);
+
+    // Test $week returns Nothing with invalid date.
+    dateAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(42));
+    runAndAssertNothing(compiledWeek.get());
+
+    // Test $week returns Nothing with invalid timezone.
+    dateAccessor.reset(value::TypeTags::Date, value::bitcastFrom<int64_t>(21929999));
+    timezoneAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(42));
+    runAndAssertNothing(compiledWeek.get());
+
+    // Test $week returns Nothing with invalid timezoneDB.
+    timezoneAccessor.reset(timezoneTag, timezoneVal);
+    timezoneDBAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(42));
+    runAndAssertNothing(compiledWeek.get());
+
+    // Test $week with constant timezone
+    value::OwnedValueAccessor timezoneObjAccessor;
+    auto timezoneObjSlot = bindAccessor(&timezoneObjAccessor);
+    weekExpr = sbe::makeE<sbe::EFunction>(
+        "week", sbe::makeEs(makeE<EVariable>(dateSlot), makeE<EVariable>(timezoneObjSlot)));
+    compiledWeek = compileExpression(*weekExpr);
+
+    dateAccessor.reset(value::TypeTags::Date,
+                       value::bitcastFrom<int64_t>(
+                           kDefaultTimeZone.createFromDateParts(1996, 1, 1, 10, 11, 12, 123)
+                               .toMillisSinceEpoch()));
+    auto timezone = tzdb->utcZone();
+    timezoneObjAccessor.reset(
+        false, value::TypeTags::timeZone, value::bitcastFrom<TimeZone*>(&timezone));
+    runAndAssertExpression(compiledWeek.get(), 0);
+}
+
+TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicISOWeekYear) {
+    value::OwnedValueAccessor timezoneDBAccessor;
+    auto timezoneDBSlot = bindAccessor(&timezoneDBAccessor);
+    value::OwnedValueAccessor dateAccessor;
+    auto dateSlot = bindAccessor(&dateAccessor);
+    value::OwnedValueAccessor timezoneAccessor;
+    auto timezoneSlot = bindAccessor(&timezoneAccessor);
+
+    auto isoWeekYearExpr = sbe::makeE<sbe::EFunction>("isoWeekYear",
+                                                      sbe::makeEs(makeE<EVariable>(dateSlot),
+                                                                  makeE<EVariable>(timezoneDBSlot),
+                                                                  makeE<EVariable>(timezoneSlot)));
+    auto compiledISOWeekYear = compileExpression(*isoWeekYearExpr);
+
+    // Test $isoWeekYear returns the correct value.
+    auto tzdb = std::make_unique<TimeZoneDatabase>();
+    timezoneDBAccessor.reset(
+        false, value::TypeTags::timeZoneDB, value::bitcastFrom<TimeZoneDatabase*>(tzdb.get()));
+    dateAccessor.reset(value::TypeTags::Date,
+                       value::bitcastFrom<int64_t>(
+                           kDefaultTimeZone.createFromDateParts(1996, 7, 18, 10, 11, 12, 123)
+                               .toMillisSinceEpoch()));
+    auto [timezoneTag, timezoneVal] = value::makeNewString("UTC");
+    timezoneAccessor.reset(timezoneTag, timezoneVal);
+    runAndAssertExpression(compiledISOWeekYear.get(), 1996);
+
+    // Test $isoWeekYear returns Nothing with invalid date.
+    dateAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(42));
+    runAndAssertNothing(compiledISOWeekYear.get());
+
+    // Test $isoWeekYear returns Nothing with invalid timezone.
+    dateAccessor.reset(value::TypeTags::Date, value::bitcastFrom<int64_t>(21929999));
+    timezoneAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(42));
+    runAndAssertNothing(compiledISOWeekYear.get());
+
+    // Test $isoWeekYear returns Nothing with invalid timezoneDB.
+    timezoneAccessor.reset(timezoneTag, timezoneVal);
+    timezoneDBAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(42));
+    runAndAssertNothing(compiledISOWeekYear.get());
+
+    // Test $isoWeekYear with constant timezone
+    value::OwnedValueAccessor timezoneObjAccessor;
+    auto timezoneObjSlot = bindAccessor(&timezoneObjAccessor);
+    isoWeekYearExpr = sbe::makeE<sbe::EFunction>(
+        "isoWeekYear", sbe::makeEs(makeE<EVariable>(dateSlot), makeE<EVariable>(timezoneObjSlot)));
+    compiledISOWeekYear = compileExpression(*isoWeekYearExpr);
+
+    dateAccessor.reset(value::TypeTags::Date,
+                       value::bitcastFrom<int64_t>(
+                           kDefaultTimeZone.createFromDateParts(1996, 7, 18, 10, 11, 12, 123)
+                               .toMillisSinceEpoch()));
+    auto timezone = tzdb->utcZone();
+    timezoneObjAccessor.reset(
+        false, value::TypeTags::timeZone, value::bitcastFrom<TimeZone*>(&timezone));
+    runAndAssertExpression(compiledISOWeekYear.get(), 1996);
+}
+
+TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicISODayOfWeek) {
+    value::OwnedValueAccessor timezoneDBAccessor;
+    auto timezoneDBSlot = bindAccessor(&timezoneDBAccessor);
+    value::OwnedValueAccessor dateAccessor;
+    auto dateSlot = bindAccessor(&dateAccessor);
+    value::OwnedValueAccessor timezoneAccessor;
+    auto timezoneSlot = bindAccessor(&timezoneAccessor);
+
+    auto isoDayOfWeekExpr = sbe::makeE<sbe::EFunction>("isoDayOfWeek",
+                                                       sbe::makeEs(makeE<EVariable>(dateSlot),
+                                                                   makeE<EVariable>(timezoneDBSlot),
+                                                                   makeE<EVariable>(timezoneSlot)));
+    auto compiledISODayOfWeek = compileExpression(*isoDayOfWeekExpr);
+
+    // Test $isoDayOfWeek returns the correct value.
+    auto tzdb = std::make_unique<TimeZoneDatabase>();
+    timezoneDBAccessor.reset(
+        false, value::TypeTags::timeZoneDB, value::bitcastFrom<TimeZoneDatabase*>(tzdb.get()));
+    dateAccessor.reset(value::TypeTags::Date,
+                       value::bitcastFrom<int64_t>(
+                           kDefaultTimeZone.createFromDateParts(1996, 7, 18, 10, 11, 12, 123)
+                               .toMillisSinceEpoch()));
+    auto [timezoneTag, timezoneVal] = value::makeNewString("UTC");
+    timezoneAccessor.reset(timezoneTag, timezoneVal);
+    runAndAssertExpression(compiledISODayOfWeek.get(), 4);
+
+    // Test $isoDayOfWeek returns Nothing with invalid date.
+    dateAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(42));
+    runAndAssertNothing(compiledISODayOfWeek.get());
+
+    // Test $isoDayOfWeek returns Nothing with invalid timezone.
+    dateAccessor.reset(value::TypeTags::Date, value::bitcastFrom<int64_t>(21929999));
+    timezoneAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(42));
+    runAndAssertNothing(compiledISODayOfWeek.get());
+
+    // Test $isoDayOfWeek returns Nothing with invalid timezoneDB.
+    timezoneAccessor.reset(timezoneTag, timezoneVal);
+    timezoneDBAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(42));
+    runAndAssertNothing(compiledISODayOfWeek.get());
+
+    // Test $isoDayOfWeek with constant timezone
+    value::OwnedValueAccessor timezoneObjAccessor;
+    auto timezoneObjSlot = bindAccessor(&timezoneObjAccessor);
+    isoDayOfWeekExpr = sbe::makeE<sbe::EFunction>(
+        "isoDayOfWeek", sbe::makeEs(makeE<EVariable>(dateSlot), makeE<EVariable>(timezoneObjSlot)));
+    compiledISODayOfWeek = compileExpression(*isoDayOfWeekExpr);
+
+    dateAccessor.reset(value::TypeTags::Date,
+                       value::bitcastFrom<int64_t>(
+                           kDefaultTimeZone.createFromDateParts(1996, 7, 18, 10, 11, 12, 123)
+                               .toMillisSinceEpoch()));
+    auto timezone = tzdb->utcZone();
+    timezoneObjAccessor.reset(
+        false, value::TypeTags::timeZone, value::bitcastFrom<TimeZone*>(&timezone));
+    runAndAssertExpression(compiledISODayOfWeek.get(), 4);
+}
+
+TEST_F(SBEDateExpressionAcceptingTimezoneTest, BasicISOWeek) {
+    value::OwnedValueAccessor timezoneDBAccessor;
+    auto timezoneDBSlot = bindAccessor(&timezoneDBAccessor);
+    value::OwnedValueAccessor dateAccessor;
+    auto dateSlot = bindAccessor(&dateAccessor);
+    value::OwnedValueAccessor timezoneAccessor;
+    auto timezoneSlot = bindAccessor(&timezoneAccessor);
+
+    auto isoWeekExpr = sbe::makeE<sbe::EFunction>("isoWeek",
+                                                  sbe::makeEs(makeE<EVariable>(dateSlot),
+                                                              makeE<EVariable>(timezoneDBSlot),
+                                                              makeE<EVariable>(timezoneSlot)));
+    auto compiledISOWeek = compileExpression(*isoWeekExpr);
+
+    // Test $isoWeek returns the correct value.
+    auto tzdb = std::make_unique<TimeZoneDatabase>();
+    timezoneDBAccessor.reset(
+        false, value::TypeTags::timeZoneDB, value::bitcastFrom<TimeZoneDatabase*>(tzdb.get()));
+    dateAccessor.reset(value::TypeTags::Date,
+                       value::bitcastFrom<int64_t>(
+                           kDefaultTimeZone.createFromDateParts(1996, 1, 1, 10, 11, 12, 123)
+                               .toMillisSinceEpoch()));
+    auto [timezoneTag, timezoneVal] = value::makeNewString("UTC");
+    timezoneAccessor.reset(timezoneTag, timezoneVal);
+    runAndAssertExpression(compiledISOWeek.get(), 1);
+
+    // Test $isoWeek returns Nothing with invalid date.
+    dateAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(42));
+    runAndAssertNothing(compiledISOWeek.get());
+
+    // Test $isoWeek returns Nothing with invalid timezone.
+    dateAccessor.reset(value::TypeTags::Date, value::bitcastFrom<int64_t>(21929999));
+    timezoneAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(42));
+    runAndAssertNothing(compiledISOWeek.get());
+
+    // Test $isoWeek returns Nothing with invalid timezoneDB.
+    timezoneAccessor.reset(timezoneTag, timezoneVal);
+    timezoneDBAccessor.reset(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(42));
+    runAndAssertNothing(compiledISOWeek.get());
+
+    // Test $isoWeek with constant timezone
+    value::OwnedValueAccessor timezoneObjAccessor;
+    auto timezoneObjSlot = bindAccessor(&timezoneObjAccessor);
+    isoWeekExpr = sbe::makeE<sbe::EFunction>(
+        "isoWeek", sbe::makeEs(makeE<EVariable>(dateSlot), makeE<EVariable>(timezoneObjSlot)));
+    compiledISOWeek = compileExpression(*isoWeekExpr);
+
+    dateAccessor.reset(value::TypeTags::Date,
+                       value::bitcastFrom<int64_t>(
+                           kDefaultTimeZone.createFromDateParts(1996, 1, 1, 10, 11, 12, 123)
+                               .toMillisSinceEpoch()));
+    auto timezone = tzdb->utcZone();
+    timezoneObjAccessor.reset(
+        false, value::TypeTags::timeZone, value::bitcastFrom<TimeZone*>(&timezone));
+    runAndAssertExpression(compiledISOWeek.get(), 1);
+}
 }  // namespace mongo::sbe
