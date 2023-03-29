@@ -221,7 +221,7 @@ CursorInitialReply createInitialCursorReplyMongod(OperationContext* opCtx,
     auto& nss = cursorParams.nss;
 
     std::vector<BSONObj> firstBatch;
-    size_t bytesBuffered = 0;
+    FindCommon::BSONArrayResponseSizeTracker responseSizeTracker;
     for (long long objCount = 0; objCount < batchSize; objCount++) {
         BSONObj nextDoc;
         PlanExecutor::ExecState state = exec->getNext(&nextDoc, nullptr);
@@ -232,12 +232,12 @@ CursorInitialReply createInitialCursorReplyMongod(OperationContext* opCtx,
 
         // If we can't fit this result inside the current batch, then we stash it for
         // later.
-        if (!FindCommon::haveSpaceForNext(nextDoc, objCount, bytesBuffered)) {
+        if (!responseSizeTracker.haveSpaceForNext(nextDoc)) {
             exec->stashResult(nextDoc);
             break;
         }
 
-        bytesBuffered += nextDoc.objsize();
+        responseSizeTracker.add(nextDoc);
         firstBatch.push_back(std::move(nextDoc));
     }
 

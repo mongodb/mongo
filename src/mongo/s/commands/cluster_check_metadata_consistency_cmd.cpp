@@ -45,12 +45,6 @@
 namespace mongo {
 namespace {
 
-// We must allow some amount of overhead per result document, since when we make a cursor response
-// the documents are elements of a BSONArray. The overhead is 1 byte/doc for the type + 1 byte/doc
-// for the field name's null terminator + 1 byte per digit in the array index. The index can be no
-// more than 8 decimal digits since the response is at most 16MB, and 16 * 1024 * 1024 < 1 * 10^8.
-static const int kPerDocumentOverheadBytesUpperBound = 10;
-
 /*
  * Return the set of shards that are primaries for at least one database
  */
@@ -197,7 +191,6 @@ public:
                                            const NamespaceString& nss,
                                            ClusterClientCursorGuard&& ccc) {
             auto cursorState = ClusterCursorManager::CursorState::NotExhausted;
-            size_t bytesBuffered = 0;
             std::vector<BSONObj> firstBatch;
             const auto& cursorOpts = request().getCursor();
             const auto batchSize = [&] {
@@ -207,7 +200,7 @@ public:
                     return query_request_helper::kDefaultBatchSize;
                 }
             }();
-
+            FindCommon::BSONArrayResponseSizeTracker responseSizeTracker;
             for (long long objCount = 0; objCount < batchSize; objCount++) {
                 auto next = uassertStatusOK(ccc->next());
                 if (next.isEOF()) {
@@ -222,12 +215,11 @@ public:
 
                 // If adding this object will cause us to exceed the message size limit, then we
                 // stash it for later.
-                if (!FindCommon::haveSpaceForNext(nextObj, objCount, bytesBuffered)) {
+                if (!responseSizeTracker.haveSpaceForNext(nextObj)) {
                     ccc->queueResult(nextObj);
                     break;
                 }
-
-                bytesBuffered += nextObj.objsize() + kPerDocumentOverheadBytesUpperBound;
+                responseSizeTracker.add(nextObj);
                 firstBatch.push_back(std::move(nextObj));
             }
 
