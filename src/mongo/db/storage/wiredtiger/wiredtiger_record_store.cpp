@@ -900,7 +900,9 @@ void WiredTigerRecordStore::reclaimOplog(OperationContext* opCtx) {
 
             // Stash the truncate point for next time to cleanly skip over tombstones, etc.
             _oplogTruncateMarkers->firstRecord = truncateMarker->lastRecord;
-            _oplogFirstRecord = std::move(truncateMarker->lastRecord);
+            Timestamp firstRecordTimestamp{
+                static_cast<uint64_t>(truncateMarker->lastRecord.getLong())};
+            _oplogFirstRecordTimestamp.store(firstRecordTimestamp);
         } catch (const WriteConflictException&) {
             LOGV2_DEBUG(
                 22400, 1, "Caught WriteConflictException while truncating oplog entries, retrying");
@@ -1103,7 +1105,12 @@ StatusWith<Timestamp> WiredTigerRecordStore::getEarliestOplogTimestamp(Operation
     invariant(_keyFormat == KeyFormat::Long);
     dassert(opCtx->lockState()->isReadLocked());
 
-    if (_oplogFirstRecord == RecordId()) {
+    // Using relaxed loads is fine here. The returned timestamp can be from a deleted oplog entry by
+    // the time we return from the method. Additionally we perform initialisation that uses strong
+    // memory ordering so initialisation will only work if we've actually never initialised the
+    // timestamp.
+    auto firstRecordTimestamp = _oplogFirstRecordTimestamp.loadRelaxed();
+    if (firstRecordTimestamp == Timestamp()) {
         WiredTigerSessionCache* cache = WiredTigerRecoveryUnit::get(opCtx)->getSessionCache();
         auto sessRaii = cache->getSession();
         WT_CURSOR* cursor =
@@ -1118,10 +1125,13 @@ StatusWith<Timestamp> WiredTigerRecordStore::getEarliestOplogTimestamp(Operation
         }
         invariantWTOK(ret, cursor->session);
 
-        _oplogFirstRecord = getKey(cursor);
+        Timestamp ts{static_cast<uint64_t>(getKey(cursor).getLong())};
+        if (_oplogFirstRecordTimestamp.compareAndSwap(&firstRecordTimestamp, ts)) {
+            firstRecordTimestamp = ts;
+        }
     }
 
-    return {Timestamp(static_cast<unsigned long long>(_oplogFirstRecord.getLong()))};
+    return firstRecordTimestamp;
 }
 
 Status WiredTigerRecordStore::doUpdateRecord(OperationContext* opCtx,

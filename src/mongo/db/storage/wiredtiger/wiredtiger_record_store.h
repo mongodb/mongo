@@ -351,7 +351,7 @@ private:
     // True if force to update with the full document, and false otherwise.
     const bool _forceUpdateWithFullDocument;
     boost::optional<int64_t> _oplogMaxSize;
-    RecordId _oplogFirstRecord;
+    AtomicWord<Timestamp> _oplogFirstRecordTimestamp{Timestamp()};
 
     // Protects initialization of the _nextIdNum.
     mutable Mutex _initNextIdMutex = MONGO_MAKE_LATCH("WiredTigerRecordStore::_initNextIdMutex");
