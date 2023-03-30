@@ -14,6 +14,8 @@
  *     requires_timeseries,
  *     # Cannot insert into a time-series collection in a multi-document transaction.
  *     does_not_support_transactions,
+ *     # Time-series hint by index key did not exist in 5.0
+ *     requires_fcv_60,
  * ]
  */
 

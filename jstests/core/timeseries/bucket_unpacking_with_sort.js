@@ -17,6 +17,9 @@
  *     requires_timeseries,
  *     # Explain of a resolved view must be executed by mongos.
  *     directly_against_shardsvrs_incompatible,
+ *     # Time-series hint by index key did not exist in 5.0.
+ *     # Also, the 5.0 version of this feature does not support reverse collscan.
+ *     requires_fcv_60,
  * ]
  */
 (function() {

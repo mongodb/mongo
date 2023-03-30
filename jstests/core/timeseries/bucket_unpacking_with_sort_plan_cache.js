@@ -21,6 +21,8 @@
  *     directly_against_shardsvrs_incompatible,
  *     # We use the profiler to get info in order to force replanning.
  *     requires_profiling,
+ *     # The 5.0 version of this feature does not support reverse collscan.
+ *     requires_fcv_60,
  * ]
  */
 (function() {
