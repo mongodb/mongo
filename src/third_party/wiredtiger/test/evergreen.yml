@@ -3078,8 +3078,7 @@ tasks:
       - func: "install gcp dependencies"
       - func: "compile wiredtiger"
         vars:
-          <<: *configure_flags_tiered_storage_azure
-          <<: *configure_flags_tiered_storage_gcp
+          <<: [*configure_flags_tiered_storage_azure, *configure_flags_tiered_storage_gcp]
       - func: "run tiered storage test"
         vars:
           # Set this in case of a core to get the correct python binary.
@@ -3092,8 +3091,7 @@ tasks:
       - func: "install gcp dependencies"
       - func: "compile wiredtiger"
         vars:
-          <<: *configure_flags_tiered_storage_azure
-          <<: *configure_flags_tiered_storage_gcp
+          <<: [*configure_flags_tiered_storage_azure, *configure_flags_tiered_storage_gcp]
           HAVE_UNITTEST: -DHAVE_UNITTEST=1
       - command: shell.exec
         params:
@@ -3131,8 +3129,7 @@ tasks:
       - func: "install gcp dependencies"
       - func: "compile wiredtiger"
         vars:
-          <<: *configure_flags_tiered_storage_azure
-          <<: *configure_flags_tiered_storage_gcp
+          <<: [*configure_flags_tiered_storage_azure, *configure_flags_tiered_storage_gcp]
       - func: "run tiered storage test"
         vars:
           # Set this in case of a core to get the correct python binary.

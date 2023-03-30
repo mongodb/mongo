@@ -61,18 +61,22 @@ azure_connection::list_objects(
         blob_parameters.PageSizeHint = 1;
 
     try {
-        _azure_client.ListBlobs(blob_parameters);
+        auto list_blobs_response = _azure_client.ListBlobs(blob_parameters);
+        do {
+            for (const auto &blob_item : list_blobs_response.Blobs)
+                objects.push_back(blob_item.Name.substr(_bucket_prefix.length()));
+
+            // Do not traverse all the blob pages if we are only looking for one object.
+            if (list_single)
+                break;
+            list_blobs_response.MoveToNextPage();
+        } while (list_blobs_response.HasPage());
     } catch (const Azure::Core::RequestFailedException &e) {
         return http_to_errno(e);
     } catch (const std::exception &e) {
         std::cerr << e.what() << std::endl;
         return -1;
     }
-
-    auto list_blobs_response = _azure_client.ListBlobs(blob_parameters);
-
-    for (const auto blob_item : list_blobs_response.Blobs)
-        objects.push_back(blob_item.Name.substr(_bucket_prefix.length()));
 
     return 0;
 }
@@ -170,21 +174,25 @@ azure_connection::object_exists(
     exists = false;
     std::string obj = _bucket_prefix + object_key;
     object_size = 0;
+    Azure::Storage::Blobs::ListBlobsOptions blob_parameters;
 
-    auto list_blob_response = _azure_client.ListBlobs();
-
-    for (const auto blob_item : list_blob_response.Blobs) {
-        // Check if object exists.
-        if (blob_item.Name.compare(obj) == 0) {
-            // Check if object is deleted and has not been cleared by garbage collection.
-            if (blob_item.IsDeleted) {
-                return -1;
+    blob_parameters.Prefix = _bucket_prefix + object_key;
+    auto list_blob_response = _azure_client.ListBlobs(blob_parameters);
+    do {
+        for (const auto &blob_item : list_blob_response.Blobs) {
+            // Check if object exists.
+            if (blob_item.Name.compare(obj) == 0) {
+                // Check if object is deleted and has not been cleared by garbage collection.
+                if (blob_item.IsDeleted) {
+                    return -1;
+                }
+                object_size = blob_item.BlobSize;
+                exists = true;
+                break;
             }
-            object_size = blob_item.BlobSize;
-            exists = true;
-            break;
         }
-    }
+        list_blob_response.MoveToNextPage();
+    } while (list_blob_response.HasPage());
     return 0;
 }
 
