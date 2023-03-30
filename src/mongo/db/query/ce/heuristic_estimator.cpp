@@ -254,7 +254,7 @@ public:
         });
 
         if (topLevelSelectivities.empty()) {
-            return {1.0};
+            return childResult;
         }
         // The elements of the PartialSchemaRequirements map represent an implicit conjunction.
         topLevelSel = conjExponentialBackoff(std::move(topLevelSelectivities));

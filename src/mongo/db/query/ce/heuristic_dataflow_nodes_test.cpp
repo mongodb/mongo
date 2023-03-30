@@ -122,7 +122,7 @@ TEST_F(CEDataflowTest, EstimateUnionNode) {
         t.setIndexes(
             {{"indexA", makeIndexDefinition("a", CollationOp::Ascending, /* isMultiKey */ true)}});
         t.setDisableScan(true);
-        ASSERT_MATCH_CE(t, {"{a: [12]}"}, 1);
+        ASSERT_MATCH_CE(t, {"{a: [12]}"}, 88.4427);
     }
     {
         DataflowCETester t;
