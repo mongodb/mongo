@@ -969,6 +969,11 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkMigration(
         return {ErrorCodes::IllegalOperation, "chunk operation requires validAfter timestamp"};
     }
 
+    uassertStatusOK(
+        ShardKeyPattern::checkShardKeyIsValidForMetadataStorage(migratedChunk.getMin()));
+    uassertStatusOK(
+        ShardKeyPattern::checkShardKeyIsValidForMetadataStorage(migratedChunk.getMax()));
+
     // Mark opCtx as interruptible to ensure that all reads and writes to the metadata collections
     // under the exclusive _kChunkOpLock happen on the same term.
     opCtx->setAlwaysInterruptAtStepDownOrUp();
