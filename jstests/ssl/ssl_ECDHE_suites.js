@@ -37,7 +37,8 @@ const mongod = MongoRunner.runMongod(x509_options);
 // Use new toolchain python, if it exists
 let python_binary = '/opt/mongodbtoolchain/v3/bin/python3';
 if (runProgram('/bin/sh', '-c', 'ls ' + python_binary) !== 0) {
-    python_binary = '/opt/mongodbtoolchain/v3/bin/python3';
+    // We are running on mac
+    python_binary = 'python3';
 }
 
 // Run the tls cipher suite enumerator
