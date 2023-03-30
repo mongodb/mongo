@@ -1166,7 +1166,7 @@ the existing transaction to be **implicitly aborted**. Implicitly aborting a tra
 the transaction is aborted without an explicit `abortTransaction` command. However, prepared
 transactions cannot be implicitly aborted, since they can only complete after a `commitTransaction`
 or `abortTransaction` command from the `TransactionCoordinator`. As a result, any attempt to start a
-new transaction on a session that already has a prepared tranFsaction on it will fail with a
+new transaction on a session that already has a prepared transaction on it will fail with a
 `PreparedTransactionInProgress` error.
 
 Additionally, the only operations that can be run on a prepared transaction are
