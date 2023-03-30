@@ -70,6 +70,7 @@ public:
                        value::SlotVector vars,
                        PlanYieldPolicy* yieldPolicy,
                        PlanNodeId planNodeId,
+                       bool lowPriority = false,
                        bool participateInTrialRunTracking = true);
 
     value::SlotAccessor* getAccessor(CompileCtx& ctx, value::SlotId slot) final;
@@ -171,6 +172,9 @@ protected:
     ScanState _scanState = ScanState::kNeedSeek;
     IndexScanStats _specificStats;
 
+    bool _lowPriority;
+    boost::optional<ScopedAdmissionPriorityForLock> _priority;
+
     // If provided, used during a trial run to accumulate certain execution stats. Once the trial
     // run is complete, this pointer is reset to nullptr.
     TrialRunTracker* _tracker{nullptr};
@@ -208,6 +212,7 @@ public:
                          std::unique_ptr<EExpression> seekKeyHigh,
                          PlanYieldPolicy* yieldPolicy,
                          PlanNodeId planNodeId,
+                         bool lowPriority = false,
                          bool participateInTrialRunTracking = true);
 
     std::unique_ptr<PlanStage> clone() const override;

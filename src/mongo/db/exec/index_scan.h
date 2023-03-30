@@ -48,12 +48,14 @@ struct IndexScanParams {
                     std::string indexName,
                     BSONObj keyPattern,
                     MultikeyPaths multikeyPaths,
-                    bool multikey)
+                    bool multikey,
+                    bool lowPriority = false)
         : indexDescriptor(descriptor),
           name(std::move(indexName)),
           keyPattern(std::move(keyPattern)),
           multikeyPaths(std::move(multikeyPaths)),
-          isMultiKey(multikey) {}
+          isMultiKey(multikey),
+          lowPriority(lowPriority) {}
 
     IndexScanParams(OperationContext* opCtx,
                     const CollectionPtr& collection,
@@ -82,6 +84,8 @@ struct IndexScanParams {
 
     // Do we want to add the key as metadata?
     bool addKeyMetadata{false};
+
+    bool lowPriority = false;
 };
 
 /**
@@ -215,6 +219,9 @@ private:
     bool _startKeyInclusive;
     // Is the end key included in the range?
     bool _endKeyInclusive;
+
+    bool _lowPriority;
+    boost::optional<ScopedAdmissionPriorityForLock> _priority;
 };
 
 }  // namespace mongo

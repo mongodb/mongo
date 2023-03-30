@@ -403,6 +403,26 @@ void handleRIDRangeScan(const MatchExpression* conjunct,
     }
 }
 
+/**
+ * Sets the lowPriority parameter on the given index scan node.
+ */
+void deprioritizeUnboundedIndexScan(IndexScanNode* solnRoot,
+                                    const FindCommandRequest& findCommand) {
+    auto sort = findCommand.getSort();
+    if (findCommand.getLimit() &&
+        (sort.isEmpty() || sort[query_request_helper::kNaturalSortField])) {
+        // There is a limit with either no sort or the natural sort.
+        return;
+    }
+
+    auto indexScan = checked_cast<IndexScanNode*>(solnRoot);
+    if (!indexScan->bounds.isUnbounded()) {
+        return;
+    }
+
+    indexScan->lowPriority = true;
+}
+
 }  // namespace
 
 std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
@@ -1820,6 +1840,8 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::scanWholeIndex(
         QueryPlannerCommon::reverseScans(isn.get());
         isn->direction = -1;
     }
+
+    deprioritizeUnboundedIndexScan(isn.get(), query.getFindCommandRequest());
 
     unique_ptr<MatchExpression> filter = query.root()->clone();
 

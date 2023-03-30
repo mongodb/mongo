@@ -221,6 +221,16 @@ BSONObj allValues() {
 }
 
 /**
+ * Returns an object representing the interval [MaxKey, MinKey].
+ */
+BSONObj allValuesReverse() {
+    BSONObjBuilder bob;
+    bob.appendMaxKey("");
+    bob.appendMinKey("");
+    return bob.obj();
+}
+
+/**
  * Test that if we complement the OIL twice,
  * we get back the original OIL.
  */
@@ -651,6 +661,31 @@ TEST(IndexBoundsTest, BoundsDebugStringFormatTest) {
     ASSERT_EQ(stringInterval.toString(true),
               "['a']: [CollationKey(0x737472696e67), CollationKey(0x737472696e67)]");
     ASSERT_EQ(nonStringInterval.toString(true), "['b']: [1, 1]");
+}
+
+TEST(IndexBoundsTest, Unbounded) {
+    IndexBounds bounds;
+
+    bounds.fields.push_back([] {
+        OrderedIntervalList oil;
+        oil.intervals.emplace_back(allValues(), true, true);
+        return oil;
+    }());
+    ASSERT_TRUE(bounds.isUnbounded());
+
+    bounds.fields.push_back([] {
+        OrderedIntervalList oil;
+        oil.intervals.emplace_back(allValuesReverse(), true, true);
+        return oil;
+    }());
+    ASSERT_TRUE(bounds.isUnbounded());
+
+    bounds.fields.push_back([] {
+        OrderedIntervalList oil;
+        oil.intervals.emplace_back(minKeyIntObj(1), true, true);
+        return oil;
+    }());
+    ASSERT_FALSE(bounds.isUnbounded());
 }
 
 //

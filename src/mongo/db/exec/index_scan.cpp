@@ -77,7 +77,8 @@ IndexScan::IndexScan(ExpressionContext* expCtx,
       _shouldDedup(params.shouldDedup),
       _addKeyMetadata(params.addKeyMetadata),
       _startKeyInclusive(IndexBounds::isStartIncludedInBound(_bounds.boundInclusion)),
-      _endKeyInclusive(IndexBounds::isEndIncludedInBound(_bounds.boundInclusion)) {
+      _endKeyInclusive(IndexBounds::isEndIncludedInBound(_bounds.boundInclusion)),
+      _lowPriority(params.lowPriority) {
     _specificStats.indexName = params.name;
     _specificStats.keyPattern = _keyPattern;
     _specificStats.isMultiKey = params.isMultiKey;
@@ -92,6 +93,11 @@ IndexScan::IndexScan(ExpressionContext* expCtx,
 }
 
 boost::optional<IndexKeyEntry> IndexScan::initIndexScan() {
+    if (_lowPriority && opCtx()->getClient()->isFromUserConnection() &&
+        opCtx()->lockState()->shouldWaitForTicket()) {
+        _priority.emplace(opCtx()->lockState(), AdmissionContext::Priority::kLow);
+    }
+
     // Perform the possibly heavy-duty initialization of the underlying index cursor.
     _indexCursor = indexAccessMethod()->newCursor(opCtx(), _forward);
 
@@ -165,6 +171,7 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
                         _forward));
                     break;
                 case HIT_END:
+                    _priority.reset();
                     return PlanStage::IS_EOF;
             }
             return PlanStage::ADVANCED;
@@ -220,6 +227,7 @@ PlanStage::StageState IndexScan::doWork(WorkingSetID* out) {
         _scanState = HIT_END;
         _commonStats.isEOF = true;
         _indexCursor.reset();
+        _priority.reset();
         return PlanStage::IS_EOF;
     }
 
@@ -281,9 +289,15 @@ void IndexScan::doRestoreStateRequiresIndex() {
 void IndexScan::doDetachFromOperationContext() {
     if (_indexCursor)
         _indexCursor->detachFromOperationContext();
+
+    _priority.reset();
 }
 
 void IndexScan::doReattachToOperationContext() {
+    if (_lowPriority && opCtx()->getClient()->isFromUserConnection() &&
+        opCtx()->lockState()->shouldWaitForTicket()) {
+        _priority.emplace(opCtx()->lockState(), AdmissionContext::Priority::kLow);
+    }
     if (_indexCursor)
         _indexCursor->reattachToOperationContext(opCtx());
 }

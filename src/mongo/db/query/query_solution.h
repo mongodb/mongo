@@ -814,6 +814,8 @@ struct IndexScanNode : public QuerySolutionNodeWithSortSet {
      * A vector of Interval Evaluation Trees (IETs) with the same ordering as the index key pattern.
      */
     std::vector<interval_evaluation_tree::IET> iets;
+
+    bool lowPriority = false;
 };
 
 struct ReturnKeyNode : public QuerySolutionNode {

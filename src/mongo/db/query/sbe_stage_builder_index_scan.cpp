@@ -512,7 +512,8 @@ generateSingleIntervalIndexScan(StageBuilderState& state,
                                 sbe::value::SlotVector indexKeySlots,
                                 const PlanStageReqs& reqs,
                                 PlanYieldPolicy* yieldPolicy,
-                                PlanNodeId planNodeId) {
+                                PlanNodeId planNodeId,
+                                bool lowPriority) {
     auto slotIdGenerator = state.slotIdGenerator;
     auto recordIdSlot = slotIdGenerator->generate();
     tassert(6584701,
@@ -553,7 +554,8 @@ generateSingleIntervalIndexScan(StageBuilderState& state,
                                                        lowKeyExpr->clone(),
                                                        highKeyExpr->clone(),
                                                        yieldPolicy,
-                                                       planNodeId);
+                                                       planNodeId,
+                                                       lowPriority);
 
     auto outputs = buildPlanStageSlots(
         state, reqs, indexName, keyPattern, recordIdSlot, snapshotIdSlot, indexKeySlot);
@@ -655,7 +657,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
                                             fieldAndSortKeySlots,
                                             reqs,
                                             yieldPolicy,
-                                            ixn->nodeId());
+                                            ixn->nodeId(),
+                                            ixn->lowPriority);
     } else if (intervals.size() > 1) {
         // If we were able to decompose multi-interval index bounds into a number of single-interval
         // bounds, we can also built an optimized sub-tree to perform an index scan.
@@ -870,7 +873,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
                                             outputFieldAndSortKeySlots,
                                             reqs,
                                             yieldPolicy,
-                                            ixn->nodeId());
+                                            ixn->nodeId(),
+                                            false /* lowPriority */);
         recordIdSlot = outputs.get(PlanStageSlots::kRecordId);
         tassert(6484702,
                 "lowKey and highKey runtime environment slots must be present",

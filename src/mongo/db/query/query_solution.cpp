@@ -1138,6 +1138,7 @@ std::unique_ptr<QuerySolutionNode> IndexScanNode::clone() const {
     copy->addKeyMetadata = this->addKeyMetadata;
     copy->bounds = this->bounds;
     copy->queryCollator = this->queryCollator;
+    copy->lowPriority = this->lowPriority;
 
     return copy;
 }

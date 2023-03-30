@@ -244,6 +244,10 @@ bool OrderedIntervalList::isMinToMax() const {
     return intervals.size() == 1 && intervals[0].isMinToMax();
 }
 
+bool OrderedIntervalList::isMaxToMin() const {
+    return intervals.size() == 1 && intervals[0].isMaxToMin();
+}
+
 bool OrderedIntervalList::isPoint() const {
     return intervals.size() == 1 && intervals[0].isPoint();
 }
@@ -414,6 +418,12 @@ IndexBounds IndexBounds::reverse() const {
     }
 
     return reversed;
+}
+
+bool IndexBounds::isUnbounded() const {
+    return std::all_of(fields.begin(), fields.end(), [](const auto& field) {
+        return field.isMinToMax() || field.isMaxToMin();
+    });
 }
 
 //
