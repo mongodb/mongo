@@ -47,6 +47,8 @@
 #include "mongo/logv2/log.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/shard_version_factory.h"
+#include "mongo/s/stale_exception.h"
 #include "mongo/util/fail_point.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -529,6 +531,13 @@ void ShardServerCatalogCacheLoader::waitForCollectionFlush(OperationContext* opC
                               << " because the node's replication role changed.",
                 _role == ReplicaSetRole::Primary && _term == initialTerm);
 
+        uassert(StaleConfigInfo(nss,
+                                ShardVersionFactory::make(ChunkVersion::IGNORED(), boost::none),
+                                boost::none,
+                                getSelfShardId(opCtx)),
+                "config server is not storing cached metadata",
+                !shouldSkipStoringLocally());
+
         auto it = _collAndChunkTaskLists.find(nss);
 
         // If there are no tasks for the specified namespace, everything must have been completed
@@ -575,7 +584,7 @@ void ShardServerCatalogCacheLoader::waitForCollectionFlush(OperationContext* opC
             opCtx->waitForConditionOrInterrupt(*condVar, lg, [&]() {
                 const auto it = _collAndChunkTaskLists.find(nss);
                 return it == _collAndChunkTaskLists.end() || it->second.empty() ||
-                    it->second.front().taskNum != activeTaskNum;
+                    it->second.front().taskNum != activeTaskNum || shouldSkipStoringLocally();
             });
         }
     }
@@ -595,6 +604,10 @@ void ShardServerCatalogCacheLoader::waitForDatabaseFlush(OperationContext* opCtx
                               << dbName.toString()
                               << " because the node's replication role changed.",
                 _role == ReplicaSetRole::Primary && _term == initialTerm);
+
+        uassert(StaleDbRoutingVersion(dbName.toString(), DatabaseVersion::makeFixed(), boost::none),
+                "config server is not storing cached metadata",
+                !shouldSkipStoringLocally());
 
         auto it = _dbTaskLists.find(dbName.toString());
 
@@ -643,7 +656,7 @@ void ShardServerCatalogCacheLoader::waitForDatabaseFlush(OperationContext* opCtx
             opCtx->waitForConditionOrInterrupt(*condVar, lg, [&]() {
                 const auto it = _dbTaskLists.find(dbName.toString());
                 return it == _dbTaskLists.end() || it->second.empty() ||
-                    it->second.front().taskNum != activeTaskNum;
+                    it->second.front().taskNum != activeTaskNum || shouldSkipStoringLocally();
             });
         }
     }
@@ -653,6 +666,11 @@ StatusWith<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_runSecond
     OperationContext* opCtx,
     const NamespaceString& nss,
     const ChunkVersion& catalogCacheSinceVersion) {
+
+    if (shouldSkipStoringLocally()) {
+        return _configServerLoader->getChunksSince(nss, catalogCacheSinceVersion).getNoThrow();
+    }
+
     Timer t;
     forcePrimaryCollectionRefreshAndWaitForReplication(opCtx, nss);
     LOGV2_FOR_CATALOG_REFRESH(5965800,
@@ -805,6 +823,10 @@ ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
 
 StatusWith<DatabaseType> ShardServerCatalogCacheLoader::_runSecondaryGetDatabase(
     OperationContext* opCtx, StringData dbName) {
+    if (shouldSkipStoringLocally()) {
+        return _configServerLoader->getDatabase(dbName).getNoThrow();
+    }
+
     Timer t;
     forcePrimaryDatabaseRefreshAndWaitForReplication(opCtx, dbName);
     LOGV2_FOR_CATALOG_REFRESH(5965801,
@@ -1006,7 +1028,6 @@ void ShardServerCatalogCacheLoader::_ensureMajorityPrimaryAndScheduleCollAndChun
             if (ErrorCodes::isCancellationError(status)) {
                 return;
             }
-
             fassertFailedWithStatus(4826400, status);
         }
 
@@ -1050,14 +1071,14 @@ void ShardServerCatalogCacheLoader::_runCollAndChunksTasks(const NamespaceString
                     getGlobalServiceContext());
     auto context = _contexts.makeOperationContext(*tc);
 
-    if (MONGO_unlikely(hangCollectionFlush.shouldFail())) {
-        LOGV2(5710200, "Hit hangCollectionFlush failpoint");
-        hangCollectionFlush.pauseWhileSet(context.opCtx());
-    }
-
     bool taskFinished = false;
     bool inShutdown = false;
     try {
+        if (MONGO_unlikely(hangCollectionFlush.shouldFail())) {
+            LOGV2(5710200, "Hit hangCollectionFlush failpoint");
+            hangCollectionFlush.pauseWhileSet(context.opCtx());
+        }
+
         _updatePersistedCollAndChunksMetadata(context.opCtx(), nss);
         taskFinished = true;
     } catch (const ExceptionForCat<ErrorCategory::ShutdownError>&) {
@@ -1129,13 +1150,13 @@ void ShardServerCatalogCacheLoader::_runDbTasks(StringData dbName) {
     ThreadClient tc("ShardServerCatalogCacheLoader::runDbTasks", getGlobalServiceContext());
     auto context = _contexts.makeOperationContext(*tc);
 
-    if (MONGO_unlikely(hangDatabaseFlush.shouldFail())) {
-        hangDatabaseFlush.pauseWhileSet(context.opCtx());
-    }
-
     bool taskFinished = false;
     bool inShutdown = false;
     try {
+        if (MONGO_unlikely(hangDatabaseFlush.shouldFail())) {
+            hangDatabaseFlush.pauseWhileSet(context.opCtx());
+        }
+
         _updatePersistedDbMetadata(context.opCtx(), dbName);
         taskFinished = true;
     } catch (const ExceptionForCat<ErrorCategory::ShutdownError>&) {
