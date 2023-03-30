@@ -86,7 +86,7 @@ bool FeatureFlag::isEnabledOnVersion(multiversion::FeatureCompatibilityVersion t
     return targetFCV >= _version;
 }
 
-bool FeatureFlag::isEnabledOnTargetFCVButDisabledOnOriginalFCV(
+bool FeatureFlag::isDisabledOnTargetFCVButEnabledOnOriginalFCV(
     multiversion::FeatureCompatibilityVersion targetFCV,
     multiversion::FeatureCompatibilityVersion originalFCV) const {
     if (!_enabled) {
@@ -94,6 +94,16 @@ bool FeatureFlag::isEnabledOnTargetFCVButDisabledOnOriginalFCV(
     }
 
     return originalFCV >= _version && targetFCV < _version;
+}
+
+bool FeatureFlag::isEnabledOnTargetFCVButDisabledOnOriginalFCV(
+    multiversion::FeatureCompatibilityVersion targetFCV,
+    multiversion::FeatureCompatibilityVersion originalFCV) const {
+    if (!_enabled) {
+        return false;
+    }
+
+    return targetFCV >= _version && originalFCV < _version;
 }
 
 multiversion::FeatureCompatibilityVersion FeatureFlag::getVersion() const {

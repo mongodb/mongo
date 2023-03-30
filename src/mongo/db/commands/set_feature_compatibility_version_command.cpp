@@ -514,7 +514,8 @@ public:
         // TODO SERVER-72796: Remove once gGlobalIndexesShardingCatalog is enabled.
         if (serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
             requestedVersion > actualVersion &&
-            feature_flags::gGlobalIndexesShardingCatalog.isEnabledOnVersion(requestedVersion)) {
+            feature_flags::gGlobalIndexesShardingCatalog
+                .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion, actualVersion)) {
             ShardingDDLCoordinatorService::getService(opCtx)
                 ->waitForCoordinatorsOfGivenTypeToComplete(
                     opCtx, DDLCoordinatorTypeEnum::kRenameCollectionPre63Compatible);
@@ -523,8 +524,8 @@ public:
         // TODO SERVER-73627: Remove once 7.0 becomes last LTS.
         if (serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
             requestedVersion > actualVersion &&
-            feature_flags::gDropCollectionHoldingCriticalSection.isEnabledOnVersion(
-                requestedVersion)) {
+            feature_flags::gDropCollectionHoldingCriticalSection
+                .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion, actualVersion)) {
             ShardingDDLCoordinatorService::getService(opCtx)
                 ->waitForCoordinatorsOfGivenTypeToComplete(
                     opCtx, DDLCoordinatorTypeEnum::kDropCollectionPre70Compatible);
@@ -563,7 +564,7 @@ private:
         const auto isUpgrading = originalVersion < requestedVersion;
         // TODO (SERVER-71309): Remove once 7.0 becomes last LTS.
         if (isDowngrading &&
-            feature_flags::gResilientMovePrimary.isEnabledOnTargetFCVButDisabledOnOriginalFCV(
+            feature_flags::gResilientMovePrimary.isDisabledOnTargetFCVButEnabledOnOriginalFCV(
                 requestedVersion, originalVersion)) {
             ShardingDDLCoordinatorService::getService(opCtx)
                 ->waitForCoordinatorsOfGivenTypeToComplete(opCtx,
@@ -572,7 +573,7 @@ private:
 
         // TODO SERVER-68008: Remove collMod draining mechanism after 7.0 becomes last LTS.
         if (isDowngrading &&
-            feature_flags::gCollModCoordinatorV3.isEnabledOnTargetFCVButDisabledOnOriginalFCV(
+            feature_flags::gCollModCoordinatorV3.isDisabledOnTargetFCVButEnabledOnOriginalFCV(
                 requestedVersion, originalVersion)) {
             // Drain all running collMod v3 coordinator because they produce backward
             // incompatible on disk metadata
@@ -583,7 +584,7 @@ private:
         // TODO SERVER-72796: Remove once gGlobalIndexesShardingCatalog is enabled.
         if (isDowngrading &&
             feature_flags::gGlobalIndexesShardingCatalog
-                .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion, originalVersion)) {
+                .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion, originalVersion)) {
             ShardingDDLCoordinatorService::getService(opCtx)
                 ->waitForCoordinatorsOfGivenTypeToComplete(
                     opCtx, DDLCoordinatorTypeEnum::kRenameCollection);
@@ -592,7 +593,7 @@ private:
         // TODO SERVER-73627: Remove once 7.0 becomes last LTS.
         if (isDowngrading &&
             feature_flags::gDropCollectionHoldingCriticalSection
-                .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion, originalVersion)) {
+                .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion, originalVersion)) {
             ShardingDDLCoordinatorService::getService(opCtx)
                 ->waitForCoordinatorsOfGivenTypeToComplete(opCtx,
                                                            DDLCoordinatorTypeEnum::kDropCollection);
@@ -652,10 +653,11 @@ private:
     void _completeUpgrade(OperationContext* opCtx,
                           const multiversion::FeatureCompatibilityVersion requestedVersion) {
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-            _cleanupConfigVersionOnUpgrade(opCtx, requestedVersion);
-            _createSchemaOnConfigSettings(opCtx, requestedVersion);
-            _initializePlacementHistory(opCtx, requestedVersion);
-            _setOnCurrentShardSinceFieldOnChunks(opCtx, requestedVersion);
+            const auto actualVersion = serverGlobalParams.featureCompatibility.getVersion();
+            _cleanupConfigVersionOnUpgrade(opCtx, requestedVersion, actualVersion);
+            _createSchemaOnConfigSettings(opCtx, requestedVersion, actualVersion);
+            _initializePlacementHistory(opCtx, requestedVersion, actualVersion);
+            _setOnCurrentShardSinceFieldOnChunks(opCtx, requestedVersion, actualVersion);
             _dropConfigMigrationsCollection(opCtx);
         }
 
@@ -664,8 +666,11 @@ private:
 
     // TODO SERVER-68889 remove once 7.0 becomes last LTS
     void _cleanupConfigVersionOnUpgrade(
-        OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
-        if (feature_flags::gStopUsingConfigVersion.isEnabledOnVersion(requestedVersion)) {
+        OperationContext* opCtx,
+        const multiversion::FeatureCompatibilityVersion requestedVersion,
+        const multiversion::FeatureCompatibilityVersion actualVersion) {
+        if (feature_flags::gStopUsingConfigVersion.isEnabledOnTargetFCVButDisabledOnOriginalFCV(
+                requestedVersion, actualVersion)) {
             LOGV2(6888800, "Removing deprecated fields from config.version collection");
             static const std::vector<StringData> deprecatedFields{
                 "excluding"_sd,
@@ -704,7 +709,7 @@ private:
         OperationContext* opCtx,
         const multiversion::FeatureCompatibilityVersion requestedVersion,
         const multiversion::FeatureCompatibilityVersion originalVersion) {
-        if (feature_flags::gStopUsingConfigVersion.isEnabledOnTargetFCVButDisabledOnOriginalFCV(
+        if (feature_flags::gStopUsingConfigVersion.isDisabledOnTargetFCVButEnabledOnOriginalFCV(
                 requestedVersion, originalVersion)) {
             LOGV2(6888801, "Restoring removed fields in config.version collection");
             const auto updateObj = [&] {
@@ -734,9 +739,11 @@ private:
 
     // TODO SERVER-69106 remove once v7.0 becomes last-lts
     void _initializePlacementHistory(
-        OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
-        if (feature_flags::gHistoricalPlacementShardingCatalog.isEnabledOnVersion(
-                requestedVersion)) {
+        OperationContext* opCtx,
+        const multiversion::FeatureCompatibilityVersion requestedVersion,
+        const multiversion::FeatureCompatibilityVersion actualVersion) {
+        if (feature_flags::gHistoricalPlacementShardingCatalog
+                .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion, actualVersion)) {
             ShardingCatalogManager::get(opCtx)->initializePlacementHistory(opCtx);
         }
     }
@@ -744,7 +751,9 @@ private:
     void _createShardingIndexCatalogIndexes(
         OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
         // TODO SERVER-67392: Remove once gGlobalIndexesShardingCatalog is enabled.
-        if (feature_flags::gGlobalIndexesShardingCatalog.isEnabledOnVersion(requestedVersion)) {
+        const auto actualVersion = serverGlobalParams.featureCompatibility.getVersion();
+        if (feature_flags::gGlobalIndexesShardingCatalog
+                .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion, actualVersion)) {
             uassertStatusOK(sharding_util::createShardingIndexCatalogIndexes(opCtx));
             if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
                 uassertStatusOK(sharding_util::createShardCollectionCatalogIndexes(opCtx));
@@ -754,8 +763,11 @@ private:
 
     // TODO (SERVER-70763): Remove once FCV 7.0 becomes last-lts.
     void _createSchemaOnConfigSettings(
-        OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
-        if (feature_flags::gConfigSettingsSchema.isEnabledOnVersion(requestedVersion)) {
+        OperationContext* opCtx,
+        const multiversion::FeatureCompatibilityVersion requestedVersion,
+        const multiversion::FeatureCompatibilityVersion actualVersion) {
+        if (feature_flags::gConfigSettingsSchema.isEnabledOnTargetFCVButDisabledOnOriginalFCV(
+                requestedVersion, actualVersion)) {
             LOGV2(6885200, "Creating schema on config.settings");
             uassertStatusOK(ShardingCatalogManager::get(opCtx)->upgradeConfigSettings(opCtx));
         }
@@ -763,8 +775,11 @@ private:
 
     // TODO (SERVER-72791): Remove once FCV 7.0 becomes last-lts.
     void _setOnCurrentShardSinceFieldOnChunks(
-        OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
-        if (feature_flags::gAutoMerger.isEnabledOnVersion(requestedVersion)) {
+        OperationContext* opCtx,
+        const multiversion::FeatureCompatibilityVersion requestedVersion,
+        const multiversion::FeatureCompatibilityVersion actualVersion) {
+        if (feature_flags::gAutoMerger.isEnabledOnTargetFCVButDisabledOnOriginalFCV(
+                requestedVersion, actualVersion)) {
             uassertStatusOK(
                 ShardingCatalogManager::get(opCtx)->setOnCurrentShardSinceFieldOnChunks(opCtx));
         }
@@ -944,13 +959,13 @@ private:
         // Note the config server is also considered a shard, so the ConfigServer and ShardServer
         // roles aren't mutually exclusive.
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-            if (gFeatureFlagCatalogShard.isEnabledOnTargetFCVButDisabledOnOriginalFCV(
+            if (gFeatureFlagCatalogShard.isDisabledOnTargetFCVButEnabledOnOriginalFCV(
                     requestedVersion, originalVersion)) {
                 _assertNoCollectionsHaveChangeStreamsPrePostImages(opCtx);
             }
 
             if (feature_flags::gGlobalIndexesShardingCatalog
-                    .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion,
+                    .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion,
                                                                   originalVersion)) {
                 bool hasShardingIndexCatalogEntries;
                 BSONObj indexDoc, collDoc;
@@ -986,7 +1001,7 @@ private:
         if (serverGlobalParams.clusterRole == ClusterRole::ShardServer ||
             serverGlobalParams.clusterRole == ClusterRole::None) {
             if (feature_flags::gTimeseriesScalabilityImprovements
-                    .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion,
+                    .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion,
                                                                   originalVersion)) {
                 for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
                     Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
@@ -1068,7 +1083,7 @@ private:
             }
 
             if (feature_flags::gfeatureFlagCappedCollectionsRelaxedSize
-                    .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion,
+                    .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion,
                                                                   originalVersion)) {
                 for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
                     Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
@@ -1161,7 +1176,7 @@ private:
             // Timeseries collection in sharding DDL Coordinators we need to drain all ongoing
             // coordinators
             if (feature_flags::gImplicitDDLTimeseriesNssTranslation
-                    .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion,
+                    .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion,
                                                                   originalVersion)) {
                 ShardingDDLCoordinatorService::getService(opCtx)
                     ->waitForOngoingCoordinatorsToFinish(opCtx);
@@ -1179,7 +1194,7 @@ private:
         // FCV's must not find cluster-wide indexes.
         DropReply dropReply;
         if (feature_flags::gGlobalIndexesShardingCatalog
-                .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion, originalVersion)) {
+                .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion, originalVersion)) {
             // Note the config server is also considered a shard, so the ConfigServer and
             // ShardServer roles aren't mutually exclusive.
             if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
@@ -1261,7 +1276,7 @@ private:
         OperationContext* opCtx,
         const multiversion::FeatureCompatibilityVersion requestedVersion,
         const multiversion::FeatureCompatibilityVersion originalVersion) {
-        if (feature_flags::gConfigSettingsSchema.isEnabledOnTargetFCVButDisabledOnOriginalFCV(
+        if (feature_flags::gConfigSettingsSchema.isDisabledOnTargetFCVButEnabledOnOriginalFCV(
                 requestedVersion, originalVersion)) {
             LOGV2(6885201, "Removing schema on config.settings");
             CollMod collModCmd{NamespaceString::kConfigSettingsNamespace};
@@ -1282,7 +1297,7 @@ private:
     // uassert if users need to manually clean up user data or settings.
     // When doing feature flag checking for downgrade, we should check the feature flag is enabled
     // on current FCV and will be disabled after downgrade by using
-    // isEnabledOnTargetFCVButDisabledOnOriginalFCV(targetFCV, originalFCV)
+    // isDisabledOnTargetFCVButEnabledOnOriginalFCV(targetFCV, originalFCV)
     // Please read the comments on those helper functions for more details on what should be placed
     // in each function.
     void _prepareToDowngrade(OperationContext* opCtx,
@@ -1329,7 +1344,7 @@ private:
     // * _internalServerCleanupForDowngrade: for any internal server downgrade cleanup
     // When doing feature flag checking for downgrade, we should check the feature flag is enabled
     // on current FCV and will be disabled after downgrade by using
-    // isEnabledOnTargetFCVButDisabledOnOriginalFCV(targetFCV, originalFCV)
+    // isDisabledOnTargetFCVButEnabledOnOriginalFCV(targetFCV, originalFCV)
     // Please read the comments on those helper functions for more details on what should be placed
     // in each function.
     void _runDowngrade(OperationContext* opCtx,

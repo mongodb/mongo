@@ -84,6 +84,13 @@ public:
     /**
      * Returns true if the feature flag is disabled on targetFCV but enabled on originalFCV.
      */
+    bool isDisabledOnTargetFCVButEnabledOnOriginalFCV(
+        multiversion::FeatureCompatibilityVersion targetFCV,
+        multiversion::FeatureCompatibilityVersion originalFCV) const;
+
+    /**
+     * Returns true if the feature flag is enabled on targetFCV but disabled on originalFCV.
+     */
     bool isEnabledOnTargetFCVButDisabledOnOriginalFCV(
         multiversion::FeatureCompatibilityVersion targetFCV,
         multiversion::FeatureCompatibilityVersion originalFCV) const;
