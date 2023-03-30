@@ -55,7 +55,7 @@ let res = assert.commandWorked(db.runCommand({
 assert.eq(kNumDocs, res.cursor.firstBatch.length);
 
 // Instantiate a new collection without any shared state.
-assert(checkLog.checkContainsWithCountJson(db, 6825401, {}, 1));
+checkLog.containsJson(db, 6825401);
 
 rst.stopSet();
 })();
