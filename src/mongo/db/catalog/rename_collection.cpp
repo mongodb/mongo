@@ -447,13 +447,6 @@ Status renameCollectionWithinDBForApplyOps(OperationContext* opCtx,
     });
 }
 
-/*
- * This is a duplicate of renameBetweenDBs that is intended to replace it.
- * The feature flag - InternalWritesAreReplicatedTransactionally - toggles
- * between the two functions. This function provides batching of all the inserts
- * into the new temporary collection.
- * TODO: SERVER-71596 is tracking the removal of renameBetweenDBs.
- */
 Status renameCollectionAcrossDatabases(OperationContext* opCtx,
                                        const NamespaceString& source,
                                        const NamespaceString& target,
