@@ -111,7 +111,7 @@ assert.commandWorked(session2.abortTransaction_forTesting());
 replTest.awaitReplication();
 assert.eq(secondaryTestColl.find().sort({_id: 1}).toArray(), [{_id: 1, a: 1}, {_id: 2}]);
 
-jsTestLog("Attempting to run another transction");
+jsTestLog("Attempting to run another transaction");
 
 // Make sure that we can run another conflicting transaction after recovery without any
 // problems and that we can see its changes when we read from the secondary.
