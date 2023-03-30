@@ -39,4 +39,13 @@ server_parameters:
       name: ChangeStreamOptionsParameter
       override_set: true
       override_validate: true
-      
+  changeStreamTruncateMarkersMinBytes:
+    description: "Server parameter that specifies the minimum number of bytes contained in each
+    truncate marker. This is only of use if featureFlagUseUnreplicatedTruncatesForDeletions is
+    enabled"
+    set_at: startup
+    cpp_varname: gChangeStreamTruncateMarkersMinBytes
+    cpp_vartype: int32_t
+    default: 33_554_432  # 32 MiB
+    validator:
+      gt: 0

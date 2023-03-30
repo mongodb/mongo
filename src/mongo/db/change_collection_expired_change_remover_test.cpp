@@ -139,8 +139,9 @@ protected:
             ChangeStreamChangeCollectionManager::getChangeCollectionPurgingJobMetadata(
                 opCtx, &*changeCollection)
                 ->maxRecordIdBound;
-        return ChangeStreamChangeCollectionManager::removeExpiredChangeCollectionsDocuments(
-            opCtx, &*changeCollection, maxRecordIdBound, expirationTime);
+        return ChangeStreamChangeCollectionManager::
+            removeExpiredChangeCollectionsDocumentsWithCollScan(
+                opCtx, &*changeCollection, maxRecordIdBound, expirationTime);
     }
 
     const TenantId _tenantId;
@@ -168,33 +169,6 @@ protected:
         changeStreamsParam->setValue(oldSettings, _tenantId).ignore();
     }
 
-    void insertDocumentToChangeCollection(OperationContext* opCtx,
-                                          const TenantId& tenantId,
-                                          const BSONObj& obj) {
-        WriteUnitOfWork wuow(opCtx);
-        ChangeCollectionExpiredChangeRemoverTest::insertDocumentToChangeCollection(
-            opCtx, tenantId, obj);
-        const auto wallTime = now();
-        Timestamp timestamp{wallTime};
-        RecordId recordId =
-            record_id_helpers::keyForOptime(timestamp, KeyFormat::String).getValue();
-
-        _truncateMarkers->updateCurrentMarkerAfterInsertOnCommit(
-            opCtx, obj.objsize(), recordId, wallTime, 1);
-        wuow.commit();
-    }
-
-    void dropAndRecreateChangeCollection(OperationContext* opCtx,
-                                         const TenantId& tenantId,
-                                         int64_t minBytesPerMarker) {
-        auto& changeCollectionManager = ChangeStreamChangeCollectionManager::get(opCtx);
-        changeCollectionManager.dropChangeCollection(opCtx, tenantId);
-        _truncateMarkers.reset();
-        changeCollectionManager.createChangeCollection(opCtx, tenantId);
-        _truncateMarkers = std::make_unique<ChangeCollectionTruncateMarkers>(
-            tenantId, std::deque<CollectionTruncateMarkers::Marker>{}, 0, 0, minBytesPerMarker);
-    }
-
     size_t removeExpiredChangeCollectionsDocuments(OperationContext* opCtx,
                                                    boost::optional<TenantId> tenantId,
                                                    Date_t expirationTime) {
@@ -203,23 +177,13 @@ protected:
         const auto changeCollection =
             AutoGetChangeCollection{opCtx, AutoGetChangeCollection::AccessMode::kWrite, tenantId};
 
-        WriteUnitOfWork wuow(opCtx);
-        size_t numRecordsDeleted = 0;
-        while (boost::optional<CollectionTruncateMarkers::Marker> marker =
-                   _truncateMarkers->peekOldestMarkerIfNeeded(opCtx)) {
-            auto recordStore = changeCollection->getRecordStore();
-
-            ASSERT_OK(recordStore->rangeTruncate(
-                opCtx, RecordId(), marker->lastRecord, -marker->bytes, -marker->records));
-
-            _truncateMarkers->popOldestMarker();
-            numRecordsDeleted += marker->records;
-        }
-        wuow.commit();
-        return numRecordsDeleted;
+        return ChangeStreamChangeCollectionManager::
+            removeExpiredChangeCollectionsDocumentsWithTruncate(
+                opCtx, &*changeCollection, expirationTime);
     }
 
-    std::unique_ptr<ChangeCollectionTruncateMarkers> _truncateMarkers;
+    RAIIServerParameterControllerForTest truncateFeatureFlag{
+        "featureFlagUseUnreplicatedTruncatesForDeletions", true};
 };
 
 // Tests that the last expired focument retrieved is the expected one.
@@ -325,10 +289,12 @@ TEST_F(ChangeCollectionTruncateExpirationTest, ShouldRemoveOnlyExpiredDocument_M
     const BSONObj notExpired = BSON("_id"
                                     << "notExpired");
 
+    RAIIServerParameterControllerForTest minBytesPerMarker{
+        "changeStreamTruncateMarkersMinBytes", firstExpired.objsize() + secondExpired.objsize()};
+
     const auto timeAtStart = now();
     const auto opCtx = operationContext();
-    dropAndRecreateChangeCollection(
-        opCtx, _tenantId, firstExpired.objsize() + secondExpired.objsize());
+    dropAndRecreateChangeCollection(opCtx, _tenantId);
 
     insertDocumentToChangeCollection(opCtx, _tenantId, firstExpired);
     clockSource()->advance(Hours(1));
@@ -352,8 +318,11 @@ TEST_F(ChangeCollectionTruncateExpirationTest, ShouldRemoveOnlyExpiredDocument_M
 
 // Tests that the last expired document is never deleted.
 TEST_F(ChangeCollectionTruncateExpirationTest, ShouldLeaveAtLeastOneDocument_Markers) {
+    RAIIServerParameterControllerForTest minBytesPerMarker{"changeStreamTruncateMarkersMinBytes",
+                                                           1};
     const auto opCtx = operationContext();
-    dropAndRecreateChangeCollection(opCtx, _tenantId, 1);
+
+    dropAndRecreateChangeCollection(opCtx, _tenantId);
 
     setExpireAfterSeconds(opCtx, Seconds{1});
 

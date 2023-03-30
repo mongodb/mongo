@@ -30,9 +30,12 @@
 #pragma once
 
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/change_collection_truncate_markers.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/collection_markers.h"
+#include "mongo/util/concurrent_shared_values_map.h"
 
 namespace mongo {
 
@@ -165,17 +168,33 @@ public:
     getChangeCollectionPurgingJobMetadata(OperationContext* opCtx,
                                           const CollectionPtr* changeCollection);
 
-    /** Removes documents from a change collection whose wall time is less than the
-     * 'expirationTime'. Returns the number of documents deleted. The 'maxRecordIdBound' is the
-     * maximum record id bound that will not be included in the collection scan.
+    /**
+     * Removes documents from a change collection whose wall time is less than the 'expirationTime'.
+     * Returns the number of documents deleted. The 'maxRecordIdBound' is the maximum record id
+     * bound that will not be included in the collection scan.
+     *
+     * The removal process is performed with a collection scan + batch delete.
      */
-    static size_t removeExpiredChangeCollectionsDocuments(OperationContext* opCtx,
-                                                          const CollectionPtr* changeCollection,
-                                                          RecordIdBound maxRecordIdBound,
-                                                          Date_t expirationTime);
+    static size_t removeExpiredChangeCollectionsDocumentsWithCollScan(
+        OperationContext* opCtx,
+        const CollectionPtr* changeCollection,
+        RecordIdBound maxRecordIdBound,
+        Date_t expirationTime);
+
+    /**
+     * Removes documents from a change collection whose wall time is less than the 'expirationTime'.
+     * Returns the number of documents deleted. The 'maxRecordIdBound' is the maximum record id
+     * bound that will not be included in the collection scan.
+     *
+     * The removal process is performed with a single range truncate call to the record store.
+     */
+    static size_t removeExpiredChangeCollectionsDocumentsWithTruncate(
+        OperationContext* opCtx, const CollectionPtr* changeCollection, Date_t expirationTime);
 
 private:
     // Change collections purging job stats.
     PurgingJobStats _purgingJobStats;
+    ConcurrentSharedValuesMap<UUID, ChangeCollectionTruncateMarkers, UUID::Hash>
+        _tenantTruncateMarkersMap;
 };
 }  // namespace mongo

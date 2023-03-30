@@ -277,6 +277,9 @@ public:
                                                         Date_t wallTime,
                                                         int64_t countInserted) final;
 
+    // Updates the highest seen RecordId and wall time if they are above the current ones.
+    void updateHighestSeenRecordIdAndWallTime(const RecordId& rId, Date_t wallTime);
+
 private:
     // Highest marker seen during the lifetime of the class. Modifications must happen
     // while holding '_lastHighestRecordMutex'.
@@ -284,10 +287,6 @@ private:
         MONGO_MAKE_LATCH("CollectionTruncateMarkersWithPartialExpiration::_lastHighestRecordMutex");
     RecordId _lastHighestRecordId;
     Date_t _lastHighestWallTime;
-
-    // Replaces the highest marker if _isMarkerLargerThanHighest returns true.
-    void _replaceNewHighestMarkingIfNecessary(const RecordId& newMarkerRecordId,
-                                              Date_t newMarkerWallTime);
 
     // Used to decide if the current partially built marker has expired.
     virtual bool _hasPartialMarkerExpired(OperationContext* opCtx) const {

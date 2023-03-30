@@ -159,7 +159,6 @@ void CollectionTruncateMarkers::createNewMarkerIfNeeded(OperationContext* opCtx,
     pokeReclaimThread(opCtx);
 }
 
-
 void CollectionTruncateMarkers::updateCurrentMarkerAfterInsertOnCommit(
     OperationContext* opCtx,
     int64_t bytesInserted,
@@ -511,7 +510,7 @@ void CollectionTruncateMarkersWithPartialExpiration::updateCurrentMarkerAfterIns
         // will happen after the marker has been created. This guarantees that the metrics
         // will eventually be correct as long as the expiration criteria checks for the
         // metrics and the highest marker expiration.
-        collectionMarkers->_replaceNewHighestMarkingIfNecessary(recordId, wallTime);
+        collectionMarkers->updateHighestSeenRecordIdAndWallTime(recordId, wallTime);
         collectionMarkers->_currentRecords.addAndFetch(countInserted);
         int64_t newCurrentBytes = collectionMarkers->_currentBytes.addAndFetch(bytesInserted);
         if (wallTime != Date_t() && newCurrentBytes >= collectionMarkers->_minBytesPerMarker) {
@@ -571,7 +570,7 @@ void CollectionTruncateMarkersWithPartialExpiration::createPartialMarkerIfNecess
     }
 }
 
-void CollectionTruncateMarkersWithPartialExpiration::_replaceNewHighestMarkingIfNecessary(
+void CollectionTruncateMarkersWithPartialExpiration::updateHighestSeenRecordIdAndWallTime(
     const RecordId& rId, Date_t wallTime) {
     stdx::unique_lock lk(_lastHighestRecordMutex);
     _lastHighestRecordId = std::max(_lastHighestRecordId, rId);
