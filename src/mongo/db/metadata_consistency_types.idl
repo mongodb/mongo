@@ -38,7 +38,7 @@ enums:
         type: string
         values:
             kUUIDMismatch: "UUIDMismatch"
-            kHiddenUnshardedCollection: "HiddenUnshardedCollection"
+            kMisplacedCollection: "MisplacedCollection"
             kHiddenShardedCollection: "HiddenShardedCollection" 
             kMissingShardKeyIndex: "MissingShardKeyIndex"
 

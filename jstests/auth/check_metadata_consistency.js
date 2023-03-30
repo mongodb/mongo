@@ -13,7 +13,7 @@ function assertAuthCommandWorked(adminDb, conn, user) {
     assert(adminDb.auth(user, "pwd"));
     const inconsistencies = conn.checkMetadataConsistency().toArray();
     assert.eq(1, inconsistencies.length);
-    assert.eq("HiddenUnshardedCollection", inconsistencies[0].type);
+    assert.eq("MisplacedCollection", inconsistencies[0].type);
 }
 
 // Helper function to assert that the checkMetadataConsistency command fails

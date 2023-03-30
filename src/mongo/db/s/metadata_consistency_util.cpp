@@ -49,14 +49,14 @@ namespace metadata_consistency_util {
 
 namespace {
 
-void _appendHiddenUnshardedCollectionInconsistency(
+void _appendMisplacedCollectionInconsistency(
     const ShardId& shardId,
     const NamespaceString& localNss,
     const UUID& localUUID,
     std::vector<MetadataInconsistencyItem>& inconsistencies) {
     MetadataInconsistencyItem val;
     val.setNs(localNss);
-    val.setType(MetadataInconsistencyTypeEnum::kHiddenUnshardedCollection);
+    val.setType(MetadataInconsistencyTypeEnum::kMisplacedCollection);
     val.setShard(shardId);
     val.setInfo(BSON(kDescriptionFieldName
                      << "Unsharded collection found on shard different from db primary shard"
@@ -289,7 +289,7 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataInconsistencies(
         } else {
             // Case where we have found a local collection that is not in the catalog client.
             if (shardId != primaryShardId) {
-                _appendHiddenUnshardedCollectionInconsistency(
+                _appendMisplacedCollectionInconsistency(
                     shardId, localNss, localUUID, inconsistencies);
             }
             itLocalCollections++;
@@ -300,7 +300,7 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataInconsistencies(
     // hidden unsharded collection inconsistency if we are not the db primary shard.
     while (itLocalCollections != localCollections.end() && shardId != primaryShardId) {
         const auto localColl = itLocalCollections->get();
-        _appendHiddenUnshardedCollectionInconsistency(
+        _appendMisplacedCollectionInconsistency(
             shardId, localColl->ns(), localColl->uuid(), inconsistencies);
         itLocalCollections++;
     }
