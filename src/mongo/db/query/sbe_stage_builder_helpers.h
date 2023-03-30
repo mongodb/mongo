@@ -642,18 +642,20 @@ struct StageBuilderState {
 template <typename T>
 struct PathTreeNode {
     PathTreeNode() = default;
-    explicit PathTreeNode(StringData name) : name(name) {}
+    explicit PathTreeNode(std::string name) : name(std::move(name)) {}
 
     // Aside from the root node, it is very common for a node to have no children or only 1 child.
     using ChildrenVector = absl::InlinedVector<std::unique_ptr<PathTreeNode<T>>, 1>;
 
-    PathTreeNode<T>* emplace(StringData fieldComponent) {
-        auto newNode = std::make_unique<PathTreeNode<T>>(fieldComponent);
+    // It is the caller's responsibility to verify that there is not an existing field with the
+    // same name as 'fieldComponent'.
+    PathTreeNode<T>* emplace_back(std::string fieldComponent) {
+        auto newNode = std::make_unique<PathTreeNode<T>>(std::move(fieldComponent));
         const auto newNodeRaw = newNode.get();
         children.emplace_back(std::move(newNode));
 
         if (childrenMap) {
-            childrenMap->emplace(fieldComponent, newNodeRaw);
+            childrenMap->emplace(newNodeRaw->name, newNodeRaw);
         } else if (children.size() >= 3) {
             // If 'childrenMap' is null and there are 3 or more children, build 'childrenMap' now.
             buildChildrenMap();
@@ -781,9 +783,9 @@ inline auto buildPathTreeImpl(const std::vector<StringT>& paths,
         const bool ignorePath = (removeConflictingPaths && node->isLeaf() && node != tree.get());
         if (!ignorePath) {
             if (i < numParts) {
-                node = node->emplace(part);
+                node = node->emplace_back(std::string(part));
                 for (++i; i < numParts; ++i) {
-                    node = node->emplace(path.getPart(i));
+                    node = node->emplace_back(std::string(path.getPart(i)));
                 }
             } else if (removeConflictingPaths && !node->isLeaf()) {
                 // If 'removeConflictingPaths' is true, delete any children that 'node' has.

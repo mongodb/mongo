@@ -1043,7 +1043,7 @@ public:
             if (auto child = node->findChild(part)) {
                 node = child;
             } else {
-                node = node->emplace(part);
+                node = node->emplace_back(std::string(part));
             }
         }
     }
