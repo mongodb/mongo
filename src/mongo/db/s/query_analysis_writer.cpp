@@ -116,17 +116,31 @@ BSONObj createSampledQueriesDiffTTLIndex(OperationContext* opCtx) {
     return resObj;
 }
 
-
-struct SampledWriteCommandRequest {
+struct SampledCommandRequest {
     UUID sampleId;
     NamespaceString nss;
-    BSONObj cmd;  // the BSON for a {Update,Delete,FindAndModify}CommandRequest
+    // The BSON for a SampledReadCommand or {Update,Delete,FindAndModify}CommandRequest.
+    BSONObj cmd;
 };
+
+/*
+ * Returns a sampled read command for a read with the given filter, collation, let and runtime
+ * constants.
+ */
+SampledCommandRequest makeSampledReadCommand(const UUID& sampleId,
+                                             const NamespaceString& nss,
+                                             const BSONObj& filter,
+                                             const BSONObj& collation,
+                                             const boost::optional<BSONObj>& letParameters) {
+    SampledReadCommand sampledCmd(filter, collation);
+    sampledCmd.setLet(letParameters);
+    return {sampleId, nss, sampledCmd.toBSON()};
+}
 
 /*
  * Returns a sampled update command for the update at 'opIndex' in the given update command.
  */
-SampledWriteCommandRequest makeSampledUpdateCommandRequest(
+SampledCommandRequest makeSampledUpdateCommandRequest(
     const UUID& sampleId, const write_ops::UpdateCommandRequest& originalCmd, int opIndex) {
     auto op = originalCmd.getUpdates()[opIndex];
     if (op.getSampleId()) {
@@ -158,7 +172,7 @@ SampledWriteCommandRequest makeSampledUpdateCommandRequest(
 /*
  * Returns a sampled delete command for the delete at 'opIndex' in the given delete command.
  */
-SampledWriteCommandRequest makeSampledDeleteCommandRequest(
+SampledCommandRequest makeSampledDeleteCommandRequest(
     const UUID& sampleId, const write_ops::DeleteCommandRequest& originalCmd, int opIndex) {
     auto op = originalCmd.getDeletes()[opIndex];
     if (op.getSampleId()) {
@@ -190,7 +204,7 @@ SampledWriteCommandRequest makeSampledDeleteCommandRequest(
 /*
  * Returns a sampled findAndModify command for the given findAndModify command.
  */
-SampledWriteCommandRequest makeSampledFindAndModifyCommandRequest(
+SampledCommandRequest makeSampledFindAndModifyCommandRequest(
     const UUID& sampleId, const write_ops::FindAndModifyCommandRequest& originalCmd) {
     write_ops::FindAndModifyCommandRequest sampledCmd(originalCmd.getNamespace());
     if (sampledCmd.getSampleId()) {
@@ -217,7 +231,6 @@ SampledWriteCommandRequest makeSampledFindAndModifyCommandRequest(
     sampledCmd.setSort(originalCmd.getSort());
     sampledCmd.setArrayFilters(originalCmd.getArrayFilters());
     sampledCmd.setLet(originalCmd.getLet());
-    sampledCmd.setSampleId(originalCmd.getSampleId());
 
     return {sampleId,
             sampledCmd.getNamespace(),
@@ -523,11 +536,24 @@ bool QueryAnalysisWriter::_exceedsMaxSizeBytes() {
     return _queries.getSize() + _diffs.getSize() >= gQueryAnalysisWriterMaxMemoryUsageBytes.load();
 }
 
-ExecutorFuture<void> QueryAnalysisWriter::addFindQuery(const UUID& sampleId,
-                                                       const NamespaceString& nss,
-                                                       const BSONObj& filter,
-                                                       const BSONObj& collation) {
-    return _addReadQuery(sampleId, nss, SampledCommandNameEnum::kFind, filter, collation);
+ExecutorFuture<void> QueryAnalysisWriter::addFindQuery(
+    const UUID& sampleId,
+    const NamespaceString& nss,
+    const BSONObj& filter,
+    const BSONObj& collation,
+    const boost::optional<BSONObj>& letParameters) {
+    return _addReadQuery(
+        sampleId, nss, SampledCommandNameEnum::kFind, filter, collation, letParameters);
+}
+
+ExecutorFuture<void> QueryAnalysisWriter::addAggregateQuery(
+    const UUID& sampleId,
+    const NamespaceString& nss,
+    const BSONObj& filter,
+    const BSONObj& collation,
+    const boost::optional<BSONObj>& letParameters) {
+    return _addReadQuery(
+        sampleId, nss, SampledCommandNameEnum::kAggregate, filter, collation, letParameters);
 }
 
 ExecutorFuture<void> QueryAnalysisWriter::addCountQuery(const UUID& sampleId,
@@ -544,47 +570,43 @@ ExecutorFuture<void> QueryAnalysisWriter::addDistinctQuery(const UUID& sampleId,
     return _addReadQuery(sampleId, nss, SampledCommandNameEnum::kDistinct, filter, collation);
 }
 
-ExecutorFuture<void> QueryAnalysisWriter::addAggregateQuery(const UUID& sampleId,
-                                                            const NamespaceString& nss,
-                                                            const BSONObj& filter,
-                                                            const BSONObj& collation) {
-    return _addReadQuery(sampleId, nss, SampledCommandNameEnum::kAggregate, filter, collation);
-}
-
-ExecutorFuture<void> QueryAnalysisWriter::_addReadQuery(const UUID& sampleId,
-                                                        const NamespaceString& nss,
-                                                        SampledCommandNameEnum cmdName,
-                                                        const BSONObj& filter,
-                                                        const BSONObj& collation) {
+ExecutorFuture<void> QueryAnalysisWriter::_addReadQuery(
+    const UUID& sampleId,
+    const NamespaceString& nss,
+    SampledCommandNameEnum cmdName,
+    const BSONObj& filter,
+    const BSONObj& collation,
+    const boost::optional<BSONObj>& letParameters) {
     invariant(_executor);
     return ExecutorFuture<void>(_executor)
         .then([this,
-               sampleId,
-               nss,
                cmdName,
-               filter = filter.getOwned(),
-               collation = collation.getOwned()] {
+               sampledReadCmd =
+                   makeSampledReadCommand(sampleId, nss, filter, collation, letParameters)] {
             auto opCtxHolder = cc().makeOperationContext();
             auto opCtx = opCtxHolder.get();
 
-            auto collUuid = CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, nss);
-
+            auto collUuid =
+                CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, sampledReadCmd.nss);
             if (!collUuid) {
                 LOGV2(7047301, "Found a sampled read query for non-existing collection");
                 return;
             }
 
-            auto cmd = SampledReadCommand{filter.getOwned(), collation.getOwned()};
             auto expireAt = opCtx->getServiceContext()->getFastClockSource()->now() +
                 mongo::Milliseconds(gQueryAnalysisSampleExpirationSecs.load() * 1000);
-            auto doc =
-                SampledQueryDocument{sampleId, nss, *collUuid, cmdName, cmd.toBSON(), expireAt}
-                    .toBSON();
+            auto doc = SampledQueryDocument{sampledReadCmd.sampleId,
+                                            sampledReadCmd.nss,
+                                            *collUuid,
+                                            cmdName,
+                                            std::move(sampledReadCmd.cmd),
+                                            expireAt}
+                           .toBSON();
 
             stdx::lock_guard<Latch> lk(_mutex);
             if (_queries.add(doc)) {
                 QueryAnalysisSampleCounters::get(opCtx).incrementReads(
-                    nss, *collUuid, doc.objsize());
+                    sampledReadCmd.nss, *collUuid, doc.objsize());
             }
         })
         .then([this] {
@@ -614,7 +636,6 @@ ExecutorFuture<void> QueryAnalysisWriter::addUpdateQuery(
 
             auto collUuid =
                 CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, sampledUpdateCmd.nss);
-
             if (!collUuid) {
                 LOGV2_WARNING(7075300,
                               "Found a sampled update query for a non-existing collection");
@@ -671,7 +692,6 @@ ExecutorFuture<void> QueryAnalysisWriter::addDeleteQuery(
 
             auto collUuid =
                 CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, sampledDeleteCmd.nss);
-
             if (!collUuid) {
                 LOGV2_WARNING(7075302,
                               "Found a sampled delete query for a non-existing collection");
@@ -729,7 +749,6 @@ ExecutorFuture<void> QueryAnalysisWriter::addFindAndModifyQuery(
 
             auto collUuid =
                 CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, sampledFindAndModifyCmd.nss);
-
             if (!collUuid) {
                 LOGV2_WARNING(7075304,
                               "Found a sampled findAndModify query for a non-existing collection");

@@ -143,10 +143,13 @@ protected:
         return kSampledReadCommandNames[getRandomInt(kSampledReadCommandNames.size())];
     }
 
-    SampledQueryDocument makeSampledReadQueryDocument(SampledCommandNameEnum cmdName,
-                                                      const BSONObj& filter,
-                                                      const BSONObj& collation = BSONObj()) const {
+    SampledQueryDocument makeSampledReadQueryDocument(
+        SampledCommandNameEnum cmdName,
+        const BSONObj& filter,
+        const BSONObj& collation = BSONObj(),
+        const boost::optional<BSONObj>& letParameters = boost::none) const {
         auto cmd = SampledReadCommand{filter, collation};
+        cmd.setLet(letParameters);
         return {UUID::gen(),
                 nss,
                 collUuid,
@@ -826,16 +829,22 @@ TEST_F(ReadDistributionFilterByShardKeyEqualityTest, ShardKeyEqualityHashed) {
                         hasCollatableType);
 }
 
-TEST_F(ReadDistributionFilterByShardKeyEqualityTest, ShardKeyEqualityExpression) {
+TEST_F(ReadDistributionFilterByShardKeyEqualityTest, ShardKeyEqualityExpressionWithLetParameters) {
     auto targeter = makeCollectionRoutingInfoTargeter(chunkSplitInfoRangeSharding0);
-    auto filter = BSON("$expr" << BSON("$and" << BSON_ARRAY(BSON("$eq" << BSON_ARRAY("$a.x" << 100))
+    auto filter = BSON("$expr" << BSON("$and" << BSON_ARRAY(BSON("$eq" << BSON_ARRAY("$a.x"
+                                                                                     << "$$value"))
                                                             << BSON("$eq" << BSON_ARRAY("$b.y"
                                                                                         << "A")))));
+    auto collation = BSONObj();
+    auto letParameters = BSON("value" << 100);
+
     auto numByRange = std::vector<int64_t>({0, 0, 1});
     auto hasSimpleCollation = true;
     auto hasCollatableType = true;
+
     assertTargetMetrics(targeter,
-                        makeSampledReadQueryDocument(getRandomSampledReadCommandName(), filter),
+                        makeSampledReadQueryDocument(
+                            getRandomSampledReadCommandName(), filter, collation, letParameters),
                         numByRange,
                         hasSimpleCollation,
                         hasCollatableType);
@@ -982,6 +991,17 @@ TEST_F(ReadDistributionNotFilterByShardKeyTest, ShardKeyPrefixEqualityDotted) {
     // although it only matches the data in the chunk {a.x: -100, b.y: "A"} -> {a.x: 100, b.y:
     // "A"}.
     auto filter = BSON("a.x" << 0);
+    assertTargetMetrics(targeter,
+                        makeSampledReadQueryDocument(getRandomSampledReadCommandName(), filter));
+}
+
+TEST_F(ReadDistributionNotFilterByShardKeyTest, RuntimeConstants) {
+    auto targeter = makeCollectionRoutingInfoTargeter(chunkSplitInfoRangeSharding0);
+    auto filter = BSON(
+        "$expr" << BSON("$and" << BSON_ARRAY(BSON("$eq" << BSON_ARRAY("$ts"
+                                                                      << "$$NOW"))
+                                             << BSON("$eq" << BSON_ARRAY("$clusterTime"
+                                                                         << "$$CLUSTER_TIME")))));
     assertTargetMetrics(targeter,
                         makeSampledReadQueryDocument(getRandomSampledReadCommandName(), filter));
 }

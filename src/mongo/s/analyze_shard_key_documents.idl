@@ -31,6 +31,7 @@ global:
 
 imports:
   - "mongo/db/basic_types.idl"
+  - "mongo/db/pipeline/legacy_runtime_constants.idl"
   - "mongo/s/analyze_shard_key_common.idl"
 
 structs:
@@ -59,6 +60,10 @@ structs:
       collation:
         type: object
         description: "The collation for the read."
+      let:
+        type: object
+        description: "The user-specified constants for the read."
+        optional: true
 
   SampledQueryDocument:
     description: "Represents a document storing a sampled read or write query."

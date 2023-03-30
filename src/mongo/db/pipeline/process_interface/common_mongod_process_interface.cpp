@@ -454,9 +454,14 @@ CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(
     if (expCtx->eligibleForSampling()) {
         if (auto sampleId = analyze_shard_key::tryGenerateSampleId(
                 expCtx->opCtx, expCtx->ns, analyze_shard_key::SampledCommandNameEnum::kAggregate)) {
+            auto [_, letParameters] =
+                expCtx->variablesParseState.transitionalCompatibilitySerialize(expCtx->variables);
             analyze_shard_key::QueryAnalysisWriter::get(expCtx->opCtx)
-                ->addAggregateQuery(
-                    *sampleId, expCtx->ns, pipeline->getInitialQuery(), expCtx->getCollatorBSON())
+                ->addAggregateQuery(*sampleId,
+                                    expCtx->ns,
+                                    pipeline->getInitialQuery(),
+                                    expCtx->getCollatorBSON(),
+                                    letParameters)
                 .getAsync([](auto) {});
         }
     }

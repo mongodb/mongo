@@ -169,7 +169,7 @@ void ReadDistributionMetricsCalculator::addQuery(OperationContext* opCtx,
 
     auto cmd = SampledReadCommand::parse(IDLParserContext("ReadDistributionMetricsCalculator"),
                                          doc.getCmd());
-    auto info = _getTargetingInfoForQuery(opCtx, cmd.getFilter(), cmd.getCollation());
+    auto info = _getTargetingInfoForQuery(opCtx, cmd.getFilter(), cmd.getCollation(), cmd.getLet());
     _incrementMetricsForQuery(info);
 }
 

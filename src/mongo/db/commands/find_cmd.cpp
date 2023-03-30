@@ -480,8 +480,11 @@ public:
                         analyze_shard_key::SampledCommandNameEnum::kFind,
                         *findCommand)) {
                     analyze_shard_key::QueryAnalysisWriter::get(opCtx)
-                        ->addFindQuery(
-                            *sampleId, nss, findCommand->getFilter(), findCommand->getCollation())
+                        ->addFindQuery(*sampleId,
+                                       nss,
+                                       findCommand->getFilter(),
+                                       findCommand->getCollation(),
+                                       findCommand->getLet())
                         .getAsync([](auto) {});
                 }
             }

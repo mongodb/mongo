@@ -149,7 +149,14 @@ public:
     ExecutorFuture<void> addFindQuery(const UUID& sampleId,
                                       const NamespaceString& nss,
                                       const BSONObj& filter,
-                                      const BSONObj& collation);
+                                      const BSONObj& collation,
+                                      const boost::optional<BSONObj>& letParameters);
+
+    ExecutorFuture<void> addAggregateQuery(const UUID& sampleId,
+                                           const NamespaceString& nss,
+                                           const BSONObj& filter,
+                                           const BSONObj& collation,
+                                           const boost::optional<BSONObj>& letParameters);
 
     ExecutorFuture<void> addCountQuery(const UUID& sampleId,
                                        const NamespaceString& nss,
@@ -160,11 +167,6 @@ public:
                                           const NamespaceString& nss,
                                           const BSONObj& filter,
                                           const BSONObj& collation);
-
-    ExecutorFuture<void> addAggregateQuery(const UUID& sampleId,
-                                           const NamespaceString& nss,
-                                           const BSONObj& filter,
-                                           const BSONObj& collation);
 
     ExecutorFuture<void> addUpdateQuery(const UUID& sampleId,
                                         const write_ops::UpdateCommandRequest& updateCmd,
@@ -225,7 +227,8 @@ private:
                                        const NamespaceString& nss,
                                        SampledCommandNameEnum cmdName,
                                        const BSONObj& filter,
-                                       const BSONObj& collation);
+                                       const BSONObj& collation,
+                                       const boost::optional<BSONObj>& letParameters = boost::none);
 
     void _flushQueries(OperationContext* opCtx);
     void _flushDiffs(OperationContext* opCtx);

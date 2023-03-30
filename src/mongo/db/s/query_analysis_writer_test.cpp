@@ -199,6 +199,10 @@ protected:
                     << "strength" << strength);
     }
 
+    BSONObj makeLetParameters() {
+        return BSON("constant" << UUID::gen());
+    }
+
     /*
      * Asserts that collection nss has a TTL index with the specified name and
      * expireAfterSeconds set to 0.
@@ -370,11 +374,13 @@ protected:
      * Asserts that there is a sampled read query document with the given sample id and that it has
      * the given fields.
      */
-    void assertSampledReadQueryDocument(const UUID& sampleId,
-                                        const NamespaceString& nss,
-                                        SampledCommandNameEnum cmdName,
-                                        const BSONObj& filter,
-                                        const BSONObj& collation) {
+    void assertSampledReadQueryDocument(
+        const UUID& sampleId,
+        const NamespaceString& nss,
+        SampledCommandNameEnum cmdName,
+        const BSONObj& filter,
+        const BSONObj& collation,
+        const boost::optional<BSONObj>& letParameters = boost::none) {
         auto doc = _getConfigDocument(NamespaceString::kConfigSampledQueriesNamespace, sampleId);
         auto parsedQueryDoc =
             SampledQueryDocument::parse(IDLParserContext("QueryAnalysisWriterTest"), doc);
@@ -387,6 +393,12 @@ protected:
                                                    parsedQueryDoc.getCmd());
         ASSERT_BSONOBJ_EQ(parsedCmd.getFilter(), filter);
         ASSERT_BSONOBJ_EQ(parsedCmd.getCollation(), collation);
+        if (letParameters) {
+            ASSERT(parsedCmd.getLet().has_value());
+            ASSERT_BSONOBJ_EQ(*parsedCmd.getLet(), *letParameters);
+        } else {
+            ASSERT(!parsedCmd.getLet().has_value());
+        }
     }
 
     /*
@@ -592,17 +604,19 @@ TEST_F(QueryAnalysisWriterTest, NoQueries) {
 TEST_F(QueryAnalysisWriterTest, FindQuery) {
     auto& writer = *QueryAnalysisWriter::get(operationContext());
 
-    auto testFindCmdCommon = [&](const BSONObj& filter, const BSONObj& collation) {
+    auto testFindCmdCommon = [&](const BSONObj& filter,
+                                 const BSONObj& collation,
+                                 const boost::optional<BSONObj>& letParameters = boost::none) {
         auto sampleId = UUID::gen();
 
-        writer.addFindQuery(sampleId, nss0, filter, collation).get();
+        writer.addFindQuery(sampleId, nss0, filter, collation, letParameters).get();
         ASSERT_EQ(writer.getQueriesCountForTest(), 1);
         writer.flushQueriesForTest(operationContext());
         ASSERT_EQ(writer.getQueriesCountForTest(), 0);
 
         ASSERT_EQ(getSampledQueryDocumentsCount(nss0), 1);
         assertSampledReadQueryDocument(
-            sampleId, nss0, SampledCommandNameEnum::kFind, filter, collation);
+            sampleId, nss0, SampledCommandNameEnum::kFind, filter, collation, letParameters);
 
         deleteSampledQueryDocuments();
     };
@@ -611,6 +625,7 @@ TEST_F(QueryAnalysisWriterTest, FindQuery) {
     testFindCmdCommon(makeNonEmptyFilter(), emptyCollation);
     testFindCmdCommon(emptyFilter, makeNonEmptyCollation());
     testFindCmdCommon(emptyFilter, emptyCollation);
+    testFindCmdCommon(emptyFilter, emptyCollation, makeLetParameters());
 }
 
 TEST_F(QueryAnalysisWriterTest, CountQuery) {
@@ -664,17 +679,19 @@ TEST_F(QueryAnalysisWriterTest, DistinctQuery) {
 TEST_F(QueryAnalysisWriterTest, AggregateQuery) {
     auto& writer = *QueryAnalysisWriter::get(operationContext());
 
-    auto testAggregateCmdCommon = [&](const BSONObj& filter, const BSONObj& collation) {
+    auto testAggregateCmdCommon = [&](const BSONObj& filter,
+                                      const BSONObj& collation,
+                                      const boost::optional<BSONObj>& letParameters = boost::none) {
         auto sampleId = UUID::gen();
 
-        writer.addAggregateQuery(sampleId, nss0, filter, collation).get();
+        writer.addAggregateQuery(sampleId, nss0, filter, collation, letParameters).get();
         ASSERT_EQ(writer.getQueriesCountForTest(), 1);
         writer.flushQueriesForTest(operationContext());
         ASSERT_EQ(writer.getQueriesCountForTest(), 0);
 
         ASSERT_EQ(getSampledQueryDocumentsCount(nss0), 1);
         assertSampledReadQueryDocument(
-            sampleId, nss0, SampledCommandNameEnum::kAggregate, filter, collation);
+            sampleId, nss0, SampledCommandNameEnum::kAggregate, filter, collation, letParameters);
 
         deleteSampledQueryDocuments();
     };
@@ -683,6 +700,7 @@ TEST_F(QueryAnalysisWriterTest, AggregateQuery) {
     testAggregateCmdCommon(makeNonEmptyFilter(), emptyCollation);
     testAggregateCmdCommon(emptyFilter, makeNonEmptyCollation());
     testAggregateCmdCommon(emptyFilter, emptyCollation);
+    testAggregateCmdCommon(emptyFilter, emptyCollation, makeLetParameters());
 }
 
 DEATH_TEST_F(QueryAnalysisWriterTest, UpdateQueryNotMarkedForSampling, "invariant") {
@@ -847,7 +865,13 @@ TEST_F(QueryAnalysisWriterTest, DuplicateQueries) {
     auto originalCountFilter = makeNonEmptyFilter();
     auto originalCountCollation = makeNonEmptyCollation();
 
-    writer.addFindQuery(findSampleId, nss0, originalFindFilter, originalFindCollation).get();
+    writer
+        .addFindQuery(findSampleId,
+                      nss0,
+                      originalFindFilter,
+                      originalFindCollation,
+                      boost::none /* letParameters */)
+        .get();
     ASSERT_EQ(writer.getQueriesCountForTest(), 1);
     writer.flushQueriesForTest(operationContext());
     ASSERT_EQ(writer.getQueriesCountForTest(), 0);
@@ -860,7 +884,12 @@ TEST_F(QueryAnalysisWriterTest, DuplicateQueries) {
                                    originalFindCollation);
 
     writer.addUpdateQuery(originalUpdateCmd, 0).get();
-    writer.addFindQuery(findSampleId, nss0, originalFindFilter, originalFindCollation)
+    writer
+        .addFindQuery(findSampleId,
+                      nss0,
+                      originalFindFilter,
+                      originalFindCollation,
+                      boost::none /* letParameters */)
         .get();  // This is a duplicate.
     writer.addCountQuery(countSampleId, nss0, originalCountFilter, originalCountCollation).get();
     ASSERT_EQ(writer.getQueriesCountForTest(), 3);
@@ -895,7 +924,8 @@ TEST_F(QueryAnalysisWriterTest, QueriesMultipleBatches_MaxBatchSize) {
         auto sampleId = UUID::gen();
         auto filter = makeNonEmptyFilter();
         auto collation = makeNonEmptyCollation();
-        writer.addAggregateQuery(sampleId, nss0, filter, collation).get();
+        writer.addAggregateQuery(sampleId, nss0, filter, collation, boost::none /* letParameters */)
+            .get();
         expectedSampledCmds.push_back({sampleId, filter, collation});
     }
     ASSERT_EQ(writer.getQueriesCountForTest(), numQueries);
@@ -919,7 +949,8 @@ TEST_F(QueryAnalysisWriterTest, QueriesMultipleBatches_MaxBSONObjSize) {
         auto sampleId = UUID::gen();
         auto filter = BSON(std::string(BSONObjMaxUserSize / 2, 'a') << 1);
         auto collation = makeNonEmptyCollation();
-        writer.addAggregateQuery(sampleId, nss0, filter, collation).get();
+        writer.addAggregateQuery(sampleId, nss0, filter, collation, boost::none /* letParameters */)
+            .get();
         expectedSampledCmds.push_back({sampleId, filter, collation});
     }
     ASSERT_EQ(writer.getQueriesCountForTest(), numQueries);
@@ -948,10 +979,12 @@ TEST_F(QueryAnalysisWriterTest, FlushAfterAddReadIfExceedsSizeLimit) {
     auto filter1 = BSON(std::string(maxMemoryUsageBytes / 2, 'b') << 1);
     auto collation1 = makeNonEmptyCollation();
 
-    writer.addFindQuery(sampleId0, nss0, filter0, collation0).get();
+    writer.addFindQuery(sampleId0, nss0, filter0, collation0, boost::none /* letParameters */)
+        .get();
     ASSERT_EQ(writer.getQueriesCountForTest(), 1);
     // Adding the next query causes the size to exceed the limit.
-    writer.addAggregateQuery(sampleId1, nss1, filter1, collation1).get();
+    writer.addAggregateQuery(sampleId1, nss1, filter1, collation1, boost::none /* letParameters */)
+        .get();
     ASSERT_EQ(writer.getQueriesCountForTest(), 0);
 
     ASSERT_EQ(getSampledQueryDocumentsCount(nss0), 1);
@@ -1069,7 +1102,13 @@ TEST_F(QueryAnalysisWriterTest, AddQueriesBackAfterWriteError) {
     std::vector<UUID> sampleIds0;
     for (auto i = 0; i < numQueries; i++) {
         sampleIds0.push_back(UUID::gen());
-        writer.addFindQuery(sampleIds0[i], nss0, originalFilter, originalCollation).get();
+        writer
+            .addFindQuery(sampleIds0[i],
+                          nss0,
+                          originalFilter,
+                          originalCollation,
+                          boost::none /* letParameters */)
+            .get();
     }
     ASSERT_EQ(writer.getQueriesCountForTest(), numQueries);
 
@@ -1124,7 +1163,13 @@ TEST_F(QueryAnalysisWriterTest, RemoveDuplicatesFromBufferAfterWriteError) {
     std::vector<UUID> sampleIds0;
     for (auto i = 0; i < numQueries0; i++) {
         sampleIds0.push_back(UUID::gen());
-        writer.addFindQuery(sampleIds0[i], nss0, originalFilter, originalCollation).get();
+        writer
+            .addFindQuery(sampleIds0[i],
+                          nss0,
+                          originalFilter,
+                          originalCollation,
+                          boost::none /* letParameters */)
+            .get();
     }
     ASSERT_EQ(writer.getQueriesCountForTest(), numQueries0);
     writer.flushQueriesForTest(operationContext());
@@ -1141,10 +1186,22 @@ TEST_F(QueryAnalysisWriterTest, RemoveDuplicatesFromBufferAfterWriteError) {
     std::vector<UUID> sampleIds1;
     for (auto i = 0; i < numQueries1; i++) {
         sampleIds1.push_back(UUID::gen());
-        writer.addFindQuery(sampleIds1[i], nss1, originalFilter, originalCollation).get();
+        writer
+            .addFindQuery(sampleIds1[i],
+                          nss1,
+                          originalFilter,
+                          originalCollation,
+                          boost::none /* letParameters */)
+            .get();
         // This is a duplicate.
         if (i < numQueries0) {
-            writer.addFindQuery(sampleIds0[i], nss0, originalFilter, originalCollation).get();
+            writer
+                .addFindQuery(sampleIds0[i],
+                              nss0,
+                              originalFilter,
+                              originalCollation,
+                              boost::none /* letParameters */)
+                .get();
         }
     }
     ASSERT_EQ(writer.getQueriesCountForTest(), numQueries0 + numQueries1);

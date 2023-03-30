@@ -133,7 +133,8 @@ function getRandomCount() {
     return AnalyzeShardKeyUtil.getRandInteger(1, 100);
 }
 
-function makeTestCase(collName, {shardKeyField, isHashed, minVal, maxVal}) {
+function makeTestCase(
+    sampledCollName, notSampledCollName, {shardKeyField, isHashed, minVal, maxVal}) {
     // Generate commands and populate the expected metrics.
     const cmdObjs = [];
 
@@ -168,7 +169,7 @@ function makeTestCase(collName, {shardKeyField, isHashed, minVal, maxVal}) {
     // Below are reads targeting a single shard.
 
     for (let i = 0; i < getRandomCount(); i++) {
-        cmdObjs.push({find: collName, filter: {[shardKeyField]: getNextVal()}});
+        cmdObjs.push({find: sampledCollName, filter: {[shardKeyField]: getNextVal()}});
         readDistribution.sampleSize.find++;
         readDistribution.sampleSize.total++;
         readDistribution.numSingleShard++;
@@ -176,7 +177,7 @@ function makeTestCase(collName, {shardKeyField, isHashed, minVal, maxVal}) {
 
     for (let i = 0; i < getRandomCount(); i++) {
         cmdObjs.push({
-            aggregate: collName,
+            aggregate: sampledCollName,
             pipeline: [{$match: {[shardKeyField]: getNextVal()}}],
             cursor: {}
         });
@@ -186,14 +187,44 @@ function makeTestCase(collName, {shardKeyField, isHashed, minVal, maxVal}) {
     }
 
     for (let i = 0; i < getRandomCount(); i++) {
-        cmdObjs.push({count: collName, query: {[shardKeyField]: getNextVal()}});
+        cmdObjs.push({
+            aggregate: sampledCollName,
+            pipeline: [{$match: {$expr: {$eq: ["$" + shardKeyField, "$$value"]}}}],
+            cursor: {},
+            let : {value: getNextVal()}
+        });
+        readDistribution.sampleSize.aggregate++;
+        readDistribution.sampleSize.total++;
+        readDistribution.numSingleShard++;
+    }
+
+    for (let i = 0; i < getRandomCount(); i++) {
+        cmdObjs.push({
+            aggregate: notSampledCollName,
+            pipeline: [{
+                $lookup: {
+                    from: sampledCollName,
+                    let : {value: getNextVal()},
+                    pipeline: [{$match: {$expr: {$eq: ["$" + shardKeyField, "$$value"]}}}],
+                    as: "joined"
+                }
+            }],
+            cursor: {}
+        });
+        readDistribution.sampleSize.aggregate++;
+        readDistribution.sampleSize.total++;
+        readDistribution.numSingleShard++;
+    }
+
+    for (let i = 0; i < getRandomCount(); i++) {
+        cmdObjs.push({count: sampledCollName, query: {[shardKeyField]: getNextVal()}});
         readDistribution.sampleSize.count++;
         readDistribution.sampleSize.total++;
         readDistribution.numSingleShard++;
     }
 
     for (let i = 0; i < getRandomCount(); i++) {
-        cmdObjs.push({distinct: collName, key: "x", query: {[shardKeyField]: getNextVal()}});
+        cmdObjs.push({distinct: sampledCollName, key: "x", query: {[shardKeyField]: getNextVal()}});
         readDistribution.sampleSize.distinct++;
         readDistribution.sampleSize.total++;
         readDistribution.numSingleShard++;
@@ -202,7 +233,7 @@ function makeTestCase(collName, {shardKeyField, isHashed, minVal, maxVal}) {
     // Below are reads targeting a variable number of shards.
 
     for (let i = 0; i < getRandomCount(); i++) {
-        cmdObjs.push({find: collName, filter: {[shardKeyField]: {$gte: getNextVal()}}});
+        cmdObjs.push({find: sampledCollName, filter: {[shardKeyField]: {$gte: getNextVal()}}});
         readDistribution.sampleSize.find++;
         readDistribution.sampleSize.total++;
         if (isHashed) {
@@ -215,7 +246,7 @@ function makeTestCase(collName, {shardKeyField, isHashed, minVal, maxVal}) {
 
     for (let i = 0; i < getRandomCount(); i++) {
         cmdObjs.push({
-            aggregate: collName,
+            aggregate: sampledCollName,
             pipeline: [{$match: {[shardKeyField]: {$lt: getNextVal()}}}],
             cursor: {}
         });
@@ -230,7 +261,7 @@ function makeTestCase(collName, {shardKeyField, isHashed, minVal, maxVal}) {
     }
 
     for (let i = 0; i < getRandomCount(); i++) {
-        cmdObjs.push({count: collName, query: {[shardKeyField]: {$lte: getNextVal()}}});
+        cmdObjs.push({count: sampledCollName, query: {[shardKeyField]: {$lte: getNextVal()}}});
         readDistribution.sampleSize.count++;
         readDistribution.sampleSize.total++;
         if (isHashed) {
@@ -244,8 +275,19 @@ function makeTestCase(collName, {shardKeyField, isHashed, minVal, maxVal}) {
     // Below are reads targeting all shards.
 
     for (let i = 0; i < getRandomCount(); i++) {
-        cmdObjs.push({find: collName, filter: {}});
+        cmdObjs.push({find: sampledCollName, filter: {}});
         readDistribution.sampleSize.find++;
+        readDistribution.sampleSize.total++;
+        readDistribution.numScatterGather++;
+    }
+
+    for (let i = 0; i < getRandomCount(); i++) {
+        cmdObjs.push({
+            aggregate: sampledCollName,
+            pipeline: [{$match: {$expr: {$eq: ["$ts", "$$NOW"]}}}],
+            cursor: {}
+        });
+        readDistribution.sampleSize.aggregate++;
         readDistribution.sampleSize.total++;
         readDistribution.numScatterGather++;
     }
@@ -254,7 +296,7 @@ function makeTestCase(collName, {shardKeyField, isHashed, minVal, maxVal}) {
 
     for (let i = 0; i < getRandomCount(); i++) {
         cmdObjs.push({
-            update: collName,
+            update: sampledCollName,
             updates: [
                 {q: {[shardKeyField]: getNextVal()}, u: {$set: {z: 0}}},
                 {q: {$expr: {$eq: ["$" + shardKeyField, getNextVal()]}}, u: [{$set: {z: 0}}]}
@@ -267,7 +309,7 @@ function makeTestCase(collName, {shardKeyField, isHashed, minVal, maxVal}) {
 
     for (let i = 0; i < getRandomCount(); i++) {
         cmdObjs.push({
-            delete: collName,
+            delete: sampledCollName,
             deletes: [
                 {q: {[shardKeyField]: minVal++}, limit: 1},
                 {q: {[shardKeyField]: maxVal--}, limit: 0}
@@ -281,7 +323,7 @@ function makeTestCase(collName, {shardKeyField, isHashed, minVal, maxVal}) {
     for (let i = 0; i < getRandomCount(); i++) {
         cmdObjs.push({
             // This is a shard key update.
-            findAndModify: collName,
+            findAndModify: sampledCollName,
             query: {[shardKeyField]: minVal++},
             update: {$inc: {[shardKeyField]: 1}},
             lsid: {id: UUID()},
@@ -297,7 +339,7 @@ function makeTestCase(collName, {shardKeyField, isHashed, minVal, maxVal}) {
 
     for (let i = 0; i < getRandomCount(); i++) {
         cmdObjs.push({
-            update: collName,
+            update: sampledCollName,
             updates: [{q: {[shardKeyField]: {$gte: getNextVal()}}, u: {$set: {z: 0}}}]
         });
         writeDistribution.sampleSize.update++;
@@ -312,8 +354,10 @@ function makeTestCase(collName, {shardKeyField, isHashed, minVal, maxVal}) {
     }
 
     for (let i = 0; i < getRandomCount(); i++) {
-        cmdObjs.push(
-            {delete: collName, deletes: [{q: {[shardKeyField]: {$lte: minVal++}}, limit: 0}]});
+        cmdObjs.push({
+            delete: sampledCollName,
+            deletes: [{q: {[shardKeyField]: {$lte: minVal++}}, limit: 0}]
+        });
         writeDistribution.sampleSize.delete ++;
         writeDistribution.sampleSize.total++;
         if (isHashed) {
@@ -327,7 +371,7 @@ function makeTestCase(collName, {shardKeyField, isHashed, minVal, maxVal}) {
 
     for (let i = 0; i < getRandomCount(); i++) {
         cmdObjs.push({
-            findAndModify: collName,
+            findAndModify: sampledCollName,
             query: {[shardKeyField]: {$lte: getNextVal()}},
             update: {$set: {z: 0}}
         });
@@ -345,7 +389,7 @@ function makeTestCase(collName, {shardKeyField, isHashed, minVal, maxVal}) {
     // Below are writes targeting all shards.
 
     for (let i = 0; i < getRandomCount(); i++) {
-        cmdObjs.push({findAndModify: collName, query: {}, update: {$set: {z: 0}}});
+        cmdObjs.push({findAndModify: sampledCollName, query: {}, update: {$set: {z: 0}}});
         writeDistribution.sampleSize.findAndModify++;
         writeDistribution.sampleSize.total++;
         writeDistribution.numScatterGather++;
@@ -370,7 +414,7 @@ function waitForSampledQueries(conn, ns, shardKey, testCase) {
             res.writeDistribution.sampleSize.total / 100;
 
         if (numTries % 100 == 0) {
-            jsTest.log("Waiting for sampled queries and diffs" + tojsononeline({
+            jsTest.log("Waiting for sampled queries and diffs " + tojsononeline({
                            actual: {
                                readSampleSize: res.readDistribution.sampleSize,
                                writeSampleSize: res.writeDistribution.sampleSize,
@@ -396,65 +440,77 @@ function waitForSampledQueries(conn, ns, shardKey, testCase) {
 
 function runTest(fixture, {isShardedColl, shardKeyField, isHashed}) {
     const dbName = "testDb";
-    const collName = isShardedColl ? "testCollSharded" : "testCollUnsharded";
-    const ns = dbName + "." + collName;
+    // Make the database have two collections, one with query sampling enabled and one without.
+    // The sampled collection is used for testing the analyzeShardKey metrics. The non-sampled
+    // collection is used as the local collection when running aggregate commands with $lookup
+    // against the sampled collection.
+    const sampledCollName = isShardedColl ? "sampledCollSharded" : "sampledCollUnsharded";
+    const notSampledCollName = "notSampledColl";
+    const sampledNs = dbName + "." + sampledCollName;
     const shardKey = {[shardKeyField]: isHashed ? "hashed" : 1};
-    jsTest.log(`Test analyzing the shard key ${tojsononeline(shardKey)} for the collection ${ns}`);
+    jsTest.log(`Test analyzing the shard key ${tojsononeline(shardKey)} for the collection ${
+        tojson({ns: sampledNs})}`);
 
-    fixture.setUpCollectionFn(dbName, collName, isShardedColl);
+    const sampledColl = fixture.conn.getDB(dbName).getCollection(sampledCollName);
+    const notSampledColl = fixture.conn.getDB(dbName).getCollection(notSampledCollName);
 
-    const coll = fixture.conn.getDB(dbName).getCollection(collName);
+    fixture.setUpCollectionFn(dbName, sampledCollName, isShardedColl);
+    assert.commandWorked(notSampledColl.insert([{a: 0}]));
 
     // Verify that the analyzeShardKey command fails while calculating the read and write
     // distribution if the cardinality of the shard key is lower than analyzeShardKeyNumRanges.
-    assert.commandWorked(coll.insert({[shardKeyField]: 1}));
-    assert.commandFailedWithCode(fixture.conn.adminCommand({analyzeShardKey: ns, key: shardKey}),
-                                 4952606);
+    assert.commandWorked(sampledColl.insert({[shardKeyField]: 1}));
+    assert.commandFailedWithCode(
+        fixture.conn.adminCommand({analyzeShardKey: sampledNs, key: shardKey}), 4952606);
 
-    // Insert documents into the collection. The range of values is selected such that the
+    // Insert documents into the sampled collection. The range of values is selected such that the
     // documents will be distributed across all the shards if the collection is sharded.
     const minVal = -1500;
     const maxVal = 1500;
     const docs = [];
     for (let i = minVal; i < maxVal + 1; i++) {
-        docs.push({_id: i, x: i, y: i});
+        docs.push({_id: i, x: i, y: i, ts: new Date()});
     }
-    assert.commandWorked(coll.insert(docs));
+    assert.commandWorked(sampledColl.insert(docs));
 
     // Verify that the analyzeShardKey command returns zeros for the read and write sample size
     // when there are no sampled queries.
-    let res = assert.commandWorked(fixture.conn.adminCommand({analyzeShardKey: ns, key: shardKey}));
+    let res = assert.commandWorked(
+        fixture.conn.adminCommand({analyzeShardKey: sampledNs, key: shardKey}));
     assertMetricsEmptySampleSize(res);
 
     // Turn on query sampling and wait for sampling to become active.
     assert.commandWorked(
-        fixture.conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", sampleRate}));
+        fixture.conn.adminCommand({configureQueryAnalyzer: sampledNs, mode: "full", sampleRate}));
     fixture.waitForActiveSamplingFn();
 
     // Create and run test queries.
-    const testCase = makeTestCase(collName, {shardKeyField, isHashed, minVal, maxVal});
+    const testCase = makeTestCase(
+        sampledCollName, notSampledCollName, {shardKeyField, isHashed, minVal, maxVal});
 
     fixture.runCmdsFn(dbName, testCase.cmdObjs);
 
     // Turn off query sampling and wait for sampling to become inactive. The wait is necessary for
     // preventing the internal aggregate commands run by the analyzeShardKey commands below from
     // getting sampled.
-    assert.commandWorked(fixture.conn.adminCommand({configureQueryAnalyzer: ns, mode: "off"}));
+    assert.commandWorked(
+        fixture.conn.adminCommand({configureQueryAnalyzer: sampledNs, mode: "off"}));
     fixture.waitForInactiveSamplingFn();
 
-    res = waitForSampledQueries(fixture.conn, ns, shardKey, testCase);
+    res = waitForSampledQueries(fixture.conn, sampledNs, shardKey, testCase);
     fixture.assertNoConfigSplitPointsCollFn();
 
     // Verify that the metrics are as expected and that the temporary collections for storing
     // the split points have been dropped.
     assertMetricsNonEmptySampleSize(res, testCase.metrics, isHashed);
 
-    // Drop the collection without removing its config.sampledQueries and
+    assert(notSampledColl.drop());
+    // Drop the sampled collection without removing its config.sampledQueries and
     // config.sampledQueriesDiff documents to get test coverage for analyzing shard keys for a
     // collection that has gone through multiple incarnations. That is, if the analyzeShardKey
     // command filters those documents by ns instead of collection uuid, it would return
     // incorrect metrics.
-    assert(coll.drop());
+    assert(sampledColl.drop());
 }
 
 // Make the periodic jobs for refreshing sample rates and writing sampled queries and diffs have a
@@ -474,8 +530,8 @@ const mongodSetParameterOpts = {
 const mongosSetParametersOpts = {queryAnalysisSamplerConfigurationRefreshSecs};
 
 {
-    jsTest.log("Verify that on a sharded cluster the analyzeShardKey command return correct read " +
-               "and write distribution metrics");
+    jsTest.log("Verify that on a sharded cluster the analyzeShardKey command returns correct read" +
+               " and write distribution metrics");
 
     const numMongoses = 2;  // Test sampling on multiple mongoses.
     const numShards = 3;
@@ -546,7 +602,7 @@ const mongosSetParametersOpts = {queryAnalysisSamplerConfigurationRefreshSecs};
 }
 
 {
-    jsTest.log("Verify that on a replica set the analyzeShardKey command doesn't return read " +
+    jsTest.log("Verify that on a replica set the analyzeShardKey command returns correct read " +
                "and write distribution metrics");
 
     const rst = new ReplSetTest({nodes: 2, nodeOptions: {setParameter: mongodSetParameterOpts}});

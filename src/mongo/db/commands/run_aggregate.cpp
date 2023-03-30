@@ -1031,8 +1031,11 @@ Status runAggregate(OperationContext* opCtx,
                 analyze_shard_key::SampledCommandNameEnum::kAggregate,
                 request)) {
             analyze_shard_key::QueryAnalysisWriter::get(opCtx)
-                ->addAggregateQuery(
-                    *sampleId, expCtx->ns, pipeline->getInitialQuery(), expCtx->getCollatorBSON())
+                ->addAggregateQuery(*sampleId,
+                                    expCtx->ns,
+                                    pipeline->getInitialQuery(),
+                                    expCtx->getCollatorBSON(),
+                                    request.getLet())
                 .getAsync([](auto) {});
         }
 
