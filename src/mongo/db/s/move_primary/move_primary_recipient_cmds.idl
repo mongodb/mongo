@@ -39,10 +39,11 @@ imports:
     - "mongo/db/s/move_primary/move_primary_common_metadata.idl"
 
 commands:
-    movePrimaryRecipientSyncData:
-        description: "Parser for the 'movePrimaryRecipientSyncData' command."
+    _movePrimaryRecipientSyncData:
+        description: "Parser for the '_movePrimaryRecipientSyncData' command."
         api_version: ""
-        command_name: movePrimaryRecipientSyncData
+        command_name: _movePrimaryRecipientSyncData
+        cpp_name: MovePrimaryRecipientSyncData
         strict: false
         namespace: ignored
         reply_type: OkReply
@@ -52,17 +53,19 @@ commands:
         fields:
             returnAfterReachingDonorTimestamp:
                 description: >-
-                    If provided, the recipient should return after syncing up to this donor timestamp.
-                    Otherwise, the recipient will return once its copy of the data is consistent.
+                    If provided, the recipient should return after syncing up to this donor timestamp 
+                    i.e. once it reaches kPrepared state. Otherwise, the recipient will return 
+                    once it finishes cloning.
                 type: timestamp
                 optional: true
                 validator:
                     callback: "move_primary_util::validateTimestampNotNull"
 
-    movePrimaryRecipientForgetMigration:
-        description: "Parser for the 'movePrimaryRecipientForgetMigration' command."
+    _movePrimaryRecipientForgetMigration:
+        description: "Parser for the '_movePrimaryRecipientForgetMigration' command."
         api_version: ""
-        command_name: movePrimaryRecipientForgetMigration
+        command_name: _movePrimaryRecipientForgetMigration
+        cpp_name: MovePrimaryRecipientForgetMigration
         reply_type: OkReply
         strict: false
         namespace: ignored
@@ -70,10 +73,11 @@ commands:
         chained_structs:
             MovePrimaryCommonMetadata: MovePrimaryCommonMetadata
 
-    movePrimaryRecipientAbortMigration:
-        description: "Parser for the 'movePrimaryRecipientAbortMigration' command."
+    _movePrimaryRecipientAbortMigration:
+        description: "Parser for the '_movePrimaryRecipientAbortMigration' command."
         api_version: ""
-        command_name: movePrimaryRecipientAbortMigration
+        command_name: _movePrimaryRecipientAbortMigration
+        cpp_name: MovePrimaryRecipientAbortMigration
         reply_type: OkReply
         strict: false
         namespace: ignored

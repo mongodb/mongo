@@ -39,6 +39,7 @@ namespace mongo {
 namespace {
 
 const auto kDatabaseName = NamespaceString{"testDb"};
+constexpr auto kOldPrimaryShardName = "oldPrimaryId";
 constexpr auto kNewPrimaryShardName = "newPrimaryId";
 const StatusWith<Shard::CommandResponse> kOkResponse =
     Shard::CommandResponse{boost::none, BSON("ok" << 1), Status::OK(), Status::OK()};
@@ -163,29 +164,32 @@ protected:
 
     MovePrimaryCommonMetadata createMetadata() const {
         MovePrimaryCommonMetadata metadata;
-        metadata.set_id(UUID::gen());
+        metadata.setMigrationId(UUID::gen());
         metadata.setDatabaseName(kDatabaseName);
-        metadata.setShardName(kNewPrimaryShardName);
+        metadata.setFromShardName(kOldPrimaryShardName);
+        metadata.setToShardName(kNewPrimaryShardName);
         return metadata;
     }
 
     MovePrimaryDonorDocument createStateDocument() const {
         MovePrimaryDonorDocument doc;
-        doc.setMetadata(createMetadata());
+        auto metadata = createMetadata();
+        doc.setMetadata(metadata);
+        doc.setId(metadata.getMigrationId());
         return doc;
     }
 
     MovePrimaryDonorDocument getStateDocumentOnDisk(OperationContext* opCtx, UUID instanceId) {
         DBDirectClient client(opCtx);
         auto doc = client.findOne(NamespaceString::kMovePrimaryDonorNamespace,
-                                  BSON(MovePrimaryDonorDocument::k_idFieldName << instanceId));
+                                  BSON(MovePrimaryDonorDocument::kIdFieldName << instanceId));
         IDLParserContext errCtx("MovePrimaryDonorServiceTest::getStateDocumentOnDisk()");
         return MovePrimaryDonorDocument::parse(errCtx, doc);
     }
 
     MovePrimaryDonorDocument getStateDocumentOnDisk(
         OperationContext* opCtx, const std::shared_ptr<DonorInstance>& instance) {
-        return getStateDocumentOnDisk(opCtx, instance->getMetadata().get_id());
+        return getStateDocumentOnDisk(opCtx, instance->getMetadata().getMigrationId());
     }
 
     static constexpr auto kBefore = "before";
@@ -247,7 +251,7 @@ protected:
     }
 
     std::shared_ptr<DonorInstance> getExistingInstance(OperationContext* opCtx, const UUID& id) {
-        auto instanceId = BSON(MovePrimaryDonorDocument::k_idFieldName << id);
+        auto instanceId = BSON(MovePrimaryDonorDocument::kIdFieldName << id);
         auto instance = DonorInstance::lookup(opCtx, _service, instanceId);
         if (!instance) {
             return nullptr;
@@ -317,7 +321,7 @@ protected:
 
     Timestamp getBlockingWritesTimestamp(OperationContext* opCtx,
                                          const std::shared_ptr<DonorInstance>& instance) {
-        auto doc = getStateDocumentOnDisk(opCtx, instance->getMetadata().get_id());
+        auto doc = getStateDocumentOnDisk(opCtx, instance->getMetadata().getMigrationId());
         auto timestamp = doc.getMutableFields().getBlockingWritesTimestamp();
         ASSERT_TRUE(timestamp.has_value());
         return *timestamp;
@@ -360,7 +364,7 @@ protected:
         boost::optional<UUID> instanceId;
         {
             auto [instance, fp] = createInstanceInState(opCtx, state);
-            instanceId = instance->getMetadata().get_id();
+            instanceId = instance->getMetadata().getMigrationId();
             stepDown();
             fp->setMode(FailPoint::off);
             ASSERT_NOT_OK(instance->getCompletionFuture().getNoThrow());
@@ -469,7 +473,9 @@ TEST_F(MovePrimaryDonorServiceTest, CannotCreateTwoInstancesForSameDb) {
     auto stateDoc = createStateDocument();
     auto instance = DonorInstance::getOrCreate(opCtx.get(), _service, stateDoc.toBSON());
     auto otherStateDoc = stateDoc;
-    otherStateDoc.getMetadata().set_id(UUID::gen());
+    auto otherMigrationId = UUID::gen();
+    otherStateDoc.getMetadata().setMigrationId(otherMigrationId);
+    otherStateDoc.setId(otherMigrationId);
     ASSERT_THROWS_CODE(DonorInstance::getOrCreate(opCtx.get(), _service, otherStateDoc.toBSON()),
                        DBException,
                        ErrorCodes::ConflictingOperationInProgress);
@@ -491,7 +497,7 @@ TEST_F(MovePrimaryDonorServiceTest, SameUuidMustHaveSameRecipient) {
     auto stateDoc = createStateDocument();
     auto instance = DonorInstance::getOrCreate(opCtx.get(), _service, stateDoc.toBSON());
     auto otherStateDoc = stateDoc;
-    otherStateDoc.getMetadata().setShardName("someOtherShard");
+    otherStateDoc.getMetadata().setToShardName("someOtherShard");
     ASSERT_THROWS_CODE(DonorInstance::getOrCreate(opCtx.get(), _service, otherStateDoc.toBSON()),
                        DBException,
                        ErrorCodes::ConflictingOperationInProgress);

@@ -28,6 +28,7 @@
  */
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
@@ -54,6 +55,7 @@
 #include "mongo/s/config_server_catalog_cache_loader.h"
 #include "mongo/s/sharding_router_test_fixture.h"
 #include "mongo/unittest/assert.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include <memory>
 
@@ -87,8 +89,12 @@ class MovePrimaryRecipientExternalStateForTest : public MovePrimaryRecipientExte
         const BSONObj& command,
         const std::vector<ShardId>& shardIds,
         const std::shared_ptr<executor::TaskExecutor>& executor) {
-        executor::RemoteCommandResponse kOkResponse{repl::OpTimeBase(Timestamp::min()).toBSON(),
-                                                    Milliseconds(0)};
+        auto opTimeBase = repl::OpTimeBase(Timestamp::min());
+        opTimeBase.setTerm(0);
+        BSONArrayBuilder bab;
+        bab.append(opTimeBase.toBSON());
+        executor::RemoteCommandResponse kOkResponse{
+            BSON("ok" << 1 << "cursor" << BSON("firstBatch" << bab.done())), Microseconds(0)};
         std::vector<AsyncRequestsSender::Response> shardResponses{
             {kShardList.front().getName(),
              kOkResponse,
@@ -222,11 +228,14 @@ class MovePrimaryRecipientServiceTest : public ShardServerTestFixture {
 protected:
     MovePrimaryRecipientDocument createRecipientDoc() {
         UUID migrationId = UUID::gen();
-        MovePrimaryCommonMetadata metadata(
-            migrationId, NamespaceString{"foo"}, kShardList.front().getName());
+        MovePrimaryCommonMetadata metadata(migrationId,
+                                           NamespaceString{"foo"},
+                                           kShardList.front().getName(),
+                                           kShardList.back().getName());
 
         MovePrimaryRecipientDocument doc;
         doc.setMetadata(metadata);
+        doc.setId(migrationId);
 
         return doc;
     }
@@ -340,7 +349,8 @@ TEST_F(MovePrimaryRecipientServiceTest, TransitionsThroughEachStateInRunToComple
 
     recipient->getCompletionFuture().get();
     movePrimaryRecipientPauseBeforeCompletion->setMode(FailPoint::off, 0);
-    waitUntilDocDeleted(opCtx, NamespaceString::kMovePrimaryRecipientNamespace, doc.get_id());
+    waitUntilDocDeleted(
+        opCtx, NamespaceString::kMovePrimaryRecipientNamespace, doc.getMigrationId());
 }
 
 TEST_F(MovePrimaryRecipientServiceTest, PersistsStateDocument) {
@@ -358,10 +368,10 @@ TEST_F(MovePrimaryRecipientServiceTest, PersistsStateDocument) {
     movePrimaryRecipientPauseAfterInsertingStateDoc->waitForTimesEntered(timesEnteredFailPoint + 1);
 
     ASSERT(instance.get());
-    ASSERT_EQ(doc.get_id(), instance->getMigrationId());
+    ASSERT_EQ(doc.getMigrationId(), instance->getMigrationId());
     ASSERT(instance->getRecipientDocDurableFuture().isReady());
 
-    auto persistedDoc = getRecipientDoc(opCtx, doc.get_id());
+    auto persistedDoc = getRecipientDoc(opCtx, doc.getMigrationId());
     ASSERT_BSONOBJ_EQ(persistedDoc.getMetadata().toBSON(), doc.getMetadata().toBSON());
 
     movePrimaryRecipientPauseAfterInsertingStateDoc->setMode(FailPoint::off, 0);
@@ -383,7 +393,7 @@ TEST_F(MovePrimaryRecipientServiceTest, ThrowsWithConflictingOperation) {
 
     auto conflictingDoc = createRecipientDoc();
 
-    ASSERT_NE(doc.get_id(), conflictingDoc.get_id());
+    ASSERT_NE(doc.getMigrationId(), conflictingDoc.getMigrationId());
 
     // Asserts that a movePrimary op on same database fails with MovePrimaryInProgress
     ASSERT_THROWS_CODE(MovePrimaryRecipientService::MovePrimaryRecipient::getOrCreate(
@@ -409,9 +419,12 @@ TEST_F(MovePrimaryRecipientServiceTest, ThrowsWithConflictingOptions) {
 
     movePrimaryRecipientPauseAfterInsertingStateDoc->waitForTimesEntered(timesEnteredFailPoint + 1);
 
-    MovePrimaryCommonMetadata metadata(
-        doc.get_id(), NamespaceString{"bar"}, "second/localhost:27018");
+    MovePrimaryCommonMetadata metadata(doc.getMigrationId(),
+                                       NamespaceString{"bar"},
+                                       "second/localhost:27018",
+                                       "first/localhost:27019");
     MovePrimaryRecipientDocument conflictingDoc;
+    conflictingDoc.setId(doc.getMigrationId());
     conflictingDoc.setMetadata(metadata);
 
     // Asserts that a movePrimary op with a different fromShard fails with MovePrimaryInProgress
@@ -535,7 +548,8 @@ TEST_F(MovePrimaryRecipientServiceTest, CanAbortInEachAbortableState) {
 
         recipient.reset();
 
-        waitUntilDocDeleted(opCtx, NamespaceString::kMovePrimaryRecipientNamespace, doc.get_id());
+        waitUntilDocDeleted(
+            opCtx, NamespaceString::kMovePrimaryRecipientNamespace, doc.getMigrationId());
 
         _service->releaseInstance(instanceId, Status::OK());
 
@@ -614,7 +628,8 @@ TEST_F(MovePrimaryRecipientServiceTest, StepUpStepDownEachPersistedStateLifecycl
 
         recipient.reset();
 
-        waitUntilDocDeleted(opCtx, NamespaceString::kMovePrimaryRecipientNamespace, doc.get_id());
+        waitUntilDocDeleted(
+            opCtx, NamespaceString::kMovePrimaryRecipientNamespace, doc.getMigrationId());
 
         _service->releaseInstance(instanceId, Status::OK());
 
@@ -632,10 +647,13 @@ TEST_F(MovePrimaryRecipientServiceTest, CleansUpPersistedMetadataOnCompletion) {
         opCtx, _service, doc.toBSON());
     auto future = recipient->onReceiveForgetMigration();
     future.get(opCtx);
-    waitUntilDocDeleted(opCtx, NamespaceString::kMovePrimaryRecipientNamespace, doc.get_id());
-    waitUntilDocDeleted(opCtx, NamespaceString::kMovePrimaryApplierProgressNamespace, doc.get_id());
     waitUntilDocDeleted(
-        opCtx, NamespaceString::makeMovePrimaryOplogBufferNSS(doc.get_id()), doc.get_id());
+        opCtx, NamespaceString::kMovePrimaryRecipientNamespace, doc.getMigrationId());
+    waitUntilDocDeleted(
+        opCtx, NamespaceString::kMovePrimaryApplierProgressNamespace, doc.getMigrationId());
+    waitUntilDocDeleted(opCtx,
+                        NamespaceString::makeMovePrimaryOplogBufferNSS(doc.getMigrationId()),
+                        doc.getMigrationId());
 }
 
 TEST_F(MovePrimaryRecipientServiceTest, OnReceiveSyncData) {

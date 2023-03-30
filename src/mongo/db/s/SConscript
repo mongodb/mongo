@@ -549,6 +549,7 @@ env.Library(
         'move_primary_coordinator_document.idl',
         'move_primary_coordinator.cpp',
         'move_primary_coordinator_no_resilient.cpp',
+        'move_primary/move_primary_recipient_cmds.cpp',
         'refine_collection_shard_key_coordinator_document.idl',
         'refine_collection_shard_key_coordinator.cpp',
         'refresh_query_analyzer_configuration_cmd.cpp',

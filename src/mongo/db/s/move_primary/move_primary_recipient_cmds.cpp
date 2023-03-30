@@ -31,11 +31,16 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/repl/primary_only_service.h"
+#include "mongo/db/s/move_primary/move_primary_common_metadata_gen.h"
 #include "mongo/db/s/move_primary/move_primary_recipient_cmds_gen.h"
 #include "mongo/db/s/move_primary/move_primary_recipient_service.h"
 #include "mongo/db/s/move_primary/move_primary_state_machine_gen.h"
 #include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/move_primary/move_primary_feature_flag_gen.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/thread_pool.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kMovePrimary
 
 namespace mongo {
 
@@ -59,24 +64,27 @@ public:
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
             const auto& cmd = request();
-            MovePrimaryRecipientDocument recipientDoc(std::move(cmd.getMigrationId()),
-                                                      cmd.getDatabaseName().toString(),
-                                                      cmd.getFromShard().toString());
+
+            MovePrimaryRecipientDocument recipientDoc;
+            recipientDoc.setId(cmd.getMigrationId());
+            recipientDoc.setMetadata(std::move(cmd.getMovePrimaryCommonMetadata()));
 
             auto registry = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext());
             auto service = registry->lookupServiceByName(
                 MovePrimaryRecipientService::kMovePrimaryRecipientServiceName);
+
             auto instance = MovePrimaryRecipientService::MovePrimaryRecipient::getOrCreate(
                 opCtx, service, recipientDoc.toBSON());
 
             auto returnAfterReachingDonorTimestamp = cmd.getReturnAfterReachingDonorTimestamp();
 
             if (!returnAfterReachingDonorTimestamp) {
-                return instance->waitUntilMigrationReachesConsistentState(opCtx);
+                instance->getDataClonedFuture().get(opCtx);
+            } else {
+                auto preparedFuture =
+                    instance->onReceiveSyncData(returnAfterReachingDonorTimestamp.get());
+                preparedFuture.get(opCtx);
             }
-
-            return instance->waitUntilMigrationReachesReturnAfterReachingDonorTimestamp(
-                opCtx, returnAfterReachingDonorTimestamp.get());
         }
 
     private:
@@ -134,17 +142,17 @@ public:
             auto registry = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext());
             auto service = registry->lookupServiceByName(
                 MovePrimaryRecipientService::kMovePrimaryRecipientServiceName);
-
             auto instance = MovePrimaryRecipientService::MovePrimaryRecipient::lookup(
-                opCtx, service, migrationId.toBSON());
+                opCtx, service, BSON("_id" << migrationId));
+
             if (instance) {
-                instance->get()->onReceiveRecipientForgetMigration(opCtx);
-                return instance->get()->getForgetMigrationDurableFuture().get(opCtx);
+                auto completionFuture = (*instance)->onReceiveForgetMigration();
+                completionFuture.get(opCtx);
+            } else {
+                LOGV2(7270002,
+                      "No instance of movePrimary recipient found to forget",
+                      "metadata"_attr = cmd.getMovePrimaryCommonMetadata());
             }
-            uassert(
-                ErrorCodes::MovePrimaryRecipientDocNotFound,
-                "Received movePrimaryRecipientForgetMigration for a non-existent state document",
-                instance);
         }
 
     private:
@@ -198,24 +206,20 @@ public:
 
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
-            // It is possible that the movePrimaryRecipientAbortMigration cmd is received before
-            // movePrimaryRecipientSyncData if movePrimaryDonorAbortMigration is called by the
-            // coordinator before the recipient receives movePrimaryRecipientSyncData from the
-            // donor. We create a new state doc and set its state to kAborted to disallow migration
-            // from starting when movePrimaryRecipientSyncData reaches the recipient.
-            MovePrimaryRecipientDocument recipientDoc(std::move(cmd.getMigrationId()),
-                                                      cmd.getDatabaseName().toString(),
-                                                      cmd.getFromShard().toString());
-            recipientDoc.setState(MovePrimaryRecipientStateEnum::kAborted);
-
+            auto& migrationId = cmd.getMigrationId();
             auto registry = repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext());
             auto service = registry->lookupServiceByName(
                 MovePrimaryRecipientService::kMovePrimaryRecipientServiceName);
-            auto instance = MovePrimaryRecipientService::MovePrimaryRecipient::getOrCreate(
-                opCtx, service, recipientDoc.toBSON());
-
-            instance->onRecieveRecipientAbortMigration(opCtx);
-            instance->getAbortMigrationDurableFuture().get(opCtx);
+            auto instance = MovePrimaryRecipientService::MovePrimaryRecipient::lookup(
+                opCtx, service, BSON("_id" << migrationId));
+            if (instance) {
+                instance.get()->abort();
+                instance.get()->getCompletionFuture().get(opCtx);
+            } else {
+                LOGV2(7270003,
+                      "No instance of movePrimary recipient found to abort",
+                      "metadata"_attr = cmd.getMovePrimaryCommonMetadata());
+            }
         }
 
     private:

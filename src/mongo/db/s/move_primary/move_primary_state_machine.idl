@@ -93,6 +93,11 @@ structs:
         chained_structs:
             MovePrimaryCommonMetadata: metadata
         fields:
+            _id:
+                type: uuid
+                description: >-
+                    Unique identifier for the movePrimary operation. 
+                cpp_name: id
             mutableFields:
                 type: MovePrimaryDonorMutableFields
                 default: true
@@ -104,6 +109,12 @@ structs:
         chained_structs:
             MovePrimaryCommonMetadata: metadata
         fields:
+            _id:
+                type: uuid
+                description: >-
+                    Unique identifier for the movePrimary operation. 
+                    This is sent as migrationId to the recipient by the donor.
+                cpp_name: id
             state:
                 type: MovePrimaryRecipientState
                 description: "The state of the recipient during an in progress movePrimary operation."

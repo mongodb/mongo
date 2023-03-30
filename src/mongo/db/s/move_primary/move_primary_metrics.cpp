@@ -29,6 +29,7 @@
 
 #include "mongo/db/s/move_primary/move_primary_metrics.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/s/move_primary/move_primary_metrics_field_name_provider.h"
 
 namespace mongo {
@@ -51,13 +52,14 @@ MovePrimaryMetrics::MovePrimaryMetrics(const MovePrimaryCommonMetadata& metadata
                                        ClockSource* clockSource,
                                        ShardingDataTransformCumulativeMetrics* cumulativeMetrics,
                                        AnyState state)
-    : MovePrimaryMetrics{metadata.get_id(),
-                         createOriginalCommand(metadata.getDatabaseName(), metadata.getShardName()),
-                         metadata.getDatabaseName(),
-                         role,
-                         clockSource->now(),
-                         clockSource,
-                         cumulativeMetrics} {
+    : MovePrimaryMetrics{
+          metadata.getMigrationId(),
+          createOriginalCommand(metadata.getDatabaseName(), metadata.getToShardName()),
+          metadata.getDatabaseName(),
+          role,
+          clockSource->now(),
+          clockSource,
+          cumulativeMetrics} {
     setState(state);
 }
 

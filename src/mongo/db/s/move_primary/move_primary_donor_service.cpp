@@ -215,9 +215,9 @@ void MovePrimaryDonorRetryHelper::_handleTransientError(const std::string& opera
           "MovePrimaryDonor has encountered a transient error",
           "operation"_attr = operationName,
           "status"_attr = redact(status),
-          "migrationId"_attr = _metadata.get_id(),
+          "migrationId"_attr = _metadata.getMigrationId(),
           "databaseName"_attr = _metadata.getDatabaseName(),
-          "toShard"_attr = _metadata.getShardName());
+          "toShard"_attr = _metadata.getToShardName());
 }
 
 void MovePrimaryDonorRetryHelper::_handleUnrecoverableError(const std::string& operationName,
@@ -226,9 +226,9 @@ void MovePrimaryDonorRetryHelper::_handleUnrecoverableError(const std::string& o
           "MovePrimaryDonor has encountered an unrecoverable error",
           "operation"_attr = operationName,
           "status"_attr = redact(status),
-          "migrationId"_attr = _metadata.get_id(),
+          "migrationId"_attr = _metadata.getMigrationId(),
           "databaseName"_attr = _metadata.getDatabaseName(),
-          "toShard"_attr = _metadata.getShardName());
+          "toShard"_attr = _metadata.getToShardName());
 }
 
 ExecutorFuture<void> MovePrimaryDonorRetryHelper::_waitForMajorityOrStepdown(
@@ -254,7 +254,7 @@ const MovePrimaryCommonMetadata& MovePrimaryDonorExternalState::getMetadata() co
 }
 
 ShardId MovePrimaryDonorExternalState::getRecipientShardId() const {
-    return ShardId{_metadata.getShardName().toString()};
+    return ShardId{_metadata.getToShardName().toString()};
 }
 
 void MovePrimaryDonorExternalState::syncDataOnRecipient(OperationContext* opCtx) {
@@ -349,11 +349,11 @@ void MovePrimaryDonor::checkIfOptionsConflict(const BSONObj& stateDoc) const {
         IDLParserContext("MovePrimaryDonorCheckIfOptionsConflict"), stateDoc);
     const auto& otherMetadata = otherDoc.getMetadata();
     const auto& metadata = getMetadata();
-    invariant(metadata.get_id() == otherMetadata.get_id());
+    invariant(metadata.getMigrationId() == otherMetadata.getMigrationId());
     uassert(ErrorCodes::ConflictingOperationInProgress,
             "Existing movePrimary operation exists with same id, but incompatible arguments",
             metadata.getDatabaseName() == otherMetadata.getDatabaseName() &&
-                metadata.getShardName() == otherMetadata.getShardName());
+                metadata.getToShardName() == otherMetadata.getToShardName());
 }
 
 const MovePrimaryCommonMetadata& MovePrimaryDonor::getMetadata() const {
@@ -402,6 +402,7 @@ MovePrimaryDonorDocument MovePrimaryDonor::_buildCurrentStateDocument() const {
     MovePrimaryDonorDocument doc;
     doc.setMetadata(getMetadata());
     doc.setMutableFields(_getMutableFields());
+    doc.setId(getMetadata().getMigrationId());
     return doc;
 }
 
@@ -490,9 +491,9 @@ void MovePrimaryDonor::_tryTransitionToStateOnce(OperationContext* opCtx,
           "MovePrimaryDonor transitioned state",
           "oldState"_attr = MovePrimaryDonorState_serializer(oldState),
           "newState"_attr = MovePrimaryDonorState_serializer(newState),
-          "migrationId"_attr = _metadata.get_id(),
+          "migrationId"_attr = _metadata.getMigrationId(),
           "databaseName"_attr = _metadata.getDatabaseName(),
-          "toShard"_attr = _metadata.getShardName());
+          "toShard"_attr = _metadata.getToShardName());
 
     evaluatePauseDuringStateTransitionFailpoints(StateTransitionProgress::kAfter, newState);
 }
@@ -506,11 +507,11 @@ void MovePrimaryDonor::_updateOnDiskState(OperationContext* opCtx,
         store.add(opCtx, newStateDocument, WriteConcerns::kLocalWriteConcern);
     } else if (newState == MovePrimaryDonorStateEnum::kDone) {
         store.remove(opCtx,
-                     BSON(MovePrimaryDonorDocument::k_idFieldName << _metadata.get_id()),
+                     BSON(MovePrimaryDonorDocument::kIdFieldName << _metadata.getMigrationId()),
                      WriteConcerns::kLocalWriteConcern);
     } else {
         store.update(opCtx,
-                     BSON(MovePrimaryDonorDocument::k_idFieldName << _metadata.get_id()),
+                     BSON(MovePrimaryDonorDocument::kIdFieldName << _metadata.getMigrationId()),
                      BSON("$set" << BSON(MovePrimaryDonorDocument::kMutableFieldsFieldName
                                          << newStateDocument.getMutableFields().toBSON())),
                      WriteConcerns::kLocalWriteConcern);
@@ -558,9 +559,9 @@ ExecutorFuture<void> MovePrimaryDonor::_waitUntilReadyToBlockWrites() {
         // TODO SERVER-74933: Use commit monitor to determine when to engage critical section.
         LOGV2(7306500,
               "MovePrimaryDonor ready to block writes",
-              "migrationId"_attr = _metadata.get_id(),
+              "migrationId"_attr = _metadata.getMigrationId(),
               "databaseName"_attr = _metadata.getDatabaseName(),
-              "toShard"_attr = _metadata.getShardName());
+              "toShard"_attr = _metadata.getToShardName());
 
         _progressedToReadyToBlockWritesPromise.setFrom(Status::OK());
     });
@@ -598,9 +599,9 @@ void MovePrimaryDonor::abort(Status reason) {
     LOGV2(7306700,
           "MovePrimaryDonor has received signal to abort",
           "reason"_attr = redact(reason),
-          "migrationId"_attr = _metadata.get_id(),
+          "migrationId"_attr = _metadata.getMigrationId(),
           "databaseName"_attr = _metadata.getDatabaseName(),
-          "toShard"_attr = _metadata.getShardName());
+          "toShard"_attr = _metadata.getToShardName());
 }
 
 bool MovePrimaryDonor::isAborted() const {
@@ -622,9 +623,9 @@ ExecutorFuture<void> MovePrimaryDonor::_persistBlockingWritesTimestamp(
             LOGV2(7306501,
                   "MovePrimaryDonor persisted block timestamp",
                   "blockingWritesTimestamp"_attr = blockingWritesTimestamp,
-                  "migrationId"_attr = _metadata.get_id(),
+                  "migrationId"_attr = _metadata.getMigrationId(),
                   "databaseName"_attr = _metadata.getDatabaseName(),
-                  "toShard"_attr = _metadata.getShardName());
+                  "toShard"_attr = _metadata.getToShardName());
         });
 }
 

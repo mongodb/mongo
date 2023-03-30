@@ -37,12 +37,15 @@ structs:
         description: "Common metadata for movePrimary operations"
         strict: false
         fields:
-            _id:
+            migrationId:
                 description: "Unique identifier for the movePrimary operation."
                 type: uuid
             databaseName:
                 description: "The name of the database being moved as part of movePrimary."
                 type: namespacestring
-            shardName:
-                description: "The name of the shard being moved to or moved from."
+            fromShardName:
+                description: "The name of the shard the database is being moved from."
+                type: string
+            toShardName:
+                description: "The name of the shard the database is being moved to."
                 type: string

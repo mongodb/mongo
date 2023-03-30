@@ -149,8 +149,8 @@ void MovePrimaryRecipientService::MovePrimaryRecipient::checkIfOptionsConflict(
         IDLParserContext("movePrimaryCheckIfOptionsConflict"), stateDoc);
     uassert(ErrorCodes::MovePrimaryInProgress,
             str::stream() << "Found an existing movePrimary operation in progress",
-            recipientDoc.getDatabaseName() == _metadata.getDatabaseName() &&
-                recipientDoc.getShardName() == _metadata.getShardName());
+            recipientDoc.getDatabaseName() == getDatabaseName() &&
+                recipientDoc.getFromShardName() == _metadata.getFromShardName());
 }
 
 std::vector<AsyncRequestsSender::Response>
@@ -262,6 +262,7 @@ void MovePrimaryRecipientService::MovePrimaryRecipient::abort() {
     stdx::lock_guard<Latch> lg(_mutex);
     _abortCalled = true;
     if (_ctHolder) {
+        LOGV2(7270000, "Received abort of movePrimary operation", "metadata"_attr = _metadata);
         _ctHolder->abort();
     }
 }
@@ -365,13 +366,13 @@ ExecutorFuture<void> MovePrimaryRecipientService::MovePrimaryRecipient::
                     ShardingRecoveryService::get(opCtx.get())
                         ->acquireRecoverableCriticalSectionBlockWrites(
                             opCtx.get(),
-                            _metadata.getDatabaseName(),
+                            getDatabaseName(),
                             _criticalSectionReason,
                             ShardingCatalogClient::kLocalWriteConcern);
                     ShardingRecoveryService::get(opCtx.get())
                         ->promoteRecoverableCriticalSectionToBlockAlsoReads(
                             opCtx.get(),
-                            _metadata.getDatabaseName(),
+                            getDatabaseName(),
                             _criticalSectionReason,
                             ShardingCatalogClient::kLocalWriteConcern);
                 });
@@ -443,6 +444,9 @@ MovePrimaryRecipientService::MovePrimaryRecipient::_transitionToAbortedStateAndC
         ->withAutomaticRetry([this, executor](const auto& factory) {
             return ExecutorFuture(**executor)
                 .then([this, factory] {
+                    if (_checkInvalidStateTransition(MovePrimaryRecipientStateEnum::kAborted)) {
+                        return;
+                    }
                     auto opCtx = factory.makeOperationContext(Client::getCurrent());
                     _updateRecipientDocument(opCtx.get(),
                                              MovePrimaryRecipientDocument::kStateFieldName,
@@ -500,7 +504,7 @@ MovePrimaryRecipientService::MovePrimaryRecipient::_transitionToDoneStateAndFini
                     ShardingRecoveryService::get(opCtx.get())
                         ->releaseRecoverableCriticalSection(
                             opCtx.get(),
-                            _metadata.getDatabaseName(),
+                            getDatabaseName(),
                             _criticalSectionReason,
                             ShardingCatalogClient::kLocalWriteConcern);
                     movePrimaryRecipientPauseBeforeDeletingStateDoc.pauseWhileSetAndNotCanceled(
@@ -534,13 +538,13 @@ void MovePrimaryRecipientService::MovePrimaryRecipient::_cleanUpOperationMetadat
     OperationContext* opCtx, const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     // Drop temp oplog buffer
     resharding::data_copy::ensureCollectionDropped(
-        opCtx, NamespaceString::makeMovePrimaryOplogBufferNSS(_metadata.get_id()));
+        opCtx, NamespaceString::makeMovePrimaryOplogBufferNSS(getMigrationId()));
 
     // Drop oplog applier progress document
     PersistentTaskStore<MovePrimaryOplogApplierProgress> store(
         NamespaceString::kMovePrimaryApplierProgressNamespace);
     store.remove(opCtx,
-                 BSON(MovePrimaryRecipientDocument::k_idFieldName << _metadata.get_id()),
+                 BSON(MovePrimaryRecipientDocument::kMigrationIdFieldName << getMigrationId()),
                  WriteConcerns::kLocalWriteConcern);
 }
 
@@ -550,14 +554,18 @@ void MovePrimaryRecipientService::MovePrimaryRecipient::_removeRecipientDocument
     PersistentTaskStore<MovePrimaryRecipientDocument> store(
         NamespaceString::kMovePrimaryRecipientNamespace);
     store.remove(opCtx,
-                 BSON(MovePrimaryRecipientDocument::k_idFieldName << _metadata.get_id()),
+                 BSON(MovePrimaryRecipientDocument::kIdFieldName << getMigrationId()),
                  WriteConcerns::kLocalWriteConcern);
-    LOGV2(7306902, "Removed recipient document for movePrimary op", "metadata"_attr = _metadata);
+    LOGV2(7306902,
+          "Removed recipient document for movePrimary operation",
+          "metadata"_attr = _metadata);
 }
 
 SharedSemiFuture<void>
 MovePrimaryRecipientService::MovePrimaryRecipient::onReceiveForgetMigration() {
     stdx::lock_guard<Latch> lg(_mutex);
+    LOGV2(
+        7270001, "Received forgetMigration for movePrimary operation", "metadata"_attr = _metadata);
     move_primary_util::ensureFulfilledPromise(lg, _forgetMigrationPromise);
     return _completionPromise.getFuture();
 }
@@ -597,9 +605,9 @@ void MovePrimaryRecipientService::MovePrimaryRecipient::_transitionStateMachine(
           "Transitioned movePrimary recipient state",
           "oldState"_attr = MovePrimaryRecipientState_serializer(newState),
           "newState"_attr = MovePrimaryRecipientState_serializer(_state),
-          "migrationId"_attr = _metadata.get_id(),
-          "databaseName"_attr = _metadata.getDatabaseName(),
-          "fromShard"_attr = _metadata.getShardName());
+          "migrationId"_attr = getMigrationId(),
+          "databaseName"_attr = getDatabaseName(),
+          "fromShard"_attr = _metadata.getFromShardName());
 }
 
 ExecutorFuture<void>
@@ -614,6 +622,7 @@ MovePrimaryRecipientService::MovePrimaryRecipient::_transitionToInitializingStat
             auto opCtx = opCtxHolder.get();
 
             MovePrimaryRecipientDocument recipientDoc;
+            recipientDoc.setId(getMigrationId());
             recipientDoc.setMetadata(_metadata);
             recipientDoc.setState(MovePrimaryRecipientStateEnum::kInitializing);
             recipientDoc.setStartAt(_serviceContext->getPreciseClockSource()->now());
@@ -634,10 +643,12 @@ MovePrimaryRecipientService::MovePrimaryRecipient::_transitionToInitializingStat
         .until<Status>([](const Status& status) { return status.isOK(); })
         .on(**executor, _ctHolder->getAbortToken())
         .onCompletion([this, executor](Status status) {
-            return _waitForMajority(executor).then([this] {
-                LOGV2(7306903,
-                      "MovePrimaryRecipient persisted state doc",
-                      "metadata"_attr = _metadata);
+            return _waitForMajority(executor).then([this, status] {
+                if (status.isOK()) {
+                    LOGV2(7306903,
+                          "MovePrimaryRecipient persisted state doc",
+                          "metadata"_attr = _metadata);
+                }
             });
         });
 }
@@ -681,7 +692,7 @@ void MovePrimaryRecipientService::MovePrimaryRecipient::_updateRecipientDocument
     }
 
     store.update(opCtx,
-                 BSON(MovePrimaryRecipientDocument::k_idFieldName << _metadata.get_id()),
+                 BSON(MovePrimaryRecipientDocument::kIdFieldName << getMigrationId()),
                  updateBuilder.done(),
                  WriteConcerns::kLocalWriteConcern);
 }
@@ -699,14 +710,17 @@ repl::OpTime MovePrimaryRecipientService::MovePrimaryRecipient::_getStartApplyin
 
     auto rawResp = _movePrimaryRecipientExternalState->sendCommandToShards(
         opCtx,
-        _metadata.getDatabaseName().toString(),
+        "local"_sd,
         findCmd.toBSON({}),
-        {ShardId(_metadata.getShardName().toString())},
+        {ShardId(_metadata.getFromShardName().toString())},
         **executor);
 
     uassert(7356200, "Unable to find majority committed OpTime at donor", !rawResp.empty());
     auto swResp = uassertStatusOK(rawResp.front().swResponse);
-    auto majorityOpTime = uassertStatusOK(repl::OpTime::parseFromOplogEntry(swResp.data));
+    BSONObj cursorObj = swResp.data["cursor"].Obj();
+    BSONObj firstBatchObj = cursorObj["firstBatch"].Obj();
+    auto majorityOpTime =
+        uassertStatusOK(repl::OpTime::parseFromOplogEntry(firstBatchObj[0].Obj()));
     return majorityOpTime;
 }
 
@@ -716,7 +730,7 @@ MovePrimaryRecipientService::MovePrimaryRecipient::_getShardedCollectionsFromCon
     auto catalogClient = Grid::get(opCtx)->catalogClient();
     auto shardedColls =
         catalogClient->getAllShardedCollectionsForDb(opCtx,
-                                                     _metadata.getDatabaseName().toString(),
+                                                     getDatabaseName().toString(),
                                                      repl::ReadConcernLevel::kMajorityReadConcern,
                                                      BSON("ns" << 1));
     return shardedColls;
@@ -751,7 +765,7 @@ NamespaceString MovePrimaryRecipientService::MovePrimaryRecipient::getDatabaseNa
 }
 
 UUID MovePrimaryRecipientService::MovePrimaryRecipient::getMigrationId() const {
-    return _metadata.get_id();
+    return _metadata.getMigrationId();
 }
 
 bool MovePrimaryRecipientService::MovePrimaryRecipient::_canAbort(WithLock) const {
