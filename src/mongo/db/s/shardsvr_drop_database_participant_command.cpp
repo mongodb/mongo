@@ -82,7 +82,7 @@ public:
                             1,
                             "Received a ShardsvrDropDatabaseParticipant but did not find the "
                             "database locally",
-                            logAttrs(dbName));
+                            "database"_attr = dbName);
             }
         }
 

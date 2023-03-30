@@ -579,7 +579,7 @@ bool TTLMonitor::_doTTLIndexDelete(OperationContext* opCtx,
                         1,
                         "Postpone TTL of DB because of active tenant migration",
                         "tenantMigrationAccessBlocker"_attr = mtab->getDebugInfo().jsonString(),
-                        logAttrs(coll.getDb()->name()));
+                        "database"_attr = coll.getDb()->name());
             return false;
         }
 
