@@ -292,12 +292,16 @@ OplogEntry makeApplyOpsOplogEntry(int t, bool prepare, const std::vector<OplogEn
 OplogEntry makeCommitTransactionOplogEntry(int t, StringData dbName, bool prepared, int count) {
     auto nss = NamespaceString::createNamespaceString_forTest(dbName).getCommandNS();
     BSONObj oField;
+
     if (prepared) {
         CommitTransactionOplogObject cmdObj;
-        cmdObj.setCount(count);
         oField = cmdObj.toBSON();
     } else {
-        oField = BSON("applyOps" << BSONArray() << "count" << count);
+        BSONArrayBuilder applyOpsBuilder;
+        for (int i = 0; i < count; i++) {
+            applyOpsBuilder.append(BSONObj());
+        }
+        oField = BSON("applyOps" << applyOpsBuilder.done());
     }
     return {DurableOplogEntry(OpTime(Timestamp(t, 1), 1),  // optime
                               OpTypeEnum::kCommand,        // op type
@@ -343,7 +347,6 @@ OplogEntry makeLargeTransactionOplogEntries(int t,
     if (isLast && prepared) {
         // Makes a commit command oplog entry if this is the last oplog entry we wish to create.
         CommitTransactionOplogObject cmdObj;
-        cmdObj.setCount(count);
         oField = cmdObj.toBSON();
         invariant(innerOps.empty());
     } else {

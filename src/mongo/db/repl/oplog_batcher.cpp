@@ -84,29 +84,6 @@ void OplogBatcher::shutdown() {
     }
 }
 
-namespace {
-/**
- * Returns whether an oplog entry represents an implicit commit for a transaction which has not
- * been prepared.  An entry is an unprepared commit if it has a boolean "prepared" field set to
- * false and "isPartial" is not present.
- */
-bool isUnpreparedCommit(const OplogEntry& entry) {
-    if (entry.getCommandType() != OplogEntry::CommandType::kApplyOps) {
-        return false;
-    }
-
-    if (entry.isPartialTransaction()) {
-        return false;
-    }
-
-    if (entry.shouldPrepare()) {
-        return false;
-    }
-
-    return true;
-}
-}  // namespace
-
 /**
  * Returns true if this oplog entry must be processed in its own batch and cannot be grouped with
  * other entries.
@@ -143,12 +120,20 @@ bool OplogBatcher::mustProcessIndividually(const OplogEntry& entry) {
 }
 
 std::size_t OplogBatcher::getOpCount(const OplogEntry& entry) {
-    if (isUnpreparedCommit(entry)) {
-        auto count = entry.getObject().getIntField(CommitTransactionOplogObject::kCountFieldName);
+    // Get the number of operations enclosed in 'applyOps'. The 'count' field only exists in
+    // the last applyOps oplog entry of a large transaction that has multiple oplog entries,
+    // and when not present, we fallback to get the count by using BSONObj::nFields() which
+    // could be slower.
+    if (entry.isTerminalApplyOps() || entry.shouldPrepare()) {
+        auto count = entry.getObject().getIntField(ApplyOpsCommandInfoBase::kCountFieldName);
         if (count > 0) {
             return std::size_t(count);
         }
+        auto size =
+            entry.getObject()[ApplyOpsCommandInfoBase::kOperationsFieldName].Obj().nFields();
+        return size > 0 ? std::size_t(size) : 1U;
     }
+
     return 1U;
 }
 
