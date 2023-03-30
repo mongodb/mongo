@@ -61,7 +61,7 @@ TicketHolderManager::TicketHolderManager(ServiceContext* svcCtx,
                   return nullptr;
               case StorageEngineConcurrencyAdjustmentAlgorithmEnum::kThroughputProbing:
                   return std::make_unique<execution_control::ThroughputProbing>(
-                      svcCtx, _readTicketHolder.get(), _writeTicketHolder.get(), Milliseconds{500});
+                      svcCtx, _readTicketHolder.get(), _writeTicketHolder.get(), Milliseconds{100});
           }
           MONGO_UNREACHABLE;
       }()) {
