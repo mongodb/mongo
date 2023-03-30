@@ -165,8 +165,7 @@ namespace {
 std::unique_ptr<PercentileAlgorithm> createPercentileAlgorithm(int32_t algoType) {
     switch (static_cast<PercentileAlgorithmTypeEnum>(algoType)) {
         case PercentileAlgorithmTypeEnum::Approximate:
-            // Temporary implementation!
-            return createDiscreteSortAndRankParallelClassic();
+            return createTDigestDistributedClassic();
         default:
             tasserted(7435800,
                       str::stream() << "Currently only approximate percentiles are supported");

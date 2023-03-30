@@ -74,7 +74,7 @@ int computeRank(const vector<double>& sorted, double value) {
 }
 
 TEST(TDigestTestParallel, CombineEmpty) {
-    std::unique_ptr<PercentileAlgorithm> empty = createTDigestParallelClassic();
+    std::unique_ptr<PercentileAlgorithm> empty = createTDigestDistributedClassic();
     dynamic_cast<PartialPercentile<Value>*>(empty.get())
         ->combine(dynamic_cast<PartialPercentile<Value>*>(empty.get())->serialize());
 
@@ -83,8 +83,8 @@ TEST(TDigestTestParallel, CombineEmpty) {
 }
 
 TEST(TDigestTestParallel, CombineWithEmpty) {
-    std::unique_ptr<PercentileAlgorithm> empty = createTDigestParallelClassic();
-    std::unique_ptr<PercentileAlgorithm> digest = createTDigestParallelClassic();
+    std::unique_ptr<PercentileAlgorithm> empty = createTDigestDistributedClassic();
+    std::unique_ptr<PercentileAlgorithm> digest = createTDigestDistributedClassic();
     vector<double> inputs = generateData(10'000);
     for (double val : inputs) {
         digest->incorporate(val);
@@ -100,8 +100,8 @@ TEST(TDigestTestParallel, CombineWithEmpty) {
 }
 
 TEST(TDigestTestParallel, CombineIntoEmpty) {
-    std::unique_ptr<PercentileAlgorithm> empty = createTDigestParallelClassic();
-    std::unique_ptr<PercentileAlgorithm> digest = createTDigestParallelClassic();
+    std::unique_ptr<PercentileAlgorithm> empty = createTDigestDistributedClassic();
+    std::unique_ptr<PercentileAlgorithm> digest = createTDigestDistributedClassic();
     vector<double> inputs = generateData(10'000);
     for (double val : inputs) {
         digest->incorporate(val);
@@ -117,8 +117,8 @@ TEST(TDigestTestParallel, CombineIntoEmpty) {
 }
 
 TEST(TDigestTestParallel, CombineTwoNonEmpty) {
-    std::unique_ptr<PercentileAlgorithm> d1 = createTDigestParallelClassic();
-    std::unique_ptr<PercentileAlgorithm> d2 = createTDigestParallelClassic();
+    std::unique_ptr<PercentileAlgorithm> d1 = createTDigestDistributedClassic();
+    std::unique_ptr<PercentileAlgorithm> d2 = createTDigestDistributedClassic();
     vector<double> inputs = generateData(10'000);
     for (size_t i = 0; i < inputs.size() / 2; i++) {
         d1->incorporate(inputs[i]);
@@ -145,8 +145,8 @@ TEST(TDigestTestParallel, CombineTwoNonEmpty) {
 TEST(TDigestTestParallel, CombineInfinities) {
     const double inf = std::numeric_limits<double>::infinity();
 
-    std::unique_ptr<PercentileAlgorithm> d1 = createTDigestParallelClassic();
-    std::unique_ptr<PercentileAlgorithm> d2 = createTDigestParallelClassic();
+    std::unique_ptr<PercentileAlgorithm> d1 = createTDigestDistributedClassic();
+    std::unique_ptr<PercentileAlgorithm> d2 = createTDigestDistributedClassic();
     vector<double> inputs = generateData(10'000);
     for (size_t i = 0; i < inputs.size() / 2; i++) {
         d1->incorporate(inputs[i]);

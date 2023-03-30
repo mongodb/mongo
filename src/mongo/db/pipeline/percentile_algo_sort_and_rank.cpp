@@ -85,8 +85,8 @@ protected:
     bool _shouldSort = true;
 };
 
-class DiscreteSortAndRankParallelClassic : public DiscreteSortAndRank,
-                                           public PartialPercentile<Value> {
+class DiscreteSortAndRankDistributedClassic : public DiscreteSortAndRank,
+                                              public PartialPercentile<Value> {
 public:
     Value serialize() final {
         if (_shouldSort) {
@@ -126,8 +126,8 @@ std::unique_ptr<PercentileAlgorithm> createDiscreteSortAndRank() {
     return std::make_unique<DiscreteSortAndRank>();
 }
 
-std::unique_ptr<PercentileAlgorithm> createDiscreteSortAndRankParallelClassic() {
-    return std::make_unique<DiscreteSortAndRankParallelClassic>();
+std::unique_ptr<PercentileAlgorithm> createDiscreteSortAndRankDistributedClassic() {
+    return std::make_unique<DiscreteSortAndRankDistributedClassic>();
 }
 
 }  // namespace mongo

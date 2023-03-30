@@ -38,7 +38,7 @@
 
 namespace mongo {
 
-class TDigestParallelClassic : public TDigest, public PartialPercentile<Value> {
+class TDigestDistributedClassic : public TDigest, public PartialPercentile<Value> {
     constexpr static size_t kNegInfCountOffset = 0;
     constexpr static size_t kPosInfCountOffset = 1;
     constexpr static size_t kMinOffset = 2;
@@ -46,7 +46,7 @@ class TDigestParallelClassic : public TDigest, public PartialPercentile<Value> {
     constexpr static size_t kCentroidsOffset = 4;
 
 public:
-    TDigestParallelClassic(ScalingFunction k_limit, int delta) : TDigest(k_limit, delta) {}
+    TDigestDistributedClassic(ScalingFunction k_limit, int delta) : TDigest(k_limit, delta) {}
 
     /**
      * Serialize the digest's state into a flat array of doubles:
@@ -101,10 +101,9 @@ public:
     }
 };
 
-
-std::unique_ptr<PercentileAlgorithm> createTDigestParallelClassic() {
-    return std::make_unique<TDigestParallelClassic>(TDigest::k2_limit,
-                                                    internalQueryTdigestDelta.load());
+std::unique_ptr<PercentileAlgorithm> createTDigestDistributedClassic() {
+    return std::make_unique<TDigestDistributedClassic>(TDigest::k2_limit,
+                                                       internalQueryTdigestDelta.load());
 }
 
 }  // namespace mongo

@@ -84,8 +84,8 @@ struct PartialPercentile {
  * Factory methods for instantiating concrete algorithms.
  */
 std::unique_ptr<PercentileAlgorithm> createDiscreteSortAndRank();
-std::unique_ptr<PercentileAlgorithm> createDiscreteSortAndRankParallelClassic();
+std::unique_ptr<PercentileAlgorithm> createDiscreteSortAndRankDistributedClassic();
 std::unique_ptr<PercentileAlgorithm> createTDigest();
-std::unique_ptr<PercentileAlgorithm> createTDigestParallelClassic();
+std::unique_ptr<PercentileAlgorithm> createTDigestDistributedClassic();
 
 }  // namespace mongo

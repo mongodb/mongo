@@ -97,15 +97,10 @@ void assertIsValid(const TDigest& digest,
     assertConformsToScaling(digest, k, delta, tag);
 }
 
-// Yes, a binary search could be faster, but it's not worth doing it here.
 int computeRank(const vector<double>& sorted, double value) {
-    for (size_t i = 0; i < sorted.size(); ++i) {
-        if (value <= sorted[i]) {
-            return i;
-        }
-    }
-    ASSERT(false) << value << " is larger than the max input " << sorted.back();
-    return -1;
+    auto lower = std::lower_bound(sorted.begin(), sorted.end(), value);
+    ASSERT(lower != sorted.end()) << value << " is larger than the max input " << sorted.back();
+    return std::distance(sorted.begin(), lower);
 }
 
 // t-digest doesn't guarantee accuracy error bounds (there exists inputs for which the error can

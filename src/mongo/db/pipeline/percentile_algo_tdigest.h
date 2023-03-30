@@ -269,6 +269,8 @@ protected:
     // can be higher, if '_buffer' isn't empty and if any infinite values have been encountered).
     int64_t _n = 0;
 
+    // We are tracking infinities separately because, while they can be compared to other doubles
+    // with a mathematically expected result, no arithmetics can be done on them.
     int64_t _negInfCount = 0;
     int64_t _posInfCount = 0;
 
