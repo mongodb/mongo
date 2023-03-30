@@ -91,6 +91,9 @@ void DocumentMetadataFields::mergeWith(const DocumentMetadataFields& other) {
     if (!hasTimeseriesBucketMaxTime() && other.hasTimeseriesBucketMaxTime()) {
         setTimeseriesBucketMaxTime(other.getTimeseriesBucketMaxTime());
     }
+    if (!hasSearchSortValues() && other.hasSearchSortValues()) {
+        setSearchSortValues(other.getSearchSortValues());
+    }
 }
 
 void DocumentMetadataFields::copyFrom(const DocumentMetadataFields& other) {
@@ -127,6 +130,9 @@ void DocumentMetadataFields::copyFrom(const DocumentMetadataFields& other) {
     if (other.hasTimeseriesBucketMaxTime()) {
         setTimeseriesBucketMaxTime(other.getTimeseriesBucketMaxTime());
     }
+    if (other.hasSearchSortValues()) {
+        setSearchSortValues(other.getSearchSortValues());
+    }
 }
 
 size_t DocumentMetadataFields::getApproximateSize() const {
@@ -148,6 +154,7 @@ size_t DocumentMetadataFields::getApproximateSize() const {
     size -= sizeof(_holder->searchHighlights);
     size += _holder->indexKey.objsize();
     size += _holder->searchScoreDetails.objsize();
+    size += _holder->searchSortValues.objsize();
 
     return size;
 }
@@ -204,6 +211,10 @@ void DocumentMetadataFields::serializeForSorter(BufBuilder& buf) const {
         buf.appendNum(static_cast<char>(MetaType::kTimeseriesBucketMaxTime + 1));
         buf.appendNum(getTimeseriesBucketMaxTime().toMillisSinceEpoch());
     }
+    if (hasSearchSortValues()) {
+        buf.appendNum(static_cast<char>(MetaType::kSearchSortValues + 1));
+        getSearchSortValues().appendSelfToBufBuilder(buf);
+    }
     buf.appendNum(static_cast<char>(0));
 }
 
@@ -239,6 +250,9 @@ void DocumentMetadataFields::deserializeForSorter(BufReader& buf, DocumentMetada
             out->setTimeseriesBucketMinTime(Date_t::fromMillisSinceEpoch(buf.read<long long>()));
         } else if (marker == static_cast<char>(MetaType::kTimeseriesBucketMaxTime) + 1) {
             out->setTimeseriesBucketMaxTime(Date_t::fromMillisSinceEpoch(buf.read<long long>()));
+        } else if (marker == static_cast<char>(MetaType::kSearchSortValues) + 1) {
+            out->setSearchSortValues(
+                BSONObj::deserializeForSorter(buf, BSONObj::SorterDeserializeSettings()));
         } else {
             uasserted(28744, "Unrecognized marker, unable to deserialize buffer");
         }
@@ -298,6 +312,8 @@ const char* DocumentMetadataFields::typeNameToDebugString(DocumentMetadataFields
             return "timeseries bucket min time";
         case DocumentMetadataFields::kTimeseriesBucketMaxTime:
             return "timeseries bucket max time";
+        case DocumentMetadataFields::kSearchSortValues:
+            return "$search sort values";
         default:
             MONGO_UNREACHABLE;
     }
