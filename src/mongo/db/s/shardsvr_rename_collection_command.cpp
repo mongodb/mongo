@@ -138,10 +138,6 @@ public:
             const bool useNewPath =
                 feature_flags::gShardingFullDDLSupport.isEnabled(*fixedFCVRegion);
 
-            if (fromNss.db() != toNss.db()) {
-                sharding_ddl_util::checkDbPrimariesOnTheSameShard(opCtx, fromNss, toNss);
-            }
-
             if (!useNewPath) {
                 {
                     Lock::GlobalLock lock(opCtx, MODE_IX);
