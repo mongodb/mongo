@@ -1732,7 +1732,7 @@ __checkpoint_lock_dirty_tree_int(WT_SESSION_IMPL *session, bool is_checkpoint, b
                 F_CLR(ckpt, WT_CKPT_DELETE);
                 continue;
             }
-            WT_RET_MSG(session, ret, "checkpoints cannot be dropped when in-use");
+            WT_RET_MSG(session, ret, "checkpoint %s cannot be dropped when in-use", ckpt->name);
         }
     /*
      * There are special trees: those being bulk-loaded, salvaged, upgraded or verified during the
