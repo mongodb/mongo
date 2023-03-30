@@ -491,7 +491,11 @@ assert.eq(1, writeRes.nMatched);
 // Sharded upsert that does not target a single shard can now be executed with a two phase
 // write protocol that will target at most 1 matching document.
 if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(testDB)) {
-    // TODO: SERVER-73057 Implement upsert behavior for _clusterQueryWithoutShardKey
+    writeRes = coll.update(
+        {a: "filter"}, {$set: {b: 1}}, {multi: false, upsert: true, collation: caseInsensitive});
+    assert.commandWorked(writeRes);
+    assert.eq(1, writeRes.nUpserted);
+    assert.commandWorked(coll.remove({a: "filter"}, {justOne: true}));
 } else {
     // Upsert must always be single-shard.
 

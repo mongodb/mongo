@@ -1,9 +1,12 @@
 //
-// Upsert behavior tests for sharding
-// NOTE: Generic upsert behavior tests belong in the core suite
+// Upsert behavior tests for sharding. If updateOneWithoutShardKey feature flag is enabled, upsert
+// operations with queries that do not match on the entire shard key are successful. NOTE: Generic
+// upsert behavior tests belong in the core suite
 //
 (function() {
 'use strict';
+
+load("jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js");
 
 const st = new ShardingTest({shards: 2, mongos: 1});
 
@@ -77,34 +80,47 @@ assert.eq(1, upsertedXVal(coll, {x: {$in: [1]}}, {$set: {a: 1}}));
 assert.eq(1, upsertedXVal(coll, {$and: [{x: {$eq: 1}}]}, {$set: {a: 1}}));
 assert.eq(1, upsertedXVal(coll, {$or: [{x: {$eq: 1}}]}, {$set: {a: 1}}));
 
-// Missing shard key in query.
-assert.commandFailedWithCode(upsertedResult(coll, {}, {$set: {a: 1, x: 1}}),
-                             ErrorCodes.ShardKeyNotFound);
+if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(coll.getDB())) {
+    assert.eq(1, upsertedXVal(coll, {}, {$set: {a: 1, x: 1}}));
+    assert.eq(5, upsertedXVal(coll, {x: {$gt: 10}}, {$set: {a: 1, x: 5}}));
+    assert.eq("regexValue",
+              upsertedXVal(coll, {x: {$eq: /abc*/}}, {$set: {a: 1, x: "regexValue"}}));
+    assert.eq(/abc/, upsertedXVal(coll, {x: {$eq: /abc/}}, {$set: {a: 1, x: /abc/}}));
+    assert.eq({$gt: 5}, upsertedXVal(coll, {x: {$eq: {$gt: 5}}}, {$set: {a: 1}}));
+    assert.eq({x: 1}, upsertedXVal(coll, {"x.x": 1}, {$set: {a: 1}}));
+    assert.eq({x: 1}, upsertedXVal(coll, {"x.x": {$eq: 1}}, {$set: {a: 1}}));
+} else {
+    // Missing shard key in query.
+    assert.commandFailedWithCode(upsertedResult(coll, {}, {$set: {a: 1, x: 1}}),
+                                 ErrorCodes.ShardKeyNotFound);
 
-// Missing equality match on shard key in query.
-assert.commandFailedWithCode(upsertedResult(coll, {x: {$gt: 10}}, {$set: {a: 1, x: 5}}),
-                             ErrorCodes.ShardKeyNotFound);
+    // Missing equality match on shard key in query.
+    assert.commandFailedWithCode(upsertedResult(coll, {x: {$gt: 10}}, {$set: {a: 1, x: 5}}),
+                                 ErrorCodes.ShardKeyNotFound);
 
-// Regex shard key value in query is ambigious and cannot be extracted for an equality match.
-assert.commandFailedWithCode(
-    upsertedResult(coll, {x: {$eq: /abc*/}}, {$set: {a: 1, x: "regexValue"}}),
-    ErrorCodes.ShardKeyNotFound);
-assert.commandFailedWithCode(upsertedResult(coll, {x: {$eq: /abc/}}, {$set: {a: 1, x: /abc/}}),
-                             ErrorCodes.ShardKeyNotFound);
+    // Regex shard key value in query is ambigious and cannot be extracted for an equality match.
+    assert.commandFailedWithCode(
+        upsertedResult(coll, {x: {$eq: /abc*/}}, {$set: {a: 1, x: "regexValue"}}),
+        ErrorCodes.ShardKeyNotFound);
+    assert.commandFailedWithCode(upsertedResult(coll, {x: {$eq: /abc/}}, {$set: {a: 1, x: /abc/}}),
+                                 ErrorCodes.ShardKeyNotFound);
+
+    // Shard key in query is not extractable.
+    assert.commandFailedWithCode(upsertedResult(coll, {x: {$eq: {$gt: 5}}}, {$set: {a: 1}}),
+                                 ErrorCodes.ShardKeyNotFound);
+
+    // Nested field extraction always fails with non-nested key - like _id, we require setting the
+    // elements directly
+    assert.commandFailedWithCode(upsertedResult(coll, {"x.x": 1}, {$set: {a: 1}}),
+                                 ErrorCodes.ShardKeyNotFound);
+    assert.commandFailedWithCode(upsertedResult(coll, {"x.x": {$eq: 1}}, {$set: {a: 1}}),
+                                 ErrorCodes.ShardKeyNotFound);
+}
 
 // Shard key in query not extractable.
 assert.commandFailedWithCode(upsertedResult(coll, {x: undefined}, {$set: {a: 1}}),
                              ErrorCodes.BadValue);
 assert.commandFailedWithCode(upsertedResult(coll, {x: [1, 2]}, {$set: {a: 1}}),
-                             ErrorCodes.ShardKeyNotFound);
-assert.commandFailedWithCode(upsertedResult(coll, {x: {$eq: {$gt: 5}}}, {$set: {a: 1}}),
-                             ErrorCodes.ShardKeyNotFound);
-
-// Nested field extraction always fails with non-nested key - like _id, we require setting the
-// elements directly
-assert.commandFailedWithCode(upsertedResult(coll, {"x.x": 1}, {$set: {a: 1}}),
-                             ErrorCodes.ShardKeyNotFound);
-assert.commandFailedWithCode(upsertedResult(coll, {"x.x": {$eq: 1}}, {$set: {a: 1}}),
                              ErrorCodes.ShardKeyNotFound);
 
 coll.drop();
@@ -174,9 +190,13 @@ assert.commandFailedWithCode(upsertedResult(coll, {"x.x": -1}, {x: {x: []}}),
 assert.commandFailedWithCode(upsertedResult(coll, {"x.x": -1}, {x: [{x: 1}]}),
                              ErrorCodes.NotSingleValueField);
 
-// Can't set sub-fields of nested key
-assert.commandFailedWithCode(upsertedResult(coll, {"x.x.x": {$eq: 1}}, {$set: {a: 1}}),
-                             ErrorCodes.ShardKeyNotFound);
+if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(coll.getDB())) {
+    assert.eq({x: {x: 1}}, upsertedXVal(coll, {"x.x.x": {$eq: 1}}, {$set: {a: 1}}));
+} else {
+    // Can't set sub-fields of nested key
+    assert.commandFailedWithCode(upsertedResult(coll, {"x.x.x": {$eq: 1}}, {$set: {a: 1}}),
+                                 ErrorCodes.ShardKeyNotFound);
+}
 
 coll.drop();
 
@@ -249,26 +269,59 @@ assert.commandFailedWithCode(upsertSuppliedResult(coll, {_id: {x: -1, y: -1}}, {
 assert.commandFailedWithCode(upsertedResult(coll, {_id: {x: -1, y: -1}}, {$unset: {"_id.y": 1}}),
                              ErrorCodes.ImmutableField);
 
-// No upsert type can set array element for nested _id key.
-assert.commandFailedWithCode(upsertedResult(coll, {_id: {x: [1]}}, {}),
-                             ErrorCodes.ShardKeyNotFound);
-assert.commandFailedWithCode(upsertedResult(coll, {"_id.x": [1]}, {}), ErrorCodes.ShardKeyNotFound);
-assert.commandFailedWithCode(upsertedResult(coll, {_id: [{x: 1}]}, {}),
-                             ErrorCodes.ShardKeyNotFound);
+if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(coll.getDB())) {
+    // Incorrect format of _id or shard key errors.
+    assert.commandFailedWithCode(
+        upsertedResult(coll, {_id: {x: [1]}}, {}),
+        ErrorCodes
+            .ShardKeyNotFound);  // Shard key cannot contain array values or array descendants.
+    assert.commandFailedWithCode(upsertedResult(coll, {"_id.x": [1]}, {}),
+                                 ErrorCodes.NotExactValueField);
+    assert.commandFailedWithCode(upsertedResult(coll, {_id: [{x: 1}]}, {}),
+                                 ErrorCodes.NotSingleValueField);
 
-assert.commandFailedWithCode(upsertSuppliedResult(coll, {_id: {x: [1]}}, {}),
-                             ErrorCodes.ShardKeyNotFound);
-assert.commandFailedWithCode(upsertSuppliedResult(coll, {"_id.x": [1]}, {}),
-                             ErrorCodes.ShardKeyNotFound);
-assert.commandFailedWithCode(upsertSuppliedResult(coll, {_id: [{x: 1}]}, {}),
-                             ErrorCodes.ShardKeyNotFound);
+    assert.commandFailedWithCode(upsertSuppliedResult(coll, {_id: {x: [1]}}, {}),
+                                 ErrorCodes.NotSingleValueField);
+    assert.commandFailedWithCode(
+        upsertSuppliedResult(coll, {"_id.x": [1]}, {}),
+        ErrorCodes
+            .ShardKeyNotFound);  // Shard key cannot contain array values or array descendants.
+    assert.commandFailedWithCode(upsertSuppliedResult(coll, {_id: [{x: 1}]}, {}),
+                                 ErrorCodes.NotSingleValueField);
 
-assert.commandFailedWithCode(upsertedResult(coll, {_id: {x: [1]}}, {$set: {y: 1}}),
-                             ErrorCodes.ShardKeyNotFound);
-assert.commandFailedWithCode(upsertedResult(coll, {"_id.x": [1]}, {$set: {y: 1}}),
-                             ErrorCodes.ShardKeyNotFound);
-assert.commandFailedWithCode(upsertedResult(coll, {_id: [{x: 1}]}, {$set: {y: 1}}),
-                             ErrorCodes.ShardKeyNotFound);
+    assert.commandFailedWithCode(upsertedResult(coll, {_id: {x: [1]}}, {$set: {y: 1}}),
+                                 ErrorCodes.NotSingleValueField);
+    assert.commandFailedWithCode(
+        upsertedResult(coll, {"_id.x": [1]}, {$set: {y: 1}}),
+        ErrorCodes
+            .ShardKeyNotFound);  // Shard key cannot contain array values or array descendants.
+    assert.commandFailedWithCode(
+        upsertedResult(coll, {_id: [{x: 1}]}, {$set: {y: 1}}),
+        ErrorCodes
+            .ShardKeyNotFound);  // Shard key cannot contain array values or array descendants.
+} else {
+    // No upsert type can set array element for nested _id key.
+    assert.commandFailedWithCode(upsertedResult(coll, {_id: {x: [1]}}, {}),
+                                 ErrorCodes.ShardKeyNotFound);
+    assert.commandFailedWithCode(upsertedResult(coll, {"_id.x": [1]}, {}),
+                                 ErrorCodes.ShardKeyNotFound);
+    assert.commandFailedWithCode(upsertedResult(coll, {_id: [{x: 1}]}, {}),
+                                 ErrorCodes.ShardKeyNotFound);
+
+    assert.commandFailedWithCode(upsertSuppliedResult(coll, {_id: {x: [1]}}, {}),
+                                 ErrorCodes.ShardKeyNotFound);
+    assert.commandFailedWithCode(upsertSuppliedResult(coll, {"_id.x": [1]}, {}),
+                                 ErrorCodes.ShardKeyNotFound);
+    assert.commandFailedWithCode(upsertSuppliedResult(coll, {_id: [{x: 1}]}, {}),
+                                 ErrorCodes.ShardKeyNotFound);
+
+    assert.commandFailedWithCode(upsertedResult(coll, {_id: {x: [1]}}, {$set: {y: 1}}),
+                                 ErrorCodes.ShardKeyNotFound);
+    assert.commandFailedWithCode(upsertedResult(coll, {"_id.x": [1]}, {$set: {y: 1}}),
+                                 ErrorCodes.ShardKeyNotFound);
+    assert.commandFailedWithCode(upsertedResult(coll, {_id: [{x: 1}]}, {$set: {y: 1}}),
+                                 ErrorCodes.ShardKeyNotFound);
+}
 
 // Replacement and op-style {$set _id} fail when using dotted-path query on nested _id key.
 // TODO SERVER-44615: these tests should succeed when SERVER-44615 is complete.

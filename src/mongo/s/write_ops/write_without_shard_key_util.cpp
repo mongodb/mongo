@@ -125,6 +125,51 @@ BSONObj generateUpsertDocument(OperationContext* opCtx, const UpdateRequest& upd
     return parsedUpdate.getDriver()->getDocument().getObject();
 }
 
+BSONObj constructUpsertResponse(BatchedCommandResponse& writeRes,
+                                const BSONObj& targetDoc,
+                                StringData commandName,
+                                bool appendPostImage) {
+    BSONObj reply;
+    auto upsertedId = IDLAnyTypeOwned::parseFromBSON(targetDoc.getField(kIdFieldName));
+
+    if (commandName == write_ops::FindAndModifyCommandRequest::kCommandName ||
+        commandName == write_ops::FindAndModifyCommandRequest::kCommandAlias) {
+        write_ops::FindAndModifyLastError lastError;
+        lastError.setNumDocs(writeRes.getN());
+        lastError.setUpdatedExisting(false);
+        lastError.setUpserted(upsertedId);
+
+        write_ops::FindAndModifyCommandReply result;
+        result.setLastErrorObject(std::move(lastError));
+        if (appendPostImage) {
+            result.setValue(targetDoc);
+        }
+
+        reply = result.toBSON();
+    } else {
+        write_ops::UpdateCommandReply updateReply = write_ops::UpdateCommandReply::parse(
+            IDLParserContext("upsertWithoutShardKeyResult"), writeRes.toBSON());
+        write_ops::Upserted upsertedType;
+
+        // It is guaranteed that the index of this update is 0 since shards evaluate one
+        // targetedWrite per batch in a singleWriteWithoutShardKey.
+        upsertedType.setIndex(0);
+        upsertedType.set_id(upsertedId);
+        updateReply.setUpserted(std::vector<mongo::write_ops::Upserted>{upsertedType});
+
+        reply = updateReply.toBSON();
+    }
+
+    BSONObjBuilder responseBob(reply);
+    responseBob.append("ok", 1);
+
+    BSONObjBuilder bob;
+    bob.append("response", responseBob.obj());
+    bob.append("shardId", "");
+
+    return bob.obj();
+}
+
 bool useTwoPhaseProtocol(OperationContext* opCtx,
                          NamespaceString nss,
                          bool isUpdateOrDelete,
@@ -218,26 +263,51 @@ StatusWith<ClusterWriteWithoutShardKeyResponse> runTwoPhaseWriteProtocol(Operati
                 ClusterQueryWithoutShardKeyResponse::parseOwned(
                     IDLParserContext("_clusterQueryWithoutShardKeyResponse"), std::move(queryRes));
 
-            // If there's no matching document and upsert:false, then no modification needs to be
-            // made.
+            // The target document can contain the target document's _id or a generated upsert
+            // document. If there's no targetDocument, then no modification needs to be made.
             if (!queryResponse.getTargetDoc()) {
                 return SemiFuture<void>::makeReady();
             }
 
-            BSONObjBuilder bob(sharedBlock->cmdObj);
-            ClusterWriteWithoutShardKey clusterWriteWithoutShardKeyCommand(
-                bob.obj(),
-                std::string(*queryResponse.getShardId()) /* shardId */,
-                *queryResponse.getTargetDoc() /* targetDocId */);
+            // If upsertRequired, insert target document directly into the database.
+            if (queryResponse.getUpsertRequired()) {
+                std::vector<BSONObj> docs;
+                docs.push_back(queryResponse.getTargetDoc().get());
+                write_ops::InsertCommandRequest insertRequest(sharedBlock->nss, docs);
 
-            auto writeRes = txnClient
-                                .runCommand(sharedBlock->nss.dbName(),
-                                            clusterWriteWithoutShardKeyCommand.toBSON(BSONObj()))
-                                .get();
-            uassertStatusOK(getStatusFromCommandResult(writeRes));
+                auto writeRes =
+                    txnClient.runCRUDOp(insertRequest, std::vector<StmtId>{kUninitializedStmtId})
+                        .get();
 
-            sharedBlock->clusterWriteResponse = ClusterWriteWithoutShardKeyResponse::parseOwned(
-                IDLParserContext("_clusterWriteWithoutShardKeyResponse"), std::move(writeRes));
+                auto upsertResponse =
+                    constructUpsertResponse(writeRes,
+                                            queryResponse.getTargetDoc().get(),
+                                            sharedBlock->cmdObj.firstElementFieldNameStringData(),
+                                            sharedBlock->cmdObj.getBoolField("new"));
+
+                sharedBlock->clusterWriteResponse = ClusterWriteWithoutShardKeyResponse::parseOwned(
+                    IDLParserContext("_clusterWriteWithoutShardKeyResponse"),
+                    std::move(upsertResponse));
+            } else {
+                BSONObjBuilder bob(sharedBlock->cmdObj);
+                ClusterWriteWithoutShardKey clusterWriteWithoutShardKeyCommand(
+                    bob.obj(),
+                    std::string(*queryResponse.getShardId()) /* shardId */,
+                    *queryResponse.getTargetDoc() /* targetDocId */);
+
+                auto writeRes =
+                    txnClient
+                        .runCommand(sharedBlock->nss.dbName(),
+                                    clusterWriteWithoutShardKeyCommand.toBSON(BSONObj()))
+                        .get();
+                uassertStatusOK(getStatusFromCommandResult(writeRes));
+
+                sharedBlock->clusterWriteResponse = ClusterWriteWithoutShardKeyResponse::parseOwned(
+                    IDLParserContext("_clusterWriteWithoutShardKeyResponse"), std::move(writeRes));
+            }
+            uassertStatusOK(
+                getStatusFromWriteCommandReply(sharedBlock->clusterWriteResponse.getResponse()));
+
             return SemiFuture<void>::makeReady();
         });
 

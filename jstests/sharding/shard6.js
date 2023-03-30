@@ -1,6 +1,9 @@
 // shard6.js
 (function() {
 "use strict";
+
+load("jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js");
+
 var summary = "";
 
 var s = new ShardingTest({name: "shard6", shards: 2});
@@ -103,11 +106,14 @@ checkItCount(2);
 
 poolStats("after checking itcount");
 
-// --- Verify that modify & save style updates doesn't work on sharded clusters ---
+// When the updateOneWithoutShardKey feature flag is disabled, verify that modify & save style
+// updates doesn't work on sharded clusters.
+if (!WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(db)) {
+    var o = db.data.findOne();
+    o.x = 16;
+    assert.commandFailedWithCode(db.data.save(o), ErrorCodes.ShardKeyNotFound);
+}
 
-var o = db.data.findOne();
-o.x = 16;
-assert.commandFailedWithCode(db.data.save(o), ErrorCodes.ShardKeyNotFound);
 poolStats("at end");
 
 print(summary);

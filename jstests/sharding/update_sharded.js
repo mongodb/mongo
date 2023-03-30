@@ -58,14 +58,11 @@ for (let i = 0; i < 2; i++) {
     assert.commandWorked(coll.update({_id: 2}, {key: 2, other: 2}));
     assert.commandWorked(coll.update({_id: 3}, {key: 3, other: 3}));
 
-    // TODO: SERVER-73057 Implement upsert behavior for _clusterQueryWithoutShardKey
-    if (!WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(sessionDb)) {
-        // do a replacement-style update which queries the shard key and keeps it constant
-        assert.commandWorked(coll.update({key: 4}, {_id: 4, key: 4}, {upsert: true}));
-        assert.commandWorked(coll.update({key: 4}, {key: 4, other: 4}));
-        assert.eq(coll.find({key: 4, other: 4}).count(), 1, 'replacement update error');
-        coll.remove({_id: 4});
-    }
+    // do a replacement-style update which queries the shard key and keeps it constant
+    assert.commandWorked(coll.update({key: 4}, {_id: 4, key: 4}, {upsert: true}));
+    assert.commandWorked(coll.update({key: 4}, {key: 4, other: 4}));
+    assert.eq(coll.find({key: 4, other: 4}).count(), 1, 'replacement update error');
+    coll.remove({_id: 4});
 
     assert.eq(coll.count(), 3, "count B");
     coll.find().forEach(function(x) {
@@ -80,14 +77,11 @@ for (let i = 0; i < 2; i++) {
 
     assert.commandWorked(coll.update({_id: 1, key: 1}, {$set: {foo: 2}}));
 
-    // TODO: SERVER-73057 Implement upsert behavior for _clusterQueryWithoutShardKey
-    if (!WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(sessionDb)) {
-        coll.update({key: 17}, {$inc: {x: 5}}, true);
-        assert.eq(5, coll.findOne({key: 17}).x, "up1");
+    coll.update({key: 17}, {$inc: {x: 5}}, true);
+    assert.eq(5, coll.findOne({key: 17}).x, "up1");
 
-        coll.update({key: 18}, {$inc: {x: 5}}, true, true);
-        assert.eq(5, coll.findOne({key: 18}).x, "up2");
-    }
+    coll.update({key: 18}, {$inc: {x: 5}}, true, true);
+    assert.eq(5, coll.findOne({key: 18}).x, "up2");
 
     // Make sure we can extract exact _id from certain queries
     assert.commandWorked(coll.update({_id: ObjectId()}, {$set: {x: 1}}, {multi: false}));

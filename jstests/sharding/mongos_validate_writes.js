@@ -48,9 +48,12 @@ st.shardColl(coll, {c: 1}, {c: 0}, {c: 1}, coll.getDB(), true);
 // Make sure we can successfully upsert, even though we have stale state
 assert.commandWorked(staleCollA.update({c: "c"}, {c: "c"}, true));
 
-// Make sure we unsuccessfully upsert with old info
-assert.commandFailedWithCode(staleCollB.update({b: "b"}, {b: "b"}, true),
-                             ErrorCodes.ShardKeyNotFound);
+if (!WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(coll.getDB())) {
+    // When updateOneWithoutShardKey feature flag is disabled, make sure we unsuccessfully upsert
+    // with old info.
+    assert.commandFailedWithCode(staleCollB.update({b: "b"}, {b: "b"}, true),
+                                 ErrorCodes.ShardKeyNotFound);
+}
 
 // Change the collection sharding state
 coll.drop();
@@ -63,12 +66,9 @@ assert.commandWorked(coll.insert({d: "d"}));
 assert.commandWorked(staleCollA.update({d: "d"}, {$set: {x: "x"}}, false, false));
 assert.eq(staleCollA.findOne().x, "x");
 
-// Sharded updateOnes that do not directly target a shard can now use the two phase write protocol
-// to execute.
-if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(admin)) {
-    assert.commandWorked(staleCollB.update({c: "c"}, {$set: {x: "y"}}, false, false));
-} else {
-    // Make sure we unsuccessfully update with old info
+if (!WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(coll.getDB())) {
+    // When updateOneWithoutShardKey feature flag is disabled, make sure we unsuccessfully update
+    // with old info.
     assert.commandFailedWithCode(staleCollB.update({c: "c"}, {$set: {x: "y"}}, false, false),
                                  ErrorCodes.InvalidOptions);
 }
@@ -88,12 +88,9 @@ assert.commandWorked(coll.insert({e: "e"}));
 assert.commandWorked(staleCollA.remove({e: "e"}, true));
 assert.eq(null, staleCollA.findOne());
 
-// Sharded deleteOnes that do not directly target a shard can now use the two phase write protocol
-// to execute.
-if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(admin)) {
-    assert.commandWorked(staleCollB.remove({d: "d"}, true));
-} else {
-    // Make sure we unsuccessfully remove with old info
+if (!WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(coll.getDB())) {
+    // When updateOneWithoutShardKey feature flag is disabled, make sure we unsuccessfully delete
+    // with old info.
     assert.commandFailedWithCode(staleCollB.remove({d: "d"}, true), ErrorCodes.ShardKeyNotFound);
 }
 

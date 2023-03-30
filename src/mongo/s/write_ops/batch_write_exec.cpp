@@ -408,9 +408,14 @@ void executeTwoPhaseWrite(OperationContext* opCtx,
     Status responseStatus = swRes.getStatus();
     BatchedCommandResponse batchedCommandResponse;
     if (swRes.isOK()) {
-        std::string errMsg;
-        if (!batchedCommandResponse.parseBSON(swRes.getValue().getResponse(), &errMsg)) {
-            responseStatus = {ErrorCodes::FailedToParse, errMsg};
+        // Explicitly set the status of a no-op if there is no response.
+        if (swRes.getValue().getResponse().isEmpty()) {
+            batchedCommandResponse.setStatus(Status::OK());
+        } else {
+            std::string errMsg;
+            if (!batchedCommandResponse.parseBSON(swRes.getValue().getResponse(), &errMsg)) {
+                responseStatus = {ErrorCodes::FailedToParse, errMsg};
+            }
         }
     }
 
@@ -433,17 +438,16 @@ void executeTwoPhaseWrite(OperationContext* opCtx,
         invariant(nextBatch->getWrites().size() == 1);
 
         if (responseStatus.isOK()) {
-            // If no document matches were made, then the response shardId would be the empty string
-            // and all of the child batches would record no-ops.
-            if (!hasRecordedWriteResponseForFirstBatch && !swRes.getValue().getShardId().empty()) {
-                if ((abortBatch = processResponseFromRemote(
-                         opCtx,
-                         targeter,
-                         ShardId(swRes.getValue().getShardId().toString()),
-                         batchedCommandResponse,
-                         batchOp,
-                         nextBatch.get(),
-                         stats))) {
+            if (!hasRecordedWriteResponseForFirstBatch) {
+                // Resolve the first child batch with the response of the write or a no-op response
+                // if there was no matching document.
+                if ((abortBatch = processResponseFromRemote(opCtx,
+                                                            targeter,
+                                                            nextBatch.get()->getShardId(),
+                                                            batchedCommandResponse,
+                                                            batchOp,
+                                                            nextBatch.get(),
+                                                            stats))) {
                     break;
                 }
                 hasRecordedWriteResponseForFirstBatch = true;

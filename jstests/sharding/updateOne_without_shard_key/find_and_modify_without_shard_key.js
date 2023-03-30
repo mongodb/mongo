@@ -37,27 +37,42 @@ function verifyResult(testCase, res) {
         assert.commandFailedWithCode(res, testCase.errorCode);
     } else {
         assert.commandWorked(res);
-        assert.eq(testCase.resultDoc, testColl.findOne(testCase.resultDoc));
 
-        // No document matched the query, no modification was made.
-        if (testCase.insertDoc.y != testCase.cmdObj.query.y) {
-            assert.eq(0, res.lastErrorObject.n, res);
-            assert.eq(false, res.lastErrorObject.updatedExisting);
-        } else {
+        let noMod = testCase.insertDoc ? (testCase.insertDoc.y != testCase.cmdObj.query.y) : false;
+        if (testCase.cmdObj.upsert) {
             assert.eq(1, res.lastErrorObject.n, res);
+            assert.eq(false, res.lastErrorObject.updatedExisting);
+            assert.eq(testCase.resultDoc._id, res.lastErrorObject.upserted);
+            assert.eq(testCase.resultDoc, testColl.findOne(testCase.resultDoc));
 
-            // Check for pre/post image in command response.
-            if (testCase.cmdObj.new) {
-                assert.eq(testCase.resultDoc, res.value, res.value);
+            // Clean up, remove upserted document from db.
+            assert.commandWorked(testColl.deleteOne({_id: testCase.resultDoc._id}));
+            assert.eq(null, testColl.findOne({_id: testCase.resultDoc._id}));
+        } else {
+            if (noMod) {
+                // No modification expected.
+                assert.eq(0, res.lastErrorObject.n, res);
+                assert.eq(false, res.lastErrorObject.updatedExisting);
+                assert.eq(testCase.insertDoc, testColl.findOne(testCase.insertDoc));
             } else {
-                assert.eq(testCase.insertDoc, res.value, res.value);
+                assert.eq(1, res.lastErrorObject.n, res);
+                assert.eq(testCase.resultDoc, testColl.findOne(testCase.resultDoc));
             }
+
+            // Clean up, remove inserted document from db.
+            assert.commandWorked(testColl.deleteOne({_id: testCase.insertDoc._id}));
+            assert.eq(null, testColl.findOne({_id: testCase.insertDoc._id}));
+        }
+
+        // Check for pre/post image in command response.
+        if (noMod) {
+            assert.eq(null, res.value);
+        } else if (testCase.cmdObj.new) {
+            assert.eq(testCase.resultDoc, res.value, res.value);
+        } else {
+            assert.eq(testCase.insertDoc, res.value, res.value);
         }
     }
-
-    // Clean up, remove document from db.
-    assert.commandWorked(testColl.deleteOne({_id: testCase.insertDoc._id}));
-    assert.eq(null, testColl.findOne({_id: testCase.insertDoc._id}));
 }
 
 // When more than one document matches the command query, ensure that a single document is modified
@@ -110,7 +125,9 @@ function verifySingleModification(testCase, res) {
 function runCommandAndVerify(testCase, additionalCmdFields = {}) {
     const cmdObjWithAdditionalFields = Object.assign({}, testCase.cmdObj, additionalCmdFields);
 
-    assert.commandWorked(testColl.insert(testCase.insertDoc));
+    if (testCase.insertDoc) {
+        assert.commandWorked(testColl.insert(testCase.insertDoc));
+    }
     const res = st.getDB(dbName).runCommand(cmdObjWithAdditionalFields);
 
     if (cmdObjWithAdditionalFields.hasOwnProperty("autocommit") && !testCase.errorCode) {
@@ -122,7 +139,7 @@ function runCommandAndVerify(testCase, additionalCmdFields = {}) {
         }));
     }
 
-    if (testCase.insertDoc.length > 1) {
+    if (testCase.insertDoc && testCase.insertDoc.length > 1) {
         return verifySingleModification(testCase, res);
     } else {
         verifyResult(testCase, res);
@@ -140,6 +157,29 @@ const testCases = [
             update: {_id: 0, x: -1, y: 7},
             new: true,
         }
+    },
+    {
+        logMessage: "Upsert document.",
+        insertDoc: null,
+        resultDoc: {_id: 5, a: 0},
+        cmdObj: {
+            findAndModify: collectionName,
+            query: {_id: 5, a: -1},
+            update: {$inc: {a: 1}},
+            upsert: true,
+        },
+    },
+    {
+        logMessage: "Upsert document with post image.",
+        insertDoc: null,
+        resultDoc: {_id: 6, a: 3},
+        cmdObj: {
+            findAndModify: collectionName,
+            query: {_id: 6, a: -1},
+            update: {$inc: {a: 4}},
+            upsert: true,
+            new: true,
+        },
     },
     {
         logMessage: "Aggregation update style, no sort filter, preimage.",
@@ -164,7 +204,7 @@ const testCases = [
     {
         logMessage: "Query does not match, no update.",
         insertDoc: {_id: 2, x: -2, y: 6},
-        resultDoc: {_id: 2, x: -2, y: 6},
+        resultDoc: null,
         cmdObj: {
             findAndModify: collectionName,
             query: {y: 5},

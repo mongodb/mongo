@@ -378,6 +378,38 @@ const testCases = [
         dbName: dbName,
         collName: collName
     },
+    {
+        logMessage:
+            "Running a single update where no document matches on the query and {upsert: true}",
+        docsToInsert: [],
+        cmdObj: {
+            update: collName,
+            updates: [{q: {y: 5}, u: {_id: 5, x: -1}, upsert: true}],
+        },
+        options: [{ordered: true}, {ordered: false}],
+        expectedMods: [{_id: 5, x: -1, y: 5}],
+        expectedResponse: {n: 1, nModified: 0, upserted: [{"index": 0, _id: 5}]},
+        dbName: dbName,
+        collName: collName
+    },
+    {
+        logMessage: "Running a batch update without shard key with an upsert: true update.",
+        docsToInsert: [
+            {_id: 0, x: xFieldValShard0_1, y: yFieldVal},
+        ],
+        cmdObj: {
+            update: collName,
+            updates: [
+                {q: {y: yFieldVal}, u: {y: yFieldVal + 1}},
+                {q: {y: 6}, u: {x: -1, _id: 6}, upsert: true}
+            ],
+        },
+        options: [{ordered: true}, {ordered: false}],
+        expectedMods: [{_id: 0, x: xFieldValShard0_1, y: yFieldVal + 1}, {_id: 6, y: 6, x: -1}],
+        expectedResponse: {n: 2, nModified: 1, upserted: [{"index": 1, _id: 6}]},
+        dbName: dbName,
+        collName: collName
+    },
 ];
 
 const configurations = [

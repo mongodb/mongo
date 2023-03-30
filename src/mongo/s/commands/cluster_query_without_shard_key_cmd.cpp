@@ -184,7 +184,7 @@ ParsedCommandInfo parseWriteCommand(OperationContext* opCtx,
             parsedInfo.collation = *parsedCollation;
         }
     } else {
-        uasserted(ErrorCodes::InvalidOptions, "Not a supported batch write command");
+        uasserted(ErrorCodes::InvalidOptions, "Not a supported write command");
     }
     return parsedInfo;
 }

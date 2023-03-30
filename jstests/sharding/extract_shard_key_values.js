@@ -159,41 +159,44 @@ assert.commandWorked(mongos.getCollection(kNsName).insert({a: -100, b: 1, c: 1, 
 assert.commandWorked(mongos.getCollection(kNsName).insert({a: 0, b: 1, c: 2, d: 1}));
 assert.commandWorked(mongos.getCollection(kNsName).insert({a: 100, b: 1, c: 3, d: 1}));
 
-// Verify we cannot update a shard key value via a query that's missing the shard key, despite being
-// able to target using the replacement document.
-
 // Need to start a session to change the shard key.
 const session = st.s.startSession({retryWrites: true});
 const sessionDB = session.getDatabase(kDbName);
 const sessionColl = sessionDB[kCollName];
 
-// Sharded updateOnes that do not directly target a shard can now use the two phase write
-// protocol to execute.
 if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
     assert.commandWorked(sessionColl.update({d: 1}, {b: 1, c: 4, d: 1}));
-} else {
-    assert.commandFailedWithCode(sessionColl.update({d: 1}, {b: 1, c: 4, d: 1}), 31025);
-}
 
-// Verify that an upsert targets shards without treating missing shard key fields as null values.
-// This implies that upsert still requires the entire shard key to be specified in the query.
-assert.writeErrorWithCode(
-    mongos.getCollection(kNsName).update({b: 1}, {$set: {c: 2}}, {upsert: true}),
-    ErrorCodes.ShardKeyNotFound);
+    let res = assert.commandWorked(
+        mongos.getCollection(kNsName).update({b: 2}, {$set: {c: 2}}, {upsert: true}));
+    assert.eq(0, res.nMatched);
+    assert.eq(1, res.nUpserted);
+    docsArr = mongos.getCollection(kNsName).find({b: 2}).toArray();
+    assert.eq(1, docsArr.length);
 
-// Sharded findAndModify that do not directly target a shard can now use the two phase write
-// protocol to execute.
-if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
     assert.commandWorked(sessionColl.insert({_id: "findAndModify", a: 1}));
-    let res = assert.commandWorked(sessionDB.runCommand(
-        {findAndModify: kCollName, query: {a: 1}, update: {$set: {updated: true}}}));
+    res = assert.commandWorked(sessionDB.runCommand(
+        {findAndModify: kCollName, query: {a: 2}, update: {$set: {updated: true}}, upsert: true}));
     assert.eq(1, res.lastErrorObject.n);
+    assert.eq(0, res.lastErrorObject.updatedExisting);
+    assert(res.lastErrorObject.upserted);
+    docsArr = mongos.getCollection(kNsName).find({a: 2}).toArray();
+    assert.eq(1, docsArr.length);
 } else {
-    assert.commandWorked(sessionColl.insert({_id: "findAndModify", a: 1}));
-    assert.commandFailedWithCode(
-        sessionDB.runCommand(
-            {findAndModify: kCollName, query: {a: 1}, update: {$set: {updated: true}}}),
+    // When the updateOneWithouShardKey feature flag is not enabled, upsert operations require the
+    // entire shard key to be specified in the query.
+    assert.commandFailedWithCode(sessionColl.update({d: 1}, {b: 1, c: 4, d: 1}), 31025);
+    assert.writeErrorWithCode(
+        mongos.getCollection(kNsName).update({b: 2}, {$set: {c: 2}}, {upsert: true}),
         ErrorCodes.ShardKeyNotFound);
+
+    assert.commandWorked(sessionColl.insert({_id: "findAndModify", a: 1}));
+    assert.commandFailedWithCode(sessionDB.runCommand({
+        findAndModify: kCollName,
+        query: {a: 2},
+        update: {$set: {updated: true}, upsert: true}
+    }),
+                                 ErrorCodes.ShardKeyNotFound);
 }
 
 st.stop();

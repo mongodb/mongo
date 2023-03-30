@@ -1,4 +1,6 @@
-// This checks to make sure that sharded regex queries behave the same as unsharded regex queries
+// This checks to make sure that sharded regex queries behave the same as unsharded regex queries.
+// Note, when the updateOneWithoutShardKey feature flag is enabled, upsert operations with queries
+// that do not match on the entire shard key are successful.
 (function() {
 'use strict';
 
@@ -156,14 +158,32 @@ collSharded.remove({});
 collCompound.remove({});
 collNested.remove({});
 
-// Sharded updateOnes that do not directly target a shard can now use the two phase write
-// protocol to execute.
 if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
+    // Op-style updates with regex succeed on sharded collections.
     assert.commandWorked(collSharded.update({a: /abcde-1/}, {"$set": {b: 1}}, {upsert: false}));
     assert.commandWorked(collSharded.update({a: /abcde-[1-2]/}, {"$set": {b: 1}}, {upsert: false}));
     assert.commandWorked(collNested.update(
         {a: {b: /abcde-1/}}, {"$set": {"a.b": /abcde-1/, b: 1}}, {upsert: false}));
     assert.commandWorked(collNested.update({"a.b": /abcde.*/}, {"$set": {b: 1}}, {upsert: false}));
+
+    assert.commandWorked(
+        collSharded.update({a: /abcde.*/}, {$set: {a: /abcde.*/}}, {upsert: true}));
+    assert.commandWorked(
+        collCompound.update({a: /abcde-1/}, {$set: {a: /abcde.*/, b: 1}}, {upsert: true}));
+    assert.commandWorked(
+        collNested.update({'a.b': /abcde.*/}, {$set: {'a.b': /abcde.*/}}, {upsert: true}));
+    assert.commandWorked(
+        collNested.update({a: {b: /abcde.*/}}, {$set: {'a.b': /abcde.*/}}, {upsert: true}));
+    assert.commandWorked(collNested.update({c: 1}, {$set: {'a.b': /abcde.*/}}, {upsert: true}));
+
+    // Upsert by replacement-style regex succeed on sharded collections.
+    assert.commandWorked(collSharded.update({a: /abcde.*/}, {a: /abcde.*/}, {upsert: true}));
+    assert.commandWorked(collCompound.update({a: /abcde.*/}, {a: /abcde.*/, b: 1}, {upsert: true}));
+    assert.commandWorked(
+        collNested.update({'a.b': /abcde-1/}, {a: {b: /abcde.*/}}, {upsert: true}));
+    assert.commandWorked(
+        collNested.update({a: {b: /abcde.*/}}, {a: {b: /abcde.*/}}, {upsert: true}));
+    assert.commandWorked(collNested.update({c: 1}, {a: {b: /abcde.*/}}, {upsert: true}));
 } else {
     //
     //
@@ -181,26 +201,6 @@ if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
     assert.commandFailedWithCode(
         collNested.update({"a.b": /abcde.*/}, {"$set": {b: 1}}, {upsert: false}),
         ErrorCodes.InvalidOptions);
-}
-
-//
-//
-// Replacement style updates with regex should work on sharded collections.
-// If query clause is ambiguous, we fallback to using update clause for targeting.
-assert.commandWorked(collSharded.update({a: /abcde.*/}, {a: /abcde.*/, b: 1}, {upsert: false}));
-assert.commandWorked(collSharded.update({a: /abcde-1/}, {a: /abcde-1/, b: 1}, {upsert: false}));
-assert.commandWorked(collNested.update({a: {b: /abcde.*/}}, {a: {b: /abcde.*/}}, {upsert: false}));
-assert.commandWorked(collNested.update({'a.b': /abcde-1/}, {a: {b: /abcde.*/}}, {upsert: false}));
-
-// Sharded updateOnes that do not directly target a shard can now use the two phase write
-// protocol to execute.
-if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
-    // TODO: SERVER-73057 Implement upsert behavior for _clusterQueryWithoutShardKey
-} else {
-    //
-    //
-    // Upsert with op-style regex should fail on sharded collections
-    // Query clause is targeted, and regex in query clause is ambiguous
 
     // The queries will also be interpreted as regex based prefix search and cannot target a single
     // shard.
@@ -233,6 +233,13 @@ if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
     assert.commandFailedWithCode(collNested.update({c: 1}, {a: {b: /abcde.*/}}, {upsert: true}),
                                  ErrorCodes.ShardKeyNotFound);
 }
+
+// Replacement style updates with regex should work on sharded collections.
+// If query clause is ambiguous, we fallback to using update clause for targeting.
+assert.commandWorked(collSharded.update({a: /abcde.*/}, {a: /abcde.*/, b: 1}, {upsert: false}));
+assert.commandWorked(collSharded.update({a: /abcde-1/}, {a: /abcde-1/, b: 1}, {upsert: false}));
+assert.commandWorked(collNested.update({a: {b: /abcde.*/}}, {a: {b: /abcde.*/}}, {upsert: false}));
+assert.commandWorked(collNested.update({'a.b': /abcde-1/}, {a: {b: /abcde.*/}}, {upsert: false}));
 
 //
 //

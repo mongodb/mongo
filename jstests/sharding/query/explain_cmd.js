@@ -2,6 +2,8 @@
 (function() {
 'use strict';
 
+load("jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js");
+
 // Create a cluster with 3 shards.
 var st = new ShardingTest({shards: 2});
 
@@ -133,12 +135,25 @@ assert.eq(explain.queryPlanner.winningPlan.shards.length, 1);
 // Check that the upsert didn't actually happen.
 assert.eq(0, collSharded.count({a: 10}));
 
-// Explain an upsert operation which cannot be targeted, ensure an error is thrown
-explain = db.runCommand({
-    explain: {update: collSharded.getName(), updates: [{q: {b: 10}, u: {b: 10}, upsert: true}]},
-    verbosity: "allPlansExecution"
-});
-assert.commandFailed(explain, tojson(explain));
+if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(collSharded.getDB())) {
+    // Explain an upsert operation which cannot be targeted and verify that it is successful.
+    // TODO SERVER-69922: Verify expected response.
+    explain = db.runCommand({
+        explain: {update: collSharded.getName(), updates: [{q: {b: 10}, u: {b: 10}, upsert: true}]},
+        verbosity: "allPlansExecution"
+    });
+    assert.commandWorked(explain, tojson(explain));
+    assert.eq(explain.queryPlanner.winningPlan.shards.length, 2);
+    // Check that the upsert didn't actually happen.
+    assert.eq(0, collSharded.count({b: 10}));
+} else {
+    // Explain an upsert operation which cannot be targeted, ensure an error is thrown
+    explain = db.runCommand({
+        explain: {update: collSharded.getName(), updates: [{q: {b: 10}, u: {b: 10}, upsert: true}]},
+        verbosity: "allPlansExecution"
+    });
+    assert.commandFailed(explain, tojson(explain));
+}
 
 // Explain a changeStream, ensure an error is thrown under snapshot read concern.
 const session = db.getMongo().startSession();

@@ -98,6 +98,11 @@ var WriteWithoutShardKeyTestUtil = (function() {
         if (operationType === OperationType.updateOne) {
             assert.eq(expectedResponse.n, res.n);
             assert.eq(expectedResponse.nModified, res.nModified);
+            cmdObj.updates.forEach(update => {
+                if (update.upsert) {
+                    assert.eq(expectedResponse.upserted, res.upserted);
+                }
+            });
         } else if (operationType === OperationType.deleteOne) {
             assert.eq(expectedResponse.n, res.n);
         } else {

@@ -456,10 +456,13 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
             uassertStatusOKWithContext(_targetShardKey(shardKey, collation, chunkRanges), msg)};
     };
 
-    // If this is an upsert, then the query must contain an exact match on the shard key. If we were
-    // to target based on the replacement doc, it could result in an insertion even if a document
-    // matching the query exists on another shard.
-    if (isUpsert) {
+    // With the introduction of PM-1632, we can use the two phase write protocol to successfully
+    // target an upsert without the full shard key. Else, the the query must contain an exact match
+    // on the shard key. If we were to target based on the replacement doc, it could result in an
+    // insertion even if a document matching the query exists on another shard.
+    if (!feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
+            serverGlobalParams.featureCompatibility) &&
+        isUpsert) {
         return targetByShardKey(
             extractShardKeyFromBasicQueryWithContext(expCtx, shardKeyPattern, query),
             "Failed to target upsert by query");
