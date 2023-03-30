@@ -137,8 +137,8 @@ fi' >> .bash_profile
 
     UNITTEST_ARCHIVE=$(ls /data/mci/artifacts-*run_unittests/mongo-unittests-*.tgz 2>/dev/null)
     if [[ -n $UNITTEST_ARCHIVE ]]; then
-        tar --wildcards --strip-components=0 -xzf $UNITTEST_ARCHIVE '*/bin/*' &
-        tar --wildcards -xzf $UNITTEST_ARCHIVE '*/lib/*' &
+        tar --wildcards --strip-components=0 -xzf $UNITTEST_ARCHIVE 'bin/*' &
+        tar --wildcards -xzf $UNITTEST_ARCHIVE 'lib/*' &
     else
         archive_fail "unittest"
     fi
