@@ -63,3 +63,14 @@ server_parameters:
         validator:
           gte: 0
         default: 15000 # 15 seconds
+
+    balancerMigrationsThrottlingMs:
+        # Sleep between balancer rounds in the case where the last round found some chunks which needed to
+        # be balanced. This value should be set sufficiently low so that imbalanced clusters will quickly
+        # reach balanced state, but setting it too low may cause CRUD operations to start failing due to
+        # not being able to establish a stable shard version.
+        description: The minimum amount of time between two consecutive balancing rounds
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int32_t>
+        cpp_varname: balancerMigrationsThrottlingMs
+        default: 1000 # 1 sec

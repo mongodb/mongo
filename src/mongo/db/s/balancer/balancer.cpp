@@ -82,12 +82,6 @@ MONGO_FAIL_POINT_DEFINE(overrideBalanceRoundInterval);
 
 const Milliseconds kBalanceRoundDefaultInterval(10 * 1000);
 
-// Sleep between balancer rounds in the case where the last round found some chunks which needed to
-// be balanced. This value should be set sufficiently low so that imbalanced clusters will quickly
-// reach balanced state, but setting it too low may cause CRUD operations to start failing due to
-// not being able to establish a stable shard version.
-const Milliseconds kBalancerMigrationsThrottling(1 * 1000);
-
 /**
  * Balancer status response
  */
@@ -804,7 +798,8 @@ void Balancer::_mainThread() {
                     _sleepFor(opCtx.get(),
                               forcedBalancerRoundInterval
                                   ? *forcedBalancerRoundInterval - timeSinceLastMigration
-                                  : kBalancerMigrationsThrottling - timeSinceLastMigration);
+                                  : Milliseconds(balancerMigrationsThrottlingMs.load()) -
+                                      timeSinceLastMigration);
 
                     _balancedLastTime =
                         _moveChunks(opCtx.get(), chunksToRebalance, chunksToDefragment);
@@ -826,8 +821,8 @@ void Balancer::_mainThread() {
                         .ignore();
 
                     LOGV2_DEBUG(6679500, 1, "End balancing round");
-                    // Migration throttling of kBalancerMigrationsThrottling will be applied before
-                    // the next call to _moveChunks, so don't sleep here.
+                    // Migration throttling of `balancerMigrationsThrottlingMs` will be applied
+                    // before the next call to _moveChunks, so don't sleep here.
                     _endRound(opCtx.get(), Milliseconds(0));
                 }
             }
