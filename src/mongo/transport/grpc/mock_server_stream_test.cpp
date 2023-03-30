@@ -39,14 +39,13 @@
 #include "mongo/rpc/op_msg.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/grpc/metadata.h"
-#include "mongo/transport/grpc/mock_fixtures.h"
 #include "mongo/transport/grpc/mock_server_context.h"
 #include "mongo/transport/grpc/mock_server_stream.h"
+#include "mongo/transport/grpc/test_fixtures.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/unittest/unittest.h"
-#include "mongo/util/clock_source_mock.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/net/hostandport.h"
@@ -56,12 +55,14 @@
 
 namespace mongo::transport::grpc {
 
-class MockServerStreamTest : public LockerNoopServiceContextTest {
+template <class Base>
+class MockServerStreamBase : public Base {
 public:
     static constexpr Milliseconds kTimeout = Milliseconds(100);
     static constexpr const char* kRemote = "abc:123";
 
     virtual void setUp() override {
+        Base::setUp();
         _fixtures = std::make_unique<MockStreamTestFixtures>(
             HostAndPort{kRemote}, kTimeout, _clientMetadata);
     }
@@ -109,7 +110,7 @@ public:
         unittest::threadAssertionMonitoredTest([&](unittest::ThreadAssertionMonitor& monitor) {
             Client::initThread("tryCancelTest");
 
-            auto opCtx = makeOperationContext();
+            auto opCtx = Base::makeOperationContext();
             Notification<void> opDone;
             Notification<void> setupDone;
 
@@ -139,26 +140,10 @@ private:
     std::unique_ptr<MockStreamTestFixtures> _fixtures;
 };
 
-class MockServerStreamTestWithMockedClockSource : public MockServerStreamTest {
-public:
-    virtual void setUp() override {
-        _clkSource = std::make_shared<ClockSourceMock>();
-        // The fast clock is used by OperationContext::hasDeadlineExpired.
-        getServiceContext()->setFastClockSource(
-            std::make_unique<SharedClockSourceAdapter>(_clkSource));
-        // The precise clock is used by waitForConditionOrInterruptNoAssertUntil.
-        getServiceContext()->setPreciseClockSource(
-            std::make_unique<SharedClockSourceAdapter>(_clkSource));
-        MockServerStreamTest::setUp();
-    }
+class MockServerStreamTest : public MockServerStreamBase<LockerNoopServiceContextTest> {};
 
-    ClockSourceMock& getClockSourceMock() {
-        return *_clkSource;
-    }
-
-private:
-    std::shared_ptr<ClockSourceMock> _clkSource;
-};
+class MockServerStreamTestWithMockedClockSource
+    : public MockServerStreamBase<ServiceContextWithClockSourceMockTest> {};
 
 TEST_F(MockServerStreamTest, SendReceiveMessage) {
     auto clientFirst = makeUniqueMessage();
@@ -236,7 +221,7 @@ TEST_F(MockServerStreamTest, CannotRetrieveMetadataBeforeSent) {
 }
 
 TEST_F(MockServerStreamTestWithMockedClockSource, DeadlineIsEnforced) {
-    getClockSourceMock().advance(kTimeout * 2);
+    clockSource().advance(kTimeout * 2);
     ASSERT_TRUE(getServerContext().isCancelled());
     ASSERT_FALSE(getServerStream().read());
     ASSERT_FALSE(getServerStream().write(makeUniqueMessage().sharedBuffer()));

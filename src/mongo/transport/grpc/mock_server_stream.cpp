@@ -43,7 +43,8 @@ MockServerStream::MockServerStream(HostAndPort hostAndPort,
     : _deadline{getGlobalServiceContext()->getFastClockSource()->now() + timeout},
       _initialMetadata(std::move(initialMetadataPromise)),
       _pipe{std::move(serverPipeEnd)},
-      _clientMetadata{std::move(clientMetadata)} {}
+      _clientMetadata{std::move(clientMetadata)},
+      _hostAndPort(std::move(hostAndPort)) {}
 
 boost::optional<SharedBuffer> MockServerStream::read() {
     return runWithDeadline<boost::optional<SharedBuffer>>(

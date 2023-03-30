@@ -33,12 +33,14 @@
 #include <memory>
 #include <string>
 
+#include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
 #include "mongo/transport/grpc/bidirectional_pipe.h"
 #include "mongo/transport/grpc/metadata.h"
 #include "mongo/transport/grpc/mock_client_context.h"
 #include "mongo/transport/grpc/mock_client_stream.h"
 #include "mongo/transport/grpc/mock_server_context.h"
 #include "mongo/transport/grpc/mock_server_stream.h"
+#include "mongo/util/clock_source_mock.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo::transport::grpc {
@@ -68,6 +70,24 @@ struct MockStreamTestFixtures {
     std::unique_ptr<MockClientContext> clientCtx;
     std::unique_ptr<MockServerStream> serverStream;
     std::unique_ptr<MockServerContext> serverCtx;
+};
+
+class ServiceContextWithClockSourceMockTest : public LockerNoopServiceContextTest {
+public:
+    void setUp() override {
+        _clkSource = std::make_shared<ClockSourceMock>();
+        getServiceContext()->setFastClockSource(
+            std::make_unique<SharedClockSourceAdapter>(_clkSource));
+        getServiceContext()->setPreciseClockSource(
+            std::make_unique<SharedClockSourceAdapter>(_clkSource));
+    }
+
+    auto& clockSource() {
+        return *_clkSource;
+    }
+
+private:
+    std::shared_ptr<ClockSourceMock> _clkSource;
 };
 
 }  // namespace mongo::transport::grpc

@@ -34,6 +34,7 @@ env.CppUnitTest(
     target='grpc_transport_layer_test',
     source=[
         'client_cache_test.cpp',
+        'grpc_session_test.cpp',
         'mock_server_stream_test.cpp',
     ],
     LIBDEPS=[
