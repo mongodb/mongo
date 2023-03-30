@@ -133,12 +133,6 @@ void AccumulatorPercentile::processInternal(const Value& input, bool merging) {
     }
     _algo->incorporate(input.coerceToDouble());
     _memUsageBytes = sizeof(*this) + _algo->memUsageBytes();
-    // TODO SERVER-75115 confirm that $percentile can spill and remove uassert.
-    uassert(
-        ErrorCodes::ExceededMemoryLimit,
-        str::stream() << "$percentile used too much memory and cannot spill to disk.Memory limit: "
-                      << _maxMemUsageBytes << " bytes" << _maxMemUsageBytes,
-        static_cast<long long>(_memUsageBytes) < _maxMemUsageBytes);
 }
 
 Value AccumulatorPercentile::getValue(bool toBeMerged) {
@@ -180,8 +174,7 @@ AccumulatorPercentile::AccumulatorPercentile(ExpressionContext* const expCtx,
     : AccumulatorState(expCtx),
       _percentiles(ps),
       _algo(createPercentileAlgorithm(algoType)),
-      _algoType(algoType),
-      _maxMemUsageBytes(internalDocumentSourceSetWindowFieldsMaxMemoryBytes.load()) {
+      _algoType(algoType) {
     _memUsageBytes = sizeof(*this) + _algo->memUsageBytes();
 }
 
@@ -254,6 +247,7 @@ AccumulatorMedian::parsePercentileAndAlgoType(BSONElement elem) {
     return std::pair<std::vector<double>, int32_t>({0.5},
                                                    static_cast<int32_t>(spec.getAlgorithm()));
 }
+
 boost::intrusive_ptr<Expression> AccumulatorMedian::parseExpression(ExpressionContext* const expCtx,
                                                                     BSONElement elem,
                                                                     VariablesParseState vps) {

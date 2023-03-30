@@ -47,13 +47,6 @@ public:
         }
         _values.insert(value.coerceToDouble());
         _memUsageBytes += sizeof(double);
-
-        // TODO SERVER-75115 confirm that $percentile can spill and remove uassert.
-        uassert(ErrorCodes::ExceededMemoryLimit,
-                str::stream()
-                    << "$percentile used too much memory and cannot spill to disk. Memory limit:"
-                    << _maxMemUsageBytes << " bytes" << _maxMemUsageBytes,
-                static_cast<long long>(_memUsageBytes) < _maxMemUsageBytes);
     }
 
     void remove(Value value) override {
@@ -77,9 +70,7 @@ public:
 
 protected:
     explicit WindowFunctionPercentileCommon(ExpressionContext* const expCtx)
-        : WindowFunctionState(expCtx),
-          _values(std::multiset<double>()),
-          _maxMemUsageBytes(internalDocumentSourceSetWindowFieldsMaxMemoryBytes.load()) {}
+        : WindowFunctionState(expCtx), _values(std::multiset<double>()) {}
 
     Value computePercentile(double p) const {
         // Calculate the rank.
@@ -95,7 +86,6 @@ protected:
 
     // Holds all the values in the window in ascending order.
     std::multiset<double> _values;
-    long long _maxMemUsageBytes;
 };
 
 class WindowFunctionPercentile : public WindowFunctionPercentileCommon {
@@ -129,7 +119,6 @@ public:
         WindowFunctionPercentileCommon::reset();
         _memUsageBytes = sizeof(*this) + _ps.capacity() * sizeof(double);
     }
-
 
 private:
     std::vector<double> _ps;
