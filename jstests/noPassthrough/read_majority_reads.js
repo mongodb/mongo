@@ -19,6 +19,9 @@
 (function() {
 'use strict';
 
+// Skip metadata consistency check since the sharded clsuter is started with 0 shards
+TestData.skipCheckMetadataConsistency = true;
+
 var testServer = MongoRunner.runMongod();
 var db = testServer.getDB("test");
 if (!db.serverStatus().storageEngine.supportsCommittedReads) {

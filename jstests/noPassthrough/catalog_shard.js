@@ -10,6 +10,10 @@
 (function() {
 "use strict";
 
+// TODO (SERVER-74534): Enable the metadata consistency check when it will work with co-located
+// configsvr.
+TestData.skipCheckMetadataConsistency = true;
+
 load("jstests/libs/fail_point_util.js");
 
 const dbName = "foo";

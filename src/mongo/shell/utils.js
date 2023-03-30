@@ -426,6 +426,7 @@ jsTestOptions = function() {
             // in dbpath; additionally, prevent the dbpath from being cleared after a node
             // is shut down.
             alwaysUseLogFiles: TestData.alwaysUseLogFiles || false,
+            skipCheckMetadataConsistency: TestData.skipCheckMetadataConsistency || false,
             skipCheckOrphans: TestData.skipCheckOrphans || false,
             skipCheckRoutingTableConsistency: TestData.skipCheckRoutingTableConsistency || false,
             skipCheckShardFilteringMetadata: TestData.skipCheckShardFilteringMetadata || false,

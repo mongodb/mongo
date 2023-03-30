@@ -2,7 +2,7 @@
 
 load('jstests/libs/feature_flag_util.js');  // For FeatureFlagUtil.
 
-const MetadataConsistencyChecker = (function() {
+var MetadataConsistencyChecker = (function() {
     const run = (mongos) => {
         const adminDB = mongos.getDB('admin');
 

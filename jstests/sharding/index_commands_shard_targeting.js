@@ -18,6 +18,10 @@ TestData.skipCheckOrphans = true;
 // This test connects directly to shards and creates collections.
 TestData.skipCheckShardFilteringMetadata = true;
 
+// Do not check metadata consistency as collections on non-primary shards are created for testing
+// purposes.
+TestData.skipCheckMetadataConsistency = true;
+
 /*
  * Runs the command after performing chunk operations to make the primary shard (shard0) not own
  * any chunks for the collection, and the subset of non-primary shards (shard1 and shard2) that

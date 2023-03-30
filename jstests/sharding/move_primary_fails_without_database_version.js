@@ -1,4 +1,8 @@
-// Tests that a movePrimary will fail if the database doesn't have a version in config.databases
+// Tests that a movePrimary will fail if the database doesn't have a version in config.databases.
+
+// Do not check metadata consistency as the database version is missing for testing purposes.
+TestData.skipCheckMetadataConsistency = true;
+
 (function() {
 "use strict";
 
