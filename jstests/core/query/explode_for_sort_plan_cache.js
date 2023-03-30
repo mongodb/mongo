@@ -29,7 +29,6 @@ load("jstests/libs/analyze_plan.js");
 load("jstests/libs/sbe_util.js");
 
 const isSBEEnabled = checkSBEEnabled(db);
-const isSBEFullEnabled = checkSBEEnabled(db, ["featureFlagSbeFull"]);
 const coll = db.explode_for_sort_plan_cache;
 coll.drop();
 
@@ -147,9 +146,8 @@ assertExplodeForSortCacheParameterizedCorrectly({
     newQuery: {$and: [{$expr: {$eq: ["$a", 2]}}, {b: {$in: [1, 2]}}]},
     newQueryCount: 6,
     // The plan cache entry is always reused for the classic engine but never reused for the SBE
-    // engine. Whether this query uses SBE currently depends on the value of 'featureFlagSbeFull',
-    // since $expr is not yet enabled by default in SBE.
-    reuseEntry: !isSBEFullEnabled,
+    // engine.
+    reuseEntry: !isSBEEnabled,
 });
 
 // Rewriting the $in predicate with $or should reuse the plan cache and gives correct results.

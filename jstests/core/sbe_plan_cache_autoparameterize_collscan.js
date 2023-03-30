@@ -7,8 +7,8 @@
  *   assumes_read_preference_unchanged,
  *   assumes_unsharded_collection,
  *   does_not_support_stepdowns,
- *   # The SBE plan cache was enabled by default in 6.3, some of the $in tests behave differently
- *   # in 7.0.
+ *   # Auto-parameterization behavior observed by this test changed in 7.0 as a result of enabling
+ *   # additional scenarios in SBE.
  *   requires_fcv_70,
  *   # Plan cache state is node-local and will not get migrated alongside tenant data.
  *   tenant_migration_incompatible,
@@ -306,35 +306,31 @@ runTest({query: {a: {$exists: true}}, projection: {_id: 1}},
         false);
 
 // Test that comparisons expressed as $expr are not auto-parameterized.
-if (checkSBEEnabled(db, ["featureFlagSbeFull"])) {
-    runTest({query: {$expr: {$eq: ["$a", 3]}}, projection: {_id: 1}},
-            [{_id: 2}],
-            {query: {$expr: {$eq: ["$a", 4]}}, projection: {_id: 1}},
-            [{_id: 3}, {_id: 4}],
-            false);
-    runTest({query: {$expr: {$lt: ["$a", 3]}, a: {$type: "number"}}, projection: {_id: 1}},
-            [{_id: 0}, {_id: 1}],
-            {query: {$expr: {$lt: ["$a", 4]}, a: {$type: "number"}}, projection: {_id: 1}},
-            [{_id: 0}, {_id: 1}, {_id: 2}],
-            false);
-    runTest({query: {$expr: {$lte: ["$a", 3]}, a: {$type: "number"}}, projection: {_id: 1}},
-            [{_id: 0}, {_id: 1}, {_id: 2}],
-            {query: {$expr: {$lte: ["$a", 4]}, a: {$type: "number"}}, projection: {_id: 1}},
-            [{_id: 0}, {_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}],
-            false);
-    runTest({query: {$expr: {$gt: ["$a", 2]}, a: {$type: "number"}}, projection: {_id: 1}},
-            [{_id: 2}, {_id: 3}, {_id: 4}, {_id: 5}, {_id: 6}],
-            {query: {$expr: {$gt: ["$a", 3]}, a: {$type: "number"}}, projection: {_id: 1}},
-            [{_id: 3}, {_id: 4}, {_id: 5}, {_id: 6}],
-            false);
-    runTest({query: {$expr: {$gte: ["$a", 2]}, a: {$type: "number"}}, projection: {_id: 1}},
-            [{_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}, {_id: 5}, {_id: 6}],
-            {query: {$expr: {$gte: ["$a", 3]}, a: {$type: "number"}}, projection: {_id: 1}},
-            [{_id: 2}, {_id: 3}, {_id: 4}, {_id: 5}, {_id: 6}],
-            false);
-} else {
-    jsTestLog("Skipping $expr test cases because SBE is not fully enabled");
-}
+runTest({query: {$expr: {$eq: ["$a", 3]}}, projection: {_id: 1}},
+        [{_id: 2}],
+        {query: {$expr: {$eq: ["$a", 4]}}, projection: {_id: 1}},
+        [{_id: 3}, {_id: 4}],
+        false);
+runTest({query: {$expr: {$lt: ["$a", 3]}, a: {$type: "number"}}, projection: {_id: 1}},
+        [{_id: 0}, {_id: 1}],
+        {query: {$expr: {$lt: ["$a", 4]}, a: {$type: "number"}}, projection: {_id: 1}},
+        [{_id: 0}, {_id: 1}, {_id: 2}],
+        false);
+runTest({query: {$expr: {$lte: ["$a", 3]}, a: {$type: "number"}}, projection: {_id: 1}},
+        [{_id: 0}, {_id: 1}, {_id: 2}],
+        {query: {$expr: {$lte: ["$a", 4]}, a: {$type: "number"}}, projection: {_id: 1}},
+        [{_id: 0}, {_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}],
+        false);
+runTest({query: {$expr: {$gt: ["$a", 2]}, a: {$type: "number"}}, projection: {_id: 1}},
+        [{_id: 2}, {_id: 3}, {_id: 4}, {_id: 5}, {_id: 6}],
+        {query: {$expr: {$gt: ["$a", 3]}, a: {$type: "number"}}, projection: {_id: 1}},
+        [{_id: 3}, {_id: 4}, {_id: 5}, {_id: 6}],
+        false);
+runTest({query: {$expr: {$gte: ["$a", 2]}, a: {$type: "number"}}, projection: {_id: 1}},
+        [{_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}, {_id: 5}, {_id: 6}],
+        {query: {$expr: {$gte: ["$a", 3]}, a: {$type: "number"}}, projection: {_id: 1}},
+        [{_id: 2}, {_id: 3}, {_id: 4}, {_id: 5}, {_id: 6}],
+        false);
 
 // Test that the same length of $in list generates the same plan cache key.
 runTest({query: {a: {$in: [1, 2]}}, projection: {_id: 1}},

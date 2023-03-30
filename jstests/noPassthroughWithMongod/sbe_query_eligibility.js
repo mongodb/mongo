@@ -8,11 +8,19 @@ load("jstests/libs/analyze_plan.js");
 load("jstests/libs/sbe_util.js");  // For 'checkSBEEnabled'.
 
 /**
- * Utility which asserts whether, when aggregating over 'collection' with 'pipeline', whether
- * explain reports that SBE or classic was used, based on the value of 'isSBE'.
+ * Utility which asserts that when running the given 'query' over 'collection', explain's reported
+ * use of SBE versus classic agrees with the given 'isSBE' value.
+ *
+ * If 'query' is an array, assumes that it is an aggregation pipeline. Otherwise, treats it as an
+ * arbitrary explainable command.
  */
-function assertEngineUsed(collection, pipeline, isSBE) {
-    const explain = collection.explain().aggregate(pipeline);
+function assertEngineUsed(collection, query, isSBE) {
+    let explain;
+    if (Array.isArray(query)) {
+        explain = collection.explain().aggregate(query);
+    } else {
+        explain = db.runCommand({explain: query});
+    }
     const expectedExplainVersion = isSBE ? "2" : "1";
     assert(explain.hasOwnProperty("explainVersion"), explain);
     assert.eq(explain.explainVersion, expectedExplainVersion, explain);
@@ -29,7 +37,7 @@ coll.drop();
 assert.commandWorked(coll.insert({}));
 assert.eq(coll.find().itcount(), 1);
 
-// Simple eligible cases.
+// Queries which should use SBE.
 const expectedSbeCases = [
     // Non-$expr match filters.
     [{$match: {a: 1}}],
@@ -76,15 +84,10 @@ const expectedSbeCases = [
         {$group: {_id: "$a", out: {$sum: 1}}},
         {$match: {$expr: {$eq: ["$a", "$b"]}}}
     ],
-];
 
-for (const pipeline of expectedSbeCases) {
-    assertEngineUsed(coll, pipeline, true /* isSBE */);
-}
+    // A find command which uses $slice projection.
+    {find: coll.getName(), projection: {a: {$slice: 3}}},
 
-// The cases below are expected to use SBE only if 'featureFlagSbeFull' is on.
-const isSbeFullyEnabled = checkSBEEnabled(db, ["featureFlagSbeFull"]);
-const sbeFullCases = [
     // Match filters with $expr.
     [{$match: {$expr: {$eq: ["$a", "$b"]}}}],
     [{$match: {$and: [{$expr: {$eq: ["$a", "$b"]}}, {c: 1}]}}],
@@ -186,7 +189,32 @@ const sbeFullCases = [
     ],
 ];
 
-for (const pipeline of sbeFullCases) {
-    assertEngineUsed(coll, pipeline, isSbeFullyEnabled /* isSBE */);
+for (const query of expectedSbeCases) {
+    assertEngineUsed(coll, query, true /* isSBE */);
+}
+
+// Queries that are ineligible for SBE and will fall back to the classic engine.
+const fallbackToClassicCases = [
+    // Uses an unsupported expression.
+    [{$project: {fieldA: {$getField: "a"}}}],
+
+    // Sort with numeric path component.
+    [{$sort: {"a.0": 1}}],
+
+    // An idhack eligible query.
+    [{$match: {_id: 1}}],
+
+    // A find command which $elemMatch projection.
+    {find: coll.getName(), projection: {a: {$elemMatch: {b: 1}}}},
+
+    // A find command which uses positional ($) projection.
+    {find: coll.getName(), filter: {a: 1}, projection: {"a.$": 1}},
+
+    // A find command which uses 'showRecordId'.
+    {find: coll.getName(), filter: {a: 1}, showRecordId: true},
+];
+
+for (const query of fallbackToClassicCases) {
+    assertEngineUsed(coll, query, false /* isSBE */);
 }
 })();

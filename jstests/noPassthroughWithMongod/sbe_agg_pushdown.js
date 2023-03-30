@@ -13,9 +13,8 @@ const kUnsupportedExpression = {
     $toBool: {date: "$b"}
 };
 
-const isSBEEnabled = checkSBEEnabled(db, ["featureFlagSbeFull"]);
-if (!isSBEEnabled) {
-    jsTestLog("Skipping test because the SBE feature flag is disabled");
+if (!checkSBEEnabled(db)) {
+    jsTestLog("Skipping test because SBE is not enabled");
     return;
 }
 

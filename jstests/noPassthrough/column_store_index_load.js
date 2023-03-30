@@ -8,7 +8,6 @@
  *   # yet implemented.
  *   does_not_support_stepdowns,
  *   featureFlagColumnstoreIndexes,
- *   featureFlagSbeFull,
  * ]
  */
 (function() {

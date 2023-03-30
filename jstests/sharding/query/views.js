@@ -53,7 +53,6 @@ let config = mongos.getDB("config");
 let db = mongos.getDB(jsTestName());
 db.dropDatabase();
 
-const sbeEnabled = checkSBEEnabled(db);
 const isClustered = ClusteredCollectionUtil.areAllCollectionsClustered(st.rs0.getPrimary());
 
 let coll = db.getCollection("coll");
@@ -117,21 +116,25 @@ for (let verbosity of explainVerbosities) {
 //
 assert.eq(5, view.count({a: {$lte: 8}}));
 
-result = db.runCommand({explain: {count: "view", query: {a: {$lte: 8}}}});
-// Allow success whether or not the pipeline is optimized away, as it differs based on test
-// environment and execution engine used.
-verifyExplainResult({
-    shardedExplain: result,
-    verbosity: "allPlansExecution",
-    optimizedAwayPipeline: sbeEnabled && !isClustered
-});
-for (let verbosity of explainVerbosities) {
-    result = db.runCommand({explain: {count: "view", query: {a: {$lte: 8}}}, verbosity: verbosity});
+// If SBE is enabled on all nodes, then validate the explain results for a count command. We could
+// validate the explain results when the classic engine is enabled, but doing so is complicated for
+// multiversion scenarios (e.g. in the multiversion passthrough on the classic engine build variant
+// only some shards have SBE enabled, so the expected results differ across shards).
+if (checkSBEEnabled(db, [], true /*checkAllNodes*/)) {
+    result = db.runCommand({explain: {count: "view", query: {a: {$lte: 8}}}});
+    // Allow success whether or not the pipeline is optimized away, as it differs based on test
+    // environment and execution engine used.
     verifyExplainResult({
         shardedExplain: result,
-        verbosity: verbosity,
-        optimizedAwayPipeline: sbeEnabled && !isClustered
+        verbosity: "allPlansExecution",
+        optimizedAwayPipeline: !isClustered
     });
+    for (let verbosity of explainVerbosities) {
+        result =
+            db.runCommand({explain: {count: "view", query: {a: {$lte: 8}}}, verbosity: verbosity});
+        verifyExplainResult(
+            {shardedExplain: result, verbosity: verbosity, optimizedAwayPipeline: !isClustered});
+    }
 }
 
 //

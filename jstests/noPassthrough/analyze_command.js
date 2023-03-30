@@ -8,8 +8,8 @@ assert.neq(null, conn, "mongod was unable to start up");
 
 const db = conn.getDB(jsTestName());
 
-if (checkSBEEnabled(db, ["featureFlagSbeFull"], true)) {
-    jsTestLog("Skipping the test because it doesn't work in Full SBE...");
+if (!checkSBEEnabled(db)) {
+    jsTestLog("Skipping test because SBE is not enabled");
     MongoRunner.stopMongod(conn);
     return;
 }

@@ -6,9 +6,8 @@
  * @tags: [
  *   requires_persistence,
  *   requires_replication,
- *   # column store indexes are still under a feature flag and require full sbe
+ *   # column store indexes are still under a feature flag.
  *   featureFlagColumnstoreIndexes,
- *   featureFlagSbeFull,
  * ]
  */
 

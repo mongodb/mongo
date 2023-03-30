@@ -14,8 +14,8 @@ const st = new ShardingTest({
 
 const db = st.getDB("test");
 
-if (checkSBEEnabled(db, ["featureFlagSbeFull"], true)) {
-    jsTestLog("Skipping the test because it doesn't work in Full SBE...");
+if (!checkSBEEnabled(db)) {
+    jsTestLog("Skipping test because SBE is not enabled");
     st.stop();
     return;
 }

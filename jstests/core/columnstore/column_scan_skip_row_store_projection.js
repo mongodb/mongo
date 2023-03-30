@@ -3,9 +3,8 @@
  * above a columnscan stage.
  *
  * @tags: [
- *   # Column store indexes are still under a feature flag and require full SBE.
+ *   # Column store indexes are still under a feature flag.
  *   featureFlagColumnstoreIndexes,
- *   featureFlagSbeFull,
  *   # explain is not supported in transactions
  *   does_not_support_transactions,
  *   requires_pipeline_optimization,

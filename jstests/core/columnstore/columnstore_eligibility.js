@@ -1,9 +1,8 @@
 /**
  * Tests the eligibility of certain queries to use a columnstore index.
  * @tags: [
- *   # Column store indexes are still under a feature flag and require full SBE.
+ *   # Column store indexes are still under a feature flag.
  *   featureFlagColumnstoreIndexes,
- *   featureFlagSbeFull,
  *   # Refusing to run a test that issues an aggregation command with explain because it may return
  *   # incomplete results if interrupted by a stepdown.
  *   does_not_support_stepdowns,
@@ -13,6 +12,9 @@
  *   # server parameters are stored in-memory only so are not transferred onto the recipient.
  *   tenant_migration_incompatible,
  *   not_allowed_with_security_token,
+ *   # Logic for when a COLUMN_SCAN plan is generated changed slightly as part of enabling more
+ *   # queries in SBE in the 7.0 release.
+ *   requires_fcv_70,
  * ]
  */
 (function() {
@@ -21,7 +23,6 @@
 load("jstests/libs/analyze_plan.js");
 load("jstests/libs/columnstore_util.js");  // For setUpServerForColumnStoreIndexTest.
 load("jstests/libs/fixture_helpers.js");   // For FixtureHelpers.isMongos.
-load("jstests/libs/sbe_util.js");          // For checkSBEEnabled.
 
 if (!setUpServerForColumnStoreIndexTest(db)) {
     return;
@@ -69,33 +70,18 @@ explain = coll.find({$or: [{a: 2}, {b: 2}]}, {_id: 0, a: 1}).explain();
 // COLUMN_SCAN is used for top-level $or queries.
 assert(planHasStage(db, explain, "COLUMN_SCAN"), explain);
 
-// COLUMN_SCAN is only used for for certain top-level $or queries when sbeFull is also enabled due
-// to a quirk in the engine selection logic.
-const sbeFull = checkSBEEnabled(db, ["featureFlagSbeFull"]);
 explain = coll.explain().aggregate([
     {$match: {$or: [{a: {$gt: 0}}, {b: {$gt: 0}}]}},
     {$project: {_id: 0, computedField: {$add: ["$a", "$b"]}}},
 ]);
-let planHasColumnScan = planHasStage(db, explain, "COLUMN_SCAN");
-
-if (sbeFull) {
-    assert(planHasColumnScan, explain);
-} else {
-    assert(!planHasColumnScan, explain);
-}
+assert(planHasStage(db, explain, "COLUMN_SCAN"), explain);
 
 explain = coll.explain().aggregate([
     {$match: {$or: [{a: {$gt: 0}}, {b: {$gt: 0}}]}},
     {$project: {_id: 0, computedField: {$add: ["$a", "$b"]}}},
     {$group: {_id: "$computedField"}}
 ]);
-planHasColumnScan = planHasStage(db, explain, "COLUMN_SCAN");
-
-if (sbeFull) {
-    assert(planHasColumnScan, explain);
-} else {
-    assert(!planHasColumnScan, explain);
-}
+assert(planHasStage(db, explain, "COLUMN_SCAN"), explain);
 
 // Simplest case: just scan "a" column.
 explain = coll.find({a: {$exists: true}}, {_id: 0, a: 1}).explain();

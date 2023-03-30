@@ -657,47 +657,41 @@ pipeline = [{$group: {_id: "$a.b", s: {$first: "$a"}}}];
 // assertProjectionCanBeRemovedBeforeGroup(pipeline, "PROJECTION_SIMPLE");
 assertProjectionIsNotRemoved(pipeline);
 
-// Though $group is generally eligible for pushdown into SBE, such a pushdown may be inhibited by
-// dotted as well as computed projections. As such we only run the test cases below if SBE is fully
-// enabled.
-const sbeFull = checkSBEEnabled(db, ["featureFlagSbeFull"], true /* checkAllNodes */);
-if (sbeFull) {
-    assertProjectionCanBeRemovedBeforeGroup(
-        [{$project: {'a.b': 1, 'b.c': 1}}, {$group: {_id: "$a.b", s: {$sum: "$b.c"}}}],
-        "PROJECTION_DEFAULT");
+assertProjectionCanBeRemovedBeforeGroup(
+    [{$project: {'a.b': 1, 'b.c': 1}}, {$group: {_id: "$a.b", s: {$sum: "$b.c"}}}],
+    "PROJECTION_DEFAULT");
 
-    // Test that a computed projection at the front of the pipeline is pushed down, even if there's
-    // no finite dependency set.
-    pipeline = [{$project: {x: {$add: ["$a", 1]}}}];
-    assertPipelineDoesNotUseAggregation(
-        {pipeline: pipeline, expectedStages: ["COLLSCAN", "PROJECTION_DEFAULT"]});
+// Test that a computed projection at the front of the pipeline is pushed down, even if there's no
+// finite dependency set.
+pipeline = [{$project: {x: {$add: ["$a", 1]}}}];
+assertPipelineDoesNotUseAggregation(
+    {pipeline: pipeline, expectedStages: ["COLLSCAN", "PROJECTION_DEFAULT"]});
 
-    // The projections below are not removed because they fail to include the $group's dependencies.
-    assertProjectionIsNotRemoved([{$project: {'a.b': 1}}, {$group: {_id: "$a.b", s: {$sum: "$b"}}}],
-                                 "PROJECTION_DEFAULT");
-    assertProjectionIsNotRemoved(
-        [{$project: {'a.b': 1}}, {$group: {_id: "$a.b", s: {$sum: "$a.c"}}}], "PROJECTION_DEFAULT");
+// The projections below are not removed because they fail to include the $group's dependencies.
+assertProjectionIsNotRemoved([{$project: {'a.b': 1}}, {$group: {_id: "$a.b", s: {$sum: "$b"}}}],
+                             "PROJECTION_DEFAULT");
+assertProjectionIsNotRemoved([{$project: {'a.b': 1}}, {$group: {_id: "$a.b", s: {$sum: "$a.c"}}}],
+                             "PROJECTION_DEFAULT");
 
-    pipeline = [{$project: {a: {$add: ["$a", 1]}}}, {$group: {_id: "$a", s: {$sum: "$b"}}}];
-    assertPipelineIfGroupPushdown(
-        // Test that a computed projection at the front of the pipeline is pushed down when there's
-        // a finite dependency set. Additionally, the group pushdown shouldn't erase the computed
-        // projection.
-        function() {
-            explain = coll.explain().aggregate(pipeline);
-            assertPipelineDoesNotUseAggregation(
-                {pipeline: pipeline, expectedStages: ["COLLSCAN", "PROJECTION_DEFAULT", "GROUP"]});
-        },
-        // Test that a computed projection at the front of the pipeline is pushed down when there's
-        // a finite dependency set.
-        function() {
-            explain = coll.explain().aggregate(pipeline);
-            assertPipelineUsesAggregation({
-                pipeline: pipeline,
-                expectedStages: ["COLLSCAN", "PROJECTION_DEFAULT", "$group"],
-            });
+pipeline = [{$project: {a: {$add: ["$a", 1]}}}, {$group: {_id: "$a", s: {$sum: "$b"}}}];
+assertPipelineIfGroupPushdown(
+    // Test that a computed projection at the front of the pipeline is pushed down when there's a
+    // finite dependency set. Additionally, the group pushdown shouldn't erase the computed
+    // projection.
+    function() {
+        explain = coll.explain().aggregate(pipeline);
+        assertPipelineDoesNotUseAggregation(
+            {pipeline: pipeline, expectedStages: ["COLLSCAN", "PROJECTION_DEFAULT", "GROUP"]});
+    },
+    // Test that a computed projection at the front of the pipeline is pushed down when there's a
+    // finite dependency set.
+    function() {
+        explain = coll.explain().aggregate(pipeline);
+        assertPipelineUsesAggregation({
+            pipeline: pipeline,
+            expectedStages: ["COLLSCAN", "PROJECTION_DEFAULT", "$group"],
         });
-}
+    });
 
 // We generate a projection stage from dependency analysis, even if the pipeline begins with an
 // exclusion projection.

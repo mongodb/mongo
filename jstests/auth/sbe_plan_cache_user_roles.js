@@ -15,6 +15,8 @@ const mongod = MongoRunner.runMongod();
 const dbName = "test";
 const db = mongod.getDB(dbName);
 
+const sbeEnabled = checkSBEEnabled(db);
+
 // Create two users, each with different roles.
 assert.commandWorked(
     db.runCommand({createUser: "user1", pwd: "pwd", roles: [{role: "read", db: dbName}]}));
@@ -25,7 +27,7 @@ const coll = db.sbe_plan_cache_user_roles;
 coll.drop();
 
 const verifyPlanCache = function(role) {
-    if (checkSBEEnabled(db, ["featureFlagSbeFull"])) {
+    if (sbeEnabled) {
         const caches = coll.getPlanCache().list();
         assert.eq(1, caches.length, caches);
         assert.eq(caches[0].cachedPlan.stages.includes(role), false, caches);

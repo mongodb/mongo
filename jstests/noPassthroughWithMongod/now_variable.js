@@ -156,7 +156,7 @@ runTestsExpectFailure(baseCollectionClusterTimeAgg);
 runTestsExpectFailure(fromViewWithClusterTime);
 runTestsExpectFailure(withExprClusterTime);
 
-if (checkSBEEnabled(db, ["featureFlagSbeFull"])) {
+if (checkSBEEnabled(db)) {
     function verifyPlanCacheSize(query) {
         coll.getPlanCache().clear();
 

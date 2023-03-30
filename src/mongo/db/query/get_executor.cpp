@@ -838,13 +838,6 @@ public:
         return buildMultiPlan(std::move(solutions));
     }
 
-    /**
-     * Returns the planner params if initialized, otherwise returns nullptr.
-     */
-    const QueryPlannerParams* plannerParams() const {
-        return _plannerParamsInitialized ? &_plannerParams : nullptr;
-    }
-
 protected:
     static constexpr bool ShouldDeferExecutionTreeGeneration = DeferExecutionTreeGeneration;
 
@@ -1416,88 +1409,30 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
 }
 
 /**
- * Checks if the result of query planning is SBE compatible. In this function, 'sbeFull' indicates
- * whether the full set of features supported by SBE is enabled, while 'canUseRegularSbe' indicates
- * whether the query is compatible with the subset of SBE enabled by default.
+ * Checks if the result of query planning is SBE compatible. If any of the query solutions in
+ * 'planningResult' cannot currently be compiled to an SBE plan via the SBE stage builders, then we
+ * will fall back to the classic engine.
  */
-bool shouldPlanningResultUseSbe(bool sbeFull,
-                                bool canUseRegularSbe,
-                                bool columnIndexPresent,
-                                const SlotBasedPrepareExecutionResult& planningResult) {
+bool shouldPlanningResultUseSbe(const SlotBasedPrepareExecutionResult& planningResult) {
     // If we have an entry in the SBE plan cache, then we can use SBE.
     if (planningResult.isRecoveredFromPlanCache()) {
         return true;
     }
 
-    // For now this function assumes one of these is true. If all are false, we should not use
-    // SBE.
-    tassert(6164401,
-            "Expected sbeFull, or a regular SBE compatiable query, or a CSI present",
-            sbeFull || canUseRegularSbe || columnIndexPresent);
-
     const auto& solutions = planningResult.solutions();
     if (solutions.empty()) {
-        // Query needs subplanning (plans are generated later, we don't have access yet).
+        // Query needs subplanning (plans are generated later, we don't have access yet). We can
+        // proceed with using SBE in this case.
         invariant(planningResult.needsSubplanning());
-
-        // Use SBE for rooted $or queries if SBE is fully enabled or the query is SBE compatible to
-        // begin with.
-        return sbeFull || canUseRegularSbe;
-    }
-
-    // Check that the query solution is SBE compatible.
-    const bool allStagesCompatible =
-        std::all_of(solutions.begin(), solutions.end(), [](const auto& solution) {
-            // We must have a solution, otherwise we would have early exited.
-            invariant(solution->root());
-            return isQueryPlanSbeCompatible(solution.get());
-        });
-
-    if (!allStagesCompatible) {
-        return false;
-    }
-
-    if (sbeFull || canUseRegularSbe) {
         return true;
     }
 
-    // Return true if we have a column scan plan, and false otherwise.
-    return solutions.size() == 1 &&
-        solutions.front()->root()->hasNode(StageType::STAGE_COLUMN_SCAN);
-}
-
-/**
- * Returns true if the query *may* be eligible for column scan. This requires three conditions:
- *
- * 1) apiStrict is false
- * 2) query has a column scan-eligible projection, i.e. an inclusion projection or is count-like
- * 3) there is a column store index present on the main collection
- *
- * These checks are an optimization in cases where we can determine without query planning that a
- * query doesn't meet other SBE requirements, and definitely can't use column scan.
- */
-bool maybeQueryIsColumnScanEligible(OperationContext* opCtx,
-                                    const MultipleCollectionAccessor& collections,
-                                    const CanonicalQuery* cq) {
-    if (APIParameters::get(opCtx).getAPIStrict().value_or(false)) {
-        // Column scan is not allowed with apiStrict: true.
-        return false;
-    }
-
-    if (!cq->isCountLike() && (!cq->getProj() || cq->getProj()->isExclusionOnly())) {
-        // The query's projection makes it automatically ineligible for column scan.
-        return false;
-    }
-
-    if (const auto& mainColl = collections.getMainCollection()) {
-        std::vector<const IndexDescriptor*> csiIndexes;
-        mainColl->getIndexCatalog()->findIndexByType(opCtx, IndexNames::COLUMN, csiIndexes);
-        return std::any_of(csiIndexes.begin(), csiIndexes.end(), [](const auto* descriptor) {
-            return !descriptor->hidden();
-        });
-    }
-
-    return false;
+    // Check that all query solutions are SBE compatible.
+    return std::all_of(solutions.begin(), solutions.end(), [](const auto& solution) {
+        // We must have a solution, otherwise we would have early exited.
+        invariant(solution->root());
+        return isQueryPlanSbeCompatible(solution.get());
+    });
 }
 
 /**
@@ -1505,35 +1440,16 @@ bool maybeQueryIsColumnScanEligible(OperationContext* opCtx,
  * 'featureFlagSbeFull' being set; false otherwise.
  */
 bool shouldUseRegularSbe(const CanonicalQuery& cq) {
-    if (cq.getExpCtx()->sbeCompatibility != SbeCompatibility::fullyCompatible) {
-        return false;
-    }
-
-    const auto* proj = cq.getProj();
-
-    // Disallow projections which use expressions.
-    if (proj && proj->hasExpressions()) {
-        return false;
-    }
-
-    // Disallow projections which have dotted paths.
-    if (proj && proj->hasDottedPaths()) {
-        return false;
-    }
-
-    // Disallow filters which feature $expr.
-    if (cq.countNodes(cq.root(), MatchExpression::MatchType::EXPRESSION) > 0) {
-        return false;
-    }
-
-    const auto& sortPattern = cq.getSortPattern();
-
-    // Disallow sorts which have a common prefix.
-    if (sortPattern && sortPatternHasPartsWithCommonPrefix(*sortPattern)) {
-        return false;
-    }
-
-    return true;
+    auto sbeCompatLevel = cq.getExpCtx()->sbeCompatibility;
+    // We shouldn't get here if there are expressions in the query which are completely unsupported
+    // by SBE.
+    tassert(7248600,
+            "Unexpected SBE compatibility value",
+            sbeCompatLevel != SbeCompatibility::notCompatible);
+    // The 'ExpressionContext' may indicate that there are expressions which are only supported in
+    // SBE when 'featureFlagSbeFull' is set, or fully supported regardless of the value of the
+    // feature flag. This function should only return true in the latter case.
+    return cq.getExpCtx()->sbeCompatibility == SbeCompatibility::fullyCompatible;
 }
 
 /**
@@ -1564,14 +1480,14 @@ attemptToGetSlotBasedExecutor(
     const bool sbeFull = feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV();
     const bool canUseRegularSbe = shouldUseRegularSbe(*canonicalQuery);
 
-    // Attempt to use SBE if the query may be eligible for column scan, if the currently supported
-    // subset of SBE is being used, or if SBE is fully enabled. Otherwise, fallback to the classic
-    // engine right away.
-    if (sbeFull || canUseRegularSbe ||
-        maybeQueryIsColumnScanEligible(opCtx, collections, canonicalQuery.get())) {
-        // Create the SBE prepare execution helper and initialize the params for the planner. Our
-        // decision about using SBE will depend on whether there is a column index present.
-
+    // If 'canUseRegularSbe' is true, then only the subset of SBE which is currently on by default
+    // is used by the query. If 'sbeFull' is true, then the server is configured to run any
+    // SBE-compatible query using SBE, even if the query uses features that are not on in SBE by
+    // default. Either way, try to construct an SBE plan executor.
+    if (canUseRegularSbe || sbeFull) {
+        // Create the SBE prepare execution helper and initialize the params for the planner. If
+        // planning results in any 'QuerySolution' which cannot be handled by the SBE stage builder,
+        // then we will fall back to the classic engine.
         auto sbeYieldPolicy = makeSbeYieldPolicy(
             opCtx, yieldPolicy, &collections.getMainCollection(), canonicalQuery->nss());
         SlotBasedPrepareExecutionHelper helper{
@@ -1581,11 +1497,7 @@ attemptToGetSlotBasedExecutor(
             return planningResultWithStatus.getStatus();
         }
 
-        const bool csiPresent =
-            helper.plannerParams() && !helper.plannerParams()->columnStoreIndexes.empty();
-
-        if (shouldPlanningResultUseSbe(
-                sbeFull, canUseRegularSbe, csiPresent, *planningResultWithStatus.getValue())) {
+        if (shouldPlanningResultUseSbe(*planningResultWithStatus.getValue())) {
             if (extractAndAttachPipelineStages) {
                 // We know now that we will use SBE, so we need to remove the pushed-down stages
                 // from the original pipeline object.

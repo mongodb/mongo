@@ -76,7 +76,8 @@ feature_flags:
       default: false
 
     featureFlagSbeFull:
-      description: "Feature flag for enabling SBE for a much larger class of queries than what is exposed by default"
+      description: "Feature flag for SBE behaviors, features, or extensions that are not yet enabled
+                    by default"
       cpp_varname: gFeatureFlagSbeFull
       default: false
 

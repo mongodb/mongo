@@ -1,9 +1,8 @@
 /**
  * Testing of just the query layer's integration for columnar indexes that encode large arrays.
  * @tags: [
- *   # Column store indexes are still under a feature flag and require full SBE.
+ *   # Column store indexes are still under a feature flag.
  *   featureFlagColumnstoreIndexes,
- *   featureFlagSbeFull,
  *   # Columnstore tests set server parameters to disable columnstore query planning heuristics -
  *   # 1) server parameters are stored in-memory only so are not transferred onto the recipient,
  *   # 2) server parameters may not be set in stepdown passthroughs because it is a command that may

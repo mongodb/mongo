@@ -185,38 +185,28 @@ assertResultsMatchWithAndWithoutPushdown(
     ],
     1);
 
-// Computed projections are only eligible for pushdown into SBE when SBE is fully enabled.
-// Additionally, $group stages with dotted fields may only be eligible for pushdown when SBE is
-// fully enabled as dependancy analysis may produce a dotted projection, which are not currently
-// supported in mainline SBE.
-const sbeFull = checkSBEEnabled(db, ["featureFlagSbeFull"]);
-if (sbeFull) {
-    // The $group stage refers to two existing sub-fields.
-    assertResultsMatchWithAndWithoutPushdown(
-        coll,
-        [
-            {
-                $project:
-                    {item: 1, price: 1, quantity: 1, dateParts: {$dateToParts: {date: "$date"}}}
-            },
-            {
-                $group: {
-                    _id: "$item",
-                    hs: {$sum:
-                             {$add: ["$dateParts.hour", "$dateParts.hour", "$dateParts.minute"]}}
-                }
-            },
-        ],
-        [{"_id": "a", "hs": 39}, {"_id": "b", "hs": 34}, {"_id": "c", "hs": 23}],
-        1);
+// The $group stage refers to two existing sub-fields.
+assertResultsMatchWithAndWithoutPushdown(
+    coll,
+    [
+        {$project: {item: 1, price: 1, quantity: 1, dateParts: {$dateToParts: {date: "$date"}}}},
+        {
+            $group: {
+                _id: "$item",
+                hs: {$sum: {$add: ["$dateParts.hour", "$dateParts.hour", "$dateParts.minute"]}}
+            }
+        },
+    ],
+    [{"_id": "a", "hs": 39}, {"_id": "b", "hs": 34}, {"_id": "c", "hs": 23}],
+    1);
 
-    // The $group stage refers to a non-existing sub-field twice.
-    assertResultsMatchWithAndWithoutPushdown(
-        coll,
-        [{$group: {_id: "$item", hs: {$sum: {$add: ["$date.hour", "$date.hour"]}}}}],
-        [{"_id": "a", "hs": 0}, {"_id": "b", "hs": 0}, {"_id": "c", "hs": 0}],
-        1);
-}
+// The $group stage refers to a non-existing sub-field twice.
+assertResultsMatchWithAndWithoutPushdown(
+    coll,
+    [{$group: {_id: "$item", hs: {$sum: {$add: ["$date.hour", "$date.hour"]}}}}],
+    [{"_id": "a", "hs": 0}, {"_id": "b", "hs": 0}, {"_id": "c", "hs": 0}],
+    1);
+
 // Two group stages both get pushed down and the second $group stage refers to only existing
 // top-level fields of the first $group. The field name may be one of "result" / "recordId" /
 // "returnKey" / "snapshotId" / "indexId" / "indexKey" / "indexKeyPattern" which are reserved names

@@ -1,9 +1,8 @@
 /**
  * Tests some basic use cases and functionality of a columnstore index.
  * @tags: [
- *   # Column store indexes are still under a feature flag and require full SBE.
+ *   # Column store indexes are still under a feature flag.
  *   featureFlagColumnstoreIndexes,
- *   featureFlagSbeFull,
  *
  *   # Uses $indexStats which is not supported inside a transaction.
  *   does_not_support_transactions,

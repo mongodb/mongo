@@ -3,7 +3,6 @@
  * the columstore index is the winning plan.
  * @tags: [
  *   featureFlagColumnstoreIndexes,
- *   featureFlagSbeFull,
  * ]
  */
 (function() {
