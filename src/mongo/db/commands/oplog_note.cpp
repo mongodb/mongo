@@ -58,6 +58,9 @@ MONGO_FAIL_POINT_DEFINE(hangInAppendOplogNote);
 
 namespace {
 Status _performNoopWrite(OperationContext* opCtx, BSONObj msgObj, StringData note) {
+    ScopedAdmissionPriorityForLock priority{opCtx->lockState(),
+                                            AdmissionContext::Priority::kImmediate};
+
     repl::ReplicationCoordinator* const replCoord = repl::ReplicationCoordinator::get(opCtx);
     // Use GlobalLock instead of DBLock to allow return when the lock is not available. It may
     // happen when the primary steps down and a shared global lock is acquired.
