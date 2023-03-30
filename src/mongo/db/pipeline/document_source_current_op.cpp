@@ -68,8 +68,8 @@ std::unique_ptr<DocumentSourceCurrentOp::LiteParsed> DocumentSourceCurrentOp::Li
                                 << typeName(spec.type()));
     }
 
-    auto allUsers = UserMode::kExcludeOthers;
-    auto localOps = LocalOpsMode::kRemoteShardOps;
+    auto allUsers = kDefaultUserMode;
+    auto localOps = kDefaultLocalOpsMode;
 
     // Check the spec for all fields named 'allUsers'. If any of them are 'true', we require
     // the 'inprog' privilege. This avoids the possibility that a spec with multiple
@@ -111,13 +111,14 @@ const char* DocumentSourceCurrentOp::getSourceName() const {
 
 DocumentSource::GetNextResult DocumentSourceCurrentOp::doGetNext() {
     if (_ops.empty()) {
-        _ops = pExpCtx->mongoProcessInterface->getCurrentOps(pExpCtx,
-                                                             _includeIdleConnections,
-                                                             _includeIdleSessions,
-                                                             _includeOpsFromAllUsers,
-                                                             _truncateOps,
-                                                             _idleCursors,
-                                                             _backtrace);
+        _ops = pExpCtx->mongoProcessInterface->getCurrentOps(
+            pExpCtx,
+            _includeIdleConnections.value_or(kDefaultConnMode),
+            _includeIdleSessions.value_or(kDefaultSessionMode),
+            _includeOpsFromAllUsers.value_or(kDefaultUserMode),
+            _truncateOps.value_or(kDefaultTruncationMode),
+            _idleCursors.value_or(kDefaultCursorMode),
+            _backtrace.value_or(kDefaultBacktraceMode));
 
         _opsIter = _ops.begin();
 
@@ -185,13 +186,13 @@ intrusive_ptr<DocumentSource> DocumentSourceCurrentOp::createFromBson(
             "$currentOp must be run against the 'admin' database with {aggregate: 1}",
             nss.db() == DatabaseName::kAdmin.db() && nss.isCollectionlessAggregateNS());
 
-    ConnMode includeIdleConnections = ConnMode::kExcludeIdle;
-    SessionMode includeIdleSessions = SessionMode::kIncludeIdle;
-    UserMode includeOpsFromAllUsers = UserMode::kExcludeOthers;
-    LocalOpsMode showLocalOpsOnMongoS = LocalOpsMode::kRemoteShardOps;
-    TruncationMode truncateOps = TruncationMode::kNoTruncation;
-    CursorMode idleCursors = CursorMode::kExcludeCursors;
-    BacktraceMode backtrace = BacktraceMode::kExcludeBacktrace;
+    boost::optional<ConnMode> includeIdleConnections;
+    boost::optional<SessionMode> includeIdleSessions;
+    boost::optional<UserMode> includeOpsFromAllUsers;
+    boost::optional<LocalOpsMode> showLocalOpsOnMongoS;
+    boost::optional<TruncationMode> truncateOps;
+    boost::optional<CursorMode> idleCursors;
+    boost::optional<BacktraceMode> backtrace;
 
     for (auto&& elem : spec.embeddedObject()) {
         const auto fieldName = elem.fieldNameStringData();
@@ -272,13 +273,13 @@ intrusive_ptr<DocumentSource> DocumentSourceCurrentOp::createFromBson(
 
 intrusive_ptr<DocumentSourceCurrentOp> DocumentSourceCurrentOp::create(
     const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-    ConnMode includeIdleConnections,
-    SessionMode includeIdleSessions,
-    UserMode includeOpsFromAllUsers,
-    LocalOpsMode showLocalOpsOnMongoS,
-    TruncationMode truncateOps,
-    CursorMode idleCursors,
-    BacktraceMode backtrace) {
+    boost::optional<ConnMode> includeIdleConnections,
+    boost::optional<SessionMode> includeIdleSessions,
+    boost::optional<UserMode> includeOpsFromAllUsers,
+    boost::optional<LocalOpsMode> showLocalOpsOnMongoS,
+    boost::optional<TruncationMode> truncateOps,
+    boost::optional<CursorMode> idleCursors,
+    boost::optional<BacktraceMode> backtrace) {
     return new DocumentSourceCurrentOp(pExpCtx,
                                        includeIdleConnections,
                                        includeIdleSessions,
@@ -290,25 +291,40 @@ intrusive_ptr<DocumentSourceCurrentOp> DocumentSourceCurrentOp::create(
 }
 
 Value DocumentSourceCurrentOp::serialize(SerializationOptions opts) const {
-    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
-        MONGO_UNIMPLEMENTED_TASSERT(7484351);
-    }
-
     return Value(Document{
         {getSourceName(),
-         Document{{kIdleConnectionsFieldName,
-                   _includeIdleConnections == ConnMode::kIncludeIdle ? Value(true) : Value()},
-                  {kIdleSessionsFieldName,
-                   _includeIdleSessions == SessionMode::kExcludeIdle ? Value(false) : Value()},
-                  {kAllUsersFieldName,
-                   _includeOpsFromAllUsers == UserMode::kIncludeAll ? Value(true) : Value()},
-                  {kLocalOpsFieldName,
-                   _showLocalOpsOnMongoS == LocalOpsMode::kLocalMongosOps ? Value(true) : Value()},
-                  {kTruncateOpsFieldName,
-                   _truncateOps == TruncationMode::kTruncateOps ? Value(true) : Value()},
-                  {kIdleCursorsFieldName,
-                   _idleCursors == CursorMode::kIncludeCursors ? Value(true) : Value()},
-                  {kBacktraceFieldName,
-                   _backtrace == BacktraceMode::kIncludeBacktrace ? Value(true) : Value()}}}});
+         Document{
+             {kIdleConnectionsFieldName,
+              _includeIdleConnections.has_value()
+                  ? opts.serializeLiteralValue(_includeIdleConnections.value() ==
+                                               ConnMode::kIncludeIdle)
+                  : Value()},
+             {kIdleSessionsFieldName,
+              _includeIdleSessions.has_value()
+                  ? opts.serializeLiteralValue(_includeIdleSessions.value() ==
+                                               SessionMode::kIncludeIdle)
+                  : Value()},
+             {kAllUsersFieldName,
+              _includeOpsFromAllUsers.has_value()
+                  ? opts.serializeLiteralValue(_includeOpsFromAllUsers.value() ==
+                                               UserMode::kIncludeAll)
+                  : Value()},
+             {kLocalOpsFieldName,
+              _showLocalOpsOnMongoS.has_value()
+                  ? opts.serializeLiteralValue(_showLocalOpsOnMongoS.value() ==
+                                               LocalOpsMode::kLocalMongosOps)
+                  : Value()},
+             {kTruncateOpsFieldName,
+              _truncateOps.has_value()
+                  ? opts.serializeLiteralValue(_truncateOps.value() == TruncationMode::kTruncateOps)
+                  : Value()},
+             {kIdleCursorsFieldName,
+              _idleCursors.has_value()
+                  ? opts.serializeLiteralValue(_idleCursors.value() == CursorMode::kIncludeCursors)
+                  : Value()},
+             {kBacktraceFieldName,
+              _backtrace.has_value() ? opts.serializeLiteralValue(_backtrace.value() ==
+                                                                  BacktraceMode::kIncludeBacktrace)
+                                     : Value()}}}});
 }
 }  // namespace mongo

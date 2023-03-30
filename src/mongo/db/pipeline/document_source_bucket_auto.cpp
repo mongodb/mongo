@@ -381,25 +381,20 @@ void DocumentSourceBucketAuto::doDispose() {
 }
 
 Value DocumentSourceBucketAuto::serialize(SerializationOptions opts) const {
-    auto explain = opts.verbosity;
-    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
-        MONGO_UNIMPLEMENTED_TASSERT(7484364);
-    }
-
     MutableDocument insides;
 
-    insides["groupBy"] = _groupByExpression->serialize(explain);
-    insides["buckets"] = Value(_nBuckets);
+    insides["groupBy"] = _groupByExpression->serialize(opts);
+    insides["buckets"] = opts.serializeLiteralValue(_nBuckets);
 
     if (_granularityRounder) {
-        insides["granularity"] = Value(_granularityRounder->getName());
+        insides["granularity"] = opts.serializeLiteralValue(_granularityRounder->getName());
     }
 
     MutableDocument outputSpec(_accumulatedFields.size());
     for (auto&& accumulatedField : _accumulatedFields) {
         intrusive_ptr<AccumulatorState> accum = accumulatedField.makeAccumulator();
-        outputSpec[accumulatedField.fieldName] = Value(accum->serialize(
-            accumulatedField.expr.initializer, accumulatedField.expr.argument, explain));
+        outputSpec[opts.serializeFieldName(accumulatedField.fieldName)] = Value(accum->serialize(
+            accumulatedField.expr.initializer, accumulatedField.expr.argument, opts));
     }
     insides["output"] = outputSpec.freezeToValue();
 
