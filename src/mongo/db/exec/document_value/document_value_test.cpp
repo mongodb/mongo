@@ -874,7 +874,8 @@ TEST(MetaFields, CopyMetadataFromCopiesAllMetadata) {
                  << "foo"
                  << "h" << 1 << "$indexKey" << BSON("y" << 1) << "$searchScoreDetails"
                  << BSON("scoreDetails"
-                         << "foo")));
+                         << "foo")
+                 << "$searchSortValues" << BSON("a" << 1)));
 
     MutableDocument destination{};
     destination.copyMetaDataFrom(source);
@@ -891,6 +892,7 @@ TEST(MetaFields, CopyMetadataFromCopiesAllMetadata) {
     ASSERT_BSONOBJ_EQ(result.metadata().getSearchScoreDetails(),
                       BSON("scoreDetails"
                            << "foo"));
+    ASSERT_BSONOBJ_EQ(result.metadata().getSearchSortValues(), BSON("a" << 1));
 }
 
 class SerializationTest : public unittest::Test {
@@ -981,6 +983,7 @@ TEST(MetaFields, ToAndFromBson) {
                                                         << "def"_sd));
     docBuilder.metadata().setSearchScoreDetails(BSON("scoreDetails"
                                                      << "foo"));
+    docBuilder.metadata().setSearchSortValues(BSON("a" << 42));
     Document doc = docBuilder.freeze();
     BSONObj obj = doc.toBsonWithMetaData(SortKeyFormat::k42SortKey);
     ASSERT_EQ(10.0, obj[Document::metaFieldTextScore].Double());
@@ -992,6 +995,7 @@ TEST(MetaFields, ToAndFromBson) {
     ASSERT_BSONOBJ_EQ(obj[Document::metaFieldSearchScoreDetails].Obj(),
                       BSON("scoreDetails"
                            << "foo"));
+    ASSERT_BSONOBJ_EQ(BSON("a" << 42), obj[Document::metaFieldSearchSortValues].Obj());
     Document fromBson = Document::fromBsonWithMetaData(obj);
     ASSERT_TRUE(fromBson.metadata().hasTextScore());
     ASSERT_TRUE(fromBson.metadata().hasRandVal());
@@ -1000,6 +1004,7 @@ TEST(MetaFields, ToAndFromBson) {
     ASSERT_BSONOBJ_EQ(BSON("scoreDetails"
                            << "foo"),
                       fromBson.metadata().getSearchScoreDetails());
+    ASSERT_BSONOBJ_EQ(BSON("a" << 42), fromBson.metadata().getSearchSortValues());
 }
 
 TEST(MetaFields, MetaFieldsIncludedInDocumentApproximateSize) {

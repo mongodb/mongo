@@ -53,6 +53,7 @@ const StringDataSet Document::allMetadataFieldNames{Document::metaFieldTextScore
                                                     Document::metaFieldGeoNearPoint,
                                                     Document::metaFieldSearchScore,
                                                     Document::metaFieldSearchHighlights,
+                                                    Document::metaFieldSearchSortValues,
                                                     Document::metaFieldIndexKey,
                                                     Document::metaFieldSearchScoreDetails};
 
@@ -407,6 +408,8 @@ void DocumentStorage::loadLazyMetadata() const {
                 _metadataFields.setIndexKey(elem.Obj());
             } else if (fieldName == Document::metaFieldSearchScoreDetails) {
                 _metadataFields.setSearchScoreDetails(elem.Obj());
+            } else if (fieldName == Document::metaFieldSearchSortValues) {
+                _metadataFields.setSearchSortValues(elem.Obj());
             }
         }
     }
@@ -479,6 +482,7 @@ constexpr StringData Document::metaFieldGeoNearPoint;
 constexpr StringData Document::metaFieldSearchScore;
 constexpr StringData Document::metaFieldSearchHighlights;
 constexpr StringData Document::metaFieldSearchScoreDetails;
+constexpr StringData Document::metaFieldSearchSortValues;
 
 BSONObj Document::toBsonWithMetaData(SortKeyFormat sortKeyFormat) const {
     BSONObjBuilder bb;
@@ -521,6 +525,9 @@ BSONObj Document::toBsonWithMetaData(SortKeyFormat sortKeyFormat) const {
         bb.append(metaFieldIndexKey, metadata().getIndexKey());
     if (metadata().hasSearchScoreDetails())
         bb.append(metaFieldSearchScoreDetails, metadata().getSearchScoreDetails());
+    if (metadata().hasSearchSortValues()) {
+        bb.append(metaFieldSearchSortValues, metadata().getSearchSortValues());
+    }
     return bb.obj();
 }
 

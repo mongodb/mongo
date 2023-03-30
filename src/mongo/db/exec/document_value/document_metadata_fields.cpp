@@ -85,6 +85,9 @@ void DocumentMetadataFields::mergeWith(const DocumentMetadataFields& other) {
     if (!hasSearchScoreDetails() && other.hasSearchScoreDetails()) {
         setSearchScoreDetails(other.getSearchScoreDetails());
     }
+    if (!hasSearchSortValues() && other.hasSearchSortValues()) {
+        setSearchSortValues(other.getSearchSortValues());
+    }
 }
 
 void DocumentMetadataFields::copyFrom(const DocumentMetadataFields& other) {
@@ -115,6 +118,9 @@ void DocumentMetadataFields::copyFrom(const DocumentMetadataFields& other) {
     if (other.hasSearchScoreDetails()) {
         setSearchScoreDetails(other.getSearchScoreDetails());
     }
+    if (other.hasSearchSortValues()) {
+        setSearchSortValues(other.getSearchSortValues());
+    }
 }
 
 size_t DocumentMetadataFields::getApproximateSize() const {
@@ -136,6 +142,7 @@ size_t DocumentMetadataFields::getApproximateSize() const {
     size -= sizeof(_holder->searchHighlights);
     size += _holder->indexKey.objsize();
     size += _holder->searchScoreDetails.objsize();
+    size += _holder->searchSortValues.objsize();
 
     return size;
 }
@@ -184,6 +191,10 @@ void DocumentMetadataFields::serializeForSorter(BufBuilder& buf) const {
         buf.appendNum(static_cast<char>(MetaType::kSearchScoreDetails + 1));
         getSearchScoreDetails().appendSelfToBufBuilder(buf);
     }
+    if (hasSearchSortValues()) {
+        buf.appendNum(static_cast<char>(MetaType::kSearchSortValues + 1));
+        getSearchSortValues().appendSelfToBufBuilder(buf);
+    }
     buf.appendNum(static_cast<char>(0));
 }
 
@@ -214,6 +225,9 @@ void DocumentMetadataFields::deserializeForSorter(BufReader& buf, DocumentMetada
                 BSONObj::deserializeForSorter(buf, BSONObj::SorterDeserializeSettings()));
         } else if (marker == static_cast<char>(MetaType::kSearchScoreDetails) + 1) {
             out->setSearchScoreDetails(
+                BSONObj::deserializeForSorter(buf, BSONObj::SorterDeserializeSettings()));
+        } else if (marker == static_cast<char>(MetaType::kSearchSortValues) + 1) {
+            out->setSearchSortValues(
                 BSONObj::deserializeForSorter(buf, BSONObj::SorterDeserializeSettings()));
         } else {
             uasserted(28744, "Unrecognized marker, unable to deserialize buffer");
@@ -286,6 +300,8 @@ const char* DocumentMetadataFields::typeNameToDebugString(DocumentMetadataFields
             return "text score";
         case DocumentMetadataFields::kSearchScoreDetails:
             return "$search score details";
+        case DocumentMetadataFields::kSearchSortValues:
+            return "$search sort values";
         default:
             MONGO_UNREACHABLE;
     }
