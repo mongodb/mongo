@@ -50,11 +50,11 @@ function resetProfiler(db) {
 let avgDocSize = 171;
 let smallPartitionSize = 6;
 let largePartitionSize = 21;
-// The number 230 was chosen by observing how much memory is required for the accumulators to run
-// on all windows (~1250 bytes).
+// The number 600 was chosen by observing how much memory is required for the accumulators to run
+// on all windows (~1600 bytes).
 setParameterOnAllHosts(DiscoverTopology.findNonConfigNodes(db.getMongo()),
                        "internalDocumentSourceSetWindowFieldsMaxMemoryBytes",
-                       avgDocSize * smallPartitionSize + 230);
+                       avgDocSize * smallPartitionSize + 600);
 
 seedWithTickerData(coll, 10);
 
