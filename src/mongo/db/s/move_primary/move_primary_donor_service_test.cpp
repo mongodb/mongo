@@ -74,6 +74,7 @@ public:
                                                   const std::string& dbName,
                                                   const BSONObj& cmdObj,
                                                   Shard::RetryPolicy retryPolicy) {
+        stdx::unique_lock lock{_mutex};
         _commandHistory.emplace_back(shardId, readPref, dbName, cmdObj, retryPolicy);
         if (_nextResponses.empty()) {
             return kOkResponse;
@@ -84,6 +85,7 @@ public:
     }
 
     boost::optional<const CommandDetails&> getLastCommandDetails() {
+        stdx::unique_lock lock{_mutex};
         if (_commandHistory.empty()) {
             return boost::none;
         }
@@ -91,18 +93,22 @@ public:
     }
 
     const std::list<CommandDetails>& getCommandHistory() const {
+        stdx::unique_lock lock{_mutex};
         return _commandHistory;
     }
 
     size_t getCommandsRunCount() const {
+        stdx::unique_lock lock{_mutex};
         return _commandHistory.size();
     }
 
     void addNextResponse(StatusWith<Shard::CommandResponse> response) {
+        stdx::unique_lock lock{_mutex};
         _nextResponses.push_back(std::move(response));
     }
 
 private:
+    mutable Mutex _mutex;
     std::list<StatusWith<Shard::CommandResponse>> _nextResponses;
     std::list<CommandDetails> _commandHistory;
 };
@@ -335,21 +341,13 @@ protected:
         instance->onReadyToForget();
     }
 
-    void assertCompletesWithSuccess(const std::shared_ptr<DonorInstance>& instance) {
-        makeReadyToComplete(instance);
-        ASSERT_OK(instance->getCompletionFuture().getNoThrow());
-    }
-
-    void assertCompletesWithFailure(const std::shared_ptr<DonorInstance>& instance) {
-        makeReadyToComplete(instance);
-        ASSERT_NOT_OK(instance->getCompletionFuture().getNoThrow());
-    }
-
     void assertCompletesAppropriately(const std::shared_ptr<DonorInstance>& instance) {
+        makeReadyToComplete(instance);
+        auto result = instance->getCompletionFuture().getNoThrow();
         if (instance->isAborted()) {
-            assertCompletesWithFailure(instance);
+            ASSERT_NOT_OK(result);
         } else {
-            assertCompletesWithSuccess(instance);
+            ASSERT_OK(result);
         }
     }
 
