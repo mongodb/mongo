@@ -1,7 +1,7 @@
 /**
  * Test that FCV upgrade fails if downgrading fails during isCleaningServerMetadata phase.
  *
- * @tags: [featureFlagDowngradingToUpgrading]
+ * @tags: [requires_fcv_70]
  */
 
 (function() {
@@ -71,12 +71,6 @@ function runStandaloneTest() {
         null, conn, "mongod was unable to start up with version=" + latest + " and no data files");
     const adminDB = conn.getDB("admin");
 
-    if (!FeatureFlagUtil.isEnabled(adminDB, "DowngradingToUpgrading")) {
-        jsTestLog("Skipping as featureFlagDowngradingToUpgrading is not enabled");
-        MongoRunner.stopMongod(conn);
-        return;
-    }
-
     function restartDeploymentFn() {
         MongoRunner.stopMongod(conn);
         conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: latest, noCleanData: true});
@@ -104,12 +98,6 @@ function runReplicaSetTest() {
     const primaryAdminDB = rst.getPrimary().getDB("admin");
     const primary = rst.getPrimary();
 
-    if (!FeatureFlagUtil.isEnabled(primaryAdminDB, "DowngradingToUpgrading")) {
-        jsTestLog("Skipping as featureFlagDowngradingToUpgrading is not enabled");
-        rst.stopSet();
-        return;
-    }
-
     function restartDeploymentFn() {
         rst.stopSet(null /* signal */, true /* forRestart */);
         rst.startSet({restart: true});
@@ -127,12 +115,6 @@ function runReplicaSetTest() {
 
 function runShardedClusterTest() {
     const st = new ShardingTest({shards: 2});
-
-    if (!FeatureFlagUtil.isEnabled(st.configRS.getPrimary(), "DowngradingToUpgrading")) {
-        jsTestLog("Skipping as featureFlagDowngradingToUpgrading is not enabled");
-        st.stop();
-        return;
-    }
 
     function restartDeploymentFn() {
         st.stopAllShards({}, true /* forRestart */);

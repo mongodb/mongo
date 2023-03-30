@@ -3,7 +3,7 @@
  *      1. The FCV cannot be downgraded to 6.0 if there are queryable range encryption indexes.
  *      2. The FCV can be set back to upgraded if feature flag DowngradingToUpgrading is true.
  *
- * @tags: [featureFlagDowngradingToUpgrading]
+ * @tags: [requires_fcv_70]
  */
 (function() {
 "use strict";

@@ -1809,7 +1809,7 @@ let runTest = function(conn, adminDB, fixture) {
             commandsList = new Set(commandsList.concat(shardCommandsList));
         }
 
-        for (const command of Object.keys(allCommands)) {
+        for (const command of commandsList) {
             const test = allCommands[command];
 
             // Coverage already guaranteed above, but check again just in case.

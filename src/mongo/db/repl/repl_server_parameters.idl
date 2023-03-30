@@ -785,7 +785,8 @@ feature_flags:
         description: When enabled, 
                      allow kDowngradingFromLatestToLastLTS -> kUpgrading -> kUpgraded path.
         cpp_varname: feature_flags::gDowngradingToUpgrading
-        default: false
+        default: true
+        version: 7.0
 
     featureFlagApplyPreparedTxnsInParallel:
         description: when enabled, secondaries will apply prepared transactions in parallel.

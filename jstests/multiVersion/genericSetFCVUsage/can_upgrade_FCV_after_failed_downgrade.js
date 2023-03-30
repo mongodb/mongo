@@ -2,7 +2,7 @@
  * Tests for the new fcv change path added:
  * kDowngradingFromLatestToLastLTS -> kUpgradingFromLastLTSToLatest -> kLatest.
  *
- * @tags: [featureFlagDowngradingToUpgrading]
+ * @tags: [requires_fcv_70]
  */
 
 (function() {
@@ -49,12 +49,6 @@ function runStandaloneTest() {
         null, conn, "mongod was unable to start up with version=" + latest + " and no data files");
     const adminDB = conn.getDB("admin");
 
-    if (!FeatureFlagUtil.isEnabled(adminDB, "DowngradingToUpgrading")) {
-        jsTestLog("Skipping as featureFlagDowngradingToUpgrading is not enabled");
-        MongoRunner.stopMongod(conn);
-        return;
-    }
-
     downgradingToUpgradingTest(conn, adminDB);
 
     MongoRunner.stopMongod(conn);
@@ -66,12 +60,6 @@ function runReplicaSetTest() {
     rst.initiate();
     const primaryAdminDB = rst.getPrimary().getDB("admin");
     const primary = rst.getPrimary();
-
-    if (!FeatureFlagUtil.isEnabled(primaryAdminDB, "DowngradingToUpgrading")) {
-        jsTestLog("Skipping as featureFlagDowngradingToUpgrading is not enabled");
-        rst.stopSet();
-        return;
-    }
 
     downgradingToUpgradingTest(primary, primaryAdminDB);
 
@@ -85,12 +73,6 @@ function testConfigServerFCVTimestampIsAlwaysNewer() {
     const configPrimary = st.configRS.getPrimary();
     const shardPrimaryAdminDB = st.rs0.getPrimary().getDB("admin");
     checkFCV(shardPrimaryAdminDB, latestFCV);
-
-    if (!FeatureFlagUtil.isEnabled(mongosAdminDB, "DowngradingToUpgrading")) {
-        jsTestLog("Skipping as featureFlagDowngradingToUpgrading is not enabled");
-        st.stop();
-        return;
-    }
 
     downgradingToUpgradingTest(configPrimary, mongosAdminDB);
 

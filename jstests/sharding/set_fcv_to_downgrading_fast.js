@@ -5,7 +5,7 @@
  * Catalog shard incompatible because we do not currently allow downgrading FCV with a catalog
  * shard. TODO SERVER-73279: Enable in catalog shard mode when it supports FCV downgrade.
  * @tags: [
- *   featureFlagDowngradingToUpgrading,
+ *   requires_fcv_70,
  *   multiversion_incompatible,
  *   does_not_support_stepdowns,
  *   catalog_shard_incompatible,
@@ -27,12 +27,6 @@ function runStandaloneTest() {
     assert.neq(
         null, conn, "mongod was unable to start up with version=" + latest + " and no data files");
     const adminDB = conn.getDB("admin");
-
-    if (!FeatureFlagUtil.isEnabled(adminDB, "DowngradingToUpgrading")) {
-        jsTestLog("Skipping as featureFlagDowngradingToUpgrading is not enabled");
-        MongoRunner.stopMongod(conn);
-        return;
-    }
 
     const fcvDoc = adminDB.system.version.findOne({_id: 'featureCompatibilityVersion'});
     jsTestLog("current FCV (should be latest): " + tojson(fcvDoc));
@@ -64,12 +58,6 @@ function runReplicaSetTest() {
     rst.initiate();
     const primaryAdminDB = rst.getPrimary().getDB("admin");
     const primary = rst.getPrimary();
-
-    if (!FeatureFlagUtil.isEnabled(primaryAdminDB, "DowngradingToUpgrading")) {
-        jsTestLog("Skipping as featureFlagDowngradingToUpgrading is not enabled");
-        rst.stopSet();
-        return;
-    }
 
     const fcvDoc = primaryAdminDB.system.version.findOne({_id: 'featureCompatibilityVersion'});
     jsTestLog("current FCV (should be latest): " + tojson(fcvDoc));

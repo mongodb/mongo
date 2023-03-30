@@ -4,7 +4,7 @@
  *         that is non multiple of 256 bytes.
  *      2. The FCV can be set back to upgraded if feature flag DowngradingToUpgrading is true.
  *
- * @tags: [featureFlagDowngradingToUpgrading]
+ * @tags: [requires_fcv_70]
  */
 (function() {
 "use strict";

@@ -2,7 +2,7 @@
  * Tests startup with a node in downgrading state.
  * Starts a sharded cluster with 2 shards, each with 2 nodes.
  *
- *  @tags: [featureFlagDowngradingToUpgrading]
+ *  @tags: [requires_fcv_70]
  */
 
 (function() {
