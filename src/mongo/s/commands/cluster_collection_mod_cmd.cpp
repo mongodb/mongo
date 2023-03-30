@@ -94,7 +94,7 @@ public:
                     1,
                     "collMod: {namespace} cmd: {command}",
                     "CMD: collMod",
-                    "namespace"_attr = nss,
+                    logAttrs(nss),
                     "command"_attr = redact(cmdObj));
 
         auto swDbInfo = Grid::get(opCtx)->catalogCache()->getDatabase(

@@ -61,7 +61,7 @@ void registerTaskWithOngoingQueriesOnOpLogEntryCommit(OperationContext* opCtx,
                 LOGV2_INFO(
                     7179200,
                     "Range deletion will be scheduled after all possibly dependent queries finish",
-                    "namespace"_attr = rdt.getNss(),
+                    logAttrs(rdt.getNss()),
                     "range"_attr = rdt.getRange(),
                     "cursorsDirectlyReferringTheNamespace"_attr = openCursorsIds);
             }

@@ -365,13 +365,13 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                     LOGV2_DEBUG(5494504,
                                 2,
                                 "Completing collection drop from previous primary",
-                                "namespace"_attr = coll.getNss());
+                                logAttrs(coll.getNss()));
                     _dropShardedCollection(opCtx, coll, executor);
                 }
 
                 for (const auto& coll : allCollectionsForDb) {
                     const auto& nss = coll.getNss();
-                    LOGV2_DEBUG(5494505, 2, "Dropping collection", "namespace"_attr = nss);
+                    LOGV2_DEBUG(5494505, 2, "Dropping collection", logAttrs(nss));
 
                     sharding_ddl_util::stopMigrations(opCtx, nss, coll.getUuid());
 

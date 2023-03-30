@@ -614,7 +614,7 @@ void checkForIdIndexesAndDropPendingCollections(OperationContext* opCtx,
             LOGV2(20321,
                   "Found drop-pending namespace {namespace} with drop optime {dropOpTime}",
                   "Found drop-pending namespace",
-                  "namespace"_attr = nss,
+                  logAttrs(nss),
                   "dropOpTime"_attr = dropOpTime);
             repl::DropPendingCollectionReaper::get(opCtx)->addDropPendingNamespace(
                 opCtx, dropOpTime, nss);
@@ -640,7 +640,7 @@ void checkForIdIndexesAndDropPendingCollections(OperationContext* opCtx,
             "Collection lacks a unique index on _id. This index is "
             "needed for replication to function properly. To fix this, you need to create a unique "
             "index on _id. See http://dochub.mongodb.org/core/build-replica-set-indexes",
-            "namespace"_attr = nss);
+            logAttrs(nss));
     }
 }
 
@@ -658,7 +658,7 @@ void clearTempCollections(OperationContext* opCtx, const DatabaseName& dbName) {
                 LOGV2_WARNING(20327,
                               "could not drop temp collection '{namespace}': {error}",
                               "could not drop temp collection",
-                              "namespace"_attr = collection->ns(),
+                              logAttrs(collection->ns()),
                               "error"_attr = redact(status));
             }
             wuow.commit();
@@ -667,7 +667,7 @@ void clearTempCollections(OperationContext* opCtx, const DatabaseName& dbName) {
                 20328,
                 "could not drop temp collection '{namespace}' due to WriteConflictException",
                 "could not drop temp collection due to WriteConflictException",
-                "namespace"_attr = collection->ns());
+                logAttrs(collection->ns()));
             opCtx->recoveryUnit()->abandonSnapshot();
         }
         return true;

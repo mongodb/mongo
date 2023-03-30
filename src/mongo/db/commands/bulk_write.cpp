@@ -467,7 +467,7 @@ bool handleUpdateOp(OperationContext* opCtx,
                                   logv2::LogSeverity::Debug(1),
                                   retryAttempts,
                                   "Caught DuplicateKey exception during bulkWrite update",
-                                  "namespace"_attr = updateRequest.getNamespaceString().ns());
+                                  logAttrs(updateRequest.getNamespaceString()));
                 }
             }
         });

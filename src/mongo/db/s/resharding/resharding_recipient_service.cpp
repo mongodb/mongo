@@ -280,7 +280,7 @@ ReshardingRecipientService::RecipientStateMachine::_runUntilStrictConsistencyOrE
 
             LOGV2(4956500,
                   "Resharding operation recipient state machine failed",
-                  "namespace"_attr = _metadata.getSourceNss(),
+                  logAttrs(_metadata.getSourceNss()),
                   "reshardingUUID"_attr = _metadata.getReshardingUUID(),
                   "error"_attr = redact(status));
 
@@ -891,7 +891,7 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionState(
                "Transitioned resharding recipient state",
                "newState"_attr = RecipientState_serializer(newState),
                "oldState"_attr = RecipientState_serializer(oldState),
-               "namespace"_attr = _metadata.getSourceNss(),
+               logAttrs(_metadata.getSourceNss()),
                "collectionUUID"_attr = _metadata.getSourceUUID(),
                "reshardingUUID"_attr = _metadata.getReshardingUUID());
 }

@@ -718,7 +718,7 @@ void indexKeyCorruptionCheckCallback(OperationContext* opCtx,
                 "Erroneous index key found with reference to non-existent record id. Consider "
                 "dropping and then re-creating the index and then running the validate command "
                 "on the collection.",
-                "namespace"_attr = nss,
+                logAttrs(nss),
                 "recordId"_attr = rid,
                 "indexKeyData"_attr = hydratedKey);
         }

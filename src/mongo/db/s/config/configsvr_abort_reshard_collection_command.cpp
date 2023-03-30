@@ -116,7 +116,7 @@ public:
 
             LOGV2(5403501,
                   "Aborting resharding operation",
-                  "namespace"_attr = ns(),
+                  logAttrs(ns()),
                   "reshardingUUID"_attr = reshardingUUID);
 
             assertExistsReshardingDocument(opCtx, reshardingUUID);

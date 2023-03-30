@@ -108,9 +108,9 @@ public:
                 LOGV2(22763,
                       "Routing metadata flushed for collection {namespace}",
                       "Routing metadata flushed for collection",
-                      "namespace"_attr = nss);
+                      logAttrs(nss));
                 catalogCache->invalidateCollectionEntry_LINEARIZABLE(nss);
-                LOGV2(7343300, "Index information flushed for collection", "namespace"_attr = nss);
+                LOGV2(7343300, "Index information flushed for collection", logAttrs(nss));
                 catalogCache->invalidateIndexEntry_LINEARIZABLE(nss);
             }
         }

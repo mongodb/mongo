@@ -508,7 +508,7 @@ MigrateInfosWithReason BalancerPolicy::balance(
                     "cannot be balanced. This should be corrected by either assigning shards "
                     "to the zone or by deleting it.",
                     "zone"_attr = redact(zone),
-                    "namespace"_attr = distribution.nss());
+                    logAttrs(distribution.nss()));
             }
             continue;
         }
@@ -575,7 +575,7 @@ bool BalancerPolicy::_singleZoneBalanceBasedOnDataSize(
     LOGV2_DEBUG(6581601,
                 1,
                 "Balancing single zone",
-                "namespace"_attr = distribution.nss().ns(),
+                logAttrs(distribution.nss()),
                 "zone"_attr = zone,
                 "fromShardId"_attr = from,
                 "fromShardDataSize"_attr = fromSize,
@@ -618,7 +618,7 @@ bool BalancerPolicy::_singleZoneBalanceBasedOnDataSize(
     if (numJumboChunks) {
         LOGV2_WARNING(6581602,
                       "Shard has only jumbo chunks for this collection and cannot be balanced",
-                      "namespace"_attr = distribution.nss().ns(),
+                      logAttrs(distribution.nss()),
                       "shardId"_attr = from,
                       "zone"_attr = zone,
                       "numJumboChunks"_attr = numJumboChunks);

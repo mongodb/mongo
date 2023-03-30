@@ -375,13 +375,13 @@ bool ShardingInitializationMongoD::initializeShardingAwarenessIfNeeded(Operation
                 LOGV2_WARNING(7445900,
                               "Started with ShardServer role, but no shardIdentity document was "
                               "found on disk.",
-                              "namespace"_attr = NamespaceString::kServerConfigurationNamespace);
+                              logAttrs(NamespaceString::kServerConfigurationNamespace));
             } else {
                 LOGV2_WARNING(22074,
                               "Started with ShardServer role, but no shardIdentity document was "
                               "found on disk. This most likely means this server has not yet been "
                               "added to a sharded cluster.",
-                              "namespace"_attr = NamespaceString::kServerConfigurationNamespace);
+                              logAttrs(NamespaceString::kServerConfigurationNamespace));
             }
             return false;
         }
@@ -406,7 +406,7 @@ bool ShardingInitializationMongoD::initializeShardingAwarenessIfNeeded(Operation
                 "Not started with --shardsvr, but a shardIdentity document was found "
                 "on disk in {namespace}: {shardIdentityDocument}",
                 "Not started with --shardsvr, but a shardIdentity document was found on disk",
-                "namespace"_attr = NamespaceString::kServerConfigurationNamespace,
+                logAttrs(NamespaceString::kServerConfigurationNamespace),
                 "shardIdentityDocument"_attr = shardIdentityBSON);
         }
         return false;

@@ -79,10 +79,7 @@ public:
             uassertStatusOK(validateNamespace(nss));
             const auto collUuid = uassertStatusOK(validateCollectionOptionsLocally(opCtx, nss));
 
-            LOGV2(6875001,
-                  "Start analyzing shard key",
-                  "namespace"_attr = nss,
-                  "shardKey"_attr = key);
+            LOGV2(6875001, "Start analyzing shard key", logAttrs(nss), "shardKey"_attr = key);
 
             Response response;
 

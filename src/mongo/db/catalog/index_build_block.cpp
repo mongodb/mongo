@@ -273,7 +273,7 @@ void IndexBuildBlock::success(OperationContext* opCtx, Collection* collection) {
                   "Index build: done building",
                   "buildUUID"_attr = buildUUID,
                   "collectionUUID"_attr = coll->uuid(),
-                  "namespace"_attr = coll->ns(),
+                  logAttrs(coll->ns()),
                   "index"_attr = indexName,
                   "ident"_attr = entry->getIdent(),
                   "collectionIdent"_attr = coll->getSharedIdent()->getIdent(),

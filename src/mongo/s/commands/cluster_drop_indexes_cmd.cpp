@@ -112,7 +112,7 @@ public:
                     1,
                     "dropIndexes: {namespace} cmd: {command}",
                     "CMD: dropIndexes",
-                    "namespace"_attr = nss,
+                    logAttrs(nss),
                     "command"_attr = redact(cmdObj));
 
         ShardsvrDropIndexes shardsvrDropIndexCmd(nss);

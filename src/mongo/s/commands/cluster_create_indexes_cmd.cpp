@@ -98,7 +98,7 @@ public:
                     1,
                     "createIndexes: {namespace} cmd: {command}",
                     "CMD: createIndexes",
-                    "namespace"_attr = nss,
+                    logAttrs(nss),
                     "command"_attr = redact(cmdObj));
 
         // TODO SERVER-67798 Change cluster::createDatabase to use DatabaseName
@@ -130,7 +130,7 @@ public:
         CommandHelpers::appendSimpleCommandStatus(output, ok, errmsg);
 
         if (ok) {
-            LOGV2(5706400, "Indexes created", "namespace"_attr = nss);
+            LOGV2(5706400, "Indexes created", logAttrs(nss));
         }
 
         return ok;

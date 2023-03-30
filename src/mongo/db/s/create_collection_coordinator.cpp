@@ -563,7 +563,7 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                             LOGV2_DEBUG(5458704,
                                         1,
                                         "Removing partial changes from previous run",
-                                        "namespace"_attr = nss());
+                                        logAttrs(nss()));
 
                             _updateSession(opCtx);
                             cleanupPartialChunksFromPreviousAttempt(
@@ -659,7 +659,7 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                 !status.isA<ErrorCategory::ShutdownError>()) {
                 LOGV2_ERROR(5458702,
                             "Error running create collection",
-                            "namespace"_attr = originalNss(),
+                            logAttrs(originalNss()),
                             "error"_attr = redact(status));
 
                 auto opCtxHolder = cc().makeOperationContext();
@@ -801,8 +801,7 @@ CreateCollectionCoordinator::_checkIfCollectionAlreadyShardedWithSameOptions(
 }
 
 void CreateCollectionCoordinator::_checkCommandArguments(OperationContext* opCtx) {
-    LOGV2_DEBUG(
-        5277902, 2, "Create collection _checkCommandArguments", "namespace"_attr = originalNss());
+    LOGV2_DEBUG(5277902, 2, "Create collection _checkCommandArguments", logAttrs(originalNss()));
 
     if (originalNss().dbName() == DatabaseName::kConfig) {
         // Only allowlisted collections in config may be sharded (unless we are in test mode)
@@ -1046,8 +1045,7 @@ void CreateCollectionCoordinator::_releaseCriticalSections(OperationContext* opC
 
 void CreateCollectionCoordinator::_createCollectionAndIndexes(
     OperationContext* opCtx, const ShardKeyPattern& shardKeyPattern) {
-    LOGV2_DEBUG(
-        5277903, 2, "Create collection _createCollectionAndIndexes", "namespace"_attr = nss());
+    LOGV2_DEBUG(5277903, 2, "Create collection _createCollectionAndIndexes", logAttrs(nss()));
 
     const auto& collationBSON = _doc.getTranslatedRequestParams()->getCollation();
     boost::optional<Collation> collation;
@@ -1101,10 +1099,7 @@ void CreateCollectionCoordinator::_createCollectionAndIndexes(
         auto createStatus = getStatusFromCommandResult(createRes);
 
         if (!createStatus.isOK() && createStatus.code() == ErrorCodes::NamespaceExists) {
-            LOGV2_DEBUG(5909400,
-                        3,
-                        "Timeseries namespace already exists",
-                        "namespace"_attr = viewName.toString());
+            LOGV2_DEBUG(5909400, 3, "Timeseries namespace already exists", logAttrs(viewName));
         } else {
             uassertStatusOK(createStatus);
         }
@@ -1152,7 +1147,7 @@ void CreateCollectionCoordinator::_createCollectionAndIndexes(
 
 void CreateCollectionCoordinator::_createPolicy(OperationContext* opCtx,
                                                 const ShardKeyPattern& shardKeyPattern) {
-    LOGV2_DEBUG(6042001, 2, "Create collection _createPolicy", "namespace"_attr = nss());
+    LOGV2_DEBUG(6042001, 2, "Create collection _createPolicy", logAttrs(nss()));
     _collectionEmpty = checkIfCollectionIsEmpty(opCtx, nss());
 
     _splitPolicy = InitialSplitPolicy::calculateOptimizationStrategy(
@@ -1167,7 +1162,7 @@ void CreateCollectionCoordinator::_createPolicy(OperationContext* opCtx,
 
 void CreateCollectionCoordinator::_createChunks(OperationContext* opCtx,
                                                 const ShardKeyPattern& shardKeyPattern) {
-    LOGV2_DEBUG(5277904, 2, "Create collection _createChunks", "namespace"_attr = nss());
+    LOGV2_DEBUG(5277904, 2, "Create collection _createChunks", logAttrs(nss()));
     _initialChunks = _splitPolicy->createFirstChunks(
         opCtx, shardKeyPattern, {*_collectionUUID, ShardingState::get(opCtx)->shardId()});
 
@@ -1178,10 +1173,8 @@ void CreateCollectionCoordinator::_createChunks(OperationContext* opCtx,
 
 void CreateCollectionCoordinator::_createCollectionOnNonPrimaryShards(
     OperationContext* opCtx, const OperationSessionInfo& osi) {
-    LOGV2_DEBUG(5277905,
-                2,
-                "Create collection _createCollectionOnNonPrimaryShards",
-                "namespace"_attr = nss());
+    LOGV2_DEBUG(
+        5277905, 2, "Create collection _createCollectionOnNonPrimaryShards", logAttrs(nss()));
 
     std::vector<AsyncRequestsSender::Request> requests;
     std::set<ShardId> initializedShards;
@@ -1240,7 +1233,7 @@ void CreateCollectionCoordinator::_createCollectionOnNonPrimaryShards(
 
 void CreateCollectionCoordinator::_commit(OperationContext* opCtx,
                                           const std::shared_ptr<executor::TaskExecutor>& executor) {
-    LOGV2_DEBUG(5277906, 2, "Create collection _commit", "namespace"_attr = nss());
+    LOGV2_DEBUG(5277906, 2, "Create collection _commit", logAttrs(nss()));
 
     if (MONGO_unlikely(failAtCommitCreateCollectionCoordinator.shouldFail())) {
         LOGV2_DEBUG(6960301, 2, "About to hit failAtCommitCreateCollectionCoordinator fail point");
@@ -1309,13 +1302,13 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx,
         notifyChangeStreamsOnShardCollection(
             opCtx, nss(), *_collectionUUID, _request.toBSON(), CommitPhase::kSuccessful);
 
-        LOGV2_DEBUG(5277907, 2, "Collection successfully committed", "namespace"_attr = nss());
+        LOGV2_DEBUG(5277907, 2, "Collection successfully committed", logAttrs(nss()));
 
         forceShardFilteringMetadataRefresh(opCtx, nss());
     } catch (const DBException& ex) {
         LOGV2(5277908,
               "Failed to obtain collection's placement version, so it will be recovered",
-              "namespace"_attr = nss(),
+              logAttrs(nss()),
               "error"_attr = redact(ex));
 
         // If the refresh fails, then set the placement version to UNKNOWN and let a future
@@ -1354,7 +1347,7 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx,
 
     LOGV2(5277901,
           "Created initial chunk(s)",
-          "namespace"_attr = nss(),
+          logAttrs(nss()),
           "numInitialChunks"_attr = _initialChunks->chunks.size(),
           "initialCollectionPlacementVersion"_attr = _initialChunks->collPlacementVersion());
 
@@ -1365,7 +1358,7 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx,
 
     LOGV2(5458701,
           "Collection created",
-          "namespace"_attr = nss(),
+          logAttrs(nss()),
           "UUID"_attr = _result->getCollectionUUID(),
           "placementVersion"_attr = _result->getCollectionVersion());
 }

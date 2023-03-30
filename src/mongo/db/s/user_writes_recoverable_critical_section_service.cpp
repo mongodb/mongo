@@ -96,7 +96,7 @@ void acquireRecoverableCriticalSection(OperationContext* opCtx,
     LOGV2_DEBUG(6351900,
                 3,
                 "Acquiring user writes recoverable critical section",
-                "namespace"_attr = nss,
+                logAttrs(nss),
                 "blockShardedDDL"_attr = blockShardedDDL,
                 "blockUserWrites"_attr = blockUserWrites);
 
@@ -130,7 +130,7 @@ void acquireRecoverableCriticalSection(OperationContext* opCtx,
             LOGV2_DEBUG(6351914,
                         3,
                         "The user writes recoverable critical section was already acquired",
-                        "namespace"_attr = nss);
+                        logAttrs(nss));
             return;
         }
 
@@ -148,7 +148,7 @@ void acquireRecoverableCriticalSection(OperationContext* opCtx,
     LOGV2_DEBUG(6351901,
                 2,
                 "Acquired user writes recoverable critical section",
-                "namespace"_attr = nss,
+                logAttrs(nss),
                 "blockShardedDDL"_attr = blockShardedDDL,
                 "blockUserWrites"_attr = blockUserWrites);
 }
@@ -209,7 +209,7 @@ void UserWritesRecoverableCriticalSectionService::
     LOGV2_DEBUG(6351902,
                 3,
                 "Promoting user writes recoverable critical section to also block reads",
-                "namespace"_attr = nss);
+                logAttrs(nss));
 
     invariant(nss == UserWritesRecoverableCriticalSectionService::kGlobalUserWritesNamespace);
     invariant(!opCtx->lockState()->isLocked());
@@ -240,7 +240,7 @@ void UserWritesRecoverableCriticalSectionService::
                         "The user writes recoverable critical section was already promoted to also "
                         "block user "
                         "writes, do nothing",
-                        "namespace"_attr = nss);
+                        logAttrs(nss));
             return;
         }
 
@@ -252,7 +252,7 @@ void UserWritesRecoverableCriticalSectionService::
     LOGV2_DEBUG(6351904,
                 2,
                 "Promoted user writes recoverable critical section to also block user writes",
-                "namespace"_attr = nss);
+                logAttrs(nss));
 }
 
 void UserWritesRecoverableCriticalSectionService::
@@ -265,7 +265,7 @@ void UserWritesRecoverableCriticalSectionService::
     LOGV2_DEBUG(6351905,
                 3,
                 "Demoting user writes recoverable critical section to no longer block user writes",
-                "namespace"_attr = nss);
+                logAttrs(nss));
 
     invariant(nss == UserWritesRecoverableCriticalSectionService::kGlobalUserWritesNamespace);
     invariant(!opCtx->lockState()->isLocked());
@@ -280,7 +280,7 @@ void UserWritesRecoverableCriticalSectionService::
                 6351906,
                 3,
                 "The user writes recoverable critical section was not currently taken, do nothing",
-                "namespace"_attr = nss);
+                logAttrs(nss));
             return;
         }
 
@@ -293,7 +293,7 @@ void UserWritesRecoverableCriticalSectionService::
                         3,
                         "The user writes recoverable critical section was already not blocking "
                         "user writes, do nothing",
-                        "namespace"_attr = nss);
+                        logAttrs(nss));
             return;
         }
 
@@ -305,14 +305,13 @@ void UserWritesRecoverableCriticalSectionService::
     LOGV2_DEBUG(6351908,
                 2,
                 "Demoted user writes recoverable critical section to no longer block user writes",
-                "namespace"_attr = nss);
+                logAttrs(nss));
 }
 
 
 void UserWritesRecoverableCriticalSectionService::releaseRecoverableCriticalSection(
     OperationContext* opCtx, const NamespaceString& nss) {
-    LOGV2_DEBUG(
-        6351909, 3, "Releasing user writes recoverable critical section", "namespace"_attr = nss);
+    LOGV2_DEBUG(6351909, 3, "Releasing user writes recoverable critical section", logAttrs(nss));
 
     invariant(nss == UserWritesRecoverableCriticalSectionService::kGlobalUserWritesNamespace);
     invariant(!opCtx->lockState()->isLocked());
@@ -328,7 +327,7 @@ void UserWritesRecoverableCriticalSectionService::releaseRecoverableCriticalSect
                 6351910,
                 3,
                 "The user writes recoverable critical section was already released, do nothing",
-                "namespace"_attr = nss);
+                logAttrs(nss));
             return;
         }
 
@@ -358,8 +357,7 @@ void UserWritesRecoverableCriticalSectionService::releaseRecoverableCriticalSect
         uassertStatusOK(getStatusFromWriteCommandReply(commandReply));
     }
 
-    LOGV2_DEBUG(
-        6351911, 2, "Released user writes recoverable critical section", "namespace"_attr = nss);
+    LOGV2_DEBUG(6351911, 2, "Released user writes recoverable critical section", logAttrs(nss));
 }
 
 void UserWritesRecoverableCriticalSectionService::recoverRecoverableCriticalSections(

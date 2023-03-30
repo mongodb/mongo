@@ -133,7 +133,7 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
         LOGV2(22107,
               "Requested split points lookup for chunk {namespace} {minKey} -->> {maxKey}",
               "Requested split points lookup for chunk",
-              "namespace"_attr = nss.toString(),
+              logAttrs(nss),
               "minKey"_attr = redact(prettyKey(keyPattern, minKey)),
               "maxKey"_attr = redact(prettyKey(keyPattern, maxKey)));
 
@@ -208,7 +208,7 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
                 "Possible low cardinality key detected in {namespace} - range {minKey} -->> "
                 "{maxKey} contains only the key {key}",
                 "Possible low cardinality key detected in range. Range contains only a single key.",
-                "namespace"_attr = nss.toString(),
+                logAttrs(nss),
                 "minKey"_attr = redact(prettyKey(shardKeyIdx->keyPattern(), minKey)),
                 "maxKey"_attr = redact(prettyKey(shardKeyIdx->keyPattern(), maxKey)),
                 "key"_attr = redact(prettyKey(shardKeyIdx->keyPattern(), currKey)));
@@ -252,7 +252,7 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
                                   "of chunk {namespace} {minKey} -->> {maxKey}",
                                   "Max BSON response size reached for split vector before the end "
                                   "of chunk",
-                                  "namespace"_attr = nss.toString(),
+                                  logAttrs(nss),
                                   "minKey"_attr =
                                       redact(prettyKey(shardKeyIdx->keyPattern(), minKey)),
                                   "maxKey"_attr =
@@ -280,7 +280,7 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
                           "the end of chunk {namespace} {minKey} -->> {maxKey}",
                           "Max number of requested split points reached before the end of chunk",
                           "numSplitPoints"_attr = numChunks,
-                          "namespace"_attr = nss.toString(),
+                          logAttrs(nss),
                           "minKey"_attr = redact(prettyKey(shardKeyIdx->keyPattern(), minKey)),
                           "maxKey"_attr = redact(prettyKey(shardKeyIdx->keyPattern(), maxKey)));
                     break;
@@ -328,7 +328,7 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
                           "Possible low cardinality key detected in {namespace} - key is "
                           "{key}",
                           "Possible low cardinality key detected",
-                          "namespace"_attr = nss.toString(),
+                          logAttrs(nss),
                           "key"_attr = redact(prettyKey(shardKeyIdx->keyPattern(), *it)));
         }
 
@@ -341,7 +341,7 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
                 "Finding the split vector for {namespace} over {keyPattern} keyCount: {keyCount} "
                 "numSplits: {numSplits} lookedAt: {currCount} took {duration}",
                 "Finding the split vector completed",
-                "namespace"_attr = nss.toString(),
+                logAttrs(nss),
                 "keyPattern"_attr = redact(keyPattern),
                 "keyCount"_attr = keyCount,
                 "numSplits"_attr = splitKeys.size(),

@@ -443,7 +443,7 @@ void SortedDataIndexAccessMethod::removeOneKey(OperationContext* opCtx,
               "Assertion failure: _unindex failed",
               "error"_attr = redact(e),
               "keyString"_attr = keyString,
-              "namespace"_attr = ns,
+              logAttrs(ns),
               "indexName"_attr = _descriptor->indexName());
         printStackTrace();
     }
@@ -1320,7 +1320,7 @@ void SortedDataIndexAccessMethod::_unindexKeysOrWriteToSideTable(
         LOGV2(20362,
               "Couldn't unindex record",
               "record"_attr = redact(obj),
-              "namespace"_attr = ns,
+              logAttrs(ns),
               "error"_attr = redact(status));
     }
 

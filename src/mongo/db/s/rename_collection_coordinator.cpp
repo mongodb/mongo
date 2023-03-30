@@ -484,14 +484,14 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     BSON("source" << nss().toString() << "destination"
                                   << _request.getTo().toString()),
                     ShardingCatalogClient::kMajorityWriteConcern);
-                LOGV2(5460504, "Collection renamed", "namespace"_attr = nss());
+                LOGV2(5460504, "Collection renamed", logAttrs(nss()));
             }))
         .onError([this, anchor = shared_from_this()](const Status& status) {
             if (!status.isA<ErrorCategory::NotPrimaryError>() &&
                 !status.isA<ErrorCategory::ShutdownError>()) {
                 LOGV2_ERROR(5460505,
                             "Error running rename collection",
-                            "namespace"_attr = nss(),
+                            logAttrs(nss()),
                             "error"_attr = redact(status));
             }
 

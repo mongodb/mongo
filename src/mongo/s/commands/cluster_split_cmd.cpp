@@ -264,7 +264,7 @@ public:
               "Splitting chunk",
               "chunkRange"_attr = redact(ChunkRange(chunk->getMin(), chunk->getMax()).toString()),
               "splitPoint"_attr = redact(splitPoint),
-              "namespace"_attr = nss.ns(),
+              logAttrs(nss),
               "shardId"_attr = chunk->getShardId());
 
         uassertStatusOK(

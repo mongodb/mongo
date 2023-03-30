@@ -93,7 +93,7 @@ void _validateIndexesInternalStructure(OperationContext* opCtx,
                       {LogComponent::kIndex},
                       "Validating internal structure",
                       "index"_attr = descriptor->indexName(),
-                      "namespace"_attr = validateState->nss());
+                      logAttrs(validateState->nss()));
 
         auto indexResults = iam->validate(opCtx, full);
 
@@ -125,7 +125,7 @@ void _validateIndexes(OperationContext* opCtx,
                       {LogComponent::kIndex},
                       "Validating index consistency",
                       "index"_attr = descriptor->indexName(),
-                      "namespace"_attr = validateState->nss());
+                      logAttrs(validateState->nss()));
 
         int64_t numTraversedKeys;
         indexValidator->traverseIndex(opCtx, index.get(), &numTraversedKeys, results);
@@ -640,7 +640,7 @@ Status validate(OperationContext* opCtx,
                           {LogComponent::kIndex},
                           "Index inconsistencies were detected. "
                           "Starting the second phase of index validation to gather concise errors",
-                          "namespace"_attr = validateState.nss());
+                          logAttrs(validateState.nss()));
             _gatherIndexEntryErrors(opCtx, &validateState, &indexValidator, results);
         }
 
@@ -694,7 +694,7 @@ Status validate(OperationContext* opCtx,
         LOGV2_OPTIONS(5160302,
                       {LogComponent::kIndex},
                       "Validation failed due to exception",
-                      "namespace"_attr = validateState.nss(),
+                      logAttrs(validateState.nss()),
                       "error"_attr = e.toString());
     }
 

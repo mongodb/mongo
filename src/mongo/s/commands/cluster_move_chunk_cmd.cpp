@@ -131,7 +131,7 @@ public:
                     " does not exist",
                     "moveChunk destination shard does not exist",
                     "toShardId"_attr = destination,
-                    "namespace"_attr = ns());
+                    logAttrs(ns()));
             }
 
 

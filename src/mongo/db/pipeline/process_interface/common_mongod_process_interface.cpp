@@ -183,10 +183,8 @@ std::vector<Document> CommonMongodProcessInterface::getIndexStats(OperationConte
 
     std::vector<Document> indexStats;
     if (!collection) {
-        LOGV2_DEBUG(23881,
-                    2,
-                    "Collection not found on index stats retrieval: {ns_ns}",
-                    "ns_ns"_attr = ns.ns());
+        LOGV2_DEBUG(
+            23881, 2, "Collection not found on index stats retrieval: {ns_ns}", "ns_ns"_attr = ns);
         return indexStats;
     }
 

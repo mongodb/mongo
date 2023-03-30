@@ -136,7 +136,7 @@ CoordinatorCommitMonitor::queryRemainingOperationTimeForRecipients() const {
     LOGV2_DEBUG(5392001,
                 kDiagnosticLogLevel,
                 "Querying recipient shards for the remaining operation time",
-                "namespace"_attr = _ns);
+                logAttrs(_ns));
 
     auto opCtx = CancelableOperationContext(cc().makeOperationContext(), _cancelToken, _executor);
     auto executor = _networkExecutor ? _networkExecutor : _executor;
@@ -192,7 +192,7 @@ CoordinatorCommitMonitor::queryRemainingOperationTimeForRecipients() const {
     LOGV2_DEBUG(5392002,
                 kDiagnosticLogLevel,
                 "Finished querying recipient shards for the remaining operation time",
-                "namespace"_attr = _ns,
+                logAttrs(_ns),
                 "remainingTime"_attr = maxRemainingTime);
 
     return {minRemainingTime, maxRemainingTime};

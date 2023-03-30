@@ -80,7 +80,7 @@ void dropChunksIfEpochChanged(OperationContext* opCtx,
 
     LOGV2(5990400,
           "Dropped persisted chunk metadata due to epoch change",
-          "namespace"_attr = nss,
+          logAttrs(nss),
           "currentEpoch"_attr = currentEpoch,
           "previousEpoch"_attr = maxLoaderVersion.epoch());
 }
@@ -135,7 +135,7 @@ Status persistCollectionAndChangedChunks(OperationContext* opCtx,
         return status;
     }
 
-    LOGV2(3463204, "Persisted collection entry and chunk metadata", "namespace"_attr = nss);
+    LOGV2(3463204, "Persisted collection entry and chunk metadata", logAttrs(nss));
 
     return Status::OK();
 }
@@ -659,7 +659,7 @@ StatusWith<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_runSecond
                               2,
                               "Cache loader on secondary successfully waited for primary refresh "
                               "and replication of collection",
-                              "namespace"_attr = nss,
+                              logAttrs(nss),
                               "duration"_attr = Milliseconds(t.millis()));
 
     // Read the local metadata.
@@ -722,7 +722,7 @@ ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
             "Cache loader remotely refreshed for collection {namespace} from version "
             "{oldCollectionPlacementVersion} and no metadata was found",
             "Cache loader remotely refreshed for collection and no metadata was found",
-            "namespace"_attr = nss,
+            logAttrs(nss),
             "oldCollectionPlacementVersion"_attr = maxLoaderVersion);
         return swCollectionAndChangedChunks;
     }
@@ -760,7 +760,7 @@ ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
         "version {oldCollectionPlacementVersion} and found collection placement version "
         "{refreshedCollectionPlacementVersion}",
         "Cache loader remotely refreshed for collection",
-        "namespace"_attr = nss,
+        logAttrs(nss),
         "oldCollectionPlacementVersion"_attr = maxLoaderVersion,
         "refreshedCollectionPlacementVersion"_attr =
             collAndChunks.changedChunks.back().getVersion());
@@ -1064,13 +1064,13 @@ void ShardServerCatalogCacheLoader::_runCollAndChunksTasks(const NamespaceString
         LOGV2(22094,
               "Failed to persist chunk metadata update for collection {namespace} due to shutdown",
               "Failed to persist chunk metadata update for collection due to shutdown",
-              "namespace"_attr = nss);
+              logAttrs(nss));
         inShutdown = true;
     } catch (const DBException& ex) {
         LOGV2(22095,
               "Failed to persist chunk metadata update for collection {namespace} {error}",
               "Failed to persist chunk metadata update for collection",
-              "namespace"_attr = nss,
+              logAttrs(nss),
               "error"_attr = redact(ex));
     }
 
@@ -1112,7 +1112,7 @@ void ShardServerCatalogCacheLoader::_runCollAndChunksTasks(const NamespaceString
                   "Cache loader failed to schedule a persisted metadata update task. Clearing task "
                   "list so that scheduling will be attempted by the next caller to refresh this "
                   "namespace",
-                  "namespace"_attr = nss,
+                  logAttrs(nss),
                   "error"_attr = redact(status));
 
             {
@@ -1244,7 +1244,7 @@ void ShardServerCatalogCacheLoader::_updatePersistedCollAndChunksMetadata(
         "{oldCollectionPlacementVersion} to collection placement version "
         "{newCollectionPlacementVersion}",
         "Successfully updated persisted chunk metadata for collection",
-        "namespace"_attr = nss,
+        logAttrs(nss),
         "oldCollectionPlacementVersion"_attr = task.minQueryVersion,
         "newCollectionPlacementVersion"_attr = task.maxQueryVersion);
 }

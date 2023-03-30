@@ -297,7 +297,7 @@ void openCatalog(OperationContext* opCtx,
             LOGV2(20275,
                   "openCatalog: rebuilding index: collection: {collNss}, index: {indexName}",
                   "openCatalog: rebuilding index",
-                  "namespace"_attr = collNss.toString(),
+                  logAttrs(collNss),
                   "index"_attr = indexName);
         }
 

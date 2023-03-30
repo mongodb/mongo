@@ -35,12 +35,31 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/namespace_string_util.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 namespace mongo {
 namespace {
 
 using namespace fmt::literals;
+
+TEST(NamespaceStringTest, CheckNamespaceStringLogAttrs) {
+    TenantId tenantId(OID::gen());
+    DatabaseName dbName(tenantId, "foo");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(dbName, "bar");
+
+    startCapturingLogMessages();
+    LOGV2(7311500, "Msg nss:", logAttrs(nss));
+
+    std::string nssAsString = str::stream() << *(nss.tenantId()) << '_' << nss.ns();
+
+    ASSERT_EQUALS(
+        1, countBSONFormatLogLinesIsSubset(BSON("attr" << BSON("namespace" << nssAsString))));
+    stopCapturingLogMessages();
+}
 
 TEST(NamespaceStringTest, Oplog) {
     ASSERT(!NamespaceString::oplog("a"));

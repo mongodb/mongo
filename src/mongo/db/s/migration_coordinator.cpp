@@ -212,7 +212,7 @@ SharedSemiFuture<void> MigrationCoordinator::_commitMigrationOnDonorAndRecipient
         "Bumping transaction number with lsid {lsid} and current txnNumber {currentTxnNumber} on "
         "recipient shard {recipientShardId} for commit of collection {nss}",
         "Bumping transaction number on recipient shard for commit",
-        "namespace"_attr = _migrationInfo.getNss(),
+        logAttrs(_migrationInfo.getNss()),
         "recipientShardId"_attr = _migrationInfo.getRecipientShardId(),
         "lsid"_attr = _migrationInfo.getLsid(),
         "currentTxnNumber"_attr = _migrationInfo.getTxnNumber(),
@@ -337,7 +337,7 @@ void MigrationCoordinator::_abortMigrationOnDonorAndRecipient(OperationContext* 
                     "{currentTxnNumber} on "
                     "recipient shard {recipientShardId} for abort of collection {nss}",
                     "Bumping transaction number on recipient shard for abort",
-                    "namespace"_attr = _migrationInfo.getNss(),
+                    logAttrs(_migrationInfo.getNss()),
                     "recipientShardId"_attr = _migrationInfo.getRecipientShardId(),
                     "lsid"_attr = _migrationInfo.getLsid(),
                     "currentTxnNumber"_attr = _migrationInfo.getTxnNumber(),
@@ -351,7 +351,7 @@ void MigrationCoordinator::_abortMigrationOnDonorAndRecipient(OperationContext* 
                     1,
                     "Failed to advance transaction number on recipient shard for abort and/or "
                     "marking range deletion task on recipient as ready for processing",
-                    "namespace"_attr = _migrationInfo.getNss(),
+                    logAttrs(_migrationInfo.getNss()),
                     "migrationId"_attr = _migrationInfo.getId(),
                     "recipientShardId"_attr = _migrationInfo.getRecipientShardId(),
                     "currentTxnNumber"_attr = _migrationInfo.getTxnNumber(),

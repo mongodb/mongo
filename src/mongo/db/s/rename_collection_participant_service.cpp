@@ -63,7 +63,7 @@ void dropCollectionLocally(OperationContext* opCtx,
     LOGV2_DEBUG(5515100,
                 1,
                 "Dropped target collection locally on renameCollection participant.",
-                "namespace"_attr = nss);
+                logAttrs(nss));
 }
 
 /*
@@ -111,7 +111,7 @@ void renameOrDropTarget(OperationContext* opCtx,
         LOGV2_DEBUG(5515101,
                     1,
                     "Source namespace not found while trying to rename collection on participant",
-                    "namespace"_attr = fromNss);
+                    logAttrs(fromNss));
         dropCollectionLocally(opCtx, toNss, options.markFromMigrate);
         deleteRangeDeletionTasksForRename(opCtx, fromNss, toNss);
     }

@@ -416,13 +416,13 @@ Status dropChunksAndDeleteCollectionsEntry(OperationContext* opCtx, const Namesp
     } catch (const DBException& ex) {
         LOGV2_ERROR(5966301,
                     "Failed to drop persisted chunk metadata and collection entry",
-                    "namespace"_attr = nss,
+                    logAttrs(nss),
                     "error"_attr = redact(ex.toStatus()));
 
         return ex.toStatus();
     }
 
-    LOGV2(5966302, "Dropped persisted chunk metadata and collection entry", "namespace"_attr = nss);
+    LOGV2(5966302, "Dropped persisted chunk metadata and collection entry", logAttrs(nss));
 
     return Status::OK();
 }
@@ -442,7 +442,7 @@ void dropChunks(OperationContext* opCtx, const NamespaceString& nss) {
         }
     }
 
-    LOGV2_DEBUG(22091, 1, "Dropped persisted chunk metadata", "namespace"_attr = nss);
+    LOGV2_DEBUG(22091, 1, "Dropped persisted chunk metadata", logAttrs(nss));
 }
 
 Status deleteDatabasesEntry(OperationContext* opCtx, StringData dbName) {

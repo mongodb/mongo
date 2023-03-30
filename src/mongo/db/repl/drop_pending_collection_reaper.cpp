@@ -150,7 +150,7 @@ bool DropPendingCollectionReaper::rollBackDropPendingCollection(
                           "{namespace} to roll back.",
                           "Cannot find drop-pending namespace to roll back",
                           "opTime"_attr = opTime,
-                          "namespace"_attr = collectionNamespace);
+                          logAttrs(collectionNamespace));
             return false;
         }
 
@@ -164,7 +164,7 @@ bool DropPendingCollectionReaper::rollBackDropPendingCollection(
           "Rolling back collection drop",
           "pendingNamespace"_attr = pendingNss,
           "dropOpTime"_attr = opTime,
-          "namespace"_attr = collectionNamespace);
+          logAttrs(collectionNamespace));
 
     return true;
 }
@@ -197,7 +197,7 @@ void DropPendingCollectionReaper::dropCollectionsOlderThan(OperationContext* opC
                   "Completing collection drop for {namespace} with drop optime {dropOpTime} "
                   "(notification optime: {notificationOpTime})",
                   "Completing collection drop",
-                  "namespace"_attr = nss,
+                  logAttrs(nss),
                   "dropOpTime"_attr = dropOpTime,
                   "notificationOpTime"_attr = opTime);
             Status status = Status::OK();
@@ -213,7 +213,7 @@ void DropPendingCollectionReaper::dropCollectionsOlderThan(OperationContext* opC
                     "Failed to remove drop-pending collection {namespace} with drop optime "
                     "{dropOpTime} (notification optime: {notificationOpTime}): {error}",
                     "Failed to remove drop-pending collection ",
-                    "namespace"_attr = nss,
+                    logAttrs(nss),
                     "dropOpTime"_attr = dropOpTime,
                     "notificationOpTime"_attr = opTime,
                     "error"_attr = status);

@@ -593,7 +593,7 @@ IndexCatalogEntry* IndexCatalogImpl::createIndexEntry(OperationContext* opCtx,
         LOGV2_FATAL(28782,
                     "Found an invalid index",
                     "descriptor"_attr = descriptor->infoObj(),
-                    "namespace"_attr = collection->ns(),
+                    logAttrs(collection->ns()),
                     "error"_attr = redact(status));
     }
 
@@ -1195,7 +1195,7 @@ Status IndexCatalogImpl::_doesSpecConflictWithExisting(OperationContext* opCtx,
                                  << " key:" << key;
         LOGV2(20354,
               "Exceeded maximum number of indexes",
-              "namespace"_attr = collection->ns(),
+              logAttrs(collection->ns()),
               "key"_attr = key,
               "maxNumIndexes"_attr = kMaxNumIndexesAllowed);
         return Status(ErrorCodes::CannotCreateIndex, s);

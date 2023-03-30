@@ -103,7 +103,7 @@ void ReshardingCleaner<Service, StateMachine, ReshardingDocument>::clean(Operati
 
     LOGV2(5403503,
           "Cleaning up resharding operation",
-          "namespace"_attr = _originalCollectionNss,
+          logAttrs(_originalCollectionNss),
           "reshardingUUID"_attr = _reshardingUUID,
           "serviceType"_attr = Service::kServiceName);
 

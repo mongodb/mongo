@@ -449,7 +449,7 @@ private:
             exec = InternalPlanner::collectionScan(
                 opCtx, &collection, PlanYieldPolicy::YieldPolicy::NO_YIELD);
         } else {
-            LOGV2(20455, "Can't find _id index for namespace", "namespace"_attr = collection->ns());
+            LOGV2(20455, "Can't find _id index for namespace", logAttrs(collection->ns()));
             return "no _id _index";
         }
 
@@ -463,9 +463,8 @@ private:
                 md5_append(&st, (const md5_byte_t*)c.objdata(), c.objsize());
             }
         } catch (DBException& exception) {
-            LOGV2_WARNING(20456,
-                          "Error while hashing, db possibly dropped",
-                          "namespace"_attr = collection->ns());
+            LOGV2_WARNING(
+                20456, "Error while hashing, db possibly dropped", logAttrs(collection->ns()));
             exception.addContext("Plan executor error while running dbHash command");
             throw;
         }

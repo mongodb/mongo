@@ -378,7 +378,7 @@ StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToSpli
                     21852,
                     "Unable to enforce zone range policy for collection {namespace}: {error}",
                     "Unable to enforce zone range policy for collection",
-                    "namespace"_attr = nss.ns(),
+                    logAttrs(nss),
                     "error"_attr = candidatesStatus.getStatus());
             }
 
@@ -457,7 +457,7 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
             LOGV2_DEBUG(5966401,
                         1,
                         "Not balancing explicitly disabled collection",
-                        "namespace"_attr = coll.getNss(),
+                        logAttrs(coll.getNss()),
                         "allowBalance"_attr = coll.getAllowBalance(),
                         "allowMigrations"_attr = coll.getAllowMigrations(),
                         "permitMigrations"_attr = coll.getPermitMigrations(),
@@ -489,7 +489,7 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
             } else if (!swMigrateCandidates.isOK()) {
                 LOGV2_WARNING(21853,
                               "Unable to balance collection",
-                              "namespace"_attr = nss.ns(),
+                              logAttrs(nss),
                               "error"_attr = swMigrateCandidates.getStatus());
                 continue;
             }

@@ -274,7 +274,7 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
                       "refineCollectionShardKey updated collection entry for {namespace}: took "
                       "{durationMillis} ms. Total time taken: {totalTimeMillis} ms.",
                       "refineCollectionShardKey updated collection entry",
-                      "namespace"_attr = nss.ns(),
+                      logAttrs(nss),
                       "durationMillis"_attr = timers->executionTimer.millis(),
                       "totalTimeMillis"_attr = timers->totalTimer.millis());
                 timers->executionTimer.reset();
@@ -308,7 +308,7 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
                           "refineCollectionShardKey: updated chunk entries for {namespace}: took "
                           "{durationMillis} ms. Total time taken: {totalTimeMillis} ms.",
                           "refineCollectionShardKey: updated chunk entries",
-                          "namespace"_attr = nss.ns(),
+                          logAttrs(nss),
                           "durationMillis"_attr = timers->executionTimer.millis(),
                           "totalTimeMillis"_attr = timers->totalTimer.millis());
                     timers->executionTimer.reset();
@@ -332,7 +332,7 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
                       "refineCollectionShardKey: updated zone entries for {namespace}: took "
                       "{durationMillis} ms. Total time taken: {totalTimeMillis} ms.",
                       "refineCollectionShardKey: updated zone entries",
-                      "namespace"_attr = nss.ns(),
+                      logAttrs(nss),
                       "durationMillis"_attr = timers->executionTimer.millis(),
                       "totalTimeMillis"_attr = timers->totalTimer.millis());
 
@@ -376,7 +376,7 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
             "in {namespace}",
             "refineCollectionShardKey: failed to best-effort refresh all shards containing chunks",
             "error"_attr = ex.toStatus(),
-            "namespace"_attr = nss.ns());
+            logAttrs(nss));
     }
 }
 

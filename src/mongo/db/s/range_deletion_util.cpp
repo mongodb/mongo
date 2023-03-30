@@ -94,10 +94,8 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
     const auto shardKeyIdx =
         findShardKeyPrefixedIndex(opCtx, collection, keyPattern, /*requireSingleKey=*/false);
     if (!shardKeyIdx) {
-        LOGV2_ERROR(23765,
-                    "Unable to find shard key index",
-                    "keyPattern"_attr = keyPattern,
-                    "namespace"_attr = nss.ns());
+        LOGV2_ERROR(
+            23765, "Unable to find shard key index", "keyPattern"_attr = keyPattern, logAttrs(nss));
 
         // When a shard key index is not found, the range deleter gets stuck and indefinitely logs
         // an error message. This sleep is aimed at avoiding logging too aggressively in order to
@@ -125,7 +123,7 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
                 "Begin removal of range",
                 "min"_attr = min,
                 "max"_attr = max,
-                "namespace"_attr = nss.ns());
+                logAttrs(nss));
 
     auto deleteStageParams = std::make_unique<DeleteStageParams>();
     deleteStageParams->fromMigrate = true;
@@ -180,7 +178,7 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
                           "Cursor error while trying to delete range",
                           "min"_attr = redact(min),
                           "max"_attr = redact(max),
-                          "namespace"_attr = nss,
+                          logAttrs(nss),
                           "stats"_attr = redact(stats),
                           "error"_attr = redact(ex.toStatus()));
             throw;
@@ -283,7 +281,7 @@ ExecutorFuture<void> waitForDeletionsToMajorityReplicate(
             LOGV2_DEBUG(5346202,
                         1,
                         "Waiting for majority replication of local deletions",
-                        "namespace"_attr = nss.ns(),
+                        logAttrs(nss),
                         "collectionUUID"_attr = collectionUuid,
                         "range"_attr = redact(range.toString()),
                         "clientOpTime"_attr = clientOpTime);
@@ -354,7 +352,7 @@ Status deleteRangeInBatches(OperationContext* opCtx,
                     LOGV2_DEBUG(6777800,
                                 1,
                                 "Starting batch deletion",
-                                "namespace"_attr = collection.getNss(),
+                                logAttrs(collection.getNss()),
                                 "collectionUUID"_attr = collectionUuid,
                                 "range"_attr = redact(range.toString()),
                                 "numDocsToRemovePerBatch"_attr = numDocsToRemovePerBatch,
@@ -386,7 +384,7 @@ Status deleteRangeInBatches(OperationContext* opCtx,
                         1,
                         "Deleted documents in pass",
                         "numDeleted"_attr = numDeleted,
-                        "namespace"_attr = nss.ns(),
+                        logAttrs(nss),
                         "collectionUUID"_attr = collectionUuid,
                         "range"_attr = range.toString());
 
@@ -486,7 +484,7 @@ SharedSemiFuture<void> removeDocumentsInRange(
             LOGV2_DEBUG(23772,
                         1,
                         "Beginning deletion of documents",
-                        "namespace"_attr = nss.ns(),
+                        logAttrs(nss),
                         "range"_attr = redact(range.toString()));
 
             return deleteRangeInBatchesWithExecutor(
@@ -507,7 +505,7 @@ SharedSemiFuture<void> removeDocumentsInRange(
                             LOGV2_DEBUG(5346201,
                                         1,
                                         "Finished waiting for majority for deleted batch",
-                                        "namespace"_attr = nss,
+                                        logAttrs(nss),
                                         "range"_attr = redact(range.toString()));
                             // Propagate any errors to the onCompletion() handler below.
                             return s;
@@ -520,13 +518,13 @@ SharedSemiFuture<void> removeDocumentsInRange(
                             1,
                             "Completed deletion of documents in {namespace} range {range}",
                             "Completed deletion of documents",
-                            "namespace"_attr = nss.ns(),
+                            logAttrs(nss),
                             "range"_attr = redact(range.toString()));
             } else {
                 LOGV2(23774,
                       "Failed to delete documents in {namespace} range {range} due to {error}",
                       "Failed to delete documents",
-                      "namespace"_attr = nss.ns(),
+                      logAttrs(nss),
                       "range"_attr = redact(range.toString()),
                       "error"_attr = redact(s));
             }
@@ -555,7 +553,7 @@ SharedSemiFuture<void> removeDocumentsInRange(
                             "{namespace} due to {error}",
                             "Failed to delete range deletion task",
                             "range"_attr = range,
-                            "namespace"_attr = nss,
+                            logAttrs(nss),
                             "error"_attr = e.what());
 
                 return e.toStatus();
@@ -566,7 +564,7 @@ SharedSemiFuture<void> removeDocumentsInRange(
                         "Completed removal of persistent range deletion task for {namespace} "
                         "range {range}",
                         "Completed removal of persistent range deletion task",
-                        "namespace"_attr = nss.ns(),
+                        logAttrs(nss),
                         "range"_attr = redact(range.toString()));
 
             // Propagate any errors to callers waiting on the result.

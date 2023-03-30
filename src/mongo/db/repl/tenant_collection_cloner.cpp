@@ -132,7 +132,7 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::TenantCollectionClonerSta
         // We can exit this cloner cleanly and move on to the next one.
         LOGV2(5289701,
               "TenantCollectionCloner stopped because collection was dropped on the donor.",
-              "namespace"_attr = getCloner()->getSourceNss(),
+              logAttrs(getCloner()->getSourceNss()),
               "uuid"_attr = getCloner()->getSourceUuid(),
               "tenantId"_attr = getCloner()->getTenantId());
         return kSkipRemainingStages;
@@ -157,7 +157,7 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::countStage() {
         LOGV2_WARNING(4884502,
                       "Count command returned negative value. Updating to 0 to allow progress "
                       "meter to function properly",
-                      "namespace"_attr = _sourceNss.ns(),
+                      logAttrs(_sourceNss),
                       "tenantId"_attr = _tenantId);
         count = 0;
     }
@@ -206,7 +206,7 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::checkIfDonorCollectionIsE
                 1,
                 "Checked if donor collection was empty",
                 "wasEmpty"_attr = _donorCollectionWasEmptyBeforeListIndexes,
-                "namespace"_attr = _sourceNss.ns(),
+                logAttrs(_sourceNss),
                 "tenantId"_attr = _tenantId);
     return kContinueNormally;
 }
@@ -231,7 +231,7 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::listIndexesStage() {
                 LOGV2(4884509,
                       "tenantCollectionClonerHangAfterGettingOperationTime fail point "
                       "enabled. Blocking until fail point is disabled",
-                      "namespace"_attr = _sourceNss.toString(),
+                      logAttrs(_sourceNss),
                       "tenantId"_attr = _tenantId);
                 mongo::sleepsecs(1);
             }
@@ -254,7 +254,7 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::listIndexesStage() {
     if (indexSpecs.empty()) {
         LOGV2_WARNING(4884503,
                       "No indexes found for collection while cloning",
-                      "namespace"_attr = _sourceNss.ns(),
+                      logAttrs(_sourceNss),
                       "source"_attr = getSource(),
                       "tenantId"_attr = _tenantId);
     }
@@ -284,7 +284,7 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::listIndexesStage() {
     if (!_idIndexSpec.isEmpty() && _collectionOptions.autoIndexId == CollectionOptions::NO) {
         LOGV2_WARNING(4884504,
                       "Found the _id index spec but the collection specified autoIndexId of false",
-                      "namespace"_attr = this->_sourceNss,
+                      logAttrs(_sourceNss),
                       "tenantId"_attr = _tenantId);
     }
     return kContinueNormally;
@@ -394,7 +394,7 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::createCollectionStage() {
             // will be covered by the oplog application phase.
             LOGV2(5767200,
                   "Tenant collection cloner: Skipping cloning this collection.",
-                  "namespace"_attr = getSourceNss(),
+                  logAttrs(getSourceNss()),
                   "migrationId"_attr = getSharedData()->getMigrationId(),
                   "tenantId"_attr = getTenantId(),
                   "error"_attr = status);
@@ -419,7 +419,7 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::queryStage() {
     if (_donorCollectionWasEmptyBeforeListIndexes) {
         LOGV2_WARNING(5368501,
                       "Collection was empty at clone time.",
-                      "namespace"_attr = _sourceNss,
+                      logAttrs(_sourceNss),
                       "tenantId"_attr = _tenantId);
         return kContinueNormally;
     }
@@ -507,7 +507,7 @@ void TenantCollectionCloner::handleNextBatch(DBClientCursor& cursor) {
                 LOGV2(4884506,
                       "tenantMigrationHangCollectionClonerAfterHandlingBatchResponse fail point "
                       "enabled. Blocking until fail point is disabled",
-                      "namespace"_attr = _sourceNss.toString(),
+                      logAttrs(_sourceNss),
                       "tenantId"_attr = _tenantId);
                 mongo::sleepsecs(1);
             }

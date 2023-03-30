@@ -120,7 +120,7 @@ ExecutorFuture<void> SetAllowMigrationsCoordinator::_runImpl(
         .onError([this, anchor = shared_from_this()](const Status& status) {
             LOGV2_ERROR(5622700,
                         "Error running set allow migrations",
-                        "namespace"_attr = nss(),
+                        logAttrs(nss()),
                         "error"_attr = redact(status));
             return status;
         });

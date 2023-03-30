@@ -117,7 +117,7 @@ protected:
                                         const SimpleBSONObjUnorderedSet& idSet) final {
         LOGV2(21647,
               "Simulating writing a rollback file for namespace {nss_ns} with uuid {uuid}",
-              "nss_ns"_attr = nss.ns(),
+              logAttrs(nss),
               "uuid"_attr = uuid);
         for (auto&& id : idSet) {
             LOGV2(21648,

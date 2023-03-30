@@ -120,7 +120,7 @@ void assertNoMovePrimaryInProgress(OperationContext* opCtx, NamespaceString cons
     const auto scopedDss =
         DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, nss.dbName());
     if (scopedDss->isMovePrimaryInProgress()) {
-        LOGV2(4909100, "assertNoMovePrimaryInProgress", "namespace"_attr = nss.toString());
+        LOGV2(4909100, "assertNoMovePrimaryInProgress", logAttrs(nss));
 
         uasserted(ErrorCodes::MovePrimaryInProgress,
                   "movePrimary is in progress for namespace " + nss.toString());
@@ -407,7 +407,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
                                                 bool markFromMigrate) const {
     invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X));
 
-    LOGV2_DEBUG(20313, 1, "dropCollection: {namespace}", "dropCollection", "namespace"_attr = nss);
+    LOGV2_DEBUG(20313, 1, "dropCollection: {namespace}", "dropCollection", logAttrs(nss));
 
     // A valid 'dropOpTime' is not allowed when writes are replicated.
     if (!dropOpTime.isNull() && opCtx->writesAreReplicated()) {
@@ -470,7 +470,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
               "collection with optime {dropOpTime} and commit timestamp {commitTimestamp}",
               "dropCollection: storage engine will take ownership of drop-pending "
               "collection",
-              "namespace"_attr = nss,
+              logAttrs(nss),
               "uuid"_attr = uuid,
               "dropOpTime"_attr = dropOpTime,
               "commitTimestamp"_attr = commitTimestamp);
@@ -539,7 +539,7 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
           "{dropPendingName} with drop "
           "optime {dropOpTime}",
           "dropCollection: renaming to drop-pending collection",
-          "namespace"_attr = nss,
+          logAttrs(nss),
           "uuid"_attr = uuid,
           "dropPendingName"_attr = dpns,
           "dropOpTime"_attr = dropOpTime);
@@ -561,13 +561,11 @@ void DatabaseImpl::_dropCollectionIndexes(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           Collection* collection) const {
     invariant(_name == nss.dbName());
-    LOGV2_DEBUG(
-        20316, 1, "dropCollection: {namespace} - dropAllIndexes start", "namespace"_attr = nss);
+    LOGV2_DEBUG(20316, 1, "dropCollection: {namespace} - dropAllIndexes start", logAttrs(nss));
     collection->getIndexCatalog()->dropAllIndexes(opCtx, collection, true, {});
 
     invariant(collection->getTotalIndexCount() == 0);
-    LOGV2_DEBUG(
-        20317, 1, "dropCollection: {namespace} - dropAllIndexes done", "namespace"_attr = nss);
+    LOGV2_DEBUG(20317, 1, "dropCollection: {namespace} - dropAllIndexes done", logAttrs(nss));
 }
 
 Status DatabaseImpl::_finishDropCollection(OperationContext* opCtx,
@@ -582,7 +580,7 @@ Status DatabaseImpl::_finishDropCollection(OperationContext* opCtx,
                 debugLevel,
                 "Finishing collection drop for {namespace} ({uuid}).",
                 "Finishing collection drop",
-                "namespace"_attr = nss,
+                logAttrs(nss),
                 "uuid"_attr = uuid);
 
     // A virtual collection does not have a durable catalog entry.
@@ -801,7 +799,7 @@ Collection* DatabaseImpl::_createCollection(
             LOGV2_ERROR_OPTIONS(20329,
                                 {logv2::UserAssertAfterLog(ErrorCodes::InvalidOptions)},
                                 "Attempted to create a new collection without a UUID",
-                                "namespace"_attr = nss);
+                                logAttrs(nss));
         } else {
             optionsWithUUID.uuid.emplace(UUID::gen());
             generatedUUID = true;
@@ -845,7 +843,7 @@ Collection* DatabaseImpl::_createCollection(
                 "createCollection: {namespace} with {generatedUUID_generated_provided} UUID: "
                 "{optionsWithUUID_uuid_get} and options: {options}",
                 "createCollection",
-                "namespace"_attr = nss,
+                logAttrs(nss),
                 "uuidDisposition"_attr = (generatedUUID ? "generated" : "provided"),
                 "uuid"_attr = optionsWithUUID.uuid.value(),
                 "options"_attr = options);
@@ -968,7 +966,7 @@ Status DatabaseImpl::userCreateNS(OperationContext* opCtx,
     LOGV2_DEBUG(20324,
                 1,
                 "create collection {namespace} {collectionOptions}",
-                "namespace"_attr = nss,
+                logAttrs(nss),
                 "collectionOptions"_attr = collectionOptions.toBSON());
     if (!NamespaceString::validCollectionComponent(nss.ns()))
         return Status(ErrorCodes::InvalidNamespace, str::stream() << "invalid ns: " << nss);
@@ -1066,7 +1064,7 @@ Status DatabaseImpl::userCreateVirtualNS(OperationContext* opCtx,
     LOGV2_DEBUG(6968505,
                 1,
                 "create collection {namespace} {collectionOptions}",
-                "namespace"_attr = nss,
+                logAttrs(nss),
                 "collectionOptions"_attr = opts.toBSON());
     if (!NamespaceString::validCollectionComponent(nss.ns()))
         return Status(ErrorCodes::InvalidNamespace, str::stream() << "invalid ns: " << nss);

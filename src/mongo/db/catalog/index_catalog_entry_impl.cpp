@@ -116,7 +116,7 @@ IndexCatalogEntryImpl::IndexCatalogEntryImpl(OperationContext* const opCtx,
         LOGV2_DEBUG(20350,
                     2,
                     "have filter expression for {namespace} {indexName} {filter}",
-                    "namespace"_attr = collection->ns(),
+                    logAttrs(collection->ns()),
                     "indexName"_attr = _descriptor->indexName(),
                     "filter"_attr = redact(filter));
     }
@@ -426,7 +426,7 @@ void IndexCatalogEntryImpl::_catalogSetMultikey(OperationContext* opCtx,
         LOGV2_DEBUG(4718705,
                     1,
                     "Index set to multi key, clearing query plan cache",
-                    "namespace"_attr = collection->ns(),
+                    logAttrs(collection->ns()),
                     "keyPattern"_attr = _descriptor->keyPattern());
         CollectionQueryInfo::get(collection).clearQueryCacheForSetMultikey(collection);
     }

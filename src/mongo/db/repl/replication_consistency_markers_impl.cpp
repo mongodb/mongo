@@ -507,8 +507,7 @@ void ReplicationConsistencyMarkersImpl::setInitialSyncIdIfNotSet(OperationContex
     auto status =
         _storageInterface->createCollection(opCtx, _initialSyncIdNss, CollectionOptions());
     if (!status.isOK() && status.code() != ErrorCodes::NamespaceExists) {
-        LOGV2_FATAL(
-            4608500, "Failed to create collection", "namespace"_attr = _initialSyncIdNss.ns());
+        LOGV2_FATAL(4608500, "Failed to create collection", logAttrs(_initialSyncIdNss));
         fassertFailedWithStatus(4608502, status);
     }
 

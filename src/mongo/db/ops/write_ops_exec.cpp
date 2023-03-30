@@ -528,7 +528,7 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
                   "{namespace}. Blocking until fail point is disabled",
                   "Batch insert - hangDuringBatchInsert fail point enabled for a namespace. "
                   "Blocking until fail point is disabled",
-                  "namespace"_attr = nss);
+                  logAttrs(nss));
         },
         nss);
 
@@ -1086,7 +1086,7 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
                   "{namespace}. Blocking until fail point is disabled",
                   "Batch update - hangDuringBatchUpdate fail point enabled for a namespace. "
                   "Blocking until fail point is disabled",
-                  "namespace"_attr = ns);
+                  logAttrs(ns));
         },
         ns);
 
@@ -1316,7 +1316,7 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
                           logv2::LogSeverity::Debug(1),
                           numAttempts,
                           "Caught DuplicateKey exception during upsert",
-                          "namespace"_attr = ns.ns());
+                          logAttrs(ns));
         }
     }
 

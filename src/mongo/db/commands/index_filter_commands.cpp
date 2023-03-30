@@ -301,9 +301,7 @@ Status ClearFilters::clear(OperationContext* opCtx,
             planCacheCommandKeys, collection->uuid(), planCacheSBE);
     }
 
-    LOGV2(20480,
-          "Removed all index filters for collection",
-          "namespace"_attr = collection->ns().ns());
+    LOGV2(20480, "Removed all index filters for collection", logAttrs(collection->ns()));
 
     return Status::OK();
 }

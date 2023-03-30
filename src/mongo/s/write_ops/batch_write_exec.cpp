@@ -490,7 +490,7 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                 4,
                 "Starting execution of a write batch of size {size} for collection {namespace}",
                 "Starting execution of a write batch",
-                "namespace"_attr = nss.ns(),
+                logAttrs(nss),
                 "size"_attr = clientRequest.sizeWriteOps());
 
     BatchWriteOp batchOp(opCtx, clientRequest);
@@ -660,7 +660,7 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                     (clientResponse->isErrDetailsSet() ? "failed" : "succeeded"),
                 "wcSucceededOrFailed"_attr =
                     (clientResponse->isWriteConcernErrorSet() ? "failed" : "succeeded"),
-                "namespace"_attr = clientRequest.getNS());
+                logAttrs(clientRequest.getNS()));
 }
 
 void BatchWriteExecStats::noteTargetedShard(const ShardId& shardId) {

@@ -173,7 +173,7 @@ void doRenameOperation(const CompactStructuredEncryptionDataState& state,
         LOGV2_DEBUG(7299603,
                     1,
                     "Create collection failed because namespace already exists",
-                    "namespace"_attr = ecocNss);
+                    logAttrs(ecocNss));
     }
 
     if (MONGO_unlikely(fleCompactHangAfterECOCCreate.shouldFail())) {

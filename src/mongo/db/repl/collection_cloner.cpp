@@ -170,7 +170,7 @@ BaseCloner::AfterStageBehavior CollectionCloner::CollectionClonerStage::run() {
               "CollectionCloner ns: '{namespace}' uuid: "
               "UUID(\"{uuid}\") stopped because collection was dropped on source.",
               "CollectionCloner stopped because collection was dropped on source",
-              "namespace"_attr = getCloner()->getSourceNss(),
+              logAttrs(getCloner()->getSourceNss()),
               "uuid"_attr = getCloner()->getSourceUuid());
         getCloner()->waitForDatabaseWorkToComplete();
         return kSkipRemainingStages;
@@ -215,7 +215,7 @@ BaseCloner::AfterStageBehavior CollectionCloner::listIndexesStage() {
         LOGV2_WARNING(21143,
                       "No indexes found for collection {namespace} while cloning from {source}",
                       "No indexes found for collection while cloning",
-                      "namespace"_attr = _sourceNss.ns(),
+                      logAttrs(_sourceNss),
                       "source"_attr = getSource());
     }
 
@@ -260,7 +260,7 @@ BaseCloner::AfterStageBehavior CollectionCloner::listIndexesStage() {
                       "Found the _id_ index spec but the collection specified autoIndexId of false "
                       "on ns:{namespace}",
                       "Found the _id index spec but the collection specified autoIndexId of false",
-                      "namespace"_attr = this->_sourceNss);
+                      logAttrs(this->_sourceNss));
     }
     return kContinueNormally;
 }
@@ -434,7 +434,7 @@ void CollectionCloner::handleNextBatch(DBClientCursor& cursor) {
                       "enabled for {namespace}. Blocking until fail point is disabled.",
                       "initialSyncHangCollectionClonerAfterHandlingBatchResponse fail point "
                       "enabled. Blocking until fail point is disabled",
-                      "namespace"_attr = _sourceNss.toString());
+                      logAttrs(_sourceNss));
                 mongo::sleepsecs(1);
             }
         },
@@ -457,7 +457,7 @@ void CollectionCloner::insertDocumentsCallback(const executor::TaskExecutor::Cal
             LOGV2_WARNING(21145,
                           "insertDocumentsCallback, but no documents to insert for ns:{namespace}",
                           "insertDocumentsCallback, but no documents to insert",
-                          "namespace"_attr = _sourceNss);
+                          logAttrs(_sourceNss));
             return;
         }
         _documentsToInsert.swap(docs);

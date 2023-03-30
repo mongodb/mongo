@@ -54,7 +54,7 @@ public:
         void typedRun(OperationContext* opCtx) {
             const NamespaceString& nss = ns();
 
-            LOGV2(5403500, "Beginning reshard abort operation", "namespace"_attr = ns());
+            LOGV2(5403500, "Beginning reshard abort operation", logAttrs(ns()));
 
             ConfigsvrAbortReshardCollection configsvrAbortReshardCollection(nss);
             configsvrAbortReshardCollection.setDbName(request().getDbName());

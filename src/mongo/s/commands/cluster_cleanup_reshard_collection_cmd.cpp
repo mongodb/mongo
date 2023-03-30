@@ -54,7 +54,7 @@ public:
         void typedRun(OperationContext* opCtx) {
             const NamespaceString& nss = ns();
 
-            LOGV2(5403502, "Beginning reshard cleanup operation", "namespace"_attr = ns());
+            LOGV2(5403502, "Beginning reshard cleanup operation", logAttrs(ns()));
 
             ConfigsvrCleanupReshardCollection configsvrCleanupReshardCollection(nss);
             configsvrCleanupReshardCollection.setDbName(request().getDbName());

@@ -409,7 +409,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                 !status.isA<ErrorCategory::ShutdownError>()) {
                 LOGV2_ERROR(5757002,
                             "Error running collMod",
-                            "namespace"_attr = nss(),
+                            logAttrs(nss()),
                             "error"_attr = redact(status));
             }
             return status;

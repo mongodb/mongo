@@ -334,7 +334,7 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx,
                                   "Failed to recover orphaned data file for collection "
                                   "'{namespace}': {error}",
                                   "Failed to recover orphaned data file for collection",
-                                  "namespace"_attr = entry.nss,
+                                  logAttrs(entry.nss),
                                   "error"_attr = status);
                     WriteUnitOfWork wuow(opCtx);
                     fassert(50716, _catalog->_removeEntry(opCtx, entry.catalogId));
@@ -465,7 +465,7 @@ Status StorageEngineImpl::_recoverOrphanedCollection(OperationContext* opCtx,
     LOGV2(22249,
           "Storage engine is missing collection from its metadata. Attempting to locate and "
           "recover the data",
-          "namespace"_attr = collectionName,
+          logAttrs(collectionName),
           "ident"_attr = collectionIdent);
 
     WriteUnitOfWork wuow(opCtx);

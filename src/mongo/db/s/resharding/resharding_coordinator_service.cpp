@@ -1258,7 +1258,7 @@ void ReshardingCoordinator::installCoordinatorDoc(
                "Transitioned resharding coordinator state",
                "newState"_attr = CoordinatorState_serializer(doc.getState()),
                "oldState"_attr = CoordinatorState_serializer(_coordinatorDoc.getState()),
-               "namespace"_attr = doc.getSourceNss(),
+               logAttrs(doc.getSourceNss()),
                "collectionUUID"_attr = doc.getSourceUUID(),
                "reshardingUUID"_attr = doc.getReshardingUUID());
 
@@ -1393,7 +1393,7 @@ ExecutorFuture<void> ReshardingCoordinator::_initializeCoordinator(
             auto nss = _coordinatorDoc.getSourceNss();
             LOGV2(4956903,
                   "Resharding failed",
-                  "namespace"_attr = nss.ns(),
+                  logAttrs(nss),
                   "newShardKeyPattern"_attr = _coordinatorDoc.getReshardingKey(),
                   "error"_attr = status);
 
@@ -1466,7 +1466,7 @@ ExecutorFuture<ReshardingCoordinatorDocument> ReshardingCoordinator::_runUntilRe
             auto nss = _coordinatorDoc.getSourceNss();
             LOGV2(4956902,
                   "Resharding failed",
-                  "namespace"_attr = nss.ns(),
+                  logAttrs(nss),
                   "newShardKeyPattern"_attr = _coordinatorDoc.getReshardingKey(),
                   "error"_attr = status);
 
@@ -2329,7 +2329,7 @@ void ReshardingCoordinator::_updateChunkImbalanceMetrics(const NamespaceString& 
     } catch (const DBException& ex) {
         LOGV2_WARNING(5543000,
                       "Encountered error while trying to update resharding chunk imbalance metrics",
-                      "namespace"_attr = nss,
+                      logAttrs(nss),
                       "error"_attr = redact(ex.toStatus()));
     }
 }

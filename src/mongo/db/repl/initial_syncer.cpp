@@ -809,7 +809,7 @@ Status InitialSyncer::_truncateOplogAndDropReplicatedDatabases() {
                 "user databases (so that we can clone them).",
                 "About to truncate the oplog, if it exists, and drop all user databases (so that "
                 "we can clone them)",
-                "namespace"_attr = NamespaceString::kRsOplogNamespace);
+                logAttrs(NamespaceString::kRsOplogNamespace));
 
     auto opCtx = makeOpCtx();
     // This code can make untimestamped writes (deletes) to the _mdb_catalog on top of existing
@@ -824,7 +824,7 @@ Status InitialSyncer::_truncateOplogAndDropReplicatedDatabases() {
                 2,
                 "Truncating the existing oplog: {namespace}",
                 "Truncating the existing oplog",
-                "namespace"_attr = NamespaceString::kRsOplogNamespace);
+                logAttrs(NamespaceString::kRsOplogNamespace));
     Timer timer;
     auto status = _storage->truncateCollection(opCtx.get(), NamespaceString::kRsOplogNamespace);
     LOGV2(21173,
@@ -837,7 +837,7 @@ Status InitialSyncer::_truncateOplogAndDropReplicatedDatabases() {
                     2,
                     "Creating the oplog: {namespace}",
                     "Creating the oplog",
-                    "namespace"_attr = NamespaceString::kRsOplogNamespace);
+                    logAttrs(NamespaceString::kRsOplogNamespace));
         status = _storage->createOplog(opCtx.get(), NamespaceString::kRsOplogNamespace);
         if (!status.isOK()) {
             return status;
@@ -1202,7 +1202,7 @@ void InitialSyncer::_fcvFetcherCallback(const StatusWith<Fetcher::QueryResponse>
                 "{namespace} and the begin fetching timestamp to {beginFetchingTimestamp}",
                 "Setting begin applying timestamp and begin fetching timestamp",
                 "beginApplyingTimestamp"_attr = _initialSyncState->beginApplyingTimestamp,
-                "namespace"_attr = NamespaceString::kRsOplogNamespace,
+                logAttrs(NamespaceString::kRsOplogNamespace),
                 "beginFetchingTimestamp"_attr = _initialSyncState->beginFetchingTimestamp);
 
     const auto configResult = _dataReplicatorExternalState->getCurrentConfig();

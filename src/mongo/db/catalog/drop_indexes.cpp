@@ -374,7 +374,7 @@ void assertNoMovePrimaryInProgress(OperationContext* opCtx, const NamespaceStrin
 
         if (!collDesc.isSharded()) {
             if (scopedDss->isMovePrimaryInProgress()) {
-                LOGV2(4976500, "assertNoMovePrimaryInProgress", "namespace"_attr = nss.toString());
+                LOGV2(4976500, "assertNoMovePrimaryInProgress", logAttrs(nss));
 
                 uasserted(ErrorCodes::MovePrimaryInProgress,
                           "movePrimary is in progress for namespace " + nss.toString());
@@ -409,7 +409,7 @@ DropIndexesReply dropIndexes(OperationContext* opCtx,
     if (!serverGlobalParams.quiet.load()) {
         LOGV2(51806,
               "CMD: dropIndexes",
-              "namespace"_attr = nss,
+              logAttrs(nss),
               "uuid"_attr = collectionUUID,
               "indexes"_attr =
                   stdx::visit(OverloadedVisitor{[](const std::string& arg) { return arg; },
@@ -590,7 +590,7 @@ Status dropIndexesForApplyOps(OperationContext* opCtx,
         if (!serverGlobalParams.quiet.load()) {
             LOGV2(20344,
                   "CMD: dropIndexes",
-                  "namespace"_attr = nss,
+                  logAttrs(nss),
                   "indexes"_attr = cmdObj[kIndexFieldName].toString(false));
         }
 

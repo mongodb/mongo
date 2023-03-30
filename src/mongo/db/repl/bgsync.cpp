@@ -978,7 +978,7 @@ OpTime BackgroundSync::_readLastAppliedOpTime(OperationContext* opCtx) {
         LOGV2_FATAL(18904,
                     "Problem reading {namespace}: {error}",
                     "Problem reading from namespace",
-                    "namespace"_attr = NamespaceString::kRsOplogNamespace.ns(),
+                    logAttrs(NamespaceString::kRsOplogNamespace),
                     "error"_attr = redact(ex));
     }
 

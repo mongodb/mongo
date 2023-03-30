@@ -115,7 +115,7 @@ void PreWriteFilter::logSkippingDocument(const Document& doc,
                 "Skipping the operation to orphan document to prevent a wrong change "
                 "stream event",
                 "op"_attr = opKind,
-                "namespace"_attr = collNs,
+                logAttrs(collNs),
                 "record"_attr = doc);
 }
 
@@ -127,7 +127,7 @@ void PreWriteFilter::logFromMigrate(const Document& doc,
                 "Marking the operation to orphan document with the fromMigrate flag to "
                 "prevent a wrong change stream event",
                 "op"_attr = opKind,
-                "namespace"_attr = collNs,
+                logAttrs(collNs),
                 "record"_attr = doc);
 }
 

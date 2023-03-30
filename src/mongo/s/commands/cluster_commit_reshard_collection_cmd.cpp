@@ -56,7 +56,7 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            LOGV2(5391600, "Beginning commitReshardCollection", "namespace"_attr = ns());
+            LOGV2(5391600, "Beginning commitReshardCollection", logAttrs(ns()));
             ConfigsvrCommitReshardCollection cmd(ns());
             cmd.setDbName(request().getDbName());
 

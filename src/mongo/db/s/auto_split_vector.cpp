@@ -201,7 +201,7 @@ std::pair<std::vector<BSONObj>, bool> autoSplitVector(OperationContext* opCtx,
             LOGV2_WARNING(
                 5865001,
                 "Possible low cardinality key detected in range. Range contains only a single key.",
-                "namespace"_attr = collection.getNss(),
+                logAttrs(collection.getNss()),
                 "minKey"_attr = redact(prettyKey(keyPattern, minKey)),
                 "maxKey"_attr = redact(prettyKey(keyPattern, maxKey)),
                 "key"_attr = redact(prettyKey(shardKeyIdx->keyPattern(), firstKeyInOriginalChunk)));
@@ -210,7 +210,7 @@ std::pair<std::vector<BSONObj>, bool> autoSplitVector(OperationContext* opCtx,
 
         LOGV2(6492600,
               "Requested split points lookup for range",
-              "namespace"_attr = nss,
+              logAttrs(nss),
               "minKey"_attr = redact(prettyKey(keyPattern, minKey)),
               "maxKey"_attr = redact(prettyKey(keyPattern, maxKey)),
               "direction"_attr = forward ? "forwards" : "backwards");
@@ -374,7 +374,7 @@ std::pair<std::vector<BSONObj>, bool> autoSplitVector(OperationContext* opCtx,
         if (reachedMaxBSONSize) {
             LOGV2(5865002,
                   "Max BSON response size reached for split vector before the end of chunk",
-                  "namespace"_attr = nss,
+                  logAttrs(nss),
                   "minKey"_attr = redact(prettyKey(shardKeyIdx->keyPattern(), minKey)),
                   "maxKey"_attr = redact(prettyKey(shardKeyIdx->keyPattern(), maxKey)));
         }
@@ -384,14 +384,14 @@ std::pair<std::vector<BSONObj>, bool> autoSplitVector(OperationContext* opCtx,
     for (const auto& frequentKey : tooFrequentKeys) {
         LOGV2_WARNING(5865004,
                       "Possible low cardinality key detected",
-                      "namespace"_attr = nss,
+                      logAttrs(nss),
                       "key"_attr = redact(prettyKey(keyPattern, frequentKey)));
     }
 
     if (elapsedMillisToFindSplitPoints > serverGlobalParams.slowMS.load()) {
         LOGV2_WARNING(5865005,
                       "Finding the auto split vector completed",
-                      "namespace"_attr = nss,
+                      logAttrs(nss),
                       "keyPattern"_attr = redact(keyPattern),
                       "numSplits"_attr = splitKeys.size(),
                       "duration"_attr = Milliseconds(elapsedMillisToFindSplitPoints));

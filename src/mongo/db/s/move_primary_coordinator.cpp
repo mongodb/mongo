@@ -590,7 +590,7 @@ void MovePrimaryCoordinator::dropStaleDataOnDonor(OperationContext* opCtx) const
         if (!dropStatus.isOK()) {
             LOGV2_WARNING(7120210,
                           "Failed to drop stale collection on donor",
-                          "namespace"_attr = nss,
+                          logAttrs(nss),
                           "error"_attr = redact(dropStatus));
         }
     }

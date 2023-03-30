@@ -124,7 +124,7 @@ BSONObj buildRepairedIndexSpec(
         } else {
             LOGV2_WARNING(23878,
                           "Removing unknown field from index spec",
-                          "namespace"_attr = redact(ns.toString()),
+                          "namespace"_attr = redact(toStringForLogging(ns)),
                           "fieldName"_attr = redact(fieldName),
                           "indexSpec"_attr = redact(indexSpec));
         }
@@ -309,7 +309,7 @@ BSONObj repairIndexSpec(const NamespaceString& ns,
             !indexSpecElem.isNumber() && !indexSpecElem.isBoolean() && indexSpecElem.trueValue()) {
             LOGV2_WARNING(6444400,
                           "Fixing boolean field from index spec",
-                          "namespace"_attr = redact(ns.toString()),
+                          "namespace"_attr = redact(toStringForLogging(ns)),
                           "fieldName"_attr = redact(fieldName),
                           "indexSpec"_attr = redact(indexSpec));
             builder->appendBool(fieldName, true);
@@ -319,7 +319,7 @@ BSONObj repairIndexSpec(const NamespaceString& ns,
                         .isOK()) {
             LOGV2_WARNING(6835900,
                           "Fixing expire field from TTL index spec",
-                          "namespace"_attr = redact(ns.toString()),
+                          "namespace"_attr = redact(toStringForLogging(ns)),
                           "fieldName"_attr = redact(fieldName),
                           "indexSpec"_attr = redact(indexSpec));
             builder->appendNumber(fieldName,

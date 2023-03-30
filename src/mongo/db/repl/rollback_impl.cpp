@@ -705,7 +705,7 @@ void RollbackImpl::_correctRecordStoreCounts(OperationContext* opCtx) {
                 "[{ident}] because it is marked for size adjustment.",
                 "Not setting collection count because namespace is marked for size adjustment",
                 "newCount"_attr = newCount,
-                "namespace"_attr = nss.ns(),
+                logAttrs(nss),
                 "uuid"_attr = uuid.toString(),
                 "ident"_attr = ident);
             continue;
@@ -718,7 +718,7 @@ void RollbackImpl::_correctRecordStoreCounts(OperationContext* opCtx) {
             LOGV2(21602,
                   "Scanning collection {namespace} ({uuid}) to fix collection count.",
                   "Scanning collection to fix collection count",
-                  "namespace"_attr = nss.ns(),
+                  logAttrs(nss),
                   "uuid"_attr = uuid.toString());
             AutoGetCollectionForRead collToScan(opCtx, nss);
             invariant(coll == collToScan.getCollection().get(),
@@ -741,7 +741,7 @@ void RollbackImpl::_correctRecordStoreCounts(OperationContext* opCtx) {
                               "Failed to set count of {namespace} ({uuid}) [{ident}] due to failed "
                               "collection scan: {error}",
                               "Failed to set count of namespace due to failed collection scan",
-                              "namespace"_attr = nss.ns(),
+                              logAttrs(nss),
                               "uuid"_attr = uuid.toString(),
                               "ident"_attr = ident,
                               "error"_attr = exec->stateToStr(state));
@@ -759,7 +759,7 @@ void RollbackImpl::_correctRecordStoreCounts(OperationContext* opCtx) {
                           "Failed to set count of {namespace} ({uuid}) [{ident}] to {newCount}. "
                           "Received: {error}",
                           "Failed to set count of namespace",
-                          "namespace"_attr = nss.ns(),
+                          logAttrs(nss),
                           "uuid"_attr = uuid.toString(),
                           "ident"_attr = ident,
                           "newCount"_attr = newCount,
@@ -769,7 +769,7 @@ void RollbackImpl::_correctRecordStoreCounts(OperationContext* opCtx) {
                         2,
                         "Set collection count of {namespace} ({uuid}) [{ident}] to {newCount}.",
                         "Set collection count of namespace",
-                        "namespace"_attr = nss.ns(),
+                        logAttrs(nss),
                         "uuid"_attr = uuid.toString(),
                         "ident"_attr = ident,
                         "newCount"_attr = newCount);
@@ -827,7 +827,7 @@ Status RollbackImpl::_findRecordStoreCounts(OperationContext* opCtx) {
                           "count during rollback.",
                           "Count for namespace was larger than the maximum int64_t value. Not "
                           "attempting to fix count during rollback",
-                          "namespace"_attr = nss->ns(),
+                          logAttrs(*nss),
                           "uuid"_attr = uuid.toString(),
                           "oldCount"_attr = oldCount);
             continue;
@@ -846,7 +846,7 @@ Status RollbackImpl::_findRecordStoreCounts(OperationContext* opCtx) {
                 "Attempted to set count for namespace but set it to 0 instead. This is likely due "
                 "to the count previously becoming inconsistent from an unclean shutdown or a "
                 "rollback that could not fix the count correctly",
-                "namespace"_attr = nss->ns(),
+                logAttrs(*nss),
                 "uuid"_attr = uuid.toString(),
                 "newCount"_attr = newCount,
                 "oldCount"_attr = oldCount,
@@ -859,7 +859,7 @@ Status RollbackImpl::_findRecordStoreCounts(OperationContext* opCtx) {
             "Record count of {namespace} ({uuid}) before rollback is {oldCount}. Setting it "
             "to {newCount}, due to change of {countDiff}",
             "Setting record count for namespace after rollback",
-            "namespace"_attr = nss->ns(),
+            logAttrs(*nss),
             "uuid"_attr = uuid.toString(),
             "oldCount"_attr = oldCount,
             "newCount"_attr = newCount,
@@ -1260,7 +1260,7 @@ boost::optional<BSONObj> RollbackImpl::_findDocumentById(OperationContext* opCtx
             "{uuid}{error}",
             "Rollback failed to read document",
             "id"_attr = redact(id),
-            "namespace"_attr = nss.ns(),
+            logAttrs(nss),
             "uuid"_attr = uuid.toString(),
             "error"_attr = causedBy(document.getStatus()));
         fassert(50751, document.getStatus());
@@ -1308,7 +1308,7 @@ void RollbackImpl::_writeRollbackFileForNamespace(OperationContext* opCtx,
           "Preparing to write deleted documents to a rollback file for collection {namespace} with "
           "uuid {uuid} to {file}",
           "Preparing to write deleted documents to a rollback file",
-          "namespace"_attr = nss.ns(),
+          logAttrs(nss),
           "uuid"_attr = uuid.toString(),
           "file"_attr = removeSaver.file().generic_string());
 

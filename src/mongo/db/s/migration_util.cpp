@@ -1034,7 +1034,7 @@ void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx) {
 void recoverMigrationCoordinations(OperationContext* opCtx,
                                    NamespaceString nss,
                                    CancellationToken cancellationToken) {
-    LOGV2_DEBUG(4798501, 2, "Starting migration recovery", "namespace"_attr = nss);
+    LOGV2_DEBUG(4798501, 2, "Starting migration recovery", logAttrs(nss));
 
     unsigned migrationRecoveryCount = 0;
 
@@ -1329,7 +1329,7 @@ void asyncRecoverMigrationUntilSuccessOrStepDown(OperationContext* opCtx,
                 // This is expected in the event of a stepdown.
                 LOGV2(6316100,
                       "Interrupted deferred migration recovery",
-                      "namespace"_attr = nss,
+                      logAttrs(nss),
                       "error"_attr = redact(ex));
             }
         })

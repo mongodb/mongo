@@ -170,7 +170,7 @@ ExecutorFuture<void> ShardingDDLCoordinator::_translateTimeseriesNss(
             if (!status.isOK()) {
                 LOGV2_WARNING(6675600,
                               "Failed to fetch information for the bucket namespace",
-                              "namespace"_attr = originalNss().makeTimeseriesBucketsNamespace(),
+                              logAttrs(originalNss().makeTimeseriesBucketsNamespace()),
                               "coordinatorId"_attr = _coordId,
                               "error"_attr = redact(status));
             }

@@ -403,7 +403,7 @@ void reconcileCatalogAndRebuildUnfinishedIndexes(
             LOGV2(21004,
                   "Rebuilding index. Collection: {collNss} Index: {indexName}",
                   "Rebuilding index",
-                  "namespace"_attr = collNss,
+                  logAttrs(collNss),
                   "index"_attr = indexName);
         }
 

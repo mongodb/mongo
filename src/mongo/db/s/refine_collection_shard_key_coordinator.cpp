@@ -160,7 +160,7 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
         .onError([this, anchor = shared_from_this()](const Status& status) {
             LOGV2_ERROR(5277700,
                         "Error running refine collection shard key",
-                        "namespace"_attr = nss(),
+                        logAttrs(nss()),
                         "error"_attr = redact(status));
 
             return status;

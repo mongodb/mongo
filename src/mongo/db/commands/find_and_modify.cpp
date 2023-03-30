@@ -555,7 +555,7 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
                                   logv2::LogSeverity::Debug(1),
                                   retryAttempts,
                                   "Caught DuplicateKey exception during findAndModify upsert",
-                                  "namespace"_attr = nsString.ns());
+                                  logAttrs(nsString));
                 } catch (const ExceptionFor<ErrorCodes::WouldChangeOwningShard>& ex) {
                     if (analyze_shard_key::supportsPersistingSampledQueries(opCtx) &&
                         req.getSampleId()) {

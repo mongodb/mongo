@@ -792,7 +792,7 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
         static constexpr char message[] = "Cannot roll back op with no _id";
         LOGV2_FATAL_CONTINUE(21737,
                              message,
-                             "namespace"_attr = nss.ns(),
+                             logAttrs(nss),
                              "oplogEntry"_attr = redact(oplogEntry.toBSONForLogging()));
         throw RSFatalException(str::stream() << message << ". ns: " << nss.ns());
     }
@@ -871,7 +871,7 @@ void dropIndex(OperationContext* opCtx,
                       "Rollback failed to drop index {indexName} in {namespace}: index not found.",
                       "Rollback failed to drop index: index not found",
                       "indexName"_attr = indexName,
-                      "namespace"_attr = nss.toString());
+                      logAttrs(nss));
         return;
     }
 
@@ -883,7 +883,7 @@ void dropIndex(OperationContext* opCtx,
                         "Rollback failed to drop index {indexName} in {namespace}: {error}",
                         "Rollback failed to drop index",
                         "indexName"_attr = indexName,
-                        "namespace"_attr = nss.toString(),
+                        logAttrs(nss),
                         "error"_attr = redact(status));
         }
     } else {
@@ -894,7 +894,7 @@ void dropIndex(OperationContext* opCtx,
                 "Rollback failed to drop unfinished index {indexName} in {namespace}: {error}",
                 "Rollback failed to drop unfinished index",
                 "indexName"_attr = indexName,
-                "namespace"_attr = nss.toString(),
+                logAttrs(nss),
                 "error"_attr = redact(status));
         }
     }
@@ -944,7 +944,7 @@ void rollbackCreateIndexes(OperationContext* opCtx, UUID uuid, std::set<std::str
               "Dropping index in rollback for collection: {namespace}, UUID: {uuid}, index: "
               "{indexName}",
               "Dropping index in rollback",
-              "namespace"_attr = *nss,
+              logAttrs(*nss),
               "uuid"_attr = uuid,
               "indexName"_attr = indexName);
 
@@ -957,7 +957,7 @@ void rollbackCreateIndexes(OperationContext* opCtx, UUID uuid, std::set<std::str
                     "Dropped index in rollback for collection: {namespace}, UUID: {uuid}, index: "
                     "{indexName}",
                     "Dropped index in rollback",
-                    "namespace"_attr = *nss,
+                    logAttrs(*nss),
                     "uuid"_attr = uuid,
                     "indexName"_attr = indexName);
     }
@@ -997,7 +997,7 @@ void rollbackDropIndexes(OperationContext* opCtx,
               "Creating index in rollback for collection: {namespace}, UUID: {uuid}, index: "
               "{indexName}",
               "Creating index in rollback",
-              "namespace"_attr = *nss,
+              logAttrs(*nss),
               "uuid"_attr = uuid,
               "indexName"_attr = indexName);
 
@@ -1008,7 +1008,7 @@ void rollbackDropIndexes(OperationContext* opCtx,
                     "Created index in rollback for collection: {namespace}, UUID: {uuid}, index: "
                     "{indexName}",
                     "Created index in rollback",
-                    "namespace"_attr = *nss,
+                    logAttrs(*nss),
                     "uuid"_attr = uuid,
                     "indexName"_attr = indexName);
     }
@@ -1029,7 +1029,7 @@ void dropCollection(OperationContext* opCtx,
               "file for a collection with uuid {uuid} to "
               "{rollbackFile}",
               "Rolling back createCollection: Preparing to write documents to a rollback file",
-              "namespace"_attr = nss,
+              logAttrs(nss),
               "uuid"_attr = collection->uuid(),
               "rollbackFile"_attr = removeSaver.file().generic_string());
 
@@ -1049,7 +1049,7 @@ void dropCollection(OperationContext* opCtx,
                                          "write document to remove saver file: {error}",
                                          "Rolling back createCollection failed to write document "
                                          "to remove saver file",
-                                         "namespace"_attr = nss,
+                                         logAttrs(nss),
                                          "error"_attr = redact(status));
                     throw RSFatalException(
                         "Rolling back createCollection. Failed to write document to remove saver "
@@ -1061,7 +1061,7 @@ void dropCollection(OperationContext* opCtx,
                                  "Rolling back createCollection on {namespace} failed with "
                                  "{error}. A full resync is necessary",
                                  "Rolling back createCollection failed. A full resync is necessary",
-                                 "namespace"_attr = nss,
+                                 logAttrs(nss),
                                  "error"_attr = redact(exceptionToStatus()));
             throw RSFatalException(
                 "Rolling back createCollection failed. A full resync is necessary.");
@@ -1234,7 +1234,7 @@ void syncFixUp(OperationContext* opCtx,
                             2,
                             "Refetching document, collection: {namespace}, UUID: {uuid}, {_id}",
                             "Refetching document",
-                            "namespace"_attr = *nss,
+                            logAttrs(*nss),
                             "uuid"_attr = uuid,
                             "_id"_attr = redact(doc._id));
             } else {
@@ -1389,7 +1389,7 @@ void syncFixUp(OperationContext* opCtx,
             LOGV2(21697,
                   "Dropping collection: {namespace}, UUID: {uuid}",
                   "Dropping collection",
-                  "namespace"_attr = *nss,
+                  logAttrs(*nss),
                   "uuid"_attr = uuid);
             AutoGetDb dbLock(opCtx, nss->dbName(), MODE_X);
 
@@ -1402,7 +1402,7 @@ void syncFixUp(OperationContext* opCtx,
                             1,
                             "Dropped collection: {namespace}, UUID: {uuid}",
                             "Dropped collection",
-                            "namespace"_attr = *nss,
+                            logAttrs(*nss),
                             "uuid"_attr = uuid);
             }
         }
@@ -1439,7 +1439,7 @@ void syncFixUp(OperationContext* opCtx,
                     "collection: {namespace}",
                     "Rolling back collection pending being dropped",
                     "optime"_attr = optime,
-                    "namespace"_attr = collectionNamespace);
+                    logAttrs(collectionNamespace));
         DropPendingCollectionReaper::get(opCtx)->rollBackDropPendingCollection(
             opCtx, optime, collectionNamespace);
     }
@@ -1461,7 +1461,7 @@ void syncFixUp(OperationContext* opCtx,
             LOGV2(21702,
                   "Resyncing collection metadata for collection: {namespace}, UUID: {uuid}",
                   "Resyncing collection metadata",
-                  "namespace"_attr = *nss,
+                  logAttrs(*nss),
                   "uuid"_attr = uuid);
 
             Lock::DBLock dbLock(opCtx, nss->dbName(), MODE_X);
@@ -1486,7 +1486,7 @@ void syncFixUp(OperationContext* opCtx,
                       "operation. Instead, we will drop the collection soon.",
                       "Namespace not found on remote host, so we do not roll back collmod "
                       "operation. Instead, we will drop the collection soon",
-                      "namespace"_attr = nss->ns());
+                      logAttrs(*nss));
                 continue;
             }
 
@@ -1539,7 +1539,7 @@ void syncFixUp(OperationContext* opCtx,
                         "with: {info}, "
                         "to: {catalogId}",
                         "Resynced collection metadata",
-                        "namespace"_attr = *nss,
+                        logAttrs(*nss),
                         "uuid"_attr = uuid,
                         "info"_attr = redact(info),
                         "catalogId"_attr = redact(collection->getCollectionOptions().toBSON()));
@@ -1595,7 +1595,7 @@ void syncFixUp(OperationContext* opCtx,
                   "{namespace} "
                   "with uuid {uuid} to {rollbackFile}",
                   "Preparing to write deleted documents to a rollback file",
-                  "namespace"_attr = *nss,
+                  logAttrs(*nss),
                   "uuid"_attr = uuid.toString(),
                   "rollbackFile"_attr = removeSaver->file().generic_string());
         }
@@ -1641,7 +1641,7 @@ void syncFixUp(OperationContext* opCtx,
                                 "Rollback cannot write document in namespace {namespace} to "
                                 "archive file: {error}",
                                 "Rollback cannot write document to archive file",
-                                "namespace"_attr = nss->ns(),
+                                logAttrs(*nss),
                                 "error"_attr = redact(status));
                             throw RSFatalException(str::stream()
                                                    << "Rollback cannot write document in namespace "
@@ -1653,7 +1653,7 @@ void syncFixUp(OperationContext* opCtx,
                             "Rollback cannot find object: {pattern} in namespace {namespace}",
                             "Rollback cannot find object",
                             "pattern"_attr = pattern,
-                            "namespace"_attr = nss->ns());
+                            logAttrs(*nss));
                     }
                 }
 
@@ -1664,7 +1664,7 @@ void syncFixUp(OperationContext* opCtx,
                                 "UUID: {uuid}",
                                 "Deleting document",
                                 "_id"_attr = redact(doc._id),
-                                "namespace"_attr = doc.ns,
+                                logAttrs(docNss),
                                 "uuid"_attr = uuid);
                     // If the document could not be found on the primary, deletes the document.
                     // TODO 1.6 : can't delete from a capped collection. Need to handle that
@@ -1689,7 +1689,7 @@ void syncFixUp(OperationContext* opCtx,
                                         21726,
                                         "Roll back slow no _id index for {namespace} perhaps?",
                                         "Roll back slow no _id index for namespace perhaps?",
-                                        "namespace"_attr = nss->ns());
+                                        logAttrs(*nss));
                                 // Would be faster but requires index:
                                 // RecordId loc = Helpers::findById(nsd, pattern);
                                 if (!loc.isNull()) {
@@ -1729,7 +1729,7 @@ void syncFixUp(OperationContext* opCtx,
                                               "{_id}: {error}",
                                               "Ignoring failure to roll back change to capped "
                                               "collection",
-                                              "namespace"_attr = nss->ns(),
+                                              logAttrs(*nss),
                                               "_id"_attr = redact(idAndDoc.first._id.toString(
                                                   /*includeFieldName*/ false)),
                                               "error"_attr = redact(e));
@@ -1771,7 +1771,7 @@ void syncFixUp(OperationContext* opCtx,
                 LOGV2(21713,
                       "Exception in rollback ns:{namespace} {pattern} {error} ndeletes:{deletes}",
                       "Exception in rollback",
-                      "namespace"_attr = nss->ns(),
+                      logAttrs(*nss),
                       "pattern"_attr = pattern,
                       "error"_attr = redact(e),
                       "deletes"_attr = deletes);

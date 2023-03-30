@@ -71,7 +71,7 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
                   "{namespace} does not exist",
                   "cleanupOrphaned skipping waiting for orphaned data cleanup because "
                   "collection does not exist",
-                  "namespace"_attr = ns.ns());
+                  logAttrs(ns));
             return CleanupResult::kDone;
         }
         collectionUuid.emplace(autoColl.getCollection()->uuid());
@@ -85,7 +85,7 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
                   "{namespace} is not sharded",
                   "cleanupOrphaned skipping waiting for orphaned data cleanup because "
                   "collection is not sharded",
-                  "namespace"_attr = ns.ns());
+                  logAttrs(ns));
             return CleanupResult::kDone;
         }
         range.emplace(optCollDescr->getMinKey(), optCollDescr->getMaxKey());
@@ -121,7 +121,7 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
 
         LOGV2(4416003,
               "cleanupOrphaned going to wait for range deletion tasks to complete",
-              "namespace"_attr = ns.ns(),
+              logAttrs(ns),
               "collectionUUID"_attr = *collectionUuid,
               "numRemainingDeletionTasks"_attr = numRemainingDeletionTasks);
 

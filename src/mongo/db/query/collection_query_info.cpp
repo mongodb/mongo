@@ -238,14 +238,14 @@ void CollectionQueryInfo::clearQueryCache(OperationContext* opCtx, const Collect
         LOGV2_DEBUG(5014501,
                     1,
                     "Clearing plan cache - collection info cache cleared",
-                    "namespace"_attr = coll->ns());
+                    logAttrs(coll->ns()));
 
         _planCacheState->clearPlanCache();
     } else {
         LOGV2_DEBUG(5014502,
                     1,
                     "Clearing plan cache - collection info cache reinstantiated",
-                    "namespace"_attr = coll->ns());
+                    logAttrs(coll->ns()));
 
         updatePlanCacheIndexEntries(opCtx, coll);
     }
@@ -255,7 +255,7 @@ void CollectionQueryInfo::clearQueryCacheForSetMultikey(const CollectionPtr& col
     LOGV2_DEBUG(5014500,
                 1,
                 "Clearing plan cache for multikey - collection info cache cleared",
-                "namespace"_attr = coll->ns());
+                logAttrs(coll->ns()));
     _planCacheState->clearPlanCache();
 }
 

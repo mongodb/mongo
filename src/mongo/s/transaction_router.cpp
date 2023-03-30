@@ -868,7 +868,7 @@ void TransactionRouter::Router::onViewResolutionError(OperationContext* opCtx,
         "sessionId"_attr = _sessionId(),
         "txnNumber"_attr = o().txnNumberAndRetryCounter.getTxnNumber(),
         "txnRetryCounter"_attr = o().txnNumberAndRetryCounter.getTxnRetryCounter(),
-        "namespace"_attr = nss);
+        logAttrs(nss));
 
     // Requests against views are always routed to the primary shard for its database, but the retry
     // on the resolved namespace does not have to re-target the primary, so pending participants

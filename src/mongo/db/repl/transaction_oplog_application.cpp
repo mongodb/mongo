@@ -540,7 +540,7 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
             LOGV2_WARNING(21849,
                           "Blocking replication until single-phase index builds are finished on "
                           "collection, due to prepared transaction",
-                          "namespace"_attr = redact(ns.toString()),
+                          "namespace"_attr = redact(toStringForLogging(ns)),
                           "uuid"_attr = uuid);
             indexBuildsCoord->awaitNoIndexBuildInProgressForCollection(
                 opCtx, uuid, IndexBuildProtocol::kSinglePhase);

@@ -139,7 +139,7 @@ void handleActionResult(OperationContext* opCtx,
         LOGV2_DEBUG(6261701,
                     1,
                     "Hit retriable error while defragmenting collection",
-                    "namespace"_attr = nss,
+                    logAttrs(nss),
                     "uuid"_attr = uuid,
                     "currentPhase"_attr = currentPhase,
                     "error"_attr = redact(status));
@@ -147,7 +147,7 @@ void handleActionResult(OperationContext* opCtx,
     } else {
         LOGV2_ERROR(6258601,
                     "Defragmentation for collection hit non-retriable error",
-                    "namespace"_attr = nss,
+                    logAttrs(nss),
                     "uuid"_attr = uuid,
                     "currentPhase"_attr = currentPhase,
                     "error"_attr = redact(status));
@@ -536,7 +536,7 @@ public:
                     LOGV2_DEBUG(6290000,
                                 1,
                                 "Migration failed during collection defragmentation",
-                                "namespace"_attr = _nss,
+                                logAttrs(_nss),
                                 "uuid"_attr = _uuid,
                                 "currentPhase"_attr = getType(),
                                 "error"_attr = redact(migrationResponse));
@@ -580,7 +580,7 @@ public:
                     LOGV2_ERROR(6290001,
                                 "Encountered non-retriable error on migration during "
                                 "collection defragmentation",
-                                "namespace"_attr = _nss,
+                                logAttrs(_nss),
                                 "uuid"_attr = _uuid,
                                 "currentPhase"_attr = getType(),
                                 "error"_attr = redact(migrationResponse));
@@ -841,7 +841,7 @@ private:
                 LOGV2_WARNING(
                     6172701,
                     "Chunk with no estimated size detected while building MoveAndMergeChunksPhase",
-                    "namespace"_attr = _nss,
+                    logAttrs(_nss),
                     "uuid"_attr = _uuid,
                     "range"_attr = chunk.getRange());
                 _abort(DefragmentationPhaseEnum::kMergeAndMeasureChunks);
@@ -970,7 +970,7 @@ private:
                                 1,
                                 "Postponing small chunk processing due to pending range deletion "
                                 "on recipient shard(s)",
-                                "namespace"_attr = _nss,
+                                logAttrs(_nss),
                                 "uuid"_attr = _uuid,
                                 "range"_attr = (*candidateIt)->range,
                                 "estimatedSizeBytes"_attr = (*candidateIt)->estimatedSizeBytes,
@@ -981,7 +981,7 @@ private:
                 } else {
                     LOGV2(6290003,
                           "Discarding small chunk due to pending range deletion on recipient shard",
-                          "namespace"_attr = _nss,
+                          logAttrs(_nss),
                           "uuid"_attr = _uuid,
                           "range"_attr = (*candidateIt)->range,
                           "estimatedSizeBytes"_attr = (*candidateIt)->estimatedSizeBytes,
@@ -1477,7 +1477,7 @@ std::unique_ptr<DefragmentationPhase> BalancerDefragmentationPolicyImpl::_transi
         afterBuildingNextDefragmentationPhase.pauseWhileSet();
         LOGV2(6172702,
               "Collection defragmentation transitioned to new phase",
-              "namespace"_attr = coll.getNss(),
+              logAttrs(coll.getNss()),
               "phase"_attr = nextPhaseObject
                   ? DefragmentationPhase_serializer(nextPhaseObject->getType())
                   : kNoPhase,
@@ -1485,7 +1485,7 @@ std::unique_ptr<DefragmentationPhase> BalancerDefragmentationPolicyImpl::_transi
     } catch (const DBException& e) {
         LOGV2_ERROR(6153101,
                     "Error while building defragmentation phase on collection",
-                    "namespace"_attr = coll.getNss(),
+                    logAttrs(coll.getNss()),
                     "uuid"_attr = coll.getUuid(),
                     "phase"_attr = nextPhase,
                     "error"_attr = e);

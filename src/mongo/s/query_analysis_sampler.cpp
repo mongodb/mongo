@@ -220,7 +220,7 @@ void QueryAnalysisSampler::SampleRateLimiter::_refill(double numTokensPerSecond,
         LOGV2_DEBUG(7372303,
                     2,
                     "Refilled the bucket",
-                    "namespace"_attr = _nss,
+                    logAttrs(_nss),
                     "collectionUUID"_attr = _collUuid,
                     "numSecondsElapsed"_attr = numSecondsElapsed,
                     "numTokensPerSecond"_attr = numTokensPerSecond,
@@ -238,7 +238,7 @@ bool QueryAnalysisSampler::SampleRateLimiter::tryConsume() {
         LOGV2_DEBUG(7372304,
                     2,
                     "Successfully consumed one token",
-                    "namespace"_attr = _nss,
+                    logAttrs(_nss),
                     "collectionUUID"_attr = _collUuid,
                     "lastNumTokens"_attr = _lastNumTokens);
         return true;
@@ -249,7 +249,7 @@ bool QueryAnalysisSampler::SampleRateLimiter::tryConsume() {
         LOGV2_DEBUG(7372305,
                     2,
                     "Successfully consumed approximately one token",
-                    "namespace"_attr = _nss,
+                    logAttrs(_nss),
                     "collectionUUID"_attr = _collUuid,
                     "lastNumTokens"_attr = _lastNumTokens);
         return true;
@@ -257,7 +257,7 @@ bool QueryAnalysisSampler::SampleRateLimiter::tryConsume() {
     LOGV2_DEBUG(7372306,
                 2,
                 "Failed to consume one token",
-                "namespace"_attr = _nss,
+                logAttrs(_nss),
                 "collectionUUID"_attr = _collUuid,
                 "lastNumTokens"_attr = _lastNumTokens);
     return false;

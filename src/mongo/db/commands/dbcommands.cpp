@@ -396,7 +396,7 @@ public:
             } catch (DBException& ex) {
                 LOGV2_WARNING(23801,
                               "Internal error while reading",
-                              "namespace"_attr = nss,
+                              logAttrs(nss),
                               "error"_attr = ex.toStatus());
                 ex.addContext("Executor error while reading during dataSize command");
                 throw;

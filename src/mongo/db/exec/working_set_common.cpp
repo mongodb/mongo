@@ -141,7 +141,7 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
                 "Erroneous index key found with reference to non-existent record id. Consider "
                 "dropping and then re-creating the index and then running the validate command "
                 "on the collection.",
-                "namespace"_attr = ns,
+                logAttrs(ns),
                 "recordId"_attr = member->recordId,
                 "indexKeyData"_attr = indexKeyData);
         }

@@ -195,7 +195,7 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
         .onError([this, anchor = shared_from_this()](const Status& status) {
             LOGV2_ERROR(6206401,
                         "Error running reshard collection",
-                        "namespace"_attr = nss(),
+                        logAttrs(nss()),
                         "error"_attr = redact(status));
             return status;
         });

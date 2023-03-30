@@ -136,7 +136,7 @@ public:
                             1,
                             "Forcing remote routing table refresh for {namespace}",
                             "Forcing remote routing table refresh",
-                            "namespace"_attr = ns());
+                            logAttrs(ns()));
                 onCollectionPlacementVersionMismatch(opCtx, ns(), boost::none);
             }
 

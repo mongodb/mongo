@@ -655,7 +655,7 @@ bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
               "data"_attr = data,
               "threadName"_attr = threadName,
               "appName"_attr = appName,
-              "namespace"_attr = nss,
+              logAttrs(nss),
               "isInternalClient"_attr = isInternalClient,
               "command"_attr = cmd->getName());
         return true;
@@ -668,7 +668,7 @@ bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
                   "data"_attr = data,
                   "threadName"_attr = threadName,
                   "appName"_attr = appName,
-                  "namespace"_attr = nss,
+                  logAttrs(nss),
                   "isInternalClient"_attr = isInternalClient,
                   "command"_attr = cmd->getName());
 

@@ -1543,7 +1543,7 @@ void ShardingCatalogManager::upgradeChunksHistory(OperationContext* opCtx,
         LOGV2(620650,
               "Resetting the 'historyIsAt40' field for all chunks in collection {namespace} in "
               "order to force all chunks' history to get recreated",
-              "namespace"_attr = nss.ns());
+              logAttrs(nss));
 
         BatchedCommandRequest request([collUuid = coll.getUuid()] {
             write_ops::UpdateCommandRequest updateOp(ChunkType::ConfigNS);
@@ -2122,7 +2122,7 @@ void ShardingCatalogManager::splitOrMarkJumbo(OperationContext* opCtx,
                       "Couldn't mark chunk with namespace {namespace} and min key {minKey} as "
                       "jumbo due to {error}",
                       "Couldn't mark chunk as jumbo",
-                      "namespace"_attr = redact(nss.ns()),
+                      "namespace"_attr = redact(toStringForLogging(nss)),
                       "minKey"_attr = redact(chunk.getMin()),
                       "error"_attr = redact(status.getStatus()));
             }

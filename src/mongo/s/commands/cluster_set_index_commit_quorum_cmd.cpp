@@ -102,11 +102,8 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
-        LOGV2_DEBUG(22757,
-                    1,
-                    "setIndexCommitQuorum",
-                    "namespace"_attr = nss,
-                    "command"_attr = redact(cmdObj));
+        LOGV2_DEBUG(
+            22757, 1, "setIndexCommitQuorum", logAttrs(nss), "command"_attr = redact(cmdObj));
 
         auto cri =
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
@@ -128,7 +125,7 @@ public:
         CommandHelpers::appendSimpleCommandStatus(result, ok, errmsg);
 
         if (ok) {
-            LOGV2(5688700, "Index commit quorums set", "namespace"_attr = nss);
+            LOGV2(5688700, "Index commit quorums set", logAttrs(nss));
         }
 
         return ok;

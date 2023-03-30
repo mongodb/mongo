@@ -423,13 +423,13 @@ void OpObserverImpl::onCreateIndex(OperationContext* opCtx,
         if (opTime.isNull()) {
             LOGV2(7360100,
                   "Added oplog entry for createIndexes to transaction",
-                  "namespace"_attr = oplogEntry.getNss(),
+                  logAttrs(oplogEntry.getNss()),
                   "uuid"_attr = oplogEntry.getUuid(),
                   "object"_attr = oplogEntry.getObject());
         } else {
             LOGV2(7360101,
                   "Wrote oplog entry for createIndexes",
-                  "namespace"_attr = oplogEntry.getNss(),
+                  logAttrs(oplogEntry.getNss()),
                   "uuid"_attr = oplogEntry.getUuid(),
                   "opTime"_attr = opTime,
                   "object"_attr = oplogEntry.getObject());
@@ -1199,13 +1199,13 @@ void OpObserverImpl::onCreateCollection(OperationContext* opCtx,
         if (opTime.isNull()) {
             LOGV2(7360102,
                   "Added oplog entry for create to transaction",
-                  "namespace"_attr = oplogEntry.getNss(),
+                  logAttrs(oplogEntry.getNss()),
                   "uuid"_attr = oplogEntry.getUuid(),
                   "object"_attr = oplogEntry.getObject());
         } else {
             LOGV2(7360103,
                   "Wrote oplog entry for create",
-                  "namespace"_attr = oplogEntry.getNss(),
+                  logAttrs(oplogEntry.getNss()),
                   "uuid"_attr = oplogEntry.getUuid(),
                   "opTime"_attr = opTime,
                   "object"_attr = oplogEntry.getObject());
@@ -1257,7 +1257,7 @@ void OpObserverImpl::onCollMod(OperationContext* opCtx,
         if (opCtx->writesAreReplicated()) {
             LOGV2(7360104,
                   "Wrote oplog entry for collMod",
-                  "namespace"_attr = oplogEntry.getNss(),
+                  logAttrs(oplogEntry.getNss()),
                   "uuid"_attr = oplogEntry.getUuid(),
                   "opTime"_attr = opTime,
                   "object"_attr = oplogEntry.getObject());
@@ -1290,7 +1290,7 @@ void OpObserverImpl::onDropDatabase(OperationContext* opCtx, const DatabaseName&
     if (opCtx->writesAreReplicated()) {
         LOGV2(7360105,
               "Wrote oplog entry for dropDatabase",
-              "namespace"_attr = oplogEntry.getNss(),
+              logAttrs(oplogEntry.getNss()),
               "opTime"_attr = opTime,
               "object"_attr = oplogEntry.getObject());
     }
@@ -1338,7 +1338,7 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
             logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _oplogWriter.get());
         LOGV2(7360106,
               "Wrote oplog entry for drop",
-              "namespace"_attr = oplogEntry.getNss(),
+              logAttrs(oplogEntry.getNss()),
               "uuid"_attr = oplogEntry.getUuid(),
               "opTime"_attr = opTime,
               "object"_attr = oplogEntry.getObject());
@@ -1400,7 +1400,7 @@ void OpObserverImpl::onDropIndex(OperationContext* opCtx,
     if (opCtx->writesAreReplicated()) {
         LOGV2(7360107,
               "Wrote oplog entry for dropIndexes",
-              "namespace"_attr = oplogEntry.getNss(),
+              logAttrs(oplogEntry.getNss()),
               "uuid"_attr = oplogEntry.getUuid(),
               "opTime"_attr = opTime,
               "object"_attr = oplogEntry.getObject());
@@ -1456,7 +1456,7 @@ repl::OpTime OpObserverImpl::preRenameCollection(OperationContext* const opCtx,
     if (opCtx->writesAreReplicated()) {
         LOGV2(7360108,
               "Wrote oplog entry for renameCollection",
-              "namespace"_attr = oplogEntry.getNss(),
+              logAttrs(oplogEntry.getNss()),
               "uuid"_attr = oplogEntry.getUuid(),
               "opTime"_attr = opTime,
               "object"_attr = oplogEntry.getObject());

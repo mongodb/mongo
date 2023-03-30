@@ -84,7 +84,7 @@ void assertNoMovePrimaryInProgress(OperationContext* opCtx, NamespaceString cons
 
         if (!collDesc.isSharded()) {
             if (scopedDss->isMovePrimaryInProgress()) {
-                LOGV2(4945200, "assertNoMovePrimaryInProgress", "namespace"_attr = nss.toString());
+                LOGV2(4945200, "assertNoMovePrimaryInProgress", logAttrs(nss));
 
                 uasserted(ErrorCodes::MovePrimaryInProgress,
                           "movePrimary is in progress for namespace " + nss.toString());

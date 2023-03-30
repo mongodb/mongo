@@ -189,7 +189,7 @@ Status repairCollection(OperationContext* opCtx,
                         const NamespaceString& nss) {
     opCtx->checkForInterrupt();
 
-    LOGV2(21027, "Repairing collection", "namespace"_attr = nss);
+    LOGV2(21027, "Repairing collection", logAttrs(nss));
 
     Status status = Status::OK();
     {

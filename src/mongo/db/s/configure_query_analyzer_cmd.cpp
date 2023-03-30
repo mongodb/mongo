@@ -181,7 +181,7 @@ public:
             // document.
             LOGV2(6915001,
                   "Persisting query analyzer configuration",
-                  "namespace"_attr = nss,
+                  logAttrs(nss),
                   "collectionUUID"_attr = collUuid,
                   "mode"_attr = mode,
                   "sampleRate"_attr = sampleRate);

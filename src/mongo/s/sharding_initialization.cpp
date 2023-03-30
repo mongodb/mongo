@@ -292,7 +292,7 @@ void preCacheMongosRoutingInfo(OperationContext* opCtx) {
             if (!resp.isOK()) {
                 LOGV2_WARNING(6203600,
                               "Failed to warmup collection routing information",
-                              "namespace"_attr = coll,
+                              logAttrs(coll),
                               "error"_attr = redact(resp.getStatus()));
             }
         }

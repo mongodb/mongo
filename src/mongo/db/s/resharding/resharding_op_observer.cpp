@@ -237,7 +237,7 @@ void ReshardingOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEn
                     LOGV2_INFO(6148200,
                                "Interrupted while waiting for resharding coordinator to be rebuilt;"
                                " will retry on new primary",
-                               "namespace"_attr = newCoordinatorDoc.getSourceNss(),
+                               logAttrs(newCoordinatorDoc.getSourceNss()),
                                "reshardingUUID"_attr = newCoordinatorDoc.getReshardingUUID(),
                                "error"_attr = redact(ex.toStatus()));
                 }

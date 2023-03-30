@@ -471,7 +471,7 @@ Status MovePrimarySourceManager::cleanStaleData(OperationContext* opCtx) {
             LOGV2(22045,
                   "Failed to drop cloned collection {namespace} in movePrimary: {error}",
                   "Failed to drop cloned collection in movePrimary",
-                  "namespace"_attr = coll,
+                  logAttrs(coll),
                   "error"_attr = redact(dropStatus));
         }
     }

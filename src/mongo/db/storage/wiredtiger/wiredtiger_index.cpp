@@ -676,7 +676,7 @@ void WiredTigerIndex::_repairDataFormatVersion(OperationContext* opCtx,
                                  .getValue();
         LOGV2_WARNING(6818600,
                       "Fixing index metadata data format version",
-                      "namespace"_attr = desc->getEntry()->getNSSFromCatalog(opCtx),
+                      logAttrs(desc->getEntry()->getNSSFromCatalog(opCtx)),
                       "indexName"_attr = desc->indexName(),
                       "prevVersion"_attr = prevVersion,
                       "newVersion"_attr = _dataFormatVersion);

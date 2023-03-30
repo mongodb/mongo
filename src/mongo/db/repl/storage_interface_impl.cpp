@@ -199,7 +199,7 @@ StorageInterfaceImpl::createCollectionForBulkLoading(
                 2,
                 "StorageInterfaceImpl::createCollectionForBulkLoading called for ns: {namespace}",
                 "StorageInterfaceImpl::createCollectionForBulkLoading called",
-                "namespace"_attr = nss.ns());
+                logAttrs(nss));
 
     class StashClient {
     public:

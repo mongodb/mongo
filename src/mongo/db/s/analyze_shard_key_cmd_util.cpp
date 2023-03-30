@@ -347,7 +347,7 @@ CardinalityFrequencyMetrics calculateCardinalityAndFrequencyUnique(OperationCont
                                                                    int64_t numDocs) {
     LOGV2(6915302,
           "Calculating cardinality and frequency for a unique shard key",
-          "namespace"_attr = nss,
+          logAttrs(nss),
           "shardKey"_attr = shardKey);
 
     CardinalityFrequencyMetrics metrics;
@@ -401,7 +401,7 @@ CardinalityFrequencyMetrics calculateCardinalityAndFrequencyGeneric(OperationCon
                                                                     const BSONObj& hintIndexKey) {
     LOGV2(6915303,
           "Calculating cardinality and frequency for a non-unique shard key",
-          "namespace"_attr = nss,
+          logAttrs(nss),
           "shardKey"_attr = shardKey,
           "indexKey"_attr = hintIndexKey);
 
@@ -458,7 +458,7 @@ MonotonicityMetrics calculateMonotonicity(OperationContext* opCtx,
                                           const BSONObj& shardKey) {
     LOGV2(6915304,
           "Calculating monotonicity",
-          "namespace"_attr = collection->ns(),
+          logAttrs(collection->ns()),
           "shardKey"_attr = shardKey);
 
     MonotonicityMetrics metrics;
@@ -538,7 +538,7 @@ MonotonicityMetrics calculateMonotonicity(OperationContext* opCtx,
     auto coefficientThreshold = gMonotonicityCorrelationCoefficientThreshold.load();
     LOGV2(6875302,
           "Calculated monotonicity",
-          "namespace"_attr = collection->ns(),
+          logAttrs(collection->ns()),
           "shardKey"_attr = shardKey,
           "indexKey"_attr = indexKeyPattern,
           "numRecords"_attr = recordIds.size(),
@@ -778,7 +778,7 @@ KeyCharacteristicsMetrics calculateKeyCharacteristicsMetrics(OperationContext* o
 
         LOGV2(6915305,
               "Calculating metrics about the characteristics of the shard key",
-              "namespace"_attr = nss,
+              logAttrs(nss),
               "shardKey"_attr = shardKeyBson,
               "indexKey"_attr = indexKeyBson);
         analyzeShardKeyPauseBeforeCalculatingKeyCharacteristicsMetrics.pauseWhileSet(opCtx);
@@ -816,7 +816,7 @@ std::pair<ReadDistributionMetrics, WriteDistributionMetrics> calculateReadWriteD
     const KeyPattern& shardKey) {
     LOGV2(6915306,
           "Calculating metrics about the read and write distribution",
-          "namespace"_attr = nss,
+          logAttrs(nss),
           "shardKey"_attr = shardKey);
     analyzeShardKeyPauseBeforeCalculatingReadWriteDistributionMetrics.pauseWhileSet(opCtx);
 

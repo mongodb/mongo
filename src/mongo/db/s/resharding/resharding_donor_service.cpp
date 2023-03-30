@@ -277,7 +277,7 @@ ExecutorFuture<void> ReshardingDonorService::DonorStateMachine::_runUntilBlockin
 
             LOGV2(4956400,
                   "Resharding operation donor state machine failed",
-                  "namespace"_attr = _metadata.getSourceNss(),
+                  logAttrs(_metadata.getSourceNss()),
                   "reshardingUUID"_attr = _metadata.getReshardingUUID(),
                   "error"_attr = status);
 
@@ -642,7 +642,7 @@ void ReshardingDonorService::DonorStateMachine::
     LOGV2_DEBUG(5390702,
                 2,
                 "Collection being resharded now ready for recipients to begin cloning",
-                "namespace"_attr = _metadata.getSourceNss(),
+                logAttrs(_metadata.getSourceNss()),
                 "minFetchTimestamp"_attr = minFetchTimestamp,
                 "bytesToClone"_attr = bytesToClone,
                 "documentsToClone"_attr = documentsToClone,
@@ -763,7 +763,7 @@ void ReshardingDonorService::DonorStateMachine::
                 LOGV2_DEBUG(5279504,
                             0,
                             "Committed oplog entries to temporarily block writes for resharding",
-                            "namespace"_attr = _metadata.getSourceNss(),
+                            logAttrs(_metadata.getSourceNss()),
                             "reshardingUUID"_attr = _metadata.getReshardingUUID(),
                             "numRecipients"_attr = _recipientShardIds.size(),
                             "duration"_attr = duration_cast<Milliseconds>(latency.elapsed()));
@@ -857,7 +857,7 @@ void ReshardingDonorService::DonorStateMachine::_transitionState(DonorShardConte
                "Transitioned resharding donor state",
                "newState"_attr = DonorState_serializer(newState),
                "oldState"_attr = DonorState_serializer(oldState),
-               "namespace"_attr = _metadata.getSourceNss(),
+               logAttrs(_metadata.getSourceNss()),
                "collectionUUID"_attr = _metadata.getSourceUUID(),
                "reshardingUUID"_attr = _metadata.getReshardingUUID());
 }

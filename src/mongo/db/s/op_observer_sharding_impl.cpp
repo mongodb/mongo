@@ -79,7 +79,7 @@ void assertNoMovePrimaryInProgress(OperationContext* opCtx, const NamespaceStrin
     const auto scopedDss =
         DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, nss.dbName());
     if (scopedDss->isMovePrimaryInProgress()) {
-        LOGV2(4908600, "assertNoMovePrimaryInProgress", "namespace"_attr = nss.toString());
+        LOGV2(4908600, "assertNoMovePrimaryInProgress", logAttrs(nss));
 
         uasserted(ErrorCodes::MovePrimaryInProgress,
                   "movePrimary is in progress for namespace " + nss.toString());

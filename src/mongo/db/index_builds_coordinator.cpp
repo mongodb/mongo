@@ -803,7 +803,7 @@ std::vector<UUID> IndexBuildsCoordinator::abortCollectionIndexBuilds(
 
     LOGV2(23879,
           "About to abort all index builders",
-          "namespace"_attr = collectionNss,
+          logAttrs(collectionNss),
           "uuid"_attr = collectionUUID,
           "reason"_attr = reason);
 
@@ -1226,7 +1226,7 @@ void IndexBuildsCoordinator::applyAbortIndexBuild(OperationContext* opCtx,
     LOGV2(5010504,
           "Index build: failed to abort index build while applying abortIndexBuild operation",
           "buildUUID"_attr = buildUUID,
-          "namespace"_attr = nss,
+          logAttrs(nss),
           "collectionUUID"_attr = collUUID,
           "cause"_attr = *oplogEntry.cause);
 
@@ -1974,7 +1974,7 @@ void IndexBuildsCoordinator::createIndex(OperationContext* opCtx,
                         1,
                         "Ignoring indexing error",
                         "error"_attr = redact(status),
-                        "namespace"_attr = nss,
+                        logAttrs(nss),
                         "collectionUUID"_attr = collectionUUID,
                         "spec"_attr = spec);
             return;

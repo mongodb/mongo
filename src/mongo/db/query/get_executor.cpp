@@ -753,7 +753,7 @@ public:
             LOGV2_DEBUG(20921,
                         2,
                         "Collection does not exist. Using EOF plan",
-                        "namespace"_attr = _cq->ns(),
+                        logAttrs(_cq->nss()),
                         "canonicalQuery"_attr = redact(_cq->toStringShort()));
 
             auto solution = std::make_unique<QuerySolution>();
@@ -1783,7 +1783,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
         LOGV2_DEBUG(20927,
                     2,
                     "Collection does not exist. Using EOF stage",
-                    "namespace"_attr = nss.ns(),
+                    logAttrs(nss),
                     "query"_attr = redact(request->getQuery()));
         return plan_executor_factory::make(expCtx,
                                            std::move(ws),
@@ -2003,7 +2003,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
         LOGV2_DEBUG(20929,
                     2,
                     "Collection does not exist. Using EOF stage",
-                    "namespace"_attr = nss.ns(),
+                    logAttrs(nss),
                     "query"_attr = redact(request->getQuery()));
         return plan_executor_factory::make(expCtx,
                                            std::move(ws),

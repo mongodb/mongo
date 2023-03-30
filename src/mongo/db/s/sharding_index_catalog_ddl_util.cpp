@@ -97,8 +97,8 @@ void renameCollectionShardingIndexCatalog(OperationContext* opCtx,
                                     "than current collection index version",
                                     "collectionIndexVersion"_attr = toIndexVersion,
                                     "expectedIndexVersion"_attr = indexVersion,
-                                    "fromNss"_attr = redact(fromNss.toString()),
-                                    "toNss"_attr = redact(toNss.toString()));
+                                    "fromNss"_attr = redact(toStringForLogging(fromNss)),
+                                    "toNss"_attr = redact(toStringForLogging(toNss)));
                         return;
                     }
                     toUuid.emplace(collectionTo.getUuid());
@@ -197,7 +197,7 @@ void addShardingIndexCatalogEntryToCollection(OperationContext* opCtx,
                                     "older than current collection index version",
                                     "collectionIndexVersion"_attr = *collection.getIndexVersion(),
                                     "expectedIndexVersion"_attr = lastmod,
-                                    "nss"_attr = redact(userCollectionNss.toString()));
+                                    "nss"_attr = redact(toStringForLogging(userCollectionNss)));
                         return;
                     }
                 }
@@ -274,7 +274,7 @@ void removeShardingIndexCatalogEntryFromCollection(OperationContext* opCtx,
                                     "version older than current collection index version",
                                     "collectionIndexVersion"_attr = *collection.getIndexVersion(),
                                     "expectedIndexVersion"_attr = lastmod,
-                                    "nss"_attr = redact(nss.toString()));
+                                    "nss"_attr = redact(toStringForLogging(nss)));
                         return;
                     }
                 }
@@ -348,7 +348,7 @@ void replaceCollectionShardingIndexCatalog(OperationContext* opCtx,
                                     "current collection index version",
                                     "collectionIndexVersion"_attr = *collection.getIndexVersion(),
                                     "expectedIndexVersion"_attr = indexVersion,
-                                    "nss"_attr = redact(nss.toString()));
+                                    "nss"_attr = redact(toStringForLogging(nss)));
                         return;
                     }
                 }
@@ -425,7 +425,7 @@ void dropCollectionShardingIndexCatalog(OperationContext* opCtx, const Namespace
                                 1,
                                 "dropCollectionGlobalIndexesMetadata did not found collection, "
                                 "skipping dropping index metadata",
-                                "nss"_attr = redact(nss.toString()));
+                                "nss"_attr = redact(toStringForLogging(nss)));
                     return;
                 }
                 auto collection = ShardAuthoritativeCollectionType::parse(

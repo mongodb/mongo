@@ -153,7 +153,7 @@ BaseCloner::AfterStageBehavior TenantDatabaseCloner::listCollectionsStage() {
             LOGV2_DEBUG(4881602,
                         1,
                         "Database cloner skipping 'system' collection",
-                        "namespace"_attr = collectionNamespace.ns(),
+                        logAttrs(collectionNamespace),
                         "tenantId"_attr = _tenantId);
             continue;
         }
@@ -221,7 +221,7 @@ BaseCloner::AfterStageBehavior TenantDatabaseCloner::listExistingCollectionsStag
                         "Tenant database cloner skipping 'system' collection",
                         "migrationId"_attr = getSharedData()->getMigrationId(),
                         "tenantId"_attr = _tenantId,
-                        "namespace"_attr = collectionNamespace.ns());
+                        logAttrs(collectionNamespace));
             continue;
         }
         clonedCollectionUUIDs.emplace_back(result.getInfo().getUuid());
@@ -330,12 +330,12 @@ void TenantDatabaseCloner::postStage() {
             LOGV2_DEBUG(4881600,
                         1,
                         "Tenant collection clone finished",
-                        "namespace"_attr = sourceNss,
+                        logAttrs(sourceNss),
                         "tenantId"_attr = _tenantId);
         } else {
             LOGV2_ERROR(4881601,
                         "Tenant collection clone failed",
-                        "namespace"_attr = sourceNss,
+                        logAttrs(sourceNss),
                         "error"_attr = collStatus.toString(),
                         "tenantId"_attr = _tenantId);
             auto message = collStatus.withContext(str::stream() << "Error cloning collection '"

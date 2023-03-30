@@ -101,7 +101,7 @@ void CollectionMetadata::throwIfReshardingInProgress(NamespaceString const& nss)
         const auto& reshardingFields = getReshardingFields();
         // Throw if the coordinator is not in states "aborting", "committing", or "done".
         if (reshardingFields && reshardingFields->getState() < CoordinatorStateEnum::kAborting) {
-            LOGV2(5277122, "reshardCollection in progress", "namespace"_attr = nss.toString());
+            LOGV2(5277122, "reshardCollection in progress", logAttrs(nss));
 
             uasserted(ErrorCodes::ReshardCollectionInProgress,
                       "reshardCollection is in progress for namespace " + nss.toString());

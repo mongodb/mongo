@@ -96,7 +96,7 @@ BaseCloner::AfterStageBehavior DatabaseCloner::listCollectionsStage() {
                         1,
                         "Skipping 'system' collection: {namespace}",
                         "Database cloner skipping 'system' collection",
-                        "namespace"_attr = collectionNamespace.ns());
+                        logAttrs(collectionNamespace));
             continue;
         }
         LOGV2_DEBUG(21147,
@@ -161,12 +161,12 @@ void DatabaseCloner::postStage() {
                         1,
                         "collection clone finished: {namespace}",
                         "Collection clone finished",
-                        "namespace"_attr = sourceNss);
+                        logAttrs(sourceNss));
         } else {
             LOGV2_ERROR(21149,
                         "collection clone for '{namespace}' failed due to {error}",
                         "Collection clone failed",
-                        "namespace"_attr = sourceNss,
+                        logAttrs(sourceNss),
                         "error"_attr = collStatus.toString());
             setSyncFailedStatus({ErrorCodes::InitialSyncFailure,
                                  collStatus

@@ -122,7 +122,7 @@ void DropCollectionCoordinator::dropCollectionLocally(OperationContext* opCtx,
         LOGV2_DEBUG(5280920,
                     1,
                     "Namespace not found while trying to delete local collection",
-                    "namespace"_attr = nss);
+                    logAttrs(nss));
     }
 
     // Force the refresh of the catalog cache to purge outdated information. Note also that this
@@ -179,7 +179,7 @@ ExecutorFuture<void> DropCollectionCoordinator::_runImpl(
                 !status.isA<ErrorCategory::ShutdownError>()) {
                 LOGV2_ERROR(5280901,
                             "Error running drop collection",
-                            "namespace"_attr = nss(),
+                            logAttrs(nss()),
                             "error"_attr = redact(status));
             }
             return status;
@@ -257,7 +257,7 @@ void DropCollectionCoordinator::_freezeMigrations(
 
 void DropCollectionCoordinator::_enterCriticalSection(
     std::shared_ptr<executor::ScopedTaskExecutor> executor) {
-    LOGV2_DEBUG(7038100, 2, "Acquiring critical section", "namespace"_attr = nss());
+    LOGV2_DEBUG(7038100, 2, "Acquiring critical section", logAttrs(nss()));
 
     auto opCtxHolder = cc().makeOperationContext();
     auto* opCtx = opCtxHolder.get();
@@ -278,7 +278,7 @@ void DropCollectionCoordinator::_enterCriticalSection(
         Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx),
         **executor);
 
-    LOGV2_DEBUG(7038101, 2, "Acquired critical section", "namespace"_attr = nss());
+    LOGV2_DEBUG(7038101, 2, "Acquired critical section", logAttrs(nss()));
 }
 
 void DropCollectionCoordinator::_commitDropCollection(
@@ -289,11 +289,7 @@ void DropCollectionCoordinator::_commitDropCollection(
 
     const auto collIsSharded = bool(_doc.getCollInfo());
 
-    LOGV2_DEBUG(5390504,
-                2,
-                "Dropping collection",
-                "namespace"_attr = nss(),
-                "sharded"_attr = collIsSharded);
+    LOGV2_DEBUG(5390504, 2, "Dropping collection", logAttrs(nss()), "sharded"_attr = collIsSharded);
 
     if (collIsSharded) {
         invariant(_doc.getCollInfo());
@@ -333,12 +329,12 @@ void DropCollectionCoordinator::_commitDropCollection(
     sharding_ddl_util::removeQueryAnalyzerMetadataFromConfig(opCtx, nss(), boost::none);
 
     ShardingLogging::get(opCtx)->logChange(opCtx, "dropCollection", nss().ns());
-    LOGV2(5390503, "Collection dropped", "namespace"_attr = nss());
+    LOGV2(5390503, "Collection dropped", logAttrs(nss()));
 }
 
 void DropCollectionCoordinator::_exitCriticalSection(
     std::shared_ptr<executor::ScopedTaskExecutor> executor) {
-    LOGV2_DEBUG(7038102, 2, "Releasing critical section", "namespace"_attr = nss());
+    LOGV2_DEBUG(7038102, 2, "Releasing critical section", logAttrs(nss()));
 
     auto opCtxHolder = cc().makeOperationContext();
     auto* opCtx = opCtxHolder.get();
@@ -359,7 +355,7 @@ void DropCollectionCoordinator::_exitCriticalSection(
         Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx),
         **executor);
 
-    LOGV2_DEBUG(7038103, 2, "Released critical section", "namespace"_attr = nss());
+    LOGV2_DEBUG(7038103, 2, "Released critical section", logAttrs(nss()));
 }
 
 }  // namespace mongo

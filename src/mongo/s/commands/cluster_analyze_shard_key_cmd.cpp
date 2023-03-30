@@ -147,7 +147,7 @@ public:
                           "Failed to analyze shard key on the selected shard since it did not "
                           "have any documents for the collection locally. Retrying on a different "
                           "shard.",
-                          "namespace"_attr = nss,
+                          logAttrs(nss),
                           "shardKey"_attr = request().getKey(),
                           "shardId"_attr = shardId,
                           "error"_attr = status);

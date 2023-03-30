@@ -113,7 +113,7 @@ void profile(OperationContext* opCtx, NetworkOp op) {
             LOGV2(20700,
                   "note: not profiling because db went away for {namespace}",
                   "note: not profiling because db went away for namespace",
-                  "namespace"_attr = ns);
+                  logAttrs(ns));
             return;
         }
 
@@ -132,7 +132,7 @@ void profile(OperationContext* opCtx, NetworkOp op) {
                       "{namespace}: {assertion}",
                       "Caught Assertion while trying to profile operation",
                       "operation"_attr = networkOpToString(op),
-                      "namespace"_attr = ns,
+                      logAttrs(ns),
                       "assertion"_attr = redact(assertionEx));
     }
 }
@@ -162,7 +162,7 @@ Status createProfileCollection(OperationContext* opCtx, Database* db) {
         LOGV2(20701,
               "Creating profile collection: {namespace}",
               "Creating profile collection",
-              "namespace"_attr = dbProfilingNS);
+              logAttrs(dbProfilingNS));
 
         CollectionOptions collectionOptions;
         collectionOptions.capped = true;

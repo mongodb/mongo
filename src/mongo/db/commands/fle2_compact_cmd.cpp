@@ -76,7 +76,7 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
     const bool useV1Protocol =
         !gFeatureFlagFLE2ProtocolVersion2.isEnabled(serverGlobalParams.featureCompatibility);
 
-    LOGV2(6319900, "Compacting the encrypted compaction collection", "namespace"_attr = edcNss);
+    LOGV2(6319900, "Compacting the encrypted compaction collection", logAttrs(edcNss));
 
     AutoGetDb autoDb(opCtx, edcNss.dbName(), MODE_IX);
     uassert(ErrorCodes::NamespaceNotFound,
@@ -149,7 +149,7 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
     } else {
         LOGV2(7293610,
               "Resuming compaction from a stale ECOC collection",
-              "namespace"_attr = namespaces.ecocRenameNss);
+              logAttrs(namespaces.ecocRenameNss));
     }
 
     if (!ecoc) {
@@ -171,7 +171,7 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
             LOGV2_DEBUG(7299602,
                         1,
                         "Create collection failed because namespace already exists",
-                        "namespace"_attr = namespaces.ecocNss);
+                        logAttrs(namespaces.ecocNss));
         }
     }
 
@@ -228,7 +228,7 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
 
     LOGV2(6319902,
           "Done compacting the encrypted compaction collection",
-          "namespace"_attr = request.getNamespace());
+          logAttrs(request.getNamespace()));
     return stats;
 }
 

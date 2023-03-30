@@ -431,6 +431,17 @@ public:
         return ns();
     }
 
+    /**
+     * Method to be used only when logging a NamespaceString in a log message.
+     * It is called anytime a NamespaceString is logged by logAttrs or otherwise.
+     */
+    friend std::string toStringForLogging(const NamespaceString& nss) {
+        if (auto tenantId = nss.tenantId())
+            return str::stream() << *tenantId << '_' << nss.ns();
+
+        return nss.ns();
+    }
+
     size_t size() const {
         return _ns.size();
     }

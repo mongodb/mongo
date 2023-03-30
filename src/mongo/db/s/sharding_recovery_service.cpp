@@ -149,7 +149,7 @@ void ShardingRecoveryService::acquireRecoverableCriticalSectionBlockWrites(
     LOGV2_DEBUG(5656600,
                 3,
                 "Acquiring recoverable critical section blocking writes",
-                "namespace"_attr = nss,
+                logAttrs(nss),
                 "reason"_attr = reason,
                 "writeConcern"_attr = writeConcern);
 
@@ -203,7 +203,7 @@ void ShardingRecoveryService::acquireRecoverableCriticalSectionBlockWrites(
                         3,
                         "The recoverable critical section was already acquired to block "
                         "writes, do nothing",
-                        "namespace"_attr = nss,
+                        logAttrs(nss),
                         "reason"_attr = reason,
                         "writeConcern"_attr = writeConcern);
 
@@ -248,7 +248,7 @@ void ShardingRecoveryService::acquireRecoverableCriticalSectionBlockWrites(
     LOGV2_DEBUG(5656602,
                 2,
                 "Acquired recoverable critical section blocking writes",
-                "namespace"_attr = nss,
+                logAttrs(nss),
                 "reason"_attr = reason,
                 "writeConcern"_attr = writeConcern);
 }
@@ -262,7 +262,7 @@ void ShardingRecoveryService::promoteRecoverableCriticalSectionToBlockAlsoReads(
     LOGV2_DEBUG(5656603,
                 3,
                 "Promoting recoverable critical section to also block reads",
-                "namespace"_attr = nss,
+                logAttrs(nss),
                 "reason"_attr = reason,
                 "writeConcern"_attr = writeConcern);
 
@@ -323,7 +323,7 @@ void ShardingRecoveryService::promoteRecoverableCriticalSectionToBlockAlsoReads(
                         3,
                         "The recoverable critical section was already promoted to also block "
                         "reads, do nothing",
-                        "namespace"_attr = nss,
+                        logAttrs(nss),
                         "reason"_attr = reason,
                         "writeConcern"_attr = writeConcern);
             return;
@@ -375,7 +375,7 @@ void ShardingRecoveryService::promoteRecoverableCriticalSectionToBlockAlsoReads(
     LOGV2_DEBUG(5656605,
                 2,
                 "Promoted recoverable critical section to also block reads",
-                "namespace"_attr = nss,
+                logAttrs(nss),
                 "reason"_attr = reason,
                 "writeConcern"_attr = writeConcern);
 }
@@ -390,7 +390,7 @@ void ShardingRecoveryService::releaseRecoverableCriticalSection(
     LOGV2_DEBUG(5656606,
                 3,
                 "Releasing recoverable critical section",
-                "namespace"_attr = nss,
+                logAttrs(nss),
                 "reason"_attr = reason,
                 "writeConcern"_attr = writeConcern);
 
@@ -430,7 +430,7 @@ void ShardingRecoveryService::releaseRecoverableCriticalSection(
             LOGV2_DEBUG(5656607,
                         3,
                         "The recoverable critical section was already released, do nothing",
-                        "namespace"_attr = nss,
+                        logAttrs(nss),
                         "reason"_attr = reason,
                         "writeConcern"_attr = writeConcern);
             return;
@@ -446,7 +446,7 @@ void ShardingRecoveryService::releaseRecoverableCriticalSection(
                         2,
                         "Impossible to release recoverable critical section since it was taken by "
                         "another operation with different reason",
-                        "namespace"_attr = nss,
+                        logAttrs(nss),
                         "callerReason"_attr = reason,
                         "storedReason"_attr = collCSDoc.getReason(),
                         "writeConcern"_attr = writeConcern);
@@ -505,7 +505,7 @@ void ShardingRecoveryService::releaseRecoverableCriticalSection(
     LOGV2_DEBUG(5656608,
                 2,
                 "Released recoverable critical section",
-                "namespace"_attr = nss,
+                logAttrs(nss),
                 "reason"_attr = reason,
                 "writeConcern"_attr = writeConcern);
 }
@@ -602,7 +602,7 @@ void ShardingRecoveryService::recoverIndexesCatalog(OperationContext* opCtx) {
                         2,
                         "Skipping attempting to clear indexes for a view in "
                         "recoverIndexCatalogs",
-                        "namespace"_attr = collName);
+                        logAttrs(collName));
         }
     }
     DBDirectClient client(opCtx);

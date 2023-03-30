@@ -305,7 +305,7 @@ void SessionCatalogMigrationDestination::_retrieveSessionStateFromSource(Service
                                   "Recipient finished draining oplog entries for retryable writes "
                                   "and transactions from donor again after receiving "
                                   "_recvChunkCommit",
-                                  "namespace"_attr = _nss,
+                                  logAttrs(_nss),
                                   "migrationSessionId"_attr = _migrationSessionId,
                                   "fromShard"_attr = _fromShard);
                             break;
@@ -328,7 +328,7 @@ void SessionCatalogMigrationDestination::_retrieveSessionStateFromSource(Service
                               "Recipient finished draining oplog entries for retryable writes and "
                               "transactions from donor for the first time, before receiving "
                               "_recvChunkCommit",
-                              "namespace"_attr = _nss,
+                              logAttrs(_nss),
                               "migrationSessionId"_attr = _migrationSessionId,
                               "fromShard"_attr = _fromShard);
                         _state = State::ReadyToCommit;
@@ -550,7 +550,7 @@ std::string SessionCatalogMigrationDestination::getErrMsg() {
 void SessionCatalogMigrationDestination::_errorOccurred(StringData errMsg) {
     LOGV2(5087102,
           "Recipient failed to copy oplog entries for retryable writes and transactions from donor",
-          "namespace"_attr = _nss,
+          logAttrs(_nss),
           "migrationSessionId"_attr = _migrationSessionId,
           "fromShard"_attr = _fromShard,
           "error"_attr = errMsg);

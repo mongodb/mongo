@@ -1103,7 +1103,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
                     "ignoring collection drop: {command}",
                     "applyCommand: collection is already in a drop-pending state, ignoring "
                     "collection drop",
-                    "namespace"_attr = nss,
+                    logAttrs(nss),
                     "command"_attr = redact(cmd));
               return Status::OK();
           }

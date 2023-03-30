@@ -305,7 +305,7 @@ public:
                                 "doc"_attr = doc,
                                 "shouldRestore"_attr = shouldRestore,
                                 logAttrs(coll->ns().dbName()),
-                                "dbNss"_attr = dbNss.toString());
+                                "dbNss"_attr = dbNss);
 
                     if (shouldRestore) {
                         // This database had at least one collection restored.

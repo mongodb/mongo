@@ -625,7 +625,7 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
               "Waiting for migration cleanup after chunk commit for the namespace {namespace} "
               "and range {range}",
               "Waiting for migration cleanup after chunk commit",
-              "namespace"_attr = nss(),
+              logAttrs(nss()),
               "range"_attr = redact(range.toString()),
               "migrationId"_attr = _coordinator->getMigrationId());
 

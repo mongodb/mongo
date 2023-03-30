@@ -113,7 +113,7 @@ StatusWith<int64_t> compactCollection(OperationContext* opCtx,
                   {LogComponent::kCommand},
                   "compact {namespace} begin",
                   "Compact begin",
-                  "namespace"_attr = collectionNss);
+                  logAttrs(collectionNss));
 
     auto bytesBefore = recordStore->storageSize(opCtx) + collection->getIndexSize(opCtx);
     auto indexCatalog = collection->getIndexCatalog();
@@ -136,7 +136,7 @@ StatusWith<int64_t> compactCollection(OperationContext* opCtx,
     // running. So it is possible for the size after a compact to be larger than before it.
     LOGV2(7386700,
           "Compact end",
-          "namespace"_attr = collectionNss,
+          logAttrs(collectionNss),
           "bytesBefore"_attr = bytesBefore,
           "bytesAfter"_attr = bytesAfter,
           "bytesDiff"_attr = bytesDiff);

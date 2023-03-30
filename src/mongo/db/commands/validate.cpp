@@ -128,7 +128,7 @@ void logCollStats(OperationContext* opCtx, const NamespaceString& nss) {
         LOGV2_OPTIONS(7463200,
                       logv2::LogTruncation::Disabled,
                       "Corrupt namespace $collStats results",
-                      "namespace"_attr = nss,
+                      logAttrs(nss),
                       "collStats"_attr =
                           collStatsResult.getObjectField("cursor").getObjectField("firstBatch"));
     } catch (const DBException& ex) {
@@ -136,7 +136,7 @@ void logCollStats(OperationContext* opCtx, const NamespaceString& nss) {
         // debug logging.
         LOGV2_WARNING(7463201,
                       "Failed to fetch $collStats for validation error",
-                      "namespace"_attr = nss,
+                      logAttrs(nss),
                       "error"_attr = ex.toStatus());
     }
 }
@@ -290,7 +290,7 @@ public:
         if (!serverGlobalParams.quiet.load()) {
             LOGV2(20514,
                   "CMD: validate",
-                  "namespace"_attr = nss,
+                  logAttrs(nss),
                   "background"_attr = background,
                   "full"_attr = fullValidate,
                   "enforceFastCount"_attr = enforceFastCount,
