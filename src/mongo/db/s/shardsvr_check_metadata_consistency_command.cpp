@@ -49,6 +49,30 @@
 namespace mongo {
 namespace {
 
+/*
+ * Retrieve from config server the list of databases for which this shard is primary for.
+ */
+std::vector<DatabaseType> getDatabasesThisShardIsPrimaryFor(OperationContext* opCtx) {
+    const auto thisShardId = ShardingState::get(opCtx)->shardId();
+    const auto configServer = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+    auto rawDatabases{uassertStatusOK(configServer->exhaustiveFindOnConfig(
+                                          opCtx,
+                                          ReadPreferenceSetting{ReadPreference::Nearest},
+                                          repl::ReadConcernLevel::kMajorityReadConcern,
+                                          NamespaceString::kConfigDatabasesNamespace,
+                                          BSON(DatabaseType::kPrimaryFieldName << thisShardId),
+                                          BSONObj() /* No sorting */,
+                                          boost::none /* No limit */))
+                          .docs};
+    std::vector<DatabaseType> databases;
+    databases.reserve(rawDatabases.size());
+    for (auto&& rawDb : rawDatabases) {
+        databases.emplace_back(
+            DatabaseType::parseOwned(IDLParserContext("DatabaseType"), std::move(rawDb)));
+    }
+    return databases;
+}
+
 MetadataConsistencyCommandLevelEnum getCommandLevel(const NamespaceString& nss) {
     if (nss.isAdminDB()) {
         return MetadataConsistencyCommandLevelEnum::kClusterLevel;
@@ -120,32 +144,24 @@ public:
 
             // Need to retrieve a list of databases which this shard is primary for and run the
             // command on each of them.
-            const auto databases = Grid::get(opCtx)->catalogClient()->getAllDBs(
-                opCtx, repl::ReadConcernLevel::kMajorityReadConcern);
-            const auto shardId = ShardingState::get(opCtx)->shardId();
-
-            // TODO: SERVER-73976: Retrieve the list of databases which the given shard is the
-            // primary db shard directly from configsvr.
-            for (const auto& db : databases) {
-                if (db.getPrimary() == shardId) {
-                    const NamespaceString dbNss{db.getName(), nss.coll()};
-                    ScopedSetShardRole scopedSetShardRole(opCtx,
-                                                          dbNss,
-                                                          boost::none /* shardVersion */,
-                                                          db.getVersion() /* databaseVersion */);
-                    try {
-                        auto dbCursors = _establishCursorOnParticipants(opCtx, dbNss);
-                        cursors.insert(cursors.end(),
-                                       std::make_move_iterator(dbCursors.begin()),
-                                       std::make_move_iterator(dbCursors.end()));
-                    } catch (const ExceptionFor<ErrorCodes::StaleDbVersion>& ex) {
-                        LOGV2_DEBUG(7328700,
-                                    1,
-                                    "Skipping database metadata check since the database is "
-                                    "currently being migrated",
-                                    logAttrs(dbNss.dbName()),
-                                    "error"_attr = redact(ex));
-                    }
+            for (const auto& db : getDatabasesThisShardIsPrimaryFor(opCtx)) {
+                const NamespaceString dbNss{db.getName(), nss.coll()};
+                ScopedSetShardRole scopedSetShardRole(opCtx,
+                                                      dbNss,
+                                                      boost::none /* shardVersion */,
+                                                      db.getVersion() /* databaseVersion */);
+                try {
+                    auto dbCursors = _establishCursorOnParticipants(opCtx, dbNss);
+                    cursors.insert(cursors.end(),
+                                   std::make_move_iterator(dbCursors.begin()),
+                                   std::make_move_iterator(dbCursors.end()));
+                } catch (const ExceptionFor<ErrorCodes::StaleDbVersion>& ex) {
+                    LOGV2_DEBUG(7328700,
+                                1,
+                                "Skipping database metadata check since the database is "
+                                "currently being migrated",
+                                logAttrs(dbNss.dbName()),
+                                "error"_attr = redact(ex));
                 }
             }
 
