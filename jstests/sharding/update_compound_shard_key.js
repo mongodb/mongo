@@ -249,6 +249,24 @@ if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
                                         {x: 102, y: 55, z: 3, a: 1},
                                         true /* isUpsert */,
                                         false /* inTransaction */);
+
+    // Query on partial shard key with _id.
+    assertUpdateWorkedWithNoMatchingDoc({x: 100, y: 50, a: 5, _id: 23},
+                                        {x: 100, y: 55, z: 3, a: 2},
+                                        true /* isUpsert */,
+                                        false /* inTransaction */);
+    assertUpdateWorkedWithNoMatchingDoc({x: 100, y: 50, a: 5, _id: 24, nonExistingField: true},
+                                        {x: 100, y: 55, z: 3, a: 3},
+                                        true /* isUpsert */,
+                                        false /* inTransaction */);
+
+    // Query on only _id.
+    assertUpdateWorkedWithNoMatchingDoc(
+        {_id: 25}, {z: 3, x: 4, y: 3, a: 4}, true /* isUpsert */, false /* inTransaction */);
+    assertUpdateWorkedWithNoMatchingDoc({_id: "nonExisting"},
+                                        {z: 3, x: 4, y: 3, a: 5},
+                                        true /* isUpsert */,
+                                        false /* inTransaction */);
 } else {
     // Full shard key not specified in query.
 
@@ -380,10 +398,17 @@ if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
                                         false /* inTransaction */);
     assertUpdateWorkedWithNoMatchingDoc(
         {y: 4}, {"$set": {z: 3, x: 4, y: 3, a: 2}}, true /* isUpsert */, false /* inTransaction */);
+
+    // Upserts that match on _id are successful.
+    assertUpdateWorkedWithNoMatchingDoc({_id: 20},
+                                        {"$set": {x: 2, y: 11, z: 10, opStyle: 7}},
+                                        true /* isUpsert */,
+                                        false /* inTransaction */);
+    assertUpdateWorkedWithNoMatchingDoc({_id: 21, y: 3},
+                                        {"$set": {z: 3, x: 4, y: 3, a: 1}},
+                                        true /* isUpsert */,
+                                        false /* inTransaction */);
 } else {
-    // TODO SERVER-75194: Move test case outside if-else. Should error with ShardKeyNotFound
-    // regardless of updateOneWithoutShardKey feature flag enablement. Query on _id doesn't work for
-    // upserts.
     assert.commandFailedWithCode(
         st.s.getDB(kDbName).coll.update(
             {_id: 0}, {"$set": {x: 2, y: 11, z: 10, opStyle: 7}}, {upsert: true}),
@@ -534,6 +559,17 @@ assert.eq(1, sessionDB.coll.find(upsertProjectTxnDoc).itcount());
 if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
     assertUpdateWorkedWithNoMatchingDoc({_id: 18, z: 4, x: 3},
                                         [{$addFields: {foo: 4}}],
+                                        true /* isUpsert */,
+                                        false /* inTransaction */);
+    assertUpdateWorkedWithNoMatchingDoc({_id: 22},
+                                        [{
+                                            "$project": {
+                                                x: {$literal: 2111},
+                                                y: {$literal: 55},
+                                                z: {$literal: 3},
+                                                pipelineUpdate: {$literal: true}
+                                            }
+                                        }],
                                         true /* isUpsert */,
                                         false /* inTransaction */);
 } else {

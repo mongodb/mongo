@@ -493,8 +493,13 @@ bool FindAndModifyCmd::run(OperationContext* opCtx,
     const auto& cm = cri.cm;
     if (cm.isSharded()) {
         const BSONObj query = cmdObjForShard.getObjectField("query");
-        if (write_without_shard_key::useTwoPhaseProtocol(
-                opCtx, nss, false /* isUpdateOrDelete */, query, getCollation(cmdObjForShard))) {
+        const bool isUpsert = cmdObjForShard.getBoolField("upsert");
+        if (write_without_shard_key::useTwoPhaseProtocol(opCtx,
+                                                         nss,
+                                                         false /* isUpdateOrDelete */,
+                                                         isUpsert,
+                                                         query,
+                                                         getCollation(cmdObjForShard))) {
             _runCommandWithoutShardKey(opCtx,
                                        nss,
                                        applyReadWriteConcern(opCtx, this, cmdObjForShard),
@@ -723,7 +728,12 @@ void FindAndModifyCmd::_handleWouldChangeOwningShardErrorRetryableWriteLegacy(
 
         if (const auto query = cmdObj.getObjectField("query");
             write_without_shard_key::useTwoPhaseProtocol(
-                opCtx, nss, false /* isUpdateOrDelete */, query, getCollation(cmdObj))) {
+                opCtx,
+                nss,
+                false /* isUpdateOrDelete */,
+                cmdObj.getBoolField("upsert") /* isUpsert */,
+                query,
+                getCollation(cmdObj))) {
             _runCommandWithoutShardKey(
                 opCtx, nss, stripWriteConcern(cmdObj), false /* isExplain */, result);
         } else {

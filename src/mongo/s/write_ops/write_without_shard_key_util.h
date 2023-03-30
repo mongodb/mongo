@@ -50,6 +50,7 @@ BSONObj generateUpsertDocument(OperationContext* opCtx, const UpdateRequest& upd
 bool useTwoPhaseProtocol(OperationContext* opCtx,
                          NamespaceString ns,
                          bool isUpdateOrDelete,
+                         bool isUpsert,
                          const BSONObj& query,
                          const BSONObj& collation);
 

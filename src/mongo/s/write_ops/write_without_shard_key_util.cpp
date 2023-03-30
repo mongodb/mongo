@@ -173,6 +173,7 @@ BSONObj constructUpsertResponse(BatchedCommandResponse& writeRes,
 bool useTwoPhaseProtocol(OperationContext* opCtx,
                          NamespaceString nss,
                          bool isUpdateOrDelete,
+                         bool isUpsert,
                          const BSONObj& query,
                          const BSONObj& collation) {
     if (!feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
@@ -198,10 +199,10 @@ bool useTwoPhaseProtocol(OperationContext* opCtx,
         CollatorInterface::collatorsMatch(collator.get(), cm.getDefaultCollator());
 
     // updateOne and deleteOne do not use the two phase protocol for single writes that specify
-    // _id in their queries. An exact _id match requires default collation if the _id value is a
-    // collatable type.
+    // _id in their queries, unless a document is being upserted. An exact _id match requires
+    // default collation if the _id value is a collatable type.
     if (isUpdateOrDelete && query.hasField("_id") &&
-        isExactIdQuery(opCtx, nss, query, collation, hasDefaultCollation)) {
+        isExactIdQuery(opCtx, nss, query, collation, hasDefaultCollation) && !isUpsert) {
         return false;
     }
 
