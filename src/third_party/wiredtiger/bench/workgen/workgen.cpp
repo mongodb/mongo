@@ -54,8 +54,7 @@ extern "C" {
 #include <stdint.h>
 #include <stdlib.h>
 #include <errno.h>
-#include "error.h"
-#include "misc.h"
+#include "test_util.h"
 }
 #define BUF_SIZE 100
 
@@ -1402,24 +1401,7 @@ pareto_calculation(uint32_t randint, uint64_t recno_max, ParetoOptions &pareto)
         r = (pareto.range_low * static_cast<double>(UINT32_MAX)) +
           r * (pareto.range_high - pareto.range_low);
     }
-    double S1 = (-1 / PARETO_SHAPE);
-    double S2 = recno_max * (pareto.param / 100.0) * (PARETO_SHAPE - 1);
-    double U = 1 - r / static_cast<double>(UINT32_MAX); // interval [0, 1)
-    uint32_t result = (uint64_t)((pow(U, S1) - 1) * S2);
-
-    /*
-     * This Pareto calculation chooses out of range values less than 20% of the time, depending on
-     * pareto_param. For param of 0, it is never out of range, for param of 100, 19.2%. For the
-     * default pareto_param of 20, it will be out of range 2.7% of the time. Out of range values are
-     * channeled into the first key, making it "hot". Unfortunately, that means that using a higher
-     * param can get a lot lumped into the first bucket.
-     *
-     * XXX This matches the behavior of wtperf, we may consider instead retrying (modifying the
-     * random number) until we get a good value.
-     */
-    if (result > recno_max)
-        result = 0;
-    return (result);
+    return testutil_pareto((uint64_t)r, recno_max, pareto.param);
 }
 
 uint64_t

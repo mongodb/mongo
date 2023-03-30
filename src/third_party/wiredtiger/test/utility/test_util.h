@@ -455,6 +455,7 @@ void testutil_lazyfs_clear_cache(WT_LAZY_FS *);
 void testutil_lazyfs_setup(WT_LAZY_FS *, const char *);
 void testutil_make_work_dir(const char *);
 void testutil_modify_apply(WT_ITEM *, WT_ITEM *, WT_MODIFY *, int, uint8_t);
+uint64_t testutil_pareto(uint64_t, uint64_t, u_int);
 void testutil_parse_begin_opt(int, char *const *, const char *, TEST_OPTS *);
 void testutil_parse_end_opt(TEST_OPTS *);
 int testutil_parse_single_opt(TEST_OPTS *, int);

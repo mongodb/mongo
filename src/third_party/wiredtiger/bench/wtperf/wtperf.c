@@ -2848,7 +2848,6 @@ wtperf_rand(WTPERF_THREAD *thread)
     CONFIG_OPTS *opts;
     WT_CURSOR *rnd_cursor;
     WTPERF *wtperf;
-    double S1, S2, U;
     uint64_t end_range, range, rval, start_range;
 #ifdef __SIZEOF_INT128__
     unsigned __int128 rval128;
@@ -2889,22 +2888,9 @@ wtperf_rand(WTPERF_THREAD *thread)
      * Use WiredTiger's random number routine: it's lock-free and fairly good.
      */
     rval = __wt_random(&thread->rnd);
-
     /* Use Pareto distribution to give 80/20 hot/cold values. */
-    if (opts->pareto != 0) {
-#define PARETO_SHAPE 1.5
-        S1 = (-1 / PARETO_SHAPE);
-        S2 = range * (opts->pareto / 100.0) * (PARETO_SHAPE - 1);
-        U = 1 - (double)rval / (double)UINT32_MAX;
-        rval = (uint64_t)((pow(U, S1) - 1) * S2);
-        /*
-         * This Pareto calculation chooses out of range values about
-         * 2% of the time, from my testing. That will lead to the
-         * first item in the table being "hot".
-         */
-        if (rval > end_range)
-            rval = 0;
-    }
+    if (opts->pareto != 0)
+        rval = testutil_pareto(rval, end_range - start_range, opts->pareto);
 
     /*
      * A distribution that selects the record with a higher key with higher probability. This was

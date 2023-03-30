@@ -220,6 +220,12 @@ CONFIG configuration_list[] = {{"assert.read_timestamp", "assert read_timestamp"
   {"ops.hs_cursor", "configure history store cursor reads", C_BOOL, 50, 0, 0,
     V_GLOBAL_OPS_HS_CURSOR},
 
+  {"ops.pareto", "configure crud operations to be pareto distributed", C_BOOL | C_TABLE, 20, 0, 0,
+    V_TABLE_OPS_PARETO},
+
+  {"ops.pareto.skew", "adjusts the amount of skew used by the pareto distribution", C_TABLE, 1, 100,
+    100, V_TABLE_OPS_PARETO_SKEW},
+
   {"ops.pct.delete", "delete operations (percentage)", C_IGNORE | C_TABLE, 0, 0, 100,
     V_TABLE_OPS_PCT_DELETE},
 

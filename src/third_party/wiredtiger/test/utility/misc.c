@@ -27,6 +27,8 @@
  */
 #include "test_util.h"
 
+#include <math.h>
+
 #ifndef _WIN32
 #include <sys/wait.h>
 #endif
@@ -628,6 +630,30 @@ testutil_time_us(WT_SESSION *session)
 
     __wt_epoch((WT_SESSION_IMPL *)session, &ts);
     return ((uint64_t)ts.tv_sec * WT_MILLION + (uint64_t)ts.tv_nsec / WT_THOUSAND);
+}
+
+/*
+ * testutil_pareto --
+ *     Given a random value, a range and a skew percentage. Return a value between [0 and range).
+ */
+uint64_t
+testutil_pareto(uint64_t rand, uint64_t range, u_int skew)
+{
+    double S1, S2, U;
+#define PARETO_SHAPE 1.5
+
+    S1 = (-1 / PARETO_SHAPE);
+    S2 = range * (skew / 100.0) * (PARETO_SHAPE - 1);
+    U = 1 - (double)rand / (double)UINT32_MAX;
+    rand = (uint64_t)((pow(U, S1) - 1) * S2);
+    /*
+     * This Pareto calculation chooses out of range values about
+     * 2% of the time, from my testing. That will lead to the
+     * first item in the table being "hot".
+     */
+    if (rand > range)
+        rand = 0;
+    return (rand);
 }
 
 /*

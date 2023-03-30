@@ -221,6 +221,10 @@ CONFIG configuration_list[] = {
 
 {"ops.hs_cursor", "configure history store cursor reads", C_BOOL, 50, 0, 0}
 
+{"ops.pareto", "configure crud operations to be pareto distributed", C_BOOL | C_TABLE, 20, 0, 0}
+
+{"ops.pareto.skew", "adjusts the amount of skew used by the pareto distribution", C_TABLE, 1, 100, 100}
+
 {"ops.pct.delete", "delete operations (percentage)", C_IGNORE | C_TABLE, 0, 0, 100}
 
 {"ops.pct.insert", "insert operations (percentage)", C_IGNORE | C_TABLE, 0, 0, 100}
