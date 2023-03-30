@@ -324,26 +324,25 @@ bool explodeNode(const QuerySolutionNode* node,
             for (size_t pidx = 0; pidx < prefixIndices.size(); pidx++) {
                 invariant(pidx < isn->iets.size());
                 const auto& iet = isn->iets[pidx];
-                if (const auto* ietEval = iet.cast<interval_evaluation_tree::EvalNode>(); ietEval) {
-                    if (ietEval->matchType() == MatchExpression::MATCH_IN) {
-                        auto ietExplode = interval_evaluation_tree::IET::make<
-                            interval_evaluation_tree::ExplodeNode>(
-                            iet, std::make_pair(nodeIndex, pidx), prefixIndices[pidx]);
-                        child->iets.push_back(std::move(ietExplode));
-                    } else {
-                        child->iets.push_back(iet);
+                auto needsExplodeNode = [&]() {
+                    if (const auto* ietEval = iet.cast<interval_evaluation_tree::EvalNode>();
+                        ietEval) {
+                        return ietEval->matchType() == MatchExpression::MATCH_IN;
+                    } else if (const auto* ietConst =
+                                   iet.cast<interval_evaluation_tree::ConstNode>();
+                               ietConst) {
+                        return ietConst->oil.intervals.size() > 1;
                     }
-                } else if (const auto* ietConst = iet.cast<interval_evaluation_tree::ConstNode>();
-                           ietConst) {
-                    OrderedIntervalList oilChild(ietConst->oil.name);
-                    oilChild.intervals.push_back(ietConst->oil.intervals[prefixIndices[pidx]]);
-                    invariant(oilChild.isPoint());
-                    auto ietConstChild =
-                        interval_evaluation_tree::IET::make<interval_evaluation_tree::ConstNode>(
-                            oilChild);
-                    child->iets.push_back(ietConstChild);
-                } else {
                     MONGO_UNREACHABLE;
+                }();
+
+                if (needsExplodeNode) {
+                    auto ietExplode =
+                        interval_evaluation_tree::IET::make<interval_evaluation_tree::ExplodeNode>(
+                            iet, std::make_pair(nodeIndex, pidx), prefixIndices[pidx]);
+                    child->iets.push_back(std::move(ietExplode));
+                } else {
+                    child->iets.push_back(std::move(iet));
                 }
             }
             // Copy the rest of the unexploded IETs directly into the new child.
