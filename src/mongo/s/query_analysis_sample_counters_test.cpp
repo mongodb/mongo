@@ -60,7 +60,7 @@ public:
      * Run through sample counters refreshConfiguration and increment functions depending on
      * whether process is mongod or mongos.
      */
-    void testRefreshConfigIncrementAndReport(bool isMongos);
+    void testRefreshConfigIncrementAndReport();
 
 protected:
     const NamespaceString nss0 =
@@ -69,17 +69,14 @@ protected:
         NamespaceString::createNamespaceString_forTest("testDb", "testColl1");
     const UUID collUuid0 = UUID::gen();
     const UUID collUuid1 = UUID::gen();
-
-private:
-    bool _originalIsMongos;
 };
 
-void QueryAnalysisSampleCountersTest::testRefreshConfigIncrementAndReport(const bool testMongos) {
-    bool originalIsMongos = isMongos();
-    setMongos(testMongos);
-    ON_BLOCK_EXIT([&] { setMongos(originalIsMongos); });
-
-    const bool testMongod = !testMongos;
+void QueryAnalysisSampleCountersTest::testRefreshConfigIncrementAndReport() {
+    const bool supportsSampling =
+        isMongos() || serverGlobalParams.clusterRole.has(ClusterRole::None);
+    const bool supportsPersisting = !isMongos() &&
+        (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) ||
+         serverGlobalParams.clusterRole.has(ClusterRole::None));
 
     const double sampleRate0 = 0.0;
     const double sampleRate1Before = 0.0000000001;
@@ -106,12 +103,12 @@ void QueryAnalysisSampleCountersTest::testRefreshConfigIncrementAndReport(const 
     ASSERT_EQ(parsedOp.getDesc(), kCurrentOpDescFieldValue);
     ASSERT_EQ(parsedOp.getNs(), nss0);
     ASSERT_EQ(parsedOp.getCollUuid(), collUuid0);
-    if (testMongos) {
+    if (supportsSampling) {
         ASSERT_EQ(parsedOp.getSampleRate(), sampleRate0);
     }
     ASSERT_EQ(parsedOp.getSampledReadsCount(), 0);
     ASSERT_EQ(parsedOp.getSampledWritesCount(), 0);
-    if (testMongod) {
+    if (supportsPersisting) {
         ASSERT_EQ(*(parsedOp.getSampledReadsBytes()), 0L);
         ASSERT_EQ(*(parsedOp.getSampledWritesBytes()), 0L);
     }
@@ -126,7 +123,7 @@ void QueryAnalysisSampleCountersTest::testRefreshConfigIncrementAndReport(const 
     ASSERT_EQ(parsedServerStatus.getTotalCollections(), 1);
     ASSERT_EQ(parsedServerStatus.getTotalSampledReadsCount(), 0);
     ASSERT_EQ(parsedServerStatus.getTotalSampledWritesCount(), 0);
-    if (testMongod) {
+    if (supportsPersisting) {
         ASSERT_EQ(*parsedServerStatus.getTotalSampledReadsBytes(), 0L);
         ASSERT_EQ(*parsedServerStatus.getTotalSampledWritesBytes(), 0L);
     }
@@ -147,12 +144,12 @@ void QueryAnalysisSampleCountersTest::testRefreshConfigIncrementAndReport(const 
     ASSERT_EQ(parsedOp.getDesc(), kCurrentOpDescFieldValue);
     ASSERT_EQ(parsedOp.getNs(), nss0);
     ASSERT_EQ(parsedOp.getCollUuid(), collUuid0);
-    if (testMongos) {
+    if (supportsSampling) {
         ASSERT_EQ(parsedOp.getSampleRate(), sampleRate0);
     }
     ASSERT_EQ(parsedOp.getSampledReadsCount(), 0);
     ASSERT_EQ(parsedOp.getSampledWritesCount(), 0);
-    if (testMongod) {
+    if (supportsPersisting) {
         ASSERT_EQ(*(parsedOp.getSampledReadsBytes()), 0L);
         ASSERT_EQ(*(parsedOp.getSampledWritesBytes()), 0L);
     }
@@ -161,12 +158,12 @@ void QueryAnalysisSampleCountersTest::testRefreshConfigIncrementAndReport(const 
         ops[1]);
     ASSERT_EQ(parsedOp.getNs(), nss1);
     ASSERT_EQ(parsedOp.getCollUuid(), collUuid1);
-    if (testMongos) {
+    if (supportsSampling) {
         ASSERT_EQ(parsedOp.getSampleRate(), sampleRate1Before);
     }
     ASSERT_EQ(parsedOp.getSampledReadsCount(), 0);
     ASSERT_EQ(parsedOp.getSampledWritesCount(), 0);
-    if (testMongod) {
+    if (supportsPersisting) {
         ASSERT_EQ(*(parsedOp.getSampledReadsBytes()), 0L);
         ASSERT_EQ(*(parsedOp.getSampledWritesBytes()), 0L);
     }
@@ -180,7 +177,7 @@ void QueryAnalysisSampleCountersTest::testRefreshConfigIncrementAndReport(const 
     ASSERT_EQ(parsedServerStatus.getTotalCollections(), 2);
     ASSERT_EQ(parsedServerStatus.getTotalSampledReadsCount(), 0);
     ASSERT_EQ(parsedServerStatus.getTotalSampledWritesCount(), 0);
-    if (testMongod) {
+    if (supportsPersisting) {
         ASSERT_EQ(*parsedServerStatus.getTotalSampledReadsBytes(), 0L);
         ASSERT_EQ(*parsedServerStatus.getTotalSampledWritesBytes(), 0L);
     }
@@ -192,19 +189,18 @@ void QueryAnalysisSampleCountersTest::testRefreshConfigIncrementAndReport(const 
     sampleCounters.refreshConfigurations(configurationsV3);
 
     // Increment read and write counters.
-    if (testMongos) {
-        sampleCounters.incrementReads(nss0, collUuid0);
-        sampleCounters.incrementWrites(nss0, collUuid0);
-        sampleCounters.incrementReads(nss1, collUuid1);
-        sampleCounters.incrementReads(nss1, collUuid1);
-        sampleCounters.incrementWrites(nss1, collUuid1);
-    }
-    if (testMongod) {
+    if (supportsPersisting) {
         sampleCounters.incrementReads(nss0, collUuid0, sampledQueryDocSizeBytes);
         sampleCounters.incrementWrites(nss0, collUuid0, sampledQueryDocSizeBytes);
         sampleCounters.incrementReads(nss1, collUuid1, sampledQueryDocSizeBytes);
         sampleCounters.incrementReads(nss1, collUuid1, sampledQueryDocSizeBytes);
         sampleCounters.incrementWrites(nss1, collUuid1, sampledQueryDocSizeBytes);
+    } else if (supportsSampling) {
+        sampleCounters.incrementReads(nss0, collUuid0);
+        sampleCounters.incrementWrites(nss0, collUuid0);
+        sampleCounters.incrementReads(nss1, collUuid1);
+        sampleCounters.incrementReads(nss1, collUuid1);
+        sampleCounters.incrementWrites(nss1, collUuid1);
     }
 
     // Verify currentOp, two configurations, updated sample rate.
@@ -216,12 +212,12 @@ void QueryAnalysisSampleCountersTest::testRefreshConfigIncrementAndReport(const 
         ops[0]);
     ASSERT_EQ(parsedOp.getNs(), nss0);
     ASSERT_EQ(parsedOp.getCollUuid(), collUuid0);
-    if (testMongos) {
+    if (supportsSampling) {
         ASSERT_EQ(parsedOp.getSampleRate(), sampleRate0);
     }
     ASSERT_EQ(parsedOp.getSampledReadsCount(), 1);
     ASSERT_EQ(parsedOp.getSampledWritesCount(), 1);
-    if (testMongod) {
+    if (supportsPersisting) {
         ASSERT_EQ(*(parsedOp.getSampledReadsBytes()), sampledQueryDocSizeBytes);
         ASSERT_EQ(*(parsedOp.getSampledWritesBytes()), sampledQueryDocSizeBytes);
     }
@@ -230,12 +226,12 @@ void QueryAnalysisSampleCountersTest::testRefreshConfigIncrementAndReport(const 
         ops[1]);
     ASSERT_EQ(parsedOp.getNs(), nss1);
     ASSERT_EQ(parsedOp.getCollUuid(), collUuid1);
-    if (testMongos) {
+    if (supportsSampling) {
         ASSERT_EQ(parsedOp.getSampleRate(), sampleRate1After);
     }
     ASSERT_EQ(parsedOp.getSampledReadsCount(), 2);
     ASSERT_EQ(parsedOp.getSampledWritesCount(), 1);
-    if (testMongod) {
+    if (supportsPersisting) {
         ASSERT_EQ(*(parsedOp.getSampledReadsBytes()), 2 * sampledQueryDocSizeBytes);
         ASSERT_EQ(*(parsedOp.getSampledWritesBytes()), sampledQueryDocSizeBytes);
     }
@@ -249,7 +245,7 @@ void QueryAnalysisSampleCountersTest::testRefreshConfigIncrementAndReport(const 
     ASSERT_EQ(parsedServerStatus.getTotalCollections(), 2);
     ASSERT_EQ(parsedServerStatus.getTotalSampledReadsCount(), 3);
     ASSERT_EQ(parsedServerStatus.getTotalSampledWritesCount(), 2);
-    if (testMongod) {
+    if (supportsPersisting) {
         ASSERT_EQ(*parsedServerStatus.getTotalSampledReadsBytes(), 3 * sampledQueryDocSizeBytes);
         ASSERT_EQ(*parsedServerStatus.getTotalSampledWritesBytes(), 2 * sampledQueryDocSizeBytes);
     }
@@ -268,12 +264,12 @@ void QueryAnalysisSampleCountersTest::testRefreshConfigIncrementAndReport(const 
         ops[0]);
     ASSERT_EQ(parsedOp.getNs(), nss0);
     ASSERT_EQ(parsedOp.getCollUuid(), collUuid0);
-    if (testMongos) {
+    if (supportsSampling) {
         ASSERT_EQ(parsedOp.getSampleRate(), sampleRate0);
     }
     ASSERT_EQ(parsedOp.getSampledReadsCount(), 1);
     ASSERT_EQ(parsedOp.getSampledWritesCount(), 1);
-    if (testMongod) {
+    if (supportsPersisting) {
         ASSERT_EQ(*(parsedOp.getSampledReadsBytes()), sampledQueryDocSizeBytes);
         ASSERT_EQ(*(parsedOp.getSampledWritesBytes()), sampledQueryDocSizeBytes);
     }
@@ -287,7 +283,7 @@ void QueryAnalysisSampleCountersTest::testRefreshConfigIncrementAndReport(const 
     ASSERT_EQ(parsedServerStatus.getTotalCollections(), 2);
     ASSERT_EQ(parsedServerStatus.getTotalSampledReadsCount(), 3);
     ASSERT_EQ(parsedServerStatus.getTotalSampledWritesCount(), 2);
-    if (testMongod) {
+    if (supportsPersisting) {
         ASSERT_EQ(*parsedServerStatus.getTotalSampledReadsBytes(), 3 * sampledQueryDocSizeBytes);
         ASSERT_EQ(*parsedServerStatus.getTotalSampledWritesBytes(), 2 * sampledQueryDocSizeBytes);
     }
@@ -308,12 +304,12 @@ void QueryAnalysisSampleCountersTest::testRefreshConfigIncrementAndReport(const 
     ASSERT_EQ(parsedOp.getDesc(), kCurrentOpDescFieldValue);
     ASSERT_EQ(parsedOp.getNs(), nss0);
     ASSERT_EQ(parsedOp.getCollUuid(), collUuid0);
-    if (testMongos) {
+    if (supportsSampling) {
         ASSERT_EQ(parsedOp.getSampleRate(), sampleRate0);
     }
     ASSERT_EQ(parsedOp.getSampledReadsCount(), 1);
     ASSERT_EQ(parsedOp.getSampledWritesCount(), 1);
-    if (testMongod) {
+    if (supportsPersisting) {
         ASSERT_EQ(parsedOp.getSampledReadsBytes(), sampledQueryDocSizeBytes);
         ASSERT_EQ(parsedOp.getSampledWritesBytes(), sampledQueryDocSizeBytes);
     }
@@ -323,12 +319,12 @@ void QueryAnalysisSampleCountersTest::testRefreshConfigIncrementAndReport(const 
     ASSERT_EQ(parsedOp.getDesc(), kCurrentOpDescFieldValue);
     ASSERT_EQ(parsedOp.getNs(), nss1);
     ASSERT_EQ(parsedOp.getCollUuid(), collUuid1);
-    if (testMongos) {
+    if (supportsSampling) {
         ASSERT_EQ(parsedOp.getSampleRate(), sampleRate1After);
     }
     ASSERT_EQ(parsedOp.getSampledReadsCount(), 0);
     ASSERT_EQ(parsedOp.getSampledWritesCount(), 0);
-    if (testMongod) {
+    if (supportsPersisting) {
         ASSERT_EQ(*(parsedOp.getSampledReadsBytes()), 0L);
         ASSERT_EQ(*(parsedOp.getSampledWritesBytes()), 0L);
     }
@@ -342,18 +338,44 @@ void QueryAnalysisSampleCountersTest::testRefreshConfigIncrementAndReport(const 
     ASSERT_EQ(parsedServerStatus.getTotalCollections(), 2);
     ASSERT_EQ(parsedServerStatus.getTotalSampledReadsCount(), 3);
     ASSERT_EQ(parsedServerStatus.getTotalSampledWritesCount(), 2);
-    if (testMongod) {
+    if (supportsPersisting) {
         ASSERT_EQ(*parsedServerStatus.getTotalSampledReadsBytes(), 3 * sampledQueryDocSizeBytes);
         ASSERT_EQ(*parsedServerStatus.getTotalSampledWritesBytes(), 2 * sampledQueryDocSizeBytes);
     }
 }
 
 TEST_F(QueryAnalysisSampleCountersTest, RefreshConfigIncrementAndReportMongos) {
-    testRefreshConfigIncrementAndReport(true);
+    bool originalIsMongos = isMongos();
+    ON_BLOCK_EXIT([&] { setMongos(originalIsMongos); });
+
+    setMongos(true);
+    testRefreshConfigIncrementAndReport();
 }
 
-TEST_F(QueryAnalysisSampleCountersTest, RefreshConfigIncrementAndReportMongod) {
-    testRefreshConfigIncrementAndReport(false);
+TEST_F(QueryAnalysisSampleCountersTest, RefreshConfigIncrementAndReportShardSvrMongod) {
+    bool originalIsMongos = isMongos();
+    auto originalRole = serverGlobalParams.clusterRole;
+    ON_BLOCK_EXIT([&] {
+        setMongos(originalIsMongos);
+        serverGlobalParams.clusterRole = originalRole;
+    });
+
+    setMongos(false);
+    serverGlobalParams.clusterRole = ClusterRole::ShardServer;
+    testRefreshConfigIncrementAndReport();
+}
+
+TEST_F(QueryAnalysisSampleCountersTest, RefreshConfigIncrementAndReportReplSetMongod) {
+    bool originalIsMongos = isMongos();
+    auto originalRole = serverGlobalParams.clusterRole;
+    ON_BLOCK_EXIT([&] {
+        setMongos(originalIsMongos);
+        serverGlobalParams.clusterRole = originalRole;
+    });
+
+    setMongos(false);
+    serverGlobalParams.clusterRole = ClusterRole::None;
+    testRefreshConfigIncrementAndReport();
 }
 
 }  // namespace

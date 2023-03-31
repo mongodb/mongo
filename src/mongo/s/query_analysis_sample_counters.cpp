@@ -129,11 +129,12 @@ BSONObj QueryAnalysisSampleCounters::CollectionSampleCounters::reportForCurrentO
     report.setCollUuid(_collUuid);
     report.setSampledReadsCount(_sampledReadsCount);
     report.setSampledWritesCount(_sampledWritesCount);
-    if (isMongos()) {
-        report.setSampleRate(_sampleRate);
-    } else {
+    if (!isMongos()) {
         report.setSampledReadsBytes(_sampledReadsBytes);
         report.setSampledWritesBytes(_sampledWritesBytes);
+    }
+    if (isMongos() || serverGlobalParams.clusterRole.has(ClusterRole::None)) {
+        report.setSampleRate(_sampleRate);
     }
 
     return report.toBSON();

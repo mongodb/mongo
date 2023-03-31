@@ -399,7 +399,12 @@ boost::optional<UUID> QueryAnalysisSampler::tryGenerateSampleId(OperationContext
 
     auto& rateLimiter = it->second;
     if (rateLimiter.tryConsume()) {
-        _incrementCounters(opCtx, nss, cmdName);
+        if (isMongos() || serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
+            // On a standalone replica set, sample selection is done by the mongod persisting the
+            // sample itself. To avoid double counting a sample, the counters will be incremented
+            // by the QueryAnalysisWriter when the sample gets added to the buffer.
+            _incrementCounters(opCtx, nss, cmdName);
+        }
         return UUID::gen();
     }
     return boost::none;
