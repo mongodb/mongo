@@ -245,6 +245,114 @@ TEST_F(DocumentSourceGroupTest, ShouldNotReportDottedGroupKeyAsARename) {
     ASSERT_EQ(modifiedPathsRet.renames.size(), 0UL);
 }
 
+TEST_F(DocumentSourceGroupTest, GroupRedactsCorrectWithIdNull) {
+    auto spec = fromjson(R"({
+        $group: {
+            _id: null,
+            foo: { $count: {} }
+        }
+    })");
+    auto docSource = DocumentSourceGroup::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$group": {
+                "_id": {
+                    "$const": "?"
+                },
+                "HASH<foo>": {
+                    "$sum": {
+                        "$const": "?"
+                    }
+                }
+            }
+        })",
+        redact(*docSource));
+}
+
+TEST_F(DocumentSourceGroupTest, GroupRedactsCorrectWithIdSingleField) {
+    auto spec = fromjson(R"({
+        $group: {
+            _id: '$foo'
+        }
+    })");
+    auto docSource = DocumentSourceGroup::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$group": {
+                "_id": "$HASH<foo>"
+            }
+        })",
+        redact(*docSource));
+}
+
+TEST_F(DocumentSourceGroupTest, GroupRedactsCorrectWithIdDocument) {
+    auto spec = fromjson(R"({
+        $group: {
+            _id: {
+                x: '$x',
+                y: '$z'
+            },
+            foo: {
+                $sum: {
+                    $multiply: ['$a.b', '$c', '$d']
+                }
+            },
+            bar: {
+                $first: '$baz'
+            }
+        }
+    })");
+    auto docSource = DocumentSourceGroup::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$group": {
+                "_id": {
+                    "HASH<x>": "$HASH<x>",
+                    "HASH<y>": "$HASH<z>"
+                },
+                "HASH<foo>": {
+                    "$sum": {
+                        "$multiply": ["$HASH<a>.HASH<b>", "$HASH<c>", "$HASH<d>"]
+                    }
+                },
+                "HASH<bar>": {
+                    "$first": "$HASH<baz>"
+                }
+            }
+        })",
+        redact(*docSource));
+}
+
+TEST_F(DocumentSourceGroupTest, StreamingGroupRedactsCorrectly) {
+    auto spec = fromjson(R"({
+        $_internalStreamingGroup: {
+            _id: {
+                a: "$a",
+                b: "$b"
+            },
+            a: {
+                $first: '$b'
+            },
+            $monotonicIdFields: [ "a", "b" ]
+        }
+    })");
+    auto docSource = DocumentSourceStreamingGroup::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$_internalStreamingGroup": {
+                "_id": {
+                    "HASH<a>": "$HASH<a>",
+                    "HASH<b>": "$HASH<b>"
+                },
+                "HASH<a>": {
+                    "$first": "$HASH<b>"
+                },
+                "$monotonicIdFields": [ "HASH<a>", "HASH<b>" ]
+            }
+        })",
+        redact(*docSource));
+}
+
 BSONObj toBson(const intrusive_ptr<DocumentSource>& source) {
     vector<Value> arr;
     source->serializeToArray(arr);

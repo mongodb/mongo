@@ -188,6 +188,17 @@ TEST_F(SampleBasics, ShouldPropagatePauses) {
     assertEOF();
 }
 
+TEST_F(SampleBasics, RedactsCorrectly) {
+    createSample(10);
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$sample": {
+                "size": "?"
+            }
+        })",
+        redact(*sample()));
+}
+
 /**
  * Fixture to test error cases of the $sample stage.
  */

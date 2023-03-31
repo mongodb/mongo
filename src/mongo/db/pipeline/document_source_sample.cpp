@@ -84,10 +84,7 @@ DocumentSource::GetNextResult DocumentSourceSample::doGetNext() {
 }
 
 Value DocumentSourceSample::serialize(SerializationOptions opts) const {
-    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
-        MONGO_UNIMPLEMENTED_TASSERT(7484317);
-    }
-    return Value(DOC(kStageName << DOC("size" << _size)));
+    return Value(DOC(kStageName << DOC("size" << opts.serializeLiteralValue(_size))));
 }
 
 namespace {

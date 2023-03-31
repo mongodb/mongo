@@ -240,5 +240,25 @@ TEST_F(DocumentSourceInternalApplyOplogUpdateTest, ShouldErrorOnInvalidDiffs) {
     }
 }
 
+TEST_F(DocumentSourceInternalApplyOplogUpdateTest, RedactsCorrectly) {
+    auto spec = fromjson(R"({
+        $_internalApplyOplogUpdate: {
+            oplogUpdate: {
+                $v: 2,
+                diff: { sa: [] }
+            }
+        }
+    })");
+    auto docSource =
+        DocumentSourceInternalApplyOplogUpdate::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$_internalApplyOplogUpdate": {
+                "oplogUpdate": "?"
+            }
+        })",
+        redact(*docSource));
+}
+
 }  // namespace
 }  // namespace mongo

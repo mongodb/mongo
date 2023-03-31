@@ -199,7 +199,7 @@ protected:
     }
 
     virtual void serializeAdditionalFields(
-        MutableDocument& out, boost::optional<ExplainOptions::Verbosity> explain) const {};
+        MutableDocument& out, SerializationOptions opts = SerializationOptions()) const {};
 
     // If the expression for the '_id' field represents a non-empty object, we track its fields'
     // names in '_idFieldNames'.

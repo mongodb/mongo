@@ -91,7 +91,7 @@ protected:
 
     bool isSpecFieldReserved(StringData fieldName) final;
     void serializeAdditionalFields(MutableDocument& out,
-                                   boost::optional<ExplainOptions::Verbosity> explain) const final;
+                                   SerializationOptions opts = SerializationOptions()) const final;
 
 private:
     static constexpr StringData kMonotonicIdFieldsSpecField = "$monotonicIdFields"_sd;
