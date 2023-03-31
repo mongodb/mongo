@@ -221,9 +221,11 @@ Status buildDupKeyErrorStatus(const BSONObj& key,
             (hasCollation || !isValidUTF8(keyValueElem.valueStringData()));
 
         if (shouldHexEncode) {
-            auto stringToEncode = keyValueElem.valueStringData();
-            builderForErrmsg.append(keyNameElem.fieldName(),
-                                    "0x" + hexblob::encodeLower(stringToEncode));
+            std::string hexEncoded = "0x" + hexblob::encodeLower(keyValueElem.valueStringData());
+            if (hasCollation) {
+                hexEncoded = str::stream() << "CollationKey(" << hexEncoded << ")";
+            }
+            builderForErrmsg.append(keyNameElem.fieldName(), hexEncoded);
         } else {
             builderForErrmsg.appendAs(keyValueElem, keyNameElem.fieldName());
         }
