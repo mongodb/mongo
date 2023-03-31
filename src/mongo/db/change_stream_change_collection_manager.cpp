@@ -38,7 +38,6 @@
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog_raii.h"
-#include "mongo/db/change_stream_options_parameter_gen.h"
 #include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/multitenancy_gen.h"
@@ -171,10 +170,8 @@ boost::optional<BSONObj> createChangeCollectionEntryFromOplog(const BSONObj& opl
  */
 class ChangeCollectionsWriter {
 public:
-    explicit ChangeCollectionsWriter(
-        const AutoGetChangeCollection::AccessMode& accessMode,
-        ConcurrentSharedValuesMap<UUID, ChangeCollectionTruncateMarkers, UUID::Hash>& map)
-        : _accessMode{accessMode}, _tenantTruncateMarkersMap(map) {}
+    explicit ChangeCollectionsWriter(const AutoGetChangeCollection::AccessMode& accessMode)
+        : _accessMode{accessMode} {}
 
     /**
      * Adds the insert statement for the provided tenant that will be written to the change
@@ -206,14 +203,6 @@ public:
             // Writes to the change collection should not be replicated.
             repl::UnreplicatedWritesBlock unReplBlock(opCtx);
 
-            // To avoid creating a lot of unnecessary calls to
-            // CollectionTruncateMarkers::updateCurrentMarkerAfterInsertOnCommit we aggregate all
-            // the results and make a singular call. This requires storing the highest
-            // RecordId/WallTime seen from the insert statements.
-            RecordId maxRecordIdSeen;
-            Date_t maxWallTimeSeen;
-            int64_t bytesInserted = 0;
-
             /**
              * For a serverless shard merge, we clone all change collection entries from the donor
              * and then fetch/apply retryable writes that took place before the migration. As a
@@ -233,8 +222,6 @@ public:
                     LOGV2(7282901,
                           "Ignoring DuplicateKey error for change collection insert",
                           "doc"_attr = insertStatement.doc.toString());
-                    // Continue to the next insert statement as we've ommitted the current one.
-                    continue;
                 } else if (!status.isOK()) {
                     return Status(status.code(),
                                   str::stream()
@@ -243,40 +230,6 @@ public:
                                       << "failed")
                         .withReason(status.reason());
                 }
-
-                // Right now we assume that the tenant change collection is clustered and
-                // reconstruct the RecordId used in the KV store. Ideally we want the write path to
-                // return the record ids used for the insert but as it isn't available we
-                // reconstruct the key here.
-                dassert(tenantChangeCollection->isClustered());
-                auto recordId = invariantStatusOK(record_id_helpers::keyForDoc(
-                    insertStatement.doc,
-                    tenantChangeCollection->getClusteredInfo()->getIndexSpec(),
-                    tenantChangeCollection->getDefaultCollator()));
-
-                maxRecordIdSeen = std::max(std::move(recordId), maxRecordIdSeen);
-                auto docWallTime =
-                    insertStatement.doc[repl::OplogEntry::kWallClockTimeFieldName].Date();
-                maxWallTimeSeen = std::max(maxWallTimeSeen, docWallTime);
-
-                bytesInserted += insertStatement.doc.objsize();
-            }
-
-            const bool useUnreplicatedDeletes =
-                feature_flags::gFeatureFlagUseUnreplicatedTruncatesForDeletions
-                    .isEnabledAndIgnoreFCV();
-            std::shared_ptr<ChangeCollectionTruncateMarkers> truncateMarkers =
-                useUnreplicatedDeletes
-                ? _tenantTruncateMarkersMap.find(tenantChangeCollection->uuid())
-                : nullptr;
-            if (truncateMarkers && bytesInserted > 0) {
-                // We update the TruncateMarkers instance if it exists. Creation is performed
-                // asynchronously by the remover thread.
-                truncateMarkers->updateCurrentMarkerAfterInsertOnCommit(opCtx,
-                                                                        bytesInserted,
-                                                                        maxRecordIdSeen,
-                                                                        maxWallTimeSeen,
-                                                                        insertStatements.size());
             }
         }
 
@@ -305,9 +258,6 @@ private:
     // Maps inserts statements for each tenant.
     stdx::unordered_map<TenantId, std::vector<InsertStatement>, TenantId::Hasher>
         _tenantStatementsMap;
-
-    ConcurrentSharedValuesMap<UUID, ChangeCollectionTruncateMarkers, UUID::Hash>&
-        _tenantTruncateMarkersMap;
 };
 
 }  // namespace
@@ -355,23 +305,6 @@ void ChangeStreamChangeCollectionManager::dropChangeCollection(OperationContext*
     DropReply dropReply;
     const auto changeCollNss = NamespaceString::makeChangeCollectionNSS(tenantId);
 
-    const bool useUnreplicatedDeletes =
-        feature_flags::gFeatureFlagUseUnreplicatedTruncatesForDeletions.isEnabledAndIgnoreFCV();
-    // We get the UUID now in order to remove the collection from the map later. We can't get the
-    // UUID once the collection has been dropped.
-    auto collUUID = [&]() -> boost::optional<UUID> {
-        if (!useUnreplicatedDeletes) {
-            // Won't update the truncate markers map so no need to get the UUID.
-            return boost::none;
-        }
-        AutoGetDb lk(opCtx, changeCollNss.dbName(), MODE_IS);
-        auto collection =
-            CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, changeCollNss);
-        if (collection) {
-            return collection->uuid();
-        }
-        return boost::none;
-    }();
     const auto status =
         dropCollection(opCtx,
                        changeCollNss,
@@ -381,12 +314,6 @@ void ChangeStreamChangeCollectionManager::dropChangeCollection(OperationContext*
             str::stream() << "Failed to drop change collection: "
                           << changeCollNss.toStringWithTenantId() << causedBy(status.reason()),
             status.isOK() || status.code() == ErrorCodes::NamespaceNotFound);
-
-    if (useUnreplicatedDeletes && collUUID) {
-        // Remove the collection from the TruncateMarkers map. As we are dropping the collection
-        // there's no need to keep it for the remover. Data will be deleted anyways.
-        _tenantTruncateMarkersMap.erase(*collUUID);
-    }
 }
 
 void ChangeStreamChangeCollectionManager::insertDocumentsToChangeCollection(
@@ -400,7 +327,7 @@ void ChangeStreamChangeCollectionManager::insertDocumentsToChangeCollection(
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
 
     ChangeCollectionsWriter changeCollectionsWriter{
-        AutoGetChangeCollection::AccessMode::kWriteInOplogContext, _tenantTruncateMarkersMap};
+        AutoGetChangeCollection::AccessMode::kWriteInOplogContext};
 
     for (size_t idx = 0; idx < oplogRecords.size(); idx++) {
         auto& record = oplogRecords[idx];
@@ -437,8 +364,7 @@ Status ChangeStreamChangeCollectionManager::insertDocumentsToChangeCollection(
     const auto changeCollAccessMode = isGlobalIXLockAcquired
         ? AutoGetChangeCollection::AccessMode::kWriteInOplogContext
         : AutoGetChangeCollection::AccessMode::kWrite;
-    ChangeCollectionsWriter changeCollectionsWriter{changeCollAccessMode,
-                                                    _tenantTruncateMarkersMap};
+    ChangeCollectionsWriter changeCollectionsWriter{changeCollAccessMode};
 
     // Transform oplog entries to change collections entries and group them by tenant id.
     for (auto oplogEntryIter = beginOplogEntries; oplogEntryIter != endOplogEntries;
@@ -489,7 +415,7 @@ ChangeStreamChangeCollectionManager::getChangeCollectionPurgingJobMetadata(
     return {{firstDocAttributes->first, RecordIdBound(std::move(lastDocRecordId))}};
 }
 
-size_t ChangeStreamChangeCollectionManager::removeExpiredChangeCollectionsDocumentsWithCollScan(
+size_t ChangeStreamChangeCollectionManager::removeExpiredChangeCollectionsDocuments(
     OperationContext* opCtx,
     const CollectionPtr* changeCollection,
     RecordIdBound maxRecordIdBound,
@@ -528,110 +454,5 @@ size_t ChangeStreamChangeCollectionManager::removeExpiredChangeCollectionsDocume
         // document, so ignore this error.
         return 0;
     }
-}
-
-namespace {
-std::shared_ptr<ChangeCollectionTruncateMarkers> initialiseTruncateMarkers(
-    OperationContext* opCtx,
-    const Collection* changeCollectionPtr,
-    ConcurrentSharedValuesMap<UUID, ChangeCollectionTruncateMarkers, UUID::Hash>& truncateMap) {
-    auto rs = changeCollectionPtr->getRecordStore();
-    const auto& ns = changeCollectionPtr->ns();
-
-    WriteUnitOfWork wuow(opCtx);
-
-    auto minBytesPerMarker = gChangeStreamTruncateMarkersMinBytes;
-    CollectionTruncateMarkers::InitialSetOfMarkers initialSetOfMarkers =
-        CollectionTruncateMarkers::createFromExistingRecordStore(
-            opCtx, rs, ns, minBytesPerMarker, [](const Record& record) {
-                const auto obj = record.data.toBson();
-                auto wallTime = obj[repl::OplogEntry::kWallClockTimeFieldName].Date();
-                return CollectionTruncateMarkers::RecordIdAndWallTime{record.id, wallTime};
-            });
-    // Leftover bytes contains the difference between the amount of bytes we had for the
-    // markers and the latest collection size/count. This is susceptible to a race
-    // condition, but metrics are already assumed to be approximate. Ignoring this issue is
-    // a valid strategy here.
-    auto truncateMarkers = truncateMap.getOrEmplace(changeCollectionPtr->uuid(),
-                                                    *ns.tenantId(),
-                                                    std::move(initialSetOfMarkers.markers),
-                                                    initialSetOfMarkers.leftoverRecordsCount,
-                                                    initialSetOfMarkers.leftoverRecordsBytes,
-                                                    minBytesPerMarker);
-    // Update the truncate markers with the last collection entry's RecordId and wall time.
-    // This is necessary for correct marker expiration. Otherwise the highest seen points
-    // would be null. Nothing would expire since we have to maintain the last entry in the
-    // change collection and null RecordId < any initialised RecordId. This would only get
-    // fixed once an entry has been inserted, initialising the data points.
-    auto backCursor = rs->getCursor(opCtx, false);
-    if (auto obj = backCursor->next()) {
-        auto wallTime = obj->data.toBson()[repl::OplogEntry::kWallClockTimeFieldName].Date();
-        truncateMarkers->updateHighestSeenRecordIdAndWallTime(obj->id, wallTime);
-    }
-
-    wuow.commit();
-
-    return truncateMarkers;
-}
-}  // namespace
-
-size_t ChangeStreamChangeCollectionManager::removeExpiredChangeCollectionsDocumentsWithTruncate(
-    OperationContext* opCtx, const CollectionPtr* changeCollection, Date_t expirationTime) {
-    auto& changeCollectionManager = ChangeStreamChangeCollectionManager::get(opCtx);
-    auto& truncateMap = changeCollectionManager._tenantTruncateMarkersMap;
-
-    auto changeCollectionPtr = changeCollection->get();
-    auto truncateMarkers = truncateMap.find(changeCollectionPtr->uuid());
-
-    while (!truncateMarkers) {
-        try {
-            // No marker means it's a new collection, or we've just performed startup. Initialize
-            // the TruncateMarkers instance.
-            truncateMarkers = initialiseTruncateMarkers(opCtx, changeCollectionPtr, truncateMap);
-        } catch (const WriteConflictException&) {
-            LOGV2_DEBUG(7474902,
-                        1,
-                        "Caught WriteConflictException while initialising change collection "
-                        "truncate markers, retrying",
-                        "namespace"_attr = changeCollectionPtr->ns());
-        }
-    }
-
-    int64_t numRecordsDeleted = 0;
-
-    while (auto marker = truncateMarkers->peekOldestMarkerIfNeeded(opCtx)) {
-        try {
-            WriteUnitOfWork wuow(opCtx);
-            auto bytesDeleted = marker->bytes;
-            auto docsDeleted = marker->records;
-            auto rs = changeCollectionPtr->getRecordStore();
-            auto status =
-                rs->rangeTruncate(opCtx,
-                                  // Truncate from the beginning of the collection, this will
-                                  // cover cases where some leftover documents are present.
-                                  RecordId(),
-                                  marker->lastRecord,
-                                  -bytesDeleted,
-                                  -docsDeleted);
-            invariantStatusOK(status);
-            wuow.commit();
-
-            truncateMarkers->popOldestMarker();
-            numRecordsDeleted += docsDeleted;
-
-            changeCollectionManager.getPurgingJobStats().docsDeleted.fetchAndAddRelaxed(
-                docsDeleted);
-            changeCollectionManager.getPurgingJobStats().bytesDeleted.fetchAndAddRelaxed(
-                bytesDeleted);
-        } catch (const WriteConflictException&) {
-            LOGV2_DEBUG(
-                7474901,
-                1,
-                "Caught WriteConflictException while truncating change collection, retrying",
-                "namespace"_attr = changeCollectionPtr->ns());
-        }
-    }
-
-    return numRecordsDeleted;
 }
 }  // namespace mongo

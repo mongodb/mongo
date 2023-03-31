@@ -35,7 +35,6 @@
 #include "mongo/db/change_streams_cluster_parameter_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/mutex.h"
@@ -70,11 +69,6 @@ change_stream_serverless_helpers::TenantSet getConfigDbTenants(OperationContext*
 void removeExpiredDocuments(Client* client) {
     hangBeforeRemovingExpiredChanges.pauseWhileSet();
 
-    // We ignore the FCV version here since the feature is potentially backported to older versions
-    // of mongod. Look only at whether the feature flag is enabled or not.
-    bool useUnreplicatedTruncates =
-        feature_flags::gFeatureFlagUseUnreplicatedTruncatesForDeletions.isEnabledAndIgnoreFCV();
-
     try {
         auto opCtx = client->makeOperationContext();
         const auto clock = client->getServiceContext()->getFastClockSource();
@@ -101,13 +95,9 @@ void removeExpiredDocuments(Client* client) {
             AutoGetChangeCollection changeCollection{
                 opCtx.get(), AutoGetChangeCollection::AccessMode::kWrite, tenantId};
 
-            // Early exit if collection does not exist.
-            if (!changeCollection) {
-                continue;
-            }
-            // Early exit if running on a secondary and we haven't enabled the unreplicated truncate
-            // maintenance flag (requires opCtx->lockState()->isRSTLLocked()).
-            if (!useUnreplicatedTruncates &&
+            // Early exit if collection does not exist or if running on a secondary (requires
+            // opCtx->lockState()->isRSTLLocked()).
+            if (!changeCollection ||
                 !repl::ReplicationCoordinator::get(opCtx.get())
                      ->canAcceptWritesForDatabase(opCtx.get(), DatabaseName::kConfig.toString())) {
                 continue;
@@ -123,21 +113,12 @@ void removeExpiredDocuments(Client* client) {
                 continue;
             }
 
-            if (useUnreplicatedTruncates) {
-                removedCount += ChangeStreamChangeCollectionManager::
-                    removeExpiredChangeCollectionsDocumentsWithTruncate(
-                        opCtx.get(),
-                        &*changeCollection,
-                        currentWallTime - Seconds(expiredAfterSeconds));
-            } else {
-                removedCount += ChangeStreamChangeCollectionManager::
-                    removeExpiredChangeCollectionsDocumentsWithCollScan(
-                        opCtx.get(),
-                        &*changeCollection,
-                        purgingJobMetadata->maxRecordIdBound,
-                        currentWallTime - Seconds(expiredAfterSeconds));
-            }
-
+            removedCount +=
+                ChangeStreamChangeCollectionManager::removeExpiredChangeCollectionsDocuments(
+                    opCtx.get(),
+                    &*changeCollection,
+                    purgingJobMetadata->maxRecordIdBound,
+                    currentWallTime - Seconds(expiredAfterSeconds));
             changeCollectionManager.getPurgingJobStats().scannedCollections.fetchAndAddRelaxed(1);
             maxStartWallTime =
                 std::max(maxStartWallTime, purgingJobMetadata->firstDocWallTimeMillis);
