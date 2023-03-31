@@ -519,6 +519,10 @@ void WiredTigerSessionCache::releaseSession(WiredTigerSession* session) {
 
     if (!returnedToCache)
         delete session;
+
+    if (_engine) {
+        _engine->sizeStorerPeriodicFlush();
+    }
 }
 
 

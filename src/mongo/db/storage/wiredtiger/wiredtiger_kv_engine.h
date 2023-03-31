@@ -423,6 +423,12 @@ public:
     StatusWith<BSONObj> getSanitizedStorageOptionsForSecondaryReplication(
         const BSONObj& options) const override;
 
+    /**
+     * Flushes any WiredTigerSizeStorer updates to the storage engine if enough time has elapsed, as
+     * dictated by the _sizeStorerSyncTracker.
+     */
+    void sizeStorerPeriodicFlush();
+
 private:
     class WiredTigerSessionSweeper;
 
@@ -506,6 +512,7 @@ private:
     std::unique_ptr<WiredTigerSizeStorer> _sizeStorer;
     std::string _sizeStorerUri;
     mutable ElapsedTracker _sizeStorerSyncTracker;
+
     bool _ephemeral;  // whether we are using the in-memory mode of the WT engine
     const bool _inRepairMode;
 
