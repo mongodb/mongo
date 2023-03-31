@@ -115,6 +115,26 @@ TEST_F(DocumentSourceOutTest, SerializeToString) {
     ASSERT_EQ(reSerialized["$out"]["coll"].getStringData(), "some_collection");
 }
 
+TEST_F(DocumentSourceOutTest, Redaction) {
+    // TODO SERVER-75110 test support for redaction with timeseries options
+    auto spec = fromjson(R"({
+            $out: {
+                db: "foo",
+                coll: "bar"
+            }
+        })");
+    auto docSource = DocumentSourceOut::createFromBson(spec.firstElement(), getExpCtx());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            $out: {
+                db: "HASH<foo>",
+                coll: "HASH<bar>"
+            }
+        })",
+        redact(*docSource));
+}
+
 using DocumentSourceOutServerlessTest = ServerlessAggregationContextFixture;
 
 TEST_F(DocumentSourceOutServerlessTest,

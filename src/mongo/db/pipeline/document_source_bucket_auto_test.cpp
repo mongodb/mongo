@@ -853,5 +853,62 @@ TEST_F(BucketAutoTests, ShouldFailOnNegativeNumbersWhenGranularitySpecified) {
         AssertionException,
         40260);
 }
+
+TEST_F(BucketAutoTests, RedactionWithoutOutputField) {
+    auto spec = fromjson(R"({
+            $bucketAuto: {
+                groupBy: '$_id',
+                buckets: 5,
+                granularity: "R5"
+            }
+        })");
+    auto docSource = DocumentSourceBucketAuto::createFromBson(spec.firstElement(), getExpCtx());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$bucketAuto": {
+                "groupBy": "$HASH<_id>",
+                "buckets": "?",
+                "granularity": "?",
+                "output": {
+                    "HASH<count>": {
+                        "$sum": {
+                            "$const": "?"
+                        }
+                    }
+                }
+            }
+        })",
+        redact(*docSource));
+}
+
+TEST_F(BucketAutoTests, RedactionWithOutputField) {
+    auto spec = fromjson(R"({
+            $bucketAuto: {
+                groupBy: '$year',
+                buckets: 3,
+                output: {
+                    count: { $sum: 1 },
+                    years: { $push: '$year' }
+                }
+            }
+        })");
+    auto docSource = DocumentSourceBucketAuto::createFromBson(spec.firstElement(), getExpCtx());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$bucketAuto": {
+                "groupBy": "$HASH<year>",
+                "buckets": "?",
+                "output": {
+                    "HASH<count>": {
+                        $sum: { "$const": "?" }
+                    },
+                    "HASH<years>": { $push: "$HASH<year>" }
+                }
+            }
+        })",
+        redact(*docSource));
+}
 }  // namespace
 }  // namespace mongo

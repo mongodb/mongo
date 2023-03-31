@@ -99,10 +99,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceTelemetry::createFromBson(
 }
 
 Value DocumentSourceTelemetry::serialize(SerializationOptions opts) const {
-    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
-        MONGO_UNIMPLEMENTED_TASSERT(7484308);
-    }
-
+    // This document source never contains any user information, so no need for any work when
+    // redacting.
     return Value{Document{{kStageName, Document{}}}};
 }
 
