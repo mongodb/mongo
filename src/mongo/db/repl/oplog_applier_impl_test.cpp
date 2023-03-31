@@ -75,7 +75,6 @@
 #include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
 #include "mongo/db/transaction/transaction_participant_gen.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
-#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -555,8 +554,8 @@ TEST_F(OplogApplierImplTest, CreateCollectionCommand) {
 }
 
 TEST_F(OplogApplierImplTest, CreateCollectionCommandMultitenant) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    setServerParameter("multitenancySupport", true);
+    setServerParameter("featureFlagRequireTenantID", true);
 
     auto tid{TenantId(OID::gen())};
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(tid, "test.foo");
@@ -584,8 +583,8 @@ TEST_F(OplogApplierImplTest, CreateCollectionCommandMultitenant) {
 }
 
 TEST_F(OplogApplierImplTest, CreateCollectionCommandMultitenantRequireTenantIDFalse) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", false);
+    setServerParameter("multitenancySupport", true);
+    setServerParameter("featureFlagRequireTenantID", false);
 
     auto tid{TenantId(OID::gen())};
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(tid, "test.foo");
@@ -619,8 +618,8 @@ TEST_F(OplogApplierImplTest, CreateCollectionCommandMultitenantRequireTenantIDFa
 }
 
 TEST_F(OplogApplierImplTest, CreateCollectionCommandMultitenantAlreadyExists) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    setServerParameter("multitenancySupport", true);
+    setServerParameter("featureFlagRequireTenantID", true);
 
     auto tid1{TenantId(OID::gen())};
     auto tid2{TenantId(OID::gen())};
@@ -679,8 +678,8 @@ TEST_F(OplogApplierImplTest, CreateCollectionCommandMultitenantAlreadyExists) {
 }
 
 TEST_F(OplogApplierImplTest, RenameCollectionCommandMultitenant) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    setServerParameter("multitenancySupport", true);
+    setServerParameter("featureFlagRequireTenantID", true);
 
     auto tid{TenantId(OID::gen())};  // rename should not occur across tenants
     const NamespaceString sourceNss =
@@ -709,8 +708,8 @@ TEST_F(OplogApplierImplTest, RenameCollectionCommandMultitenant) {
 }
 
 TEST_F(OplogApplierImplTest, RenameCollectionCommandMultitenantRequireTenantIDFalse) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", false);
+    setServerParameter("multitenancySupport", true);
+    setServerParameter("featureFlagRequireTenantID", false);
 
     auto tid{TenantId(OID::gen())};  // rename should not occur across tenants
     const NamespaceString sourceNss =
@@ -739,8 +738,8 @@ TEST_F(OplogApplierImplTest, RenameCollectionCommandMultitenantRequireTenantIDFa
 }
 
 TEST_F(OplogApplierImplTest, RenameCollectionCommandMultitenantAcrossTenantsRequireTenantIDFalse) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", false);
+    setServerParameter("multitenancySupport", true);
+    setServerParameter("featureFlagRequireTenantID", false);
 
     auto tid{TenantId(OID::gen())};
     auto wrongTid{TenantId(OID::gen())};  // rename should not occur across tenants
@@ -853,8 +852,8 @@ TEST_F(OplogApplierImplTest, applyOplogEntryToInvalidateChangeStreamPreImages) {
 }
 
 TEST_F(IdempotencyTest, CollModCommandMultitenant) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    setServerParameter("multitenancySupport", true);
+    setServerParameter("featureFlagRequireTenantID", true);
 
     auto tid{TenantId(OID::gen())};
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest(tid, "test.foo");
@@ -891,8 +890,8 @@ TEST_F(IdempotencyTest, CollModCommandMultitenant) {
 }
 
 TEST_F(IdempotencyTest, CollModCommandMultitenantWrongTenant) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    setServerParameter("multitenancySupport", true);
+    setServerParameter("featureFlagRequireTenantID", true);
 
     auto tid1{TenantId(OID::gen())};
     auto tid2{TenantId(OID::gen())};
@@ -1114,8 +1113,8 @@ TEST_F(OplogApplierImplTest,
 }
 
 TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsInsertDocumentIncludesTenantId) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    setServerParameter("multitenancySupport", true);
+    setServerParameter("featureFlagRequireTenantID", true);
     const TenantId tid(OID::gen());
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest(tid, "test.t");
     BSONObj doc = BSON("_id" << 0);
@@ -1130,8 +1129,8 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsInsertDocumentInclud
 }
 
 TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsInsertDocumentIncorrectTenantId) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    setServerParameter("multitenancySupport", true);
+    setServerParameter("featureFlagRequireTenantID", true);
     const auto commonNss("test.t"_sd);
     const TenantId tid1(OID::gen());
     const TenantId tid2(OID::gen());
@@ -1159,8 +1158,8 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsDeleteDocumentInclud
     // Setup the pre-images collection.
     const TenantId tid(OID::gen());
     ChangeStreamPreImagesCollectionManager::createPreImagesCollection(_opCtx.get(), tid);
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    setServerParameter("multitenancySupport", true);
+    setServerParameter("featureFlagRequireTenantID", true);
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest(tid, "test.t");
     BSONObj doc = BSON("_id" << 0);
 
@@ -1181,8 +1180,8 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsDeleteDocumentInclud
 }
 
 TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsDeleteDocumentIncorrectTenantId) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    setServerParameter("multitenancySupport", true);
+    setServerParameter("featureFlagRequireTenantID", true);
     const auto commonNss("test.t"_sd);
     const TenantId tid1(OID::gen());
     const TenantId tid2(OID::gen());
@@ -1209,8 +1208,8 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsDeleteDocumentIncorr
 // upsert and masking duplicateKey errors.
 TEST_F(OplogApplierImplTestEnableSteadyStateConstraints,
        applyOplogEntryOrGroupedInsertsUuidIncludesTenantId) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    setServerParameter("multitenancySupport", true);
+    setServerParameter("featureFlagRequireTenantID", true);
     const auto commonNss("test.t"_sd);
     const TenantId tid1(OID::gen());
     const TenantId tid2(OID::gen());
@@ -1237,8 +1236,8 @@ TEST_F(OplogApplierImplTestEnableSteadyStateConstraints,
 }
 
 TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsUpdateDocumentIncludesTenantId) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    setServerParameter("multitenancySupport", true);
+    setServerParameter("featureFlagRequireTenantID", true);
     const TenantId tid(OID::gen());
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest(tid, "test.t");
     BSONObj doc = BSON("_id" << 0);
@@ -1262,8 +1261,8 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsUpdateDocumentInclud
 }
 
 TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsUpdateDocumentIncorrectTenantId) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    setServerParameter("multitenancySupport", true);
+    setServerParameter("featureFlagRequireTenantID", true);
     const auto commonNss("test.t"_sd);
     const TenantId tid1(OID::gen());
     const TenantId tid2(OID::gen());
@@ -1760,8 +1759,8 @@ private:
 
 TEST_F(MultiOplogEntryOplogApplierImplTestMultitenant,
        MultiApplyUnpreparedTransactionTwoBatchesFeatureFlagOn) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    setServerParameter("multitenancySupport", true);
+    setServerParameter("featureFlagRequireTenantID", true);
     // Tests an unprepared transaction with ops both in the batch with the commit and prior
     // batches. Populate transaction with 2 linked entries - a create collection and an insert.
     std::vector<OplogEntry> ops;
@@ -1830,8 +1829,8 @@ TEST_F(MultiOplogEntryOplogApplierImplTestMultitenant,
 
 TEST_F(MultiOplogEntryOplogApplierImplTestMultitenant,
        MultiApplyUnpreparedTransactionTwoBatchesFeatureFlagOff) {
-    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", false);
+    setServerParameter("multitenancySupport", true);
+    setServerParameter("featureFlagRequireTenantID", false);
     // Tests an unprepared transaction with ops both in the batch with the commit and prior
     // batches. Populate transaction with 2 linked entries - a create collection and an insert.
     std::vector<OplogEntry> ops;

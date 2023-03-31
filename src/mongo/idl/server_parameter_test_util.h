@@ -36,8 +36,40 @@
 namespace mongo {
 
 /**
- * Test-only RAII type that allows to set a server parameter value during the execution of a
- * unit test, or part of a unit test, and resets it to the original value on destruction.
+ * Test-only class that sets a server parameter to the specified value and allows
+ * resetting after the test completes.
+ */
+class ServerParameterControllerForTest {
+public:
+    /**
+     * Constructor setting the server parameter to the specified value.
+     */
+    template <typename T>
+    ServerParameterControllerForTest(const std::string& name, T value)
+        : _serverParam(ServerParameterSet::getNodeParameterSet()->get(name)) {
+        // Save the old value.
+        BSONObjBuilder bob;
+        _serverParam->appendSupportingRoundtrip(nullptr, &bob, name, boost::none);
+        _oldValue = bob.obj();
+
+        // Set server param to the new value.
+        uassertStatusOK(_serverParam->set(BSON(name << value).firstElement(), boost::none));
+    }
+
+    void reset() {
+        // Reset to the old value.
+        auto elem = _oldValue.firstElement();
+        uassertStatusOK(_serverParam->set(elem, boost::none));
+    }
+
+private:
+    ServerParameter* _serverParam;
+    BSONObj _oldValue;
+};
+
+/**
+ * Test-only RAII type that wraps ServerParameterControllerForTest. Upon destruction, the server
+ * parameter will be set to its original value.
  */
 class RAIIServerParameterControllerForTest {
 public:
@@ -46,28 +78,17 @@ public:
      */
     template <typename T>
     RAIIServerParameterControllerForTest(const std::string& name, T value)
-        : _serverParam(ServerParameterSet::getNodeParameterSet()->get(name)) {
-        // Save the old value
-        BSONObjBuilder bob;
-        _serverParam->appendSupportingRoundtrip(nullptr, &bob, name, boost::none);
-        _oldValue = bob.obj();
-
-        // Set to the new value
-        uassertStatusOK(_serverParam->set(BSON(name << value).firstElement(), boost::none));
-    }
+        : _serverParamController(ServerParameterControllerForTest(name, value)) {}
 
     /**
      * Destructor resetting the server parameter to the original value.
      */
     ~RAIIServerParameterControllerForTest() {
-        // Reset to the old value
-        auto elem = _oldValue.firstElement();
-        uassertStatusOK(_serverParam->set(elem, boost::none));
+        _serverParamController.reset();
     }
 
 private:
-    ServerParameter* _serverParam;
-    BSONObj _oldValue;
+    ServerParameterControllerForTest _serverParamController;
 };
 
 }  // namespace mongo

@@ -53,6 +53,16 @@ env.Library(
 )
 
 env.Library(
+    target='oplog_constraint_violation_logger',
+    source=[
+        'oplog_constraint_violation_logger.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+    ],
+)
+
+env.Library(
     target='oplog',
     source=[
         'apply_ops.cpp',
@@ -68,6 +78,7 @@ env.Library(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
         '$BUILD_DIR/mongo/db/catalog/collection_crud',
+        '$BUILD_DIR/mongo/db/catalog/health_log_interface',
         '$BUILD_DIR/mongo/db/catalog/import_collection_oplog_entry',
         '$BUILD_DIR/mongo/db/catalog/index_build_oplog_entry',
         '$BUILD_DIR/mongo/db/catalog/local_oplog_info',
@@ -98,6 +109,7 @@ env.Library(
         '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         'dbcheck',
         'image_collection_entry',
+        'oplog_constraint_violation_logger',
         'repl_coordinator_interface',
         'repl_server_parameters',
         'repl_settings',
@@ -1654,6 +1666,8 @@ if wiredtiger:
         LIBDEPS=[
             '$BUILD_DIR/mongo/db/catalog/database_holder',
             '$BUILD_DIR/mongo/db/catalog/document_validation',
+            '$BUILD_DIR/mongo/db/catalog/health_log',
+            '$BUILD_DIR/mongo/db/catalog/health_log_interface',
             '$BUILD_DIR/mongo/db/index_builds_coordinator_interface',
             '$BUILD_DIR/mongo/db/multitenancy',
             '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
@@ -1773,6 +1787,7 @@ if wiredtiger:
             '$BUILD_DIR/mongo/db/auth/authmocks',
             '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
             '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
+            '$BUILD_DIR/mongo/db/catalog/health_log',
             '$BUILD_DIR/mongo/db/change_stream_pre_images_collection_manager',
             '$BUILD_DIR/mongo/db/commands/mongod_fcv',
             '$BUILD_DIR/mongo/db/commands/txn_cmd_request',
