@@ -63,7 +63,7 @@
 			"dbaeumer.vscode-eslint",
 			"ms-python.python",
 			"xaver.clang-format",
-			"notskm.clang-tidy"
+			"cs128.cs128-clang-tidy"
 		]
 	}
 }
