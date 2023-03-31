@@ -57,7 +57,9 @@ executor:
       oplogSize: 1024
       set_parameters:
         enableTestCommands: 1
-        queryAnalysisSamplerConfigurationRefreshSecs: 1
-        queryAnalysisWriterIntervalSecs: 1
+        # TODO (SERVER-75503): Avoid setting query sampling server parameters in multiversion
+        # concurrency suites.
+        # queryAnalysisSamplerConfigurationRefreshSecs: 1
+        # queryAnalysisWriterIntervalSecs: 1
         roleGraphInvalidationIsFatal: 1
     num_nodes: 3
