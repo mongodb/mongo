@@ -1,12 +1,13 @@
 /**
  * Tests that direct updates to a timeseries bucket collection close the bucket, preventing further
- * inserts to land in that bucket.
+ * inserts to land in that bucket or deletes and updates to be applied to it.
  */
 (function() {
 'use strict';
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallel_shell_helpers.js");
+load("jstests/libs/feature_flag_util.js");
 
 const conn = MongoRunner.runMongod();
 
@@ -90,6 +91,29 @@ assert.eq(buckets[1].control.max[timeFieldName], times[1]);
 assert(buckets[1].control.closed);
 assert.eq(buckets[2].control.min[timeFieldName], times[2]);
 assert.eq(buckets[2].control.max[timeFieldName], times[2]);
+assert(!buckets[2].control.hasOwnProperty("closed"));
+
+// Make sure that closed buckets are skipped by updates and deletes.
+if (FeatureFlagUtil.isPresentAndEnabled(testDB, "TimeseriesUpdatesSupport")) {
+    // TODO SERVER-73454 Enable this test.
+    // The first two buckets containing documents 0 and 1 are closed, so we can only update the
+    // third document in the last bucket.
+    // const result = assert.commandWorked(coll.updateMany({}, {$set: {newField: 123}}));
+    // assert.eq(result.matchedCount, 1, result);
+    // assert.eq(result.modifiedCount, 1, result);
+    // assert.docEq(docs.slice(2, 3),
+    //              coll.find({newField: 123}, {newField: 0}).toArray(),
+    //              `Expected exactly one document to be updated. ${coll.find().toArray()}`);
+}
+if (FeatureFlagUtil.isPresentAndEnabled(testDB, "TimeseriesDeletesSupport")) {
+    // The first two buckets containing documents 0 and 1 are closed, so we can only delete the
+    // third document from the last bucket.
+    const result = assert.commandWorked(coll.deleteMany({}));
+    assert.eq(result.deletedCount, 1);
+    assert.docEq(docs.slice(0, 2),
+                 coll.find().sort({_id: 1}).toArray(),
+                 `Expected exactly one document to be deleted. ${coll.find().toArray()}`);
+}
 
 MongoRunner.stopMongod(conn);
 })();

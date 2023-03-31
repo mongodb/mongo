@@ -354,6 +354,10 @@ public:
         return std::string{timeseries::kControlMaxFieldNamePrefix} + field;
     }
 
+    bool isClosedBucket() const {
+        return _closedBucket;
+    }
+
     void setBucketSpec(BucketSpec&& bucketSpec);
     void setIncludeMinTimeAsMetadata();
     void setIncludeMaxTimeAsMetadata();
@@ -418,6 +422,10 @@ private:
     // value in the reset phase and use it to materialize as a metadata field in each measurement
     // if required by the pipeline.
     boost::optional<Date_t> _maxTime;
+
+    // Flag indicating whether this bucket is closed, as determined by the presence of the
+    // 'control.closed' field.
+    bool _closedBucket;
 
     // Map <name, BSONElement> for the computed meta field projections. Updated for
     // every bucket upon reset().

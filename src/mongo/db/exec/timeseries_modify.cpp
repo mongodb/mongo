@@ -249,7 +249,7 @@ PlanStage::StageState TimeseriesModifyStage::doWork(WorkingSetID* out) {
 
     tassert(7495500,
             "Expected bucketUnpacker's current bucket to be exhausted",
-            !_bucketUnpacker.hasNext());
+            !_bucketUnpacker.hasNext() || _bucketUnpacker.isClosedBucket());
 
     auto id = WorkingSet::INVALID_ID;
     auto status = _getNextBucket(id);
@@ -282,6 +282,10 @@ PlanStage::StageState TimeseriesModifyStage::doWork(WorkingSetID* out) {
     // Unpack the bucket and determine which measurements match the residual predicate.
     auto ownedBucket = member->doc.value().toBson().getOwned();
     _bucketUnpacker.reset(std::move(ownedBucket));
+    if (_bucketUnpacker.isClosedBucket()) {
+        // This bucket is closed, skip it.
+        return PlanStage::NEED_TIME;
+    }
     ++_specificStats.bucketsUnpacked;
 
     std::vector<BSONObj> unchangedMeasurements;

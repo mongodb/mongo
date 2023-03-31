@@ -1603,6 +1603,9 @@ void BucketUnpacker::reset(BSONObj&& bucket, bool bucketMatchedQuery) {
             "The $_internalUnpackBucket stage requires 'control' object to be present",
             controlField && controlField.type() == BSONType::Object);
 
+    auto&& controlClosed = controlField.Obj()[timeseries::kBucketControlClosedFieldName];
+    _closedBucket = controlClosed.booleanSafe();
+
     if (_includeMinTimeAsMetadata) {
         auto&& controlMin = controlField.Obj()[timeseries::kBucketControlMinFieldName];
         uassert(6460203,
