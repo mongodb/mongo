@@ -42,7 +42,7 @@ DEFAULT_VARIANT = "enterprise-rhel-80-64-bit-dynamic-required"
 ENTERPRISE_MODULE_PATH = "src/mongo/db/modules/enterprise"
 DEFAULT_REPO_LOCATIONS = [".", f"./{ENTERPRISE_MODULE_PATH}"]
 REPEAT_SUITES = 2
-EVERGREEN_FILE = "etc/evergreen.yml"
+DEFAULT_EVG_PROJECT_FILE = "etc/evergreen.yml"
 # The executor_file and suite_files defaults are required to make the suite resolver work
 # correctly.
 SELECTOR_FILE = "etc/burn_in_tests.yml"
@@ -633,12 +633,15 @@ class BurnInOrchestrator:
     help="The revision in the mongo repo that changes will be compared against if specified.")
 @click.option("--install-dir", "install_dir", type=str,
               help="Path to bin directory of a testable installation")
+@click.option("--evg-project-file", "evg_project_file", default=DEFAULT_EVG_PROJECT_FILE,
+              help="Evergreen project config file")
 @click.argument("resmoke_args", nargs=-1, type=click.UNPROCESSED)
 # pylint: disable=too-many-arguments,too-many-locals
 def main(build_variant: str, no_exec: bool, repeat_tests_num: Optional[int],
          repeat_tests_min: Optional[int], repeat_tests_max: Optional[int],
          repeat_tests_secs: Optional[int], resmoke_args: str, verbose: bool,
-         origin_rev: Optional[str], install_dir: Optional[str], use_yaml: bool) -> None:
+         origin_rev: Optional[str], install_dir: Optional[str], use_yaml: bool,
+         evg_project_file: Optional[str]) -> None:
     """
     Run new or changed tests in repeated mode to validate their stability.
 
@@ -669,6 +672,9 @@ def main(build_variant: str, no_exec: bool, repeat_tests_num: Optional[int],
     :param resmoke_args: Arguments to pass through to resmoke.
     :param verbose: Log extra debug information.
     :param origin_rev: The revision that local changes will be compared against.
+    :param install_dir: Path to bin directory of a testable installation.
+    :param use_yaml: Output discovered tasks in YAML. Tests will not be run.
+    :param evg_project_file: Evergreen project config file.
     """
     _configure_logging(verbose)
 
@@ -678,7 +684,7 @@ def main(build_variant: str, no_exec: bool, repeat_tests_num: Optional[int],
                                  repeat_tests_num=repeat_tests_num)  # yapf: disable
 
     repos = [Repo(x) for x in DEFAULT_REPO_LOCATIONS if os.path.isdir(x)]
-    evg_conf = parse_evergreen_file(EVERGREEN_FILE)
+    evg_conf = parse_evergreen_file(evg_project_file)
 
     change_detector = LocalFileChangeDetector(origin_rev)
     executor = LocalBurnInExecutor(resmoke_args, repeat_config)
