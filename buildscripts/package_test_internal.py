@@ -91,14 +91,14 @@ def run_zypper_test(packages: List[str]):
     run_and_log("zypper -n --no-gpg-checks install {}".format(' '.join(packages)))
 
 
-def run_mongo_query(query, should_fail=False, tries=60, interval=1.0):
+def run_mongo_query(shell, query, should_fail=False, tries=60, interval=1.0):
     # type: (str, bool, int, float) -> Optional[subprocess.CompletedProcess[bytes]]
     assert tries >= 1
 
     exec_result = None  # type: Union[subprocess.CompletedProcess[bytes], None]
     current_try = 1
 
-    command = "mongosh --eval '{}'".format(query)
+    command = "{} --eval '{}'".format(shell, query)
 
     # Keep trying the query until we either get a successful return code or we
     # run out of tries.
@@ -248,6 +248,11 @@ def get_test_args(package_manager: str, package_files: List[str]) -> TestArgs:
     else:
         test_args["systemd_path"] = "/bin"
 
+    if not pathlib.Path("/usr/bin/mongosh").exists():
+        test_args["mongo_shell"] = "/usr/bin/mongo"
+    else:
+        test_args["mongo_shell"] = "/usr/bin/mongosh"
+
     return test_args
 
 
@@ -311,7 +316,7 @@ def test_start():
     run_and_log("systemctl enable mongod.service")
     run_and_log("systemctl start mongod.service")
 
-    run_mongo_query("db.smoke.insertOne({answer: 42})")
+    run_mongo_query(test_args["mongo_shell"], "db.smoke.insertOne({answer: 42})")
     run_and_log("systemctl is-active mongod.service")
 
 
@@ -408,7 +413,7 @@ def test_restart():
     run_and_log("systemctl restart mongod.service")
 
     logging.debug("Waiting up to 60 seconds for mongod to restart...")
-    run_mongo_query("db.smoke.insertOne({answer: 42})")
+    run_mongo_query(test_args["mongo_shell"], "db.smoke.insertOne({answer: 42})")
 
     run_and_log("systemctl is-active mongod.service")
 
@@ -419,7 +424,7 @@ def test_stop():
     run_and_log("systemctl stop mongod.service")
 
     logging.debug("Waiting up to 60 seconds for mongod to finish shutting down...")
-    run_mongo_query("db.smoke.insertOne({answer: 42})", should_fail=True)
+    run_mongo_query(test_args["mongo_shell"], "db.smoke.insertOne({answer: 42})", should_fail=True)
 
     run_and_log("systemctl is-active mongod.service", end_on_error=False)
 

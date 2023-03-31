@@ -21,6 +21,7 @@ import requests
 from docker.client import DockerClient
 from docker.models.containers import Container
 from docker.models.images import Image
+
 from simple_report import Report, Result
 
 root = logging.getLogger()
@@ -508,7 +509,9 @@ if args.command == "release":
 
         mongosh_package = get_mongosh_package(arch, test_os)
         if mongosh_package:
-            urls.append(mongosh_package)
+            # The mongosh package doesn't work on Ubuntu 16.04
+            if test_os != "ubuntu1604":
+                urls.append(mongosh_package)
         else:
             logging.error("Could not find mongosh package for %s and %s", arch, test_os)
             sys.exit(1)
