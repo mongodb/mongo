@@ -43,6 +43,7 @@
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/catalog/type_namespace_placement_gen.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/clock_source_mock.h"
@@ -541,6 +542,32 @@ protected:
         assertTemporaryCollectionCatalogEntryMatchesExpected(opCtx, expectedTempCollType);
     }
 
+    void assertCatalogPlacementHistoryEntryMatchExpected(
+        OperationContext* opCtx,
+        const std::vector<ChunkType>& expectedChunks,
+        const NamespaceString& nss,
+        const UUID& reshardingUUID) {
+        DBDirectClient client(opCtx);
+        std::set<ShardId> expectedCollPlacement;
+        for (const auto& chunk : expectedChunks) {
+            expectedCollPlacement.insert(chunk.getShard());
+        }
+
+        FindCommandRequest reshardedCollPlacementReq(
+            NamespaceString::kConfigsvrPlacementHistoryNamespace);
+        reshardedCollPlacementReq.setFilter(BSON("nss" << nss.ns()));
+        reshardedCollPlacementReq.setSort(BSON("timestamp" << -1));
+        const auto placementDoc = client.findOne(reshardedCollPlacementReq);
+        ASSERT(!placementDoc.isEmpty());
+        const auto placement = NamespacePlacementType::parse(
+            IDLParserContext("writeDecisionPersistedStateExpectSuccess"), placementDoc);
+        ASSERT_EQ(reshardingUUID, placement.getUuid());
+        ASSERT_EQ(expectedCollPlacement.size(), placement.getShards().size());
+        for (const auto& shardId : placement.getShards()) {
+            ASSERT(expectedCollPlacement.find(shardId) != expectedCollPlacement.end());
+        }
+    }
+
     void writeInitialStateAndCatalogUpdatesExpectSuccess(
         OperationContext* opCtx,
         ReshardingCoordinatorDocument expectedCoordinatorDoc,
@@ -629,12 +656,19 @@ protected:
         Timestamp fetchTimestamp,
         std::vector<ChunkType> expectedChunks,
         std::vector<TagsType> expectedZones) {
+        std::set<ShardId> reshardedCollectionPlacement;
+        for (const auto& chunk : expectedChunks) {
+            reshardedCollectionPlacement.insert(chunk.getShard());
+        }
+
         writeDecisionPersistedState(operationContext(),
                                     _metrics.get(),
                                     expectedCoordinatorDoc,
                                     _finalEpoch,
                                     _finalTimestamp,
-                                    boost::none);
+                                    boost::none,
+                                    std::vector<ShardId>(reshardedCollectionPlacement.begin(),
+                                                         reshardedCollectionPlacement.end()));
 
         updateTagsDocsForTempNss(operationContext(), expectedCoordinatorDoc);
 
@@ -649,6 +683,9 @@ protected:
 
         auto tagDoc = client.findOne(TagsType::ConfigNS, BSON("ns" << _tempNss.ns()));
         ASSERT(tagDoc.isEmpty());
+
+        assertCatalogPlacementHistoryEntryMatchExpected(
+            opCtx, expectedChunks, _originalNss, _reshardingUUID);
     }
 
     void cleanupSourceCollectionExpectSuccess(OperationContext* opCtx,

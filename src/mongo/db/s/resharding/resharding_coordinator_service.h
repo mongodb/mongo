@@ -61,7 +61,8 @@ void writeDecisionPersistedState(OperationContext* opCtx,
                                  const ReshardingCoordinatorDocument& coordinatorDoc,
                                  OID newCollectionEpoch,
                                  Timestamp newCollectionTimestamp,
-                                 boost::optional<CollectionIndexes> indexVersion);
+                                 boost::optional<CollectionIndexes> indexVersion,
+                                 const std::vector<ShardId>& reshardedCollectionPlacement);
 
 void updateTagsDocsForTempNss(OperationContext* opCtx,
                               const ReshardingCoordinatorDocument& coordinatorDoc);

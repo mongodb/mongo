@@ -628,15 +628,14 @@ void writeToConfigPlacementHistoryForOriginalNss(
     OperationContext* opCtx,
     const ReshardingCoordinatorDocument& coordinatorDoc,
     const Timestamp& newCollectionTimestamp,
+    const std::vector<ShardId>& reshardedCollectionPlacement,
     TxnNumber txnNumber) {
     invariant(coordinatorDoc.getState() == CoordinatorStateEnum::kCommitting,
               "New placement data on the collection being resharded can only be persisted at "
               "commit time");
 
     NamespacePlacementType placementInfo(
-        coordinatorDoc.getSourceNss(),
-        newCollectionTimestamp,
-        resharding::extractShardIdsFromParticipantEntries(coordinatorDoc.getRecipientShards()));
+        coordinatorDoc.getSourceNss(), newCollectionTimestamp, reshardedCollectionPlacement);
     placementInfo.setUuid(coordinatorDoc.getReshardingUUID());
 
     auto request = BatchedCommandRequest::buildInsertOp(
@@ -763,7 +762,8 @@ void writeDecisionPersistedState(OperationContext* opCtx,
                                  const ReshardingCoordinatorDocument& coordinatorDoc,
                                  OID newCollectionEpoch,
                                  Timestamp newCollectionTimestamp,
-                                 boost::optional<CollectionIndexes> collectionIndexes) {
+                                 boost::optional<CollectionIndexes> collectionIndexes,
+                                 const std::vector<ShardId>& reshardedCollectionPlacement) {
 
     // No need to bump originalNss version because its epoch will be changed.
     executeMetadataChangesInTxn(
@@ -772,7 +772,8 @@ void writeDecisionPersistedState(OperationContext* opCtx,
          &coordinatorDoc,
          &newCollectionEpoch,
          &newCollectionTimestamp,
-         &collectionIndexes](OperationContext* opCtx, TxnNumber txnNumber) {
+         &collectionIndexes,
+         &reshardedCollectionPlacement](OperationContext* opCtx, TxnNumber txnNumber) {
             // Update the config.reshardingOperations entry
             writeToCoordinatorStateNss(opCtx, metrics, coordinatorDoc, txnNumber);
 
@@ -794,8 +795,11 @@ void writeDecisionPersistedState(OperationContext* opCtx,
 
             // Insert the list of recipient shard IDs (together with the new timestamp and UUID) as
             // the latest entry in config.placementHistory about the original namespace
-            writeToConfigPlacementHistoryForOriginalNss(
-                opCtx, coordinatorDoc, newCollectionTimestamp, txnNumber);
+            writeToConfigPlacementHistoryForOriginalNss(opCtx,
+                                                        coordinatorDoc,
+                                                        newCollectionTimestamp,
+                                                        reshardedCollectionPlacement,
+                                                        txnNumber);
         });
 }
 
@@ -2108,12 +2112,34 @@ void ReshardingCoordinator::_commit(const ReshardingCoordinatorDocument& coordin
     auto indexVersion = _reshardingCoordinatorExternalState->getCatalogIndexVersionForCommit(
         opCtx.get(), updatedCoordinatorDoc.getTempReshardingNss());
 
+    // Retrieve the exact placement of the resharded collection from the routing table.
+    // The 'recipientShards' field of the coordinator doc cannot be used for this purpose as it
+    // always includes the primary shard for the parent database (even when it doesn't own any chunk
+    // under the new key pattern).
+    auto reshardedCollectionPlacement = [&] {
+        std::set<ShardId> collectionPlacement;
+        std::vector<ShardId> collectionPlacementAsVector;
+        const auto [cm, _] =
+            uassertStatusOK(Grid::get(opCtx.get())
+                                ->catalogCache()
+                                ->getShardedCollectionRoutingInfoWithPlacementRefresh(
+                                    opCtx.get(), coordinatorDoc.getTempReshardingNss()));
+        cm.getAllShardIds(&collectionPlacement);
+
+        collectionPlacementAsVector.reserve(collectionPlacement.size());
+        for (auto& elem : collectionPlacement) {
+            collectionPlacementAsVector.emplace_back(std::move(elem));
+        }
+        return collectionPlacementAsVector;
+    }();
+
     resharding::writeDecisionPersistedState(opCtx.get(),
                                             _metrics.get(),
                                             updatedCoordinatorDoc,
                                             std::move(newCollectionEpoch),
                                             std::move(newCollectionTimestamp),
-                                            std::move(indexVersion));
+                                            std::move(indexVersion),
+                                            reshardedCollectionPlacement);
 
     // Update the in memory state
     installCoordinatorDoc(opCtx.get(), updatedCoordinatorDoc);
