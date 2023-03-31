@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_internal_compute_geo_near_distance.h"
 #include "mongo/db/pipeline/document_source_mock.h"
@@ -143,6 +144,25 @@ TEST_F(DocumentSourceInternalGeoNearDistanceTest, DistanceBetweenTwoMixedPointsS
     const int meterToLatDegree = 111319;  // Each degree of latitude is approximately 111km.
     ASSERT_EQUALS(doc["dist"].getType(), BSONType::NumberDouble);
     ASSERT_APPROX_EQUAL(doc["dist"].coerceToDouble(), meterToLatDegree, 300);
+}
+
+TEST_F(DocumentSourceInternalGeoNearDistanceTest, RedactsCorrectly) {
+    BSONObj computeGeoSpec = fromjson(R"(
+        { $_internalComputeGeoNearDistance: {
+            near: {
+                type: "Point",
+                coordinates: [0, 1]
+            },
+            key: "loc",
+            distanceMultiplier: 1,
+            distanceField: "dist"
+        }})");
+    auto geoDist = DocumentSourceInternalGeoNearDistance::createFromBson(
+        computeGeoSpec.firstElement(), getExpCtx());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({$_internalComputeGeoNearDistance: {near: "?", key: "HASH<loc>", distanceField: "HASH<dist>", distanceMultiplier: "?"}})",
+        redact(*geoDist, true));
 }
 
 }  // namespace

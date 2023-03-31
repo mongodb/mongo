@@ -146,10 +146,7 @@ DocumentSource::GetNextResult DocumentSourceSampleFromRandomCursor::getNextNonDu
 }
 
 Value DocumentSourceSampleFromRandomCursor::serialize(SerializationOptions opts) const {
-    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
-        MONGO_UNIMPLEMENTED_TASSERT(7484316);
-    }
-    return Value(DOC(getSourceName() << DOC("size" << _size)));
+    return Value(DOC(getSourceName() << DOC("size" << opts.serializeLiteralValue(_size))));
 }
 
 DepsTracker::State DocumentSourceSampleFromRandomCursor::getDependencies(DepsTracker* deps) const {

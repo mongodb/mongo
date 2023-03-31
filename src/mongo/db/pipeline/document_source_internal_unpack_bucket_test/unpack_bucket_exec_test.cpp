@@ -925,5 +925,27 @@ TEST_F(InternalUnpackBucketExecTest, ParserRoundtripsComputedMetaProjFieldOverri
     unpackBucket->serializeToArray(array);
     ASSERT_BSONOBJ_EQ(array[0].getDocument().toBson(), bson);
 }
+
+std::string redactFieldNameForTest(StringData s) {
+    return str::stream() << "HASH<" << s << ">";
+}
+
+TEST_F(InternalUnpackBucketExecTest, RedactsCorrectly) {
+    auto bson = fromjson(
+        "{$_internalUnpackBucket: {include: ['a', 'b', 'c'], timeField: 'time', metaField: 'meta', "
+        "bucketMaxSpanSeconds: 3600, computedMetaProjFields: ['a', 'b', 'c']}}");
+    auto array = std::vector<Value>{};
+    SerializationOptions opts;
+    opts.redactFieldNamesStrategy = redactFieldNameForTest;
+    opts.redactFieldNames = true;
+    opts.replacementForLiteralArgs = "?";
+    DocumentSourceInternalUnpackBucket::createFromBsonInternal(bson.firstElement(), getExpCtx())
+        ->serializeToArray(array, opts);
+    ASSERT_VALUE_EQ_AUTO(  // NOLINT
+        "{$_internalUnpackBucket: {include: [\"HASH<a>\", \"HASH<b>\", \"HASH<c>\"], timeField: "
+        "\"HASH<time>\", metaField: \"HASH<meta>\", bucketMaxSpanSeconds: \"?\", "
+        "computedMetaProjFields: [\"HASH<a>\", \"HASH<b>\", \"HASH<c>\"]}}",
+        array[0]);
+}
 }  // namespace
 }  // namespace mongo

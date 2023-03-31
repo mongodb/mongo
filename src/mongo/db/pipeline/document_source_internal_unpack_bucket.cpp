@@ -482,9 +482,6 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
 void DocumentSourceInternalUnpackBucket::serializeToArray(std::vector<Value>& array,
                                                           SerializationOptions opts) const {
     auto explain = opts.verbosity;
-    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
-        MONGO_UNIMPLEMENTED_TASSERT(7484332);
-    }
 
     MutableDocument out;
     auto behavior =
@@ -492,7 +489,7 @@ void DocumentSourceInternalUnpackBucket::serializeToArray(std::vector<Value>& ar
     const auto& spec = _bucketUnpacker.bucketSpec();
     std::vector<Value> fields;
     for (auto&& field : spec.fieldSet()) {
-        fields.emplace_back(field);
+        fields.emplace_back(opts.serializeFieldName(field));
     }
     if (((_bucketUnpacker.includeMetaField() &&
           _bucketUnpacker.behavior() == BucketSpec::Behavior::kInclude) ||
@@ -501,23 +498,24 @@ void DocumentSourceInternalUnpackBucket::serializeToArray(std::vector<Value>& ar
         std::find(spec.computedMetaProjFields().cbegin(),
                   spec.computedMetaProjFields().cend(),
                   *spec.metaField()) == spec.computedMetaProjFields().cend())
-        fields.emplace_back(*spec.metaField());
+        fields.emplace_back(opts.serializeFieldName(*spec.metaField()));
 
     out.addField(behavior, Value{std::move(fields)});
-    out.addField(timeseries::kTimeFieldName, Value{spec.timeField()});
+    out.addField(timeseries::kTimeFieldName, Value{opts.serializeFieldName(spec.timeField())});
     if (spec.metaField()) {
-        out.addField(timeseries::kMetaFieldName, Value{*spec.metaField()});
+        out.addField(timeseries::kMetaFieldName, Value{opts.serializeFieldName(*spec.metaField())});
     }
-    out.addField(kBucketMaxSpanSeconds, Value{_bucketMaxSpanSeconds});
+    out.addField(kBucketMaxSpanSeconds, opts.serializeLiteralValue(Value{_bucketMaxSpanSeconds}));
     if (_assumeNoMixedSchemaData)
-        out.addField(kAssumeNoMixedSchemaData, Value(_assumeNoMixedSchemaData));
+        out.addField(kAssumeNoMixedSchemaData,
+                     opts.serializeLiteralValue(Value(_assumeNoMixedSchemaData)));
 
     if (spec.usesExtendedRange()) {
         // Include this flag so that 'explain' is more helpful.
         // But this is not so useful for communicating from one process to another,
         // because mongos and/or the primary shard don't know whether any other shard
         // has extended-range data.
-        out.addField(kUsesExtendedRange, Value{true});
+        out.addField(kUsesExtendedRange, opts.serializeLiteralValue(Value{true}));
     }
 
     if (!spec.computedMetaProjFields().empty())
@@ -526,34 +524,39 @@ void DocumentSourceInternalUnpackBucket::serializeToArray(std::vector<Value>& ar
                          std::transform(spec.computedMetaProjFields().cbegin(),
                                         spec.computedMetaProjFields().cend(),
                                         std::back_inserter(compFields),
-                                        [](auto&& projString) { return Value{projString}; });
+                                        [opts](auto&& projString) {
+                                            return Value{opts.serializeFieldName(projString)};
+                                        });
                          return compFields;
                      }()});
 
     if (_bucketUnpacker.includeMinTimeAsMetadata()) {
-        out.addField(kIncludeMinTimeAsMetadata, Value{_bucketUnpacker.includeMinTimeAsMetadata()});
+        out.addField(kIncludeMinTimeAsMetadata,
+                     opts.serializeLiteralValue(Value{_bucketUnpacker.includeMinTimeAsMetadata()}));
     }
     if (_bucketUnpacker.includeMaxTimeAsMetadata()) {
-        out.addField(kIncludeMaxTimeAsMetadata, Value{_bucketUnpacker.includeMaxTimeAsMetadata()});
+        out.addField(kIncludeMaxTimeAsMetadata,
+                     opts.serializeLiteralValue(Value{_bucketUnpacker.includeMaxTimeAsMetadata()}));
     }
 
     if (_wholeBucketFilter) {
-        out.addField(kWholeBucketFilter, Value{_wholeBucketFilter->serialize()});
+        out.addField(kWholeBucketFilter, Value{_wholeBucketFilter->serialize(opts)});
     }
     if (_eventFilter) {
-        out.addField(kEventFilter, Value{_eventFilter->serialize()});
+        out.addField(kEventFilter, Value{_eventFilter->serialize(opts)});
     }
 
     if (!explain) {
         array.push_back(Value(DOC(getSourceName() << out.freeze())));
         if (_sampleSize) {
             auto sampleSrc = DocumentSourceSample::create(pExpCtx, *_sampleSize);
-            sampleSrc->serializeToArray(array);
+            sampleSrc->serializeToArray(array, opts);
         }
     } else {
         if (_sampleSize) {
-            out.addField("sample", Value{static_cast<long long>(*_sampleSize)});
-            out.addField("bucketMaxCount", Value{_bucketMaxCount});
+            out.addField("sample",
+                         opts.serializeLiteralValue(Value{static_cast<long long>(*_sampleSize)}));
+            out.addField("bucketMaxCount", opts.serializeLiteralValue(Value{_bucketMaxCount}));
         }
         array.push_back(Value(DOC(getSourceName() << out.freeze())));
     }

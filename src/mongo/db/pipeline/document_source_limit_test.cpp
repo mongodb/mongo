@@ -161,5 +161,16 @@ TEST_F(DocumentSourceLimitTest, ShouldPropagatePauses) {
     ASSERT_TRUE(limit->getNext().isEOF());
 }
 
+TEST_F(DocumentSourceLimitTest, RedactsCorrectly) {
+    auto limit = DocumentSourceLimit::create(getExpCtx(), 2);
+    SerializationOptions opts;
+    opts.replacementForLiteralArgs = "?"_sd;
+    std::vector<Value> vec;
+    limit->serializeToArray(vec, opts);
+    ASSERT_VALUE_EQ_AUTO(  // NOLINT
+        "{$limit: \"?\"}",
+        vec[0]);
+}
+
 }  // namespace
 }  // namespace mongo

@@ -89,10 +89,7 @@ DocumentSource::GetNextResult DocumentSourceLimit::doGetNext() {
 }
 
 Value DocumentSourceLimit::serialize(SerializationOptions opts) const {
-    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
-        MONGO_UNIMPLEMENTED_TASSERT(7484331);
-    }
-    return Value(Document{{getSourceName(), _limit}});
+    return Value(Document{{getSourceName(), opts.serializeLiteralValue(_limit)}});
 }
 
 intrusive_ptr<DocumentSourceLimit> DocumentSourceLimit::create(

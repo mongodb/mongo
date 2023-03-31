@@ -142,17 +142,16 @@ DocumentSource::GetNextResult DocumentSourceInternalGeoNearDistance::doGetNext()
 }
 
 Value DocumentSourceInternalGeoNearDistance::serialize(SerializationOptions opts) const {
-    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
-        MONGO_UNIMPLEMENTED_TASSERT(7484338);
-    }
 
     MutableDocument out;
-    out.setField(DocumentSourceInternalGeoNearDistance::kNearFieldName, Value(_coords));
-    out.setField(DocumentSourceInternalGeoNearDistance::kKeyFieldName, Value(_key));
+    out.setField(DocumentSourceInternalGeoNearDistance::kNearFieldName,
+                 opts.serializeLiteralValue(_coords));
+    out.setField(DocumentSourceInternalGeoNearDistance::kKeyFieldName,
+                 Value(opts.serializeFieldName(_key)));
     out.setField(DocumentSourceInternalGeoNearDistance::kDistanceFieldFieldName,
-                 Value(_distanceField.fullPath()));
+                 Value(opts.serializeFieldName(_distanceField.fullPath())));
     out.setField(DocumentSourceInternalGeoNearDistance::kDistanceMultiplierFieldName,
-                 Value(_distanceMultiplier));
+                 opts.serializeLiteralValue(_distanceMultiplier));
 
     return Value(DOC(getSourceName() << out.freeze()));
 }

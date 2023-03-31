@@ -413,5 +413,16 @@ DEATH_TEST_REGEX_F(SampleFromRandomCursorBasics,
     sample()->getNext();
 }
 
+TEST_F(SampleFromRandomCursorBasics, RedactsCorrectly) {
+    createSample(2);
+    SerializationOptions opts;
+    opts.replacementForLiteralArgs = "?"_sd;
+    std::vector<Value> vec;
+    sample()->serializeToArray(vec, opts);
+    ASSERT_VALUE_EQ_AUTO(  // NOLINT
+        "{$sampleFromRandomCursor: {size: \"?\"}}",
+        vec[0]);
+}
+
 }  // namespace
 }  // namespace mongo
