@@ -11,36 +11,81 @@
 (function() {
 "use strict";
 
-/* Downgrading FCV to an unsupported version when catalogShard is enabled. */
-jsTest.log("Downgrading FCV to an unsupported version when catalogShard is enabled.");
-var st = new ShardingTest({catalogShard: true});
-var mongosAdminDB = st.s.getDB("admin");
+// TODO (SERVER-74534): Enable the metadata consistency check when it will work with co-located
+// configsvr.
+TestData.skipCheckMetadataConsistency = true;
 
-let errRes = assert.commandFailedWithCode(
-    mongosAdminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV}),
-    ErrorCodes.CannotDowngrade);
-assert.eq(errRes.errmsg,
-          `Cannot downgrade featureCompatibilityVersion to ${lastLTSFCV} with a catalog shard as it is not supported in earlier versions. Please transition the config server to dedicated mode using the transitionToDedicatedConfigServer command.`);
+load("jstests/libs/catalog_shard_util.js");
 
-errRes = assert.commandFailedWithCode(
-    mongosAdminDB.runCommand({setFeatureCompatibilityVersion: lastContinuousFCV}),
-    ErrorCodes.CannotDowngrade);
-assert.eq(errRes.errmsg,
-          `Cannot downgrade featureCompatibilityVersion to ${lastContinuousFCV} with a catalog shard as it is not supported in earlier versions. Please transition the config server to dedicated mode using the transitionToDedicatedConfigServer command.`);
+const shardedNs = "foo.bar";
+const unshardedNs = "unsharded_foo.unsharded_bar";
 
-var res = st.config0.getDB("admin").runCommand({getParameter: 1, featureCompatibilityVersion: 1});
-assert(res.featureCompatibilityVersion);
-assert.eq(res.featureCompatibilityVersion.version, latestFCV);
+function basicCRUD(conn, ns) {
+    assert.commandWorked(
+        conn.getCollection(ns).insert([{_id: 1, x: 1, skey: -1000}, {_id: 2, skey: 1000}]));
+    assert.sameMembers(conn.getCollection(ns).find().toArray(),
+                       [{_id: 1, x: 1, skey: -1000}, {_id: 2, skey: 1000}]);
+    assert.commandWorked(conn.getCollection(ns).remove({x: 1}));
+    assert.commandWorked(conn.getCollection(ns).remove({skey: 1000}));
+    assert.eq(conn.getCollection(ns).find().toArray().length, 0);
+}
 
-st.stop();
+let splitPoint = 0;
+function basicShardedDDL(conn, ns) {
+    assert.commandWorked(conn.adminCommand({split: ns, middle: {skey: splitPoint}}));
+    splitPoint += 10;
+}
 
-/* Attempting to create a catalogShard on an unsupported FCV. */
-jsTest.log("Attempting to create a catalogShard on an unsupported FCV.");
-st = new ShardingTest({catalogShard: false});
-mongosAdminDB = st.s.getDB("admin");
+const st = new ShardingTest({shards: 2, catalogShard: true, other: {enableBalancer: true}});
+const mongosAdminDB = st.s.getDB("admin");
 
-assert.commandWorked(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
-assert.commandFailedWithCode(mongosAdminDB.runCommand({transitionToCatalogShard: 1}), 7467202);
+assert.commandWorked(st.s.adminCommand({shardCollection: shardedNs, key: {skey: 1}}));
+
+function runTest(targetFCV) {
+    jsTest.log("Downgrading FCV to an unsupported version when catalogShard is enabled.");
+
+    const errRes = assert.commandFailedWithCode(
+        mongosAdminDB.runCommand({setFeatureCompatibilityVersion: targetFCV}),
+        ErrorCodes.CannotDowngrade);
+    assert.eq(errRes.errmsg,
+          `Cannot downgrade featureCompatibilityVersion to ${targetFCV} with a catalog shard as it is not supported in earlier versions. Please transition the config server to dedicated mode using the transitionToDedicatedConfigServer command.`);
+
+    // The downgrade fails and should not start the downgrade process on any cluster node.
+    const configRes =
+        st.config0.getDB("admin").runCommand({getParameter: 1, featureCompatibilityVersion: 1});
+    assert(configRes.featureCompatibilityVersion);
+    assert.eq(configRes.featureCompatibilityVersion.version, latestFCV);
+
+    const shardRes =
+        st.shard1.getDB("admin").runCommand({getParameter: 1, featureCompatibilityVersion: 1});
+    assert(shardRes.featureCompatibilityVersion);
+    assert.eq(shardRes.featureCompatibilityVersion.version, latestFCV);
+
+    // The catalog shard's data can still be accessed.
+    basicCRUD(st.s, shardedNs);
+    basicShardedDDL(st.s, shardedNs);
+    basicCRUD(st.s, unshardedNs);
+
+    // Remove the catalog shard and verify we can now downgrade.
+    CatalogShardUtil.transitionToDedicatedConfigServer(st);
+    assert.commandWorked(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: targetFCV}));
+
+    jsTest.log("Attempting to create a catalogShard on an unsupported FCV.");
+
+    assert.commandWorked(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: targetFCV}));
+    assert.commandFailedWithCode(mongosAdminDB.runCommand({transitionToCatalogShard: 1}), 7467202);
+
+    // Upgrade and transition back to catalog shard mode for the next test.
+    assert.commandWorked(mongosAdminDB.runCommand({setFeatureCompatibilityVersion: latestFCV}));
+    assert.commandWorked(mongosAdminDB.runCommand({transitionToCatalogShard: 1}));
+
+    basicCRUD(st.s, shardedNs);
+    basicShardedDDL(st.s, shardedNs);
+    basicCRUD(st.s, unshardedNs);
+}
+
+runTest(lastLTSFCV);
+runTest(lastContinuousFCV);
 
 st.stop();
 })();

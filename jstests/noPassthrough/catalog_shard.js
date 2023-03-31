@@ -16,6 +16,7 @@
 TestData.skipCheckMetadataConsistency = true;
 
 load("jstests/libs/fail_point_util.js");
+load("jstests/libs/write_concern_util.js");
 
 const dbName = "foo";
 const collName = "bar";
@@ -192,8 +193,10 @@ const newShardName =
         st.s.adminCommand({moveChunk: indexedNs, find: {_id: 0}, to: configShardName}));
     assert.commandWorked(st.s.getCollection(indexedNs).createIndex({oldKey: 1}));
 
-    let removeRes =
-        assert.commandWorked(st.s0.adminCommand({transitionToDedicatedConfigServer: 1}));
+    // Use write concern to verify the commands support them. Any values weaker than the default
+    // sharding metadata write concerns will be upgraded.
+    let removeRes = assert.commandWorked(
+        st.s0.adminCommand({transitionToDedicatedConfigServer: 1, writeConcern: {wtimeout: 100}}));
     assert.eq("started", removeRes.state);
 
     // The removal won't complete until all chunks and dbs are moved off the catalog shard.
@@ -293,7 +296,10 @@ const newShardName =
     // correct indexes when receiving its first chunk after the transition.
     assert.commandWorked(st.s.getCollection(indexedNs).createIndex({newKey: 1}));
 
-    assert.commandWorked(st.s.adminCommand({transitionToCatalogShard: 1}));
+    // Use write concern to verify the command support them. Any values weaker than the default
+    // sharding metadata write concerns will be upgraded.
+    assert.commandWorked(
+        st.s.adminCommand({transitionToCatalogShard: 1, writeConcern: {wtimeout: 100}}));
 
     // Basic CRUD and sharded DDL work.
     basicCRUD(st.s);
@@ -307,6 +313,36 @@ const newShardName =
         st.s.adminCommand({moveChunk: indexedNs, find: {_id: 0}, to: configShardName}));
     assert.sameMembers(st.configRS.getPrimary().getCollection(indexedNs).getIndexKeys(),
                        [{_id: 1}, {oldKey: 1}, {newKey: 1}]);
+}
+
+{
+    //
+    // transitionToCatalogShard requires replication to all config server nodes.
+    //
+    // TODO SERVER-75391: Remove.
+    //
+
+    // Transition to dedicated mode so the config server can transition back to catalog shard mode.
+    let removeRes = assert.commandWorked(st.s.adminCommand({transitionToDedicatedConfigServer: 1}));
+    assert.eq("started", removeRes.state);
+    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {skey: 0}, to: newShardName}));
+    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {skey: 5}, to: newShardName}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: indexedNs, find: {_id: 0}, to: newShardName}));
+    assert.commandWorked(st.s.adminCommand({movePrimary: "directDB", to: newShardName}));
+    assert.commandWorked(st.s.adminCommand({transitionToDedicatedConfigServer: 1}));
+
+    // transitionToCatalogShard times out with a lagged config secondary despite having a majority
+    // of its set still replicating.
+    const laggedSecondary = st.configRS.getSecondary();
+    st.configRS.awaitReplication();
+    stopServerReplication(laggedSecondary);
+    assert.commandFailedWithCode(st.s.adminCommand({transitionToCatalogShard: 1, maxTimeMS: 1000}),
+                                 ErrorCodes.MaxTimeMSExpired);
+    restartServerReplication(laggedSecondary);
+
+    // Now it succeeds.
+    assert.commandWorked(st.s.adminCommand({transitionToCatalogShard: 1}));
 }
 
 st.stop();

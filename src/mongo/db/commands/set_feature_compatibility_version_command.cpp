@@ -458,13 +458,6 @@ public:
 
         if (!request.getPhase() || request.getPhase() == SetFCVPhaseEnum::kPrepare) {
             if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
-                // (Ignore FCV check): This feature flag is intentional to only check if it is
-                // enabled on this binary so the config server can be a shard.
-                if (gFeatureFlagCatalogShard.isEnabledAndIgnoreFCVUnsafe()) {
-                    // The config server may also be a shard, so have it run any shard server tasks.
-                    _shardServerPhase1Tasks(opCtx, requestedVersion);
-                }
-
                 uassert(ErrorCodes::Error(6794600),
                         "Failing downgrade due to "
                         "'failBeforeSendingShardsToDowngradingOrUpgrading' failpoint set",
@@ -472,6 +465,15 @@ public:
                 // Tell the shards to enter 'start' phase of setFCV (transition to kDowngrading).
                 _sendSetFCVRequestToShards(
                     opCtx, request, changeTimestamp, SetFCVPhaseEnum::kStart);
+
+                // (Ignore FCV check): This feature flag is intentional to only check if it is
+                // enabled on this binary so the config server can be a shard.
+                if (gFeatureFlagCatalogShard.isEnabledAndIgnoreFCVUnsafe()) {
+                    // The config server may also be a shard, so have it run any shard server tasks.
+                    // Run this after sending the first phase to shards so they enter the transition
+                    // state even if this throws.
+                    _shardServerPhase1Tasks(opCtx, requestedVersion);
+                }
             }
 
             // Any checks and actions that need to be performed before being able to downgrade needs

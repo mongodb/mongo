@@ -103,7 +103,12 @@ public:
         CommandHelpers::uassertCommandRunWithMajority(getName(), opCtx->getWriteConcern());
 
         ON_BLOCK_EXIT([&opCtx] {
-            repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+            try {
+                repl::ReplClientInfo::forClient(opCtx->getClient())
+                    .setLastOpToSystemLastOpTime(opCtx);
+            } catch (const ExceptionForCat<ErrorCategory::Interruption>&) {
+                // This can throw if the opCtx was interrupted. Catch to prevent crashing.
+            }
         });
 
         // Set the operation context read concern level to local for reads into the config database.

@@ -768,6 +768,21 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
             gFeatureFlagCatalogShard.isEnabled(serverGlobalParams.featureCompatibility) ||
                 !isCatalogShard);
 
+        if (isCatalogShard) {
+            // TODO SERVER-75391: Remove.
+            //
+            // At this point we know the config primary is in the latest FCV, but secondaries may
+            // not yet have replicated the FCV update, so write a noop and wait for it to replicate
+            // to all nodes in the config server to guarantee they have replicated up to the latest
+            // FCV.
+            //
+            // This guarantees all secondaries use the shard server method to refresh their
+            // metadata, which contains synchronization to prevent secondaries from serving reads
+            // for owned chunks that have not yet replicated to them.
+            _performLocalNoopWriteWithWAllWriteConcern(
+                opCtx, "w:all write barrier in transitionToCatalogShard");
+        }
+
         uassert(5563603,
                 "Cannot add shard while in upgrading/downgrading FCV state",
                 !fcvRegion->isUpgradingOrDowngrading());

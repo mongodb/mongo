@@ -50,6 +50,7 @@
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/s/config/index_on_config.h"
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/db/vector_clock.h"
@@ -1321,6 +1322,24 @@ void ShardingCatalogManager::initializePlacementHistory(OperationContext* opCtx)
     txn_api::SyncTransactionWithRetries txn(
         opCtx, sleepInlineExecutor, nullptr /*resourceYielder*/, inlineExecutor);
     txn.run(opCtx, transactionChain);
+}
+
+void ShardingCatalogManager::_performLocalNoopWriteWithWAllWriteConcern(OperationContext* opCtx,
+                                                                        StringData msg) {
+    tenant_migration_access_blocker::performNoopWrite(opCtx, msg);
+
+    auto allMembersWriteConcern =
+        WriteConcernOptions(repl::ReplSetConfig::kConfigAllWriteConcernName,
+                            WriteConcernOptions::SyncMode::NONE,
+                            // Defaults to no timeout if none was set.
+                            opCtx->getWriteConcern().wTimeout);
+
+    const auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
+    auto awaitReplicationResult = repl::ReplicationCoordinator::get(opCtx)->awaitReplication(
+        opCtx, replClient.getLastOp(), allMembersWriteConcern);
+    uassertStatusOKWithContext(awaitReplicationResult.status,
+                               str::stream() << "Waiting for replication of noop with message: \""
+                                             << msg << "\" failed");
 }
 
 }  // namespace mongo
