@@ -566,7 +566,7 @@ public:
      * Only called on the FCV upgrade
      * TODO (SERVER-72791): Remove the method once FCV 7.0 becomes last-lts.
      */
-    Status setOnCurrentShardSinceFieldOnChunks(OperationContext* opCtx);
+    void setOnCurrentShardSinceFieldOnChunks(OperationContext* opCtx);
 
     /**
      * Returns a catalog client that will always run commands locally. Can only be used on a

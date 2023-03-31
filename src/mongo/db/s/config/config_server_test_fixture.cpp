@@ -297,9 +297,9 @@ StatusWith<ShardType> ConfigServerTestFixture::getShardDoc(OperationContext* opC
     return ShardType::fromBSON(doc.getValue());
 }
 
-void ConfigServerTestFixture::setupCollection(const NamespaceString& nss,
-                                              const KeyPattern& shardKey,
-                                              const std::vector<ChunkType>& chunks) {
+CollectionType ConfigServerTestFixture::setupCollection(const NamespaceString& nss,
+                                                        const KeyPattern& shardKey,
+                                                        const std::vector<ChunkType>& chunks) {
     auto dbDoc =
         findOneOnConfigCollection(operationContext(),
                                   NamespaceString::kConfigDatabasesNamespace,
@@ -328,6 +328,8 @@ void ConfigServerTestFixture::setupCollection(const NamespaceString& nss,
         ASSERT_OK(insertToConfigCollection(
             operationContext(), ChunkType::ConfigNS, chunk.toConfigBSON()));
     }
+
+    return coll;
 }
 
 StatusWith<ChunkType> ConfigServerTestFixture::getChunkDoc(OperationContext* opCtx,
@@ -382,13 +384,15 @@ StatusWith<ChunkVersion> ConfigServerTestFixture::getCollectionPlacementVersion(
     return chunkType.getValue().getVersion();
 }
 
-void ConfigServerTestFixture::setupDatabase(const std::string& dbName,
-                                            const ShardId& primaryShard) {
-    DatabaseType db(dbName, primaryShard, DatabaseVersion(UUID::gen(), Timestamp()));
+DatabaseType ConfigServerTestFixture::setupDatabase(const std::string& dbName,
+                                                    const ShardId& primaryShard,
+                                                    const DatabaseVersion& dbVersion) {
+    DatabaseType db(dbName, primaryShard, dbVersion);
     ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
                                                     NamespaceString::kConfigDatabasesNamespace,
                                                     db.toBSON(),
                                                     ShardingCatalogClient::kMajorityWriteConcern));
+    return db;
 }
 
 StatusWith<std::vector<BSONObj>> ConfigServerTestFixture::getIndexes(OperationContext* opCtx,

@@ -658,8 +658,9 @@ private:
             const auto actualVersion = serverGlobalParams.featureCompatibility.getVersion();
             _cleanupConfigVersionOnUpgrade(opCtx, requestedVersion, actualVersion);
             _createSchemaOnConfigSettings(opCtx, requestedVersion, actualVersion);
-            _initializePlacementHistory(opCtx, requestedVersion, actualVersion);
             _setOnCurrentShardSinceFieldOnChunks(opCtx, requestedVersion, actualVersion);
+            // Depends on _setOnCurrentShardSinceFieldOnChunks()
+            _initializePlacementHistory(opCtx, requestedVersion, actualVersion);
             _dropConfigMigrationsCollection(opCtx);
         }
 
@@ -782,8 +783,7 @@ private:
         const multiversion::FeatureCompatibilityVersion actualVersion) {
         if (feature_flags::gAutoMerger.isEnabledOnTargetFCVButDisabledOnOriginalFCV(
                 requestedVersion, actualVersion)) {
-            uassertStatusOK(
-                ShardingCatalogManager::get(opCtx)->setOnCurrentShardSinceFieldOnChunks(opCtx));
+            ShardingCatalogManager::get(opCtx)->setOnCurrentShardSinceFieldOnChunks(opCtx);
         }
     }
 

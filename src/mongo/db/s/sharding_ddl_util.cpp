@@ -58,7 +58,6 @@
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/set_allow_migrations_gen.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
 #include "mongo/util/uuid.h"
 
@@ -224,14 +223,11 @@ void deleteCollection(OperationContext* opCtx,
             .thenRunOn(txnExec)
             .then([&](const BatchedCommandResponse& deleteCollResponse) {
                 uassertStatusOK(deleteCollResponse.toStatus());
-                const auto writePlacementEntry =
-                    feature_flags::gHistoricalPlacementShardingCatalog.isEnabled(
-                        serverGlobalParams.featureCompatibility);
 
-                // Also skip the insertion of the placement entry if the previous statement didn't
+                // Skip the insertion of the placement entry if the previous statement didn't
                 // remove any document - we can deduce that the whole transaction was already
                 // committed in a previous attempt.
-                if (!writePlacementEntry || deleteCollResponse.getN() == 0) {
+                if (deleteCollResponse.getN() == 0) {
                     BatchedCommandResponse noOpResponse;
                     noOpResponse.setStatus(Status::OK());
                     noOpResponse.setN(0);
@@ -604,13 +600,7 @@ void shardedRenameMetadata(OperationContext* opCtx,
     // Update "FROM" tags to "TO".
     updateTags(opCtx, configShard, fromNss, toNss, writeConcern);
 
-    auto renamedCollPlacementInfo = [&]() -> boost::optional<NamespacePlacementType> {
-        // TODO SERVER-72870 replace feature flag check
-        if (!feature_flags::gHistoricalPlacementShardingCatalog.isEnabled(
-                serverGlobalParams.featureCompatibility)) {
-            return boost::none;
-        }
-
+    auto renamedCollPlacementInfo = [&]() {
         // Retrieve the latest placement document about "FROM" prior to its deletion (which will
         // have left an entry with an empty set of shards).
         auto query = BSON(NamespacePlacementType::kNssFieldName
@@ -628,40 +618,36 @@ void shardedRenameMetadata(OperationContext* opCtx,
                                 1 /*limit*/))
                 .docs;
 
-        if (queryResponse.empty()) {
-            // Persisted placement information may be unavailable as a consequence of FCV
-            // transitions. Use the content of config.chunks as a fallback.
-            LOGV2_WARNING(7068200,
-                          "Unable to retrieve placement entry for the namespace being renamed",
-                          "fromNss"_attr = fromNss);
-
-            DistinctCommandRequest distinctRequest(ChunkType::ConfigNS);
-            distinctRequest.setKey(ChunkType::shard.name());
-            distinctRequest.setQuery(BSON(ChunkType::collectionUUID.name() << fromUUID));
-
-            auto reply = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
-                opCtx,
-                ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet{}),
-                DatabaseName::kConfig.toString(),
-                distinctRequest.toBSON({}),
-                Shard::RetryPolicy::kIdempotent));
-
-            uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(reply));
-            std::vector<ShardId> shardIds;
-            for (const auto& valueElement : reply.response.getField("values").Array()) {
-                shardIds.emplace_back(valueElement.String());
-            }
-
-            // Compose a placement info object based on the retrieved information; the timestamp
-            // field may be disregarded, since it will be overwritten by the caller before being
-            // consumed.
-            NamespacePlacementType placementInfo(fromNss, Timestamp(), std::move(shardIds));
-            placementInfo.setUuid(fromUUID);
-            return placementInfo;
+        if (!queryResponse.empty()) {
+            return NamespacePlacementType::parse(IDLParserContext("shardedRenameMetadata"),
+                                                 queryResponse.back());
         }
 
-        return NamespacePlacementType::parse(IDLParserContext("shardedRenameMetadata"),
-                                             queryResponse.back());
+        // Persisted placement information may be unavailable as a consequence of FCV
+        // transitions. Use the content of config.chunks as a fallback.
+        DistinctCommandRequest distinctRequest(ChunkType::ConfigNS);
+        distinctRequest.setKey(ChunkType::shard.name());
+        distinctRequest.setQuery(BSON(ChunkType::collectionUUID.name() << fromUUID));
+
+        auto reply = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
+            opCtx,
+            ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet{}),
+            DatabaseName::kConfig.toString(),
+            distinctRequest.toBSON({}),
+            Shard::RetryPolicy::kIdempotent));
+
+        uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(reply));
+        std::vector<ShardId> shardIds;
+        for (const auto& valueElement : reply.response.getField("values").Array()) {
+            shardIds.emplace_back(valueElement.String());
+        }
+
+        // Compose a placement info object based on the retrieved information; the timestamp
+        // field may be disregarded, since it will be overwritten by the caller before being
+        // consumed.
+        NamespacePlacementType placementInfo(fromNss, Timestamp(), std::move(shardIds));
+        placementInfo.setUuid(fromUUID);
+        return placementInfo;
     }();
 
     // Rename namespace and bump timestamp in the original collection and placement entries of
@@ -671,10 +657,9 @@ void shardedRenameMetadata(OperationContext* opCtx,
     auto newTimestamp = now.clusterTime().asTimestamp();
     fromCollType.setTimestamp(newTimestamp);
     fromCollType.setEpoch(OID::gen());
-    if (renamedCollPlacementInfo) {
-        renamedCollPlacementInfo->setNss(toNss);
-        renamedCollPlacementInfo->setTimestamp(newTimestamp);
-    }
+
+    renamedCollPlacementInfo.setNss(toNss);
+    renamedCollPlacementInfo.setTimestamp(newTimestamp);
 
     // Use the modified entries to insert collection and placement entries for "TO".
     auto transactionChain = [collInfo = std::move(fromCollType),
@@ -686,15 +671,14 @@ void shardedRenameMetadata(OperationContext* opCtx,
             .thenRunOn(txnExec)
             .then([&](const BatchedCommandResponse& insertCollResponse) {
                 uassertStatusOK(insertCollResponse.toStatus());
-                if (!placementInfo || insertCollResponse.getN() == 0) {
+                if (insertCollResponse.getN() == 0) {
                     BatchedCommandResponse noOpResponse;
                     noOpResponse.setStatus(Status::OK());
                     noOpResponse.setN(0);
                     return SemiFuture<BatchedCommandResponse>(std::move(noOpResponse));
                 }
                 write_ops::InsertCommandRequest insertPlacementEntry(
-                    NamespaceString::kConfigsvrPlacementHistoryNamespace,
-                    {placementInfo->toBSON()});
+                    NamespaceString::kConfigsvrPlacementHistoryNamespace, {placementInfo.toBSON()});
                 return txnClient.runCRUDOp(insertPlacementEntry, {} /*stmtIds*/);
             })
             .thenRunOn(txnExec)

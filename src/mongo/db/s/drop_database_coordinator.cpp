@@ -54,7 +54,6 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/flush_database_cache_updates_gen.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -119,10 +118,7 @@ void removeDatabaseFromConfigAndUpdatePlacementHistory(
 
                 // pre-check to guarantee idempotence: in case of a retry, the placement history
                 // entry may already exist
-                bool isHistoricalPlacementEnabled =
-                    feature_flags::gHistoricalPlacementShardingCatalog.isEnabled(
-                        serverGlobalParams.featureCompatibility);
-                if (!isHistoricalPlacementEnabled || deleteDatabaseEntryResponse.getN() == 0) {
+                if (deleteDatabaseEntryResponse.getN() == 0) {
                     BatchedCommandResponse noOp;
                     noOp.setN(0);
                     noOp.setStatus(Status::OK());

@@ -49,7 +49,6 @@
 #include "mongo/s/client/shard.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_util.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/pcre.h"
@@ -291,7 +290,6 @@ DatabaseType ShardingCatalogManager::createDatabase(
         }
     }();
 
-
     // Note, making the primary shard refresh its databaseVersion here is not required for
     // correctness, since either:
     // 1) This is the first time this database is being created. The primary shard will not have a
@@ -381,11 +379,7 @@ void ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
 
                 // pre-check to guarantee idempotence: in case of a retry, the placement history
                 // entry may already exist
-                bool isHistoricalPlacementEnabled =
-                    feature_flags::gHistoricalPlacementShardingCatalog.isEnabled(
-                        serverGlobalParams.featureCompatibility);
-                if (!isHistoricalPlacementEnabled ||
-                    updateCatalogDatabaseEntryResponse.getNModified() == 0) {
+                if (updateCatalogDatabaseEntryResponse.getNModified() == 0) {
                     BatchedCommandResponse noOp;
                     noOp.setN(0);
                     noOp.setStatus(Status::OK());
@@ -416,4 +410,5 @@ void ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
     txn_api::SyncTransactionWithRetries txn(opCtx, executor, nullptr /*resourceYielder*/);
     txn.run(opCtx, transactionChain);
 }
+
 }  // namespace mongo

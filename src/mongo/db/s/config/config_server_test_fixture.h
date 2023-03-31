@@ -141,9 +141,9 @@ protected:
     /**
      * Setup the config.chunks collection to contain the given chunks.
      */
-    void setupCollection(const NamespaceString& nss,
-                         const KeyPattern& shardKey,
-                         const std::vector<ChunkType>& chunks);
+    CollectionType setupCollection(const NamespaceString& nss,
+                                   const KeyPattern& shardKey,
+                                   const std::vector<ChunkType>& chunks);
 
     /**
      * Retrieves the chunk document <uuid, minKey> from the config server.
@@ -175,7 +175,10 @@ protected:
     /**
      * Inserts a document for the database into the config.databases collection.
      */
-    void setupDatabase(const std::string& dbName, const ShardId& primaryShard);
+    DatabaseType setupDatabase(const std::string& dbName,
+                               const ShardId& primaryShard,
+                               const DatabaseVersion& dbVersion = DatabaseVersion(UUID::gen(),
+                                                                                  Timestamp()));
 
     /**
      * Returns the indexes definitions defined on a given collection.

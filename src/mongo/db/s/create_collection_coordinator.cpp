@@ -343,28 +343,6 @@ void insertChunks(OperationContext* opCtx,
     }
 }
 
-void insertCollectionEntry(OperationContext* opCtx,
-                           CollectionType& coll,
-                           const OperationSessionInfo& osi) {
-    const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-
-    BatchedCommandRequest insertRequest(
-        write_ops::InsertCommandRequest(CollectionType::ConfigNS, {coll.toBSON()}));
-    insertRequest.setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
-
-    const BSONObj cmdObj = insertRequest.toBSON().addFields(osi.toBSON());
-
-    BatchedCommandResponse unusedResponse;
-    uassertStatusOK(Shard::CommandResponse::processBatchWriteResponse(
-        configShard->runCommand(opCtx,
-                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                CollectionType::ConfigNS.db().toString(),
-                                cmdObj,
-                                Shard::kDefaultConfigCommandTimeout,
-                                Shard::RetryPolicy::kIdempotent),
-        &unusedResponse));
-}
-
 void insertCollectionAndPlacementEntries(OperationContext* opCtx,
                                          const std::shared_ptr<executor::TaskExecutor>& executor,
                                          const std::shared_ptr<CollectionType>& coll,
@@ -1283,7 +1261,6 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx,
     _updateSession(opCtx);
 
     try {
-
         notifyChangeStreamsOnShardCollection(opCtx,
                                              nss(),
                                              *_collectionUUID,
@@ -1291,13 +1268,8 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx,
                                              CommitPhase::kPrepare,
                                              *shardsHoldingData);
 
-        if (feature_flags::gHistoricalPlacementShardingCatalog.isEnabled(
-                serverGlobalParams.featureCompatibility)) {
-            insertCollectionAndPlacementEntries(
-                opCtx, executor, coll, placementVersion, shardsHoldingData);
-        } else {
-            insertCollectionEntry(opCtx, *coll, getCurrentSession());
-        }
+        insertCollectionAndPlacementEntries(
+            opCtx, executor, coll, placementVersion, shardsHoldingData);
 
         notifyChangeStreamsOnShardCollection(
             opCtx, nss(), *_collectionUUID, _request.toBSON(), CommitPhase::kSuccessful);

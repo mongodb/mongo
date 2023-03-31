@@ -629,11 +629,6 @@ void writeToConfigPlacementHistoryForOriginalNss(
     const ReshardingCoordinatorDocument& coordinatorDoc,
     const Timestamp& newCollectionTimestamp,
     TxnNumber txnNumber) {
-    if (!feature_flags::gHistoricalPlacementShardingCatalog.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        return;
-    }
-
     invariant(coordinatorDoc.getState() == CoordinatorStateEnum::kCommitting,
               "New placement data on the collection being resharded can only be persisted at "
               "commit time");
