@@ -158,9 +158,8 @@ SessionsCollection::SendBatchFn SessionsCollection::makeSendFnForBatchWrite(
     const NamespaceString& ns, DBClientBase* client) {
     auto send = [client, ns](BSONObj batch) {
         BSONObj res;
-        if (!client->runCommand(ns.dbName(), batch, res)) {
-            uassertStatusOK(getStatusFromCommandResult(res));
-        }
+        client->runCommand(ns.dbName(), batch, res);
+        uassertStatusOK(getStatusFromWriteCommandReply(res));
     };
 
     return send;
