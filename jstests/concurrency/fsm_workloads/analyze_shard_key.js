@@ -5,13 +5,18 @@
  *
  * This workload implicitly assumes that its tid range is [0, $config.threadCount). This isn't
  * guaranteed to be true when it is run in parallel with other workloads.
+ *
+ * TODO (SERVER-75532): Investigate the high variability of the runtime of analyze_shard_key.js in
+ * suites with chunk migration and/or stepdown/kill/terminate.
  * @tags: [
  *  requires_fcv_70,
  *  featureFlagAnalyzeShardKey,
  *  featureFlagUpdateOneWithoutShardKey,
  *  uses_transactions,
  *  resource_intensive,
- *  incompatible_with_concurrency_simultaneous
+ *  incompatible_with_concurrency_simultaneous,
+ *  does_not_support_stepdowns,
+ *  assumes_balancer_off
  * ]
  */
 load("jstests/concurrency/fsm_libs/extend_workload.js");
