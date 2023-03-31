@@ -2708,4 +2708,10 @@ StatusWith<BSONObj> WiredTigerKVEngine::getSanitizedStorageOptionsForSecondaryRe
     return options;
 }
 
+void WiredTigerKVEngine::sizeStorerPeriodicFlush() {
+    if (_sizeStorerSyncTracker.intervalHasElapsed()) {
+        syncSizeInfo(false);
+    }
+}
+
 }  // namespace mongo

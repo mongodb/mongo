@@ -124,6 +124,9 @@ public:
      * cache exceeds wiredTigerCursorCacheSize.
      * The exact cursor config that was used to create the cursor must be provided or subsequent
      * users will retrieve cursors with incorrect configurations.
+     *
+     * Additionally calls into the WiredTigerKVEngine to see if the SizeStorer needs to be flushed.
+     * The SizeStorer gets flushed on a periodic basis.
      */
     void releaseCursor(uint64_t id, WT_CURSOR* cursor, const std::string& config);
 
