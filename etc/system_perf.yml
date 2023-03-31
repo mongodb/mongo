@@ -2696,10 +2696,10 @@ buildvariants:
       - name: schedule_variant_auto_tasks
       - name: industry_benchmarks
       - name: ycsb_60GB
+      - name: tpcc
+      - name: tpcc_majority
       - name: linkbench
-      # TODO
-      # - name: tpcc
-      # - name: linkbench2
+      - name: linkbench2
 
   - name: atlas-M60-real
     display_name: M60-Atlas ReplSet AWS
