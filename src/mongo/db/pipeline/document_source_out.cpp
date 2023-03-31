@@ -212,11 +212,13 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceOut::createFromBson(
 }
 
 Value DocumentSourceOut::serialize(SerializationOptions opts) const {
-    MutableDocument spec;
+    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        MONGO_UNIMPLEMENTED_TASSERT(7484321);
+    }
+
     // Do not include the tenantId in the serialized 'outputNs'.
-    spec["db"] = Value(opts.serializeFieldName(_outputNs.dbName().db()));
-    spec["coll"] = Value(opts.serializeFieldName(_outputNs.coll()));
-    return Value(Document{{kStageName, spec.freezeToValue()}});
+    return Value(
+        DOC(kStageName << DOC("db" << _outputNs.dbName().db() << "coll" << _outputNs.coll())));
 }
 
 void DocumentSourceOut::waitWhileFailPointEnabled() {

@@ -416,8 +416,7 @@ function runCommonTests(conn, curOpSpec) {
         explain: true
     }));
 
-    let expectedStages =
-        [{$currentOp: {idleConnections: true, allUsers: false}}, {$match: {desc: {$eq: "test"}}}];
+    let expectedStages = [{$currentOp: {idleConnections: true}}, {$match: {desc: {$eq: "test"}}}];
 
     if (isRemoteShardCurOp) {
         assert.docEq(expectedStages, explainPlan.splitPipeline.shardsPart);

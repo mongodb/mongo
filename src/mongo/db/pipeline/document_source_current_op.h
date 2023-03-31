@@ -45,14 +45,6 @@ public:
 
     static constexpr StringData kStageName = "$currentOp"_sd;
 
-    static constexpr ConnMode kDefaultConnMode = ConnMode::kExcludeIdle;
-    static constexpr SessionMode kDefaultSessionMode = SessionMode::kIncludeIdle;
-    static constexpr UserMode kDefaultUserMode = UserMode::kExcludeOthers;
-    static constexpr LocalOpsMode kDefaultLocalOpsMode = LocalOpsMode::kRemoteShardOps;
-    static constexpr TruncationMode kDefaultTruncationMode = TruncationMode::kNoTruncation;
-    static constexpr CursorMode kDefaultCursorMode = CursorMode::kExcludeCursors;
-    static constexpr BacktraceMode kDefaultBacktraceMode = BacktraceMode::kExcludeBacktrace;
-
     class LiteParsed final : public LiteParsedDocumentSource {
     public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
@@ -106,28 +98,29 @@ public:
 
     static boost::intrusive_ptr<DocumentSourceCurrentOp> create(
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-        boost::optional<ConnMode> includeIdleConnections = boost::none,
-        boost::optional<SessionMode> includeIdleSessions = boost::none,
-        boost::optional<UserMode> includeOpsFromAllUsers = boost::none,
-        boost::optional<LocalOpsMode> showLocalOpsOnMongoS = boost::none,
-        boost::optional<TruncationMode> truncateOps = boost::none,
-        boost::optional<CursorMode> idleCursors = boost::none,
-        boost::optional<BacktraceMode> backtrace = boost::none);
+        ConnMode includeIdleConnections = ConnMode::kExcludeIdle,
+        SessionMode includeIdleSessions = SessionMode::kIncludeIdle,
+        UserMode includeOpsFromAllUsers = UserMode::kExcludeOthers,
+        LocalOpsMode showLocalOpsOnMongoS = LocalOpsMode::kRemoteShardOps,
+        TruncationMode truncateOps = TruncationMode::kNoTruncation,
+        CursorMode idleCursors = CursorMode::kExcludeCursors,
+        BacktraceMode backtrace = BacktraceMode::kExcludeBacktrace);
 
     const char* getSourceName() const final;
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
-        bool showLocalOps =
-            _showLocalOpsOnMongoS.value_or(kDefaultLocalOpsMode) == LocalOpsMode::kLocalMongosOps;
-        StageConstraints constraints(
-            StreamType::kStreaming,
-            PositionRequirement::kFirst,
-            (showLocalOps ? HostTypeRequirement::kLocalOnly : HostTypeRequirement::kAnyShard),
-            DiskUseRequirement::kNoDiskUse,
-            FacetRequirement::kNotAllowed,
-            TransactionRequirement::kNotAllowed,
-            LookupRequirement::kAllowed,
-            (showLocalOps ? UnionRequirement::kNotAllowed : UnionRequirement::kAllowed));
+        StageConstraints constraints(StreamType::kStreaming,
+                                     PositionRequirement::kFirst,
+                                     (_showLocalOpsOnMongoS == LocalOpsMode::kLocalMongosOps
+                                          ? HostTypeRequirement::kLocalOnly
+                                          : HostTypeRequirement::kAnyShard),
+                                     DiskUseRequirement::kNoDiskUse,
+                                     FacetRequirement::kNotAllowed,
+                                     TransactionRequirement::kNotAllowed,
+                                     LookupRequirement::kAllowed,
+                                     (_showLocalOpsOnMongoS == LocalOpsMode::kLocalMongosOps
+                                          ? UnionRequirement::kNotAllowed
+                                          : UnionRequirement::kAllowed));
 
         constraints.isIndependentOfAnyCollection = true;
         constraints.requiresInputDocSource = false;
@@ -147,13 +140,13 @@ public:
 
 private:
     DocumentSourceCurrentOp(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
-                            boost::optional<ConnMode> includeIdleConnections,
-                            boost::optional<SessionMode> includeIdleSessions,
-                            boost::optional<UserMode> includeOpsFromAllUsers,
-                            boost::optional<LocalOpsMode> showLocalOpsOnMongoS,
-                            boost::optional<TruncationMode> truncateOps,
-                            boost::optional<CursorMode> idleCursors,
-                            boost::optional<BacktraceMode> backtrace)
+                            ConnMode includeIdleConnections,
+                            SessionMode includeIdleSessions,
+                            UserMode includeOpsFromAllUsers,
+                            LocalOpsMode showLocalOpsOnMongoS,
+                            TruncationMode truncateOps,
+                            CursorMode idleCursors,
+                            BacktraceMode backtrace)
         : DocumentSource(kStageName, pExpCtx),
           _includeIdleConnections(includeIdleConnections),
           _includeIdleSessions(includeIdleSessions),
@@ -165,13 +158,13 @@ private:
 
     GetNextResult doGetNext() final;
 
-    boost::optional<ConnMode> _includeIdleConnections;
-    boost::optional<SessionMode> _includeIdleSessions;
-    boost::optional<UserMode> _includeOpsFromAllUsers;
-    boost::optional<LocalOpsMode> _showLocalOpsOnMongoS;
-    boost::optional<TruncationMode> _truncateOps;
-    boost::optional<CursorMode> _idleCursors;
-    boost::optional<BacktraceMode> _backtrace;
+    ConnMode _includeIdleConnections = ConnMode::kExcludeIdle;
+    SessionMode _includeIdleSessions = SessionMode::kIncludeIdle;
+    UserMode _includeOpsFromAllUsers = UserMode::kExcludeOthers;
+    LocalOpsMode _showLocalOpsOnMongoS = LocalOpsMode::kRemoteShardOps;
+    TruncationMode _truncateOps = TruncationMode::kNoTruncation;
+    CursorMode _idleCursors = CursorMode::kExcludeCursors;
+    BacktraceMode _backtrace = BacktraceMode::kExcludeBacktrace;
 
     std::string _shardName;
 

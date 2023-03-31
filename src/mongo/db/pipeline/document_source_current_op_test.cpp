@@ -157,10 +157,10 @@ TEST_F(DocumentSourceCurrentOpTest, ShouldFailToParseIfUnrecognisedParameterSpec
                        ErrorCodes::FailedToParse);
 }
 
-TEST_F(DocumentSourceCurrentOpTest, ShouldParseAndSerializeAllExplicitlySpecifiedArguments) {
+TEST_F(DocumentSourceCurrentOpTest, ShouldParseAndSerializeNonDefaultOptionalArguments) {
     const auto specObj = fromjson(
-        "{$currentOp:{idleConnections:false, idleSessions:false, allUsers:true, localOps:true, "
-        "truncateOps:false}}");
+        "{$currentOp:{idleConnections:true, idleSessions:false, allUsers:true, localOps:true, "
+        "truncateOps:true}}");
 
     const auto parsed =
         DocumentSourceCurrentOp::createFromBson(specObj.firstElement(), getExpCtx());
@@ -168,38 +168,28 @@ TEST_F(DocumentSourceCurrentOpTest, ShouldParseAndSerializeAllExplicitlySpecifie
     const auto currentOp = static_cast<DocumentSourceCurrentOp*>(parsed.get());
 
     const auto expectedOutput = Document{{"$currentOp",
-                                          Document{{"idleConnections", false},
+                                          Document{{"idleConnections", true},
                                                    {"idleSessions", false},
                                                    {"allUsers", true},
                                                    {"localOps", true},
-                                                   {"truncateOps", false}}}};
+                                                   {"truncateOps", true}}}};
 
     ASSERT_DOCUMENT_EQ(currentOp->serialize().getDocument(), expectedOutput);
 }
 
-TEST_F(DocumentSourceCurrentOpTest,
-       ShouldParseAndSerializeAllExplicitlySpecifiedArgumentsWithRedaction) {
-    auto spec = fromjson(
-        R"({
-            $currentOp: {
-                idleConnections: true,
-                allUsers: false,
-                idleSessions: false,
-                localOps: true
-            }
-        })");
-    auto docSource = DocumentSourceCurrentOp::createFromBson(spec.firstElement(), getExpCtx());
+TEST_F(DocumentSourceCurrentOpTest, ShouldParseButNotSerializeDefaultOptionalArguments) {
+    const auto specObj = fromjson(
+        "{$currentOp:{idleConnections:false, idleSessions:true, allUsers:false, localOps:false, "
+        "truncateOps:false}}");
 
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({
-            "$currentOp": {
-                "idleConnections": "?",
-                "idleSessions": "?",
-                "allUsers": "?",
-                "localOps": "?"
-            }
-        })",
-        redact(*docSource));
+    const auto parsed =
+        DocumentSourceCurrentOp::createFromBson(specObj.firstElement(), getExpCtx());
+
+    const auto currentOp = static_cast<DocumentSourceCurrentOp*>(parsed.get());
+
+    const auto expectedOutput = Document{{"$currentOp", Document{}}};
+
+    ASSERT_DOCUMENT_EQ(currentOp->serialize().getDocument(), expectedOutput);
 }
 
 TEST_F(DocumentSourceCurrentOpTest, ShouldNotSerializeOmittedOptionalArguments) {
@@ -213,19 +203,6 @@ TEST_F(DocumentSourceCurrentOpTest, ShouldNotSerializeOmittedOptionalArguments) 
     const auto expectedOutput = Document{{"$currentOp", Document{}}};
 
     ASSERT_DOCUMENT_EQ(currentOp->serialize().getDocument(), expectedOutput);
-}
-
-TEST_F(DocumentSourceCurrentOpTest, ShouldNotSerializeOmittedOptionalArgumentsWithRedaction) {
-    const auto specObj = fromjson("{$currentOp:{}}");
-
-    const auto docSource =
-        DocumentSourceCurrentOp::createFromBson(specObj.firstElement(), getExpCtx());
-
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({
-            "$currentOp": {}
-        })",
-        redact(*docSource));
 }
 
 TEST_F(DocumentSourceCurrentOpTest, ShouldReturnEOFImmediatelyIfNoCurrentOps) {
