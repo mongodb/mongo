@@ -1965,8 +1965,9 @@ DropAllRolesFromDatabaseReply CmdUMCTyped<DropAllRolesFromDatabaseCommand>::Invo
             txn.update(usersNSS(dbname.tenantId()), rolesMatch, BSON("$pull" << rolesMatch));
         if (!swCount.isOK()) {
             return useDefaultCode(swCount.getStatus(), ErrorCodes::UserModificationFailed)
-                .withContext(str::stream() << "Failed to remove roles from \"" << dbname.db()
-                                           << "\" db from all users");
+                .withContext(str::stream()
+                             << "Failed to remove roles from \"" << dbname.toStringForErrorMsg()
+                             << "\" db from all users");
         }
 
         // Remove these roles from all other roles
@@ -1975,15 +1976,16 @@ DropAllRolesFromDatabaseReply CmdUMCTyped<DropAllRolesFromDatabaseCommand>::Invo
                              BSON("$pull" << rolesMatch));
         if (!swCount.isOK()) {
             return useDefaultCode(swCount.getStatus(), ErrorCodes::RoleModificationFailed)
-                .withContext(str::stream() << "Failed to remove roles from \"" << dbname.db()
-                                           << "\" db from all roles");
+                .withContext(str::stream()
+                             << "Failed to remove roles from \"" << dbname.toStringForErrorMsg()
+                             << "\" db from all roles");
         }
 
         // Finally, remove the actual role documents
         swCount = txn.remove(rolesNSS(dbname.tenantId()), roleMatch);
         if (!swCount.isOK()) {
             return swCount.getStatus().withContext(
-                str::stream() << "Removed roles from \"" << dbname.db()
+                str::stream() << "Removed roles from \"" << dbname.toStringForErrorMsg()
                               << "\" db "
                                  " from all users and roles but failed to actually delete"
                                  " those roles themselves");

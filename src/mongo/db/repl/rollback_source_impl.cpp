@@ -108,10 +108,10 @@ StatusWith<BSONObj> RollbackSourceImpl::getCollectionInfoByUUID(const DatabaseNa
     std::list<BSONObj> info =
         _getConnection()->getCollectionInfos(dbName, BSON("info.uuid" << uuid));
     if (info.empty()) {
-        return StatusWith<BSONObj>(ErrorCodes::NoSuchKey,
-                                   str::stream()
-                                       << "No collection info found for collection with uuid: "
-                                       << uuid.toString() << " in db: " << dbName.db());
+        return StatusWith<BSONObj>(
+            ErrorCodes::NoSuchKey,
+            str::stream() << "No collection info found for collection with uuid: "
+                          << uuid.toString() << " in db: " << dbName.toStringForErrorMsg());
     }
     invariant(info.size() == 1U);
     return info.front();

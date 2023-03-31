@@ -254,7 +254,8 @@ Status applyOps(OperationContext* opCtx,
 
     if (userInitiatedWritesAndNotPrimary)
         return Status(ErrorCodes::NotWritablePrimary,
-                      str::stream() << "Not primary while applying ops to database " << dbName);
+                      str::stream() << "Not primary while applying ops to database "
+                                    << dbName.toStringForErrorMsg());
 
     LOGV2_DEBUG(5854600,
                 2,

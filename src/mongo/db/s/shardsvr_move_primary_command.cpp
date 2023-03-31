@@ -101,11 +101,12 @@ public:
 
         uassert(
             ErrorCodes::InvalidNamespace,
-            str::stream() << "invalid db name specified: " << dbName.db(),
+            str::stream() << "invalid db name specified: " << dbName.toStringForErrorMsg(),
             NamespaceString::validDBName(dbName, NamespaceString::DollarInDbNameBehavior::Allow));
 
         uassert(ErrorCodes::InvalidOptions,
-                str::stream() << "Can't move primary for " << dbName.db() << " database",
+                str::stream() << "Can't move primary for " << dbName.toStringForErrorMsg()
+                              << " database",
                 !dbNss.isOnInternalDb());
 
         uassert(ErrorCodes::InvalidOptions,

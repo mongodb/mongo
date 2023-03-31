@@ -90,7 +90,7 @@ NamespaceString parseGraphLookupFromAndResolveNamespace(const BSONElement& elem,
     uassert(ErrorCodes::FailedToParse,
             str::stream()
                 << "$graphLookup with syntax {from: {db:<>, coll:<>},..} is not supported for db: "
-                << nss.db() << " and coll: " << nss.coll(),
+                << nss.dbName().toStringForErrorMsg() << " and coll: " << nss.coll(),
             nss == NamespaceString::kTenantMigrationOplogView);
     return nss;
 }
