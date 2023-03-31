@@ -50,10 +50,6 @@ feature_flags:
         description: "Enable support for global indexes"
         cpp_varname: gFeatureFlagGlobalIndexes
         default: false
-    featureFlagAsyncRemoteCommandAPI:
-        description: "Enable use of the new async remote command invocation API"
-        cpp_varname: gFeatureFlagAsyncRemoteCmd
-        default: false
     featureFlagAdditionalParticipants:
         description: "Adding additional participants to existing transactions"
         cpp_varname: gFeatureFlagAdditionalParticipants
