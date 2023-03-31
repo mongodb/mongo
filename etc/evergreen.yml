@@ -1584,6 +1584,7 @@ buildvariants:
   - name: .sharding .txns
   - name: .sharding .common
   - name: sharded_multi_stmt_txn_jscore_passthrough
+  - name: sharding_jscore_passthrough_with_catalog_shard
   - name: .serverless
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm_gen
   - name: .updatefuzzer
