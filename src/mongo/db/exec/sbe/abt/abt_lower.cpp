@@ -1124,11 +1124,6 @@ std::unique_ptr<sbe::EExpression> SBENodeLowering::convertBoundsToExpr(
     for (const auto& expr : bound.getBound()) {
         ksFnArgs.emplace_back(exprLower.optimize(expr));
     }
-    if (!isLower && (bound.isMinusInf() || bound.isPlusInf())) {
-        // We can skip if fully infinite only for upper bound. For lower bound we need to generate
-        // minkeys.
-        return nullptr;
-    };
 
     KeyString::Discriminator discriminator;
     // For a reverse scan, we start from the high bound and iterate until the low bound.
