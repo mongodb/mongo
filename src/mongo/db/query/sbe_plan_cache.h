@@ -217,6 +217,10 @@ struct CachedSbePlan {
 using PlanCacheEntry = PlanCacheEntryBase<CachedSbePlan, plan_cache_debug_info::DebugInfoSBE>;
 
 struct BudgetEstimator {
+    /**
+     * This estimator function is called when an entry is added or removed to LRU cache in order to
+     * make sure the total plan cache size does not exceed the maximum size.
+     */
     size_t operator()(const sbe::PlanCacheKey& key,
                       const std::shared_ptr<const PlanCacheEntry>& entry) {
         // TODO: SERVER-73649 include size of underlying query shape and size of int_32 key hash in

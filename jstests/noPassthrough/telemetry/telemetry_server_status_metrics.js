@@ -80,10 +80,31 @@ function countRateLimitedRequestsTest(conn, testDB, coll, testOptions) {
     }
 }
 
+function telemetryStoreSizeEstimateTest(conn, testDB, coll, testOptions) {
+    assert.eq(testDB.serverStatus().metrics.telemetry.telemetryStoreSizeEstimateBytes, 0);
+    let halfWayPointSize;
+    // Only using three digit numbers (eg 100, 101) means the string length will be the same for all
+    // entries and therefore the key size will be the same for all entries, which makes predicting
+    // the total size of the store clean and easy.
+    for (var i = 100; i < 200; i++) {
+        coll.aggregate([{$match: {["foo" + i]: "bar"}}]).itcount();
+        if (i == 150) {
+            halfWayPointSize =
+                testDB.serverStatus().metrics.telemetry.telemetryStoreSizeEstimateBytes;
+        }
+    }
+    // Confirm that telemetry store has grown and size is non-zero.
+    assert.gt(halfWayPointSize, 0);
+    const fullSize = testDB.serverStatus().metrics.telemetry.telemetryStoreSizeEstimateBytes;
+    assert.gt(fullSize, 0);
+    // Make sure the final telemetry store size is twice as much as the halfway point size (+/- 5%)
+    assert(fullSize >= halfWayPointSize * 1.95 && fullSize <= halfWayPointSize * 2.05,
+           tojson({fullSize, halfWayPointSize}));
+}
 /**
- * In this configuration, we insert enough entries into the telemetry store to trigger LRU eviction.
- *
- * */
+ * In this configuration, we insert enough entries into the telemetry store to trigger LRU
+ * eviction.
+ */
 runTestWithMongodOptions({
     setParameter: {
         internalQueryConfigureTelemetryCacheSize: "1MB",
@@ -122,4 +143,13 @@ runTestWithMongodOptions({
 },
                          countRateLimitedRequestsTest,
                          {samplingRate: 10, numRequests: 20});
+
+/**
+ * Sample all queries and assert that the size of telemetry store is equal to num entries * entry
+ * size
+ */
+runTestWithMongodOptions({
+    setParameter: {internalQueryConfigureTelemetrySamplingRate: 2147483647},
+},
+                         telemetryStoreSizeEstimateTest);
 }());

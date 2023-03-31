@@ -144,7 +144,7 @@ DocumentSource::GetNextResult DocumentSourceTelemetry::doGetNext() {
         const auto partitionReadTime =
             Timestamp{Timestamp(Date_t::now().toMillisSinceEpoch() / 1000, 0)};
         for (auto&& [key, metrics] : *partition) {
-            auto swKey = metrics.redactKey(key, _redactFieldNames, pExpCtx->opCtx);
+            auto swKey = metrics->redactKey(key, _redactFieldNames, pExpCtx->opCtx);
             if (!swKey.isOK()) {
                 LOGV2_DEBUG(7349403,
                             3,
@@ -158,7 +158,7 @@ DocumentSource::GetNextResult DocumentSourceTelemetry::doGetNext() {
                 continue;
             }
             _materializedPartition.push_back({{"key", std::move(swKey.getValue())},
-                                              {"metrics", metrics.toBSON()},
+                                              {"metrics", metrics->toBSON()},
                                               {"asOf", partitionReadTime}});
         }
     }

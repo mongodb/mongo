@@ -235,6 +235,11 @@ using PlanCacheEntry = PlanCacheEntryBase<SolutionCacheData, plan_cache_debug_in
 using CachedSolution = CachedPlanHolder<SolutionCacheData, plan_cache_debug_info::DebugInfo>;
 
 struct BudgetEstimator {
+    /**
+     * This estimator function is called when an entry is added or removed to LRU cache in order to
+     * make sure the total plan cache size does not exceed the maximum size.
+     */
+
     size_t operator()(const PlanCacheKey&, const std::shared_ptr<const PlanCacheEntry>&) {
         return 1;
     }

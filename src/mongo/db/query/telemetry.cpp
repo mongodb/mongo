@@ -386,8 +386,7 @@ void appendShardedTelemetryKeyIfApplicable(BSONObjBuilder& objToModify,
     objToModify.append(kTelemetryKeyInShardedCommand,
                        telemetryKeyToShardedStoreId(*telemetryKey, hostAndPort).toBSON());
 }
-
-
+CounterMetric telemetryStoreSizeEstimateBytesMetric("telemetry.telemetryStoreSizeEstimateBytes");
 namespace {
 
 CounterMetric telemetryEvictedMetric("telemetry.numEvicted");
@@ -815,21 +814,22 @@ void writeTelemetry(OperationContext* opCtx,
     }
     auto&& telemetryStore = getTelemetryStore(opCtx);
     auto&& [statusWithMetrics, partitionLock] = telemetryStore.getWithPartitionLock(*telemetryKey);
-    TelemetryMetrics* metrics;
+    std::shared_ptr<TelemetryMetrics> metrics;
     if (statusWithMetrics.isOK()) {
-        metrics = statusWithMetrics.getValue();
+        metrics = *statusWithMetrics.getValue();
     } else {
-        size_t numEvicted = telemetryStore.put(
-            *telemetryKey,
-            TelemetryMetrics(cmdObj, getApplicationName(opCtx), CurOp::get(opCtx)->getNSS()),
-            partitionLock);
+        size_t numEvicted =
+            telemetryStore.put(*telemetryKey,
+                               std::make_shared<TelemetryMetrics>(
+                                   cmdObj, getApplicationName(opCtx), CurOp::get(opCtx)->getNSS()),
+                               partitionLock);
         telemetryEvictedMetric.increment(numEvicted);
         auto newMetrics = partitionLock->get(*telemetryKey);
         // This can happen if the budget is immediately exceeded. Specifically if the there is
         // not enough room for a single new entry if the number of partitions is too high
         // relative to the size.
         tassert(7064700, "Should find telemetry store entry", newMetrics.isOK());
-        metrics = &newMetrics.getValue()->second;
+        metrics = newMetrics.getValue()->second;
     }
 
     metrics->lastExecutionMicros = queryExecMicros;
