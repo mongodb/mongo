@@ -60,7 +60,7 @@ assert.eq(res[0], res[1]);
 //
 assert(coll.drop());
 assert.commandWorked(coll.insert([
-    {date: new Date("January 14, 2011"), timezone: "UTC"},
+    {date: ISODate("2011-01-14"), timezone: "UTC"},
     {date: ISODate("1998-11-07T00:00:00Z"), timezone: "-0400"},
 ]));
 
