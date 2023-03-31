@@ -243,12 +243,6 @@ function isRetryableMoveChunkResponse(res) {
         res.code === ErrorCodes.CallbackCanceled;
 }
 
-function isFailedToSatisfyPrimaryReadPreferenceError(msg) {
-    const kReplicaSetMonitorError =
-        /^Could not find host matching read preference.*mode: "primary"/;
-    return msg.match(kReplicaSetMonitorError);
-}
-
 function hasError(res) {
     return res.ok !== 1 || res.writeErrors;
 }
@@ -794,7 +788,7 @@ const kContinue = Object.create(null);
 // retry the current command without subtracting from our retry allocation. By default sets ok=1
 // for failures with acceptable error codes, unless shouldOverrideAcceptableError is false.
 function shouldRetryWithNetworkErrorOverride(
-    res, cmdName, startTime, logError, shouldOverrideAcceptableError = true) {
+    res, cmdName, logError, shouldOverrideAcceptableError = true) {
     assert(configuredForNetworkRetry());
 
     if (RetryableWritesUtil.isRetryableWriteCmdName(cmdName)) {
@@ -847,17 +841,6 @@ function shouldRetryWithNetworkErrorOverride(
 
         if (isRetryableExecutorCodeAndMessage(res.code, res.errmsg)) {
             logError("Retrying because of executor interruption");
-            return kContinue;
-        }
-
-        if (isFailedToSatisfyPrimaryReadPreferenceError(res.errmsg) &&
-            Date.now() - startTime < 5 * 60 * 1000) {
-            // ReplicaSetMonitor::getHostOrRefresh() waits up to 15 seconds to find the
-            // primary of the replica set. It is possible for the step up attempt of another
-            // node in the replica set to take longer than 15 seconds so we allow retrying
-            // for up to 5 minutes.
-            logError("Failed to find primary when attempting to run command," +
-                     " will retry for another 15 seconds");
             return kContinue;
         }
 
@@ -959,11 +942,12 @@ function shouldRetryWithNetworkExceptionOverride(
     e, cmdName, cmdObj, startTime, numNetworkErrorRetries, logError) {
     assert(configuredForNetworkRetry());
 
+    const kReplicaSetMonitorError =
+        /^Could not find host matching read preference.*mode: "primary"/;
     if (numNetworkErrorRetries === 0) {
         logError("No retries, throwing");
         throw e;
-    } else if (isFailedToSatisfyPrimaryReadPreferenceError(e.message) &&
-               Date.now() - startTime < 5 * 60 * 1000) {
+    } else if (e.message.match(kReplicaSetMonitorError) && Date.now() - startTime < 5 * 60 * 1000) {
         // ReplicaSetMonitor::getHostOrRefresh() waits up to 15 seconds to find the
         // primary of the replica set. It is possible for the step up attempt of another
         // node in the replica set to take longer than 15 seconds so we allow retrying
@@ -1034,8 +1018,7 @@ function runCommandOverrideBody(conn, dbName, cmdName, cmdObj, lsid, clientFunct
             }
 
             if (canRetryNetworkError) {
-                const networkRetryRes =
-                    shouldRetryWithNetworkErrorOverride(res, cmdName, startTime, logError);
+                const networkRetryRes = shouldRetryWithNetworkErrorOverride(res, cmdName, logError);
                 if (networkRetryRes === kContinue) {
                     continue;
                 } else {
