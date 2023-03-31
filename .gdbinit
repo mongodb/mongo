@@ -5,6 +5,7 @@ set python print-stack full
 source buildscripts/gdb/mongo.py
 
 # Load the mongodb pretty printers
+source buildscripts/gdb/optimizer_printers.py
 source buildscripts/gdb/mongo_printers.py
 
 # Load the mongodb lock analysis
