@@ -13,7 +13,7 @@
 (function() {
 "use strict";
 
-function runTest(db, supportsTransactions, writeConcern = {}, secondaries = []) {
+function runTest(db, supportsTransctions, writeConcern = {}, secondaries = []) {
     assert.commandWorked(db.runCommand({setParameter: 1, requireApiVersion: true}));
     for (const secondary of secondaries) {
         assert.commandWorked(secondary.adminCommand({setParameter: 1, requireApiVersion: true}));
@@ -47,7 +47,7 @@ function runTest(db, supportsTransactions, writeConcern = {}, secondaries = []) 
     assert.commandWorked(
         db.runCommand({getMore: reply.cursor.id, collection: "collection", apiVersion: "1"}));
 
-    if (supportsTransactions) {
+    if (supportsTransctions) {
         /*
          * Commands in transactions require API version.
          */

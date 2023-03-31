@@ -72,7 +72,6 @@
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
-#include "mongo/util/debugger.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/log_with_sampling.h"
 #include "mongo/util/net/socket_utils.h"
@@ -98,8 +97,6 @@ MONGO_FAIL_POINT_DEFINE(skipCommitTxnCheckPrepareMajorityCommitted);
 MONGO_FAIL_POINT_DEFINE(restoreLocksFail);
 
 MONGO_FAIL_POINT_DEFINE(failTransactionNoopWrite);
-
-MONGO_FAIL_POINT_DEFINE(hangInCommitSplitPreparedTxnOnPrimary);
 
 const auto getTransactionParticipant = Session::declareDecoration<TransactionParticipant>();
 
@@ -2018,14 +2015,6 @@ void TransactionParticipant::Participant::_commitSplitPreparedTxnOnPrimary(
 
     for (const auto& sessInfos :
          splitPrepareManager->getSplitSessions(userSessionId, userTxnNumber).get()) {
-
-        if (MONGO_unlikely(hangInCommitSplitPreparedTxnOnPrimary.shouldFail())) {
-            LOGV2(
-                7369500,
-                "transaction - hangInCommitSplitPreparedTxnOnPrimary fail point enabled. Blocking "
-                "until fail point is disabled");
-            hangInCommitSplitPreparedTxnOnPrimary.pauseWhileSet();
-        }
 
         auto splitClientOwned = userOpCtx->getServiceContext()->makeClient("tempSplitClient");
         auto splitOpCtx = splitClientOwned->makeOperationContext();

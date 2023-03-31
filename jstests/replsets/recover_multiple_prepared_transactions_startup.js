@@ -154,7 +154,7 @@ jsTestLog("Aborting the second transaction");
 assert.commandWorked(sessionDB2.adminCommand(
     {abortTransaction: 1, txnNumber: NumberLong(txnNumber2), autocommit: false}));
 
-jsTestLog("Attempting to run another transaction");
+jsTestLog("Attempting to run another transction");
 
 // Make sure that we can run another conflicting transaction after recovery without any
 // problems.
