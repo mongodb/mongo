@@ -160,7 +160,7 @@ buildvariants:
     test_flags: &windows_common_test_excludes --excludeWithAnyTags=incompatible_with_windows_tls
     external_auth_jobs_max: 1
   tasks:
-  #- name: burn_in_tests_gen
+  - name: burn_in_tests_gen
   - name: audit
   - name: auth_audit_gen
   - name: causally_consistent_jscore_txns_passthrough
@@ -223,7 +223,7 @@ buildvariants:
   - name: version_burn_in_gen
     variant: generate-tasks-for-version
   tasks:
-  #- name: burn_in_tests_gen
+  - name: burn_in_tests_gen
   - name: .aggfuzzer !.feature_flag_guarded
   - name: .aggregation !.feature_flag_guarded
   - name: audit
