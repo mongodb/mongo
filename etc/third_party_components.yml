@@ -292,6 +292,7 @@ components:
     release_monitoring_id: 3715
     local_directory_path: src/third_party/protobuf
     team_owner: "Service Architecture"
+    upgrade_suppression: TODO SERVER-75567
 
   python-testscenarios:
     homepage_url: https://launchpad.net/testscenarios
