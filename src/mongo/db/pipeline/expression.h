@@ -602,8 +602,8 @@ public:
     explicit ExpressionFromAccumulatorQuantile(ExpressionContext* const expCtx,
                                                std::vector<double>& ps,
                                                boost::intrusive_ptr<Expression> input,
-                                               int32_t algo)
-        : Expression(expCtx, {input}), _ps(ps), _input(input), _algo(algo) {
+                                               int32_t method)
+        : Expression(expCtx, {input}), _ps(ps), _input(input), _method(method) {
         expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
     }
 
@@ -613,13 +613,13 @@ public:
 
     Value serialize(SerializationOptions options) const final {
         MutableDocument md;
-        TAccumulator::serializeHelper(_input, options, _ps, _algo, md);
+        TAccumulator::serializeHelper(_input, options, _ps, _method, md);
         return Value(DOC(getOpName() << md.freeze()));
     }
 
     Value evaluate(const Document& root, Variables* variables) const final {
         // TODO SERVER-75144: investigate performance for this implementation
-        TAccumulator accum(this->getExpressionContext(), _ps, _algo);
+        TAccumulator accum(this->getExpressionContext(), _ps, _method);
 
         // Verify that '_input' produces an array and pass each element to 'process'.
         auto input = _input->evaluate(root, variables);
@@ -649,7 +649,7 @@ public:
 private:
     std::vector<double> _ps;
     boost::intrusive_ptr<Expression> _input;
-    int32_t _algo;
+    int32_t _method;
 };
 
 /**

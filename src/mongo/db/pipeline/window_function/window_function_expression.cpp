@@ -404,7 +404,7 @@ boost::intrusive_ptr<Expression> ExpressionQuantile<AccumulatorTType>::parse(
     BSONObj obj, const boost::optional<SortPattern>& sortBy, ExpressionContext* expCtx) {
 
     std::vector<double> ps;
-    int32_t algoType = -1;
+    int32_t method = -1;
     boost::intrusive_ptr<::mongo::Expression> outputExpr;
     boost::intrusive_ptr<::mongo::Expression> initializeExpr;  // need for serializer.
     boost::optional<WindowBounds> bounds = WindowBounds::defaultBounds();
@@ -419,8 +419,8 @@ boost::intrusive_ptr<Expression> ExpressionQuantile<AccumulatorTType>::parse(
             outputExpr = std::move(accExpr.argument);
             initializeExpr = std::move(accExpr.initializer);
 
-            // Retrieve the values of 'ps' and 'algoType' from the accumulator's IDL parser.
-            std::tie(ps, algoType) = AccumulatorTType::parsePercentileAndAlgoType(elem);
+            // Retrieve the values of 'ps' and 'method' from the accumulator's IDL parser.
+            std::tie(ps, method) = AccumulatorTType::parsePercentileAndMethod(elem);
         } else if (fieldName == kWindowArg) {
             bounds = WindowBounds::parse(elem, sortBy, expCtx);
         } else {
@@ -431,10 +431,10 @@ boost::intrusive_ptr<Expression> ExpressionQuantile<AccumulatorTType>::parse(
 
     tassert(7455900,
             str::stream() << "missing accumulator specification for " << name,
-            initializeExpr && outputExpr && !ps.empty() && algoType != -1);
+            initializeExpr && outputExpr && !ps.empty() && method != -1);
 
     return make_intrusive<ExpressionQuantile>(
-        expCtx, std::string(name), std::move(outputExpr), initializeExpr, *bounds, ps, algoType);
+        expCtx, std::string(name), std::move(outputExpr), initializeExpr, *bounds, ps, method);
 }
 
 template <typename AccumulatorTType>
@@ -442,7 +442,7 @@ Value ExpressionQuantile<AccumulatorTType>::serialize(SerializationOptions opts)
     MutableDocument result;
 
     MutableDocument md;
-    AccumulatorTType::serializeHelper(_input, opts, _ps, _algoType, md);
+    AccumulatorTType::serializeHelper(_input, opts, _ps, _method, md);
     result[AccumulatorTType::kName] = md.freezeToValue();
 
     MutableDocument windowField;
@@ -463,7 +463,7 @@ std::unique_ptr<WindowFunctionState> ExpressionQuantile<AccumulatorTType>::build
 template <typename AccumulatorTType>
 boost::intrusive_ptr<AccumulatorState> ExpressionQuantile<AccumulatorTType>::buildAccumulatorOnly()
     const {
-    return AccumulatorTType::create(_expCtx, _ps, _algoType);
+    return AccumulatorTType::create(_expCtx, _ps, _method);
 }
 
 

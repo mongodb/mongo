@@ -26,42 +26,42 @@ function testWithSingleGroup({docs, percentileSpec, expectedResult, msg}) {
 
 testWithSingleGroup({
     docs: [{x: 0}, {x: "non-numeric"}, {x: 1}, {no_x: 0}, {x: 2}],
-    percentileSpec: {$percentile: {p: [0.5], input: "$x", algorithm: "approximate"}},
+    percentileSpec: {$percentile: {p: [0.5], input: "$x", method: "approximate"}},
     expectedResult: [1],
     msg: "Non-numeric data should be ignored"
 });
 
 testWithSingleGroup({
     docs: [{x: "non-numeric"}, {no_x: 0}, {x: new Date()}, {x: [42, 43]}, {x: null}, {x: NaN}],
-    percentileSpec: {$percentile: {p: [0.5], input: "$x", algorithm: "approximate"}},
-    expectedResult: null,
+    percentileSpec: {$percentile: {p: [0.5], input: "$x", method: "approximate"}},
+    expectedResult: [null],
     msg: "Single percentile of completely non-numeric data"
 });
 
 testWithSingleGroup({
     docs: [{x: "non-numeric"}, {no_x: 0}, {x: new Date()}, {x: [42, 43]}, {x: null}, {x: NaN}],
-    percentileSpec: {$percentile: {p: [0.5, 0.9], input: "$x", algorithm: "approximate"}},
-    expectedResult: null,
+    percentileSpec: {$percentile: {p: [0.5, 0.9], input: "$x", method: "approximate"}},
+    expectedResult: [null, null],
     msg: "Multiple percentiles of completely non-numeric data"
 });
 
 testWithSingleGroup({
     docs: [{x: 10}, {x: 5}, {x: 27}],
-    percentileSpec: {$percentile: {p: [0], input: "$x", algorithm: "approximate"}},
+    percentileSpec: {$percentile: {p: [0], input: "$x", method: "approximate"}},
     expectedResult: [5],
     msg: "Minimun percentile"
 });
 
 testWithSingleGroup({
     docs: [{x: 10}, {x: 5}, {x: 27}],
-    percentileSpec: {$percentile: {p: [1], input: "$x", algorithm: "approximate"}},
+    percentileSpec: {$percentile: {p: [1], input: "$x", method: "approximate"}},
     expectedResult: [27],
     msg: "Maximum percentile"
 });
 
 testWithSingleGroup({
     docs: [{x: 0}, {x: 1}, {x: 2}],
-    percentileSpec: {$percentile: {p: [0.5, 0.9, 0.1], input: "$x", algorithm: "approximate"}},
+    percentileSpec: {$percentile: {p: [0.5, 0.9, 0.1], input: "$x", method: "approximate"}},
     expectedResult: [1, 2, 0],
     msg: "Multiple percentiles"
 });
@@ -80,8 +80,8 @@ function testWithMultipleGroups({docs, percentileSpec, expectedResult, msg}) {
 
 testWithMultipleGroups({
     docs: [{k: 0, x: 0}, {k: 0, x: 1}, {k: 1, x: 2}, {k: 2}, {k: 0, x: "str"}, {k: 1, x: 0}],
-    percentileSpec: {$percentile: {p: [0.9], input: "$x", algorithm: "approximate"}},
-    expectedResult: [/* k:0 */[1], /* k:1 */[2], /* k:2 */ null],
+    percentileSpec: {$percentile: {p: [0.9], input: "$x", method: "approximate"}},
+    expectedResult: [/* k:0 */[1], /* k:1 */[2], /* k:2 */[null]],
     msg: "Multiple groups"
 });
 
@@ -143,7 +143,7 @@ const p = [0.0, 0.001, 0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.99, 
     }
     testWithAccuracyError({
         docs: docs,
-        percentileSpec: {$percentile: {p: p, input: "$x", algorithm: "approximate"}},
+        percentileSpec: {$percentile: {p: p, input: "$x", method: "approximate"}},
         sorted: sortedSamples,
         msg: "Single group of uniformly distributed data",
         error: accuracyError
@@ -165,7 +165,7 @@ const p = [0.0, 0.001, 0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.99, 
 
     testWithAccuracyError({
         docs: docs,
-        percentileSpec: {$percentile: {p: p, input: "$x", algorithm: "approximate"}},
+        percentileSpec: {$percentile: {p: p, input: "$x", method: "approximate"}},
         sorted: sortedSamplesWithInfinities,
         msg: "Single group of uniformly distributed data with infinite values",
         error: accuracyError
@@ -184,7 +184,7 @@ const p = [0.0, 0.001, 0.01, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.99, 
     }
     testWithAccuracyError({
         docs: docs,
-        percentileSpec: {$percentile: {p: p, input: "$x", algorithm: "approximate"}},
+        percentileSpec: {$percentile: {p: p, input: "$x", method: "approximate"}},
         sorted: sortedSamples,
         msg: "Single group of uniformly distributed Decimal128 data",
         error: accuracyError

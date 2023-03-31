@@ -102,9 +102,11 @@ public:
     }
 
     Value getValue() const final {
-        if (_values.empty())
-            return Value{BSONNULL};
-
+        if (_values.empty()) {
+            std::vector<Value> nulls;
+            nulls.insert(nulls.end(), _ps.size(), Value(BSONNULL));
+            return Value(nulls);
+        }
         std::vector<Value> pctls;
         pctls.reserve(_ps.size());
         for (double p : _ps) {

@@ -69,7 +69,7 @@ let errorPipeline = [
             sortBy: {partition: 1},
             output: {
                 p: {
-                    $percentile: {p: [0.9], input: "$price", algorithm: "approximate"},
+                    $percentile: {p: [0.9], input: "$price", method: "approximate"},
                     window: {documents: [0, "unbounded"]}
                 }
             }
@@ -86,13 +86,13 @@ assert.commandFailedWithCode(
 // In the test suite below, we will run a query identical to the one that failed above.
 resetProfiler(db);
 testAccumAgainstGroup(
-    coll, "$percentile", null, {p: [0.9], input: "$price", algorithm: "approximate"});
+    coll, "$percentile", [null], {p: [0.9], input: "$price", method: "approximate"});
 // Confirm that spilling did occur.
 checkProfilerForDiskWrite(db, "$setWindowFields");
 
 // Run $median test with memory limits that cause spilling to disk.
 resetProfiler(db);
-testAccumAgainstGroup(coll, "$median", null, {input: "$price", algorithm: "approximate"});
+testAccumAgainstGroup(coll, "$median", null, {input: "$price", method: "approximate"});
 // Confirm that spilling did occur.
 checkProfilerForDiskWrite(db, "$setWindowFields");
 
@@ -250,7 +250,7 @@ function runExceedMemoryLimitTest(spec) {
 runExceedMemoryLimitTest({arr: {$push: "$val", window: {documents: [-21, 21]}}});
 runExceedMemoryLimitTest({
     percentile: {
-        $percentile: {p: [0.6, 0.7], input: "$price", algorithm: "approximate"},
+        $percentile: {p: [0.6, 0.7], input: "$price", method: "approximate"},
         window: {documents: [-21, 21]}
     }
 });

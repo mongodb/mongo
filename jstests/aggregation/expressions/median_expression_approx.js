@@ -18,7 +18,7 @@ function testWithProject({doc, medianSpec, expectedResult, msg}) {
 
     let medianArgs = medianSpec["$median"];
     const percentileSpec = {
-        $percentile: {input: medianArgs.input, algorithm: medianArgs.algorithm, p: [0.5]}
+        $percentile: {input: medianArgs.input, method: medianArgs.method, p: [0.5]}
     };
 
     const medianRes = coll.aggregate([{$project: {p: medianSpec}}]).toArray();
@@ -28,9 +28,7 @@ function testWithProject({doc, medianSpec, expectedResult, msg}) {
 
     // If all the data is non-numeric then the expected result is just null, and therefore cannot be
     // indexed into.
-    assert.eq((percentileRes[0].p ? percentileRes[0].p[0] : percentileRes[0].p),
-              medianRes[0].p,
-              msg + ` result: ${tojson(medianRes)}`);
+    assert.eq(percentileRes[0].p[0], medianRes[0].p, msg + ` result: ${tojson(medianRes)}`);
 }
 
 /**
@@ -38,14 +36,14 @@ function testWithProject({doc, medianSpec, expectedResult, msg}) {
  */
 testWithProject({
     doc: {x: [0, "non-numeric", 1, 2], no_x: 0},
-    medianSpec: {$median: {input: "$x", algorithm: "approximate"}},
+    medianSpec: {$median: {input: "$x", method: "approximate"}},
     expectedResult: 1,
     msg: "Non-numeric data should be ignored in input which evaluates to an array"
 });
 
 testWithProject({
     doc: {x: ["non-numeric", [1, 2, 3]]},
-    medianSpec: {$median: {input: "$x", algorithm: "approximate"}},
+    medianSpec: {$median: {input: "$x", method: "approximate"}},
     expectedResult: null,
     msg: "Median of completely non-numeric data in input which evaluates to an array"
 });
@@ -55,14 +53,14 @@ testWithProject({
  */
 testWithProject({
     doc: {x: 0, x1: "non-numeric", x2: 1, x3: 2},
-    medianSpec: {$median: {input: ["$x", "$x1", "$x2", "$x3"], algorithm: "approximate"}},
+    medianSpec: {$median: {input: ["$x", "$x1", "$x2", "$x3"], method: "approximate"}},
     expectedResult: 1,
     msg: "Non-numeric data should be ignored in input passed in as an array"
 });
 
 testWithProject({
     doc: {x: "non-numeric", x1: "hello"},
-    medianSpec: {$median: {input: ["$x", "$x1"], algorithm: "approximate"}},
+    medianSpec: {$median: {input: ["$x", "$x1"], method: "approximate"}},
     expectedResult: null,
     msg: "Median of completely non-numeric data in input passed in as an array"
 });
@@ -72,7 +70,7 @@ testWithProject({
  */
 testWithProject({
     doc: {x: 1, x1: "hello"},
-    medianSpec: {$median: {input: "$x1", algorithm: "approximate"}},
+    medianSpec: {$median: {input: "$x1", method: "approximate"}},
     expectedResult: null,
     msg: "Median of completely non-numeric data with input as a scalar"
 });

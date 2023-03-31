@@ -26,8 +26,8 @@ const medianDoc = docsOrderedByPrice[Math.floor(docsOrderedByPrice.length / 2) -
 // Run the suite of partition and bounds tests against the $percentile function. Will run tests with
 // removable and non-removable windows.
 testAccumAgainstGroup(
-    coll, "$percentile", null, {p: [0.1, 0.6], input: "$price", algorithm: "approximate"});
-testAccumAgainstGroup(coll, "$median", null, {input: "$price", algorithm: "approximate"});
+    coll, "$percentile", [null, null], {p: [0.1, 0.6], input: "$price", method: "approximate"});
+testAccumAgainstGroup(coll, "$median", null, {input: "$price", method: "approximate"});
 
 function runSetWindowStage(percentileSpec, medianSpec) {
     return coll
@@ -55,14 +55,14 @@ function assertResultEqToVal({resultArray: results, percentile: pVal, median: mV
 
 // Test that $median and $percentile return null for windows which do not contain numeric values.
 let results =
-    runSetWindowStage({$percentile: {p: [0.1, 0.6], input: "$str", algorithm: "approximate"}},
-                      {$median: {input: "$str", algorithm: "approximate"}});
-assertResultEqToVal({resultArray: results, percentile: null, median: null});
+    runSetWindowStage({$percentile: {p: [0.1, 0.6], input: "$str", method: "approximate"}},
+                      {$median: {input: "$str", method: "approximate"}});
+assertResultEqToVal({resultArray: results, percentile: [null, null], median: null});
 
 // Test that an unbounded window calculates $percentile and $median correctly an approximate method.
 results =
-    runSetWindowStage({$percentile: {p: [0.01, 0.99], input: "$price", algorithm: "approximate"}},
-                      {$median: {input: "$price", algorithm: "approximate"}});
+    runSetWindowStage({$percentile: {p: [0.01, 0.99], input: "$price", method: "approximate"}},
+                      {$median: {input: "$price", method: "approximate"}});
 // Since our percentiles are 0.01 and 0.99 and our collection is small, we will always return the
 // minimum and maximum value in the collection.
 assertResultEqToVal(
@@ -71,11 +71,8 @@ assertResultEqToVal(
 // Test that a removable window calculates $percentile and $median correctly using an approximate
 // method.
 results = runSetWindowStage(
-    {
-        $percentile: {p: [0.9], input: "$price", algorithm: "approximate"},
-        window: {documents: [-1, 0]}
-    },
-    {$median: {input: "$price", algorithm: "approximate"}, window: {documents: [-1, 0]}});
+    {$percentile: {p: [0.9], input: "$price", method: "approximate"}, window: {documents: [-1, 0]}},
+    {$median: {input: "$price", method: "approximate"}, window: {documents: [-1, 0]}});
 // With a window of size 2 the 0.9 percentile should always be the maximum document
 // in our window, and the median will be the other document in the window.
 for (let index = 0; index < results.length; index++) {
@@ -99,31 +96,30 @@ function testError(percentileSpec, expectedCode) {
 }
 
 // Invalid window specification.
-testError({$percentile: {p: [0.1, 0.6], input: "$str", algorithm: "approximate"}, window: [-1, 1]},
+testError({$percentile: {p: [0.1, 0.6], input: "$str", method: "approximate"}, window: [-1, 1]},
           ErrorCodes.FailedToParse);
-testError({$median: {input: "$str", algorithm: "approximate"}, window: [-1, 1]},
+testError({$median: {input: "$str", method: "approximate"}, window: [-1, 1]},
           ErrorCodes.FailedToParse);
-testError(
-    {$percentile: {p: [0.6], input: "$str", algorithm: "approximate"}, window: {documents: []}},
-    ErrorCodes.FailedToParse);
-testError({$median: {input: "$str", algorithm: "approximate"}, window: {documents: []}},
+testError({$percentile: {p: [0.6], input: "$str", method: "approximate"}, window: {documents: []}},
+          ErrorCodes.FailedToParse);
+testError({$median: {input: "$str", method: "approximate"}, window: {documents: []}},
           ErrorCodes.FailedToParse);
 
 // Extra argument in the window function.
-testError({$percentile: {p: [0.1, 0.6], input: "$str", algorithm: "approximate"}, extra: "extra"},
+testError({$percentile: {p: [0.1, 0.6], input: "$str", method: "approximate"}, extra: "extra"},
           ErrorCodes.FailedToParse);
-testError({$median: {input: "$str", algorithm: "approximate"}, extra: "extra"},
+testError({$median: {input: "$str", method: "approximate"}, extra: "extra"},
           ErrorCodes.FailedToParse);
 
 // Invalid input for the accumulators.
 testError({$percentile: "not an object"}, 7429703);
 testError({$median: "not an object"}, 7436100);
 
-testError({$percentile: {p: [0.1, 0.6], input: "$str", algorithm: false}}, ErrorCodes.TypeMismatch);
-testError({$median: {input: "$str", algorithm: false}}, ErrorCodes.TypeMismatch);
+testError({$percentile: {p: [0.1, 0.6], input: "$str", method: false}}, ErrorCodes.TypeMismatch);
+testError({$median: {input: "$str", method: false}}, ErrorCodes.TypeMismatch);
 
-testError({$percentile: {input: "$str", algorithm: "approximate"}},
+testError({$percentile: {input: "$str", method: "approximate"}},
           40414 /* IDL required field error */);
-testError({$median: {p: [0.1, 0.6], input: "$str", algorithm: "approximate"}},
+testError({$median: {p: [0.1, 0.6], input: "$str", method: "approximate"}},
           40415 /* IDL unknown field error */);
 })();

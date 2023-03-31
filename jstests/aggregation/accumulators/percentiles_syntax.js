@@ -27,53 +27,52 @@ function assertInvalidSyntax(percentileSpec, msg) {
 
 assertInvalidSyntax({$percentile: 0.5}, "Should fail if $percentile is not an object");
 
-assertInvalidSyntax({$percentile: {input: "$x", algorithm: "approximate"}},
+assertInvalidSyntax({$percentile: {input: "$x", method: "approximate"}},
                     "Should fail if $percentile is missing 'p' field");
 
-assertInvalidSyntax({$percentile: {p: [0.5], algorithm: "approximate"}},
+assertInvalidSyntax({$percentile: {p: [0.5], method: "approximate"}},
                     "Should fail if $percentile is missing 'input' field");
 
 assertInvalidSyntax({$percentile: {p: [0.5], input: "$x"}},
-                    "Should fail if $percentile is missing 'algorithm' field");
+                    "Should fail if $percentile is missing 'method' field");
 
-assertInvalidSyntax({$percentile: {p: [0.5], input: "$x", algorithm: "approximate", extras: 42}},
+assertInvalidSyntax({$percentile: {p: [0.5], input: "$x", method: "approximate", extras: 42}},
                     "Should fail if $percentile contains an unexpected field");
 
-assertInvalidSyntax({$percentile: {p: 0.5, input: "$x", algorithm: "approximate"}},
+assertInvalidSyntax({$percentile: {p: 0.5, input: "$x", method: "approximate"}},
                     "Should fail if 'p' field in $percentile isn't array");
 
-assertInvalidSyntax({$percentile: {p: [], input: "$x", algorithm: "approximate"}},
+assertInvalidSyntax({$percentile: {p: [], input: "$x", method: "approximate"}},
                     "Should fail if 'p' field in $percentile is an empty array");
 
 assertInvalidSyntax(
-    {$percentile: {p: [0.5, "foo"], input: "$x", algorithm: "approximate"}},
+    {$percentile: {p: [0.5, "foo"], input: "$x", method: "approximate"}},
     "Should fail if 'p' field in $percentile is an array with a non-numeric element");
 
 assertInvalidSyntax(
-    {$percentile: {p: [0.5, 10], input: "$x", algorithm: "approximate"}},
+    {$percentile: {p: [0.5, 10], input: "$x", method: "approximate"}},
     "Should fail if 'p' field in $percentile is an array with any value outside of [0, 1] range");
 
-assertInvalidSyntax({$percentile: {p: [0.5, 0.7], input: "$x", algorithm: 42}},
-                    "Should fail if 'algorithm' field isn't a string");
+assertInvalidSyntax({$percentile: {p: [0.5, 0.7], input: "$x", method: 42}},
+                    "Should fail if 'method' field isn't a string");
 
-assertInvalidSyntax({$percentile: {p: [0.5, 0.7], input: "$x", algorithm: "fancy"}},
-                    "Should fail if 'algorithm' isn't one of _predefined_ strings");
+assertInvalidSyntax({$percentile: {p: [0.5, 0.7], input: "$x", method: "fancy"}},
+                    "Should fail if 'method' isn't one of _predefined_ strings");
 
 /**
  * Tests for $median. $median desugars to $percentile with the field p:[0.5] added, and therefore
  * has similar syntax to $percentile.
  */
 
-assertInvalidSyntax({$median: {p: [0.5], input: "$x", algorithm: "approximate"}},
+assertInvalidSyntax({$median: {p: [0.5], input: "$x", method: "approximate"}},
                     "Should fail if 'p' is defined");
 
-assertInvalidSyntax({$median: {algorithm: "approximate"}},
+assertInvalidSyntax({$median: {method: "approximate"}},
                     "Should fail if $median is missing 'input' field");
 
-assertInvalidSyntax({$median: {input: "$x"}},
-                    "Should fail if $median is missing 'algorithm' field");
+assertInvalidSyntax({$median: {input: "$x"}}, "Should fail if $median is missing 'method' field");
 
-assertInvalidSyntax({$median: {input: "$x", algorithm: "approximate", extras: 42}},
+assertInvalidSyntax({$median: {input: "$x", method: "approximate", extras: 42}},
                     "Should fail if $median contains an unexpected field");
 /**
  * Test that valid $percentile specifications are accepted. The results, i.e. semantics, are tested
@@ -88,40 +87,19 @@ function assertValidSyntax(percentileSpec, msg) {
 }
 
 assertValidSyntax(
-    {$percentile: {p: [0.0, 0.0001, 0.5, 0.995, 1.0], input: "$x", algorithm: "approximate"}},
+    {$percentile: {p: [0.0, 0.0001, 0.5, 0.995, 1.0], input: "$x", method: "approximate"}},
     "Should be able to specify an array of percentiles");
 
 assertValidSyntax(
-    {$percentile: {p: [0.5, 0.9], input: {$divide: ["$x", 2]}, algorithm: "approximate"}},
+    {$percentile: {p: [0.5, 0.9], input: {$divide: ["$x", 2]}, method: "approximate"}},
     "Should be able to specify 'input' as an expression");
 
-assertValidSyntax({$percentile: {p: [0.5, 0.9], input: "x", algorithm: "approximate"}},
+assertValidSyntax({$percentile: {p: [0.5, 0.9], input: "x", method: "approximate"}},
                   "Non-numeric inputs should be gracefully ignored");
 
 /**
  * Tests for $median. $median desugars to $percentile with the field p:[0.5] added.
  */
 
-assertValidSyntax({$median: {input: "$x", algorithm: "approximate"}},
-                  "Simple base case for $median.");
-
-/**
- * Test that the "arrayness" of the result matches the "arrayness" of the specification.
- */
-function assertArrayness(percentileSpec, msg) {
-    const pInSpec = percentileSpec.$percentile.p;
-
-    const res = coll.aggregate([{$group: {_id: null, p: percentileSpec}}]).toArray();
-
-    assert.eq(Array.isArray(pInSpec), Array.isArray(res[0].p), msg + ` result: ${tojson(res)}`);
-    if (Array.isArray(pInSpec)) {
-        assert.eq(pInSpec.length, res[0].p.length, msg + ` result: ${tojson(res)}`);
-    }
-}
-
-assertArrayness({$percentile: {p: [0.2, 0.9], input: "$x", algorithm: "approximate"}},
-                "Computed percentiles should be in an array of length 2");
-
-assertArrayness({$percentile: {p: [0.2], input: "$x", algorithm: "approximate"}},
-                "Computed percentiles should be in an array of length 1");
+assertValidSyntax({$median: {input: "$x", method: "approximate"}}, "Simple base case for $median.");
 })();

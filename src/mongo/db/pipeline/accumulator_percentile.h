@@ -62,11 +62,9 @@ public:
 
     static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx,
                                                          const std::vector<double>& ps,
-                                                         int32_t algoType);
+                                                         int32_t method);
 
-    AccumulatorPercentile(ExpressionContext* expCtx,
-                          const std::vector<double>& ps,
-                          int32_t algoType);
+    AccumulatorPercentile(ExpressionContext* expCtx, const std::vector<double>& ps, int32_t method);
 
     /**
      * Ingressing values and computing the requested percentiles.
@@ -82,7 +80,7 @@ public:
     /**
      * Necessary for supporting $percentile as window functions.
      */
-    static std::pair<std::vector<double> /*ps*/, int32_t /*algoType*/> parsePercentileAndAlgoType(
+    static std::pair<std::vector<double> /*ps*/, int32_t /*method*/> parsePercentileAndMethod(
         BSONElement elem);
 
     /**
@@ -92,7 +90,7 @@ public:
      *
      * The implementation in 'AccumulatorState' assumes the accumulator has the simple syntax {
      * <name>: <argument> }, such as { $sum: <argument> }. Because $percentile's syntax is more
-     * complex ({$percentile: {p: [0.5, 0.8], input: "$x", algorithm: "approximate"}}) we have to
+     * complex ({$percentile: {p: [0.5, 0.8], input: "$x", method: "approximate"}}) we have to
      * override this method.
      */
     Document serialize(boost::intrusive_ptr<Expression> initializer,
@@ -106,16 +104,19 @@ public:
     static void serializeHelper(const boost::intrusive_ptr<Expression>& argument,
                                 SerializationOptions options,
                                 std::vector<double> percentiles,
-                                int32_t algoType,
+                                int32_t method,
                                 MutableDocument& md);
 
 protected:
     std::vector<double> _percentiles;
     std::unique_ptr<PercentileAlgorithm> _algo;
 
-    // TODO SERVER-74894: This should have been 'PercentileAlgorithmTypeEnum' but the generated
+    // TODO SERVER-74894: This should have been 'PercentileMethodEnum' but the generated
     // header from the IDL includes this header, creating a dependency.
-    const int32_t _algoType;
+    const int32_t _method;
+
+    // TODO SERVER-75115 potentially remove this.
+    long long _maxMemUsageBytes;
 };
 
 /*
@@ -142,21 +143,19 @@ public:
 
     static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx,
                                                          const std::vector<double>& unused,
-                                                         int32_t algoType);
+                                                         int32_t method);
 
     /**
      * We are matching the signature of the AccumulatorPercentile for the purpose of using
      * ExpressionFromAccumulatorQuantile as a template for both $median and $percentile. This is the
      * reason for passing in `unused` and it will not be referenced.
      */
-    AccumulatorMedian(ExpressionContext* expCtx,
-                      const std::vector<double>& unused,
-                      int32_t algoType);
+    AccumulatorMedian(ExpressionContext* expCtx, const std::vector<double>& unused, int32_t method);
 
     /**
      * Necessary for supporting $median as window functions.
      */
-    static std::pair<std::vector<double> /*ps*/, int32_t /*algoType*/> parsePercentileAndAlgoType(
+    static std::pair<std::vector<double> /*ps*/, int32_t /*method*/> parsePercentileAndMethod(
         BSONElement elem);
     /**
      * Modify the base-class implementation to return a single value rather than a single-element
@@ -175,7 +174,7 @@ public:
     static void serializeHelper(const boost::intrusive_ptr<Expression>& argument,
                                 SerializationOptions options,
                                 std::vector<double> percentiles,
-                                int32_t algoType,
+                                int32_t method,
                                 MutableDocument& md);
 };
 }  // namespace mongo
