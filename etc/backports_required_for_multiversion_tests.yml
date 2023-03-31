@@ -322,6 +322,8 @@ last-continuous:
     ticket: SERVER-75517
   - test_file: jstests/core/clustered/clustered_collection_hint.js
     ticket: SERVER-73482
+  - test_file: jstests/replsets/session_cache_refresh_write_error_fail.js
+    ticket: SERVER-73229
   suites: null
 last-lts:
   all:
@@ -715,4 +717,6 @@ last-lts:
     ticket: SERVER-75517
   - test_file: jstests/core/clustered/clustered_collection_hint.js
     ticket: SERVER-73482
+  - test_file: jstests/replsets/session_cache_refresh_write_error_fail.js
+    ticket: SERVER-73229
   suites: null
