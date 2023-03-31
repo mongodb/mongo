@@ -44,7 +44,6 @@ imports:
     - "mongo/db/basic_types.idl"
     - "mongo/db/query/cursor_response.idl"
     - "mongo/db/query/hint.idl"
-    - "mongo/db/query/telemetry.idl"
 
 types:
     boolNoOpSerializer:
@@ -249,9 +248,4 @@ commands:
         type: uuid
         optional: true
         stability: unstable
-      hashedTelemetryKey:
-        description: "For sharded queries the telemetry key is calculated on mongos instead of from the full query shape locally"
-        type: ShardedTelemetryStoreKey 
-        optional: true
-        stability: internal
 

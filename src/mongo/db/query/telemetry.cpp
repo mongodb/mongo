@@ -51,10 +51,8 @@
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
-#include "mongo/util/md5.hpp"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/system_clock_source.h"
-#include <array>
 #include <optional>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -62,23 +60,6 @@
 namespace mongo {
 
 namespace telemetry {
-
-// This is defined by IDL in the find and aggregate command, but we don't want to pull in those
-// files/libraries here. Instead define here as well.
-static const std::string kTelemetryKeyInShardedCommand = "hashedTelemetryKey";
-
-
-ShardedTelemetryStoreKey telemetryKeyToShardedStoreId(const BSONObj& key, std::string hostAndPort) {
-    md5digest finishedMD5;
-    std::array<unsigned char, 16> md5Bin;
-    md5(key.objdata(), 16, finishedMD5);
-    std::copy(std::begin(finishedMD5), std::end(finishedMD5), std::begin(md5Bin));
-    return ShardedTelemetryStoreKey(hostAndPort, md5Bin);
-}
-
-boost::optional<BSONObj> getTelemetryKeyFromOpCtx(OperationContext* opCtx) {
-    return CurOp::get(opCtx)->debug().telemetryStoreKey;
-}
 
 /**
  * Redacts all BSONObj field names as if they were paths, unless the field name is a special hint
@@ -360,32 +341,6 @@ StatusWith<BSONObj> makeTelemetryKey(const FindCommandRequest& findCommand,
     return bob.obj();
 }
 
-void appendShardedTelemetryKeyIfApplicable(MutableDocument& objToModify,
-                                           std::string hostAndPort,
-                                           OperationContext* opCtx) {
-    if (!isTelemetryEnabled()) {
-        return;
-    }
-    if (auto telemetryKey = getTelemetryKeyFromOpCtx(opCtx)) {
-        objToModify.addField(
-            kTelemetryKeyInShardedCommand,
-            Value(telemetryKeyToShardedStoreId(*telemetryKey, hostAndPort).toBSON()));
-    }
-}
-
-void appendShardedTelemetryKeyIfApplicable(BSONObjBuilder& objToModify,
-                                           std::string hostAndPort,
-                                           OperationContext* opCtx) {
-    if (!isTelemetryEnabled()) {
-        return;
-    }
-    auto telemetryKey = getTelemetryKeyFromOpCtx(opCtx);
-    if (!telemetryKey) {
-        return;
-    }
-    objToModify.append(kTelemetryKeyInShardedCommand,
-                       telemetryKeyToShardedStoreId(*telemetryKey, hostAndPort).toBSON());
-}
 CounterMetric telemetryStoreSizeEstimateBytesMetric("telemetry.telemetryStoreSizeEstimateBytes");
 namespace {
 
@@ -731,13 +686,7 @@ void registerAggRequest(const AggregateCommandRequest& request, OperationContext
     if (!shouldCollect(opCtx->getServiceContext())) {
         return;
     }
-    if (auto hashKey = request.getHashedTelemetryKey()) {
-        // The key is in the command request in "telemetryKey".
-        CurOp::get(opCtx)->debug().telemetryStoreKey = hashKey->toBSON();
-        return;
-    }
 
-    // On standalone build the key from the request.
     BSONObjBuilder telemetryKey;
     BSONObjBuilder pipelineBuilder = telemetryKey.subarrayStart("pipeline"_sd);
     try {
@@ -775,12 +724,6 @@ void registerFindRequest(const FindCommandRequest& request,
     }
 
     if (!shouldCollect(opCtx->getServiceContext())) {
-        return;
-    }
-
-    if (auto hashKey = request.getHashedTelemetryKey()) {
-        // The key is in the command request in "hashedTelemetryKey".
-        CurOp::get(opCtx)->debug().telemetryStoreKey = hashKey->toBSON();
         return;
     }
 

@@ -36,7 +36,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/partitioned_cache.h"
 #include "mongo/db/query/plan_explainer.h"
-#include "mongo/db/query/telemetry_gen.h"
 #include "mongo/db/query/util/memory_util.h"
 #include "mongo/db/service_context.h"
 #include <cstdint>
@@ -58,28 +57,6 @@ using BSONNumeric = long long;
 namespace telemetry {
 
 bool isTelemetryEnabled();
-
-/**
- * Generate a Telemetry Store key to be used on a shard from a Telemetry Store key that is being
- * used on mongos.
- */
-ShardedTelemetryStoreKey telemetryKeyToShardedStoreId(const BSONObj& key, std::string hostAndPort);
-/**
- * Get the telemetry query shape from the opCtx.
- */
-boost::optional<BSONObj> getTelemetryKeyFromOpCtx(OperationContext* opCtx);
-
-/**
- * Given an object builder these functions append the telemetry key to it in the form
- * for sharded commands {hostAndPort and hashedKey}. If there is no telemetry key available
- * on the opCtx, does not modify the object.
- */
-void appendShardedTelemetryKeyIfApplicable(MutableDocument& objToModify,
-                                           std::string hostAndPort,
-                                           OperationContext* opCtx);
-void appendShardedTelemetryKeyIfApplicable(BSONObjBuilder& objToModify,
-                                           std::string hostAndPort,
-                                           OperationContext* opCtx);
 
 /**
  * An aggregated metric stores a compressed view of data. It balances the loss of information
