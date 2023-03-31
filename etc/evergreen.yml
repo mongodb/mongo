@@ -1587,6 +1587,7 @@ buildvariants:
   - name: sharding_jscore_passthrough_with_catalog_shard
   - name: .serverless
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm_gen
+  - name: sharded_collections_jscore_passthrough_with_catalog_shard
   - name: .updatefuzzer
   - name: secondary_reads_passthrough_gen
   - name: .shard_split
