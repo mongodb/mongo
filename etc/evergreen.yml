@@ -1031,7 +1031,6 @@ buildvariants:
   - name: disk_wiredtiger
   - name: .jscore .common !.auth
   - name: json_schema
-  - name: powercycle_gen
   - name: .query_fuzzer
   - name: .read_write_concern
   - name: replica_sets_gen
