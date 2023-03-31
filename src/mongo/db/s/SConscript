@@ -757,6 +757,7 @@ env.CppUnitTest(
         'global_index/global_index_inserter_test.cpp',
         'global_index/global_index_metrics_test.cpp',
         'implicit_collection_creation_test.cpp',
+        'metadata_consistency_util_test.cpp',
         'metadata_manager_test.cpp',
         'metrics/phase_duration_test.cpp',
         'metrics/sharding_data_transform_cumulative_metrics_test.cpp',

@@ -41,6 +41,10 @@ enums:
             kMisplacedCollection: "MisplacedCollection"
             kHiddenShardedCollection: "HiddenShardedCollection" 
             kMissingShardKeyIndex: "MissingShardKeyIndex"
+            kLastShardKeyIndexMultiKey: "LastShardKeyIndexMultiKey"
+            kRoutingTableRangeGap: "RoutingTableRangeGap"
+            kRoutingTableRangeOverlap: "RoutingTableRangeOverlap"
+            kCorruptedChunkShardKey: "CorruptedChunkShardKey"
 
     MetadataConsistencyCommandLevel:
         description: "Level mode of the metadata consistency command."
