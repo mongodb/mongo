@@ -46,6 +46,8 @@ namespace analyze_shard_key {
 
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(queryAnalysisCoordinatorDistributeSampleRateEqually);
+
 const auto getQueryAnalysisCoordinator =
     ServiceContext::declareDecoration<QueryAnalysisCoordinator>();
 
@@ -288,7 +290,9 @@ QueryAnalysisCoordinator::getNewConfigurationsForSampler(OperationContext* opCtx
     // If the coordinator doesn't yet have a full view of the query distribution or no samplers
     // have executed any queries, each sampler gets an equal ratio of the sample rates. Otherwise,
     // the ratio is weighted based on the query distribution across samplers.
-    double sampleRateRatio = (numWeights < numActiveSamplers || totalWeight == 0)
+    double sampleRateRatio =
+        (numWeights < numActiveSamplers || totalWeight == 0 ||
+         MONGO_unlikely(queryAnalysisCoordinatorDistributeSampleRateEqually.shouldFail()))
         ? (1.0 / numActiveSamplers)
         : (weight / totalWeight);
 

@@ -527,7 +527,10 @@ const mongodSetParameterOpts = {
     analyzeShardKeyNumRanges,
     logComponentVerbosity: tojson({sharding: 2})
 };
-const mongosSetParametersOpts = {queryAnalysisSamplerConfigurationRefreshSecs};
+const mongosSetParametersOpts = {
+    queryAnalysisSamplerConfigurationRefreshSecs,
+    logComponentVerbosity: tojson({sharding: 2})
+};
 
 {
     jsTest.log("Verify that on a sharded cluster the analyzeShardKey command returns correct read" +
@@ -540,7 +543,17 @@ const mongosSetParametersOpts = {queryAnalysisSamplerConfigurationRefreshSecs};
         mongos: numMongoses,
         shards: numShards,
         rs: {nodes: 2, setParameter: mongodSetParameterOpts},
-        mongosOptions: {setParameter: mongosSetParametersOpts}
+        mongosOptions: {setParameter: mongosSetParametersOpts},
+        other: {
+            configOptions: {
+                setParameter: {
+                    // This test expects every query to get sampled regardless of which mongos or
+                    // mongod routes it.
+                    "failpoint.queryAnalysisCoordinatorDistributeSampleRateEqually":
+                        tojson({mode: "alwaysOn"})
+                }
+            }
+        },
     });
 
     const fixture = {
@@ -605,7 +618,17 @@ const mongosSetParametersOpts = {queryAnalysisSamplerConfigurationRefreshSecs};
     jsTest.log("Verify that on a replica set the analyzeShardKey command returns correct read " +
                "and write distribution metrics");
 
-    const rst = new ReplSetTest({nodes: 2, nodeOptions: {setParameter: mongodSetParameterOpts}});
+    const rst = new ReplSetTest({
+        nodes: 2,
+        nodeOptions: {
+            setParameter: Object.assign({}, mongodSetParameterOpts, {
+                // This test expects every query to get sampled regardless of which mongod it runs
+                // on.
+                "failpoint.queryAnalysisCoordinatorDistributeSampleRateEqually":
+                    tojson({mode: "alwaysOn"})
+            })
+        }
+    });
     rst.startSet();
     rst.initiate();
     const primary = rst.getPrimary();
