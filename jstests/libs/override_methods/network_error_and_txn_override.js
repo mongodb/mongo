@@ -243,6 +243,12 @@ function isRetryableMoveChunkResponse(res) {
         res.code === ErrorCodes.CallbackCanceled;
 }
 
+function isFailedToSatisfyPrimaryReadPreferenceError(msg) {
+    const kReplicaSetMonitorError =
+        /^Could not find host matching read preference.*mode: "primary"/;
+    return msg.match(kReplicaSetMonitorError);
+}
+
 function hasError(res) {
     return res.ok !== 1 || res.writeErrors;
 }
@@ -761,7 +767,7 @@ function retryWithTxnOverride(res, conn, dbName, cmdName, cmdObj, lsid, logError
 }
 
 // Returns true if any error code in a response's "raw" field is retryable.
-function rawResponseHasRetryableError(rawRes, cmdName, logError) {
+function rawResponseHasRetryableError(rawRes, cmdName, startTime, logError) {
     for (let shard in rawRes) {
         const shardRes = rawRes[shard];
 
@@ -773,7 +779,7 @@ function rawResponseHasRetryableError(rawRes, cmdName, logError) {
         // Don't override the responses from each shard because only the top-level code in a
         // response is used to determine if a command succeeded or not.
         const networkRetryShardRes = shouldRetryWithNetworkErrorOverride(
-            shardRes, cmdName, logShardError, false /* shouldOverrideAcceptableError */);
+            shardRes, cmdName, startTime, logShardError, false /* shouldOverrideAcceptableError */);
         if (networkRetryShardRes === kContinue) {
             return true;
         }
@@ -788,7 +794,7 @@ const kContinue = Object.create(null);
 // retry the current command without subtracting from our retry allocation. By default sets ok=1
 // for failures with acceptable error codes, unless shouldOverrideAcceptableError is false.
 function shouldRetryWithNetworkErrorOverride(
-    res, cmdName, logError, shouldOverrideAcceptableError = true) {
+    res, cmdName, startTime, logError, shouldOverrideAcceptableError = true) {
     assert(configuredForNetworkRetry());
 
     if (RetryableWritesUtil.isRetryableWriteCmdName(cmdName)) {
@@ -844,11 +850,23 @@ function shouldRetryWithNetworkErrorOverride(
             return kContinue;
         }
 
+        if (res.hasOwnProperty("errmsg") &&
+            isFailedToSatisfyPrimaryReadPreferenceError(res.errmsg) &&
+            Date.now() - startTime < 5 * 60 * 1000) {
+            // ReplicaSetMonitor::getHostOrRefresh() waits up to 15 seconds to find the
+            // primary of the replica set. It is possible for the step up attempt of another
+            // node in the replica set to take longer than 15 seconds so we allow retrying
+            // for up to 5 minutes.
+            logError("Failed to find primary when attempting to run command," +
+                     " will retry for another 15 seconds");
+            return kContinue;
+        }
+
         // Some sharding commands return raw responses from all contacted shards and there won't
         // be a top level code if shards returned more than one error code, in which case retry
         // if any error is retryable.
         if (res.hasOwnProperty("raw") && !res.hasOwnProperty("code") &&
-            rawResponseHasRetryableError(res.raw, cmdName, logError)) {
+            rawResponseHasRetryableError(res.raw, cmdName, startTime, logError)) {
             logError("Retrying because of retryable code in raw response");
             return kContinue;
         }
@@ -942,12 +960,11 @@ function shouldRetryWithNetworkExceptionOverride(
     e, cmdName, cmdObj, startTime, numNetworkErrorRetries, logError) {
     assert(configuredForNetworkRetry());
 
-    const kReplicaSetMonitorError =
-        /^Could not find host matching read preference.*mode: "primary"/;
     if (numNetworkErrorRetries === 0) {
         logError("No retries, throwing");
         throw e;
-    } else if (e.message.match(kReplicaSetMonitorError) && Date.now() - startTime < 5 * 60 * 1000) {
+    } else if (isFailedToSatisfyPrimaryReadPreferenceError(e.message) &&
+               Date.now() - startTime < 5 * 60 * 1000) {
         // ReplicaSetMonitor::getHostOrRefresh() waits up to 15 seconds to find the
         // primary of the replica set. It is possible for the step up attempt of another
         // node in the replica set to take longer than 15 seconds so we allow retrying
@@ -1018,7 +1035,8 @@ function runCommandOverrideBody(conn, dbName, cmdName, cmdObj, lsid, clientFunct
             }
 
             if (canRetryNetworkError) {
-                const networkRetryRes = shouldRetryWithNetworkErrorOverride(res, cmdName, logError);
+                const networkRetryRes =
+                    shouldRetryWithNetworkErrorOverride(res, cmdName, startTime, logError);
                 if (networkRetryRes === kContinue) {
                     continue;
                 } else {
