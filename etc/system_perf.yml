@@ -2963,7 +2963,9 @@ buildvariants:
 
   - name: linux-standalone-telemetry
     display_name: Linux Standalone 2022-11 (Telemetry)
-    cron: "0 0 * * 0,2,3,4,5" # Run it every day except Saturday and Monday.
+    # Run it twice a day.
+    # Will make it less frequent when perf is finished.
+    cron: "0 3,15 * * 0,1,2,3,4,5,6"
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -2989,7 +2991,9 @@ buildvariants:
 
   - name: linux-1-node-replSet-telemetry
     display_name: Linux 1-Node ReplSet 2022-11 (Telemetry)
-    cron: "0 0 * * 0,2,3,4,5" # Run it every day except Saturday and Monday.
+    # Run it twice a day.
+    # Will make it less frequent when perf is finished.
+    cron: "0 3,15 * * 0,1,2,3,4,5,6"
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -3016,7 +3020,9 @@ buildvariants:
 
   - name: linux-3-node-replSet-telemetry
     display_name: Linux 3-Node ReplSet 2022-11 (Telemetry)
-    cron: "0 0 * * 0,2,3,4,5" # Run it every day except Saturday and Monday.
+    # Run it twice a day.
+    # Will make it less frequent when perf is finished.
+    cron: "0 3,15 * * 0,1,2,3,4,5,6"
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -3044,7 +3050,9 @@ buildvariants:
 
   - name: linux-3-shard-telemetry
     display_name: Linux 3-Shard Cluster 2022-11 (Telemetry)
-    cron: "0 0 * * 0,2,3,4,5" # Run it every day except Saturday and Monday.
+    # Run it twice a day.
+    # Will make it less frequent when perf is finished.
+    cron: "0 3,15 * * 0,1,2,3,4,5,6"
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
