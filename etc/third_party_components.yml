@@ -309,6 +309,7 @@ components:
     release_monitoring_id: 10500
     local_directory_path: src/third_party/re2
     team_owner: "Service Architecture"
+    upgrade_suppression: TODO SERVER-75570
 
   extras:
     homepage_url: https://github.com/testing-cabal/extras
