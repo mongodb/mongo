@@ -33,25 +33,26 @@
 #include <memory>
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/commands/fle2_compact_gen.h"
+#include "mongo/db/commands/fle2_compact.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/compact_structured_encryption_data_coordinator_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
 
 namespace mongo {
 
-class CompactStructuredEncryptionDataCoordinator final
-    : public RecoverableShardingDDLCoordinator<CompactStructuredEncryptionDataState,
+// TODO: SERVER-68373 remove once 7.0 becomes last LTS
+class CompactStructuredEncryptionDataCoordinatorPre70Compatible final
+    : public RecoverableShardingDDLCoordinator<CompactStructuredEncryptionDataStatePre70Compatible,
                                                CompactStructuredEncryptionDataPhaseEnum> {
 public:
-    static constexpr auto kStateContext = "CompactStructuredEncryptionDataState"_sd;
-    using StateDoc = CompactStructuredEncryptionDataState;
+    static constexpr auto kStateContext = "CompactStructuredEncryptionDataStatePre70Compatible"_sd;
+    using StateDoc = CompactStructuredEncryptionDataStatePre70Compatible;
     using Phase = CompactStructuredEncryptionDataPhaseEnum;
 
-    CompactStructuredEncryptionDataCoordinator(ShardingDDLCoordinatorService* service,
-                                               const BSONObj& doc)
+    CompactStructuredEncryptionDataCoordinatorPre70Compatible(
+        ShardingDDLCoordinatorService* service, const BSONObj& doc)
         : RecoverableShardingDDLCoordinator(
-              service, "CompactStructuredEncryptionDataCoordinator", doc) {}
+              service, "CompactStructuredEncryptionDataCoordinatorPre70Compatible", doc) {}
 
     boost::optional<BSONObj> reportForCurrentOp(
         MongoProcessInterface::CurrentOpConnectionsMode connMode,
@@ -86,6 +87,63 @@ private:
     boost::optional<CompactStructuredEncryptionDataCommandReply> _response;
     bool _skipCompact{false};
     boost::optional<UUID> _ecocRenameUuid;
+};
+
+class CompactStructuredEncryptionDataCoordinator final
+    : public RecoverableShardingDDLCoordinator<CompactStructuredEncryptionDataState,
+                                               CompactStructuredEncryptionDataPhaseEnum> {
+public:
+    static constexpr auto kStateContext = "CompactStructuredEncryptionDataState"_sd;
+    using StateDoc = CompactStructuredEncryptionDataState;
+    using Phase = CompactStructuredEncryptionDataPhaseEnum;
+
+    CompactStructuredEncryptionDataCoordinator(ShardingDDLCoordinatorService* service,
+                                               const BSONObj& doc)
+        : RecoverableShardingDDLCoordinator(
+              service, "CompactStructuredEncryptionDataCoordinator", doc) {}
+
+    boost::optional<BSONObj> reportForCurrentOp(
+        MongoProcessInterface::CurrentOpConnectionsMode connMode,
+        MongoProcessInterface::CurrentOpSessionsMode sessionMode) noexcept final;
+
+    CompactStructuredEncryptionDataCommandReply getResponse(OperationContext* opCtx) {
+        getCompletionFuture().get(opCtx);
+        invariant(_response);
+        return *_response;
+    }
+
+    void checkIfOptionsConflict(const BSONObj& stateDoc) const final {}
+
+private:
+    StringData serializePhase(const Phase& phase) const override {
+        return CompactStructuredEncryptionDataPhase_serializer(phase);
+    }
+
+    ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                                  const CancellationToken& token) noexcept final;
+
+private:
+    // The response to the compact command
+    boost::optional<CompactStructuredEncryptionDataCommandReply> _response;
+
+    // Whether to skip the compaction operation during the compact phase
+    bool _skipCompact{false};
+
+    // The UUID of the temporary collection that the ECOC was renamed to
+    boost::optional<UUID> _ecocRenameUuid;
+
+    // Contains the set of _id values of documents that must be deleted from the ESC
+    // during the compact phase. This is populated during the rename phase.
+    // It is by design that this is not persisted to disk between phases, as this should
+    // be emptied (and hence no ESC deletions must happen) if the coordinator were resumed
+    // from disk during the compact phase.
+    FLECompactESCDeleteSet _escDeleteSet;
+
+    // Stats for the ESC
+    ECStats _escStats;
+
+    // Stats for the ECOC
+    ECOCStats _ecocStats;
 };
 
 }  // namespace mongo

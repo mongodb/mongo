@@ -65,7 +65,10 @@ enums:
             # TODO SERVER-68008: Remove once 7.0 becomes last LTS
             kCollModPre61Compatible: "collMod_V2"
             kReshardCollection: "reshardCollection"
-            kCompactStructuredEncryptionData: "compactStructuredEncryptionData_V2"
+            # Note: the V3 refers to the coordinator version, not the FLE2 protocol version
+            kCompactStructuredEncryptionData: "compactStructuredEncryptionData_V3"
+            # TODO SERVER-68373: Remove once 7.0 becomes last LTS
+            kCompactStructuredEncryptionDataPre70Compatible: "compactStructuredEncryptionData_V2"
             # TODO SERVER-68373 remove once 7.0 becomes last LTS
             kCompactStructuredEncryptionDataPre61Compatible: "compactStructuredEncryptionData"
 

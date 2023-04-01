@@ -106,6 +106,11 @@ std::shared_ptr<ShardingDDLCoordinator> constructShardingDDLCoordinatorInstance(
             break;
         case DDLCoordinatorTypeEnum::kCompactStructuredEncryptionDataPre61Compatible:
             // TODO SERVER-68373 remove once 7.0 becomes last LTS
+        case DDLCoordinatorTypeEnum::kCompactStructuredEncryptionDataPre70Compatible:
+            // TODO SERVER-68373 remove once 7.0 becomes last LTS
+            return std::make_shared<CompactStructuredEncryptionDataCoordinatorPre70Compatible>(
+                service, std::move(initialState));
+            break;
         case DDLCoordinatorTypeEnum::kCompactStructuredEncryptionData:
             return std::make_shared<CompactStructuredEncryptionDataCoordinator>(
                 service, std::move(initialState));

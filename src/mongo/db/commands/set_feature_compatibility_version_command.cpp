@@ -341,6 +341,19 @@ public:
                         opCtx, DDLCoordinatorTypeEnum::kDropDatabasePre70Compatible);
             }
 
+            // TODO SERVER-68373: Remove once 7.0 becomes last LTS
+            if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) &&
+                gFeatureFlagFLE2ProtocolVersion2.isEnabledOnVersion(requestedVersion)) {
+                ShardingDDLCoordinatorService::getService(opCtx)
+                    ->waitForCoordinatorsOfGivenTypeToComplete(
+                        opCtx,
+                        DDLCoordinatorTypeEnum::kCompactStructuredEncryptionDataPre70Compatible);
+                ShardingDDLCoordinatorService::getService(opCtx)
+                    ->waitForCoordinatorsOfGivenTypeToComplete(
+                        opCtx,
+                        DDLCoordinatorTypeEnum::kCompactStructuredEncryptionDataPre61Compatible);
+            }
+
             return true;
         }
 
@@ -536,6 +549,19 @@ public:
                     opCtx, DDLCoordinatorTypeEnum::kDropDatabasePre70Compatible);
         }
 
+        // TODO SERVER-68373: Remove once 7.0 becomes last LTS
+        if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) &&
+            requestedVersion > actualVersion &&
+            gFeatureFlagFLE2ProtocolVersion2.isEnabledOnTargetFCVButDisabledOnOriginalFCV(
+                requestedVersion, actualVersion)) {
+            ShardingDDLCoordinatorService::getService(opCtx)
+                ->waitForCoordinatorsOfGivenTypeToComplete(
+                    opCtx, DDLCoordinatorTypeEnum::kCompactStructuredEncryptionDataPre70Compatible);
+            ShardingDDLCoordinatorService::getService(opCtx)
+                ->waitForCoordinatorsOfGivenTypeToComplete(
+                    opCtx, DDLCoordinatorTypeEnum::kCompactStructuredEncryptionDataPre61Compatible);
+        }
+
         LOGV2(6744302,
               "setFeatureCompatibilityVersion succeeded",
               "upgradeOrDowngrade"_attr = upgradeOrDowngrade,
@@ -605,7 +631,9 @@ private:
         }
 
         // TODO SERVER-68373 remove once 7.0 becomes last LTS
-        if (isDowngrading) {
+        if (isDowngrading &&
+            gFeatureFlagFLE2ProtocolVersion2.isDisabledOnTargetFCVButEnabledOnOriginalFCV(
+                requestedVersion, originalVersion)) {
             // Drain the QE compact coordinator because it persists state that is
             // not backwards compatible with earlier versions.
             ShardingDDLCoordinatorService::getService(opCtx)

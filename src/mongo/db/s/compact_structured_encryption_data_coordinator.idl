@@ -46,6 +46,50 @@ enums:
 
 structs:
     CompactStructuredEncryptionDataState:
+        description: "Represents the state of the compactStructuredEncryptionData pipeline
+            for protocol version 2"
+        strict: false
+        chained_structs:
+            ShardingDDLCoordinatorMetadata: ShardingDDLCoordinatorMetadata
+        fields:
+            phase:
+                description: "Current phase"
+                type: CompactStructuredEncryptionDataPhase
+                default: kUnset
+            skipCompact:
+                description: "Whether to skip the compaction operation"
+                type: bool
+                default: false
+            escNss:
+                description: "Collection containing insertions metadata"
+                type: namespacestring
+            ecocNss:
+                description: "Collection containing compaction metadata to perform compact with"
+                type: namespacestring
+            ecocUuid:
+                description: "UUID of the collection identified by ecocNss"
+                type: uuid
+                optional: true
+            ecocRenameNss:
+                description: "Temporary name to use while performing compaction"
+                type: namespacestring
+            ecocRenameUuid:
+                description: "UUID of the collection identified by ecocRenameNss"
+                type: uuid
+                optional: true
+            compactionTokens:
+                description: "Compaction tokens for the compact operation"
+                type: object_owned
+            escStats:
+                description: "Statistics for the ESC collection"
+                type: ECStats
+                optional: true
+            ecocStats:
+                description: "Statistics for the temporary ECOC collection"
+                type: ECOCStats
+                optional: true
+
+    CompactStructuredEncryptionDataStatePre70Compatible:
         description: "Represents the state of the compactStructuredEncryptionData pipeline"
         strict: false
         chained_structs:
