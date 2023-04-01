@@ -151,7 +151,7 @@ public:
                  repl::ReplicationCoordinator::modeNone) &&
                 (dbName == DatabaseName::kLocal)) {
                 uasserted(ErrorCodes::IllegalOperation,
-                          str::stream() << "Cannot drop '" << dbName.toStringForErrorMsg()
+                          str::stream() << "Cannot drop '" << dbName
                                         << "' database while replication is active");
             }
 
@@ -626,7 +626,7 @@ public:
                 ErrorCodes::BadValue, "Scale factor must be greater than zero", cmd.getScale() > 0);
 
             uassert(ErrorCodes::InvalidNamespace,
-                    str::stream() << "Invalid db name: " << dbname.toStringForErrorMsg(),
+                    str::stream() << "Invalid db name: " << dbname,
                     NamespaceString::validDBName(dbname.db(),
                                                  NamespaceString::DollarInDbNameBehavior::Allow));
 

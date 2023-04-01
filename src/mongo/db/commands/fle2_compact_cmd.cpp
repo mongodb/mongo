@@ -80,8 +80,7 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
 
     AutoGetDb autoDb(opCtx, edcNss.dbName(), MODE_IX);
     uassert(ErrorCodes::NamespaceNotFound,
-            str::stream() << "Database '" << edcNss.dbName().toStringForErrorMsg()
-                          << "' does not exist",
+            str::stream() << "Database '" << edcNss.db() << "' does not exist",
             autoDb.getDb());
 
     auto catalog = CollectionCatalog::get(opCtx);

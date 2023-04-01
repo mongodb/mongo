@@ -6,11 +6,6 @@
 'use strict';
 
 load("jstests/libs/override_methods/override_helpers.js");  // For 'OverrideHelpers'.
-load(
-    "jstests/libs/override_methods/tenant_aware_response_checker.js");  // For
-                                                                        // `assertExpectedDbNameInResponse`
-                                                                        // and
-                                                                        // `updateDbNamesInResponse`.
 
 const kUserName = "userTenant1";
 const kTenantId = ObjectId();
@@ -54,6 +49,46 @@ function prepareSecurityToken(conn) {
         const securityToken =
             _createSecurityToken({user: kUserName, db: '$external', tenant: kTenantId});
         conn._setSecurityToken(securityToken);
+    }
+}
+
+function getDbName(nss) {
+    if (nss.length === 0 || !nss.includes(".")) {
+        return nss;
+    }
+    return nss.split(".")[0];
+}
+
+function checkDbNameInString(str, requestDbName, logError) {
+    if (requestDbName.length === 0) {
+        return;
+    }
+    if (requestDbName.includes("_")) {
+        return;
+    }
+    assert.eq(false, str.includes(kTenantId.str + "_" + requestDbName), logError);
+}
+
+function checkReponse(res, requestDbName, logError) {
+    // We expect the response db name matches request.
+    for (let k of Object.keys(res)) {
+        let v = res[k];
+        if (typeof v === "string") {
+            if (k === "dbName" || k == "db" || k == "dropped") {
+                checkDbNameInString(v, requestDbName, logError);
+            } else if (k === "namespace" || k === "ns") {
+                checkDbNameInString(getDbName(v), requestDbName, logError);
+            } else if (k === "errmsg" || k == "name") {
+                checkDbNameInString(v, requestDbName, logError);
+            }
+        } else if (Array.isArray(v)) {
+            v.forEach((item) => {
+                if (typeof item === "object" && item !== null)
+                    checkReponse(item, requestDbName, logError);
+            });
+        } else if (typeof v === "object" && v !== null && Object.keys(v).length > 0) {
+            checkReponse(v, requestDbName, logError);
+        }
     }
 }
 
@@ -135,10 +170,12 @@ function runCommandWithResponseCheck(
 
     // Actually run the provided command.
     let res = originalRunCommand.apply(conn, makeRunCommandArgs(cmdObj));
-    const prefixedDbName = kTenantId + "_" + dbName;
+    const logUnmatchedDbName = (dbName, resObj) => {
+        return `Response db name does not match sent db name "${dbName}", response: ${
+            tojsononeline(resObj)}`;
+    };
 
-    assertExpectedDbNameInResponse(res, dbName, prefixedDbName);
-    updateDbNamesInResponse(res, dbName, prefixedDbName);
+    checkReponse(res, dbName, logUnmatchedDbName(dbName, res));
     return res;
 }
 

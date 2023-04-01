@@ -78,8 +78,8 @@ void OperationShardingState::setShardRole(OperationContext* opCtx,
         if (!emplaceResult.second) {
             uassert(640571,
                     str::stream() << "Illegal attempt to change the expected database version for "
-                                  << nss.dbName().toStringForErrorMsg() << " from " << tracker.v
-                                  << " to " << *databaseVersion,
+                                  << nss.db() << " from " << tracker.v << " to "
+                                  << *databaseVersion,
                     tracker.v == *databaseVersion);
         }
         invariant(++tracker.recursion > 0);
