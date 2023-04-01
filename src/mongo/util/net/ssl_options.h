@@ -66,13 +66,12 @@ struct SSLParams {
     std::string sslPEMKeyFile;      // --tlsCertificateKeyFile
     std::string sslPEMKeyPassword;  // --tlsCertificateKeyFilePassword
     std::string sslClusterFile;     // --tlsInternalKeyFile
-    std::string sslClusterPassword;             // --tlsInternalKeyPassword
-    std::string sslCAFile;                      // --tlsCAFile
-    std::string sslClusterCAFile;               // --tlsClusterCAFile
-    std::string sslCRLFile;                     // --tlsCRLFile
-    std::string sslCipherConfig;                // --tlsCipherConfig
-    std::string sslCipherSuiteConfig;           // --tlsCipherSuiteConfig
-    std::string clusterAuthX509ExtensionValue;  // --tlsClusterAuthX509ExtensionValue
+    std::string sslClusterPassword;    // --tlsInternalKeyPassword
+    std::string sslCAFile;             // --tlsCAFile
+    std::string sslClusterCAFile;      // --tlsClusterCAFile
+    std::string sslCRLFile;            // --tlsCRLFile
+    std::string sslCipherConfig;       // --tlsCipherConfig
+    std::string sslCipherSuiteConfig;  // --tlsCipherSuiteConfig
 
     boost::optional<TLSCATrusts> tlsCATrusts;  // --setParameter tlsCATrusts
 

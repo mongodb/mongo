@@ -64,7 +64,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/auth/auth_options',
         '$BUILD_DIR/mongo/db/auth/cluster_auth_mode',
         '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/db/server_feature_flags',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
     ],
 )

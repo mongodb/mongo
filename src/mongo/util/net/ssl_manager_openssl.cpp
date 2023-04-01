@@ -109,11 +109,6 @@ using transport::SSLConnectionContext;
 
 namespace {
 
-// NIDs mapping to OIDs in the MongoDBInc namespace.
-// Allocated during MONGO_INITIALIZER(SSLManager), valid for process lifetime.
-static int sMongoDbRolesNID;
-static int sMongoDbClusterMembershipNID;
-
 MONGO_FAIL_POINT_DEFINE(disableStapling);
 
 using UniqueX509StoreCtx =
@@ -1520,21 +1515,11 @@ private:
      */
     void _getCRLInfo(StringData crlFile, CRLInformationToLog* info) const;
 
-    struct ParsedPeerExtensions {
-        stdx::unordered_set<RoleName> roles;
-        boost::optional<std::string> clusterMembership;
-    };
-    StatusWith<ParsedPeerExtensions> _parsePeerExtensions(X509* peerCert) const;
+    StatusWith<stdx::unordered_set<RoleName>> _parsePeerRoles(X509* peerCert) const;
 
-    // Fetches NID for mongodbRolesOID constant.
-    static int _getMongoDbRolesNID() {
-        return sMongoDbRolesNID;
-    }
-
-    // Fetches NID for mongodbClusterMembershipOID constant.
-    static int _getMongoDbClusterMembershipNID() {
-        return sMongoDbClusterMembershipNID;
-    }
+    // Fetches NID for mongodbRolesOID constant. Initializes once, safe to invoke
+    // multiple times.
+    static int _getMongoDbRolesOID();
 
     StatusWith<boost::optional<std::vector<DERInteger>>> _parseTLSFeature(X509* peerCert) const;
 
@@ -1633,19 +1618,17 @@ bool isSSLServer = false;
 
 extern SSLManagerCoordinator* theSSLManagerCoordinator;
 
+static int sMongoDbRolesOID;
+
 MONGO_INITIALIZER_WITH_PREREQUISITES(SSLManager, ("SetupOpenSSL", "EndStartupOptionHandling"))
 (InitializerContext*) {
     if (!isSSLServer || (sslGlobalParams.sslMode.load() != SSLParams::SSLMode_disabled)) {
         theSSLManagerCoordinator = new SSLManagerCoordinator();
     }
 
-    sMongoDbRolesNID = OBJ_create(mongodbRolesOID.identifier.c_str(),
+    sMongoDbRolesOID = OBJ_create(mongodbRolesOID.identifier.c_str(),
                                   mongodbRolesOID.shortDescription.c_str(),
                                   mongodbRolesOID.longDescription.c_str());
-
-    sMongoDbClusterMembershipNID = OBJ_create(mongodbClusterMembershipOID.identifier.c_str(),
-                                              mongodbClusterMembershipOID.shortDescription.c_str(),
-                                              mongodbClusterMembershipOID.longDescription.c_str());
 }
 
 std::shared_ptr<SSLManagerInterface> SSLManagerInterface::create(
@@ -3336,13 +3319,13 @@ Future<SSLPeerInfo> SSLManagerOpenSSL::parseAndValidatePeerCertificate(
                    "cipher"_attr = SSL_CIPHER_get_name(cipher));
     }
 
-    auto swParsedPeerExtensions = _parsePeerExtensions(peerCert.get());
-    if (!swParsedPeerExtensions.isOK()) {
-        return Future<SSLPeerInfo>::makeReady(swParsedPeerExtensions.getStatus());
+    StatusWith<stdx::unordered_set<RoleName>> swPeerCertificateRoles =
+        _parsePeerRoles(peerCert.get());
+    if (!swPeerCertificateRoles.isOK()) {
+        return Future<SSLPeerInfo>::makeReady(swPeerCertificateRoles.getStatus());
     }
-    auto parsedPeerExtensions = std::move(swParsedPeerExtensions.getValue());
 
-    if (auto status = _validatePeerRoles(parsedPeerExtensions.roles, conn); !status.isOK()) {
+    if (auto status = _validatePeerRoles(swPeerCertificateRoles.getValue(), conn); !status.isOK()) {
         return status;
     }
 
@@ -3372,11 +3355,8 @@ Future<SSLPeerInfo> SSLManagerOpenSSL::parseAndValidatePeerCertificate(
         return std::move(ocspFuture)
             .then([peerSubject,
                    sni,
-                   roles = std::move(parsedPeerExtensions.roles),
-                   clusterMembership = std::move(parsedPeerExtensions.clusterMembership)] {
-                SSLPeerInfo info(peerSubject, sni, roles);
-                info.setClusterMembership(clusterMembership);
-                return info;
+                   peerCertificateRoles = std::move(swPeerCertificateRoles.getValue())] {
+                return SSLPeerInfo(peerSubject, sni, peerCertificateRoles);
             });
     }
 
@@ -3512,8 +3492,7 @@ SSLPeerInfo SSLManagerOpenSSL::parseAndValidatePeerCertificateDeprecated(
     return swPeerSubjectName.getValue();
 }
 
-StatusWith<SSLManagerOpenSSL::ParsedPeerExtensions> SSLManagerOpenSSL::_parsePeerExtensions(
-    X509* peerCert) const {
+StatusWith<stdx::unordered_set<RoleName>> SSLManagerOpenSSL::_parsePeerRoles(X509* peerCert) const {
     // exts is owned by the peerCert
     const STACK_OF(X509_EXTENSION)* exts = X509_get0_extensions(peerCert);
 
@@ -3522,37 +3501,29 @@ StatusWith<SSLManagerOpenSSL::ParsedPeerExtensions> SSLManagerOpenSSL::_parsePee
         extCount = sk_X509_EXTENSION_num(exts);
     }
 
-    ASN1_OBJECT* rolesObj = OBJ_nid2obj(_getMongoDbRolesNID());
-    ASN1_OBJECT* clusterMembershipObj = OBJ_nid2obj(_getMongoDbClusterMembershipNID());
+    ASN1_OBJECT* rolesObj = OBJ_nid2obj(_getMongoDbRolesOID());
 
     // Search all certificate extensions for our own
-    ParsedPeerExtensions parsed;
+    stdx::unordered_set<RoleName> roles;
     for (int i = 0; i < extCount; i++) {
         X509_EXTENSION* ex = sk_X509_EXTENSION_value(exts, i);
         ASN1_OBJECT* obj = X509_EXTENSION_get_object(ex);
 
         if (!OBJ_cmp(obj, rolesObj)) {
-            // mongodbRoles extension.
+            // We've found an extension which has our roles OID
             ASN1_OCTET_STRING* data = X509_EXTENSION_get_data(ex);
-            auto ptr = reinterpret_cast<char*>(data->data);
-            auto swRoles = parsePeerRoles(ConstDataRange(ptr, ptr + data->length));
-            if (!swRoles.isOK()) {
-                return std::move(swRoles.getStatus());
-            }
-            parsed.roles = std::move(swRoles.getValue());
-        } else if (!OBJ_cmp(obj, clusterMembershipObj)) {
-            // mongodbClusterMembership extension.
-            ASN1_OCTET_STRING* data = X509_EXTENSION_get_data(ex);
-            auto ptr = reinterpret_cast<char*>(data->data);
-            auto swMembership = parseDERString(ConstDataRange(ptr, ptr + data->length));
-            if (!swMembership.isOK()) {
-                return std::move(swMembership.getStatus());
-            }
-            parsed.clusterMembership = std::move(swMembership.getValue());
+
+            return parsePeerRoles(
+                ConstDataRange(reinterpret_cast<char*>(data->data),
+                               reinterpret_cast<char*>(data->data) + data->length));
         }
     }
 
-    return parsed;
+    return roles;
+}
+
+int SSLManagerOpenSSL::_getMongoDbRolesOID() {
+    return sMongoDbRolesOID;
 }
 
 StatusWith<boost::optional<std::vector<DERInteger>>> SSLManagerOpenSSL::_parseTLSFeature(

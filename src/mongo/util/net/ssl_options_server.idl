@@ -180,12 +180,3 @@ configs:
     short_name: tlsLogVersions
     arg_vartype: String
 
-  "net.tls.clusterAuthX509.extensionValue":
-    description: >-
-        If specified, clients who expect to be regarded as cluster members
-        must present a valid X.509 certificate containing an X.509 extension
-        for OID 1.3.6.1.4.1.34601.2.1.2 which contains the specified value.
-    short_name: tlsClusterAuthX509ExtensionValue
-    arg_vartype: String
-    # // TODO SERVER-74989 X.509 Subject Name Matching
-    # conflicts: "net.tls.clusterAuthX509.attributes"

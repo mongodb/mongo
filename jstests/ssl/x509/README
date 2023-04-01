@@ -64,4 +64,3 @@ certs:
     - mongoRoles:
       - {role: readWrite, db: test1}
       - {role: read, db: test2}
-    - mongoClusterMembership: clusterName
