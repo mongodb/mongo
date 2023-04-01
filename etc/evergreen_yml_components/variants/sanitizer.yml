@@ -35,6 +35,7 @@ buildvariants:
     - name: .aggfuzzer .common !.feature_flag_guarded
     - name: free_monitoring
     - name: .jstestfuzz !.initsync
+    - name: generate_buildid_to_debug_symbols_mapping
 
 - name: rhel80-debug-asan
   display_name: ~ ASAN Enterprise RHEL 8.0 DEBUG
@@ -125,6 +126,7 @@ buildvariants:
   - name: .updatefuzzer
   - name: server_discovery_and_monitoring_json_test_TG
   - name: server_selection_json_test_TG
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: rhel80-debug-ubsan
   display_name: ~ UBSAN Enterprise RHEL 8.0 DEBUG
@@ -205,3 +207,4 @@ buildvariants:
   - name: watchdog_wiredtiger
   - name: server_discovery_and_monitoring_json_test_TG
   - name: server_selection_json_test_TG
+  - name: generate_buildid_to_debug_symbols_mapping

@@ -955,6 +955,7 @@ buildvariants:
   - name: .ssl
   - name: jsCore
   - name: external_auth
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: ubi8
   display_name: "UBI 8"
@@ -981,6 +982,9 @@ buildvariants:
   - name: jsCore
   - name: sharding_gen
   - name: replica_sets_gen
+  - name: generate_buildid_to_debug_symbols_mapping
+    distros:
+    - rhel80-large
 
 - name: rhel80
   display_name: RHEL 8.0
@@ -2669,6 +2673,7 @@ buildvariants:
   - name: .stitch
   - name: unittest_shell_hang_analyzer_gen
   - name: push
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: macos-arm64
   display_name: macOS arm64
@@ -2723,6 +2728,7 @@ buildvariants:
   - name: .stitch
   - name: unittest_shell_hang_analyzer_gen
   - name: push
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-macos
   display_name: Enterprise macOS
@@ -2768,6 +2774,7 @@ buildvariants:
   - name: push
   - name: .crypt
   - name: .publish_crypt
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-macos-arm64
   display_name: Enterprise macOS arm64
@@ -2812,6 +2819,7 @@ buildvariants:
   - name: push
   - name: .crypt
   - name: .publish_crypt
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-rhel-82-arm64-grpc
   display_name: "Enterprise RHEL 8.2 arm64 GRPC"

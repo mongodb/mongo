@@ -485,6 +485,7 @@ buildvariants:
   - name: server_selection_json_test_TG
     distros:
     - rhel80-xlarge
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - <<: *enterprise-rhel80-dynamic-gcc-debug-experimental-template
   name: &enterprise-rhel80-dynamic-clang-cxx20-debug-experimental enterprise-rhel80-dynamic-clang-cxx20-debug-experimental
@@ -553,6 +554,7 @@ buildvariants:
   - name: .jscore .common
   - name: .replica_sets !.ignore_non_generated_replica_sets_jscore_passthrough !.ignore_on_code_coverage
   - name: replica_sets_jscore_passthrough_gen
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: &enterprise-rhel-80-64-bit-coverage-clang enterprise-rhel-80-64-bit-coverage-clang
   display_name: "~ Enterprise RHEL 8.0 DEBUG Code Coverage (clang)"
@@ -713,6 +715,7 @@ buildvariants:
     - name: server_selection_json_test_TG
       distros:
       - rhel80-xlarge
+    - name: generate_buildid_to_debug_symbols_mapping
 
 
 - <<: *enterprise-rhel80-dynamic-gcc-debug-experimental-template
@@ -1157,6 +1160,7 @@ buildvariants:
   - name: replica_sets_jscore_passthrough_gen
   - name: sasl
   - name: .crypt
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: &enterprise-macos-cxx20 enterprise-macos-cxx20
   display_name: "Enterprise macOS C++20 DEBUG"
@@ -1193,6 +1197,7 @@ buildvariants:
   - name: replica_sets_jscore_passthrough_gen
   - name: sasl
   - name: .crypt
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: &enterprise-macos-arm64 enterprise-macos-arm64
   display_name: "~ Enterprise macOS arm64"
@@ -1224,6 +1229,7 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: .crypt
+  - name: generate_buildid_to_debug_symbols_mapping
 
 ###########################################
 #          Redhat buildvariants           #
@@ -1822,6 +1828,7 @@ buildvariants:
     - rhel80-xlarge
   - name: .multiversion !.future_git_tag_incompatible
   - name: .multiversion_future_git_tag
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: &enterprise-rhel-80-64-bit-suggested enterprise-rhel-80-64-bit-suggested
   display_name: "* Enterprise RHEL 8.0"
@@ -1987,6 +1994,7 @@ buildvariants:
   - name: compile_test_and_package_parallel_dbtest_stream_TG
   - name: jsCore
   - name: noPassthroughHotBackups_gen
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: &ubuntu1804-container ubuntu1804-container
   display_name: "Ubuntu 18.04 Container"
@@ -2013,6 +2021,9 @@ buildvariants:
   - name: jsCore
   - name: sharding_gen
   - name: replica_sets_gen
+  - name: generate_buildid_to_debug_symbols_mapping
+    distros:
+    - ubuntu1804-build
 
 - name: &enterprise-rhel-72-s390x-compile enterprise-rhel-72-s390x-compile
   display_name: "Enterprise RHEL 7.2 s390x Compile"
@@ -2284,6 +2295,7 @@ buildvariants:
   - name: .updatefuzzer
   - name: server_discovery_and_monitoring_json_test_TG
   - name: server_selection_json_test_TG
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - &rhel80-debug-ubsan-all-feature-flags-template
   name: &rhel80-debug-ubsan-all-feature-flags rhel80-debug-ubsan-all-feature-flags
@@ -2327,6 +2339,7 @@ buildvariants:
   - name: compile_and_archive_dist_test_then_package_TG
   - name: .concurrency !.no_txns !.repl !.kill_terminate
   - name: disk_wiredtiger
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: &rhel80-debug-ubsan-classic-engine rhel80-debug-ubsan-classic-engine
   display_name: "* UBSAN Enterprise RHEL 8.0 DEBUG (Classic Engine)"
@@ -2403,6 +2416,7 @@ buildvariants:
   - name: watchdog_wiredtiger
   - name: server_discovery_and_monitoring_json_test_TG
   - name: server_selection_json_test_TG
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - &rhel80-debug-aubsan-lite-template
   <<: *linux_debug_aubsan_compile_variant_dependency
@@ -2657,6 +2671,7 @@ buildvariants:
   - name: server_selection_json_test_TG
     distros:
     - rhel80-xlarge
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - &enterprise-rhel80-debug-complete-tsan-template
   name: &enterprise-rhel80-debug-complete-tsan enterprise-rhel80-debug-complete-tsan
@@ -2733,6 +2748,7 @@ buildvariants:
     distros:
     - rhel80-xlarge
   - name: streams
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: &enterprise-rhel80-no-latch-64-bit enterprise-rhel80-no-latch-64-bit
   display_name: "~ Enterprise RHEL 8.0 (without Diagnostic Latches)"
@@ -2758,6 +2774,9 @@ buildvariants:
     distros:
     - rhel80-build
   - name: compile_test_and_package_parallel_dbtest_stream_TG
+    distros:
+    - rhel80-build
+  - name: generate_buildid_to_debug_symbols_mapping
     distros:
     - rhel80-build
 
@@ -2787,6 +2806,9 @@ buildvariants:
     distros:
     - rhel80-build
   - name: compile_test_and_package_parallel_dbtest_stream_TG
+    distros:
+    - rhel80-build
+  - name: generate_buildid_to_debug_symbols_mapping
     distros:
     - rhel80-build
 
@@ -2833,6 +2855,7 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.csrs !.encrypt
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: &enterprise-rhel80-sdam-replica-set-monitor-64-bit enterprise-rhel80-sdam-replica-set-monitor-64-bit
   display_name: "~ Enterprise RHEL 8.0 (with SdamReplicaSetMonitor)"
@@ -2876,6 +2899,7 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.csrs !.encrypt
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: &enterprise-rhel80-sharding-task-executor-pool-rsm-matchPrimary-64-bit enterprise-rhel80-sharding-task-executor-pool-rsm-matchPrimary-64-bit
   display_name: "~ Enterprise RHEL 8.0 (with {ShardingTaskExecutorPoolReplicaSetMatching: \"matchPrimaryNode\"})"
@@ -2918,6 +2942,7 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.csrs !.encrypt
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: &enterprise-rhel80-sharding-task-executor-pool-rsm-matchBusiest-64-bit enterprise-rhel80-sharding-task-executor-pool-rsm-matchBusiest-64-bit
   display_name: "~ Enterprise RHEL 8.0 (with {ShardingTaskExecutorPoolReplicaSetMatching: \"matchBusiestNode\"})"
@@ -2965,6 +2990,7 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.csrs !.encrypt
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: &enterprise-rhel80-sharding-task-executor-pool-rsm-disabled-64-bit enterprise-rhel80-sharding-task-executor-pool-rsm-disabled-64-bit
   display_name: "~ Enterprise RHEL 8.0 (with {ShardingTaskExecutorPoolReplicaSetMatching: \"disabled\"})"
@@ -3012,6 +3038,7 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.csrs !.encrypt
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: &enterprise-rhel80-join-ingress-sessions-on-shutdown enterprise-rhel80-join-ingress-sessions-on-shutdown
   display_name: "~ Enterprise RHEL 8.0 (with {joinIngressSessionsOnShutdown: \"true\"})"

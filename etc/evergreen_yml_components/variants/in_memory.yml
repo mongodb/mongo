@@ -73,6 +73,7 @@ buildvariants:
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_gen
   - name: .ssl
   - name: .updatefuzzer
+  - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-windows-inmem
   display_name: Enterprise Windows (inMemory)
