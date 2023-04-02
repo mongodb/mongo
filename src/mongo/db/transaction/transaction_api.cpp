@@ -53,6 +53,7 @@
 #include "mongo/db/transaction/internal_transaction_metrics.h"
 #include "mongo/db/transaction_validation.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/executor/inline_executor.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/factory.h"
@@ -74,21 +75,34 @@ const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 
 namespace txn_api {
 
+namespace {
+
+void runFutureInline(executor::InlineExecutor* inlineExecutor, Notification<void>& mayReturn) {
+    inlineExecutor->run([&]() { return !!mayReturn; });
+}
+
+}  // namespace
+
 SyncTransactionWithRetries::SyncTransactionWithRetries(
     OperationContext* opCtx,
-    std::shared_ptr<executor::TaskExecutor> executor,
+    std::shared_ptr<executor::InlineExecutor::SleepableExecutor> sleepableExecutor,
     std::unique_ptr<ResourceYielder> resourceYielder,
+    std::shared_ptr<executor::InlineExecutor> inlineExecutor,
     std::unique_ptr<TransactionClient> txnClient)
     : _resourceYielder(std::move(resourceYielder)),
+      _inlineExecutor(inlineExecutor),
+      _sleepExec(sleepableExecutor),
       _txn(std::make_shared<details::TransactionWithRetries>(
           opCtx,
-          executor,
+          _sleepExec,
           _source.token(),
           txnClient ? std::move(txnClient)
                     : std::make_unique<details::SEPTransactionClient>(
                           opCtx,
-                          executor,
+                          inlineExecutor,
+                          sleepableExecutor,
                           std::make_unique<details::DefaultSEPTransactionClientBehaviors>()))) {
+
     // Callers should always provide a yielder when using the API with a session checked out,
     // otherwise commands run by the API won't be able to check out that session.
     invariant(!OperationContextSession::get(opCtx) || _resourceYielder);
@@ -102,7 +116,15 @@ StatusWith<CommitResult> SyncTransactionWithRetries::runNoThrow(OperationContext
         return yieldStatus;
     }
 
-    auto txnFuture = _txn->run(std::move(callback));
+    Notification<void> mayReturn;
+    auto txnFuture = _txn->run(opCtx, std::move(callback))
+                         .unsafeToInlineFuture()
+                         .tapAll([&](auto&&) { mayReturn.set(); })
+                         .semi();
+
+
+    runFutureInline(_inlineExecutor.get(), mayReturn);
+
     auto txnResult = txnFuture.getNoThrow(opCtx);
 
     // Cancel the source to guarantee the transaction will terminate if our opCtx was interrupted.
@@ -123,7 +145,13 @@ StatusWith<CommitResult> SyncTransactionWithRetries::runNoThrow(OperationContext
     //
     // Also schedule after getting the transaction's operation time so the best effort abort can't
     // unnecessarily advance it.
-    _txn->cleanUpIfNecessary().getNoThrow(opCtx).ignore();
+    Notification<void> mayReturnFromCleanup;
+    auto cleanUpFuture = _txn->cleanUpIfNecessary().unsafeToInlineFuture().tapAll(
+        [&](auto&&) { mayReturnFromCleanup.set(); });
+
+    runFutureInline(_inlineExecutor.get(), mayReturnFromCleanup);
+
+    cleanUpFuture.getNoThrow(opCtx).ignore();
 
     auto unyieldStatus = _resourceYielder ? _resourceYielder->unyieldNoThrow(opCtx) : Status::OK();
 
@@ -253,7 +281,8 @@ void logNextStep(Transaction::ErrorHandlingStep nextStep, const BSONObj& txnInfo
           "attempts"_attr = attempts);
 }
 
-SemiFuture<CommitResult> TransactionWithRetries::run(Callback callback) noexcept {
+SemiFuture<CommitResult> TransactionWithRetries::run(OperationContext* opCtx,
+                                                     Callback callback) noexcept {
     InternalTransactionMetrics::get(_internalTxn->getParentServiceContext())->incrementStarted();
     _internalTxn->setCallback(std::move(callback));
 
@@ -377,8 +406,8 @@ Future<DbResponse> DefaultSEPTransactionClientBehaviors::handleRequest(
     return serviceEntryPoint->handleRequest(opCtx, request);
 }
 
-SemiFuture<BSONObj> SEPTransactionClient::runCommand(const DatabaseName& dbName,
-                                                     BSONObj cmdObj) const {
+ExecutorFuture<BSONObj> SEPTransactionClient::_runCommand(const DatabaseName& dbName,
+                                                          BSONObj cmdObj) const {
     invariant(_hooks, "Transaction metadata hooks must be injected before a command can be run");
 
     BSONObjBuilder cmdBuilder(_behaviors->maybeModifyCommand(std::move(cmdObj)));
@@ -399,16 +428,32 @@ SemiFuture<BSONObj> SEPTransactionClient::runCommand(const DatabaseName& dbName,
     auto opMsgRequest = OpMsgRequestBuilder::create(dbName, cmdBuilder.obj());
     auto requestMessage = opMsgRequest.serialize();
     return _behaviors->handleRequest(cancellableOpCtx.get(), requestMessage)
+        .thenRunOn(_executor)
         .then([this](DbResponse dbResponse) {
             auto reply = rpc::makeReply(&dbResponse.response)->getCommandReply().getOwned();
             _hooks->runReplyHook(reply);
             uassertStatusOK(getStatusFromCommandResult(reply));
             return reply;
-        })
-        .semi();
+        });
 }
 
-SemiFuture<BatchedCommandResponse> SEPTransactionClient::runCRUDOp(
+BSONObj SEPTransactionClient::runCommandSync(const DatabaseName& dbName, BSONObj cmdObj) const {
+    Notification<void> mayReturn;
+
+    auto result =
+        _runCommand(dbName, cmdObj).unsafeToInlineFuture().tapAll([&](auto&&) { mayReturn.set(); });
+
+    runFutureInline(_inlineExecutor.get(), mayReturn);
+
+    return std::move(result).get();
+}
+
+SemiFuture<BSONObj> SEPTransactionClient::runCommand(const DatabaseName& dbName,
+                                                     BSONObj cmdObj) const {
+    return _runCommand(dbName, cmdObj).semi();
+}
+
+ExecutorFuture<BatchedCommandResponse> SEPTransactionClient::_runCRUDOp(
     const BatchedCommandRequest& cmd, std::vector<StmtId> stmtIds) const {
     invariant(!stmtIds.size() || (cmd.sizeWriteOps() == stmtIds.size()),
               fmt::format("If stmtIds are specified, they must match the number of write ops. "
@@ -432,11 +477,32 @@ SemiFuture<BatchedCommandResponse> SEPTransactionClient::runCRUDOp(
                 uasserted(ErrorCodes::FailedToParse, errmsg);
             }
             return response;
-        })
-        .semi();
+        });
 }
 
-SemiFuture<std::vector<BSONObj>> SEPTransactionClient::exhaustiveFind(
+SemiFuture<BatchedCommandResponse> SEPTransactionClient::runCRUDOp(
+    const BatchedCommandRequest& cmd, std::vector<StmtId> stmtIds) const {
+    return _runCRUDOp(cmd, stmtIds).semi();
+}
+
+BatchedCommandResponse SEPTransactionClient::runCRUDOpSync(const BatchedCommandRequest& cmd,
+                                                           std::vector<StmtId> stmtIds) const {
+
+    Notification<void> mayReturn;
+
+    auto result =
+        _runCRUDOp(cmd, stmtIds)
+            .unsafeToInlineFuture()
+            // Use tap and tapError instead of tapAll since tapAll is not move-only type friendly
+            .tap([&](auto&&) { mayReturn.set(); })
+            .tapError([&](auto&&) { mayReturn.set(); });
+
+    runFutureInline(_inlineExecutor.get(), mayReturn);
+
+    return std::move(result).get();
+}
+
+ExecutorFuture<std::vector<BSONObj>> SEPTransactionClient::_exhaustiveFind(
     const FindCommandRequest& cmd) const {
     return runCommand(cmd.getDbName(), cmd.toBSON({}))
         .thenRunOn(_executor)
@@ -487,8 +553,23 @@ SemiFuture<std::vector<BSONObj>> SEPTransactionClient::exhaustiveFind(
                 // AsyncTry will inherit the real token.
                 .on(_executor, CancellationToken::uncancelable())
                 .then([response = std::move(response)] { return std::move(*response); });
-        })
-        .semi();
+        });
+}
+
+SemiFuture<std::vector<BSONObj>> SEPTransactionClient::exhaustiveFind(
+    const FindCommandRequest& cmd) const {
+    return _exhaustiveFind(cmd).semi();
+}
+
+std::vector<BSONObj> SEPTransactionClient::exhaustiveFindSync(const FindCommandRequest& cmd) const {
+    Notification<void> mayReturn;
+
+    auto result =
+        _exhaustiveFind(cmd).unsafeToInlineFuture().tapAll([&](auto&&) { mayReturn.set(); });
+
+    runFutureInline(_inlineExecutor.get(), mayReturn);
+
+    return std::move(result).get();
 }
 
 SemiFuture<CommitResult> Transaction::commit() {

@@ -94,7 +94,7 @@ public:
                                 IDLParserContext("FindCommandRequest", false /* apiStrict */),
                                 findOpMsgRequest.body);
 
-                            auto docs = txnClient.exhaustiveFind(findCommand).get();
+                            auto docs = txnClient.exhaustiveFindSync(findCommand);
 
                             BSONObjBuilder resBob;
                             resBob.append("docs", std::move(docs));
@@ -102,7 +102,8 @@ public:
                             continue;
                         }
 
-                        const auto res = txnClient.runCommand(dbName, command).get();
+                        const auto res = txnClient.runCommandSync(dbName, command);
+
                         sharedBlock->responses.emplace_back(
                             CommandHelpers::filterCommandReplyForPassthrough(
                                 res.removeField("recoveryToken")));

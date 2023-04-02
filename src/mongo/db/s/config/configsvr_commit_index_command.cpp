@@ -93,8 +93,14 @@ void commitIndexInTransaction(OperationContext* opCtx,
         return entry;
     }()});
 
+    auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
+    auto sleepInlineExecutor = inlineExecutor->getSleepableExecutor(executor);
+
     txn_api::SyncTransactionWithRetries txn(
-        opCtx, executor, TransactionParticipantResourceYielder::make("commitIndexCatalogEntry"));
+        opCtx,
+        sleepInlineExecutor,
+        TransactionParticipantResourceYielder::make("commitIndexCatalogEntry"),
+        inlineExecutor);
 
     txn.run(opCtx,
             [updateCollectionOp, upsertIndexOp](const txn_api::TransactionClient& txnClient,

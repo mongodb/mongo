@@ -117,13 +117,17 @@ void runTransactionOnShardingCatalog(OperationContext* opCtx,
     ScopeGuard guard([opCtx, originalWC] { opCtx->setWriteConcern(originalWC); });
     auto& executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
 
+    auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
+    auto sleepInlineExecutor = inlineExecutor->getSleepableExecutor(executor);
+
     // Instantiate the right custom TXN client to ensure that the queries to the config DB will be
     // routed to the CSRS.
     auto customTxnClient = [&]() -> std::unique_ptr<txn_api::TransactionClient> {
         if (serverGlobalParams.clusterRole.exclusivelyHasShardRole()) {
             return std::make_unique<txn_api::details::SEPTransactionClient>(
                 opCtx,
-                executor,
+                inlineExecutor,
+                sleepInlineExecutor,
                 std::make_unique<txn_api::details::ClusterSEPTransactionClientBehaviors>(
                     opCtx->getServiceContext()));
         }
@@ -132,8 +136,11 @@ void runTransactionOnShardingCatalog(OperationContext* opCtx,
         return nullptr;
     }();
 
-    txn_api::SyncTransactionWithRetries txn(
-        opCtx, executor, nullptr /*resourceYielder*/, std::move(customTxnClient));
+    txn_api::SyncTransactionWithRetries txn(opCtx,
+                                            sleepInlineExecutor,
+                                            nullptr /*resourceYielder*/,
+                                            inlineExecutor,
+                                            std::move(customTxnClient));
     txn.run(opCtx, std::move(transactionChain));
 }
 

@@ -155,10 +155,12 @@ void handleWouldChangeOwningShardErrorNonTransaction(
     const NamespaceString& nss,
     const write_ops::FindAndModifyCommandRequest& request,
     BSONObjBuilder* result) {
-    auto txn =
-        txn_api::SyncTransactionWithRetries(opCtx,
-                                            Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
-                                            nullptr /* resourceYielder */);
+    auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
+    auto sleepInlineExecutor = inlineExecutor->getSleepableExecutor(
+        Grid::get(opCtx)->getExecutorPool()->getFixedExecutor());
+
+    auto txn = txn_api::SyncTransactionWithRetries(
+        opCtx, sleepInlineExecutor, nullptr /* resourceYielder */, inlineExecutor);
 
     // Shared state for the transaction API use below.
     struct SharedBlock {
@@ -253,10 +255,15 @@ void handleWouldChangeOwningShardErrorTransaction(
         WouldChangeOwningShardInfo::parseFromCommandError(extraInfo), nss);
 
     try {
+        auto& executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+        auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
+        auto sleepInlineExecutor = inlineExecutor->getSleepableExecutor(executor);
+
         auto txn = txn_api::SyncTransactionWithRetries(
             opCtx,
-            Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
-            TransactionRouterResourceYielder::makeForLocalHandoff());
+            sleepInlineExecutor,
+            TransactionRouterResourceYielder::makeForLocalHandoff(),
+            inlineExecutor);
 
         txn.run(opCtx,
                 [sharedBlock, fleCrudProcessed](const txn_api::TransactionClient& txnClient,

@@ -631,6 +631,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/set_change_stream_state_coordinator',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_conversion_util',
         '$BUILD_DIR/mongo/db/transaction/transaction_api',
+        '$BUILD_DIR/mongo/executor/inline_executor',
         '$BUILD_DIR/mongo/util/net/ssl_manager',
         'cluster_server_parameter_commands_invocation',
         'core',

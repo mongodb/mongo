@@ -79,7 +79,6 @@ MONGO_FAIL_POINT_DEFINE(fleCrudHangPreFindAndModify);
 
 namespace mongo {
 namespace {
-
 std::vector<write_ops::WriteError> singleStatusToWriteErrors(const Status& status) {
     std::vector<write_ops::WriteError> errors;
 
@@ -222,10 +221,15 @@ std::vector<std::vector<FLEEdgeCountInfo>> toEdgeCounts(
 
 std::shared_ptr<txn_api::SyncTransactionWithRetries> getTransactionWithRetriesForMongoS(
     OperationContext* opCtx) {
+
+    auto fleInlineCrudExecutor = std::make_shared<executor::InlineExecutor>();
+
     return std::make_shared<txn_api::SyncTransactionWithRetries>(
         opCtx,
-        Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
-        TransactionRouterResourceYielder::makeForLocalHandoff());
+        fleInlineCrudExecutor->getSleepableExecutor(
+            Grid::get(opCtx)->getExecutorPool()->getFixedExecutor()),
+        TransactionRouterResourceYielder::makeForLocalHandoff(),
+        fleInlineCrudExecutor);
 }
 
 namespace {
@@ -1768,7 +1772,7 @@ BSONObj FLEQueryInterfaceImpl::getById(const NamespaceString& nss, BSONElement e
     }
 
     // Throws on error
-    auto docs = _txnClient.exhaustiveFind(find).get();
+    auto docs = _txnClient.exhaustiveFindSync(find);
 
     if (docs.size() == 0) {
         return BSONObj();
@@ -1784,7 +1788,6 @@ BSONObj FLEQueryInterfaceImpl::getById(const NamespaceString& nss, BSONElement e
 
 uint64_t FLEQueryInterfaceImpl::countDocuments(const NamespaceString& nss) {
     // Since count() does not work in a transaction, call count() by bypassing the transaction api
-    invariant(!haveClient());
     auto client = _serviceContext->makeClient("SEP-int-fle-crud");
     AlternativeClientRegion clientRegion(client);
     auto opCtx = cc().makeOperationContext();
@@ -1829,7 +1832,8 @@ std::vector<std::vector<FLEEdgeCountInfo>> FLEQueryInterfaceImpl::getTags(
     getCountsCmd.setTokens(toTagSets(tokensSets));
     getCountsCmd.setForInsert(type == FLEQueryInterface::TagQueryType::kInsert);
 
-    auto response = _txnClient.runCommand(nss.db(), getCountsCmd.toBSON({})).get();
+    auto response = _txnClient.runCommandSync(nss.db(), getCountsCmd.toBSON({}));
+
     auto status = getStatusFromWriteCommandReply(response);
     uassertStatusOK(status);
 
@@ -1873,10 +1877,7 @@ StatusWith<write_ops::InsertCommandReply> FLEQueryInterfaceImpl::insertDocuments
         }
     }
 
-
-    auto response = _txnClient.runCRUDOp(BatchedCommandRequest(insertRequest), stmtIds).get();
-
-    auto status = response.toStatus();
+    auto response = _txnClient.runCRUDOpSync(BatchedCommandRequest(insertRequest), stmtIds);
 
     write_ops::InsertCommandReply reply;
 
@@ -1912,7 +1913,8 @@ std::pair<write_ops::DeleteCommandReply, BSONObj> FLEQueryInterfaceImpl::deleteW
     ei2.setCrudProcessed(true);
     findAndModifyRequest.setEncryptionInformation(ei2);
 
-    auto response = _txnClient.runCommand(nss.dbName(), findAndModifyRequest.toBSON({})).get();
+    auto response = _txnClient.runCommandSync(nss.dbName(), findAndModifyRequest.toBSON({}));
+
     auto status = getStatusFromWriteCommandReply(response);
 
     BSONObj returnObj;
@@ -1940,7 +1942,8 @@ write_ops::DeleteCommandReply FLEQueryInterfaceImpl::deleteDocument(
     dassert(!deleteRequest.getWriteCommandRequestBase().getEncryptionInformation());
     dassert(deleteRequest.getStmtIds().value_or(std::vector<int32_t>()).empty());
 
-    auto response = _txnClient.runCRUDOp(BatchedCommandRequest(deleteRequest), {stmtId}).get();
+    auto response = _txnClient.runCRUDOpSync(BatchedCommandRequest(deleteRequest), {stmtId});
+
     write_ops::DeleteCommandReply reply;
     responseToReply(response, reply.getWriteCommandReplyBase());
     return {reply};
@@ -1977,7 +1980,8 @@ std::pair<write_ops::UpdateCommandReply, BSONObj> FLEQueryInterfaceImpl::updateW
     ei2.setCrudProcessed(true);
     findAndModifyRequest.setEncryptionInformation(ei2);
 
-    auto response = _txnClient.runCommand(nss.dbName(), findAndModifyRequest.toBSON({})).get();
+    auto response = _txnClient.runCommandSync(nss.dbName(), findAndModifyRequest.toBSON({}));
+
     auto status = getStatusFromWriteCommandReply(response);
     uassertStatusOK(status);
 
@@ -2024,7 +2028,7 @@ write_ops::UpdateCommandReply FLEQueryInterfaceImpl::update(
 
     dassert(updateRequest.getStmtIds().value_or(std::vector<int32_t>()).empty());
 
-    auto response = _txnClient.runCRUDOp(BatchedCommandRequest(updateRequest), {stmtId}).get();
+    auto response = _txnClient.runCRUDOpSync(BatchedCommandRequest(updateRequest), {stmtId});
 
     write_ops::UpdateCommandReply reply;
 
@@ -2047,7 +2051,8 @@ write_ops::FindAndModifyCommandReply FLEQueryInterfaceImpl::findAndModify(
     // WriteConcern is set at the transaction level so strip it out
     newFindAndModifyRequest.setWriteConcern(boost::none);
 
-    auto response = _txnClient.runCommand(nss.dbName(), newFindAndModifyRequest.toBSON({})).get();
+    auto response = _txnClient.runCommandSync(nss.dbName(), newFindAndModifyRequest.toBSON({}));
+
     auto status = getStatusFromWriteCommandReply(response);
     uassertStatusOK(status);
 
@@ -2064,7 +2069,7 @@ std::vector<BSONObj> FLEQueryInterfaceImpl::findDocuments(const NamespaceString&
     find.setFilter(filter);
 
     // Throws on error
-    return _txnClient.exhaustiveFind(find).get();
+    return _txnClient.exhaustiveFindSync(find);
 }
 
 void processFLEFindS(OperationContext* opCtx,

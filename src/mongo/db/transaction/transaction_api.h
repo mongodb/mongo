@@ -34,10 +34,12 @@
 #include "mongo/db/query/find_command_gen.h"
 #include "mongo/db/resource_yielder.h"
 #include "mongo/db/session/logical_session_id.h"
+#include "mongo/executor/inline_executor.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/write_concern_error_detail.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/util/concurrency/notification.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/future.h"
 
@@ -98,6 +100,7 @@ public:
      */
     virtual SemiFuture<BSONObj> runCommand(const DatabaseName& dbName, BSONObj cmd) const = 0;
 
+    virtual BSONObj runCommandSync(const DatabaseName& dbName, BSONObj cmd) const = 0;
     /**
      * Helper method to run commands representable as a BatchedCommandRequest in the transaction
      * client's transaction.
@@ -122,6 +125,8 @@ public:
      */
     virtual SemiFuture<BatchedCommandResponse> runCRUDOp(const BatchedCommandRequest& cmd,
                                                          std::vector<StmtId> stmtIds) const = 0;
+    virtual BatchedCommandResponse runCRUDOpSync(const BatchedCommandRequest& cmd,
+                                                 std::vector<StmtId> stmtIds) const = 0;
 
     /**
      * Helper method that runs the given find in the transaction client's transaction and will
@@ -129,6 +134,7 @@ public:
      */
     virtual SemiFuture<std::vector<BSONObj>> exhaustiveFind(
         const FindCommandRequest& cmd) const = 0;
+    virtual std::vector<BSONObj> exhaustiveFindSync(const FindCommandRequest& cmd) const = 0;
 
     /**
      * Whether the implementation expects to work in the client transaction context. The API
@@ -165,11 +171,12 @@ public:
      * Optionally accepts a custom TransactionClient and will default to a client that runs commands
      * against the local service entry point.
      */
-    SyncTransactionWithRetries(OperationContext* opCtx,
-                               std::shared_ptr<executor::TaskExecutor> executor,
-                               std::unique_ptr<ResourceYielder> resourceYielder,
-                               std::unique_ptr<TransactionClient> txnClient = nullptr);
-
+    SyncTransactionWithRetries(
+        OperationContext* opCtx,
+        std::shared_ptr<executor::InlineExecutor::SleepableExecutor> sleepableExecutor,
+        std::unique_ptr<ResourceYielder> resourceYielder,
+        std::shared_ptr<executor::InlineExecutor> executor,
+        std::unique_ptr<TransactionClient> txnClient = nullptr);
     /**
      * Returns a bundle with the commit command status and write concern error, if any. Any error
      * prior to receiving a response from commit (e.g. an interruption or a user assertion in the
@@ -198,6 +205,8 @@ public:
 private:
     CancellationSource _source;
     std::unique_ptr<ResourceYielder> _resourceYielder;
+    std::shared_ptr<executor::InlineExecutor> _inlineExecutor;
+    std::shared_ptr<executor::InlineExecutor::SleepableExecutor> _sleepExec;
     std::shared_ptr<details::TransactionWithRetries> _txn;
 };
 
@@ -258,9 +267,11 @@ public:
 class SEPTransactionClient : public TransactionClient {
 public:
     SEPTransactionClient(OperationContext* opCtx,
-                         std::shared_ptr<executor::TaskExecutor> executor,
+                         std::shared_ptr<executor::InlineExecutor> inlineExecutor,
+                         std::shared_ptr<executor::InlineExecutor::SleepableExecutor> executor,
                          std::unique_ptr<SEPTransactionClientBehaviors> behaviors)
         : _serviceContext(opCtx->getServiceContext()),
+          _inlineExecutor(inlineExecutor),
           _executor(executor),
           _behaviors(std::move(behaviors)) {}
 
@@ -273,12 +284,16 @@ public:
     }
 
     virtual SemiFuture<BSONObj> runCommand(const DatabaseName& dbName, BSONObj cmd) const override;
+    virtual BSONObj runCommandSync(const DatabaseName& dbName, BSONObj cmd) const override;
 
     virtual SemiFuture<BatchedCommandResponse> runCRUDOp(
         const BatchedCommandRequest& cmd, std::vector<StmtId> stmtIds) const override;
+    virtual BatchedCommandResponse runCRUDOpSync(const BatchedCommandRequest& cmd,
+                                                 std::vector<StmtId> stmtIds) const override;
 
     virtual SemiFuture<std::vector<BSONObj>> exhaustiveFind(
         const FindCommandRequest& cmd) const override;
+    virtual std::vector<BSONObj> exhaustiveFindSync(const FindCommandRequest& cmd) const override;
 
     virtual bool supportsClientTransactionContext() const override {
         return true;
@@ -289,8 +304,17 @@ public:
     }
 
 private:
+    ExecutorFuture<BSONObj> _runCommand(const DatabaseName& dbName, BSONObj cmd) const;
+
+    ExecutorFuture<BatchedCommandResponse> _runCRUDOp(const BatchedCommandRequest& cmd,
+                                                      std::vector<StmtId> stmtIds) const;
+
+    ExecutorFuture<std::vector<BSONObj>> _exhaustiveFind(const FindCommandRequest& cmd) const;
+
+private:
     ServiceContext* const _serviceContext;
-    std::shared_ptr<executor::TaskExecutor> _executor;
+    std::shared_ptr<executor::InlineExecutor> _inlineExecutor;
+    std::shared_ptr<executor::InlineExecutor::SleepableExecutor> _executor;
     std::unique_ptr<SEPTransactionClientBehaviors> _behaviors;
     std::unique_ptr<details::TxnHooks> _hooks;
 };
@@ -324,7 +348,7 @@ public:
      * and infers its execution context from the given OperationContext.
      */
     Transaction(OperationContext* opCtx,
-                std::shared_ptr<executor::TaskExecutor> executor,
+                std::shared_ptr<executor::InlineExecutor::SleepableExecutor> executor,
                 const CancellationToken& token,
                 std::unique_ptr<TransactionClient> txnClient)
         : _executor(executor),
@@ -481,7 +505,7 @@ private:
      */
     void _primeTransaction(OperationContext* opCtx);
 
-    const std::shared_ptr<executor::TaskExecutor> _executor;
+    std::shared_ptr<executor::InlineExecutor::SleepableExecutor> _executor;
     std::unique_ptr<TransactionClient> _txnClient;
     CancellationToken _token;
     Callback _callback;
@@ -543,7 +567,7 @@ public:
     TransactionWithRetries operator=(const TransactionWithRetries&) = delete;
 
     TransactionWithRetries(OperationContext* opCtx,
-                           std::shared_ptr<executor::TaskExecutor> executor,
+                           std::shared_ptr<executor::InlineExecutor::SleepableExecutor> executor,
                            const CancellationToken& token,
                            std::unique_ptr<TransactionClient> txnClient)
         : _internalTxn(std::make_shared<Transaction>(opCtx, executor, token, std::move(txnClient))),
@@ -559,7 +583,7 @@ public:
      *
      * TODO SERVER-65840: Allow returning a SemiFuture with any type.
      */
-    SemiFuture<CommitResult> run(Callback callback) noexcept;
+    SemiFuture<CommitResult> run(OperationContext* opCtx, Callback callback) noexcept;
 
     /**
      * Returns the latest operationTime returned by a command in this transaction.
@@ -586,7 +610,7 @@ private:
     ExecutorFuture<void> _bestEffortAbort();
 
     std::shared_ptr<Transaction> _internalTxn;
-    std::shared_ptr<executor::TaskExecutor> _executor;
+    std::shared_ptr<executor::InlineExecutor::SleepableExecutor> _executor;
     CancellationToken _token;
 };
 

@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/executor/inline_executor.h"
 #include "mongo/s/commands/internal_transactions_test_command.h"
 #include "mongo/s/transaction_router_resource_yielder.h"
 
@@ -41,8 +42,15 @@ public:
         std::shared_ptr<executor::TaskExecutor> executor,
         StringData commandName,
         bool useClusterClient) {
+        auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
+        auto sleepInlineExecutor = inlineExecutor->getSleepableExecutor(
+            Grid::get(opCtx)->getExecutorPool()->getFixedExecutor());
+
         return txn_api::SyncTransactionWithRetries(
-            opCtx, executor, TransactionRouterResourceYielder::makeForLocalHandoff());
+            opCtx,
+            sleepInlineExecutor,
+            TransactionRouterResourceYielder::makeForLocalHandoff(),
+            inlineExecutor);
     }
 };
 

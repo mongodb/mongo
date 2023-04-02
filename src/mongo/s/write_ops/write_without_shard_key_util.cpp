@@ -258,19 +258,24 @@ StatusWith<ClusterWriteWithoutShardKeyResponse> runTwoPhaseWriteProtocol(Operati
         ClusterWriteWithoutShardKeyResponse clusterWriteResponse;
     };
 
-    auto txn = txn_api::SyncTransactionWithRetries(
-        opCtx,
-        Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
-        TransactionRouterResourceYielder::makeForLocalHandoff());
+    auto& executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+    auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
+    auto sleepInlineExecutor = inlineExecutor->getSleepableExecutor(executor);
+
+    auto txn =
+        txn_api::SyncTransactionWithRetries(opCtx,
+                                            sleepInlineExecutor,
+                                            TransactionRouterResourceYielder::makeForLocalHandoff(),
+                                            inlineExecutor);
 
     auto sharedBlock = std::make_shared<SharedBlock>(nss, cmdObj);
     auto swResult = txn.runNoThrow(
         opCtx, [sharedBlock](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
             ClusterQueryWithoutShardKey clusterQueryWithoutShardKeyCommand(sharedBlock->cmdObj);
-            auto queryRes = txnClient
-                                .runCommand(sharedBlock->nss.dbName(),
-                                            clusterQueryWithoutShardKeyCommand.toBSON({}))
-                                .get();
+
+            auto queryRes = txnClient.runCommandSync(sharedBlock->nss.dbName(),
+                                                     clusterQueryWithoutShardKeyCommand.toBSON({}));
+
             uassertStatusOK(getStatusFromCommandResult(queryRes));
 
             ClusterQueryWithoutShardKeyResponse queryResponse =
@@ -289,9 +294,8 @@ StatusWith<ClusterWriteWithoutShardKeyResponse> runTwoPhaseWriteProtocol(Operati
                 docs.push_back(queryResponse.getTargetDoc().get());
                 write_ops::InsertCommandRequest insertRequest(sharedBlock->nss, docs);
 
-                auto writeRes =
-                    txnClient.runCRUDOp(insertRequest, std::vector<StmtId>{kUninitializedStmtId})
-                        .get();
+                auto writeRes = txnClient.runCRUDOpSync(insertRequest,
+                                                        std::vector<StmtId>{kUninitializedStmtId});
 
                 auto upsertResponse =
                     constructUpsertResponse(writeRes,
@@ -310,10 +314,8 @@ StatusWith<ClusterWriteWithoutShardKeyResponse> runTwoPhaseWriteProtocol(Operati
                     *queryResponse.getTargetDoc() /* targetDocId */);
 
                 auto writeRes =
-                    txnClient
-                        .runCommand(sharedBlock->nss.dbName(),
-                                    clusterWriteWithoutShardKeyCommand.toBSON(BSONObj()))
-                        .get();
+                    txnClient.runCommandSync(sharedBlock->nss.dbName(),
+                                             clusterWriteWithoutShardKeyCommand.toBSON(BSONObj()));
                 uassertStatusOK(getStatusFromCommandResult(writeRes));
 
                 sharedBlock->clusterWriteResponse = ClusterWriteWithoutShardKeyResponse::parseOwned(

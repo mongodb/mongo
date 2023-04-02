@@ -57,6 +57,7 @@
 #include "mongo/db/transaction/transaction_api.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction/transaction_participant_resource_yielder.h"
+#include "mongo/executor/inline_executor.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/idl/idl_parser.h"
@@ -305,8 +306,15 @@ const auto kIdIndexName = "_id_"_sd;
 
 std::shared_ptr<txn_api::SyncTransactionWithRetries> getTransactionWithRetriesForMongoD(
     OperationContext* opCtx) {
+
+    auto fleInlineCrudExecutor = std::make_shared<executor::InlineExecutor>();
+    auto inlineSleepExecutor = fleInlineCrudExecutor->getSleepableExecutor(_fleCrudExecutor);
+
     return std::make_shared<txn_api::SyncTransactionWithRetries>(
-        opCtx, _fleCrudExecutor, std::make_unique<FLEMongoDResourceYielder>());
+        opCtx,
+        inlineSleepExecutor,
+        std::make_unique<FLEMongoDResourceYielder>(),
+        fleInlineCrudExecutor);
 }
 
 void startFLECrud(ServiceContext* serviceContext) {
@@ -319,6 +327,7 @@ void startFLECrud(ServiceContext* serviceContext) {
     _fleCrudExecutor = std::make_shared<executor::ThreadPoolTaskExecutor>(
         std::make_unique<ThreadPool>(getThreadPoolOptions()),
         executor::makeNetworkInterface("FLECrudNetwork"));
+
     _fleCrudExecutor->startup();
 }
 

@@ -356,9 +356,13 @@ void insertCollectionAndPlacementEntries(OperationContext* opCtx,
                                                WriteConcernOptions::kNoTimeout});
     ScopeGuard guard([opCtx, &originalWC] { opCtx->setWriteConcern(originalWC); });
 
+    auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
+    auto sleepInlineExecutor = inlineExecutor->getSleepableExecutor(executor);
+
     auto txnClient = std::make_unique<txn_api::details::SEPTransactionClient>(
         opCtx,
-        executor,
+        inlineExecutor,
+        sleepInlineExecutor,
         std::make_unique<txn_api::details::ClusterSEPTransactionClientBehaviors>(
             opCtx->getServiceContext()));
 
@@ -394,8 +398,11 @@ void insertCollectionAndPlacementEntries(OperationContext* opCtx,
             .semi();
     };
 
-    txn_api::SyncTransactionWithRetries txn(
-        opCtx, executor, nullptr /*resourceYielder*/, std::move(txnClient));
+    txn_api::SyncTransactionWithRetries txn(opCtx,
+                                            sleepInlineExecutor,
+                                            nullptr /*resourceYielder*/,
+                                            inlineExecutor,
+                                            std::move(txnClient));
     txn.run(opCtx, insertionChain);
 }
 

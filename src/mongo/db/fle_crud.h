@@ -44,6 +44,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/transaction/transaction_api.h"
+#include "mongo/executor/inline_executor.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
 #include "mongo/s/write_ops/batched_command_response.h"
@@ -353,6 +354,7 @@ public:
 private:
     const txn_api::TransactionClient& _txnClient;
     ServiceContext* _serviceContext;
+    std::shared_ptr<executor::InlineExecutor::SleepableExecutor> _executor;
 };
 
 /**

@@ -268,10 +268,12 @@ DatabaseType ShardingCatalogManager::createDatabase(
                     .semi();
             };
 
+            auto& executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+            auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
+            auto sleepInlineExecutor = inlineExecutor->getSleepableExecutor(executor);
+
             txn_api::SyncTransactionWithRetries txn(
-                opCtx,
-                Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
-                nullptr /*resourceYielder*/);
+                opCtx, sleepInlineExecutor, nullptr /*resourceYielder*/, inlineExecutor);
             txn.run(opCtx, transactionChain);
 
             hangBeforeNotifyingCreateDatabaseCommitted.pauseWhileSet();
@@ -406,8 +408,13 @@ void ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
     };
 
     auto& executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+    auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
+    auto sleepInlineExecutor = inlineExecutor->getSleepableExecutor(executor);
 
-    txn_api::SyncTransactionWithRetries txn(opCtx, executor, nullptr /*resourceYielder*/);
+    txn_api::SyncTransactionWithRetries txn(opCtx,
+                                            sleepInlineExecutor,
+                                            nullptr, /*resourceYielder*/
+                                            inlineExecutor);
     txn.run(opCtx, transactionChain);
 }
 
