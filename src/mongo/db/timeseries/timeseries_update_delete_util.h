@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/pipeline/expression_context.h"
 
 namespace mongo::timeseries {
 /**
@@ -54,4 +55,12 @@ write_ops::UpdateModification translateUpdate(const write_ops::UpdateModificatio
  * Returns the function to use to count the number of documents updated or deleted.
  */
 std::function<size_t(const BSONObj&)> numMeasurementsForBucketCounter(StringData timeField);
+
+/**
+ * Translates the query into a query on the time-series collection's underlying buckets collection
+ * and splits out the meta field predicate out of the query and renames it to 'meta'.
+ */
+BSONObj getBucketLevelPredicateForRouting(const BSONObj& originalQuery,
+                                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                          boost::optional<StringData> metaField);
 }  // namespace mongo::timeseries

@@ -562,6 +562,10 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                 tassert(
                     6992000, "Executing write batches with a size of 0", childBatches.size() > 0u);
 
+                uassert(7545800,
+                        "Cannot perform time-series singleton writes without a shard key",
+                        !targeter.isShardedTimeSeriesBucketsNamespace());
+
                 // Execute the two phase write protocol for writes that cannot directly target a
                 // shard. If there are any transaction errors, 'abortBatch' will be set.
                 executeTwoPhaseWrite(

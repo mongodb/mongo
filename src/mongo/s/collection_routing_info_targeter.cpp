@@ -32,7 +32,6 @@
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
-#include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/mongos_process_interface.h"
@@ -515,54 +514,6 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
     return endPoints;
 }
 
-namespace {
-BSONObj getBucketLevelPredicateForRouting(const BSONObj& originalQuery,
-                                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                                          boost::optional<StringData> metaField) {
-    if (!metaField) {
-        // In case the time-series collection does not have meta field defined, we target the
-        // request to all shards using empty predicate. Since we allow only delete requests with
-        // 'limit:0', we will not delete any extra documents.
-        //
-        // TODO SERVER-73087 / SERVER-75160: Move this block into the if
-        // gTimeseriesDeletesSupport is not enabled block as soon as we implement either one
-        // of SERVER-73087 and SERVER-75160. As of now, this block is common, irrespective of the
-        // feature flag value.
-        return BSONObj();
-    }
-
-    if (!feature_flags::gTimeseriesDeletesSupport.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        // Translate the delete query into a query on the time-series collection's underlying
-        // buckets collection.
-        return timeseries::translateQuery(originalQuery, *metaField);
-    }
-
-    auto swMatchExpr =
-        MatchExpressionParser::parse(originalQuery,
-                                     expCtx,
-                                     ExtensionsCallbackNoop(),
-                                     MatchExpressionParser::kAllowAllSpecialFeatures);
-    uassertStatusOKWithContext(swMatchExpr.getStatus(), "Failed to parse delete query");
-    auto metaFieldStr = metaField->toString();
-    // Split out the bucket-level predicate from the delete query and rename the meta field to the
-    // internal name, 'meta'.
-    auto [bucketLevelPredicate, _] = expression::splitMatchExpressionBy(
-        std::move(swMatchExpr.getValue()),
-        {metaFieldStr} /*fields*/,
-        {{metaFieldStr, timeseries::kBucketMetaFieldName.toString()}} /*renames*/,
-        expression::isOnlyDependentOn);
-
-    if (bucketLevelPredicate) {
-        return bucketLevelPredicate->serialize();
-    }
-
-    // In case that the delete query does not contain bucket-level predicate that can be split out
-    // and renamed, target the request to all shards using empty predicate.
-    return BSONObj();
-}
-}  // namespace
-
 std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetDelete(
     OperationContext* opCtx, const BatchItemRef& itemRef, std::set<ChunkRange>* chunkRanges) const {
     const auto& deleteOp = itemRef.getDelete();
@@ -588,11 +539,11 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetDelete(
                     feature_flags::gFeatureFlagShardedTimeSeriesUpdateDelete.isEnabled(
                         serverGlobalParams.featureCompatibility));
 
-            // TODO SERVER-73087: Relax this check to allow deleteOne under
-            // gTimeseriesUpdatesDeletesSupport feature flag.
             uassert(ErrorCodes::IllegalOperation,
                     "Cannot perform a non-multi delete on a time-series collection",
-                    deleteOp.getMulti());
+                    feature_flags::gTimeseriesDeletesSupport.isEnabled(
+                        serverGlobalParams.featureCompatibility) ||
+                        deleteOp.getMulti());
 
             auto tsFields = _cri.cm.getTimeseriesFields();
             tassert(5918101, "Missing timeseriesFields on buckets collection", tsFields);
@@ -603,8 +554,8 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetDelete(
             //
             // Note: The query returned would match a super set of the documents matched by the
             // original query.
-            deleteQuery =
-                getBucketLevelPredicateForRouting(deleteQuery, expCtx, tsFields->getMetaField());
+            deleteQuery = timeseries::getBucketLevelPredicateForRouting(
+                deleteQuery, expCtx, tsFields->getMetaField());
         }
 
         // Sharded collections have the following further requirements for targeting:
@@ -646,7 +597,8 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetDelete(
                              "shard key (and have the simple collation). Delete request: "
                           << deleteOp.toBSON()
                           << ", shard key pattern: " << _cri.cm.getShardKeyPattern().toString(),
-            !_cri.cm.isSharded() || deleteOp.getMulti() || isExactIdQuery(opCtx, *cq, _cri.cm) ||
+            !_cri.cm.isSharded() || deleteOp.getMulti() ||
+                (isExactIdQuery(opCtx, *cq, _cri.cm) && !isShardedTimeSeriesBucketsNamespace()) ||
                 feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
                     serverGlobalParams.featureCompatibility));
 

@@ -255,26 +255,27 @@ function runTest(collConfig, reqConfig, insert) {
         assert.commandFailedWithCode(st.shard0.getDB(dbName).runCommand(failingDeleteCommand),
                                      5916400);
 
-        // Currently, we do not support queries on non-meta fields for delete commands.
-        delete failingDeleteCommand.isTimeseriesNamespace;
-        // TODO (SERVER-75379): Remove this test.
+        // TODO (SERVER-75379): Remove these tests.
         if (!FeatureFlagUtil.isPresentAndEnabled(mainDB, "TimeseriesDeletesSupport")) {
+            delete failingDeleteCommand.isTimeseriesNamespace;
             for (let additionalField of [timeField, 'randomFieldWhichShouldNotBeHere']) {
                 // JavaScript does not have a reliable way to perform deep copy of an object. So
                 // instead of copying delete query each time, we just set and unset additional
                 // fields in it. See https://stackoverflow.com/a/122704 for details.
                 failingDeleteCommand.deletes[0].q[additionalField] = 1;
+
+                // Currently, we do not support queries on non-meta fields for delete commands.
                 assert.commandFailedWithCode(mainDB.runCommand(failingDeleteCommand),
                                              ErrorCodes.InvalidOptions);
                 delete failingDeleteCommand.deletes[0].q[additionalField];
             }
-        }
 
-        // Currently, we support only delete commands with 'limit: 0' for sharded time-series
-        // collections.
-        failingDeleteCommand.deletes[0].limit = 1;
-        assert.commandFailedWithCode(mainDB.runCommand(failingDeleteCommand),
-                                     ErrorCodes.IllegalOperation);
+            // Currently, we support only delete commands with 'limit: 0' for sharded time-series
+            // collections.
+            failingDeleteCommand.deletes[0].limit = 1;
+            assert.commandFailedWithCode(mainDB.runCommand(failingDeleteCommand),
+                                         ErrorCodes.IllegalOperation);
+        }
     }
 
     // Reset database profiler.

@@ -30,6 +30,9 @@
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
 
 #include "mongo/db/exec/bucket_unpacker.h"
+#include "mongo/db/matcher/expression_algo.h"
+#include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 
 namespace mongo::timeseries {
@@ -199,5 +202,51 @@ std::function<size_t(const BSONObj&)> numMeasurementsForBucketCounter(StringData
     return [timeField = timeField.toString()](const BSONObj& bucket) {
         return BucketUnpacker::computeMeasurementCount(bucket, timeField);
     };
+}
+
+BSONObj getBucketLevelPredicateForRouting(const BSONObj& originalQuery,
+                                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                          boost::optional<StringData> metaField) {
+    if (!metaField) {
+        // In case the time-series collection does not have meta field defined, we target the
+        // request to all shards using empty predicate. Since we allow only delete requests with
+        // 'limit:0', we will not delete any extra documents.
+        //
+        // TODO SERVER-73087 / SERVER-75160: Move this block into the if
+        // gTimeseriesDeletesSupport is not enabled block as soon as we implement either one
+        // of SERVER-73087 and SERVER-75160. As of now, this block is common, irrespective of the
+        // feature flag value.
+        return BSONObj();
+    }
+
+    if (!feature_flags::gTimeseriesDeletesSupport.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        // Translate the delete query into a query on the time-series collection's underlying
+        // buckets collection.
+        return timeseries::translateQuery(originalQuery, *metaField);
+    }
+
+    auto swMatchExpr =
+        MatchExpressionParser::parse(originalQuery,
+                                     expCtx,
+                                     ExtensionsCallbackNoop(),
+                                     MatchExpressionParser::kAllowAllSpecialFeatures);
+    uassertStatusOKWithContext(swMatchExpr.getStatus(), "Failed to parse delete query");
+    auto metaFieldStr = metaField->toString();
+    // Split out the bucket-level predicate from the delete query and rename the meta field to the
+    // internal name, 'meta'.
+    auto [bucketLevelPredicate, _] = expression::splitMatchExpressionBy(
+        std::move(swMatchExpr.getValue()),
+        {metaFieldStr} /*fields*/,
+        {{metaFieldStr, timeseries::kBucketMetaFieldName.toString()}} /*renames*/,
+        expression::isOnlyDependentOn);
+
+    if (bucketLevelPredicate) {
+        return bucketLevelPredicate->serialize();
+    }
+
+    // In case that the delete query does not contain bucket-level predicate that can be split out
+    // and renamed, target the request to all shards using empty predicate.
+    return BSONObj();
 }
 }  // namespace mongo::timeseries
