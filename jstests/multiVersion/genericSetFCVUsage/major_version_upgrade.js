@@ -8,7 +8,8 @@
  * - Insert a document into the new collection.
  * - Create an index on the new collection.
  *
- * @tags: [requires_v4_0]
+ * TODO (SERVER-75468): Re-enable this test under the future_git_tag variant.
+ * @tags: [requires_v4.0, future_git_tag_incompatible]
  */
 
 (function() {
