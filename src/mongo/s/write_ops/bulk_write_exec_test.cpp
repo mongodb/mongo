@@ -116,7 +116,7 @@ auto initTargeterHalfRange(const NamespaceString& nss, const ShardEndpoint& endp
     return std::make_unique<BulkWriteMockNSTargeter>(nss, std::move(range));
 }
 
-using namespace bulkWriteExec;
+using namespace bulk_write_exec;
 
 class BulkWriteOpTest : public ServiceContextTest {
 protected:
@@ -550,10 +550,10 @@ TEST_F(BulkWriteExecTest, RefreshTargetersOnTargetErrors) {
         {NamespaceInfoEntry(nss0), NamespaceInfoEntry(nss1)});
 
     // Test unordered operations. Since only the first op is untargetable, the second op will
-    // succeed without errors. But bulkWriteExec::execute would retry on targeting errors and try to
-    // refresh the targeters upon targeting errors.
+    // succeed without errors. But bulk_write_exec::execute would retry on targeting errors and try
+    // to refresh the targeters upon targeting errors.
     request.setOrdered(false);
-    auto replyItems = bulkWriteExec::execute(operationContext(), targeters, request);
+    auto replyItems = bulk_write_exec::execute(operationContext(), targeters, request);
     ASSERT_EQUALS(replyItems.size(), 2u);
     ASSERT_NOT_OK(replyItems[0].getStatus());
     ASSERT_OK(replyItems[1].getStatus());
@@ -563,7 +563,7 @@ TEST_F(BulkWriteExecTest, RefreshTargetersOnTargetErrors) {
     // Test ordered operations. This is mostly the same as the test case above except that we should
     // only return the first error for ordered operations.
     request.setOrdered(true);
-    replyItems = bulkWriteExec::execute(operationContext(), targeters, request);
+    replyItems = bulk_write_exec::execute(operationContext(), targeters, request);
     ASSERT_EQUALS(replyItems.size(), 1u);
     ASSERT_NOT_OK(replyItems[0].getStatus());
     // We should have another refresh attempt.
@@ -602,7 +602,7 @@ TEST_F(BulkWriteExecTest, CollectionDroppedBeforeRefreshingTargeters) {
 
     // After the targeting error from the first op, targeter refresh will throw a StaleEpoch
     // exception which should abort the entire bulkWrite.
-    auto replyItems = bulkWriteExec::execute(operationContext(), targeters, request);
+    auto replyItems = bulk_write_exec::execute(operationContext(), targeters, request);
     ASSERT_EQUALS(replyItems.size(), 2u);
     ASSERT_EQUALS(replyItems[0].getStatus().code(), ErrorCodes::StaleEpoch);
     ASSERT_EQUALS(replyItems[1].getStatus().code(), ErrorCodes::StaleEpoch);

@@ -49,7 +49,7 @@ namespace {
 const int kMaxRoundsWithoutProgress(5);
 
 }  // namespace
-namespace bulkWriteExec {
+namespace bulk_write_exec {
 
 std::vector<BulkWriteReplyItem> execute(OperationContext* opCtx,
                                         const std::vector<std::unique_ptr<NSTargeter>>& targeters,
@@ -313,6 +313,6 @@ std::vector<BulkWriteReplyItem> BulkWriteOp::generateReplyItems() const {
 
     return replyItems;
 }
-}  // namespace bulkWriteExec
+}  // namespace bulk_write_exec
 
 }  // namespace mongo

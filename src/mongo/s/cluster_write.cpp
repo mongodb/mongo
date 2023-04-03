@@ -81,7 +81,7 @@ std::vector<BulkWriteReplyItem> bulkWrite(OperationContext* opCtx,
         targeters.push_back(std::make_unique<CollectionRoutingInfoTargeter>(opCtx, nsInfo.getNs()));
     }
 
-    return bulkWriteExec::execute(opCtx, targeters, request);
+    return bulk_write_exec::execute(opCtx, targeters, request);
 }
 
 }  // namespace cluster

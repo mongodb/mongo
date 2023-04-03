@@ -38,7 +38,7 @@
 #include "mongo/s/write_ops/write_op.h"
 
 namespace mongo {
-namespace bulkWriteExec {
+namespace bulk_write_exec {
 /**
  * Executes a client bulkWrite request by sending child batches to several shard endpoints, and
  * returns a vector of BulkWriteReplyItem (each of which is a reply for an individual op).
@@ -154,5 +154,5 @@ private:
     const bool _isRetryableWrite{false};
 };
 
-}  // namespace bulkWriteExec
+}  // namespace bulk_write_exec
 }  // namespace mongo

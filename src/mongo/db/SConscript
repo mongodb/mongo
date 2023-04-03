@@ -2510,6 +2510,7 @@ if wiredtiger:
     envWithAsio.CppUnitTest(
         target='db_unittest_test',
         source=[
+            'bulk_write_shard_test.cpp',
             'cancelable_operation_context_test.cpp',
             'catalog_raii_test.cpp',
             'change_collection_expired_change_remover_test.cpp',
@@ -2590,6 +2591,7 @@ if wiredtiger:
             '$BUILD_DIR/mongo/db/change_stream_change_collection_manager',
             '$BUILD_DIR/mongo/db/change_stream_serverless_helpers',
             '$BUILD_DIR/mongo/db/change_streams_cluster_parameter',
+            '$BUILD_DIR/mongo/db/commands/bulk_write_command',
             '$BUILD_DIR/mongo/db/mongohasher',
             '$BUILD_DIR/mongo/db/ops/write_ops',
             '$BUILD_DIR/mongo/db/pipeline/change_stream_expired_pre_image_remover',
