@@ -121,6 +121,7 @@ enums:
            insert :  "insert"
            internal :  "internal"  # Special action type that represents internal actions
            invalidateUserCache :  "invalidateUserCache"
+           issueDirectShardOperations: "issueDirectShardOperations"
            killAnyCursor :  "killAnyCursor"
            killAnySession :  "killAnySession"
            killCursors :  "killCursors"  # Deprecated in favor of killAnyCursor

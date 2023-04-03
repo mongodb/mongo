@@ -583,6 +583,7 @@ roles:
             - readWriteAnyDatabase
             - backup
             - restore
+            - directShardOperations
         privileges:
             - matchType: any
               actions:
@@ -610,7 +611,10 @@ roles:
     # privileges to write directly to shards.
     directShardOperations:
         adminOnly: true
-        privileges: []
+        privileges:
+              - matchType: cluster
+                actions:
+                     - issueDirectShardOperations
 
     # Builtin role 'admin.__system' has its privileges special cased in builtin_roles.tpl.cpp
     __system:

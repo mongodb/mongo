@@ -1108,6 +1108,10 @@ void AuthorizationSessionImpl::verifyContract(const AuthorizationContract* contr
     // Implicitly checked often to keep mayBypassWriteBlockingMode() fast
     tempContract.addPrivilege(kBypassWriteBlockingModeOnClusterPrivilege);
 
+    // Needed for internal sessions started by the server.
+    tempContract.addPrivilege(
+        Privilege(ResourcePattern::forClusterResource(), ActionType::issueDirectShardOperations));
+
     uassert(5452401,
             "Authorization Session contains more authorization checks then permitted by contract.",
             tempContract.contains(_contract));
