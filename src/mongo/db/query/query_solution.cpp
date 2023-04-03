@@ -652,6 +652,10 @@ void IndexScanNode::appendToString(str::stream* ss, int indent) const {
     *ss << "direction = " << direction << '\n';
     addIndent(ss, indent + 1);
     *ss << "bounds = " << bounds.toString(index.collator != nullptr) << '\n';
+    if (!iets.empty()) {
+        addIndent(ss, indent + 1);
+        *ss << "iets = " << ietsToString(index, iets) << '\n';
+    }
     addCommon(ss, indent);
 }
 
