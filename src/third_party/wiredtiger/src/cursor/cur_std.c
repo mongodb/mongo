@@ -725,11 +725,13 @@ __wt_cursor_cache_release(WT_SESSION_IMPL *session, WT_CURSOR *cursor, bool *rel
 
     /*
      * Do any sweeping first, if there are errors, it will be easier to clean up if the cursor is
-     * not already cached.
+     * not already cached. When sweeping, don't use the "big" option. We want only a modest sweep as
+     * we're in a performance path.
      */
     if (--session->cursor_sweep_countdown == 0) {
         session->cursor_sweep_countdown = WT_SESSION_CURSOR_SWEEP_COUNTDOWN;
-        WT_RET(__wt_session_cursor_cache_sweep(session));
+        WT_RET(__wt_session_cursor_cache_sweep(session, false));
+        __wt_session_dhandle_sweep(session);
     }
 
     /*
