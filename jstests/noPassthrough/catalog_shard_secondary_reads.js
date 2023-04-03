@@ -9,6 +9,9 @@
 (function() {
 "use strict";
 
+// TODO SERVER-74534: Enable metadata consistency check when it works with a catalog shard.
+TestData.skipCheckMetadataConsistency = true;
+
 load("jstests/libs/fail_point_util.js");
 load('jstests/libs/chunk_manipulation_util.js');
 
