@@ -67,6 +67,7 @@ FlexeLint
 FreeBSD
 FreeBSD's
 GCC
+GCP
 GPL
 Gawlick
 Gimpel
@@ -126,6 +127,7 @@ RocksDB
 Roelofs
 Rrx
 SDK
+SDKs
 SDK's
 SCons
 SYSV
@@ -185,6 +187,7 @@ atomicity
 autoconf
 autogen
 automake
+backend
 basecfg
 basho
 benchmarking
@@ -368,6 +371,7 @@ fuzzutil
 fvisibility
 fxray
 gcc
+gcp
 gcov
 gdbm
 ge

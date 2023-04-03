@@ -1,0 +1,110 @@
+/*! @arch_page arch-cloud-storage-extension Storage Source
+
+@section extension_storage_source Cloud Storage Source Implementation
+
+The WiredTiger extension API allows control over how files are stored via the storage source
+abstraction layer. More information can be found about customizing storage sources in
+@ref custom_storage_sources. There are three storage sources that extend WiredTiger's capability
+to store data files into cloud storage through Azure, Google and AWS providers. The cloud storage
+extensions provide a means to construct, configure and control a custom file system linked to a
+cloud bucket. All three storage source implementations internally interact with the cloud storage
+through their own C++ SDKs.
+
+All storage sources implement the following key functionalities defined by the storage source
+interface:
+- Initialize the store, cloud provider's SDK, and create a logging module for the store.
+
+- Provide an API to access and terminate the store. A reference count is incremented each time the
+storage source reference is taken and decremented with its termination. When the reference count
+drops to zero, the storage source is de-registered with WiredTiger and any allocated resources are
+freed.
+
+- The storage source also provides a function that can create an instance of a cloud file system
+following the interface implementation of \c WT_FILE_SYSTEM. The file system has a one-to-one
+connection to a bucket and requires an access token to perform operations on the bucket.
+
+@section extension_connection Connection class
+
+All extensions have a connection class which represents an active connection to a bucket. It
+encapsulates and implements all the operations the filesystem requires. Instantiation of the
+class object authenticates with the cloud provider and validates the existence of, and access to,
+the configured bucket. The connection class exposes APIs to list the bucket contents filtered by a
+directory and a prefix, check for an object's existence in the bucket, put an object in the cloud,
+and get an object from the cloud. Though not required for the file system's implementation, the
+class also provides the means to delete objects, to clean up artifacts from internal unit testing.
+
+@section extension_cloud_file_system Cloud File System Interface
+
+WiredTiger supports a database over a custom file system by exposing a \c WT_FILE_SYSTEM interface
+for the end-user to implement. The store itself provides a means to configure as many file systems
+as needed, each linked to a bucket. These file systems - \c GCP_FILE_SYSTEM, \c AZURE_FILE_SYSTEM
+and \c S3_FILE_SYSTEM - are custom implementations provided by the storage source. These file
+systems contain an instance of the connection class, hence providing an active connection to the
+bucket embedded in the file system instance.
+
+The cloud file system uses the functionality provided by the connection class to simulate a
+write-once-read-many file system. The filesystem can list directory contents, check for a file's
+presence, and access the file by creating a file handle.
+
+The storage sources use the file system's put-object functionality to flush files into the cloud.
+The Tier Manager inside WiredTiger directs this flush. Only S3 storage source files pushed to the
+cloud are also copied to the local cache.
+
+@section extension_cloud_file_handle Cloud File Handle Interface
+
+Each storage source also implements the \c WT_FILE_HANDLE interface, to access the files
+on the file system. Since the object store is read-only, all the write access methods are disabled.
+
+@section extension_log_stat Messaging and Statistics
+The cloud provider SDKs use the term logging differently to WiredTiger. The SDK's logging definition
+refers to the error or informational messages that are generated when performing calls to the SDK.
+The SDKs also provide their own log levels which are translated into WiredTiger messaging levels.
+
+All of the cloud storage sources have their own messaging system and statistics to monitor the
+state of the SDKs and the storage sources. The messaging system captures error and informational
+messages from both the SDK and the custom storage source which are redirected into the WiredTiger
+messaging system. The statistics are printed when the WiredTiger verbosity is set to \c WT_VERBOSE
+or higher on the storage source.
+
+@section s3_store S3 Storage source
+The S3 store implements the following functionality defined by the storage source interface:
+
+- The bucket is expected to be a string argument comprised of the bucket name and the
+corresponding region separated by a ';', e.g. "bucket1;ap-southeast-2".
+
+- The S3 store handles authentication with AWS, requiring the user to provide an access token. The
+access token is comprised of an access key ID and a secret access key as a set. The S3 store
+requires the token to be provided as a single string argument of the access key followed by the
+secret key, separated by a ';'.
+
+- The S3 store configures a directory on the local file system as a cache for object files. The
+cache is used to keep a local copy of the file such that file operations doesn't need to go
+over the network, thus mitigating network latency.
+
+- When a S3 file handle is created, the local cache gets a copy of the S3 object if
+it doesn't already have it. Since the local cache is a directory on the WiredTiger database's file
+system, the file is accessed using a \c WT_FILE_HANDLE implementation native to WiredTiger.
+Hence, a \c WT_FILE_HANDLE is kept encapsulated in the S3 file handle.
+
+- The S3 store has created a logging class which extends the AWS SDK's logging system.
+
+@section azure_gcp_store Azure and GCP Storage Source
+The Azure and Google Cloud Platform (GCP) stores implement the following functionality:
+
+- The Azure and GCP stores follow different authentication methods to connect to their respective
+SDKs. GCP requires setting a \c GOOGLE_APPLICATION_CREDENTIALS environment variable with the
+path to an authentication file and Azure requires the \c AZURE_STORAGE_CONNECTION_STRING environment
+variable to be set.
+
+- Another reference count is incremented each time the file handle reference is opened and
+decremented with the close. When the reference count goes zero, the file system is de-registered
+from the storage source and any allocated resources are freed.
+
+- Whenever a GCP or Azure file handle is created, it does not require the file to be present in the
+local file system. The file handle will directly interact with the connection class to handle all
+file handle operations.
+
+- The GCP store has created a logging class which extends the GCP SDK's logging backend and the
+Azure store has created a logging class using the Azure SDK's callback function.
+
+*/
