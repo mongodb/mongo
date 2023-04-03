@@ -1,7 +1,7 @@
 /**
- * Commits a shard split and abort it due to timeout prior to marking it for garbage collection and
- * checks that we recover the tenant access blockers since the split is aborted but not marked as
- *  garbage collectable. Checks that `abortOpTime` and `blockOpTime` are set.
+ * Commits a shard split and aborts it prior to marking it for garbage collection and checks that we
+ * recover the tenant access blockers since the split is aborted but not marked as garbage
+ * collectable. Checks that `abortOpTime` and `blockOpTime` are set.
  * @tags: [requires_fcv_63, serverless]
  */
 
@@ -22,7 +22,6 @@ const test = new ShardSplitTest({
     nodeOptions: {
         setParameter: {
             "failpoint.PrimaryOnlyServiceSkipRebuildingInstances": tojson({mode: "alwaysOn"}),
-            "shardSplitTimeoutMS": 1000
         }
     }
 });
@@ -31,12 +30,16 @@ test.addRecipientNodes();
 let donorPrimary = test.donor.getPrimary();
 
 // Pause the shard split before waiting to mark the doc for garbage collection.
-let fp = configureFailPoint(donorPrimary.getDB("admin"), "pauseShardSplitAfterBlocking");
+const fp = configureFailPoint(donorPrimary.getDB("admin"), "pauseShardSplitAfterBlocking");
 
 const tenantIds = [ObjectId(), ObjectId()];
 const operation = test.createSplitOperation(tenantIds);
-assert.commandFailed(operation.commit());
+const commitThread = operation.commitAsync();
 fp.wait();
+assert.commandWorked(operation.abort());
+fp.off();
+commitThread.join();
+assert.commandFailed(commitThread.returnData());
 
 assertMigrationState(donorPrimary, operation.migrationId, "aborted");
 
