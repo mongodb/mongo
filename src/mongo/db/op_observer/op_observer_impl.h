@@ -253,7 +253,7 @@ private:
                                            NamespaceString const& nss,
                                            BSONObj const& doc) {}
     virtual void shardObserveInsertsOp(OperationContext* opCtx,
-                                       NamespaceString nss,
+                                       const NamespaceString& nss,
                                        std::vector<InsertStatement>::const_iterator first,
                                        std::vector<InsertStatement>::const_iterator last,
                                        const std::vector<repl::OpTime>& opTimeList,
@@ -261,7 +261,7 @@ private:
                                        bool fromMigrate,
                                        bool inMultiDocumentTransaction){};
     virtual void shardObserveUpdateOp(OperationContext* opCtx,
-                                      const NamespaceString nss,
+                                      const NamespaceString& nss,
                                       boost::optional<BSONObj> preImageDoc,
                                       const BSONObj& postImageDoc,
                                       const repl::OpTime& opTime,
@@ -269,7 +269,7 @@ private:
                                       const repl::OpTime& prePostImageOpTime,
                                       const bool inMultiDocumentTransaction) {}
     virtual void shardObserveDeleteOp(OperationContext* opCtx,
-                                      const NamespaceString nss,
+                                      const NamespaceString& nss,
                                       const BSONObj& documentKey,
                                       const repl::OpTime& opTime,
                                       const ShardingWriteRouter& shardingWriteRouter,

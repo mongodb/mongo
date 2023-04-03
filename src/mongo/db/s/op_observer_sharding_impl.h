@@ -49,7 +49,7 @@ protected:
                                    NamespaceString const& nss,
                                    BSONObj const& docToDelete) override;
     void shardObserveInsertsOp(OperationContext* opCtx,
-                               NamespaceString nss,
+                               const NamespaceString& nss,
                                std::vector<InsertStatement>::const_iterator first,
                                std::vector<InsertStatement>::const_iterator last,
                                const std::vector<repl::OpTime>& opTimeList,
@@ -57,7 +57,7 @@ protected:
                                bool fromMigrate,
                                bool inMultiDocumentTransaction) override;
     void shardObserveUpdateOp(OperationContext* opCtx,
-                              NamespaceString nss,
+                              const NamespaceString& nss,
                               boost::optional<BSONObj> preImageDoc,
                               const BSONObj& updatedDoc,
                               const repl::OpTime& opTime,
@@ -65,7 +65,7 @@ protected:
                               const repl::OpTime& prePostImageOpTime,
                               bool inMultiDocumentTransaction) override;
     void shardObserveDeleteOp(OperationContext* opCtx,
-                              NamespaceString nss,
+                              const NamespaceString& nss,
                               const BSONObj& documentKey,
                               const repl::OpTime& opTime,
                               const ShardingWriteRouter& shardingWriteRouter,

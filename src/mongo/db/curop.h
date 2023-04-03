@@ -557,7 +557,7 @@ public:
     /**
      * Gets the name of the namespace on which the current operation operates.
      */
-    NamespaceString getNSS() const {
+    const NamespaceString& getNSS() const {
         return _nss;
     }
 

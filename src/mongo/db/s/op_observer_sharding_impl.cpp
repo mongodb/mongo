@@ -109,7 +109,7 @@ void OpObserverShardingImpl::shardObserveAboutToDelete(OperationContext* opCtx,
 
 void OpObserverShardingImpl::shardObserveInsertsOp(
     OperationContext* opCtx,
-    const NamespaceString nss,
+    const NamespaceString& nss,
     std::vector<InsertStatement>::const_iterator first,
     std::vector<InsertStatement>::const_iterator last,
     const std::vector<repl::OpTime>& opTimeList,
@@ -154,7 +154,7 @@ void OpObserverShardingImpl::shardObserveInsertsOp(
 }
 
 void OpObserverShardingImpl::shardObserveUpdateOp(OperationContext* opCtx,
-                                                  const NamespaceString nss,
+                                                  const NamespaceString& nss,
                                                   boost::optional<BSONObj> preImageDoc,
                                                   const BSONObj& postImageDoc,
                                                   const repl::OpTime& opTime,
@@ -191,7 +191,7 @@ void OpObserverShardingImpl::shardObserveUpdateOp(OperationContext* opCtx,
 }
 
 void OpObserverShardingImpl::shardObserveDeleteOp(OperationContext* opCtx,
-                                                  const NamespaceString nss,
+                                                  const NamespaceString& nss,
                                                   const BSONObj& documentKey,
                                                   const repl::OpTime& opTime,
                                                   const ShardingWriteRouter& shardingWriteRouter,
