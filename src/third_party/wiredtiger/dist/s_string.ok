@@ -920,6 +920,7 @@ lu
 luc
 lwsync
 lz
+mP
 madvise
 majorp
 malloc
@@ -1032,6 +1033,7 @@ oversized
 ovfl
 ownp
 pR
+pT
 packv
 pageref
 pagesize

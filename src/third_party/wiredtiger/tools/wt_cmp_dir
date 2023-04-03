@@ -29,8 +29,14 @@
 # Compare content in WT home directories.
 
 usage_exit() {
-    echo "Usage: wt_cmp_dir [ -t timestamp ] dir1 [ -t timestamp  ] dir2"
+    echo "Usage: wt_cmp_dir [ -i ignore_regexp ] [ -t timestamp ] dir1 [ -t timestamp  ] dir2"
     exit 1
+}
+
+# Convert from space separated data to line separated.
+# This is used to allow the use of line oriented tools, like grep.
+line_separated() {
+    tr ' ' '\12'
 }
 
 # Find the 'wt' utility, and set the global wt variable.
@@ -64,7 +70,6 @@ wtfiles() {
     # The uris are a simple list, for example: "colgroup:table1 file:table1.wt table:table1"
     uris=$(cat $tmpa)
     rm -f $tmpa $tmpb
-    #echo INITIAL URIS $uris >&2
     results=""
     for uri in $uris; do
         case "$uri" in
@@ -83,12 +88,13 @@ wtfiles() {
                 ;;
         esac
     done
-    #echo EDITED URIS $results >&2
-    echo $results
+    # Convert the results back to one per line to make it easy to filter the output.
+    echo $results | line_separated
 }
 
 timestamp_opt1=
 timestamp_opt2=
+ignore_regexp=
 
 while [ "$#" -gt 2 ]; do
     if [ "$1" = '-t' ]; then
@@ -96,6 +102,13 @@ while [ "$#" -gt 2 ]; do
         # applies to both directories
         timestamp_opt1="-t $2"
         timestamp_opt2="-t $2"
+        shift; shift
+    elif [ "$1" = '-i' ]; then
+        if [ "$ignore_regexp" != '' ]; then
+            echo "$0: -i cannot be specified twice"
+            usage_exit
+        fi
+        ignore_regexp="$2"
         shift; shift
     else
         break  # done with flags
@@ -109,8 +122,12 @@ init_wt_utility
 
 # The next argument is the first directory
 dir1="$1"
-files1=$(wtfiles "$dir1")
 shift
+if [ "$ignore_regexp" != '' ]; then
+    files1=$(wtfiles "$dir1" | egrep -v "$ignore_regexp")
+else
+    files1=$(wtfiles "$dir1")
+fi
 
 # We can still have another -t argument to apply to the
 # second directory.
@@ -126,7 +143,11 @@ fi
 
 # The next argument is the second directory
 dir2="$1"
-files2=$(wtfiles "$dir2")
+if [ "$ignore_regexp" != '' ]; then
+    files2=$(wtfiles "$dir2" | egrep -v "$ignore_regexp")
+else
+    files2=$(wtfiles "$dir2")
+fi
 
 # If the home directories have different files, give up.
 # In the future we might consider relaxing this, reporting missing files,
@@ -134,8 +155,8 @@ files2=$(wtfiles "$dir2")
 
 if [ "$files1" != "$files2" ]; then
     echo "Directories have different files to compare, stopping."
-    echo "  $dir1: $files1"
-    echo "  $dir2: $files2"
+    echo "  $dir1: $(echo $files1)"
+    echo "  $dir2: $(echo $files2)"
     exit 1
 fi
 
