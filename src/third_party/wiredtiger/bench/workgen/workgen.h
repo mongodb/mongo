@@ -302,6 +302,8 @@ struct Operation {
     double _timed;
     // Indicates whether a table is selected randomly to be worked on.
     bool _random_table;
+    // Maintain the random table being used by each thread running the operation.
+    std::vector<std::string> _tables;
 
     Operation();
     Operation(OpType optype, Table table, Key key, Value value);
@@ -323,7 +325,6 @@ struct Operation {
     void init_internal(OperationInternal *other);
     void create_all();
     void get_static_counts(Stats &stats, int multiplier);
-    bool has_table() const;
     bool is_table_op() const;
     void kv_compute_max(bool iskey, bool has_random);
     void kv_gen(ThreadRunner *runner, bool iskey, uint64_t compressibility,

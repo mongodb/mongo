@@ -162,10 +162,12 @@ struct ThreadRunner {
     void op_create_all(Operation *, size_t &keysize, size_t &valuesize);
     uint64_t op_get_key_recno(Operation *, uint64_t range, tint_t tint);
     void op_get_static_counts(Operation *, Stats &, int);
+    std::tuple<std::string, tint_t> op_get_table(Operation *op) const;
+    bool op_has_table(Operation *op) const;
     void op_kv_gen(Operation *op, const tint_t tint);
     int op_run(Operation *);
     int op_run_setup(Operation *);
-    void op_set_table(Operation *op, const std::string &uri, const tint_t tint);
+    void op_set_table(Operation *op, const std::string &uri);
     float random_signed();
     uint32_t random_value();
 
