@@ -42,8 +42,6 @@
 
 namespace mongo {
 
-class ScopedCollectionAcquisition;
-
 /**
  * Query execution helper. Runs the argument function 'f'. If 'f' throws an exception other than
  * 'WriteConflictException' or 'TemporarilyUnavailableException', then these exceptions escape
@@ -91,17 +89,16 @@ public:
      * order to avoid depending directly on this concrete implementation of the PlanExecutor
      * interface.
      */
-    PlanExecutorImpl(
-        OperationContext* opCtx,
-        std::unique_ptr<WorkingSet> ws,
-        std::unique_ptr<PlanStage> rt,
-        std::unique_ptr<QuerySolution> qs,
-        std::unique_ptr<CanonicalQuery> cq,
-        const boost::intrusive_ptr<ExpressionContext>& expCtx,
-        stdx::variant<const CollectionPtr*, const ScopedCollectionAcquisition*> collection,
-        bool returnOwnedBson,
-        NamespaceString nss,
-        PlanYieldPolicy::YieldPolicy yieldPolicy);
+    PlanExecutorImpl(OperationContext* opCtx,
+                     std::unique_ptr<WorkingSet> ws,
+                     std::unique_ptr<PlanStage> rt,
+                     std::unique_ptr<QuerySolution> qs,
+                     std::unique_ptr<CanonicalQuery> cq,
+                     const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                     const CollectionPtr& collection,
+                     bool returnOwnedBson,
+                     NamespaceString nss,
+                     PlanYieldPolicy::YieldPolicy yieldPolicy);
 
     virtual ~PlanExecutorImpl();
     CanonicalQuery* getCanonicalQuery() const final;

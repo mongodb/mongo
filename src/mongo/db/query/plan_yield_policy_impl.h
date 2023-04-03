@@ -39,7 +39,7 @@ class PlanYieldPolicyImpl final : public PlanYieldPolicy {
 public:
     PlanYieldPolicyImpl(PlanExecutorImpl* exec,
                         PlanYieldPolicy::YieldPolicy policy,
-                        stdx::variant<const Yieldable*, YieldThroughAcquisitions> yieldable,
+                        const Yieldable* yieldable,
                         std::unique_ptr<YieldPolicyCallbacks> callbacks);
 
 private:

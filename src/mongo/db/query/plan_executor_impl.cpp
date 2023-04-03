@@ -63,7 +63,6 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/shard_role.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
@@ -91,10 +90,9 @@ namespace {
 /**
  * Constructs a PlanYieldPolicy based on 'policy'.
  */
-std::unique_ptr<PlanYieldPolicy> makeYieldPolicy(
-    PlanExecutorImpl* exec,
-    PlanYieldPolicy::YieldPolicy policy,
-    stdx::variant<const Yieldable*, PlanYieldPolicy::YieldThroughAcquisitions> yieldable) {
+std::unique_ptr<PlanYieldPolicy> makeYieldPolicy(PlanExecutorImpl* exec,
+                                                 PlanYieldPolicy::YieldPolicy policy,
+                                                 const Yieldable* yieldable) {
     switch (policy) {
         case PlanYieldPolicy::YieldPolicy::YIELD_AUTO:
         case PlanYieldPolicy::YieldPolicy::YIELD_MANUAL:
@@ -118,17 +116,16 @@ std::unique_ptr<PlanYieldPolicy> makeYieldPolicy(
 }
 }  // namespace
 
-PlanExecutorImpl::PlanExecutorImpl(
-    OperationContext* opCtx,
-    unique_ptr<WorkingSet> ws,
-    unique_ptr<PlanStage> rt,
-    unique_ptr<QuerySolution> qs,
-    unique_ptr<CanonicalQuery> cq,
-    const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    stdx::variant<const CollectionPtr*, const ScopedCollectionAcquisition*> collection,
-    bool returnOwnedBson,
-    NamespaceString nss,
-    PlanYieldPolicy::YieldPolicy yieldPolicy)
+PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
+                                   unique_ptr<WorkingSet> ws,
+                                   unique_ptr<PlanStage> rt,
+                                   unique_ptr<QuerySolution> qs,
+                                   unique_ptr<CanonicalQuery> cq,
+                                   const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                   const CollectionPtr& collection,
+                                   bool returnOwnedBson,
+                                   NamespaceString nss,
+                                   PlanYieldPolicy::YieldPolicy yieldPolicy)
     : _opCtx(opCtx),
       _cq(std::move(cq)),
       _expCtx(_cq ? _cq->getExpCtx() : expCtx),
@@ -141,20 +138,11 @@ PlanExecutorImpl::PlanExecutorImpl(
     invariant(!_expCtx || _expCtx->opCtx == _opCtx);
     invariant(!_cq || !_expCtx || _cq->getExpCtx() == _expCtx);
 
-    const CollectionPtr* collectionPtr =
-        stdx::visit(OverloadedVisitor{[](const CollectionPtr* coll) { return coll; },
-                                      [](const ScopedCollectionAcquisition* coll) {
-                                          return &coll->getCollectionPtr();
-                                      }},
-                    collection);
-    invariant(collectionPtr);
-    const bool collectionExists = static_cast<bool>(*collectionPtr);
-
     // If we don't yet have a namespace string, then initialize it from either 'collection' or
     // '_cq'.
     if (_nss.isEmpty()) {
-        if (collectionExists) {
-            _nss = (*collectionPtr)->ns();
+        if (collection) {
+            _nss = collection->ns();
         } else {
             invariant(_cq);
             _nss =
@@ -163,22 +151,10 @@ PlanExecutorImpl::PlanExecutorImpl(
     }
 
     // There's no point in yielding if the collection doesn't exist.
-    const stdx::variant<const Yieldable*, PlanYieldPolicy::YieldThroughAcquisitions> yieldable =
-        stdx::visit(
-            OverloadedVisitor{[](const CollectionPtr* coll) {
-                                  return stdx::variant<const Yieldable*,
-                                                       PlanYieldPolicy::YieldThroughAcquisitions>(
-                                      *coll ? coll : nullptr);
-                              },
-                              [](const ScopedCollectionAcquisition* coll) {
-                                  return stdx::variant<const Yieldable*,
-                                                       PlanYieldPolicy::YieldThroughAcquisitions>(
-                                      PlanYieldPolicy::YieldThroughAcquisitions{});
-                              }},
-            collection);
-
-    _yieldPolicy = makeYieldPolicy(
-        this, collectionExists ? yieldPolicy : PlanYieldPolicy::YieldPolicy::NO_YIELD, yieldable);
+    _yieldPolicy =
+        makeYieldPolicy(this,
+                        collection ? yieldPolicy : PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                        collection ? &collection : nullptr);
 
     uassertStatusOK(_pickBestPlan());
 
@@ -276,10 +252,7 @@ void PlanExecutorImpl::saveState() {
     if (!isMarkedAsKilled()) {
         _root->saveState();
     }
-
-    if (!_yieldPolicy->usesCollectionAcquisitions()) {
-        _yieldPolicy->setYieldable(nullptr);
-    }
+    _yieldPolicy->setYieldable(nullptr);
     _currentState = kSaved;
 }
 
@@ -299,9 +272,7 @@ void PlanExecutorImpl::restoreStateWithoutRetrying(const RestoreContext& context
                                                    const Yieldable* yieldable) {
     invariant(_currentState == kSaved);
 
-    if (!_yieldPolicy->usesCollectionAcquisitions()) {
-        _yieldPolicy->setYieldable(yieldable);
-    }
+    _yieldPolicy->setYieldable(yieldable);
     if (!isMarkedAsKilled()) {
         _root->restoreState(context);
     }

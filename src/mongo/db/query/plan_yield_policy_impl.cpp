@@ -35,11 +35,10 @@
 
 namespace mongo {
 
-PlanYieldPolicyImpl::PlanYieldPolicyImpl(
-    PlanExecutorImpl* exec,
-    PlanYieldPolicy::YieldPolicy policy,
-    stdx::variant<const Yieldable*, YieldThroughAcquisitions> yieldable,
-    std::unique_ptr<YieldPolicyCallbacks> callbacks)
+PlanYieldPolicyImpl::PlanYieldPolicyImpl(PlanExecutorImpl* exec,
+                                         PlanYieldPolicy::YieldPolicy policy,
+                                         const Yieldable* yieldable,
+                                         std::unique_ptr<YieldPolicyCallbacks> callbacks)
     : PlanYieldPolicy(exec->getOpCtx()->lockState()->isGlobalLockedRecursively()
                           ? PlanYieldPolicy::YieldPolicy::NO_YIELD
                           : policy,

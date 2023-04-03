@@ -51,7 +51,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     std::unique_ptr<CanonicalQuery> cq,
     std::unique_ptr<WorkingSet> ws,
     std::unique_ptr<PlanStage> rt,
-    stdx::variant<const CollectionPtr*, const ScopedCollectionAcquisition*> collection,
+    const CollectionPtr* collection,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     size_t plannerOptions,
     NamespaceString nss,
@@ -74,7 +74,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     std::unique_ptr<WorkingSet> ws,
     std::unique_ptr<PlanStage> rt,
-    stdx::variant<const CollectionPtr*, const ScopedCollectionAcquisition*> collection,
+    const CollectionPtr* collection,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     size_t plannerOptions,
     NamespaceString nss,
@@ -99,11 +99,11 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
     std::unique_ptr<QuerySolution> qs,
     std::unique_ptr<CanonicalQuery> cq,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
-    stdx::variant<const CollectionPtr*, const ScopedCollectionAcquisition*> collection,
+    const CollectionPtr* collection,
     size_t plannerOptions,
     NamespaceString nss,
     PlanYieldPolicy::YieldPolicy yieldPolicy) {
-    stdx::visit([](const auto& ptr) { dassert(ptr); }, collection);
+    dassert(collection);
 
     try {
         auto execImpl = new PlanExecutorImpl(opCtx,
@@ -112,7 +112,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> make(
                                              std::move(qs),
                                              std::move(cq),
                                              expCtx,
-                                             collection,
+                                             *collection,
                                              plannerOptions & QueryPlannerParams::RETURN_OWNED_DATA,
                                              std::move(nss),
                                              yieldPolicy);
