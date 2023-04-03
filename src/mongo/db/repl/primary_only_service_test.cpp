@@ -1155,6 +1155,14 @@ TEST_F(PrimaryOnlyServiceTest, StateTransitionFromRebuildingShouldWakeUpConditio
 }
 
 TEST_F(PrimaryOnlyServiceTest, PrimaryOnlyServiceLogSlowServices) {
+    // We change slow stepUp threshold to a extremely large value to avoid test failure in some slow
+    // test environments.
+    const auto oldSlowServiceOnStepUpCompleteThresholdMS =
+        repl::slowServiceOnStepUpCompleteThresholdMS.load();
+    const auto oldSlowTotalOnStepUpCompleteThresholdMS =
+        repl::slowTotalOnStepUpCompleteThresholdMS.load();
+    repl::slowServiceOnStepUpCompleteThresholdMS.store(1000000);
+    repl::slowTotalOnStepUpCompleteThresholdMS.store(1000000);
     std::string slowSingleServiceStepUpCompleteMsg =
         "Duration spent in PrimaryOnlyServiceRegistry::onStepUpComplete for service "
         "exceeded slowServiceOnStepUpCompleteThresholdMS";
@@ -1170,6 +1178,10 @@ TEST_F(PrimaryOnlyServiceTest, PrimaryOnlyServiceLogSlowServices) {
     stopCapturingLogMessages();
     ASSERT_EQ(0, countTextFormatLogLinesContaining(slowSingleServiceStepUpCompleteMsg));
     ASSERT_EQ(0, countTextFormatLogLinesContaining(slowTotalTimeStepUpCompleteMsg));
+
+    // Reset thresholds.
+    repl::slowServiceOnStepUpCompleteThresholdMS.store(oldSlowServiceOnStepUpCompleteThresholdMS);
+    repl::slowTotalOnStepUpCompleteThresholdMS.store(oldSlowTotalOnStepUpCompleteThresholdMS);
 
     // Use the "PrimaryOnlyServiceHangBeforeLaunchingStepUpLogic", which is encountered
     // via PrimaryOnlyServiceRegistry::onStepUpComplete, to simulate a slow primary-only
