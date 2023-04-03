@@ -1049,16 +1049,21 @@ public:
         const auto& [key, req] = entry;
 
         if (const auto& projName = key._projectionName) {
-            printer.fieldName("refProjection").print(*projName).separator(", ");
+            printer.fieldName("refProjection", ExplainVersion::V3).print(*projName).separator(", ");
         }
         ExplainPrinter pathPrinter = generate(key._path);
-        printer.fieldName("path").separator("'").printSingleLevel(pathPrinter).separator("', ");
+        printer.fieldName("path", ExplainVersion::V3)
+            .separator("'")
+            .printSingleLevel(pathPrinter)
+            .separator("', ");
 
         if (const auto& boundProjName = req.getBoundProjectionName()) {
-            printer.fieldName("boundProjection").print(*boundProjName).separator(", ");
+            printer.fieldName("boundProjection", ExplainVersion::V3)
+                .print(*boundProjName)
+                .separator(", ");
         }
 
-        printer.fieldName("intervals");
+        printer.fieldName("intervals", ExplainVersion::V3);
         {
             ExplainPrinter intervals = printIntervalExpr<IntervalRequirement>(req.getIntervals());
             printer.printSingleLevel(intervals, "" /*singleLevelSpacer*/);
@@ -1393,11 +1398,18 @@ public:
             .print(IndexReqTargetEnum::toString[static_cast<int>(node.getTarget())])
             .separator("]");
         nodeCEPropsPrint(printer, n, node);
-        size_t childCount = scanParams ? 5 : 4;
-        // In V3 only we include the ref block (see at the end of this function), so V3 has one
-        // more child.
-        if constexpr (version == ExplainVersion::V3) {
+
+        size_t childCount = 2;
+        if (scanParams) {
             childCount++;
+        }
+        if (!node.getCandidateIndexes().empty()) {
+            childCount++;
+        }
+        // In V3 only we include the bind block and ref block (see at the end of this function), so
+        // V3 has two more children.
+        if constexpr (version == ExplainVersion::V3) {
+            childCount += 2;
         }
         printer.setChildCount(childCount);
 
@@ -1411,11 +1423,10 @@ public:
             MONGO_UNREACHABLE;
         }
 
-        {
+        if (const auto& candidateIndexes = node.getCandidateIndexes(); !candidateIndexes.empty()) {
             std::vector<ExplainPrinter> candidateIndexesPrinters;
-            for (size_t index = 0; index < node.getCandidateIndexes().size(); index++) {
-                const CandidateIndexEntry& candidateIndexEntry =
-                    node.getCandidateIndexes().at(index);
+            for (size_t index = 0; index < candidateIndexes.size(); index++) {
+                const CandidateIndexEntry& candidateIndexEntry = candidateIndexes.at(index);
 
                 ExplainPrinter local;
                 local.fieldName("candidateId")
@@ -1525,9 +1536,11 @@ public:
             printer.printAppend(scanParamsPrinter);
         }
 
-        printer.fieldName("bindings", ExplainVersion::V3).print(bindResult);
         if constexpr (version == ExplainVersion::V3) {
-            printer.fieldName("references", ExplainVersion::V3).print(refsResult);
+            printer.fieldName("bindings")
+                .print(bindResult)
+                .fieldName("references")
+                .print(refsResult);
         }
         printer.fieldName("child", ExplainVersion::V3).print(childResult);
         return printer;

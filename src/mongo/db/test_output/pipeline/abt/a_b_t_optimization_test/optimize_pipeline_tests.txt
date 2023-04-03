@@ -34,14 +34,14 @@ optimization phases:
 -- OUTPUT:
 Root [{scan_0}]
 Sargable [Complete]
-|   |   |   |   requirements: 
-|   |   |   |       {{{refProjection: scan_0, path: 'PathGet [a] PathTraverse [1] PathIdentity []', intervals: {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}}}}
-|   |   |   candidateIndexes: 
-|   |   |       candidateId: 1, index1, {}, {Compound}, {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}
-|   |   scanParams: 
-|   |       {'a': evalTemp_0}
-|   |           residualReqs: 
-|   |               {{{refProjection: evalTemp_0, path: 'PathTraverse [1] PathIdentity []', intervals: {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}, entryIndex: 0}}}
+|   |   |   requirements: 
+|   |   |       {{{scan_0, 'PathGet [a] PathTraverse [1] PathIdentity []', {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}}}}
+|   |   candidateIndexes: 
+|   |       candidateId: 1, index1, {}, {Compound}, {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}
+|   scanParams: 
+|       {'a': evalTemp_0}
+|           residualReqs: 
+|               {{{evalTemp_0, 'PathTraverse [1] PathIdentity []', {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}, entryIndex: 0}}}
 Scan [collection, {scan_0}]
 
 
@@ -81,14 +81,14 @@ optimization phases:
 -- OUTPUT:
 Root [{scan_0}]
 Sargable [Complete]
-|   |   |   |   requirements: 
-|   |   |   |       {{{refProjection: scan_0, path: 'PathGet [a] PathTraverse [1] PathIdentity []', intervals: {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}}}}
-|   |   |   candidateIndexes: 
-|   |   |       candidateId: 1, index1, {}, {Compound}, {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}
-|   |   scanParams: 
-|   |       {'a': evalTemp_0}
-|   |           residualReqs: 
-|   |               {{{refProjection: evalTemp_0, path: 'PathTraverse [1] PathIdentity []', intervals: {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}, entryIndex: 0}}}
+|   |   |   requirements: 
+|   |   |       {{{scan_0, 'PathGet [a] PathTraverse [1] PathIdentity []', {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}}}}
+|   |   candidateIndexes: 
+|   |       candidateId: 1, index1, {}, {Compound}, {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}
+|   scanParams: 
+|       {'a': evalTemp_0}
+|           residualReqs: 
+|               {{{evalTemp_0, 'PathTraverse [1] PathIdentity []', {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}, entryIndex: 0}}}
 Scan [collection, {scan_0}]
 
 
@@ -1052,29 +1052,28 @@ optimization phases:
 -- OUTPUT:
 Root [{scan_0}]
 Sargable [Complete]
-|   |   |   |   requirements: 
-|   |   |   |       {{
-|   |   |   |           {refProjection: scan_0, path: 'PathGet [a] PathIdentity []', intervals: {{{[Const [[]], Const [BinData(0, )])}}}}
-|   |   |   |        ^ 
-|   |   |   |           {refProjection: scan_0, path: 'PathGet [a] PathTraverse [1] PathIdentity []', intervals: {{{[Const [5], Const [6]]}}}}
-|   |   |   |        ^ 
-|   |   |   |           {refProjection: scan_0, path: 'PathGet [b] PathIdentity []', intervals: {{{[Const [[]], Const [BinData(0, )])}}}}
-|   |   |   |        ^ 
-|   |   |   |           {refProjection: scan_0, path: 'PathGet [b] PathTraverse [1] PathIdentity []', intervals: {{{[Const [1], Const [3]]}}}}
-|   |   |   |       }}
-|   |   |   candidateIndexes: 
-|   |   scanParams: 
-|   |       {'a': evalTemp_7, 'b': evalTemp_8}
-|   |           residualReqs: 
-|   |               {{
-|   |                   {refProjection: evalTemp_7, path: 'PathIdentity []', intervals: {{{[Const [[]], Const [BinData(0, )])}}}, entryIndex: 0}
-|   |                ^ 
-|   |                   {refProjection: evalTemp_7, path: 'PathTraverse [1] PathIdentity []', intervals: {{{[Const [5], Const [6]]}}}, entryIndex: 1}
-|   |                ^ 
-|   |                   {refProjection: evalTemp_8, path: 'PathIdentity []', intervals: {{{[Const [[]], Const [BinData(0, )])}}}, entryIndex: 2}
-|   |                ^ 
-|   |                   {refProjection: evalTemp_8, path: 'PathTraverse [1] PathIdentity []', intervals: {{{[Const [1], Const [3]]}}}, entryIndex: 3}
-|   |               }}
+|   |   requirements: 
+|   |       {{
+|   |           {scan_0, 'PathGet [a] PathIdentity []', {{{[Const [[]], Const [BinData(0, )])}}}}
+|   |        ^ 
+|   |           {scan_0, 'PathGet [a] PathTraverse [1] PathIdentity []', {{{[Const [5], Const [6]]}}}}
+|   |        ^ 
+|   |           {scan_0, 'PathGet [b] PathIdentity []', {{{[Const [[]], Const [BinData(0, )])}}}}
+|   |        ^ 
+|   |           {scan_0, 'PathGet [b] PathTraverse [1] PathIdentity []', {{{[Const [1], Const [3]]}}}}
+|   |       }}
+|   scanParams: 
+|       {'a': evalTemp_7, 'b': evalTemp_8}
+|           residualReqs: 
+|               {{
+|                   {evalTemp_7, 'PathIdentity []', {{{[Const [[]], Const [BinData(0, )])}}}, entryIndex: 0}
+|                ^ 
+|                   {evalTemp_7, 'PathTraverse [1] PathIdentity []', {{{[Const [5], Const [6]]}}}, entryIndex: 1}
+|                ^ 
+|                   {evalTemp_8, 'PathIdentity []', {{{[Const [[]], Const [BinData(0, )])}}}, entryIndex: 2}
+|                ^ 
+|                   {evalTemp_8, 'PathTraverse [1] PathIdentity []', {{{[Const [1], Const [3]]}}}, entryIndex: 3}
+|               }}
 Scan [test, {scan_0}]
 
 

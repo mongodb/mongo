@@ -25,7 +25,7 @@ metadata:
 						distribution type: Centralized
 						distribution paths: 
 					requirements: 
-					    {{{refProjection: scan_0, path: 'PathGet [b] PathTraverse [1] PathIdentity []', intervals: {{{=Const [2]}}}}}}
+					    {{{scan_0, 'PathGet [b] PathTraverse [1] PathIdentity []', {{{=Const [2]}}}}}}
 
 			collection exists: 1
 			CE type: -1
@@ -84,7 +84,7 @@ metadata:
 						distribution type: Centralized
 						distribution paths: 
 					requirements: 
-					    {{{refProjection: scan_0, path: 'PathGet [b] PathTraverse [1] PathIdentity []', intervals: {{{=Const [2]}}}}}}
+					    {{{scan_0, 'PathGet [b] PathTraverse [1] PathIdentity []', {{{=Const [2]}}}}}}
 
 			collection exists: 1
 			CE type: -1

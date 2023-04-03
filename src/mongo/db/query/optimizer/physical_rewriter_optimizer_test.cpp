@@ -621,12 +621,11 @@ TEST(PhysRewriter, FilterIndexing) {
             "RIDIntersect [root]\n"
             "|   Scan [c1, {root}]\n"
             "Sargable [Index]\n"
-            "|   |   |   requirements: \n"
-            "|   |   |       {{{refProjection: root, path: 'PathGet [a] PathTraverse [1] "
-            "PathIdentity "
-            "[]', intervals: {{{=Const [1]}}}}}}\n"
-            "|   |   candidateIndexes: \n"
-            "|   |       candidateId: 1, index1, {}, {SimpleEquality}, {{{=Const [1]}}}\n"
+            "|   |   requirements: \n"
+            "|   |       {{{root, 'PathGet [a] PathTraverse [1] PathIdentity []', {{{=Const "
+            "[1]}}}}}}\n"
+            "|   candidateIndexes: \n"
+            "|       candidateId: 1, index1, {}, {SimpleEquality}, {{{=Const [1]}}}\n"
             "Scan [c1, {root}]\n",
             optimized);
     }
@@ -1808,15 +1807,12 @@ TEST(PhysRewriter, SargableProjectionRenames) {
         "Root [{root}]\n"
         "Evaluation [{pa1} = Variable [pa]]\n"
         "Sargable [Complete]\n"
-        "|   |   |   |   requirements: \n"
-        "|   |   |   |       {{{refProjection: root, path: 'PathGet [a] PathIdentity []', "
-        "boundProjection: pa, intervals: {{{=Const [1]}}}}}}\n"
-        "|   |   |   candidateIndexes: \n"
-        "|   |   scanParams: \n"
-        "|   |       {'a': pa}\n"
-        "|   |           residualReqs: \n"
-        "|   |               {{{refProjection: pa, path: 'PathIdentity []', intervals: {{{=Const "
-        "[1]}}}, entryIndex: 0}}}\n"
+        "|   |   requirements: \n"
+        "|   |       {{{root, 'PathGet [a] PathIdentity []', pa, {{{=Const [1]}}}}}}\n"
+        "|   scanParams: \n"
+        "|       {'a': pa}\n"
+        "|           residualReqs: \n"
+        "|               {{{pa, 'PathIdentity []', {{{=Const [1]}}}, entryIndex: 0}}}\n"
         "Scan [c1, {root}]\n",
         optimized);
 }
@@ -1854,15 +1850,12 @@ TEST(PhysRewriter, SargableAcquireProjection) {
     ASSERT_EXPLAIN_V2_AUTO(
         "Root [{root}]\n"
         "Sargable [Complete]\n"
-        "|   |   |   |   requirements: \n"
-        "|   |   |   |       {{{refProjection: root, path: 'PathGet [a] PathIdentity []', "
-        "boundProjection: pa, intervals: {{{=Const [1]}}}}}}\n"
-        "|   |   |   candidateIndexes: \n"
-        "|   |   scanParams: \n"
-        "|   |       {'a': pa}\n"
-        "|   |           residualReqs: \n"
-        "|   |               {{{refProjection: pa, path: 'PathIdentity []', intervals: {{{=Const "
-        "[1]}}}, entryIndex: 0}}}\n"
+        "|   |   requirements: \n"
+        "|   |       {{{root, 'PathGet [a] PathIdentity []', pa, {{{=Const [1]}}}}}}\n"
+        "|   scanParams: \n"
+        "|       {'a': pa}\n"
+        "|           residualReqs: \n"
+        "|               {{{pa, 'PathIdentity []', {{{=Const [1]}}}, entryIndex: 0}}}\n"
         "Scan [c1, {root}]\n",
         optimized);
 }
@@ -4770,18 +4763,19 @@ TEST(PhysRewriter, EqMemberSargable) {
         ASSERT_EXPLAIN_V2_AUTO(
             "Root [{root}]\n"
             "Sargable [Complete]\n"
-            "|   |   |   |   requirements: \n"
-            "|   |   |   |       {{{refProjection: root, path: 'PathGet [a] PathIdentity []', "
-            "intervals: {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}}}}\n"
-            "|   |   |   candidateIndexes: \n"
-            "|   |   |       candidateId: 1, index1, {}, {Compound}, {{{=Const [1]}} U {{=Const "
+            "|   |   |   requirements: \n"
+            "|   |   |       {{{root, 'PathGet [a] PathIdentity []', {{{=Const [1]}} U {{=Const "
             "[2]}} "
-            "U {{=Const [3]}}}\n"
-            "|   |   scanParams: \n"
-            "|   |       {'a': evalTemp_0}\n"
-            "|   |           residualReqs: \n"
-            "|   |               {{{refProjection: evalTemp_0, path: 'PathIdentity []', intervals: "
-            "{{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}, entryIndex: 0}}}\n"
+            "U {{=Const [3]}}}}}}\n"
+            "|   |   candidateIndexes: \n"
+            "|   |       candidateId: 1, index1, {}, {Compound}, {{{=Const [1]}} U {{=Const [2]}} "
+            "U "
+            "{{=Const [3]}}}\n"
+            "|   scanParams: \n"
+            "|       {'a': evalTemp_0}\n"
+            "|           residualReqs: \n"
+            "|               {{{evalTemp_0, 'PathIdentity []', {{{=Const [1]}} U {{=Const [2]}} U "
+            "{{=Const [3]}}}, entryIndex: 0}}}\n"
             "Scan [c1, {root}]\n",
             optimized);
     }
