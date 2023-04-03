@@ -50,9 +50,15 @@ namespace mongo {
 
 namespace {
 
+const auto getMaintainerThread = ServiceContext::declareDecoration<OplogCapMaintainerThread>();
+
 MONGO_FAIL_POINT_DEFINE(hangOplogCapMaintainerThread);
 
 }  // namespace
+
+OplogCapMaintainerThread* OplogCapMaintainerThread::get(ServiceContext* serviceCtx) {
+    return &getMaintainerThread(serviceCtx);
+}
 
 bool OplogCapMaintainerThread::_deleteExcessDocuments() {
     if (!getGlobalServiceContext()->getStorageEngine()) {
@@ -113,9 +119,18 @@ void OplogCapMaintainerThread::run() {
             hangOplogCapMaintainerThread.pauseWhileSet();
         }
 
-        if (!_deleteExcessDocuments()) {
+        if (!_deleteExcessDocuments() && !globalInShutdownDeprecated()) {
             sleepmillis(1000);  // Back off in case there were problems deleting.
         }
     }
 }
+
+void OplogCapMaintainerThread::waitForFinish() {
+    if (running()) {
+        LOGV2_INFO(7474902, "Shutting down oplog cap maintainer thread");
+        wait();
+        LOGV2(7474901, "Finished shutting down oplog cap maintainer thread");
+    }
+}
+
 }  // namespace mongo

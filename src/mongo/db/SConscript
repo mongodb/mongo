@@ -2407,6 +2407,7 @@ env.Library(
         'storage/disk_space_monitor',
         'storage/flow_control',
         'storage/flow_control_parameters',
+        'storage/oplog_cap_maintainer_thread',
         'storage/storage_control',
         'storage/storage_engine_common',
         'system_index',

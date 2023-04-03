@@ -1414,8 +1414,8 @@ void StorageInterfaceImpl::initializeStorageControlsForReplication(
     // periodically execute deletion via oplog truncate markers. OplogTruncateMarkers are a
     // replacement for capped collection deletion of the oplog collection history.
     if (serviceCtx->getStorageEngine()->supportsOplogTruncateMarkers()) {
-        BackgroundJob* backgroundThread = new OplogCapMaintainerThread();
-        backgroundThread->go();
+        auto maintainerThread = OplogCapMaintainerThread::get(serviceCtx);
+        maintainerThread->go();
     }
 }
 

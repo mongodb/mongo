@@ -177,6 +177,7 @@
 #include "mongo/db/storage/encryption_hooks.h"
 #include "mongo/db/storage/flow_control.h"
 #include "mongo/db/storage/flow_control_parameters_gen.h"
+#include "mongo/db/storage/oplog_cap_maintainer_thread.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_engine_lock_file.h"
@@ -1581,6 +1582,11 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
         LOGV2(4784930, "Shutting down the storage engine");
         shutdownGlobalStorageEngineCleanly(serviceContext);
     }
+
+    // We wait for the oplog cap maintainer thread to stop. This has to be done after the engine has
+    // been closed since the thread will only die once all references to the oplog have been deleted
+    // and we're performing a shutdown.
+    OplogCapMaintainerThread::get(serviceContext)->waitForFinish();
 
     // We drop the scope cache because leak sanitizer can't see across the
     // thread we use for proxying MozJS requests. Dropping the cache cleans up

@@ -41,13 +41,20 @@ namespace mongo {
  */
 class OplogCapMaintainerThread : public BackgroundJob {
 public:
-    OplogCapMaintainerThread() : BackgroundJob(true /* deleteSelf */) {}
+    OplogCapMaintainerThread() : BackgroundJob(false /* deleteSelf */) {}
+
+    static OplogCapMaintainerThread* get(ServiceContext* serviceCtx);
 
     virtual std::string name() const {
         return _name;
     }
 
     virtual void run();
+
+    /**
+     * Waits until the maintainer thread finishes.
+     */
+    void waitForFinish();
 
 private:
     /**
