@@ -150,7 +150,7 @@ private:
                                           std::shared_ptr<ReplIndexBuildState> replState);
 
 
-    void _signalIfCommitQuorumIsSatisfied(OperationContext* opCtx,
+    bool _signalIfCommitQuorumIsSatisfied(OperationContext* opCtx,
                                           std::shared_ptr<ReplIndexBuildState> replState) override;
 
 

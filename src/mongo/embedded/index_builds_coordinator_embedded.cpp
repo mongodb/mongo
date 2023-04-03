@@ -118,7 +118,7 @@ Status IndexBuildsCoordinatorEmbedded::setCommitQuorum(OperationContext* opCtx,
     MONGO_UNREACHABLE;
 }
 
-void IndexBuildsCoordinatorEmbedded::_signalIfCommitQuorumIsSatisfied(
+bool IndexBuildsCoordinatorEmbedded::_signalIfCommitQuorumIsSatisfied(
     OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
     MONGO_UNREACHABLE;
 }

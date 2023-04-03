@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/stdx/mutex.h"
 #include <algorithm>
 #include <list>
 #include <string>
@@ -350,6 +351,16 @@ public:
      * Returns true if this index build has been aborted.
      */
     bool isAborted() const;
+
+    /**
+     * Returns true if this index is in the process of aborting.
+     */
+    bool isAborting() const;
+
+    /**
+     * Returns true if this index build has been committed.
+     */
+    bool isCommitted() const;
 
     /**
      * Returns true if this index build is being set up.

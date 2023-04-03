@@ -793,8 +793,10 @@ protected:
      * commit the index build if the number of voters have satisfied the commit quorum for that
      * index build. Sets the ReplIndexBuildState::waitForNextAction promise value to be
      * IndexBuildAction::kCommitQuorumSatisfied.
+     *
+     * Returns true when the index build has been signalled, false otherwise.
      */
-    virtual void _signalIfCommitQuorumIsSatisfied(
+    virtual bool _signalIfCommitQuorumIsSatisfied(
         OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) = 0;
 
     /**

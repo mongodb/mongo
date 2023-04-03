@@ -609,7 +609,7 @@ void IndexBuildsCoordinatorMongod::_sendCommitQuorumSatisfiedSignal(
     replState->setCommitQuorumSatisfied(opCtx);
 }
 
-void IndexBuildsCoordinatorMongod::_signalIfCommitQuorumIsSatisfied(
+bool IndexBuildsCoordinatorMongod::_signalIfCommitQuorumIsSatisfied(
     OperationContext* opCtx, std::shared_ptr<ReplIndexBuildState> replState) {
 
     // Acquire the commitQuorumLk in shared mode to make sure commit quorum value did not change
@@ -625,17 +625,18 @@ void IndexBuildsCoordinatorMongod::_signalIfCommitQuorumIsSatisfied(
     // This can occur when no vote got received and stepup tries to check if commit quorum is
     // satisfied.
     if (!voteMemberList)
-        return;
+        return false;
 
     bool commitQuorumSatisfied = repl::ReplicationCoordinator::get(opCtx)->isCommitQuorumSatisfied(
         indexBuildEntry.getCommitQuorum(), voteMemberList.value());
 
     if (!commitQuorumSatisfied)
-        return;
+        return false;
 
     LOGV2(
         3856201, "Index build: commit quorum satisfied", "indexBuildEntry"_attr = indexBuildEntry);
     _sendCommitQuorumSatisfiedSignal(opCtx, replState);
+    return true;
 }
 
 bool IndexBuildsCoordinatorMongod::_signalIfCommitQuorumNotEnabled(

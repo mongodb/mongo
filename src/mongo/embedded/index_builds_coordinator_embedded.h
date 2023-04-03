@@ -89,7 +89,7 @@ public:
                            const CommitQuorumOptions& newCommitQuorum) override;
 
 private:
-    void _signalIfCommitQuorumIsSatisfied(OperationContext* opCtx,
+    bool _signalIfCommitQuorumIsSatisfied(OperationContext* opCtx,
                                           std::shared_ptr<ReplIndexBuildState> replState) override;
 
     bool _signalIfCommitQuorumNotEnabled(OperationContext* opCtx,
