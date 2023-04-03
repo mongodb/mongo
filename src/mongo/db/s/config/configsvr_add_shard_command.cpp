@@ -41,15 +41,64 @@
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/sharding_cluster_parameters_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_shard.h"
+#include "mongo/s/grid.h"
 #include "mongo/s/request_types/add_shard_request_type.h"
+#include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 
 namespace mongo {
+
+namespace {
+
+Status notifyShardsOfSecondShardIfNeeded(OperationContext* opCtx) {
+    if (!feature_flags::gCheckForDirectShardOperations.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        return Status::OK();
+    }
+
+    auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
+    auto* clusterCardinalityParam =
+        clusterParameters->get<ClusterParameterWithStorage<ShardedClusterCardinalityParam>>(
+            "shardedClusterCardinalityForDirectConns");
+
+    auto alreadyHasTwoShards =
+        clusterCardinalityParam->getValue(boost::none).getHasTwoOrMoreShards();
+
+    // If the cluster already has 2 shards or previously had 2 shards, there is nothing to do.
+    if (alreadyHasTwoShards) {
+        return Status::OK();
+    }
+
+    const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+
+    // If this is only the first shard to be added, there is nothing to do.
+    if (shardRegistry->getNumShards(opCtx) < 2) {
+        return Status::OK();
+    }
+
+    // Set the cluster parameter to disallow direct writes to shards
+    ConfigsvrSetClusterParameter configsvrSetClusterParameter(
+        BSON("shardedClusterCardinalityForDirectConns" << BSON("hasTwoOrMoreShards" << true)));
+    configsvrSetClusterParameter.setDbName(DatabaseName(boost::none, "admin"));
+
+    const auto cmdResponse = shardRegistry->getConfigShard()->runCommandWithFixedRetryAttempts(
+        opCtx,
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        DatabaseName::kAdmin.toString(),
+        configsvrSetClusterParameter.toBSON({}),
+        Shard::RetryPolicy::kIdempotent);
+
+    return Shard::CommandResponse::getEffectiveStatus(std::move(cmdResponse));
+}
+
+}  // namespace
 
 /**
  * Internal sharding command run on config servers to add a shard to the cluster.
@@ -123,13 +172,19 @@ public:
             parsedRequest.getConnString(),
             false);
 
-        if (!addShardResult.isOK()) {
+        Status status = addShardResult.getStatus();
+
+        if (status.isOK()) {
+            status = notifyShardsOfSecondShardIfNeeded(opCtx);
+        }
+
+        if (!status.isOK()) {
             LOGV2(21920,
                   "addShard request '{request}' failed: {error}",
                   "addShard request failed",
                   "request"_attr = parsedRequest,
-                  "error"_attr = addShardResult.getStatus());
-            uassertStatusOK(addShardResult.getStatus());
+                  "error"_attr = status);
+            uassertStatusOK(status);
         }
 
         result << "shardAdded" << addShardResult.getValue();

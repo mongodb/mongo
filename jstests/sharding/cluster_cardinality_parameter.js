@@ -1,6 +1,6 @@
 /**
  * Tests that the cluster parameter "shardedClusterCardinalityForDirectConns" has the correct value
- * after upgrade and downgrade.
+ * after upgrade, downgrade, and addShard.
  *
  * @tags: [multiversion_incompatible, featureFlagCheckForDirectShardOperations,
  * temporary_catalog_shard_incompatible]
@@ -43,6 +43,19 @@ assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFC
 // There is one shard in the cluster while upgrading, so the cluster parameter should be false
 checkClusterParameter(st.configRS.getPrimary(), false);
 checkClusterParameter(st.shard0, false);
+
+assert.commandWorked(st.s.adminCommand({addShard: additionalShard.getURL(), name: "shard02"}));
+
+// Since the feature flag is enabled, addShard should update the cluster parameter
+checkClusterParameter(st.configRS.getPrimary(), true);
+checkClusterParameter(st.shard0, true);
+checkClusterParameter(additionalShard.getPrimary(), true);
+
+removeShard(st, "shard02");
+
+// Removing a shard while the feature flag is enabled shouldn't change the cluster parameter
+checkClusterParameter(st.configRS.getPrimary(), true);
+checkClusterParameter(st.shard0, true);
 
 additionalShard.stopSet();
 st.stop();

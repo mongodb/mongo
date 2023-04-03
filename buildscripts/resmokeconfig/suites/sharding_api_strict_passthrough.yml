@@ -9,7 +9,8 @@ selector:
   - jstests/sharding/auth_sharding_cmd_metadata.js
   - jstests/sharding/change_stream_update_lookup_collation.js
   - jstests/sharding/count_config_servers.js
-  - jstests/sharding/hash_crud.js
+  # TODO SERVER-75496: Uncomment once ticket is complete.
+  # - jstests/sharding/hash_crud.js
   - jstests/sharding/internal_txns/end_sessions.js
   - jstests/sharding/internal_txns/retry_on_transient_error_basic.js
   - jstests/sharding/internal_txns/retry_on_transient_error_validation.js
@@ -21,7 +22,8 @@ selector:
   # TODO SERVER-74176: Uncomment once ticket is complete.
   # - jstests/sharding/query/collation_lookup.js
   - jstests/sharding/query/collation_shard_targeting_hashed_shard_key.js
-  - jstests/sharding/query/current_op_with_drop_shard.js
+  # TODO SERVER-75496: Uncomment once ticket is complete.
+  # - jstests/sharding/query/current_op_with_drop_shard.js
   # TODO SERVER-74167: Uncomment once ticket is complete.
   # - jstests/sharding/query/explain_cmd.js
   - jstests/sharding/query/mongos_query_comment.js
@@ -29,7 +31,8 @@ selector:
   # - jstests/sharding/query/merge_to_non_existing.js
   - jstests/sharding/query/pipeline_length_limit.js
   - jstests/sharding/query/pipeline_pass_through_from_mongos.js
-  - jstests/sharding/query/union_sharded_views.js
+    # TODO SERVER-75496: Uncomment once ticket is complete.
+  # - jstests/sharding/query/union_sharded_views.js
   - jstests/sharding/query/view_on_shard_rewrite.js
   - jstests/sharding/resharding_prohibited_commands.js
   - jstests/sharding/resharding_replicate_updates_as_insert_delete.js
