@@ -335,11 +335,12 @@ __wt_checkpoint_get_handles(WT_SESSION_IMPL *session, const char *cfg[])
 }
 
 /*
- * __checkpoint_reduce_dirty_cache --
- *     Release clean trees from the list cached for checkpoints.
+ * __checkpoint_wait_reduce_dirty_cache --
+ *     Try to reduce the amount of dirty data in cache so there is less work do during the critical
+ *     section of the checkpoint.
  */
 static void
-__checkpoint_reduce_dirty_cache(WT_SESSION_IMPL *session)
+__checkpoint_wait_reduce_dirty_cache(WT_SESSION_IMPL *session)
 {
     WT_CACHE *cache;
     WT_CONNECTION_IMPL *conn;
@@ -352,11 +353,8 @@ __checkpoint_reduce_dirty_cache(WT_SESSION_IMPL *session)
     conn = S2C(session);
     cache = conn->cache;
 
-    /*
-     * Give up if scrubbing is disabled, including when checkpointing with a timestamp on close (we
-     * can't evict dirty pages in that case, so scrubbing cannot help).
-     */
-    if (F_ISSET(conn, WT_CONN_CLOSING_TIMESTAMP) || cache->eviction_checkpoint_target < DBL_EPSILON)
+    /* Give up if scrubbing is disabled. */
+    if (cache->eviction_checkpoint_target < DBL_EPSILON)
         return;
 
     time_start = __wt_clock(session);
@@ -855,7 +853,7 @@ __txn_checkpoint(WT_SESSION_IMPL *session, const char *cfg[])
      * Try to reduce the amount of dirty data in cache so there is less work do during the critical
      * section of the checkpoint.
      */
-    __checkpoint_reduce_dirty_cache(session);
+    __checkpoint_wait_reduce_dirty_cache(session);
 
     /* Tell logging that we are about to start a database checkpoint. */
     if (full && logging)
