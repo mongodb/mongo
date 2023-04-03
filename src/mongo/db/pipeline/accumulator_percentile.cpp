@@ -179,8 +179,7 @@ AccumulatorPercentile::AccumulatorPercentile(ExpressionContext* const expCtx,
     : AccumulatorState(expCtx),
       _percentiles(ps),
       _algo(createPercentileAlgorithm(method)),
-      _method(method),
-      _maxMemUsageBytes(internalDocumentSourceSetWindowFieldsMaxMemoryBytes.load()) {
+      _method(method) {
     _memUsageBytes = sizeof(*this) + _algo->memUsageBytes();
 }
 

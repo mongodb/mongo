@@ -114,9 +114,6 @@ protected:
     // TODO SERVER-74894: This should have been 'PercentileMethodEnum' but the generated
     // header from the IDL includes this header, creating a dependency.
     const int32_t _method;
-
-    // TODO SERVER-75115 potentially remove this.
-    long long _maxMemUsageBytes;
 };
 
 /*
