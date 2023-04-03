@@ -83,6 +83,7 @@ selector:
   - jstests/sharding/move_primary_fails_without_database_version.js
   # Calls the config server primary directly (not through mongos)
   - jstests/sharding/analyze_shard_key/configure_query_analyzer_basic.js
+  - jstests/sharding/analyze_shard_key/invalid_config_docs.js
   - jstests/sharding/analyze_shard_key/persist_sampled_diffs.js
   - jstests/sharding/analyze_shard_key/persist_sampled_read_queries.js
   - jstests/sharding/analyze_shard_key/persist_sampled_write_queries.js

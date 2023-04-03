@@ -39,7 +39,7 @@ imports:
 structs:
   DocumentSourceAnalyzeShardKeyReadWriteDistributionSpec:
     description: Specification for a $_analyzeShardKeyReadWriteDistribution stage.
-    strict: true
+    strict: false
     fields:
       key:
         description: The shard key to evaluate.

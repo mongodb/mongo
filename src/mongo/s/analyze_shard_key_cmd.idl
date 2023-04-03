@@ -160,7 +160,7 @@ structs:
 
   ReadDistributionMetrics:
     description: "The metrics about the read distribution calculated using sampled read queries."
-    strict: true
+    strict: false
     fields:
       sampleSize:
         type: ReadSampleSize
@@ -209,7 +209,7 @@ structs:
 
   WriteDistributionMetrics:
     description: "The metrics about the write distribution calculated using sampled write queries."
-    strict: true
+    strict: false
     fields:
       sampleSize:
         type: WriteSampleSize

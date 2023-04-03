@@ -71,6 +71,7 @@ structs:
   CollectionQueryAnalyzerConfiguration:
     description: "The query analyzer configuration for a collection as returned by the
                   _refreshQueryAnalyzerConfiguration command."
+    strict: false
     fields:
       ns:
           type: namespacestring

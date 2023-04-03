@@ -35,9 +35,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/s/analyze_shard_key_server_parameters_gen.h"
-#include "mongo/s/catalog/type_mongos.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -71,58 +69,48 @@ bool QueryAnalysisCoordinator::shouldRegisterReplicaSetAwareService() const {
     return supportsCoordinatingQueryAnalysis(true /* isReplEnabled */, true /* ignoreFCV */);
 }
 
-void QueryAnalysisCoordinator::onConfigurationInsert(const BSONObj& doc) {
+void QueryAnalysisCoordinator::onConfigurationInsert(const QueryAnalyzerDocument& doc) {
     stdx::lock_guard<Latch> lk(_mutex);
 
-    auto analyzerDoc =
-        QueryAnalyzerDocument::parse(IDLParserContext("QueryAnalysisCoordinator"), doc);
-    LOGV2(7372308, "Detected new query analyzer configuration", "configuration"_attr = analyzerDoc);
+    LOGV2(7372308, "Detected new query analyzer configuration", "configuration"_attr = doc);
 
-    if (analyzerDoc.getMode() == QueryAnalyzerModeEnum::kOff) {
+    if (doc.getMode() == QueryAnalyzerModeEnum::kOff) {
         // Do not create an entry for it if the mode is "off".
         return;
     }
 
     auto configuration = CollectionQueryAnalyzerConfiguration{
-        analyzerDoc.getNs(), analyzerDoc.getCollectionUuid(), *analyzerDoc.getSampleRate()};
+        doc.getNs(), doc.getCollectionUuid(), *doc.getSampleRate()};
 
-    _configurations.emplace(analyzerDoc.getCollectionUuid(), std::move(configuration));
+    _configurations.emplace(doc.getCollectionUuid(), std::move(configuration));
 }
 
-void QueryAnalysisCoordinator::onConfigurationUpdate(const BSONObj& doc) {
+void QueryAnalysisCoordinator::onConfigurationUpdate(const QueryAnalyzerDocument& doc) {
     stdx::lock_guard<Latch> lk(_mutex);
 
-    auto analyzerDoc =
-        QueryAnalyzerDocument::parse(IDLParserContext("QueryAnalysisCoordinator"), doc);
-    LOGV2(7372309,
-          "Detected a query analyzer configuration update",
-          "configuration"_attr = analyzerDoc);
+    LOGV2(7372309, "Detected a query analyzer configuration update", "configuration"_attr = doc);
 
-    if (analyzerDoc.getMode() == QueryAnalyzerModeEnum::kOff) {
+    if (doc.getMode() == QueryAnalyzerModeEnum::kOff) {
         // Remove the entry for it if the mode has been set to "off".
-        _configurations.erase(analyzerDoc.getCollectionUuid());
+        _configurations.erase(doc.getCollectionUuid());
     } else {
-        auto it = _configurations.find(analyzerDoc.getCollectionUuid());
+        auto it = _configurations.find(doc.getCollectionUuid());
         if (it == _configurations.end()) {
             auto configuration = CollectionQueryAnalyzerConfiguration{
-                analyzerDoc.getNs(), analyzerDoc.getCollectionUuid(), *analyzerDoc.getSampleRate()};
-            _configurations.emplace(analyzerDoc.getCollectionUuid(), std::move(configuration));
+                doc.getNs(), doc.getCollectionUuid(), *doc.getSampleRate()};
+            _configurations.emplace(doc.getCollectionUuid(), std::move(configuration));
         } else {
-            it->second.setSampleRate(*analyzerDoc.getSampleRate());
+            it->second.setSampleRate(*doc.getSampleRate());
         }
     }
 }
 
-void QueryAnalysisCoordinator::onConfigurationDelete(const BSONObj& doc) {
+void QueryAnalysisCoordinator::onConfigurationDelete(const QueryAnalyzerDocument& doc) {
     stdx::lock_guard<Latch> lk(_mutex);
 
-    auto analyzerDoc =
-        QueryAnalyzerDocument::parse(IDLParserContext("QueryAnalysisCoordinator"), doc);
-    LOGV2(7372310,
-          "Detected a query analyzer configuration delete",
-          "configuration"_attr = analyzerDoc);
+    LOGV2(7372310, "Detected a query analyzer configuration delete", "configuration"_attr = doc);
 
-    _configurations.erase(analyzerDoc.getCollectionUuid());
+    _configurations.erase(doc.getCollectionUuid());
 }
 
 Date_t QueryAnalysisCoordinator::_getMinLastPingTime() {
@@ -143,38 +131,35 @@ void QueryAnalysisCoordinator::Sampler::resetLastNumQueriesExecutedPerSecond() {
     _lastNumQueriesExecutedPerSecond = boost::none;
 }
 
-void QueryAnalysisCoordinator::onSamplerInsert(const BSONObj& doc) {
+void QueryAnalysisCoordinator::onSamplerInsert(const MongosType& doc) {
     invariant(serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
     stdx::lock_guard<Latch> lk(_mutex);
 
-    auto mongosDoc = uassertStatusOK(MongosType::fromBSON(doc));
-    if (mongosDoc.getPing() < _getMinLastPingTime()) {
+    if (doc.getPing() < _getMinLastPingTime()) {
         return;
     }
-    auto sampler = Sampler{mongosDoc.getName(), mongosDoc.getPing()};
-    _samplers.emplace(mongosDoc.getName(), std::move(sampler));
+    auto sampler = Sampler{doc.getName(), doc.getPing()};
+    _samplers.emplace(doc.getName(), std::move(sampler));
 }
 
-void QueryAnalysisCoordinator::onSamplerUpdate(const BSONObj& doc) {
+void QueryAnalysisCoordinator::onSamplerUpdate(const MongosType& doc) {
     invariant(serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
     stdx::lock_guard<Latch> lk(_mutex);
 
-    auto mongosDoc = uassertStatusOK(MongosType::fromBSON(doc));
-    auto it = _samplers.find(mongosDoc.getName());
+    auto it = _samplers.find(doc.getName());
     if (it == _samplers.end()) {
-        auto sampler = Sampler{mongosDoc.getName(), mongosDoc.getPing()};
-        _samplers.emplace(mongosDoc.getName(), std::move(sampler));
+        auto sampler = Sampler{doc.getName(), doc.getPing()};
+        _samplers.emplace(doc.getName(), std::move(sampler));
     } else {
-        it->second.setLastPingTime(mongosDoc.getPing());
+        it->second.setLastPingTime(doc.getPing());
     }
 }
 
-void QueryAnalysisCoordinator::onSamplerDelete(const BSONObj& doc) {
+void QueryAnalysisCoordinator::onSamplerDelete(const MongosType& doc) {
     invariant(serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
     stdx::lock_guard<Latch> lk(_mutex);
 
-    auto mongosDoc = uassertStatusOK(MongosType::fromBSON(doc));
-    auto erased = _samplers.erase(mongosDoc.getName());
+    auto erased = _samplers.erase(doc.getName());
     invariant(erased);
 }
 
@@ -190,13 +175,13 @@ void QueryAnalysisCoordinator::onStartup(OperationContext* opCtx) {
                                                                                  << "off")));
         auto cursor = client.find(std::move(findRequest));
         while (cursor->more()) {
-            auto analyzerDoc = QueryAnalyzerDocument::parse(
-                IDLParserContext("QueryAnalysisCoordinator"), cursor->next());
-            invariant(analyzerDoc.getMode() != QueryAnalyzerModeEnum::kOff);
+            auto doc = QueryAnalyzerDocument::parse(IDLParserContext("QueryAnalysisCoordinator"),
+                                                    cursor->next());
+            invariant(doc.getMode() != QueryAnalyzerModeEnum::kOff);
             auto configuration = CollectionQueryAnalyzerConfiguration{
-                analyzerDoc.getNs(), analyzerDoc.getCollectionUuid(), *analyzerDoc.getSampleRate()};
+                doc.getNs(), doc.getCollectionUuid(), *doc.getSampleRate()};
             auto [_, inserted] =
-                _configurations.emplace(analyzerDoc.getCollectionUuid(), std::move(configuration));
+                _configurations.emplace(doc.getCollectionUuid(), std::move(configuration));
             invariant(inserted);
         }
     }
@@ -209,10 +194,10 @@ void QueryAnalysisCoordinator::onStartup(OperationContext* opCtx) {
         findRequest.setFilter(BSON(MongosType::ping << BSON("$gte" << minPingTime)));
         auto cursor = client.find(std::move(findRequest));
         while (cursor->more()) {
-            auto mongosDoc = uassertStatusOK(MongosType::fromBSON(cursor->next()));
-            invariant(mongosDoc.getPing() >= minPingTime);
-            auto sampler = Sampler{mongosDoc.getName(), mongosDoc.getPing()};
-            _samplers.emplace(mongosDoc.getName(), std::move(sampler));
+            auto doc = uassertStatusOK(MongosType::fromBSON(cursor->next()));
+            invariant(doc.getPing() >= minPingTime);
+            auto sampler = Sampler{doc.getName(), doc.getPing()};
+            _samplers.emplace(doc.getName(), std::move(sampler));
         }
     }
 }

@@ -33,7 +33,9 @@
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
+#include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/s/analyze_shard_key_role.h"
+#include "mongo/s/catalog/type_mongos.h"
 #include "mongo/util/periodic_runner.h"
 
 namespace mongo {
@@ -99,17 +101,17 @@ public:
      * Creates, updates and deletes the configuration for the collection with the given
      * config.queryAnalyzers document.
      */
-    void onConfigurationInsert(const BSONObj& doc);
-    void onConfigurationUpdate(const BSONObj& doc);
-    void onConfigurationDelete(const BSONObj& doc);
+    void onConfigurationInsert(const QueryAnalyzerDocument& doc);
+    void onConfigurationUpdate(const QueryAnalyzerDocument& doc);
+    void onConfigurationDelete(const QueryAnalyzerDocument& doc);
 
     /**
      * On a sharded cluster, creates, updates and deletes the sampler for the mongos with the given
      * config.mongos document.
      */
-    void onSamplerInsert(const BSONObj& doc);
-    void onSamplerUpdate(const BSONObj& doc);
-    void onSamplerDelete(const BSONObj& doc);
+    void onSamplerInsert(const MongosType& doc);
+    void onSamplerUpdate(const MongosType& doc);
+    void onSamplerDelete(const MongosType& doc);
 
     /**
      * Given the average number of queries that a sampler executes, returns the new query analyzer

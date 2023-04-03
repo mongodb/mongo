@@ -55,21 +55,22 @@ void QueryAnalysisOpObserver::onInserts(OperationContext* opCtx,
     if (analyze_shard_key::supportsCoordinatingQueryAnalysis(opCtx)) {
         if (coll->ns() == NamespaceString::kConfigQueryAnalyzersNamespace) {
             for (auto it = begin; it != end; ++it) {
-                const auto& insertedDoc = it->doc;
-                opCtx->recoveryUnit()->onCommit([insertedDoc](OperationContext* opCtx,
-                                                              boost::optional<Timestamp>) {
+                const auto parsedDoc = QueryAnalyzerDocument::parse(
+                    IDLParserContext("QueryAnalysisOpObserver::onInserts"), it->doc);
+                opCtx->recoveryUnit()->onCommit([parsedDoc](OperationContext* opCtx,
+                                                            boost::optional<Timestamp>) {
                     analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onConfigurationInsert(
-                        insertedDoc);
+                        parsedDoc);
                 });
             }
         } else if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
                    coll->ns() == MongosType::ConfigNS) {
             for (auto it = begin; it != end; ++it) {
-                const auto& insertedDoc = it->doc;
+                const auto parsedDoc = uassertStatusOK(MongosType::fromBSON(it->doc));
                 opCtx->recoveryUnit()->onCommit(
-                    [insertedDoc](OperationContext* opCtx, boost::optional<Timestamp>) {
+                    [parsedDoc](OperationContext* opCtx, boost::optional<Timestamp>) {
                         analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onSamplerInsert(
-                            insertedDoc);
+                            parsedDoc);
                     });
             }
         }
@@ -79,20 +80,21 @@ void QueryAnalysisOpObserver::onInserts(OperationContext* opCtx,
 void QueryAnalysisOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArgs& args) {
     if (analyze_shard_key::supportsCoordinatingQueryAnalysis(opCtx)) {
         if (args.coll->ns() == NamespaceString::kConfigQueryAnalyzersNamespace) {
-            const auto& updatedDoc = args.updateArgs->updatedDoc;
+            const auto parsedDoc = QueryAnalyzerDocument::parse(
+                IDLParserContext("QueryAnalysisOpObserver::onUpdate"), args.updateArgs->updatedDoc);
             opCtx->recoveryUnit()->onCommit(
-                [updatedDoc](OperationContext* opCtx, boost::optional<Timestamp>) {
+                [parsedDoc](OperationContext* opCtx, boost::optional<Timestamp>) {
                     analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onConfigurationUpdate(
-                        updatedDoc);
+                        parsedDoc);
                 });
         } else if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
                    args.coll->ns() == MongosType::ConfigNS) {
-            const auto& updatedDoc = args.updateArgs->updatedDoc;
-            opCtx->recoveryUnit()->onCommit(
-                [updatedDoc](OperationContext* opCtx, boost::optional<Timestamp>) {
-                    analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onSamplerUpdate(
-                        updatedDoc);
-                });
+            const auto parsedDoc =
+                uassertStatusOK(MongosType::fromBSON(args.updateArgs->updatedDoc));
+            opCtx->recoveryUnit()->onCommit([parsedDoc](OperationContext* opCtx,
+                                                        boost::optional<Timestamp>) {
+                analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onSamplerUpdate(parsedDoc);
+            });
         }
     }
 
@@ -127,18 +129,22 @@ void QueryAnalysisOpObserver::onDelete(OperationContext* opCtx,
         if (coll->ns() == NamespaceString::kConfigQueryAnalyzersNamespace) {
             auto& doc = docToDeleteDecoration(opCtx);
             invariant(!doc.isEmpty());
-            opCtx->recoveryUnit()->onCommit([doc](OperationContext* opCtx,
-                                                  boost::optional<Timestamp>) {
-                analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onConfigurationDelete(doc);
-            });
+            const auto parsedDoc = QueryAnalyzerDocument::parse(
+                IDLParserContext("QueryAnalysisOpObserver::onDelete"), doc);
+            opCtx->recoveryUnit()->onCommit(
+                [parsedDoc](OperationContext* opCtx, boost::optional<Timestamp>) {
+                    analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onConfigurationDelete(
+                        parsedDoc);
+                });
         } else if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
                    coll->ns() == MongosType::ConfigNS) {
             auto& doc = docToDeleteDecoration(opCtx);
             invariant(!doc.isEmpty());
-            opCtx->recoveryUnit()->onCommit(
-                [doc](OperationContext* opCtx, boost::optional<Timestamp>) {
-                    analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onSamplerDelete(doc);
-                });
+            const auto parsedDoc = uassertStatusOK(MongosType::fromBSON(doc));
+            opCtx->recoveryUnit()->onCommit([parsedDoc](OperationContext* opCtx,
+                                                        boost::optional<Timestamp>) {
+                analyze_shard_key::QueryAnalysisCoordinator::get(opCtx)->onSamplerDelete(parsedDoc);
+            });
         }
     }
 }

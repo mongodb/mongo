@@ -38,6 +38,7 @@ structs:
   QueryAnalyzerDocument:
     description: "Represents a document storing the query analyzer configuration for a collection
                   as configured via the configureQueryAnalyzer command."
+    strict: false
     fields:
       _id:
         type: uuid
