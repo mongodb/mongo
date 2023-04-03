@@ -614,7 +614,8 @@ buildvariants:
   - name: .sharding .common !.csrs
   - name: .ssl
   - name: .stitch
-  - name: selinux_rhel7_org
+  #TODO: BF-24515 renable once fixed
+  #- name: selinux_rhel7_org
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -811,7 +812,8 @@ buildvariants:
   - name: server_selection_json_test_TG
     distros:
     - rhel80-large
-  - name: selinux_rhel8_enterprise
+  #TODO: BF-24515 renable once fixed
+  #- name: selinux_rhel8_enterprise
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -957,7 +959,8 @@ buildvariants:
   - name: .sharding .common !.csrs !.multiversion
   - name: .ssl
   - name: .stitch
-  - name: selinux_rhel9_org
+  #TODO: BF-24515 renable once fixed
+  #- name: selinux_rhel9_org
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -1031,7 +1034,8 @@ buildvariants:
   - name: .crypt
   - name: .publish_crypt
   - name: unittest_shell_hang_analyzer_gen
-  - name: selinux_rhel9_enterprise
+  #TODO: BF-24515 renable once fixed
+  #- name: selinux_rhel9_enterprise
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 

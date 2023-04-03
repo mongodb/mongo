@@ -70,6 +70,7 @@ buildvariants:
   - name: .crypt
   - name: .publish_crypt
   - name: unittest_shell_hang_analyzer_gen
-  - name: selinux_rhel7_enterprise
+  # TODO: BF-24515 restore when BF is resolved
+  #- name: selinux_rhel7_enterprise
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
