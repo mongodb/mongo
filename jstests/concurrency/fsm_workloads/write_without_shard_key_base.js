@@ -18,17 +18,14 @@ load('jstests/concurrency/fsm_libs/extend_workload.js');
 load('jstests/concurrency/fsm_workloads/random_moveChunk_base.js');  // for $config
 load('jstests/concurrency/fsm_workload_helpers/balancer.js');
 
-let acceptableErrors = [ErrorCodes.DuplicateKey, ErrorCodes.IllegalOperation];
-const duplicateKeyInChangeShardKeyMsg = "Failed to update document's shard key field";
-const wouldChangeOwningShardMsg =
-    "Must run update to document shard key in a transaction or as a retryable write.";
-
 var $config = extendWorkload($config, function($config, $super) {
     $config.threadCount = 10;
     $config.iterations = 10;
     $config.startState = "init";  // Inherited from random_moveChunk_base.js.
     $config.data.partitionSize = 100;
     $config.data.secondaryDocField = 'y';
+    $config.data.runningWithStepdowns =
+        TestData.runningWithConfigStepdowns || TestData.runningWithShardStepdowns;
 
     /**
      * Returns a random integer between min (inclusive) and max (inclusive).
@@ -101,27 +98,39 @@ var $config = extendWorkload($config, function($config, $super) {
         const containsMatchedDocs = db[collName].findOne(query) != null;
 
         let res;
-        if (updateType === 0 /* Update operator document */) {
-            const update =
-                {[doShardKeyUpdate ? this.defaultShardKeyField : this.secondaryDocField]: newValue};
-            res = assert.commandWorked(db[collName].updateOne(query, {$set: update}));
-        } else if (updateType === 1 /* Replacement Update */) {
-            // Always including a shard key update for replacement documents in order to keep the
-            // new document within the current thread's partition.
-            res = assert.commandWorked(db[collName].replaceOne(query, {
-                [this.defaultShardKeyField]: newValue,
-                [this.secondaryDocField]: newValue,
-                tid: this.tid
-            }));
-        } else { /* Aggregation pipeline update */
-            const update =
-                {[doShardKeyUpdate ? this.defaultShardKeyField : this.secondaryDocField]: newValue};
+        try {
+            if (updateType === 0 /* Update operator document */) {
+                const update = {
+                    [doShardKeyUpdate ? this.defaultShardKeyField : this.secondaryDocField]:
+                        newValue
+                };
+                res = db[collName].updateOne(query, {$set: update});
+            } else if (updateType === 1 /* Replacement Update */) {
+                // Always including a shard key update for replacement documents in order to keep
+                // the new document within the current thread's partition.
+                res = db[collName].replaceOne(query, {
+                    [this.defaultShardKeyField]: newValue,
+                    [this.secondaryDocField]: newValue,
+                    tid: this.tid
+                });
+            } else { /* Aggregation pipeline update */
+                const update = {
+                    [doShardKeyUpdate ? this.defaultShardKeyField : this.secondaryDocField]:
+                        newValue
+                };
 
-            // The $unset will result in a no-op since 'z' is not a field populated in any of the
-            // documents.
-            res = assert.commandWorked(
-                db[collName].updateOne(query, [{$set: update}, {$unset: "z"}]));
+                // The $unset will result in a no-op since 'z' is not a field populated in any of
+                // the documents.
+                res = db[collName].updateOne(query, [{$set: update}, {$unset: "z"}]);
+            }
+        } catch (err) {
+            if (this.shouldSkipWriteResponseValidation(err)) {
+                return;
+            }
+            throw err;
         }
+
+        assert.commandWorked(res);
 
         if (containsMatchedDocs) {
             assert.eq(res.matchedCount, 1, query);
@@ -134,6 +143,92 @@ var $config = extendWorkload($config, function($config, $super) {
         // In case the modification results in no change to the document, matched may be higher
         // than modified.
         assert.gte(res.matchedCount, res.modifiedCount, res);
+    };
+
+    /**
+     * Checks the response of a write. If we have a write error, return true if we should skip write
+     * response validation for an acceptable error, false otherwise.
+     */
+    $config.data.shouldSkipWriteResponseValidation = function shouldSkipWriteResponseValidation(
+        res) {
+        let acceptableErrors = [
+            ErrorCodes.DuplicateKey,
+            ErrorCodes.IllegalOperation,
+            ErrorCodes.LockTimeout,
+            ErrorCodes.IncompleteTransactionHistory,
+            ErrorCodes.NoSuchTransaction,
+            ErrorCodes.StaleConfig,
+        ];
+
+        // If we're running in a stepdown suite, then attempting to update the shard key may
+        // interact with stepdowns and transactions to cause the following errors. We only expect
+        // these errors in stepdown suites and not in other suites, so we surface them to the test
+        // runner in other scenarios.
+        const stepdownErrors = [ErrorCodes.ConflictingOperationInProgress];
+
+        if (this.runningWithStepdowns) {
+            acceptableErrors.push(...stepdownErrors);
+        }
+
+        const duplicateKeyInChangeShardKeyMsg = "Failed to update document's shard key field";
+        const wouldChangeOwningShardMsg =
+            "Must run update to document shard key in a transaction or as a retryable write.";
+        const otherErrorsInChangeShardKeyMsg = "was converted into a distributed transaction";
+        const failureInRetryableWriteToTxnConversionMsg =
+            "Cannot retry a retryable write that has been converted";
+
+        if (res.code && (res.code !== ErrorCodes.OK)) {
+            if (acceptableErrors.includes(res.code)) {
+                const msg = res.errmsg ? res.errmsg : res.message;
+
+                // This duplicate key error is only acceptable if it's a document shard key
+                // change during a concurrent migration.
+                if (res.code === ErrorCodes.DuplicateKey) {
+                    if (!msg.includes(duplicateKeyInChangeShardKeyMsg)) {
+                        return false;
+                    }
+                }
+
+                // This is a possible transient transaction error issue that could occur with
+                // concurrent moveChunks and transactions (if we happen to run a
+                // WouldChangeOwningShard update).
+                if (res.code === ErrorCodes.LockTimeout || res.code === ErrorCodes.StaleConfig ||
+                    res.code === ErrorCodes.ConflictingOperationInProgress) {
+                    if (!msg.includes(otherErrorsInChangeShardKeyMsg)) {
+                        return false;
+                    }
+                }
+
+                // In the current implementation, retrying a retryable write that was converted into
+                // a distributed transaction should fail with IncompleteTransactionHistory.
+                if (res.code === ErrorCodes.IncompleteTransactionHistory) {
+                    if (!msg.includes(failureInRetryableWriteToTxnConversionMsg)) {
+                        return false;
+                    }
+                }
+
+                // TODO: SERVER-67429 Remove this since we can run in all configurations.
+                // If we have a WouldChangeOwningShard update and we aren't running as a retryable
+                // write or in a transaction, then this is an acceptable error.
+                if (res.code === ErrorCodes.IllegalOperation) {
+                    if (!msg.includes(wouldChangeOwningShardMsg)) {
+                        return false;
+                    }
+                }
+
+                // If we're here that means the remaining acceptable errors must be
+                // TransientTransactionErrors.
+                if (res.errorLabels && !res.errorLabels.includes("TransientTransactionError")) {
+                    return false;
+                }
+                return true;
+            } else {
+                return false;
+            }
+        } else {
+            // We got an OK response from running the command.
+            return false;
+        }
     };
 
     /**
@@ -157,15 +252,15 @@ var $config = extendWorkload($config, function($config, $super) {
                     [doShardKeyUpdate ? this.defaultShardKeyField : this.secondaryDocField]:
                         newValue
                 };
-                res = assert.commandWorked(db.runCommand({
+                res = db.runCommand({
                     findAndModify: collName,
                     query: query,
                     update: {$set: update},
-                }));
+                });
             } else if (updateType === 1 /* Replacement Update */) {
-                // Always including a shard key update for replacement documents in order to keep
-                // the new document within the current thread's partition.
-                res = assert.commandWorked(db.runCommand({
+                // Always including a shard key update for replacement documents in order to
+                // keep the new document within the current thread's partition.
+                res = db.runCommand({
                     findAndModify: collName,
                     query: query,
                     update: {
@@ -173,23 +268,27 @@ var $config = extendWorkload($config, function($config, $super) {
                         [this.secondaryDocField]: newValue,
                         tid: this.tid
                     },
-                }));
+                });
             } else { /* Aggregation pipeline update */
                 const update = {
                     [doShardKeyUpdate ? this.defaultShardKeyField : this.secondaryDocField]:
                         newValue
                 };
 
-                // The $unset will result in a no-op since 'z' is not a field populated in any of
-                // the
-                // documents.
-                res = assert.commandWorked(db.runCommand({
+                // The $unset will result in a no-op since 'z' is not a field populated in any
+                // of the documents.
+                res = db.runCommand({
                     findAndModify: collName,
                     query: query,
                     update: [{$set: update}, {$unset: "z"}],
-                }));
+                });
             }
 
+            if (this.shouldSkipWriteResponseValidation(res)) {
+                return;
+            }
+
+            assert.commandWorked(res);
             if (containsMatchedDocs) {
                 assert.eq(res.lastErrorObject.n, 1, res);
                 assert.eq(res.lastErrorObject.updatedExisting, true, res);
@@ -222,30 +321,7 @@ var $config = extendWorkload($config, function($config, $super) {
 
     $config.states.updateOne = function updateOne(db, collName, connCache) {
         jsTestLog("Running updateOne state");
-        try {
-            this.generateAndRunRandomUpdateOp(db, collName);
-        } catch (e) {
-            if (acceptableErrors.includes(e.code)) {
-                // This duplicate key error is only acceptable if it's a document shard key
-                // change during a concurrent migration.
-                if (e.code === ErrorCodes.DuplicateKey) {
-                    if (!e.message.includes(duplicateKeyInChangeShardKeyMsg)) {
-                        throw e;
-                    }
-                }
-
-                // TODO: SERVER-67429 Remove this since we can run in all configurations.
-                // If we have a WouldChangeOwningShard update and we aren't running as a retryable
-                // write or in a transaction, then this is an acceptable error.
-                if (e.code === ErrorCodes.IllegalOperation) {
-                    if (!e.message.includes(wouldChangeOwningShardMsg)) {
-                        throw e;
-                    }
-                }
-            } else {
-                throw e;
-            }
-        }
+        this.generateAndRunRandomUpdateOp(db, collName);
     };
 
     $config.states.deleteOne = function deleteOne(db, collName, connCache) {
@@ -273,30 +349,7 @@ var $config = extendWorkload($config, function($config, $super) {
 
     $config.states.findAndModify = function findAndModify(db, collName, connCache) {
         jsTestLog("Running findAndModify state");
-        try {
-            this.generateAndRunRandomFindAndModifyOp(db, collName);
-        } catch (e) {
-            if (acceptableErrors.includes(e.code)) {
-                // This duplicate key error is only acceptable if it's a document shard key
-                // change during a concurrent migration.
-                if (e.code === ErrorCodes.DuplicateKey) {
-                    if (!e.message.includes(duplicateKeyInChangeShardKeyMsg)) {
-                        throw e;
-                    }
-                }
-
-                // TODO: SERVER-67429 Remove this since we can run in all configurations.
-                // If we have a WouldChangeOwningShard update and we aren't running as a retryable
-                // write or in a transaction, then this is an acceptable error.
-                if (e.code === ErrorCodes.IllegalOperation) {
-                    if (!e.message.includes(wouldChangeOwningShardMsg)) {
-                        throw e;
-                    }
-                }
-            } else {
-                throw e;
-            }
-        }
+        this.generateAndRunRandomFindAndModifyOp(db, collName);
     };
 
     $config.setup = function setup(db, collName, cluster) {
