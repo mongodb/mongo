@@ -361,9 +361,11 @@ __curtable_next(WT_CURSOR *cursor)
 
     ctable = (WT_CURSOR_TABLE *)cursor;
     JOINABLE_CURSOR_API_CALL(cursor, session, next, NULL);
+    API_RETRYABLE(session);
     APPLY_CG(ctable, next);
 
 err:
+    API_RETRYABLE_END(session, ret);
     API_END_RET(session, ret);
 }
 
@@ -414,9 +416,11 @@ __curtable_prev(WT_CURSOR *cursor)
 
     ctable = (WT_CURSOR_TABLE *)cursor;
     JOINABLE_CURSOR_API_CALL(cursor, session, prev, NULL);
+    API_RETRYABLE(session)
     APPLY_CG(ctable, prev);
 
 err:
+    API_RETRYABLE_END(session, ret);
     API_END_RET(session, ret);
 }
 
@@ -452,9 +456,11 @@ __curtable_search(WT_CURSOR *cursor)
 
     ctable = (WT_CURSOR_TABLE *)cursor;
     JOINABLE_CURSOR_API_CALL(cursor, session, search, NULL);
+    API_RETRYABLE(session);
     APPLY_CG(ctable, search);
 
 err:
+    API_RETRYABLE_END(session, ret);
     API_END_RET(session, ret);
 }
 
@@ -473,6 +479,8 @@ __curtable_search_near(WT_CURSOR *cursor, int *exact)
 
     ctable = (WT_CURSOR_TABLE *)cursor;
     JOINABLE_CURSOR_API_CALL(cursor, session, search_near, NULL);
+    API_RETRYABLE(session);
+
     cp = ctable->cg_cursors;
     primary = *cp;
     WT_ERR(primary->search_near(primary, exact));
@@ -486,6 +494,7 @@ __curtable_search_near(WT_CURSOR *cursor, int *exact)
     }
 
 err:
+    API_RETRYABLE_END(session, ret);
     API_END_RET(session, ret);
 }
 

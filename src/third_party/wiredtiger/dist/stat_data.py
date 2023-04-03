@@ -31,6 +31,10 @@ class Stat:
     def __cmp__(self, other):
         return cmp(self.desc.lower(), other.desc.lower())
 
+class AutoCommitStat(Stat):
+    prefix = 'autocommit'
+    def __init__(self, name, desc, flags=''):
+        Stat.__init__(self, name, AutoCommitStat.prefix, desc, flags)
 class BlockCacheStat(Stat):
     prefix = 'block-cache'
     def __init__(self, name, desc, flags=''):
@@ -798,6 +802,12 @@ dsrc_stats = sorted(dsrc_stats, key=attrgetter('desc'))
 # CONNECTION AND DATA SOURCE statistics
 ##########################################
 conn_dsrc_stats = [
+    ##########################################
+    # Autocommit statistics
+    ##########################################
+    AutoCommitStat('autocommit_readonly_retry', 'retries for readonly operations'),
+    AutoCommitStat('autocommit_update_retry', 'retries for update operations'),
+
     ##########################################
     # Cache and eviction statistics
     ##########################################
