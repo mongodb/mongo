@@ -909,7 +909,8 @@ def remote_handler(options, task_config, root_dir):
         def set_fcv():
             mongo = pymongo.MongoClient(**mongo_client_opts)
             try:
-                ret = mongo.admin.command("setFeatureCompatibilityVersion", task_config.fcv)
+                ret = mongo.admin.command("setFeatureCompatibilityVersion", task_config.fcv,
+                                          confirm=True)
                 ret = 0 if ret["ok"] == 1 else 1
             except pymongo.errors.OperationFailure as err:
                 LOGGER.error("%s", err)
