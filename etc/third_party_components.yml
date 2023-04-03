@@ -162,8 +162,8 @@ components:
     vulnerability_suppression: TODO SERVER-49211
     upgrade_suppression: TODO SERVER-49211
 
-  immer:
-    homepage_url: https://sinusoid.es/immer
+  arximboldi/immer:
+    homepage_url: https://github.com/arximboldi/immer
     open_hub_url: N/A
     release_monitoring_id: -1
     local_directory_path: src/third_party/immer
