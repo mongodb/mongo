@@ -165,12 +165,12 @@ for (const postImageMode of ["required", "updateLookup"]) {
                               ErrorCodes.BSONObjectTooLarge);
 
         const newChangeStreamsLargeEventsFailed = getChangeStreamMetricSum("largeEventsFailed");
-        // We will hit this exception once on each shard that encounters a large change event
-        // document.
-        const numShardsWithLargeDocs =
-            Math.min(2, FixtureHelpers.numberOfShardsForCollection(testColl));
-        assert.eq(newChangeStreamsLargeEventsFailed,
-                  oldChangeStreamsLargeEventsFailed + numShardsWithLargeDocs);
+        // We will hit the 'BSONObjectTooLarge' error once on each shard that encounters a large
+        // change event document. The error will occur maximum on 2 shards, because we trigger only
+        // 2 change events. The error might occur only on 1 shard when the collection is not sharded
+        // or due to the timing of exceptions on sharded clusters.
+        assert.contains(newChangeStreamsLargeEventsFailed - oldChangeStreamsLargeEventsFailed,
+                        [1, 2]);
     }
 
     {
