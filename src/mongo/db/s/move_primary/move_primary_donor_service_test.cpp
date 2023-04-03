@@ -833,8 +833,10 @@ TEST_F(MovePrimaryDonorServiceTest, StateDocumentRemovedAfterSuccess) {
 
 TEST_F(MovePrimaryDonorServiceTest, ReadyToBlockWritesPromiseReturnsErrorIfAborted) {
     auto opCtx = makeOperationContext();
-    auto instance = createInstance(opCtx.get());
+    auto [instance, fp] =
+        createInstanceInState(opCtx.get(), MovePrimaryDonorStateEnum::kInitializing);
     instance->abort(kAbortedError);
+    fp->setMode(FailPoint::off);
     ASSERT_EQ(instance->getReadyToBlockWritesFuture().getNoThrow(), kAbortedError);
 }
 
