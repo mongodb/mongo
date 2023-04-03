@@ -53,7 +53,14 @@ public:
      * Getter for the sampling rate.
      */
     RequestCount getSamplingRate() {
-        return _samplingRate;
+        return _samplingRate.load();
+    }
+
+    /*
+     * Setter for the sampling rate.
+     */
+    void setSamplingRate(RequestCount samplingRate) {
+        _samplingRate.store(samplingRate);
     }
 
     /*
@@ -86,7 +93,7 @@ private:
     /*
      * Sampling rate is the bound on the number of requests we want to admit per window.
      */
-    const RequestCount _samplingRate;
+    AtomicWord<RequestCount> _samplingRate;
 
     /*
      * Time period is the window size in ms.

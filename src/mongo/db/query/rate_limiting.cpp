@@ -54,7 +54,7 @@ bool RateLimiting::handleRequestFixedWindow() {
     stdx::unique_lock windowLock{_windowMutex};
     tickWindow();
 
-    if (_currentCount < _samplingRate) {
+    if (_currentCount < _samplingRate.load()) {
         _currentCount += 1;
         return true;
     }
@@ -83,7 +83,7 @@ bool RateLimiting::handleRequestSlidingWindow() {
     // Add this estimate to the requests we know have taken place within the current time block.
     double estimatedCount = _currentCount + estimatedRemaining;
 
-    if (estimatedCount < _samplingRate) {
+    if (estimatedCount < _samplingRate.load()) {
         _currentCount += 1;
         return true;
     }

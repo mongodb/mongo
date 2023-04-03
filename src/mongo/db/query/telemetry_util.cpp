@@ -79,6 +79,18 @@ Status validateTelemetryStoreSize(const std::string& str, const boost::optional<
     return memory_util::MemorySize::parse(str).getStatus();
 }
 
+Status onTelemetrySamplingRateUpdate(int samplingRate) {
+    // The client is nullptr if the parameter is supplied from the command line. In this case, we
+    // ignore the update event, the parameter will be processed when initializing the service
+    // context.
+    if (auto client = Client::getCurrent()) {
+        auto&& [serviceCtx, updater] = getUpdater(*client);
+        updater->updateSamplingRate(serviceCtx, samplingRate);
+    }
+
+    return Status::OK();
+}
+
 const Decorable<ServiceContext>::Decoration<std::unique_ptr<OnParamChangeUpdater>>
     telemetryStoreOnParamChangeUpdater =
         ServiceContext::declareDecoration<std::unique_ptr<OnParamChangeUpdater>>();

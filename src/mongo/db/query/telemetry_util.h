@@ -42,6 +42,8 @@ Status onTelemetryStoreSizeUpdate(const std::string& str);
 
 Status validateTelemetryStoreSize(const std::string& str, const boost::optional<TenantId>&);
 
+Status onTelemetrySamplingRateUpdate(int samplingRate);
+
 /**
  *  An interface used to modify the telemetry store when query setParameters are modified. This is
  *  done via an interface decorating the 'ServiceContext' in order to avoid a link-time dependency
@@ -57,6 +59,11 @@ public:
      * cache fits within the new size bound.
      */
     virtual void updateCacheSize(ServiceContext* serviceCtx, memory_util::MemorySize memSize) = 0;
+
+    /**
+     * Updates the sampling rate for the telemetry rate limiter.
+     */
+    virtual void updateSamplingRate(ServiceContext* serviceCtx, int samplingRate) = 0;
 };
 
 /**
@@ -67,6 +74,12 @@ class NoChangesAllowedTelemetryParamUpdater : public OnParamChangeUpdater {
 public:
     void updateCacheSize(ServiceContext* serviceCtx, memory_util::MemorySize memSize) final {
         uasserted(7373500,
+                  "Cannot configure telemetry store - it is currently disabled and a restart is "
+                  "required to activate.");
+    }
+
+    void updateSamplingRate(ServiceContext* serviceCtx, int samplingRate) {
+        uasserted(7506200,
                   "Cannot configure telemetry store - it is currently disabled and a restart is "
                   "required to activate.");
     }

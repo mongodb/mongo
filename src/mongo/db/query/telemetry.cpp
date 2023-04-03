@@ -418,6 +418,10 @@ public:
         size_t numEvicted = telemetryStore.reset(cappedSize);
         telemetryEvictedMetric.increment(numEvicted);
     }
+
+    void updateSamplingRate(ServiceContext* serviceCtx, int samplingRate) {
+        telemetryRateLimiter(serviceCtx).get()->setSamplingRate(samplingRate);
+    }
 };
 
 ServiceContext::ConstructorActionRegisterer telemetryStoreManagerRegisterer{

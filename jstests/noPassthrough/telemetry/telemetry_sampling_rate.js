@@ -26,12 +26,13 @@ coll.aggregate([{$match: {foo: 1}}], {cursor: {batchSize: 2}});
 let telStore = testdb.adminCommand({aggregate: 1, pipeline: [{$telemetry: {}}], cursor: {}});
 assert.eq(telStore.cursor.firstBatch.length, 0);
 
-// TODO SERVER-71531 enable below test.
 // Reading telemetry store should work now with a sampling rate of greater than 0.
-// assert.commandWorked(testdb.adminCommand({setParameter: 1,
-// internalQueryConfigureTelemetrySamplingRate: 2147483647})); coll.aggregate([{$match: {foo: 1}}],
-// {cursor: {batchSize: 2}}); assert.commandWorked(testdb.adminCommand({aggregate: 1, pipeline:
-// [{$telemetry: {}}], cursor: {}}));
+assert.commandWorked(testdb.adminCommand(
+    {setParameter: 1, internalQueryConfigureTelemetrySamplingRate: 2147483647}));
+coll.aggregate([{$match: {foo: 1}}], {cursor: {batchSize: 2}});
+telStore = assert.commandWorked(
+    testdb.adminCommand({aggregate: 1, pipeline: [{$telemetry: {}}], cursor: {}}));
+assert.eq(telStore.cursor.firstBatch.length, 1);
 
 MongoRunner.stopMongod(conn);
 }());

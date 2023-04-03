@@ -1026,6 +1026,9 @@ server_parameters:
     cpp_varname: "queryTelemetrySamplingRate"
     cpp_vartype: AtomicWord<int>
     default: 0
+    validator:
+      gte: 0
+    on_update: telemetry_util::onTelemetrySamplingRateUpdate
 
   internalQueryConfigureTelemetryCacheSize:
     description: "The maximum amount of memory that the system will allocate for the query telemetry
