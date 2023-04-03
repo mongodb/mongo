@@ -51,7 +51,7 @@ function validateServerStatusMongos(serverStatus) {
     assert(!serverStatus.hasOwnProperty("totalSampledWritesBytes"), serverStatus);
 }
 
-function validateServerStatusMongod(serverStatus, isShardSvr) {
+function validateServerStatusMongod(serverStatus) {
     assert(serverStatus.hasOwnProperty("activeCollections"), serverStatus);
     assert(serverStatus.hasOwnProperty("totalCollections"), serverStatus);
     assert(serverStatus.hasOwnProperty("totalSampledReadsCount"), serverStatus);
@@ -187,7 +187,8 @@ function assertCurrentOpAndServerStatusMongod(ns, opKind, oldState, newState, is
     if (opKind == opKindRead) {
         // On a mongod, the counters are incremented asynchronously so they might not be up-to-date
         // after the command returns.
-        if (newState.currentOp[0].sampledReadsCount == oldState.currentOp[0].sampledReadsCount) {
+        if (bsonWoCompare(newState.currentOp[0].sampledReadsCount,
+                          oldState.currentOp[0].sampledReadsCount) == 0) {
             return false;
         }
         assert.eq(newState.currentOp[0].sampledReadsCount,
@@ -222,7 +223,8 @@ function assertCurrentOpAndServerStatusMongod(ns, opKind, oldState, newState, is
     } else if (opKind == opKindWrite) {
         // On a mongod, the counters are incremented asynchronously so they might not be up-to-date
         // after the command returns.
-        if (newState.currentOp[0].sampledWritesCount == oldState.currentOp[0].sampledWritesCount) {
+        if (bsonWoCompare(newState.currentOp[0].sampledWritesCount,
+                          oldState.currentOp[0].sampledWritesCount) == 0) {
             return false;
         }
         assert.eq(newState.currentOp[0].sampledReadsCount,
