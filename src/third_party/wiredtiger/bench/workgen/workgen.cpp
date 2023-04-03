@@ -211,8 +211,6 @@ volatile std::sig_atomic_t signal_raised = 0;
 void
 signal_handler(int signum)
 {
-    std::cerr << "Workgen received signal " << signum << ": " << strsignal(signum) << "."
-              << std::endl;
     signal_raised = signum;
 }
 
