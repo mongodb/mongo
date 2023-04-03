@@ -940,19 +940,47 @@ const Collection* CollectionCatalog::_openCollectionAtLatestByNamespaceOrUUID(
     // If the catalog entry is not found in our snapshot then the collection is being dropped and we
     // can observe the drop. Lookups by this namespace or uuid should not find a collection.
     if (catalogEntry.isEmpty()) {
+        // If we performed this lookup by UUID we could be in a case where we're looking up
+        // concurrently with a rename with dropTarget=true where the UUID that we use is the target
+        // that got dropped. If that rename has committed we need to put the correct collection
+        // under open collection for this namespace. We can detect this case by comparing the
+        // catalogId with what is pending for this namespace.
+        if (nssOrUUID.uuid()) {
+            const std::shared_ptr<Collection>& pending = *_pendingCommitNamespaces.find(nss);
+            if (pending && pending->getCatalogId() != catalogId) {
+                openedCollections.store(nullptr, boost::none, uuid);
+                openedCollections.store(pending, nss, pending->uuid());
+                return nullptr;
+            }
+        }
         openedCollections.store(nullptr, nss, uuid);
         return nullptr;
     }
 
     // When trying to open the latest collection by namespace and the catalog entry has a different
-    // namespace in our snapshot, then there is a rename operation concurrent with this call. We
-    // need to store entries under uncommitted catalog changes for two namespaces (rename 'from' and
-    // 'to') so we can make sure lookups by UUID is supported and will return a Collection with its
-    // namespace in sync with the storage snapshot.
+    // namespace in our snapshot, then there is a rename operation concurrent with this call.
     NamespaceString nsInDurableCatalog = DurableCatalog::getNamespaceFromCatalogEntry(catalogEntry);
     if (nssOrUUID.nss() && nss != nsInDurableCatalog) {
-        // Like above, the correct instance is either in the catalog or under pending. First
-        // lookup in pending by UUID to determine if it contains the right namespace.
+        // There are two types of rename depending on the dropTarget flag.
+        if (pendingCollection && latestCollection &&
+            pendingCollection->getCatalogId() != latestCollection->getCatalogId()) {
+            // When there is a rename with dropTarget=true the two possible choices for the
+            // collection we need to observe are different logical collections, they have different
+            // UUID and catalogId. In this case storing a single entry in open collections is
+            // sufficient. We know that the instance we are looking for must be under
+            // 'latestCollection' as we used the catalogId from 'pendingCollection' when fetching
+            // durable catalog entry and the namespace in it did not match the namespace for
+            // 'pendingCollection' (the rename has not been comitted yet)
+            openedCollections.store(latestCollection, nss, latestCollection->uuid());
+            return latestCollection.get();
+        }
+
+        // For a regular rename of the same logical collection with dropTarget=false have the same
+        // UUID and catalogId for the two choices. In this case we need to store entries under open
+        // collections for two namespaces (rename 'from' and 'to') so we can make sure lookups by
+        // UUID is supported and will return a Collection with its namespace in sync with the
+        // storage snapshot. Like above, the correct instance is either in the catalog or under
+        // pending. First lookup in pending by UUID to determine if it contains the right namespace.
         const std::shared_ptr<Collection>* pending = _pendingCommitUUIDs.find(uuid);
         invariant(pending);
         const auto& pendingCollectionByUUID = *pending;
@@ -979,7 +1007,18 @@ const Collection* CollectionCatalog::_openCollectionAtLatestByNamespaceOrUUID(
     if (nssOrUUID.uuid() && latestCollection && pendingCollection &&
         latestCollection->ns() != pendingCollection->ns()) {
         if (latestCollection->ns() == nsInDurableCatalog) {
-            openedCollections.store(nullptr, pendingCollection->ns(), boost::none);
+            // If this is a rename with dropTarget=true and we're looking up with the 'from' UUID
+            // before the rename committed, the namespace would correspond to a valid collection
+            // that we need to store under open collections.
+            auto latestCollectionByNamespace =
+                _getCollectionByNamespace(opCtx, pendingCollection->ns());
+            if (latestCollectionByNamespace) {
+                openedCollections.store(latestCollectionByNamespace,
+                                        latestCollectionByNamespace->ns(),
+                                        latestCollectionByNamespace->uuid());
+            } else {
+                openedCollections.store(nullptr, pendingCollection->ns(), boost::none);
+            }
             openedCollections.store(latestCollection, nsInDurableCatalog, uuid);
             return latestCollection.get();
         } else {

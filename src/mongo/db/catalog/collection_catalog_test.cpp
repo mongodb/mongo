@@ -3358,6 +3358,263 @@ TEST_F(CollectionCatalogTimestampTest,
         });
 }
 
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentRenameCollectionWithDropTargetAndOpenCollectionBeforeCommit) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagPointInTimeCatalogLookups", true);
+
+    const NamespaceString originalNss = NamespaceString::createNamespaceString_forTest("a.b");
+    const NamespaceString targetNss = NamespaceString::createNamespaceString_forTest("a.c");
+    const Timestamp createOriginalCollectionTs = Timestamp(10, 10);
+    const Timestamp createTargetCollectionTs = Timestamp(15, 15);
+    const Timestamp renameCollectionTs = Timestamp(20, 20);
+
+    createCollection(opCtx.get(), originalNss, createOriginalCollectionTs);
+    createCollection(opCtx.get(), targetNss, createTargetCollectionTs);
+
+    // We expect to find the UUID for the original collection
+    UUID uuid = CollectionCatalog::get(opCtx.get())
+                    ->lookupCollectionByNamespace(opCtx.get(), originalNss)
+                    ->uuid();
+
+    // When the snapshot is opened right before the rename is committed to the durable catalog, and
+    // the openCollection looks for the targetNss, we find the target collection.
+    concurrentRenameCollectionAndEstablishConsistentCollection(
+        opCtx.get(), originalNss, targetNss, targetNss, renameCollectionTs, true, true, 0, [&]() {
+            // Verify that we can find the original Collection when we search by original UUID.
+            auto coll =
+                CollectionCatalog::get(opCtx.get())->lookupCollectionByUUID(opCtx.get(), uuid);
+            ASSERT(coll);
+            ASSERT_EQ(coll->ns(), originalNss);
+
+            ASSERT_EQ(CollectionCatalog::get(opCtx.get())->lookupNSSByUUID(opCtx.get(), uuid),
+                      originalNss);
+        });
+}
+
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentRenameCollectionWithDropTargetAndOpenCollectionAfterCommit) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagPointInTimeCatalogLookups", true);
+
+    const NamespaceString originalNss = NamespaceString::createNamespaceString_forTest("a.b");
+    const NamespaceString targetNss = NamespaceString::createNamespaceString_forTest("a.c");
+    const Timestamp createOriginalCollectionTs = Timestamp(10, 10);
+    const Timestamp createTargetCollectionTs = Timestamp(15, 15);
+    const Timestamp renameCollectionTs = Timestamp(20, 20);
+
+    createCollection(opCtx.get(), originalNss, createOriginalCollectionTs);
+    createCollection(opCtx.get(), targetNss, createTargetCollectionTs);
+
+    // We expect to find the UUID for the target collection
+    UUID uuid = CollectionCatalog::get(opCtx.get())
+                    ->lookupCollectionByNamespace(opCtx.get(), targetNss)
+                    ->uuid();
+
+    // When the snapshot is opened right after the rename is committed to the durable catalog, and
+    // the openCollection looks for the targetNss, we find the original collection.
+    concurrentRenameCollectionAndEstablishConsistentCollection(
+        opCtx.get(), originalNss, targetNss, targetNss, renameCollectionTs, false, true, 0, [&]() {
+            // Verify that search by UUID is as expected and returns the target collection
+            auto coll =
+                CollectionCatalog::get(opCtx.get())->lookupCollectionByUUID(opCtx.get(), uuid);
+            ASSERT(coll);
+            ASSERT_EQ(coll->ns(), targetNss);
+
+            ASSERT_EQ(CollectionCatalog::get(opCtx.get())->lookupNSSByUUID(opCtx.get(), uuid),
+                      targetNss);
+        });
+}
+
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentRenameCollectionWithDropTargetAndOpenCollectionWithOriginalUUIDBeforeCommit) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagPointInTimeCatalogLookups", true);
+
+    const NamespaceString originalNss = NamespaceString::createNamespaceString_forTest("a.b");
+    const NamespaceString targetNss = NamespaceString::createNamespaceString_forTest("a.c");
+    const Timestamp createOriginalCollectionTs = Timestamp(10, 10);
+    const Timestamp createTargetCollectionTs = Timestamp(15, 15);
+    const Timestamp renameCollectionTs = Timestamp(20, 20);
+
+    createCollection(opCtx.get(), originalNss, createOriginalCollectionTs);
+    createCollection(opCtx.get(), targetNss, createTargetCollectionTs);
+
+    // We expect to find the UUID for the original collection
+    UUID originalUUID = CollectionCatalog::get(opCtx.get())
+                            ->lookupCollectionByNamespace(opCtx.get(), originalNss)
+                            ->uuid();
+    UUID targetUUID = CollectionCatalog::get(opCtx.get())
+                          ->lookupCollectionByNamespace(opCtx.get(), targetNss)
+                          ->uuid();
+    NamespaceStringOrUUID uuidWithDbName(originalNss.dbName(), originalUUID);
+
+    // When the snapshot is opened right before the rename is committed to the durable catalog, and
+    // the openCollection looks for the original UUID, we should find the original collection
+    concurrentRenameCollectionAndEstablishConsistentCollection(
+        opCtx.get(),
+        originalNss,
+        targetNss,
+        uuidWithDbName,
+        renameCollectionTs,
+        true,
+        true,
+        0,
+        [&]() {
+            // Verify that we can find the original Collection when we search by namespace as rename
+            // has not committed yet.
+            auto coll = CollectionCatalog::get(opCtx.get())
+                            ->lookupCollectionByNamespace(opCtx.get(), originalNss);
+            ASSERT(coll);
+            ASSERT_EQ(coll->uuid(), originalUUID);
+
+            // Verify that we can find the target Collection when we search by namespace as rename
+            // has not committed yet.
+            coll = CollectionCatalog::get(opCtx.get())
+                       ->lookupCollectionByNamespace(opCtx.get(), targetNss);
+            ASSERT(coll);
+            ASSERT_EQ(coll->uuid(), targetUUID);
+        });
+}
+
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentRenameCollectionWithDropTargetAndOpenCollectionWithOriginalUUIDAfterCommit) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagPointInTimeCatalogLookups", true);
+
+    const NamespaceString originalNss = NamespaceString::createNamespaceString_forTest("a.b");
+    const NamespaceString targetNss = NamespaceString::createNamespaceString_forTest("a.c");
+    const Timestamp createOriginalCollectionTs = Timestamp(10, 10);
+    const Timestamp createTargetCollectionTs = Timestamp(15, 15);
+    const Timestamp renameCollectionTs = Timestamp(20, 20);
+
+    createCollection(opCtx.get(), originalNss, createOriginalCollectionTs);
+    createCollection(opCtx.get(), targetNss, createTargetCollectionTs);
+
+    // We expect to find the UUID for the original collection
+    UUID uuid = CollectionCatalog::get(opCtx.get())
+                    ->lookupCollectionByNamespace(opCtx.get(), originalNss)
+                    ->uuid();
+    NamespaceStringOrUUID uuidWithDbName(originalNss.dbName(), uuid);
+
+    // When the snapshot is opened right after the rename is committed to the durable catalog, and
+    // the openCollection looks for the newNss, no collection instance should be returned.
+    concurrentRenameCollectionAndEstablishConsistentCollection(
+        opCtx.get(),
+        originalNss,
+        targetNss,
+        uuidWithDbName,
+        renameCollectionTs,
+        false,
+        true,
+        0,
+        [&]() {
+            // Verify that we cannot find the Collection when we search by the original namespace.
+            auto coll = CollectionCatalog::get(opCtx.get())
+                            ->lookupCollectionByNamespace(opCtx.get(), originalNss);
+            ASSERT(!coll);
+
+            // Verify that we can find the original Collection UUID when we search by namespace.
+            coll = CollectionCatalog::get(opCtx.get())
+                       ->lookupCollectionByNamespace(opCtx.get(), targetNss);
+            ASSERT(coll);
+            ASSERT_EQ(coll->uuid(), uuid);
+        });
+}
+
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentRenameCollectionWithDropTargetAndOpenCollectionWithTargetUUIDBeforeCommit) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagPointInTimeCatalogLookups", true);
+
+    const NamespaceString originalNss = NamespaceString::createNamespaceString_forTest("a.b");
+    const NamespaceString targetNss = NamespaceString::createNamespaceString_forTest("a.c");
+    const Timestamp createOriginalCollectionTs = Timestamp(10, 10);
+    const Timestamp createTargetCollectionTs = Timestamp(15, 15);
+    const Timestamp renameCollectionTs = Timestamp(20, 20);
+
+    createCollection(opCtx.get(), originalNss, createOriginalCollectionTs);
+    createCollection(opCtx.get(), targetNss, createTargetCollectionTs);
+
+    UUID originalUUID = CollectionCatalog::get(opCtx.get())
+                            ->lookupCollectionByNamespace(opCtx.get(), originalNss)
+                            ->uuid();
+    UUID targetUUID = CollectionCatalog::get(opCtx.get())
+                          ->lookupCollectionByNamespace(opCtx.get(), targetNss)
+                          ->uuid();
+    NamespaceStringOrUUID uuidWithDbName(originalNss.dbName(), targetUUID);
+
+    // When the snapshot is opened right before the rename is committed to the durable catalog, and
+    // the openCollection looks for the original UUID, we should find the original collection
+    concurrentRenameCollectionAndEstablishConsistentCollection(
+        opCtx.get(),
+        originalNss,
+        targetNss,
+        uuidWithDbName,
+        renameCollectionTs,
+        true,
+        true,
+        0,
+        [&]() {
+            // Verify that we can find the original Collection when we search by namespace as rename
+            // has not committed yet.
+            auto coll = CollectionCatalog::get(opCtx.get())
+                            ->lookupCollectionByNamespace(opCtx.get(), originalNss);
+            ASSERT(coll);
+            ASSERT_EQ(coll->uuid(), originalUUID);
+
+            // Verify that we can find the target Collection when we search by namespace as rename
+            // has not committed yet.
+            coll = CollectionCatalog::get(opCtx.get())
+                       ->lookupCollectionByNamespace(opCtx.get(), targetNss);
+            ASSERT(coll);
+            ASSERT_EQ(coll->uuid(), targetUUID);
+        });
+}
+
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentRenameCollectionWithDropTargetAndOpenCollectionWithTargetUUIDAfterCommit) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagPointInTimeCatalogLookups", true);
+
+    const NamespaceString originalNss = NamespaceString::createNamespaceString_forTest("a.b");
+    const NamespaceString targetNss = NamespaceString::createNamespaceString_forTest("a.c");
+    const Timestamp createOriginalCollectionTs = Timestamp(10, 10);
+    const Timestamp createTargetCollectionTs = Timestamp(15, 15);
+    const Timestamp renameCollectionTs = Timestamp(20, 20);
+
+    createCollection(opCtx.get(), originalNss, createOriginalCollectionTs);
+    createCollection(opCtx.get(), targetNss, createTargetCollectionTs);
+
+    // We expect to find the UUID for the original collection
+    UUID originalUUID = CollectionCatalog::get(opCtx.get())
+                            ->lookupCollectionByNamespace(opCtx.get(), originalNss)
+                            ->uuid();
+    UUID targetUUID = CollectionCatalog::get(opCtx.get())
+                          ->lookupCollectionByNamespace(opCtx.get(), targetNss)
+                          ->uuid();
+    NamespaceStringOrUUID uuidWithDbName(originalNss.dbName(), targetUUID);
+
+    // When the snapshot is opened right after the rename is committed to the durable catalog, and
+    // the openCollection looks for the newNss, no collection instance should be returned.
+    concurrentRenameCollectionAndEstablishConsistentCollection(
+        opCtx.get(),
+        originalNss,
+        targetNss,
+        uuidWithDbName,
+        renameCollectionTs,
+        false,
+        false,
+        0,
+        [&]() {
+            // Verify that we can find the original Collection UUID when we search by namespace.
+            auto coll = CollectionCatalog::get(opCtx.get())
+                            ->lookupCollectionByNamespace(opCtx.get(), targetNss);
+            ASSERT(coll);
+            ASSERT_EQ(coll->uuid(), originalUUID);
+        });
+}
+
 TEST_F(CollectionCatalogTimestampTest, ConcurrentCreateIndexAndOpenCollectionBeforeCommit) {
     RAIIServerParameterControllerForTest featureFlagController(
         "featureFlagPointInTimeCatalogLookups", true);
