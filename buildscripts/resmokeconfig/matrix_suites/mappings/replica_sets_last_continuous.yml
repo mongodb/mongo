@@ -1,0 +1,4 @@
+base_suite: replica_sets
+overrides:
+  - "multiversion.replica_sets_multiversion_selector"
+  - "multiversion.replica_sets_multiversion_testdata_last_continuous"

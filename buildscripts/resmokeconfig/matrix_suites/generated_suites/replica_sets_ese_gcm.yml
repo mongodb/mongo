@@ -1,0 +1,27 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/replica_sets_ese_gcm.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
+##########################################################
+executor:
+  config:
+    shell_options:
+      global_vars:
+        TestData:
+          enableEncryption: ''
+          encryptionCipherMode: AES256-GCM
+          encryptionKeyFile: src/mongo/db/modules/enterprise/jstests/encryptdb/libs/ekf2
+      nodb: ''
+matrix_suite: true
+selector:
+  exclude_files: null
+  exclude_with_any_tags:
+  - does_not_support_encrypted_storage_engine
+  - serverless
+  roots:
+  - jstests/replsets/*.js
+  - src/mongo/db/modules/enterprise/jstests/fcbis/*.js
+test_kind: js_test

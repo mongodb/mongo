@@ -1,0 +1,3 @@
+base_suite: sharding_jscore_passthrough
+overrides:
+  - "multiversion.sharded_fixture_last_lts_new_old_old_new"

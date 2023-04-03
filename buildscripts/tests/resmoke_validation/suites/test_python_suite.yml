@@ -1,0 +1,6 @@
+test_kind: py_test
+
+selector:
+  roots: []
+
+executor: {}

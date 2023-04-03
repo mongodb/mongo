@@ -1,0 +1,27 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/replica_sets_large_txns_format.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
+##########################################################
+executor:
+  archive:
+    tests: true
+  config:
+    shell_options:
+      global_vars:
+        TestData:
+          setParameters:
+            maxNumberOfTransactionOperationsInSingleOplogEntry: 1
+      nodb: ''
+matrix_suite: true
+selector:
+  exclude_files:
+  - jstests/replsets/tenant_migration_recipient_shard_merge_copies_change_collections.js
+  exclude_with_any_tags:
+  - requires_capped
+  roots:
+  - jstests/replsets/*.js
+test_kind: js_test

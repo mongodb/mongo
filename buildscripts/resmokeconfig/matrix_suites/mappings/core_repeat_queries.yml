@@ -1,8 +1,7 @@
 # This suite should not be run in evergreen, it is combined into
 # core_min_batch_repeat_queries_ese_gsm
-- suite_name: core_repeat_queries
-  base_suite: core
-  eval:
-    - "repeat_queries.enable_eval"
-  excludes:
-    - "repeat_queries.excluded_files"
+base_suite: core
+eval:
+  - "repeat_queries.enable_eval"
+excludes:
+  - "repeat_queries.excluded_files"

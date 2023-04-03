@@ -1,8 +1,7 @@
-- suite_name: replica_sets_ese_gcm
-  base_suite: replica_sets
-  overrides:
-    - "encryption.testdata_ese"
-    - "encryption.testdata_gcm"
-  excludes:
-    - "encryption.excluded_files"
-    - "encryption.serverless_excluded_files"
+base_suite: replica_sets
+overrides:
+  - "encryption.testdata_ese"
+  - "encryption.testdata_gcm"
+excludes:
+  - "encryption.excluded_files"
+  - "encryption.serverless_excluded_files"

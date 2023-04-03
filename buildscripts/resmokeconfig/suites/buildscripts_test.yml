@@ -10,6 +10,7 @@ selector:
   - buildscripts/tests/resmokelib/utils/test_archival.py # Requires boto3.
   - buildscripts/tests/resmokelib/powercycle/test_remote_operations.py # Requires ssh to be enabled locally.
   - buildscripts/tests/resmoke_end2end/**/test_*.py # Requires compile task. Test run in resmoke_end2end_tests.yml instead.
+  - buildscripts/tests/resmoke_validation/**/test_*.py # Ran in commit queue in resmoke_validation_tests
   - buildscripts/tests/tooling_metrics_e2e/**/test_*.py # Only supported on Ubuntu 18.04 Virtual Workstations
 
 

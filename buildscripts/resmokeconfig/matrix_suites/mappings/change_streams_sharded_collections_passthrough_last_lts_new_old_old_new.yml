@@ -1,0 +1,13 @@
+base_suite: change_streams
+# The change_stream overrides are copied from change_streams_sharded_collections_passthrough.yml
+overrides:
+  - "change_streams.mongos_passthrough"
+  - "change_streams.sharded_collections_passthrough"
+  - "change_streams.base_eval"
+  - "multiversion.sharded_fixture_last_lts_new_old_old_new"
+eval:
+  - "change_streams.sharded_collections_passthrough_eval"
+  - "change_streams.causal_consistency"
+excludes:
+  - "change_streams.mongos_passthrough_excludes"
+  - "change_streams.sharded_collections_passthrough_excludes"

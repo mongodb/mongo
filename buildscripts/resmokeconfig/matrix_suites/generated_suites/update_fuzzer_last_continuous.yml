@@ -1,0 +1,25 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/update_fuzzer_last_continuous.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
+##########################################################
+executor:
+  archive:
+    tests: true
+  config:
+    shell_options:
+      global_vars:
+        TestData:
+          clusterType: standalone
+          internalQueryAppendIdToSetWindowFieldsSort: true
+          internalQueryMaxAllowedDensifyDocs: 1000
+          traceExceptions: false
+      nodb: ''
+matrix_suite: true
+selector:
+  roots:
+  - jstestfuzz/out/*.js
+test_kind: js_test

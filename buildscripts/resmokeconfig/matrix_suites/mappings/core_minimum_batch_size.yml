@@ -1,10 +1,9 @@
 # This suite should not be run in evergreen, it is combined into
 # core_min_batch_repeat_queries_ese_gsm
-- suite_name: core_minimum_batch_size
-  base_suite: core
-  overrides:
-    - "minimum_batch_size.enable_override"
-  eval:
-    - "minimum_batch_size.enable_eval"
-  excludes:
-    - "minimum_batch_size.excluded_files"
+base_suite: core
+overrides:
+  - "minimum_batch_size.enable_override"
+eval:
+  - "minimum_batch_size.enable_eval"
+excludes:
+  - "minimum_batch_size.excluded_files"

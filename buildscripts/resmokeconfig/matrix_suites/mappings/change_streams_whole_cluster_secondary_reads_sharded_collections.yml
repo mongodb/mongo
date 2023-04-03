@@ -3,23 +3,22 @@
 # change_streams_whole_cluster_sharded_collections_passthrough.
 # If part of this suite fails, you can comment out individual parts or run the above tests
 # to dig deeper into what is failing.
-- suite_name: change_streams_whole_cluster_secondary_reads_sharded_collections
-  base_suite: change_streams_whole_cluster_passthrough
-  description: >-
-    This suite is a combination of core_ese_gcm, core_repeat_queries, and core_minimum_batch_size.
-    You can run any of these tests individually to debug any issues that might arrise.
-  overrides:
-    - "change_streams.mongos_passthrough"
-    - "change_streams.sharded_collections_passthrough"
-    - "change_streams.secondary_reads"
-    - "change_streams.base_eval"
-  eval:
-    - "change_streams.secondary_reads_eval"
-    - "change_streams.sharded_collections_passthrough_eval"
-    - "change_streams.whole_cluster_eval"
-    #uncomment this line if you comment out the secondary reads portion of this file
-    # - "change_streams.causal_consistency"
-  excludes:
-    - "change_streams.mongos_passthrough_excludes"
-    - "change_streams.sharded_collections_passthrough_excludes"
-    - "change_streams.secondary_reads_excludes"
+base_suite: change_streams_whole_cluster_passthrough
+description: >-
+  This suite is a combination of core_ese_gcm, core_repeat_queries, and core_minimum_batch_size.
+  You can run any of these tests individually to debug any issues that might arrise.
+overrides:
+  - "change_streams.mongos_passthrough"
+  - "change_streams.sharded_collections_passthrough"
+  - "change_streams.secondary_reads"
+  - "change_streams.base_eval"
+eval:
+  - "change_streams.secondary_reads_eval"
+  - "change_streams.sharded_collections_passthrough_eval"
+  - "change_streams.whole_cluster_eval"
+  #uncomment this line if you comment out the secondary reads portion of this file
+  # - "change_streams.causal_consistency"
+excludes:
+  - "change_streams.mongos_passthrough_excludes"
+  - "change_streams.sharded_collections_passthrough_excludes"
+  - "change_streams.secondary_reads_excludes"

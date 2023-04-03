@@ -1,0 +1,3 @@
+base_suite: concurrency_replication
+overrides:
+  - "multiversion.replica_fixture_last_lts_new_new_old"

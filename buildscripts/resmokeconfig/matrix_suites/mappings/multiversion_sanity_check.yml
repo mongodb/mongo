@@ -1,0 +1,4 @@
+# Dummy "base suite" to placate the task generator.
+base_suite: replica_sets_jscore_passthrough
+overrides:
+  - "multiversion.multiversion_sanity_check_selector"

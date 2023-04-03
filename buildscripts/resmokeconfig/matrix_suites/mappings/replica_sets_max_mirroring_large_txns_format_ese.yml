@@ -1,16 +1,15 @@
-- suite_name: replica_sets_max_mirroring_large_txns_format_ese
-  base_suite: replica_sets
-  description: >-
-    This suite is a combination of replica_sets_max_mirroring, replica_sets_ese, and
-    replica_sets_large_txns_format. You can run any of these tests individually to
-    debug any issues that might arrise.
-  overrides:
-    - "max_mirroring.enable"
-    - "large_txns_format.enable"
-    - "encryption.testdata_ese"
-    - "archive.tests"
-  excludes:
-    - "encryption.excluded_files"
-    - "encryption.serverless_excluded_files"
-    - "large_txns_format.excluded_files"
-    - "large_txns_format.replica_sets_excluded_files"
+base_suite: replica_sets
+description: >-
+  This suite is a combination of replica_sets_max_mirroring, replica_sets_ese, and
+  replica_sets_large_txns_format. You can run any of these tests individually to
+  debug any issues that might arrise.
+overrides:
+  - "max_mirroring.enable"
+  - "large_txns_format.enable"
+  - "encryption.testdata_ese"
+  - "archive.tests"
+excludes:
+  - "encryption.excluded_files"
+  - "encryption.serverless_excluded_files"
+  - "large_txns_format.excluded_files"
+  - "large_txns_format.replica_sets_excluded_files"

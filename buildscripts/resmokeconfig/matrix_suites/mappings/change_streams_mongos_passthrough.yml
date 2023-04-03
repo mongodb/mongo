@@ -1,6 +1,5 @@
-- suite_name: change_streams_mongos_passthrough
-  base_suite: change_streams
-  overrides:
-    - "change_streams.mongos_passthrough"
-  excludes:
-    - "change_streams.mongos_passthrough_excludes"
+base_suite: change_streams
+overrides:
+  - "change_streams.mongos_passthrough"
+excludes:
+  - "change_streams.mongos_passthrough_excludes"

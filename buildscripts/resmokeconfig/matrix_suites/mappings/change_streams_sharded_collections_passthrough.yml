@@ -1,4 +1,3 @@
-- suite_name: change_streams_sharded_collections_passthrough
   base_suite: change_streams
   overrides:
     - "change_streams.mongos_passthrough"

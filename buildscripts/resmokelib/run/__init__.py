@@ -116,6 +116,8 @@ class TestRunner(Subcommand):
                 self.list_tags()
             elif self.__command == "generate-multiversion-exclude-tags":
                 self.generate_multiversion_exclude_tags()
+            elif self.__command == "generate-matrix-suites":
+                suitesconfig.generate()
             elif config.DRY_RUN == "tests":
                 self.dry_run()
             else:
@@ -628,6 +630,7 @@ class RunPlugin(PluginInterface):
         """
         RunPlugin._add_run(subparsers)
         RunPlugin._add_list_suites(subparsers)
+        RunPlugin._add_generate(subparsers)
         RunPlugin._add_find_suites(subparsers)
         RunPlugin._add_list_tags(subparsers)
         RunPlugin._add_generate_multiversion_exclude_tags(subparsers)
@@ -643,7 +646,7 @@ class RunPlugin(PluginInterface):
         :return: None or a Subcommand
         """
         if subcommand in ('find-suites', 'list-suites', 'list-tags', 'run',
-                          'generate-multiversion-exclude-tags'):
+                          'generate-multiversion-exclude-tags', 'generate-matrix-suites'):
             configure_resmoke.validate_and_update_config(parser, parsed_args)
             if config.EVERGREEN_TASK_ID is not None:
                 return TestRunnerEvg(subcommand, **kwargs)
@@ -1158,6 +1161,12 @@ class RunPlugin(PluginInterface):
                   " located in the resmokeconfig/suites/ directory, then the basename"
                   " without the .yml extension can be specified, e.g. 'console'."))
         parser.set_defaults(logger_file="console")
+
+    @classmethod
+    def _add_generate(cls, subparsers):
+        """Create and add the parser for the generate subcommand."""
+        subparsers.add_parser("generate-matrix-suites",
+                              help="Generate matrix suite config files from the mapping files.")
 
     @classmethod
     def _add_find_suites(cls, subparsers):

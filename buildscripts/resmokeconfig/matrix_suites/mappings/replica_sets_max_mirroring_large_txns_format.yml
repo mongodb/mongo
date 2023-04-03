@@ -1,14 +1,13 @@
-- suite_name: replica_sets_max_mirroring_large_txns_format
-  base_suite: replica_sets
-  description: >-
-    This suite is a combination of replica_sets_max_mirroring and
-    replica_sets_large_txns_format. You can run any of these tests individually to
-    debug any issues that might arrise.
-  overrides:
-    - "max_mirroring.enable"
-    - "large_txns_format.enable"
-    - "archive.tests"
-    - "replica_sets.non_enterprise_root"
-  excludes:
-    - "large_txns_format.excluded_files"
-    - "large_txns_format.replica_sets_excluded_files"
+base_suite: replica_sets
+description: >-
+  This suite is a combination of replica_sets_max_mirroring and
+  replica_sets_large_txns_format. You can run any of these tests individually to
+  debug any issues that might arrise.
+overrides:
+  - "max_mirroring.enable"
+  - "large_txns_format.enable"
+  - "archive.tests"
+  - "replica_sets.non_enterprise_root"
+excludes:
+  - "large_txns_format.excluded_files"
+  - "large_txns_format.replica_sets_excluded_files"

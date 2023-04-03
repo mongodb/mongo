@@ -1,0 +1,144 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/sharded_retryable_writes_downgrade_last_continuous_new_old_old_new.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
+##########################################################
+executor:
+  archive:
+    hooks:
+    - CheckReplDBHash
+    - CheckReplOplogs
+    - ValidateCollections
+    tests: true
+  config:
+    shell_options:
+      eval: testingReplication = true; load('jstests/libs/override_methods/network_error_and_txn_override.js');
+        db = connect(TestData.connectionString); load("jstests/libs/override_methods/enable_sessions.js");
+        load("jstests/libs/override_methods/set_read_and_write_concerns.js"); load("jstests/libs/override_methods/fail_unclean_shutdown_incompatible_commands.js");
+        load("jstests/libs/override_methods/fail_unclean_shutdown_start_parallel_shell.js");
+      global_vars:
+        TestData:
+          alwaysInjectTransactionNumber: true
+          defaultReadConcernLevel: majority
+          logRetryAttempts: true
+          networkErrorAndTxnOverrideConfig:
+            retryOnNetworkErrors: true
+          overrideRetryAttempts: 3
+          sessionOptions:
+            readConcern:
+              level: majority
+            readPreference:
+              mode: primary
+            retryWrites: true
+      nodb: ''
+  fixture:
+    class: ShardedClusterFixture
+    configsvr_options:
+      mongod_options:
+        set_parameters:
+          enableTestCommands: 1
+      num_nodes: 2
+    mixed_bin_versions: new_old_old_new
+    mongod_options:
+      enableMajorityReadConcern: ''
+      set_parameters:
+        enableElectionHandoff: 0
+        enableTestCommands: 1
+        logComponentVerbosity:
+          replication:
+            heartbeats: 2
+            rollback: 2
+          storage:
+            recovery: 2
+      syncdelay: 5
+      wiredTigerEngineConfigString: debug_mode=(table_logging=true)
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+    num_rs_nodes_per_shard: 2
+    num_shards: 2
+    old_bin_version: last_continuous
+    shard_options:
+      all_nodes_electable: true
+      replset_config_options:
+        settings:
+          catchUpTimeoutMillis: 0
+  hooks:
+  - class: ContinuousStepdown
+    config_stepdown: false
+    should_downgrade: true
+  - class: CheckReplOplogs
+  - class: CheckReplDBHash
+  - class: ValidateCollections
+  - class: CleanEveryN
+    n: 20
+matrix_suite: true
+selector:
+  exclude_files:
+  - jstests/core/txns/**/*.js
+  - jstests/core/**/operation_latency_histogram.js
+  - jstests/core/**/profile2.js
+  - jstests/core/**/profile3.js
+  - jstests/core/**/profile_findandmodify.js
+  - jstests/core/**/top.js
+  - jstests/core/views/views_stats.js
+  - jstests/core/**/crud_api.js
+  - jstests/core/**/find_and_modify.js
+  - jstests/core/**/find_and_modify2.js
+  - jstests/core/**/find_and_modify_server6865.js
+  - jstests/core/**/project_with_collation.js
+  - jstests/core/**/currentop.js
+  - jstests/core/**/fsync.js
+  - jstests/core/**/killop_drop_collection.js
+  - jstests/core/**/explain_upsert.js
+  - jstests/core/**/indexes_multiple_commands.js
+  - jstests/core/**/create_indexes.js
+  - jstests/core/**/objid5.js
+  - jstests/core/**/coveredIndex1.js
+  - jstests/core/**/sortc.js
+  - jstests/core/**/bench_test*.js
+  - jstests/core/**/benchrun_pipeline_updates.js
+  - jstests/core/**/connection_string_validation.js
+  - jstests/core/**/explain_large_bounds.js
+  - jstests/core/**/list_collections_filter.js
+  - jstests/core/**/startup_log.js
+  - jstests/core/**/shell_connection_strings.js
+  - jstests/core/**/geo_s2ordering.js
+  - jstests/core/**/dbhash.js
+  - jstests/core/**/dbhash2.js
+  - jstests/core/**/explain_missing_database.js
+  - jstests/core/**/geo_2d_explain.js
+  - jstests/core/**/geo_s2explain.js
+  - jstests/core/**/geo_s2sparse.js
+  - jstests/core/**/mixed_version_replica_set.js
+  - jstests/core/timeseries/timeseries_merge.js
+  exclude_with_any_tags:
+  - assumes_against_mongod_not_mongos
+  - assumes_standalone_mongod
+  - assumes_no_implicit_collection_creation_after_drop
+  - assumes_no_implicit_index_creation
+  - assumes_unsharded_collection
+  - cannot_create_unique_index_when_using_hashed_shard_key
+  - assumes_read_concern_local
+  - requires_getmore
+  - requires_non_retryable_writes
+  - requires_non_retryable_commands
+  - does_not_support_stepdowns
+  - assumes_read_concern_unchanged
+  - assumes_write_concern_unchanged
+  - requires_fastcount
+  - requires_dbstats
+  - requires_collstats
+  - requires_datasize
+  - operations_longer_than_stepdown_interval
+  - uses_parallel_shell
+  - cannot_run_during_upgrade_downgrade
+  - requires_timeseries
+  roots:
+  - jstests/core/**/*.js
+  - jstests/fle2/**/*.js
+  - src/mongo/db/modules/*/jstests/fle2/**/*.js
+test_kind: js_test

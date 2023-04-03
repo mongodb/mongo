@@ -1,0 +1,31 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/initial_sync_fuzzer_last_lts.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
+##########################################################
+executor:
+  archive:
+    tests: true
+  config:
+    shell_options:
+      global_vars:
+        TestData:
+          logComponentVerbosity:
+            replication:
+              election: 0
+              heartbeats: 0
+              initialSync: 4
+              rollback: 0
+              verbosity: 3
+          setParameters:
+            numInitialSyncAttempts: 10000000
+          useRandomBinVersionsWithinReplicaSet: last-lts
+      nodb: ''
+matrix_suite: true
+selector:
+  roots:
+  - jstestfuzz/out/*.js
+test_kind: js_test

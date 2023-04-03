@@ -1,0 +1,71 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/sharding_jscore_passthrough_last_continuous_new_old_old_new.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
+##########################################################
+executor:
+  archive:
+    hooks:
+    - CheckReplDBHash
+    - CheckMetadataConsistencyInBackground
+    - ValidateCollections
+  config: {}
+  fixture:
+    class: ShardedClusterFixture
+    enable_sharding:
+    - test
+    mixed_bin_versions: new_old_old_new
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+    num_rs_nodes_per_shard: 2
+    num_shards: 2
+    old_bin_version: last_continuous
+  hooks:
+  - class: CheckReplDBHash
+  - class: CheckMetadataConsistencyInBackground
+  - class: ValidateCollections
+  - class: CleanEveryN
+    n: 20
+matrix_suite: true
+selector:
+  exclude_files:
+  - jstests/core/txns/**/*.js
+  - jstests/core/**/apitest_db.js
+  - jstests/core/**/check_shard_index.js
+  - jstests/core/**/collection_truncate.js
+  - jstests/core/**/compact_keeps_indexes.js
+  - jstests/core/**/currentop.js
+  - jstests/core/**/dbhash.js
+  - jstests/core/**/dbhash2.js
+  - jstests/core/**/fsync.js
+  - jstests/core/**/geo_s2cursorlimitskip.js
+  - jstests/core/**/geo_update_btree2.js
+  - jstests/core/**/index9.js
+  - jstests/core/**/queryoptimizera.js
+  - jstests/core/**/stages*.js
+  - jstests/core/**/startup_log.js
+  - jstests/core/**/top.js
+  - jstests/core/**/explain_missing_database.js
+  - jstests/core/**/geo_2d_explain.js
+  - jstests/core/**/geo_s2explain.js
+  - jstests/core/**/geo_s2sparse.js
+  - jstests/core/**/operation_latency_histogram.js
+  - jstests/core/**/killop_drop_collection.js
+  - jstests/core/**/or_to_in.js
+  - jstests/core/**/explain_upsert.js
+  exclude_with_any_tags:
+  - assumes_standalone_mongod
+  - assumes_against_mongod_not_mongos
+  - requires_profiling
+  roots:
+  - jstests/core/**/*.js
+  - jstests/fle2/**/*.js
+  - src/mongo/db/modules/*/jstests/fle2/**/*.js
+test_kind: js_test

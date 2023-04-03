@@ -1,0 +1,35 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/multiversion_auth_future_git_tag.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
+##########################################################
+config_variables:
+- jstests/libs/authTestsKey
+- Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
+executor:
+  config:
+    shell_options:
+      authenticationDatabase: local
+      global_vars:
+        TestData:
+          auth: true
+          keyFile: jstests/libs/authTestsKey
+          keyFileData: Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
+      nodb: ''
+      password: Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
+      username: __system
+matrix_suite: true
+selector:
+  exclude_files:
+  - jstests/multiVersion/libs/*.js
+  - jstests/multiVersion/targetedTestsLastContinuousFeatures/*.js
+  - jstests/multiVersion/genericSetFCVUsage/balancer_multiVersion_detect.js
+  - jstests/multiVersion/genericBinVersion/minor_version_tags_new_old_new.js
+  - jstests/multiVersion/genericSetFCVUsage/crash_mongos_against_upgraded_cluster.js
+  - jstests/multiVersion/genericBinVersion/load_keys_on_upgrade.js
+  roots:
+  - jstests/multiVersion/**/*.js
+test_kind: js_test

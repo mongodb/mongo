@@ -1,9 +1,8 @@
 # This suite should not be run in evergreen, it is combined into
 # sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm
-- suite_name: sharding_ese_gcm
-  base_suite: sharding
-  overrides:
-    - "encryption.testdata_ese"
-    - "encryption.testdata_gcm"
-  excludes:
-    - "encryption.excluded_files"
+base_suite: sharding
+overrides:
+  - "encryption.testdata_ese"
+  - "encryption.testdata_gcm"
+excludes:
+  - "encryption.excluded_files"

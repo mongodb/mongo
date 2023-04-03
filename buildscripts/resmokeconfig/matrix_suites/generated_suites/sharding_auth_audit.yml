@@ -1,0 +1,52 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/sharding_auth_audit.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
+##########################################################
+config_variables:
+- jstests/libs/authTestsKey
+- Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
+executor:
+  archive:
+    tests:
+    - jstests/sharding/*reshard*.js
+  config:
+    shell_options:
+      global_vars:
+        TestData:
+          auditDestination: console
+          auth: true
+          authMechanism: SCRAM-SHA-256
+          keyFile: jstests/libs/authTestsKey
+          keyFileData: Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
+          roleGraphInvalidationIsFatal: true
+          setParameters:
+            receiveChunkWaitForRangeDeleterTimeoutMS: 90000
+      nodb: ''
+matrix_suite: true
+selector:
+  exclude_files:
+  - jstests/sharding/**/libs/**/*.js
+  - jstests/sharding/*[aA]uth*.js
+  - jstests/sharding/query/*[aA]uth*.js
+  - jstests/sharding/change_streams/*[aA]uth*.js
+  - jstests/sharding/advance_cluster_time_action_type.js
+  - jstests/sharding/query/aggregation_currentop.js
+  - jstests/sharding/internal_txns/internal_client_restrictions.js
+  - jstests/sharding/kill_sessions.js
+  - jstests/sharding/parallel.js
+  - jstests/sharding/migration_ignore_interrupts_1.js
+  - jstests/sharding/migration_ignore_interrupts_2.js
+  - jstests/sharding/migration_server_status.js
+  - jstests/sharding/migration_sets_fromMigrate_flag.js
+  - jstests/sharding/migration_with_source_ops.js
+  - jstests/sharding/movechunk_parallel.js
+  - jstests/sharding/migration_critical_section_concurrency.js
+  - jstests/sharding/mongod_returns_no_cluster_time_without_keys.js
+  - jstests/sharding/set_user_write_block_mode.js
+  roots:
+  - jstests/sharding/**/*.js
+test_kind: js_test

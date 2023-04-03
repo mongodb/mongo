@@ -1,0 +1,31 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/multiversion_future_git_tag.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
+##########################################################
+executor:
+  archive:
+    tests:
+    - src/mongo/db/modules/enterprise/jstests/hot_backups/multiVersion/*.js
+  config:
+    shell_options:
+      nodb: ''
+matrix_suite: true
+selector:
+  exclude_files:
+  - jstests/multiVersion/libs/*.js
+  - jstests/multiVersion/targetedTestsLastContinuousFeatures/*.js
+  - jstests/multiVersion/targetedTestsLastLtsFeatures/*.js
+  - jstests/multiVersion/genericSetFCVUsage/balancer_multiVersion_detect.js
+  - jstests/multiVersion/genericBinVersion/minor_version_tags_new_old_new.js
+  - jstests/multiVersion/genericSetFCVUsage/crash_mongos_against_upgraded_cluster.js
+  exclude_with_any_tags:
+  - featureFlagToaster
+  - featureFlagSpoon
+  roots:
+  - jstests/multiVersion/**/*.js
+  - src/mongo/db/modules/*/jstests/hot_backups/multiVersion/*.js
+test_kind: js_test

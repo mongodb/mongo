@@ -1,0 +1,52 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/concurrency_replication_last_lts_old_new_new.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
+##########################################################
+executor:
+  archive:
+    hooks:
+    - RunDBCheckInBackground
+    - CheckReplDBHashInBackground
+    - ValidateCollectionsInBackground
+    - CheckReplDBHash
+    - ValidateCollections
+    tests: true
+  config: {}
+  fixture:
+    class: ReplicaSetFixture
+    mixed_bin_versions: old_new_new
+    mongod_options:
+      oplogSize: 1024
+      set_parameters:
+        enableTestCommands: 1
+        roleGraphInvalidationIsFatal: 1
+    num_nodes: 3
+    old_bin_version: last_lts
+  hooks:
+  - class: RunDBCheckInBackground
+  - class: CheckReplDBHashInBackground
+  - class: ValidateCollectionsInBackground
+  - class: CheckReplDBHash
+  - class: ValidateCollections
+  - class: CleanupConcurrencyWorkloads
+matrix_suite: true
+selector:
+  exclude_files:
+  - jstests/concurrency/fsm_workloads/agg_group_external.js
+  - jstests/concurrency/fsm_workloads/agg_sort_external.js
+  - jstests/concurrency/fsm_workloads/findAndModify_update_grow.js
+  - jstests/concurrency/fsm_workloads/schema_validator_with_expr_variables.js
+  - jstests/concurrency/fsm_workloads/reindex.js
+  - jstests/concurrency/fsm_workloads/reindex_background.js
+  - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
+  - jstests/concurrency/fsm_workloads/create_collection_and_view.js
+  exclude_with_any_tags:
+  - requires_sharding
+  roots:
+  - jstests/concurrency/fsm_workloads/**/*.js
+  - src/mongo/db/modules/*/jstests/concurrency/fsm_workloads/*.js
+test_kind: fsm_workload_test

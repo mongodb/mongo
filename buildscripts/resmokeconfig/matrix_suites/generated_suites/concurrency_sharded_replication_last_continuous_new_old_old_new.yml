@@ -1,0 +1,97 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/concurrency_sharded_replication_last_continuous_new_old_old_new.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
+##########################################################
+executor:
+  archive:
+    hooks:
+    - CheckReplDBHashInBackground
+    - CheckReplDBHash
+    - CheckMetadataConsistencyInBackground
+    - ValidateCollections
+    tests: true
+  config:
+    shell_options:
+      global_vars:
+        TestData:
+          runningWithBalancer: false
+  fixture:
+    class: ShardedClusterFixture
+    enable_balancer: false
+    mixed_bin_versions: new_old_old_new
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        receiveChunkWaitForRangeDeleterTimeoutMS: 90000
+        roleGraphInvalidationIsFatal: 1
+    mongos_options:
+      set_parameters:
+        enableTestCommands: 1
+    num_mongos: 2
+    num_rs_nodes_per_shard: 2
+    num_shards: 2
+    old_bin_version: last_continuous
+    shard_options:
+      mongod_options:
+        oplogSize: 1024
+  hooks:
+  - class: CheckReplDBHashInBackground
+  - class: CheckReplDBHash
+  - class: CheckMetadataConsistencyInBackground
+  - class: CheckOrphansDeleted
+  - class: CheckRoutingTableConsistency
+  - class: CheckShardFilteringMetadata
+  - class: ValidateCollections
+  - class: CleanupConcurrencyWorkloads
+matrix_suite: true
+selector:
+  exclude_files:
+  - jstests/concurrency/fsm_workloads/distinct.js
+  - jstests/concurrency/fsm_workloads/distinct_noindex.js
+  - jstests/concurrency/fsm_workloads/distinct_projection.js
+  - jstests/concurrency/fsm_workloads/agg_match.js
+  - jstests/concurrency/fsm_workloads/auth_create_role.js
+  - jstests/concurrency/fsm_workloads/auth_create_user.js
+  - jstests/concurrency/fsm_workloads/auth_drop_role.js
+  - jstests/concurrency/fsm_workloads/auth_drop_user.js
+  - jstests/concurrency/fsm_workloads/agg_group_external.js
+  - jstests/concurrency/fsm_workloads/agg_sort_external.js
+  - jstests/concurrency/fsm_workloads/compact.js
+  - jstests/concurrency/fsm_workloads/compact_while_creating_indexes.js
+  - jstests/concurrency/fsm_workloads/convert_to_capped_collection.js
+  - jstests/concurrency/fsm_workloads/convert_to_capped_collection_index.js
+  - jstests/concurrency/fsm_workloads/findAndModify_mixed_queue_unindexed.js
+  - jstests/concurrency/fsm_workloads/findAndModify_remove_queue_unindexed.js
+  - jstests/concurrency/fsm_workloads/findAndModify_update_collscan.js
+  - jstests/concurrency/fsm_workloads/findAndModify_update_queue.js
+  - jstests/concurrency/fsm_workloads/findAndModify_update_queue_unindexed.js
+  - jstests/concurrency/fsm_workloads/findAndModify_remove_queue.js
+  - jstests/concurrency/fsm_workloads/findAndModify_update_grow.js
+  - jstests/concurrency/fsm_workloads/plan_cache_drop_database.js
+  - jstests/concurrency/fsm_workloads/reindex.js
+  - jstests/concurrency/fsm_workloads/reindex_background.js
+  - jstests/concurrency/fsm_workloads/reindex_writeconflict.js
+  - jstests/concurrency/fsm_workloads/collmod_writeconflict.js
+  - jstests/concurrency/fsm_workloads/remove_single_document.js
+  - jstests/concurrency/fsm_workloads/upsert_where.js
+  - jstests/concurrency/fsm_workloads/yield_and_hashed.js
+  - jstests/concurrency/fsm_workloads/yield_and_sorted.js
+  - jstests/concurrency/fsm_workloads/agg_out_interrupt_cleanup.js
+  - jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation_metrics_test.js
+  - jstests/concurrency/fsm_workloads/multi_statement_transaction_all_commands_same_session.js
+  - jstests/concurrency/fsm_workloads/view_catalog_direct_system_writes.js
+  - jstests/concurrency/fsm_workloads/create_timeseries_collection.js
+  - jstests/concurrency/fsm_workloads/create_collection_and_view.js
+  exclude_with_any_tags:
+  - requires_replication
+  - assumes_balancer_on
+  - requires_profiling
+  - assumes_unsharded_collection
+  roots:
+  - jstests/concurrency/fsm_workloads/**/*.js
+  - src/mongo/db/modules/*/jstests/concurrency/fsm_workloads/*.js
+test_kind: fsm_workload_test

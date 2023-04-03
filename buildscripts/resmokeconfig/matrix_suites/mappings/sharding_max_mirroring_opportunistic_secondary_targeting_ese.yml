@@ -2,16 +2,15 @@
 # sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm or
 # sharding_max_mirroring_opportunistic_secondary_targeting.
 # sharding_ese should be run in these cases instead.
-- suite_name: sharding_max_mirroring_opportunistic_secondary_targeting_ese
-  base_suite: sharding
-  description: >-
-    This suite is a combination of sharding_max_mirroring, sharding_ese, and
-    sharding_opportunistic_secondary_targeting. You can run any of these tests individually to
-    debug any issues that might arrise.
-  overrides:
-    - "max_mirroring.enable"
-    - "opportunistic_secondary_targeting.enable"
-    - "encryption.testdata_ese"
-  excludes:
-    - "max_mirroring.sharding_excluded_files"
-    - "encryption.excluded_files"
+base_suite: sharding
+description: >-
+  This suite is a combination of sharding_max_mirroring, sharding_ese, and
+  sharding_opportunistic_secondary_targeting. You can run any of these tests individually to
+  debug any issues that might arrise.
+overrides:
+  - "max_mirroring.enable"
+  - "opportunistic_secondary_targeting.enable"
+  - "encryption.testdata_ese"
+excludes:
+  - "max_mirroring.sharding_excluded_files"
+  - "encryption.excluded_files"

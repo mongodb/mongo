@@ -1,9 +1,8 @@
-- suite_name: replica_sets_large_txns_format
-  base_suite: replica_sets
-  overrides:
-    - "large_txns_format.enable"
-    - "archive.tests"
-    - "replica_sets.non_enterprise_root"
-  excludes:
-    - "large_txns_format.excluded_files"
-    - "large_txns_format.replica_sets_excluded_files"
+base_suite: replica_sets
+overrides:
+  - "large_txns_format.enable"
+  - "archive.tests"
+  - "replica_sets.non_enterprise_root"
+excludes:
+  - "large_txns_format.excluded_files"
+  - "large_txns_format.replica_sets_excluded_files"

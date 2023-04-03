@@ -1,0 +1,8 @@
+base_suite: replica_sets_jscore_passthrough
+overrides:
+  - "kill_primary.replica_sets_shell_options"
+  - "kill_primary.replica_sets_hooks"
+  - "kill_primary.replica_sets_archive"
+  - "kill_primary.replica_sets_fixture"
+  - "replica_sets_stepdown_selector.kill_primary_jscore_passthrough_exclude_files"
+  - "replica_sets_stepdown_selector.kill_primary_jscore_passthrough_exclude_with_any_tags"

@@ -2,10 +2,9 @@
 # sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm
 # sharding_max_mirroring_opportunistic_secondary_targeting_ese
 # sharding_max_mirroring_opportunistic_secondary_targeting
-- suite_name: sharding_max_mirroring
-  base_suite: sharding
-  overrides:
-    - "max_mirroring.enable"
-    - "archive.no_archive"
-  excludes:
-    - "max_mirroring.sharding_excluded_files"
+base_suite: sharding
+overrides:
+  - "max_mirroring.enable"
+  - "archive.no_archive"
+excludes:
+  - "max_mirroring.sharding_excluded_files"

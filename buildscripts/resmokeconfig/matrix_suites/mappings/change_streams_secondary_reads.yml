@@ -1,12 +1,11 @@
-- suite_name: change_streams_secondary_reads
-  base_suite: change_streams
-  overrides:
-    - "change_streams.mongos_passthrough"
-    - "change_streams.secondary_reads"
-    - "change_streams.disable_write_noops"
-    - "change_streams.base_eval"
-  eval:
-    - "change_streams.secondary_reads_eval"
-  excludes:
-    - "change_streams.mongos_passthrough_excludes"
-    - "change_streams.secondary_reads_excludes"
+base_suite: change_streams
+overrides:
+  - "change_streams.mongos_passthrough"
+  - "change_streams.secondary_reads"
+  - "change_streams.disable_write_noops"
+  - "change_streams.base_eval"
+eval:
+  - "change_streams.secondary_reads_eval"
+excludes:
+  - "change_streams.mongos_passthrough_excludes"
+  - "change_streams.secondary_reads_excludes"

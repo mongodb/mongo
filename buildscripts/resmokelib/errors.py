@@ -80,3 +80,9 @@ class CedarReportError(ResmokeError):
     """Exception raised while generating cedar report."""
 
     pass
+
+
+class InvalidMatrixSuiteError(ResmokeError):
+    """Exception raised when validating a matrix suite mapping file."""
+
+    pass

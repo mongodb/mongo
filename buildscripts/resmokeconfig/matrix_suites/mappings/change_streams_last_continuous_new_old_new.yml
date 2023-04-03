@@ -1,0 +1,3 @@
+base_suite: change_streams
+overrides:
+  - "multiversion.replica_fixture_last_continuous_new_old_new"

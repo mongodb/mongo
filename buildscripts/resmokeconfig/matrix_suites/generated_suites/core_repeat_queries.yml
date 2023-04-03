@@ -1,0 +1,42 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/core_repeat_queries.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
+##########################################################
+executor:
+  archive:
+    hooks:
+    - ValidateCollections
+  config:
+    shell_options:
+      crashOnInvalidBSONError: ''
+      eval: load("jstests/libs/override_methods/detect_spawning_own_mongod.js");;
+        load("jstests/libs/override_methods/rerun_queries.js");
+      objcheck: ''
+  fixture:
+    class: MongoDFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+  hooks:
+  - class: ValidateCollections
+    shell_options:
+      global_vars:
+        TestData:
+          skipValidationOnNamespaceNotFound: false
+  - class: CleanEveryN
+    n: 20
+matrix_suite: true
+selector:
+  exclude_files:
+  - jstests/core/txns/**/*.js
+  exclude_with_any_tags:
+  - does_not_support_repeated_reads
+  - requires_profiling
+  roots:
+  - jstests/core/**/*.js
+  - jstests/core_standalone/**/*.js
+test_kind: js_test

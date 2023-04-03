@@ -1,0 +1,68 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_whole_cluster_secondary_reads_sharded_collections.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
+##########################################################
+description: This suite is a combination of core_ese_gcm, core_repeat_queries, and
+  core_minimum_batch_size. You can run any of these tests individually to debug any
+  issues that might arrise.
+executor:
+  archive:
+    hooks:
+    - CheckReplDBHash
+    - ValidateCollections
+  config:
+    shell_options:
+      eval: var testingReplication = true; load('jstests/libs/override_methods/set_read_and_write_concerns.js');;
+        load('jstests/libs/override_methods/set_read_preference_secondary.js');; load('jstests/libs/override_methods/implicitly_shard_accessed_collections.js');;
+        load('jstests/libs/override_methods/implicit_whole_cluster_changestreams.js');
+      global_vars:
+        TestData:
+          defaultReadConcernLevel: null
+  fixture:
+    class: ShardedClusterFixture
+    mongod_options:
+      bind_ip_all: ''
+      set_parameters:
+        coordinateCommitReturnImmediatelyAfterPersistingDecision: true
+        enableTestCommands: 1
+        logComponentVerbosity:
+          command: 1
+          query: 1
+          replication: 3
+          verbosity: 0
+        periodicNoopIntervalSecs: 1
+        writePeriodicNoops: true
+    mongos_options:
+      bind_ip_all: ''
+      set_parameters:
+        enableTestCommands: 1
+        logComponentVerbosity:
+          command: 1
+          network:
+            asio: 2
+            verbosity: 1
+          tracking: 0
+          verbosity: 0
+    num_rs_nodes_per_shard: 2
+  hooks:
+  - class: CheckReplDBHash
+  - class: ValidateCollections
+  - class: CleanEveryN
+    n: 20
+matrix_suite: true
+selector:
+  exclude_files:
+  - jstests/change_streams/only_wake_getmore_for_relevant_changes.js
+  exclude_with_any_tags:
+  - assumes_write_concern_unchanged
+  - do_not_run_in_whole_cluster_passthrough
+  - assumes_against_mongod_not_mongos
+  - assumes_unsharded_collection
+  - assumes_read_preference_unchanged
+  roots:
+  - jstests/change_streams/**/*.js
+test_kind: js_test

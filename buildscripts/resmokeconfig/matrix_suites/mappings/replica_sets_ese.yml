@@ -1,7 +1,6 @@
-- suite_name: replica_sets_ese
-  base_suite: replica_sets
-  overrides:
-    - "encryption.testdata_ese"
-  excludes:
-    - "encryption.excluded_files"
-    - "encryption.serverless_excluded_files"
+base_suite: replica_sets
+overrides:
+  - "encryption.testdata_ese"
+excludes:
+  - "encryption.excluded_files"
+  - "encryption.serverless_excluded_files"

@@ -1,13 +1,12 @@
-- suite_name: change_streams_whole_cluster_secondary_reads_passthrough
-  base_suite: change_streams_whole_cluster_passthrough
-  overrides:
-    - "change_streams.mongos_passthrough"
-    - "change_streams.secondary_reads"
-    - "change_streams.disable_write_noops"
-    - "change_streams.base_eval"
-  eval:
-    - "change_streams.secondary_reads_eval"
-    - "change_streams.whole_cluster_eval"
-  excludes:
-    - "change_streams.mongos_passthrough_excludes"
-    - "change_streams.secondary_reads_excludes"
+base_suite: change_streams_whole_cluster_passthrough
+overrides:
+  - "change_streams.mongos_passthrough"
+  - "change_streams.secondary_reads"
+  - "change_streams.disable_write_noops"
+  - "change_streams.base_eval"
+eval:
+  - "change_streams.secondary_reads_eval"
+  - "change_streams.whole_cluster_eval"
+excludes:
+  - "change_streams.mongos_passthrough_excludes"
+  - "change_streams.secondary_reads_excludes"

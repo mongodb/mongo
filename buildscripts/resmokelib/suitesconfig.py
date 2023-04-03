@@ -1,13 +1,15 @@
 """Module for retrieving the configuration of resmoke.py test suites."""
 import collections
+import copy
 import os
 from threading import Lock
 from typing import Dict, List
-import buildscripts.resmokelib.logging.loggers as loggers
+
+import yaml
 
 import buildscripts.resmokelib.utils.filesystem as fs
-from buildscripts.resmokelib import config as _config
-from buildscripts.resmokelib import errors, utils
+import buildscripts.resmokelib.logging.loggers as loggers
+from buildscripts.resmokelib import config as _config, errors, utils
 from buildscripts.resmokelib.testing import suite as _suite
 from buildscripts.resmokelib.utils import load_yaml_file
 from buildscripts.resmokelib.utils.dictionary import get_dict_value, merge_dicts, set_dict_value
@@ -129,6 +131,10 @@ def _get_suite_config(suite_name_or_path):
     return SuiteFinder.get_config_obj(suite_name_or_path)
 
 
+def generate():
+    MatrixSuiteConfig.generate_all_matrix_suite_files()
+
+
 class SuiteConfigInterface:
     """Interface for suite configs."""
 
@@ -203,7 +209,7 @@ class MatrixSuiteConfig(SuiteConfigInterface):
     @classmethod
     def get_suite_files(cls):
         """Get the suite files."""
-        mappings_dir = os.path.join(cls._get_suites_dir(), "mappings")
+        mappings_dir = os.path.join(cls.get_suites_dir(), "mappings")
         return cls.__get_suite_files_in_dir(mappings_dir)
 
     @classmethod
@@ -216,26 +222,53 @@ class MatrixSuiteConfig(SuiteConfigInterface):
         }
 
     @staticmethod
-    def _get_suites_dir():
+    def get_suites_dir():
         return os.path.join(_config.CONFIG_DIR, "matrix_suites")
 
     @classmethod
     def get_config_obj(cls, suite_name):
+        """Get the suite config object in the given file and verify it matches the generated file."""
+
+        config = cls._get_config_obj_no_verify(suite_name)
+
+        if not config:
+            return None
+
+        generated_path = cls.get_generated_suite_path(suite_name)
+        if not os.path.exists(generated_path):
+            raise errors.InvalidMatrixSuiteError(
+                f"No generated suite file was found for {suite_name}" +
+                "To (re)generate the matrix suite files use `python3 buildscripts/resmoke.py generate-matrix-suites`"
+            )
+
+        new_text = cls.generate_matrix_suite_text(suite_name)
+        with open(generated_path, "r") as file:
+            old_text = file.read()
+            if new_text != old_text:
+                raise errors.InvalidMatrixSuiteError(
+                    f"The generated file found on disk did not match the mapping file for {suite_name}. "
+                    +
+                    "To (re)generate the matrix suite files use `python3 buildscripts/resmoke.py generate-matrix-suites`"
+                )
+
+        return config
+
+    @classmethod
+    def _get_config_obj_no_verify(cls, suite_name):
         """Get the suite config object in the given file."""
-        suites_dir = cls._get_suites_dir()
+        suites_dir = cls.get_suites_dir()
         matrix_suite = cls.parse_mappings_file(suites_dir, suite_name)
         if not matrix_suite:
             return None
 
         all_overrides = cls.parse_override_file(suites_dir)
 
-        return cls.process_overrides(matrix_suite, all_overrides)
+        return cls.process_overrides(matrix_suite, all_overrides, suite_name)
 
     @classmethod
-    def process_overrides(cls, suite, overrides):
+    def process_overrides(cls, suite, overrides, suite_name):
         """Provide override key-value pairs for a given matrix suite."""
         base_suite_name = suite["base_suite"]
-        suite_name = suite["suite_name"]
         override_names = suite.get("overrides", None)
         excludes_names = suite.get("excludes", None)
         eval_names = suite.get("eval", None)
@@ -246,8 +279,9 @@ class MatrixSuiteConfig(SuiteConfigInterface):
         if base_suite is None:
             raise ValueError(f"Unknown base suite {base_suite_name} for matrix suite {suite_name}")
 
-        res = base_suite.copy()
+        res = copy.deepcopy(base_suite)
         res['matrix_suite'] = True
+        overrides = copy.deepcopy(overrides)
 
         if description:
             res['description'] = description
@@ -326,7 +360,7 @@ class MatrixSuiteConfig(SuiteConfigInterface):
     @classmethod
     def get_named_suites(cls):
         """Get a list of all suite names."""
-        suites_dir = cls._get_suites_dir()
+        suites_dir = cls.get_suites_dir()
         all_mappings = cls.get_all_mappings(suites_dir)
         return list(all_mappings.keys())
 
@@ -337,13 +371,12 @@ class MatrixSuiteConfig(SuiteConfigInterface):
             mappings_dir = os.path.join(suites_dir, "mappings")
             mappings_files = cls.get_all_yamls(mappings_dir)
 
-            for _, suite_config_file in mappings_files.items():
-                for suite_config in suite_config_file:
-                    if "suite_name" in suite_config and "base_suite" in suite_config:
-                        cls._all_mappings[suite_config["suite_name"]] = suite_config
-                    else:
-                        raise ValueError("Invalid suite configuration, missing required keys. ",
-                                         suite_config)
+            for suite_name, suite_config in mappings_files.items():
+                if "base_suite" in suite_config:
+                    cls._all_mappings[suite_name] = suite_config
+                else:
+                    raise ValueError("Invalid suite configuration, missing required keys. ",
+                                     suite_config)
         return cls._all_mappings
 
     @classmethod
@@ -358,6 +391,59 @@ class MatrixSuiteConfig(SuiteConfigInterface):
                 all_files[short_name] = os.path.join(root, filename)
 
         return all_files
+
+    @classmethod
+    def get_generated_suite_path(cls, suite_name):
+        matrix_dir = cls.get_suites_dir()
+        suites_dir = os.path.join(matrix_dir, "generated_suites")
+        if not os.path.exists(suites_dir):
+            os.mkdir(suites_dir)
+        path = os.path.join(suites_dir, f"{suite_name}.yml")
+        return path
+
+    @classmethod
+    def generate_matrix_suite_text(cls, suite_name):
+        suites_dir = cls.get_suites_dir()
+        mappings_dir = os.path.join(suites_dir, "mappings")
+        mapping_path = None
+        for ext in (".yml", ".yaml"):
+            path = os.path.join(mappings_dir, f"{suite_name}{ext}")
+            if os.path.exists(path):
+                mapping_path = path
+
+        matrix_suite = cls._get_config_obj_no_verify(suite_name)
+
+        if not matrix_suite or not mapping_path:
+            print(f"Could not find mappings file for {suite_name}")
+            return None
+
+        yml = yaml.safe_dump(matrix_suite)
+        comments = [
+            "##########################################################",
+            "# THIS IS A GENERATED FILE -- DO NOT MODIFY.",
+            "# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE",
+            "# AND REGENERATE THE MATRIX SUITES.",
+            "#",
+            f"# matrix suite mapping file: {mapping_path}",
+            "# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites",
+            "##########################################################",
+        ]
+
+        return "\n".join(comments) + "\n" + yml
+
+    @classmethod
+    def generate_matrix_suite_file(cls, suite_name):
+        text = cls.generate_matrix_suite_text(suite_name)
+        path = cls.get_generated_suite_path(suite_name)
+        with open(path, 'w+') as file:
+            file.write(text)
+        print(f"Generated matrix suite file {path}")
+
+    @classmethod
+    def generate_all_matrix_suite_files(cls):
+        suite_names = cls.get_named_suites()
+        for suite_name in suite_names:
+            cls.generate_matrix_suite_file(suite_name)
 
 
 class SuiteFinder(object):

@@ -1,8 +1,7 @@
 # This suite should not be run in evergreen, it is combined into
 # sharding_max_mirroring_opportunistic_secondary_targeting_ese
-- suite_name: sharding_ese
-  base_suite: sharding
-  overrides:
-    - "encryption.testdata_ese"
-  excludes:
-    - "encryption.excluded_files"
+base_suite: sharding
+overrides:
+  - "encryption.testdata_ese"
+excludes:
+  - "encryption.excluded_files"

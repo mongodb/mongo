@@ -1,10 +1,9 @@
-- suite_name: change_streams_whole_cluster_mongos_passthrough
-  base_suite: change_streams_whole_cluster_passthrough
-  overrides:
-    - "change_streams.mongos_passthrough"
-    - "change_streams.base_eval"
-  eval:
-    - "change_streams.whole_cluster_eval"
-    - "change_streams.causal_consistency"
-  excludes:
-    - "change_streams.mongos_passthrough_excludes"
+base_suite: change_streams_whole_cluster_passthrough
+overrides:
+  - "change_streams.mongos_passthrough"
+  - "change_streams.base_eval"
+eval:
+  - "change_streams.whole_cluster_eval"
+  - "change_streams.causal_consistency"
+excludes:
+  - "change_streams.mongos_passthrough_excludes"

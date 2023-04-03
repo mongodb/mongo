@@ -1,0 +1,44 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/change_streams_last_lts_old_new_new.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
+##########################################################
+executor:
+  archive:
+    hooks:
+    - CheckReplDBHash
+    - CheckReplOplogs
+    - ValidateCollections
+  config:
+    shell_options:
+      eval: var testingReplication = true; load('jstests/libs/override_methods/set_read_and_write_concerns.js');
+        load('jstests/libs/override_methods/enable_causal_consistency_without_read_pref.js');
+      global_vars:
+        TestData:
+          defaultReadConcernLevel: null
+          enableMajorityReadConcern: ''
+  fixture:
+    class: ReplicaSetFixture
+    mixed_bin_versions: old_new_new
+    mongod_options:
+      bind_ip_all: ''
+      set_parameters:
+        enableTestCommands: 1
+    num_nodes: 3
+    old_bin_version: last_lts
+  hooks:
+  - class: CheckReplOplogs
+  - class: CheckReplDBHash
+  - class: ValidateCollections
+  - class: CleanEveryN
+    n: 20
+matrix_suite: true
+selector:
+  exclude_with_any_tags:
+  - assumes_write_concern_unchanged
+  roots:
+  - jstests/change_streams/**/*.js
+test_kind: js_test

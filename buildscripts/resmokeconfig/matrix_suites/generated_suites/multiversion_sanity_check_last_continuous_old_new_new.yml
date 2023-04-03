@@ -1,0 +1,52 @@
+##########################################################
+# THIS IS A GENERATED FILE -- DO NOT MODIFY.
+# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE
+# AND REGENERATE THE MATRIX SUITES.
+#
+# matrix suite mapping file: buildscripts/resmokeconfig/matrix_suites/mappings/multiversion_sanity_check_last_continuous_old_new_new.yml
+# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites
+##########################################################
+executor:
+  archive:
+    hooks:
+    - CheckReplDBHashInBackground
+    - ValidateCollectionsInBackground
+    - CheckReplDBHash
+    - CheckReplOplogs
+    - ValidateCollections
+  config:
+    shell_options:
+      eval: testingReplication = true;
+  fixture:
+    class: ReplicaSetFixture
+    mixed_bin_versions: old_new_new
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+    num_nodes: 3
+    old_bin_version: last_continuous
+  hooks:
+  - class: CheckReplDBHashInBackground
+  - class: ValidateCollectionsInBackground
+  - class: CheckReplOplogs
+  - class: CheckReplDBHash
+  - class: ValidateCollections
+  - class: CleanEveryN
+    n: 20
+matrix_suite: true
+selector:
+  exclude_files:
+  - jstests/core/txns/abort_expired_transaction.js
+  - jstests/core/txns/abort_transaction_thread_does_not_block_on_locks.js
+  - jstests/core/txns/kill_op_on_txn_expiry.js
+  - jstests/core/**/set_param1.js
+  - jstests/core/**/or_to_in.js
+  exclude_with_any_tags:
+  - assumes_standalone_mongod
+  include_with_any_tags:
+  - multiversion_sanity_check
+  roots:
+  - jstests/core/**/*.js
+  - jstests/fle2/**/*.js
+  - src/mongo/db/modules/*/jstests/fle2/**/*.js
+test_kind: js_test
