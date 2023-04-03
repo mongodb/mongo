@@ -113,4 +113,5 @@ feature_flags:
     featureFlagApproxPercentiles:
       description: "Feature flag to enable approximate $percentile accumulator/expression."
       cpp_varname: gFeatureFlagApproxPercentiles
-      default: false
+      default: true
+      version: 7.0

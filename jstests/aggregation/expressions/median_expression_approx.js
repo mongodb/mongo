@@ -2,6 +2,7 @@
  * Tests that the approximate median expression semantics match the percentile expression semantics
  * with the field 'p':[0.5].
  * @tags: [
+ *   requires_fcv_70,
  *   featureFlagApproxPercentiles
  * ]
  */

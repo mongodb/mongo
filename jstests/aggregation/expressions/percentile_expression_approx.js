@@ -1,6 +1,7 @@
 /**
  * Tests for the approximate percentile expression semantics.
  * @tags: [
+ *   requires_fcv_70,
  *   featureFlagApproxPercentiles
  * ]
  */

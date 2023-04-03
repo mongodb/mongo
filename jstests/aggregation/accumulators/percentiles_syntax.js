@@ -1,7 +1,8 @@
 /**
  * Tests for the $percentile accumulator syntax.
  * @tags: [
- *   featureFlagApproxPercentiles,
+ *   requires_fcv_70,
+ *   featureFlagApproxPercentiles
  * ]
  */
 (function() {

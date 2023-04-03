@@ -2,9 +2,8 @@
  * Tests that the approximate median accumulator semantics matches the percentile semantics with the
  * field 'p':[0.5].
  * @tags: [
- *   featureFlagApproxPercentiles,
- *   # sharded collections aren't supported yet.
- *   assumes_unsharded_collection,
+ *   requires_fcv_70,
+ *   featureFlagApproxPercentiles
  * ]
  */
 (function() {

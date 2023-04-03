@@ -1,7 +1,8 @@
 /**
  * Tests for the approximate percentile accumulator semantics.
  * @tags: [
- *   featureFlagApproxPercentiles,
+ *   requires_fcv_70,
+ *   featureFlagApproxPercentiles
  * ]
  */
 (function() {

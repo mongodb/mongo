@@ -1,6 +1,7 @@
 /*
  * Test that spilling to disk in $setWindowFields works and returns the correct results.
  * @tags: [
+ * requires_fcv_70,
  * requires_profiling,
  * assumes_read_concern_unchanged,
  * do_not_wrap_aggregations_in_facets,
