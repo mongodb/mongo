@@ -362,6 +362,7 @@ cache of the [durable catalog](#durable-catalog) state. It provides the followin
  * Deregister individual dropped `Collection` objects, releasing ownership.
  * Allow closing/reopening the catalog while still providing limited `UUID` to `NamespaceString`
    lookup to support rollback to a point in time.
+ * Ensures `Collection` objects are in-sync with opened storage snapshots.
 
 ### Synchronization
 Catalog access is synchronized using [read-copy-update][] where reads operate on an immutable
@@ -398,8 +399,6 @@ Notable properties of `Collection` objects are:
  * Collation and validation properties.
  * Decorations that are either `Collection` instance specific or shared between all `Collection`
    objects over the lifetime of the collection.
- * minimum visible snapshot - The minimum point-in-time snapshot at which the information the
-   `Collection` object is valid.
 
 In addition `Collection` objects have shared ownership of:
  * An [`IndexCatalog`](#index-catalog) - an in-memory structure representing the `md.indexes` data
@@ -428,17 +427,77 @@ versioned query information per Collection instance. Additionally, there are
 `SharedCollectionDecorations` for storing index usage statistics and query settings that are shared
 between `Collection` instances across DDL operations.
 
+### Collection lifetime
+The `Collection` object is brought to existence in two ways:
+1. Any DDL operation is run. Non-create operations such as `collMod` clone the existing `Collection`
+   object.
+2. Using an existing durable catalog entry to instantiate an existing collection. This happens when
+   we:
+   1. Load the `CollectionCatalog` during startup or after rollback.
+   2. When we need to instantiate a collection at an earlier point-in-time because the `Collection`
+      is not present in the `CollectionCatalog`, or the `Collection` is there, but incompatible with
+      the snapshot. See [here](#catalog-changes-versioning-and-the-minimum-valid-snapshot) how a
+      `Collection` is determined to be incompatible.
+
+For (1) and (2.1) the `Collection` objects are stored as shared pointers in the `CollectionCatalog`
+and available to all operations running in the database. These `Collection` objects are released
+when the collection is dropped from the `CollectionCatalog` and there are no more operations holding
+a shared pointer to the `Collection`. The can be during shutdown or when the `Collection` is dropped
+and there are no more readers.
+
+For (2.2) the `Collection` objects are stored as shared pointers in `OpenedCollections`, which is a
+decoration on the `Snapshot`. Meaning these `Collection` objects are only available to the operation
+that instantiated them. When the snapshot is abandoned, such as during query yield, these
+`Collection` objects are released. Multiple lookups from the `CollectionCatalog` will re-use the
+previously instantiated `Collection` instead of performing the instantiation at every lookup for the
+same operation.
+
+Users of `Collection` instances have a few responsibilities to keep the object valid.
+1. Hold a collection-level lock.
+2. Use an AutoGetCollection helper.
+3. Explicitly hold a reference to the `CollectionCatalog`.
+
 ### Index Catalog
 Each `Collection` object owns an `IndexCatalog` object, which in turn has shared ownership of
 `IndexCatalogEntry` objects that each again own an `IndexDescriptor` containing an in-memory
 presentation of the data stored in the [durable catalog](#durable-catalog).
 
-## Catalog Changes, versioning and the Minimum Visible Snapshot
+## Catalog Changes, versioning and the Minimum Valid Snapshot
 Every catalog change has a corresponding write with a commit time. When registered `OpObserver`
-objects observe catalog changes, they set the minimum visible snapshot of the `Collection` or
-`IndexCatalogEntry` object to the commit timestamp. Readers use this timestamp to determine whether
-the information cached in the `Collection` and `IndexCatalog` is valid for the point in time at
-which they read.
+objects observe catalog changes, they set the minimum valid snapshot of the `Collection` to the
+commit timestamp. The `CollectionCatalog` uses this timestamp to determine whether the `Collection`
+is valid for a given point-in-time read. If not, a new `Collection` instance will be instantiated to
+satisfy the read.
+
+When performing a DDL operation on a `Collection` object, the `CollectionCatalog` uses a two-phase
+commit algorithm. In the first phase (pre-commit phase) the `Namespace` and `UUID` is marked as
+pending commit. This has the affect of reading from durable storage to determine if the latest
+instance or the pending commit instance in the catalog match. We return the instance that matches.
+This is only for reads without a timestamp that come in during the pending commit state. The second
+phase (commit phase) removes the `Namespace` and `UUID` from the pending commit state. With this, we
+can guarantee that `Collection` objects are fully in-sync with the storage snapshot.
+
+With lock-free reads there may be ongoing concurrent DDL operations. In order to have a
+`CollectionCatalog` that's consistent with the snapshot, the following is performed when setting up
+a lock-free read:
+* Get the latest version of the `CollectionCatalog`.
+* Open a snapshot.
+* Get the latest version of the `CollectionCatalog` and check if it matches the one obtained
+  earlier. If not, we need to retry this. Otherwise we'd have a `CollectionCatalog` that's
+  inconsistent with the opened snapshot.
+
+## Collection Catalog and Multi-document Transactions
+* When we start the transaction we open a storage snapshot and stash a CollectionCatalog instance
+  similar to a regular lock-free read (but holding the RSTL as opposed to lock-free reads).
+* User reads within this transaction lock the namespace and ensures we have a Collection instance
+  consistent with the snapshot (same as above).
+* User writes do an additional step after locking to check if the collection instance obtained is
+  the latest instance in the CollectionCatalog, if it is not we treat this as a WriteConflict so the
+  transaction is retried.
+
+The `CollectionCatalog` contains a mapping of `Namespace` and `UUID` to the `catalogId` for
+timestamps back to the oldest timestamp. These are used for efficient lookups into the durable
+catalog, and are resilient to create, drop and rename operations.
 
 Operations that use collection locks (in any [lockmode](#lock-modes)) can rely on the catalog
 information of the collection not changing. However, when unlocking and then relocking, not only
@@ -474,6 +533,11 @@ checkpoint, will never be missing collection or index data that should still exi
 time that is less than the drop timestamp. Requiring the drop timestamp to pass (become older) than
 the oldest_timestamp ensures that all reads, which are supported back to the oldest_timestamp,
 successfully find the collection or index data.
+
+There's a mechanism to delay an ident drop during the second phase via
+`KVDropPendingIdentReaper::markIdentInUse()` when there are no more references to the drop token.
+This is currently used when instantiating `Collection` objects at earlier points in time for reads,
+and prevents the reaper from dropping the collection and index tables during the instantiation.
 
 _Code spelunking starting points:_
 
@@ -602,6 +666,13 @@ match. Lock-free reads skip collection and RSTL locks, so
 are compared before and after. In general, lock-free reads work by acquiring all the 'versioned'
 state needed for the read at the beginning, rather than relying on a collection-level lock to keep
 the state from changing.
+
+When setting up the read, `AutoGetCollectionForRead` will trigger the instantiation of a
+`Collection` object when either:
+* Reading at an earlier time than the minimum valid snapshot of the matching `Collection` from the `CollectionCatalog`.
+* No matching `Collection` is found in the `CollectionCatalog`.
+
+In versions earlier than v7.0 this would error with `SnapshotUnavailable`.
 
 Sharding `shardVersion` checks still occur in the appropriate query plan stage code when/if the
 shard filtering metadata is acquired. The `shardVersion` check after
