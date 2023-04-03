@@ -270,6 +270,9 @@ var $config = (function() {
                 assertAlways.commandWorked(mongos.getDB('config').collections.update(
                     {_id: fullNs}, {$set: {"noBalance": false}}));
                 sh.awaitCollectionBalance(mongos.getCollection(fullNs), 300000 /* 5 minutes */);
+                // Re-disable balancing
+                assertAlways.commandWorked(mongos.getDB('config').collections.update(
+                    {_id: fullNs}, {$set: {"noBalance": true}}));
                 // Begin defragmentation again
                 assertAlways.commandWorked(mongos.adminCommand({
                     configureCollectionBalancing: fullNs,
