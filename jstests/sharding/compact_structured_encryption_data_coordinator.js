@@ -54,13 +54,6 @@ jsTest.log(reply);
 assert.eq(reply.stats.ecoc.read, 0);
 assert.eq(reply.stats.ecoc.deleted, 0);
 
-if (!isFLE2ProtocolVersion2Enabled()) {
-    assert.eq(reply.stats.ecc.read, 0);
-    assert.eq(reply.stats.ecc.inserted, 0);
-    assert.eq(reply.stats.ecc.updated, 0);
-    assert.eq(reply.stats.ecc.deleted, 0);
-}
-
 assert.eq(reply.stats.esc.read, 0);
 assert.eq(reply.stats.esc.inserted, 0);
 assert.eq(reply.stats.esc.updated, 0);

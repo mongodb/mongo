@@ -290,11 +290,6 @@ def mongo_shell_program(logger, executable=None, connection_string=None, filenam
         if "host" in kwargs:
             kwargs.pop("host")
 
-    # if featureFlagFLE2ProtocolVersion2 is enabled in setParameter, enable it in the shell also
-    # TODO: SERVER-73303 remove once v2 is enabled by default
-    if mongod_set_parameters.get("featureFlagFLE2ProtocolVersion2"):
-        args.append("--setShellParameter=featureFlagFLE2ProtocolVersion2=true")
-
     # Apply the rest of the command line arguments.
     _apply_kwargs(args, kwargs)
 

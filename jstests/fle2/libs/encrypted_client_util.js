@@ -21,9 +21,6 @@ var EncryptedClient = class {
         // use
         this.useImplicitSharding = !(typeof (ImplicitlyShardAccessCollSettings) === "undefined");
 
-        // TODO: SERVER-73303 remove when v2 is enabled by default
-        this.ecocCountMatchesEscCount = false;
-
         const localKMS = {
             key: BinData(
                 0,
@@ -111,7 +108,6 @@ var EncryptedClient = class {
         assert(baseCollInfo.options.encryptedFields !== undefined);
         return {
             esc: baseCollInfo.options.encryptedFields.escCollection,
-            ecc: baseCollInfo.options.encryptedFields.eccCollection,
             ecoc: baseCollInfo.options.encryptedFields.ecocCollection,
         };
     }
@@ -194,10 +190,6 @@ var EncryptedClient = class {
         assert.commandWorked(this._edb.createCollection(ef.escCollection, tenantOption));
         assert.commandWorked(this._edb.createCollection(ef.ecocCollection, tenantOption));
 
-        // TODO: SERVER-73303 remove once v2 is enabled by default
-        if (!isFLE2ProtocolVersion2Enabled()) {
-            assert.commandWorked(this._edb.createCollection(ef.eccCollection, tenantOption));
-        }
         return res;
     }
 
@@ -250,14 +242,6 @@ var EncryptedClient = class {
         assert.eq(actualEsc,
                   expectedEsc,
                   `ESC document count is wrong: Actual ${actualEsc} vs Expected ${expectedEsc}`);
-
-        if (!isFLE2ProtocolVersion2Enabled()) {
-            const actualEcc = countDocuments(sessionDB, ef.eccCollection, tenantId);
-            assert.eq(
-                actualEcc,
-                expectedEcc,
-                `ECC document count is wrong: Actual ${actualEcc} vs Expected ${expectedEcc}`);
-        }
 
         const actualEcoc = countDocuments(sessionDB, ef.ecocCollection, tenantId);
         assert.eq(actualEcoc,
@@ -404,11 +388,6 @@ var EncryptedClient = class {
         checkMap[baseCollInfo.options.encryptedFields.ecocCollection] = ecocExists;
         checkMap[baseCollInfo.options.encryptedFields.ecocCollection + ".compact"] = ecocTempExists;
 
-        // TODO: SERVER-73303 remove once v2 is enabled by default
-        if (!isFLE2ProtocolVersion2Enabled()) {
-            checkMap[baseCollInfo.options.encryptedFields.eccCollection] = true;
-        }
-
         const edb = this._edb;
         Object.keys(checkMap).forEach(function(coll) {
             const info = edb.getCollectionInfos({"name": coll});
@@ -455,14 +434,6 @@ function isFLE2RangeEnabled(db) {
 }
 
 /**
- * @returns Returns true if featureFlagFLE2ProtocolVersion2 is enabled
- */
-function isFLE2ProtocolVersion2Enabled() {
-    return typeof (TestData) !== "undefined" &&
-        TestData.setParameters.featureFlagFLE2ProtocolVersion2;
-}
-
-/**
  * @returns Returns true if internalQueryFLEAlwaysUseEncryptedCollScanMode is enabled
  */
 function isFLE2AlwaysUseCollScanModeEnabled(db) {
@@ -480,13 +451,6 @@ function isFLE2AlwaysUseCollScanModeEnabled(db) {
 function assertIsIndexedEncryptedField(value) {
     assert(value instanceof BinData, "Expected BinData, found: " + value);
     assert.eq(value.subtype(), 6, "Expected Encrypted bindata: " + value);
-
-    // TODO: SERVER-73303 remove once v2 is enabled by default
-    if (!isFLE2ProtocolVersion2Enabled()) {
-        assert(value.hex().startsWith("07") || value.hex().startsWith("09"),
-               "Expected subtype 7 or 9 but found the wrong type: " + value.hex());
-        return;
-    }
     assert(value.hex().startsWith("0e") || value.hex().startsWith("0f"),
            "Expected subtype 14 or 15 but found the wrong type: " + value.hex());
 }
@@ -499,12 +463,6 @@ function assertIsIndexedEncryptedField(value) {
 function assertIsEqualityIndexedEncryptedField(value) {
     assert(value instanceof BinData, "Expected BinData, found: " + value);
     assert.eq(value.subtype(), 6, "Expected Encrypted bindata: " + value);
-    // TODO: SERVER-73303 remove once v2 is enabled by default
-    if (!isFLE2ProtocolVersion2Enabled()) {
-        assert(value.hex().startsWith("07"),
-               "Expected subtype 7 but found the wrong type: " + value.hex());
-        return;
-    }
     assert(value.hex().startsWith("0e"),
            "Expected subtype 14 but found the wrong type: " + value.hex());
 }
@@ -517,12 +475,6 @@ function assertIsEqualityIndexedEncryptedField(value) {
 function assertIsRangeIndexedEncryptedField(value) {
     assert(value instanceof BinData, "Expected BinData, found: " + value);
     assert.eq(value.subtype(), 6, "Expected Encrypted bindata: " + value);
-    // TODO: SERVER-73303 remove once v2 is enabled by default
-    if (!isFLE2ProtocolVersion2Enabled()) {
-        assert(value.hex().startsWith("09"),
-               "Expected subtype 9 but found the wrong type: " + value.hex());
-        return;
-    }
     assert(value.hex().startsWith("0f"),
            "Expected subtype 15 but found the wrong type: " + value.hex());
 }
@@ -535,12 +487,6 @@ function assertIsRangeIndexedEncryptedField(value) {
 function assertIsUnindexedEncryptedField(value) {
     assert(value instanceof BinData, "Expected BinData, found: " + value);
     assert.eq(value.subtype(), 6, "Expected Encrypted bindata: " + value);
-    // TODO: SERVER-73303 remove once v2 is enabled by default
-    if (!isFLE2ProtocolVersion2Enabled()) {
-        assert(value.hex().startsWith("06"),
-               "Expected subtype 6 but found the wrong type: " + value.hex());
-        return;
-    }
     assert(value.hex().startsWith("10"),
-           "Expected subtype 6 but found the wrong type: " + value.hex());
+           "Expected subtype 16 but found the wrong type: " + value.hex());
 }

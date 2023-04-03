@@ -510,24 +510,21 @@ let testCases = {
     getMore: {skip: "requires a previously established cursor"},
     getParameter: {skip: "executes locally on mongos (not sent to any remote node)"},
     getQueryableEncryptionCountInfo: {
-        // TODO SERVER-69563 - Enable this test once the feature flag is enabled
-        skip: "requires feature flag"
-        // run: {
-        //     sendsDbVersion: true,
-        //     command: function(dbName, collName) {
-        //         return {
-        //             getQueryableEncryptionCountInfo: collName,
-        //             tokens: [
-        //                 {
-        //                     tokens:
-        //                         [{"s": BinData(0,
-        //                         "lUBO7Mov5Sb+c/D4cJ9whhhw/+PZFLCk/AQU2+BpumQ=")}]
-        //                 },
-        //             ],
-        //             "forInsert": true
-        //         };
-        //     }
-        // }
+        run: {
+            sendsDbVersion: true,
+            command: function(dbName, collName) {
+                return {
+                    getQueryableEncryptionCountInfo: collName,
+                    tokens: [
+                        {
+                            tokens:
+                                [{"s": BinData(0, "lUBO7Mov5Sb+c/D4cJ9whhhw/+PZFLCk/AQU2+BpumQ=")}]
+                        },
+                    ],
+                    "forInsert": true
+                };
+            }
+        }
     },
     getShardMap: {skip: "executes locally on mongos (not sent to any remote node)"},
     getShardVersion: {skip: "executes locally on mongos (not sent to any remote node)"},

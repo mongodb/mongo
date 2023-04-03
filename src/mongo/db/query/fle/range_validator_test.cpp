@@ -110,11 +110,11 @@ std::string payload(StringData path,
     FLE2RangeFindSpec spec(payloadId, firstOp);
     spec.setSecondOperator(secondOp);
 
-    auto ffp = FLEClientCrypto::serializeFindRangePayload(
+    auto ffp = FLEClientCrypto::serializeFindRangePayloadV2(
         indexKeyAndId, userKeyAndId, std::vector<std::string>(), 0, spec);
 
     BSONObjBuilder builder;
-    toEncryptedBinData(path, EncryptedBinDataType::kFLE2FindRangePayload, ffp, &builder);
+    toEncryptedBinData(path, EncryptedBinDataType::kFLE2FindRangePayloadV2, ffp, &builder);
     return builder.obj().firstElement().jsonString(ExtendedCanonicalV2_0_0, false, false);
 }
 
@@ -127,10 +127,10 @@ std::string stub(StringData path,
                  boost::optional<Fle2RangeOperator> secondOp) {
     FLE2RangeFindSpec spec(payloadId, firstOp);
     spec.setSecondOperator(secondOp);
-    auto ffp = FLEClientCrypto::serializeFindRangeStub(spec);
+    auto ffp = FLEClientCrypto::serializeFindRangeStubV2(spec);
 
     BSONObjBuilder builder;
-    toEncryptedBinData(path, EncryptedBinDataType::kFLE2FindRangePayload, ffp, &builder);
+    toEncryptedBinData(path, EncryptedBinDataType::kFLE2FindRangePayloadV2, ffp, &builder);
     return builder.obj().firstElement().jsonString(ExtendedCanonicalV2_0_0, false, false);
 }
 

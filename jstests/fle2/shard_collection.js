@@ -2,6 +2,7 @@
  * Verify valid and invalid scenarios for shard collection
  *
  * @tags: [
+ * requires_fcv_70
  * ]
  */
 load("jstests/fle2/libs/encrypted_client_util.js");
@@ -29,11 +30,6 @@ const result = dbTest.getCollectionInfos({name: "basic"});
 print("result" + tojson(result));
 const ef = result[0].options.encryptedFields;
 assert.eq(ef.escCollection, "enxcol_.basic.esc");
-
-// TODO SERVER-73303 remove when V2 is enabled
-if (!isFLE2ProtocolVersion2Enabled()) {
-    assert.eq(ef.eccCollection, "enxcol_.basic.ecc");
-}
 assert.eq(ef.ecocCollection, "enxcol_.basic.ecoc");
 
 assert.commandFailedWithCode(

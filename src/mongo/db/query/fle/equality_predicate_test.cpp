@@ -161,10 +161,10 @@ BSONObj generateFFP(StringData path, int value) {
 
     BSONObj doc = BSON("value" << value);
     auto element = doc.firstElement();
-    auto fpp = FLEClientCrypto::serializeFindPayload(indexKeyAndId, userKeyAndId, element, 0);
+    auto fpp = FLEClientCrypto::serializeFindPayloadV2(indexKeyAndId, userKeyAndId, element, 0);
 
     BSONObjBuilder builder;
-    toEncryptedBinData(path, EncryptedBinDataType::kFLE2FindEqualityPayload, fpp, &builder);
+    toEncryptedBinData(path, EncryptedBinDataType::kFLE2FindEqualityPayloadV2, fpp, &builder);
     return builder.obj();
 }
 
@@ -236,18 +236,9 @@ TEST_F(EqualityPredicateCollScanRewriteTest, Eq_Match) {
     auto expected = fromjson(R"({
         "$_internalFleEq": {
             "field": "$ssn",
-            "edc": {
-                "$binary": {
-                    "base64": "CEWSmQID7SfwyAUI3ZkSFkATKryDQfnxXEOGad5d4Rsg",
-                    "subType": "6"
-                }
-            },
-            "counter": {
-                "$numberLong": "0"
-            },
             "server": {
                 "$binary": {
-                    "base64": "COuac/eRLYakKX6B0vZ1r3QodOQFfjqJD+xlGiPu4/Ps",
+                    "base64": "CCL2XXIiI5N4wjgvCxYp6XRXY1OS39OuX6WT6Y60cR9R",
                     "subType": "6"
                 }
             }
@@ -266,18 +257,9 @@ TEST_F(EqualityPredicateCollScanRewriteTest, Eq_Expr) {
     auto expected = fromjson(R"({
         "$_internalFleEq": {
             "field": "$ssn",
-            "edc": {
-                "$binary": {
-                    "base64": "CEWSmQID7SfwyAUI3ZkSFkATKryDQfnxXEOGad5d4Rsg",
-                    "subType": "6"
-                }
-            },
-            "counter": {
-                "$numberLong": "0"
-            },
             "server": {
                 "$binary": {
-                    "base64": "COuac/eRLYakKX6B0vZ1r3QodOQFfjqJD+xlGiPu4/Ps",
+                    "base64": "CCL2XXIiI5N4wjgvCxYp6XRXY1OS39OuX6WT6Y60cR9R",
                     "subType": "6"
                 }
             }
@@ -303,18 +285,9 @@ TEST_F(EqualityPredicateCollScanRewriteTest, In_Match) {
             "$expr": {
                 "$_internalFleEq": {
                     "field": "$ssn",
-                    "edc": {
-                        "$binary": {
-                            "base64": "CEWSmQID7SfwyAUI3ZkSFkATKryDQfnxXEOGad5d4Rsg",
-                            "subType": "6"
-                        }
-                    },
-                    "counter": {
-                        "$numberLong": "0"
-                    },
                     "server": {
                         "$binary": {
-                            "base64": "COuac/eRLYakKX6B0vZ1r3QodOQFfjqJD+xlGiPu4/Ps",
+                            "base64": "CCL2XXIiI5N4wjgvCxYp6XRXY1OS39OuX6WT6Y60cR9R",
                             "subType": "6"
                         }
                     }
@@ -325,18 +298,9 @@ TEST_F(EqualityPredicateCollScanRewriteTest, In_Match) {
             "$expr": {
                 "$_internalFleEq": {
                     "field": "$ssn",
-                    "edc": {
-                        "$binary": {
-                            "base64": "CLpCo6rNuYMVT+6n1HCX15MNrVYDNqf6udO46ayo43Sw",
-                            "subType": "6"
-                        }
-                    },
-                    "counter": {
-                        "$numberLong": "0"
-                    },
                     "server": {
                         "$binary": {
-                            "base64": "COuac/eRLYakKX6B0vZ1r3QodOQFfjqJD+xlGiPu4/Ps",
+                            "base64": "CB94z16OvvvDIOA1rjeDCWnhyhfjroyqXV8k/3uUkEmN",
                             "subType": "6"
                         }
                     }
@@ -347,18 +311,9 @@ TEST_F(EqualityPredicateCollScanRewriteTest, In_Match) {
             "$expr": {
                 "$_internalFleEq": {
                     "field": "$ssn",
-                    "edc": {
-                        "$binary": {
-                            "base64": "CPi44oCQHnNDeRqHsNLzbdCeHt2DK/wCly0g2dxU5fqN",
-                            "subType": "6"
-                        }
-                    },
-                    "counter": {
-                        "$numberLong": "0"
-                    },
                     "server": {
                         "$binary": {
-                            "base64": "COuac/eRLYakKX6B0vZ1r3QodOQFfjqJD+xlGiPu4/Ps",
+                            "base64": "CIGY0H2DhM4LFcdH2RPZcvYuKE1Mu2d6rfJ4IMlfRd2r",
                             "subType": "6"
                         }
                     }
@@ -382,18 +337,9 @@ TEST_F(EqualityPredicateCollScanRewriteTest, In_Expr) {
     auto expected = fromjson(R"({ "$or" : [ {
                 "$_internalFleEq": {
                     "field": "$ssn",
-                    "edc": {
-                        "$binary": {
-                            "base64": "CEWSmQID7SfwyAUI3ZkSFkATKryDQfnxXEOGad5d4Rsg",
-                            "subType": "6"
-                        }
-                    },
-                    "counter": {
-                        "$numberLong": "0"
-                    },
                     "server": {
                         "$binary": {
-                            "base64": "COuac/eRLYakKX6B0vZ1r3QodOQFfjqJD+xlGiPu4/Ps",
+                            "base64": "CCL2XXIiI5N4wjgvCxYp6XRXY1OS39OuX6WT6Y60cR9R",
                             "subType": "6"
                         }
                     }
@@ -401,18 +347,9 @@ TEST_F(EqualityPredicateCollScanRewriteTest, In_Expr) {
                 {
                 "$_internalFleEq": {
                     "field": "$ssn",
-                    "edc": {
-                        "$binary": {
-                            "base64": "CEWSmQID7SfwyAUI3ZkSFkATKryDQfnxXEOGad5d4Rsg",
-                            "subType": "6"
-                        }
-                    },
-                    "counter": {
-                        "$numberLong": "0"
-                    },
                     "server": {
                         "$binary": {
-                            "base64": "COuac/eRLYakKX6B0vZ1r3QodOQFfjqJD+xlGiPu4/Ps",
+                            "base64": "CCL2XXIiI5N4wjgvCxYp6XRXY1OS39OuX6WT6Y60cR9R",
                             "subType": "6"
                         }
                     }

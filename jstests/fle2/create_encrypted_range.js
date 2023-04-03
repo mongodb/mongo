@@ -2,7 +2,7 @@
 
 /**
  * @tags: [
- * requires_fcv_62,
+ * requires_fcv_70,
  * assumes_unsharded_collection
  * ]
  */

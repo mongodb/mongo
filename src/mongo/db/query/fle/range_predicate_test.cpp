@@ -217,10 +217,10 @@ BSONObj generateFFP(StringData path, int lb, int ub, int min, int max) {
     auto edges = minCoverInt32(lb, true, ub, true, min, max, 1);
     FLE2RangeFindSpec spec(0, Fle2RangeOperator::kGt);
     auto ffp =
-        FLEClientCrypto::serializeFindRangePayload(indexKeyAndId, userKeyAndId, edges, 0, spec);
+        FLEClientCrypto::serializeFindRangePayloadV2(indexKeyAndId, userKeyAndId, edges, 0, spec);
 
     BSONObjBuilder builder;
-    toEncryptedBinData(path, EncryptedBinDataType::kFLE2FindRangePayload, ffp, &builder);
+    toEncryptedBinData(path, EncryptedBinDataType::kFLE2FindRangePayloadV2, ffp, &builder);
     return builder.obj();
 }
 
@@ -246,34 +246,27 @@ TEST_F(RangePredicateRewriteTest, CollScanRewriteMatch) {
     auto expected = fromjson(R"({
         "$_internalFleBetween": {
             "field": "$age",
-            "edc": [
+            "server": [
                 {
                     "$binary": {
-                        "base64": "CJb59SJCWcnn4u4uS1KHMphf8zK7M5+fUoFTzzUMqFVv",
+                        "base64": "CKPIq22z0nimnLE48v2/ZyeljOYmlDVlUYEWiCINEhII",
                         "subType": "6"
                     }
                 },
                 {
                     "$binary": {
-                        "base64": "CDE4/QorDvn6+GnmlPJtxQ5pZmwKOt/F48HmNrQuVJ1o",
+                        "base64": "CGO26k3E2Qb5M5GlI1SoqcxUkXJbsCwHlwPwTbzesr53",
                         "subType": "6"
                     }
                 },
                 {
                     "$binary": {
-                        "base64": "CE0h7vfdciFBeqIk1N14ZXw/jzFT0bLfXcNyiPRsg4W4",
+                        "base64": "CJ0Xu3p6LfkwHkE1EAR0DLCWEx1SPlyLHL3kkNPlOaxz",
                         "subType": "6"
                     }
                 }
-                
-            ],
-            "counter": {$numberLong: "0"},
-            "server": {
-                "$binary": {
-                    "base64": "COuac/eRLYakKX6B0vZ1r3QodOQFfjqJD+xlGiPu4/Ps",
-                    "subType": "6"
-                }
-            }
+
+            ]
         }
     })");
 #define ASSERT_REWRITE_TO_INTERNAL_BETWEEN(T)                                          \
@@ -297,34 +290,27 @@ TEST_F(RangePredicateRewriteTest, CollScanRewriteAgg) {
     auto expected = fromjson(R"({
         "$_internalFleBetween": {
             "field": "$age",
-            "edc": [
+            "server": [
                 {
                     "$binary": {
-                        "base64": "CJb59SJCWcnn4u4uS1KHMphf8zK7M5+fUoFTzzUMqFVv",
+                        "base64": "CKPIq22z0nimnLE48v2/ZyeljOYmlDVlUYEWiCINEhII",
                         "subType": "6"
                     }
                 },
                 {
                     "$binary": {
-                        "base64": "CDE4/QorDvn6+GnmlPJtxQ5pZmwKOt/F48HmNrQuVJ1o",
+                        "base64": "CGO26k3E2Qb5M5GlI1SoqcxUkXJbsCwHlwPwTbzesr53",
                         "subType": "6"
                     }
                 },
                 {
                     "$binary": {
-                        "base64": "CE0h7vfdciFBeqIk1N14ZXw/jzFT0bLfXcNyiPRsg4W4",
+                        "base64": "CJ0Xu3p6LfkwHkE1EAR0DLCWEx1SPlyLHL3kkNPlOaxz",
                         "subType": "6"
                     }
                 }
-                
-            ],
-            "counter": {$numberLong: "0"},
-            "server": {
-                "$binary": {
-                    "base64": "COuac/eRLYakKX6B0vZ1r3QodOQFfjqJD+xlGiPu4/Ps",
-                    "subType": "6"
-                }
-            }
+
+            ]
         }
     })");
     auto ops = {ExpressionCompare::GT,

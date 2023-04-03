@@ -4,7 +4,8 @@
  * @tags: [
  * assumes_unsharded_collection,
  * requires_non_retryable_commands,
- * assumes_against_mongod_not_mongos
+ * assumes_against_mongod_not_mongos,
+ * requires_fcv_70
  * ]
  */
 load("jstests/fle2/libs/encrypted_client_util.js");

@@ -3,7 +3,8 @@
 /**
  * @tags: [
  * assumes_unsharded_collection,
- * does_not_support_transactions
+ * does_not_support_transactions,
+ * requires_fcv_70
  * ]
  */
 (function() {

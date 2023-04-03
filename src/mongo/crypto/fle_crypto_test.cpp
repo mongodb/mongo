@@ -1270,9 +1270,9 @@ void assertPayload(BSONElement elem, EncryptedBinDataType type) {
 
 void assertPayload(BSONElement elem, Operation operation) {
     if (operation == Operation::kFind) {
-        assertPayload(elem, EncryptedBinDataType::kFLE2FindEqualityPayload);
+        assertPayload(elem, EncryptedBinDataType::kFLE2FindEqualityPayloadV2);
     } else if (operation == Operation::kInsert) {
-        assertPayload(elem, EncryptedBinDataType::kFLE2EqualityIndexedValue);
+        assertPayload(elem, EncryptedBinDataType::kFLE2EqualityIndexedValueV2);
     } else {
         FAIL("Not implemented.");
     }
@@ -1309,8 +1309,8 @@ void roundTripTest(BSONObj doc, BSONType type, Operation opType, Fle2AlgorithmIn
     if (opType == Operation::kFind) {
         assertPayload(finalDoc["encrypted"],
                       algorithm == Fle2AlgorithmInt::kEquality
-                          ? EncryptedBinDataType::kFLE2FindEqualityPayload
-                          : EncryptedBinDataType::kFLE2FindRangePayload);
+                          ? EncryptedBinDataType::kFLE2FindEqualityPayloadV2
+                          : EncryptedBinDataType::kFLE2FindRangePayloadV2);
     } else {
         ASSERT_BSONOBJ_EQ(inputDoc, decryptedDoc);
     }
@@ -1655,11 +1655,13 @@ void disallowedEqualityPayloadType(BSONType type) {
             auto [encryptedTypeBinding, subCdr] = fromEncryptedConstDataRange(cdr);
 
 
-            auto iup = parseFromCDR<FLE2InsertUpdatePayload>(subCdr);
+            auto iup = parseFromCDR<FLE2InsertUpdatePayloadV2>(subCdr);
 
             iup.setType(type);
-            toEncryptedBinData(
-                fieldNameToSerialize, EncryptedBinDataType::kFLE2InsertUpdatePayload, iup, builder);
+            toEncryptedBinData(fieldNameToSerialize,
+                               EncryptedBinDataType::kFLE2InsertUpdatePayloadV2,
+                               iup,
+                               builder);
         });
 
 
@@ -2408,40 +2410,7 @@ TEST(EncryptionInformation, BadSchema) {
                        6371205);
 }
 
-// TODO: SERVER-73303 remove when v2 is enabled by default
-TEST(EncryptionInformation, MissingStateCollectionV1) {
-    NamespaceString ns = NamespaceString::createNamespaceString_forTest("test.test");
-
-    {
-        EncryptedFieldConfig efc = getTestEncryptedFieldConfig();
-        efc.setEscCollection(boost::none);
-        auto obj = EncryptionInformationHelpers::encryptionInformationSerialize(ns, efc);
-        ASSERT_THROWS_CODE(EncryptionInformationHelpers::getAndValidateSchema(
-                               ns, EncryptionInformation::parse(IDLParserContext("foo"), obj)),
-                           DBException,
-                           6371207);
-    }
-    {
-        EncryptedFieldConfig efc = getTestEncryptedFieldConfig();
-        efc.setEccCollection(boost::none);
-        auto obj = EncryptionInformationHelpers::encryptionInformationSerialize(ns, efc);
-        ASSERT_THROWS_CODE(EncryptionInformationHelpers::getAndValidateSchema(
-                               ns, EncryptionInformation::parse(IDLParserContext("foo"), obj)),
-                           DBException,
-                           6371206);
-    }
-    {
-        EncryptedFieldConfig efc = getTestEncryptedFieldConfig();
-        efc.setEcocCollection(boost::none);
-        auto obj = EncryptionInformationHelpers::encryptionInformationSerialize(ns, efc);
-        ASSERT_THROWS_CODE(EncryptionInformationHelpers::getAndValidateSchema(
-                               ns, EncryptionInformation::parse(IDLParserContext("foo"), obj)),
-                           DBException,
-                           6371208);
-    }
-}
-
-TEST(EncryptionInformation, MissingStateCollectionV2) {
+TEST(EncryptionInformation, MissingStateCollection) {
     RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
     NamespaceString ns = NamespaceString::createNamespaceString_forTest("test.test");
 
@@ -2917,19 +2886,6 @@ TEST(FLE_Update, Basic) {
     ASSERT_EQ(finalDoc["$push"][kSafeContent]["$each"].Array().size(), 1);
     ASSERT_TRUE(
         finalDoc["$push"][kSafeContent]["$each"].Array()[0].isBinData(BinDataType::BinDataGeneral));
-
-    // TODO: SERVER-73303 remove below once v2 is enabled by default
-    // test w/ v2 enabled
-    RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
-    finalDoc = encryptUpdateDocument(inputDoc, &keyVault);
-
-    std::cout << finalDoc << std::endl;
-
-    ASSERT_TRUE(finalDoc["$set"]["encrypted"].isBinData(BinDataType::Encrypt));
-    ASSERT_TRUE(finalDoc["$push"][kSafeContent]["$each"].type() == Array);
-    ASSERT_EQ(finalDoc["$push"][kSafeContent]["$each"].Array().size(), 1);
-    ASSERT_TRUE(
-        finalDoc["$push"][kSafeContent]["$each"].Array()[0].isBinData(BinDataType::BinDataGeneral));
 }
 
 // Test update with no crypto
@@ -2938,16 +2894,6 @@ TEST(FLE_Update, Empty) {
 
     auto inputDoc = BSON("$set" << BSON("count" << 1));
     auto finalDoc = encryptUpdateDocument(inputDoc, &keyVault);
-
-    std::cout << finalDoc << std::endl;
-
-    ASSERT_EQ(finalDoc["$set"]["count"].type(), NumberInt);
-    ASSERT(finalDoc["$push"].eoo());
-
-    // TODO: SERVER-73303 remove below once v2 is enabled by default
-    // test w/ v2 enabled
-    RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
-    finalDoc = encryptUpdateDocument(inputDoc, &keyVault);
 
     std::cout << finalDoc << std::endl;
 
@@ -2967,11 +2913,6 @@ TEST(FLE_Update, BadPush) {
         "$push" << 123 << "$set"
                 << BSON("encrypted" << BSONBinData(buf.data(), buf.size(), BinDataType::Encrypt)));
     ASSERT_THROWS_CODE(encryptUpdateDocument(inputDoc, &keyVault), DBException, 6371511);
-
-    // TODO: SERVER-73303 remove below once v2 is enabled by default
-    // test w/ v2 enabled
-    RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
-    ASSERT_THROWS_CODE(encryptUpdateDocument(inputDoc, &keyVault), DBException, 6371511);
 }
 
 TEST(FLE_Update, PushToSafeContent) {
@@ -2985,11 +2926,6 @@ TEST(FLE_Update, PushToSafeContent) {
     auto inputDoc = BSON(
         "$push" << 123 << "$set"
                 << BSON("encrypted" << BSONBinData(buf.data(), buf.size(), BinDataType::Encrypt)));
-    ASSERT_THROWS_CODE(encryptUpdateDocument(inputDoc, &keyVault), DBException, 6371511);
-
-    // TODO: SERVER-73303 remove below once v2 is enabled by default
-    // test w/ v2 enabled
-    RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
     ASSERT_THROWS_CODE(encryptUpdateDocument(inputDoc, &keyVault), DBException, 6371511);
 }
 
@@ -3013,72 +2949,6 @@ TEST(FLE_Update, PushToOtherfield) {
     ASSERT_EQ(finalDoc["$push"][kSafeContent]["$each"].Array().size(), 1);
     ASSERT_TRUE(
         finalDoc["$push"][kSafeContent]["$each"].Array()[0].isBinData(BinDataType::BinDataGeneral));
-
-    // TODO: SERVER-73303 remove below once v2 is enabled by default
-    // test w/ v2 enabled
-    RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
-    finalDoc = encryptUpdateDocument(inputDoc, &keyVault);
-    std::cout << finalDoc << std::endl;
-
-    ASSERT_TRUE(finalDoc["$set"]["encrypted"].isBinData(BinDataType::Encrypt));
-    ASSERT_TRUE(finalDoc["$push"]["abc"].type() == NumberInt);
-    ASSERT_TRUE(finalDoc["$push"][kSafeContent]["$each"].type() == Array);
-    ASSERT_EQ(finalDoc["$push"][kSafeContent]["$each"].Array().size(), 1);
-    ASSERT_TRUE(
-        finalDoc["$push"][kSafeContent]["$each"].Array()[0].isBinData(BinDataType::BinDataGeneral));
-}
-
-// TODO: SERVER-73303 remove below once v2 is enabled by default
-// In v2, the GetRemovedTags and GenerateUpdateToRemoveTags tests replaces this test.
-TEST(FLE_Update, PullTokens) {
-    TestKeyVault keyVault;
-    NamespaceString ns = NamespaceString::createNamespaceString_forTest("test.test");
-    EncryptedFieldConfig efc = getTestEncryptedFieldConfig();
-
-    auto obj =
-        EncryptionInformationHelpers::encryptionInformationSerializeForDelete(ns, efc, &keyVault);
-
-    auto tokenMap = EncryptionInformationHelpers::getDeleteTokens(
-        ns, EncryptionInformation::parse(IDLParserContext("foo"), obj));
-
-    ASSERT_EQ(tokenMap.size(), 2);
-
-    ASSERT(tokenMap.contains("nested.encrypted"));
-    ASSERT(tokenMap.contains("encrypted"));
-
-
-    auto doc = BSON("value"
-                    << "123456");
-    auto element = doc.firstElement();
-    auto inputDoc = BSON(kSafeContent << BSON_ARRAY(1 << 2 << 4) << "encrypted" << element);
-
-    auto buf = generatePlaceholder(element, Operation::kInsert);
-    BSONObjBuilder builder;
-    builder.append(kSafeContent, BSON_ARRAY(1 << 2 << 4));
-    builder.appendBinData("encrypted", buf.size(), BinDataType::Encrypt, buf.data());
-    {
-        BSONObjBuilder sub(builder.subobjStart("nested"));
-        auto buf2 = generatePlaceholder(
-            element, Operation::kInsert, Fle2AlgorithmInt::kEquality, indexKey2Id);
-        sub.appendBinData("encrypted", buf2.size(), BinDataType::Encrypt, buf2.data());
-    }
-    auto encDoc = encryptDocument(builder.obj(), &keyVault);
-
-    auto removedFields = EDCServerCollection::getEncryptedIndexedFields(encDoc);
-
-    auto pullUpdate1 = EDCServerCollection::generateUpdateToRemoveTags(removedFields, tokenMap);
-
-    std::cout << "PULL: " << pullUpdate1 << std::endl;
-
-    ASSERT_EQ(pullUpdate1["$pull"].type(), Object);
-    ASSERT_EQ(pullUpdate1["$pull"][kSafeContent].type(), Object);
-    ASSERT_EQ(pullUpdate1["$pull"][kSafeContent]["$in"].type(), Array);
-
-    // Verify we fail when we are missing tokens for affected fields
-    tokenMap.clear();
-    ASSERT_THROWS_CODE(EDCServerCollection::generateUpdateToRemoveTags(removedFields, tokenMap),
-                       DBException,
-                       6371513);
 }
 
 TEST(FLE_Update, GetRemovedTags) {
@@ -3158,11 +3028,6 @@ TEST(FLE_Update, GetRemovedTags) {
 }
 
 TEST(FLE_Update, GenerateUpdateToRemoveTags) {
-    // TODO: SERVER-73303 remove when v2 is enabled by default
-    // This feature flag is needed for encryptDocument() to generate v2 payloads, since
-    // getRemovedTags() only supports v2.
-    RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
-
     TestKeyVault keyVault;
 
     auto doc = BSON("value"
