@@ -132,8 +132,8 @@ PlanStage::StageState TimeseriesModifyStage::_writeToTimeseriesBuckets(
         write_ops::DeleteOpEntry deleteEntry(BSON("_id" << bucketId), false);
         write_ops::DeleteCommandRequest op(collection()->ns(), {deleteEntry});
 
-        auto result =
-            timeseries::performAtomicWrites(opCtx(), collection(), recordId, op, bucketFromMigrate);
+        auto result = timeseries::performAtomicWrites(
+            opCtx(), collection(), recordId, op, bucketFromMigrate, _params->stmtId);
         if (!result.isOK()) {
             return yieldAndRetry(7309300);
         }
@@ -159,8 +159,8 @@ PlanStage::StageState TimeseriesModifyStage::_writeToTimeseriesBuckets(
         write_ops::UpdateOpEntry updateEntry(BSON("_id" << bucketId), std::move(u));
         write_ops::UpdateCommandRequest op(collection()->ns(), {updateEntry});
 
-        auto result =
-            timeseries::performAtomicWrites(opCtx(), collection(), recordId, op, bucketFromMigrate);
+        auto result = timeseries::performAtomicWrites(
+            opCtx(), collection(), recordId, op, bucketFromMigrate, _params->stmtId);
         if (!result.isOK()) {
             return yieldAndRetry(7309301);
         }

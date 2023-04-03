@@ -223,8 +223,12 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicDelete) {
 
         op.setWriteCommandRequestBase(std::move(base));
 
-        ASSERT_OK(performAtomicWrites(
-            opCtx, bucketsColl.getCollection(), recordId, op, /*fromMigrate=*/false));
+        ASSERT_OK(performAtomicWrites(opCtx,
+                                      bucketsColl.getCollection(),
+                                      recordId,
+                                      op,
+                                      /*fromMigrate=*/false,
+                                      /*stmtId=*/kUninitializedStmtId));
     }
 
     // Checks the document is removed.
@@ -286,8 +290,12 @@ TEST_F(TimeseriesWriteUtilTest, PerformAtomicUpdate) {
 
         op.setWriteCommandRequestBase(std::move(base));
 
-        ASSERT_OK(performAtomicWrites(
-            opCtx, bucketsColl.getCollection(), recordId, op, /*fromMigrate=*/false));
+        ASSERT_OK(performAtomicWrites(opCtx,
+                                      bucketsColl.getCollection(),
+                                      recordId,
+                                      op,
+                                      /*fromMigrate=*/false,
+                                      /*stmtId=*/kUninitializedStmtId));
     }
 
     // Checks the document is updated.

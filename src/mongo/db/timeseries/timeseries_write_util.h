@@ -66,5 +66,6 @@ Status performAtomicWrites(OperationContext* opCtx,
                            const RecordId& recordId,
                            const stdx::variant<write_ops::UpdateCommandRequest,
                                                write_ops::DeleteCommandRequest>& modificationOp,
-                           bool fromMigrate);
+                           bool fromMigrate,
+                           StmtId stmtId);
 }  // namespace mongo::timeseries
