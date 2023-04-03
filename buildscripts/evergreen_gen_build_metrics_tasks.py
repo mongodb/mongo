@@ -10,59 +10,90 @@ from shrub.v2.command import BuiltInCommand
 def main():
 
     tasks = {
-        'windows_tasks': [],
-        'linux_x86_64_tasks': [],
-        'linux_arm64_tasks': [],
-        'macos_tasks': [],
+        'windows_tasks': {},
+        'linux_x86_64_tasks': {},
+        'linux_arm64_tasks': {},
+        'macos_tasks': {},
     }
 
-    def create_build_metric_task_steps(task_build_flags, task_targets):
+    tasks_prefixes = {
+        'windows_tasks': 'build_metrics_msvc',
+        'linux_x86_64_tasks': 'build_metrics_x86_64',
+        'linux_arm64_tasks': 'build_metrics_arm64',
+        'macos_tasks': 'build_metrics_xcode',
+    }
+
+    task_group_targets = {
+        'dynamic': [
+            "install-devcore",
+            "install-all-meta generate-libdeps-graph",
+        ], "static": [
+            "install-devcore",
+            "install-all-meta-but-not-unittests",
+        ]
+    }
+
+    def create_build_metric_task_steps(task_build_flags, task_targets, split_num):
 
         evg_flags = f"--debug=time,count,memory VARIANT_DIR=metrics BUILD_METRICS_EVG_TASK_ID={os.environ['task_id']} BUILD_METRICS_EVG_BUILD_VARIANT={os.environ['build_variant']}"
-        cache_flags = "--cache-dir=$PWD/scons-cache --cache-signature-mode=validate"
+        cache_flags = "--cache-dir=$PWD/scons-cache-{split_num} --cache-signature-mode=validate"
 
         scons_task_steps = [
-            f"{evg_flags} --build-metrics=build_metrics.json",
-            f"{evg_flags} {cache_flags} --cache-populate --build-metrics=populate_cache.json",
+            f"{evg_flags} --build-metrics=build_metrics_{split_num}.json",
+            f"{evg_flags} {cache_flags} --cache-populate --build-metrics=populate_cache_{split_num}.json",
             f"{evg_flags} --clean",
-            f"{evg_flags} {cache_flags} --build-metrics=pull_cache.json",
+            f"{evg_flags} {cache_flags} --build-metrics=pull_cache_{split_num}.json",
         ]
 
         task_steps = [
             FunctionCall(
                 "scons compile", {
-                    "task_compile_flags": f"{task_build_flags} {step_flags}",
+                    "patch_compile_flags": f"{task_build_flags} {step_flags}",
                     "targets": task_targets,
                     "compiling_for_test": "true",
                 }) for step_flags in scons_task_steps
         ]
-        task_steps.append(FunctionCall("attach build metrics"))
-        task_steps.append(FunctionCall("print top N metrics"))
         return task_steps
+
+    def create_build_metric_task_list(task_list, link_model, build_flags):
+
+        tasks[task_list][link_model] = []
+        prefix = tasks_prefixes[task_list]
+        index = 0
+        for index, target in enumerate(task_group_targets[link_model]):
+            tasks[task_list][link_model].append(
+                Task(f"{prefix}_{link_model}_build_split_{index}_{target.replace(' ', '_')}",
+                     create_build_metric_task_steps(build_flags, target, index)))
+        tasks[task_list][link_model].append(
+            Task(f"{prefix}_{link_model}_build_split_{index+1}_combine_metrics", [
+                FunctionCall("combine build metrics"),
+                FunctionCall("attach build metrics"),
+                FunctionCall("print top N metrics")
+            ]))
 
     #############################
     if sys.platform == 'win32':
-        targets = "install-all-meta-but-not-unittests"
         build_flags = '--cache=nolinked'
 
-        tasks['windows_tasks'].append(
-            Task("build_metrics_msvc", create_build_metric_task_steps(build_flags, targets)))
+        create_build_metric_task_list(
+            'windows_tasks',
+            'static',
+            build_flags,
+        )
 
     ##############################
     elif sys.platform == 'darwin':
 
         for link_model in ['dynamic', 'static']:
-            if link_model == 'dynamic':
-                targets = "install-all-meta generate-libdeps-graph"
-            else:
-                targets = "install-all-meta-but-not-unittests"
 
             build_flags = f"--link-model={link_model} --force-macos-dynamic-link" + (
-                ' --cache=nolinked' if link_model == 'static' else "")
+                ' --cache=nolinked' if link_model == 'static' else " --cache=all")
 
-            tasks['macos_tasks'].append(
-                Task(f"build_metrics_xcode_{link_model}",
-                     create_build_metric_task_steps(build_flags, targets)))
+            create_build_metric_task_list(
+                'macos_tasks',
+                link_model,
+                build_flags,
+            )
 
     ##############################
     else:
@@ -71,26 +102,29 @@ def main():
             for compiler in ['gcc']:
                 for link_model in ['dynamic', 'static']:
 
-                    if link_model == 'dynamic':
-                        targets = "install-all-meta generate-libdeps-graph"
-                    else:
-                        targets = "install-all-meta-but-not-unittests"
+                    build_flags = (
+                        "BUILD_METRICS_BLOATY=/opt/mongodbtoolchain/v4/bin/bloaty " +
+                        f"--variables-files=etc/scons/mongodbtoolchain_{toolchain}_{compiler}.vars "
+                        + f"--link-model={link_model}" +
+                        (' --cache=nolinked' if link_model == 'static' else " --cache=all"))
 
-                    build_flags = f"BUILD_METRICS_BLOATY=/opt/mongodbtoolchain/v4/bin/bloaty --variables-files=etc/scons/mongodbtoolchain_{toolchain}_{compiler}.vars --link-model={link_model}" + (
-                        ' --cache=nolinked' if link_model == 'static' else "")
+                    create_build_metric_task_list(
+                        'linux_x86_64_tasks',
+                        link_model,
+                        build_flags,
+                    )
 
-                    tasks['linux_x86_64_tasks'].append(
-                        Task(f"build_metrics_x86_64_{toolchain}_{compiler}_{link_model}",
-                             create_build_metric_task_steps(build_flags, targets)))
-                    tasks['linux_arm64_tasks'].append(
-                        Task(f"build_metrics_arm64_{toolchain}_{compiler}_{link_model}",
-                             create_build_metric_task_steps(build_flags, targets)))
+                    create_build_metric_task_list(
+                        'linux_arm64_tasks',
+                        link_model,
+                        build_flags,
+                    )
 
     def create_task_group(target_platform, tasks):
         task_group = TaskGroup(
             name=f'build_metrics_{target_platform}_task_group_gen',
             tasks=tasks,
-            max_hosts=len(tasks),
+            max_hosts=1,
             setup_group=[
                 BuiltInCommand("manifest.load", {}),
                 FunctionCall("git get project and add git tag"),
@@ -137,29 +171,33 @@ def main():
             activate=True,
         )
         variant.add_task_group(
-            create_task_group('windows', tasks['windows_tasks']), ['windows-vsCurrent-large'])
+            create_task_group('windows', tasks['windows_tasks']['static']),
+            ['windows-vsCurrent-xlarge'])
     elif sys.platform == 'darwin':
         variant = BuildVariant(
             name="macos-enterprise-build-metrics",
             activate=True,
         )
-        variant.add_task_group(create_task_group('macos', tasks['macos_tasks']), ['macos-1100'])
+        for link_model, tasks in tasks['macos_tasks'].items():
+            variant.add_task_group(create_task_group(f'macos_{link_model}', tasks), ['macos-1100'])
     else:
         if platform.machine() == 'x86_64':
             variant = BuildVariant(
                 name="enterprise-rhel-80-64-bit-build-metrics",
                 activate=True,
             )
-            variant.add_task_group(
-                create_task_group('linux_X86_64', tasks['linux_x86_64_tasks']), ['rhel80-xlarge'])
+            for link_model, tasks in tasks['linux_x86_64_tasks'].items():
+                variant.add_task_group(
+                    create_task_group(f'linux_X86_64_{link_model}', tasks), ['rhel80-xlarge'])
         else:
             variant = BuildVariant(
                 name="enterprise-rhel-80-aarch64-build-metrics",
                 activate=True,
             )
-            variant.add_task_group(
-                create_task_group('linux_arm64', tasks['linux_arm64_tasks']),
-                ['amazon2022-arm64-large'])
+            for link_model, tasks in tasks['linux_arm64_tasks'].items():
+                variant.add_task_group(
+                    create_task_group(f'linux_arm64_{link_model}', tasks),
+                    ['amazon2022-arm64-large'])
 
     project = ShrubProject({variant})
     with open('build_metrics_task_gen.json', 'w') as fout:

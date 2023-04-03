@@ -61,7 +61,14 @@ with open(clean_build_metrics_json) as f:
             ]
         })
 
-    cedar_report.append(single_metric_test("SCons memory usage", "MBs", build_metrics['scons_metrics']['memory']['post_build'] / 1024.0 / 1024.0))
+    try:
+        cedar_report.append(single_metric_test("SCons memory usage", "MBs", build_metrics['scons_metrics']['memory']['post_build'] / 1024.0 / 1024.0))
+    except KeyError:
+        if sys.platform == 'darwin':
+            # MacOS has known memory reporting issues, although this is not directly related to scons which does not use
+            # psutil for this case, I think both use underlying OS calls to determine the memory: https://github.com/giampaolo/psutil/issues/1908
+            pass
+        
     cedar_report.append(single_metric_test("System Memory Peak", "MBs", build_metrics['system_memory']['max'] / 1024.0 / 1024.0))
     cedar_report.append(single_metric_test("Total Build time", "seconds", build_metrics['scons_metrics']['time']['total']))
     cedar_report.append(single_metric_test("Total Build output size", "MBs", build_metrics['artifact_metrics']['total_artifact_size'] / 1024.0 / 1024.0))

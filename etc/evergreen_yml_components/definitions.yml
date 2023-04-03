@@ -2205,6 +2205,25 @@ functions:
     params:
       file_location: ${report_file|src/report.json}
 
+  "combine build metrics":
+    - command: subprocess.exec
+      params:
+        binary: bash
+        add_expansions_to_env: true
+        args:
+        - "src/evergreen/run_python_script.sh"
+        - "site_scons/site_tools/build_metrics/combine_metrics_unittest.py"
+    - command: subprocess.exec
+      params:
+        binary: bash
+        add_expansions_to_env: true
+        args:
+        - "src/evergreen/run_python_script.sh"
+        - "site_scons/site_tools/build_metrics/combine_metrics.py"
+        - "--prefix-name=build_metrics"
+        - "--prefix-name=populate_cache"
+        - "--prefix-name=pull_cache"
+
   "print top N metrics":
     - command: subprocess.exec
       params:
