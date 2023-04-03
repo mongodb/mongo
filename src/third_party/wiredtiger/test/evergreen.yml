@@ -496,7 +496,7 @@ functions:
         set -o errexit
         set -o verbose
         for i in $(seq ${times|1}); do
-          ./t -c ${config|../../../test/format/CONFIG.stress} ${trace_args|-T bulk,txn,retain=100} ${extra_args|} || ( [ -f RUNDIR/CONFIG ] && cat RUNDIR/CONFIG ) 2>&1
+          ./t -c ${config|../../../test/format/CONFIG.stress} ${trace_args|-T bulk,txn,retain=50} ${extra_args|} || ( [ -f RUNDIR/CONFIG ] && cat RUNDIR/CONFIG ) 2>&1
         done
   "format test predictable":
     command: shell.exec
