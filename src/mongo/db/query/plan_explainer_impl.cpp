@@ -485,10 +485,14 @@ void statsToBSON(const PlanStageStats& stats,
     } else if (STAGE_TIMESERIES_MODIFY == stats.stageType) {
         TimeseriesModifyStats* spec = static_cast<TimeseriesModifyStats*>(stats.specific.get());
 
+        bob->append("opType", spec->opType);
+        bob->append("bucketFilter", spec->bucketFilter);
+        bob->append("residualFilter", spec->residualFilter);
+
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
-            bob->appendNumber("bucketsUnpacked", static_cast<long long>(spec->bucketsUnpacked));
-            bob->appendNumber("measurementsDeleted",
-                              static_cast<long long>(spec->measurementsDeleted));
+            bob->appendNumber("nBucketsUnpacked", static_cast<long long>(spec->nBucketsUnpacked));
+            bob->appendNumber("nMeasurementsDeleted",
+                              static_cast<long long>(spec->nMeasurementsDeleted));
         }
     } else if (STAGE_UNPACK_TIMESERIES_BUCKET == stats.stageType) {
         UnpackTimeseriesBucketStats* spec =

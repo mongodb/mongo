@@ -1181,8 +1181,11 @@ struct TimeseriesModifyStats final : public SpecificStats {
         visitor->visit(this);
     }
 
-    size_t bucketsUnpacked = 0u;
-    size_t measurementsDeleted = 0u;
+    std::string opType;
+    BSONObj bucketFilter;
+    BSONObj residualFilter;
+    size_t nBucketsUnpacked = 0u;
+    size_t nMeasurementsDeleted = 0u;
 };
 
 struct SampleFromTimeseriesBucketStats final : public SpecificStats {

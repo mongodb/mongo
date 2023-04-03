@@ -13,8 +13,8 @@
 (function() {
 "use strict";
 
-load("jstests/core/timeseries/libs/timeseries.js");
 load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest'.
+load("jstests/libs/analyze_plan.js");                // For planHasStage().
 load("jstests/libs/fixture_helpers.js");             // For 'FixtureHelpers'.
 
 if (FixtureHelpers.isMongos(db) &&
@@ -50,13 +50,24 @@ TimeseriesTest.run((insert) => {
         docsToInsert.forEach(doc => {
             assert.commandWorked(insert(coll, doc));
         });
+
+        const deleteCommand = {delete: coll.getName(), deletes: deleteQuery, ordered, let : letDoc};
+
+        // Explain for delete command only works for single delete when the arbitrary timeseries
+        // delete feature is enabled and we check whether the explain works only when it's supposed
+        // to work without an error because we verify it with 'executionStats' explain.
+        if (isArbitraryDeleteEnabled && deleteQuery.length === 1 && expectedErrorCode === null) {
+            const explain = assert.commandWorked(
+                testDB.runCommand({explain: deleteCommand, verbosity: "executionStats"}));
+            jsTestLog(tojson(explain));
+            assert(planHasStage(testDB, explain.queryPlanner.winningPlan, "BATCHED_DELETE") ||
+                   planHasStage(testDB, explain.queryPlanner.winningPlan, "DELETE") ||
+                   planHasStage(testDB, explain.queryPlanner.winningPlan, "TS_MODIFY"));
+        }
+
         const res = expectedErrorCode
-            ? assert.commandFailedWithCode(
-                  testDB.runCommand(
-                      {delete: coll.getName(), deletes: deleteQuery, ordered, let : letDoc}),
-                  expectedErrorCode)
-            : assert.commandWorked(testDB.runCommand(
-                  {delete: coll.getName(), deletes: deleteQuery, ordered, let : letDoc}));
+            ? assert.commandFailedWithCode(testDB.runCommand(deleteCommand), expectedErrorCode)
+            : assert.commandWorked(testDB.runCommand(deleteCommand));
         const docs = coll.find({}, {_id: 0}).toArray();
         assert.eq(res["n"], expectedNRemoved);
         assert.sameMembers(docs, expectedRemainingDocs);
