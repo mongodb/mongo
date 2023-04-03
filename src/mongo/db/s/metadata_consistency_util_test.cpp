@@ -274,8 +274,8 @@ TEST_F(MetadataConsistencyRandomRoutingTableTest, FindRoutingTableRangeOverlapIn
         return;
     }
 
-    auto it = chunks.begin() + (_random.nextInt64(chunks.size()));
-    auto chunk = *it;
+    const auto chunkIdx = static_cast<size_t>(_random.nextInt64(chunks.size()));
+    auto& chunk = chunks.at(chunkIdx);
 
     auto overlapMax = [&]() {
         if (_random.nextInt64(10) == 0) {
@@ -299,9 +299,9 @@ TEST_F(MetadataConsistencyRandomRoutingTableTest, FindRoutingTableRangeOverlapIn
         }
     };
 
-    if (it == chunks.begin()) {
+    if (chunkIdx == 0) {
         overlapMax();
-    } else if (it == chunks.end() - 1) {
+    } else if (chunkIdx == (chunks.size() - 1)) {
         overlapMin();
     } else {
         // With 1/2 probability, overlap min or max
@@ -311,9 +311,6 @@ TEST_F(MetadataConsistencyRandomRoutingTableTest, FindRoutingTableRangeOverlapIn
             overlapMax();
         }
     }
-
-    chunks.erase(it);
-    chunks.insert(it, chunk);
 
     inconsistencies =
         metadata_consistency_util::checkChunksInconsistencies(operationContext(), _coll, chunks);
