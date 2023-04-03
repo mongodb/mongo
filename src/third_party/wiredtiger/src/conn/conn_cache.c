@@ -320,6 +320,7 @@ __wt_cache_stats_update(WT_SESSION_IMPL *session)
     WT_STAT_SET(session, stats, cache_bytes_updates, __wt_cache_bytes_updates(cache));
 
     WT_STAT_SET(session, stats, cache_eviction_maximum_page_size, cache->evict_max_page_size);
+    WT_STAT_SET(session, stats, cache_eviction_maximum_seconds, cache->evict_max_seconds);
     WT_STAT_SET(
       session, stats, cache_pages_dirty, cache->pages_dirty_intl + cache->pages_dirty_leaf);
 
@@ -338,6 +339,9 @@ __wt_cache_stats_update(WT_SESSION_IMPL *session)
     if (conn->evict_server_running)
         WT_STAT_SET(session, stats, cache_eviction_walks_active, cache->walk_session->nhazard);
 
+    WT_STAT_SET(session, stats, rec_maximum_hs_wrapup_seconds, conn->rec_maximum_hs_wrapup_seconds);
+    WT_STAT_SET(
+      session, stats, rec_maximum_image_build_seconds, conn->rec_maximum_image_build_seconds);
     WT_STAT_SET(session, stats, rec_maximum_seconds, conn->rec_maximum_seconds);
 }
 

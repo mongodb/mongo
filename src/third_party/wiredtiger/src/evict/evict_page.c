@@ -95,7 +95,7 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state, uint32
     WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     WT_PAGE *page;
-    uint64_t time_start, time_stop;
+    uint64_t eviction_time, eviction_time_seconds;
     bool clean_page, closing, force_evict_hs, inmem_split, local_gen, tree_dead;
 
     conn = S2C(session);
@@ -103,6 +103,7 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state, uint32
     closing = LF_ISSET(WT_EVICT_CALL_CLOSING);
     force_evict_hs = false;
     local_gen = false;
+    eviction_time = eviction_time_seconds = 0;
 
     __wt_verbose(
       session, WT_VERB_EVICT, "page %p (%s)", (void *)page, __wt_page_type_string(page->type));
@@ -120,13 +121,14 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state, uint32
         __wt_session_gen_enter(session, WT_GEN_EVICT);
     }
 
+    WT_CLEAR(session->reconcile_timeline);
+    WT_CLEAR(session->evict_timeline);
+    session->evict_timeline.evict_start = __wt_clock(session);
     /*
-     * Track how long forcible eviction took. Immediately increment the forcible eviction counter,
-     * we might do an in-memory split and not an eviction, which skips the other statistics.
+     * Immediately increment the forcible eviction counter, we might do an in-memory split and not
+     * an eviction, which skips the other statistics.
      */
-    time_start = 0;
     if (LF_ISSET(WT_EVICT_CALL_URGENT)) {
-        time_start = __wt_clock(session);
         WT_STAT_CONN_INCR(session, cache_eviction_force);
 
         /*
@@ -218,19 +220,18 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state, uint32
      * We have loaded the new disk image and updated the tree structure. We can no longer fail after
      * this point.
      */
-
-    if (time_start != 0) {
-        time_stop = __wt_clock(session);
+    session->evict_timeline.evict_finish = __wt_clock(session);
+    eviction_time =
+      WT_CLOCKDIFF_US(session->evict_timeline.evict_finish, session->evict_timeline.evict_start);
+    if (LF_ISSET(WT_EVICT_CALL_URGENT)) {
         if (force_evict_hs)
             WT_STAT_CONN_INCR(session, cache_eviction_force_hs_success);
         if (clean_page) {
             WT_STAT_CONN_INCR(session, cache_eviction_force_clean);
-            WT_STAT_CONN_INCRV(
-              session, cache_eviction_force_clean_time, WT_CLOCKDIFF_US(time_stop, time_start));
+            WT_STAT_CONN_INCRV(session, cache_eviction_force_clean_time, eviction_time);
         } else {
             WT_STAT_CONN_INCR(session, cache_eviction_force_dirty);
-            WT_STAT_CONN_INCRV(
-              session, cache_eviction_force_dirty_time, WT_CLOCKDIFF_US(time_stop, time_start));
+            WT_STAT_CONN_INCRV(session, cache_eviction_force_dirty_time, eviction_time);
         }
     }
     if (clean_page)
@@ -246,20 +247,32 @@ __wt_evict(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t previous_state, uint32
 err:
         if (!closing)
             __evict_exclusive_clear(session, ref, previous_state);
-
-        if (time_start != 0) {
-            time_stop = __wt_clock(session);
+        session->evict_timeline.evict_finish = __wt_clock(session);
+        eviction_time = WT_CLOCKDIFF_US(
+          session->evict_timeline.evict_finish, session->evict_timeline.evict_start);
+        if (LF_ISSET(WT_EVICT_CALL_URGENT)) {
             if (force_evict_hs)
                 WT_STAT_CONN_INCR(session, cache_eviction_force_hs_fail);
             WT_STAT_CONN_INCR(session, cache_eviction_force_fail);
-            WT_STAT_CONN_INCRV(
-              session, cache_eviction_force_fail_time, WT_CLOCKDIFF_US(time_stop, time_start));
+            WT_STAT_CONN_INCRV(session, cache_eviction_force_fail_time, eviction_time);
         }
 
         WT_STAT_CONN_DATA_INCR(session, cache_eviction_fail);
     }
 
 done:
+    eviction_time_seconds = eviction_time / WT_MILLION;
+    if (eviction_time_seconds > conn->cache->evict_max_seconds)
+        conn->cache->evict_max_seconds = eviction_time_seconds;
+    if (eviction_time_seconds > 60)
+        __wt_verbose_warning(session, WT_VERB_EVICT,
+          "Eviction took more than 1 minute (%" PRIu64 "). Building disk image took %" PRIu64
+          "us. History store wrapup took %" PRIu64 "us.",
+          eviction_time,
+          WT_CLOCKDIFF_US(session->reconcile_timeline.image_build_finish,
+            session->reconcile_timeline.image_build_start),
+          WT_CLOCKDIFF_US(session->reconcile_timeline.hs_wrapup_finish,
+            session->reconcile_timeline.hs_wrapup_start));
     /* Leave any local eviction generation. */
     if (local_gen)
         __wt_session_gen_leave(session, WT_GEN_EVICT);
