@@ -155,12 +155,17 @@ function getNewDb() {
     st.shardColl(coll1, {skey: 1});
     st.shardColl(coll2, {skey: 1});
 
+    // Save db1 and db2 configuration to restore it later
+    const configDatabasesColl = mongos.getDB('config').databases;
+    const db1ConfigEntry = configDatabasesColl.findOne({_id: db1.getName()});
+    const db2ConfigEntry = configDatabasesColl.findOne({_id: db2.getName()});
+
     // Check that there are no inconsistencies so far
     let inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
     assert.eq(0, inconsistencies.length);
 
     // Remove db1 so that coll1 became hidden
-    assert.commandWorked(mongos.getDB('config').databases.deleteOne({_id: db1.getName()}));
+    assert.commandWorked(configDatabasesColl.deleteOne({_id: db1.getName()}));
 
     inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
     assert.eq(1, inconsistencies.length);
@@ -168,7 +173,7 @@ function getNewDb() {
     assert.eq(coll1.getFullName(), inconsistencies[0].ns);
 
     // Remove db2 so that coll2 also became hidden
-    assert.commandWorked(mongos.getDB('config').databases.deleteOne({_id: db2.getName()}));
+    assert.commandWorked(configDatabasesColl.deleteOne({_id: db2.getName()}));
 
     inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
     assert.eq(2, inconsistencies.length);
@@ -176,6 +181,9 @@ function getNewDb() {
     assert.eq(coll1.getFullName(), inconsistencies[0].ns);
     assert.eq("HiddenShardedCollection", inconsistencies[1].type);
     assert.eq(coll2.getFullName(), inconsistencies[1].ns);
+
+    // Restore db1 and db2 configuration to ensure the correct behavior of dropDatabase operations
+    assert.commandWorked(configDatabasesColl.insertMany([db1ConfigEntry, db2ConfigEntry]));
 
     // Clean up the database to pass the hooks that detect inconsistencies
     db1.dropDatabase();
