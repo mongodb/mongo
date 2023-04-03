@@ -103,6 +103,7 @@ namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeNotifyingaddShardCommitted);
+MONGO_FAIL_POINT_DEFINE(hangAfterDroppingCollectionInTransitionToDedicatedConfigServer);
 
 using CallbackHandle = executor::TaskExecutor::CallbackHandle;
 using CallbackArgs = executor::TaskExecutor::CallbackArgs;
@@ -944,6 +945,28 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     // Draining is done, now finish removing the shard.
     LOGV2(
         21949, "Going to remove shard: {shardId}", "Going to remove shard", "shardId"_attr = name);
+
+    if (shardId == ShardId::kConfigServerId) {
+        // Drop the drained collections locally so the config server can transition back to catalog
+        // shard mode in the future without requiring users to manually drop them.
+        LOGV2(7509600, "Locally dropping drained collections", "shardId"_attr = name);
+
+        auto shardedCollections = _localCatalogClient->getCollections(opCtx, {});
+        for (auto&& collection : shardedCollections) {
+            DBDirectClient client(opCtx);
+
+            BSONObj result;
+            if (!client.dropCollection(
+                    collection.getNss(), ShardingCatalogClient::kLocalWriteConcern, &result)) {
+                // Note attempting to drop a non-existent collection does not return an error, so
+                // it's safe to assert the status is ok even if an earlier attempt was interrupted
+                // by a failover.
+                uassertStatusOK(getStatusFromCommandResult(result));
+            }
+
+            hangAfterDroppingCollectionInTransitionToDedicatedConfigServer.pauseWhileSet(opCtx);
+        }
+    }
 
     // Synchronize the control shard selection, the shard's document removal, and the topology time
     // update to exclude potential race conditions in case of concurrent add/remove shard

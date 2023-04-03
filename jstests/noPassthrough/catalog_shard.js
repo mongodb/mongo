@@ -20,8 +20,13 @@ load("jstests/libs/fail_point_util.js");
 const dbName = "foo";
 const collName = "bar";
 const ns = dbName + "." + collName;
+const unshardedDbName = "unsharded_db";
+const unshardedNs = unshardedDbName + ".unsharded_coll";
+const indexedNs = "db_with_index.coll";
 
 function basicCRUD(conn) {
+    assert.commandWorked(st.s.getCollection(unshardedNs).insert([{x: 1}, {x: -1}]));
+
     assert.commandWorked(conn.getCollection(ns).insert({_id: 1, x: 1}));
     assert.sameMembers(conn.getCollection(ns).find({x: 1}).toArray(), [{_id: 1, x: 1}]);
     assert.commandWorked(conn.getCollection(ns).remove({x: 1}));
@@ -170,6 +175,13 @@ const newShardName =
     //
     // Remove the catalog shard.
     //
+    let configPrimary = st.configRS.getPrimary();
+
+    // Shard a second collection to verify it gets dropped locally by the transition.
+    assert.commandWorked(st.s.adminCommand({shardCollection: indexedNs, key: {_id: 1}}));
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: indexedNs, find: {_id: 0}, to: configShardName}));
+    assert.commandWorked(st.s.getCollection(indexedNs).createIndex({oldKey: 1}));
 
     let removeRes =
         assert.commandWorked(st.s0.adminCommand({transitionToDedicatedConfigServer: 1}));
@@ -181,6 +193,8 @@ const newShardName =
 
     assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {skey: -1}, to: newShardName}));
     assert.commandWorked(
+        st.s.adminCommand({moveChunk: indexedNs, find: {_id: 0}, to: newShardName}));
+    assert.commandWorked(
         st.s.adminCommand({moveChunk: "config.system.sessions", find: {_id: 0}, to: newShardName}));
 
     // Still blocked until the db has been moved away.
@@ -188,9 +202,40 @@ const newShardName =
     assert.eq("ongoing", removeRes.state);
 
     assert.commandWorked(st.s.adminCommand({movePrimary: dbName, to: newShardName}));
+    assert.commandWorked(st.s.adminCommand({movePrimary: unshardedDbName, to: newShardName}));
 
-    removeRes = assert.commandWorked(st.s0.adminCommand({transitionToDedicatedConfigServer: 1}));
+    // The draining sharded collections should not have been locally dropped yet.
+    assert(configPrimary.getCollection(ns).exists());
+    assert(configPrimary.getCollection(indexedNs).exists());
+    assert.sameMembers(configPrimary.getCollection(indexedNs).getIndexKeys(),
+                       [{_id: 1}, {oldKey: 1}]);
+    assert(configPrimary.getCollection("config.system.sessions").exists());
+
+    // Start the final transition command. This will trigger locally dropping collections on the
+    // config server. Hang after removing one collection and trigger a failover to verify the final
+    // transition can be resumed on the new primary and the collection dropping is idempotent.
+    const hangRemoveFp = configureFailPoint(
+        st.configRS.getPrimary(), "hangAfterDroppingCollectionInTransitionToDedicatedConfigServer");
+    const finishRemoveThread = new Thread(function(mongosHost) {
+        const mongos = new Mongo(mongosHost);
+        return mongos.adminCommand({transitionToDedicatedConfigServer: 1});
+    }, st.s.host);
+    finishRemoveThread.start();
+
+    hangRemoveFp.wait();
+    st.configRS.stepUp(st.configRS.getSecondary());
+    hangRemoveFp.off();
+    configPrimary = st.configRS.getPrimary();
+
+    finishRemoveThread.join();
+    removeRes = assert.commandWorked(finishRemoveThread.returnData());
     assert.eq("completed", removeRes.state);
+
+    // All sharded collections should have been dropped locally from the config server.
+    assert(!configPrimary.getCollection(ns).exists());
+    assert(!configPrimary.getCollection(indexedNs).exists());
+    assert.sameMembers(configPrimary.getCollection(indexedNs).getIndexKeys(), []);
+    assert(!configPrimary.getCollection("config.system.sessions").exists());
 
     // Basic CRUD and sharded DDL work.
     basicCRUD(st.s);
@@ -198,7 +243,7 @@ const newShardName =
     basicCRUD(st.s);
 
     // Flushing routing / db cache updates works.
-    flushRoutingAndDBCacheUpdates(st.configRS.getPrimary());
+    flushRoutingAndDBCacheUpdates(configPrimary);
 
     //
     // A config server that isn't currently a shard can support changeStreamPreAndPostImages. Note
@@ -206,8 +251,8 @@ const newShardName =
     // to the config server to create a collection on a different db.
     //
     const directConfigNS = "directDB.onConfig";
-    assert.commandWorked(st.configRS.getPrimary().getCollection(directConfigNS).insert({x: 1}));
-    assert.commandWorked(st.configRS.getPrimary().getDB("directDB").runCommand({
+    assert.commandWorked(configPrimary.getCollection(directConfigNS).insert({x: 1}));
+    assert.commandWorked(configPrimary.getDB("directDB").runCommand({
         collMod: "onConfig",
         changeStreamPreAndPostImages: {enabled: true}
     }));
@@ -235,9 +280,10 @@ const newShardName =
     // Add back the catalog shard.
     //
 
-    // movePrimary won't delete from the source, so drop the moved db directly to avoid a conflict
-    // in addShard.
-    assert.commandWorked(st.configRS.getPrimary().getDB(dbName).dropDatabase());
+    // Create an index while the collection is not on the config server to verify it clones the
+    // correct indexes when receiving its first chunk after the transition.
+    assert.commandWorked(st.s.getCollection(indexedNs).createIndex({newKey: 1}));
+
     assert.commandWorked(st.s.adminCommand({transitionToCatalogShard: 1}));
 
     // Basic CRUD and sharded DDL work.
@@ -245,6 +291,13 @@ const newShardName =
     assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {skey: 0}, to: configShardName}));
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {skey: 5}}));
     basicCRUD(st.s);
+
+    // Move a chunk for the indexed collection to the config server and it should create the correct
+    // index locally.
+    assert.commandWorked(
+        st.s.adminCommand({moveChunk: indexedNs, find: {_id: 0}, to: configShardName}));
+    assert.sameMembers(st.configRS.getPrimary().getCollection(indexedNs).getIndexKeys(),
+                       [{_id: 1}, {oldKey: 1}, {newKey: 1}]);
 }
 
 st.stop();
