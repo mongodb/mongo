@@ -130,6 +130,7 @@ executor:
     hooks:
       - CheckReplDBHash
       - CheckReplOplogs
+      - CheckMetadataConsistencyInBackground
       - ValidateCollections
   config:
     shell_options:
@@ -139,6 +140,7 @@ executor:
   - class: AnalyzeShardKeysInBackground
   - class: CheckReplOplogs
   - class: CheckReplDBHash
+  - class: CheckMetadataConsistencyInBackground
   - class: ValidateCollections
   - class: CleanEveryN
     n: 20
