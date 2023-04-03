@@ -419,10 +419,10 @@ TEST_F(AutoMergerPolicyTest, MergeActionRescheduledUponConflictingOperationInPro
     auto action = stdx::get<MergeAllChunksOnShardInfo>(*optAction);
     ASSERT_EQ(action.nss, nss);
     ASSERT_EQ(action.shardId, _shard0);
-    _automerger.applyActionResult(
-        operationContext(),
-        action,
-        BalancerStreamActionResponse(Status{ErrorCodes::ConflictingOperationInProgress, "err"}));
+    _automerger.applyActionResult(operationContext(),
+                                  action,
+                                  BalancerStreamActionResponse(StatusWith<int>{
+                                      ErrorCodes::ConflictingOperationInProgress, "err"}));
 
     // Discard merge scheduled for shard1
     _automerger.getNextStreamingAction(operationContext());

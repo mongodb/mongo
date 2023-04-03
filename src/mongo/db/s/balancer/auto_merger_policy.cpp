@@ -152,33 +152,30 @@ void AutoMergerPolicy::applyActionResult(OperationContext* opCtx,
 
     const auto& mergeAction = stdx::get<MergeAllChunksOnShardInfo>(action);
 
-    try {
-        const auto& swResponse = stdx::get<StatusWith<NumMergedChunks>>(response);
-        // swResponse must be ok, otherwise it would not have been possible to parse it as a
-        // StatusWith<NumMergedChunks>
-        invariant(swResponse.isOK());
+    const auto& swResponse = stdx::get<StatusWith<NumMergedChunks>>(response);
+    if (swResponse.isOK()) {
         auto numMergedChunks = swResponse.getValue();
         if (numMergedChunks > 0) {
             // Reschedule auto-merge for <shard, nss> until no merge has been performed
             _rescheduledCollectionsToMergePerShard[mergeAction.shardId].push_back(mergeAction.nss);
         }
-    } catch (std::exception&) {
-        // Parsing of StatusWith<NumMergedChunks> failed, meaning we need to parse a status
-        const auto& status = stdx::get<Status>(response);
-        if (status.code() == ErrorCodes::ConflictingOperationInProgress) {
-            // Reschedule auto-merge for <shard, nss> because commit overlapped with other chunk ops
-            _rescheduledCollectionsToMergePerShard[mergeAction.shardId].push_back(mergeAction.nss);
-        } else {
-            // Reset the history window to consider during next round because chunk merges may have
-            // been potentially missed due to an unexpected error
-            _maxHistoryTimeCurrentRound = _maxHistoryTimePreviousRound;
-            LOGV2_DEBUG(7312600,
-                        1,
-                        "Hit unexpected error while automerging chunks",
-                        "shard"_attr = mergeAction.shardId,
-                        "nss"_attr = mergeAction.nss,
-                        "error"_attr = redact(status));
-        }
+        return;
+    }
+
+    const auto status = std::move(swResponse.getStatus());
+    if (status.code() == ErrorCodes::ConflictingOperationInProgress) {
+        // Reschedule auto-merge for <shard, nss> because commit overlapped with other chunk ops
+        _rescheduledCollectionsToMergePerShard[mergeAction.shardId].push_back(mergeAction.nss);
+    } else {
+        // Reset the history window to consider during next round because chunk merges may have
+        // been potentially missed due to an unexpected error
+        _maxHistoryTimeCurrentRound = _maxHistoryTimePreviousRound;
+        LOGV2_DEBUG(7312600,
+                    1,
+                    "Hit unexpected error while automerging chunks",
+                    "shard"_attr = mergeAction.shardId,
+                    "nss"_attr = mergeAction.nss,
+                    "error"_attr = redact(status));
     }
 }
 
