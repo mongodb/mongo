@@ -70,6 +70,9 @@ public:
 
         void typedRun(OperationContext* opCtx) {
             uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
+            uassert(ErrorCodes::IllegalOperation,
+                    "Can't reshard a collection in the config database",
+                    !ns().isConfigDB());
 
             CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
                                                           opCtx->getWriteConcern());
