@@ -34,6 +34,8 @@
 #include <string>
 
 #include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
+#include "mongo/rpc/message.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/transport/grpc/bidirectional_pipe.h"
 #include "mongo/transport/grpc/metadata.h"
 #include "mongo/transport/grpc/mock_client_context.h"
@@ -42,10 +44,17 @@
 #include "mongo/transport/grpc/mock_server_stream.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo::transport::grpc {
 
 #define ASSERT_EQ_MSG(a, b) ASSERT_EQ((a).opMsgDebugString(), (b).opMsgDebugString())
+
+inline Message makeUniqueMessage() {
+    OpMsg msg;
+    msg.body = BSON("id" << UUID::gen().toBSON());
+    return msg.serialize();
+}
 
 struct MockStreamTestFixtures {
     MockStreamTestFixtures(HostAndPort hostAndPort,

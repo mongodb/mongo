@@ -13,6 +13,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/wire_version',
+        '$BUILD_DIR/third_party/shim_grpc',
     ],
 )
 
@@ -36,12 +37,14 @@ env.CppUnitTest(
         'client_cache_test.cpp',
         'grpc_session_test.cpp',
         'mock_server_stream_test.cpp',
+        'service_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
         '$BUILD_DIR/mongo/rpc/message',
         '$BUILD_DIR/mongo/util/clock_source_mock',
+        '$BUILD_DIR/third_party/shim_grpc',
         'grpc_transport_layer',
         'grpc_transport_mock',
     ],

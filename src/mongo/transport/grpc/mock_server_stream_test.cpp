@@ -36,7 +36,6 @@
 #include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/rpc/message.h"
-#include "mongo/rpc/op_msg.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/grpc/metadata.h"
 #include "mongo/transport/grpc/mock_server_context.h"
@@ -93,12 +92,6 @@ public:
 
     const MetadataView& getClientMetadata() const {
         return _clientMetadata;
-    }
-
-    static Message makeUniqueMessage() {
-        OpMsg msg;
-        msg.body = BSON("id" << UUID::gen().toBSON());
-        return msg.serialize();
     }
 
     /**
