@@ -12,8 +12,7 @@
  * - Successfully restart the node in the original version.
  * - Verify data files are intact.
  *
- * TODO (SERVER-75468): Re-enable this test under the future_git_tag variant.
- * @tags: [requires_v4_0, future_git_tag_incompatible]
+ * @tags: [requires_v4_0]
  */
 
 (function() {
