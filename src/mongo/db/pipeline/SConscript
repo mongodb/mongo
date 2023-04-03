@@ -123,7 +123,7 @@ env.Library(
         'map_reduce_options.idl',
         'percentile_algo_sort_and_rank.cpp',
         'percentile_algo_tdigest.cpp',
-        'percentile_algo_tdigest_parallel.cpp',
+        'percentile_algo_tdigest_distributed.cpp',
         'window_function/window_bounds.cpp',
         'window_function/window_function_covariance.cpp',
         'window_function/window_function_count.cpp',
@@ -745,7 +745,7 @@ env.CppUnitTest(
     target='db_percentile_algo_test',
     source=[
         'percentile_algo_tdigest_test.cpp',
-        'percentile_algo_tdigest_parallel_test.cpp',
+        'percentile_algo_tdigest_distributed_test.cpp',
     ],
     LIBDEPS=[
         'accumulator',
