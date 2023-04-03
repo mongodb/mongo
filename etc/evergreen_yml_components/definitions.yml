@@ -5449,12 +5449,11 @@ tasks:
     vars:
       resmoke_jobs_max: 1
 
-- <<: *task_template
-  name: sharded_collections_jscore_passthrough
+- <<: *gen_task_template
+  name: sharded_collections_jscore_passthrough_gen
   tags: ["sharding", "jscore"]
   commands:
-  - func: "do setup"
-  - func: "run tests"
+  - func: "generate resmoke tasks"
 
 - <<: *task_template
   name: sharded_collections_jscore_passthrough_with_catalog_shard
