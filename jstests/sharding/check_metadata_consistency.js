@@ -81,6 +81,8 @@ function getNewDb() {
 
     // Clean up the database to pass the hooks that detect inconsistencies
     db.dropDatabase();
+    res = mongos.getDB("admin").checkMetadataConsistency().toArray();
+    assert.eq(0, res.length, tojson(res));
 })();
 
 (function testUUIDMismatchInconsistency() {
@@ -95,12 +97,14 @@ function getNewDb() {
         st.s.adminCommand({shardCollection: db.coll.getFullName(), key: {_id: 1}}));
 
     // Database level mode command
-    const inconsistencies = db.checkMetadataConsistency().toArray();
-    assert.eq(1, inconsistencies.length);
-    assert.eq("UUIDMismatch", inconsistencies[0].type);
+    let inconsistencies = db.checkMetadataConsistency().toArray();
+    assert.eq(1, inconsistencies.length, tojson(inconsistencies));
+    assert.eq("UUIDMismatch", inconsistencies[0].type, tojson(inconsistencies[0]));
 
     // Clean up the database to pass the hooks that detect inconsistencies
     db.dropDatabase();
+    inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
+    assert.eq(0, inconsistencies.length, tojson(inconsistencies));
 })();
 
 (function testMisplacedCollection() {
@@ -112,12 +116,14 @@ function getNewDb() {
     assert.commandWorked(st.shard1.getDB(db.getName()).coll.insert({_id: 'foo'}));
 
     // Database level mode command
-    const inconsistencies = db.checkMetadataConsistency().toArray();
-    assert.eq(1, inconsistencies.length);
-    assert.eq("MisplacedCollection", inconsistencies[0].type);
+    let inconsistencies = db.checkMetadataConsistency().toArray();
+    assert.eq(1, inconsistencies.length, tojson(inconsistencies));
+    assert.eq("MisplacedCollection", inconsistencies[0].type, tojson(inconsistencies[0]));
 
     // Clean up the database to pass the hooks that detect inconsistencies
     db.dropDatabase();
+    inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
+    assert.eq(0, inconsistencies.length, tojson(inconsistencies));
 })();
 
 (function testMissingShardKeyInconsistency() {
@@ -135,13 +141,15 @@ function getNewDb() {
     assert.commandWorked(st.s.getDB(db.getName()).coll.insert({skey: 10}));
 
     // Database level mode command
-    const inconsistencies = db.checkMetadataConsistency().toArray();
-    assert.eq(2, inconsistencies.length);
-    assert.eq("MissingShardKeyIndex", inconsistencies[0].type);
-    assert.eq("MissingShardKeyIndex", inconsistencies[1].type);
+    let inconsistencies = db.checkMetadataConsistency().toArray();
+    assert.eq(2, inconsistencies.length, tojson(inconsistencies));
+    assert.eq("MissingShardKeyIndex", inconsistencies[0].type, tojson(inconsistencies[0]));
+    assert.eq("MissingShardKeyIndex", inconsistencies[1].type, tojson(inconsistencies[1]));
 
     // Clean up the database to pass the hooks that detect inconsistencies
     db.dropDatabase();
+    inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
+    assert.eq(0, inconsistencies.length, tojson(inconsistencies));
 })();
 
 (function testHiddenShardedCollections() {
@@ -162,25 +170,25 @@ function getNewDb() {
 
     // Check that there are no inconsistencies so far
     let inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
-    assert.eq(0, inconsistencies.length);
+    assert.eq(0, inconsistencies.length, tojson(inconsistencies));
 
     // Remove db1 so that coll1 became hidden
     assert.commandWorked(configDatabasesColl.deleteOne({_id: db1.getName()}));
 
     inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
-    assert.eq(1, inconsistencies.length);
-    assert.eq("HiddenShardedCollection", inconsistencies[0].type);
-    assert.eq(coll1.getFullName(), inconsistencies[0].ns);
+    assert.eq(1, inconsistencies.length, tojson(inconsistencies));
+    assert.eq("HiddenShardedCollection", inconsistencies[0].type, tojson(inconsistencies[0]));
+    assert.eq(coll1.getFullName(), inconsistencies[0].ns, tojson(inconsistencies[0]));
 
     // Remove db2 so that coll2 also became hidden
     assert.commandWorked(configDatabasesColl.deleteOne({_id: db2.getName()}));
 
     inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
-    assert.eq(2, inconsistencies.length);
-    assert.eq("HiddenShardedCollection", inconsistencies[0].type);
-    assert.eq(coll1.getFullName(), inconsistencies[0].ns);
-    assert.eq("HiddenShardedCollection", inconsistencies[1].type);
-    assert.eq(coll2.getFullName(), inconsistencies[1].ns);
+    assert.eq(2, inconsistencies.length, tojson(inconsistencies));
+    assert.eq("HiddenShardedCollection", inconsistencies[0].type, tojson(inconsistencies[0]));
+    assert.eq(coll1.getFullName(), inconsistencies[0].ns, tojson(inconsistencies[0]));
+    assert.eq("HiddenShardedCollection", inconsistencies[1].type, tojson(inconsistencies[1]));
+    assert.eq(coll2.getFullName(), inconsistencies[1].ns, tojson(inconsistencies[1]));
 
     // Restore db1 and db2 configuration to ensure the correct behavior of dropDatabase operations
     assert.commandWorked(configDatabasesColl.insertMany([db1ConfigEntry, db2ConfigEntry]));
@@ -189,7 +197,7 @@ function getNewDb() {
     db1.dropDatabase();
     db2.dropDatabase();
     inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
-    assert.eq(0, inconsistencies.length);
+    assert.eq(0, inconsistencies.length, tojson(inconsistencies));
 })();
 
 (function testClusterLevelMode() {
@@ -219,20 +227,22 @@ function getNewDb() {
         st.s.adminCommand({shardCollection: db_UUIDMismatch.coll.getFullName(), key: {_id: 1}}));
 
     // Cluster level mode command
-    const inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
+    let inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
 
     // Check that there are 3 inconsistencies: 2 MisplacedCollection and 1 UUIDMismatch
-    assert.eq(3, inconsistencies.length);
+    assert.eq(3, inconsistencies.length, tojson(inconsistencies));
     const count = inconsistencies.reduce((acc, object) => {
         return object.type === "MisplacedCollection" ? acc + 1 : acc;
     }, 0);
-    assert.eq(2, count);
-    assert(inconsistencies.some(object => object.type === "UUIDMismatch"));
+    assert.eq(2, count, tojson(inconsistencies));
+    assert(inconsistencies.some(object => object.type === "UUIDMismatch"), tojson(inconsistencies));
 
     // Clean up the databases to pass the hooks that detect inconsistencies
     db_MisplacedCollection1.dropDatabase();
     db_MisplacedCollection2.dropDatabase();
     db_UUIDMismatch.dropDatabase();
+    inconsistencies = mongos.getDB("admin").checkMetadataConsistency().toArray();
+    assert.eq(0, inconsistencies.length, tojson(inconsistencies));
 })();
 
 st.stop();
