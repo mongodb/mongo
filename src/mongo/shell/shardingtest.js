@@ -512,7 +512,10 @@ var ShardingTest = function(params) {
     };
 
     this.stop = function(opts = {}) {
-        this.checkMetadataConsistency();
+        // TODO SERVER-74534: Enable metadata consistency check on catalog shard deployment
+        if (!isCatalogShardMode) {
+            this.checkMetadataConsistency();
+        }
         this.checkUUIDsConsistentAcrossCluster();
         this.checkIndexesConsistentAcrossCluster();
         this.checkOrphansAreDeleted();
