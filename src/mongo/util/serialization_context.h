@@ -28,6 +28,9 @@
  */
 
 #pragma once
+#include <boost/optional.hpp>
+
+#include "mongo/util/static_immortal.h"
 
 #include "mongo/util/static_immortal.h"
 
@@ -91,6 +94,10 @@ struct SerializationContext {
         static StaticImmortal<SerializationContext> stateCommandRequest{Source::Command,
                                                                         CallerType::Request};
         return *stateCommandRequest;
+    }
+
+    void setPrefixState(bool prefixState) {
+        _prefixState = prefixState ? Prefix::IncludePrefix : Prefix::ExcludePrefix;
     }
 };
 

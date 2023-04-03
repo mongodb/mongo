@@ -1567,8 +1567,14 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     self._writer.write_line(
                         '%s.%s(%s);' % (_get_field_member_name(field.chained_struct_field),
                                         _get_field_member_setter_name(field), object_value))
+                elif field.name == 'expectPrefix':
+                    # expectPrefix is only included in commands, and we need this value to set
+                    # the state in the local SerializerFlags object
+                    self._writer.write_line(
+                        '_serializationContext.setPrefixState(%s);' % object_value)
                 else:
                     validate_and_assign_or_uassert(field, object_value)
+
             if is_command_field and predicate:
                 with self._block('else {', '}'):
                     self._writer.write_line(
@@ -1779,6 +1785,10 @@ class _CppSourceFileWriter(_CppFileWriterBase):
     def _gen_fields_deserializer_common(self, struct, bson_object, tenant):
         # type: (ast.Struct, str, str) -> _FieldUsageCheckerBase
         """Generate the C++ code to deserialize list of fields."""
+
+        struct_fields = struct.fields.copy()
+        preparse_fields = []  # type: List[ast.Field]
+
         field_usage_check = _get_field_usage_checker(self._writer, struct)
         if isinstance(struct, ast.Command):
             self._writer.write_line('BSONElement commandElement;')
@@ -1788,6 +1798,14 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             # inject a context into the IDLParserContext that tags the class as a command request
             self._writer.write_line(
                 'setSerializationContext(SerializationContext::stateCommandRequest());')
+
+            # some fields are consumed in the BSON iteration loop and need to be parsed before
+            # entering the main loop
+            for field in struct.fields:  # iterate over the original list
+                if field.preparse:
+                    struct_fields.remove(field)
+                    preparse_fields.append(field)
+
         else:
             # set the local serializer flags according to the constexpr set by is_command_reply
             self._writer.write_empty_line()
@@ -1797,70 +1815,86 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         self._writer.write_empty_line()
 
-        with self._block('for (const auto& element :%s) {' % (bson_object), '}'):
+        # we need to build two loops: one for the preparsed fields, and one for fields that don't
+        # depend on other fields
+        fields = []  # type: List[List[ast.Field]]
+        if preparse_fields:
+            fields.append(preparse_fields)
+        fields.append(struct_fields)
+        for_blocks = len(fields)
+        last_block = for_blocks - 1
 
-            self._writer.write_line('const auto fieldName = element.fieldNameStringData();')
-            self._writer.write_empty_line()
+        for block_num in range(for_blocks):
+            with self._block('for (const auto& element :%s) {' % (bson_object), '}'):
 
-            if isinstance(struct, ast.Command):
-                with self._predicate("firstFieldFound == false"):
-                    # Get the Command element if we need it for later in the deserializer to get the
-                    # namespace
-                    if struct.namespace != common.COMMAND_NAMESPACE_IGNORED:
-                        self._writer.write_line('commandElement = element;')
+                self._writer.write_line('const auto fieldName = element.fieldNameStringData();')
+                self._writer.write_empty_line()
 
-                    self._writer.write_line('firstFieldFound = true;')
-                    self._writer.write_line('continue;')
+                if isinstance(struct, ast.Command) and block_num == last_block:
+                    with self._predicate("firstFieldFound == false"):
+                        # Get the Command element if we need it for later in the deserializer to get the
+                        # namespace
+                        if struct.namespace != common.COMMAND_NAMESPACE_IGNORED:
+                            self._writer.write_line('commandElement = element;')
 
-            self._writer.write_empty_line()
+                        self._writer.write_line('firstFieldFound = true;')
+                        self._writer.write_line('continue;')
 
-            first_field = True
-            for field in struct.fields:
-                # Do not parse chained fields as fields since they are actually chained types.
-                if field.chained and not field.chained_struct_field:
-                    continue
-                # Internal only fields are not parsed from BSON objects
-                if field.type and field.type.internal_only:
-                    continue
+                    self._writer.write_empty_line()
 
-                field_predicate = 'fieldName == %s' % (_get_field_constant_name(field))
+                first_field = True
+                for field in fields[block_num]:
+                    # Do not parse chained fields as fields since they are actually chained types.
+                    if field.chained and not field.chained_struct_field:
+                        continue
+                    # Internal only fields are not parsed from BSON objects
+                    if field.type and field.type.internal_only:
+                        continue
 
-                with self._predicate(field_predicate, not first_field):
+                    field_predicate = 'fieldName == %s' % (_get_field_constant_name(field))
 
-                    if field.ignore:
-                        field_usage_check.add(field, "element")
+                    with self._predicate(field_predicate, not first_field):
 
-                        self._writer.write_line('// ignore field')
+                        if field.ignore:
+                            field_usage_check.add(field, "element")
+
+                            self._writer.write_line('// ignore field')
+                        else:
+                            self.gen_field_deserializer(field, field.type, bson_object, "element",
+                                                        field_usage_check, tenant)
+
+                    if first_field:
+                        first_field = False
+
+                # only check for extraneous fields in the final block
+                if block_num == last_block:
+                    # End of for fields
+                    # Generate strict check for extranous fields
+                    if struct.strict:
+                        # For commands, check if this is a well known command field that the IDL parser
+                        # should ignore regardless of strict mode.
+                        command_predicate = None
+                        if isinstance(struct, ast.Command):
+                            command_predicate = "!mongo::isGenericArgument(fieldName)"
+
+                        # Ditto for command replies
+                        if struct.is_command_reply:
+                            command_predicate = "!mongo::isGenericReply(fieldName)"
+
+                        with self._block('else {', '}'):
+                            with self._predicate(command_predicate):
+                                self._writer.write_line('ctxt.throwUnknownField(fieldName);')
                     else:
-                        self.gen_field_deserializer(field, field.type, bson_object, "element",
-                                                    field_usage_check, tenant)
+                        with self._else(not first_field):
+                            self._writer.write_line(
+                                'auto push_result = usedFieldSet.insert(fieldName);')
+                            with writer.IndentedScopedBlock(
+                                    self._writer,
+                                    'if (MONGO_unlikely(push_result.second == false)) {', '}'):
+                                self._writer.write_line('ctxt.throwDuplicateField(fieldName);')
 
-                if first_field:
-                    first_field = False
-
-            # End of for fields
-            # Generate strict check for extranous fields
-            if struct.strict:
-                # For commands, check if this is a well known command field that the IDL parser
-                # should ignore regardless of strict mode.
-                command_predicate = None
-                if isinstance(struct, ast.Command):
-                    command_predicate = "!mongo::isGenericArgument(fieldName)"
-
-                # Ditto for command replies
-                if struct.is_command_reply:
-                    command_predicate = "!mongo::isGenericReply(fieldName)"
-
-                with self._block('else {', '}'):
-                    with self._predicate(command_predicate):
-                        self._writer.write_line('ctxt.throwUnknownField(fieldName);')
-            else:
-                with self._else(not first_field):
-                    self._writer.write_line('auto push_result = usedFieldSet.insert(fieldName);')
-                    with writer.IndentedScopedBlock(
-                            self._writer, 'if (MONGO_unlikely(push_result.second == false)) {',
-                            '}'):
-                        self._writer.write_line('ctxt.throwDuplicateField(fieldName);')
+            if block_num < last_block:
+                self._writer.write_empty_line()
 
         # Parse chained structs if not inlined
         # Parse chained types always here
@@ -2257,10 +2291,6 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         # type: (ast.Field) -> None
         """Generate the serialize method definition."""
 
-        # Internal-only types aren't serialized or deserialized.
-        if field.type and field.type.internal_only:
-            return
-
         member_name = _get_field_member_name(field)
 
         # Is this a scalar bson C++ type?
@@ -2322,7 +2352,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         # Serialize the namespace as the first field
         if isinstance(struct, ast.Command):
             if struct.command_field:
-                self._gen_serializer_method_common(struct.command_field)
+                # Internal-only types aren't serialized or deserialized.
+                if not (struct.command_field.type and struct.command_field.type.internal_only):
+                    self._gen_serializer_method_common(struct.command_field)
             else:
                 struct_type_info = struct_types.get_struct_info(struct)
                 struct_type_info.gen_serializer(self._writer)
@@ -2344,6 +2376,11 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             # Serialize fields that can be document sequence as document sequences so as not to
             # generate the BSON body >= 16 MB.
             if field.supports_doc_sequence and is_op_msg_request:
+                continue
+
+            # Internal-only types aren't serialized or deserialized, while expectPrefix should not
+            # be serialized
+            if field.type and field.type.internal_only or field.name == 'expectPrefix':
                 continue
 
             self._gen_serializer_method_common(field)

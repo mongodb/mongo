@@ -96,7 +96,7 @@ executor:
         enableTestCommands: 1
         multitenancySupport: true
         featureFlagSecurityToken: true
-        # TODO SERVER-70740: remove featureFlagRequireTenantID from the parameters and have the
+        # TODO SERVER-74284: remove featureFlagRequireTenantID from the parameters and have the
         # inject_security_token override to be able to test both tenant-prefixed request and non-tenant-prefixed request.
         # Currently, we only test non-tenant-prefixed request and enable the featureFlagRequireTenantID
         # to have mongod return non-tenant-prefixed response too.

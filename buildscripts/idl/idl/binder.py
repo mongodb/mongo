@@ -414,6 +414,19 @@ def _inject_hidden_command_fields(command):
 
     command.fields.append(tenant_field)
 
+    # Inject "expectPrefix" used to detect whether request contains a prefixed tenantId.
+    expect_prefix_field = syntax.Field(command.file_name, command.line, command.column)
+    expect_prefix_field.name = "expectPrefix"
+    expect_prefix_field.type = syntax.FieldTypeSingle(command.file_name, command.line,
+                                                      command.column)
+    expect_prefix_field.type.type_name = "bool"
+    expect_prefix_field.cpp_name = "expectPrefix"
+    expect_prefix_field.optional = True
+    # we must extract expectPrefix before any other fields that may consume it
+    expect_prefix_field.preparse = True
+
+    command.fields.append(expect_prefix_field)
+
 
 def _bind_struct_type(struct):
     # type: (syntax.Struct) -> ast.Type
@@ -1013,6 +1026,7 @@ def _bind_field(ctxt, parsed_spec, field):
     # to provide compatibility support.
     ast_field.stability = field.stability
     ast_field.always_serialize = field.always_serialize
+    ast_field.preparse = field.preparse
 
     ast_field.cpp_name = field.name
     if field.cpp_name:

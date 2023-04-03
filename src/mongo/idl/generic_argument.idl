@@ -163,7 +163,9 @@ structs:
                 type: IDLAnyType
                 cpp_name: "dollarTenant"
                 forward_to_shards: true
-
+            expectPrefix:
+                type: bool
+                forward_to_shards: false
 
     generic_reply_fields_api_v1:
         description: "Fields that may appear in any command reply. These are guaranteed backwards-compatible for as long as the server supports API Version 1."

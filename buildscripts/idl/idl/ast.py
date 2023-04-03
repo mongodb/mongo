@@ -226,6 +226,9 @@ class Field(common.SourceLocation):
         self.type = None  # type: Type
         self.always_serialize = False  # type: bool
 
+        # Set if this field must be populated before entering the BSON iteration loop
+        self.preparse = False  # type: bool
+
         # Properties specific to fields which are arrays.
         self.supports_doc_sequence = False  # type: bool
 

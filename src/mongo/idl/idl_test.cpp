@@ -4315,6 +4315,560 @@ TEST(IDLParserContext, TestConstructorWithPredecessorAndDifferentTenant) {
         8423379);
 }
 
+TEST(IDLTypeCommand, TestCommandWithBypassAndNamespaceMember_Parse) {
+    for (bool multitenancySupport : {false, true}) {
+        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
+                                                                    multitenancySupport);
+        for (bool featureFlag : {false, true}) {
+            RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
+                                                                       featureFlag);
+            IDLParserContext ctxt("root");
+
+            const char* ns1 = "db.coll1";
+            const char* ns2 = "a.b";
+            const char* ns3 = "c.d";
+            auto nsInfoStructBSON = [&](const char* ns) {
+                BSONObjBuilder builder;
+                builder.append("ns", ns);
+                return builder.obj();
+            };
+            auto bypassStructBSON = [&]() {
+                BSONObjBuilder builder;
+                builder.append("field1", nsInfoStructBSON(ns1));
+                builder.append("field2",
+                               BSON_ARRAY(nsInfoStructBSON(ns2) << nsInfoStructBSON(ns3)));
+                return builder.obj();
+            };
+
+            auto testDoc = BSONObjBuilder{}
+                               .append("CommandWithBypassAndNamespaceMember", 1)
+                               .append("field1", bypassStructBSON())
+                               .append("$db", "admin")
+                               .obj();
+
+            OpMsgRequest request;
+            if (multitenancySupport) {
+                const auto tenantId = TenantId(OID::gen());
+                request = makeOMRWithTenant(testDoc, tenantId);
+            } else
+                request.body = testDoc;
+
+            auto testStruct = CommandWithBypassAndNamespaceStruct::parse(ctxt, request);
+
+            auto serializationContextCommand = testStruct.getSerializationContext();
+            ASSERT_EQUALS(serializationContextCommand._source,
+                          SerializationContext::Source::Command);
+            ASSERT_EQUALS(serializationContextCommand._callerType,
+                          SerializationContext::CallerType::Request);
+
+            auto bypassStruct = testStruct.getField1();
+            auto serializationContextBypass = bypassStruct.getSerializationContext();
+            ASSERT_EQUALS(serializationContextBypass._source,
+                          SerializationContext::Source::Command);
+            ASSERT_EQUALS(serializationContextBypass._callerType,
+                          SerializationContext::CallerType::Request);
+
+
+            auto nsInfoStruct = bypassStruct.getField1();
+            auto serializationContextNsInfo = nsInfoStruct.getSerializationContext();
+            ASSERT_EQUALS(serializationContextNsInfo._source,
+                          SerializationContext::Source::Command);
+            ASSERT_EQUALS(serializationContextNsInfo._callerType,
+                          SerializationContext::CallerType::Request);
+
+
+            auto nsInfoArray = bypassStruct.getField2();
+            for (const auto& nsInfo : nsInfoArray) {
+                auto serializationContextNsInfoArr = nsInfo.getSerializationContext();
+                ASSERT_EQUALS(serializationContextNsInfoArr._source,
+                              SerializationContext::Source::Command);
+                ASSERT_EQUALS(serializationContextNsInfoArr._callerType,
+                              SerializationContext::CallerType::Request);
+            }
+        }
+    }
+}
+
+TEST(IDLTypeCommand, TestStructWithBypassAndNamespaceMember_Parse) {
+    for (bool multitenancySupport : {false, true}) {
+        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
+                                                                    multitenancySupport);
+        for (bool featureFlag : {false, true}) {
+            RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
+                                                                       featureFlag);
+            boost::optional<TenantId> tenantId =
+                multitenancySupport ? boost::make_optional(TenantId(OID::gen())) : boost::none;
+            IDLParserContext ctxt("root", false, tenantId);
+
+            const char* ns1 = "db.coll1";
+            const char* ns2 = "a.b";
+            const char* ns3 = "c.d";
+            auto nsInfoStructBSON = [&](const char* ns) {
+                BSONObjBuilder builder;
+                builder.append("ns", ns);
+                return builder.obj();
+            };
+
+            auto bypassStructBSON = [&]() {
+                BSONObjBuilder builder;
+                builder.append("field1", nsInfoStructBSON(ns1));
+                builder.append("field2",
+                               BSON_ARRAY(nsInfoStructBSON(ns2) << nsInfoStructBSON(ns3)));
+                return builder.obj();
+            };
+
+            auto testDoc = bypassStructBSON();
+            auto testStruct = BypassStruct::parse(ctxt, testDoc);
+
+            auto serializationContextBypass = testStruct.getSerializationContext();
+            ASSERT_EQUALS(serializationContextBypass._source,
+                          SerializationContext::Source::Default);
+            ASSERT_EQUALS(serializationContextBypass._callerType,
+                          SerializationContext::CallerType::None);
+
+            auto nsInfoStruct = testStruct.getField1();
+            auto serializationContextNsInfo = nsInfoStruct.getSerializationContext();
+            ASSERT_EQUALS(serializationContextNsInfo._source,
+                          SerializationContext::Source::Default);
+            ASSERT_EQUALS(serializationContextNsInfo._callerType,
+                          SerializationContext::CallerType::None);
+
+            auto nsInfoArray = testStruct.getField2();
+            for (const auto& nsInfo : nsInfoArray) {
+                auto serializationContextNsInfoArr = nsInfo.getSerializationContext();
+                ASSERT_EQUALS(serializationContextNsInfoArr._source,
+                              SerializationContext::Source::Default);
+                ASSERT_EQUALS(serializationContextNsInfoArr._callerType,
+                              SerializationContext::CallerType::None);
+            }
+        }
+    }
+}
+
+TEST(IDLTypeCommand, TestStructWithBypassReplyAndNamespaceMember_Parse) {
+    for (bool multitenancySupport : {false, true}) {
+        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
+                                                                    multitenancySupport);
+        for (bool featureFlag : {false, true}) {
+            RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
+                                                                       featureFlag);
+            boost::optional<TenantId> tenantId =
+                multitenancySupport ? boost::make_optional(TenantId(OID::gen())) : boost::none;
+            IDLParserContext ctxt("root", false, tenantId);
+
+            const char* ns1 = "db.coll1";
+            const char* ns2 = "a.b";
+            const char* ns3 = "c.d";
+            auto nsInfoStructBSON = [&](const char* ns) {
+                BSONObjBuilder builder;
+                builder.append("ns", ns);
+                return builder.obj();
+            };
+
+            auto bypassReplyStructBSON = [&]() {
+                BSONObjBuilder builder;
+                builder.append("field1", nsInfoStructBSON(ns1));
+                builder.append("field2",
+                               BSON_ARRAY(nsInfoStructBSON(ns2) << nsInfoStructBSON(ns3)));
+                return builder.obj();
+            };
+
+            auto testDoc = bypassReplyStructBSON();
+            auto testStruct = BypassReplyStruct::parse(ctxt, testDoc);
+
+            auto serializationContextBypass = testStruct.getSerializationContext();
+            ASSERT_EQUALS(serializationContextBypass._source,
+                          SerializationContext::Source::Command);
+            ASSERT_EQUALS(serializationContextBypass._callerType,
+                          SerializationContext::CallerType::Reply);
+
+            auto nsInfoStruct = testStruct.getField1();
+            auto serializationContextNsInfo = nsInfoStruct.getSerializationContext();
+            ASSERT_EQUALS(serializationContextNsInfo._source,
+                          SerializationContext::Source::Command);
+            ASSERT_EQUALS(serializationContextNsInfo._callerType,
+                          SerializationContext::CallerType::Reply);
+
+            auto nsInfoArray = testStruct.getField2();
+            for (const auto& nsInfo : nsInfoArray) {
+                auto serializationContextNsInfoArr = nsInfo.getSerializationContext();
+                ASSERT_EQUALS(serializationContextNsInfoArr._source,
+                              SerializationContext::Source::Command);
+                ASSERT_EQUALS(serializationContextNsInfoArr._callerType,
+                              SerializationContext::CallerType::Reply);
+            }
+        }
+    }
+}
+
+TEST(IDLTypeCommand, TestCommandWithBypassAndNamespaceMember_EmptyConstruct) {
+    for (bool multitenancySupport : {false, true}) {
+        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
+                                                                    multitenancySupport);
+        for (bool featureFlag : {false, true}) {
+            RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
+                                                                       featureFlag);
+
+            auto testStruct = CommandWithBypassAndNamespaceStruct();
+
+            auto serializationContextCommand = testStruct.getSerializationContext();
+            ASSERT_EQUALS(serializationContextCommand._source,
+                          SerializationContext::Source::Command);
+            ASSERT_EQUALS(serializationContextCommand._callerType,
+                          SerializationContext::CallerType::Request);
+
+            auto bypassStruct = testStruct.getField1();
+            auto serializationContextBypass = bypassStruct.getSerializationContext();
+            ASSERT_EQUALS(serializationContextBypass._source,
+                          SerializationContext::Source::Command);
+            ASSERT_EQUALS(serializationContextBypass._callerType,
+                          SerializationContext::CallerType::Request);
+
+            auto nsInfoStruct = bypassStruct.getField1();
+            auto serializationContextNsInfo = nsInfoStruct.getSerializationContext();
+            ASSERT_EQUALS(serializationContextNsInfo._source,
+                          SerializationContext::Source::Command);
+            ASSERT_EQUALS(serializationContextNsInfo._callerType,
+                          SerializationContext::CallerType::Request);
+
+            // the vector container is empty, which means that the SerializationContext obj's will
+            // reflect whatever flags are passed into the array's construction at runtime rather
+            // than being passed in from the enclosing class
+            auto nsInfoArray = bypassStruct.getField2();
+            ASSERT_EQUALS(nsInfoArray.size(), 0);
+        }
+    }
+}
+
+TEST(IDLTypeCommand, TestStructWithBypassAndNamespaceMember_EmptyConstruct) {
+    for (bool multitenancySupport : {false, true}) {
+        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
+                                                                    multitenancySupport);
+        for (bool featureFlag : {false, true}) {
+            RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
+                                                                       featureFlag);
+
+            auto testStruct = BypassStruct();
+
+            auto serializationContextBypass = testStruct.getSerializationContext();
+            ASSERT_EQUALS(serializationContextBypass._source,
+                          SerializationContext::Source::Default);
+            ASSERT_EQUALS(serializationContextBypass._callerType,
+                          SerializationContext::CallerType::None);
+
+            auto nsInfoStruct = testStruct.getField1();
+            auto serializationContextNsInfo = nsInfoStruct.getSerializationContext();
+            ASSERT_EQUALS(serializationContextNsInfo._source,
+                          SerializationContext::Source::Default);
+            ASSERT_EQUALS(serializationContextNsInfo._callerType,
+                          SerializationContext::CallerType::None);
+
+            // the vector container is empty, which means that the SerializationContext obj's will
+            // reflect whatever flags are passed into the array's construction at runtime rather
+            // than being passed in from the enclosing class
+            auto nsInfoArray = testStruct.getField2();
+            ASSERT_EQUALS(nsInfoArray.size(), 0);
+        }
+    }
+}
+
+TEST(IDLTypeCommand, TestStructWithBypassReplyAndNamespaceMember_EmptyConstruct) {
+    for (bool multitenancySupport : {false, true}) {
+        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
+                                                                    multitenancySupport);
+        for (bool featureFlag : {false, true}) {
+            RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
+                                                                       featureFlag);
+
+            auto testStruct = BypassReplyStruct();
+
+            auto serializationContextBypass = testStruct.getSerializationContext();
+            ASSERT_EQUALS(serializationContextBypass._source,
+                          SerializationContext::Source::Command);
+            ASSERT_EQUALS(serializationContextBypass._callerType,
+                          SerializationContext::CallerType::Reply);
+
+            auto nsInfoStruct = testStruct.getField1();
+            auto serializationContextNsInfo = nsInfoStruct.getSerializationContext();
+            ASSERT_EQUALS(serializationContextNsInfo._source,
+                          SerializationContext::Source::Command);
+            ASSERT_EQUALS(serializationContextNsInfo._callerType,
+                          SerializationContext::CallerType::Reply);
+
+            // the vector container is empty, which means that the SerializationContext obj's will
+            // reflect whatever flags are passed into the array's construction at runtime rather
+            // than being passed in from the enclosing class
+            auto nsInfoArray = testStruct.getField2();
+            ASSERT_EQUALS(nsInfoArray.size(), 0);
+        }
+    }
+}
+
+TEST(IDLTypeCommand, TestCommandWithBypassAndNamespaceMember_ConstructWithArgsNoCtxt) {
+    for (bool multitenancySupport : {false, true}) {
+        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
+                                                                    multitenancySupport);
+        for (bool featureFlag : {false, true}) {
+            RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
+                                                                       featureFlag);
+            boost::optional<TenantId> tenantId =
+                multitenancySupport ? boost::make_optional(TenantId(OID::gen())) : boost::none;
+
+            const char* ns1 = "db.coll1";
+
+            NamespaceInfoStruct nsArg(
+                NamespaceString::createNamespaceString_forTest(tenantId, ns1));
+            std::vector<NamespaceInfoStruct> nsArrayArg = {nsArg};
+            BypassStruct bypassArg(nsArg, nsArrayArg);
+
+            // by passing structures in as args, we are overriding any SerializationContext state
+            // because the structs being passed in are std::move'd into the enclosing object
+            auto testStruct = CommandWithBypassAndNamespaceStruct(bypassArg);
+
+            auto serializationContextCommand = testStruct.getSerializationContext();
+            ASSERT_EQUALS(serializationContextCommand._source,
+                          SerializationContext::Source::Command);
+            ASSERT_EQUALS(serializationContextCommand._callerType,
+                          SerializationContext::CallerType::Request);
+
+            // bypassArg was NOT passed in any SerializationContext flags so its flags are the
+            // default
+            auto bypassStruct = testStruct.getField1();
+            auto serializationContextBypass = bypassStruct.getSerializationContext();
+            ASSERT_EQUALS(serializationContextBypass._source,
+                          SerializationContext::Source::Default);
+            ASSERT_EQUALS(serializationContextBypass._callerType,
+                          SerializationContext::CallerType::None);
+
+            // nsArg was NOT passed in any SerializationContext flags so its flags are the default
+            auto nsInfoStruct = bypassStruct.getField1();
+            auto serializationContextNsInfo = nsInfoStruct.getSerializationContext();
+            ASSERT_EQUALS(serializationContextNsInfo._source,
+                          SerializationContext::Source::Default);
+            ASSERT_EQUALS(serializationContextNsInfo._callerType,
+                          SerializationContext::CallerType::None);
+
+            auto nsInfoArray = bypassStruct.getField2();
+            for (const auto& nsInfo : nsInfoArray) {
+                auto serializationContextNsInfoArr = nsInfo.getSerializationContext();
+                ASSERT_EQUALS(serializationContextNsInfoArr._source,
+                              SerializationContext::Source::Default);
+                ASSERT_EQUALS(serializationContextNsInfoArr._callerType,
+                              SerializationContext::CallerType::None);
+            }
+        }
+    }
+}
+
+TEST(IDLTypeCommand, TestCommandWithBypassAndNamespaceMember_ConstructWithArgs) {
+    for (bool multitenancySupport : {false, true}) {
+        RAIIServerParameterControllerForTest multitenancyController("multitenancySupport",
+                                                                    multitenancySupport);
+        for (bool featureFlag : {false, true}) {
+            RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
+                                                                       featureFlag);
+            boost::optional<TenantId> tenantId =
+                multitenancySupport ? boost::make_optional(TenantId(OID::gen())) : boost::none;
+
+            const char* ns1 = "db.coll1";
+
+            NamespaceInfoStruct nsArg(NamespaceString::createNamespaceString_forTest(tenantId, ns1),
+                                      SerializationContext::stateCommandRequest());
+            std::vector<NamespaceInfoStruct> nsArrayArg = {nsArg};
+            BypassStruct bypassArg(nsArg, nsArrayArg);
+
+            auto testStruct = CommandWithBypassAndNamespaceStruct(bypassArg);
+
+            auto serializationContextCommand = testStruct.getSerializationContext();
+            ASSERT_EQUALS(serializationContextCommand._source,
+                          SerializationContext::Source::Command);
+            ASSERT_EQUALS(serializationContextCommand._callerType,
+                          SerializationContext::CallerType::Request);
+
+            // bypassArg was NOT passed in any SerializationContext flags so its flags are the
+            // default
+            auto bypassStruct = testStruct.getField1();
+            auto serializationContextBypass = bypassStruct.getSerializationContext();
+            ASSERT_EQUALS(serializationContextBypass._source,
+                          SerializationContext::Source::Default);
+            ASSERT_EQUALS(serializationContextBypass._callerType,
+                          SerializationContext::CallerType::None);
+
+            // ...but we can still get the correct SerializationContext state if the state is
+            // manually passed into nested structs
+            auto nsInfoStruct = bypassStruct.getField1();
+            auto serializationContextNsInfo = nsInfoStruct.getSerializationContext();
+            ASSERT_EQUALS(serializationContextNsInfo._source,
+                          SerializationContext::Source::Command);
+            ASSERT_EQUALS(serializationContextNsInfo._callerType,
+                          SerializationContext::CallerType::Request);
+
+            auto nsInfoArray = bypassStruct.getField2();
+            for (const auto& nsInfo : nsInfoArray) {
+                auto serializationContextNsInfoArr = nsInfo.getSerializationContext();
+                ASSERT_EQUALS(serializationContextNsInfoArr._source,
+                              SerializationContext::Source::Command);
+                ASSERT_EQUALS(serializationContextNsInfoArr._callerType,
+                              SerializationContext::CallerType::Request);
+            }
+        }
+    }
+}
+
+TEST(IDLTypeCommand, TestCommandParseExpectPrefix_MissingExpectPrefix) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+
+    IDLParserContext ctxt("root");
+
+    const char* ns1 = "db.coll1";
+    const char* ns2 = "a.b";
+    const char* ns3 = "c.d";
+    auto nsInfoStructBSON = [&](const char* ns) {
+        BSONObjBuilder builder;
+        builder.append("ns", ns);
+        return builder.obj();
+    };
+    auto bypassStructBSON = [&]() {
+        BSONObjBuilder builder;
+        builder.append("field1", nsInfoStructBSON(ns1));
+        builder.append("field2", BSON_ARRAY(nsInfoStructBSON(ns2) << nsInfoStructBSON(ns3)));
+        return builder.obj();
+    };
+
+    auto testDoc = BSONObjBuilder{}
+                       .append("CommandWithBypassAndNamespaceMember", 1)
+                       .append("field1", bypassStructBSON())
+                       .append("$db", "admin")
+                       .obj();
+
+    OpMsgRequest request;
+    const auto tenantId = TenantId(OID::gen());
+    request = makeOMRWithTenant(testDoc, tenantId);
+
+    auto testStruct = CommandWithBypassAndNamespaceStruct::parse(ctxt, request);
+
+    auto serializationContextCommand = testStruct.getSerializationContext();
+    ASSERT_EQUALS(serializationContextCommand._prefixState, SerializationContext::Prefix::Default);
+
+    auto bypassStruct = testStruct.getField1();
+    auto serializationContextBypass = bypassStruct.getSerializationContext();
+    ASSERT_EQUALS(serializationContextBypass._prefixState, SerializationContext::Prefix::Default);
+
+    auto nsInfoStruct = bypassStruct.getField1();
+    auto serializationContextNsInfo = nsInfoStruct.getSerializationContext();
+    ASSERT_EQUALS(serializationContextNsInfo._prefixState, SerializationContext::Prefix::Default);
+
+    auto nsInfoArray = bypassStruct.getField2();
+    for (const auto& nsInfo : nsInfoArray) {
+        auto serializationContextNsInfoArr = nsInfo.getSerializationContext();
+        ASSERT_EQUALS(serializationContextNsInfoArr._prefixState,
+                      SerializationContext::Prefix::Default);
+    }
+}
+
+TEST(IDLTypeCommand, TestCommandParseExpectPrefix) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+
+    for (bool expectPrefix : {false, true}) {
+        IDLParserContext ctxt("root");
+
+        const char* ns1 = "db.coll1";
+        const char* ns2 = "a.b";
+        const char* ns3 = "c.d";
+        auto nsInfoStructBSON = [&](const char* ns) {
+            BSONObjBuilder builder;
+            builder.append("ns", ns);
+            return builder.obj();
+        };
+        auto bypassStructBSON = [&]() {
+            BSONObjBuilder builder;
+            builder.append("field1", nsInfoStructBSON(ns1));
+            builder.append("field2", BSON_ARRAY(nsInfoStructBSON(ns2) << nsInfoStructBSON(ns3)));
+            return builder.obj();
+        };
+
+        auto testDoc = BSONObjBuilder{}
+                           .append("CommandWithBypassAndNamespaceMember", 1)
+                           .append("field1", bypassStructBSON())
+                           .append("expectPrefix", expectPrefix)
+                           .append("$db", "admin")
+                           .obj();
+
+        OpMsgRequest request;
+        const auto tenantId = TenantId(OID::gen());
+        request = makeOMRWithTenant(testDoc, tenantId);
+
+        auto testStruct = CommandWithBypassAndNamespaceStruct::parse(ctxt, request);
+
+        auto serializationContextCommand = testStruct.getSerializationContext();
+        ASSERT_EQUALS(serializationContextCommand._prefixState,
+                      expectPrefix ? SerializationContext::Prefix::IncludePrefix
+                                   : SerializationContext::Prefix::ExcludePrefix);
+
+        auto bypassStruct = testStruct.getField1();
+        auto serializationContextBypass = bypassStruct.getSerializationContext();
+        ASSERT_EQUALS(serializationContextBypass._prefixState,
+                      expectPrefix ? SerializationContext::Prefix::IncludePrefix
+                                   : SerializationContext::Prefix::ExcludePrefix);
+
+        auto nsInfoStruct = bypassStruct.getField1();
+        auto serializationContextNsInfo = nsInfoStruct.getSerializationContext();
+        ASSERT_EQUALS(serializationContextNsInfo._prefixState,
+                      expectPrefix ? SerializationContext::Prefix::IncludePrefix
+                                   : SerializationContext::Prefix::ExcludePrefix);
+
+        auto nsInfoArray = bypassStruct.getField2();
+        for (const auto& nsInfo : nsInfoArray) {
+            auto serializationContextNsInfoArr = nsInfo.getSerializationContext();
+            ASSERT_EQUALS(serializationContextNsInfoArr._prefixState,
+                          expectPrefix ? SerializationContext::Prefix::IncludePrefix
+                                       : SerializationContext::Prefix::ExcludePrefix);
+        }
+    }
+}
+
+TEST(IDLTypeCommand, TestCommandParseDuplicateExpectPrefix) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+
+    for (bool featureFlag : {false, true}) {
+        RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
+                                                                   featureFlag);
+        IDLParserContext ctxt("root");
+
+        const char* ns1 = "db.coll1";
+        const char* ns2 = "a.b";
+        const char* ns3 = "c.d";
+        auto nsInfoStructBSON = [&](const char* ns) {
+            BSONObjBuilder builder;
+            builder.append("ns", ns);
+            return builder.obj();
+        };
+        auto bypassStructBSON = [&]() {
+            BSONObjBuilder builder;
+            builder.append("field1", nsInfoStructBSON(ns1));
+            builder.append("field2", BSON_ARRAY(nsInfoStructBSON(ns2) << nsInfoStructBSON(ns3)));
+            return builder.obj();
+        };
+
+        auto testDoc = BSONObjBuilder{}
+                           .append("CommandWithBypassAndNamespaceMember", 1)
+                           .append("field1", bypassStructBSON())
+                           .append("expectPrefix", true)
+                           .append("expectPrefix", false)
+                           .append("$db", "admin")
+                           .obj();
+
+        OpMsgRequest request;
+        const auto tenantId = TenantId(OID::gen());
+        request = makeOMRWithTenant(testDoc, tenantId);
+
+        ASSERT_THROWS(CommandWithBypassAndNamespaceStruct::parse(ctxt, request),
+                      AssertionException);
+    }
+}
+
 void verifyContract(const AuthorizationContract& left, const AuthorizationContract& right) {
     ASSERT_TRUE(left.contains(right));
     ASSERT_TRUE(right.contains(left));

@@ -78,6 +78,13 @@ class TestBinder(testcase.IDLTestcase):
             serializer: foo
             deserializer: foo
 
+        bool:
+            description: foo
+            cpp_type: foo
+            bson_serialization_type: any
+            serializer: foo
+            deserializer: foo
+
         string:
             description: foo
             cpp_type: foo

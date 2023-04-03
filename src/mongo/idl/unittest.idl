@@ -434,6 +434,25 @@ structs:
             ns:
                 type: namespacestring
 
+    BypassStruct:
+        description: "Test struct that contains a nested struct with namespace string field"
+        strict: true
+        fields:
+            field1:
+                type: NamespaceInfoStruct
+            field2:
+                type: array<NamespaceInfoStruct>
+
+    BypassReplyStruct:
+        description: "Reply struct that contains a nested struct with namespace string field"
+        strict: true
+        is_command_reply: true
+        fields:
+            field1:
+                type: NamespaceInfoStruct
+            field2:
+                type: array<NamespaceInfoStruct>
+
 ##################################################################################################
 #
 # Test array of simple types
@@ -1249,6 +1268,15 @@ commands:
             field2:
                 type: array<NamespaceInfoStruct>
                 supports_doc_sequence: true
+
+    CommandWithBypassAndNamespaceStruct:
+        description: UnitTest for a command whose skip level struct field has namespace string data
+        command_name: CommandWithBypassAndNamespaceStruct
+        namespace: ignored
+        api_version: ""
+        fields:
+            field1:
+                type: BypassStruct
 
     AccessCheckNone:
         description: A Stable API command with access_check and none
