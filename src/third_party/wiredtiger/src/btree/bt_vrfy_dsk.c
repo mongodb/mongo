@@ -766,7 +766,7 @@ __verify_dsk_col_int(WT_VERIFY_INFO *vi)
     WT_CELL *cell;
     WT_CELL_UNPACK_ADDR *unpack, _unpack;
     WT_DECL_RET;
-    uint32_t cell_num, i;
+    uint32_t i;
     uint8_t *end;
 
     btree = S2BT(vi->session);
@@ -774,10 +774,7 @@ __verify_dsk_col_int(WT_VERIFY_INFO *vi)
     unpack = &_unpack;
     end = (uint8_t *)vi->dsk + vi->dsk->mem_size;
 
-    cell_num = 0;
     WT_CELL_FOREACH_VRFY (vi->session, vi->dsk, cell, unpack, i) {
-        ++cell_num;
-
         /* Carefully unpack the cell. */
         ret = __wt_cell_unpack_safe(vi->session, vi->dsk, cell, unpack, NULL, end);
         if (ret != 0)
