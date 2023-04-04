@@ -66,6 +66,9 @@ assert.commandWorked(coll.insert({_id: 2, $valid: 1, $db: 1}));
 assert.commandWorked(coll.insert({_id: 3, $valid: 1, $ref: 1}));
 assert.commandWorked(coll.insert({_id: 4, $valid: 1, $alsoValid: 1}));
 
+// Valid, because _id.$gt is a field name, and not equivalent to {_id: {$gt: 4}}
+assert.commandWorked(coll.insert({"_id.$gt": 4}));
+
 //
 // Update command field name validation.
 //
@@ -93,9 +96,16 @@ assert.writeErrorWithCode(coll.update({"a.b": 1}, {_id: {$invalid: 1}}, {upsert:
                           ErrorCodes.DollarPrefixedFieldName);
 assert.writeErrorWithCode(coll.update({"a.b": 1}, {$set: {_id: {$invalid: 1}}}, {upsert: true}),
                           ErrorCodes.DollarPrefixedFieldName);
+assert.writeErrorWithCode(coll.update({"a.b": 1}, {$set: {"_id.$gt": 1}}, {upsert: true}),
+                          ErrorCodes.DollarPrefixedFieldName);
 assert.writeErrorWithCode(
     coll.update({"a.b": 1}, {$setOnInsert: {_id: {$invalid: 1}}}, {upsert: true}),
     ErrorCodes.DollarPrefixedFieldName);
+assert.writeErrorWithCode(
+    coll.update({"a.b": 1}, {$setOnInsert: {"_id.$invalid": 1}}, {upsert: true}),
+    ErrorCodes.DollarPrefixedFieldName);
+assert.writeErrorWithCode(coll.update({"_id.$gt": 1}, {$set: {a: 1}}, {upsert: true}),
+                          ErrorCodes.DollarPrefixedFieldName);
 
 // Replacement-style updates can contain nested $-prefixed fields.
 assert.commandWorked(coll.update({"a.b": 1}, {a: {$c: 1}}));

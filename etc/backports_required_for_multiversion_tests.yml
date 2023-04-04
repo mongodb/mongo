@@ -358,6 +358,8 @@ last-continuous:
     ticket: SERVER-74647
   - test_file: jstests/replsets/session_cache_refresh_write_error_fail.js
     ticket: SERVER-73229
+  - test_file: jstests/core/field_name_validation.js
+    ticket: SERVER-75517
   suites: null
 last-lts:
   all:
@@ -783,4 +785,6 @@ last-lts:
     ticket: SERVER-74647
   - test_file: jstests/replsets/session_cache_refresh_write_error_fail.js
     ticket: SERVER-73229
+  - test_file: jstests/core/field_name_validation.js
+    ticket: SERVER-75517
   suites: null
