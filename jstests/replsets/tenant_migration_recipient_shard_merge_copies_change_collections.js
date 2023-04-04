@@ -2,10 +2,11 @@
  * Tests that recipient is able to copy and apply change collection entries from the donor for the
  * shard merge protocol.
  *
+ * TODO SERVER-72828: remove this test from 'exclude_files' in 'replica_sets_large_txns_format.yml'
+ *
  * @tags: [
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,
- *   requires_fcv_70,
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   serverless,
@@ -122,7 +123,7 @@ donorTxnSession1.getDatabase("database").collection.insertOne({_id: "tenant1_in_
 donorTxnSession1.getDatabase("database").collection.updateOne({_id: "tenant1_in_transaction_1"}, {
     $set: {updated: true}
 });
-donorTxnSession1.commitTransaction_forTesting();
+donorTxnSession1.commitTransaction();
 donorTxnSession1.endSession();
 
 const fpBeforeMarkingCloneSuccess =
@@ -170,21 +171,20 @@ donorSession2.getDatabase("database").collection.insertOne({_id: "tenant2_in_tra
 donorSession2.getDatabase("database").collection.updateOne({_id: "tenant2_in_transaction_1"}, {
     $set: {updated: true}
 });
-donorSession2.commitTransaction_forTesting();
-
-// Start a transaction and perform some large writes.
-const largePad = "a".repeat(10 * 1024 * 1024);
-donorSession2.startTransaction();
-donorSession2.getDatabase("database")
-    .collection.insertOne({_id: "tenant2_in_transaction_2", largePad});
-donorSession2.getDatabase("database").collection.updateOne({_id: "tenant2_in_transaction_2"}, {
-    $set: {updated: true, largePad: "b" + largePad}
-});
-donorSession2.commitTransaction_forTesting();
+donorSession2.commitTransaction();
 
 fpBeforeMarkingCloneSuccess.off();
 
 TenantMigrationTest.assertCommitted(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
+assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
+tenantMigrationTest.waitForMigrationGarbageCollection(migrationUuid, tenantIds[0]);
+
+const recipientPrimaryTenantConn1 = ChangeStreamMultitenantReplicaSetTest.getTenantConnection(
+    recipientPrimary.host, tenantId1, tenantId1.str);
+
+// Running ChangeStreamMultitenantReplicaSetTest.getTenantConnection will create a user on the
+// primary. Await replication so that we can use the same user on secondaries.
+recipientRst.awaitReplication();
 
 tenantIds.forEach(tenantId => {
     const donorTenantConn = ChangeStreamMultitenantReplicaSetTest.getTenantConnection(
@@ -195,15 +195,12 @@ tenantIds.forEach(tenantId => {
         jsTestLog(
             `Performing change collection validation for tenant ${tenantId} on ${recipientNode}`);
         const recipientTenantConn = ChangeStreamMultitenantReplicaSetTest.getTenantConnection(
-            recipientPrimary.host, tenantId, tenantId.str);
+            recipientNode.host, tenantId, tenantId.str);
 
         assertChangeCollectionEntries(donorChangeCollectionDocuments,
                                       getChangeCollectionDocuments(recipientTenantConn));
     });
 });
-
-const recipientPrimaryTenantConn1 = ChangeStreamMultitenantReplicaSetTest.getTenantConnection(
-    recipientPrimary.host, tenantId1, tenantId1.str);
 
 const recipientSecondaryTenantConn1 = ChangeStreamMultitenantReplicaSetTest.getTenantConnection(
     recipientRst.getSecondary().host, tenantId1, tenantId1.str);
@@ -240,26 +237,26 @@ const recipientSecondaryCursor1 =
 const recipientPrimaryTenantConn2 = ChangeStreamMultitenantReplicaSetTest.getTenantConnection(
     recipientPrimary.host, tenantId2, tenantId2.str);
 
+// Running ChangeStreamMultitenantReplicaSetTest.getTenantConnection will create a user on the
+// primary. Await replication so that we can use the same user on secondaries.
+recipientRst.awaitReplication();
+
 const recipientSecondaryTenantConn2 = ChangeStreamMultitenantReplicaSetTest.getTenantConnection(
     recipientRst.getSecondary().host, tenantId2, tenantId2.str);
 
 // Resume the second change stream on the Recipient primary.
 const recipientPrimaryCursor2 =
-    recipientPrimaryTenantConn2.getDB("database").collection.watch([{$unset: "largePad"}], {
-        resumeAfter: resumeToken2
-    });
+    recipientPrimaryTenantConn2.getDB("database").collection.watch([], {resumeAfter: resumeToken2});
 
 // Resume the second change stream on the Recipient secondary.
 const recipientSecondaryCursor2 =
-    recipientSecondaryTenantConn2.getDB("database").collection.watch([{$unset: "largePad"}], {
+    recipientSecondaryTenantConn2.getDB("database").collection.watch([], {
         resumeAfter: resumeToken2,
     });
 
 [{_id: "tenant2_2", operationType: "insert"},
  {_id: "tenant2_in_transaction_1", operationType: "insert"},
  {_id: "tenant2_in_transaction_1", operationType: "update"},
- {_id: "tenant2_in_transaction_2", operationType: "insert"},
- {_id: "tenant2_in_transaction_2", operationType: "update"},
 ].forEach(expectedEvent => {
     [recipientPrimaryCursor2, recipientSecondaryCursor2].forEach(cursor => {
         assert.soon(() => cursor.hasNext());
@@ -268,9 +265,6 @@ const recipientSecondaryCursor2 =
         assert.eq(changeEvent.operationType, expectedEvent.operationType);
     });
 });
-
-assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
-tenantMigrationTest.waitForMigrationGarbageCollection(migrationOpts.migrationIdString);
 
 donorRst.stopSet();
 recipientRst.stopSet();

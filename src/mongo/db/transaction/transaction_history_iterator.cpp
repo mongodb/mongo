@@ -45,20 +45,16 @@ namespace mongo {
 namespace {
 
 /**
- * Finds the oplog entry with the given timestamp in the oplog, or in the tenant's change collection
- * if this is being used in a serverless context.
+ * Query the oplog for an entry with the given timestamp.
  */
 BSONObj findOneOplogEntry(OperationContext* opCtx,
                           const repl::OpTime& opTime,
                           bool permitYield,
                           bool prevOpOnly = false) {
-    auto tenantId = CurOp::get(opCtx)->getNSS().tenantId();
     BSONObj oplogBSON;
     invariant(!opTime.isNull());
-    NamespaceString nss = tenantId ? NamespaceString::makeChangeCollectionNSS(tenantId)
-                                   : NamespaceString::kRsOplogNamespace;
 
-    auto findCommand = std::make_unique<FindCommandRequest>(nss);
+    auto findCommand = std::make_unique<FindCommandRequest>(NamespaceString::kRsOplogNamespace);
     findCommand->setFilter(opTime.asQuery());
 
     if (prevOpOnly) {
@@ -79,29 +75,22 @@ BSONObj findOneOplogEntry(OperationContext* opCtx,
                             << causedBy(statusWithCQ.getStatus()));
     std::unique_ptr<CanonicalQuery> cq = std::move(statusWithCQ.getValue());
 
-    boost::optional<AutoGetOplog> oplogRead;
-    boost::optional<AutoGetChangeCollection> changeCollectionRead;
-    const CollectionPtr* collPtr;
-    if (tenantId) {
-        changeCollectionRead.emplace(opCtx, AutoGetChangeCollection::AccessMode::kRead, tenantId);
-        collPtr = &**changeCollectionRead;
-    } else {
-        oplogRead.emplace(opCtx, OplogAccessMode::kRead);
-        collPtr = &oplogRead->getCollection();
-    }
-
-    const auto dbName = nss.dbName();
+    AutoGetOplog oplogRead(opCtx, OplogAccessMode::kRead);
+    const DatabaseName dbName(DatabaseName::kLocal);
     const auto localDb = DatabaseHolder::get(opCtx)->getDb(opCtx, dbName);
     invariant(localDb);
     AutoStatsTracker statsTracker(opCtx,
-                                  nss,
+                                  NamespaceString::kRsOplogNamespace,
                                   Top::LockType::ReadLocked,
                                   AutoStatsTracker::LogMode::kUpdateTop,
                                   CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(dbName),
                                   Date_t::max());
 
-    auto exec = uassertStatusOK(getExecutorFind(
-        opCtx, collPtr, std::move(cq), nullptr /*extractAndAttachPipelineStages */, permitYield));
+    auto exec = uassertStatusOK(getExecutorFind(opCtx,
+                                                &oplogRead.getCollection(),
+                                                std::move(cq),
+                                                nullptr /*extractAndAttachPipelineStages */,
+                                                permitYield));
 
     PlanExecutor::ExecState getNextResult;
     try {
