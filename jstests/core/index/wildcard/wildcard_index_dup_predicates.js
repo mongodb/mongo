@@ -27,9 +27,9 @@ const allowCompoundWildcardIndexes =
 // Inserts the given document and runs the given query to confirm that:
 // (1) query matches the given document
 // (2) the winning plan does a wildcard index scan
-function assertExpectedDocAnswersWildcardIndexQuery(doc, query, match) {
+function assertExpectedDocAnswersWildcardIndexQuery(doc, query, match, excludeCWI = false) {
     for (const indexSpec of wildcardIndexes) {
-        if (!allowCompoundWildcardIndexes && indexSpec.wildcardProjection) {
+        if ((!allowCompoundWildcardIndexes || excludeCWI) && indexSpec.wildcardProjection) {
             continue;
         }
         coll.drop();
@@ -77,11 +77,12 @@ assertExpectedDocAnswersWildcardIndexQuery(
     {a: {b: "foo"}}, {$and: [{a: {$gt: {}}}, {a: {$gt: {}}}, {"a.b": "foo"}]}, true);
 
 assertExpectedDocAnswersWildcardIndexQuery(
-    {a: {b: "foo"}}, {$and: [{a: {$ne: 3}}, {a: {$ne: 3}}, {"a.b": "foo"}]}, true);
+    {a: {b: "foo"}}, {$and: [{a: {$ne: 3}}, {a: {$ne: 3}}, {"a.b": "foo"}]}, true, true);
 
 assertExpectedDocAnswersWildcardIndexQuery(
     {a: {b: "foo"}},
     {$and: [{a: {$nin: [3, 4, 5]}}, {a: {$nin: [3, 4, 5]}}, {"a.b": "foo"}]},
+    true,
     true);
 
 assertExpectedDocAnswersWildcardIndexQuery(

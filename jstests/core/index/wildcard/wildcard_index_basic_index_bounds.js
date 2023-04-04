@@ -95,31 +95,33 @@ const operationList = [
 const operationListCompound = [
     {
         query: {'a': 3, 'b.c': {$gte: 3}},
-        bounds: {'a': ['[3.0, 3.0]'], 'b.c': ['[3.0, inf.0]'], 'c': ['[MinKey, MaxKey]']},
-        path: 'b.c',
-        subpathBounds: false,
-        expectedKeyPattern: {'a': 1, '$_path': 1, 'b.c': 1, 'c': 1}
+        bounds: {'a': ['[3.0, 3.0]'], '$_path': ['[MinKey, MaxKey]'], 'c': ['[MinKey, MaxKey]']},
+        path: '$_path',
+        expectedKeyPattern: {'a': 1, '$_path': 1, 'c': 1}
     },
     {
         query: {'a': 3, 'b.c': {$gte: 3}, 'c': {$lt: 3}},
-        bounds: {'a': ['[3.0, 3.0]'], 'b.c': ['[3.0, inf.0]'], 'c': ['[-inf.0, 3.0)']},
-        path: 'b.c',
-        subpathBounds: false,
-        expectedKeyPattern: {'a': 1, '$_path': 1, 'b.c': 1, 'c': 1}
+        bounds: {'a': ['[3.0, 3.0]'], '$_path': ['[MinKey, MaxKey]'], 'c': ['[MinKey, MaxKey]']},
+        path: '$_path',
+        expectedKeyPattern: {'a': 1, '$_path': 1, 'c': 1}
     },
     {
         query: {'a': 3, 'b.c': {$in: [1, 2]}},
-        bounds:
-            {'a': ['[3.0, 3.0]'], 'b.c': ['[1.0, 1.0]', '[2.0, 2.0]'], 'c': ['[MinKey, MaxKey]']},
-        path: 'b.c',
+        bounds: {'a': ['[3.0, 3.0]'], '$_path': ['[MinKey, MaxKey]'], 'c': ['[MinKey, MaxKey]']},
+        path: '$_path',
         subpathBounds: false,
-        expectedKeyPattern: {'a': 1, '$_path': 1, 'b.c': 1, 'c': 1}
+        expectedKeyPattern: {'a': 1, '$_path': 1, 'c': 1}
+    },
+
+    {
+        query: {'a': 3, 'b.c': {$exists: true}, 'c': {$lt: 3}},
+        bounds: {'a': ['[3.0, 3.0]'], '$_path': ['[MinKey, MaxKey]'], 'c': ['[MinKey, MaxKey]']},
+        path: '$_path',
+        subpathBounds: false,
+        expectedKeyPattern: {'a': 1, '$_path': 1, 'c': 1}
     },
 
     // Queries cannot use the compound wildcard index.
-    {query: {'a': 3, 'b.c': {$exists: true}, 'c': {$lt: 3}}, bounds: null},
-    {query: {'a': 3, 'b.c': {$in: [null, 1, 2]}}, bounds: null},
-    {query: {'a': {$gt: 3}, 'b.c': {$eq: {abc: 1}}}, bounds: null},
     {query: {'b.c': {$gt: 3}}, bounds: null},
     {query: {'abc': {$gt: 3}}, bounds: null},
     {query: {'b.c': {$gt: 3}, 'abc': 10}, bounds: null},
@@ -127,6 +129,9 @@ const operationListCompound = [
 ];
 
 function makeExpectedBounds(op, path) {
+    if (path === '$_path') {
+        return op.bounds;
+    }
     // The bounds on '$_path' will always include a point-interval on the path, i.e.
     // ["path.to.field", "path.to.field"]. If 'subpathBounds' is 'true' for this
     // operation, then we add bounds that include all subpaths as well, i.e.
@@ -251,7 +256,7 @@ function runWildcardIndexTest(keyPattern, pathProjection, expectedPaths) {
 
         // We should find that one of the available $** subindexes has been chosen as the
         // winner, and all other candidate $** indexes are present in 'rejectedPlans'.
-        assert.eq(winningIxScan.length, numShards);
+        assert.eq(winningIxScan.length, numShards, explainedAnd);
         assert.eq(rejectedIxScans.length, numShards * (expectedPaths.length - 1));
 
         // Verify that each of the IXSCANs have the expected bounds and $_path key.
@@ -298,8 +303,9 @@ function runCompoundWildcardIndexTest(keyPattern, pathProjection) {
 
         // Verify that the winning plan uses the compound wildcard index with the expected bounds.
         assert.eq(ixScans.length, FixtureHelpers.numberOfShardsForCollection(coll));
-        assert.docEq(op.expectedKeyPattern, ixScans[0].keyPattern);
-        assert.docEq(expectedBounds, ixScans[0].indexBounds);
+        // Use "tojson()" in order to make ordering of fields matter.
+        assert.docEq(tojson(op.expectedKeyPattern), tojson(ixScans[0].keyPattern));
+        assert.docEq(tojson(expectedBounds), tojson(ixScans[0].indexBounds));
 
         // Verify that the results obtained from the compound wildcard index are identical to a
         // COLLSCAN. We must explicitly hint the wildcard index, because we also sort on {_id: 1} to

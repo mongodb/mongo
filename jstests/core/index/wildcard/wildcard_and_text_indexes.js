@@ -44,7 +44,10 @@ function assertWildcardQuery(query, expectedPath, isCompound) {
     const ixScans = getPlanStages(getWinningPlan(explainOutput.queryPlanner), "IXSCAN");
     // Verify that the winning plan uses the $** index with the expected path.
     assert.eq(ixScans.length, FixtureHelpers.numberOfShardsForCollection(coll));
-    assert.docEq(Object.assign({"$_path": 1}, expectedPath), ixScans[0].keyPattern);
+    for (const key in expectedPath) {
+        assert(ixScans[0].keyPattern.hasOwnProperty(key), explainOutput);
+        assert.eq(expectedPath[key], ixScans[0].keyPattern[key], explainOutput);
+    }
     // Verify that the results obtained from the $** index are identical to a COLLSCAN.
     assertArrayEq(coll.find(query).toArray(), coll.find(query).hint({$natural: 1}).toArray());
 
@@ -75,7 +78,10 @@ if (allowCompoundWildcardIndexes) {
 
 assertWildcardQuery({_fts: {$gt: 0, $lt: 4}}, {'_fts': 1}, false /* isCompound */);
 if (allowCompoundWildcardIndexes) {
-    assertWildcardQuery({_fts: 10, pre: 1}, {'pre': 1, '_fts': -1}, true /* isCompound */);
+    // The expanded CWI key pattern shouldn't have '_fts'. The query is a $and query and 'pre' field
+    // is the prefix of the CWI, so it's basically a query on the non-wildcard prefix field of a
+    // CWI. The only eligible expanded CWI is with key pattern {"pre": 1, "$_path": 1}.
+    assertWildcardQuery({_fts: 10, pre: 1}, {'pre': 1, '$_path': 1}, true /* isCompound */);
 }
 
 // Perform the tests below for simple and compound $text indexes.
@@ -87,7 +93,7 @@ for (let textIndex of [{'$**': 'text'}, {a: 1, '$**': 'text'}]) {
     // $text queries.
     assertWildcardQuery({_fts: {$gt: 0, $lt: 4}}, {'_fts': 1}, false /* isCompound */);
     if (allowCompoundWildcardIndexes) {
-        assertWildcardQuery({_fts: 10, pre: 1}, {'pre': 1, '_fts': -1}, true /* isCompound */);
+        assertWildcardQuery({_fts: 10, pre: 1}, {'pre': 1, '$_path': 1}, true /* isCompound */);
     }
 
     // Confirm that $** does not generate a candidate plan for $text search, including cases

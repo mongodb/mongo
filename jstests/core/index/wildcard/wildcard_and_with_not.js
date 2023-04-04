@@ -92,17 +92,19 @@ function assertCollScan(explain) {
     assert.eq(collScans.length, FixtureHelpers.numberOfShardsForCollection(coll), explain);
 }
 
-function ensureCorrectResultsWithAndWithoutPlanning(collName, pipeline) {
+function ensureCorrectResultsWithAndWithoutPlanning(collName, pipeline, useCollScan) {
     const expected = db[collName].aggregate(pipeline, {hint: {$natural: 1}}).toArray();
     const actual = db[collName].aggregate(pipeline /* No hint! */).toArray();
-    assertCollScan(db[collName].explain().aggregate(pipeline /* No hint! */));
+    if (useCollScan) {
+        assertCollScan(db[collName].explain().aggregate(pipeline /* No hint! */));
+    }
     assertArrayEq({expected, actual});
 }
 
-function testAndMatches() {
-    ensureCorrectResultsWithAndWithoutPlanning("this", testGraphLookup);
-    ensureCorrectResultsWithAndWithoutPlanning("that", testLargerMatch);
-    ensureCorrectResultsWithAndWithoutPlanning("that", testSmallerMatch);
+function testAndMatches(useCollScan) {
+    ensureCorrectResultsWithAndWithoutPlanning("this", testGraphLookup, useCollScan);
+    ensureCorrectResultsWithAndWithoutPlanning("that", testLargerMatch, useCollScan);
+    ensureCorrectResultsWithAndWithoutPlanning("that", testSmallerMatch, useCollScan);
 }
 
 db = db.getSiblingDB(jsTestName());
@@ -117,16 +119,16 @@ assert.commandWorked(that.insert(documentList));
 
 // Create a single-field wildcard index (always ineligible).
 assert.commandWorked(that.createIndex({"obj.obj.obj.$**": 1}, {}));
-testAndMatches();
+testAndMatches(true /* useCollScan */);
 
-// Create a compound wildcard index with obj.date as a prefix (eligible for IXSCAN + FILTER, until
-// the planner realizes we cannot support the $not using a FILTER).
+// Create a compound wildcard index with obj.date as a prefix (eligible for IXSCAN + FILTER).
 assert.commandWorked(that.dropIndexes());
 assert.commandWorked(that.createIndex({"obj.date": 1, "obj.obj.obj.$**": 1}, {}));
-testAndMatches();
+// This CWI with non-wildcard prefix fields can provide index scan plans.
+testAndMatches(false /* useCollScan */);
 
 // Create a compound wildcard index with obj.date as a suffix (always ineligible).
 assert.commandWorked(that.dropIndexes());
 assert.commandWorked(that.createIndex({"obj.obj.obj.$**": 1, "obj.date": 1}, {}));
-testAndMatches();
+testAndMatches(true /* useCollScan */);
 })();

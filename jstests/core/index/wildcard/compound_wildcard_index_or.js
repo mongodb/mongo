@@ -1,6 +1,6 @@
 /**
- * Tests that compound wildcard indexes with queries on non-wildcard prefix are not scanned in OR
- * queries.
+ * Tests that compound wildcard indexes with queries on non-wildcard prefix are used correctly for
+ * OR queries.
  *
  * @tags: [
  *   assumes_against_mongod_not_mongos,
@@ -63,7 +63,41 @@ const idxResult = wild.aggregate(pipeline).toArray();
 assertArrayEq({expected: documentList, actual: noIdxResult});
 assertArrayEq({expected: noIdxResult, actual: idxResult});
 
-// We want to make sure we do not use an IXSCAN to answer the ineligible prefix.
 const explain = assert.commandWorked(wild.explain('executionStats').aggregate(pipeline));
-WildcardIndexHelpers.assertExpectedIndexIsNotUsed(explain, "str_-1_obj.obj.obj.obj.$**_-1");
+
+// We want to make sure that the correct expanded CWI key pattern was used. The CWI,
+// {"str": -1, "obj.obj.obj.obj.$**": -1}, could be expanded internally to two key patterns:
+//      1) {"str": -1, "obj.obj.obj.obj.obj": -1} for predicates including "obj.obj.obj.obj.obj".
+//      2) {"str": -1, "$_path": -1} for queries only on the prefix field 'str'.
+// The latter key pattern should be used for the predicate with {"str": {$regex: /^Chicken/}}.
+const winningPlan = getWinningPlan(explain.queryPlanner);
+const planStages = getPlanStages(winningPlan, 'IXSCAN');
+
+let idxUsedCnt = 0;
+for (const stage of planStages) {
+    assert(stage.hasOwnProperty('indexName'), stage);
+    if (stage.indexName === "str_-1_obj.obj.obj.obj.$**_-1") {
+        idxUsedCnt++;
+
+        // This key pattern should contain "$_path" rather than any specific field.
+        const expectedKeyPattern = {"str": -1, "$_path": 1};
+        assert.eq(stage.keyPattern, expectedKeyPattern, stage);
+        assert.eq(stage.indexBounds["$_path"], ["[MinKey, MaxKey]"], stage);
+    }
+    if (stage.indexName === "obj.obj.obj.$**_1") {
+        idxUsedCnt++;
+
+        // This key pattern is a single-field wildcard index.
+        const expectedKeyPattern = {"$_path": 1, "obj.obj.obj.obj.obj": 1};
+        assert.eq(stage.keyPattern, expectedKeyPattern, stage);
+        assert.eq(stage.indexBounds["$_path"],
+                  [
+                      "[\"obj.obj.obj.obj.obj\", \"obj.obj.obj.obj.obj\"]",
+                      "[\"obj.obj.obj.obj.obj.\", \"obj.obj.obj.obj.obj/\")"
+                  ],
+                  stage);
+        assert.eq(stage.indexBounds["obj.obj.obj.obj.obj"], ["[MinKey, MaxKey]"], stage);
+    }
+}
+assert.eq(idxUsedCnt, 2);
 })();

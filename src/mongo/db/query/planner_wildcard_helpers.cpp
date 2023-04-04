@@ -531,7 +531,6 @@ void expandWildcardIndexEntry(const IndexEntry& wildcardIndex,
     const auto& includedPaths =
         wildcardProjection->exhaustivePaths() ? *wildcardProjection->exhaustivePaths() : kEmptySet;
 
-    bool wildcardIndexUsed = false;
     for (auto&& fieldName : projectedFields) {
         auto entry = createExpandedIndexEntry(wildcardIndex, fieldName, includedPaths);
 
@@ -542,16 +541,13 @@ void expandWildcardIndexEntry(const IndexEntry& wildcardIndex,
                 "'$_path' is reserved fieldname for Wildcard Indexes",
                 "$_path"_sd != fieldName);
         out->push_back(*entry);
-        wildcardIndexUsed = true;
     }
 
     // If this wildcard index cannot be expanded because the wildcard field is not relevant. We
     // should also check whether the regular fields is able to answer the query or not. That is - if
     // any field of the regular fields in a compound wildcard index is in 'fields', then we should
     // also generate an expanded wildcard 'IndexEntry' for later index analysis.
-    if (feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabledAndIgnoreFCV() &&
-        !wildcardIndexUsed) {
-
+    if (feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabledAndIgnoreFCV()) {
         bool shouldExpand = false;
         for (auto elem : wildcardIndex.keyPattern) {
             auto fieldName = elem.fieldNameStringData();

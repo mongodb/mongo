@@ -177,18 +177,22 @@ function testIndexesForWildcardField(wildcardField, subFields) {
 
         const valid = getValidKeyPatternPrefixesForSort(keyPattern);
         for (const kp of valid) {
-            {
-                // Test sort on compound fields + first wildcard field (number).
-                const sort = replaceFieldWith(kp, wildcardField, [subFields[0]]);
-                const wildFieldPred = {[subFields[0]]: {$lte: 43}};
-                runSortTestForWildcardField({index: keyPattern, sort, wildFieldPred});
-            }
+            // CWI with regular prefix cannot provide blocking sort for sort orders containing the
+            // wildcard field.
+            if (!keyPattern.hasOwnProperty('pre')) {
+                {
+                    // Test sort on compound fields + first wildcard field (number).
+                    const sort = replaceFieldWith(kp, wildcardField, [subFields[0]]);
+                    const wildFieldPred = {[subFields[0]]: {$lte: 43}};
+                    runSortTestForWildcardField({index: keyPattern, sort, wildFieldPred});
+                }
 
-            {
-                // Test sort on compound fields + second wildcard field (string).
-                const sort = replaceFieldWith(kp, wildcardField, [subFields[1]]);
-                const wildFieldPred = {[subFields[1]]: {$gt: ""}};
-                runSortTestForWildcardField({index: keyPattern, sort, wildFieldPred});
+                {
+                    // Test sort on compound fields + second wildcard field (string).
+                    const sort = replaceFieldWith(kp, wildcardField, [subFields[1]]);
+                    const wildFieldPred = {[subFields[1]]: {$gt: ""}};
+                    runSortTestForWildcardField({index: keyPattern, sort, wildFieldPred});
+                }
             }
 
             {
@@ -197,8 +201,13 @@ function testIndexesForWildcardField(wildcardField, subFields) {
                 const wildFieldPred = {[subFields[0]]: {$gt: ""}, [subFields[1]]: {$lte: 43}};
                 const pred = makeIndexCompatPred(keyPattern, wildFieldPred);
 
-                // A sort on both fields always results in a blocking sort.
-                runSortTest({pred, sort, proj, blockingSort: true});
+                let blockingSort = true;
+                // A sort only on the regular prefix field can get a nonblocking sort.
+                if (sort.hasOwnProperty('pre') && Object.keys(sort).length === 1) {
+                    blockingSort = false;
+                }
+
+                runSortTest({pred, sort, proj, blockingSort: blockingSort});
             }
         }
 
