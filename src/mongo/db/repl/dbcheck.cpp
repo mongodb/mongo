@@ -203,7 +203,7 @@ std::unique_ptr<HealthLogEntry> dbCheckBatchEntry(
         if (hashesMatch) {
             return SeverityEnum::Info;
         }
-        // Implcitily replicated collections and capped collections not replicating truncation are
+        // Implicitly replicated collections and capped collections not replicating truncation are
         // not designed to be consistent, so inconsistency is not necessarily pathological.
         if (nss.isChangeStreamPreImagesCollection() || nss.isConfigImagesCollection() ||
             (options && options->capped)) {
@@ -458,7 +458,7 @@ Status dbCheckOplogCommand(OperationContext* opCtx,
             return Status::OK();
         }
         case OplogEntriesEnum::Start:
-            // fallthrough
+            [[fallthrough]];
         case OplogEntriesEnum::Stop:
             const auto healthLogEntry = mongo::dbCheckHealthLogEntry(
                 boost::none /*nss*/, SeverityEnum::Info, "", type, boost::none /*data*/

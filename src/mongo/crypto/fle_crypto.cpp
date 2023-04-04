@@ -2195,7 +2195,7 @@ BSONObj runStateMachineForDecryption(mongocrypt_ctx_t* ctx, FLEKeyVault* keyVaul
             }
             case MONGOCRYPT_CTX_NEED_KMS_CREDENTIALS:
                 // We don't handle KMS credentials
-                // fallthrough
+                [[fallthrough]];
             default:
                 uasserted(7132216, "unsupported state machine state");
                 break;
