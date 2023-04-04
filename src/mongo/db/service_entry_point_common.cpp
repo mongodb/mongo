@@ -539,7 +539,8 @@ void appendAdditionalParticipants(OperationContext* opCtx,
                                   BSONObjBuilder* commandBodyFieldsBob,
                                   const std::string& commandName,
                                   const std::string& ns) {
-    if (gFeatureFlagAdditionalParticipants.isEnabledAndIgnoreFCV()) {
+    // (Ignore FCV check): This feature doesn't have any upgrade/downgrade concerns.
+    if (gFeatureFlagAdditionalParticipants.isEnabledAndIgnoreFCVUnsafe()) {
         std::vector<BSONElement> shardIdsFromFpData;
         if (MONGO_unlikely(
                 includeAdditionalParticipantInResponse.shouldFail([&](const BSONObj& data) {

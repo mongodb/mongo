@@ -146,8 +146,11 @@ void CollectionQueryInfo::computeUpdateIndexData(const IndexCatalogEntry* entry,
             }
 
             // Handle regular index fields of Compound Wildcard Index.
+            // (Ignore FCV check): This is intentional because we want clusters which have wildcard
+            // indexes
+            // still be able to use the feature even if the FCV is downgraded.
             if (isWildcard &&
-                feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabledAndIgnoreFCV()) {
+                feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabledAndIgnoreFCVUnsafe()) {
                 BSONObj key = descriptor->keyPattern();
                 BSONObjIterator j(key);
                 while (j.more()) {

@@ -245,7 +245,7 @@ MONGO_STARTUP_OPTIONS_POST(SSLServerOptions)(InitializerContext*) {
     if (params.count("net.tls.clusterAuthX509.extensionValue")) {
         uassert(ErrorCodes::BadValue,
                 "Unknown configuration option 'net.tls.clusterAuthX509.extensionValue'",
-                gFeatureFlagConfigurableX509ClusterAuthn.isEnabledAndIgnoreFCV());
+                gFeatureFlagConfigurableX509ClusterAuthn.isEnabledAndIgnoreFCVUnsafeAtStartup());
         uassert(ErrorCodes::BadValue,
                 "net.tls.clusterAuthX509.extensionValue requires "
                 "a clusterAuthMode which allows for usage of X509",
@@ -257,7 +257,7 @@ MONGO_STARTUP_OPTIONS_POST(SSLServerOptions)(InitializerContext*) {
     if (params.count("net.tls.clusterAuthX509.attributes")) {
         uassert(ErrorCodes::BadValue,
                 "Unknown configuration option 'net.tls.clusterAuthX509.attributes'",
-                gFeatureFlagConfigurableX509ClusterAuthn.isEnabledAndIgnoreFCV());
+                gFeatureFlagConfigurableX509ClusterAuthn.isEnabledAndIgnoreFCVUnsafeAtStartup());
         uassert(ErrorCodes::BadValue,
                 "Cannot set clusterAuthX509.attributes when clusterAuthMode does not allow X.509",
                 clusterAuthMode.allowsX509());

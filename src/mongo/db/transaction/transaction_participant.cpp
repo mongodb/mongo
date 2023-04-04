@@ -1084,8 +1084,9 @@ TransactionParticipant::Participant::onConflictingInternalTransactionCompletion(
 
 void TransactionParticipant::Participant::_setReadSnapshot(OperationContext* opCtx,
                                                            repl::ReadConcernArgs readConcernArgs) {
+    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
     bool pitLookupFeatureEnabled =
-        feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV();
+        feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe();
 
     if (readConcernArgs.getArgsAtClusterTime()) {
         // Read concern code should have already set the timestamp on the recovery unit.

@@ -106,7 +106,9 @@ void IndexBuildState::setState(State state,
 
 bool IndexBuildState::_checkIfValidTransition(IndexBuildState::State currentState,
                                               IndexBuildState::State newState) const {
-    const auto graceful = feature_flags::gIndexBuildGracefulErrorHandling.isEnabledAndIgnoreFCV();
+    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+    const auto graceful =
+        feature_flags::gIndexBuildGracefulErrorHandling.isEnabledAndIgnoreFCVUnsafe();
     switch (currentState) {
         case IndexBuildState::State::kSetup:
             return

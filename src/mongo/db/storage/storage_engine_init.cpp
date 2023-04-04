@@ -76,7 +76,7 @@ StorageEngine::LastShutdownState initializeStorageEngine(OperationContext* opCtx
     if (storageGlobalParams.restore) {
         uassert(6260400,
                 "Cannot use --restore when the 'featureFlagSelectiveBackup' is disabled",
-                feature_flags::gSelectiveBackup.isEnabledAndIgnoreFCV());
+                feature_flags::gSelectiveBackup.isEnabledAndIgnoreFCVUnsafeAtStartup());
     }
 
     // This should be set once.
@@ -162,7 +162,8 @@ StorageEngine::LastShutdownState initializeStorageEngine(OperationContext* opCtx
         writeTransactions = writeTransactions == 0 ? DEFAULT_TICKETS_VALUE : writeTransactions;
 
         auto svcCtx = opCtx->getServiceContext();
-        if (feature_flags::gFeatureFlagDeprioritizeLowPriorityOperations.isEnabledAndIgnoreFCV()) {
+        if (feature_flags::gFeatureFlagDeprioritizeLowPriorityOperations
+                .isEnabledAndIgnoreFCVUnsafeAtStartup()) {
             std::unique_ptr<TicketHolderManager> ticketHolderManager;
 #ifdef __linux__
             LOGV2_DEBUG(6902900, 1, "Using Priority Queue-based ticketing scheduler");

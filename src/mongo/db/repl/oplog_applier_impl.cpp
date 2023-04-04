@@ -842,7 +842,8 @@ void OplogApplierImpl::_deriveOpsAndFillWriterVectors(
             continue;
         }
 
-        if (repl::feature_flags::gApplyPreparedTxnsInParallel.isEnabledAndIgnoreFCV()) {
+        // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+        if (repl::feature_flags::gApplyPreparedTxnsInParallel.isEnabledAndIgnoreFCVUnsafe()) {
             // Prepare entries in secondary mode do not come in their own batch, extract applyOps
             // operations and fill writers with the extracted operations.
             if (op.shouldPrepare() && (getOptions().mode == OplogApplication::Mode::kSecondary)) {

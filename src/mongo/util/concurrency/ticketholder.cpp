@@ -150,7 +150,8 @@ int32_t TicketHolder::getAndResetPeakUsed() {
 }
 
 void TicketHolder::_updatePeakUsed() {
-    if (!feature_flags::gFeatureFlagExecutionControl.isEnabledAndIgnoreFCV()) {
+    // (Ignore FCV check): This feature flag doesn't have upgrade/downgrade concern.
+    if (!feature_flags::gFeatureFlagExecutionControl.isEnabledAndIgnoreFCVUnsafe()) {
         return;
     }
 

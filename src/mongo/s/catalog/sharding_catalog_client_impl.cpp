@@ -453,8 +453,9 @@ std::vector<BSONObj> ShardingCatalogClientImpl::runCatalogAggregation(
     aggRequest.setWriteConcern(WriteConcernOptions());
 
     const auto readPref = [&]() -> ReadPreferenceSetting {
+        // (Ignore FCV check): This is in mongos so we expect to ignore FCV.
         if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
-            !gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV()) {
+            !gFeatureFlagCatalogShard.isEnabledAndIgnoreFCVUnsafe()) {
             // When the feature flag is on, the config server may read from any node in its replica
             // set, so we should use the typical config server read preference.
             return {};
@@ -1507,8 +1508,9 @@ HistoricalPlacement ShardingCatalogClientImpl::getHistoricalPlacement(
 
     // Run the aggregation
     const auto readConcern = [&]() -> repl::ReadConcernArgs {
+        // (Ignore FCV check): This is in mongos so we expect to ignore FCV.
         if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
-            !gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV()) {
+            !gFeatureFlagCatalogShard.isEnabledAndIgnoreFCVUnsafe()) {
             // When the feature flag is on, the config server may read from a secondary which may
             // need to wait for replication, so we should use afterClusterTime.
             return {repl::ReadConcernLevel::kMajorityReadConcern};

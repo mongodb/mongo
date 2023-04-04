@@ -145,7 +145,9 @@ public:
      * we add the new downgrading->upgrading->latest path.
      */
     void featureFlaggedAddNewTransitionState() {
-        if (repl::feature_flags::gDowngradingToUpgrading.isEnabledAndIgnoreFCV()) {
+        // (Ignore FCV check): This is intentional because we want to use this feature even if we
+        // are in downgrading fcv state.
+        if (repl::feature_flags::gDowngradingToUpgrading.isEnabledAndIgnoreFCVUnsafe()) {
             for (auto&& isFromConfigServer : {false, true}) {
                 _transitions[{GenericFCV::kDowngradingFromLatestToLastLTS,
                               GenericFCV::kLatest,
@@ -304,7 +306,9 @@ void FeatureCompatibilityVersion::validateSetFeatureCompatibilityVersionRequest(
     auto fcvDoc = FeatureCompatibilityVersionDocument::parse(
         IDLParserContext("featureCompatibilityVersionDocument"), fcvObj.value());
 
-    if (repl::feature_flags::gDowngradingToUpgrading.isEnabledAndIgnoreFCV()) {
+    // (Ignore FCV check): This is intentional because we want to use this feature even if we are in
+    // downgrading fcv state.
+    if (repl::feature_flags::gDowngradingToUpgrading.isEnabledAndIgnoreFCVUnsafe()) {
         auto isCleaningServerMetadata = fcvDoc.getIsCleaningServerMetadata();
         uassert(
             7428200,
@@ -369,9 +373,11 @@ void FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
 
     // Only transition to fully upgraded or downgraded states when we have completed all required
     // upgrade/downgrade behavior, unless it is the newly added downgrading to upgrading path.
+    // (Ignore FCV check): This is intentional because we want to use this feature even if we are in
+    // downgrading fcv state.
     auto transitioningVersion = setTargetVersion &&
             serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading(fromVersion) &&
-            !(repl::feature_flags::gDowngradingToUpgrading.isEnabledAndIgnoreFCV() &&
+            !(repl::feature_flags::gDowngradingToUpgrading.isEnabledAndIgnoreFCVUnsafe() &&
               (fromVersion == GenericFCV::kDowngradingFromLatestToLastLTS &&
                newVersion == GenericFCV::kLatest))
         ? fromVersion
@@ -383,7 +389,9 @@ void FeatureCompatibilityVersion::updateFeatureCompatibilityVersionDocument(
 
     newFCVDoc.setChangeTimestamp(changeTimestamp);
 
-    if (repl::feature_flags::gDowngradingToUpgrading.isEnabledAndIgnoreFCV()) {
+    // (Ignore FCV check): This is intentional because we want to use this feature even if we are in
+    // downgrading fcv state.
+    if (repl::feature_flags::gDowngradingToUpgrading.isEnabledAndIgnoreFCVUnsafe()) {
         // The setIsCleaningServerMetadata parameter can either be true, false, or boost::none.
         // True indicates we want to set the isCleaningServerMetadata FCV document field to true.
         // False indicates we want to remove the isCleaningServerMetadata FCV document field.

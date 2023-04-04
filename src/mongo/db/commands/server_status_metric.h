@@ -110,7 +110,7 @@ private:
  * makeServerStatusMetric helper, but with the predicate as an additional
  * function argument. Example:
  *
- *     auto predicate = [] { return gMyCounterFeatureFlag.isEnabledAndIgnoreFCV(); };
+ *     auto predicate = [] { return gMyCounterFeatureFlag.isEnabledAndIgnoreFCVUnsafeAtStartup(); };
  *     auto& counter = makeServerStatusMetric<Counter64>("path.to.counter", predicate);
  *     ...
  *     counter.increment();

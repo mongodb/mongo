@@ -49,7 +49,7 @@ using TagMap = std::map<std::pair<StringData, int>, std::vector<PrfBlock>>;
 class MockServerRewrite : public QueryRewriterInterface {
 public:
     MockServerRewrite() : _expCtx((new ExpressionContextForTest())) {
-        if (!gFeatureFlagFLE2ProtocolVersion2.isEnabledAndIgnoreFCV()) {
+        if (!gFeatureFlagFLE2ProtocolVersion2.isEnabledAndIgnoreFCVUnsafe()) {
             _mockOptionalNss = NamespaceString({"mock"_sd});
             return;
         }

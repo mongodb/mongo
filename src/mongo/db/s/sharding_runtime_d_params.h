@@ -41,7 +41,8 @@ namespace mongo {
 inline Status validateChunkMigrationConcurrency(const int& chunkMigrationConcurrency,
                                                 const boost::optional<TenantId>&) {
     const int maxConcurrency = 500;
-    if (!mongo::feature_flags::gConcurrencyInChunkMigration.isEnabledAndIgnoreFCV()) {
+    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+    if (!mongo::feature_flags::gConcurrencyInChunkMigration.isEnabledAndIgnoreFCVUnsafe()) {
         return Status{ErrorCodes::InvalidOptions,
                       "Cannot set migration concurrency number without enabling migration "
                       "concurrency feature flag"};

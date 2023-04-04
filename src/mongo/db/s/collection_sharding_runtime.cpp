@@ -328,7 +328,9 @@ void CollectionShardingRuntime::clearFilteringMetadataForDroppedCollection(
 
 SharedSemiFuture<void> CollectionShardingRuntime::cleanUpRange(ChunkRange const& range,
                                                                CleanWhen when) const {
-    if (!feature_flags::gRangeDeleterService.isEnabledAndIgnoreFCV()) {
+    // (Ignore FCV check): This feature doesn't have any upgrade/downgrade concerns. The feature
+    // flag is used to turn on new range deleter on startup.
+    if (!feature_flags::gRangeDeleterService.isEnabledAndIgnoreFCVUnsafe()) {
         stdx::lock_guard lk(_metadataManagerLock);
         invariant(_metadataType == MetadataType::kSharded);
         return _metadataManager->cleanUpRange(range, when == kDelayed);
@@ -360,7 +362,9 @@ Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
                         "metadata reset"};
             }
 
-            if (feature_flags::gRangeDeleterService.isEnabledAndIgnoreFCV()) {
+            // (Ignore FCV check): This feature doesn't have any upgrade/downgrade concerns. The
+            // feature flag is used to turn on new range deleter on startup.
+            if (feature_flags::gRangeDeleterService.isEnabledAndIgnoreFCVUnsafe()) {
                 return RangeDeleterService::get(opCtx)->getOverlappingRangeDeletionsFuture(
                     self->_metadataManager->getCollectionUuid(), orphanRange);
             } else {

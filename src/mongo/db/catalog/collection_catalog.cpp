@@ -190,8 +190,8 @@ public:
         OperationContext* opCtx, UncommittedCatalogUpdates& uncommittedCatalogUpdates) {
         if (opCtx->recoveryUnit()->hasRegisteredChangeForCatalogVisibility())
             return;
-
-        if (feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV()) {
+        // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+        if (feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe()) {
             opCtx->recoveryUnit()->registerPreCommitHook(
                 [](OperationContext* opCtx) { PublishCatalogUpdates::preCommit(opCtx); });
         }
@@ -365,7 +365,8 @@ public:
 
     void rollback(OperationContext* opCtx) override {
         auto entries = _uncommittedCatalogUpdates.releaseEntries();
-        if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV())
+        // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+        if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe())
             return;
 
         if (std::none_of(
@@ -834,7 +835,8 @@ const Collection* CollectionCatalog::establishConsistentCollection(
 bool CollectionCatalog::_needsOpenCollection(OperationContext* opCtx,
                                              const NamespaceStringOrUUID& nsOrUUID,
                                              boost::optional<Timestamp> readTimestamp) const {
-    if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV()) {
+    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+    if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe()) {
         return false;
     }
 
@@ -865,7 +867,8 @@ const Collection* CollectionCatalog::_openCollection(
     OperationContext* opCtx,
     const NamespaceStringOrUUID& nssOrUUID,
     boost::optional<Timestamp> readTimestamp) const {
-    if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV()) {
+    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+    if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe()) {
         return nullptr;
     }
 
@@ -2077,7 +2080,8 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(
     invariant(_orderedCollections.find(dbIdPair) != _orderedCollections.end());
 
     // TODO SERVER-68674: Remove feature flag check.
-    if (feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV() && isDropPending) {
+    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+    if (feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe() && isDropPending) {
         if (auto sharedIdent = coll->getSharedIdent(); sharedIdent) {
             auto ident = sharedIdent->getIdent();
             LOGV2_DEBUG(
@@ -2180,7 +2184,8 @@ void CollectionCatalog::_pushCatalogIdForNSSAndUUID(const NamespaceString& nss,
                                                     boost::optional<RecordId> catalogId,
                                                     boost::optional<Timestamp> ts) {
     // TODO SERVER-68674: Remove feature flag check.
-    if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV()) {
+    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+    if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe()) {
         // No-op.
         return;
     }
@@ -2248,7 +2253,8 @@ void CollectionCatalog::_pushCatalogIdForRename(const NamespaceString& from,
                                                 const NamespaceString& to,
                                                 boost::optional<Timestamp> ts) {
     // TODO SERVER-68674: Remove feature flag check.
-    if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV()) {
+    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+    if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe()) {
         // No-op.
         return;
     }
@@ -2315,7 +2321,8 @@ void CollectionCatalog::_insertCatalogIdForNSSAndUUIDAfterScan(
     boost::optional<RecordId> catalogId,
     Timestamp ts) {
     // TODO SERVER-68674: Remove feature flag check.
-    if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV()) {
+    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+    if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe()) {
         // No-op.
         return;
     }
@@ -2480,7 +2487,9 @@ void CollectionCatalog::deregisterIndex(OperationContext* opCtx,
                                         std::shared_ptr<IndexCatalogEntry> indexEntry,
                                         bool isDropPending) {
     // TODO SERVER-68674: Remove feature flag check.
-    if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV() || !isDropPending) {
+    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+    if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe() ||
+        !isDropPending) {
         // No-op.
         return;
     }
@@ -2520,7 +2529,8 @@ CollectionCatalog::iterator CollectionCatalog::end(OperationContext* opCtx) cons
 
 bool CollectionCatalog::needsCleanupForOldestTimestamp(Timestamp oldest) const {
     // TODO SERVER-68674: Remove feature flag check.
-    if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV()) {
+    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+    if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe()) {
         // No-op.
         return false;
     }

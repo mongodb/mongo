@@ -424,7 +424,7 @@ ServiceContext::ConstructorActionRegisterer telemetryStoreManagerRegisterer{
         // changed to a supported version later.
         // TODO SERVER-73907. Move this to run after FCV is initialized. It could be we'd have to
         // re-run this function if FCV changes later during the life of the process.
-        if (!feature_flags::gFeatureFlagTelemetry.isEnabledAndIgnoreFCV()) {
+        if (!feature_flags::gFeatureFlagTelemetry.isEnabledAndIgnoreFCVUnsafeAtStartup()) {
             // featureFlags are not allowed to be changed at runtime. Therefore it's not an issue
             // to not create a telemetry store in ConstructorActionRegisterer at start up with the
             // flag off - because the flag can not be turned on at any point afterwards.

@@ -34,7 +34,8 @@
 namespace mongo {
 
 bool ClusterRole::has(const ClusterRole& other) const {
-    if (gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV() && _value == ClusterRole::ConfigServer) {
+    if (gFeatureFlagCatalogShard.isEnabledAndIgnoreFCVUnsafeAtStartup() &&
+        _value == ClusterRole::ConfigServer) {
         return other._value == ClusterRole::ConfigServer ||
             other._value == ClusterRole::ShardServer;
     }
@@ -47,6 +48,7 @@ bool ClusterRole::exclusivelyHasShardRole() {
 }
 
 bool ClusterRole::exclusivelyHasConfigRole() {
-    return _value == ClusterRole::ConfigServer && !gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV();
+    return _value == ClusterRole::ConfigServer &&
+        !gFeatureFlagCatalogShard.isEnabledAndIgnoreFCVUnsafeAtStartup();
 }
 }  // namespace mongo

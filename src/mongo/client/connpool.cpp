@@ -73,7 +73,8 @@ auto makeDuration(double secs) {
 }
 
 void recordWaitTime(PoolForHost& p, DBClientBase* conn, Date_t connRequestedAt) {
-    if (gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCV() && conn) {
+    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+    if (gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCVUnsafe() && conn) {
         p.recordConnectionWaitTime(connRequestedAt);
     }
 }
@@ -625,7 +626,8 @@ void DBConnectionPool::appendConnectionStats(executor::ConnectionPoolStats* stat
                                                    0,
                                                    0,
                                                    Milliseconds{0}};
-            if (gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCV()) {
+            // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+            if (gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCVUnsafe()) {
                 hostStats.acquisitionWaitTimes = i->second.connectionWaitTimeStats();
             }
             stats->updateStatsForHost("global", host, hostStats);

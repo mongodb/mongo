@@ -1329,13 +1329,15 @@ std::vector<std::pair<SockAddr, int>> AsioTransportLayer::getListenerSocketBackl
 }
 
 void AsioTransportLayer::appendStatsForServerStatus(BSONObjBuilder* bob) const {
-    if (gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCV()) {
+    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+    if (gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCVUnsafe()) {
         bob->append("listenerProcessingTime", _listenerProcessingTime.load().toBSON());
     }
 }
 
 void AsioTransportLayer::appendStatsForFTDC(BSONObjBuilder& bob) const {
-    if (gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCV()) {
+    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+    if (gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCVUnsafe()) {
         BSONArrayBuilder queueDepthsArrayBuilder(
             bob.subarrayStart("listenerSocketBacklogQueueDepths"));
         for (const auto& record : _acceptorRecords) {

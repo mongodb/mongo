@@ -373,7 +373,9 @@ SharedSemiFuture<void> MetadataManager::_submitRangeForDeletion(
     auto cleanupComplete = [&]() {
         const auto collUUID = _metadata.back()->metadata->getChunkManager()->getUUID();
 
-        if (feature_flags::gRangeDeleterService.isEnabledAndIgnoreFCV()) {
+        // (Ignore FCV check): This feature doesn't have any upgrade/downgrade concerns. The feature
+        // flag is used to turn on new range deleter on startup.
+        if (feature_flags::gRangeDeleterService.isEnabledAndIgnoreFCVUnsafe()) {
             return RangeDeleterService::get(_serviceContext)
                 ->getOverlappingRangeDeletionsFuture(collUUID, range);
         }

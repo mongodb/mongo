@@ -123,7 +123,8 @@ void removeIndex(OperationContext* opCtx,
         storageEngine->supportsPendingDrops() && dataRemoval == DataRemoval::kTwoPhase;
 
     // TODO SERVER-68674: Remove feature flag check.
-    if (feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV() && isTwoPhaseDrop) {
+    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+    if (feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe() && isTwoPhaseDrop) {
         invariant(entry);
         CollectionCatalog::get(opCtx)->dropIndex(
             opCtx, collection->ns(), entry, /*isDropPending=*/true);
@@ -145,7 +146,9 @@ void removeIndex(OperationContext* opCtx,
                     removeEmptyDirectory(svcCtx, storageEngine, nss);
 
                     // TODO SERVER-68674: Remove feature flag check.
-                    if (feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV() &&
+                    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade
+                    // concerns.
+                    if (feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe() &&
                         isTwoPhaseDrop) {
                         CollectionCatalog::write(svcCtx, [&](CollectionCatalog& catalog) {
                             catalog.notifyIdentDropped(ident);
@@ -213,7 +216,9 @@ Status dropCollection(OperationContext* opCtx,
                     removeEmptyDirectory(svcCtx, storageEngine, nss);
 
                     // TODO SERVER-68674: Remove feature flag check.
-                    if (feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV() &&
+                    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade
+                    // concerns.
+                    if (feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe() &&
                         storageEngine->supportsPendingDrops()) {
                         CollectionCatalog::write(svcCtx, [&](CollectionCatalog& catalog) {
                             catalog.notifyIdentDropped(ident);

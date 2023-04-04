@@ -283,8 +283,10 @@ void RangeDeleterService::ReadyRangeDeletionsProcessor::_runRangeDeletions() {
 }
 
 void RangeDeleterService::onStartup(OperationContext* opCtx) {
+    // (Ignore FCV check): This feature doesn't have any upgrade/downgrade concerns. The feature
+    // flag is used to turn on new range deleter on startup.
     if (disableResumableRangeDeleter.load() ||
-        !feature_flags::gRangeDeleterService.isEnabledAndIgnoreFCV()) {
+        !feature_flags::gRangeDeleterService.isEnabledAndIgnoreFCVUnsafe()) {
         return;
     }
 
@@ -294,7 +296,9 @@ void RangeDeleterService::onStartup(OperationContext* opCtx) {
 }
 
 void RangeDeleterService::onStepUpComplete(OperationContext* opCtx, long long term) {
-    if (!feature_flags::gRangeDeleterService.isEnabledAndIgnoreFCV()) {
+    // (Ignore FCV check): This feature doesn't have any upgrade/downgrade concerns. The feature
+    // flag is used to turn on new range deleter on startup.
+    if (!feature_flags::gRangeDeleterService.isEnabledAndIgnoreFCVUnsafe()) {
         return;
     }
 

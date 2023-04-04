@@ -449,7 +449,8 @@ Pipeline::SourceContainer::iterator DocumentSourceChangeStreamUnwindTransaction:
 
     auto nextChangeStreamStageItr = std::next(itr);
 
-    if (!feature_flags::gFeatureFlagChangeStreamsRewrite.isEnabledAndIgnoreFCV()) {
+    // (Ignore FCV check): This feature flag doesn't have upgrade/downgrade concern.
+    if (!feature_flags::gFeatureFlagChangeStreamsRewrite.isEnabledAndIgnoreFCVUnsafe()) {
         return nextChangeStreamStageItr;
     }
 

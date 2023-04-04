@@ -72,6 +72,8 @@ GENERIC_FCV = [
     r'::kUpgradingFromLastLTSToLastContinuous',
 ]
 _RE_GENERIC_FCV_REF = re.compile(r'(' + '|'.join(GENERIC_FCV) + r')\b')
+_RE_FEATURE_FLAG_IGNORE_FCV_CHECK_REF = re.compile(r'isEnabledAndIgnoreFCVUnsafe\(\)')
+_RE_FEATURE_FLAG_IGNORE_FCV_CHECK_COMMENT = re.compile(r'\(Ignore FCV check\)')
 _RE_HEADER = re.compile(r'\.(h|hpp)$')
 
 _CXX_COMPAT_HEADERS = [
@@ -125,6 +127,7 @@ class Linter:
         self.clean_lines = []
         self.nolint_suppression = []
         self.generic_fcv_comments = []
+        self.feature_flag_ignore_fcv_check_comments = []
         self._error_count = 0
 
         self.found_config_header = False
@@ -162,6 +165,10 @@ class Linter:
             if not "feature_compatibility_version" in self.file_name:
                 self._check_for_generic_fcv(linenum)
 
+            # Don't check feature_flag.h/cpp where the function is defined and test files.
+            if not "feature_flag" in self.file_name and not "test" in self.file_name:
+                self._check_for_feature_flag_ignore_fcv(linenum)
+
         return self._error_count
 
     def _check_newlines(self):
@@ -186,6 +193,9 @@ class Linter:
 
             if _RE_GENERIC_FCV_COMMENT.search(clean_line):
                 self.generic_fcv_comments.append(linenum)
+
+            if _RE_FEATURE_FLAG_IGNORE_FCV_CHECK_COMMENT.search(clean_line):
+                self.feature_flag_ignore_fcv_check_comments.append(linenum)
 
             if not in_multi_line_comment:
                 if "/*" in clean_line and not "*/" in clean_line:
@@ -320,6 +330,18 @@ class Linter:
                 linenum, 'mongodb/headers',
                 f"Prohibited include of C header '<{match['base']}.h>'. " \
                 f"Include C++ header '<c{match['base']}>' instead.")
+
+    def _check_for_feature_flag_ignore_fcv(self, linenum):
+        line = self.clean_lines[linenum]
+        if _RE_FEATURE_FLAG_IGNORE_FCV_CHECK_REF.search(line):
+            # Find the first ignore FCV check comment preceding the current line.
+            i = bisect.bisect_right(self.feature_flag_ignore_fcv_check_comments, linenum)
+            if not i or self.feature_flag_ignore_fcv_check_comments[i - 1] < (linenum - 10):
+                self._error(
+                    linenum, 'mongodb/fcv',
+                    'Please add a comment containing "(Ignore FCV check)":" within 10 lines ' +
+                    'before the isEnabledAndIgnoreFCVUnsafe() function call explaining why ' +
+                    'the FCV check is ignored.')
 
     def _error(self, linenum, category, message):
         if linenum in self.nolint_suppression:

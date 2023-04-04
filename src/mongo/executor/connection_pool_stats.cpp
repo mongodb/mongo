@@ -112,7 +112,8 @@ void ConnectionPoolStats::updateStatsForHost(std::string pool,
 }
 
 void ConnectionPoolStats::appendToBSON(mongo::BSONObjBuilder& result, bool forFTDC) {
-    const auto isCCHMEnabled = gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCV();
+    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+    const auto isCCHMEnabled = gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCVUnsafe();
 
     result.appendNumber("totalInUse", static_cast<long long>(totalInUse));
     result.appendNumber("totalAvailable", static_cast<long long>(totalAvailable));

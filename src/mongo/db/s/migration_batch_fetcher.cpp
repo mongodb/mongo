@@ -49,7 +49,8 @@ MigrationBatchFetcher<Inserter>::MigrationBatchFetcher(
     bool parallelFetchingSupported)
     : _nss{std::move(nss)},
       _chunkMigrationConcurrency{
-          mongo::feature_flags::gConcurrencyInChunkMigration.isEnabledAndIgnoreFCV()
+          // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+          mongo::feature_flags::gConcurrencyInChunkMigration.isEnabledAndIgnoreFCVUnsafe()
               ? chunkMigrationConcurrency.load()
               : 1},
       _sessionId{std::move(sessionId)},

@@ -65,7 +65,9 @@ MONGO_INITIALIZER(SecurityTokenOptionValidate)(InitializerContext*) {
 }  // namespace
 
 ValidatedTenancyScope::ValidatedTenancyScope(BSONObj obj, InitTag tag) : _originalToken(obj) {
-    const bool enabled = gMultitenancySupport && gFeatureFlagSecurityToken.isEnabledAndIgnoreFCV();
+    // (Ignore FCV check): TODO(SERVER-75396): add why FCV is ignored here.
+    const bool enabled =
+        gMultitenancySupport && gFeatureFlagSecurityToken.isEnabledAndIgnoreFCVUnsafe();
 
     uassert(ErrorCodes::InvalidOptions,
             "Multitenancy not enabled, refusing to accept securityToken",

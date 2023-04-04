@@ -64,7 +64,8 @@ int64_t getAvailableDiskSpaceBytes(const std::string& path) {
 }  // namespace
 
 void DiskSpaceMonitor::start(ServiceContext* svcCtx) {
-    if (!feature_flags::gIndexBuildGracefulErrorHandling.isEnabledAndIgnoreFCV()) {
+    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+    if (!feature_flags::gIndexBuildGracefulErrorHandling.isEnabledAndIgnoreFCVUnsafe()) {
         return;
     }
 

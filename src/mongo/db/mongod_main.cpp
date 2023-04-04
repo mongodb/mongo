@@ -1251,7 +1251,7 @@ void setUpObservers(ServiceContext* serviceContext) {
     }
 
     if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
-        if (!gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV()) {
+        if (!gFeatureFlagCatalogShard.isEnabledAndIgnoreFCVUnsafeAtStartup()) {
             opObserverRegistry->addObserver(
                 std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
         }

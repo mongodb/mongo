@@ -395,9 +395,10 @@ feature_flags::gFeatureFlagToaster.isEnabled(serverGlobalParams.featureCompatibi
 There are some places where we only want to check if the feature flag is turned on, regardless of
 which FCV we are on. For example, this could be the case if we need to perform the check in a spot
 in the code when the FCV has not been initialized yet. Only in these cases can we use the
-`isEnabledAndIgnoreFCV` helper. We should not use the `isEnabledAndIgnoreFCV` helper otherwise
-because it can result in unsafe scenarios where we enable a feature on an FCV where it is not 
-supported or where the feature has not been fully implemented yet.
+`isEnabledAndIgnoreFCVUnsafe` helper. `isEnabledAndIgnoreFCVUnsafe` should only be used when we are
+sure that we don't care what the FCV is. We should not use the `isEnabledAndIgnoreFCVUnsafe` helper
+otherwise because it can result in unsafe scenarios where we enable a feature on an FCV where it is
+not supported or where the feature has not been fully implemented yet.
 
 ***Note that in a single operation, you must only check the feature flag once***. This is because if
 you checked if the feature flag was enabled multiple times within a single operation, it's possible 

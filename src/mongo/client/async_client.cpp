@@ -67,7 +67,8 @@ MONGO_FAIL_POINT_DEFINE(alwaysLogConnAcquisitionToWireTime)
 
 namespace {
 bool connHealthMetricsEnabled() {
-    return gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCV();
+    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+    return gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCVUnsafe();
 }
 CounterMetric totalTimeForEgressConnectionAcquiredToWireMicros(
     "network.totalTimeForEgressConnectionAcquiredToWireMicros", connHealthMetricsEnabled);

@@ -150,7 +150,7 @@ REGISTER_DOCUMENT_SOURCE_CONDITIONALLY(
     ::mongo::getTestCommandsEnabled() ? AllowedWithClientType::kAny
                                       : AllowedWithClientType::kInternal,
     feature_flags::gFeatureFlagBucketUnpackWithSort,
-    feature_flags::gFeatureFlagBucketUnpackWithSort.isEnabledAndIgnoreFCV());
+    feature_flags::gFeatureFlagBucketUnpackWithSort.isEnabledAndIgnoreFCVUnsafeAtStartup());
 
 DocumentSource::GetNextResult::ReturnStatus DocumentSourceSort::timeSorterPeek() {
     if (_timeSorterNextDoc) {

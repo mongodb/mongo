@@ -177,7 +177,9 @@ void PlanCacheIndexabilityState::updateDiscriminators(
             processWildcardIndex(idx);
         }
 
-        if (feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabledAndIgnoreFCV() ||
+        // (Ignore FCV check): This is intentional because we want clusters which have wildcard
+        // indexes still be able to use the feature even if the FCV is downgraded.
+        if (feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabledAndIgnoreFCVUnsafe() ||
             idx.type != IndexType::INDEX_WILDCARD) {
             // If the index is wildcard compound or not wildcard, add discriminators for
             // fields mentioned in the key pattern.

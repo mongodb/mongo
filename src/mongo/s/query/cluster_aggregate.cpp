@@ -541,10 +541,11 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                         "passthrough from mongos",
                         nonChangeStreamLite.allowedToPassthroughFromMongos());
                 ShardId shardId(std::string(request.getPassthroughToShard()->getShard()));
+                // (Ignore FCV check): This is in mongos so we expect to ignore FCV.
                 uassert(6273803,
                         "$_passthroughToShard not supported for queries against config replica set",
                         shardId != ShardId::kConfigServerId ||
-                            gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV());
+                            gFeatureFlagCatalogShard.isEnabledAndIgnoreFCVUnsafe());
                 // This is an aggregation pipeline started internally, so it is not eligible for
                 // sampling.
                 const bool eligibleForSampling = false;

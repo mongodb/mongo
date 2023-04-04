@@ -203,7 +203,7 @@ CollectionRoutingInfo CatalogCacheTestFixture::makeCollectionRoutingInfo(
                        [](const auto& chunk) { return BSON("chunks" << chunk); });
         return aggResult;
     }());
-    if (feature_flags::gGlobalIndexesShardingCatalog.isEnabledAndIgnoreFCV()) {
+    if (feature_flags::gGlobalIndexesShardingCatalog.isEnabledAndIgnoreFCVUnsafe()) {
         onCommand([&](const executor::RemoteCommandRequest& request) {
             ASSERT_EQ(request.target, kConfigHostAndPort);
             ASSERT_EQ(request.dbname, "config");
@@ -262,7 +262,7 @@ void CatalogCacheTestFixture::expectCollectionAndIndexesAggregation(
     const ShardKeyPattern& shardKeyPattern,
     boost::optional<Timestamp> indexVersion,
     const std::vector<BSONObj>& indexes) {
-    if (feature_flags::gGlobalIndexesShardingCatalog.isEnabledAndIgnoreFCV()) {
+    if (feature_flags::gGlobalIndexesShardingCatalog.isEnabledAndIgnoreFCVUnsafe()) {
         onCommand([&](const executor::RemoteCommandRequest& request) {
             ASSERT_EQ(request.target, kConfigHostAndPort);
             ASSERT_EQ(request.dbname, "config");
@@ -327,7 +327,7 @@ ChunkManager CatalogCacheTestFixture::loadRoutingTableWithTwoChunksAndTwoShardsI
         const auto chunk2Obj = BSON("chunks" << chunk2.toConfigBSON());
         return std::vector<BSONObj>{collType.toBSON(), chunk1Obj, chunk2Obj};
     }());
-    if (feature_flags::gGlobalIndexesShardingCatalog.isEnabledAndIgnoreFCV()) {
+    if (feature_flags::gGlobalIndexesShardingCatalog.isEnabledAndIgnoreFCVUnsafe()) {
         onCommand([&](const executor::RemoteCommandRequest& request) {
             ASSERT_EQ(request.target, kConfigHostAndPort);
             ASSERT_EQ(request.dbname, "config");

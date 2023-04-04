@@ -51,7 +51,10 @@ bool isReplEnabled(ServiceContext* serviceContext) {
 
 bool isFeatureFlagEnabled(bool ignoreFCV) {
     if (ignoreFCV) {
-        return gFeatureFlagAnalyzeShardKey.isEnabledAndIgnoreFCV();
+        // (Ignore FCV check): In the following cases, ignoreFCV is set to true.
+        // 1. The call is before FCV initialization.
+        // 2. We want to stop QueryAnalysisSampler regardless of FCV.
+        return gFeatureFlagAnalyzeShardKey.isEnabledAndIgnoreFCVUnsafe();
     }
     return serverGlobalParams.featureCompatibility.isVersionInitialized() &&
         gFeatureFlagAnalyzeShardKey.isEnabled(serverGlobalParams.featureCompatibility);

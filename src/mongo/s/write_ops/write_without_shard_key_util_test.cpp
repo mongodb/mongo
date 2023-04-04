@@ -231,7 +231,7 @@ TEST_F(UnshardedCollectionTest, UnshardedCollectionDoesNotUseTwoPhaseProtocol) {
     expectFindSendBSONObjVector(kConfigHostAndPort, {});
 
     // Return no global indexes
-    if (feature_flags::gGlobalIndexesShardingCatalog.isEnabledAndIgnoreFCV()) {
+    if (feature_flags::gGlobalIndexesShardingCatalog.isEnabledAndIgnoreFCVUnsafe()) {
         onCommand([&](const executor::RemoteCommandRequest& request) {
             ASSERT_EQ(request.target, kConfigHostAndPort);
             ASSERT_EQ(request.dbname, "config");

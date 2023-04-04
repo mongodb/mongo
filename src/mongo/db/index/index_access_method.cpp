@@ -1232,7 +1232,8 @@ Status SortedDataIndexAccessMethod::_indexKeysOrWriteToSideTable(
         }
     } else {
         // Ensure that our snapshot is compatible with the index's minimum visibile snapshot.
-        if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV()) {
+        // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+        if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe()) {
             const auto minVisibleTimestamp = _indexCatalogEntry->getMinimumVisibleSnapshot();
             const auto readTimestamp =
                 opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx).value_or(
@@ -1301,7 +1302,8 @@ void SortedDataIndexAccessMethod::_unindexKeysOrWriteToSideTable(
     options.dupsAllowed = options.dupsAllowed || checkRecordId == CheckRecordId::On;
 
     // Ensure that our snapshot is compatible with the index's minimum visibile snapshot.
-    if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV()) {
+    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+    if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe()) {
         const auto minVisibleTimestamp = _indexCatalogEntry->getMinimumVisibleSnapshot();
         const auto readTimestamp =
             opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx).value_or(

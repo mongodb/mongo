@@ -92,7 +92,9 @@ public:
     }
 
     void appendInfoForServerStatus(BSONObjBuilder* builder) {
-        if (!mongo::feature_flags::gRangeDeleterService.isEnabledAndIgnoreFCV()) {
+        // (Ignore FCV check): This feature doesn't have any upgrade/downgrade concerns. The feature
+        // flag is used to turn on new range deleter on startup.
+        if (!mongo::feature_flags::gRangeDeleterService.isEnabledAndIgnoreFCVUnsafe()) {
             auto totalNumberOfRangesScheduledForDeletion = ([this] {
                 stdx::lock_guard lg(_mutex);
                 return std::accumulate(

@@ -259,7 +259,9 @@ SharedSemiFuture<void> MigrationCoordinator::_commitMigrationOnDonorAndRecipient
         deletionTask.setKeyPattern(*_shardKeyPattern);
     }
 
-    if (!feature_flags::gRangeDeleterService.isEnabledAndIgnoreFCV()) {
+    // (Ignore FCV check): This feature doesn't have any upgrade/downgrade concerns. The feature
+    // flag is used to turn on new range deleter on startup.
+    if (!feature_flags::gRangeDeleterService.isEnabledAndIgnoreFCVUnsafe()) {
         LOGV2_DEBUG(23897,
                     2,
                     "Marking range deletion task on donor as ready for processing",

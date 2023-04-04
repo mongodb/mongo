@@ -62,7 +62,7 @@ namespace mongo {
                                        AllowedWithApiStrict::kAlways,     \
                                        AllowedWithClientType::kAny,       \
                                        featureFlag,                       \
-                                       featureFlag.isEnabledAndIgnoreFCV())
+                                       featureFlag.isEnabledAndIgnoreFCVUnsafeAtStartup())
 
 /**
  * You can specify a condition, evaluated during startup,

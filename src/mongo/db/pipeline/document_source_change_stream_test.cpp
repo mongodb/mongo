@@ -429,7 +429,7 @@ public:
 };
 
 bool getCSRewriteFeatureFlagValue() {
-    return feature_flags::gFeatureFlagChangeStreamsRewrite.isEnabledAndIgnoreFCV();
+    return feature_flags::gFeatureFlagChangeStreamsRewrite.isEnabledAndIgnoreFCVUnsafe();
 }
 
 TEST_F(ChangeStreamStageTest, ShouldRejectNonObjectArg) {

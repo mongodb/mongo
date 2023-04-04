@@ -66,7 +66,8 @@ auto makeSeveritySuppressor() {
 }
 
 bool connHealthMetricsEnabled() {
-    return gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCV();
+    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+    return gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCVUnsafe();
 }
 
 bool connHealthMetricsLoggingEnabled() {

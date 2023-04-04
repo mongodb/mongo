@@ -2583,7 +2583,8 @@ void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterNonShutdownFailure(
     // vote, because we want the voting itself to be killable. Continue and try to abort as primary
     // or crash.
     if (!opCtx->isKillPending() &&
-        feature_flags::gIndexBuildGracefulErrorHandling.isEnabledAndIgnoreFCV()) {
+        // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+        feature_flags::gIndexBuildGracefulErrorHandling.isEnabledAndIgnoreFCVUnsafe()) {
         if (ErrorCodes::NotWritablePrimary == status && !replState->isAbortCleanUpRequired()) {
             // Clean up if the error happens due to stepdown before 'startIndexBuild' oplog entry is
             // replicated. Other nodes will not be aware of this index build, so trying to signal
@@ -2602,7 +2603,8 @@ void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterNonShutdownFailure(
             // The index builder thread will need to reach out to the current primary to abort on
             // its own. This can happen if an error is thrown, it is interrupted by a user killop,
             // or is killed internally by something like the DiskSpaceMonitor.
-            if (feature_flags::gIndexBuildGracefulErrorHandling.isEnabledAndIgnoreFCV()) {
+            // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+            if (feature_flags::gIndexBuildGracefulErrorHandling.isEnabledAndIgnoreFCVUnsafe()) {
                 // If we were interrupted by a caller internally who set a status, use that
                 // status instead of the generic interruption error status.
                 auto abortStatus =
@@ -2743,7 +2745,8 @@ void IndexBuildsCoordinator::_runIndexBuildInner(
     // feature flag is enabled, two-phase builds can handle unexpected errors by requesting an abort
     // to the primary node. Single-phase builds can also abort immediately, as the primary or
     // standalone is the only node aware of the build.
-    if (!feature_flags::gIndexBuildGracefulErrorHandling.isEnabledAndIgnoreFCV()) {
+    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+    if (!feature_flags::gIndexBuildGracefulErrorHandling.isEnabledAndIgnoreFCVUnsafe()) {
         // Index builds only check index constraints when committing. If an error occurs at that
         // point, then the build is cleaned up while still holding the appropriate locks. The only
         // errors that we cannot anticipate are user interrupts and shutdown errors.

@@ -65,7 +65,8 @@ MONGO_FAIL_POINT_DEFINE(triggerSendRequestNetworkTimeout);
 MONGO_FAIL_POINT_DEFINE(forceConnectionNetworkTimeout);
 
 bool connHealthMetricsEnabled() {
-    return gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCV();
+    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+    return gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCVUnsafe();
 }
 
 CounterMetric numConnectionNetworkTimeouts("operation.numConnectionNetworkTimeouts",
@@ -110,7 +111,8 @@ bool catchingInvoke(F&& f, EH&& eh, StringData hint) {
     } catch (...) {
         Status err = exceptionToStatus();
         LOGV2(5802401, "Callback failed", "msg"_attr = hint, "error"_attr = err);
-        if (gSuppressNetworkInterfaceTransportLayerExceptions.isEnabledAndIgnoreFCV())
+        if (gSuppressNetworkInterfaceTransportLayerExceptions
+                .isEnabledAndIgnoreFCVUnsafeAtStartup())
             std::forward<EH>(eh)(err);  // new server parameter protected behavior
         else
             throw;  // old behavior

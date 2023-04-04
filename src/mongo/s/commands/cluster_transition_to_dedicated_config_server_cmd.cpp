@@ -79,9 +79,10 @@ public:
              const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
+        // (Ignore FCV check): TODO(SERVER-75389): add why FCV is ignored here.
         uassert(7368401,
                 "The transition to catalog shard feature is disabled",
-                gFeatureFlagTransitionToCatalogShard.isEnabledAndIgnoreFCV());
+                gFeatureFlagTransitionToCatalogShard.isEnabledAndIgnoreFCVUnsafe());
         uassert(7467200,
                 "The catalog shard feature is disabled",
                 gFeatureFlagCatalogShard.isEnabled(serverGlobalParams.featureCompatibility));

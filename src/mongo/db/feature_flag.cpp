@@ -74,7 +74,11 @@ bool FeatureFlag::isEnabledUseDefaultFCVWhenUninitialized(
     }
 }
 
-bool FeatureFlag::isEnabledAndIgnoreFCV() const {
+bool FeatureFlag::isEnabledAndIgnoreFCVUnsafe() const {
+    return _enabled;
+}
+
+bool FeatureFlag::isEnabledAndIgnoreFCVUnsafeAtStartup() const {
     return _enabled;
 }
 
@@ -123,7 +127,7 @@ void FeatureFlagServerParameter::append(OperationContext* opCtx,
                                         BSONObjBuilder* b,
                                         StringData name,
                                         const boost::optional<TenantId>&) {
-    bool enabled = _storage.isEnabledAndIgnoreFCV();
+    bool enabled = _storage.isEnabledAndIgnoreFCVUnsafe();
 
     {
         auto sub = BSONObjBuilder(b->subobjStart(name));
@@ -141,7 +145,7 @@ void FeatureFlagServerParameter::appendSupportingRoundtrip(OperationContext* opC
                                                            BSONObjBuilder* b,
                                                            StringData name,
                                                            const boost::optional<TenantId>&) {
-    bool enabled = _storage.isEnabledAndIgnoreFCV();
+    bool enabled = _storage.isEnabledAndIgnoreFCVUnsafe();
     b->append(name, enabled);
 }
 

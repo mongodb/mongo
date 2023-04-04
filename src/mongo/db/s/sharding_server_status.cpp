@@ -128,7 +128,9 @@ public:
 
             ShardingStatistics::get(opCtx).report(&result);
             catalogCache->report(&result);
-            if (mongo::feature_flags::gRangeDeleterService.isEnabledAndIgnoreFCV()) {
+            // (Ignore FCV check): This feature doesn't have any upgrade/downgrade concerns. The
+            // feature flag is used to turn on new range deleter on startup.
+            if (mongo::feature_flags::gRangeDeleterService.isEnabledAndIgnoreFCVUnsafe()) {
                 auto nRangeDeletions = [&]() {
                     try {
                         return RangeDeleterService::get(opCtx)->totalNumOfRegisteredTasks();
@@ -163,10 +165,10 @@ public:
 
         // The serverStatus command is run before the FCV is initialized so we ignore it when
         // checking whether the resharding and global index features are enabled here.
-        if (resharding::gFeatureFlagResharding.isEnabledAndIgnoreFCV()) {
+        if (resharding::gFeatureFlagResharding.isEnabledAndIgnoreFCVUnsafeAtStartup()) {
             Metrics::getForResharding(sCtx)->reportForServerStatus(bob);
         }
-        if (gFeatureFlagGlobalIndexes.isEnabledAndIgnoreFCV()) {
+        if (gFeatureFlagGlobalIndexes.isEnabledAndIgnoreFCVUnsafeAtStartup()) {
             Metrics::getForGlobalIndexes(sCtx)->reportForServerStatus(bob);
         }
     }

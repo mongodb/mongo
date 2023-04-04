@@ -864,7 +864,8 @@ const NamespaceString& AutoGetCollectionForReadPITCatalog::getNss() const {
 AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
                                                    const NamespaceStringOrUUID& nsOrUUID,
                                                    AutoGetCollection::Options options) {
-    if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV()) {
+    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+    if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe()) {
         _legacy.emplace(opCtx, nsOrUUID, options);
     } else {
         _pitCatalog.emplace(opCtx, nsOrUUID, options);
@@ -1375,7 +1376,8 @@ AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
     OperationContext* opCtx,
     const NamespaceStringOrUUID& nsOrUUID,
     AutoGetCollection::Options options) {
-    if (feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV()) {
+    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+    if (feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe()) {
         _impl.emplace<AutoGetCollectionForReadLockFreePITCatalog>(
             opCtx, nsOrUUID, std::move(options));
     } else {

@@ -69,7 +69,8 @@ void ShardingStatistics::report(BSONObjBuilder* builder) const {
                     countDonorMoveChunkAbortConflictingIndexOperation.load());
     builder->append("unfinishedMigrationFromPreviousPrimary",
                     unfinishedMigrationFromPreviousPrimary.load());
-    if (mongo::feature_flags::gConcurrencyInChunkMigration.isEnabledAndIgnoreFCV())
+    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+    if (mongo::feature_flags::gConcurrencyInChunkMigration.isEnabledAndIgnoreFCVUnsafe())
         builder->append("chunkMigrationConcurrency", chunkMigrationConcurrencyCnt.load());
 }
 

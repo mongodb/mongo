@@ -417,7 +417,8 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
     if (_isRequestOnTimeseriesViewNamespace) {
         uassert(ErrorCodes::NotImplemented,
                 str::stream() << "Updates are disallowed on sharded timeseries collections.",
-                feature_flags::gFeatureFlagShardedTimeSeriesUpdateDelete.isEnabledAndIgnoreFCV());
+                feature_flags::gFeatureFlagShardedTimeSeriesUpdateDelete.isEnabled(
+                    serverGlobalParams.featureCompatibility));
         uassert(ErrorCodes::InvalidOptions,
                 str::stream()
                     << "A {multi:false} update on a sharded timeseries collection is disallowed.",

@@ -769,7 +769,11 @@ void CurOp::reportState(BSONObjBuilder* builder, bool truncateOps) {
         builder->append("dataThroughputAverage", *_debug.dataThroughputAverage);
     }
 
-    if (feature_flags::gFeatureFlagDeprioritizeLowPriorityOperations.isEnabledAndIgnoreFCV()) {
+    // (Ignore FCV check): This feature flag is used to initialize ticketing during storage engine
+    // initialization and FCV checking is ignored there, so here we also need to ignore FCV to keep
+    // consistent behavior.
+    if (feature_flags::gFeatureFlagDeprioritizeLowPriorityOperations
+            .isEnabledAndIgnoreFCVUnsafe()) {
         auto admissionPriority = opCtx->lockState()->getAdmissionPriority();
         if (admissionPriority < AdmissionContext::Priority::kNormal) {
             builder->append("admissionPriority", toString(admissionPriority));
@@ -993,7 +997,11 @@ void OpDebug::report(OperationContext* opCtx,
         pAttrs->add("reslen", responseLength);
     }
 
-    if (feature_flags::gFeatureFlagDeprioritizeLowPriorityOperations.isEnabledAndIgnoreFCV()) {
+    // (Ignore FCV check): This feature flag is used to initialize ticketing during storage engine
+    // initialization and FCV checking is ignored there, so here we also need to ignore FCV to keep
+    // consistent behavior.
+    if (feature_flags::gFeatureFlagDeprioritizeLowPriorityOperations
+            .isEnabledAndIgnoreFCVUnsafe()) {
         auto admissionPriority = opCtx->lockState()->getAdmissionPriority();
         if (admissionPriority < AdmissionContext::Priority::kNormal) {
             pAttrs->add("admissionPriority", admissionPriority);

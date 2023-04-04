@@ -356,8 +356,10 @@ void createTransactionTable(OperationContext* opCtx) {
 
         if (!collectionIsEmpty) {
             // Unless explicitly enabled, don't create the index to avoid delaying step up.
+            // (Ignore FCV check): This is used to fix a bug in Atlas where the index is not created
+            // in a cluster. This feature flag may no longer be used.
             if (feature_flags::gFeatureFlagAlwaysCreateConfigTransactionsPartialIndexOnStepUp
-                    .isEnabledAndIgnoreFCV()) {
+                    .isEnabledAndIgnoreFCVUnsafe()) {
                 AutoGetCollection autoColl(
                     opCtx, NamespaceString::kSessionTransactionsTableNamespace, LockMode::MODE_X);
                 IndexBuildsCoordinator::get(opCtx)->createIndex(
@@ -546,7 +548,9 @@ void MongoDSessionCatalog::onStepUp(OperationContext* opCtx) {
     abortInProgressTransactions(opCtx, this, _ti.get());
 
     createTransactionTable(opCtx);
-    if (repl::feature_flags::gFeatureFlagRetryableFindAndModify.isEnabledAndIgnoreFCV()) {
+    // (Ignore FCV check): This is intentional to try creating the image_collection collection if
+    // the feature flag is ever enabled.
+    if (repl::feature_flags::gFeatureFlagRetryableFindAndModify.isEnabledAndIgnoreFCVUnsafe()) {
         createRetryableFindAndModifyTable(opCtx);
     }
 }

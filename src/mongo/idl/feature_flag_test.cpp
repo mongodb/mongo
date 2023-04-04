@@ -62,8 +62,8 @@ void FeatureFlagTest::setUp() {
     _featureFlagSpoon = getServerParameter("featureFlagSpoon");
     ASSERT_OK(_featureFlagSpoon->setFromString("true", boost::none));
 
-    ASSERT(feature_flags::gFeatureFlagBlender.isEnabledAndIgnoreFCV() == true);
-    ASSERT(feature_flags::gFeatureFlagSpoon.isEnabledAndIgnoreFCV() == true);
+    ASSERT(feature_flags::gFeatureFlagBlender.isEnabledAndIgnoreFCVUnsafe() == true);
+    ASSERT(feature_flags::gFeatureFlagSpoon.isEnabledAndIgnoreFCVUnsafe() == true);
 
     Test::setUp();
 }
@@ -71,11 +71,11 @@ void FeatureFlagTest::setUp() {
 // Sanity check feature flags
 TEST(IDLFeatureFlag, Basic) {
     // false is set by "default" attribute in the IDL file.
-    ASSERT(feature_flags::gFeatureFlagToaster.isEnabledAndIgnoreFCV() == false);
+    ASSERT(feature_flags::gFeatureFlagToaster.isEnabledAndIgnoreFCVUnsafe() == false);
 
     auto* featureFlagToaster = getServerParameter("featureFlagToaster");
     ASSERT_OK(featureFlagToaster->setFromString("true", boost::none));
-    ASSERT(feature_flags::gFeatureFlagToaster.isEnabledAndIgnoreFCV() == true);
+    ASSERT(feature_flags::gFeatureFlagToaster.isEnabledAndIgnoreFCVUnsafe() == true);
     ASSERT_NOT_OK(featureFlagToaster->setFromString("alpha", boost::none));
 
     // (Generic FCV reference): feature flag test
@@ -93,7 +93,7 @@ TEST_F(FeatureFlagTest, Version) {
     ASSERT(feature_flags::gFeatureFlagSpoon.getVersion() == multiversion::GenericFCV::kLastLTS);
 
     ASSERT_OK(_featureFlagBlender->setFromString("false", boost::none));
-    ASSERT(feature_flags::gFeatureFlagBlender.isEnabledAndIgnoreFCV() == false);
+    ASSERT(feature_flags::gFeatureFlagBlender.isEnabledAndIgnoreFCVUnsafe() == false);
     ASSERT_NOT_OK(_featureFlagBlender->setFromString("alpha", boost::none));
 
     ASSERT_THROWS(feature_flags::gFeatureFlagBlender.getVersion(), AssertionException);
@@ -103,7 +103,7 @@ TEST_F(FeatureFlagTest, Version) {
 TEST_F(FeatureFlagTest, ServerStatus) {
     {
         ASSERT_OK(_featureFlagBlender->setFromString("true", boost::none));
-        ASSERT(feature_flags::gFeatureFlagBlender.isEnabledAndIgnoreFCV() == true);
+        ASSERT(feature_flags::gFeatureFlagBlender.isEnabledAndIgnoreFCVUnsafe() == true);
 
         BSONObjBuilder builder;
 
@@ -119,7 +119,7 @@ TEST_F(FeatureFlagTest, ServerStatus) {
 
     {
         ASSERT_OK(_featureFlagBlender->setFromString("false", boost::none));
-        ASSERT(feature_flags::gFeatureFlagBlender.isEnabledAndIgnoreFCV() == false);
+        ASSERT(feature_flags::gFeatureFlagBlender.isEnabledAndIgnoreFCVUnsafe() == false);
 
         BSONObjBuilder builder;
 

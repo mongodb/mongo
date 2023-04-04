@@ -688,7 +688,8 @@ SemiFuture<ConnectionPool::ConnectionHandle> ConnectionPool::_get(const HostAndP
 
     // Only count connections being checked-out for ordinary use, not lease, towards cumulative wait
     // time.
-    if (gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCV() && !lease) {
+    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+    if (gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCVUnsafe() && !lease) {
         connFuture = std::move(connFuture).tap([connRequestedAt, pool = pool](const auto& conn) {
             pool->recordConnectionWaitTime(connRequestedAt);
         });
@@ -715,7 +716,8 @@ void ConnectionPool::appendConnectionStats(ConnectionPoolStats* stats) const {
                                      pool->getOnceUsedConnections(),
                                      pool->getTotalConnUsageTime()};
 
-        if (gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCV()) {
+        // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+        if (gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCVUnsafe()) {
             hostStats.acquisitionWaitTimes = pool->connectionWaitTimeStats();
         }
         stats->updateStatsForHost(_name, host, hostStats);

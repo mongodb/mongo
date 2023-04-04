@@ -65,7 +65,9 @@ std::unique_ptr<CollectionShardingState> CollectionShardingStateFactoryShard::ma
 
 std::shared_ptr<executor::TaskExecutor>
 CollectionShardingStateFactoryShard::_getRangeDeletionExecutor() {
-    if (feature_flags::gRangeDeleterService.isEnabledAndIgnoreFCV()) {
+    // (Ignore FCV check): This feature doesn't have any upgrade/downgrade concerns. The feature
+    // flag is used to turn on new range deleter on startup.
+    if (feature_flags::gRangeDeleterService.isEnabledAndIgnoreFCVUnsafe()) {
         return nullptr;
     }
 

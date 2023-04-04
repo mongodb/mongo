@@ -64,7 +64,9 @@ ReadyIndexesIterator::ReadyIndexesIterator(OperationContext* const opCtx,
     : _opCtx(opCtx), _iterator(beginIterator), _endIterator(endIterator) {}
 
 const IndexCatalogEntry* ReadyIndexesIterator::_advance() {
-    auto pitFeatureEnabled = feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV();
+    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+    auto pitFeatureEnabled =
+        feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe();
     while (_iterator != _endIterator) {
         IndexCatalogEntry* entry = _iterator->get();
         ++_iterator;

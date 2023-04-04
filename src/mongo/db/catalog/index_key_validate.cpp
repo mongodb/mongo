@@ -154,8 +154,10 @@ Status validateKeyPattern(const BSONObj& key,
             return Status(code, str::stream() << "Unknown index plugin '" << pluginName << '\'');
     }
 
+    // (Ignore FCV check): This is intentional because we want clusters which have wildcard indexes
+    // still be able to use the feature even if the FCV is downgraded.
     auto compoundWildcardIndexesAllowed =
-        feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabledAndIgnoreFCV();
+        feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabledAndIgnoreFCVUnsafe();
     if (serverGlobalParams.featureCompatibility.isVersionInitialized() && !inCollValidation) {
         compoundWildcardIndexesAllowed =
             feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabled(
@@ -547,9 +549,12 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx,
             }
             try {
                 if (isWildcard) {
+                    // (Ignore FCV check): This is intentional because we want clusters which have
+                    // wildcard indexes still be able to use the feature even if the FCV is
+                    // downgraded.
                     if (key.nFields() > 1 &&
                         feature_flags::gFeatureFlagCompoundWildcardIndexes
-                            .isEnabledAndIgnoreFCV()) {
+                            .isEnabledAndIgnoreFCVUnsafe()) {
                         auto validationStatus =
                             validateWildcardProjection(key, indexSpecElem.embeddedObject());
                         if (!validationStatus.isOK()) {

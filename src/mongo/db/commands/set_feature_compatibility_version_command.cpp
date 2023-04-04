@@ -458,7 +458,9 @@ public:
 
         if (!request.getPhase() || request.getPhase() == SetFCVPhaseEnum::kPrepare) {
             if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
-                if (gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV()) {
+                // (Ignore FCV check): This feature flag is intentional to only check if it is
+                // enabled on this binary so the config server can be a shard.
+                if (gFeatureFlagCatalogShard.isEnabledAndIgnoreFCVUnsafe()) {
                     // The config server may also be a shard, so have it run any shard server tasks.
                     _shardServerPhase1Tasks(opCtx, requestedVersion);
                 }
@@ -1433,7 +1435,9 @@ private:
         // Set the isCleaningServerMetadata field to true. This prohibits the downgrading to
         // upgrading transition until the isCleaningServerMetadata is unset when we successfully
         // finish the FCV downgrade and transition to the DOWNGRADED state.
-        if (repl::feature_flags::gDowngradingToUpgrading.isEnabledAndIgnoreFCV()) {
+        // (Ignore FCV check): This is intentional because we want to use this feature even if we
+        // are in downgrading fcv state.
+        if (repl::feature_flags::gDowngradingToUpgrading.isEnabledAndIgnoreFCVUnsafe()) {
             {
                 const auto fcvChangeRegion(
                     FeatureCompatibilityVersion::enterFCVChangeRegion(opCtx));

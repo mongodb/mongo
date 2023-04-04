@@ -534,7 +534,8 @@ Status MigrationDestinationManager::start(OperationContext* opCtx,
     _sessionMigration = std::make_unique<SessionCatalogMigrationDestination>(
         _nss, _fromShard, *_sessionId, _cancellationSource.token());
     ShardingStatistics::get(opCtx).countRecipientMoveChunkStarted.addAndFetch(1);
-    if (mongo::feature_flags::gConcurrencyInChunkMigration.isEnabledAndIgnoreFCV())
+    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+    if (mongo::feature_flags::gConcurrencyInChunkMigration.isEnabledAndIgnoreFCVUnsafe())
         ShardingStatistics::get(opCtx).chunkMigrationConcurrencyCnt.store(
             chunkMigrationConcurrency.load());
 

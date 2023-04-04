@@ -250,14 +250,16 @@ public:
 
         // The CollectionCatalog to use for lock-free reads with point-in-time catalog lookups.
         std::shared_ptr<const CollectionCatalog> catalog;
-        if (feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV()) {
+        // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+        if (feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe()) {
             // Make sure we get a CollectionCatalog in sync with our snapshot.
             catalog = getConsistentCatalogAndSnapshot(opCtx);
         }
 
         boost::optional<AutoGetDb> autoDb;
         if (isPointInTimeRead) {
-            if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV()) {
+            // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+            if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe()) {
                 // We only need to lock the database in intent mode and then collection in intent
                 // mode as well to ensure that none of the collections get dropped. This is no
                 // longer necessary with point-in-time catalog lookups.
@@ -321,7 +323,8 @@ public:
             return true;
         };
 
-        if (feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV()) {
+        // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+        if (feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe()) {
             for (auto it = catalog->begin(opCtx, dbName); it != catalog->end(opCtx); ++it) {
                 UUID uuid = it.uuid();
 

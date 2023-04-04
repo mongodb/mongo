@@ -85,8 +85,9 @@ void setEncryptedDefaultEncryptedCollectionNames(const NamespaceString& ns,
         config->setEscCollection(StringData(prefix + ".esc"));
     }
 
+    // (Ignore FCV check): This feature flag check will be deleted before release.
     // TODO SERVER-73303: delete when v2 is enabled.
-    if (!gFeatureFlagFLE2ProtocolVersion2.isEnabledAndIgnoreFCV()) {
+    if (!gFeatureFlagFLE2ProtocolVersion2.isEnabledAndIgnoreFCVUnsafe()) {
         if (!config->getEccCollection()) {
             config->setEccCollection(StringData(prefix + ".ecc"));
         }

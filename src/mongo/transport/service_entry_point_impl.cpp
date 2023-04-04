@@ -442,7 +442,8 @@ void ServiceEntryPointImpl::appendStats(BSONObjBuilder* bob) const {
     appendInt("available", _maxSessions - sessionCount);
     appendInt("totalCreated", sessionsCreated);
 
-    if (gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCV()) {
+    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+    if (gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCVUnsafe()) {
         appendInt("rejected", _rejectedSessions);
     }
 

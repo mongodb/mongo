@@ -530,7 +530,7 @@ void ShardingInitializationMongoD::updateShardIdentityConfigString(
 
 void ShardingInitializationMongoD::onSetCurrentConfig(OperationContext* opCtx) {
     if (!serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) ||
-        !gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV()) {
+        !gFeatureFlagCatalogShard.isEnabledAndIgnoreFCVUnsafeAtStartup()) {
         // Only config servers capable of acting as a shard set up the config shard in their shard
         // registry with a real connection string.
         return;
@@ -560,7 +560,7 @@ void initializeGlobalShardingStateForConfigServerIfNeeded(OperationContext* opCt
     ShardingInitializationMongoD::get(opCtx)->installReplicaSetChangeListener(service);
 
     auto configCS = []() -> boost::optional<ConnectionString> {
-        if (gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV()) {
+        if (gFeatureFlagCatalogShard.isEnabledAndIgnoreFCVUnsafeAtStartup()) {
             // When the config server can operate as a shard, it sets up a ShardRemote for the
             // config shard, which is created later after loading the local replica set config.
             return boost::none;
@@ -568,7 +568,7 @@ void initializeGlobalShardingStateForConfigServerIfNeeded(OperationContext* opCt
         return {ConnectionString::forLocal()};
     }();
 
-    if (gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV()) {
+    if (gFeatureFlagCatalogShard.isEnabledAndIgnoreFCVUnsafeAtStartup()) {
         CatalogCacheLoader::set(service,
                                 std::make_unique<ShardServerCatalogCacheLoader>(
                                     std::make_unique<ConfigServerCatalogCacheLoader>()));

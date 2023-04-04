@@ -1395,7 +1395,7 @@ CommandRegistry* globalCommandRegistry();
  */
 #define MONGO_REGISTER_FEATURE_FLAGGED_COMMAND(CmdType, featureFlag)        \
     MONGO_INITIALIZER(RegisterTestCommand_##CmdType)(InitializerContext*) { \
-        if (featureFlag.isEnabledAndIgnoreFCV()) {                          \
+        if (featureFlag.isEnabledAndIgnoreFCVUnsafeAtStartup()) {           \
             new CmdType();                                                  \
         }                                                                   \
     }

@@ -534,7 +534,8 @@ private:
 
         boost::optional<AutoGetCollection> autoColl;
         const Collection* collection = nullptr;
-        if (feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV()) {
+        // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+        if (feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe()) {
             // Make sure we get a CollectionCatalog in sync with our snapshot.
             catalog = getConsistentCatalogAndSnapshot(opCtx);
 
@@ -563,7 +564,8 @@ private:
                 readTimestamp);
         auto minVisible = collection->getMinimumVisibleSnapshot();
         if (minVisible && *readTimestamp < *collection->getMinimumVisibleSnapshot()) {
-            invariant(!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV());
+            // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+            invariant(!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe());
             return {ErrorCodes::SnapshotUnavailable,
                     str::stream() << "Unable to read from collection " << info.nss
                                   << " due to pending catalog changes"};

@@ -997,7 +997,9 @@ ProvidedSortSet computeSortsForScan(const IndexEntry& index,
         BSONObjBuilder sortPatternStripped;
         // Strip '$_path' and following fields out of 'sortPattern' and then proceed with regular
         // sort analysis.
-        if (feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabledAndIgnoreFCV()) {
+        // (Ignore FCV check): This is intentional because we want clusters which have wildcard
+        // indexes still be able to use the feature even if the FCV is downgraded.
+        if (feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabledAndIgnoreFCVUnsafe()) {
             bool hasPathField = false;
             for (auto elem : sortPatternProvidedByIndex) {
                 if (elem.fieldNameStringData() == "$_path"_sd) {

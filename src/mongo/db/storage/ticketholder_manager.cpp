@@ -51,7 +51,8 @@ TicketHolderManager::TicketHolderManager(ServiceContext* svcCtx,
     : _readTicketHolder(std::move(readTicketHolder)),
       _writeTicketHolder(std::move(writeTicketHolder)),
       _monitor([this, svcCtx]() -> std::unique_ptr<TicketHolderMonitor> {
-          if (!feature_flags::gFeatureFlagExecutionControl.isEnabledAndIgnoreFCV()) {
+          // (Ignore FCV check): This feature flag doesn't have upgrade/downgrade concern.
+          if (!feature_flags::gFeatureFlagExecutionControl.isEnabledAndIgnoreFCVUnsafe()) {
               return nullptr;
           }
           switch (StorageEngineConcurrencyAdjustmentAlgorithm_parse(
@@ -71,7 +72,8 @@ TicketHolderManager::TicketHolderManager(ServiceContext* svcCtx,
 }
 
 Status TicketHolderManager::updateConcurrentWriteTransactions(const int32_t& newWriteTransactions) {
-    if (feature_flags::gFeatureFlagExecutionControl.isEnabledAndIgnoreFCV() &&
+    // (Ignore FCV check): This feature flag doesn't have upgrade/downgrade concern.
+    if (feature_flags::gFeatureFlagExecutionControl.isEnabledAndIgnoreFCVUnsafe() &&
         !gStorageEngineConcurrencyAdjustmentAlgorithm.empty()) {
         return {ErrorCodes::IllegalOperation,
                 "Cannot modify concurrent write transactions limit when it is being dynamically "
@@ -104,7 +106,8 @@ Status TicketHolderManager::updateConcurrentWriteTransactions(const int32_t& new
 };
 
 Status TicketHolderManager::updateConcurrentReadTransactions(const int32_t& newReadTransactions) {
-    if (feature_flags::gFeatureFlagExecutionControl.isEnabledAndIgnoreFCV() &&
+    // (Ignore FCV check): This feature flag doesn't have upgrade/downgrade concern.
+    if (feature_flags::gFeatureFlagExecutionControl.isEnabledAndIgnoreFCVUnsafe() &&
         !gStorageEngineConcurrencyAdjustmentAlgorithm.empty()) {
         return {ErrorCodes::IllegalOperation,
                 "Cannot modify concurrent read transactions limit when it is being dynamically "

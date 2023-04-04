@@ -428,7 +428,9 @@ StatusWith<CollectionRoutingInfo> CatalogCache::getCollectionRoutingInfo(Operati
 boost::optional<ShardingIndexesCatalogCache> CatalogCache::_getCollectionIndexInfoAt(
     OperationContext* opCtx, const NamespaceString& nss, bool allowLocks) {
 
-    if (!feature_flags::gGlobalIndexesShardingCatalog.isEnabledAndIgnoreFCV()) {
+    // (Ignore FCV check): It is okay to ignore FCV in mongos. This is a temporary solution to solve
+    // performance issue when fetching index information in mongos.
+    if (!feature_flags::gGlobalIndexesShardingCatalog.isEnabledAndIgnoreFCVUnsafe()) {
         return boost::none;
     }
 
@@ -721,7 +723,8 @@ void CatalogCache::invalidateCollectionEntry_LINEARIZABLE(const NamespaceString&
 }
 
 void CatalogCache::invalidateIndexEntry_LINEARIZABLE(const NamespaceString& nss) {
-    if (!feature_flags::gGlobalIndexesShardingCatalog.isEnabledAndIgnoreFCV()) {
+    // (Ignore FCV check): It is okay to ignore FCV in mongos.
+    if (!feature_flags::gGlobalIndexesShardingCatalog.isEnabledAndIgnoreFCVUnsafe()) {
         _indexCache.invalidateKey(nss);
     }
 }
@@ -957,8 +960,9 @@ CatalogCache::IndexCache::LookupResult CatalogCache::IndexCache::_lookupIndexes(
                                   "timeInStore"_attr = previousVersion);
 
         const auto readConcern = [&]() -> repl::ReadConcernArgs {
+            // (Ignore FCV check): This is in mongos so we expect to ignore FCV.
             if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
-                !gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV()) {
+                !gFeatureFlagCatalogShard.isEnabledAndIgnoreFCVUnsafe()) {
                 // When the feature flag is on, the config server may read from a secondary which
                 // may need to wait for replication, so we should use afterClusterTime.
                 return {repl::ReadConcernLevel::kSnapshotReadConcern};

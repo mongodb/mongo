@@ -67,11 +67,29 @@ public:
         const ServerGlobalParams::FeatureCompatibility& fcv) const;
 
     /**
-     * Returns true if this flag is enabled regardless of the current FCV version.
+     * Returns true if this flag is enabled regardless of the current FCV version. When using this
+     * function, you are allowing the feature flag to pass checking during transitional FCV states
+     * and downgraded FCV, which means the code gated by this feature flag is allowed to run even if
+     * the FCV requirement of this feature flag is not met.
      *
      * isEnabled() is prefered over this function since it will prevent upgrade/downgrade issues.
+     *
+     * Note: A comment starting with (Ignore FCV check) is required for the use of this function. If
+     * the feature flag check is before FCV initialization, use isEnabledAndIgnoreFCVUnsafeAtStartup
+     * instead.
      */
-    bool isEnabledAndIgnoreFCV() const;
+    bool isEnabledAndIgnoreFCVUnsafe() const;
+
+    /**
+     * Returns true if this flag is enabled regardless of the current FCV version. When using this
+     * function, you are allowing the feature flag to pass checking during transitional FCV states
+     * and downgraded FCV, which means the code gated by this feature flag is allowed to run even if
+     * the FCV requirement of this feature flag is not met.
+     *
+     * This is same as isEnabledAndIgnoreFCVUnsafe() but doesn't require a comment. This should
+     * only be used before FCV initialization.
+     */
+    bool isEnabledAndIgnoreFCVUnsafeAtStartup() const;
 
     /**
      * Returns true if the flag is set to true and enabled on the target FCV version.

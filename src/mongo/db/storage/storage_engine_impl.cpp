@@ -657,7 +657,9 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
         }
 
         const auto& toRemove = it;
-        Timestamp identDropTs = feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV()
+        // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+        Timestamp identDropTs =
+            feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe()
             ? stableTs
             : Timestamp::min();
         LOGV2(22251, "Dropping unknown ident", "ident"_attr = toRemove, "ts"_attr = identDropTs);
