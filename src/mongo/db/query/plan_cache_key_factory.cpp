@@ -93,17 +93,17 @@ void encodeIndexability(const MatchExpression* tree,
     encodeIndexabilityRecursive(tree, indexabilityState, keyBuilder);
 }
 
-PlanCacheKeyInfo makePlanCacheKeyInfo(const CanonicalQuery& query,
+PlanCacheKeyInfo makePlanCacheKeyInfo(CanonicalQuery::QueryShapeString&& shapeString,
+                                      const MatchExpression* root,
                                       const CollectionPtr& collection) {
-    const auto shapeString = query.encodeKey();
 
     StringBuilder indexabilityKeyBuilder;
     plan_cache_detail::encodeIndexability(
-        query.root(),
+        root,
         CollectionQueryInfo::get(collection).getPlanCacheIndexabilityState(),
         &indexabilityKeyBuilder);
 
-    return PlanCacheKeyInfo(shapeString, indexabilityKeyBuilder.str());
+    return PlanCacheKeyInfo(std::move(shapeString), indexabilityKeyBuilder.str());
 }
 
 namespace {
@@ -167,7 +167,9 @@ sbe::PlanCacheKeyCollectionState computeCollectionState(OperationContext* opCtx,
 PlanCacheKey make(const CanonicalQuery& query,
                   const CollectionPtr& collection,
                   PlanCacheKeyTag<PlanCacheKey> tag) {
-    return {plan_cache_detail::makePlanCacheKeyInfo(query, collection)};
+    auto shapeString = canonical_query_encoder::encodeClassic(query);
+    return {
+        plan_cache_detail::makePlanCacheKeyInfo(std::move(shapeString), query.root(), collection)};
 }
 
 sbe::PlanCacheKey make(const CanonicalQuery& query,
@@ -193,7 +195,9 @@ sbe::PlanCacheKey make(const CanonicalQuery& query, const MultipleCollectionAcce
         }
     }
 
-    return {plan_cache_detail::makePlanCacheKeyInfo(query, collections.getMainCollection()),
+    auto shapeString = canonical_query_encoder::encodeSBE(query);
+    return {plan_cache_detail::makePlanCacheKeyInfo(
+                std::move(shapeString), query.root(), collections.getMainCollection()),
             std::move(mainCollectionState),
             std::move(secondaryCollectionStates)};
 }

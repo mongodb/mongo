@@ -313,8 +313,8 @@ TEST_F(CanonicalQueryEncoderTest, ComputeKeyGeoWithin) {
                                                   "{a: {$geoWithin: "
                                                   "{$geometry: {type: 'Polygon', coordinates: "
                                                   "[[[0, 0], [0, 90], [90, 0], [0, 0]]]}}}}"));
-    ASSERT_NOT_EQUALS(canonical_query_encoder::encode(*cqLegacy),
-                      canonical_query_encoder::encode(*cqNew));
+    ASSERT_NOT_EQUALS(canonical_query_encoder::encodeClassic(*cqLegacy),
+                      canonical_query_encoder::encodeClassic(*cqNew));
 }
 
 // GEO_NEAR cache keys should include information on geometry and CRS in addition

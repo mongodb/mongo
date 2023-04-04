@@ -659,7 +659,7 @@ void encodeFindCommandRequest(const FindCommandRequest& findCommand, BufBuilder*
 
 namespace canonical_query_encoder {
 
-CanonicalQuery::QueryShapeString encode(const CanonicalQuery& cq) {
+CanonicalQuery::QueryShapeString encodeClassic(const CanonicalQuery& cq) {
     StringBuilder keyBuilder;
     encodeKeyForMatch(cq.root(), &keyBuilder);
     encodeKeyForSort(cq.getFindCommandRequest().getSort(), &keyBuilder);

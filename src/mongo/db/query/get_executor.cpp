@@ -779,6 +779,7 @@ public:
 
         auto planCacheKey = buildPlanCacheKey();
         getResult()->planCacheInfo().queryHash = planCacheKey.queryHash();
+        getResult()->planCacheInfo().planCacheKey = planCacheKey.planCacheKeyHash();
 
         if (auto result = buildCachedPlan(planCacheKey)) {
             return {std::move(result)};
@@ -1050,7 +1051,6 @@ protected:
         }
 
         if (shouldCacheQuery(*_cq)) {
-            getResult()->planCacheInfo().planCacheKey = planCacheKey.planCacheKeyHash();
             // Try to look up a cached solution for the query.
             if (auto cs = CollectionQueryInfo::get(_collection)
                               .getPlanCache()
@@ -1168,8 +1168,6 @@ protected:
     std::unique_ptr<SlotBasedPrepareExecutionResult> buildCachedPlan(
         const sbe::PlanCacheKey& planCacheKey) final {
         if (shouldCacheQuery(*_cq)) {
-            getResult()->planCacheInfo().planCacheKey = planCacheKey.planCacheKeyHash();
-
             auto&& planCache = sbe::getPlanCache(_opCtx);
             auto cacheEntry = planCache.getCacheEntryIfActive(planCacheKey);
             if (!cacheEntry) {

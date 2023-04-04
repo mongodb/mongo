@@ -32,7 +32,7 @@ function runAndVerifySlowQueryLog(pipeline, commentObj, hint) {
     expectedLog.command.comment = commentObj.comment;
     expectedLog.queryHash = queryPlanner.queryHash;
     expectedLog.planCacheKey = queryPlanner.planCacheKey;
-    assert(checkLog.checkContainsWithCountJson(db, logId, expectedLog, 1, null, true),
+    assert(checkLog.checkContainsWithCountJson(db, logId, expectedLog, 2, null, true),
            "failed to find [" + tojson(expectedLog) + "] in the slow query log");
 }
 

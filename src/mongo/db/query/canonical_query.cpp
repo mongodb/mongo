@@ -556,7 +556,7 @@ std::string CanonicalQuery::toStringShort() const {
 
 CanonicalQuery::QueryShapeString CanonicalQuery::encodeKey() const {
     return (!_forceClassicEngine && _sbeCompatible) ? canonical_query_encoder::encodeSBE(*this)
-                                                    : canonical_query_encoder::encode(*this);
+                                                    : canonical_query_encoder::encodeClassic(*this);
 }
 
 CanonicalQuery::QueryShapeString CanonicalQuery::encodeKeyForPlanCacheCommand() const {

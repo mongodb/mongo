@@ -77,11 +77,12 @@ bool isQueryNegatingEqualToNull(const mongo::MatchExpression* tree);
 namespace canonical_query_encoder {
 /**
  * Encode the given CanonicalQuery into a string representation which represents the shape of the
- * query. This is done by encoding the match, projection and sort and stripping the values from the
- * match. Two queries with the same shape may not necessarily be able to use the same plan, so the
- * plan cache has to add information to discriminate between queries with the same shape.
+ * query specifically for the classic plan cache. This is done by encoding the match, projection and
+ * sort and stripping the values from the match. Two queries with the same shape may not necessarily
+ * be able to use the same plan, so the plan cache has to add information to discriminate between
+ * queries with the same shape.
  */
-CanonicalQuery::QueryShapeString encode(const CanonicalQuery& cq);
+CanonicalQuery::QueryShapeString encodeClassic(const CanonicalQuery& cq);
 
 /**
  * Encode the given CanonicalQuery into a string representation which represents the shape of the
