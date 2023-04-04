@@ -731,12 +731,13 @@ void indexKeyCorruptionCheckCallback(OperationContext* opCtx,
  * or that the index keys are still part of the underlying index.
  */
 bool indexKeyConsistencyCheckCallback(OperationContext* opCtx,
-                                      const StringMap<const IndexAccessMethod*>& iamTable,
+                                      StringMap<const IndexCatalogEntry*>& entryMap,
                                       sbe::value::SlotAccessor* snapshotIdAccessor,
-                                      sbe::value::SlotAccessor* indexIdAccessor,
+                                      sbe::value::SlotAccessor* indexIdentAccessor,
                                       sbe::value::SlotAccessor* indexKeyAccessor,
                                       const CollectionPtr& collection,
                                       const Record& nextRecord) {
+    // The index consistency check is only performed when 'snapshotIdAccessor' is set.
     if (snapshotIdAccessor) {
         auto currentSnapshotId = opCtx->recoveryUnit()->getSnapshotId();
         auto [snapshotIdTag, snapshotIdVal] = snapshotIdAccessor->getViewOfValue();
@@ -748,15 +749,15 @@ bool indexKeyConsistencyCheckCallback(OperationContext* opCtx,
         auto snapshotId = sbe::value::bitcastTo<uint64_t>(snapshotIdVal);
         if (currentSnapshotId.toNumber() != snapshotId) {
             tassert(5290707, "Should have index key accessor", indexKeyAccessor);
-            tassert(5290714, "Should have index id accessor", indexIdAccessor);
+            tassert(5290714, "Should have index ident accessor", indexIdentAccessor);
 
-            auto [indexIdTag, indexIdVal] = indexIdAccessor->getViewOfValue();
+            auto [identTag, identVal] = indexIdentAccessor->getViewOfValue();
             auto [ksTag, ksVal] = indexKeyAccessor->getViewOfValue();
 
-            const auto msgIndexIdTag = indexIdTag;
+            const auto msgIdentTag = identTag;
             tassert(5290708,
-                    str::stream() << "Index name is of wrong type: " << msgIndexIdTag,
-                    sbe::value::isString(indexIdTag));
+                    str::stream() << "Index name is of wrong type: " << msgIdentTag,
+                    sbe::value::isString(identTag));
 
             const auto msgKsTag = ksTag;
             tassert(5290710,
@@ -764,18 +765,33 @@ bool indexKeyConsistencyCheckCallback(OperationContext* opCtx,
                     ksTag == sbe::value::TypeTags::ksValue);
 
             auto keyString = sbe::value::getKeyStringView(ksVal);
-            auto indexId = sbe::value::getStringView(indexIdTag, indexIdVal);
+            auto indexIdent = sbe::value::getStringView(identTag, identVal);
             tassert(5290712, "KeyString does not exist", keyString);
 
-            auto it = iamTable.find(indexId);
-            tassert(5290713,
-                    str::stream() << "IndexAccessMethod not found for index " << indexId,
-                    it != iamTable.end());
+            auto it = entryMap.find(indexIdent);
 
-            auto iam = it->second->asSortedData();
+            // If 'entryMap' doesn't contain an entry for 'indexIdent', create one.
+            if (it == entryMap.end()) {
+                auto indexCatalog = collection->getIndexCatalog();
+                auto indexDesc = indexCatalog->findIndexByIdent(opCtx, indexIdent);
+                auto entry = indexDesc ? indexDesc->getEntry() : nullptr;
+
+                // Throw an error if we can't get the IndexDescriptor or the IndexCatalogEntry
+                // (or if the index is dropped).
+                uassert(ErrorCodes::QueryPlanKilled,
+                        str::stream() << "query plan killed :: index dropped: " << indexIdent,
+                        indexDesc && entry && !entry->isDropped());
+
+                auto [newIt, _] = entryMap.emplace(indexIdent, entry);
+
+                it = newIt;
+            }
+
+            auto entry = it->second;
+            auto iam = entry->accessMethod()->asSortedData();
             tassert(5290709,
-                    str::stream() << "Expected to find SortedDataIndexAccessMethod for index "
-                                  << indexId,
+                    str::stream() << "Expected to find SortedDataIndexAccessMethod for index: "
+                                  << indexIdent,
                     iam);
 
             auto& executionCtx = StorageExecutionContext::get(opCtx);
@@ -802,6 +818,7 @@ bool indexKeyConsistencyCheckCallback(OperationContext* opCtx,
             return keys->count(*keyString);
         }
     }
+
     return true;
 }
 
@@ -812,11 +829,10 @@ std::unique_ptr<sbe::PlanStage> makeLoopJoinForFetch(std::unique_ptr<sbe::PlanSt
                                                      sbe::value::SlotVector fieldSlots,
                                                      sbe::value::SlotId seekKeySlot,
                                                      sbe::value::SlotId snapshotIdSlot,
-                                                     sbe::value::SlotId indexIdSlot,
+                                                     sbe::value::SlotId indexIdentSlot,
                                                      sbe::value::SlotId indexKeySlot,
                                                      sbe::value::SlotId indexKeyPatternSlot,
                                                      const CollectionPtr& collToFetch,
-                                                     StringMap<const IndexAccessMethod*> iamMap,
                                                      PlanNodeId planNodeId,
                                                      sbe::value::SlotVector slotsToForward) {
     // It is assumed that we are generating a fetch loop join over the main collection. If we are
@@ -824,19 +840,14 @@ std::unique_ptr<sbe::PlanStage> makeLoopJoinForFetch(std::unique_ptr<sbe::PlanSt
     // in the QSN tree to indicate which collection we are fetching over.
     tassert(6355301, "Cannot fetch from a collection that doesn't exist", collToFetch);
 
-    sbe::ScanCallbacks callbacks(
-        indexKeyCorruptionCheckCallback,
-        [iam = std::move(iamMap)](
-            auto&& arg1, auto&& arg2, auto&& arg3, auto&& arg4, auto&& arg5, auto&& arg6) {
-            return indexKeyConsistencyCheckCallback(arg1, iam, arg2, arg3, arg4, arg5, arg6);
-        });
+    sbe::ScanCallbacks callbacks(indexKeyCorruptionCheckCallback, indexKeyConsistencyCheckCallback);
 
     // Scan the collection in the range [seekKeySlot, Inf).
     auto scanStage = sbe::makeS<sbe::ScanStage>(collToFetch->uuid(),
                                                 resultSlot,
                                                 recordIdSlot,
                                                 snapshotIdSlot,
-                                                indexIdSlot,
+                                                indexIdentSlot,
                                                 indexKeySlot,
                                                 indexKeyPatternSlot,
                                                 boost::none,
@@ -854,7 +865,7 @@ std::unique_ptr<sbe::PlanStage> makeLoopJoinForFetch(std::unique_ptr<sbe::PlanSt
         std::move(inputStage),
         sbe::makeS<sbe::LimitSkipStage>(std::move(scanStage), 1, boost::none, planNodeId),
         std::move(slotsToForward),
-        sbe::makeSV(seekKeySlot, snapshotIdSlot, indexIdSlot, indexKeySlot, indexKeyPatternSlot),
+        sbe::makeSV(seekKeySlot, snapshotIdSlot, indexIdentSlot, indexKeySlot, indexKeyPatternSlot),
         nullptr,
         planNodeId);
 }

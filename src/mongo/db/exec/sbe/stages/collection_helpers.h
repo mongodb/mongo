@@ -40,8 +40,9 @@ namespace mongo::sbe {
  * A callback which gets called whenever a SCAN stage asks an underlying index scan for a result.
  */
 using IndexKeyConsistencyCheckCallback = std::function<bool(OperationContext* opCtx,
+                                                            StringMap<const IndexCatalogEntry*>&,
                                                             value::SlotAccessor* snapshotIdAccessor,
-                                                            value::SlotAccessor* indexIdAccessor,
+                                                            value::SlotAccessor* indexIdentAccessor,
                                                             value::SlotAccessor* indexKeyAccessor,
                                                             const CollectionPtr& collection,
                                                             const Record& nextRecord)>;

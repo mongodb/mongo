@@ -47,7 +47,7 @@ ScanStage::ScanStage(UUID collectionUuid,
                      boost::optional<value::SlotId> recordSlot,
                      boost::optional<value::SlotId> recordIdSlot,
                      boost::optional<value::SlotId> snapshotIdSlot,
-                     boost::optional<value::SlotId> indexIdSlot,
+                     boost::optional<value::SlotId> indexIdentSlot,
                      boost::optional<value::SlotId> indexKeySlot,
                      boost::optional<value::SlotId> indexKeyPatternSlot,
                      boost::optional<value::SlotId> oplogTsSlot,
@@ -67,7 +67,7 @@ ScanStage::ScanStage(UUID collectionUuid,
       _recordSlot(recordSlot),
       _recordIdSlot(recordIdSlot),
       _snapshotIdSlot(snapshotIdSlot),
-      _indexIdSlot(indexIdSlot),
+      _indexIdentSlot(indexIdentSlot),
       _indexKeySlot(indexKeySlot),
       _indexKeyPatternSlot(indexKeyPatternSlot),
       _oplogTsSlot(oplogTsSlot),
@@ -99,7 +99,7 @@ std::unique_ptr<PlanStage> ScanStage::clone() const {
                                        _recordSlot,
                                        _recordIdSlot,
                                        _snapshotIdSlot,
-                                       _indexIdSlot,
+                                       _indexIdentSlot,
                                        _indexKeySlot,
                                        _indexKeyPatternSlot,
                                        _oplogTsSlot,
@@ -163,8 +163,8 @@ void ScanStage::prepare(CompileCtx& ctx) {
         _snapshotIdAccessor = ctx.getAccessor(*_snapshotIdSlot);
     }
 
-    if (_indexIdSlot) {
-        _indexIdAccessor = ctx.getAccessor(*_indexIdSlot);
+    if (_indexIdentSlot) {
+        _indexIdentAccessor = ctx.getAccessor(*_indexIdentSlot);
     }
 
     if (_indexKeySlot) {
@@ -249,6 +249,7 @@ void ScanStage::doSaveState(bool relinquishCursor) {
         cursor->setSaveStorageCursorOnDetachFromOperationContext(!relinquishCursor);
     }
 
+    _indexCatalogEntryMap.clear();
     _coll.reset();
 }
 
@@ -467,9 +468,14 @@ PlanState ScanStage::getNext() {
     }
 
     // Return EOF if the index key is found to be inconsistent.
-    if (_scanCallbacks.indexKeyConsistencyCheckCallBack &&
-        !_scanCallbacks.indexKeyConsistencyCheckCallBack(
-            _opCtx, _snapshotIdAccessor, _indexIdAccessor, _indexKeyAccessor, _coll, *nextRecord)) {
+    if (_scanCallbacks.indexKeyConsistencyCheckCallback &&
+        !_scanCallbacks.indexKeyConsistencyCheckCallback(_opCtx,
+                                                         _indexCatalogEntryMap,
+                                                         _snapshotIdAccessor,
+                                                         _indexIdentAccessor,
+                                                         _indexKeyAccessor,
+                                                         _coll,
+                                                         *nextRecord)) {
         _priority.reset();
         return trackPlanState(PlanState::IS_EOF);
     }
@@ -574,6 +580,7 @@ void ScanStage::close() {
     auto optTimer(getOptTimer(_opCtx));
 
     trackClose();
+    _indexCatalogEntryMap.clear();
     _cursor.reset();
     _randomCursor.reset();
     _coll.reset();
@@ -600,8 +607,8 @@ std::unique_ptr<PlanStageStats> ScanStage::getStats(bool includeDebugInfo) const
         if (_snapshotIdSlot) {
             bob.appendNumber("snapshotIdSlot", static_cast<long long>(*_snapshotIdSlot));
         }
-        if (_indexIdSlot) {
-            bob.appendNumber("indexIdSlot", static_cast<long long>(*_indexIdSlot));
+        if (_indexIdentSlot) {
+            bob.appendNumber("indexIdentSlot", static_cast<long long>(*_indexIdentSlot));
         }
         if (_indexKeySlot) {
             bob.appendNumber("indexKeySlot", static_cast<long long>(*_indexKeySlot));
@@ -646,8 +653,8 @@ std::vector<DebugPrinter::Block> ScanStage::debugPrint() const {
         DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
     }
 
-    if (_indexIdSlot) {
-        DebugPrinter::addIdentifier(ret, _indexIdSlot.value());
+    if (_indexIdentSlot) {
+        DebugPrinter::addIdentifier(ret, _indexIdentSlot.value());
     } else {
         DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
     }
@@ -707,7 +714,7 @@ ParallelScanStage::ParallelScanStage(UUID collectionUuid,
                                      boost::optional<value::SlotId> recordSlot,
                                      boost::optional<value::SlotId> recordIdSlot,
                                      boost::optional<value::SlotId> snapshotIdSlot,
-                                     boost::optional<value::SlotId> indexIdSlot,
+                                     boost::optional<value::SlotId> indexIdentSlot,
                                      boost::optional<value::SlotId> indexKeySlot,
                                      boost::optional<value::SlotId> indexKeyPatternSlot,
                                      std::vector<std::string> fields,
@@ -721,7 +728,7 @@ ParallelScanStage::ParallelScanStage(UUID collectionUuid,
       _recordSlot(recordSlot),
       _recordIdSlot(recordIdSlot),
       _snapshotIdSlot(snapshotIdSlot),
-      _indexIdSlot(indexIdSlot),
+      _indexIdentSlot(indexIdentSlot),
       _indexKeySlot(indexKeySlot),
       _indexKeyPatternSlot(indexKeyPatternSlot),
       _fields(std::move(fields)),
@@ -737,7 +744,7 @@ ParallelScanStage::ParallelScanStage(const std::shared_ptr<ParallelState>& state
                                      boost::optional<value::SlotId> recordSlot,
                                      boost::optional<value::SlotId> recordIdSlot,
                                      boost::optional<value::SlotId> snapshotIdSlot,
-                                     boost::optional<value::SlotId> indexIdSlot,
+                                     boost::optional<value::SlotId> indexIdentSlot,
                                      boost::optional<value::SlotId> indexKeySlot,
                                      boost::optional<value::SlotId> indexKeyPatternSlot,
                                      std::vector<std::string> fields,
@@ -751,7 +758,7 @@ ParallelScanStage::ParallelScanStage(const std::shared_ptr<ParallelState>& state
       _recordSlot(recordSlot),
       _recordIdSlot(recordIdSlot),
       _snapshotIdSlot(snapshotIdSlot),
-      _indexIdSlot(indexIdSlot),
+      _indexIdentSlot(indexIdentSlot),
       _indexKeySlot(indexKeySlot),
       _indexKeyPatternSlot(indexKeyPatternSlot),
       _fields(std::move(fields)),
@@ -767,7 +774,7 @@ std::unique_ptr<PlanStage> ParallelScanStage::clone() const {
                                                _recordSlot,
                                                _recordIdSlot,
                                                _snapshotIdSlot,
-                                               _indexIdSlot,
+                                               _indexIdentSlot,
                                                _indexKeySlot,
                                                _indexKeyPatternSlot,
                                                _fields,
@@ -799,8 +806,8 @@ void ParallelScanStage::prepare(CompileCtx& ctx) {
         _snapshotIdAccessor = ctx.getAccessor(*_snapshotIdSlot);
     }
 
-    if (_indexIdSlot) {
-        _indexIdAccessor = ctx.getAccessor(*_indexIdSlot);
+    if (_indexIdentSlot) {
+        _indexIdentAccessor = ctx.getAccessor(*_indexIdentSlot);
     }
 
     if (_indexKeySlot) {
@@ -871,6 +878,7 @@ void ParallelScanStage::doSaveState(bool relinquishCursor) {
         _cursor->save();
     }
 
+    _indexCatalogEntryMap.clear();
     _coll.reset();
 }
 
@@ -1028,10 +1036,11 @@ PlanState ParallelScanStage::getNext() {
         }
 
         // Return EOF if the index key is found to be inconsistent.
-        if (_scanCallbacks.indexKeyConsistencyCheckCallBack &&
-            !_scanCallbacks.indexKeyConsistencyCheckCallBack(_opCtx,
+        if (_scanCallbacks.indexKeyConsistencyCheckCallback &&
+            !_scanCallbacks.indexKeyConsistencyCheckCallback(_opCtx,
+                                                             _indexCatalogEntryMap,
                                                              _snapshotIdAccessor,
-                                                             _indexIdAccessor,
+                                                             _indexIdentAccessor,
                                                              _indexKeyAccessor,
                                                              _coll,
                                                              *nextRecord)) {
@@ -1085,6 +1094,7 @@ void ParallelScanStage::close() {
     auto optTimer(getOptTimer(_opCtx));
 
     trackClose();
+    _indexCatalogEntryMap.clear();
     _cursor.reset();
     _coll.reset();
     _open = false;
@@ -1120,8 +1130,8 @@ std::vector<DebugPrinter::Block> ParallelScanStage::debugPrint() const {
         DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
     }
 
-    if (_indexIdSlot) {
-        DebugPrinter::addIdentifier(ret, _indexIdSlot.value());
+    if (_indexIdentSlot) {
+        DebugPrinter::addIdentifier(ret, _indexIdentSlot.value());
     } else {
         DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
     }

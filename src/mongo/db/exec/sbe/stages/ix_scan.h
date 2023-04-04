@@ -47,7 +47,8 @@ namespace mongo::sbe {
  * The "output" slots are
  *   - 'indexKeySlot': the "KeyString" representing the index entry,
  *   - 'recordIdSlot': a reference that can be used to fetch the entire document,
- *   - 'snapshotIdSlot': the storage snapshot that this index scan is reading from, and
+ *   - 'snapshotIdSlot': the storage snapshot that this index scan is reading from,
+ *   - 'indexIdentSlot': the ident of the index being read from, and
  *   - 'vars': one slot for each value in the index key that should be "projected" out of the entry.
  *
  * The 'indexKeysToInclude' bitset determines which values are included in the projection based
@@ -66,6 +67,7 @@ public:
                        boost::optional<value::SlotId> indexKeySlot,
                        boost::optional<value::SlotId> recordIdSlot,
                        boost::optional<value::SlotId> snapshotIdSlot,
+                       boost::optional<value::SlotId> indexIdentSlot,
                        IndexKeysInclusionSet indexKeysToInclude,
                        value::SlotVector vars,
                        PlanYieldPolicy* yieldPolicy,
@@ -132,6 +134,7 @@ protected:
     const boost::optional<value::SlotId> _indexKeySlot;
     const boost::optional<value::SlotId> _recordIdSlot;
     const boost::optional<value::SlotId> _snapshotIdSlot;
+    const boost::optional<value::SlotId> _indexIdentSlot;
     const IndexKeysInclusionSet _indexKeysToInclude;
     const value::SlotVector _vars;
 
@@ -148,6 +151,9 @@ protected:
     std::unique_ptr<value::OwnedValueAccessor> _recordIdAccessor;
     std::unique_ptr<value::OwnedValueAccessor> _snapshotIdAccessor;
 
+    value::OwnedValueAccessor _indexIdentAccessor;
+    value::ViewOfValueAccessor _indexIdentViewAccessor;
+
     // This field holds the latest snapshot ID that we've received from _opCtx->recoveryUnit().
     // This field gets initialized by prepare(), and it gets updated each time doRestoreState() is
     // called.
@@ -160,7 +166,6 @@ protected:
 
     std::unique_ptr<SortedDataInterface::Cursor> _cursor;
     const IndexCatalogEntry* _entry{nullptr};
-    std::string _indexIdent;
     boost::optional<Ordering> _ordering{boost::none};
     boost::optional<KeyStringEntry> _nextRecord;
 
@@ -191,12 +196,11 @@ protected:
  *
  * Debug string representation:
  *
- *   ixscan indexKeySlot? recordIdSlot? snapshotIdSlot? [slot_1 = fieldNo_1, ..., slot2 = fieldNo_n]
- *                      collectionUuid indexName forward
+ *   ixscan indexKeySlot? recordIdSlot? snapshotIdSlot? indexIdentSlot?
+ *          [slot_1 = fieldNo_1, ..., slot2 = fieldNo_n] collectionUuid indexName forward
  *
- *   ixseek lowKey highKey indexKeySlot? recordIdSlot? snapshotIdSlot?
- *          [slot_1 = fieldNo_1, ..., slot2 = fieldNo_n]
- *          collectionUuid indexName forward
+ *   ixseek lowKey highKey indexKeySlot? recordIdSlot? snapshotIdSlot? indexIdentSlot?
+ *          [slot_1 = fieldNo_1, ..., slot2 = fieldNo_n] collectionUuid indexName forward
  */
 class SimpleIndexScanStage final : public IndexScanStageBase {
 public:
@@ -206,6 +210,7 @@ public:
                          boost::optional<value::SlotId> indexKeySlot,
                          boost::optional<value::SlotId> recordIdSlot,
                          boost::optional<value::SlotId> snapshotIdSlot,
+                         boost::optional<value::SlotId> indexIdentSlot,
                          IndexKeysInclusionSet indexKeysToInclude,
                          value::SlotVector vars,
                          std::unique_ptr<EExpression> seekKeyLow,
@@ -255,9 +260,8 @@ private:
  *
  * Debug string representation:
  *
- *   ixscan_generic indexBounds indexKeySlot? recordIdSlot? snapshotIdSlot?
- *                  [slot_1 = fieldNo_1, ..., slot2 = fieldNo_n]
- *                  collectionUuid indexName forward
+ *   ixscan_generic indexBounds indexKeySlot? recordIdSlot? snapshotIdSlot? indexIdentSlot?
+ *                  [slot_1 = fieldNo_1, ..., slot2 = fieldNo_n] collectionUuid indexName forward
  */
 struct GenericIndexScanStageParams {
     std::unique_ptr<EExpression> indexBounds;
@@ -274,6 +278,7 @@ public:
                           boost::optional<value::SlotId> indexKeySlot,
                           boost::optional<value::SlotId> recordIdSlot,
                           boost::optional<value::SlotId> snapshotIdSlot,
+                          boost::optional<value::SlotId> indexIdentSlot,
                           IndexKeysInclusionSet indexKeysToInclude,
                           value::SlotVector vars,
                           PlanYieldPolicy* yieldPolicy,
