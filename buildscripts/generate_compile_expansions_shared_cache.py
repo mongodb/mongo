@@ -96,7 +96,7 @@ def generate_scons_cache_expansions():
         if sys.platform.startswith("win"):
             shared_mount_root = 'X:\\'
         else:
-            shared_mount_root = '/efs'
+            shared_mount_root = '/efs/scons'
         default_cache_path = os.path.join(shared_mount_root, system_uuid, "scons-cache")
         expansions["scons_cache_path"] = default_cache_path
         # Patches are read only, unless they are for a commit queue merge.
