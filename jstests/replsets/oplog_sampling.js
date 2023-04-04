@@ -29,12 +29,36 @@ assert.gt(res.oplogTruncation.totalTimeProcessingMicros, 0);
 assert.eq(res.oplogTruncation.processingMethod, "scanning");
 
 // Insert enough documents to force oplog sampling to occur on the following start up.
+// Ensure that fast count of oplog collection increases while we insert the documents.
+const oplogColl = replSet.getPrimary().getDB("local").getCollection("oplog.rs");
+let oplogFastCount = oplogColl.count();
 const maxOplogDocsForScanning = 2000;
+jsTestLog("Inserting " + maxOplogDocsForScanning + " documents to force oplog sampling on restart");
 for (let i = 0; i < maxOplogDocsForScanning + 1; i++) {
-    assert.commandWorked(coll.insert({m: 1 + i}));
+    let doc = {m: 1 + i};
+    assert.commandWorked(coll.insert(doc), "failed to insert " + tojson(doc));
+
+    let newOplogFastCount = oplogColl.count();
+    assert.gt(
+        newOplogFastCount,
+        oplogFastCount,
+        "fast count of oplog collection did not increase after successfully inserting " +
+            tojson(doc) + ". Previous fast count of oplog: " + oplogFastCount +
+            ". New fast count: " + newOplogFastCount + ". Last 5 oplog entries: " +
+            tojson(replSet.findOplog(replSet.getPrimary(), /*query=*/{}, /*limit=*/5).toArray()));
+    oplogFastCount = newOplogFastCount;
 }
 
+// Do not proceed with test if the oplog collection has a lower than expected fast count that
+// will result in an oplog scan on restart.
+assert.gt(
+    oplogFastCount,
+    maxOplogDocsForScanning,
+    "fast count of oplog collection is not large enough to trigger oplog sampling on restart");
+
 // Restart replica set to load entries from the oplog for sampling.
+jsTestLog("Inserted " + maxOplogDocsForScanning + " documents. Oplog fast count: " +
+          oplogFastCount + ". Restarting server to force oplog sampling.");
 replSet.stopSet(null /* signal */, true /* forRestart */);
 replSet.startSet({restart: true});
 
