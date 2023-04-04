@@ -346,7 +346,7 @@ public:
 
             // TODO SERVER-68373: Remove once 7.0 becomes last LTS
             if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) &&
-                gFeatureFlagFLE2ProtocolVersion2.isEnabledOnVersion(requestedVersion)) {
+                mongo::gFeatureFlagFLE2CompactForProtocolV2.isEnabledOnVersion(requestedVersion)) {
                 ShardingDDLCoordinatorService::getService(opCtx)
                     ->waitForCoordinatorsOfGivenTypeToComplete(
                         opCtx,
@@ -559,8 +559,8 @@ public:
         // TODO SERVER-68373: Remove once 7.0 becomes last LTS
         if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) &&
             requestedVersion > actualVersion &&
-            gFeatureFlagFLE2ProtocolVersion2.isEnabledOnTargetFCVButDisabledOnOriginalFCV(
-                requestedVersion, actualVersion)) {
+            mongo::gFeatureFlagFLE2CompactForProtocolV2
+                .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion, actualVersion)) {
             ShardingDDLCoordinatorService::getService(opCtx)
                 ->waitForCoordinatorsOfGivenTypeToComplete(
                     opCtx, DDLCoordinatorTypeEnum::kCompactStructuredEncryptionDataPre70Compatible);
@@ -639,8 +639,8 @@ private:
 
         // TODO SERVER-68373 remove once 7.0 becomes last LTS
         if (isDowngrading &&
-            gFeatureFlagFLE2ProtocolVersion2.isDisabledOnTargetFCVButEnabledOnOriginalFCV(
-                requestedVersion, originalVersion)) {
+            mongo::gFeatureFlagFLE2CompactForProtocolV2
+                .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion, originalVersion)) {
             // Drain the QE compact coordinator because it persists state that is
             // not backwards compatible with earlier versions.
             ShardingDDLCoordinatorService::getService(opCtx)

@@ -49,10 +49,6 @@ using TagMap = std::map<std::pair<StringData, int>, std::vector<PrfBlock>>;
 class MockServerRewrite : public QueryRewriterInterface {
 public:
     MockServerRewrite() : _expCtx((new ExpressionContextForTest())) {
-        if (!gFeatureFlagFLE2ProtocolVersion2.isEnabledAndIgnoreFCVUnsafe()) {
-            _mockOptionalNss = NamespaceString({"mock"_sd});
-            return;
-        }
         _mockOptionalNss = boost::none;
     }
     EncryptedCollScanMode getEncryptedCollScanMode() const override {
@@ -71,9 +67,6 @@ public:
     };
     const NamespaceString& getESCNss() const override {
         return _mockNss;
-    }
-    const boost::optional<NamespaceString>& getECCNss() const override {
-        return _mockOptionalNss;
     }
 
 

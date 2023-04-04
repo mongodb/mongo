@@ -67,7 +67,6 @@ public:
     virtual ~QueryRewriterInterface() {}
     virtual FLETagQueryInterface* getTagQueryInterface() const = 0;
     virtual const NamespaceString& getESCNss() const = 0;
-    virtual const boost::optional<NamespaceString>& getECCNss() const = 0;
 
     virtual EncryptedCollScanMode getEncryptedCollScanMode() const = 0;
     virtual ExpressionContext* getExpressionContext() const = 0;

@@ -223,23 +223,10 @@ bool doRenameOperation(const CompactionState& state,
 
 CompactStats doCompactOperationPre70Compatible(
     const CompactStructuredEncryptionDataStatePre70Compatible& state) {
-    if (state.getSkipCompact()) {
-        LOGV2_DEBUG(6517005, 1, "Skipping compaction");
-        CompactStats stats({}, {});
-        stats.setEcc({});
-        return stats;
-    }
-
-    EncryptedStateCollectionsNamespaces namespaces;
-    namespaces.edcNss = state.getId().getNss();
-    namespaces.eccNss = state.getEccNss();
-    namespaces.escNss = state.getEscNss();
-    namespaces.ecocNss = state.getEcocNss();
-    namespaces.ecocRenameNss = state.getEcocRenameNss();
-    auto opCtx = cc().makeOperationContext();
-    CompactStructuredEncryptionData request(namespaces.edcNss, state.getCompactionTokens());
-
-    return processFLECompact(opCtx.get(), request, &getTransactionWithRetriesForMongoS, namespaces);
+    LOGV2_DEBUG(6517005, 1, "Skipping compaction");
+    CompactStats stats({}, {});
+    stats.setEcc({});
+    return stats;
 }
 
 void doCompactOperation(const CompactStructuredEncryptionDataState& state,

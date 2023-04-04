@@ -61,10 +61,10 @@ feature_flags:
         version: 6.2
         cpp_varname: gFeatureFlagFLE2Range
         default: true
-    featureFlagFLE2ProtocolVersion2:
+    featureFlagFLE2CompactForProtocolV2:
         description: "Enable support for version 2 of Queryable Encryption wire protocol"
         version: 7.0
-        cpp_varname: gFeatureFlagFLE2ProtocolVersion2
+        cpp_varname: gFeatureFlagFLE2CompactForProtocolV2
         default: true
     featureFlagFLE2CleanupCommand:
         description: "Enable support for the Cleanup Structured Encryption Data command"

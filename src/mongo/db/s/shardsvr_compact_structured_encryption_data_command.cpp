@@ -82,7 +82,6 @@ public:
         using InvocationBase::InvocationBase;
 
         Reply typedRun(OperationContext* opCtx) {
-            bool useV1Protocol = false;
 
             CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
 
@@ -90,38 +89,19 @@ public:
                 [&]() -> std::shared_ptr<ShardingDDLCoordinatorService::Instance> {
                 FixedFCVRegion fixedFcvRegion(opCtx);
 
-                useV1Protocol = !gFeatureFlagFLE2ProtocolVersion2.isEnabled(
-                    serverGlobalParams.featureCompatibility);
-                if (useV1Protocol) {
-                    auto compact = makeRequestV1(opCtx);
-                    if (!compact) {
-                        return nullptr;
-                    }
-                    return ShardingDDLCoordinatorService::getService(opCtx)->getOrCreateInstance(
-                        opCtx, compact->toBSON());
-                }
+                // TODO: SERVER-68373 Remove once 7.0 becomes last LTS
+                uassert(7330300,
+                        "The preview version of compactStructuredEncryptionData is no longer "
+                        "supported in this binary version",
+                        gFeatureFlagFLE2CompactForProtocolV2.isEnabled(
+                            serverGlobalParams.featureCompatibility));
+
 
                 auto compact = makeRequest(opCtx);
                 return ShardingDDLCoordinatorService::getService(opCtx)->getOrCreateInstance(
                     opCtx, compact.toBSON());
             }();
 
-            if (!compactCoordinator) {
-                // Nothing to do.
-                LOGV2(6548305, "Skipping compaction as there is no ECOC collection to compact");
-                CompactStats stats({}, {});
-                if (useV1Protocol) {
-                    stats.setEcc(ECStats{});
-                }
-                return stats;
-            }
-
-            if (useV1Protocol) {
-                return checked_pointer_cast<
-                           CompactStructuredEncryptionDataCoordinatorPre70Compatible>(
-                           compactCoordinator)
-                    ->getResponse(opCtx);
-            }
             return checked_pointer_cast<CompactStructuredEncryptionDataCoordinator>(
                        compactCoordinator)
                 ->getResponse(opCtx);
@@ -158,58 +138,6 @@ public:
             compact.setShardingDDLCoordinatorMetadata(
                 {{nss, DDLCoordinatorTypeEnum::kCompactStructuredEncryptionData}});
             compact.setEscNss(namespaces.escNss);
-            compact.setEcocNss(namespaces.ecocNss);
-            compact.setEcocRenameNss(namespaces.ecocRenameNss);
-            compact.setCompactionTokens(req.getCompactionTokens().getOwned());
-
-            return compact;
-        }
-
-        // TODO: SERVER-68373 Remove once 7.0 becomes last LTS
-        boost::optional<CompactStructuredEncryptionDataStatePre70Compatible> makeRequestV1(
-            OperationContext* opCtx) {
-            const auto& req = request();
-            const auto& nss = req.getNamespace();
-
-            AutoGetCollection baseColl(opCtx, nss, MODE_IX);
-            uassert(ErrorCodes::NamespaceNotFound,
-                    str::stream() << "Unknown collection: " << nss,
-                    baseColl.getCollection());
-
-            validateCompactRequest(req, *(baseColl.getCollection().get()));
-
-            auto namespaces =
-                uassertStatusOK(EncryptedStateCollectionsNamespaces::createFromDataCollection(
-                    *(baseColl.getCollection().get())));
-
-            AutoGetCollection ecocColl(opCtx, namespaces.ecocNss, MODE_IX);
-            AutoGetCollection ecocTempColl(opCtx, namespaces.ecocRenameNss, MODE_IX);
-
-            if (!ecocColl.getCollection() && !ecocTempColl.getCollection()) {
-                return boost::none;
-            }
-
-            CompactStructuredEncryptionDataStatePre70Compatible compact;
-            auto coordinatorType =
-                DDLCoordinatorTypeEnum::kCompactStructuredEncryptionDataPre70Compatible;
-
-            if (!gFeatureFlagUseNewCompactStructuredEncryptionDataCoordinator.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
-                // TODO SERVER-68373 remove once 7.0 becomes last LTS
-                coordinatorType =
-                    DDLCoordinatorTypeEnum::kCompactStructuredEncryptionDataPre61Compatible;
-            }
-
-            if (ecocColl.getCollection()) {
-                compact.setEcocUuid(ecocColl->uuid());
-            }
-            if (ecocTempColl.getCollection()) {
-                compact.setEcocRenameUuid(ecocTempColl->uuid());
-            }
-
-            compact.setShardingDDLCoordinatorMetadata({{nss, coordinatorType}});
-            compact.setEscNss(namespaces.escNss);
-            compact.setEccNss(namespaces.eccNss);
             compact.setEcocNss(namespaces.ecocNss);
             compact.setEcocRenameNss(namespaces.ecocRenameNss);
             compact.setCompactionTokens(req.getCompactionTokens().getOwned());

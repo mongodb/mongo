@@ -365,16 +365,6 @@ TEST(FLETokens, TestVectorUnindexedValueDecryption) {
     // Unindexed field decryption
     // Encryption can not be generated using test vectors because IV is random
     TestKeyVault keyVault;
-    {
-        const std::string uxCiphertext = hexblob::decode(
-            "06ABCDEFAB12349876123412345678901202F2CE7FDD0DECD5442CC98C10B9138741785173E323132982740496768877A3BA46581CED4A34031B1174B5C524C15BAAE687F88C29FC71F40A32BCD53D63CDA0A6646E8677E167BB3A933529F5B519CFE255BBC323D943B4F105"_sd);
-        auto [uxBsonType, uxPlaintext] =
-            FLE2UnindexedEncryptedValue::deserialize(&keyVault, ConstDataRange(uxCiphertext));
-        ASSERT_EQUALS(uxBsonType, BSONType::String);
-        ASSERT_EQUALS(
-            hexblob::encode(uxPlaintext.data(), uxPlaintext.size()),
-            "260000004C6F7279207761732061206D6F75736520696E2061206269672062726F776E20686F75736500");
-    }
 
     {
         const std::string uxCiphertext = hexblob::decode(
@@ -388,36 +378,6 @@ TEST(FLETokens, TestVectorUnindexedValueDecryption) {
     }
 }
 
-TEST(FLETokens, TestVectorIndexedValueDecryption) {
-    // Equality indexed field decryption
-    // Encryption can not be generated using test vectors because IV is random
-
-    const std::string ixCiphertext = hexblob::decode(
-        "000000000000000000000000000000000297044B8E1B5CF4F9052EDB50236A343597C418A74352F98357A77E0D4299C04151CBEC24A5D5349A5A5EAA1FE334154FEEB6C8E7BD636089904F76950B2184D146792CBDF9179FFEDDB7D90FC257BB13DCB3E731182A447E2EF1BE7A2AF13DC9362701BABDE0B5E78CF4A92227D5B5D1E1556E75BAB5B4E9F5CEFEA3BA3E3D5D31D11B20619437A30550EFF5B602357567CF05058E4F84A103293F70302F3A50667642DD0325D194A197"_sd);
-    ServerDataEncryptionLevel1Token serverEncryptToken(
-        decodePrf("EB9A73F7912D86A4297E81D2F675AF742874E4057E3A890FEC651A23EEE3F3EC"_sd));
-
-    auto swServerPayload = FLE2IndexedEqualityEncryptedValue::decryptAndParse(
-        serverEncryptToken, ConstDataRange(ixCiphertext));
-    ASSERT_OK(swServerPayload.getStatus());
-
-    auto cdrEqualHex = [](ConstDataRange cdr, const StringData hex) -> bool {
-        const std::string s = hexblob::decode(hex);
-        return cdr.length() == s.size() && std::equal(s.begin(), s.end(), cdr.data<char>());
-    };
-
-    auto sp = swServerPayload.getValue();
-    ASSERT(cdrEqualHex(sp.edc.toCDR(),
-                       "97C8DFE394D80A4EE335E3F9FDC024D18BE4B92F9444FCA316FF9896D7BF455D"_sd));
-    ASSERT(cdrEqualHex(sp.esc.toCDR(),
-                       "EBB22F74BE0FA4AD863188D3F33AF0B95CB4CA4ED0091E1A43513DB20E9D59AE"_sd));
-    ASSERT(cdrEqualHex(sp.ecc.toCDR(),
-                       "A1DF0BB04C977BD4BC0B487FFFD2E3BBB96078354DE9F204EE5872BB10F01971"_sd));
-    ASSERT_EQ(sp.count, 123456);
-    ASSERT(cdrEqualHex(
-        sp.clientEncryptedValue,
-        "260000004C6F7279207761732061206D6F75736520696E2061206269672062726F776E20686F75736500"_sd));
-}
 
 TEST(FLETokens, TestVectorESCCollectionDecryptDocument) {
     ESCTwiceDerivedTagToken escTwiceTag(
@@ -1969,163 +1929,6 @@ TEST(FLE_EDC, ServerSide_Payloads_V2_IsValidZerosBlob) {
     ASSERT_FALSE(FLE2TagAndEncryptedMetadataBlock::isValidZerosBlob(zeros));
 }
 
-TEST(FLE_EDC, ServerSide_Payloads) {
-    TestKeyVault keyVault;
-
-    auto doc = BSON("sample" << 123456);
-    auto element = doc.firstElement();
-
-    auto value = ConstDataRange(element.value(), element.value() + element.valuesize());
-
-    auto collectionToken = FLELevel1TokenGenerator::generateCollectionsLevel1Token(getIndexKey());
-    auto serverEncryptToken =
-        FLELevel1TokenGenerator::generateServerDataEncryptionLevel1Token(getIndexKey());
-    auto edcToken = FLECollectionTokenGenerator::generateEDCToken(collectionToken);
-    auto escToken = FLECollectionTokenGenerator::generateESCToken(collectionToken);
-    auto eccToken = FLECollectionTokenGenerator::generateECCToken(collectionToken);
-    auto ecocToken = FLECollectionTokenGenerator::generateECOCToken(collectionToken);
-
-    FLECounter counter = 0;
-
-
-    EDCDerivedFromDataToken edcDatakey =
-        FLEDerivedFromDataTokenGenerator::generateEDCDerivedFromDataToken(edcToken, value);
-    ESCDerivedFromDataToken escDatakey =
-        FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(escToken, value);
-    ECCDerivedFromDataToken eccDatakey =
-        FLEDerivedFromDataTokenGenerator::generateECCDerivedFromDataToken(eccToken, value);
-
-
-    ESCDerivedFromDataTokenAndContentionFactorToken escDataCounterkey =
-        FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
-            generateESCDerivedFromDataTokenAndContentionFactorToken(escDatakey, counter);
-    ECCDerivedFromDataTokenAndContentionFactorToken eccDataCounterkey =
-        FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
-            generateECCDerivedFromDataTokenAndContentionFactorToken(eccDatakey, counter);
-
-    FLE2InsertUpdatePayload iupayload;
-
-
-    iupayload.setEdcDerivedToken(edcDatakey.toCDR());
-    iupayload.setEscDerivedToken(escDatakey.toCDR());
-    iupayload.setEccDerivedToken(eccDatakey.toCDR());
-    iupayload.setServerEncryptionToken(serverEncryptToken.toCDR());
-
-    auto swEncryptedTokens =
-        EncryptedStateCollectionTokens(escDataCounterkey, eccDataCounterkey).serialize(ecocToken);
-    uassertStatusOK(swEncryptedTokens);
-    iupayload.setEncryptedTokens(swEncryptedTokens.getValue());
-    iupayload.setValue(value);
-    iupayload.setType(element.type());
-
-    FLE2IndexedEqualityEncryptedValue serverPayload(iupayload, 123456);
-
-    auto swBuf = serverPayload.serialize(serverEncryptToken);
-    ASSERT_OK(swBuf.getStatus());
-
-    auto swServerPayload =
-        FLE2IndexedEqualityEncryptedValue::decryptAndParse(serverEncryptToken, swBuf.getValue());
-
-    ASSERT_OK(swServerPayload.getStatus());
-    auto sp = swServerPayload.getValue();
-    ASSERT_EQ(sp.edc, serverPayload.edc);
-    ASSERT_EQ(sp.esc, serverPayload.esc);
-    ASSERT_EQ(sp.ecc, serverPayload.ecc);
-    ASSERT_EQ(sp.count, serverPayload.count);
-    ASSERT(sp.clientEncryptedValue == serverPayload.clientEncryptedValue);
-    ASSERT_EQ(serverPayload.clientEncryptedValue.size(), value.length());
-    ASSERT(std::equal(serverPayload.clientEncryptedValue.begin(),
-                      serverPayload.clientEncryptedValue.end(),
-                      value.data<uint8_t>()));
-}
-
-TEST(FLE_EDC, ServerSide_Range_Payloads) {
-    TestKeyVault keyVault;
-
-    auto doc = BSON("sample" << 3);
-    auto element = doc.firstElement();
-
-    auto value = ConstDataRange(element.value(), element.value() + element.valuesize());
-
-    auto collectionToken = FLELevel1TokenGenerator::generateCollectionsLevel1Token(getIndexKey());
-    auto serverEncryptToken =
-        FLELevel1TokenGenerator::generateServerDataEncryptionLevel1Token(getIndexKey());
-    auto edcToken = FLECollectionTokenGenerator::generateEDCToken(collectionToken);
-    auto escToken = FLECollectionTokenGenerator::generateESCToken(collectionToken);
-    auto eccToken = FLECollectionTokenGenerator::generateECCToken(collectionToken);
-    auto ecocToken = FLECollectionTokenGenerator::generateECOCToken(collectionToken);
-
-    FLECounter counter = 0;
-
-
-    EDCDerivedFromDataToken edcDatakey =
-        FLEDerivedFromDataTokenGenerator::generateEDCDerivedFromDataToken(edcToken, value);
-    ESCDerivedFromDataToken escDatakey =
-        FLEDerivedFromDataTokenGenerator::generateESCDerivedFromDataToken(escToken, value);
-    ECCDerivedFromDataToken eccDatakey =
-        FLEDerivedFromDataTokenGenerator::generateECCDerivedFromDataToken(eccToken, value);
-
-
-    ESCDerivedFromDataTokenAndContentionFactorToken escDataCounterkey =
-        FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
-            generateESCDerivedFromDataTokenAndContentionFactorToken(escDatakey, counter);
-    ECCDerivedFromDataTokenAndContentionFactorToken eccDataCounterkey =
-        FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
-            generateECCDerivedFromDataTokenAndContentionFactorToken(eccDatakey, counter);
-
-    FLE2InsertUpdatePayload iupayload;
-
-
-    iupayload.setEdcDerivedToken(edcDatakey.toCDR());
-    iupayload.setEscDerivedToken(escDatakey.toCDR());
-    iupayload.setEccDerivedToken(eccDatakey.toCDR());
-    iupayload.setServerEncryptionToken(serverEncryptToken.toCDR());
-
-    auto swEncryptedTokens =
-        EncryptedStateCollectionTokens(escDataCounterkey, eccDataCounterkey).serialize(ecocToken);
-    uassertStatusOK(swEncryptedTokens);
-    iupayload.setEncryptedTokens(swEncryptedTokens.getValue());
-    iupayload.setValue(value);
-    iupayload.setType(element.type());
-
-    std::vector<EdgeTokenSet> tokens;
-    EdgeTokenSet ets;
-    ets.setEdcDerivedToken(edcDatakey.toCDR());
-    ets.setEscDerivedToken(escDatakey.toCDR());
-    ets.setEccDerivedToken(eccDatakey.toCDR());
-    ets.setEncryptedTokens(swEncryptedTokens.getValue());
-
-    tokens.push_back(ets);
-    tokens.push_back(ets);
-
-    iupayload.setEdgeTokenSet(tokens);
-
-    FLE2IndexedRangeEncryptedValue serverPayload(iupayload, {123456, 123456});
-
-    auto swBuf = serverPayload.serialize(serverEncryptToken);
-    ASSERT_OK(swBuf.getStatus());
-
-    auto swServerPayload =
-        FLE2IndexedRangeEncryptedValue::decryptAndParse(serverEncryptToken, swBuf.getValue());
-
-    ASSERT_OK(swServerPayload.getStatus());
-    auto sp = swServerPayload.getValue();
-    ASSERT_EQ(sp.tokens.size(), 2);
-    for (size_t i = 0; i < sp.tokens.size(); i++) {
-        auto ets = sp.tokens[i];
-        auto rhs = serverPayload.tokens[i];
-        ASSERT_EQ(ets.edc, rhs.edc);
-        ASSERT_EQ(ets.esc, rhs.esc);
-        ASSERT_EQ(ets.ecc, rhs.ecc);
-        ASSERT_EQ(sp.counters[i], serverPayload.counters[i]);
-    }
-
-    ASSERT(sp.clientEncryptedValue == serverPayload.clientEncryptedValue);
-    ASSERT_EQ(serverPayload.clientEncryptedValue.size(), value.length());
-    ASSERT(std::equal(serverPayload.clientEncryptedValue.begin(),
-                      serverPayload.clientEncryptedValue.end(),
-                      value.data<uint8_t>()));
-}
 
 TEST(FLE_EDC, ServerSide_Range_Payloads_V2) {
     TestKeyVault keyVault;
@@ -2411,7 +2214,6 @@ TEST(EncryptionInformation, BadSchema) {
 }
 
 TEST(EncryptionInformation, MissingStateCollection) {
-    RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
     NamespaceString ns = NamespaceString::createNamespaceString_forTest("test.test");
 
     {
@@ -2509,58 +2311,6 @@ TEST(IndexedFields, DuplicateIndexKeyIds) {
     ASSERT_THROWS_CODE(encryptDocument(builder.obj(), &keyVault), DBException, 6371407);
 }
 
-TEST(DeleteTokens, Basic) {
-    TestKeyVault keyVault;
-    NamespaceString ns = NamespaceString::createNamespaceString_forTest("test.test");
-    EncryptedFieldConfig efc = getTestEncryptedFieldConfig();
-
-    auto obj =
-        EncryptionInformationHelpers::encryptionInformationSerializeForDelete(ns, efc, &keyVault);
-
-    std::cout << "Tokens" << obj << std::endl;
-}
-
-TEST(DeleteTokens, Fetch) {
-    TestKeyVault keyVault;
-    NamespaceString ns = NamespaceString::createNamespaceString_forTest("test.test");
-    EncryptedFieldConfig efc = getTestEncryptedFieldConfig();
-
-    auto obj =
-        EncryptionInformationHelpers::encryptionInformationSerializeForDelete(ns, efc, &keyVault);
-
-    auto tokenMap = EncryptionInformationHelpers::getDeleteTokens(
-        ns, EncryptionInformation::parse(IDLParserContext("foo"), obj));
-
-    ASSERT_EQ(tokenMap.size(), 2);
-
-    ASSERT(tokenMap.contains("nested.encrypted"));
-    ASSERT(tokenMap.contains("encrypted"));
-}
-
-TEST(DeleteTokens, CorruptDelete) {
-    TestKeyVault keyVault;
-    NamespaceString ns = NamespaceString::createNamespaceString_forTest("test.test");
-    EncryptedFieldConfig efc = getTestEncryptedFieldConfig();
-
-    EncryptionInformation ei;
-    ei.setType(1);
-
-    ei.setSchema(BSON(ns.toString() << efc.toBSON()));
-
-    // Missing Delete tokens
-    ASSERT_THROWS_CODE(EncryptionInformationHelpers::getDeleteTokens(ns, ei), DBException, 6371308);
-
-    // NSS map is not an object
-    ei.setDeleteTokens(BSON(ns.toString() << "str"));
-
-    ASSERT_THROWS_CODE(EncryptionInformationHelpers::getDeleteTokens(ns, ei), DBException, 6371309);
-
-    // Tokens is not a map
-    ei.setDeleteTokens(BSON(ns.toString() << BSON("a"
-                                                  << "b")));
-
-    ASSERT_THROWS_CODE(EncryptionInformationHelpers::getDeleteTokens(ns, ei), DBException, 6371310);
-}
 
 // Verify we can compare two list of tags correctly
 TEST(TagDelta, Basic) {
@@ -2649,20 +2399,6 @@ TEST(EDC, UnindexedEncryptDecrypt) {
     auto const elementData =
         std::vector<uint8_t>(element.value(), element.value() + element.valuesize());
 
-    {
-        auto blob = FLE2UnindexedEncryptedValue::serialize(userKey, element);
-        ASSERT_EQ(blob[0], 6);
-
-        // assert length of ciphertext (including HMAC & IV) is consistent with CTR mode
-        auto cipherTextLen = blob.size() - FLE2UnindexedEncryptedValue::assocDataSize;
-        ASSERT_EQ(cipherTextLen,
-                  crypto::fle2AeadCipherOutputLength(elementData.size(), crypto::aesMode::ctr));
-
-        auto [type, plainText] = FLE2UnindexedEncryptedValue::deserialize(&keyVault, {blob});
-        ASSERT_EQ(type, element.type());
-        ASSERT_TRUE(
-            std::equal(plainText.begin(), plainText.end(), elementData.begin(), elementData.end()));
-    }
     {
         auto blob = FLE2UnindexedEncryptedValueV2::serialize(userKey, element);
         ASSERT_EQ(blob[0], 16);
@@ -3124,43 +2860,6 @@ std::vector<ECCDocument> pairsToECCDocuments(
     return output;
 }
 
-TEST(CompactionHelpersTest, mergeECCDocumentsTest) {
-    std::vector<ECCDocument> input, output, expected;
-
-    // Test empty input
-    output = CompactionHelpers::mergeECCDocuments(input);
-    ASSERT(output.empty());
-
-    // Test single pair
-    input = pairsToECCDocuments({{15, 20}});
-    output = CompactionHelpers::mergeECCDocuments(input);
-    ASSERT(output == input);
-
-    // Test input with no gaps
-    input = pairsToECCDocuments({{15, 20}, {13, 13}, {1, 6}, {7, 12}, {14, 14}});
-    output = CompactionHelpers::mergeECCDocuments(input);
-    ASSERT_EQ(output.size(), 1);
-    ASSERT_EQ(output.front().start, 1);
-    ASSERT_EQ(output.front().end, 20);
-
-    // Test input with gaps; nothing is merged
-    input = pairsToECCDocuments({{5, 5}, {12, 16}, {9, 9}, {23, 45}});
-    output = CompactionHelpers::mergeECCDocuments(input);
-    ASSERT(output == input);
-
-    // Test input with gaps; at least one merged
-    input = pairsToECCDocuments({{5, 5}, {12, 16}, {6, 9}, {17, 23}, {45, 45}});
-    expected = pairsToECCDocuments({{5, 9}, {12, 23}, {45, 45}});
-    output = CompactionHelpers::mergeECCDocuments(input);
-    ASSERT(output == expected);
-}
-
-TEST(CompactionHelpersTest, countDeletedTest) {
-    ASSERT_EQ(CompactionHelpers::countDeleted({}), 0);
-
-    auto input = pairsToECCDocuments({{15, 20}, {13, 13}, {1, 6}, {7, 12}, {14, 14}});
-    ASSERT_EQ(CompactionHelpers::countDeleted(input), 20);
-}
 
 TEST(EDCServerCollectionTest, GenerateEDCTokens) {
 
@@ -3183,8 +2882,6 @@ TEST(EDCServerCollectionTest, GenerateEDCTokens) {
 }
 
 TEST(EDCServerCollectionTest, ValidateModifiedDocumentCompatibility) {
-    RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
-
     std::vector<uint8_t> blob;
     std::vector<EncryptedBinDataType> badTypes = {
         EncryptedBinDataType::kFLE2EqualityIndexedValue,

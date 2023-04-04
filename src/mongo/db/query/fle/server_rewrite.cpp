@@ -121,20 +121,6 @@ REGISTER_DOCUMENT_SOURCE_FLE_REWRITER(DocumentSourceMatch, rewriteMatch);
 REGISTER_DOCUMENT_SOURCE_FLE_REWRITER(DocumentSourceGeoNear, rewriteGeoNear);
 REGISTER_DOCUMENT_SOURCE_FLE_REWRITER(DocumentSourceGraphLookUp, rewriteGraphLookUp);
 
-BSONObj rewriteEncryptedFilter(FLETagQueryInterface* queryImpl,
-                               const NamespaceString& nssEsc,
-                               const NamespaceString& nssEcc,
-                               boost::intrusive_ptr<ExpressionContext> expCtx,
-                               BSONObj filter,
-                               EncryptedCollScanModeAllowed mode) {
-
-    if (auto rewritten =
-            QueryRewriter(expCtx, queryImpl, nssEsc, nssEcc, mode).rewriteMatchExpression(filter)) {
-        return rewritten.value();
-    }
-
-    return filter;
-}
 
 BSONObj rewriteEncryptedFilterV2(FLETagQueryInterface* queryImpl,
                                  const NamespaceString& nssEsc,
@@ -159,23 +145,14 @@ public:
         : expCtx(expCtx), dbName(nss.dbName()) {
         auto efc = EncryptionInformationHelpers::getAndValidateSchema(nss, encryptInfo);
         esc = efc.getEscCollection()->toString();
-        if (efc.getEccCollection()) {
-            ecc = efc.getEccCollection()->toString();
-        } else {
-            ecc = boost::none;
-        }
     }
     virtual ~RewriteBase(){};
-    virtual void doRewrite(FLETagQueryInterface* queryImpl,
-                           const NamespaceString& nssEsc,
-                           const NamespaceString& nssEcc){};
 
-    virtual void doRewrite(FLEQueryInterface* queryImpl, const NamespaceString& nssEsc){};
+    virtual void doRewrite(FLETagQueryInterface* queryImpl, const NamespaceString& nssEsc){};
 
 
     boost::intrusive_ptr<ExpressionContext> expCtx;
     std::string esc;
-    boost::optional<std::string> ecc;
     DatabaseName dbName;
 };
 
@@ -188,18 +165,8 @@ public:
         : RewriteBase(toRewrite->getContext(), nss, encryptInfo), pipeline(std::move(toRewrite)) {}
 
     ~PipelineRewrite(){};
-    void doRewrite(FLETagQueryInterface* queryImpl,
-                   const NamespaceString& nssEsc,
-                   const NamespaceString& nssEcc) final {
-        auto rewriter = QueryRewriter(expCtx, queryImpl, nssEsc, nssEcc);
-        for (auto&& source : pipeline->getSources()) {
-            if (stageRewriterMap.find(typeid(*source)) != stageRewriterMap.end()) {
-                stageRewriterMap[typeid(*source)](&rewriter, source.get());
-            }
-        }
-    }
 
-    void doRewrite(FLEQueryInterface* queryImpl, const NamespaceString& nssEsc) final {
+    void doRewrite(FLETagQueryInterface* queryImpl, const NamespaceString& nssEsc) final {
         auto rewriter = QueryRewriter(expCtx, queryImpl, nssEsc);
         for (auto&& source : pipeline->getSources()) {
             if (stageRewriterMap.find(typeid(*source)) != stageRewriterMap.end()) {
@@ -227,14 +194,8 @@ public:
         : RewriteBase(expCtx, nss, encryptInfo), userFilter(toRewrite), _mode(mode) {}
 
     ~FilterRewrite(){};
-    void doRewrite(FLETagQueryInterface* queryImpl,
-                   const NamespaceString& nssEsc,
-                   const NamespaceString& nssEcc) final {
-        rewrittenFilter =
-            rewriteEncryptedFilter(queryImpl, nssEsc, nssEcc, expCtx, userFilter, _mode);
-    }
 
-    void doRewrite(FLEQueryInterface* queryImpl, const NamespaceString& nssEsc) final {
+    void doRewrite(FLETagQueryInterface* queryImpl, const NamespaceString& nssEsc) final {
         rewrittenFilter = rewriteEncryptedFilterV2(queryImpl, nssEsc, expCtx, userFilter, _mode);
     }
 
@@ -251,19 +212,16 @@ void doFLERewriteInTxn(OperationContext* opCtx,
                        std::shared_ptr<RewriteBase> sharedBlock,
                        GetTxnCallback getTxn) {
 
-    if (gFeatureFlagFLE2ProtocolVersion2.isEnabled(serverGlobalParams.featureCompatibility)) {
-        // This code path only works if we are NOT running in a a transaction.
-        // if breaks us off of the current optctx readconcern and other settings
-        //
-        if (!opCtx->inMultiDocumentTransaction()) {
-            NamespaceString nssEsc(NamespaceStringUtil::parseNamespaceFromRequest(
-                sharedBlock->dbName, sharedBlock->esc));
-            NamespaceString nssEcc;  // Ignored in V2
-            FLETagNoTXNQuery queryInterface(opCtx);
+    // This code path only works if we are NOT running in a a transaction.
+    // if breaks us off of the current optctx readconcern and other settings
+    //
+    if (!opCtx->inMultiDocumentTransaction()) {
+        NamespaceString nssEsc(
+            NamespaceStringUtil::parseNamespaceFromRequest(sharedBlock->dbName, sharedBlock->esc));
+        FLETagNoTXNQuery queryInterface(opCtx);
 
-            sharedBlock->doRewrite(&queryInterface, nssEsc, nssEcc);
-            return;
-        }
+        sharedBlock->doRewrite(&queryInterface, nssEsc);
+        return;
     }
 
     auto txn = getTxn(opCtx);
@@ -276,14 +234,7 @@ void doFLERewriteInTxn(OperationContext* opCtx,
             auto queryInterface = FLEQueryInterfaceImpl(txnClient, getGlobalServiceContext());
 
             // Rewrite the MatchExpression.
-            if (sharedBlock->ecc) {
-                sharedBlock->doRewrite(&queryInterface,
-                                       nssEsc,
-                                       NamespaceStringUtil::parseNamespaceFromRequest(
-                                           sharedBlock->dbName, sharedBlock->ecc.get()));
-            } else {
-                sharedBlock->doRewrite(&queryInterface, nssEsc);
-            }
+            sharedBlock->doRewrite(&queryInterface, nssEsc);
 
             return SemiFuture<void>::makeReady();
         });
@@ -302,12 +253,6 @@ BSONObj rewriteEncryptedFilterInsideTxn(FLETagQueryInterface* queryImpl,
                                         EncryptedCollScanModeAllowed mode) {
     NamespaceString nssEsc(
         NamespaceStringUtil::parseNamespaceFromRequest(dbName, efc.getEscCollection().value()));
-
-    if (!gFeatureFlagFLE2ProtocolVersion2.isEnabled(serverGlobalParams.featureCompatibility)) {
-        NamespaceString nssEcc(
-            NamespaceStringUtil::parseNamespaceFromRequest(dbName, efc.getEccCollection().value()));
-        return rewriteEncryptedFilter(queryImpl, nssEsc, nssEcc, expCtx, filter, mode);
-    }
 
     return rewriteEncryptedFilterV2(queryImpl, nssEsc, expCtx, filter, mode);
 }

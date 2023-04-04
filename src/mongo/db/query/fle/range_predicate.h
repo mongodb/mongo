@@ -61,20 +61,12 @@ protected:
     }
 
     bool isDeprecatedPayloadType(EncryptedBinDataType type) const override {
-        // TODO: SERVER-73303 remove when v2 is enabled by default
-        if (!gFeatureFlagFLE2ProtocolVersion2.isEnabled(serverGlobalParams.featureCompatibility)) {
-            return false;
-        }
         return type == EncryptedBinDataType::kFLE2FindRangePayload ||
             type == EncryptedBinDataType::kFLE2UnindexedEncryptedValue;
     }
 
 private:
     EncryptedBinDataType encryptedBinDataType() const override {
-        // TODO: SERVER-73303 remove when v2 is enabled by default
-        if (!gFeatureFlagFLE2ProtocolVersion2.isEnabled(serverGlobalParams.featureCompatibility)) {
-            return EncryptedBinDataType::kFLE2FindRangePayload;
-        }
         return EncryptedBinDataType::kFLE2FindRangePayloadV2;
     }
     /**

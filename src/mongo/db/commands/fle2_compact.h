@@ -44,8 +44,6 @@ struct EncryptedStateCollectionsNamespaces {
     NamespaceString escNss;
     NamespaceString ecocNss;
     NamespaceString ecocRenameNss;
-    // TODO: SERVER-73303 delete when v2 is enabled by default
-    NamespaceString eccNss;
 };
 
 /**
@@ -53,30 +51,12 @@ struct EncryptedStateCollectionsNamespaces {
  */
 void validateCompactRequest(const CompactStructuredEncryptionData& request, const Collection& edc);
 
-// TODO: SERVER-73303 delete when v2 is enabled by default
-CompactStats processFLECompact(OperationContext* opCtx,
-                               const CompactStructuredEncryptionData& request,
-                               GetTxnCallback getTxn,
-                               const EncryptedStateCollectionsNamespaces& namespaces);
-
 void processFLECompactV2(OperationContext* opCtx,
                          const CompactStructuredEncryptionData& request,
                          GetTxnCallback getTxn,
                          const EncryptedStateCollectionsNamespaces& namespaces,
                          ECStats* escStats,
                          ECOCStats* ecocStats);
-
-// TODO: SERVER-73303 delete when v2 is enabled by default
-/**
- * Get all unique documents in the ECOC collection in their decrypted form.
- *
- * Used by unit tests.
- */
-stdx::unordered_set<ECOCCompactionDocument> getUniqueCompactionDocuments(
-    FLEQueryInterface* queryImpl,
-    const CompactStructuredEncryptionData& request,
-    const NamespaceString& ecocNss,
-    ECOCStats* ecocStats);
 
 /**
  * Get all unique documents in the ECOC collection in their decrypted form.
@@ -89,19 +69,6 @@ stdx::unordered_set<ECOCCompactionDocumentV2> getUniqueCompactionDocumentsV2(
     const NamespaceString& ecocNss,
     ECOCStats* ecocStats);
 
-
-// TODO: SERVER-73303 delete when v2 is enabled by default
-/**
- * Performs compaction of the ESC and ECC entries for the encrypted field/value pair
- * whose tokens are in the provided ECOC compaction document.
- *
- * Used by unit tests.
- */
-void compactOneFieldValuePair(FLEQueryInterface* queryImpl,
-                              const ECOCCompactionDocument& ecocDoc,
-                              const EncryptedStateCollectionsNamespaces& namespaces,
-                              ECStats* escStats,
-                              ECStats* eccStats);
 
 /**
  * Performs compaction of the ESC entries for the encrypted field/value pair

@@ -51,38 +51,7 @@ namespace mongo::fle {
 class QueryRewriter : public QueryRewriterInterface {
 public:
     /**
-     * Takes in references to collection readers for the ESC and ECC that are used during tag
-     * computation.
-     *
-     * TODO SERVER-73303 Remove when V2 is enabled.
-     */
-    QueryRewriter(boost::intrusive_ptr<ExpressionContext> expCtx,
-                  FLETagQueryInterface* tagQueryInterface,
-                  const NamespaceString& nssEsc,
-                  const NamespaceString& nssEcc,
-                  EncryptedCollScanModeAllowed mode = EncryptedCollScanModeAllowed::kAllow)
-        : _expCtx(expCtx),
-          _exprRewrites(aggPredicateRewriteMap),
-          _matchRewrites(matchPredicateRewriteMap),
-          _nssEsc(nssEsc),
-          _nssEcc(nssEcc),
-          _tagQueryInterface(tagQueryInterface) {
-
-        if (internalQueryFLEAlwaysUseEncryptedCollScanMode.load()) {
-            _mode = EncryptedCollScanMode::kForceAlways;
-        }
-
-        if (mode == EncryptedCollScanModeAllowed::kDisallow) {
-            _mode = EncryptedCollScanMode::kDisallow;
-        }
-
-        // This isn't the "real" query so we don't want to increment Expression
-        // counters here.
-        _expCtx->stopExpressionCounters();
-    }
-
-    /**
-     * Takes in references to collection readers for the ESC and ECC that are used during tag
+     * Takes in references to collection readers for the ESC that are used during tag
      * computation.
      */
     QueryRewriter(boost::intrusive_ptr<ExpressionContext> expCtx,
@@ -93,7 +62,6 @@ public:
           _exprRewrites(aggPredicateRewriteMap),
           _matchRewrites(matchPredicateRewriteMap),
           _nssEsc(nssEsc),
-          _nssEcc(boost::none),
           _tagQueryInterface(tagQueryInterface) {
 
         if (internalQueryFLEAlwaysUseEncryptedCollScanMode.load()) {
@@ -152,22 +120,17 @@ public:
     const NamespaceString& getESCNss() const override {
         return _nssEsc;
     }
-    const boost::optional<NamespaceString>& getECCNss() const override {
-        return _nssEcc;
-    }
 
 protected:
     // This constructor should only be used for mocks in testing.
     QueryRewriter(boost::intrusive_ptr<ExpressionContext> expCtx,
                   const NamespaceString& nssEsc,
-                  const NamespaceString& nssEcc,
                   const ExpressionToRewriteMap& exprRewrites,
                   const MatchTypeToRewriteMap& matchRewrites)
         : _expCtx(expCtx),
           _exprRewrites(exprRewrites),
           _matchRewrites(matchRewrites),
           _nssEsc(nssEsc),
-          _nssEcc(nssEcc),
           _tagQueryInterface(nullptr) {}
 
 private:
@@ -187,7 +150,6 @@ private:
     const ExpressionToRewriteMap& _exprRewrites;
     const MatchTypeToRewriteMap& _matchRewrites;
     const NamespaceString& _nssEsc;
-    const boost::optional<NamespaceString> _nssEcc;
     FLETagQueryInterface* _tagQueryInterface;
 };
 }  // namespace mongo::fle

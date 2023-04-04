@@ -100,20 +100,6 @@ std::unique_ptr<ExpressionInternalFLEBetween> RangePredicate::fleBetweenFromPayl
     tassert(7030501,
             "$internalFleBetween can only be generated from a non-stub payload.",
             !payload.isStub());
-    // TODO: SERVER-73303 refactor when v2 is enabled by default
-    if (!gFeatureFlagFLE2ProtocolVersion2.isEnabled(serverGlobalParams.featureCompatibility)) {
-        auto cm = payload.maxCounter;
-        ServerDataEncryptionLevel1Token serverToken = std::move(payload.serverToken);
-        std::vector<ConstDataRange> edcTokens;
-        std::transform(std::make_move_iterator(payload.edges.value().begin()),
-                       std::make_move_iterator(payload.edges.value().end()),
-                       std::back_inserter(edcTokens),
-                       [](FLEFindEdgeTokenSet&& edge) { return edge.edc.toCDR(); });
-
-        auto* expCtx = _rewriter->getExpressionContext();
-        return std::make_unique<ExpressionInternalFLEBetween>(
-            expCtx, fieldpath, serverToken.toCDR(), cm, std::move(edcTokens));
-    }
 
     std::vector<ServerZerosEncryptionToken> serverZerosTokens;
     serverZerosTokens.reserve(payload.edges.value().size());
@@ -136,25 +122,6 @@ std::vector<PrfBlock> RangePredicate::generateTags(BSONValue payload) const {
     auto parsedPayload = parseFindPayload<ParsedFindRangePayload>(payload);
     std::vector<PrfBlock> tags;
     tassert(7030500, "Must generate tags from a non-stub payload.", !parsedPayload.isStub());
-
-    // TODO: SERVER-73303 remove when v2 is enabled by default
-    if (!gFeatureFlagFLE2ProtocolVersion2.isEnabled(serverGlobalParams.featureCompatibility)) {
-        invariant(_rewriter->getECCNss());
-
-        for (auto& edge : parsedPayload.edges.value()) {
-            auto tagsForEdge = readTags(_rewriter->getTagQueryInterface(),
-                                        _rewriter->getESCNss(),
-                                        _rewriter->getECCNss().get(),
-                                        edge.esc,
-                                        edge.ecc,
-                                        edge.edc,
-                                        parsedPayload.maxCounter);
-            tags.insert(tags.end(),
-                        std::make_move_iterator(tagsForEdge.begin()),
-                        std::make_move_iterator(tagsForEdge.end()));
-        }
-        return tags;
-    }
 
     // TODO - do batch generation of tags here
     for (auto& edge : parsedPayload.edges.value()) {

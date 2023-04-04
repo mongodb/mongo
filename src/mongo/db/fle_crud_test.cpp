@@ -941,7 +941,7 @@ TEST_F(FleCrudTest, InsertV1PayloadAgainstV2Protocol) {
     ASSERT_THROWS_CODE(
         processInsert(_queryImpl.get(), _edcNs, serverPayload, efc, 0, document, false),
         DBException,
-        7291907);
+        6379103);
 }
 
 // Test insert of v1 FLEUnindexedEncryptedValue is rejected if v2 is enabled.
@@ -992,8 +992,9 @@ TEST_F(FleCrudTest, InsertUnindexedV1AgainstV2Protocol) {
     ASSERT_THROWS_CODE(
         processInsert(_queryImpl.get(), _edcNs, serverPayload, efc, 0, document, false),
         DBException,
-        7413902);
+        6379103);
 }
+
 
 // Insert and delete one document
 TEST_F(FleCrudTest, InsertAndDeleteOne) {
@@ -1498,7 +1499,6 @@ TEST_F(FleTagsTest, InsertTwoDifferent) {
 }
 
 TEST_F(FleTagsTest, InsertAndDeleteOne) {
-    RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
     auto doc = BSON("encrypted"
                     << "a");
 
@@ -1509,7 +1509,6 @@ TEST_F(FleTagsTest, InsertAndDeleteOne) {
 }
 
 TEST_F(FleTagsTest, InsertTwoSameAndDeleteOne) {
-    RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
     auto doc = BSON("encrypted"
                     << "a");
 
@@ -1521,7 +1520,6 @@ TEST_F(FleTagsTest, InsertTwoSameAndDeleteOne) {
 }
 
 TEST_F(FleTagsTest, InsertTwoDifferentAndDeleteOne) {
-    RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
     auto doc1 = BSON("encrypted"
                      << "a");
     auto doc2 = BSON("encrypted"
@@ -1536,7 +1534,6 @@ TEST_F(FleTagsTest, InsertTwoDifferentAndDeleteOne) {
 }
 
 TEST_F(FleTagsTest, InsertAndUpdate) {
-    RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
     auto doc1 = BSON("encrypted"
                      << "a");
     auto doc2 = BSON("encrypted"
@@ -1582,7 +1579,6 @@ TEST_F(FleTagsTest, ContentionFactor) {
 }
 
 TEST_F(FleTagsTest, MemoryLimit) {
-    RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
     auto doc = BSON("encrypted"
                     << "a");
 

@@ -241,7 +241,7 @@ public:
                       fle::MatchTypeToRewriteMap* matchRewrites,
                       const NamespaceString& mockNss)
         : fle::QueryRewriter(
-              new ExpressionContextForTest(), mockNss, mockNss, *exprRewrites, *matchRewrites) {
+              new ExpressionContextForTest(), mockNss, *exprRewrites, *matchRewrites) {
         setMockRewriteMaps(*matchRewrites, *exprRewrites, _tags, _encryptedFields);
     }
 

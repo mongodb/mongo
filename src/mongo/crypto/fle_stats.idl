@@ -60,10 +60,10 @@ structs:
                 default: 0
 
     CompactStats:
-        description: "Stats about records in ECC, ECOC, and ESC compact touched"
+        description: "Stats about records in ECOC, and ESC compact touched"
         fields:
            ecoc: ECOCStats
-           ecc: # TODO: SERVER-73303 remove ecc when v2 is enabled by default
+           ecc: # TODO: SERVER-68373 remove ecc when 7.0 becomes last LTS
                 type: ECStats
                 optional: true
            esc: ECStats

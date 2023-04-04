@@ -2357,13 +2357,6 @@ public:
 
 class ExpressionInternalFLEEqual final : public Expression {
 public:
-    // TODO: SERVER-73303 delete constructor when v2 is enabled by default
-    ExpressionInternalFLEEqual(ExpressionContext* expCtx,
-                               boost::intrusive_ptr<Expression> field,
-                               ConstDataRange serverToken,
-                               int64_t contentionFactor,
-                               ConstDataRange edcToken);
-
     ExpressionInternalFLEEqual(ExpressionContext* expCtx,
                                boost::intrusive_ptr<Expression> field,
                                ServerZerosEncryptionToken zerosToken);
@@ -2386,19 +2379,11 @@ public:
     }
 
 private:
-    EncryptedPredicateEvaluator _evaluator;
     EncryptedPredicateEvaluatorV2 _evaluatorV2;
 };
 
 class ExpressionInternalFLEBetween final : public Expression {
 public:
-    // TODO: SERVER-73303 delete constructor when v2 is enabled by default
-    ExpressionInternalFLEBetween(ExpressionContext* expCtx,
-                                 boost::intrusive_ptr<Expression> field,
-                                 ConstDataRange serverToken,
-                                 int64_t contentionFactor,
-                                 std::vector<ConstDataRange> edcTokens);
-
     ExpressionInternalFLEBetween(ExpressionContext* expCtx,
                                  boost::intrusive_ptr<Expression> field,
                                  std::vector<ServerZerosEncryptionToken> serverTokens);
@@ -2421,7 +2406,6 @@ public:
     }
 
 private:
-    EncryptedPredicateEvaluator _evaluator;
     EncryptedPredicateEvaluatorV2 _evaluatorV2;
 };
 

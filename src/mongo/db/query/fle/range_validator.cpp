@@ -43,9 +43,6 @@ namespace {
 template <class T>
 bool hasRangeTypeToValidate(const T& value) {
     auto typeToValidate = EncryptedBinDataType::kFLE2FindRangePayloadV2;
-    if (!gFeatureFlagFLE2ProtocolVersion2.isEnabled(serverGlobalParams.featureCompatibility)) {
-        typeToValidate = EncryptedBinDataType::kFLE2FindRangePayload;
-    }
     return isPayloadOfType(typeToValidate, value);
 }
 

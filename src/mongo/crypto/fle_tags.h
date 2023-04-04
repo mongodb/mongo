@@ -40,32 +40,9 @@ class FLETagQueryInterface;
 namespace mongo::fle {
 
 /**
- * Read a list of binary tags given ESC, ECC, and EDC derived tokens and a specific contention
+ * Read a list of binary tags given ESC and and EDC derived tokens and a maximum contention
  * factor.
  */
-std::vector<PrfBlock> readTagsWithContention(const FLEStateCollectionReader& esc,
-                                             const FLEStateCollectionReader& ecc,
-                                             ESCDerivedFromDataToken s,
-                                             ECCDerivedFromDataToken c,
-                                             EDCDerivedFromDataToken d,
-                                             uint64_t contentionFactor,
-                                             size_t memoryLimit,
-                                             std::vector<PrfBlock>&& binaryTags);
-
-/**
- * Read a list of binary tags given ESC, ECC, and EDC derived tokens and a maximum contention
- * factor.
- *
- * TODO: SERVER-73303 remove when v2 is enabled by default
- */
-std::vector<PrfBlock> readTags(FLETagQueryInterface* queryImpl,
-                               const NamespaceString& nssEsc,
-                               const NamespaceString& nssEcc,
-                               ESCDerivedFromDataToken s,
-                               ECCDerivedFromDataToken c,
-                               EDCDerivedFromDataToken d,
-                               boost::optional<int64_t> cm);
-
 std::vector<PrfBlock> readTags(FLETagQueryInterface* queryImpl,
                                const NamespaceString& nssEsc,
                                ESCDerivedFromDataToken s,

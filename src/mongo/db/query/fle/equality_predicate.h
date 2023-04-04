@@ -52,20 +52,13 @@ protected:
     std::unique_ptr<Expression> rewriteToRuntimeComparison(Expression* expr) const override;
 
     bool isDeprecatedPayloadType(EncryptedBinDataType type) const override {
-        // TODO: SERVER-73303 remove when v2 is enabled by default
-        if (!gFeatureFlagFLE2ProtocolVersion2.isEnabled(serverGlobalParams.featureCompatibility)) {
-            return false;
-        }
         return type == EncryptedBinDataType::kFLE2FindEqualityPayload ||
             type == EncryptedBinDataType::kFLE2UnindexedEncryptedValue;
     }
 
 private:
     EncryptedBinDataType encryptedBinDataType() const override {
-        // TODO: SERVER-73303 remove when v2 is enabled by default
-        if (!gFeatureFlagFLE2ProtocolVersion2.isEnabled(serverGlobalParams.featureCompatibility)) {
-            return EncryptedBinDataType::kFLE2FindEqualityPayload;
-        }
+
         return EncryptedBinDataType::kFLE2FindEqualityPayloadV2;
     }
 

@@ -185,10 +185,8 @@ protected:
     std::vector<char> generatePlaceholder(UUID keyId, BSONElement value);
 
     void doSingleInsert(int id, BSONObj encryptedFieldsObj);
-    void doSingleDelete(int id, BSONObj encryptedFieldsObj);
 
     void insertFieldValues(StringData fieldName, std::map<std::string, InsertionState>& values);
-    void deleteFieldValues(StringData fieldName, std::map<std::string, InsertionState>& values);
 
 protected:
     ServiceContext::UniqueOperationContext _opCtx;
@@ -385,33 +383,6 @@ void FleCompactTest::doSingleInsert(int id, BSONObj encryptedFieldsObj) {
         _queryImpl.get(), _namespaces.edcNss, serverPayload, efc, &stmtId, result, false));
 }
 
-void FleCompactTest::doSingleDelete(int id, BSONObj encryptedFieldsObj) {
-    auto efc =
-        generateEncryptedFieldConfig(encryptedFieldsObj.getFieldNames<std::set<std::string>>());
-
-    auto doc = EncryptionInformationHelpers::encryptionInformationSerializeForDelete(
-        _namespaces.edcNss, efc, &_keyVault);
-
-    auto ei = EncryptionInformation::parse(IDLParserContext("test"), doc);
-
-    write_ops::DeleteOpEntry entry;
-    entry.setQ(BSON("_id" << id));
-    entry.setMulti(false);
-
-    write_ops::DeleteCommandRequest deleteRequest(_namespaces.edcNss);
-    deleteRequest.setDeletes({entry});
-    deleteRequest.getWriteCommandRequestBase().setEncryptionInformation(ei);
-
-    std::unique_ptr<CollatorInterface> collator;
-    auto expCtx = make_intrusive<ExpressionContext>(_opCtx.get(),
-                                                    std::move(collator),
-                                                    deleteRequest.getNamespace(),
-                                                    deleteRequest.getLegacyRuntimeConstants(),
-                                                    deleteRequest.getLet());
-
-    processDelete(_queryImpl.get(), expCtx, deleteRequest);
-}
-
 void FleCompactTest::insertFieldValues(StringData field,
                                        std::map<std::string, InsertionState>& values) {
     static int insertId = 1;
@@ -429,32 +400,11 @@ void FleCompactTest::insertFieldValues(StringData field,
     }
 }
 
-void FleCompactTest::deleteFieldValues(StringData field,
-                                       std::map<std::string, InsertionState>& values) {
-    for (auto& [value, state] : values) {
-        BSONObjBuilder builder;
-        builder.append(field, value);
-        auto entry = builder.obj();
-
-        for (auto& range : state.toDeleteRanges) {
-            for (auto ctr = range.first; ctr <= range.second; ctr++) {
-                if (state.insertedIds.find(ctr) == state.insertedIds.end()) {
-                    continue;
-                }
-                doSingleDelete(state.insertedIds[ctr], entry);
-                state.insertedIds.erase(ctr);
-            }
-        }
-    }
-}
 
 TEST_F(FleCompactTest, GetUniqueECOCDocsFromEmptyECOC) {
     ECOCStats stats;
     std::set<std::string> fieldSet = {"first", "ssn"};
     auto cmd = generateCompactCommand(fieldSet);
-    auto docsV1 = getUniqueCompactionDocuments(_queryImpl.get(), cmd, _namespaces.ecocNss, &stats);
-    ASSERT(docsV1.empty());
-
     auto docs = getUniqueCompactionDocumentsV2(_queryImpl.get(), cmd, _namespaces.ecocNss, &stats);
     ASSERT(docs.empty());
 }
@@ -505,7 +455,6 @@ TEST_F(FleCompactTest, CompactValueV2_NoNonAnchors) {
 }
 
 TEST_F(FleCompactTest, CompactValueV2_NoNullAnchors) {
-    RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
     ECStats escStats;
     std::map<std::string, InsertionState> values;
     constexpr auto key = "first"_sd;
@@ -548,7 +497,6 @@ TEST_F(FleCompactTest, CompactValueV2_NoNullAnchors) {
 }
 
 TEST_F(FleCompactTest, RandomESCNonAnchorDeletions) {
-    RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
     ECStats escStats;
     constexpr auto key = "first"_sd;
     const std::string value = "roger";

@@ -4298,7 +4298,6 @@ TEST(ExpressionFLETest, BadInputs) {
 
 // Test we return true if it matches
 TEST(ExpressionFLETest, TestBinData) {
-    RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
 
     auto expCtx = ExpressionContextForTest();
     auto vps = expCtx.variablesParseState;
@@ -4347,7 +4346,6 @@ TEST(ExpressionFLETest, TestBinData) {
 }
 
 TEST(ExpressionFLETest, TestBinData_RoundTrip) {
-    RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
 
     auto expCtx = ExpressionContextForTest();
     auto vps = expCtx.variablesParseState;
@@ -4392,7 +4390,6 @@ TEST(ExpressionFLETest, TestBinData_RoundTrip) {
 }
 
 TEST(ExpressionFLETest, ParseAndSerializeBetween) {
-    RAIIServerParameterControllerForTest controller("featureFlagFLE2ProtocolVersion2", true);
 
     auto expCtx = ExpressionContextForTest();
     auto vps = expCtx.variablesParseState;

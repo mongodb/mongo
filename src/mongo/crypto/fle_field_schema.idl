@@ -187,27 +187,6 @@ structs:
             optional: true
             validator: { gte: 1, lte: 4 }
 
-    EdgeTokenSet:
-        description: "Payload of an indexed field to insert or update"
-        strict: true
-        fields:
-          d:
-            description: "EDCDerivedFromDataTokenAndCounter"
-            type: bindata_generic
-            cpp_name: edcDerivedToken
-          s:
-            description: "ESCDerivedFromDataTokenAndCounter"
-            type: bindata_generic
-            cpp_name: escDerivedToken
-          c:
-            description: "ECCDerivedFromDataTokenAndCounter"
-            type: bindata_generic
-            cpp_name: eccDerivedToken
-          p:
-            description: "Encrypted tokens"
-            type: bindata_generic
-            cpp_name: encryptedTokens
-
     EdgeTokenSetV2:
         description: "Payload of an indexed field to insert or update. Version 2"
         strict: true
@@ -228,48 +207,6 @@ structs:
             description: "Encrypted tokens"
             type: bindata_generic
             cpp_name: encryptedTokens
-
-    FLE2InsertUpdatePayload:
-        description: "Payload of an indexed field to insert or update"
-        strict: true
-        fields:
-          d:
-            description: "EDCDerivedFromDataTokenAndCounter"
-            type: bindata_generic
-            cpp_name: edcDerivedToken
-          s:
-            description: "ESCDerivedFromDataTokenAndCounter"
-            type: bindata_generic
-            cpp_name: escDerivedToken
-          c:
-            description: "ECCDerivedFromDataTokenAndCounter"
-            type: bindata_generic
-            cpp_name: eccDerivedToken
-          p:
-            description: "Encrypted tokens"
-            type: bindata_generic
-            cpp_name: encryptedTokens
-          u:
-            description: "Index KeyId"
-            type: uuid
-            cpp_name: indexKeyId
-          t:
-            description: "Encrypted type"
-            type: safeInt
-            cpp_name: type
-          v:
-            description: "Encrypted value"
-            type: bindata_generic
-            cpp_name: value
-          e:
-            description: "ServerDataEncryptionLevel1Token"
-            type: bindata_generic
-            cpp_name: serverEncryptionToken
-          g:
-            description: "Array of Edges"
-            type: array<EdgeTokenSet>
-            cpp_name: edgeTokenSet
-            optional: true
 
     FLE2InsertUpdatePayloadV2:
         description: "Payload of an indexed field to insert or update. Version 2"
@@ -318,46 +255,6 @@ structs:
             cpp_name: edgeTokenSet
             optional: true
 
-    FLE2DeletePayload:
-        description: "Payload of an indexed field to delete"
-        strict: true
-        fields:
-          o:
-            description: "ECOCToken"
-            type: bindata_generic
-            cpp_name: ecocToken
-          e:
-            description: "ServerDataEncryptionLevel1Token"
-            type: bindata_generic
-            cpp_name: serverEncryptionToken
-
-    FLE2FindEqualityPayload:
-        description: "Payload for an equality find"
-        strict: true
-        fields:
-          d:
-            description: "EDCDerivedFromDataToken"
-            type: bindata_generic
-            cpp_name: edcDerivedToken
-          s:
-            description: "ESCDerivedFromDataToken"
-            type: bindata_generic
-            cpp_name: escDerivedToken
-          c:
-            description: "ECCDerivedFromDataToken"
-            type: bindata_generic
-            cpp_name: eccDerivedToken
-          e:
-            description: "ServerDataEncryptionLevel1Token"
-            type: bindata_generic
-            cpp_name: serverEncryptionToken
-            optional: true # For backwards compat, make this optional
-          cm:
-            description: "Queryable Encryption max counter"
-            type: long
-            cpp_name: maxCounter
-            optional: true
-
     FLE2FindEqualityPayloadV2:
         description: "Payload for an equality find. Version 2"
         strict: true
@@ -380,23 +277,6 @@ structs:
             cpp_name: maxCounter
             optional: true
 
-    EdgeFindTokenSet:
-        description: "Payload of an edge to query for"
-        strict: true
-        fields:
-          d:
-            description: "EDCDerivedFromDataToken"
-            type: bindata_generic
-            cpp_name: edcDerivedToken
-          s:
-            description: "ESCDerivedFromDataToken"
-            type: bindata_generic
-            cpp_name: escDerivedToken
-          c:
-            description: "ECCDerivedFromDataToken"
-            type: bindata_generic
-            cpp_name: eccDerivedToken
-
     EdgeFindTokenSetV2:
         description: "Payload of an edge to query for. Version 2"
         strict: true
@@ -414,23 +294,6 @@ structs:
             type: bindata_generic
             cpp_name: serverDerivedFromDataToken
 
-    FLE2FindRangePayloadEdgesInfo:
-        description: "Token information for find range payload."
-        strict: true
-        fields:
-          g:
-            description: "Array of Edges"
-            type: array<EdgeFindTokenSet>
-            cpp_name: edges
-          e:
-            description: "ServerDataEncryptionLevel1Token"
-            type: bindata_generic
-            cpp_name: serverEncryptionToken
-          cm:
-            description: "Queryable Encryption max counter"
-            type: long
-            cpp_name: maxCounter
-
     FLE2FindRangePayloadEdgesInfoV2:
         description: "Token information for find range payload."
         strict: true
@@ -443,27 +306,6 @@ structs:
             description: "Queryable Encryption max counter"
             type: long
             cpp_name: maxCounter
-
-    FLE2FindRangePayload:
-        description: "Payload for a range find"
-        strict: true
-        fields:
-          payload:
-            description: "Token information for a find range payload"
-            type: FLE2FindRangePayloadEdgesInfo
-            optional: true
-          payloadId:
-            description: "Id of payload - must be paired with another payload"
-            type: safeInt
-            optional: false
-          firstOperator:
-            description: "First query operator for which this payload was generated."
-            type: Fle2RangeOperator
-            optional: false
-          secondOperator:
-            description: "Second query operator for which this payload was generated. Only populated for two-sided ranges."
-            type: Fle2RangeOperator
-            optional: true
 
     FLE2FindRangePayloadV2:
         description: "Payload for a range find. Version 2"

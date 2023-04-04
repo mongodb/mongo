@@ -102,10 +102,6 @@ ClusterGetQueryableEncryptionCountInfoCmd::Invocation::typedRun(OperationContext
 
     CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
 
-    uassert(741502,
-            "FeatureFlagFLE2ProtocolVersion2 is not enabled",
-            gFeatureFlagFLE2ProtocolVersion2.isEnabled(serverGlobalParams.featureCompatibility));
-
     auto nss = request().getNamespace();
     const auto dbInfo =
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, nss.db()));

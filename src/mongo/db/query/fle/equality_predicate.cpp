@@ -48,17 +48,6 @@ REGISTER_ENCRYPTED_AGG_PREDICATE_REWRITE(ExpressionIn, EqualityPredicate);
 std::vector<PrfBlock> EqualityPredicate::generateTags(BSONValue payload) const {
     ParsedFindEqualityPayload tokens = parseFindPayload<ParsedFindEqualityPayload>(payload);
 
-    if (!gFeatureFlagFLE2ProtocolVersion2.isEnabled(serverGlobalParams.featureCompatibility)) {
-        invariant(_rewriter->getECCNss());
-        return readTags(_rewriter->getTagQueryInterface(),
-                        _rewriter->getESCNss(),
-                        _rewriter->getECCNss().get(),
-                        tokens.escToken,
-                        tokens.eccToken,
-                        tokens.edcToken,
-                        tokens.maxCounter);
-    }
-
     return readTags(_rewriter->getTagQueryInterface(),
                     _rewriter->getESCNss(),
                     tokens.escToken,
@@ -118,24 +107,6 @@ boost::intrusive_ptr<ExpressionInternalFLEEqual> generateFleEqualMatch(StringDat
                                                                        ExpressionContext* expCtx) {
     auto tokens = ParsedFindEqualityPayload(ffp);
 
-    // TODO: SERVER-73303 refactor when v2 is enabled by default
-    if (!gFeatureFlagFLE2ProtocolVersion2.isEnabled(serverGlobalParams.featureCompatibility)) {
-        // Generate { $_internalFleEq: { field: "$field_name", server: f_3, counter: cm, edc: k_EDC]
-        // }
-        // }
-        uassert(6672401,
-                "Missing required field server encryption token in find payload",
-                tokens.serverToken.has_value());
-
-        return make_intrusive<ExpressionInternalFLEEqual>(
-            expCtx,
-            ExpressionFieldPath::createPathFromString(
-                expCtx, path.toString(), expCtx->variablesParseState),
-            tokens.serverToken.value().data,
-            tokens.maxCounter.value_or(0LL),
-            tokens.edcToken.data);
-    }
-
     // Generate { $_internalFleEq: { field: "$field_name", server:  F_s[ f, 2, v, 2 ] }
     return make_intrusive<ExpressionInternalFLEEqual>(
         expCtx,
@@ -151,23 +122,6 @@ std::unique_ptr<ExpressionInternalFLEEqual> generateFleEqualMatchUnique(StringDa
                                                                         const PayloadT& ffp,
                                                                         ExpressionContext* expCtx) {
     auto tokens = ParsedFindEqualityPayload(ffp);
-
-    // TODO: SERVER-73303 refactor when v2 is enabled by default
-    if (!gFeatureFlagFLE2ProtocolVersion2.isEnabled(serverGlobalParams.featureCompatibility)) {
-        // Generate { $_internalFleEq: { field: "$field_name", server: f_3, counter: cm, edc: k_EDC]
-        // } }
-        uassert(6672419,
-                "Missing required field server encryption token in find payload",
-                tokens.serverToken.has_value());
-
-        return std::make_unique<ExpressionInternalFLEEqual>(
-            expCtx,
-            ExpressionFieldPath::createPathFromString(
-                expCtx, path.toString(), expCtx->variablesParseState),
-            tokens.serverToken.value().data,
-            tokens.maxCounter.value_or(0LL),
-            tokens.edcToken.data);
-    }
 
     // Generate { $_internalFleEq: { field: "$field_name", server:  F_s[ f, 2, v, 2 ] }
     return std::make_unique<ExpressionInternalFLEEqual>(

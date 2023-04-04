@@ -75,8 +75,6 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
     Lock::ExclusiveLock fleCompactCommandLock(opCtx, commandMutex);
 
     const auto& edcNss = request.getNamespace();
-    const bool useV1Protocol =
-        !gFeatureFlagFLE2ProtocolVersion2.isEnabled(serverGlobalParams.featureCompatibility);
 
     LOGV2(6319900, "Compacting the encrypted compaction collection", logAttrs(edcNss));
 
@@ -110,24 +108,10 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
     CompactStats stats({}, {});
     FLECompactESCDeleteSet escDeleteSet;
 
-    if (useV1Protocol) {
-        stats.setEcc({});
-    }
-
     if (!ecoc && !ecocRename) {
         // nothing to compact
         LOGV2(6548306, "Skipping compaction as there is no ECOC collection to compact");
         return stats;
-    } else if (ecoc && !ecocRename && useV1Protocol) {
-        // TODO: SERVER-73303 delete this branch when v2 is enabled by default
-        LOGV2(6319901,
-              "Renaming the encrypted compaction collection",
-              "ecocNss"_attr = namespaces.ecocNss,
-              "ecocRenameNss"_attr = namespaces.ecocRenameNss);
-        RenameCollectionOptions renameOpts;
-        validateAndRunRenameCollection(
-            opCtx, namespaces.ecocNss, namespaces.ecocRenameNss, renameOpts);
-        ecoc = nullptr;
     } else if (ecoc && !ecocRename) {
         // load the random set of ESC non-anchor entries to be deleted post-compact
         auto memoryLimit =
@@ -188,30 +172,21 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
                               << " no longer exists prior to compaction",
                 tempEcocColl.getCollection());
 
-        if (useV1Protocol) {
-            // TODO: SERVER-73303 delete this branch when v2 is enabled by default
-            stats =
-                processFLECompact(opCtx, request, &getTransactionWithRetriesForMongoD, namespaces);
-        } else {
-            processFLECompactV2(opCtx,
-                                request,
-                                &getTransactionWithRetriesForMongoD,
-                                namespaces,
-                                &stats.getEsc(),
-                                &stats.getEcoc());
-        }
+        processFLECompactV2(opCtx,
+                            request,
+                            &getTransactionWithRetriesForMongoD,
+                            namespaces,
+                            &stats.getEsc(),
+                            &stats.getEcoc());
     }
 
-    if (!useV1Protocol) {
-        auto tagsPerDelete =
-            ServerParameterSet::getClusterParameterSet()
-                ->get<ClusterParameterWithStorage<FLECompactionOptions>>("fleCompactionOptions")
-                ->getValue(boost::none)
-                .getMaxESCEntriesPerCompactionDelete();
-        cleanupESCNonAnchors(
-            opCtx, namespaces.escNss, escDeleteSet, tagsPerDelete, &stats.getEsc());
-        FLEStatusSection::get().updateCompactionStats(stats);
-    }
+    auto tagsPerDelete =
+        ServerParameterSet::getClusterParameterSet()
+            ->get<ClusterParameterWithStorage<FLECompactionOptions>>("fleCompactionOptions")
+            ->getValue(boost::none)
+            .getMaxESCEntriesPerCompactionDelete();
+    cleanupESCNonAnchors(opCtx, namespaces.escNss, escDeleteSet, tagsPerDelete, &stats.getEsc());
+    FLEStatusSection::get().updateCompactionStats(stats);
 
     if (MONGO_unlikely(fleCompactSkipECOCDropUnsharded.shouldFail())) {
         LOGV2(7299612,

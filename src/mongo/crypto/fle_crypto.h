@@ -750,20 +750,6 @@ using ContentionFactorFn = std::function<uint64_t(const FLE2EncryptionPlaceholde
 
 class FLEClientCrypto {
 public:
-    // TODO: SERVER-73303 delete v1 serialize methods when v2 is enabled by default
-    static FLE2FindEqualityPayload serializeFindPayload(FLEIndexKeyAndId indexKey,
-                                                        FLEUserKeyAndId userKey,
-                                                        BSONElement element,
-                                                        uint64_t maxContentionFactor);
-
-    static FLE2FindRangePayload serializeFindRangePayload(FLEIndexKeyAndId indexKey,
-                                                          FLEUserKeyAndId userKey,
-                                                          const std::vector<std::string>& edges,
-                                                          uint64_t maxContentionFactor,
-                                                          const FLE2RangeFindSpec& spec);
-
-    static FLE2FindRangePayload serializeFindRangeStub(const FLE2RangeFindSpec& spec);
-
     static FLE2FindEqualityPayloadV2 serializeFindPayloadV2(FLEIndexKeyAndId indexKey,
                                                             FLEUserKeyAndId userKey,
                                                             BSONElement element,
@@ -881,24 +867,6 @@ public:
     ESCDerivedFromDataTokenAndContentionFactorToken esc;
 };
 
-// TODO: SERVER-73303 delete when v2 is enabled by default
-struct ECOCCompactionDocument {
-
-    bool operator==(const ECOCCompactionDocument& other) const {
-        return (fieldName == other.fieldName) && (esc == other.esc) && (ecc == other.ecc);
-    }
-
-    template <typename H>
-    friend H AbslHashValue(H h, const ECOCCompactionDocument& doc) {
-        return H::combine(std::move(h), doc.fieldName, doc.esc, doc.ecc);
-    }
-
-    // Id is not included as it unimportant
-    std::string fieldName;
-    ESCDerivedFromDataTokenAndContentionFactorToken esc;
-    ECCDerivedFromDataTokenAndContentionFactorToken ecc;
-};
-
 struct ECOCCompactionDocumentV2 {
     bool operator==(const ECOCCompactionDocumentV2& other) const {
         return (fieldName == other.fieldName) && (esc == other.esc);
@@ -933,66 +901,7 @@ class ECOCCollection {
 public:
     static BSONObj generateDocument(StringData fieldName, ConstDataRange payload);
 
-    // TODO: SERVER-73303 delete when v2 is enabled by default
-    static ECOCCompactionDocument parseAndDecrypt(const BSONObj& doc, ECOCToken token);
-
     static ECOCCompactionDocumentV2 parseAndDecryptV2(const BSONObj& doc, ECOCToken token);
-};
-
-
-/**
- * Class to read/write FLE2 Equality Indexed Encrypted Values
- *
- * Fields are encrypted with the following:
- *
- * struct {
- *   uint8_t fle_blob_subtype = 7;
- *   uint8_t key_uuid[16];
- *   uint8_t original_bson_type;
- *   ciphertext[ciphertext_length];
- * }
- *
- * Encrypt(ServerDataEncryptionLevel1Token, Struct(K_KeyId, v, count, d, s, c))
- *
- * struct {
- *   uint64_t length;
- *   uint8_t[length] cipherText; // UserKeyId + Encrypt(K_KeyId, value),
- *   uint64_t counter;
- *   uint8_t[32] edc;  // EDCDerivedFromDataTokenAndContentionFactorToken
- *   uint8_t[32] esc;  // ESCDerivedFromDataTokenAndContentionFactorToken
- *   uint8_t[32] ecc;  // ECCDerivedFromDataTokenAndContentionFactorToken
- *}
- *
- * The specification needs to be in sync with the validation in 'bson_validate.cpp'.
- */
-struct FLE2IndexedEqualityEncryptedValue {
-    FLE2IndexedEqualityEncryptedValue(FLE2InsertUpdatePayload payload, uint64_t counter);
-
-    FLE2IndexedEqualityEncryptedValue(EDCDerivedFromDataTokenAndContentionFactorToken edcParam,
-                                      ESCDerivedFromDataTokenAndContentionFactorToken escParam,
-                                      ECCDerivedFromDataTokenAndContentionFactorToken eccParam,
-                                      uint64_t countParam,
-                                      BSONType typeParam,
-                                      UUID indexKeyIdParam,
-                                      std::vector<uint8_t> serializedServerValueParam);
-
-    static StatusWith<FLE2IndexedEqualityEncryptedValue> decryptAndParse(
-        ServerDataEncryptionLevel1Token token, ConstDataRange serializedServerValue);
-
-    /**
-     * Read the key id from the payload.
-     */
-    static StatusWith<UUID> readKeyId(ConstDataRange serializedServerValue);
-
-    StatusWith<std::vector<uint8_t>> serialize(ServerDataEncryptionLevel1Token token);
-
-    EDCDerivedFromDataTokenAndContentionFactorToken edc;
-    ESCDerivedFromDataTokenAndContentionFactorToken esc;
-    ECCDerivedFromDataTokenAndContentionFactorToken ecc;
-    uint64_t count;
-    BSONType bsonType;
-    UUID indexKeyId;
-    std::vector<uint8_t> clientEncryptedValue;
 };
 
 /**
@@ -1119,32 +1028,6 @@ struct FLE2IndexedEqualityEncryptedValueV2 {
     FLE2TagAndEncryptedMetadataBlock metadataBlock;
 };
 
-// TODO: SERVER-73303 delete when v2 is enabled by default
-/**
- * Class to read/write FLE2 Unindexed Encrypted Values
- *
- * Fields are encrypted with the following:
- *
- * struct {
- *   uint8_t fle_blob_subtype = 6;
- *   uint8_t key_uuid[16];
- *   uint8_t original_bson_type;
- *   ciphertext[ciphertext_length];
- * } blob;
- *
- * The specification needs to be in sync with the validation in 'bson_validate.cpp'.
- */
-struct FLE2UnindexedEncryptedValue {
-    static std::vector<uint8_t> serialize(const FLEUserKeyAndId& userKey,
-                                          const BSONElement& element);
-    static std::pair<BSONType, std::vector<uint8_t>> deserialize(FLEKeyVault* keyVault,
-                                                                 ConstDataRange blob);
-
-    static constexpr crypto::aesMode mode = crypto::aesMode::ctr;
-    static constexpr EncryptedBinDataType fleType =
-        EncryptedBinDataType::kFLE2UnindexedEncryptedValue;
-    static constexpr size_t assocDataSize = sizeof(uint8_t) + sizeof(UUID) + sizeof(uint8_t);
-};
 
 /**
  * Class to read/write FLE2 Unindexed Encrypted Values (for protocol version 2)
@@ -1188,62 +1071,6 @@ struct FLEEdgeToken {
     EDCDerivedFromDataTokenAndContentionFactorToken edc;
     ESCDerivedFromDataTokenAndContentionFactorToken esc;
     ECCDerivedFromDataTokenAndContentionFactorToken ecc;
-};
-
-/**
- * Class to read/write FLE2 Range Indexed Encrypted Values
- *
- * Fields are encrypted with the following:
- *
- * struct {
- *   uint8_t fle_blob_subtype = 9;
- *   uint8_t key_uuid[16];
- *   uint8_t original_bson_type;
- *   ciphertext[ciphertext_length];
- * }
- *
- * Encrypt(ServerDataEncryptionLevel1Token, Struct(K_KeyId, v, edgeCount, [count, d, s, c] x
- *edgeCount ))
- *
- * struct {
- *   uint64_t length;
- *   uint8_t[length] cipherText; // UserKeyId + Encrypt(K_KeyId, value),
- *   uint32_t edgeCount;
- *   struct {
- *      uint64_t counter;
- *      uint8_t[32] edc;  // EDCDerivedFromDataTokenAndContentionFactorToken
- *      uint8_t[32] esc;  // ESCDerivedFromDataTokenAndContentionFactorToken
- *      uint8_t[32] ecc;  // ECCDerivedFromDataTokenAndContentionFactorToken
- *   } edges[edgeCount];
- *}
- *
- * The specification needs to be in sync with the validation in 'bson_validate.cpp'.
- */
-struct FLE2IndexedRangeEncryptedValue {
-    FLE2IndexedRangeEncryptedValue(FLE2InsertUpdatePayload payload,
-                                   std::vector<uint64_t> countersParam);
-
-    FLE2IndexedRangeEncryptedValue(std::vector<FLEEdgeToken> tokens,
-                                   std::vector<uint64_t> countersParam,
-                                   BSONType typeParam,
-                                   UUID indexKeyIdParam,
-                                   std::vector<uint8_t> serializedServerValueParam);
-
-    static StatusWith<FLE2IndexedRangeEncryptedValue> decryptAndParse(
-        ServerDataEncryptionLevel1Token token, ConstDataRange serializedServerValue);
-
-    /**
-     * Read the key id from the payload.
-     */
-    static StatusWith<UUID> readKeyId(ConstDataRange serializedServerValue);
-
-    StatusWith<std::vector<uint8_t>> serialize(ServerDataEncryptionLevel1Token token);
-
-    std::vector<FLEEdgeToken> tokens;
-    std::vector<uint64_t> counters;
-    BSONType bsonType;
-    UUID indexKeyId;
-    std::vector<uint8_t> clientEncryptedValue;
 };
 
 /**
@@ -1310,62 +1137,6 @@ struct FLE2IndexedRangeEncryptedValueV2 {
     std::vector<FLE2TagAndEncryptedMetadataBlock> metadataBlocks;
 };
 
-// TODO: SERVER-73303 delete when v2 is enabled by default
-/*
- * Shim layer for EdgeTokenSet types with different protocol versions.
- */
-class VersionedEdgeTokenSet {
-public:
-    VersionedEdgeTokenSet() = default;
-    VersionedEdgeTokenSet(EdgeTokenSet ets);
-    VersionedEdgeTokenSet(EdgeTokenSetV2 ets);
-
-    ConstDataRange getEscDerivedToken() const;
-    ConstDataRange getEncryptedTokens() const;
-
-private:
-    stdx::variant<EdgeTokenSet, EdgeTokenSetV2> edgeTokenSet;
-};
-
-// TODO: SERVER-73303 delete when v2 is enabled by default
-/*
- * Shim layer for FLE2InsertUpdatePayload types with different protocol versions.
- */
-class VersionedInsertUpdatePayload {
-public:
-    VersionedInsertUpdatePayload() = default;
-    VersionedInsertUpdatePayload(FLE2InsertUpdatePayload iup);
-    VersionedInsertUpdatePayload(FLE2InsertUpdatePayloadV2 iup);
-
-    const FLE2InsertUpdatePayload& getInsertUpdatePayloadVersion1() const;
-    const FLE2InsertUpdatePayloadV2& getInsertUpdatePayloadVersion2() const;
-
-    const mongo::UUID& getIndexKeyId() const;
-    int getType() const;
-    ConstDataRange getEncryptedTokens() const;
-    ConstDataRange getEscDerivedToken() const;
-    ConstDataRange getEdcDerivedToken() const;
-    ConstDataRange getServerEncryptionToken() const;
-    const boost::optional<std::vector<VersionedEdgeTokenSet>>& getEdgeTokenSet() const;
-
-private:
-    template <class Payload>
-    boost::optional<std::vector<VersionedEdgeTokenSet>> convertPayloadEdgeTokenSet() {
-        boost::optional<std::vector<VersionedEdgeTokenSet>> converted;
-        auto& payload = stdx::get<Payload>(iupayload);
-        if (payload.getEdgeTokenSet().has_value()) {
-            auto& etsList = payload.getEdgeTokenSet().value();
-            converted = std::vector<VersionedEdgeTokenSet>(etsList.size());
-            std::transform(etsList.begin(), etsList.end(), edgeTokenSet->begin(), [](auto& ets) {
-                return VersionedEdgeTokenSet(ets);
-            });
-        }
-        return converted;
-    }
-    stdx::variant<FLE2InsertUpdatePayload, FLE2InsertUpdatePayloadV2> iupayload;
-    boost::optional<std::vector<VersionedEdgeTokenSet>> edgeTokenSet;
-};
-
 struct EDCServerPayloadInfo {
     static ESCDerivedFromDataTokenAndContentionFactorToken getESCToken(ConstDataRange cdr);
 
@@ -1373,8 +1144,7 @@ struct EDCServerPayloadInfo {
         return payload.getEdgeTokenSet().has_value();
     }
 
-    // TODO: SERVER-73303 change type to FLE2InsertUpdatePayloadV2 when v2 is enabled by default
-    VersionedInsertUpdatePayload payload;
+    FLE2InsertUpdatePayloadV2 payload;
     std::string fieldPathName;
     std::vector<uint64_t> counts;
 };
@@ -1429,21 +1199,13 @@ public:
      * Used during updates to verify that the modified document's pre-image can be
      * safely updated per the protocol compatibility rules.
      */
-    static void validateModifiedDocumentCompatibility(BSONObj& originalDocument);
+    static void validateModifiedDocumentCompatibility(BSONObj& obj);
+
 
     /**
      * Get information about all FLE2InsertUpdatePayload payloads
      */
     static std::vector<EDCServerPayloadInfo> getEncryptedFieldInfo(BSONObj& obj);
-
-    static StatusWith<FLE2IndexedEqualityEncryptedValue> decryptAndParse(
-        ServerDataEncryptionLevel1Token token, ConstDataRange serializedServerValue);
-
-    static StatusWith<FLE2IndexedEqualityEncryptedValue> decryptAndParse(
-        ConstDataRange token, ConstDataRange serializedServerValue);
-
-    static StatusWith<FLE2IndexedRangeEncryptedValue> decryptAndParseRange(
-        ConstDataRange token, ConstDataRange serializedServerValue);
 
     /**
      * Generate a search tag
@@ -1452,9 +1214,7 @@ public:
      */
     static PrfBlock generateTag(EDCTwiceDerivedToken edcTwiceDerived, FLECounter count);
     static PrfBlock generateTag(const EDCServerPayloadInfo& payload);
-    static PrfBlock generateTag(const FLE2IndexedEqualityEncryptedValue& indexedValue);
     static PrfBlock generateTag(const FLEEdgeToken& token, FLECounter count);
-    static std::vector<PrfBlock> generateTags(const FLE2IndexedRangeEncryptedValue& indexedValue);
     static std::vector<PrfBlock> generateTags(const EDCServerPayloadInfo& rangePayload);
 
     /**
@@ -1482,17 +1242,6 @@ public:
      */
     static BSONObj finalizeForUpdate(const BSONObj& doc,
                                      const std::vector<EDCServerPayloadInfo>& serverPayload);
-
-    // TODO: SERVER-73303 remove once v2 is enabled by default
-    /**
-     * Generate an update modifier document with $pull to remove stale tags.
-     *
-     * Generates:
-     *
-     * { $pull : {__safeContent__ : {$in : [tag..] } } }
-     */
-    static BSONObj generateUpdateToRemoveTags(const std::vector<EDCIndexedFields>& removedFields,
-                                              const StringMap<FLEDeleteToken>& tokenMap);
 
     /**
      * Generate an update modifier document with $pull to remove stale tags.
@@ -1549,26 +1298,10 @@ public:
     static BSONObj encryptionInformationSerialize(const NamespaceString& nss,
                                                   const BSONObj& encryptedFields);
 
-    // TODO: SERVER-73303 remove when v2 is enabled by default
-    /**
-     * Serialize EncryptionInformation with EncryptionInformation.schema and a map of delete tokens
-     * for each field in EncryptedFieldConfig.
-     */
-    static BSONObj encryptionInformationSerializeForDelete(const NamespaceString& nss,
-                                                           const EncryptedFieldConfig& ef,
-                                                           FLEKeyVault* keyVault);
-
     /**
      * Get a schema from EncryptionInformation and ensure the esc/ecc/ecoc are setup correctly.
      */
     static EncryptedFieldConfig getAndValidateSchema(const NamespaceString& nss,
-                                                     const EncryptionInformation& ei);
-
-    // TODO: SERVER-73303 remove when v2 is enabled by default
-    /**
-     * Get a set of delete tokens for a given nss from EncryptionInformation.
-     */
-    static StringMap<FLEDeleteToken> getDeleteTokens(const NamespaceString& nss,
                                                      const EncryptionInformation& ei);
 };
 
@@ -1595,25 +1328,6 @@ public:
      * in the encrypted field config
      */
     static void validateCompactionTokens(const EncryptedFieldConfig& efc, BSONObj compactionTokens);
-
-    // TODO: SERVER-73303 delete when v2 is enabled by default
-    /**
-     * Merges the list of ECCDocuments so that entries whose tuple values are
-     * adjacent to each other are combined into a single entry. For example,
-     * the input [ (1,3), (11,11), (7,9), (4,6) ] outputs [ (1,9), (11,11) ].
-     * Assumes none of the input entries overlap with each other.
-     *
-     * This will sort the input unmerged list as a side-effect.
-     */
-    static std::vector<ECCDocument> mergeECCDocuments(std::vector<ECCDocument>& unmerged);
-
-    // TODO: SERVER-73303 delete when v2 is enabled by default
-    /**
-     * Given a list of ECCDocument, where each document is a range of
-     * deleted positions, this calculates the total number of deleted
-     * positions.
-     */
-    static uint64_t countDeleted(const std::vector<ECCDocument>& rangeList);
 };
 
 /**
@@ -1626,10 +1340,7 @@ std::pair<EncryptedBinDataType, ConstDataRange> fromEncryptedConstDataRange(Cons
 
 struct ParsedFindEqualityPayload {
     ESCDerivedFromDataToken escToken;
-    // TODO: SERVER-73303 remove eccToken and serverToken when v2 is enabled by default
-    ECCDerivedFromDataToken eccToken;
     EDCDerivedFromDataToken edcToken;
-    boost::optional<ServerDataEncryptionLevel1Token> serverToken;
     boost::optional<std::int64_t> maxCounter;
 
     // v2 fields
@@ -1726,17 +1437,11 @@ struct FLEFindEdgeTokenSet {
     EDCDerivedFromDataToken edc;
     ESCDerivedFromDataToken esc;
 
-    // TODO: SERVER-73303 remove ecc field when v2 is enabled by default
-    ECCDerivedFromDataToken ecc;
-
     ServerDerivedFromDataToken server;
 };
 
 struct ParsedFindRangePayload {
     boost::optional<std::vector<FLEFindEdgeTokenSet>> edges;
-
-    // TODO: SERVER-73303 remove serverToken when v2 is enabled by default
-    ServerDataEncryptionLevel1Token serverToken;
 
     Fle2RangeOperator firstOp;
     boost::optional<Fle2RangeOperator> secondOp;

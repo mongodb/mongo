@@ -103,10 +103,6 @@ QECountInfosReply getTagsLocal(OperationContext* opCtx,
 
     CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
 
-    uassert(741503,
-            "FeatureFlagFLE2ProtocolVersion2 is not enabled",
-            gFeatureFlagFLE2ProtocolVersion2.isEnabled(serverGlobalParams.featureCompatibility));
-
     auto nestedTokens = toNestedTokens(request.getTokens());
 
     auto countInfoSets =
