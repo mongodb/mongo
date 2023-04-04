@@ -309,8 +309,12 @@ public:
     /**
      * Only for two-phase index builds. Requests the primary to abort the build, and transitions
      * into a waiting state.
+     *
+     * Returns true if the thread has transitioned into the waiting state.
+     * Returns false if the build is already in abort state. This can happen if the build detected
+     * an error while an external operation (e.g. a collection drop) is concurrently aborting it.
      */
-    void requestAbortFromPrimary(const Status& abortStatus);
+    bool requestAbortFromPrimary(const Status& abortStatus);
 
     /**
      * Returns timestamp for committing this index build.

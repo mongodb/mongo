@@ -92,6 +92,7 @@ MONGO_FAIL_POINT_DEFINE(hangIndexBuildBeforeWaitingUntilMajorityOpTime);
 MONGO_FAIL_POINT_DEFINE(hangBeforeUnregisteringAfterCommit);
 MONGO_FAIL_POINT_DEFINE(failSetUpResumeIndexBuild);
 MONGO_FAIL_POINT_DEFINE(failIndexBuildWithError);
+MONGO_FAIL_POINT_DEFINE(hangInRemoveIndexBuildEntryAfterCommitOrAbort);
 
 IndexBuildsCoordinator::IndexBuildsSSS::IndexBuildsSSS()
     : ServerStatusSection("indexBuilds"),
@@ -190,6 +191,8 @@ void removeIndexBuildEntryAfterCommitOrAbort(OperationContext* opCtx,
     if (IndexBuildProtocol::kSinglePhase == replState.protocol) {
         return;
     }
+
+    hangInRemoveIndexBuildEntryAfterCommitOrAbort.pauseWhileSet();
 
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     if (!replCoord->canAcceptWritesFor(opCtx, dbAndUUID)) {

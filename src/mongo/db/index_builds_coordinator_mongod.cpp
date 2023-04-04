@@ -70,6 +70,7 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeInitializingIndexBuild);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildAfterSignalPrimaryForCommitReadiness);
 MONGO_FAIL_POINT_DEFINE(hangBeforeRunningIndexBuild);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildBeforeSignalingPrimaryForAbort);
+MONGO_FAIL_POINT_DEFINE(hangIndexBuildBeforeTransitioningReplStateTokAwaitPrimaryAbort);
 
 const StringData kMaxNumActiveUserIndexBuildsServerParameterName = "maxNumActiveUserIndexBuilds"_sd;
 
@@ -681,13 +682,28 @@ bool IndexBuildsCoordinatorMongod::_signalIfCommitQuorumNotEnabled(
 
 void IndexBuildsCoordinatorMongod::_signalPrimaryForAbortAndWaitForExternalAbort(
     OperationContext* opCtx, ReplIndexBuildState* replState, const Status& abortStatus) {
+
+    hangIndexBuildBeforeTransitioningReplStateTokAwaitPrimaryAbort.pauseWhileSet(opCtx);
+
     LOGV2(7419402,
           "Index build: signaling primary to abort index build",
           "buildUUID"_attr = replState->buildUUID,
           logAttrs(replState->dbName),
           "collectionUUID"_attr = replState->collectionUUID,
           "reason"_attr = abortStatus);
-    replState->requestAbortFromPrimary(abortStatus);
+    const auto transitionedToWaitForAbort = replState->requestAbortFromPrimary(abortStatus);
+
+    if (!transitionedToWaitForAbort) {
+        // The index build has likely been aborted externally (e.g. its underlying collection was
+        // dropped), and it's in the midst of tearing down. There's nothing else to do here.
+        LOGV2(7530800,
+              "Index build: the build is already in aborted state; not signaling primary to abort",
+              "buildUUID"_attr = replState->buildUUID,
+              "db"_attr = replState->dbName,
+              "collectionUUID"_attr = replState->collectionUUID,
+              "reason"_attr = abortStatus);
+        return;
+    }
 
     hangIndexBuildBeforeSignalingPrimaryForAbort.pauseWhileSet(opCtx);
 

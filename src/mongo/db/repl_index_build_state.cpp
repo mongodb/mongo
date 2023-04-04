@@ -229,7 +229,7 @@ void ReplIndexBuildState::commit(OperationContext* opCtx) {
         });
 }
 
-void ReplIndexBuildState::requestAbortFromPrimary(const Status& abortStatus) {
+bool ReplIndexBuildState::requestAbortFromPrimary(const Status& abortStatus) {
     invariant(protocol == IndexBuildProtocol::kTwoPhase);
     stdx::lock_guard lk(_mutex);
 
@@ -245,8 +245,14 @@ void ReplIndexBuildState::requestAbortFromPrimary(const Status& abortStatus) {
                     "buildUUID"_attr = buildUUID);
     }
 
+    if (_indexBuildState.isAborted()) {
+        return false;
+    }
+
     _indexBuildState.setState(
         IndexBuildState::kAwaitPrimaryAbort, false /* skipCheck */, boost::none, abortStatus);
+
+    return true;
 }
 
 Timestamp ReplIndexBuildState::getCommitTimestamp() const {
