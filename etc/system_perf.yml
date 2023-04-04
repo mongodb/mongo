@@ -1171,7 +1171,7 @@ buildvariants:
         install-mongocryptd
       compile_variant: -arm64
     run_on:
-      - "amazon2-arm64"
+      - "amazon2-arm64-large"
     tasks:
       - name: compile
 
