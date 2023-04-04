@@ -30,6 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
@@ -123,6 +124,45 @@ void _appendRecordStats(OperationContext* opCtx,
     }
 }
 
+/**
+ * The collection stats is in the shape of
+ * {
+ *   wiredTiger : {
+ *     uri: "..."
+ *     ...
+ *   }
+ * }
+ * Returns a document only if "uri" is in the original document
+ */
+BSONObj filterQECustomStats(BSONObj obj) {
+    if (obj.firstElementFieldName() == "wiredTiger"_sd) {
+        auto uriElement = obj.firstElement()["uri"_sd];
+        if (uriElement.ok()) {
+            return BSON("wiredTiger"_sd << BSON("uri"_sd << uriElement));
+        }
+    }
+
+    return BSONObj();
+}
+
+/**
+ * The index stats is in the shape of
+ * {
+ *   uri: "..."
+ *   ...
+ * }
+ *
+ * Returns a document only if "uri" is in the original document
+ */
+BSONObj filterQEIndexStats(BSONObj obj) {
+    auto uriElement = obj["uri"_sd];
+    if (uriElement.ok()) {
+        return BSON("uri"_sd << uriElement);
+    }
+
+    return BSONObj();
+}
+
 // Append to 'result' the stats related to record store.
 void _appendRecordStore(OperationContext* opCtx,
                         const CollectionPtr& collection,
@@ -146,12 +186,23 @@ void _appendRecordStore(OperationContext* opCtx,
 
     bool redactForQE = collection.get()->getCollectionOptions().encryptedFieldConfig ||
         collection.get()->ns().isFLE2StateCollection();
-    if (!redactForQE) {
+    if (redactForQE) {
+        BSONObjBuilder filteredQEBuilder;
         if (numericOnly) {
-            recordStore->appendNumericCustomStats(opCtx, result, scale);
+            recordStore->appendNumericCustomStats(opCtx, &filteredQEBuilder, scale);
         } else {
-            recordStore->appendAllCustomStats(opCtx, result, scale);
+            recordStore->appendAllCustomStats(opCtx, &filteredQEBuilder, scale);
         }
+
+        result->appendElements(filterQECustomStats(filteredQEBuilder.obj()));
+
+        return;
+    }
+
+    if (numericOnly) {
+        recordStore->appendNumericCustomStats(opCtx, result, scale);
+    } else {
+        recordStore->appendAllCustomStats(opCtx, result, scale);
     }
 }
 
@@ -163,6 +214,9 @@ void _appendInProgressIndexesStats(OperationContext* opCtx,
     const IndexCatalog* indexCatalog = collection->getIndexCatalog();
     BSONObjBuilder indexDetails;
     std::vector<std::string> indexBuilds;
+
+    bool redactForQE = collection.get()->getCollectionOptions().encryptedFieldConfig ||
+        collection.get()->ns().isFLE2StateCollection();
 
     auto numIndexes = indexCatalog->numIndexesTotal();
     if (collection->isClustered() && !collection->ns().isTimeseriesBucketsCollection()) {
@@ -194,7 +248,11 @@ void _appendInProgressIndexesStats(OperationContext* opCtx,
 
         BSONObjBuilder bob;
         if (iam->appendCustomStats(opCtx, &bob, scale)) {
-            indexDetails.append(descriptor->indexName(), bob.obj());
+            if (redactForQE) {
+                indexDetails.append(descriptor->indexName(), filterQEIndexStats(bob.obj()));
+            } else {
+                indexDetails.append(descriptor->indexName(), bob.obj());
+            }
         }
 
         // Not all indexes in the collection stats may be visible or consistent with our
