@@ -1320,7 +1320,7 @@ TEST_F(DensifyRedactionTest, RedactionFullBoundsWithPartitionFields) {
     auto spec = fromjson(R"({
         $densify: {
             field: "foo",
-            partitionByFields: ["a", "b", "c"],
+            partitionByFields: ["a", "b", "c.d"],
             range: {
                 bounds: "full",
                 step: 100
@@ -1336,7 +1336,7 @@ TEST_F(DensifyRedactionTest, RedactionFullBoundsWithPartitionFields) {
                 "partitionByFields": [
                     "HASH<a>",
                     "HASH<b>",
-                    "HASH<c>"
+                    "HASH<c>.HASH<d>"
                 ],
                 "range": {
                     "step": "?",

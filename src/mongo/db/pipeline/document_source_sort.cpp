@@ -284,7 +284,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceSort::clone(
 void DocumentSourceSort::serializeToArray(std::vector<Value>& array,
                                           SerializationOptions opts) const {
     auto explain = opts.verbosity;
-    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+    if (opts.redactIdentifiers || opts.replacementForLiteralArgs) {
         MONGO_UNIMPLEMENTED_TASSERT(7484310);
     }
 

@@ -155,10 +155,10 @@ TEST_F(DocumentSourcePlanCacheStatsTest, RedactsSuccessfullyAfterAbsorbingMatch)
 
     SerializationOptions options;
     options.replacementForLiteralArgs = "?";
-    options.redactFieldNamesStrategy = [](StringData s) -> std::string {
+    options.identifierRedactionPolicy = [](StringData s) -> std::string {
         return str::stream() << "HASH<" << s << ">";
     };
-    options.redactFieldNames = true;
+    options.redactIdentifiers = true;
 
     pipeline->optimizePipeline();
     ASSERT_EQ(1u, pipeline->getSources().size());

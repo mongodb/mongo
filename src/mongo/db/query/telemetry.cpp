@@ -156,22 +156,15 @@ BSONObj redactHintComponent(BSONObj obj, const SerializationOptions& opts, bool 
             tassert(7421703,
                     "Hinted field must be a string with $hint operator",
                     elem.type() == BSONType::String);
-            if (opts.redactFieldNames) {
-                bob.append(hintSpecialField, FieldPath(elem.String()).redactedFullPath(opts));
-            } else {
-                bob.append(hintSpecialField, elem.String());
-            }
+            bob.append(hintSpecialField, opts.serializeFieldPathFromString(elem.String()));
             continue;
         }
 
-        std::string fieldName = elem.fieldName();
-        if (opts.redactFieldNames) {
-            fieldName = FieldPath(fieldName).redactedFullPath(opts);
-        }
         if (opts.replacementForLiteralArgs && redactValues) {
-            bob.append(fieldName, opts.replacementForLiteralArgs.get());
+            bob.append(opts.serializeFieldPathFromString(elem.fieldName()),
+                       opts.replacementForLiteralArgs.get());
         } else {
-            bob.appendAs(elem, fieldName);
+            bob.appendAs(elem, opts.serializeFieldPathFromString(elem.fieldName()));
         }
     }
     return bob.obj();
@@ -191,7 +184,7 @@ BSONObj redactLetSpec(BSONObj letSpec,
             Expression::parseOperand(expCtx.get(), elem, expCtx->variablesParseState)
                 ->serialize(opts);
         // Note that this will throw on deeply nested let variables.
-        redactedValue.addToBsonObj(&bob, opts.serializeFieldName(elem.fieldName()));
+        redactedValue.addToBsonObj(&bob, opts.serializeFieldPathFromString(elem.fieldName()));
     }
     return bob.obj();
 }
@@ -203,7 +196,7 @@ StatusWith<BSONObj> makeTelemetryKey(const FindCommandRequest& findCommand,
     // TODO: SERVER-75156 Factor query shape out of telemetry. That ticket will involve splitting
     // this function up and moving most of it to another, non-telemetry related header.
 
-    if (!opts.redactFieldNames && !opts.replacementForLiteralArgs) {
+    if (!opts.redactIdentifiers && !opts.replacementForLiteralArgs) {
         // Short circuit if no redaction needs to be done.
         BSONObjBuilder bob;
         findCommand.serialize({}, &bob);
@@ -222,12 +215,12 @@ StatusWith<BSONObj> makeTelemetryKey(const FindCommandRequest& findCommand,
             auto nss = ns.nss().value();
             if (nss.tenantId()) {
                 cmdNs.append("tenantId",
-                             opts.serializeFieldName(nss.tenantId().value().toString()));
+                             opts.serializeIdentifier(nss.tenantId().value().toString()));
             }
-            cmdNs.append("db", opts.serializeFieldName(nss.db()));
-            cmdNs.append("coll", opts.serializeFieldName(nss.coll()));
+            cmdNs.append("db", opts.serializeIdentifier(nss.db()));
+            cmdNs.append("coll", opts.serializeIdentifier(nss.coll()));
         } else {
-            cmdNs.append("uuid", opts.serializeFieldName(ns.uuid()->toString()));
+            cmdNs.append("uuid", opts.serializeIdentifier(ns.uuid()->toString()));
         }
         cmdNs.done();
     }
@@ -237,10 +230,10 @@ StatusWith<BSONObj> makeTelemetryKey(const FindCommandRequest& findCommand,
         auto nssOrUUID = findCommand.getNamespaceOrUUID();
         std::string toSerialize;
         if (nssOrUUID.uuid()) {
-            toSerialize = opts.serializeFieldName(nssOrUUID.toString());
+            toSerialize = opts.serializeIdentifier(nssOrUUID.toString());
         } else {
             // Database is set at the command level, only serialize the collection here.
-            toSerialize = opts.serializeFieldName(nssOrUUID.nss()->coll());
+            toSerialize = opts.serializeIdentifier(nssOrUUID.nss()->coll());
         }
         bob.append(FindCommandRequest::kCommandName, toSerialize);
     }
@@ -335,7 +328,7 @@ StatusWith<BSONObj> makeTelemetryKey(const FindCommandRequest& findCommand,
         return boost::none;
     }();
     if (appName.has_value()) {
-        bob.append("applicationName", opts.serializeFieldName(appName.value()));
+        bob.append("applicationName", opts.serializeIdentifier(appName.value()));
     }
 
     return bob.obj();
@@ -569,13 +562,13 @@ static const StringData replacementForLiteralArgs = "?"_sd;
 }  // namespace
 
 StatusWith<BSONObj> TelemetryMetrics::redactKey(const BSONObj& key,
-                                                bool redactFieldNames,
+                                                bool redactIdentifiers,
                                                 OperationContext* opCtx) const {
     // The redacted key for each entry is cached on first computation. However, if the redaction
     // straegy has flipped (from no redaction to SHA256, vice versa), we just return the key passed
     // to the function, so entries returned to the user match the redaction strategy requested in
     // the most recent telemetry command.
-    if (!redactFieldNames) {
+    if (!redactIdentifiers) {
         return key;
     }
     if (_redactedKey) {

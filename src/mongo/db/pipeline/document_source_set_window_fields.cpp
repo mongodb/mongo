@@ -140,7 +140,7 @@ WindowFunctionStatement WindowFunctionStatement::parse(BSONElement elem,
 }
 void WindowFunctionStatement::serialize(MutableDocument& outputFields,
                                         SerializationOptions opts) const {
-    outputFields[opts.serializeFieldName(fieldName)] = expr->serialize(opts);
+    outputFields[opts.serializeFieldPathFromString(fieldName)] = expr->serialize(opts);
 }
 
 list<intrusive_ptr<DocumentSource>> document_source_set_window_fields::create(
@@ -307,7 +307,7 @@ Value DocumentSourceInternalSetWindowFields::serialize(SerializationOptions opts
         MutableDocument md;
 
         for (auto&& [fieldName, function] : _executableOutputs) {
-            md[opts.serializeFieldName(fieldName)] = opts.serializeLiteralValue(
+            md[opts.serializeFieldPathFromString(fieldName)] = opts.serializeLiteralValue(
                 static_cast<long long>(_memoryTracker[fieldName].maxMemoryBytes()));
         }
 

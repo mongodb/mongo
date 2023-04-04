@@ -393,8 +393,9 @@ Value DocumentSourceBucketAuto::serialize(SerializationOptions opts) const {
     MutableDocument outputSpec(_accumulatedFields.size());
     for (auto&& accumulatedField : _accumulatedFields) {
         intrusive_ptr<AccumulatorState> accum = accumulatedField.makeAccumulator();
-        outputSpec[opts.serializeFieldName(accumulatedField.fieldName)] = Value(accum->serialize(
-            accumulatedField.expr.initializer, accumulatedField.expr.argument, opts));
+        outputSpec[opts.serializeFieldPathFromString(accumulatedField.fieldName)] =
+            Value(accum->serialize(
+                accumulatedField.expr.initializer, accumulatedField.expr.argument, opts));
     }
     insides["output"] = outputSpec.freezeToValue();
 

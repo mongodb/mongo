@@ -328,7 +328,7 @@ void DocumentSourceUnionWith::doDispose() {
 
 Value DocumentSourceUnionWith::serialize(SerializationOptions opts) const {
     auto explain = opts.verbosity;
-    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+    if (opts.redactIdentifiers || opts.replacementForLiteralArgs) {
         MONGO_UNIMPLEMENTED_TASSERT(7484307);
     }
 

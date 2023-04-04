@@ -157,10 +157,10 @@ void DocumentSourceStreamingGroup::serializeAdditionalFields(MutableDocument& ou
                                                              SerializationOptions opts) const {
     std::vector<Value> monotonicIdFields;
     if (_idFieldNames.empty()) {
-        monotonicIdFields.emplace_back(opts.serializeFieldName("_id"));
+        monotonicIdFields.emplace_back(opts.serializeFieldPath("_id"));
     } else {
         for (size_t i : _monotonicExpressionIndexes) {
-            monotonicIdFields.emplace_back(opts.serializeFieldName(_idFieldNames[i]));
+            monotonicIdFields.emplace_back(opts.serializeFieldPathFromString(_idFieldNames[i]));
         }
     }
     out[kMonotonicIdFieldsSpecField] = Value(std::move(monotonicIdFields));

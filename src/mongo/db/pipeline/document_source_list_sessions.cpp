@@ -75,7 +75,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceListSessions::createFromBson(
 }
 
 Value DocumentSourceListSessions::serialize(SerializationOptions opts) const {
-    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+    if (opts.redactIdentifiers || opts.replacementForLiteralArgs) {
         MONGO_UNIMPLEMENTED_TASSERT(7484327);
     }
     ListSessionsSpec spec;

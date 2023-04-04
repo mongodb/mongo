@@ -64,7 +64,7 @@ Value DocumentSourceGeoNear::serialize(SerializationOptions opts) const {
     MutableDocument result;
 
     if (keyFieldPath) {
-        result.setField(kKeyFieldName, Value(keyFieldPath->redactedFullPath(opts)));
+        result.setField(kKeyFieldName, Value(opts.serializeFieldPath(*keyFieldPath)));
     }
 
     auto nearValue = [&]() -> Value {
@@ -76,7 +76,7 @@ Value DocumentSourceGeoNear::serialize(SerializationOptions opts) const {
         }
     }();
     result.setField("near", nearValue);
-    result.setField("distanceField", Value(distanceField->redactedFullPath(opts)));
+    result.setField("distanceField", Value(opts.serializeFieldPath(*distanceField)));
 
     if (maxDistance) {
         result.setField("maxDistance", opts.serializeLiteralValue(*maxDistance));
@@ -86,7 +86,7 @@ Value DocumentSourceGeoNear::serialize(SerializationOptions opts) const {
         result.setField("minDistance", opts.serializeLiteralValue(*minDistance));
     }
 
-    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+    if (opts.redactIdentifiers || opts.replacementForLiteralArgs) {
         auto matchExpr = uassertStatusOK(MatchExpressionParser::parse(query, pExpCtx));
         result.setField("query", Value(matchExpr->serialize(opts)));
     } else {
@@ -98,7 +98,7 @@ Value DocumentSourceGeoNear::serialize(SerializationOptions opts) const {
     }
 
     if (includeLocs)
-        result.setField("includeLocs", Value(includeLocs->redactedFullPath(opts)));
+        result.setField("includeLocs", Value(opts.serializeFieldPath(*includeLocs)));
 
     return Value(DOC(getSourceName() << result.freeze()));
 }

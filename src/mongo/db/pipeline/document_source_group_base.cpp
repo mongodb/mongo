@@ -99,7 +99,8 @@ Value DocumentSourceGroupBase::serialize(SerializationOptions opts) const {
         invariant(_idExpressions.size() == _idFieldNames.size());
         MutableDocument md;
         for (size_t i = 0; i < _idExpressions.size(); i++) {
-            md[opts.serializeFieldName(_idFieldNames[i])] = _idExpressions[i]->serialize(opts);
+            md[opts.serializeFieldPathFromString(_idFieldNames[i])] =
+                _idExpressions[i]->serialize(opts);
         }
         insides["_id"] = md.freezeToValue();
     }
@@ -107,8 +108,9 @@ Value DocumentSourceGroupBase::serialize(SerializationOptions opts) const {
     // Add the remaining fields.
     for (auto&& accumulatedField : _accumulatedFields) {
         intrusive_ptr<AccumulatorState> accum = accumulatedField.makeAccumulator();
-        insides[opts.serializeFieldName(accumulatedField.fieldName)] = Value(accum->serialize(
-            accumulatedField.expr.initializer, accumulatedField.expr.argument, opts));
+        insides[opts.serializeFieldPathFromString(accumulatedField.fieldName)] =
+            Value(accum->serialize(
+                accumulatedField.expr.initializer, accumulatedField.expr.argument, opts));
     }
 
     if (_doingMerge) {
@@ -124,7 +126,7 @@ Value DocumentSourceGroupBase::serialize(SerializationOptions opts) const {
         MutableDocument md;
 
         for (size_t i = 0; i < _accumulatedFields.size(); i++) {
-            md[opts.serializeFieldName(_accumulatedFields[i].fieldName)] =
+            md[opts.serializeFieldPathFromString(_accumulatedFields[i].fieldName)] =
                 opts.serializeLiteralValue(static_cast<long long>(
                     _memoryTracker[_accumulatedFields[i].fieldName].maxMemoryBytes()));
         }

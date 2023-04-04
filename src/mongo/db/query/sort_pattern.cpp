@@ -120,7 +120,7 @@ Document SortPattern::serialize(SortKeySerialization serializationMode,
     for (size_t i = 0; i < n; ++i) {
         if (_sortPattern[i].fieldPath) {
             std::stringstream serializedFieldName;
-            if (!options.redactFieldNames) {
+            if (!options.redactIdentifiers) {
                 // Append a named integer based on whether the sort is ascending/descending.
                 serializedFieldName << _sortPattern[i].fieldPath->fullPath();
             } else {
@@ -130,7 +130,7 @@ Document SortPattern::serialize(SortKeySerialization serializationMode,
                     if (index > 0) {
                         serializedFieldName << ".";
                     }
-                    serializedFieldName << options.redactFieldNamesStrategy(
+                    serializedFieldName << options.identifierRedactionPolicy(
                         _sortPattern[i].fieldPath->getFieldName(index));
                 }
             }

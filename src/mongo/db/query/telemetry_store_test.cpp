@@ -130,8 +130,8 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
     fcr.setFilter(BSON("a" << 1));
     SerializationOptions opts;
     opts.replacementForLiteralArgs = "?";
-    opts.redactFieldNames = true;
-    opts.redactFieldNamesStrategy = redactFieldNameForTest;
+    opts.redactIdentifiers = true;
+    opts.identifierRedactionPolicy = redactFieldNameForTest;
 
     auto redacted = uassertStatusOK(telemetry::makeTelemetryKey(fcr, opts, expCtx));
 
@@ -392,8 +392,8 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestEmptyFields) {
     fcr.setProjection(BSONObj());
     SerializationOptions opts;
     opts.replacementForLiteralArgs = "?";
-    opts.redactFieldNames = true;
-    opts.redactFieldNamesStrategy = redactFieldNameForTest;
+    opts.redactIdentifiers = true;
+    opts.identifierRedactionPolicy = redactFieldNameForTest;
 
     auto redacted = uassertStatusOK(telemetry::makeTelemetryKey(fcr, opts, expCtx));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -475,8 +475,8 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
         redacted);
 
     fcr.setHint(BSON("z" << 1 << "c" << 1));
-    opts.redactFieldNamesStrategy = redactFieldNameForTest;
-    opts.redactFieldNames = true;
+    opts.identifierRedactionPolicy = redactFieldNameForTest;
+    opts.redactIdentifiers = true;
     opts.replacementForLiteralArgs = boost::none;
     redacted = uassertStatusOK(telemetry::makeTelemetryKey(fcr, opts, expCtx));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT

@@ -214,8 +214,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceOut::createFromBson(
 Value DocumentSourceOut::serialize(SerializationOptions opts) const {
     MutableDocument spec;
     // Do not include the tenantId in the serialized 'outputNs'.
-    spec["db"] = Value(opts.serializeFieldName(_outputNs.dbName().db()));
-    spec["coll"] = Value(opts.serializeFieldName(_outputNs.coll()));
+    spec["db"] = Value(opts.serializeIdentifier(_outputNs.dbName().db()));
+    spec["coll"] = Value(opts.serializeIdentifier(_outputNs.coll()));
     return Value(Document{{kStageName, spec.freezeToValue()}});
 }
 

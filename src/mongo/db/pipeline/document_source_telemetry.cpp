@@ -49,23 +49,23 @@ bool parseTelemetryEmbeddedObject(BSONObj embeddedObj) {
         uassert(ErrorCodes::FailedToParse,
                 str::stream()
                     << DocumentSourceTelemetry::kStageName
-                    << " parameters object may only contain one field, 'redactFieldNames'. Found: "
+                    << " parameters object may only contain one field, 'redactIdentifiers'. Found: "
                     << embeddedObj.toString(),
                 embeddedObj.nFields() == 1);
 
         uassert(ErrorCodes::FailedToParse,
                 str::stream()
                     << DocumentSourceTelemetry::kStageName
-                    << " parameters object may only contain 'redactFieldNames' option. Found: "
+                    << " parameters object may only contain 'redactIdentifiers' option. Found: "
                     << embeddedObj.firstElementFieldName(),
-                embeddedObj.hasField("redactFieldNames"));
+                embeddedObj.hasField("redactIdentifiers"));
 
         uassert(ErrorCodes::FailedToParse,
                 str::stream() << DocumentSourceTelemetry::kStageName
-                              << " redactFieldNames parameter must be boolean. Found type: "
+                              << " redactIdentifiers parameter must be boolean. Found type: "
                               << typeName(embeddedObj.firstElementType()),
                 embeddedObj.firstElementType() == BSONType::Bool);
-        fieldNameRedaction = embeddedObj["redactFieldNames"].trueValue();
+        fieldNameRedaction = embeddedObj["redactIdentifiers"].trueValue();
     }
     return fieldNameRedaction;
 }
@@ -144,7 +144,7 @@ DocumentSource::GetNextResult DocumentSourceTelemetry::doGetNext() {
         const auto partitionReadTime =
             Timestamp{Timestamp(Date_t::now().toMillisSinceEpoch() / 1000, 0)};
         for (auto&& [key, metrics] : *partition) {
-            auto swKey = metrics->redactKey(key, _redactFieldNames, pExpCtx->opCtx);
+            auto swKey = metrics->redactKey(key, _redactIdentifiers, pExpCtx->opCtx);
             if (!swKey.isOK()) {
                 LOGV2_DEBUG(7349403,
                             3,

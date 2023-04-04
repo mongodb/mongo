@@ -1747,8 +1747,8 @@ Value parseAndSerializeAccumExpr(
     SerializationOptions options;
     std::string replacementChar = "?";
     options.replacementForLiteralArgs = replacementChar;
-    options.redactFieldNames = true;
-    options.redactFieldNamesStrategy = redactFieldNameForTest;
+    options.redactIdentifiers = true;
+    options.identifierRedactionPolicy = redactFieldNameForTest;
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     auto expr = func(expCtx.get(), obj.firstElement(), expCtx->variablesParseState);
     return expr->serialize(options);
@@ -1761,8 +1761,8 @@ Document parseAndSerializeAccum(
     SerializationOptions options;
     std::string replacementChar = "?";
     options.replacementForLiteralArgs = replacementChar;
-    options.redactFieldNames = true;
-    options.redactFieldNamesStrategy = redactFieldNameForTest;
+    options.redactIdentifiers = true;
+    options.identifierRedactionPolicy = redactFieldNameForTest;
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     VariablesParseState vps = expCtx->variablesParseState;
 

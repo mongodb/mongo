@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/util/assert_util.h"
 #include <boost/optional.hpp>
@@ -62,17 +63,62 @@ struct SerializationOptions {
 
     SerializationOptions(ExplainOptions::Verbosity verbosity_) : verbosity(verbosity_) {}
 
-    SerializationOptions(std::function<std::string(StringData)> redactFieldNamesStrategy_,
+    SerializationOptions(std::function<std::string(StringData)> identifierRedactionPolicy_,
                          boost::optional<StringData> replacementForLiteralArgs_)
         : replacementForLiteralArgs(replacementForLiteralArgs_),
-          redactFieldNames(redactFieldNamesStrategy_),
-          redactFieldNamesStrategy(redactFieldNamesStrategy_) {}
+          redactIdentifiers(identifierRedactionPolicy_),
+          identifierRedactionPolicy(identifierRedactionPolicy_) {}
 
-    std::string serializeFieldName(StringData str) const {
-        if (redactFieldNames) {
-            return redactFieldNamesStrategy(str);
+    // Helper function for redacting identifiable information (like collection/db names).
+    // Note: serializeFieldPath/serializeFieldPathFromString should be used for redacting field
+    // names.
+    std::string serializeIdentifier(StringData str) const {
+        if (redactIdentifiers) {
+            return identifierRedactionPolicy(str);
         }
         return str.toString();
+    }
+
+    std::string serializeFieldPath(FieldPath path) const {
+        if (redactIdentifiers) {
+            std::stringstream redacted;
+            for (size_t i = 0; i < path.getPathLength(); ++i) {
+                if (i > 0) {
+                    redacted << ".";
+                }
+                redacted << identifierRedactionPolicy(path.getFieldName(i));
+            }
+            return redacted.str();
+        }
+        return path.fullPath();
+    }
+
+    std::string serializeFieldPathWithPrefix(FieldPath path) const {
+        return "$" + serializeFieldPath(path);
+    }
+
+    std::string serializeFieldPathFromString(StringData path) const {
+        if (redactIdentifiers) {
+            // Some valid field names are considered invalid as a FieldPath (for example, fields
+            // like "foo.$bar" where a sub-component is prefixed with "$"). For now, if
+            // serializeFieldPath errors due to an "invalid" field name, we'll serialize that field
+            // name with this placeholder.
+            // TODO SERVER-75623 Implement full redaction for all field names and remove placeholder
+            try {
+                return serializeFieldPath(path);
+            } catch (DBException&) {
+                return serializeFieldPath("dollarPlaceholder");
+            }
+        }
+        return path.toString();
+    }
+
+    template <class T>
+    Value serializeLiteralValue(T n) const {
+        if (replacementForLiteralArgs) {
+            return Value(*replacementForLiteralArgs);
+        }
+        return Value(n);
     }
 
     // Helper functions for redacting BSONObj. Does not take into account anything to do with MQL
@@ -96,9 +142,10 @@ struct SerializationOptions {
             }
         }
     }
+
     void redactObjToBuilder(BSONObjBuilder* bob, BSONObj objToRedact) {
         for (const auto& elem : objToRedact) {
-            auto fieldName = serializeFieldName(elem.fieldName());
+            auto fieldName = serializeFieldPath(elem.fieldName());
             if (elem.type() == BSONType::Object) {
                 BSONObjBuilder subObj(bob->subobjStart(fieldName));
                 redactObjToBuilder(&subObj, elem.Obj());
@@ -117,14 +164,6 @@ struct SerializationOptions {
         }
     }
 
-    template <class T>
-    Value serializeLiteralValue(T n) {
-        if (replacementForLiteralArgs) {
-            return Value(*replacementForLiteralArgs);
-        }
-        return Value(n);
-    }
-
     // 'replacementForLiteralArgs' is an independent option to serialize in a genericized format
     // with the aim of similar "shaped" queries serializing to the same object. For example, if
     // set to '?' then the serialization of {a: {$gt: 2}} will result in {a: {$gt: '?'}}, as
@@ -135,11 +174,11 @@ struct SerializationOptions {
     // 4, so the serialization expected would be {$and: [{a: {$gt: '?'}}, {b: {$lt: '?'}}]}.
     boost::optional<StringData> replacementForLiteralArgs = boost::none;
 
-    // If true the caller must set redactFieldNamesStrategy. 'redactFieldNames' if set along with
-    // a strategy the redaction strategy will be called on any field paths/names encountered
-    // before serializing them.
-    bool redactFieldNames = false;
-    std::function<std::string(StringData)> redactFieldNamesStrategy = defaultRedactionStrategy;
+    // If true the caller must set identifierRedactionPolicy. 'redactIdentifiers' if set along with
+    // a strategy the redaction strategy will be called on any personal identifiable information
+    // (e.g., field paths/names, collection names) encountered before serializing them.
+    bool redactIdentifiers = false;
+    std::function<std::string(StringData)> identifierRedactionPolicy = defaultRedactionStrategy;
 
     // If set, serializes without including the path. For example {a: {$gt: 2}} would serialize
     // as just {$gt: 2}.

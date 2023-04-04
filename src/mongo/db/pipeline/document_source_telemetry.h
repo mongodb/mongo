@@ -47,9 +47,9 @@ public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec);
 
-        LiteParsed(std::string parseTimeName, bool redactFieldNames)
+        LiteParsed(std::string parseTimeName, bool redactIdentifiers)
             : LiteParsedDocumentSource(std::move(parseTimeName)),
-              _redactFieldNames(redactFieldNames) {}
+              _redactIdentifiers(redactIdentifiers) {}
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const override {
             return stdx::unordered_set<NamespaceString>();
@@ -74,7 +74,7 @@ public:
             transactionNotSupported(kStageName);
         }
 
-        bool _redactFieldNames;
+        bool _redactIdentifiers;
     };
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
@@ -112,8 +112,8 @@ public:
 
 private:
     DocumentSourceTelemetry(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                            bool redactFieldNames = false)
-        : DocumentSource(kStageName, expCtx), _redactFieldNames(redactFieldNames) {}
+                            bool redactIdentifiers = false)
+        : DocumentSource(kStageName, expCtx), _redactIdentifiers(redactIdentifiers) {}
 
     GetNextResult doGetNext() final;
 
@@ -130,7 +130,7 @@ private:
     TelemetryStore::PartitionId _currentPartition = -1;
 
     // When true, redact field names from returned query shapes.
-    bool _redactFieldNames;
+    bool _redactIdentifiers;
 };
 
 }  // namespace mongo

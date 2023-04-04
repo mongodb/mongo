@@ -1024,7 +1024,7 @@ void DocumentSourceLookUp::appendSpecificExecStats(MutableDocument& doc) const {
 void DocumentSourceLookUp::serializeToArray(std::vector<Value>& array,
                                             SerializationOptions opts) const {
     auto explain = opts.verbosity;
-    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+    if (opts.redactIdentifiers || opts.replacementForLiteralArgs) {
         MONGO_UNIMPLEMENTED_TASSERT(7484326);
     }
 

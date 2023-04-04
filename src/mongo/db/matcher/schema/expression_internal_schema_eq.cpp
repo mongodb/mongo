@@ -65,7 +65,7 @@ void InternalSchemaEqMatchExpression::debugString(StringBuilder& debug,
 BSONObj InternalSchemaEqMatchExpression::getSerializedRightHandSide(
     SerializationOptions opts) const {
     BSONObjBuilder eqObj;
-    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+    if (opts.redactIdentifiers || opts.replacementForLiteralArgs) {
         if (_rhsElem.isABSONObj()) {
             BSONObjBuilder exprSpec(eqObj.subobjStart(kName));
             opts.redactObjToBuilder(&exprSpec, _rhsElem.Obj());

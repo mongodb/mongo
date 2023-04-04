@@ -65,9 +65,9 @@ std::string redactFieldNameForTest(StringData s) {
 TEST(Redaction, ProjectionTest) {
     SerializationOptions options;
     options.replacementForLiteralArgs = "?";
-    options.redactFieldNames = true;
+    options.redactIdentifiers = true;
 
-    options.redactFieldNamesStrategy = redactFieldNameForTest;
+    options.identifierRedactionPolicy = redactFieldNameForTest;
     auto redactProj = [&](std::string obj) {
         return compileProjection(fromjson(obj))->serializeTransformation(boost::none, options);
     };

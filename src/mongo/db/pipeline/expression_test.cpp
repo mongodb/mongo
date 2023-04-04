@@ -3731,8 +3731,8 @@ TEST(ExpressionGetFieldTest, GetFieldSerializesAndRedactsCorrectly) {
     SerializationOptions options;
     std::string replacementChar = "?";
     options.replacementForLiteralArgs = replacementChar;
-    options.redactFieldNamesStrategy = redactFieldNameForTest;
-    options.redactFieldNames = true;
+    options.identifierRedactionPolicy = redactFieldNameForTest;
+    options.redactIdentifiers = true;
     auto expCtx = ExpressionContextForTest{};
     VariablesParseState vps = expCtx.variablesParseState;
 
@@ -3776,8 +3776,8 @@ TEST(ExpressionSetFieldTest, SetFieldRedactsCorrectly) {
     SerializationOptions options;
     std::string replacementChar = "?";
     options.replacementForLiteralArgs = replacementChar;
-    options.redactFieldNamesStrategy = redactFieldNameForTest;
-    options.redactFieldNames = true;
+    options.identifierRedactionPolicy = redactFieldNameForTest;
+    options.redactIdentifiers = true;
     auto expCtx = ExpressionContextForTest{};
     VariablesParseState vps = expCtx.variablesParseState;
 

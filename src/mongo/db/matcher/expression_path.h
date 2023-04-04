@@ -161,12 +161,7 @@ public:
     void serialize(BSONObjBuilder* out, SerializationOptions opts) const override {
         auto&& rhs = getSerializedRightHandSide(opts);
         if (opts.includePath) {
-            if (opts.redactFieldNames) {
-                auto redactedFieldName = opts.redactFieldNamesStrategy(path());
-                out->append(redactedFieldName, rhs);
-            } else {
-                out->append(path(), rhs);
-            }
+            out->append(opts.serializeFieldPathFromString(path()), rhs);
         } else {
             out->appendElements(rhs);
         }

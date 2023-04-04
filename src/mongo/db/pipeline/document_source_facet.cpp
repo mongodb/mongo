@@ -186,7 +186,7 @@ DocumentSource::GetNextResult DocumentSourceFacet::doGetNext() {
 }
 
 Value DocumentSourceFacet::serialize(SerializationOptions opts) const {
-    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+    if (opts.redactIdentifiers || opts.replacementForLiteralArgs) {
         MONGO_UNIMPLEMENTED_TASSERT(7484347);
     }
 

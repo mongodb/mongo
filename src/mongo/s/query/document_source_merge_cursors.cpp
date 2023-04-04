@@ -117,7 +117,7 @@ DocumentSource::GetNextResult DocumentSourceMergeCursors::doGetNext() {
 Value DocumentSourceMergeCursors::serialize(SerializationOptions opts) const {
     invariant(!_blockingResultsMerger);
     invariant(_armParams);
-    if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+    if (opts.redactIdentifiers || opts.replacementForLiteralArgs) {
         MONGO_UNIMPLEMENTED_TASSERT(7484301);
     }
 

@@ -296,10 +296,10 @@ Pipeline::SourceContainer::iterator DocumentSourceUnwind::doOptimizeAt(
 Value DocumentSourceUnwind::serialize(SerializationOptions opts) const {
     return Value(DOC(
         getSourceName() << DOC(
-            "path" << _unwindPath.redactedFullPathWithPrefix(opts) << "preserveNullAndEmptyArrays"
+            "path" << opts.serializeFieldPathWithPrefix(_unwindPath) << "preserveNullAndEmptyArrays"
                    << (_preserveNullAndEmptyArrays ? opts.serializeLiteralValue(true) : Value())
                    << "includeArrayIndex"
-                   << (_indexPath ? Value((*_indexPath).redactedFullPath(opts)) : Value()))));
+                   << (_indexPath ? Value(opts.serializeFieldPath(*_indexPath)) : Value()))));
 }
 
 DepsTracker::State DocumentSourceUnwind::getDependencies(DepsTracker* deps) const {

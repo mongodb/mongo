@@ -290,12 +290,12 @@ void ProjectionNode::serialize(boost::optional<ExplainOptions::Verbosity> explai
 
     // Always put "_id" first if it was projected (implicitly or explicitly).
     if (_projectedFieldsSet.find("_id") != _projectedFieldsSet.end()) {
-        output->addField(options.serializeFieldName("_id"), Value(projVal));
+        output->addField(options.serializeFieldPath("_id"), Value(projVal));
     }
 
     for (auto&& projectedField : _projectedFields) {
         if (projectedField != "_id") {
-            output->addField(options.serializeFieldName(projectedField), Value(projVal));
+            output->addField(options.serializeFieldPathFromString(projectedField), Value(projVal));
         }
     }
 
@@ -304,7 +304,7 @@ void ProjectionNode::serialize(boost::optional<ExplainOptions::Verbosity> explai
         if (childIt != _children.end()) {
             MutableDocument subDoc;
             childIt->second->serialize(explain, &subDoc, options);
-            output->addField(options.serializeFieldName(field), subDoc.freezeToValue());
+            output->addField(options.serializeFieldPathFromString(field), subDoc.freezeToValue());
         } else {
             tassert(7241727,
                     "computed fields must be allowed in inclusion projections.",
@@ -313,7 +313,7 @@ void ProjectionNode::serialize(boost::optional<ExplainOptions::Verbosity> explai
             tassert(7241728,
                     "reached end of the expression iterator",
                     expressionIt != _expressions.end());
-            output->addField(options.serializeFieldName(field),
+            output->addField(options.serializeFieldPathFromString(field),
                              expressionIt->second->serialize(options));
         }
     }

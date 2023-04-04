@@ -498,11 +498,7 @@ void NotMatchExpression::serialize(BSONObjBuilder* out, SerializationOptions opt
             BSONObjBuilder pathBob(out->subobjStart(path));
             pathBob.append("$not", pathMatch->getSerializedRightHandSide(opts));
         };
-        if (opts.redactFieldNames) {
-            append(opts.redactFieldNamesStrategy(pathMatch->path()));
-        } else {
-            append(pathMatch->path());
-        }
+        append(opts.serializeFieldPathFromString(pathMatch->path()));
         return;
     }
     return serializeNotExpressionToNor(expressionToNegate, out, opts);

@@ -158,7 +158,7 @@ TEST(ExpressionGeoTest, GeoNearEquivalent) {
 
 TEST(ExpressionGeoTest, SerializeGeoExpressions) {
     SerializationOptions opts = {};
-    opts.redactFieldNames = true;
+    opts.redactIdentifiers = true;
     opts.replacementForLiteralArgs = "?";
     {
         BSONObj query = fromjson("{$within: {$box: [{x: 4, y: 4}, [6, 6]]}}");

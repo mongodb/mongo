@@ -164,18 +164,4 @@ FieldPath FieldPath::concat(const FieldPath& tail) const {
 
     return FieldPath(std::move(concat), std::move(newDots), std::move(newHashes));
 }
-
-std::string FieldPath::redactedFullPath(SerializationOptions opts) const {
-    if (!opts.redactFieldNames) {
-        return fullPath();
-    }
-    std::stringstream redacted;
-    for (size_t i = 0; i < getPathLength(); ++i) {
-        if (i > 0) {
-            redacted << ".";
-        }
-        redacted << opts.redactFieldNamesStrategy(getFieldName(i));
-    }
-    return redacted.str();
-}
 }  // namespace mongo

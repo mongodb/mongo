@@ -2390,7 +2390,8 @@ Value ExpressionObject::serialize(SerializationOptions options) const {
     }
     MutableDocument outputDoc;
     for (auto&& pair : _expressions) {
-        outputDoc.addField(options.serializeFieldName(pair.first), pair.second->serialize(options));
+        outputDoc.addField(options.serializeFieldPathFromString(pair.first),
+                           pair.second->serialize(options));
     }
     return outputDoc.freezeToValue();
 }
@@ -2594,29 +2595,19 @@ auto getPrefixAndPath(FieldPath path) {
 
 Value ExpressionFieldPath::serialize(SerializationOptions options) const {
     auto [prefix, path] = getPrefixAndPath(_fieldPath);
-    if (options.redactFieldNames) {
-        // This is a variable.
-        if (prefix.length() == 2) {
-            if (path.getPathLength() == 1 && Variables::isBuiltin(_variable)) {
-                // Nothing to redact.
-                return Value(prefix + path.fullPath());
-            } else if (path.getPathLength() == 1) {
-                // This may be a variable or a field path, but either way it needs to be redacted.
-                return Value(prefix + path.redactedFullPath(options));
-            } else if (path.getPathLength() > 1 && Variables::isBuiltin(_variable)) {
-                // The first component of this path is a system variable, so keep that and redact
-                // the rest.
-                return Value(prefix + path.front() + "." + path.tail().redactedFullPath(options));
-            } else {
-                // This path has multiple components, and each part is from the user. Redact every
-                // component.
-                return Value(prefix + path.redactedFullPath(options));
-            }
+    // First handles special cases for redaction of system variables. User variables will fall
+    // through to the default full redaction case.
+    if (options.redactIdentifiers && prefix.length() == 2) {
+        if (path.getPathLength() == 1 && Variables::isBuiltin(_variable)) {
+            // Nothing to redact for builtin variables.
+            return Value(prefix + path.fullPath());
+        } else if (path.getPathLength() > 1 && Variables::isBuiltin(_variable)) {
+            // The first component of this path is a system variable, so keep that and redact
+            // the rest.
+            return Value(prefix + path.front() + "." + options.serializeFieldPath(path.tail()));
         }
-        return Value(path.redactedFullPathWithPrefix(options));
-    } else {
-        return Value(prefix + path.fullPath());
     }
+    return Value(prefix + options.serializeFieldPath(path));
 }
 
 Expression::ComputedPaths ExpressionFieldPath::getComputedPaths(const std::string& exprFieldPath,
@@ -2954,8 +2945,8 @@ Value ExpressionLet::serialize(SerializationOptions options) const {
     for (VariableMap::const_iterator it = _variables.begin(), end = _variables.end(); it != end;
          ++it) {
         auto key = it->second.name;
-        if (options.redactFieldNames) {
-            key = options.redactFieldNamesStrategy(key);
+        if (options.redactIdentifiers) {
+            key = options.identifierRedactionPolicy(key);
         }
         vars[key] = it->second.expression->serialize(options);
     }
@@ -8138,13 +8129,12 @@ intrusive_ptr<Expression> ExpressionGetField::optimize() {
 
 Value ExpressionGetField::serialize(SerializationOptions options) const {
     MutableDocument argDoc;
-    if (options.redactFieldNames) {
+    if (options.redactIdentifiers) {
         // The parser guarantees that the '_children[_kField]' expression evaluates to a constant
         // string.
         auto strPath =
             static_cast<ExpressionConstant*>(_children[_kField].get())->getValue().getString();
-        FieldPath fp(strPath);
-        argDoc.addField("field"_sd, Value(fp.redactedFullPath(options)));
+        argDoc.addField("field"_sd, Value(options.serializeFieldPathFromString(strPath)));
     } else {
         argDoc.addField("field"_sd, _children[_kField]->serialize(options));
     }
@@ -8262,13 +8252,12 @@ intrusive_ptr<Expression> ExpressionSetField::optimize() {
 
 Value ExpressionSetField::serialize(SerializationOptions options) const {
     MutableDocument argDoc;
-    if (options.redactFieldNames) {
+    if (options.redactIdentifiers) {
         // The parser guarantees that the '_children[_kField]' expression evaluates to a constant
         // string.
         auto strPath =
             static_cast<ExpressionConstant*>(_children[_kField].get())->getValue().getString();
-        FieldPath fp(strPath);
-        argDoc.addField("field"_sd, Value(fp.redactedFullPath(options)));
+        argDoc.addField("field"_sd, Value(options.serializeFieldPathFromString(strPath)));
     } else {
         argDoc.addField("field"_sd, _children[_kField]->serialize(options));
     }

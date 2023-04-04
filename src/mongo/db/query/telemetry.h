@@ -130,7 +130,7 @@ public:
      * Redact a given telemetry key and set _keySize.
      */
     StatusWith<BSONObj> redactKey(const BSONObj& key,
-                                  bool redactFieldNames,
+                                  bool redactIdentifiers,
                                   OperationContext* opCtx) const;
 
     /**

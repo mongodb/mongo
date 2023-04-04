@@ -812,8 +812,8 @@ TEST_F(ExprMatchTest, ExprRedactsCorrectly) {
     createMatcher(fromjson("{$expr: {$sum: [\"$a\", \"$b\"]}}"));
 
     SerializationOptions opts;
-    opts.redactFieldNamesStrategy = redactFieldNameForTest;
-    opts.redactFieldNames = true;
+    opts.identifierRedactionPolicy = redactFieldNameForTest;
+    opts.redactIdentifiers = true;
     opts.replacementForLiteralArgs = "?";
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT

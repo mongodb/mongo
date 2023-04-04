@@ -936,8 +936,8 @@ TEST_F(InternalUnpackBucketExecTest, RedactsCorrectly) {
         "bucketMaxSpanSeconds: 3600, computedMetaProjFields: ['a', 'b', 'c']}}");
     auto array = std::vector<Value>{};
     SerializationOptions opts;
-    opts.redactFieldNamesStrategy = redactFieldNameForTest;
-    opts.redactFieldNames = true;
+    opts.identifierRedactionPolicy = redactFieldNameForTest;
+    opts.redactIdentifiers = true;
     opts.replacementForLiteralArgs = "?";
     DocumentSourceInternalUnpackBucket::createFromBsonInternal(bson.firstElement(), getExpCtx())
         ->serializeToArray(array, opts);

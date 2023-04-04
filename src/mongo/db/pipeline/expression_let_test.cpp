@@ -44,8 +44,8 @@ std::string redactFieldNameForTest(StringData s) {
 
 TEST(RedactionTest, ExpressionLet) {
     SerializationOptions options;
-    options.redactFieldNamesStrategy = redactFieldNameForTest;
-    options.redactFieldNames = true;
+    options.identifierRedactionPolicy = redactFieldNameForTest;
+    options.redactIdentifiers = true;
 
     auto expCtx = ExpressionContextForTest{};
 

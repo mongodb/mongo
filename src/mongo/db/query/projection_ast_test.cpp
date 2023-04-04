@@ -780,8 +780,8 @@ std::string redactFieldNameForTest(StringData s) {
 TEST_F(ProjectionASTTest, TestASTRedaction) {
     SerializationOptions options;
     options.replacementForLiteralArgs = "?";
-    options.redactFieldNames = true;
-    options.redactFieldNamesStrategy = redactFieldNameForTest;
+    options.redactIdentifiers = true;
+    options.identifierRedactionPolicy = redactFieldNameForTest;
 
 
     auto proj = fromjson("{'a.b': 1}");

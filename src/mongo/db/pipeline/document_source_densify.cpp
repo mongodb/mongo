@@ -635,13 +635,12 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalDensify::createFromBs
 
 Value DocumentSourceInternalDensify::serialize(SerializationOptions opts) const {
     MutableDocument spec;
-    spec[kFieldFieldName] = Value(opts.serializeFieldName(_field.fullPath()));
+    spec[kFieldFieldName] = Value(opts.serializeFieldPath(_field));
     std::vector<Value> serializedPartitionByFields(_partitions.size());
-    std::transform(
-        _partitions.begin(),
-        _partitions.end(),
-        serializedPartitionByFields.begin(),
-        [&](FieldPath field) -> Value { return Value(opts.serializeFieldName(field.fullPath())); });
+    std::transform(_partitions.begin(),
+                   _partitions.end(),
+                   serializedPartitionByFields.begin(),
+                   [&](FieldPath field) -> Value { return Value(opts.serializeFieldPath(field)); });
     spec[kPartitionByFieldsFieldName] = Value(serializedPartitionByFields);
     spec[kRangeFieldName] = _range.serialize(opts);
     MutableDocument out;

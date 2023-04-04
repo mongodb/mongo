@@ -489,7 +489,7 @@ void DocumentSourceInternalUnpackBucket::serializeToArray(std::vector<Value>& ar
     const auto& spec = _bucketUnpacker.bucketSpec();
     std::vector<Value> fields;
     for (auto&& field : spec.fieldSet()) {
-        fields.emplace_back(opts.serializeFieldName(field));
+        fields.emplace_back(opts.serializeFieldPathFromString(field));
     }
     if (((_bucketUnpacker.includeMetaField() &&
           _bucketUnpacker.behavior() == BucketSpec::Behavior::kInclude) ||
@@ -498,12 +498,14 @@ void DocumentSourceInternalUnpackBucket::serializeToArray(std::vector<Value>& ar
         std::find(spec.computedMetaProjFields().cbegin(),
                   spec.computedMetaProjFields().cend(),
                   *spec.metaField()) == spec.computedMetaProjFields().cend())
-        fields.emplace_back(opts.serializeFieldName(*spec.metaField()));
+        fields.emplace_back(opts.serializeFieldPathFromString(*spec.metaField()));
 
     out.addField(behavior, Value{std::move(fields)});
-    out.addField(timeseries::kTimeFieldName, Value{opts.serializeFieldName(spec.timeField())});
+    out.addField(timeseries::kTimeFieldName,
+                 Value{opts.serializeFieldPathFromString(spec.timeField())});
     if (spec.metaField()) {
-        out.addField(timeseries::kMetaFieldName, Value{opts.serializeFieldName(*spec.metaField())});
+        out.addField(timeseries::kMetaFieldName,
+                     Value{opts.serializeFieldPathFromString(*spec.metaField())});
     }
     out.addField(kBucketMaxSpanSeconds, opts.serializeLiteralValue(Value{_bucketMaxSpanSeconds}));
     if (_assumeNoMixedSchemaData)
@@ -525,7 +527,8 @@ void DocumentSourceInternalUnpackBucket::serializeToArray(std::vector<Value>& ar
                                         spec.computedMetaProjFields().cend(),
                                         std::back_inserter(compFields),
                                         [opts](auto&& projString) {
-                                            return Value{opts.serializeFieldName(projString)};
+                                            return Value{
+                                                opts.serializeFieldPathFromString(projString)};
                                         });
                          return compFields;
                      }()});

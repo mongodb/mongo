@@ -1868,8 +1868,8 @@ TEST(SerializeInternalSchema, AllowedPropertiesRedactsCorrectly) {
     ASSERT_OK(objMatch.getStatus());
 
     SerializationOptions opts;
-    opts.redactFieldNames = true;
-    opts.redactFieldNamesStrategy = redactFieldNameForTest;
+    opts.redactIdentifiers = true;
+    opts.identifierRedactionPolicy = redactFieldNameForTest;
     opts.replacementForLiteralArgs = "?";
 
     ASSERT_BSONOBJ_EQ(
@@ -1904,9 +1904,9 @@ std::unique_ptr<InternalSchemaCondMatchExpression> createCondMatchExpression(BSO
 
 TEST(SerializeInternalSchema, CondMatchRedactsCorrectly) {
     SerializationOptions opts;
-    opts.redactFieldNames = true;
+    opts.redactIdentifiers = true;
     opts.replacementForLiteralArgs = "?";
-    opts.redactFieldNamesStrategy = redactFieldNameForTest;
+    opts.identifierRedactionPolicy = redactFieldNameForTest;
     auto conditionQuery = BSON("age" << BSON("$lt" << 18));
     auto thenQuery = BSON("job"
                           << "student");
@@ -1946,8 +1946,8 @@ TEST(SerializeInternalSchema, MatchArrayIndexRedactsCorrectly) {
 
     BSONObjBuilder bob;
     SerializationOptions opts;
-    opts.redactFieldNames = true;
-    opts.redactFieldNamesStrategy = redactFieldNameForTest;
+    opts.redactIdentifiers = true;
+    opts.identifierRedactionPolicy = redactFieldNameForTest;
     opts.replacementForLiteralArgs = "?";
     objMatch.getValue()->serialize(&bob, opts);
 
@@ -1965,9 +1965,9 @@ TEST(SerializeInternalSchema, MatchArrayIndexRedactsCorrectly) {
 TEST(SerializeInternalSchema, MaxItemsRedactsCorrectly) {
     InternalSchemaMaxItemsMatchExpression maxItems("a.b"_sd, 2);
     SerializationOptions opts;
-    opts.redactFieldNames = true;
+    opts.redactIdentifiers = true;
     opts.replacementForLiteralArgs = "?";
-    opts.redactFieldNamesStrategy = redactFieldNameForTest;
+    opts.identifierRedactionPolicy = redactFieldNameForTest;
 
     ASSERT_BSONOBJ_EQ(maxItems.getSerializedRightHandSide(opts),
                       BSON("$_internalSchemaMaxItems"
@@ -1986,9 +1986,9 @@ TEST(SerializeInternalSchema, MaxLengthRedactsCorrectly) {
 TEST(SerializeInternalSchema, MinItemsRedactsCorrectly) {
     InternalSchemaMinItemsMatchExpression minItems("a.b"_sd, 2);
     SerializationOptions opts;
-    opts.redactFieldNames = true;
+    opts.redactIdentifiers = true;
     opts.replacementForLiteralArgs = "?";
-    opts.redactFieldNamesStrategy = redactFieldNameForTest;
+    opts.identifierRedactionPolicy = redactFieldNameForTest;
 
     ASSERT_BSONOBJ_EQ(minItems.getSerializedRightHandSide(opts),
                       BSON("$_internalSchemaMinItems"
@@ -2018,8 +2018,8 @@ TEST(SerializeInternalSchema, MinPropertiesRedactsCorrectly) {
 
 TEST(SerializeInternalSchema, ObjectMatchRedactsCorrectly) {
     SerializationOptions opts;
-    opts.redactFieldNames = true;
-    opts.redactFieldNamesStrategy = redactFieldNameForTest;
+    opts.redactIdentifiers = true;
+    opts.identifierRedactionPolicy = redactFieldNameForTest;
     opts.replacementForLiteralArgs = "?";
     auto query = fromjson(
         "    {a: {$_internalSchemaObjectMatch: {"
@@ -2039,8 +2039,8 @@ TEST(SerializeInternalSchema, RootDocEqRedactsCorrectly) {
     auto query = fromjson("{$_internalSchemaRootDocEq: {a:1, b: {c: 1, d: [1]}}}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
     SerializationOptions opts;
-    opts.redactFieldNames = true;
-    opts.redactFieldNamesStrategy = redactFieldNameForTest;
+    opts.redactIdentifiers = true;
+    opts.identifierRedactionPolicy = redactFieldNameForTest;
     opts.replacementForLiteralArgs = "?";
     auto objMatch = MatchExpressionParser::parse(query, expCtx);
     ASSERT_OK(objMatch.getStatus());
@@ -2090,8 +2090,8 @@ TEST(SerializesInternalSchema, MaxPropertiesRedactsCorrectly) {
 
 TEST(SerializesInternalSchema, EqRedactsCorrectly) {
     SerializationOptions opts;
-    opts.redactFieldNamesStrategy = redactFieldNameForTest;
-    opts.redactFieldNames = true;
+    opts.identifierRedactionPolicy = redactFieldNameForTest;
+    opts.redactIdentifiers = true;
     opts.replacementForLiteralArgs = "?";
     auto query = fromjson("{$_internalSchemaEq: {a:1, b: {c: 1, d: [1]}}}");
     BSONObjBuilder bob;
@@ -2116,8 +2116,8 @@ TEST(InternalSchemaAllElemMatchFromIndexMatchExpression, RedactsExpressionCorrec
         expr.getValue().get());
 
     SerializationOptions opts;
-    opts.redactFieldNames = true;
-    opts.redactFieldNamesStrategy = redactFieldNameForTest;
+    opts.redactIdentifiers = true;
+    opts.identifierRedactionPolicy = redactFieldNameForTest;
     opts.replacementForLiteralArgs = "?";
 
     ASSERT_BSONOBJ_EQ(BSON("$_internalSchemaAllElemMatchFromIndex"

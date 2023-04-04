@@ -78,7 +78,7 @@ BSONObj InternalSchemaMatchArrayIndexMatchExpression::getSerializedRightHandSide
         }
         if (auto placeHolder = _expression->getPlaceholder()) {
             matchArrayElemSubobj.append("namePlaceholder",
-                                        opts.serializeFieldName(placeHolder.get()));
+                                        opts.serializeFieldPathFromString(placeHolder.get()));
         } else {
             matchArrayElemSubobj.append("namePlaceholder", "");
         }

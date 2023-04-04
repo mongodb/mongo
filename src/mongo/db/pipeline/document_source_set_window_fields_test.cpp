@@ -260,7 +260,7 @@ TEST_F(DocumentSourceSetWindowFieldsTest, RedactionOnExpMovingAvgOperator) {
     auto spec = fromjson(
         R"({
             $setWindowFields: {
-                partitionBy: '$foo',
+                partitionBy: '$foo.bar',
                 sortBy: {
                     bar: 1
                 },
@@ -280,7 +280,7 @@ TEST_F(DocumentSourceSetWindowFieldsTest, RedactionOnExpMovingAvgOperator) {
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "$_internalSetWindowFields": {
-                "partitionBy": "$HASH<foo>",
+                "partitionBy": "$HASH<foo>.HASH<bar>",
                 "sortBy": {
                     "HASH<bar>": 1
                 },

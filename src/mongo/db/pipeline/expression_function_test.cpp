@@ -50,8 +50,8 @@ TEST(ExpressionFunction, SerializeAndRedactArgs) {
     SerializationOptions options;
     std::string replacementChar = "?";
     options.replacementForLiteralArgs = replacementChar;
-    options.redactFieldNames = true;
-    options.redactFieldNamesStrategy = redactFieldNameForTest;
+    options.redactIdentifiers = true;
+    options.identifierRedactionPolicy = redactFieldNameForTest;
 
     auto expCtx = ExpressionContextForTest();
     auto expr = BSON("$function" << BSON("body"

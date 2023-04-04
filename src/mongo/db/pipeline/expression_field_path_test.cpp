@@ -233,8 +233,8 @@ TEST(FieldPath, ScalarVariableWithDottedFieldPathOptimizesToConstantMissingValue
 
 TEST(FieldPath, SerializeWithRedaction) {
     SerializationOptions options;
-    options.redactFieldNamesStrategy = redactFieldNameForTest;
-    options.redactFieldNames = true;
+    options.identifierRedactionPolicy = redactFieldNameForTest;
+    options.redactIdentifiers = true;
 
     auto expCtx = ExpressionContextForTest{};
     intrusive_ptr<Expression> expression =

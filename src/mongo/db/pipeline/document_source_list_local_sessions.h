@@ -102,7 +102,7 @@ public:
     }
 
     Value serialize(SerializationOptions opts = SerializationOptions()) const final override {
-        if (opts.redactFieldNames || opts.replacementForLiteralArgs) {
+        if (opts.redactIdentifiers || opts.replacementForLiteralArgs) {
             MONGO_UNIMPLEMENTED_TASSERT(7484328);
         }
         return Value(Document{{getSourceName(), _spec.toBSON()}});

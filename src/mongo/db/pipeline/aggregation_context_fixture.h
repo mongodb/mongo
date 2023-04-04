@@ -81,10 +81,10 @@ public:
         SerializationOptions options;
         if (performRedaction) {
             options.replacementForLiteralArgs = "?";
-            options.redactFieldNamesStrategy = [](StringData s) -> std::string {
+            options.identifierRedactionPolicy = [](StringData s) -> std::string {
                 return str::stream() << "HASH<" << s << ">";
             };
-            options.redactFieldNames = true;
+            options.redactIdentifiers = true;
         }
         std::vector<Value> serialized;
         docSource.serializeToArray(serialized, options);

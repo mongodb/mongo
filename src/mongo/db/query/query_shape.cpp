@@ -38,11 +38,11 @@ BSONObj predicateShape(const MatchExpression* predicate) {
 }
 
 BSONObj predicateShape(const MatchExpression* predicate,
-                       std::function<std::string(StringData)> redactFieldNamesStrategy) {
+                       std::function<std::string(StringData)> identifierRedactionPolicy) {
     SerializationOptions opts;
     opts.replacementForLiteralArgs = kLiteralArgString;
-    opts.redactFieldNamesStrategy = redactFieldNamesStrategy;
-    opts.redactFieldNames = true;
+    opts.identifierRedactionPolicy = identifierRedactionPolicy;
+    opts.redactIdentifiers = true;
     return predicate->serialize(opts);
 }
 

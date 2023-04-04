@@ -91,7 +91,7 @@ public:
 
 protected:
     std::string getFieldName() {
-        return _options.serializeFieldName(_context->childPath());
+        return _options.serializeFieldPathFromString(_context->childPath());
     }
 
     PathTrackingVisitorContext<BSONVisitorContext>* _context;

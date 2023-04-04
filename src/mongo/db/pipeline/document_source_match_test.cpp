@@ -708,10 +708,10 @@ TEST_F(DocumentSourceMatchTest, RedactionWithAnd) {
         $match: {
             $and: [
                 {
-                    a: 'abc'
+                    "a.c": "abc"
                 },
                 {
-                    b: {
+                    "b": {
                         $gt: 10
                     }
                 }
@@ -723,7 +723,7 @@ TEST_F(DocumentSourceMatchTest, RedactionWithAnd) {
             "$match": {
                 "$and": [
                     {
-                        "HASH<a>": {
+                        "HASH<a>.HASH<c>": {
                             "$eq": "?"
                         }
                     },

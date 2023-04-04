@@ -197,12 +197,8 @@ void InternalBucketGeoWithinMatchExpression::serialize(BSONObjBuilder* builder,
     }
     withinRegionBob.doneFast();
     // Serialize the field which is being searched over.
-    if (opts.redactFieldNames) {
-        bob.append(InternalBucketGeoWithinMatchExpression::kField,
-                   opts.redactFieldNamesStrategy(_field));
-    } else {
-        bob.append(InternalBucketGeoWithinMatchExpression::kField, _field);
-    }
+    bob.append(InternalBucketGeoWithinMatchExpression::kField,
+               opts.serializeFieldPathFromString(_field));
     bob.doneFast();
 }
 
