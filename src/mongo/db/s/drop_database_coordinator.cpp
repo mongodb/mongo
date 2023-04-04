@@ -153,6 +153,7 @@ void removeDatabaseFromConfigAndUpdatePlacementHistory(
     txn.run(opCtx, transactionChain);
 }
 
+// TODO SERVER-73627: Remove once 7.0 becomes last LTS
 class ScopedDatabaseCriticalSection {
 public:
     ScopedDatabaseCriticalSection(OperationContext* opCtx,
@@ -180,6 +181,9 @@ public:
             DatabaseShardingState::assertDbLockedAndAcquireExclusive(_opCtx, databaseName);
         scopedDss->exitCriticalSection(_opCtx, _reason);
     }
+
+    ScopedDatabaseCriticalSection(const ScopedDatabaseCriticalSection&) = delete;
+    ScopedDatabaseCriticalSection(ScopedDatabaseCriticalSection&&) = delete;
 
 private:
     OperationContext* _opCtx;
@@ -417,8 +421,7 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                             _critSecReason,
                             ShardingCatalogClient::kLocalWriteConcern);
                     } else {
-                        scopedCritSec.emplace(ScopedDatabaseCriticalSection(
-                            opCtx, _dbName.toString(), _critSecReason));
+                        scopedCritSec.emplace(opCtx, _dbName.toString(), _critSecReason);
                     }
 
                     auto dropDatabaseParticipantCmd = ShardsvrDropDatabaseParticipant();
