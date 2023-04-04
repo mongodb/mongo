@@ -31,13 +31,13 @@ assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 st.ensurePrimaryShard(dbName, st.shard0.shardName);
 
 // Make the collection have the following chunks:
-// shard0: [MinKey, 0] (6000 documents)
+// shard0: [MinKey, 0] (-11000 documents)
 // shard1: [0, MaxKey] (2000 documents)
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {x: 1}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: 0}}));
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 0}, to: st.shard1.shardName}));
 
-const minVal = -6000;
+const minVal = -11000;
 const maxVal = 2000;
 const docs = [];
 for (let i = minVal; i < maxVal; i++) {
@@ -55,7 +55,7 @@ const res0 = assert.commandWorked(st.s.adminCommand({analyzeShardKey: ns, key: {
 assert.eq(res0.monotonicity.type, expectedType, res0);
 
 // Make the collection have the following chunks:
-// shard0: [MinKey, -1000] (5000 documents)
+// shard0: [MinKey, -1000] (10000 documents)
 // shard1: [0, MaxKey] [-1000, 0] (3000 documents)
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {x: -1000}}));
 assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: -1000}, to: st.shard1.shardName}));
