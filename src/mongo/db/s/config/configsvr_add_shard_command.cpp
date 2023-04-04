@@ -58,7 +58,7 @@ namespace mongo {
 namespace {
 
 Status notifyShardsOfSecondShardIfNeeded(OperationContext* opCtx) {
-    if (!feature_flags::gCheckForDirectShardOperations.isEnabled(
+    if (!feature_flags::gClusterCardinalityParameter.isEnabled(
             serverGlobalParams.featureCompatibility)) {
         return Status::OK();
     }

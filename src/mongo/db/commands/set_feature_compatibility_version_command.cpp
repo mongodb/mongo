@@ -810,7 +810,7 @@ private:
 
     void _setShardedClusterCardinalityParam(
         OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
-        if (feature_flags::gCheckForDirectShardOperations.isEnabledOnVersion(requestedVersion)) {
+        if (feature_flags::gClusterCardinalityParameter.isEnabledOnVersion(requestedVersion)) {
             // Get current cluster parameter value so that we don't run SetClusterParameter
             // extraneously
             auto* clusterParameters = ServerParameterSet::getClusterParameterSet();

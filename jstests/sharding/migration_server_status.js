@@ -19,7 +19,7 @@ var mongos = st.s0;
 var admin = mongos.getDB("admin");
 var coll = mongos.getCollection("migration_server_status.coll");
 const usingSetClusterParameter =
-    FeatureFlagUtil.isPresentAndEnabled(st.config, "CheckForDirectShardOperations");
+    FeatureFlagUtil.isPresentAndEnabled(st.config, "ClusterCardinalityParameter");
 
 assert.commandWorked(
     admin.runCommand({enableSharding: coll.getDB() + "", primaryShard: st.shard0.shardName}));

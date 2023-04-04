@@ -110,3 +110,8 @@ feature_flags:
     description: "Feature flag for checking for direct shard operations."
     cpp_varname: feature_flags::gCheckForDirectShardOperations
     default: false
+  featureFlagClusterCardinalityParameter:
+    description: "Feature flag for enabling the cluster parameter tracking cluster cardinality."
+    cpp_varname: feature_flags::gClusterCardinalityParameter
+    default: true
+    version: 7.0

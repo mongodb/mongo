@@ -2,7 +2,7 @@
  * Tests that the cluster parameter "shardedClusterCardinalityForDirectConns" has the correct value
  * after upgrade, downgrade, and addShard.
  *
- * @tags: [multiversion_incompatible, featureFlagCheckForDirectShardOperations,
+ * @tags: [multiversion_incompatible, featureFlagClusterCardinalityParameter,
  * temporary_catalog_shard_incompatible]
  */
 
