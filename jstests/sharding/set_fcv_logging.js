@@ -5,10 +5,11 @@
  *      FCV is upgrading or downgrading     (6744301)
  *      FCV upgrade or downgrade success    (6744302).
  *
+ * TODO SERVER-75391: Enable with catalog shards when catalog shards can downgrade FCV.
  * @tags: [
  *   multiversion_incompatible,
  *   does_not_support_stepdowns,
- *   temporary_catalog_shard_incompatible,
+ *   catalog_shard_incompatible,
  * ]
  */
 

@@ -6,8 +6,9 @@
  *
  * This test verifies this behavior.
  *
- * Shuts down shard0, which also shuts down the config server. See if the test can be reworked.
- * @tags: [temporary_catalog_shard_incompatible]
+ * Shuts down shard0, which also shuts down the config server. Tests mongos targeting, which won't
+ * be affected by a catalog shard.
+ * @tags: [catalog_shard_incompatible]
  */
 
 // This test shuts down a shard's node and because of this consistency checking

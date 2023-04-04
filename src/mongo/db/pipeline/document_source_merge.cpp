@@ -626,7 +626,8 @@ void DocumentSourceMerge::waitWhileFailPointEnabled() {
             LOGV2(
                 20900,
                 "Hanging aggregation due to 'hangWhileBuildingDocumentSourceMergeBatch' failpoint");
-        });
+        },
+        _outputNs);
 }
 
 }  // namespace mongo

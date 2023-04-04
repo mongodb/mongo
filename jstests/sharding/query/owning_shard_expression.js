@@ -2,7 +2,7 @@
  * Tests that $_internalOwningShard expression correctly computes the shard id the document belongs
  * to, while executing on mongod.
  *
- * @tags: [requires_fcv_63, temporary_catalog_shard_incompatible]
+ * @tags: [requires_fcv_63]
  */
 (function() {
 "use strict";
@@ -106,7 +106,7 @@ CreateShardedCollectionUtil.shardCollectionWithChunks(destinationColl, {_id: 1},
     {min: {_id: 66}, max: {_id: MaxKey}, shard: st.shard2.shardName},
 ]);
 const expectedResult = [
-    {shard: `${dbName}-rs0`, indexData: documentOnShard0},
+    {shard: st.shard0.shardName, indexData: documentOnShard0},
     {shard: `${dbName}-rs1`, indexData: documentOnShard1},
     {shard: `${dbName}-rs2`, indexData: documentOnShard2},
 ];

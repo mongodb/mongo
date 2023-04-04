@@ -1,9 +1,5 @@
 // Tests that the $merge aggregation stage is resilient to chunk migrations in both the source and
 // output collection during execution.
-//
-// Fails waiting for a specific aggregation in currentOp, which probably isn't working when we
-// change the cluster topology.
-// @tags: [temporary_catalog_shard_incompatible]
 (function() {
 'use strict';
 
@@ -16,10 +12,18 @@ const sourceColl = mongosDB["source"];
 const targetColl = mongosDB["target"];
 
 function setAggHang(mode) {
-    assert.commandWorked(st.shard0.adminCommand(
-        {configureFailPoint: "hangBeforeDocumentSourceCursorLoadBatch", mode: mode}));
-    assert.commandWorked(st.shard1.adminCommand(
-        {configureFailPoint: "hangBeforeDocumentSourceCursorLoadBatch", mode: mode}));
+    // Match on the output namespace to avoid hanging the sharding metadata refresh aggregation when
+    // shard0 is a catalog shard.
+    assert.commandWorked(st.shard0.adminCommand({
+        configureFailPoint: "hangBeforeDocumentSourceCursorLoadBatch",
+        mode: mode,
+        data: {nss: "merge_with_chunk_migrations.source"}
+    }));
+    assert.commandWorked(st.shard1.adminCommand({
+        configureFailPoint: "hangBeforeDocumentSourceCursorLoadBatch",
+        mode: mode,
+        data: {nss: "merge_with_chunk_migrations.source"}
+    }));
 }
 
 function runMergeWithMode(whenMatchedMode, whenNotMatchedMode, shardedColl) {

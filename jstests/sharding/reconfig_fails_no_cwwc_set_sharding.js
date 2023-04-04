@@ -8,12 +8,14 @@
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   requires_fcv_51,
- *   temporary_catalog_shard_incompatible,
  * ]
  */
 
 (function() {
 'use strict';
+
+// TODO SERVER-75820: Investigate why a shard node doesn't have metadata at test shutdown.
+TestData.skipCheckShardFilteringMetadata = true;
 
 load("jstests/replsets/rslib.js");  // For reconfig, isConfigCommitted and
                                     // safeReconfigShouldFail.

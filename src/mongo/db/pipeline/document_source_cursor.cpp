@@ -33,6 +33,7 @@
 #include "mongo/db/pipeline/document_source_cursor.h"
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/working_set_common.h"
@@ -131,11 +132,15 @@ void DocumentSourceCursor::loadBatch() {
         return;
     }
 
-    while (MONGO_unlikely(hangBeforeDocumentSourceCursorLoadBatch.shouldFail())) {
-        LOGV2(20895,
-              "Hanging aggregation due to 'hangBeforeDocumentSourceCursorLoadBatch' failpoint");
-        sleepmillis(10);
-    }
+    CurOpFailpointHelpers::waitWhileFailPointEnabled(
+        &hangBeforeDocumentSourceCursorLoadBatch,
+        pExpCtx->opCtx,
+        "hangBeforeDocumentSourceCursorLoadBatch",
+        []() {
+            LOGV2(20895,
+                  "Hanging aggregation due to 'hangBeforeDocumentSourceCursorLoadBatch' failpoint");
+        },
+        _exec->nss());
 
     PlanExecutor::ExecState state;
     Document resultObj;

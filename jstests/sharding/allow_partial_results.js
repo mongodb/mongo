@@ -1,8 +1,6 @@
 /**
  * Tests that the 'allowPartialResults' option to find is respected, and that aggregation does not
  * accept the 'allowPartialResults' option.
- *
- * @tags: [temporary_catalog_shard_incompatible]
  */
 
 // This test shuts down a shard.
@@ -28,11 +26,11 @@ for (let i = -50; i < 50; i++) {
 assert.commandWorked(bulk.execute());
 
 jsTest.log("Create a sharded collection with one chunk on each of the two shards.");
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
+st.ensurePrimaryShard(dbName, st.shard1.shardName);
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
 assert.commandWorked(st.s.adminCommand({shardCollection: ns, key: {_id: 1}}));
 assert.commandWorked(st.s.adminCommand({split: ns, middle: {_id: 0}}));
-assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard1.shardName}));
+assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {_id: 0}, to: st.shard0.shardName}));
 
 let findRes;
 
@@ -59,8 +57,8 @@ assert.eq(batchSize, findRes.cursor.firstBatch.length);
 assert.eq(undefined, findRes.cursor.partialResultsReturned);
 nRemainingDocs -= batchSize;
 
-jsTest.log("Stopping " + st.shard0.shardName);
-st.rs0.stopSet();
+jsTest.log("Stopping " + st.shard1.shardName);
+st.rs1.stopSet();
 nRemainingDocs -= nDocs / 2 - batchSize;
 
 // Do getMore with the returned cursor.

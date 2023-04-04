@@ -106,8 +106,8 @@ var ReshardingTest = class {
 
     setup() {
         const mongosOptions = {setParameter: {}};
-        const configOptions = {setParameter: {}};
-        const rsOptions = {
+        let configOptions = {setParameter: {}};
+        let rsOptions = {
             setParameter: {
                 storeFindAndModifyImagesInSideCollection:
                     this._storeFindAndModifyImagesInSideCollection
@@ -175,6 +175,15 @@ var ReshardingTest = class {
         if (this._maxNumberOfTransactionOperationsInSingleOplogEntry !== undefined) {
             rsOptions.setParameter.maxNumberOfTransactionOperationsInSingleOplogEntry =
                 this._maxNumberOfTransactionOperationsInSingleOplogEntry;
+        }
+
+        if (this._catalogShard) {
+            // ShardingTest does not currently support deep merging of options, so merge the set
+            // parameters for config and replica sets here.
+            rsOptions.setParameter =
+                Object.merge(rsOptions.setParameter, configOptions.setParameter);
+            configOptions.setParameter =
+                Object.merge(configOptions.setParameter, rsOptions.setParameter);
         }
 
         this._st = new ShardingTest({

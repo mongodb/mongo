@@ -1,6 +1,5 @@
 // SERVER-34954 This test ensures a node started with --shardsvr and added to a replica set has
 // the correct version of unique indexes upon re-initiation.
-// @tags: [temporary_catalog_shard_incompatible]
 (function() {
 "use strict";
 load("jstests/libs/check_unique_indexes.js");
@@ -21,7 +20,12 @@ assert.commandWorked(mongos.getDB("test").coll.createIndex({e: 1}));
 assert.commandWorked(mongos.getDB("test").coll.createIndex({f: 1}, {"unique": true}));
 
 // Add a node with --shardsvr to the replica set.
-let newNode = rs.add({'shardsvr': '', rsConfig: {priority: 0, votes: 0}});
+let newNode;
+if (TestData.catalogShard) {
+    newNode = rs.add({'configsvr': '', rsConfig: {priority: 0, votes: 0}});
+} else {
+    newNode = rs.add({'shardsvr': '', rsConfig: {priority: 0, votes: 0}});
+}
 rs.reInitiate();
 rs.awaitSecondaryNodes();
 

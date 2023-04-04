@@ -4,7 +4,6 @@
  * @tags: [
  *     uses_change_streams,
  *     requires_fcv_50,
- *     temporary_catalog_shard_incompatible,
  * ]
  */
 
@@ -41,7 +40,7 @@ const shardOtherCollCsCursor =
 // Drop, recreate, and shard the 'coll_reshard' collection.
 assertDropAndRecreateCollection(mongosDB, reshardCollName);
 
-st.ensurePrimaryShard(dbName, st.rs0.name);
+st.ensurePrimaryShard(dbName, st.shard0.shardName);
 st.shardColl(mongosReshardColl, {a: 1}, {a: 50});
 
 for (let i = 0; i < 100; ++i) {

@@ -4,7 +4,6 @@
  * @tags: [
  *   requires_replication,
  *   requires_sharding,
- *   temporary_catalog_shard_incompatible,
  * ]
  */
 
@@ -34,7 +33,7 @@ const testColl = mongosDB.test;
 
 // Enable sharding on the the test database and ensure that the primary is on shard0.
 assert.commandWorked(mongosDB.adminCommand({enableSharding: mongosDB.getName()}));
-st.ensurePrimaryShard(mongosDB.getName(), st.rs0.getURL());
+st.ensurePrimaryShard(mongosDB.getName(), st.rs1.getURL());
 
 // Shard the collection on _id, split at {_id:0}, and move the upper chunk to the second shard.
 st.shardColl(testColl, {_id: 1}, {_id: 0}, {_id: 1}, mongosDB.getName(), true);
@@ -107,7 +106,7 @@ assertMatchingLogLineExists(Object.assign({nShards: 2}, getMoreCmd));
 assert.eq(getMoreRes.cursor.partialResultsReturned, undefined);
 
 // Now stop shard0.
-st.rs0.stopSet();
+st.rs1.stopSet();
 
 // Issue another getMore with a higher batchSize.
 getMoreCmd.comment = "allow_partial_results_getmore_nshards_2_again";

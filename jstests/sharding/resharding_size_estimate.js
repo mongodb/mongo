@@ -3,7 +3,6 @@
  *
  * @tags: [
  *   uses_atclustertime,
- *   temporary_catalog_shard_incompatible,
  * ]
  */
 
@@ -96,7 +95,7 @@ reshardingTest.withReshardingInBackground(
         jsTest.log("Check size estimate on resharding coordinator document:\n" +
                    tojson(coordinatorDoc));
 
-        const s0Estimate = getShardEstimate(coordinatorDoc, 'shard0');
+        const s0Estimate = getShardEstimate(coordinatorDoc, donorShardNames[0]);
         const s1Estimate = getShardEstimate(coordinatorDoc, 'shard1');
 
         assert.gt(s0Estimate.bytesToClone, smallData.length);

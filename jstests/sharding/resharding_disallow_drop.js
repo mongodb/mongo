@@ -3,7 +3,6 @@
  * @tags: [
  *  requires_fcv_53,
  *  featureFlagRecoverableShardsvrReshardCollectionCoordinator,
- *  temporary_catalog_shard_incompatible,
  * ]
  */
 (function() {
@@ -13,7 +12,7 @@ load("jstests/libs/fail_point_util.js");
 
 var st = new ShardingTest({
     shards: {rs0: {nodes: 2}},
-    config: 1,
+    config: TestData.catalogShard ? 2 : 1,
     mongos: 1,
     other: {
         configOptions: {setParameter: {reshardingCriticalSectionTimeoutMillis: 24 * 60 * 60 * 1000}}

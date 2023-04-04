@@ -1,8 +1,5 @@
 /**
  * Verifies creating the logical sessions collection TTL index retries on stale version errors.
- * @tags: [
- *   temporary_catalog_shard_incompatible,
- * ]
  */
 
 (function() {
@@ -17,7 +14,7 @@ let st = new ShardingTest({shards: 2});
 // Validate the initial state.
 validateSessionsCollection(st.shard0, true, true);
 validateSessionsCollection(st.shard1, false, false);
-validateSessionsCollection(st.configRS.getPrimary(), false, false);
+validateSessionsCollection(st.configRS.getPrimary(), TestData.catalogShard, TestData.catalogShard);
 
 // Drop the TTL index on shard0.
 assert.commandWorked(st.shard0.getDB("config").system.sessions.dropIndex({lastUse: 1}));

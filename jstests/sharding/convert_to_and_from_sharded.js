@@ -1,7 +1,7 @@
 /**
  * Test that a replica set member can process basic CRUD operations after switching from being
  * a shardsvr and back to non shardsvr.
- * @tags: [requires_persistence, temporary_catalog_shard_incompatible]
+ * @tags: [requires_persistence]
  */
 (function() {
 "use strict";
@@ -32,7 +32,8 @@ var checkBasicCRUD = function(coll) {
     assert.eq('marker', coll.findOne({_id: 'marker'})._id);
 };
 
-var st = new ShardingTest({shards: {}});
+const numShards = TestData.catalogShard ? 1 : 0;
+var st = new ShardingTest({shards: numShards});
 
 var replShard = new ReplSetTest({nodes: NUM_NODES});
 replShard.startSet({verbose: 1});

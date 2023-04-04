@@ -2,7 +2,6 @@
 // @tags: [
 //     requires_sharding,
 //     requires_fcv_70,
-//     temporary_catalog_shard_incompatible
 // ]
 
 (function() {
@@ -12,10 +11,15 @@ load('jstests/fle2/libs/encrypted_client_util.js');
 
 const options = {
     mongos: 1,
-    config: 1,
     shards: 1,
     rs: {nodes: [{}]},
 };
+
+if (!TestData.catalogShard) {
+    // Setting config options will override shard options in catalog shard mode, which doesn't set
+    // the right audit node options on the catalog shard.
+    options.config = 1;
+}
 
 const kHaveAuditing = buildInfo().modules.includes("enterprise");
 if (kHaveAuditing) {

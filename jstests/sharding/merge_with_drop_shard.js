@@ -1,7 +1,5 @@
 // Tests that the $merge aggregation stage is resilient to drop shard in both the source and
 // output collection during execution.
-//
-// @tags: [temporary_catalog_shard_incompatible]
 (function() {
 'use strict';
 
@@ -20,13 +18,21 @@ const sourceColl = mongosDB["source"];
 const targetColl = mongosDB["target"];
 
 assert.commandWorked(st.s.getDB("admin").runCommand({enableSharding: mongosDB.getName()}));
-st.ensurePrimaryShard(mongosDB.getName(), st.shard1.name);
+st.ensurePrimaryShard(mongosDB.getName(), st.shard0.name);
 
 function setAggHang(mode) {
-    assert.commandWorked(st.shard0.adminCommand(
-        {configureFailPoint: "hangWhileBuildingDocumentSourceMergeBatch", mode: mode}));
-    assert.commandWorked(st.shard1.adminCommand(
-        {configureFailPoint: "hangWhileBuildingDocumentSourceMergeBatch", mode: mode}));
+    // Match on the output namespace to avoid hanging the sharding metadata refresh aggregation when
+    // shard0 is a catalog shard.
+    assert.commandWorked(st.shard0.adminCommand({
+        configureFailPoint: "hangWhileBuildingDocumentSourceMergeBatch",
+        mode: mode,
+        data: {nss: targetColl.getFullName()}
+    }));
+    assert.commandWorked(st.shard1.adminCommand({
+        configureFailPoint: "hangWhileBuildingDocumentSourceMergeBatch",
+        mode: mode,
+        data: {nss: targetColl.getFullName()}
+    }));
 }
 
 function removeShardAndRefreshRouter(shard) {
@@ -99,9 +105,9 @@ function runMergeWithMode(
         });
 
     if (dropShard) {
-        removeShardAndRefreshRouter(st.shard0);
+        removeShardAndRefreshRouter(st.shard1);
     } else {
-        addShard(st.rs0.getURL());
+        addShard(st.rs1.getURL());
     }
     // Unset the failpoint to unblock the $merge and join with the parallel shell.
     setAggHang("off");

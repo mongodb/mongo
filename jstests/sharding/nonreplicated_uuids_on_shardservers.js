@@ -1,6 +1,6 @@
 // SERVER-32255 This test ensures a node started with --shardsvr and added to a replica set receives
 // UUIDs upon re-initiation.
-// @tags: [multiversion_incompatible, temporary_catalog_shard_incompatible]
+// @tags: [multiversion_incompatible]
 (function() {
 "use strict";
 load("jstests/libs/check_uuids.js");
@@ -12,7 +12,8 @@ let rs = st.rs0;
 mongos.getDB("test").coll.insert({_id: 1, x: 1});
 
 // Add a node with --shardsvr to the replica set.
-let newNode = rs.add({'shardsvr': '', rsConfig: {priority: 0, votes: 0}});
+const clusterRoleOption = TestData.catalogShard ? "configsvr" : "shardsvr";
+let newNode = rs.add({[clusterRoleOption]: '', rsConfig: {priority: 0, votes: 0}});
 rs.reInitiate();
 rs.awaitSecondaryNodes();
 

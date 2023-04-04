@@ -4,9 +4,7 @@
  * txnCloners were not started until after waiting for reshardingMinimumOperationDurationMillis to
  * elapse.
  *
- * The higher minimumOperationDurationMS parameter is not being set on the config server. Correctly
- * waits for the default value, but not the expected higher one.
- * @tags: [uses_atclustertime, temporary_catalog_shard_incompatible]
+ * @tags: [uses_atclustertime]
  */
 
 (function() {

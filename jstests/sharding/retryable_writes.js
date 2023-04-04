@@ -1,8 +1,6 @@
 /**
  * Test basic retryable write without errors by checking that the resulting collection after the
  * retry is as expected and it does not create additional oplog entries.
- *
- * @tags: [temporary_catalog_shard_incompatible]
  */
 (function() {
 "use strict";
@@ -37,6 +35,12 @@ function verifyServerStatusChanges(
 
 function runTests(mainConn, priConn) {
     var lsid = UUID();
+
+    if (TestData.catalogShard) {
+        // Creating a collection updates counters on the config server, so do that before getting
+        // the initial stats.
+        assert.commandWorked(mainConn.getDB("test").createCollection("user"));
+    }
 
     ////////////////////////////////////////////////////////////////////////
     // Test insert command
@@ -324,6 +328,12 @@ function runFailpointTests(mainConn, priConn) {
     // Test the 'onPrimaryTransactionalWrite' failpoint
     var lsid = UUID();
     var testDb = mainConn.getDB('TestDB');
+
+    if (TestData.catalogShard) {
+        // TODO SERVER-75821: Workaround for crash when executing the fail point while implicitly
+        // creating a collection in a transaction on the config server.
+        assert.commandWorked(testDb.createCollection("user"));
+    }
 
     // Test connection close (default behaviour). The connection will get closed, but the
     // inserts must succeed

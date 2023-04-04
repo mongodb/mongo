@@ -4,7 +4,6 @@
  * @tags: [
  *   requires_sharding,
  *   uses_change_streams,
- *   temporary_catalog_shard_incompatible,
  * ]
  */
 (function() {
@@ -106,7 +105,12 @@ assert.eq(findCursor.objsLeftInBatch(), 0);
 const aggCursor = coll.aggregate([{$match: {}}, {$sort: {_id: 1}}], {cursor: {batchSize: 0}});
 
 // Now stop shard0...
-st.rs0.stopSet();
+if (!TestData.catalogShard) {
+    st.rs0.stopSet();
+} else {
+    // The config server is shard0 in catalog shard mode and we'll restart it later.
+    st.rs0.stopSet(undefined, true /* forRestart */);
+}
 
 // ...  and confirm that getMore on the $changeStream throws one of the expected exceptions.
 let err = assert.throws(() => assert.soon(() => csCursor.hasNext()));
@@ -152,5 +156,9 @@ assert.commandFailedWithCode(err, ErrorCodes.FailedToSatisfyReadPreference);
 // ... but does NOT include the "ResumableChangeStreamError" error label.
 assert(!("errorLabels" in err), err);
 
+if (TestData.catalogShard) {
+    // shard0 is the config server and it needs to be up for ShardingTest shutdown.
+    st.rs0.startSet(undefined, true /* forRestart */);
+}
 st.stop();
 }());

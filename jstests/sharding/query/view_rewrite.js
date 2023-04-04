@@ -1,8 +1,6 @@
 /**
  * Tests that query options are not dropped by mongos when a query against a view is rewritten as an
  * aggregation against the underlying collection.
- *
- * @tags: [temporary_catalog_shard_incompatible]
  */
 (function() {
 "use strict";
@@ -31,7 +29,7 @@ const mongosDB = mongos.getDB("view_rewrite");
 const coll = mongosDB.getCollection("coll");
 
 assert.commandWorked(config.adminCommand({enableSharding: mongosDB.getName()}));
-st.ensurePrimaryShard(mongosDB.getName(), "view_rewrite-rs0");
+st.ensurePrimaryShard(mongosDB.getName(), st.shard0.shardName);
 
 const rs0Secondary = st.rs0.getSecondary();
 const rs1Primary = st.rs1.getPrimary();

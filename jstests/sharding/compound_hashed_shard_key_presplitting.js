@@ -4,7 +4,6 @@
  *
  * @tags: [
  *   multiversion_incompatible,
- *   temporary_catalog_shard_incompatible,
  * ]
  */
 (function() {

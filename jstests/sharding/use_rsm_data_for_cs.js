@@ -1,4 +1,3 @@
-// @tags: [temporary_catalog_shard_incompatible]
 (function() {
 'use strict';
 
@@ -22,7 +21,11 @@ rs.nodes.forEach(function(node) {
 });
 
 // add a node to shard rs
-rs.add({'shardsvr': ''});
+if (TestData.catalogShard) {
+    rs.add({'configsvr': ''});
+} else {
+    rs.add({'shardsvr': ''});
+}
 rs.reInitiate();
 rs.awaitSecondaryNodes();
 

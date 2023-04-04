@@ -1,6 +1,5 @@
 /**
  * Test of complex sharding initialization
- * @tags: [temporary_catalog_shard_incompatible]
  */
 
 (function() {
@@ -46,7 +45,12 @@ function shardingTestUsingObjects() {
 
     assert(s0.commandLine.hasOwnProperty("vvvvvv"));
     assert(s1.commandLine.hasOwnProperty("vvvvv"));
-    assert(c0.commandLine.hasOwnProperty("vvvv"));
+    if (!TestData.catalogShard) {
+        assert(c0.commandLine.hasOwnProperty("vvvv"));
+    } else {
+        // Same as shard 1.
+        assert(c0.commandLine.hasOwnProperty("vvv"));
+    }
     assert(rs0_d0.commandLine.hasOwnProperty("vvv"));
     assert(rs1_d0.commandLine.hasOwnProperty("vv"));
     assert(rs1_a1.commandLine.hasOwnProperty("v"));
@@ -82,7 +86,12 @@ function shardingTestUsingArrays() {
 
     assert(s0.commandLine.hasOwnProperty("vvvvv"));
     assert(s1.commandLine.hasOwnProperty("vvvv"));
-    assert(c0.commandLine.hasOwnProperty("vvv"));
+    if (!TestData.catalogShard) {
+        assert(c0.commandLine.hasOwnProperty("vvv"));
+    } else {
+        // Same as shard 1.
+        assert(c0.commandLine.hasOwnProperty("vv"));
+    }
     assert(rs0_d0.commandLine.hasOwnProperty("vv"));
     assert(rs1_d0.commandLine.hasOwnProperty("v"));
 

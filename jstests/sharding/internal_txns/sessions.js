@@ -1,7 +1,7 @@
 /*
  * Tests basic support for internal sessions.
  *
- * @tags: [requires_fcv_70, uses_transactions, temporary_catalog_shard_incompatible]
+ * @tags: [requires_fcv_70, uses_transactions]
  */
 (function() {
 'use strict';
@@ -14,7 +14,9 @@ const st = new ShardingTest({
         setParameter:
             {maxSessions: 1, 'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"}
     },
-    shardOptions: {setParameter: {maxSessions: 1}}
+    // The config server uses a session for internal operations, so raise the limit by 1 for a
+    // catalog shard.
+    shardOptions: {setParameter: {maxSessions: TestData.catalogShard ? 2 : 1}}
 });
 const shard0Primary = st.rs0.getPrimary();
 
@@ -94,6 +96,12 @@ const kConfigSessionNs = "config.system.sessions";
     // documents but are tracked as one logical session (i.e. using the same config.system.sessions
     // document).
     const sessionUUID = UUID();
+
+    if (TestData.catalogShard) {
+        // Create the collection first separately, otherwise the session will be used for the
+        // transaction that creates the collection, leading to one extra transaction document.
+        assert.commandWorked(testDB.createCollection(kCollName));
+    }
 
     const parentLsid = {id: sessionUUID};
     assert.commandWorked(testDB.runCommand(

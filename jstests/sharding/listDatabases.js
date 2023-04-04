@@ -1,4 +1,3 @@
-// @tags: [temporary_catalog_shard_incompatible]
 (function() {
 'use strict';
 var test = new ShardingTest({shards: 1, mongos: 1, other: {chunkSize: 1}});
@@ -39,9 +38,9 @@ var dbEntryCheck = function(dbEntry, onConfig) {
     res = mongos.adminCommand("listDatabases");
     dbArray = res.databases;
 
-    dbEntryCheck(getDBSection(dbArray, "blah"), false);
-    dbEntryCheck(getDBSection(dbArray, "foo"), false);
-    dbEntryCheck(getDBSection(dbArray, "raw"), false);
+    dbEntryCheck(getDBSection(dbArray, "blah"), TestData.catalogShard);
+    dbEntryCheck(getDBSection(dbArray, "foo"), TestData.catalogShard);
+    dbEntryCheck(getDBSection(dbArray, "raw"), TestData.catalogShard);
 }
 
 // Local db is never returned.
@@ -74,7 +73,8 @@ var dbEntryCheck = function(dbEntry, onConfig) {
     var entry = getDBSection(dbArray, "config");
     dbEntryCheck(entry, true);
     assert(entry["shards"]);
-    assert.eq(Object.keys(entry["shards"]).length, 2);
+    // There's only the "config" shard in catalog shard mode.
+    assert.eq(Object.keys(entry["shards"]).length, TestData.catalogShard ? 1 : 2);
 }
 
 // Admin db is only reported on the config shard, never on other shards.

@@ -3,7 +3,7 @@
  * primary mongod in a sharded cluster and the primary mongod in standalone replica set, and that
  * it returns correct sample rates.
  *
- * @tags: [requires_fcv_70, requires_persistence, temporary_catalog_shard_incompatible]
+ * @tags: [requires_fcv_70, requires_persistence]
  */
 (function() {
 "use strict";
@@ -284,6 +284,7 @@ function runTest(createConnFn, rst, samplerNames) {
             s2: {setParameter: setParameterOpts}
         },
         shards: 1,
+        config: 3,
         rs: {nodes: 1, setParameter: setParameterOpts},
         other: {
             configOptions: {setParameter: setParameterOpts},
@@ -300,9 +301,12 @@ function runTest(createConnFn, rst, samplerNames) {
         numQueriesExecutedPerSecond: 1
     };
     assert.commandFailedWithCode(st.s.adminCommand(cmdObj), ErrorCodes.CommandNotFound);
-    st.rs0.nodes.forEach(node => {
-        assert.commandFailedWithCode(node.adminCommand(cmdObj), ErrorCodes.IllegalOperation);
-    });
+    if (!TestData.catalogShard) {
+        // Shard0 is the config server in catalog shard mode.
+        st.rs0.nodes.forEach(node => {
+            assert.commandFailedWithCode(node.adminCommand(cmdObj), ErrorCodes.IllegalOperation);
+        });
+    }
     st.configRS.getSecondaries(node => {
         assert.commandFailedWithCode(node.adminCommand(cmdObj), ErrorCodes.NotWritablePrimary);
     });

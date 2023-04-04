@@ -1,8 +1,6 @@
 /**
  * Test that mongos times out when the config server replica set only contains nodes that
  * are behind the majority opTime.
- *
- * @tags: [temporary_catalog_shard_incompatible]
  */
 
 load("jstests/libs/write_concern_util.js");
@@ -30,6 +28,7 @@ const failpointParams = {
 
 var st = new ShardingTest({
     shards: 1,
+    config: 3,
     configReplSetTestOptions: {settings: {chainingAllowed: false}},
     other: {
         configOptions: failpointParams,
