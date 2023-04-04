@@ -202,12 +202,14 @@ void DatabaseShardingState::assertIsPrimaryShardForDb(OperationContext* opCtx,
         return;
     }
 
+    auto expectedDbVersion = OperationShardingState::get(opCtx).getDbVersion(dbName.toString());
+
     uassert(ErrorCodes::IllegalOperation,
             str::stream() << "Received request without the version for the database " << dbName,
-            OperationShardingState::get(opCtx).hasDbVersion());
+            expectedDbVersion);
 
     Lock::DBLock dbLock(opCtx, dbName, MODE_IS);
-    assertMatchingDbVersion(opCtx, dbName);
+    assertMatchingDbVersion(opCtx, dbName, *expectedDbVersion);
 
     const auto scopedDss = assertDbLockedAndAcquireShared(opCtx, dbName);
     const auto primaryShardId = scopedDss->_dbInfo->getPrimary();

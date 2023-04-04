@@ -132,11 +132,6 @@ public:
     boost::optional<ShardVersion> getShardVersion(const NamespaceString& nss);
 
     /**
-     * Returns true if the client sent a databaseVersion for any namespace.
-     */
-    bool hasDbVersion() const;
-
-    /**
      * If 'db' matches the 'db' in the namespace the client sent versions for, returns the database
      * version sent by the client (if any), else returns boost::none.
      */

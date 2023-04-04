@@ -110,10 +110,6 @@ boost::optional<ShardVersion> OperationShardingState::getShardVersion(const Name
     return boost::none;
 }
 
-bool OperationShardingState::hasDbVersion() const {
-    return !_databaseVersions.empty();
-}
-
 boost::optional<DatabaseVersion> OperationShardingState::getDbVersion(StringData dbName) const {
     const auto it = _databaseVersions.find(dbName);
     if (it != _databaseVersions.end()) {

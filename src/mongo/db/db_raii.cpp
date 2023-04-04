@@ -176,19 +176,6 @@ bool isAnyNssAViewOrSharded(OperationContext* opCtx,
     });
 }
 
-std::vector<NamespaceString> resolveNamespaceStringOrUUIDs(
-    OperationContext* opCtx,
-    const CollectionCatalog* catalog,
-    const std::vector<NamespaceStringOrUUID>& nssOrUUIDs) {
-    std::vector<NamespaceString> resolvedNamespaces;
-    resolvedNamespaces.reserve(nssOrUUIDs.size());
-    for (auto&& nssOrUUID : nssOrUUIDs) {
-        auto nss = catalog->resolveNamespaceStringOrUUID(opCtx, nssOrUUID);
-        resolvedNamespaces.emplace_back(nss);
-    }
-    return resolvedNamespaces;
-}
-
 void assertAllNamespacesAreCompatibleForReadTimestamp(
     OperationContext* opCtx,
     const CollectionCatalog* catalog,
@@ -215,8 +202,12 @@ boost::optional<std::vector<NamespaceString>> resolveSecondaryNamespacesOrUUIDs(
     OperationContext* opCtx,
     const CollectionCatalog* catalog,
     const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDs) {
-
-    auto resolvedNamespaces = resolveNamespaceStringOrUUIDs(opCtx, catalog, secondaryNssOrUUIDs);
+    std::vector<NamespaceString> resolvedNamespaces;
+    resolvedNamespaces.reserve(secondaryNssOrUUIDs.size());
+    for (auto&& nssOrUUID : secondaryNssOrUUIDs) {
+        auto nss = catalog->resolveNamespaceStringOrUUID(opCtx, nssOrUUID);
+        resolvedNamespaces.emplace_back(nss);
+    }
 
     auto isAnySecondaryNssShardedOrAView =
         isAnyNssAViewOrSharded(opCtx, catalog, resolvedNamespaces);
