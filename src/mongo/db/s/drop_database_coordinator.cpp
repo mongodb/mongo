@@ -353,7 +353,7 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                 // ensure we do not delete collections of a different DB
                 if (!_firstExecution &&
                     isDbAlreadyDropped(opCtx, _doc.getDatabaseVersion(), _dbName)) {
-                    if (!_isPre70Compatible()) {
+                    if (_isPre70Compatible()) {
                         // Clear the database sharding state so that all subsequent write operations
                         // with the old database version will fail due to StaleDbVersion.
                         // Note: because we are using an scoped critical section it could happen
