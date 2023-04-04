@@ -141,8 +141,10 @@ public:
     /**
      * Fills a BatchCommandRequest from a TargetedWriteBatch for this BatchWriteOp.
      */
-    BatchedCommandRequest buildBatchRequest(const TargetedWriteBatch& targetedBatch,
-                                            const NSTargeter& targeter) const;
+    BatchedCommandRequest buildBatchRequest(
+        const TargetedWriteBatch& targetedBatch,
+        const NSTargeter& targeter,
+        boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery) const;
 
     /**
      * Stores a response from one of the outstanding TargetedWriteBatches for this BatchWriteOp.

@@ -172,7 +172,7 @@ var $config = extendWorkload($config, function($config, $super) {
 
         const duplicateKeyInChangeShardKeyMsg = "Failed to update document's shard key field";
         const wouldChangeOwningShardMsg =
-            "Must run update to document shard key in a transaction or as a retryable write.";
+            "Must run update to shard key field in a multi-statement transaction";
         const otherErrorsInChangeShardKeyMsg = "was converted into a distributed transaction";
         const failureInRetryableWriteToTxnConversionMsg =
             "Cannot retry a retryable write that has been converted";

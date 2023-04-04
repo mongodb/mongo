@@ -341,13 +341,6 @@ bool ClusterWriteCmd::handleWouldChangeOwningShardError(OperationContext* opCtx,
         }
     } else {
         // TODO SERVER-67429: Delete this branch.
-        if (!txnRouter && !isRetryableWrite) {
-            response->getErrDetails().back().setStatus(Status(
-                ErrorCodes::IllegalOperation,
-                "Must run update to document shard key in a transaction or as a retryable write."));
-            return false;
-        }
-
         opCtx->setQuerySamplingOptions(QuerySamplingOptions::kOptOut);
 
         if (isRetryableWrite) {

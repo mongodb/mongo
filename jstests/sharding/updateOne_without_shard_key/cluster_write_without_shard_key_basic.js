@@ -369,46 +369,6 @@ function runAndVerifyCommand(testCase) {
         targetDocId: {_id: _id},
     };
     assert.commandFailedWithCode(mongosConn.runCommand(cmdObj), ErrorCodes.IllegalOperation);
-
-    // Cannot specify $_allowShardKeyUpdatesWithoutFullShardKeyInQuery for an update from an
-    // external client.
-    cmdObj = {
-        _clusterWriteWithoutShardKey: 1,
-        writeCmd: {
-            update: collName,
-            updates: [
-                {q: {}, u: {$set: {x: 90}}, $_allowShardKeyUpdatesWithoutFullShardKeyInQuery: true},
-            ],
-        },
-        shardId: shard0Name,
-        targetDocId: {_id: _id},
-        txnNumber: NumberLong(1),
-        lsid: {id: UUID()},
-        startTransaction: true,
-        autocommit: false
-    };
-    assert.commandFailedWithCode(mongosConn.runCommand(cmdObj), ErrorCodes.InvalidOptions);
-
-    // Cannot specify $_allowShardKeyUpdatesWithoutFullShardKeyInQuery for a findAndModify from an
-    // external client.
-    cmdObj = {
-        _clusterWriteWithoutShardKey: 1,
-        writeCmd: {
-            findAndModify: collName,
-            query: {},
-            update: [
-                {$set: {a: aFieldValue}},
-            ],
-            $_allowShardKeyUpdatesWithoutFullShardKeyInQuery: true
-        },
-        shardId: shard0Name,
-        targetDocId: {_id: _id},
-        txnNumber: NumberLong(1),
-        lsid: {id: UUID()},
-        startTransaction: true,
-        autocommit: false
-    };
-    assert.commandFailedWithCode(mongosConn.runCommand(cmdObj), ErrorCodes.InvalidOptions);
 })();
 
 st.stop();

@@ -195,9 +195,9 @@ if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
         // If a WouldChangeOwningShard update is performed not as a retryable write or in a
         // transaction, expect an error.
         assert.eq(updateRes.getWriteError().code, ErrorCodes.IllegalOperation);
-        assert.eq(
-            updateRes.getWriteError().errmsg,
-            "Must run update to document shard key in a transaction or as a retryable write.");
+        assert(updateRes.getWriteError().errmsg.includes(
+            "Must run update to shard key field in a multi-statement transaction or with " +
+            "retryWrites: true."));
     }
 
 } else {

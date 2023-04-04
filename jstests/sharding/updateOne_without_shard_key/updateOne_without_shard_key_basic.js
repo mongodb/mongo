@@ -321,6 +321,7 @@ const testCases = [
 
         replacementDocTest: true,  // Replacement tests validate that the final replacement
         // operation was only applied once.
+        mustBeInRetryableWriteOrTransaction: true,
         cmdObj: {
             update: collName,
             updates:
@@ -342,6 +343,7 @@ const testCases = [
 
         replacementDocTest: true,  // Replacement tests validate that the final replacement
         // operation was only applied once.
+        mustBeInRetryableWriteOrTransaction: true,
         cmdObj: {
             update: collName,
             updates: [
@@ -365,9 +367,9 @@ const testCases = [
             {_id: 1, x: xFieldValShard1_1, y: yFieldVal}
         ],
 
-        replacementDocTest: true,      // Replacement tests validate that the final replacement
-                                       // operation was only applied once.
-        wouldChangeOwningShard: true,  // Can only run in retryable write or transaction.
+        replacementDocTest: true,  // Replacement tests validate that the final replacement
+                                   // operation was only applied once.
+        mustBeInRetryableWriteOrTransaction: true,
         cmdObj: {
             update: collName,
             updates: [{q: {y: yFieldVal}, u: {x: xFieldValShard0_2, y: yFieldVal, a: setFieldVal}}]
@@ -404,6 +406,7 @@ const testCases = [
                 {q: {y: 6}, u: {x: -1, _id: 6}, upsert: true}
             ],
         },
+        mustBeInRetryableWriteOrTransaction: true,
         options: [{ordered: true}, {ordered: false}],
         expectedMods: [{_id: 0, x: xFieldValShard0_1, y: yFieldVal + 1}, {_id: 6, y: 6, x: -1}],
         expectedResponse: {n: 2, nModified: 1, upserted: [{"index": 1, _id: 6}]},
@@ -425,7 +428,7 @@ const isTxnApiEnabled = FeatureFlagUtil.isEnabled(
 configurations.forEach(config => {
     let conn = WriteWithoutShardKeyTestUtil.getClusterConnection(st, config);
     testCases.forEach(testCase => {
-        if (!isTxnApiEnabled && testCase.wouldChangeOwningShard &&
+        if (!isTxnApiEnabled && testCase.mustBeInRetryableWriteOrTransaction &&
             (config === WriteWithoutShardKeyTestUtil.Configurations.noSession ||
              config === WriteWithoutShardKeyTestUtil.Configurations.sessionNotRetryableWrite)) {
             return;

@@ -261,7 +261,7 @@ TEST_F(BatchWriteOpTest, SingleWriteConcernErrorOrdered) {
     assertEndpointsEqual(getFirstTargetedWriteEndpoint(targeted.begin()->second), endpoint);
 
     BatchedCommandRequest targetBatch =
-        batchOp.buildBatchRequest(*targeted.begin()->second, targeter);
+        batchOp.buildBatchRequest(*targeted.begin()->second, targeter, boost::none);
     ASSERT(targetBatch.getWriteConcern().woCompare(request.getWriteConcern()) == 0);
 
     BatchedCommandResponse response;
@@ -1640,7 +1640,7 @@ TEST_F(BatchWriteOpTest, AttachingStmtIds) {
         assertEndpointsEqual(getFirstTargetedWriteEndpoint(targeted.begin()->second), endpoint);
 
         BatchedCommandRequest targetedRequest =
-            batchOp.buildBatchRequest(*targeted.begin()->second, targeter);
+            batchOp.buildBatchRequest(*targeted.begin()->second, targeter, boost::none);
         return targetedRequest;
     };
 

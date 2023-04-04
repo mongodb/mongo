@@ -634,49 +634,62 @@ void UpdateStage::_checkRestrictionsOnUpdatingShardKeyAreNotViolated(
     const auto& shardKeyPathsVector = collDesc.getKeyPatternFields();
     pathsupport::EqualityMatches equalities;
 
-    if (_params.request->getAllowShardKeyUpdatesWithoutFullShardKeyInQuery()) {
-        bool isInternalClient =
-            !cc().session() || (cc().session()->getTags() & transport::Session::kInternalClient);
-        uassert(ErrorCodes::InvalidOptions,
-                "$_allowShardKeyUpdatesWithoutFullShardKeyInQuery is an internal parameter",
-                isInternalClient);
-    }
-
-    // If the incoming update request came from a _clusterWriteWithoutShardKey command, we allow
-    // shard key updates without the full shard key specified.
-    bool allowShardKeyUpdatesWithoutFullShardKeyInQuery =
-        feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
-            serverGlobalParams.featureCompatibility) &&
-        _params.request->getAllowShardKeyUpdatesWithoutFullShardKeyInQuery();
-
-    uassert(31025,
-            "Shard key update is not allowed without specifying the full shard key in the "
-            "query",
-            (_params.canonicalQuery &&
-             pathsupport::extractFullEqualityMatches(
-                 *(_params.canonicalQuery->root()), shardKeyPaths, &equalities)
-                 .isOK() &&
-             equalities.size() == shardKeyPathsVector.size()) ||
-                allowShardKeyUpdatesWithoutFullShardKeyInQuery);
-
     // We do not allow updates to the shard key when 'multi' is true.
     uassert(ErrorCodes::InvalidOptions,
             "Multi-update operations are not allowed when updating the shard key field.",
             !_params.request->isMulti());
 
-    // If this node is a replica set primary node, an attempted update to the shard key value must
-    // either be a retryable write or inside a transaction.
-    // An update without a transaction number is legal if
-    // gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi is enabled because mongos
-    // will be able to start an internal transaction to handle the wouldChangeOwningShard error
-    // thrown below.
-    // If this node is a replica set secondary node, we can skip validation.
-    if (!feature_flags::gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi.isEnabled(
+    // With the introduction of PM-1632, we allow updating a document shard key without
+    // providing a full shard key if the update is executed in a retryable write or transaction.
+    // PM-1632 uses an internal transaction to execute these updates, so to make sure that we can
+    // only update the document shard key in a retryable write or transaction, mongos only sets
+    // $_allowShardKeyUpdatesWithoutFullShardKeyInQuery to true if the client executed write was a
+    // retryable write or in a transaction.
+    if (_params.request->getAllowShardKeyUpdatesWithoutFullShardKeyInQuery().has_value() &&
+        feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
             serverGlobalParams.featureCompatibility)) {
-        uassert(ErrorCodes::IllegalOperation,
-                "Must run update to shard key field in a multi-statement transaction or with "
-                "retryWrites: true.",
-                opCtx()->getTxnNumber());
+        bool isInternalClient =
+            !cc().session() || (cc().session()->getTags() & transport::Session::kInternalClient);
+        uassert(ErrorCodes::InvalidOptions,
+                "$_allowShardKeyUpdatesWithoutFullShardKeyInQuery is an internal parameter",
+                isInternalClient);
+
+        // If this node is a replica set primary node, an attempted update to the shard key value
+        // must either be a retryable write or inside a transaction. An update without a transaction
+        // number is legal if gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi is enabled
+        // because mongos will be able to start an internal transaction to handle the
+        // wouldChangeOwningShard error thrown below. If this node is a replica set secondary node,
+        // we can skip validation.
+        if (!feature_flags::gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi.isEnabled(
+                serverGlobalParams.featureCompatibility)) {
+            uassert(ErrorCodes::IllegalOperation,
+                    "Must run update to shard key field in a multi-statement transaction or with "
+                    "retryWrites: true.",
+                    _params.request->getAllowShardKeyUpdatesWithoutFullShardKeyInQuery());
+        }
+    } else {
+        uassert(31025,
+                "Shard key update is not allowed without specifying the full shard key in the "
+                "query",
+                (_params.canonicalQuery &&
+                 pathsupport::extractFullEqualityMatches(
+                     *(_params.canonicalQuery->root()), shardKeyPaths, &equalities)
+                     .isOK() &&
+                 equalities.size() == shardKeyPathsVector.size()));
+
+        // If this node is a replica set primary node, an attempted update to the shard key value
+        // must either be a retryable write or inside a transaction. An update without a transaction
+        // number is legal if gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi is enabled
+        // because mongos will be able to start an internal transaction to handle the
+        // wouldChangeOwningShard error thrown below. If this node is a replica set secondary node,
+        // we can skip validation.
+        if (!feature_flags::gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi.isEnabled(
+                serverGlobalParams.featureCompatibility)) {
+            uassert(ErrorCodes::IllegalOperation,
+                    "Must run update to shard key field in a multi-statement transaction or with "
+                    "retryWrites: true.",
+                    opCtx()->getTxnNumber());
+        }
     }
 }
 
