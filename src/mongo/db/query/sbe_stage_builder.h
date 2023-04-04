@@ -143,7 +143,7 @@ public:
     static constexpr Name kRecordId = {kMeta, "recordId"_sd};
     static constexpr Name kReturnKey = {kMeta, "returnKey"_sd};
     static constexpr Name kSnapshotId = {kMeta, "snapshotId"_sd};
-    static constexpr Name kIndexId = {kMeta, "indexId"_sd};
+    static constexpr Name kIndexIdent = {kMeta, "indexIdent"_sd};
     static constexpr Name kIndexKey = {kMeta, "indexKey"_sd};
     static constexpr Name kIndexKeyPattern = {kMeta, "indexKeyPattern"_sd};
 
@@ -468,9 +468,6 @@ struct PlanStageData {
     // This holds the output slots produced by SBE plan (resultSlot, recordIdSlot, etc).
     PlanStageSlots outputs;
 
-    // Map from index name to IAM.
-    StringMap<const IndexAccessMethod*> iamMap;
-
     // The CompileCtx object owns the RuntimeEnvironment. The RuntimeEnvironment owns various
     // SlotAccessors which are accessed when the SBE plan is executed.
     sbe::RuntimeEnvironment* env{nullptr};
@@ -526,7 +523,6 @@ private:
     // RuntimeEnvironment and CompileCtx.
     void copyFrom(const PlanStageData& other) {
         outputs = other.outputs;
-        iamMap = other.iamMap;
         shouldTrackLatestOplogTimestamp = other.shouldTrackLatestOplogTimestamp;
         shouldTrackResumeToken = other.shouldTrackResumeToken;
         shouldUseTailableScan = other.shouldUseTailableScan;
@@ -558,7 +554,7 @@ public:
     static constexpr auto kRecordId = PlanStageSlots::kRecordId;
     static constexpr auto kReturnKey = PlanStageSlots::kReturnKey;
     static constexpr auto kSnapshotId = PlanStageSlots::kSnapshotId;
-    static constexpr auto kIndexId = PlanStageSlots::kIndexId;
+    static constexpr auto kIndexIdent = PlanStageSlots::kIndexIdent;
     static constexpr auto kIndexKey = PlanStageSlots::kIndexKey;
     static constexpr auto kIndexKeyPattern = PlanStageSlots::kIndexKeyPattern;
 

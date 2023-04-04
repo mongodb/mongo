@@ -547,12 +547,9 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     }
 
     // If the slots necessary for performing an index consistency check were not requested in
-    // 'reqs', then don't pass a pointer to 'iamMap' so 'generateIndexScan' doesn't generate the
-    // necessary slots.
-    auto iamMap = &_data.iamMap;
-    if (!(reqs.has(kSnapshotId) && reqs.has(kIndexId) && reqs.has(kIndexKey))) {
-        iamMap = nullptr;
-    }
+    // 'reqs', then set 'doIndexConsistencyCheck' to false to avoid generating unnecessary logic.
+    bool doIndexConsistencyCheck =
+        reqs.has(kSnapshotId) && reqs.has(kIndexIdent) && reqs.has(kIndexKey);
 
     const auto generateIndexScanFunc =
         ixn->iets.empty() ? generateIndexScan : generateIndexScanWithDynamicBounds;
@@ -562,7 +559,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                                             fieldBitset,
                                                             sortKeyBitset,
                                                             _yieldPolicy,
-                                                            iamMap,
+                                                            doIndexConsistencyCheck,
                                                             reqs.has(kIndexKeyPattern));
 
     auto stage = std::move(scanStage);
@@ -929,19 +926,17 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto childReqs = forwardingReqs.copy()
                          .set(kRecordId)
                          .set(kSnapshotId)
-                         .set(kIndexId)
+                         .set(kIndexIdent)
                          .set(kIndexKey)
                          .set(kIndexKeyPattern);
 
     auto [stage, outputs] = build(child, childReqs);
 
-    auto iamMap = _data.iamMap;
-
     uassert(4822880, "RecordId slot is not defined", outputs.has(kRecordId));
     uassert(
         4953600, "ReturnKey slot is not defined", !reqs.has(kReturnKey) || outputs.has(kReturnKey));
     uassert(5290701, "Snapshot id slot is not defined", outputs.has(kSnapshotId));
-    uassert(5290702, "Index id slot is not defined", outputs.has(kIndexId));
+    uassert(7566701, "Index ident slot is not defined", outputs.has(kIndexIdent));
     uassert(5290711, "Index key slot is not defined", outputs.has(kIndexKey));
     uassert(5113713, "Index key pattern slot is not defined", outputs.has(kIndexKeyPattern));
 
@@ -977,11 +972,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                  topLevelFieldSlots,
                                  childRidSlot,
                                  outputs.get(kSnapshotId),
-                                 outputs.get(kIndexId),
+                                 outputs.get(kIndexIdent),
                                  outputs.get(kIndexKey),
                                  outputs.get(kIndexKeyPattern),
                                  getCurrentCollection(reqs),
-                                 std::move(iamMap),
                                  root->nodeId(),
                                  std::move(relevantSlots));
 
@@ -2031,7 +2025,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto innerIdSlot = innerOutputs.get(kRecordId);
     auto innerResultSlot = innerOutputs.get(kResult);
     auto innerSnapshotIdSlot = innerOutputs.getIfExists(kSnapshotId);
-    auto innerIndexIdSlot = innerOutputs.getIfExists(kIndexId);
+    auto innerIndexIdentSlot = innerOutputs.getIfExists(kIndexIdent);
     auto innerIndexKeySlot = innerOutputs.getIfExists(kIndexKey);
     auto innerIndexKeyPatternSlot = innerOutputs.getIfExists(kIndexKeyPattern);
 
@@ -2053,10 +2047,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         innerProjectSlots.push_back(slot);
         outputs.set(kSnapshotId, slot);
     }
-    if (reqs.has(kIndexId) && innerIndexIdSlot) {
-        auto slot = *innerIndexIdSlot;
+    if (reqs.has(kIndexIdent) && innerIndexIdentSlot) {
+        auto slot = *innerIndexIdentSlot;
         innerProjectSlots.push_back(slot);
-        outputs.set(kIndexId, slot);
+        outputs.set(kIndexIdent, slot);
     }
     if (reqs.has(kIndexKey) && innerIndexKeySlot) {
         auto slot = *innerIndexKeySlot;
@@ -2121,7 +2115,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     auto outerChildReqs = childReqs.copy()
                               .clear(kSnapshotId)
-                              .clear(kIndexId)
+                              .clear(kIndexIdent)
                               .clear(kIndexKey)
                               .clear(kIndexKeyPattern);
     auto [outerStage, outerOutputs] = build(outerChild, outerChildReqs);
@@ -2154,10 +2148,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         innerProjectSlots.push_back(innerSnapshotSlot);
         outputs.set(kSnapshotId, innerSnapshotSlot);
     }
-    if (reqs.has(kIndexId)) {
-        auto innerIndexIdSlot = innerOutputs.get(kIndexId);
-        innerProjectSlots.push_back(innerIndexIdSlot);
-        outputs.set(kIndexId, innerIndexIdSlot);
+    if (reqs.has(kIndexIdent)) {
+        auto innerIndexIdentSlot = innerOutputs.get(kIndexIdent);
+        innerProjectSlots.push_back(innerIndexIdentSlot);
+        outputs.set(kIndexIdent, innerIndexIdentSlot);
     }
     if (reqs.has(kIndexKey)) {
         auto innerIndexKeySlot = innerOutputs.get(kIndexKey);

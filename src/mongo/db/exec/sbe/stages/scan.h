@@ -47,11 +47,11 @@ struct ScanCallbacks {
                   IndexKeyConsistencyCheckCallback indexKeyConsistencyCheck = {},
                   ScanOpenCallback scanOpen = {})
         : indexKeyCorruptionCheckCallback(std::move(indexKeyCorruptionCheck)),
-          indexKeyConsistencyCheckCallBack(std::move(indexKeyConsistencyCheck)),
+          indexKeyConsistencyCheckCallback(std::move(indexKeyConsistencyCheck)),
           scanOpenCallback(std::move(scanOpen)) {}
 
     IndexKeyCorruptionCheckCallback indexKeyCorruptionCheckCallback;
-    IndexKeyConsistencyCheckCallback indexKeyConsistencyCheckCallBack;
+    IndexKeyConsistencyCheckCallback indexKeyConsistencyCheckCallback;
     ScanOpenCallback scanOpenCallback;
 };
 
@@ -78,19 +78,19 @@ struct ScanCallbacks {
  * we must verify at runtime that no such inconsistency exists. This requires the scan to know the
  * value of the index key, the identity of the index from which it was obtained, and the id of the
  * storage snapshot from which it was obtained. This information is made available to the seek stage
- * via 'snapshotIdSlot', 'indexIdSlot', 'indexKeySlot', and 'indexKeyPatternSlot'.
+ * via 'snapshotIdSlot', 'indexIdentSlot', 'indexKeySlot', and 'indexKeyPatternSlot'.
  *
  * If this is an oplog scan, then the 'oplogTsSlot' will be populated with the "ts" field from each
  * oplog entry.
  *
  * Debug string representations:
  *
- *  scan recordSlot|none recordIdSlot|none snapshotIdSlot|none indexIdSlot|none indexKeySlot|none
- *       indexKeyPatternSlot|none [slot1 = fieldName1, ... slot_n = fieldName_n] collectionUuid
- *       forward needOplogSlotForTs
+ *  scan recordSlot? recordIdSlot? snapshotIdSlot? indexIdentSlot? indexKeySlot?
+ *       indexKeyPatternSlot? [slot1 = fieldName1, ... slot_n = fieldName_n]
+ *       collectionUuid forward needOplogSlotForTs
  *
- *  seek seekKeySlot recordSlot|none recordIdSlot|none snapshotIdSlot|none indexIdSlot|none
- *       indexKeySlot|none indexKeyPatternSlot|none [slot1 = fieldName1, ... slot_n = fieldName_n]
+ *  seek seekKeySlot recordSlot? recordIdSlot? snapshotIdSlot? indexIdentSlot? indexKeySlot?
+ *       indexKeyPatternSlot? [slot1 = fieldName1, ... slot_n = fieldName_n]
  *       collectionUuid forward needOplogSlotForTs
  */
 class ScanStage final : public PlanStage {
@@ -99,7 +99,7 @@ public:
               boost::optional<value::SlotId> recordSlot,
               boost::optional<value::SlotId> recordIdSlot,
               boost::optional<value::SlotId> snapshotIdSlot,
-              boost::optional<value::SlotId> indexIdSlot,
+              boost::optional<value::SlotId> indexIdentSlot,
               boost::optional<value::SlotId> indexKeySlot,
               boost::optional<value::SlotId> indexKeyPatternSlot,
               boost::optional<value::SlotId> oplogTsSlot,
@@ -160,7 +160,7 @@ private:
     const boost::optional<value::SlotId> _recordSlot;
     const boost::optional<value::SlotId> _recordIdSlot;
     const boost::optional<value::SlotId> _snapshotIdSlot;
-    const boost::optional<value::SlotId> _indexIdSlot;
+    const boost::optional<value::SlotId> _indexIdentSlot;
     const boost::optional<value::SlotId> _indexKeySlot;
     const boost::optional<value::SlotId> _indexKeyPatternSlot;
     const boost::optional<value::SlotId> _oplogTsSlot;
@@ -187,7 +187,7 @@ private:
     std::unique_ptr<value::OwnedValueAccessor> _recordAccessor;
     std::unique_ptr<value::OwnedValueAccessor> _recordIdAccessor;
     value::SlotAccessor* _snapshotIdAccessor{nullptr};
-    value::SlotAccessor* _indexIdAccessor{nullptr};
+    value::SlotAccessor* _indexIdentAccessor{nullptr};
     value::SlotAccessor* _indexKeyAccessor{nullptr};
     value::SlotAccessor* _indexKeyPatternAccessor{nullptr};
 
@@ -243,6 +243,8 @@ private:
     // collection is still valid. Only relevant to capped collections.
     bool _needsToCheckCappedPositionLost = false;
 
+    StringMap<const IndexCatalogEntry*> _indexCatalogEntryMap;
+
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
     // Debug-only buffer used to track the last thing returned from the stage. Between
     // saves/restores this is used to check that the storage cursor has not changed position.
@@ -266,7 +268,7 @@ public:
                       boost::optional<value::SlotId> recordSlot,
                       boost::optional<value::SlotId> recordIdSlot,
                       boost::optional<value::SlotId> snapshotIdSlot,
-                      boost::optional<value::SlotId> indexIdSlot,
+                      boost::optional<value::SlotId> indexIdentSlot,
                       boost::optional<value::SlotId> indexKeySlot,
                       boost::optional<value::SlotId> indexKeyPatternSlot,
                       std::vector<std::string> fields,
@@ -281,7 +283,7 @@ public:
                       boost::optional<value::SlotId> recordSlot,
                       boost::optional<value::SlotId> recordIdSlot,
                       boost::optional<value::SlotId> snapshotIdSlot,
-                      boost::optional<value::SlotId> indexIdSlot,
+                      boost::optional<value::SlotId> indexIdentSlot,
                       boost::optional<value::SlotId> indexKeySlot,
                       boost::optional<value::SlotId> indexKeyPatternSlot,
                       std::vector<std::string> fields,
@@ -323,7 +325,7 @@ private:
     const boost::optional<value::SlotId> _recordSlot;
     const boost::optional<value::SlotId> _recordIdSlot;
     const boost::optional<value::SlotId> _snapshotIdSlot;
-    const boost::optional<value::SlotId> _indexIdSlot;
+    const boost::optional<value::SlotId> _indexIdentSlot;
     const boost::optional<value::SlotId> _indexKeySlot;
     const boost::optional<value::SlotId> _indexKeyPatternSlot;
     const std::vector<std::string> _fields;
@@ -343,7 +345,7 @@ private:
     std::unique_ptr<value::OwnedValueAccessor> _recordAccessor;
     std::unique_ptr<value::OwnedValueAccessor> _recordIdAccessor;
     value::SlotAccessor* _snapshotIdAccessor{nullptr};
-    value::SlotAccessor* _indexIdAccessor{nullptr};
+    value::SlotAccessor* _indexIdentAccessor{nullptr};
     value::SlotAccessor* _indexKeyAccessor{nullptr};
     value::SlotAccessor* _indexKeyPatternAccessor{nullptr};
 
@@ -358,6 +360,8 @@ private:
     bool _open{false};
 
     std::unique_ptr<SeekableRecordCursor> _cursor;
+
+    StringMap<const IndexCatalogEntry*> _indexCatalogEntryMap;
 
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
     // Debug-only buffer used to track the last thing returned from the stage. Between

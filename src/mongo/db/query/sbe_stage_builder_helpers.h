@@ -520,11 +520,10 @@ std::unique_ptr<sbe::PlanStage> makeLoopJoinForFetch(std::unique_ptr<sbe::PlanSt
                                                      sbe::value::SlotVector fieldSlots,
                                                      sbe::value::SlotId seekKeySlot,
                                                      sbe::value::SlotId snapshotIdSlot,
-                                                     sbe::value::SlotId indexIdSlot,
+                                                     sbe::value::SlotId indexIdentSlot,
                                                      sbe::value::SlotId indexKeySlot,
                                                      sbe::value::SlotId indexKeyPatternSlot,
                                                      const CollectionPtr& collToFetch,
-                                                     StringMap<const IndexAccessMethod*> iamMap,
                                                      PlanNodeId planNodeId,
                                                      sbe::value::SlotVector slotsToForward);
 
