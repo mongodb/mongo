@@ -53,6 +53,7 @@
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner_params.h"
+#include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/sbe_stage_builder.h"
 #include "mongo/db/query/stats/collection_statistics_impl.h"
 #include "mongo/db/query/yield_policy_callbacks_impl.h"
@@ -460,9 +461,13 @@ void validateCommandOptions(const CanonicalQuery* query,
     if (query) {
         validateFindCommandOptions(query->getFindCommandRequest());
     }
-    if (indexHint && !involvedCollections.empty()) {
-        uasserted(6624256,
-                  "For now we can apply hints only for queries involving a single collection");
+    if (indexHint) {
+        uassert(6624256,
+                "For now we can apply hints only for queries involving a single collection",
+                involvedCollections.empty());
+        uassert(ErrorCodes::BadValue,
+                "$natural hint cannot be set to a value other than -1 or 1.",
+                !query_request_helper::hasInvalidNaturalParam(indexHint.value()));
     }
     // Unsupported command/collection options.
     uassert(ErrorCodes::InternalErrorNotSupported,

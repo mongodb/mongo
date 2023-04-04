@@ -146,5 +146,11 @@ void validateCursorResponse(const BSONObj& outputAsBson, boost::optional<TenantI
  */
 void addShowRecordIdMetaProj(FindCommandRequest* findCommand);
 
+/**
+ * Helper that returns true if $natural exists as a key in the passed-in BSONObj, and the value does
+ * not equal -1 or 1.
+ */
+bool hasInvalidNaturalParam(const BSONObj& obj);
+
 }  // namespace query_request_helper
 }  // namespace mongo

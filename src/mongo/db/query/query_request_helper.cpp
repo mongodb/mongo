@@ -93,6 +93,15 @@ Status validateFindCommandRequest(const FindCommandRequest& findCommand) {
         }
     }
 
+    if (hasInvalidNaturalParam(findCommand.getSort())) {
+        return Status(ErrorCodes::BadValue,
+                      "$natural sort cannot be set to a value other than -1 or 1.");
+    }
+    if (hasInvalidNaturalParam(findCommand.getHint())) {
+        return Status(ErrorCodes::BadValue,
+                      "$natural hint cannot be set to a value other than -1 or 1.");
+    }
+
     if (query_request_helper::getTailableMode(findCommand) != TailableModeEnum::kNormal) {
         // Tailable cursors cannot have any sort other than {$natural: 1}.
         const BSONObj expectedSort = BSON(query_request_helper::kNaturalSortField << 1);
@@ -377,6 +386,22 @@ StatusWith<BSONObj> asAggregationCommand(const FindCommandRequest& findCommand) 
         aggregationBuilder.append(FindCommandRequest::kLetFieldName, *findCommand.getLet());
     }
     return StatusWith<BSONObj>(aggregationBuilder.obj());
+}
+
+bool hasInvalidNaturalParam(const BSONObj& obj) {
+    if (!obj.hasElement(query_request_helper::kNaturalSortField)) {
+        return false;
+    }
+    auto naturalElem = obj[query_request_helper::kNaturalSortField];
+    if (!naturalElem.isNumber()) {
+        return true;
+    }
+    if (obj.woCompare(BSON(query_request_helper::kNaturalSortField << 1)) == 0 ||
+        obj.woCompare(BSON(query_request_helper::kNaturalSortField << -1)) == 0) {
+        return false;
+    }
+
+    return true;
 }
 
 }  // namespace query_request_helper
