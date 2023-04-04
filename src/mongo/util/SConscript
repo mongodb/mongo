@@ -606,6 +606,21 @@ env.Library(
     ],
 )
 
+if env.TargetOSIs('linux'):
+    env.Library(
+        target='pin_code_segments',
+        source=[
+            'pin_code_segments.cpp',
+            'pin_code_segments_params.idl',
+        ],
+        LIBDEPS=[
+            '$BUILD_DIR/mongo/base',
+        ],
+        LIBDEPS_PRIVATE=[
+            '$BUILD_DIR/mongo/db/server_base',
+        ],
+    )
+
 pcre_env = env.Clone()
 pcre_env.InjectThirdParty(libraries=['pcre2'])
 pcre_env.Library(

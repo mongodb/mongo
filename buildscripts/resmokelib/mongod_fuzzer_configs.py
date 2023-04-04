@@ -127,6 +127,8 @@ def generate_independent_parameters(rng, mode):
         ret["storeFindAndModifyImagesInSideCollection"] = True
     ret["syncdelay"] = rng.choice([60, rng.randint(15, 180)])
     ret["minSnapshotHistoryWindowInSeconds"] = rng.choice([300, rng.randint(5, 600)])
+    # TODO (SERVER-75632): Uncomment this to enable passthrough testing.
+    # ret["lockCodeSegmentsInMemory"] = rng.choice([True, False])
 
     return ret
 
