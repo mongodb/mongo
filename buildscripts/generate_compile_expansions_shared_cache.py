@@ -61,7 +61,7 @@ def generate_scons_cache_expansions():
         if sys.platform.startswith("win"):
             shared_mount_root = 'X:\\'
         else:
-            shared_mount_root = '/efs'
+            shared_mount_root = '/efs/scons'
 
         scons_cache_dir = os.getenv("SCONS_CACHE_DIR")
         if scons_cache_dir:
