@@ -272,6 +272,7 @@ private:
     ExecutorFuture<void> _waitForForgetThenDoCleanup();
     ExecutorFuture<void> _doCleanup();
     ExecutorFuture<void> _doAbortIfRequired();
+    ExecutorFuture<void> _ensureAbortReasonSetInStateDocument();
     ExecutorFuture<void> _doAbort();
     ExecutorFuture<void> _doForget();
     bool _allowedToAbortDuringStateTransition(MovePrimaryDonorStateEnum newState) const;
@@ -291,6 +292,7 @@ private:
     MovePrimaryDonorService* const _donorService;
     const MovePrimaryCommonMetadata _metadata;
 
+    boost::optional<Status> _abortReason;
     MovePrimaryDonorMutableFields _mutableFields;
     std::unique_ptr<MovePrimaryMetrics> _metrics;
 

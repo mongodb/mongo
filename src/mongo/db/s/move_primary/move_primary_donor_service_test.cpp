@@ -953,5 +953,17 @@ TEST_F(MovePrimaryDonorServiceTest, ExplicitAbortAfterDecisionSetOk) {
     assertSentRecipientAbortCommand();
 }
 
+TEST_F(MovePrimaryDonorServiceTest, AbortDuringPartialStateTransitionMaintainsAbortReason) {
+    auto opCtx = makeOperationContext();
+    auto [fp, count] = pauseStateTransition(kPartial, MovePrimaryDonorStateEnum::kInitializing);
+    auto instance = createInstance(opCtx.get());
+    fp->waitForTimesEntered(count + 1);
+    instance->abort(kAbortedError);
+    fp->setMode(FailPoint::off);
+    instance->onReadyToForget();
+    ASSERT_EQ(instance->getCompletionFuture().getNoThrow(), kAbortedError);
+}
+
+
 }  // namespace
 }  // namespace mongo

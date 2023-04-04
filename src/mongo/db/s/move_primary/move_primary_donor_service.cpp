@@ -323,6 +323,9 @@ MovePrimaryDonor::MovePrimaryDonor(ServiceContext* serviceContext,
       _metrics{MovePrimaryMetrics::initializeFrom(initialState, _serviceContext)},
       _cleanupExecutor{cleanupExecutor},
       _externalState{std::move(dependencies.externalState)} {
+    if (auto abortReason = _mutableFields.getAbortReason()) {
+        _abortReason = deserializeStatus(abortReason->getOwned());
+    }
     _metrics->onStateTransition(boost::none, _getCurrentState());
 }
 
@@ -383,15 +386,12 @@ MovePrimaryDonorMutableFields MovePrimaryDonor::_getMutableFields() const {
 }
 
 bool MovePrimaryDonor::_isAborted(WithLock) const {
-    return _mutableFields.getAbortReason().has_value();
+    return _abortReason.has_value();
 }
 
 boost::optional<Status> MovePrimaryDonor::_getAbortReason() const {
-    auto reason = _getMutableFields().getAbortReason();
-    if (!reason) {
-        return boost::none;
-    }
-    return deserializeStatus(reason->getOwned());
+    stdx::unique_lock lock(_mutex);
+    return _abortReason;
 }
 
 Status MovePrimaryDonor::_getOperationStatus() const {
@@ -434,7 +434,9 @@ ExecutorFuture<void> MovePrimaryDonor::_runDonorWorkflow() {
                 return _doPrepared();
             }
             abort(result);
-            return _transitionToState(State::kAborted).then([this] { return _doAbort(); });
+            return _ensureAbortReasonSetInStateDocument()
+                .then([this] { return _transitionToState(State::kAborted); })
+                .then([this] { return _doAbort(); });
         })
         .then([this] { return _waitForForgetThenDoCleanup(); })
         .thenRunOn(_cleanupExecutor)
@@ -589,9 +591,7 @@ void MovePrimaryDonor::abort(Status reason) {
         return;
     }
 
-    BSONObjBuilder bob;
-    reason.serializeErrorToBSON(&bob);
-    _mutableFields.setAbortReason(bob.obj());
+    _abortReason = reason;
     if (_cancelState) {
         _cancelState->abort();
     }
@@ -664,6 +664,21 @@ ExecutorFuture<void> MovePrimaryDonor::_doAbortIfRequired() {
         return _doNothing();
     }
     return _doAbort();
+}
+
+ExecutorFuture<void> MovePrimaryDonor::_ensureAbortReasonSetInStateDocument() {
+    return _runOnTaskExecutor([this] {
+        auto doc = _buildCurrentStateDocument();
+        if (doc.getMutableFields().getAbortReason()) {
+            return;
+        }
+        auto reason = _getAbortReason();
+        invariant(reason);
+        BSONObjBuilder bob;
+        reason->serializeErrorToBSON(&bob);
+        doc.getMutableFields().setAbortReason(bob.obj());
+        _updateInMemoryState(doc);
+    });
 }
 
 ExecutorFuture<void> MovePrimaryDonor::_doAbort() {
