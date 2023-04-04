@@ -538,6 +538,14 @@ public:
     void appendConnectionStats(executor::ConnectionPoolStats* stats);
 
     /**
+     * Appends information on the status of shard draining to the passed in result BSONObjBuilder
+     */
+    void appendShardDrainingStatus(OperationContext* opCtx,
+                                   BSONObjBuilder& result,
+                                   RemoveShardProgress shardDrainingStatus,
+                                   ShardId shardId);
+
+    /**
      * Only used for unit-tests, clears a previously-created catalog manager from the specified
      * service context, so that 'create' can be called again.
      */

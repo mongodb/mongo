@@ -118,7 +118,12 @@ public:
             return shard->getId();
         }();
 
-        const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
+        uassert(ErrorCodes::IllegalOperation,
+                "Cannot remove the config server as a shard using removeShard. To transition the "
+                "config shard to a dedicated config server use the "
+                "transitionToDedicatedConfigServer command.",
+                shardId != ShardId::kConfigServerId);
+
         const auto shardingCatalogManager = ShardingCatalogManager::get(opCtx);
 
         const auto shardDrainingStatus = [&] {
@@ -134,50 +139,8 @@ public:
             }
         }();
 
-        const auto databases = uassertStatusOK(catalogClient->getDatabasesForShard(opCtx, shardId));
-
-        // Get BSONObj containing:
-        // 1) note about moving or dropping databases in a shard
-        // 2) list of databases (excluding 'local' database) that need to be moved
-        const auto dbInfo = [&] {
-            BSONObjBuilder dbInfoBuilder;
-            dbInfoBuilder.append("note", "you need to drop or movePrimary these databases");
-
-            BSONArrayBuilder dbs(dbInfoBuilder.subarrayStart("dbsToMove"));
-            for (const auto& db : databases) {
-                if (db != DatabaseName::kLocal.db()) {
-                    dbs.append(db);
-                }
-            }
-            dbs.doneFast();
-
-            return dbInfoBuilder.obj();
-        }();
-
-        switch (shardDrainingStatus.status) {
-            case RemoveShardProgress::STARTED:
-                result.append("msg", "draining started successfully");
-                result.append("state", "started");
-                result.append("shard", shardId);
-                result.appendElements(dbInfo);
-                break;
-            case RemoveShardProgress::ONGOING: {
-                const auto& remainingCounts = shardDrainingStatus.remainingCounts;
-                result.append("msg", "draining ongoing");
-                result.append("state", "ongoing");
-                result.append("remaining",
-                              BSON("chunks" << remainingCounts->totalChunks << "dbs"
-                                            << remainingCounts->databases << "jumboChunks"
-                                            << remainingCounts->jumboChunks));
-                result.appendElements(dbInfo);
-                break;
-            }
-            case RemoveShardProgress::COMPLETED:
-                result.append("msg", "removeshard completed successfully");
-                result.append("state", "completed");
-                result.append("shard", shardId);
-                break;
-        }
+        shardingCatalogManager->appendShardDrainingStatus(
+            opCtx, result, shardDrainingStatus, shardId);
 
         return true;
     }

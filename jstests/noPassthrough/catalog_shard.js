@@ -173,6 +173,15 @@ const newShardName =
 
 {
     //
+    // Can't remove catalogShard using the removeShard command.
+    //
+
+    assert.commandFailedWithCode(st.s.adminCommand({removeShard: "config"}),
+                                 ErrorCodes.IllegalOperation);
+}
+
+{
+    //
     // Remove the catalog shard.
     //
     let configPrimary = st.configRS.getPrimary();

@@ -4,7 +4,14 @@ function removeShard(st, shardName, timeout) {
     }
 
     assert.soon(function() {
-        const res = st.s.adminCommand({removeShard: shardName});
+        let res;
+        if (TestData.catalogShard && shardName == "config") {
+            // Need to use transitionToDedicatedConfigServer if trying
+            // to remove config server as a shard
+            res = st.s.adminCommand({transitionToDedicatedConfigServer: shardName});
+        } else {
+            res = st.s.adminCommand({removeShard: shardName});
+        }
         if (!res.ok && res.code === ErrorCodes.ShardNotFound) {
             // If the config server primary steps down right after removing the config.shards doc
             // for the shard but before responding with "state": "completed", the mongos would retry

@@ -14,15 +14,21 @@ var topologyTime0 = config.shards.findOne({_id: s.shard0.shardName}).topologyTim
 var topologyTime1 = config.shards.findOne({_id: s.shard1.shardName}).topologyTime;
 assert.gt(topologyTime1, topologyTime0);
 
+// removeShard is not permited on shard0 (the catalogShard) if catalogShard is enabled, so we want
+// to use transitionToDedicatedConfigServer instead
+var removeShardOrTransitionToDedicated =
+    TestData.catalogShard ? "transitionToDedicatedConfigServer" : "removeShard";
+
 // First remove puts in draining mode, the second tells me a db needs to move, the third
 // actually removes
-assert.commandWorked(s.s0.adminCommand({removeshard: s.shard0.shardName}));
+assert.commandWorked(s.s0.adminCommand({[removeShardOrTransitionToDedicated]: s.shard0.shardName}));
 
 // Can't make all shards in the cluster draining
 assert.commandFailedWithCode(s.s0.adminCommand({removeshard: s.shard1.shardName}),
                              ErrorCodes.IllegalOperation);
 
-var removeResult = assert.commandWorked(s.s0.adminCommand({removeshard: s.shard0.shardName}));
+var removeResult = assert.commandWorked(
+    s.s0.adminCommand({[removeShardOrTransitionToDedicated]: s.shard0.shardName}));
 assert.eq(removeResult.dbsToMove, ['needToMove'], "didn't show db to move");
 
 s.s0.getDB('needToMove').dropDatabase();
@@ -31,7 +37,8 @@ s.s0.getDB('needToMove').dropDatabase();
 // removed
 s.awaitBalancerRound();
 
-removeResult = assert.commandWorked(s.s0.adminCommand({removeshard: s.shard0.shardName}));
+removeResult = assert.commandWorked(
+    s.s0.adminCommand({[removeShardOrTransitionToDedicated]: s.shard0.shardName}));
 assert.eq('completed', removeResult.state, 'Shard was not removed: ' + tojson(removeResult));
 
 var existingShards = config.shards.find({}).toArray();
