@@ -89,7 +89,7 @@ public:
                                     const WriteConcernOptions& wc,
                                     UpsertType upsert,
                                     bool multi,
-                                    boost::optional<OID>) final {
+                                    boost::optional<OID>) override {
         MONGO_UNREACHABLE;
     }
 
