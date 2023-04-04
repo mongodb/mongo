@@ -18,8 +18,7 @@ executor:
       nodb: ''
 matrix_suite: true
 selector:
-  exclude_files:
-  - jstests/replsets/tenant_migration_recipient_shard_merge_copies_change_collections.js
+  exclude_files: []
   exclude_with_any_tags:
   - requires_capped
   roots:
