@@ -101,7 +101,7 @@ protected:
     }
 
     std::vector<repl::OplogEntry> readChangeCollection(OperationContext* opCtx,
-                                                       boost::optional<TenantId> tenantId) {
+                                                       const TenantId& tenantId) {
         auto changeCollection =
             AutoGetChangeCollection{opCtx, AutoGetChangeCollection::AccessMode::kRead, tenantId};
 
@@ -127,7 +127,7 @@ protected:
     }
 
     size_t removeExpiredChangeCollectionsDocuments(OperationContext* opCtx,
-                                                   boost::optional<TenantId> tenantId,
+                                                   const TenantId& tenantId,
                                                    Date_t expirationTime) {
         // Acquire intent-exclusive lock on the change collection. Early exit if the collection
         // doesn't exist.
@@ -196,7 +196,7 @@ protected:
     }
 
     size_t removeExpiredChangeCollectionsDocuments(OperationContext* opCtx,
-                                                   boost::optional<TenantId> tenantId,
+                                                   const TenantId& tenantId,
                                                    Date_t expirationTime) {
         // Acquire intent-exclusive lock on the change collection. Early exit if the collection
         // doesn't exist.

@@ -130,8 +130,9 @@ void verifyDbAndCollection(OperationContext* opCtx,
 AutoGetDb::AutoGetDb(OperationContext* opCtx,
                      const DatabaseName& dbName,
                      LockMode mode,
+                     boost::optional<LockMode> tenantLockMode,
                      Date_t deadline)
-    : AutoGetDb(opCtx, dbName, mode, deadline, [] {
+    : AutoGetDb(opCtx, dbName, mode, tenantLockMode, deadline, [] {
           Lock::GlobalLockSkipOptions options;
           return options;
       }()) {}
@@ -139,9 +140,12 @@ AutoGetDb::AutoGetDb(OperationContext* opCtx,
 AutoGetDb::AutoGetDb(OperationContext* opCtx,
                      const DatabaseName& dbName,
                      LockMode mode,
+                     boost::optional<LockMode> tenantLockMode,
                      Date_t deadline,
                      Lock::DBLockSkipOptions options)
-    : _dbName(dbName), _dbLock(opCtx, dbName, mode, deadline, std::move(options)), _db([&] {
+    : _dbName(dbName),
+      _dbLock(opCtx, dbName, mode, deadline, std::move(options), tenantLockMode),
+      _db([&] {
           auto databaseHolder = DatabaseHolder::get(opCtx);
           return databaseHolder->getDb(opCtx, dbName);
       }()) {
@@ -196,9 +200,16 @@ AutoGetDb AutoGetDb::createForAutoGetCollection(
     return AutoGetDb(opCtx,
                      nsOrUUID.nss() ? nsOrUUID.nss()->dbName() : *nsOrUUID.dbName(),
                      isSharedLockMode(modeColl) ? MODE_IS : MODE_IX,
+                     boost::none /* tenantLockMode */,
                      deadline,
                      std::move(dbLockOptions));
 }
+
+AutoGetDb::AutoGetDb(OperationContext* opCtx,
+                     const DatabaseName& dbName,
+                     LockMode mode,
+                     Date_t deadline)
+    : AutoGetDb(opCtx, dbName, mode, boost::none, deadline) {}
 
 Database* AutoGetDb::ensureDbExists(OperationContext* opCtx) {
     if (_db) {
@@ -712,39 +723,45 @@ AutoGetOplog::AutoGetOplog(OperationContext* opCtx, OplogAccessMode mode, Date_t
     _oplog.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, _oplog));
 }
 
-
 AutoGetChangeCollection::AutoGetChangeCollection(OperationContext* opCtx,
                                                  AutoGetChangeCollection::AccessMode mode,
-                                                 boost::optional<TenantId> tenantId,
+                                                 const TenantId& tenantId,
                                                  Date_t deadline) {
-    if (mode == AccessMode::kWriteInOplogContext) {
-        // The global lock must already be held.
-        invariant(opCtx->lockState()->isWriteLocked());
+    const auto changeCollectionNamespaceString = NamespaceString::makeChangeCollectionNSS(tenantId);
+    if (AccessMode::kRead == mode || AccessMode::kWrite == mode) {
+        // Treat this as a regular AutoGetCollection.
+        _coll.emplace(opCtx,
+                      changeCollectionNamespaceString,
+                      mode == AccessMode::kRead ? MODE_IS : MODE_IX,
+                      AutoGetCollection::Options{}.deadline(deadline));
+        return;
     }
+    tassert(6671506, "Invalid lock mode", AccessMode::kWriteInOplogContext == mode);
 
-    if (mode != AccessMode::kRead) {
-        // TODO SERVER-66715 avoid taking 'AutoGetCollection' and remove
-        // 'AllowLockAcquisitionOnTimestampedUnitOfWork'.
-        _allowLockAcquisitionTsWuow.emplace(opCtx->lockState());
-    }
-
-    _coll.emplace(opCtx,
-                  NamespaceString::makeChangeCollectionNSS(tenantId),
-                  mode == AccessMode::kRead ? MODE_IS : MODE_IX,
-                  AutoGetCollection::Options{}.deadline(deadline));
+    // When writing to the change collection as part of normal operation, we avoid taking any new
+    // locks. The caller must already have the tenant lock that protects the tenant specific change
+    // stream collection from being dropped. That's sufficient for acquiring a raw collection
+    // pointer.
+    tassert(6671500,
+            str::stream() << "Lock not held in IX mode for the tenant " << tenantId,
+            opCtx->lockState()->isLockHeldForMode(
+                ResourceId(ResourceType::RESOURCE_TENANT, tenantId), LockMode::MODE_IX));
+    auto changeCollectionPtr = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
+        opCtx, changeCollectionNamespaceString);
+    _changeCollection = CollectionPtr(changeCollectionPtr);
+    _changeCollection.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, _changeCollection));
 }
 
 const Collection* AutoGetChangeCollection::operator->() const {
-    return _coll ? _coll->getCollection().get() : nullptr;
+    return (**this).get();
 }
 
 const CollectionPtr& AutoGetChangeCollection::operator*() const {
-    return _coll->getCollection();
+    return (_coll) ? *(*_coll) : _changeCollection;
 }
 
 AutoGetChangeCollection::operator bool() const {
-    return _coll && _coll->getCollection().get();
+    return static_cast<bool>(**this);
 }
-
 
 }  // namespace mongo

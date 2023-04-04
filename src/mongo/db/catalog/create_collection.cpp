@@ -546,7 +546,12 @@ Status _createCollection(
     const boost::optional<BSONObj>& idIndex,
     const boost::optional<VirtualCollectionOptions>& virtualCollectionOptions = boost::none) {
     return writeConflictRetry(opCtx, "create", nss.ns(), [&] {
-        AutoGetDb autoDb(opCtx, nss.dbName(), MODE_IX);
+        // If a change collection is to be created, that is, the change streams are being enabled
+        // for a tenant, acquire exclusive tenant lock.
+        AutoGetDb autoDb(opCtx,
+                         nss.dbName(),
+                         MODE_IX /* database lock mode*/,
+                         boost::make_optional(nss.tenantId() && nss.isChangeCollection(), MODE_X));
         Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
         auto db = autoDb.ensureDbExists(opCtx);
 

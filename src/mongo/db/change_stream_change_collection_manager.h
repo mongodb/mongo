@@ -137,19 +137,55 @@ public:
                                            const std::vector<Record>& oplogRecords,
                                            const std::vector<Timestamp>& oplogTimestamps);
 
+    class ChangeCollectionsWriterInternal;
 
     /**
-     * Performs a range inserts on respective change collections using the oplog entries as
-     * specified by 'beginOplogEntries' and 'endOplogEntries'.
-     *
-     * Bails out if a failure is encountered in inserting documents to a particular change
-     * collection.
+     * Change Collection Writer. After acquiring ChangeCollectionsWriter the user should trigger
+     * acquisition of the locks by calling 'acquireLocks()' before the first write in the Write Unit
+     * of Work. Then the write of documents to change collections can be triggered by calling
+     * 'write()'.
      */
-    Status insertDocumentsToChangeCollection(
+    class ChangeCollectionsWriter {
+        friend class ChangeStreamChangeCollectionManager;
+
+        /**
+         * Constructs a writer from a range ['beginOplogEntries', 'endOplogEntries') of oplog
+         * entries.
+         */
+        ChangeCollectionsWriter(OperationContext* opCtx,
+                                std::vector<InsertStatement>::const_iterator beginOplogEntries,
+                                std::vector<InsertStatement>::const_iterator endOplogEntries,
+                                OpDebug* opDebug);
+
+    public:
+        ChangeCollectionsWriter(ChangeCollectionsWriter&&);
+        ChangeCollectionsWriter& operator=(ChangeCollectionsWriter&&);
+
+        /**
+         * Acquires locks needed to write documents to change collections.
+         */
+        void acquireLocks();
+
+        /**
+         * Writes documents to change collections.
+         */
+        Status write();
+
+        ~ChangeCollectionsWriter();
+
+    private:
+        std::unique_ptr<ChangeCollectionsWriterInternal> _writer;
+    };
+
+    /**
+     * Returns a change collection writer that can insert change collection entries into respective
+     * change collections. The entries are constructed from a range ['beginOplogEntries',
+     * 'endOplogEntries') of oplog entries.
+     */
+    ChangeCollectionsWriter createChangeCollectionsWriter(
         OperationContext* opCtx,
         std::vector<InsertStatement>::const_iterator beginOplogEntries,
         std::vector<InsertStatement>::const_iterator endOplogEntries,
-        bool isGlobalIXLockAcquired,
         OpDebug* opDebug);
 
     PurgingJobStats& getPurgingJobStats() {

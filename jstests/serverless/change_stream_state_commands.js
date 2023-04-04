@@ -9,6 +9,10 @@
 load("jstests/libs/fail_point_util.js");         // For configureFailPoint.
 load('jstests/libs/parallel_shell_helpers.js');  // For funWithArgs.
 
+// Disable implicit sessions since dropping "config" database for a tenant must be done not in a
+// session.
+TestData.disableImplicitSessions = true;
+
 const replSetTest =
     new ReplSetTest({nodes: 2, name: "change-stream-state-commands", serverless: true});
 
@@ -103,6 +107,12 @@ const secondOrgTenantId = ObjectId();
     // Verify that disabling change stream multiple times has not side-effects.
     setChangeStreamState(firstOrgTenantId, false);
     setChangeStreamState(firstOrgTenantId, false);
+    assertChangeStreamState(firstOrgTenantId, false);
+
+    // Verify that dropping "config" database works and effectively disables change streams.
+    setChangeStreamState(firstOrgTenantId, true);
+    assert.commandWorked(replSetTest.getPrimary().getDB("config").runCommand(
+        {dropDatabase: 1, $tenant: firstOrgTenantId}));
     assertChangeStreamState(firstOrgTenantId, false);
 })();
 
@@ -302,4 +312,5 @@ const secondOrgTenantId = ObjectId();
 })();
 
 replSetTest.stopSet();
+TestData.disableImplicitSessions = false;
 }());

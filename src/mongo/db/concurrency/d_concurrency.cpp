@@ -183,17 +183,40 @@ void Lock::GlobalLock::_unlock() {
     _result = LOCK_INVALID;
 }
 
-Lock::DBLock::DBLock(OperationContext* opCtx,
-                     const DatabaseName& dbName,
-                     LockMode mode,
-                     Date_t deadline)
-    : DBLock(opCtx, dbName, mode, deadline, DBLockSkipOptions{}) {}
+Lock::TenantLock::TenantLock(OperationContext* opCtx,
+                             const TenantId& tenantId,
+                             LockMode mode,
+                             Date_t deadline)
+    : _id{RESOURCE_TENANT, tenantId}, _opCtx{opCtx} {
+    dassert(_opCtx->lockState()->isLockHeldForMode(resourceIdGlobal,
+                                                   isSharedLockMode(mode) ? MODE_IS : MODE_IX));
+    _opCtx->lockState()->lock(_opCtx, _id, mode, deadline);
+}
+
+Lock::TenantLock::TenantLock(TenantLock&& otherLock)
+    : _id(otherLock._id), _opCtx(otherLock._opCtx) {
+    otherLock._opCtx = nullptr;
+}
+
+Lock::TenantLock::~TenantLock() {
+    if (_opCtx) {
+        _opCtx->lockState()->unlock(_id);
+    }
+}
 
 Lock::DBLock::DBLock(OperationContext* opCtx,
                      const DatabaseName& dbName,
                      LockMode mode,
                      Date_t deadline,
-                     DBLockSkipOptions options)
+                     boost::optional<LockMode> tenantLockMode)
+    : DBLock(opCtx, dbName, mode, deadline, DBLockSkipOptions{}, tenantLockMode) {}
+
+Lock::DBLock::DBLock(OperationContext* opCtx,
+                     const DatabaseName& dbName,
+                     LockMode mode,
+                     Date_t deadline,
+                     DBLockSkipOptions options,
+                     boost::optional<LockMode> tenantLockMode)
     : _id(RESOURCE_DATABASE, dbName), _opCtx(opCtx), _result(LOCK_INVALID), _mode(mode) {
 
     _globalLock.emplace(opCtx,
@@ -204,6 +227,32 @@ Lock::DBLock::DBLock(OperationContext* opCtx,
 
     massert(28539, "need a valid database name", !dbName.db().empty());
 
+    tassert(6671501,
+            str::stream() << "Tenant lock mode " << modeName(*tenantLockMode)
+                          << " specified for database " << dbName.db()
+                          << " that does not belong to a tenant",
+            !tenantLockMode || dbName.tenantId());
+
+    // Acquire the tenant lock.
+    if (dbName.tenantId()) {
+        const auto effectiveTenantLockMode = [&]() {
+            const auto defaultTenantLockMode = isSharedLockMode(_mode) ? MODE_IS : MODE_IX;
+            if (tenantLockMode) {
+                tassert(6671505,
+                        str::stream()
+                            << "Requested tenant lock mode " << modeName(*tenantLockMode)
+                            << " that is weaker than the default one  "
+                            << modeName(defaultTenantLockMode) << " for database " << dbName.db()
+                            << " of tenant  " << dbName.tenantId()->toString(),
+                        isModeCovered(defaultTenantLockMode, *tenantLockMode));
+                return *tenantLockMode;
+            } else {
+                return defaultTenantLockMode;
+            }
+        }();
+        _tenantLock.emplace(opCtx, *dbName.tenantId(), effectiveTenantLockMode, deadline);
+    }
+
     _opCtx->lockState()->lock(_opCtx, _id, _mode, deadline);
     _result = LOCK_OK;
 }
@@ -213,7 +262,8 @@ Lock::DBLock::DBLock(DBLock&& otherLock)
       _opCtx(otherLock._opCtx),
       _result(otherLock._result),
       _mode(otherLock._mode),
-      _globalLock(std::move(otherLock._globalLock)) {
+      _globalLock(std::move(otherLock._globalLock)),
+      _tenantLock(std::move(otherLock._tenantLock)) {
     // Mark as moved so the destructor doesn't invalidate the newly-constructed lock.
     otherLock._result = LOCK_INVALID;
 }

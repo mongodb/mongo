@@ -4,7 +4,9 @@ selector:
   roots:
   - jstests/change_streams/**/*.js
   exclude_files:
-  # TODO SERVER-69959: Implement a majority-committed insert listener.
+  # TODO SERVER-68341: Implement enable/disable command for mongoQ in the serverless.
+  - jstests/change_streams/**/*.js
+  # TODO SERVER-74555: Implement a majority-committed insert listener.
   - jstests/change_streams/only_wake_getmore_for_relevant_changes.js
   # TODO SERVER-68341: Implement enable/disable command for mongoQ in the serverless.
   - jstests/change_streams/projection_fakes_internal_event.js

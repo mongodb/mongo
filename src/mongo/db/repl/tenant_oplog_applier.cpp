@@ -37,6 +37,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
@@ -870,6 +871,20 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
                     "op"_attr = redact(noopEntry.toBSON()));
 
         AutoGetOplog oplogWrite(opCtx.get(), OplogAccessMode::kWrite);
+        boost::optional<Lock::TenantLock> tenantLock;
+        boost::optional<TenantId> tenantId = [&]() -> boost::optional<TenantId> {
+            if (_tenantId) {
+                return TenantId{OID::createFromString(*_tenantId)};
+            }
+            if (entry.getTid()) {
+                return *entry.getTid();
+            }
+            return boost::none;
+        }();
+        if (tenantId) {
+            tenantLock.emplace(opCtx.get(), *tenantId, MODE_IX);
+        }
+
         writeConflictRetry(
             opCtx.get(), "writeTenantNoOps", NamespaceString::kRsOplogNamespace.ns(), [&] {
                 WriteUnitOfWork wuow(opCtx.get());
@@ -916,6 +931,8 @@ void TenantOplogApplier::_writeNoOpsForRange(OpObserver* opObserver,
     opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
     AutoGetOplog oplogWrite(opCtx.get(), OplogAccessMode::kWrite);
+    auto tenantLocks = _acquireIntentExclusiveTenantLocks(opCtx.get(), begin, end);
+
     writeConflictRetry(
         opCtx.get(), "writeTenantNoOps", NamespaceString::kRsOplogNamespace.ns(), [&] {
             WriteUnitOfWork wuow(opCtx.get());
@@ -947,7 +964,34 @@ void TenantOplogApplier::_writeNoOpsForRange(OpObserver* opObserver,
             wuow.commit();
         });
 }
+std::vector<Lock::TenantLock> TenantOplogApplier::_acquireIntentExclusiveTenantLocks(
+    OperationContext* opCtx,
+    std::vector<TenantNoOpEntry>::const_iterator entryBegin,
+    std::vector<TenantNoOpEntry>::const_iterator entryEnd) const {
+    // Determine all involved tenants.
+    std::set<TenantId> tenantIds = [&] {
+        std::set<TenantId> tenantIds;
+        if (_tenantId) {
+            tenantIds.emplace(OID::createFromString(*_tenantId));
+        } else {
+            for (auto iter = entryBegin; iter != entryEnd; ++iter) {
+                const auto& oplogEntry = *iter->first;
+                if (oplogEntry.getTid()) {
+                    tenantIds.insert(*oplogEntry.getTid());
+                }
+            }
+        }
+        return tenantIds;
+    }();
 
+    // Acquire a lock for each tenant.
+    std::vector<Lock::TenantLock> tenantLocks;
+    tenantLocks.reserve(tenantIds.size());
+    for (auto&& tenantId : tenantIds) {
+        tenantLocks.emplace_back(opCtx, tenantId, MODE_IX);
+    }
+    return tenantLocks;
+}
 std::vector<std::vector<ApplierOperation>> TenantOplogApplier::_fillWriterVectors(
     OperationContext* opCtx, TenantOplogBatch* batch) {
     std::vector<std::vector<ApplierOperation>> writerVectors(
