@@ -170,6 +170,10 @@ commands:
                      agg_stage: shardedDataDistribution
                      resource_pattern: cluster
                      action_type: shardedDataDistribution
+                - privilege: # $_analyzeShardKeyReadWriteDistribution
+                     agg_stage: _analyzeShardKeyReadWriteDistribution
+                     resource_pattern: exact_namespace
+                     action_type: analyzeShardKey
         # Note that the 'CursorInitialReply' is not the only response that an aggregate command
         # could return. With 'explain' or 'exchange', the response would not include the fields in
         # 'CursorInitialReply'. But using 'explain' or 'exchange' is unstable, but otherwise the

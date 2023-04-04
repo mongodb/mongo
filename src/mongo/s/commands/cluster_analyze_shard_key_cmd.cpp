@@ -175,7 +175,7 @@ public:
                     "Unauthorized",
                     AuthorizationSession::get(opCtx->getClient())
                         ->isAuthorizedForActionsOnResource(ResourcePattern::forExactNamespace(ns()),
-                                                           ActionType::shardCollection));
+                                                           ActionType::analyzeShardKey));
         }
     };
 

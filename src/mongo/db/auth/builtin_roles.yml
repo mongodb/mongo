@@ -92,6 +92,7 @@ roles:
                 - collMod
                 - collStats # clusterMonitor gets this also
                 - compact
+                - configureQueryAnalyzer # clusterManager gets this also
                 - convertToCapped # readWrite gets this also
                 - createCollection # readWrite gets this also
                 - dbStats # clusterMonitor gets this also
@@ -129,6 +130,7 @@ roles:
         privileges:
             - matchType: any_normal
               actions:
+                - analyzeShardKey
                 - enableSharding
                 - refineCollectionShardKey
                 - reshardCollection
@@ -242,6 +244,7 @@ roles:
                   - getShardMap
                   - hostInfo
                   - listDatabases
+                  - listSampledQueries
                   - listSessions # clusterManager gets this also
                   - listShards # clusterManager gets this also
                   - netstat
@@ -356,6 +359,8 @@ roles:
 
             - matchType: any_normal
               actions: &clusterManagerRoleDatabaseActions
+                  - analyzeShardKey # enableSharding gets this also
+                  - configureQueryAnalyzer # dbAdmin gets this also
                   - clearJumboFlag
                   - splitChunk
                   - moveChunk

@@ -87,7 +87,7 @@ public:
                     "Unauthorized",
                     AuthorizationSession::get(opCtx->getClient())
                         ->isAuthorizedForActionsOnResource(ResourcePattern::forExactNamespace(ns()),
-                                                           ActionType::createCollection));
+                                                           ActionType::configureQueryAnalyzer));
         }
     };
 

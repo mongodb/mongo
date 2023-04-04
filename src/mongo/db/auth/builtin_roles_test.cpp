@@ -137,6 +137,8 @@ TEST(BuiltinRoles, addSystemBucketsPrivilegesForBuiltinRoleClusterManager) {
         ActionType::splitVector,
         ActionType::refineCollectionShardKey,
         ActionType::reshardCollection,
+        ActionType::analyzeShardKey,
+        ActionType::configureQueryAnalyzer,
     });
 
     for (const auto& priv : privs) {

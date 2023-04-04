@@ -8,6 +8,7 @@ selector:
     # Skip any tests that run with auth explicitly.
     # Auth tests require authentication on the stepdown thread's connection
   - jstests/sharding/*[aA]uth*.js
+  - jstests/sharding/analyze_shard_key/*[aA]uth*.js
   - jstests/sharding/query/*[aA]uth*.js
   - jstests/sharding/change_streams/*[aA]uth*.js
   - jstests/sharding/internal_txns/internal_client_restrictions.js

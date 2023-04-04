@@ -72,9 +72,8 @@ public:
 
         PrivilegeVector requiredPrivileges(bool isMongos,
                                            bool bypassDocumentValidation) const override {
-            // TODO (SERVER-69653): Add auth privilege requirements to the analyzeShardKey and
-            // configureQueryAnalyzer commands.
-            return {Privilege(ResourcePattern::forClusterResource(), ActionType::telemetryRead)};
+            return {
+                Privilege(ResourcePattern::forExactNamespace(_nss), ActionType::analyzeShardKey)};
         }
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const override {

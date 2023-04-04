@@ -282,8 +282,8 @@ if (!TestData.auth) {
         adminDb.runCommand({createUser: "admin", pwd: "pwd", roles: ["__system"]}));
     assert(adminDb.auth("admin", "pwd"));
 
-    // The analyzeShardKey command is supported on any mongod.
-    const testCases = [{conn: adminDb, isSupported: true}];
+    // The analyzeShardKey command is not supported in multitenancy.
+    const testCases = [{conn: adminDb, isSupported: false}];
     testNonExistingCollection(testCases, tenantId);
     rst.stopSet();
 }
