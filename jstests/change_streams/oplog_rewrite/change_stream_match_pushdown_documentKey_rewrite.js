@@ -108,13 +108,11 @@ for (const op of ["insert", "update", "replace", "delete"]) {
                          [0, 2] /* expectedOplogRetDocsForEachShard */,
                          [0, 2] /* expectedChangeStreamDocsForEachShard */);
 
-    // Test out a negated predicate on the full 'documentKey' field. It's not possible to rewrite
-    // this predicate and make it part of the oplog filter, so we expect the oplog cursor to return
-    // 2 docs on each shard.
+    // Test out a negated predicate on the full 'documentKey' field.
     verifyOnWholeCluster(
         {$match: {operationType: op, documentKey: {$not: {$eq: {shard: 0, _id: 2}}}}},
         {[collName]: {[op]: [3, 2, 3]}},
-        [2, 2] /* expectedOplogRetDocsForEachShard */,
+        [1, 2] /* expectedOplogRetDocsForEachShard */,
         [1, 2] /* expectedChangeStreamDocsForEachShard */);
 
     // Test out a negated predicate on 'documentKey._id'.
@@ -129,12 +127,10 @@ for (const op of ["insert", "update", "replace", "delete"]) {
                          [0, 0] /* expectedOplogRetDocsForEachShard */,
                          [0, 0] /* expectedChangeStreamDocsForEachShard */);
 
-    // Test out a negated predicate on 'documentKey.shard'. It's not possible to rewrite this
-    // predicate and make it part of the oplog filter, so we expect the oplog cursor to return 2
-    // docs on each shard.
+    // Test out a negated predicate on 'documentKey.shard'.
     verifyOnWholeCluster({$match: {operationType: op, "documentKey.shard": {$not: {$eq: 1}}}},
                          {[collName]: {[op]: [2, 3]}},
-                         [2, 2] /* expectedOplogRetDocsForEachShard */,
+                         [2, 0] /* expectedOplogRetDocsForEachShard */,
                          [2, 0] /* expectedChangeStreamDocsForEachShard */);
 
     // Test out the '{$exists: false}' predicate on a field that doesn't exist in 'documentKey' but
@@ -156,7 +152,7 @@ for (const op of ["insert", "update", "replace", "delete"]) {
         $match: {$and: [{operationType: op}, {$expr: {$eq: ["$documentKey", {shard: 0, _id: 2}]}}]}
     },
                          {[collName]: {[op]: [2]}},
-                         [2, 2] /* expectedOplogRetDocsForEachShard */,
+                         [1, 0] /* expectedOplogRetDocsForEachShard */,
                          [1, 0] /* expectedChangeStreamDocsForEachShard */);
 
     // Test out a negated predicate on the full 'documentKey' field.
@@ -167,7 +163,7 @@ for (const op of ["insert", "update", "replace", "delete"]) {
         }
     },
                          {[collName]: {[op]: [3, 2, 3]}},
-                         [2, 2] /* expectedOplogRetDocsForEachShard */,
+                         [1, 2] /* expectedOplogRetDocsForEachShard */,
                          [1, 2] /* expectedChangeStreamDocsForEachShard */);
 
     // Test out an $expr predicate on 'documentKey._id'.
@@ -188,14 +184,14 @@ for (const op of ["insert", "update", "replace", "delete"]) {
     verifyOnWholeCluster(
         {$match: {$and: [{operationType: op}, {$expr: {$eq: ["$documentKey.shard", 1]}}]}},
         {[collName]: {[op]: [2, 3]}},
-        [2, 2] /* expectedOplogRetDocsForEachShard */,
+        [0, 2] /* expectedOplogRetDocsForEachShard */,
         [0, 2] /* expectedChangeStreamDocsForEachShard */);
 
     // Test out a negated $expr predicate on 'documentKey.shard'.
     verifyOnWholeCluster(
         {$match: {$and: [{operationType: op}, {$expr: {$not: {$eq: ["$documentKey.shard", 1]}}}]}},
         {[collName]: {[op]: [2, 3]}},
-        [2, 2] /* expectedOplogRetDocsForEachShard */,
+        [2, 0] /* expectedOplogRetDocsForEachShard */,
         [2, 0] /* expectedChangeStreamDocsForEachShard */);
 }
 

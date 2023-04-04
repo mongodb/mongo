@@ -256,16 +256,6 @@ std::unique_ptr<MatchExpression> matchRewriteDocumentKey(
             str::stream() << "Unexpected predicate path: " << predicate->path(),
             predicate->fieldRef()->getPart(0) == DocumentSourceChangeStream::kDocumentKeyField);
 
-    // Check if the predicate's path starts with "documentKey._id". If so, then we can always
-    // perform an exact rewrite. If not, because of the complexities of the 'op' == 'i' case, it's
-    // impractical to try to generate a rewritten predicate that matches exactly.
-    bool pathStartsWithDKId =
-        (predicate->fieldRef()->numParts() >= 2 &&
-         predicate->fieldRef()->getPart(1) == DocumentSourceChangeStream::kIdField);
-    if (!pathStartsWithDKId && !allowInexact) {
-        return nullptr;
-    }
-
     // Helper to generate a filter on the 'op' field for the specified type. This filter will also
     // include a copy of 'predicate' with the path renamed to apply to the oplog.
     auto generateFilterForOp = [&](StringData op, const StringMap<std::string>& renameList) {
@@ -288,84 +278,10 @@ std::unique_ptr<MatchExpression> matchRewriteDocumentKey(
         rewrittenPredicate->add(std::move(nonCRUDCase));
     }
 
-    // Handle update, replace and delete. The predicate path can simply be renamed.
+    // Handle update, replace, delete and insert. The predicate path can simply be renamed.
     rewrittenPredicate->add(generateFilterForOp("u"_sd, {{"documentKey", "o2"}}));
     rewrittenPredicate->add(generateFilterForOp("d"_sd, {{"documentKey", "o"}}));
-
-    // If the path is a subfield of 'documentKey', inserts can also be handled by renaming, as long
-    // as the path starts with _id or the predicate does not match a missing field.
-    if (predicate->fieldRef()->numParts() > 1) {
-        // If the predicate matches against a missing field and is on a field which exists in the
-        // full document but not the documentKey, then applying that predicate to the 'o' field in
-        // the oplog will discard entries that would have matched the eventual change stream event.
-        if (pathStartsWithDKId || !predicate->matchesSingleElement({})) {
-            rewrittenPredicate->add(generateFilterForOp("i"_sd, {{"documentKey", "o"}}));
-        } else {
-            // We can't rewrite the predicate, so we have to match all {op: "i"} events.
-            rewrittenPredicate->add(
-                std::make_unique<EqualityMatchExpression>("op"_sd, Value("i"_sd)));
-        }
-        return rewrittenPredicate;
-    }
-
-    // Otherwise, we must handle the {op: "i"} case where the predicate is on the full 'documentKey'
-    // field. Create an $and filter for the insert case, and seed it with {op: "i"}. If we are
-    // unable to rewrite the predicate below, this filter will simply return all insert events.
-    auto insertCase = std::make_unique<AndMatchExpression>();
-    insertCase->add(std::make_unique<EqualityMatchExpression>("op"_sd, Value("i"_sd)));
-
-    // Helper to convert an equality match against 'documentKey' into a match against each subfield.
-    auto makeInsertDocKeyFilterForOperand =
-        [&](BSONElement rhs) -> std::unique_ptr<MatchExpression> {
-        // We're comparing against the full 'documentKey' field, which is an object that has an
-        // '_id' subfield and possibly other subfields. If 'rhs' is not an object or if 'rhs'
-        // doesn't have an '_id' subfield, it will never match.
-        if (rhs.type() != BSONType::Object ||
-            !rhs.embeddedObject()[DocumentSourceChangeStream::kIdField]) {
-            return std::make_unique<AlwaysFalseMatchExpression>();
-        }
-        // Iterate over 'rhs' and add an equality match on each subfield into the $and. Each
-        // fieldname is prefixed with "o." so that it applies to the document embedded in the oplog.
-        auto andExpr = std::make_unique<AndMatchExpression>();
-        for (auto&& subfield : rhs.embeddedObject()) {
-            andExpr->add(MatchExpressionParser::parseAndNormalize(
-                BSON((str::stream() << "o." << subfield.fieldNameStringData()) << subfield),
-                expCtx));
-        }
-        return andExpr;
-    };
-
-    // There are only a limited set of predicates that we can feasibly rewrite here.
-    switch (predicate->matchType()) {
-        case MatchExpression::INTERNAL_EXPR_EQ:
-        case MatchExpression::EQ: {
-            auto cme = static_cast<const ComparisonMatchExpressionBase*>(predicate);
-            insertCase->add(makeInsertDocKeyFilterForOperand(cme->getData()));
-            break;
-        }
-        case MatchExpression::MATCH_IN: {
-            // Convert the $in into an $or with one branch for each operand. We don't need to
-            // account for regex operands, since these will never match.
-            auto ime = static_cast<const InMatchExpression*>(predicate);
-            auto orExpr = std::make_unique<OrMatchExpression>();
-            for (auto& equality : ime->getEqualities()) {
-                orExpr->add(makeInsertDocKeyFilterForOperand(equality));
-            }
-            insertCase->add(std::move(orExpr));
-            break;
-        }
-        case MatchExpression::EXISTS:
-            // An $exists predicate will match every insert, since every insert has a documentKey.
-            // Leave the filter as {op: "i"} and fall through to the default 'break' case.
-        default:
-            // For all other predicates, we give up and just allow all insert oplog entries to pass
-            // through.
-            break;
-    }
-
-    // Regardless of whether we were able to fully rewrite the {op: "i"} case or not, add the
-    // 'insertCase' to produce the final rewritten documentKey predicate.
-    rewrittenPredicate->add(std::move(insertCase));
+    rewrittenPredicate->add(generateFilterForOp("i"_sd, {{"documentKey", "o2"}}));
 
     return rewrittenPredicate;
 }
@@ -383,38 +299,22 @@ boost::intrusive_ptr<Expression> exprRewriteDocumentKey(
             str::stream() << "Unexpected field path" << fieldPath.fullPathWithPrefix(),
             fieldPath.getFieldName(0) == DocumentSourceChangeStream::kDocumentKeyField);
 
-    // If the field path refers to the full "documentKey" field (and not a subfield thereof), we
-    // don't attempt to generate a rewritten expression.
-    if (fieldPath.getPathLength() == 1) {
-        return nullptr;
-    }
-
-    // Check if the field path starts with "documentKey._id". If so, then we can always perform an
-    // exact rewrite. If not, because of the complexities of the 'op' == 'i' case, it's impractical
-    // to try to generate a rewritten expression that matches exactly.
-    bool pathStartsWithDKId = (fieldPath.getPathLength() >= 2 &&
-                               fieldPath.getFieldName(1) == DocumentSourceChangeStream::kIdField);
-    if (!pathStartsWithDKId && !allowInexact) {
-        return nullptr;
-    }
-
     // We intend to build a $switch statement which returns the correct change stream operationType
     // based on the contents of the oplog event. Start by enumerating the different opType cases.
     std::vector<BSONObj> opCases;
 
-    // Cases for 'insert' and 'delete'.
-    auto insertAndDeletePath = cloneWithSubstitution(expr, {{"documentKey", "o"}})
-                                   ->getFieldPathWithoutCurrentPrefix()
-                                   .fullPathWithPrefix();
-    opCases.push_back(
-        fromjson("{case: {$in: ['$op', ['i', 'd']]}, then: '" + insertAndDeletePath + "'}"));
+    // Case for 'delete'.
+    auto deletePath = cloneWithSubstitution(expr, {{"documentKey", "o"}})
+                          ->getFieldPathWithoutCurrentPrefix()
+                          .fullPathWithPrefix();
+    opCases.push_back(fromjson("{case: {$eq: ['$op', 'd']}, then: '" + deletePath + "'}"));
 
-    // Cases for 'update' and 'replace'.
-    auto updateAndReplacePath = cloneWithSubstitution(expr, {{"documentKey", "o2"}})
-                                    ->getFieldPathWithoutCurrentPrefix()
-                                    .fullPathWithPrefix();
+    // Cases for 'insert', 'update' and 'replace'.
+    auto insertUpdateAndReplacePath = cloneWithSubstitution(expr, {{"documentKey", "o2"}})
+                                          ->getFieldPathWithoutCurrentPrefix()
+                                          .fullPathWithPrefix();
     opCases.push_back(
-        fromjson("{case: {$eq: ['$op', 'u']}, then: '" + updateAndReplacePath + "'}"));
+        fromjson("{case: {$in: ['$op', ['i', 'u']]}, then: '" + insertUpdateAndReplacePath + "'}"));
 
     // The default case, if nothing matches.
     auto defaultCase = ExpressionConstant::create(expCtx.get(), Value())->serialize(false);
