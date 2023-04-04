@@ -75,7 +75,6 @@ bool ClonerUtils::isDatabaseForTenant(const DatabaseName& db,
     }
 }
 
-// TODO SERVER-70027: Pass tenantID object to this function instead of StringData.
 bool ClonerUtils::isNamespaceForTenant(NamespaceString nss, StringData prefix) {
     if (gMultitenancySupport && nss.tenantId() != boost::none) {
         return nss.tenantId()->toString() == prefix;
