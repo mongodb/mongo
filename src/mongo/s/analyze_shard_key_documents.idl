@@ -47,6 +47,13 @@ structs:
       ns:
         type: namespacestring
         description: "The namespace of the collection."
+      startTime:
+        type: date
+        description: "The time at which query sampling began."
+      stopTime:
+        type: date
+        description: "The time at which query sampling ended."
+        optional: true
     inline_chained_structs: true
     chained_structs:
       QueryAnalyzerConfiguration: configuration

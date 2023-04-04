@@ -173,29 +173,73 @@ public:
             }
             auto collUuid = uassertStatusOK(validateCollectionOptions(opCtx, nss));
 
-            QueryAnalyzerDocument qad;
-            qad.setNs(nss);
-            qad.setCollectionUuid(collUuid);
-            qad.setConfiguration(newConfig);
-            // TODO SERVER-69804: Implement start/stop timestamp in config.queryAnalyzers
-            // document.
             LOGV2(6915001,
                   "Persisting query analyzer configuration",
                   logAttrs(nss),
                   "collectionUUID"_attr = collUuid,
                   "mode"_attr = mode,
                   "sampleRate"_attr = sampleRate);
-            PersistentTaskStore<QueryAnalyzerDocument> store{
-                NamespaceString::kConfigQueryAnalyzersNamespace};
-            store.upsert(
-                opCtx,
-                BSON(QueryAnalyzerDocument::kCollectionUuidFieldName << qad.getCollectionUuid()),
-                qad.toBSON(),
-                WriteConcerns::kMajorityWriteConcernNoTimeout);
+
+            write_ops::FindAndModifyCommandRequest request(
+                NamespaceString::kConfigQueryAnalyzersNamespace);
+
+            using doc = QueryAnalyzerDocument;
+
+            auto currentTime = opCtx->getServiceContext()->getFastClockSource()->now();
+            if (mode == QueryAnalyzerModeEnum::kOff) {
+                request.setUpsert(false);
+                // If the mode is 'off', do not perform the update since that would overwrite the
+                // existing stop time.
+                request.setQuery(BSON(
+                    doc::kCollectionUuidFieldName
+                    << collUuid << doc::kModeFieldName
+                    << BSON("$ne" << QueryAnalyzerMode_serializer(QueryAnalyzerModeEnum::kOff))));
+
+                std::vector<BSONObj> updates;
+                updates.push_back(
+                    BSON("$set" << BSON(doc::kModeFieldName
+                                        << QueryAnalyzerMode_serializer(QueryAnalyzerModeEnum::kOff)
+                                        << doc::kStopTimeFieldName << currentTime)));
+                request.setUpdate(write_ops::UpdateModification(updates));
+            } else {
+                request.setUpsert(true);
+                request.setQuery(BSON(doc::kCollectionUuidFieldName << collUuid));
+
+                std::vector<BSONObj> updates;
+                BSONObjBuilder setBuilder;
+                setBuilder.appendElements(BSON(doc::kCollectionUuidFieldName
+                                               << collUuid << doc::kNsFieldName << nss.toString()));
+                setBuilder.appendElements(newConfig.toBSON());
+                // If the mode remains the same, keep the original start time. Otherwise, set a new
+                // start time.
+                setBuilder.append(
+                    doc::kStartTimeFieldName,
+                    BSON("$cond" << BSON("if" << BSON("$ne" << BSON_ARRAY(
+                                                          ("$" + doc::kModeFieldName)
+                                                          << QueryAnalyzerMode_serializer(mode)))
+                                              << "then" << currentTime << "else"
+                                              << ("$" + doc::kStartTimeFieldName))));
+                updates.push_back(BSON("$set" << setBuilder.obj()));
+                updates.push_back(BSON("$unset" << doc::kStopTimeFieldName));
+                request.setUpdate(write_ops::UpdateModification(updates));
+            }
+            request.setWriteConcern(WriteConcerns::kMajorityWriteConcernNoTimeout.toBSON());
+
+            DBDirectClient client(opCtx);
+            auto writeResult = client.findAndModify(request);
 
             Response response;
-            // TODO SERVER-70019: Make configQueryAnalyzer return old configuration.
             response.setNewConfiguration(newConfig);
+            if (auto preImageDoc = writeResult.getValue()) {
+                auto oldConfig = QueryAnalyzerConfiguration::parse(
+                    IDLParserContext("configureQueryAnalyzer"), *preImageDoc);
+                response.setOldConfiguration(oldConfig);
+            } else {
+                uassert(ErrorCodes::IllegalOperation,
+                        "Attempted to disable query sampling but query sampling was not active",
+                        mode != QueryAnalyzerModeEnum::kOff);
+            }
+
             return response;
         }
 

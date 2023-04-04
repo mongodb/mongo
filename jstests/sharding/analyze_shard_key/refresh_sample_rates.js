@@ -132,9 +132,6 @@ function testBasic(createConnFn, rst, samplerNames) {
         numQueriesExecutedPerSecond: 0
     }));
     assert.eq(0, res2.configurations.length);
-
-    assert.commandWorked(conn.adminCommand({configureQueryAnalyzer: ns0, mode: "off"}));
-    assert.commandWorked(conn.adminCommand({configureQueryAnalyzer: ns1, mode: "off"}));
 }
 
 function testFailover(createConnFn, rst, samplerNames) {

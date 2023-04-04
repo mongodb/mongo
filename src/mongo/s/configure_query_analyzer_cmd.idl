@@ -37,9 +37,12 @@ structs:
   configureQueryAnalyzerResponse:
     description: "The response for the 'configureQueryAnalyzer' command."
     strict: false
-    inline_chained_structs: true
-    chained_structs:
-      QueryAnalyzerConfiguration: newConfiguration
+    fields:
+      newConfiguration:
+        type: QueryAnalyzerConfiguration
+      oldConfiguration:
+        type: QueryAnalyzerConfiguration
+        optional: true
 
 commands:
   configureQueryAnalyzer:

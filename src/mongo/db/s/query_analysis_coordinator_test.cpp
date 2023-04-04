@@ -80,6 +80,10 @@ protected:
         configuration.setMode(mode);
         configuration.setSampleRate(sampleRate);
         doc.setConfiguration(configuration);
+        doc.setStartTime(now());
+        if (mode == QueryAnalyzerModeEnum::kOff) {
+            doc.setStopTime(now());
+        }
         return doc;
     }
 
@@ -90,6 +94,7 @@ protected:
         ASSERT(it != configurations.end());
         auto& configuration = it->second;
         ASSERT_EQ(configuration.getNs(), analyzerDoc.getNs());
+        ASSERT_EQ(configuration.getCollectionUuid(), analyzerDoc.getCollectionUuid());
         ASSERT_EQ(configuration.getSampleRate(), *analyzerDoc.getSampleRate());
     }
 
