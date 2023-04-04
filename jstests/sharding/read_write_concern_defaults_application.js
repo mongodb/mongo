@@ -508,19 +508,21 @@ let testCases = {
     getMore: {skip: "does not accept read or write concern"},
     getParameter: {skip: "does not accept read or write concern"},
     getQueryableEncryptionCountInfo: {
-        setUp: function(conn) {
-            assert.commandWorked(conn.getCollection(nss).insert({x: 1}, {writeConcern: {w: 1}}));
-        },
-        command: {
-            getQueryableEncryptionCountInfo: coll,
-            tokens: [
-                {tokens: [{"s": BinData(0, "lUBO7Mov5Sb+c/D4cJ9whhhw/+PZFLCk/AQU2+BpumQ=")}]},
-            ],
-            "forInsert": true,
-        },
-        checkReadConcern: true,
-        checkWriteConcern: false,
-        useLogs: true,
+        // TODO SERVER-75631 - Enable this test once the feature flag is gone
+        skip: "requires feature flag"
+        // setUp: function(conn) {
+        //     assert.commandWorked(conn.getCollection(nss).insert({x: 1}, {writeConcern: {w: 1}}));
+        // },
+        // command: {
+        //     getQueryableEncryptionCountInfo: coll,
+        //     tokens: [
+        //         {tokens: [{"s": BinData(0, "lUBO7Mov5Sb+c/D4cJ9whhhw/+PZFLCk/AQU2+BpumQ=")}]},
+        //     ],
+        //     "forInsert": true,
+        // },
+        // checkReadConcern: true,
+        // checkWriteConcern: false,
+        // useLogs: true,
     },
     getShardMap: {skip: "internal command"},
     getShardVersion: {skip: "internal command"},
