@@ -169,8 +169,3 @@ configs:
         arg_vartype: Switch
         source: [ cli, ini ]
         hidden: true
-    enableExperimentalStorageDetailsCmd:
-        description: 'EXPERIMENTAL (UNSUPPORTED). Enable command computing aggregate statistics on storage.'
-        arg_vartype: Switch
-        source: [ cli, ini ]
-        hidden: true

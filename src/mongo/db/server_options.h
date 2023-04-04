@@ -108,14 +108,6 @@ struct ServerGlobalParams {
     int forkReadyFd = -1;  // for `--fork`. Write to it and close it when daemon service is up.
 #endif
 
-    /**
-     * Switches to enable experimental (unsupported) features.
-     */
-    struct ExperimentalFeatures {
-        ExperimentalFeatures() : storageDetailsCmdEnabled(false) {}
-        bool storageDetailsCmdEnabled;  // -- enableExperimentalStorageDetailsCmd
-    } experimental;
-
     time_t started = ::time(nullptr);
 
     BSONArray argvArray;

@@ -320,11 +320,6 @@ Status storeBaseOptions(const moe::Environment& params) {
         }
     }
 
-    if (params.count("enableExperimentalStorageDetailsCmd")) {
-        serverGlobalParams.experimental.storageDetailsCmdEnabled =
-            params["enableExperimentalStorageDetailsCmd"].as<bool>();
-    }
-
     if (params.count("systemLog.quiet")) {
         serverGlobalParams.quiet.store(params["systemLog.quiet"].as<bool>());
     }

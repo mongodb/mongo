@@ -13,7 +13,6 @@ const dbPath = MongoRunner.toRealDir("$dataDir/commands_built_in_roles_standalon
 mkdir(dbPath);
 const opts = {
     auth: "",
-    enableExperimentalStorageDetailsCmd: "",
     setParameter: "trafficRecordingDirectory=" + dbPath
 };
 

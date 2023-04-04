@@ -217,8 +217,7 @@ function createUsers(conn) {
 }
 
 const opts = {
-    auth: "",
-    enableExperimentalStorageDetailsCmd: ""
+    auth: ""
 };
 const impls = {
     createUsers: createUsers,
