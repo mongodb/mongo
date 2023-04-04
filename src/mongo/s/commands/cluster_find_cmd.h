@@ -300,10 +300,14 @@ public:
 
             if (shouldDoFLERewrite(findCommand)) {
                 invariant(findCommand->getNamespaceOrUUID().nss());
+
+                if (!findCommand->getEncryptionInformation()->getCrudProcessed().value_or(false)) {
+                    processFLEFindS(
+                        opCtx, findCommand->getNamespaceOrUUID().nss().get(), findCommand.get());
+                    _didDoFLERewrite = true;
+                }
+
                 CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
-                processFLEFindS(
-                    opCtx, findCommand->getNamespaceOrUUID().nss().get(), findCommand.get());
-                _didDoFLERewrite = true;
             }
 
             return findCommand;

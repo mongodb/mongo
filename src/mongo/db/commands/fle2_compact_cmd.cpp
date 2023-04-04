@@ -64,6 +64,8 @@ Lock::ResourceMutex commandMutex("compactStructuredEncryptionDataCommandMutex");
 CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
                                                   const CompactStructuredEncryptionData& request) {
 
+    CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
+
     uassert(6583201,
             str::stream() << CompactStructuredEncryptionData::kCommandName
                           << " must be run through mongos in a sharded cluster",
@@ -97,7 +99,6 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
     }
 
     validateCompactRequest(request, *edc);
-    CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
 
     auto namespaces =
         uassertStatusOK(EncryptedStateCollectionsNamespaces::createFromDataCollection(*edc));
@@ -273,6 +274,10 @@ public:
 
     bool adminOnly() const final {
         return false;
+    }
+
+    std::set<StringData> sensitiveFieldNames() const final {
+        return {CompactStructuredEncryptionData::kCompactionTokensFieldName};
     }
 } compactStructuredEncryptionDataCmd;
 

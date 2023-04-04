@@ -39,6 +39,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/crypto/fle_crypto.h"
+#include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands/fle2_get_count_info_command_gen.h"
 #include "mongo/db/dbdirectclient.h"
@@ -256,6 +257,20 @@ boost::intrusive_ptr<ExpressionContext> makeExpCtx(OperationContext* opCtx,
                                                     request.getLet());
     expCtx->stopExpressionCounters();
     return expCtx;
+}
+
+/**
+ * We mark commands as "CrudProcessed" to ensure the various commands recognize them as QE related
+ * to ensure they are filtered out.
+ */
+EncryptionInformation makeEmptyProcessEncryptionInformation() {
+    EncryptionInformation encryptionInformation;
+    encryptionInformation.setCrudProcessed(true);
+
+    // We need to set an empty BSON object here for the schema.
+    encryptionInformation.setSchema(BSONObj());
+
+    return encryptionInformation;
 }
 
 }  // namespace
@@ -1376,6 +1391,7 @@ FLEBatchResult processFLEBatch(OperationContext* opCtx,
                                boost::optional<OID> targetEpoch) {
 
     CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
+
     if (request.getWriteCommandRequestBase().getEncryptionInformation()->getCrudProcessed()) {
         return FLEBatchResult::kNotProcessed;
     }
@@ -1458,7 +1474,9 @@ std::unique_ptr<BatchedCommandRequest> processFLEBatchExplain(
                                            &getTransactionWithRetriesForMongoS,
                                            fle::EncryptedCollScanModeAllowed::kAllow));
         deleteRequest.setDeletes({newDeleteOp});
-        deleteRequest.getWriteCommandRequestBase().setEncryptionInformation(boost::none);
+        deleteRequest.getWriteCommandRequestBase().setEncryptionInformation(
+            makeEmptyProcessEncryptionInformation());
+
         return std::make_unique<BatchedCommandRequest>(deleteRequest);
     } else if (request.getBatchType() == BatchedCommandRequest::BatchType_Update) {
         auto updateRequest = request.getUpdateRequest();
@@ -1475,7 +1493,8 @@ std::unique_ptr<BatchedCommandRequest> processFLEBatchExplain(
                                            &getTransactionWithRetriesForMongoS,
                                            encryptedCollScanModeAllowed));
         updateRequest.setUpdates({newUpdateOp});
-        updateRequest.getWriteCommandRequestBase().setEncryptionInformation(boost::none);
+        updateRequest.getWriteCommandRequestBase().setEncryptionInformation(
+            makeEmptyProcessEncryptionInformation());
         return std::make_unique<BatchedCommandRequest>(updateRequest);
     }
     MONGO_UNREACHABLE;
@@ -1718,7 +1737,7 @@ write_ops::FindAndModifyCommandRequest processFindAndModifyExplain(
                                              findAndModifyRequest.getQuery(),
                                              encryptedCollScanModeAllowed));
 
-    newFindAndModifyRequest.setEncryptionInformation(boost::none);
+    newFindAndModifyRequest.setEncryptionInformation(makeEmptyProcessEncryptionInformation());
     return newFindAndModifyRequest;
 }
 
@@ -1733,6 +1752,8 @@ FLEBatchResult processFLEFindAndModify(OperationContext* opCtx,
     if (!request.getEncryptionInformation().has_value()) {
         return FLEBatchResult::kNotProcessed;
     }
+
+    CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
 
     // FLE2 Mongos CRUD operations loopback through MongoS with EncryptionInformation as
     // findAndModify so query can do any necessary transformations. But on the nested call, CRUD
@@ -1770,6 +1791,8 @@ BSONObj FLEQueryInterfaceImpl::getById(const NamespaceString& nss, BSONElement e
     if (tenantId && gMultitenancySupport) {
         find.setDollarTenant(tenantId);
     }
+
+    find.setEncryptionInformation(makeEmptyProcessEncryptionInformation());
 
     // Throws on error
     auto docs = _txnClient.exhaustiveFindSync(find);
@@ -1857,12 +1880,9 @@ StatusWith<write_ops::InsertCommandReply> FLEQueryInterfaceImpl::insertDocuments
     if (tenantId && gMultitenancySupport) {
         insertRequest.setDollarTenant(tenantId);
     }
-    EncryptionInformation encryptionInformation;
-    encryptionInformation.setCrudProcessed(true);
 
-    // We need to set an empty BSON object here for the schema.
-    encryptionInformation.setSchema(BSONObj());
-    insertRequest.getWriteCommandRequestBase().setEncryptionInformation(encryptionInformation);
+    insertRequest.getWriteCommandRequestBase().setEncryptionInformation(
+        makeEmptyProcessEncryptionInformation());
     insertRequest.getWriteCommandRequestBase().setBypassDocumentValidation(
         bypassDocumentValidation);
 
@@ -1942,8 +1962,10 @@ write_ops::DeleteCommandReply FLEQueryInterfaceImpl::deleteDocument(
     dassert(!deleteRequest.getWriteCommandRequestBase().getEncryptionInformation());
     dassert(deleteRequest.getStmtIds().value_or(std::vector<int32_t>()).empty());
 
-    auto response = _txnClient.runCRUDOpSync(BatchedCommandRequest(deleteRequest), {stmtId});
+    deleteRequest.getWriteCommandRequestBase().setEncryptionInformation(
+        makeEmptyProcessEncryptionInformation());
 
+    auto response = _txnClient.runCRUDOpSync(BatchedCommandRequest(deleteRequest), {stmtId});
     write_ops::DeleteCommandReply reply;
     responseToReply(response, reply.getWriteCommandReplyBase());
     return {reply};
@@ -2020,11 +2042,8 @@ write_ops::UpdateCommandReply FLEQueryInterfaceImpl::update(
 
     invariant(!updateRequest.getWriteCommandRequestBase().getEncryptionInformation());
 
-    EncryptionInformation encryptionInformation;
-    encryptionInformation.setCrudProcessed(true);
-
-    encryptionInformation.setSchema(BSONObj());
-    updateRequest.getWriteCommandRequestBase().setEncryptionInformation(encryptionInformation);
+    updateRequest.getWriteCommandRequestBase().setEncryptionInformation(
+        makeEmptyProcessEncryptionInformation());
 
     dassert(updateRequest.getStmtIds().value_or(std::vector<int32_t>()).empty());
 
@@ -2067,6 +2086,8 @@ std::vector<BSONObj> FLEQueryInterfaceImpl::findDocuments(const NamespaceString&
         find.setDollarTenant(tenantId);
     }
     find.setFilter(filter);
+
+    find.setEncryptionInformation(makeEmptyProcessEncryptionInformation());
 
     // Throws on error
     return _txnClient.exhaustiveFindSync(find);

@@ -287,7 +287,8 @@ public:
             if (request().getEncryptionInformation().has_value()) {
                 // Flag set here and in fle_crud.cpp since this only executes on a mongod.
                 CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
-                if (!request().getEncryptionInformation()->getCrudProcessed()) {
+
+                if (!request().getEncryptionInformation()->getCrudProcessed().value_or(false)) {
                     write_ops::InsertCommandReply insertReply;
                     auto batch = processFLEInsert(opCtx, request(), &insertReply);
                     if (batch == FLEBatchResult::kProcessed) {
@@ -552,12 +553,17 @@ public:
             UpdateRequest updateRequest(request().getUpdates()[0]);
             updateRequest.setNamespaceString(request().getNamespace());
             if (shouldDoFLERewrite(request())) {
-                updateRequest.setQuery(
-                    processFLEWriteExplainD(opCtx,
-                                            write_ops::collationOf(request().getUpdates()[0]),
-                                            request(),
-                                            updateRequest.getQuery()));
+                CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
+
+                if (!request().getEncryptionInformation()->getCrudProcessed().value_or(false)) {
+                    updateRequest.setQuery(
+                        processFLEWriteExplainD(opCtx,
+                                                write_ops::collationOf(request().getUpdates()[0]),
+                                                request(),
+                                                updateRequest.getQuery()));
+                }
             }
+
             updateRequest.setLegacyRuntimeConstants(request().getLegacyRuntimeConstants().value_or(
                 Variables::generateRuntimeConstants(opCtx)));
             updateRequest.setLetParameters(request().getLet());
@@ -661,7 +667,10 @@ public:
             if (request().getEncryptionInformation().has_value()) {
                 // Flag set here and in fle_crud.cpp since this only executes on a mongod.
                 CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
-                return processFLEDelete(opCtx, request());
+
+                if (!request().getEncryptionInformation()->getCrudProcessed().value_or(false)) {
+                    return processFLEDelete(opCtx, request());
+                }
             }
 
             if (isTimeseries(opCtx, request())) {
@@ -730,8 +739,12 @@ public:
             const auto& firstDelete = request().getDeletes()[0];
             BSONObj query = firstDelete.getQ();
             if (shouldDoFLERewrite(request())) {
-                query = processFLEWriteExplainD(
-                    opCtx, write_ops::collationOf(firstDelete), request(), query);
+                CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
+
+                if (!request().getEncryptionInformation()->getCrudProcessed().value_or(false)) {
+                    query = processFLEWriteExplainD(
+                        opCtx, write_ops::collationOf(firstDelete), request(), query);
+                }
             }
             deleteRequest.setQuery(std::move(query));
 

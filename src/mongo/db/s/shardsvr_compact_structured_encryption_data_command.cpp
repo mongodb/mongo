@@ -73,12 +73,18 @@ public:
         return AllowedOnSecondary::kNever;
     }
 
+    std::set<StringData> sensitiveFieldNames() const final {
+        return {CompactStructuredEncryptionData::kCompactionTokensFieldName};
+    }
+
     class Invocation final : public InvocationBase {
     public:
         using InvocationBase::InvocationBase;
 
         Reply typedRun(OperationContext* opCtx) {
             bool useV1Protocol = false;
+
+            CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
 
             auto compactCoordinator =
                 [&]() -> std::shared_ptr<ShardingDDLCoordinatorService::Instance> {

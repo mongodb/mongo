@@ -76,10 +76,16 @@ public:
     bool adminOnly() const final {
         return false;
     }
+
+    std::set<StringData> sensitiveFieldNames() const final {
+        return {CompactStructuredEncryptionData::kCompactionTokensFieldName};
+    }
 } clusterCompactStructuredEncryptionDataCmd;
 
 using Cmd = ClusterCompactStructuredEncryptionDataCmd;
 Cmd::Reply Cmd::Invocation::typedRun(OperationContext* opCtx) {
+    CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
+
     auto nss = request().getNamespace();
     const auto dbInfo =
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, nss.db()));

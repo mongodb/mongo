@@ -427,6 +427,18 @@ void CurOp::raiseDbProfileLevel(int dbProfileLevel) {
 
 static constexpr size_t appendMaxElementSize = 50 * 1024;
 
+bool shouldOmitDiagnosticInformation(CurOp* curop) {
+    do {
+        if (curop->debug().shouldOmitDiagnosticInformation) {
+            return true;
+        }
+
+        curop = curop->parent();
+    } while (curop != nullptr);
+
+    return false;
+}
+
 bool CurOp::completeAndLogOperation(logv2::LogComponent component,
                                     std::shared_ptr<const ProfileFilter> filter,
                                     boost::optional<size_t> responseLength,
@@ -446,6 +458,11 @@ bool CurOp::completeAndLogOperation(logv2::LogComponent component,
         duration_cast<Microseconds>(elapsedTimeExcludingPauses());
     const auto executionTimeMillis =
         durationCount<Milliseconds>(*_debug.additiveMetrics.executionTime);
+
+    // Do not log the slow query information if asked to omit it
+    if (shouldOmitDiagnosticInformation(this)) {
+        return false;
+    }
 
     if (_debug.isReplOplogGetMore) {
         oplogGetMoreStats.recordMillis(executionTimeMillis);

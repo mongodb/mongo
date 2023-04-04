@@ -162,4 +162,8 @@ boost::optional<repl::ReadConcernArgs> ClusterClientCursorMock::getReadConcern()
     return boost::none;
 }
 
+bool ClusterClientCursorMock::shouldOmitDiagnosticInformation() const {
+    return false;
+}
+
 }  // namespace mongo

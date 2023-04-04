@@ -1012,10 +1012,13 @@ Status runAggregate(OperationContext* opCtx,
         // support querying against encrypted fields.
         if (shouldDoFLERewrite(request)) {
             CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
-            // After this rewriting, the encryption info does not need to be kept around.
-            pipeline = processFLEPipelineD(
-                opCtx, nss, request.getEncryptionInformation().value(), std::move(pipeline));
-            request.setEncryptionInformation(boost::none);
+
+            if (!request.getEncryptionInformation()->getCrudProcessed().value_or(false)) {
+                pipeline = processFLEPipelineD(
+                    opCtx, nss, request.getEncryptionInformation().value(), std::move(pipeline));
+                request.getEncryptionInformation()->setCrudProcessed(true);
+            }
+
             // Set the telemetryStoreKey to none so telemetry isn't collected when we've done a FLE
             // rewrite.
             CurOp::get(opCtx)->debug().telemetryStoreKey = boost::none;

@@ -338,12 +338,15 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
     const BSONObj& cmdObj = request().toBSON(BSONObj() /* commandPassthroughFields */);
 
     auto requestAndMsg = [&]() {
-        if (request().getEncryptionInformation() &&
-            !request().getEncryptionInformation()->getCrudProcessed().value_or(false)) {
-            return processFLEFindAndModifyExplainMongod(opCtx, request());
-        } else {
-            return std::pair{request(), OpMsgRequest()};
+        if (request().getEncryptionInformation()) {
+            CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
+
+            if (!request().getEncryptionInformation()->getCrudProcessed().value_or(false)) {
+                return processFLEFindAndModifyExplainMongod(opCtx, request());
+            }
         }
+
+        return std::pair{request(), OpMsgRequest()};
     }();
     auto request = requestAndMsg.first;
 

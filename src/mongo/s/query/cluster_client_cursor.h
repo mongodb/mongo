@@ -253,6 +253,12 @@ public:
         _leftoverMaxTimeMicros = leftoverMaxTimeMicros;
     }
 
+    /**
+     * Returns true if operations with this cursor should be omitted from diagnostic sources such as
+     * currentOp and the profiler.
+     */
+    virtual bool shouldOmitDiagnosticInformation() const = 0;
+
 protected:
     // Metrics that are accumulated over the lifetime of the cursor, incremented with each getMore.
     // Useful for diagnostics like telemetry.

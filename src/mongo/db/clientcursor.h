@@ -313,6 +313,14 @@ public:
         _killPending = newValue;
     }
 
+    /**
+     * Returns true if operations with this cursor should be omitted from diagnostic sources such as
+     * currentOp and the profiler.
+     */
+    bool shouldOmitDiagnosticInformation() const {
+        return _shouldOmitDiagnosticInformation;
+    }
+
 private:
     friend class CursorManager;
     friend class ClientCursorPin;
@@ -445,6 +453,9 @@ private:
     // Metrics that are accumulated over the lifetime of the cursor, incremented with each getMore.
     // Useful for diagnostics like telemetry.
     OpDebug::AdditiveMetrics _metrics;
+
+    // Flag to decide if diagnostic information should be omitted.
+    bool _shouldOmitDiagnosticInformation{false};
 
     // The client OperationKey associated with this cursor.
     boost::optional<OperationKey> _opKey;

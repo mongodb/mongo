@@ -652,9 +652,6 @@ void ClusterWriteCmd::InvocationBase::explain(OperationContext* opCtx,
         (_batchedRequest.getBatchType() == BatchedCommandRequest::BatchType_Delete ||
          _batchedRequest.getBatchType() == BatchedCommandRequest::BatchType_Update)) {
         req = processFLEBatchExplain(opCtx, _batchedRequest);
-        tassert(6636600,
-                "encryptionInformation should be stripped from request after rewriting for explain",
-                !req->hasEncryptionInformation());
     }
 
     auto nss = req ? req->getNS() : _batchedRequest.getNS();

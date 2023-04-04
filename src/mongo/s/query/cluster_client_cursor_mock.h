@@ -116,6 +116,8 @@ public:
      */
     void queueError(Status status);
 
+    bool shouldOmitDiagnosticInformation() const final;
+
 private:
     bool _killed = false;
     std::queue<StatusWith<ClusterQueryResult>> _resultsQueue;

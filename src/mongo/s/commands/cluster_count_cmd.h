@@ -115,8 +115,14 @@ public:
         std::vector<AsyncRequestsSender::Response> shardResponses;
         try {
             auto countRequest = CountCommandRequest::parse(IDLParserContext("count"), cmdObj);
+
             if (shouldDoFLERewrite(countRequest)) {
-                processFLECountS(opCtx, nss, &countRequest);
+
+                if (!countRequest.getEncryptionInformation()->getCrudProcessed().value_or(false)) {
+                    processFLECountS(opCtx, nss, &countRequest);
+                }
+
+                CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
             }
 
             // We only need to factor in the skip value when sending to the shards if we
@@ -229,6 +235,8 @@ public:
         // If the command has encryptionInformation, rewrite the query as necessary.
         if (shouldDoFLERewrite(countRequest)) {
             processFLECountS(opCtx, nss, &countRequest);
+
+            CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
         }
 
         BSONObj targetingQuery = countRequest.getQuery();

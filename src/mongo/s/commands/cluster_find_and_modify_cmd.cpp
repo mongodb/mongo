@@ -422,6 +422,8 @@ Status FindAndModifyCmd::explain(OperationContext* opCtx,
         auto findAndModifyRequest = write_ops::FindAndModifyCommandRequest::parse(
             IDLParserContext("ClusterFindAndModify"), request.body);
         if (shouldDoFLERewrite(findAndModifyRequest)) {
+            CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
+
             auto newRequest = processFLEFindAndModifyExplainMongos(opCtx, findAndModifyRequest);
             return newRequest.first.toBSON(request.body);
         } else {

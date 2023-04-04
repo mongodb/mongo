@@ -791,6 +791,8 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
     {
         CurOp::get(opCtx)->debug().nShards = pinnedCursor.getValue()->getNumRemotes();
         CurOp::get(opCtx)->debug().cursorid = cursorId;
+        CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation =
+            pinnedCursor.getValue()->shouldOmitDiagnosticInformation();
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         CurOp::get(opCtx)->setOriginatingCommand_inlock(
             pinnedCursor.getValue()->getOriginatingCommand());

@@ -164,7 +164,11 @@ public:
         }
 
         if (shouldDoFLERewrite(request)) {
-            processFLECountD(opCtx, nss, &request);
+            if (!request.getEncryptionInformation()->getCrudProcessed().value_or(false)) {
+                processFLECountD(opCtx, nss, &request);
+            }
+
+            CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
         }
 
         if (ctx->getView()) {
@@ -248,7 +252,10 @@ public:
         auto curOp = CurOp::get(opCtx);
         curOp->beginQueryPlanningTimer();
         if (shouldDoFLERewrite(request)) {
-            processFLECountD(opCtx, nss, &request);
+            if (!request.getEncryptionInformation()->getCrudProcessed().value_or(false)) {
+                processFLECountD(opCtx, nss, &request);
+            }
+
             curOp->debug().shouldOmitDiagnosticInformation = true;
         }
         if (request.getMirrored().value_or(false)) {

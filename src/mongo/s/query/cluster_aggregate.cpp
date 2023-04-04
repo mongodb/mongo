@@ -410,12 +410,15 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         // If the aggregate command supports encrypted collections, do rewrites of the pipeline to
         // support querying against encrypted fields.
         if (shouldDoFLERewrite) {
-            // After this rewriting, the encryption info does not need to be kept around.
-            pipeline = processFLEPipelineS(opCtx,
-                                           namespaces.executionNss,
-                                           request.getEncryptionInformation().value(),
-                                           std::move(pipeline));
-            request.setEncryptionInformation(boost::none);
+            if (!request.getEncryptionInformation()->getCrudProcessed().value_or(false)) {
+                pipeline = processFLEPipelineS(opCtx,
+                                               namespaces.executionNss,
+                                               request.getEncryptionInformation().value(),
+                                               std::move(pipeline));
+                request.getEncryptionInformation()->setCrudProcessed(true);
+            }
+
+            CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
         }
 
         pipeline->optimizePipeline();
