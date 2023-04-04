@@ -175,9 +175,9 @@ function analyzeShardKey(ns, shardKey, indexKey) {
             tojsononeline(res)}`);
         return res;
     }
-    if (res.code == ErrorCodes.QueryPlanKilled && res.errmsg.includes("dropped")) {
+    if (res.code == ErrorCodes.QueryPlanKilled) {
         jsTest.log(`Failed to analyze the shard key because the collection or the corresponding ` +
-                   `index has been dropped: ${tojsononeline(res)}`);
+                   `index has been dropped or renamed: ${tojsononeline(res)}`);
         return res;
     }
     if (res.code == 640570) {
