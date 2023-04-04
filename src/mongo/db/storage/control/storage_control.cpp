@@ -83,8 +83,7 @@ void startStorageControls(ServiceContext* serviceContext, bool forTestOnly) {
 
     if (storageEngine->supportsCheckpoints() && !storageEngine->isEphemeral() &&
         !storageGlobalParams.queryableBackupMode) {
-        std::unique_ptr<Checkpointer> checkpointer =
-            std::make_unique<Checkpointer>(storageEngine->getEngine());
+        std::unique_ptr<Checkpointer> checkpointer = std::make_unique<Checkpointer>();
         checkpointer->go();
         Checkpointer::set(serviceContext, std::move(checkpointer));
     }

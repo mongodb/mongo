@@ -187,8 +187,10 @@ TEST_F(KVEngineTestHarness, SimpleRS1) {
     {
         auto opCtx = _makeOperationContext(engine);
         std::vector<std::string> all = engine->getAllIdents(opCtx.get());
-        ASSERT_EQUALS(1U, all.size());
-        ASSERT_EQUALS(ns, all[0]);
+
+        // This includes the _mdb_catalog.
+        ASSERT_EQUALS(2U, all.size());
+        ASSERT_EQUALS(ns, all[1]);
     }
 }
 
@@ -323,8 +325,10 @@ TEST_F(KVEngineTestHarness, TemporaryRecordStoreSimple) {
         ASSERT_EQUALS(std::string("abc"), rs->dataFor(opCtx.get(), loc).data());
 
         std::vector<std::string> all = engine->getAllIdents(opCtx.get());
-        ASSERT_EQUALS(1U, all.size());
-        ASSERT_EQUALS(ident, all[0]);
+
+        // This includes the _mdb_catalog.
+        ASSERT_EQUALS(2U, all.size());
+        ASSERT_EQUALS(ident, all[1]);
 
         // Dropping a collection might fail if we haven't checkpointed the data
         engine->checkpoint(opCtx.get());

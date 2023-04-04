@@ -42,9 +42,8 @@ class Timestamp;
 
 class Checkpointer : public BackgroundJob {
 public:
-    Checkpointer(KVEngine* kvEngine)
+    Checkpointer()
         : BackgroundJob(false /* deleteSelf */),
-          _kvEngine(kvEngine),
           _shuttingDown(false),
           _shutdownReason(Status::OK()),
           _hasTriggeredFirstStableCheckpoint(false),
@@ -88,11 +87,6 @@ public:
     void shutdown(const Status& reason);
 
 private:
-    // A pointer to the KVEngine is maintained only due to unit testing limitations that don't fully
-    // setup the ServiceContext.
-    // TODO SERVER-50861: Remove this pointer.
-    KVEngine* const _kvEngine;
-
     // Protects the state below.
     Mutex _mutex = MONGO_MAKE_LATCH("Checkpointer::_mutex");
 
