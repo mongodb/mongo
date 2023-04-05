@@ -339,6 +339,7 @@ LookupPushdownCounters lookupPushdownCounters;
 SortCounters sortCounters;
 ValidatorCounters validatorCounters;
 GroupCounters groupCounters;
+PlanCacheCounters planCacheCounters;
 
 OperatorCounters operatorCountersAggExpressions{"operatorCounters.expressions."};
 OperatorCounters operatorCountersMatchExpressions{"operatorCounters.match."};

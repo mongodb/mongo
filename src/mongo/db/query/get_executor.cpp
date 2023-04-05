@@ -104,6 +104,7 @@
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/logv2/log.h"
@@ -1047,6 +1048,7 @@ protected:
         std::unique_ptr<ClassicPrepareExecutionResult> result = buildIdHackPlan();
 
         if (result) {
+            planCacheCounters.incrementClassicMissesCounter();
             return result;
         }
 
@@ -1055,6 +1057,8 @@ protected:
             if (auto cs = CollectionQueryInfo::get(_collection)
                               .getPlanCache()
                               ->getCacheEntryIfActive(planCacheKey)) {
+                planCacheCounters.incrementClassicHitsCounter();
+
                 // We have a CachedSolution.  Have the planner turn it into a QuerySolution.
                 auto statusWithQs = QueryPlanner::planFromCache(*_cq, _plannerParams, *cs);
 
@@ -1087,6 +1091,7 @@ protected:
             }
         }
 
+        planCacheCounters.incrementClassicMissesCounter();
         return nullptr;
     }
 
@@ -1171,8 +1176,10 @@ protected:
             auto&& planCache = sbe::getPlanCache(_opCtx);
             auto cacheEntry = planCache.getCacheEntryIfActive(planCacheKey);
             if (!cacheEntry) {
+                planCacheCounters.incrementSbeMissesCounter();
                 return nullptr;
             }
+            planCacheCounters.incrementSbeHitsCounter();
 
             auto&& cachedPlan = std::move(cacheEntry->cachedPlan);
             auto root = std::move(cachedPlan->root);
@@ -1187,6 +1194,7 @@ protected:
             return result;
         }
 
+        planCacheCounters.incrementSbeMissesCounter();
         return nullptr;
     }
 

@@ -453,6 +453,37 @@ public:
 extern GroupCounters groupCounters;
 
 /**
+ * A common class which holds various counters related to Classic and SBE plan caches.
+ */
+class PlanCacheCounters {
+public:
+    PlanCacheCounters() = default;
+
+    void incrementClassicHitsCounter() {
+        classicHits.increment();
+    }
+
+    void incrementClassicMissesCounter() {
+        classicMisses.increment();
+    }
+
+    void incrementSbeHitsCounter() {
+        sbeHits.increment();
+    }
+
+    void incrementSbeMissesCounter() {
+        sbeMisses.increment();
+    }
+
+private:
+    CounterMetric classicHits{"query.planCache.classic.hits"};
+    CounterMetric classicMisses{"query.planCache.classic.misses"};
+    CounterMetric sbeHits{"query.planCache.sbe.hits"};
+    CounterMetric sbeMisses{"query.planCache.sbe.misses"};
+};
+extern PlanCacheCounters planCacheCounters;
+
+/**
  * Generic class for counters of expressions inside various MQL statements.
  */
 class OperatorCounters {
