@@ -858,9 +858,6 @@ buildvariants:
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough
   - name: .encrypt !.replica_sets !.aggregation !.sharding !.jscore
-  - name: .jepsen_docker
-    distros:
-    - debian11-large
   - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
