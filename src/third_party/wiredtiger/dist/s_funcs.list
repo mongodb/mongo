@@ -33,6 +33,7 @@ __wt_print_huffman_code
 __wt_session_breakpoint
 __wt_stat_join_aggregate
 __wt_stat_join_clear_all
+__wt_strcat
 __wt_stream_set_no_buffer
 __wt_try_readlock
 populate_thread

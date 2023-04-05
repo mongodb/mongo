@@ -114,6 +114,7 @@ ENOMEM
 ENOTSUP
 ENUM
 EOF
+ERANGE
 ETIME
 ETIMEDOUT
 EVICTSERVER
@@ -1183,6 +1184,7 @@ stdout
 stepp
 str
 strace
+strcat
 strcmp
 strdup
 strerror

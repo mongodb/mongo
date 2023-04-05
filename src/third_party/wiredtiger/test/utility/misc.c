@@ -325,15 +325,15 @@ testutil_copy_data_opt(const char *dir, const char *readonly_prefix)
                 testutil_system("cp -rp -l %s ../%s.SAVE", to_link, dir);
                 to_link[0] = '\0';
             }
-            strcat(to_link, " ");
-            strcat(to_link, e->d_name);
+            testutil_check(__wt_strcat(to_link, sizeof(to_link), " "));
+            testutil_check(__wt_strcat(to_link, sizeof(to_link), e->d_name));
         } else {
             if (strlen(to_copy) + strlen(e->d_name) + 2 >= sizeof(to_copy)) {
                 testutil_system("cp -rp %s ../%s.SAVE", to_copy, dir);
                 to_copy[0] = '\0';
             }
-            strcat(to_copy, " ");
-            strcat(to_copy, e->d_name);
+            testutil_check(__wt_strcat(to_copy, sizeof(to_copy), " "));
+            testutil_check(__wt_strcat(to_copy, sizeof(to_copy), e->d_name));
         }
     }
     testutil_check(closedir(d));

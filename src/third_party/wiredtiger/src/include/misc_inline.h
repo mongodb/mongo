@@ -64,6 +64,28 @@ __wt_strnlen(const char *s, size_t maxlen)
 }
 
 /*
+ * __wt_strcat --
+ *     A safe version of string concatenation, which checks the size of the destination buffer;
+ *     return ERANGE on error.
+ */
+static inline int
+__wt_strcat(char *dest, size_t size, const char *src)
+{
+    size_t dest_length;
+    size_t src_length;
+
+    dest_length = strlen(dest);
+    src_length = strlen(src);
+
+    if (dest_length + src_length + 1 > size) /* Account for the null-terminating byte. */
+        return (ERANGE);
+
+    memcpy(dest + dest_length, src, src_length);
+    dest[dest_length + src_length] = '\0';
+    return (0);
+}
+
+/*
  * __wt_snprintf --
  *     snprintf convenience function, ignoring the returned size.
  */
