@@ -36,6 +36,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/client/connpool.h"
 #include "mongo/client/dbclient_base.h"
 
 namespace mongo {
@@ -44,6 +45,7 @@ class DBClientBase;
 class NamespaceString;
 class OperationContext;
 
+// TODO SERVER-75657: Create an interface for the Cloner.
 
 class Cloner {
     Cloner(const Cloner&) = delete;
@@ -51,7 +53,7 @@ class Cloner {
 
 public:
     Cloner();
-
+    virtual ~Cloner() {}
     /**
      * Copies an entire database from the specified host.
      * clonedColls: the function will return with this populated with a list of the collections that
@@ -60,13 +62,23 @@ public:
      *              that are cloned.  When opts.createCollections is true, this parameter is
      *              ignored and the collection list is fetched from the remote via _conn.
      */
-    Status copyDb(OperationContext* opCtx,
-                  const std::string& dBName,
-                  const std::string& masterHost,
-                  const std::vector<NamespaceString>& shardedColls,
-                  std::set<std::string>* clonedColls);
+    virtual Status copyDb(OperationContext* opCtx,
+                          const std::string& dBName,
+                          const std::string& masterHost,
+                          const std::vector<NamespaceString>& shardedColls,
+                          std::set<std::string>* clonedColls);
 
-private:
+    virtual Status setupConn(OperationContext* opCtx,
+                             const std::string& dBName,
+                             const std::string& masterHost);
+
+    virtual StatusWith<std::vector<BSONObj>> getListOfCollections(OperationContext* opCtx,
+                                                                  const std::string& dBName,
+                                                                  const std::string& masterHost);
+
+protected:
+    std::unique_ptr<ScopedDbConnection> _conn;
+
     // Filters a database's collection list and removes collections that should not be cloned.
     StatusWith<std::vector<BSONObj>> _filterCollectionsForClone(
         const std::string& fromDBName, const std::list<BSONObj>& initialCollections);
@@ -94,17 +106,19 @@ private:
                const std::string& toDBName,
                const NamespaceString& nss,
                const BSONObj& from_opts,
-               const BSONObj& from_id_index,
-               DBClientBase* conn);
+               const BSONObj& from_id_index);
 
     void _copyIndexes(OperationContext* opCtx,
                       const std::string& toDBName,
                       const NamespaceString& nss,
                       const BSONObj& from_opts,
-                      const std::list<BSONObj>& from_indexes,
-                      DBClientBase* conn);
+                      const std::list<BSONObj>& from_indexes);
 
     struct BatchHandler;
+
+    DBClientBase* getConn() {
+        return _conn->get();
+    }
 };
 
 }  // namespace mongo

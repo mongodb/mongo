@@ -351,6 +351,11 @@ public:
     static NamespaceString makeMovePrimaryOplogBufferNSS(const UUID& migrationId);
 
     /**
+     * Constructs the NamesapceString to store the collections to clone by the movePrimary op.
+     */
+    static NamespaceString makeMovePrimaryCollectionsToCloneNSS(const UUID& migrationId);
+
+    /**
      * Constructs the oplog buffer NamespaceString for the given UUID and donor shardId.
      */
     static NamespaceString makeReshardingLocalOplogBufferNSS(const UUID& existingUUID,

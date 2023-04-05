@@ -40,6 +40,7 @@
 #include <memory>
 
 #include "mongo/client/fetcher.h"
+#include "mongo/db/cloner.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/repl/oplog_fetcher.h"
 #include "mongo/db/repl/primary_only_service.h"
@@ -172,7 +173,8 @@ public:
             const MovePrimaryRecipientService* recipientService,
             MovePrimaryRecipientDocument recipientDoc,
             std::shared_ptr<MovePrimaryRecipientExternalState> externalState,
-            ServiceContext* serviceContext);
+            ServiceContext* serviceContext,
+            std::unique_ptr<Cloner> cloner);
 
         SemiFuture<void> run(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                              const CancellationToken& token) noexcept final;
@@ -231,6 +233,8 @@ public:
 
         NamespaceString getDatabaseName() const;
 
+        NamespaceString getCollectionsToCloneNSS() const;
+
         UUID getMigrationId() const;
 
     private:
@@ -258,6 +262,16 @@ public:
         ExecutorFuture<void> _transitionToDoneStateAndFinishMovePrimaryOp(
             const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
+        void _createMetadataCollection(OperationContext* opCtx);
+
+        std::vector<NamespaceString> _getUnshardedCollections(OperationContext* opCtx);
+
+        void _persistCollectionsToClone(OperationContext* opCtx);
+
+        std::vector<NamespaceString> _getCollectionsToClone(OperationContext* opCtx);
+
+        void _cleanUpOrphanedDataOnRecipient(OperationContext* opCtx);
+
         void _cleanUpOperationMetadata(
             OperationContext* opCtx, const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
@@ -283,6 +297,8 @@ public:
         bool _canAbort(WithLock) const;
 
         bool _useOnlineCloner() const;
+
+        void _cloneDataFromDonor(OperationContext* opCtx);
 
         /**
          * Waits for majority write concern for client's last applied opTime. Cancels on stepDown.
@@ -328,6 +344,8 @@ public:
         std::unique_ptr<RecipientCancellationTokenHolder> _ctHolder;
 
         MovePrimaryRecipientStateEnum _state;
+
+        std::unique_ptr<Cloner> _cloner;
 
         // Promise that is resolved when the recipient doc is persisted on disk
         SharedPromise<void> _recipientDocDurablePromise;

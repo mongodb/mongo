@@ -38,7 +38,11 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/catalog/collection_write_path.h"
+#include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/commands/list_collections_filter.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/namespace_string.h"
@@ -52,6 +56,7 @@
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/write_block_bypass.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
 #include "mongo/s/grid.h"
@@ -117,14 +122,16 @@ std::shared_ptr<repl::PrimaryOnlyService::Instance> MovePrimaryRecipientService:
         this,
         recipientStateDoc,
         std::make_shared<MovePrimaryRecipientExternalStateImpl>(),
-        _serviceContext);
+        _serviceContext,
+        std::make_unique<Cloner>());
 }
 
 MovePrimaryRecipientService::MovePrimaryRecipient::MovePrimaryRecipient(
     const MovePrimaryRecipientService* service,
     MovePrimaryRecipientDocument recipientDoc,
     std::shared_ptr<MovePrimaryRecipientExternalState> externalState,
-    ServiceContext* serviceContext)
+    ServiceContext* serviceContext,
+    std::unique_ptr<Cloner> cloner)
     : _recipientService(service),
       _metadata(recipientDoc.getMetadata()),
       _movePrimaryRecipientExternalState(externalState),
@@ -141,7 +148,8 @@ MovePrimaryRecipientService::MovePrimaryRecipient::MovePrimaryRecipient(
                                   << "Entering kPrepared state at MovePrimaryRecipientService"
                                   << "operationInfo" << _metadata.toBSON())),
       _resumedAfterFailover(recipientDoc.getState() > MovePrimaryRecipientStateEnum::kUnused),
-      _state(recipientDoc.getState()){};
+      _state(recipientDoc.getState()),
+      _cloner(std::move(cloner)){};
 
 void MovePrimaryRecipientService::MovePrimaryRecipient::checkIfOptionsConflict(
     const BSONObj& stateDoc) const {
@@ -267,6 +275,22 @@ void MovePrimaryRecipientService::MovePrimaryRecipient::abort() {
     }
 }
 
+void MovePrimaryRecipientService::MovePrimaryRecipient::_cloneDataFromDonor(
+    OperationContext* opCtx) {
+    // Enable write blocking bypass to allow cloning of catalog data even if writes are disallowed.
+    WriteBlockBypass::get(opCtx).set(true);
+    DisableDocumentValidation disableValidation(opCtx);
+    std::set<std::string> clonedCollections;
+    const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+    const auto fromShard =
+        uassertStatusOK(shardRegistry->getShard(opCtx, _metadata.getFromShardName().toString()));
+    uassertStatusOK(_cloner->copyDb(opCtx,
+                                    _metadata.getDatabaseName().toString(),
+                                    fromShard->getConnString().toString(),
+                                    _shardedColls,
+                                    &clonedCollections));
+}
+
 ExecutorFuture<void> MovePrimaryRecipientService::MovePrimaryRecipient::_transitionToCloningState(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     return _retryingCancelableOpCtxFactory
@@ -280,6 +304,7 @@ ExecutorFuture<void> MovePrimaryRecipientService::MovePrimaryRecipient::_transit
                 MovePrimaryRecipientDocument::kStateFieldName,
                 MovePrimaryRecipientState_serializer(MovePrimaryRecipientStateEnum::kCloning));
             _transitionStateMachine(MovePrimaryRecipientStateEnum::kCloning);
+            _cloneDataFromDonor(opCtx.get());
         })
         .onTransientError([](const Status& status) {
             LOGV2(7307000,
@@ -454,8 +479,9 @@ MovePrimaryRecipientService::MovePrimaryRecipient::_transitionToAbortedStateAndC
                                                  MovePrimaryRecipientStateEnum::kAborted));
                     _transitionStateMachine(MovePrimaryRecipientStateEnum::kAborted);
                 })
-                .then([] {
-                    // cleanup orphaned data by calling cloner's method
+                .then([this, factory, executor] {
+                    auto opCtx = factory.makeOperationContext(Client::getCurrent());
+                    _cleanUpOrphanedDataOnRecipient(opCtx.get());
                 });
         })
         .onTransientError([](const Status& status) {})
@@ -534,11 +560,104 @@ MovePrimaryRecipientService::MovePrimaryRecipient::_transitionToDoneStateAndFini
         });
 }
 
+void MovePrimaryRecipientService::MovePrimaryRecipient::_createMetadataCollection(
+    OperationContext* opCtx) {
+    resharding::data_copy::ensureCollectionExists(opCtx, getCollectionsToCloneNSS(), {});
+}
+
+std::vector<NamespaceString>
+MovePrimaryRecipientService::MovePrimaryRecipient::_getUnshardedCollections(
+    OperationContext* opCtx) {
+    const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+    const auto fromShard =
+        uassertStatusOK(shardRegistry->getShard(opCtx, _metadata.getFromShardName().toString()));
+
+    auto collectionsToCloneWithStatus = _cloner->getListOfCollections(
+        opCtx, getDatabaseName().dbName().toString(), fromShard->getConnString().toString());
+    auto collectionsToClone = uassertStatusOK(collectionsToCloneWithStatus);
+
+    const auto allCollections = [&] {
+        std::vector<NamespaceString> colls;
+        for (const auto& collInfo : collectionsToClone) {
+            std::string collName;
+            uassertStatusOK(bsonExtractStringField(collInfo, "name", &collName));
+            const NamespaceString nss(getDatabaseName().toString(), collName);
+            if (!nss.isSystem() ||
+                nss.isLegalClientSystemNS(serverGlobalParams.featureCompatibility)) {
+                colls.push_back(nss);
+            }
+        }
+        std::sort(colls.begin(), colls.end());
+        return colls;
+    }();
+
+    std::vector<NamespaceString> unshardedCollections;
+    std::set_difference(allCollections.cbegin(),
+                        allCollections.cend(),
+                        _shardedColls.cbegin(),
+                        _shardedColls.cend(),
+                        std::back_inserter(unshardedCollections));
+
+    return unshardedCollections;
+}
+
+void MovePrimaryRecipientService::MovePrimaryRecipient::_persistCollectionsToClone(
+    OperationContext* opCtx) {
+    auto collsToClone = _getUnshardedCollections(opCtx);
+    std::vector<InsertStatement> batch;
+    int i = 0;
+    int numBytes = 0;
+    for (const auto& coll : collsToClone) {
+        auto doc = BSON("_id" << i << "nss" << coll.ns());
+        ++i;
+        // TODO SERVER-75654: Use a server paramter instead of BSONObjMaxUserSize.
+        if ((numBytes + doc.objsize()) >= BSONObjMaxUserSize) {
+            resharding::data_copy::insertBatch(opCtx, getCollectionsToCloneNSS(), batch);
+            batch.clear();
+            numBytes = 0;
+        }
+        batch.emplace_back(InsertStatement(doc));
+        numBytes += doc.objsize();
+    }
+    if (!batch.empty())
+        resharding::data_copy::insertBatch(opCtx, getCollectionsToCloneNSS(), batch);
+}
+
+std::vector<NamespaceString>
+MovePrimaryRecipientService::MovePrimaryRecipient::_getCollectionsToClone(OperationContext* opCtx) {
+    std::vector<NamespaceString> collsToClone;
+    auto collectionsToCloneNSS = getCollectionsToCloneNSS();
+    AutoGetCollection autoColl(opCtx, collectionsToCloneNSS, MODE_IS);
+    uassert(ErrorCodes::NamespaceNotFound,
+            str::stream() << "Collection '" << collectionsToCloneNSS << "' did not already exist",
+            autoColl);
+    auto cursor = autoColl->getCursor(opCtx);
+    while (auto record = cursor->next()) {
+        BSONObj obj = record->data.releaseToBson();
+        NamespaceString ns(
+            NamespaceStringUtil::deserialize(boost::none, obj.getStringField("nss")));
+        collsToClone.emplace_back(ns);
+    }
+    return collsToClone;
+}
+
+void MovePrimaryRecipientService::MovePrimaryRecipient::_cleanUpOrphanedDataOnRecipient(
+    OperationContext* opCtx) {
+    // Drop all the collections which might have been cloned on the recipient.
+    std::vector<NamespaceString> colls = _getCollectionsToClone(opCtx);
+    for (const auto& coll : colls) {
+        resharding::data_copy::ensureCollectionDropped(opCtx, coll);
+    }
+}
+
 void MovePrimaryRecipientService::MovePrimaryRecipient::_cleanUpOperationMetadata(
     OperationContext* opCtx, const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
     // Drop temp oplog buffer
     resharding::data_copy::ensureCollectionDropped(
         opCtx, NamespaceString::makeMovePrimaryOplogBufferNSS(getMigrationId()));
+
+    // Drop collectionsToClone NSS
+    resharding::data_copy::ensureCollectionDropped(opCtx, getCollectionsToCloneNSS());
 
     // Drop oplog applier progress document
     PersistentTaskStore<MovePrimaryOplogApplierProgress> store(
@@ -666,6 +785,8 @@ ExecutorFuture<void> MovePrimaryRecipientService::MovePrimaryRecipient::_initial
                 opCtx.get(),
                 MovePrimaryRecipientDocument::kStartApplyingDonorOpTimeFieldName,
                 _startApplyingDonorOpTime.get().toBSON());
+            _createMetadataCollection(opCtx.get());
+            _persistCollectionsToClone(opCtx.get());
         })
         .onTransientError([](const Status& status) {})
         .onUnrecoverableError([this](const Status& status) {
@@ -762,6 +883,11 @@ boost::optional<BSONObj> MovePrimaryRecipientService::MovePrimaryRecipient::repo
 
 NamespaceString MovePrimaryRecipientService::MovePrimaryRecipient::getDatabaseName() const {
     return _metadata.getDatabaseName();
+}
+
+NamespaceString MovePrimaryRecipientService::MovePrimaryRecipient::getCollectionsToCloneNSS()
+    const {
+    return NamespaceString::makeMovePrimaryCollectionsToCloneNSS(getMigrationId());
 }
 
 UUID MovePrimaryRecipientService::MovePrimaryRecipient::getMigrationId() const {

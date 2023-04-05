@@ -230,6 +230,11 @@ NamespaceString NamespaceString::makeMovePrimaryOplogBufferNSS(const UUID& migra
                            "movePrimaryOplogBuffer." + migrationId.toString());
 }
 
+NamespaceString NamespaceString::makeMovePrimaryCollectionsToCloneNSS(const UUID& migrationId) {
+    return NamespaceString(DatabaseName::kConfig,
+                           "movePrimaryCollectionsToClone." + migrationId.toString());
+}
+
 NamespaceString NamespaceString::makePreImageCollectionNSS(
     const boost::optional<TenantId>& tenantId) {
     return NamespaceString{tenantId, DatabaseName::kConfig.db(), kPreImagesCollectionName};

@@ -81,6 +81,29 @@ static HostAndPort makeHostAndPort(const ShardId& shardId) {
 }
 }  // namespace
 
+class ClonerForTest : public Cloner {
+    Status copyDb(OperationContext* opCtx,
+                  const std::string& dBName,
+                  const std::string& masterHost,
+                  const std::vector<NamespaceString>& shardedColls,
+                  std::set<std::string>* clonedColls) override {
+        return Status::OK();
+    }
+
+    Status setupConn(OperationContext* opCtx,
+                     const std::string& dBName,
+                     const std::string& masterHost) override {
+        return Status::OK();
+    }
+
+    StatusWith<std::vector<BSONObj>> getListOfCollections(OperationContext* opCtx,
+                                                          const std::string& dBName,
+                                                          const std::string& masterHost) override {
+        std::vector<BSONObj> colls;
+        return colls;
+    }
+};
+
 class MovePrimaryRecipientExternalStateForTest : public MovePrimaryRecipientExternalState {
 
     std::vector<AsyncRequestsSender::Response> sendCommandToShards(
@@ -118,7 +141,8 @@ public:
             this,
             recipientStateDoc,
             std::make_shared<MovePrimaryRecipientExternalStateForTest>(),
-            _serviceContext);
+            _serviceContext,
+            std::make_unique<ClonerForTest>());
     }
 };
 

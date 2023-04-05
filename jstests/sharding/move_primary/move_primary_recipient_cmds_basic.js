@@ -20,8 +20,13 @@ assert.commandWorked(testDB.dropDatabase());
 
 assert.commandWorked(mongos.adminCommand({enableSharding: dbName, primaryShard: donor.shardName}));
 
-const coll0 = assertDropAndRecreateCollection(testDB, 'testcoll0');
-assert.commandWorked(coll0.insert([{a: 1}, {b: 1}]));
+const donorColl0 = assertDropAndRecreateCollection(testDB, 'testcoll0');
+const recipientColl0 = recipient.getDB(dbName).getCollection('testcoll0');
+
+assert.commandWorked(donorColl0.insert([{a: 1}, {b: 1}]));
+
+assert.eq(2, donorColl0.find().itcount(), "Donor does not have data before move");
+assert.eq(0, recipientColl0.find().itcount(), "Recipient has data before move");
 
 function runRecipientSyncDataCmds(uuid) {
     assert.commandWorked(recipient.adminCommand({
@@ -44,8 +49,8 @@ function runRecipientSyncDataCmds(uuid) {
 
 // Test that _movePrimaryRecipientSyncData commands work followed by
 // _movePrimaryRecipientForgetMigration.
-let uuid = UUID();
 
+let uuid = UUID();
 runRecipientSyncDataCmds(uuid);
 
 assert.commandWorked(recipient.adminCommand({
@@ -55,6 +60,8 @@ assert.commandWorked(recipient.adminCommand({
     fromShardName: donor.shardName,
     toShardName: recipient.shardName
 }));
+
+assert.eq(2, recipientColl0.count(), "Data has not been cloned to the Recipient correctly");
 
 // Test that _movePrimaryRecipientForgetMigration called on an already forgotten migration succeeds
 assert.commandWorked(recipient.adminCommand({
@@ -87,7 +94,7 @@ assert.commandWorked(recipient.adminCommand({
     toShardName: recipient.shardName
 }));
 
-// TODO SERVER-74707: Verify documents are cloned after integrating offline cloner.
+assert.eq(0, recipientColl0.count(), "Recipient has orphaned collections");
 
 st.stop();
 })();

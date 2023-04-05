@@ -247,6 +247,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/index_key_validate',
         '$BUILD_DIR/mongo/db/catalog/multi_index_block',
         '$BUILD_DIR/mongo/db/client_metadata_propagation_egress_hook',
+        '$BUILD_DIR/mongo/db/cloner',
         '$BUILD_DIR/mongo/db/commands/mongod_fcv',
         '$BUILD_DIR/mongo/db/concurrency/exception_util',
         '$BUILD_DIR/mongo/db/dbhelpers',
