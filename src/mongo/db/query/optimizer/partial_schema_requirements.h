@@ -52,7 +52,7 @@ class PartialSchemaRequirements {
 public:
     using Entry = std::pair<PartialSchemaKey, PartialSchemaRequirement>;
 
-    // TODO SERVER-69026: Remove these iterator constructs.
+    // TODO SERVER-73828: Remove these iterator constructs.
     using ConstNodeVecIter = std::vector<PSRExpr::Node>::const_iterator;
     using NodeVecIter = std::vector<PSRExpr::Node>::iterator;
 
@@ -121,7 +121,7 @@ public:
     // fully-open PartialSchemaRequirement which does not bind.
     PartialSchemaRequirements();
 
-    PartialSchemaRequirements(PSRExpr::Node requirements);
+    explicit PartialSchemaRequirements(PSRExpr::Node requirements);
 
     bool operator==(const PartialSchemaRequirements& other) const;
 
@@ -145,7 +145,7 @@ public:
     boost::optional<std::pair<size_t, PartialSchemaRequirement>> findFirstConjunct(
         const PartialSchemaKey&) const;
 
-    // TODO SERVER-69026: Remove these methods in favor of visitDis/Conjuncts().
+    // TODO SERVER-73828: Remove these methods in favor of visitDis/Conjuncts().
     Range<true> conjuncts() const {
         tassert(7453905,
                 "Expected PartialSchemaRequirement to be a singleton disjunction",
@@ -176,9 +176,6 @@ public:
      *
      * For now, we assert that we have only one disjunct. This means we avoid applying
      * the distributive law, which would duplicate the new requirement into each disjunct.
-     *
-     * TODO SERVER-69026 Consider applying the distributive law to allow contained-OR in
-     * SargableNode.
      */
     void add(PartialSchemaKey, PartialSchemaRequirement);
 
@@ -196,6 +193,19 @@ public:
      * TODO SERVER-73827: Consider applying this simplification during BoolExpr building.
      */
     bool simplify(std::function<bool(const PartialSchemaKey&, PartialSchemaRequirement&)>);
+    static bool simplify(PSRExpr::Node& expr,
+                         std::function<bool(const PartialSchemaKey&, PartialSchemaRequirement&)>);
+    static void normalize(PSRExpr::Node& expr);
+
+    /**
+     * Given a DNF, try to detect and remove redundant terms.
+     *
+     * For example, in ((a ^ b) U (z) U (a ^ b ^ c)) the (a ^ b) is redundant because
+     * (a ^ b ^ c) implies (a ^ b).
+     *
+     * TODO SERVER-73827 Consider doing this simplification as part of BoolExpr::Builder.
+     */
+    static void simplifyRedundantDNF(PSRExpr::Node& expr);
 
     const auto& getRoot() const {
         return _expr;

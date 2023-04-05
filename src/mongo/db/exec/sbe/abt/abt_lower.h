@@ -260,6 +260,12 @@ private:
     /**
      * Convert a vector of ProjectionNames to slot IDs from the projections that have already been
      * bound to slots.
+     *
+     * Preserves the order, and therefore preserves duplicates and the result .size() == the input
+     * .size().
+     *
+     * Even when 'projectionNames' is free of duplicates, the output may have duplicates because two
+     * projections can map to the same slot.
      */
     sbe::value::SlotVector convertProjectionsToSlots(const SlotVarMap& slotMap,
                                                      const ProjectionNameVector& projectionNames);
@@ -269,6 +275,10 @@ private:
      * the RequiredProjections node property. This function pulls out those projection names and
      * looks up the relevant slot IDs they are bound to. The optional toExclude vector can prevent
      * some slots from being added to the output vector.
+     *
+     * The output is free of duplicates.
+     *
+     * Does not guarantee any output order.
      */
     sbe::value::SlotVector convertRequiredProjectionsToSlots(
         const SlotVarMap& slotMap,

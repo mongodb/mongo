@@ -458,5 +458,5 @@ PhysPlanBuilder lowerEqPrefixes(PrefixId& prefixId,
                                 CEType scanGroupCE,
                                 bool useSortedMerge);
 
-bool hasProperIntervals(const PartialSchemaRequirements& reqMap);
+bool hasProperIntervals(const PSRExpr::Node& reqs);
 }  // namespace mongo::optimizer

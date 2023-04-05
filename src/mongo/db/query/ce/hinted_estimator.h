@@ -34,7 +34,7 @@
 namespace mongo::optimizer::ce {
 
 using PartialSchemaSelHints =
-    std::map<PartialSchemaKey, SelectivityType, PartialSchemaKeyLessComparator>;
+    std::map<PartialSchemaKey, SelectivityType, PartialSchemaKeyComparator::Less>;
 
 /**
  * Estimation based on hints. The hints are organized in a PartialSchemaSelHints structure.
