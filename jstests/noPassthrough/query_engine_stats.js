@@ -21,23 +21,25 @@ if (!checkSBEEnabled(db)) {
     return;
 }
 
-assert.commandWorked(db.dropDatabase());
+function initializeTestCollection() {
+    assert.commandWorked(db.dropDatabase());
 
-let coll = db.collection;
+    // Set logLevel to 1 so that all queries will be logged.
+    assert.commandWorked(db.setLogLevel(1));
+    // Set profiling level to profile all queries.
+    assert.commandWorked(db.setProfilingLevel(2));
 
-// Set logLevel to 1 so that all queries will be logged.
-assert.commandWorked(db.setLogLevel(1));
+    // Set up the collection.
+    let coll = db.collection;
+    assert.commandWorked(coll.insertMany([
+        {_id: 0, a: 1, b: 1, c: 1},
+        {_id: 1, a: 2, b: 1, c: 2},
+        {_id: 2, a: 3, b: 1, c: 3},
+        {_id: 3, a: 4, b: 2, c: 4}
+    ]));
 
-// Set profiling level to profile all queries.
-assert.commandWorked(db.setProfilingLevel(2));
-
-// Set up the collection.
-assert.commandWorked(coll.insertMany([
-    {_id: 0, a: 1, b: 1, c: 1},
-    {_id: 1, a: 2, b: 1, c: 2},
-    {_id: 2, a: 3, b: 1, c: 3},
-    {_id: 3, a: 4, b: 2, c: 4}
-]));
+    return coll;
+}
 
 const framework = {
     find: {sbe: "sbe", classic: "classic", cqf: "findCQF"},
@@ -112,6 +114,8 @@ function compareQueryEngineCounters(expectedCounters) {
     let counters = db.serverStatus().metrics.query.queryFramework;
     assert.docEq(expectedCounters, counters);
 }
+
+let coll = initializeTestCollection();
 
 // Start with SBE off.
 assert.commandWorked(
@@ -231,10 +235,7 @@ assert.neq(null, conn, "mongod was unable to start up");
 
 db = conn.getDB(jsTestName());
 
-assert.commandWorked(db.setLogLevel(1));
-assert.commandWorked(db.setProfilingLevel(2));
-
-coll = db.collection;
+coll = initializeTestCollection();
 
 // Run find using CQF
 expectedCounters = generateExpectedCounters(framework.find.cqf);
