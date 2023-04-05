@@ -1,6 +1,5 @@
 // replica set as solo shard
 // TODO: Add assertion code that catches hang
-// @tags: [temporary_catalog_shard_incompatible]
 
 // The UUID and index check must be able to contact the shard primaries, but this test manually
 // stops 2/3 nodes of a replica set.
@@ -45,7 +44,11 @@ var mongosConn = shardingTest.s;
 var testDB = mongosConn.getDB(testDBName);
 
 // Add replSet1 as only shard
-assert.commandWorked(mongosConn.adminCommand({addshard: replSet1.getURL()}));
+if (!TestData.catalogShard) {
+    assert.commandWorked(mongosConn.adminCommand({addshard: replSet1.getURL()}));
+} else {
+    assert.commandWorked(mongosConn.adminCommand({transitionToCatalogShard: 1}));
+}
 
 // Enable sharding on test db and its collection foo
 assert.commandWorked(mongosConn.getDB('admin').runCommand({enablesharding: testDBName}));

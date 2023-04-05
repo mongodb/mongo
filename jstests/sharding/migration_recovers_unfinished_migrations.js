@@ -7,7 +7,6 @@
  *     # that migration by sending a new `moveChunk` command to the donor shard causing the test to
  *     # hang.
  *     does_not_support_stepdowns,
- *     temporary_catalog_shard_incompatible,
  * ]
  */
 (function() {
@@ -27,6 +26,7 @@ const nodeOptions = {
 // the shards that would interfere with the migration recovery interleaving this test requires.
 var st = new ShardingTest({
     shards: {rs0: {nodes: 2}, rs1: {nodes: 1}},
+    config: 3,
     other: {configOptions: nodeOptions, enableBalancer: false}
 });
 let staticMongod = MongoRunner.runMongod({});
@@ -62,7 +62,7 @@ const rs0Secondary = st.rs0.getSecondary();
 let hangInEnsureChunkVersionIsGreaterThanInterruptibleFailpoint =
     configureFailPoint(rs0Secondary, "hangInEnsureChunkVersionIsGreaterThanInterruptible");
 
-assert.commandWorked(st.rs0.getPrimary().adminCommand({replSetStepDown: 60, force: true}));
+st.rs0.stepUp(rs0Secondary);
 joinMoveChunk1();
 migrationCommitNetworkErrorFailpoint.off();
 skipShardFilteringMetadataRefreshFailpoint.off();

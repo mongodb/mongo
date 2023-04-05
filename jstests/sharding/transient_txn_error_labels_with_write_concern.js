@@ -2,7 +2,6 @@
  * Test TransientTransactionError error label for commands in transactions with write concern.
  * @tags: [
  *   uses_transactions,
- *   temporary_catalog_shard_incompatible,
  * ]
  */
 (function() {
@@ -17,8 +16,11 @@ const collName = "transient_txn_error_labels_with_write_concern";
 
 // We are testing coordinateCommitTransaction, which requires the nodes to be started with
 // --shardsvr.
-const st = new ShardingTest(
-    {config: 1, mongos: 1, shards: {rs0: {nodes: [{}, {rsConfig: {priority: 0}}]}}});
+const st = new ShardingTest({
+    config: TestData.catalogShard ? undefined : 1,
+    mongos: 1,
+    shards: {rs0: {nodes: [{}, {rsConfig: {priority: 0}}]}}
+});
 const rst = st.rs0;
 
 const primary = rst.getPrimary();

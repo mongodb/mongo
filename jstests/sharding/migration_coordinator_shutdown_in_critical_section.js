@@ -3,11 +3,13 @@
  * _configsvrEnsureChunkVersionIsGreaterThan and while the node is forcing a filtering metadata
  * refresh.
  *
+ * Shuts down a donor shard which leads mongos to retry if the donor is also the config server, and
+ * this can fail waiting for read preference if the shard is slow to recover.
  * @tags: [
  *   does_not_support_stepdowns,
  *   # Require persistence to restart nodes
  *   requires_persistence,
- *   temporary_catalog_shard_incompatible,
+ *   catalog_shard_incompatible,
  * ]
  */
 

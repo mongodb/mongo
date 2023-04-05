@@ -2,7 +2,7 @@
  * Tests that serverStatus includes a migration status when called on the source shard of an active
  * migration.
  *
- * @tags: [requires_fcv_63, temporary_catalog_shard_incompatible]
+ * @tags: [requires_fcv_63]
  */
 
 load('./jstests/libs/chunk_manipulation_util.js');
@@ -141,7 +141,12 @@ assertMigrationStatusOnServerStatus(shard0ServerStatus,
                                     {"_id": 0},
                                     {"_id": {"$maxKey": 1}},
                                     coll + "");
-assertSessionMigrationStatusSource(shard0ServerStatus, 2400, 2600);
+// Background metadata operations on the config server can throw off the count, so just assert the
+// fields are present for a catalog shard.
+const expectedEntriesMigrated = TestData.catalogShard ? undefined : 2400;
+const expectedEntriesSkipped = TestData.catalogShard ? undefined : 2600;
+assertSessionMigrationStatusSource(
+    shard0ServerStatus, expectedEntriesMigrated, expectedEntriesSkipped);
 
 // Destination shard should have the correct server status
 shard1ServerStatus = st.shard1.getDB('admin').runCommand({serverStatus: 1});
@@ -153,7 +158,8 @@ assertMigrationStatusOnServerStatus(shard1ServerStatus,
                                     {"_id": 0},
                                     {"_id": {"$maxKey": 1}},
                                     coll + "");
-assertSessionMigrationStatusDestination(shard1ServerStatus, 2400);
+assertSessionMigrationStatusDestination(
+    shard1ServerStatus, expectedEntriesMigrated, expectedEntriesSkipped);
 
 unpauseMoveChunkAtStep(st.shard0, moveChunkStepNames.chunkDataCommitted);
 

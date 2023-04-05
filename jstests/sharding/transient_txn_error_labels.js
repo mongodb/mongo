@@ -2,7 +2,6 @@
  * Test TransientTransactionErrors error label in transactions.
  * @tags: [
  *   uses_transactions,
- *   temporary_catalog_shard_incompatible,
  * ]
  */
 
@@ -17,8 +16,11 @@ const collName = "no_error_labels_outside_txn";
 
 // We are testing coordinateCommitTransaction, which requires the nodes to be started with
 // --shardsvr.
-const st = new ShardingTest(
-    {config: 1, mongos: 1, shards: {rs0: {nodes: [{}, {rsConfig: {priority: 0}}]}}});
+const st = new ShardingTest({
+    config: TestData.catalogShard ? undefined : 1,
+    mongos: 1,
+    shards: {rs0: {nodes: [{}, {rsConfig: {priority: 0}}]}}
+});
 const primary = st.rs0.getPrimary();
 const secondary = st.rs0.getSecondary();
 

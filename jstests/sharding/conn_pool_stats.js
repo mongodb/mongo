@@ -1,7 +1,9 @@
 /**
  * Tests for the connPoolStats command.
  *
- * @tags: [requires_fcv_63, temporary_catalog_shard_incompatible]
+ * Incompatible because it makes assertions about the specific number of connections used, which
+ * don't account for background activity on a config server.
+ * @tags: [requires_fcv_63, catalog_shard_incompatible]
  */
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/conn_pool_helpers.js");

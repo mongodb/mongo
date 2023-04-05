@@ -2,7 +2,9 @@
  * Test to assert that the RSM behaves correctly when contacting the primary node fails in various
  * ways.
  *
- * @tags: [temporary_catalog_shard_incompatible]
+ * Restarts the config server in catalog shard suites, which requires persistence so restarted nodes
+ * can rejoin their original replica set and run shutdown hooks.
+ * @tags: [requires_persistence]
  */
 
 // Checking UUID consistency and orphans involves talking to a shard node, which in this test is
@@ -64,8 +66,18 @@ awaitRSClientHosts(mongos, {host: rsPrimary.name}, {ok: true, ismaster: true});
 
 // Shutdown the primary node. The RSM should mark the node as down.
 jsTestLog("Shutting down primary node.");
-st.rs0.stop(0);
+if (TestData.catalogShard) {
+    st.rs0.stop(0, undefined, undefined, {forRestart: true});
+} else {
+    st.rs0.stop(0);
+}
 awaitRSClientHosts(mongos, {host: rsPrimary.name}, {ok: false});
+
+if (TestData.catalogShard) {
+    // Shard0 is the config server in catalog shard mode, so restart it for the ShardingTest
+    // shutdown hooks.
+    st.rs0.start(0, undefined, true /* restart */);
+}
 
 st.stop();
 }());

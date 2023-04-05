@@ -1192,7 +1192,8 @@ var ShardingTest = function(params) {
     var numShards = otherParams.hasOwnProperty('shards') ? otherParams.shards : 2;
     var mongosVerboseLevel = otherParams.hasOwnProperty('verbose') ? otherParams.verbose : 1;
     var numMongos = otherParams.hasOwnProperty('mongos') ? otherParams.mongos : 1;
-    const usedDefaultNumConfigs = !otherParams.hasOwnProperty('config');
+    const usedDefaultNumConfigs =
+        !otherParams.hasOwnProperty('config') || otherParams.config === undefined;
     var numConfigs = otherParams.hasOwnProperty('config') ? otherParams.config : 3;
 
     let isCatalogShardMode =

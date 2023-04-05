@@ -41,7 +41,8 @@ const dbName = "test";
 const collName = "foo";
 const ns = dbName + "." + collName;
 
-let st = new ShardingTest({shards: 2});
+let st = new ShardingTest(
+    {shards: 2, configOptions: {setParameter: {enableShardedIndexConsistencyCheck: false}}});
 let testColl = st.s.getDB(dbName).getCollection(collName);
 
 assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
@@ -67,9 +68,7 @@ moveChunkHangAtStep5FailPoint.wait();
 donorReplSetTest.freeze(donorPrimary);
 
 moveChunkHangAtStep5FailPoint.off();
-if (!TestData.catalogShard) {
-    moveChunkThread.join();
-}
+moveChunkThread.join();
 
 metadataRefreshFailPoint.wait();
 donorReplSetTest.unfreeze(donorPrimary);
@@ -84,15 +83,6 @@ assert.eq(1, getNumRangeDeletionDocs(recipientShard, ns));
 
 testColl.drop();
 metadataRefreshFailPoint.off();
-
-if (TestData.catalogShard) {
-    // In catalog shard mode, the migration won't finish until after we finish migration recovery,
-    // which is blocked by the fail point until we disable it above.
-    //
-    // SERVER-74446: Investigate why this only happens in catalog shard mode and if its safe to
-    // ignore by changing the test.
-    moveChunkThread.join();
-}
 
 jsTest.log("Wait for the recipient to delete the range deletion task doc");
 assert.soon(() => {

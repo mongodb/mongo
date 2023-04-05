@@ -2,8 +2,9 @@
  * Tests that the global indexes collections are dropped on FCV downgrade and recreated after
  * upgrading.
  *
+ * TODO SERVER-75274: Enable with a catalog shard.
  * @tags: [multiversion_incompatible, featureFlagGlobalIndexesShardingCatalog,
- * requires_fcv_70, temporary_catalog_shard_incompatible]
+ * requires_fcv_70, catalog_shard_incompatible]
  */
 
 (function() {

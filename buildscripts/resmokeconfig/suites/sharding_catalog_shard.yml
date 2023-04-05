@@ -7,7 +7,6 @@ selector:
   - jstests/sharding/**/libs/**/*.js
   exclude_with_any_tags:
   - catalog_shard_incompatible
-  - temporary_catalog_shard_incompatible
 
 executor:
   archive:

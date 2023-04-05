@@ -3,8 +3,7 @@
  * shards using logical initial sync.
  *
  * We control our own failovers, and we also need the RSM to react reasonably quickly to those.
- * @tags: [does_not_support_stepdowns, requires_streamable_rsm,
- * temporary_catalog_shard_incompatible]
+ * @tags: [does_not_support_stepdowns, requires_streamable_rsm]
  */
 
 (function() {
@@ -15,7 +14,8 @@ load("jstests/sharding/libs/sharding_state_test.js");
 const st = new ShardingTest({config: 1, shards: {rs0: {nodes: 1}}});
 const rs = st.rs0;
 
-const newNode = ShardingStateTest.addReplSetNode({replSet: rs, serverTypeFlag: "shardsvr"});
+const serverTypeFlag = TestData.catalogShard ? "configsvr" : "shardsvr";
+const newNode = ShardingStateTest.addReplSetNode({replSet: rs, serverTypeFlag});
 
 jsTestLog("Checking sharding state before failover.");
 ShardingStateTest.checkShardingState(st);

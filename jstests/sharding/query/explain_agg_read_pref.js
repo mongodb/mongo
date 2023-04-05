@@ -1,7 +1,5 @@
 /**
  * Tests that readPref applies on an explain for an aggregation command.
- *
- * @tags: [temporary_catalog_shard_incompatible]
  */
 (function() {
 "use strict";
@@ -36,7 +34,7 @@ assert.commandWorked(mongosDB.dropDatabase());
 const coll = mongosDB.getCollection("coll");
 
 assert.commandWorked(config.adminCommand({enableSharding: mongosDB.getName()}));
-st.ensurePrimaryShard(mongosDB.getName(), "agg_explain_readPref-rs0");
+st.ensurePrimaryShard(mongosDB.getName(), st.shard0.shardName);
 const rs0Primary = st.rs0.getPrimary();
 const rs0Secondary = st.rs0.getSecondary();
 const rs1Primary = st.rs1.getPrimary();

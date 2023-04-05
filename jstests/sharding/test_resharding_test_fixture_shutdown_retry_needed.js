@@ -4,10 +4,13 @@
  * Verifies that the background thread running the reshardCollection command will retry when mongos
  * reports an error caused by a network error from the primary shard.
  *
+ * Incompatible with a catalog shard because it uses a sequence of fail points to test the
+ * resharding test fixture, which doesn't work when the first shard is the config server. This only
+ * tests the testing fixture, so it wouldn't add meaningful coverage for a catalog shard.
  * @tags: [
  *   requires_persistence,
  *   uses_atclustertime,
- *   temporary_catalog_shard_incompatible,
+ *   catalog_shard_incompatible,
  * ]
  */
 (function() {

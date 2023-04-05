@@ -13,7 +13,6 @@
  * @tags: [
  *   uses_multi_shard_transaction,
  *   uses_transactions,
- *   temporary_catalog_shard_incompatible,
  * ]
  */
 
@@ -32,7 +31,7 @@ const ns2 = db2Name + "." + coll2Name;
 
 const st = new ShardingTest({
     shards: {rs0: {nodes: 2}, rs1: {nodes: 1}},
-    config: 1,
+    config: TestData.catalogShard ? undefined : 1,
     other: {
         mongosOptions: {verbose: 3},
     }

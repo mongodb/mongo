@@ -9,7 +9,6 @@
 //   requires_majority_read_concern,
 //   requires_persistence,
 //   uses_change_streams,
-//   temporary_catalog_shard_incompatible,
 // ]
 (function() {
 "use strict";
@@ -36,7 +35,11 @@ const st = new ShardingTest({
     rs: {
         nodes: 1,
         // Use a higher frequency for periodic noops to speed up the test.
-        setParameter: {periodicNoopIntervalSecs: 1, writePeriodicNoops: true},
+        setParameter: {
+            periodicNoopIntervalSecs: 1,
+            writePeriodicNoops: true,
+            enableShardedIndexConsistencyCheck: false
+        },
     },
     other: {configOptions: nodeOptions}
 });

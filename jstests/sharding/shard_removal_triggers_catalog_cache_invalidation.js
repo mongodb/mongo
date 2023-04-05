@@ -1,8 +1,6 @@
 /**
  * Tests that shard removal triggers an update of the catalog cache so that routers don't continue
  * to target shards that have been removed.
- *
- * @tags: [temporary_catalog_shard_incompatible]
  */
 (function() {
 'use strict';
@@ -69,8 +67,13 @@ const dbName = 'TestDB';
     // Remove shard0.
     removeShard(st, st.shard0.shardName);
 
-    // Stop the replica set so that future requests to this shard will be unsuccessful.
-    st.rs0.stopSet();
+    // Stop the replica set so that future requests to this shard will be unsuccessful. Skip this
+    // step for a catalog shard, since the config server must be up for the second router to
+    // refresh. The default read concern is local, so the router should eventually target a shard
+    // with chunks.
+    if (!TestData.catalogShard) {
+        st.rs0.stopSet();
+    }
 
     // Ensure that s1, the router which did not run removeShard, eventually stops targeting chunks
     // for the sharded collection which previously resided on a shard that no longer exists.
@@ -128,21 +131,15 @@ const dbName = 'TestDB';
 
     // Remove shard0. We need assert.soon since chunks in the sessions collection may need to be
     // migrated off by the balancer.
-    assert.soon(() => {
-        const removeRes = st.s0.adminCommand({removeShard: st.shard0.shardName});
-        if (!removeRes.ok && removeRes.code === ErrorCodes.ShardNotFound) {
-            // If the config server primary steps down after removing the config.shards doc for the
-            // shard being removed but before completing the _configsvrRemoveShard command, the
-            // mongos would retry the command on the new config server primary which would not find
-            // the removed shard in its ShardRegistry causing the command to fail with
-            // ShardNotFound.
-            return true;
-        }
-        return removeRes.state === 'completed';
-    });
+    removeShard(st, st.shard0.shardName);
 
-    // Stop the replica set so that future requests to this shard will be unsuccessful.
-    st.rs0.stopSet();
+    // Stop the replica set so that future requests to this shard will be unsuccessful. Skip this
+    // step for a catalog shard, since the config server must be up for the second router to
+    // refresh. The default read concern is local, so the router should eventually target a shard
+    // with chunks.
+    if (!TestData.catalogShard) {
+        st.rs0.stopSet();
+    }
 
     // Ensure that s1, the router which did not run removeShard, eventually stops targeting data for
     // the unsharded collection which previously had as primary a shard that no longer exists.

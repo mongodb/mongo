@@ -1,7 +1,9 @@
 /**
  * Shuts down config server and shard replica set nodes one by one and ensures correct behaviour.
  *
- * @tags: [temporary_catalog_shard_incompatible]
+ * Restarts the config server, which requires persistence so restarted nodes can rejoin their
+ * original replica set and run shutdown hooks.
+ * @tags: [requires_persistence]
  */
 
 // Checking UUID and index consistency involves talking to the config servers, which are shut down
@@ -14,52 +16,78 @@ TestData.skipCheckShardFilteringMetadata = true;
 (function() {
 'use strict';
 
-var st = new ShardingTest({shards: {rs0: {nodes: 2}}});
+var st = new ShardingTest({
+    shards: {
+        rs0: {nodes: 2},
+    },
+    config: 3
+});
 
 // The default read concern is local, which is incompatible with secondary reads when the primary is
 // down.
 st.s.adminCommand({setDefaultRWConcern: 1, defaultReadConcern: {level: "available"}});
 
+let count = 0;
 jsTest.log('Config nodes up: 3 of 3, shard nodes up: 2 of 2: ' +
            'Insert test data to work with');
 assert.commandWorked(st.s0.getDB('TestDB').TestColl.update(
     {_id: 0}, {$inc: {count: 1}}, {upsert: true, writeConcern: {w: 2, wtimeout: 30000}}));
-assert.eq([{_id: 0, count: 1}], st.s0.getDB('TestDB').TestColl.find().toArray());
+count += 1;
+assert.eq([{_id: 0, count}], st.s0.getDB('TestDB').TestColl.find().toArray());
 
 jsTest.log('Config nodes up: 2 of 3, shard nodes up: 2 of 2: ' +
            'Inserts and queries must work');
-st.configRS.stop(0);
+st.configRS.stop(0, undefined, undefined, {forRestart: true});
 st.restartMongos(0);
 assert.commandWorked(st.s0.getDB('TestDB').TestColl.update(
     {_id: 0}, {$inc: {count: 1}}, {upsert: true, writeConcern: {w: 2, wtimeout: 30000}}));
-assert.eq([{_id: 0, count: 2}], st.s0.getDB('TestDB').TestColl.find().toArray());
+count += 1;
+assert.eq([{_id: 0, count}], st.s0.getDB('TestDB').TestColl.find().toArray());
 
-jsTest.log('Config nodes up: 1 of 3, shard nodes up: 2 of 2: ' +
-           'Inserts and queries must work');
-st.configRS.stop(1);
-st.restartMongos(0);
-assert.commandWorked(st.s0.getDB('TestDB').TestColl.update(
-    {_id: 0}, {$inc: {count: 1}}, {upsert: true, writeConcern: {w: 2, wtimeout: 30000}}));
-assert.eq([{_id: 0, count: 3}], st.s0.getDB('TestDB').TestColl.find().toArray());
+if (!TestData.catalogShard) {
+    // For a catalog shard, the config server is the shard, so we can't have a different number up.
+    jsTest.log('Config nodes up: 1 of 3, shard nodes up: 2 of 2: ' +
+               'Inserts and queries must work');
+    st.configRS.stop(1, undefined, undefined, {forRestart: true});
+    st.restartMongos(0);
+    assert.commandWorked(st.s0.getDB('TestDB').TestColl.update(
+        {_id: 0}, {$inc: {count: 1}}, {upsert: true, writeConcern: {w: 2, wtimeout: 30000}}));
+    count += 1;
+    assert.eq([{_id: 0, count}], st.s0.getDB('TestDB').TestColl.find().toArray());
+}
 
 jsTest.log('Config nodes up: 1 of 3, shard nodes up: 1 of 2: ' +
            'Only queries will work (no shard primary)');
 st.rs0.stop(0);
 st.restartMongos(0);
 st.s0.setSecondaryOk();
-assert.eq([{_id: 0, count: 3}], st.s0.getDB('TestDB').TestColl.find().toArray());
+assert.eq([{_id: 0, count}], st.s0.getDB('TestDB').TestColl.find().toArray());
 
-jsTest.log('Config nodes up: 1 of 3, shard nodes up: 0 of 2: ' +
-           'MongoS must start, but no operations will work (no shard nodes available)');
-st.rs0.stop(1);
-st.restartMongos(0);
-assert.throws(function() {
-    st.s0.getDB('TestDB').TestColl.find().toArray();
-});
+if (!TestData.catalogShard) {
+    // For a catalog shard, the config server is the shard, so we can't have a different number up.
+    jsTest.log('Config nodes up: 1 of 3, shard nodes up: 0 of 2: ' +
+               'MongoS must start, but no operations will work (no shard nodes available)');
+    st.rs0.stop(1);
+    st.restartMongos(0);
+    assert.throws(function() {
+        st.s0.getDB('TestDB').TestColl.find().toArray();
+    });
+}
 
 jsTest.log('Config nodes up: 0 of 3, shard nodes up: 0 of 2: ' +
            'Metadata cannot be loaded at all, no operations will work');
-st.configRS.stop(1);
+if (!TestData.catalogShard) {
+    st.configRS.stop(2);
+} else if (TestData.catalogShard) {
+    st.configRS.stop(1, undefined, undefined, {forRestart: true});
+    // Restart mongos while a config server is still up.
+    st.restartMongos(0);
+    // After taking down the last config/shard node, no user data operations will work.
+    st.configRS.stop(2, undefined, undefined, {forRestart: true});
+    assert.throws(function() {
+        st.s0.getDB('TestDB').TestColl.find().toArray();
+    });
+}
 
 // Instead of restarting mongos, ensure it has no metadata
 assert.commandWorked(st.s0.adminCommand({flushRouterConfig: 1}));
@@ -83,7 +111,7 @@ for (var i = 0; i < 2; i++) {
     }
 }
 
-// Restart one config server node to ensure that teardown checks may be executed
-st.restartConfigServer(0);
+// Restart two config server nodes to ensure that teardown checks may be executed
+st.restartAllConfigServers();
 st.stop();
 }());
