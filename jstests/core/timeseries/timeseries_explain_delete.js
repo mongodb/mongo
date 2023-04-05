@@ -35,6 +35,7 @@ const docs = [
 
 function testDeleteExplain({
     singleDeleteOp,
+    expectedDeleteStageName,
     expectedOpType,
     expectedBucketFilter,
     expectedResidualFilter,
@@ -42,6 +43,8 @@ function testDeleteExplain({
     expectedNumUnpacked,
     expectedUsedIndexName = null
 }) {
+    assert(expectedDeleteStageName === "TS_MODIFY" || expectedDeleteStageName === "BATCHED_DELETE");
+
     // Prepares a timeseries collection.
     const coll = testDB.getCollection(collNamePrefix + testCaseId++);
     coll.drop();
@@ -61,17 +64,21 @@ function testDeleteExplain({
     const deleteExplainPlanCommand = {explain: innerDeleteCommand, verbosity: "queryPlanner"};
     let explain = assert.commandWorked(testDB.runCommand(deleteExplainPlanCommand));
     jsTestLog(tojson(explain));
-    const tsModifyStage = getPlanStage(explain.queryPlanner.winningPlan, "TS_MODIFY");
-    assert.neq(null, tsModifyStage, `TS_MODIFY stage not found in the plan: ${tojson(explain)}`);
-    assert.eq(expectedOpType,
-              tsModifyStage.opType,
-              `TS_MODIFY opType is wrong: ${tojson(tsModifyStage)}`);
-    assert.eq(expectedBucketFilter,
-              tsModifyStage.bucketFilter,
-              `TS_MODIFY bucketFilter is wrong: ${tojson(tsModifyStage)}`);
-    assert.eq(expectedResidualFilter,
-              tsModifyStage.residualFilter,
-              `TS_MODIFY residualFilter is wrong: ${tojson(tsModifyStage)}`);
+    const deleteStage = getPlanStage(explain.queryPlanner.winningPlan, expectedDeleteStageName);
+    assert.neq(null,
+               deleteStage,
+               `${expectedDeleteStageName} stage not found in the plan: ${tojson(explain)}`);
+    if (expectedDeleteStageName === "TS_MODIFY") {
+        assert.eq(expectedOpType,
+                  deleteStage.opType,
+                  `TS_MODIFY opType is wrong: ${tojson(deleteStage)}`);
+        assert.eq(expectedBucketFilter,
+                  deleteStage.bucketFilter,
+                  `TS_MODIFY bucketFilter is wrong: ${tojson(deleteStage)}`);
+        assert.eq(expectedResidualFilter,
+                  deleteStage.residualFilter,
+                  `TS_MODIFY residualFilter is wrong: ${tojson(deleteStage)}`);
+    }
 
     if (expectedUsedIndexName) {
         const ixscanStage = getPlanStage(explain.queryPlanner.winningPlan, "IXSCAN");
@@ -86,34 +93,39 @@ function testDeleteExplain({
     explain = assert.commandWorked(testDB.runCommand(deleteExplainStatsCommand));
     jsTestLog(tojson(explain));
     const execStages = getExecutionStages(explain);
-    assert.eq("TS_MODIFY",
+    assert.gt(execStages.length, 0, `No execution stages found: ${tojson(explain)}`);
+    assert.eq(expectedDeleteStageName,
               execStages[0].stage,
               `TS_MODIFY stage not found in executionStages: ${tojson(explain)}`);
-    assert.eq(expectedNumDeleted,
-              execStages[0].nMeasurementsDeleted,
-              `Got wrong nMeasurementsDeleted: ${tojson(execStages[0])}`);
-    assert.eq(expectedNumUnpacked,
-              execStages[0].nBucketsUnpacked,
-              `Got wrong nBucketsUnpacked: ${tojson(execStages[0])}`);
+    if (expectedDeleteStageName === "TS_MODIFY") {
+        assert.eq(expectedNumDeleted,
+                  execStages[0].nMeasurementsDeleted,
+                  `Got wrong nMeasurementsDeleted: ${tojson(execStages[0])}`);
+        assert.eq(expectedNumUnpacked,
+                  execStages[0].nBucketsUnpacked,
+                  `Got wrong nBucketsUnpacked: ${tojson(execStages[0])}`);
+    } else {
+        assert.eq(expectedNumDeleted,
+                  execStages[0].nWouldDelete,
+                  `Got wrong nWouldDelete: ${tojson(execStages[0])}`);
+    }
 
     assert.sameMembers(
         docs, coll.find().toArray(), "Explain command must not touch documents in the collection");
 }
 
-(function testDeleteManyWithEmptyBucketFilter() {
+(function testDeleteManyWithEmptyQuery() {
     testDeleteExplain({
         singleDeleteOp: {
-            // The non-meta field filter leads to a COLLSCAN below the TS_MODIFY stage and so
-            // 'expectedNumUnpacked' is 2.
-            q: {_id: 2},
+            q: {},
             limit: 0,
         },
+        // If the delete query is empty, we should use the BATCHED_DELETE plan.
+        expectedDeleteStageName: "BATCHED_DELETE",
         expectedOpType: "deleteMany",
-        // TODO SERVER-75424: The bucket filter should be further optimized to "control.min._id: 2"
         expectedBucketFilter: {},
-        expectedResidualFilter: {_id: {$eq: 2}},
-        expectedNumDeleted: 1,
-        expectedNumUnpacked: 2
+        expectedResidualFilter: {},
+        expectedNumDeleted: 2,
     });
 })();
 
@@ -125,6 +137,7 @@ function testDeleteExplain({
             q: {[metaFieldName]: 2, _id: {$gte: 3}},
             limit: 0,
         },
+        expectedDeleteStageName: "TS_MODIFY",
         expectedOpType: "deleteMany",
         // The bucket filter is the one with metaFieldName translated to 'meta'.
         // TODO SERVER-75424: The bucket filter should be further optimized to "control.min._id: 3"
@@ -144,6 +157,7 @@ function testDeleteExplain({
             limit: 0,
             hint: {[metaFieldName]: 1}
         },
+        expectedDeleteStageName: "TS_MODIFY",
         expectedOpType: "deleteMany",
         // The bucket filter is the one with metaFieldName translated to 'meta'.
         // TODO SERVER-75424: The bucket filter should be further optimized to "control.min._id: 3"
@@ -165,6 +179,7 @@ function testDeleteExplain({
             q: {_id: 3},
             limit: 1,
         },
+        expectedDeleteStageName: "TS_MODIFY",
         expectedOpType: "deleteOne",
         // TODO SERVER-75424: The bucket filter should be further optimized to "control.min._id: 3"
         expectedBucketFilter: {},
@@ -182,6 +197,7 @@ function testDeleteExplain({
             q: {[metaFieldName]: 2, _id: {$gte: 1}},
             limit: 1,
         },
+        expectedDeleteStageName: "TS_MODIFY",
         expectedOpType: "deleteOne",
         // The bucket filter is the one with metaFieldName translated to 'meta'.
         // TODO SERVER-75424: The bucket filter should be further optimized to "control.min._id: 2"
@@ -201,6 +217,7 @@ function testDeleteExplain({
             limit: 1,
             hint: {[metaFieldName]: 1}
         },
+        expectedDeleteStageName: "TS_MODIFY",
         expectedOpType: "deleteOne",
         // The bucket filter is the one with metaFieldName translated to 'meta'.
         // TODO SERVER-75424: The bucket filter should be further optimized to "control.min._id: 3"

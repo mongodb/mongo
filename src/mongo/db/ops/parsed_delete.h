@@ -181,7 +181,7 @@ private:
         TimeseriesOptions _timeseriesOptions;
 
         // The bucket-level match expressions.
-        std::unique_ptr<MatchExpression> _bucketMatchExpr = nullptr;
+        std::unique_ptr<MatchExpression> _bucketExpr = nullptr;
 
         // The residual expression after splitting out metaField-dependent splittable match
         // expressions.
