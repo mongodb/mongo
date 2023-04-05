@@ -416,7 +416,7 @@ public:
                 if (_hints._disableScan) {
                     return;
                 }
-                if (_hints._forceIndexScanForPredicates && hasProperIntervals(reqMap)) {
+                if (_hints._forceIndexScanForPredicates && hasProperIntervals(reqMap.getRoot())) {
                     return;
                 }
                 break;
@@ -473,7 +473,7 @@ public:
                 requiresRootProjection = projectionsLeftToSatisfy.erase(scanProjectionName);
             }
 
-            for (const auto& [key, boundProjName] : getBoundProjections(reqMap.getRoot())) {
+            for (const auto& [key, boundProjName] : getBoundProjections(reqMap)) {
                 projectionsLeftToSatisfy.erase(boundProjName);
             }
             if (!projectionsLeftToSatisfy.getVector().empty()) {
@@ -973,8 +973,7 @@ public:
     }
 
     void operator()(const ABT& /*n*/, const RIDUnionNode& node) {
-        // TODO SERVER-69026 should implement this.
-        tasserted(7016300, "RIDUnionNode not implemented yet.");
+        // TODO SERVER-75587 should implement this.
         return;
     }
 

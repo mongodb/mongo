@@ -249,7 +249,7 @@ public:
             }
         }
 
-        indexingAvailability.setHasProperInterval(hasProperIntervals(node.getReqMap()));
+        indexingAvailability.setHasProperInterval(hasProperIntervals(node.getReqMap().getRoot()));
 
         return maybeUpdateNodePropsMap(node, std::move(result));
     }

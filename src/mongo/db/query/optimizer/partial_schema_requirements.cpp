@@ -42,11 +42,11 @@ public:
     }
 
     void transport(PSRExpr::Conjunction& node, std::vector<PSRExpr::Node>& children) {
-        sortChildren(children);
+        sortAndDedupChildren(children);
     }
 
     void transport(PSRExpr::Disjunction& node, std::vector<PSRExpr::Node>& children) {
-        sortChildren(children);
+        sortAndDedupChildren(children);
     }
 
     void normalize(PSRExpr::Node& node) {
@@ -54,13 +54,16 @@ public:
     }
 
 private:
-    void sortChildren(std::vector<PSRExpr::Node>& children) {
+    void sortAndDedupChildren(std::vector<PSRExpr::Node>& children) {
         struct Comparator {
             bool operator()(const PSRExpr::Node& i1, const PSRExpr::Node& i2) const {
                 return comparePartialSchemaRequirementsExpr(i1, i2) < 0;
             }
         };
         std::sort(children.begin(), children.end(), Comparator{});
+
+        auto end = std::unique(children.begin(), children.end());
+        children.erase(end, children.end());
     }
 };
 
@@ -74,8 +77,11 @@ PartialSchemaEntry makeNoopPartialSchemaEntry() {
 }
 }  // namespace
 
+void PartialSchemaRequirements::normalize(PSRExpr::Node& expr) {
+    PSRNormalizeTransporter{}.normalize(expr);
+}
 void PartialSchemaRequirements::normalize() {
-    PSRNormalizeTransporter{}.normalize(_expr);
+    normalize(_expr);
 }
 
 PartialSchemaRequirements::PartialSchemaRequirements(PSRExpr::Node requirements)
@@ -152,7 +158,6 @@ PartialSchemaRequirements::findFirstConjunct(const PartialSchemaKey& key) const 
 
 void PartialSchemaRequirements::add(PartialSchemaKey key, PartialSchemaRequirement req) {
     tassert(7016406, "Expected a PartialSchemaRequirements in DNF form", PSRExpr::isDNF(_expr));
-    // TODO SERVER-69026 Consider applying the distributive law.
     tassert(7453912, "Expected a singleton disjunction", PSRExpr::isSingletonDisjunction(_expr));
 
     // Add an entry to the first conjunction
@@ -228,11 +233,81 @@ static bool simplifyExpr(
 
 bool PartialSchemaRequirements::simplify(
     std::function<bool(const PartialSchemaKey&, PartialSchemaRequirement&)> func) {
-    if (PSRExpr::isCNF(_expr)) {
-        return simplifyExpr<true /*isCNF*/>(_expr, func);
-    }
-    return simplifyExpr<false /*isCNF*/>(_expr, func);
+    return simplify(_expr, func);
 }
+bool PartialSchemaRequirements::simplify(
+    PSRExpr::Node& expr,
+    std::function<bool(const PartialSchemaKey&, PartialSchemaRequirement&)> func) {
+    if (PSRExpr::isCNF(expr)) {
+        return simplifyExpr<true /*isCNF*/>(expr, func);
+    }
+    return simplifyExpr<false /*isCNF*/>(expr, func);
+}
+
+void PartialSchemaRequirements::simplifyRedundantDNF(PSRExpr::Node& expr) {
+    tassert(6902601, "simplifyRedundantDNF expects DNF", PSRExpr::isDNF(expr));
+
+    // Normalizing ensures:
+    // - Each term has no duplicate atoms.
+    // - The overall expression has no duplicate terms.
+    // - The terms are sorted in increasing length.
+    PSRNormalizeTransporter{}.normalize(expr);
+
+    // Now remove terms that are subsumed by some other term. This means try to remove terms whose
+    // atoms are a superset of some other term: (a^b) subsumes (a^b^c), so remove (a^b^c). Since
+    // there are no duplicate atoms, we're looking to remove terms whose 'nodes().size()' is large.
+    PSRExpr::NodeVector& terms = expr.cast<PSRExpr::Disjunction>()->nodes();
+
+    // First give each unique atom a label.
+    // Store each atom by value because 'remove_if' can move-from a 'PSRExpr::Node', which deletes
+    // the heap-allocated 'Atom'.
+    std::vector<PSRExpr::Atom> atoms;
+    const auto atomLabel = [&](const PSRExpr::Atom& atom) -> size_t {
+        size_t i = 0;
+        for (const auto& seen : atoms) {
+            if (atom == seen) {
+                return i;
+            }
+            ++i;
+        }
+        atoms.emplace_back(atom);
+        return i;
+    };
+    using Mask = size_t;
+    static constexpr size_t maxAtoms = sizeof(Mask) * CHAR_BIT;
+    for (const PSRExpr::Node& termNode : terms) {
+        for (const PSRExpr::Node& atomNode : termNode.cast<PSRExpr::Conjunction>()->nodes()) {
+            const PSRExpr::Atom& atom = *atomNode.cast<PSRExpr::Atom>();
+            atomLabel(atom);
+            if (atoms.size() > maxAtoms) {
+                return;
+            }
+        }
+    }
+
+    std::vector<Mask> seen;
+    seen.reserve(terms.size());
+    auto last = std::remove_if(terms.begin(), terms.end(), [&](const PSRExpr::Node& term) -> bool {
+        Mask mask = 0;
+        for (const PSRExpr::Node& atomNode : term.cast<PSRExpr::Conjunction>()->nodes()) {
+            const PSRExpr::Atom& atom = *atomNode.cast<PSRExpr::Atom>();
+            mask |= Mask{1} << atomLabel(atom);
+        }
+
+        // Does any previously-seen mask subsume this one?
+        for (Mask prev : seen) {
+            const bool isSuperset = (prev & mask) == prev;
+            if (isSuperset) {
+                return true;
+            }
+        }
+
+        seen.push_back(mask);
+        return false;
+    });
+    terms.erase(last, terms.end());
+}
+
 
 /**
  * Returns a vector of ((input binding, path), output binding). The output binding names
