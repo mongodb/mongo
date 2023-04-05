@@ -358,7 +358,7 @@ public:
                             decimalTotal = Decimal128(longTotal);
                             break;
                         case NumberDouble:
-                            decimalTotal = Decimal128(doubleTotal, Decimal128::kRoundTo34Digits);
+                            decimalTotal = Decimal128(doubleTotal);
                             break;
                         default:
                             MONGO_UNREACHABLE;
