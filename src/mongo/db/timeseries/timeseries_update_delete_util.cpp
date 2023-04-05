@@ -39,6 +39,16 @@ namespace mongo::timeseries {
 namespace {
 
 /**
+ * Expression used to filter out closed buckets for timeseries writes. The 'control.closed' field
+ * may not exist or may be false. To be safe, filter on 'control.closed' != true.
+ */
+static const std::unique_ptr<MatchExpression> closedBucketFilter =
+    std::make_unique<NotMatchExpression>(std::make_unique<EqualityMatchExpression>(
+        StringData(timeseries::kBucketControlFieldName + "." +
+                   timeseries::kBucketControlClosedFieldName),
+        Value(true)));
+
+/**
  * Returns whether the given metaField is the first element of the dotted path in the given
  * field.
  */
@@ -245,5 +255,16 @@ BSONObj getBucketLevelPredicateForRouting(const BSONObj& originalQuery,
     // In case that the delete query does not contain bucket-level predicate that can be split out
     // and renamed, target the request to all shards using empty predicate.
     return BSONObj();
+}
+
+std::unique_ptr<MatchExpression> getBucketLevelPredicateForWrites(
+    std::unique_ptr<MatchExpression> bucketExpr) {
+    if (bucketExpr) {
+        std::vector<std::unique_ptr<MatchExpression>> bucketExprs;
+        bucketExprs.emplace_back(std::move(bucketExpr));
+        bucketExprs.emplace_back(closedBucketFilter->clone());
+        return std::make_unique<AndMatchExpression>(std::move(bucketExprs));
+    }
+    return closedBucketFilter->clone();
 }
 }  // namespace mongo::timeseries

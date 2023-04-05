@@ -1544,6 +1544,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/timeseries/timeseries_write_util',
         'not_primary_error_tracker',
         'record_id_helpers',
+        'timeseries/timeseries_conversion_util',
         'working_set_common',
         'write_stage_common',
     ],

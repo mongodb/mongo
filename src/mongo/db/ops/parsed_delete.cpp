@@ -45,6 +45,7 @@
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/db/timeseries/timeseries_update_delete_util.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
@@ -122,25 +123,23 @@ Status ParsedDelete::splitOutBucketMatchExpression(const ExtensionsCallback& ext
     if (auto optMetaField = timeseriesOptions.getMetaField()) {
         auto metaField = optMetaField->toString();
         std::tie(details->_bucketExpr, details->_residualExpr) = expression::splitMatchExpressionBy(
-            swMatchExpr.getValue()->clone(),
+            std::move(swMatchExpr.getValue()),
             {metaField},
             {{metaField, timeseries::kBucketMetaFieldName.toString()}},
             expression::isOnlyDependentOn);
+        details->_bucketExpr =
+            timeseries::getBucketLevelPredicateForWrites(std::move(details->_bucketExpr));
     } else if (_request->getMulti() && _request->getQuery().isEmpty()) {
         // Special optimization: if the delete query for multi delete is empty, we don't set
         // the residual filter. Otherwise, the non-null empty residual filter leads to the TS_MODIFY
         // plan which is ineffective since it would unpack every bucket. Instead, we set the bucket
         // filter to be one on "control.closed" so that we don't delete closed buckets.
-        swMatchExpr = parseDeleteQuery(fromjson(R"({"control.closed": {$not: {$eq: true}}})"_sd));
-        if (!swMatchExpr.isOK()) {
-            return swMatchExpr.getStatus();
-        }
-
-        details->_bucketExpr = std::move(swMatchExpr.getValue());
+        details->_bucketExpr = timeseries::getBucketLevelPredicateForWrites();
     } else {
         // The '_residualExpr' becomes the same as the original query predicate because nothing is
         // to be split out if there is no meta field in the timeseries collection.
         details->_residualExpr = std::move(swMatchExpr.getValue());
+        details->_bucketExpr = timeseries::getBucketLevelPredicateForWrites();
     }
 
     return Status::OK();

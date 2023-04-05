@@ -72,6 +72,14 @@ function testDeleteExplain({
         assert.eq(expectedOpType,
                   deleteStage.opType,
                   `TS_MODIFY opType is wrong: ${tojson(deleteStage)}`);
+
+        if (Object.keys(expectedBucketFilter).length) {
+            expectedBucketFilter = {
+                "$and": [expectedBucketFilter, {"control.closed": {$not: {$eq: true}}}]
+            };
+        } else {
+            expectedBucketFilter = {"control.closed": {$not: {$eq: true}}};
+        }
         assert.eq(expectedBucketFilter,
                   deleteStage.bucketFilter,
                   `TS_MODIFY bucketFilter is wrong: ${tojson(deleteStage)}`);

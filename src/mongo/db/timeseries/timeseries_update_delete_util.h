@@ -63,4 +63,11 @@ std::function<size_t(const BSONObj&)> numMeasurementsForBucketCounter(StringData
 BSONObj getBucketLevelPredicateForRouting(const BSONObj& originalQuery,
                                           const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                           boost::optional<StringData> metaField);
+
+/**
+ * Get the bucket-level predicate for a time-series delete that filters out any buckets with
+ * 'control.closed' set.
+ */
+std::unique_ptr<MatchExpression> getBucketLevelPredicateForWrites(
+    std::unique_ptr<MatchExpression> bucketExpr = nullptr);
 }  // namespace mongo::timeseries

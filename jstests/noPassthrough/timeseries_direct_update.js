@@ -18,23 +18,24 @@ assert.commandWorked(testDB.dropDatabase());
 const collName = 'test';
 
 const timeFieldName = 'time';
+const metaFieldName = 'tag';
 const times = [
     ISODate('2021-01-01T01:00:00Z'),
     ISODate('2021-01-01T01:10:00Z'),
     ISODate('2021-01-01T01:20:00Z')
 ];
 let docs = [
-    {_id: 0, [timeFieldName]: times[0]},
-    {_id: 1, [timeFieldName]: times[1]},
-    {_id: 2, [timeFieldName]: times[2]}
+    {_id: 0, [timeFieldName]: times[0], [metaFieldName]: "A", f: 0},
+    {_id: 1, [timeFieldName]: times[1], [metaFieldName]: "B", f: 1},
+    {_id: 2, [timeFieldName]: times[2], [metaFieldName]: "C", f: 2}
 ];
 
 const coll = testDB.getCollection(collName);
 const bucketsColl = testDB.getCollection('system.buckets.' + coll.getName());
 coll.drop();
 
-assert.commandWorked(
-    testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
+assert.commandWorked(testDB.createCollection(
+    coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
 assert.contains(bucketsColl.getName(), testDB.getCollectionNames());
 
 assert.commandWorked(coll.insert(docs[0]));
@@ -107,9 +108,17 @@ if (FeatureFlagUtil.isPresentAndEnabled(testDB, "TimeseriesUpdatesSupport")) {
 }
 if (FeatureFlagUtil.isPresentAndEnabled(testDB, "TimeseriesDeletesSupport")) {
     // The first two buckets containing documents 0 and 1 are closed, so we can only delete the
-    // third document from the last bucket.
-    const result = assert.commandWorked(coll.deleteMany({}));
+    // third document from the last bucket. Use a filter on 'f' so this is treated as a non-batched
+    // multi delete.
+    let result = assert.commandWorked(coll.deleteMany({f: {$in: [0, 1, 2]}}));
     assert.eq(result.deletedCount, 1);
+    // Now use a filter on only the meta field so that we will use the batched timeseries delete
+    // path.
+    result = assert.commandWorked(coll.deleteMany({[metaFieldName]: "A"}));
+    assert.eq(result.deletedCount, 0);
+    // A completely empty filter should also skip closed buckets.
+    result = assert.commandWorked(coll.deleteMany({}));
+    assert.eq(result.deletedCount, 0);
     assert.docEq(docs.slice(0, 2),
                  coll.find().sort({_id: 1}).toArray(),
                  `Expected exactly one document to be deleted. ${coll.find().toArray()}`);

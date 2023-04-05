@@ -86,9 +86,11 @@ const testBoundedSorterPlanCache = (sortDirection, indexDirection) => {
     // Check the cache is empty.
     assert.eq(db[bucketsName].getPlanCache().list().length, 0);
 
-    // Run in order to cache the plan.
-    let result = coll.aggregate(pipeline).toArray();
-    assert.eq(result.length, 20, result);
+    // Run the query twice in order to cache and activate the plan.
+    for (let i = 0; i < 2; ++i) {
+        const result = coll.aggregate(pipeline).toArray();
+        assert.eq(result.length, 20, result);
+    }
 
     // Check the answer was cached.
     assert.eq(db[bucketsName].getPlanCache().list().length, 1);
@@ -124,7 +126,7 @@ const testBoundedSorterPlanCache = (sortDirection, indexDirection) => {
 
     // Rerun command with replanning.
     const comment = jsTestName();
-    result = coll.aggregate(pipeline, {comment}).toArray();
+    let result = coll.aggregate(pipeline, {comment}).toArray();
     assert.eq(result.length, 0);
 
     // Check that the plan was replanned.
