@@ -1000,15 +1000,19 @@ public:
          * which were attempted in an update operation, but found no bucket to update. These indices
          * can be passed as the 'indices' parameter in a subsequent call to this function, in order
          * to to be retried.
+         * In rare cases due to collision from OID generation, we will also retry inserting those
+         * bucket * documents for a limited number of times.
          */
-        std::vector<size_t> _performUnorderedTimeseriesWrites(OperationContext* opCtx,
-                                                              size_t start,
-                                                              size_t numDocs,
-                                                              const std::vector<size_t>& indices,
-                                                              std::vector<BSONObj>* errors,
-                                                              boost::optional<repl::OpTime>* opTime,
-                                                              boost::optional<OID>* electionId,
-                                                              bool* containsRetry) const {
+        std::vector<size_t> _performUnorderedTimeseriesWrites(
+            OperationContext* opCtx,
+            size_t start,
+            size_t numDocs,
+            const std::vector<size_t>& indices,
+            std::vector<BSONObj>* errors,
+            boost::optional<repl::OpTime>* opTime,
+            boost::optional<OID>* electionId,
+            bool* containsRetry,
+            absl::flat_hash_map<int, int>& retryAttemptsForDup) const {
             auto [batches, bucketStmtIds, _] =
                 _insertIntoBucketCatalog(opCtx, start, numDocs, indices, errors, containsRetry);
             bool canContinue = true;
@@ -1024,16 +1028,25 @@ public:
                     auto stmtIds = isTimeseriesWriteRetryable(opCtx)
                         ? std::move(bucketStmtIds[batch->bucketId()])
                         : std::vector<StmtId>{};
-
-                    canContinue = _commitTimeseriesBucket(opCtx,
-                                                          batch,
-                                                          start,
-                                                          index,
-                                                          std::move(stmtIds),
-                                                          errors,
-                                                          opTime,
-                                                          electionId,
-                                                          &docsToRetry);
+                    try {
+                        canContinue = _commitTimeseriesBucket(opCtx,
+                                                              batch,
+                                                              start,
+                                                              index,
+                                                              std::move(stmtIds),
+                                                              errors,
+                                                              opTime,
+                                                              electionId,
+                                                              &docsToRetry);
+                    } catch (const ExceptionFor<ErrorCodes::DuplicateKey>&) {
+                        // Automatically attempts to retry on DuplicateKey error.
+                        if (retryAttemptsForDup[index]++ <
+                            gTimeseriesInsertMaxRetriesOnDuplicates.load()) {
+                            docsToRetry.push_back(index);
+                        } else {
+                            throw;
+                        }
+                    }
                     batch.reset();
                     if (!canContinue) {
                         break;
@@ -1057,9 +1070,17 @@ public:
                                                           boost::optional<OID>* electionId,
                                                           bool* containsRetry) const {
             std::vector<size_t> docsToRetry;
+            absl::flat_hash_map<int, int> retryAttemptsForDup;
             do {
-                docsToRetry = _performUnorderedTimeseriesWrites(
-                    opCtx, start, numDocs, docsToRetry, errors, opTime, electionId, containsRetry);
+                docsToRetry = _performUnorderedTimeseriesWrites(opCtx,
+                                                                start,
+                                                                numDocs,
+                                                                docsToRetry,
+                                                                errors,
+                                                                opTime,
+                                                                electionId,
+                                                                containsRetry,
+                                                                retryAttemptsForDup);
             } while (!docsToRetry.empty());
         }
 

@@ -60,6 +60,15 @@ server_parameters:
         cpp_vartype: bool
         cpp_varname: gTimeseriesBucketsCollectionClusterById
         default: true
+    "timeseriesInsertMaxRetriesOnDuplicates":
+        description: "In rare cases due to collision from OID generation, we will retry inserting
+                      those bucket documents automatically for a limited number of times. This value
+                      represents the number of retries we would perform."
+        set_at: [ startup, runtime ]
+        cpp_vartype: "AtomicWord<int>"
+        cpp_varname: "gTimeseriesInsertMaxRetriesOnDuplicates"
+        default: 32
+        validator: {gte: 1}
 
 enums:
     BucketGranularity:

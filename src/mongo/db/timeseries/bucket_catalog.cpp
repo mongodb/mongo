@@ -676,15 +676,28 @@ BucketCatalog::Bucket* BucketCatalog::_allocateBucket(const BucketKey& key,
                                                       bool openedDuetoMetadata) {
     _expireIdleBuckets(stats);
 
-    auto [bucketId, roundedTime] = generateBucketId(time, options);
+    // In rare cases duplicate bucket _id fields can be generated and fail to be inserted. We will
+    // perform a limited number of retries to minimize the probability of collision.
+    auto maxRetries = gTimeseriesInsertMaxRetriesOnDuplicates.load();
+    OID bucketId;
+    Date_t roundedTime;
+    stdx::unordered_map<OID, std::unique_ptr<Bucket>, OID::Hasher>::iterator it;
+    bool inserted = false;
+    for (int retryAttempts = 0; !inserted && retryAttempts < maxRetries; ++retryAttempts) {
+        std::tie(bucketId, roundedTime) = generateBucketId(time, options);
+        std::tie(it, inserted) =
+            _allBuckets.try_emplace(bucketId, std::make_unique<Bucket>(bucketId));
+    }
+    uassert(6130900,
+            "Unable to insert documents due to internal OID generation collision. Increase the "
+            "value of server parameter 'timeseriesInsertMaxRetriesOnDuplicates' and try again",
+            inserted);
 
-    auto [it, inserted] = _allBuckets.try_emplace(bucketId, std::make_unique<Bucket>(bucketId));
-    tassert(6130900, "Expected bucket to be inserted", inserted);
     Bucket* bucket = it->second.get();
     _openBuckets[key] = bucket;
     {
         stdx::lock_guard statesLk{_statesMutex};
-        _bucketStates.emplace(bucketId, BucketState::kNormal);
+        _bucketStates.emplace(it->first, BucketState::kNormal);
     }
 
     if (openedDuetoMetadata) {
