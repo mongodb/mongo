@@ -135,7 +135,7 @@
 #define UNLIKELY(x) (x)
 #endif
 
-#define WT_ERR_MSG_BUF_LEN 100
+#define WT_ERR_MSG_BUF_LEN 1024
 
 /*
  * BUILD_ASSERTION_STRING --
@@ -147,7 +147,9 @@
         _offset = 0;                                                                               \
         WT_IGNORE_RET(                                                                             \
           __wt_snprintf_len_set(buf, len, &_offset, "WiredTiger assertion failed: '%s'. ", #exp)); \
-        WT_IGNORE_RET(__wt_snprintf(buf + _offset, len - _offset, __VA_ARGS__));                   \
+        /* If we would overflow, finish with what we have. */                                      \
+        if (_offset < len)                                                                         \
+            WT_IGNORE_RET(__wt_snprintf(buf + _offset, len - _offset, __VA_ARGS__));               \
     } while (0)
 
 /*
