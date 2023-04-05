@@ -141,6 +141,7 @@
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/config_server_op_observer.h"
 #include "mongo/db/s/migration_util.h"
+#include "mongo/db/s/move_primary/move_primary_donor_service.h"
 #include "mongo/db/s/move_primary/move_primary_recipient_service.h"
 #include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/db/s/periodic_sharded_index_consistency_checker.h"
@@ -381,6 +382,7 @@ void registerPrimaryOnlyServices(ServiceContext* serviceContext) {
         services.push_back(std::make_unique<ReshardingRecipientService>(serviceContext));
         services.push_back(std::make_unique<TenantMigrationDonorService>(serviceContext));
         services.push_back(std::make_unique<repl::TenantMigrationRecipientService>(serviceContext));
+        services.push_back(std::make_unique<MovePrimaryDonorService>(serviceContext));
         services.push_back(std::make_unique<MovePrimaryRecipientService>(serviceContext));
         if (getGlobalReplSettings().isServerless()) {
             services.push_back(std::make_unique<repl::ShardMergeRecipientService>(serviceContext));

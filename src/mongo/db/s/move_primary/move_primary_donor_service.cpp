@@ -288,12 +288,13 @@ void MovePrimaryDonorExternalState::forgetMigrationOnRecipient(OperationContext*
 
 void MovePrimaryDonorExternalState::_runCommandOnRecipient(OperationContext* opCtx,
                                                            const BSONObj& command) {
-    uassertStatusOK(runCommand(opCtx,
+    auto response = runCommand(opCtx,
                                getRecipientShardId(),
                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                DatabaseName::kAdmin.toString(),
                                command,
-                               Shard::RetryPolicy::kNoRetry));
+                               Shard::RetryPolicy::kNoRetry);
+    uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(response));
 }
 
 MovePrimaryDonorExternalStateImpl::MovePrimaryDonorExternalStateImpl(
@@ -581,6 +582,10 @@ void MovePrimaryDonor::onBeganBlockingWrites(StatusWith<Timestamp> blockingWrite
 }
 
 void MovePrimaryDonor::onReadyToForget() {
+    stdx::unique_lock lock(_mutex);
+    if (_readyToForgetPromise.getFuture().isReady()) {
+        return;
+    }
     _readyToForgetPromise.setFrom(Status::OK());
 }
 
