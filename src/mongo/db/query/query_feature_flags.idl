@@ -115,3 +115,8 @@ feature_flags:
       cpp_varname: gFeatureFlagApproxPercentiles
       default: true
       version: 7.0
+
+    featureFlagSearchBatchSizeLimit:
+      description: "Feature flag to enable the search batchsize and limit optimization."
+      cpp_varname: gFeatureFlagSearchBatchSizeLimit
+      default: false
