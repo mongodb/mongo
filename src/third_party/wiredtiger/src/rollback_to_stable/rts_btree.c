@@ -108,18 +108,6 @@ __rts_btree_abort_update(WT_SESSION_IMPL *session, WT_ITEM *key, WT_UPDATE *firs
                 if (tombstone != NULL)
                     F_CLR(tombstone, WT_UPDATE_HS | WT_UPDATE_TO_DELETE_FROM_HS);
             }
-        } else if (WT_IS_HS(session->dhandle) && stable_upd->type != WT_UPDATE_TOMBSTONE) {
-            /*
-             * History store will have a combination of both tombstone and update/modify types in
-             * the update list to represent time window of an update. When we are aborting the
-             * tombstone, make sure to remove all of the remaining updates also. In most of the
-             * scenarios, there will be only one update present except when the data store is a
-             * prepared commit where it is possible to have more than one update. The existing
-             * on-disk versions are removed while processing the on-disk entries.
-             */
-            for (; stable_upd != NULL; stable_upd = stable_upd->next)
-                if (!dryrun)
-                    stable_upd->txnid = WT_TXN_ABORTED;
         }
         if (stable_update_found != NULL)
             *stable_update_found = true;
@@ -162,6 +150,22 @@ __rts_btree_abort_insert_list(WT_SESSION_IMPL *session, WT_PAGE *page, WT_INSERT
               session, key, ins->upd, rollback_timestamp, &stable_update_found));
             if (stable_update_found && stable_updates_count != NULL)
                 (*stable_updates_count)++;
+            if (!stable_update_found && page->type == WT_PAGE_ROW_LEAF &&
+              !F_ISSET(S2C(session), WT_CONN_IN_MEMORY))
+                /*
+                 * When a new key is added to a page and the page is then checkpointed, updates for
+                 * that key can be present in the History Store while the key isn't present in the
+                 * disk image. RTS will then only remove these updates when there is a stable update
+                 * on-chain. These updates still need removing when no stable updates are on-chain,
+                 * so do so here explicitly. Pass in rollback_timestamp + 1 as history store cleanup
+                 * removes updates inclusive of the provided timestamp, but we only want to remove
+                 * unstable updates.
+                 *
+                 * FIXME-WT-10017: WT-9846 is an interim fix only for row-store while we investigate
+                 * the impacts of a long term correction in WT-10017. Once completed this change can
+                 * be reverted.
+                 */
+                WT_ERR(__wt_rts_history_delete_hs(session, key, rollback_timestamp + 1));
         }
 
 err:

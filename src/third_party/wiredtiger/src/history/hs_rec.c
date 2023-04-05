@@ -918,9 +918,12 @@ __hs_delete_reinsert_from_pos(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, ui
     /*
      * If we find a key with a timestamp larger than or equal to the specified timestamp then the
      * specified timestamp must be mixed mode.
+     *
+     * FIXME-WT-10017: Change this back to WT_ASSERT_ALWAYS once WT-10017 is resolved. WT-10017 will
+     * resolve a known issue where this assert fires for column store configurations.
      */
-    WT_ASSERT_ALWAYS(
-      session, ts == 1 || ts == WT_TS_NONE, "out-of-order timestamp update detected");
+    WT_ASSERT(session, ts == 1 || ts == WT_TS_NONE);
+
     /*
      * Fail the eviction if we detect any timestamp ordering issue and the error flag is set. We
      * cannot modify the history store to fix the update's timestamps as it may make the history

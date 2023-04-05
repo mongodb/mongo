@@ -60,12 +60,8 @@ class test_rollback_to_stable04(test_rollback_to_stable_base):
         ('dryrun', dict(dryrun=True))
     ]
 
-    evict = [
-        ('no_evict', dict(evict=False)),
-        ('evict', dict(evict=True))
-    ]
+    scenarios = make_scenarios(format_values, in_memory_values, prepare_values, dryrun_values)
 
-    scenarios = make_scenarios(format_values, in_memory_values, prepare_values, dryrun_values, evict)
     def conn_config(self):
         config = 'cache_size=500MB,statistics=(all),verbose=(rts:5)'
         if self.in_memory:
@@ -121,11 +117,6 @@ class test_rollback_to_stable04(test_rollback_to_stable_base):
         self.large_modifies(uri, 'Q', ds, 0, 1, nrows, self.prepare, 30)
         self.large_modifies(uri, 'R', ds, 1, 1, nrows, self.prepare, 40)
         self.large_modifies(uri, 'S', ds, 2, 1, nrows, self.prepare, 50)
-
-        # Evict the pages to disk
-        if self.evict:
-            self.evict_cursor(uri, nrows, value_modS)
-
         self.large_updates(uri, value_b, ds, nrows, self.prepare, 60)
         self.large_updates(uri, value_c, ds, nrows, self.prepare, 70)
         self.large_modifies(uri, 'T', ds, 3, 1, nrows, self.prepare, 80)
