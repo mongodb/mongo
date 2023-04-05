@@ -150,9 +150,6 @@ Status performAtomicWrites(OperationContext* opCtx,
                                                write_ops::DeleteCommandRequest>& modificationOp,
                            bool fromMigrate,
                            StmtId stmtId) try {
-    invariant(!opCtx->lockState()->inAWriteUnitOfWork());
-    invariant(!opCtx->inMultiDocumentTransaction());
-
     NamespaceString ns = coll->ns();
 
     DisableDocumentValidation disableDocumentValidation{opCtx};

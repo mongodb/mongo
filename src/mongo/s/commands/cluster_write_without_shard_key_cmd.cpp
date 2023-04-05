@@ -58,7 +58,11 @@ BSONObj _createCmdObj(OperationContext* opCtx,
             "_clusterWriteWithoutShardKey can only be run against sharded collections.",
             cri.cm.isSharded());
     const auto shardVersion = cri.getShardVersion(shardId);
-    BSONObjBuilder queryBuilder(targetDocId);
+    // For time-series collections, the 'targetDocId' corresponds to a measurement document's '_id'
+    // field which is not guaranteed to exist and does not uniquely identify a measurement so we
+    // cannot use this ID to reliably target a document in this write phase. Instead, we will
+    // forward the full query to the chosen shard and it will be executed again on the target shard.
+    BSONObjBuilder queryBuilder(nss.isTimeseriesBucketsCollection() ? BSONObj() : targetDocId);
 
     // Parse into OpMsgRequest to append the $db field, which is required for command
     // parsing.

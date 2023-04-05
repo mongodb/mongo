@@ -35,6 +35,7 @@
 #include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/update/update_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/cluster_commands_helpers.h"
@@ -99,9 +100,11 @@ std::set<ShardId> getShardsToTarget(OperationContext* opCtx,
     return allShardsContainingChunksForNs;
 }
 
-BSONObj createAggregateCmdObj(OperationContext* opCtx,
-                              const ParsedCommandInfo& parsedInfo,
-                              NamespaceString nss) {
+BSONObj createAggregateCmdObj(
+    OperationContext* opCtx,
+    const ParsedCommandInfo& parsedInfo,
+    NamespaceString nss,
+    const boost::optional<TypeCollectionTimeseriesFields>& timeseriesFields) {
     AggregateCommandRequest aggregate(nss);
 
     aggregate.setCollation(parsedInfo.collation);
@@ -117,8 +120,18 @@ BSONObj createAggregateCmdObj(OperationContext* opCtx,
     }
 
     aggregate.setPipeline([&]() {
-        std::vector<BSONObj> pipeline = {BSON(DocumentSourceMatch::kStageName << parsedInfo.query)};
+        std::vector<BSONObj> pipeline;
+        if (timeseriesFields) {
+            // We cannot aggregate on the buckets namespace with a query on the timeseries view, so
+            // we must generate a bucket unpack stage to correctly aggregate on the time-series
+            // collection.
+            pipeline.emplace_back(
+                timeseries::generateViewPipeline(timeseriesFields->getTimeseriesOptions(), false));
+        }
+        pipeline.emplace_back(BSON(DocumentSourceMatch::kStageName << parsedInfo.query));
         if (parsedInfo.sort) {
+            // TODO (SERVER-73083): skip the sort option for 'findAndModify' calls on time-series
+            // collections.
             pipeline.emplace_back(BSON(DocumentSourceSort::kStageName << *parsedInfo.sort));
         }
         pipeline.emplace_back(BSON(DocumentSourceLimit::kStageName << 1));
@@ -224,7 +237,13 @@ public:
 
             auto allShardsContainingChunksForNs =
                 getShardsToTarget(opCtx, cri.cm, nss, parsedInfoFromRequest);
-            auto cmdObj = createAggregateCmdObj(opCtx, parsedInfoFromRequest, nss);
+
+            const auto& timeseriesFields =
+                (cri.cm.isSharded() && cri.cm.getTimeseriesFields().has_value())
+                ? cri.cm.getTimeseriesFields()
+                : boost::none;
+            auto cmdObj =
+                createAggregateCmdObj(opCtx, parsedInfoFromRequest, nss, timeseriesFields);
 
             std::vector<AsyncRequestsSender::Request> requests;
             for (const auto& shardId : allShardsContainingChunksForNs) {

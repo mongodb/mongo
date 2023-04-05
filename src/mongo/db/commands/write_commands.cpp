@@ -674,11 +674,6 @@ public:
             }
 
             if (isTimeseries(opCtx, request())) {
-                uassert(ErrorCodes::OperationNotSupportedInTransaction,
-                        str::stream() << "Cannot perform a multi-document transaction on a "
-                                         "time-series collection: "
-                                      << ns(),
-                        !opCtx->inMultiDocumentTransaction());
                 source = OperationSource::kTimeseriesDelete;
             }
 

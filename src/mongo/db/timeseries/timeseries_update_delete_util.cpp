@@ -208,14 +208,11 @@ BSONObj getBucketLevelPredicateForRouting(const BSONObj& originalQuery,
                                           const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                           boost::optional<StringData> metaField) {
     if (!metaField) {
-        // In case the time-series collection does not have meta field defined, we target the
-        // request to all shards using empty predicate. Since we allow only delete requests with
-        // 'limit:0', we will not delete any extra documents.
+        // In case the time-series collection does not have meta field defined, we broadcast the
+        // request to all shards or use two phase protocol using empty predicate.
         //
-        // TODO SERVER-73087 / SERVER-75160: Move this block into the if
-        // gTimeseriesDeletesSupport is not enabled block as soon as we implement either one
-        // of SERVER-73087 and SERVER-75160. As of now, this block is common, irrespective of the
-        // feature flag value.
+        // TODO SERVER-75160: Move this block into the if gTimeseriesDeletesSupport is not enabled
+        // block as soon as we implement SERVER-75160.
         return BSONObj();
     }
 

@@ -1630,6 +1630,14 @@ WriteResult performDeletes(OperationContext* opCtx,
         wholeOp.getLegacyRuntimeConstants().value_or(Variables::generateRuntimeConstants(opCtx));
 
     for (auto&& singleOp : wholeOp.getDeletes()) {
+        if (source == OperationSource::kTimeseriesDelete) {
+            uassert(ErrorCodes::OperationNotSupportedInTransaction,
+                    str::stream() << "Cannot perform a multi delete inside of a multi-document "
+                                     "transaction on a time-series collection: "
+                                  << ns,
+                    !opCtx->inMultiDocumentTransaction() || !singleOp.getMulti());
+        }
+
         const auto currentOpIndex = nextOpIndex++;
         const auto stmtId = getStmtIdForWriteOp(opCtx, wholeOp, currentOpIndex);
         if (opCtx->isRetryableWrite() &&

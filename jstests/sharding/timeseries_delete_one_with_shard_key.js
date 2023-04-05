@@ -27,9 +27,7 @@ const bucketCollFullName = `${dbName}.${bucketCollName}`;
 const mongos = st.s;
 const testDB = mongos.getDB(dbName);
 const primary = st.shard0;
-const primaryDB = primary.getDB(dbName);
 const otherShard = st.shard1;
-const otherShardDB = otherShard.getDB(dbName);
 
 testDB.dropDatabase();
 assert.commandWorked(mongos.adminCommand({enableSharding: dbName}));
