@@ -86,6 +86,22 @@ bool ServerParameter::isEnabled() const {
 
 bool ServerParameter::isEnabledOnVersion(
     const multiversion::FeatureCompatibilityVersion& targetFCV) const {
+    if (_disableState != DisableState::Enabled) {
+        return false;
+    }
+    return _isEnabledOnVersion(targetFCV);
+}
+
+bool ServerParameter::canBeEnabledOnVersion(
+    const multiversion::FeatureCompatibilityVersion& targetFCV) const {
+    if (_disableState == DisableState::PermanentlyDisabled) {
+        return false;
+    }
+    return _isEnabledOnVersion(targetFCV);
+}
+
+bool ServerParameter::_isEnabledOnVersion(
+    const multiversion::FeatureCompatibilityVersion& targetFCV) const {
     return minFCVIsLessThanOrEqualToVersion(targetFCV) &&
         !featureFlagIsDisabledOnVersion(targetFCV);
 }
@@ -198,51 +214,11 @@ Status IDLServerParameterDeprecatedAlias::setFromString(StringData str,
     return _sp->setFromString(str, tenantId);
 }
 
-namespace {
-class DisabledTestParameter : public ServerParameter {
-public:
-    explicit DisabledTestParameter(ServerParameter* sp)
-        : ServerParameter(sp->name(), sp->getServerParameterType()), _sp(sp) {}
-
-    void append(OperationContext* opCtx,
-                BSONObjBuilder* b,
-                StringData name,
-                const boost::optional<TenantId>&) final {}
-
-    Status validate(const BSONElement& newValueElement,
-                    const boost::optional<TenantId>& tenantId) const final {
-        return {ErrorCodes::BadValue,
-                str::stream() << "Server parameter: '" << name() << "' is currently disabled"};
-    }
-
-    Status setFromString(StringData, const boost::optional<TenantId>&) final {
-        return {ErrorCodes::BadValue,
-                str::stream() << "Server parameter: '" << name() << "' is currently disabled"};
-    }
-
-    Status set(const BSONElement& newValueElement, const boost::optional<TenantId>&) final {
-        return setFromString("", boost::none);
-    }
-
-    Status reset(const boost::optional<TenantId>&) final {
-        return setFromString("", boost::none);
-    }
-
-    bool isEnabledOnVersion(const multiversion::FeatureCompatibilityVersion&) const override {
-        return false;
-    }
-
-private:
-    // Retain the original pointer to avoid ASAN complaining.
-    ServerParameter* _sp;
-};
-}  // namespace
-
 void ServerParameterSet::disableTestParameters() {
     for (auto& spit : _map) {
         auto*& sp = spit.second;
         if (sp->isTestOnly()) {
-            sp = new DisabledTestParameter(sp);
+            sp->disable(true /* permanent */);
         }
     }
 }

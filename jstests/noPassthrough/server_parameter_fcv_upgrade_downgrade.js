@@ -111,23 +111,18 @@ function runDowngradeUpgradeTestForCWSP(conn, isMongod, isStandalone, verifyStat
             verifyStateCallback(sp, true);
         }
 
-        // Downgrade FCV and ensure we can't set, and get either fails (if FCV is known by the
-        // server) or gets the default value (if it is not).
+        // Downgrade FCV and ensure we can't set or get.
         // If our downgrade takes us below the minimum FCV for
         // featureFlagAuditConfigClusterParameter, we expect all cluster parameter commands to fail
         // for standalone.
         assert.commandWorked(admin.runCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
-        if (isMongod) {
-            assertGetFailed(admin.runCommand({getClusterParameter: sp}));
-        } else {
-            const afterDowngrade =
-                assert.commandWorked(admin.runCommand({getClusterParameter: sp}));
-            assert.eq(val(afterDowngrade), initval);
-        }
+
+        assertGetFailed(admin.runCommand({getClusterParameter: sp}));
         assertSetFailed(admin.runCommand({setClusterParameter: {[sp]: {intData: updateVal + 1}}}));
+
         if (!(isStandalone && !FeatureFlagUtil.isEnabled(admin, 'AuditConfigClusterParameter'))) {
             assertParamExistenceInGetParamStar(
-                assert.commandWorked(admin.runCommand({getClusterParameter: "*"})), sp, !isMongod);
+                assert.commandWorked(admin.runCommand({getClusterParameter: "*"})), sp, false);
         }
         if (verifyStateCallback !== undefined) {
             verifyStateCallback(sp, false);

@@ -88,6 +88,8 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/audit',
         '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/db/transaction/transaction_api',
+        '$BUILD_DIR/mongo/executor/inline_executor',
         '$BUILD_DIR/mongo/s/grid',
         'cluster_server_parameter',
         'cluster_server_parameter_common',

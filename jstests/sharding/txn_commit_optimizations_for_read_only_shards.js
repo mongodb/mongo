@@ -6,7 +6,8 @@
  * no failures, a participant having failed over, a participant being unable to satisfy the client's
  * writeConcern, and an invalid client writeConcern.
  *
- * @tags: [uses_transactions, uses_multi_shard_transaction, temporary_catalog_shard_incompatible]
+ * @tags: [requires_fcv_70, uses_transactions, uses_multi_shard_transaction,
+ * temporary_catalog_shard_incompatible]
  */
 
 (function() {
@@ -65,7 +66,10 @@ let st = new ShardingTest({
     // Create shards with more than one node because we test for writeConcern majority failing.
     config: 1,
     other: {
-        mongosOptions: {verbose: 3},
+        mongosOptions: {
+            verbose: 3,
+            setParameter: {'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"}
+        },
         rs0: {nodes: [{}, {rsConfig: {priority: 0}}]},
         rs1: {nodes: [{}, {rsConfig: {priority: 0}}]},
         rs2: {nodes: [{}, {rsConfig: {priority: 0}}]},

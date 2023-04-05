@@ -1,5 +1,5 @@
 // Auth tests for the $listLocalSessions {allUsers:true} aggregation stage.
-// @tags: [requires_sharding]
+// @tags: [requires_fcv_70, requires_sharding]
 
 (function() {
 'use strict';
@@ -49,8 +49,16 @@ const mongod = MongoRunner.runMongod({auth: ""});
 runListAllLocalSessionsTest(mongod);
 MongoRunner.stopMongod(mongod);
 
-const st =
-    new ShardingTest({shards: 1, mongos: 1, config: 1, other: {keyFile: 'jstests/libs/key1'}});
+const st = new ShardingTest({
+    shards: 1,
+    mongos: 1,
+    config: 1,
+    other: {
+        keyFile: 'jstests/libs/key1',
+        mongosOptions:
+            {setParameter: {'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"}}
+    }
+});
 runListAllLocalSessionsTest(st.s0);
 st.stop();
 })();

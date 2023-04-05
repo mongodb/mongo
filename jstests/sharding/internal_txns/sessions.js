@@ -1,7 +1,7 @@
 /*
  * Tests basic support for internal sessions.
  *
- * @tags: [requires_fcv_60, uses_transactions, temporary_catalog_shard_incompatible]
+ * @tags: [requires_fcv_70, uses_transactions, temporary_catalog_shard_incompatible]
  */
 (function() {
 'use strict';
@@ -10,7 +10,10 @@ TestData.disableImplicitSessions = true;
 
 const st = new ShardingTest({
     shards: 1,
-    mongosOptions: {setParameter: {maxSessions: 1}},
+    mongosOptions: {
+        setParameter:
+            {maxSessions: 1, 'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"}
+    },
     shardOptions: {setParameter: {maxSessions: 1}}
 });
 const shard0Primary = st.rs0.getPrimary();
