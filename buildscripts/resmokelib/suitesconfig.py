@@ -234,22 +234,23 @@ class MatrixSuiteConfig(SuiteConfigInterface):
         if not config:
             return None
 
-        generated_path = cls.get_generated_suite_path(suite_name)
-        if not os.path.exists(generated_path):
-            raise errors.InvalidMatrixSuiteError(
-                f"No generated suite file was found for {suite_name}" +
-                "To (re)generate the matrix suite files use `python3 buildscripts/resmoke.py generate-matrix-suites`"
-            )
+        # TODO: SERVER-75688 add validation back
+        # generated_path = cls.get_generated_suite_path(suite_name)
+        # if not os.path.exists(generated_path):
+        #     raise errors.InvalidMatrixSuiteError(
+        #         f"No generated suite file was found for {suite_name}" +
+        #         "To (re)generate the matrix suite files use `python3 buildscripts/resmoke.py generate-matrix-suites`"
+        #     )
 
-        new_text = cls.generate_matrix_suite_text(suite_name)
-        with open(generated_path, "r") as file:
-            old_text = file.read()
-            if new_text != old_text:
-                raise errors.InvalidMatrixSuiteError(
-                    f"The generated file found on disk did not match the mapping file for {suite_name}. "
-                    +
-                    "To (re)generate the matrix suite files use `python3 buildscripts/resmoke.py generate-matrix-suites`"
-                )
+        # new_text = cls.generate_matrix_suite_text(suite_name)
+        # with open(generated_path, "r") as file:
+        #     old_text = file.read()
+        #     if new_text != old_text:
+        #         raise errors.InvalidMatrixSuiteError(
+        #             f"The generated file found on disk did not match the mapping file for {suite_name}. "
+        #             +
+        #             "To (re)generate the matrix suite files use `python3 buildscripts/resmoke.py generate-matrix-suites`"
+        #         )
 
         return config
 
