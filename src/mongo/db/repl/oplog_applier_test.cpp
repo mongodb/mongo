@@ -126,18 +126,6 @@ TEST_F(OplogApplierTest, GetNextApplierBatchGroupsCrudOps) {
     ASSERT_EQUALS(srcOps[1], batch[1]);
 }
 
-TEST_F(OplogApplierTest, GetNextApplierBatchReturnsPreparedApplyOpsOpInOwnBatch) {
-    std::vector<OplogEntry> srcOps;
-    srcOps.push_back(makeApplyOpsOplogEntry(1, true));
-    srcOps.push_back(
-        makeInsertOplogEntry(2, NamespaceString::createNamespaceString_forTest(dbName, "bar")));
-    _applier->enqueue(opCtx(), srcOps.cbegin(), srcOps.cend());
-
-    auto batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits));
-    ASSERT_EQUALS(1U, batch.size()) << toString(batch);
-    ASSERT_EQUALS(srcOps[0], batch[0]);
-}
-
 TEST_F(OplogApplierTest, GetNextApplierBatchGroupsUnpreparedApplyOpsOpWithOtherOps) {
     std::vector<OplogEntry> srcOps;
     srcOps.push_back(makeApplyOpsOplogEntry(1, false));
@@ -187,18 +175,6 @@ TEST_F(OplogApplierTest, GetNextApplierBatchReturnsConfigReshardingDonorOpInOwnB
     ASSERT_EQUALS(srcOps[0], batch[0]);
 }
 
-TEST_F(OplogApplierTest, GetNextApplierBatchReturnsPreparedCommitTransactionOpInOwnBatch) {
-    std::vector<OplogEntry> srcOps;
-    srcOps.push_back(makeCommitTransactionOplogEntry(1, dbName, true));
-    srcOps.push_back(
-        makeInsertOplogEntry(2, NamespaceString::createNamespaceString_forTest(dbName, "bar")));
-    _applier->enqueue(opCtx(), srcOps.cbegin(), srcOps.cend());
-
-    auto batch = unittest::assertGet(_applier->getNextApplierBatch(opCtx(), _limits));
-    ASSERT_EQUALS(1U, batch.size()) << toString(batch);
-    ASSERT_EQUALS(srcOps[0], batch[0]);
-}
-
 TEST_F(OplogApplierTest, GetNextApplierBatchGroupsUnpreparedCommitTransactionOpWithOtherOps) {
     std::vector<OplogEntry> srcOps;
     srcOps.push_back(makeCommitTransactionOplogEntry(1, dbName, false, 3));
@@ -213,8 +189,6 @@ TEST_F(OplogApplierTest, GetNextApplierBatchGroupsUnpreparedCommitTransactionOpW
 }
 
 TEST_F(OplogApplierTest, GetNextApplierBatchGroupsPreparedApplyOpsOrPreparedCommits) {
-    RAIIServerParameterControllerForTest controller("featureFlagApplyPreparedTxnsInParallel", true);
-
     std::vector<OplogEntry> srcOps;
     srcOps.push_back(makeApplyOpsOplogEntry(1, true /* prepare */));
     srcOps.push_back(makeApplyOpsOplogEntry(2, true /* prepare */));
@@ -248,8 +222,6 @@ TEST_F(OplogApplierTest, GetNextApplierBatchGroupsPreparedApplyOpsOrPreparedComm
 }
 
 TEST_F(OplogApplierTest, GetNextApplierBatchGroupsCrudOpsWithPreparedApplyOpsOrPreparedCommits) {
-    RAIIServerParameterControllerForTest controller("featureFlagApplyPreparedTxnsInParallel", true);
-
     std::vector<OplogEntry> srcOps;
     auto nss = NamespaceString::createNamespaceString_forTest(dbName, "bar");
     srcOps.push_back(makeInsertOplogEntry(1, nss));

@@ -2555,8 +2555,6 @@ private:
 };
 
 TEST_F(MultiPreparedTransactionsInOneBatchTest, CommitAndAbortMultiPreparedTransactionsInOneBatch) {
-    RAIIServerParameterControllerForTest controller("featureFlagApplyPreparedTxnsInParallel", true);
-
     NoopOplogApplierObserver observer;
     OplogApplierImpl oplogApplier(
         nullptr,  // executor
@@ -5136,8 +5134,6 @@ protected:
 };
 
 TEST_F(PreparedTxnSplitTest, MultiplePrepareTxnsInSameBatch) {
-    RAIIServerParameterControllerForTest controller("featureFlagApplyPreparedTxnsInParallel", true);
-
     // Scale the test by the number of writer threads, so it does not start failing if maxThreads
     // changes.
     const int kNumEntries = _writerPool->getStats().options.maxThreads * 1000;
@@ -5241,8 +5237,6 @@ TEST_F(PreparedTxnSplitTest, MultiplePrepareTxnsInSameBatch) {
 }
 
 TEST_F(PreparedTxnSplitTest, SingleEmptyPrepareTransaction) {
-    RAIIServerParameterControllerForTest controller("featureFlagApplyPreparedTxnsInParallel", true);
-
     std::vector<OplogEntry> prepareOps;
     prepareOps.push_back(makePrepareOplogEntry({}, {Timestamp(1, 1), 1}, _lsid1, _txnNum1));
 
