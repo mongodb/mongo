@@ -131,7 +131,7 @@ var shardConfig = shard.getDB("config");
     validateSessionsCollection(shard, true, true);
 
     const sessionsOpenedByAddShardCmd = 1;
-    const sessionsOpenedByShardCollectionCmd = 3;
+    const sessionsOpenedByShardCollectionCmd = 2;
     const sessionsOpenedByDDLOps = sessionsOpenedByAddShardCmd + sessionsOpenedByShardCollectionCmd;
 
     // We will have sessionsOpenedByDDLOps sessions because of the sessions used in the

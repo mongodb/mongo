@@ -291,11 +291,16 @@ void DropCollectionCoordinator::_commitDropCollection(
 
     LOGV2_DEBUG(5390504, 2, "Dropping collection", logAttrs(nss()), "sharded"_attr = collIsSharded);
 
+    _updateSession(opCtx);
     if (collIsSharded) {
         invariant(_doc.getCollInfo());
         const auto& coll = _doc.getCollInfo().value();
         sharding_ddl_util::removeCollAndChunksMetadataFromConfig(
-            opCtx, coll, ShardingCatalogClient::kMajorityWriteConcern);
+            opCtx,
+            coll,
+            ShardingCatalogClient::kMajorityWriteConcern,
+            getCurrentSession(),
+            **executor);
     }
 
     // Remove tags even if the collection is not sharded or didn't exist

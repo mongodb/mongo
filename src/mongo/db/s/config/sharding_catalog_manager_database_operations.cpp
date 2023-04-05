@@ -373,7 +373,7 @@ void ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
             return updateOp;
         }();
 
-        return txnClient.runCRUDOp(updateDatabaseEntryOp, {})
+        return txnClient.runCRUDOp(updateDatabaseEntryOp, {0})
             .thenRunOn(txnExec)
             .then([&txnClient, &txnExec, &dbName, toShardId](
                       const BatchedCommandResponse& updateCatalogDatabaseEntryResponse) {
@@ -398,7 +398,7 @@ void ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
                     NamespaceString::kConfigsvrPlacementHistoryNamespace);
                 insertPlacementHistoryOp.setDocuments({placementInfo.toBSON()});
 
-                return txnClient.runCRUDOp(insertPlacementHistoryOp, {});
+                return txnClient.runCRUDOp(insertPlacementHistoryOp, {1});
             })
             .thenRunOn(txnExec)
             .then([](const BatchedCommandResponse& insertPlacementHistoryResponse) {

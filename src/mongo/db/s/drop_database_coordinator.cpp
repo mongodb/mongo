@@ -65,7 +65,8 @@ void removeDatabaseFromConfigAndUpdatePlacementHistory(
     OperationContext* opCtx,
     const std::shared_ptr<executor::TaskExecutor>& executor,
     StringData& dbName,
-    const DatabaseVersion& dbVersion) {
+    const DatabaseVersion& dbVersion,
+    const OperationSessionInfo& osi) {
 
     // Run the remove database command on the config server and placemetHistory update in a
     // multistatement transaction
@@ -74,25 +75,6 @@ void removeDatabaseFromConfigAndUpdatePlacementHistory(
     // restore the original write concern on exit).
     IgnoreAPIParametersBlock ignoreApiParametersBlock(opCtx);
 
-    WriteConcernOptions originalWC = opCtx->getWriteConcern();
-    opCtx->setWriteConcern(WriteConcernOptions{WriteConcernOptions::kMajority,
-                                               WriteConcernOptions::SyncMode::UNSET,
-                                               WriteConcernOptions::kNoTimeout});
-
-    ScopeGuard guard([&, dbName = dbName.toString()] {
-        opCtx->setWriteConcern(originalWC);
-        Grid::get(opCtx)->catalogCache()->purgeDatabase(dbName);
-    });
-
-    auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
-    auto sleepInlineExecutor = inlineExecutor->getSleepableExecutor(executor);
-
-    auto txnClient = std::make_unique<txn_api::details::SEPTransactionClient>(
-        opCtx,
-        inlineExecutor,
-        sleepInlineExecutor,
-        std::make_unique<txn_api::details::ClusterSEPTransactionClientBehaviors>(
-            opCtx->getServiceContext()));
     /*
      * The transactionChain callback may be run on a separate thread. For this reason, all the
      * referenced parameters have to be captured by value (shared_ptrs are used to reduce the memory
@@ -112,7 +94,7 @@ void removeDatabaseFromConfigAndUpdatePlacementHistory(
         write_ops::DeleteCommandRequest deleteDatabaseEntry(
             NamespaceString::kConfigDatabasesNamespace, {deleteDatabaseEntryOp});
 
-        return txnClient.runCRUDOp(deleteDatabaseEntry, {})
+        return txnClient.runCRUDOp(deleteDatabaseEntry, {0})
             .thenRunOn(txnExec)
             .then([&](const BatchedCommandResponse& deleteDatabaseEntryResponse) {
                 uassertStatusOKWithContext(
@@ -136,7 +118,7 @@ void removeDatabaseFromConfigAndUpdatePlacementHistory(
 
                 write_ops::InsertCommandRequest insertPlacementEntry(
                     NamespaceString::kConfigsvrPlacementHistoryNamespace, {placementInfo.toBSON()});
-                return txnClient.runCRUDOp(insertPlacementEntry, {});
+                return txnClient.runCRUDOp(insertPlacementEntry, {1});
             })
             .thenRunOn(txnExec)
             .then([](const BatchedCommandResponse& insertPlacementEntryResponse) {
@@ -145,12 +127,11 @@ void removeDatabaseFromConfigAndUpdatePlacementHistory(
             .semi();
     };
 
-    txn_api::SyncTransactionWithRetries txn(opCtx,
-                                            sleepInlineExecutor,
-                                            nullptr /*resourceYielder*/,
-                                            inlineExecutor,
-                                            std::move(txnClient));
-    txn.run(opCtx, transactionChain);
+    auto wc = WriteConcernOptions{WriteConcernOptions::kMajority,
+                                  WriteConcernOptions::SyncMode::UNSET,
+                                  WriteConcernOptions::kNoTimeout};
+    sharding_ddl_util::runTransactionOnShardingCatalog(
+        opCtx, std::move(transactionChain), wc, osi, executor);
 }
 
 // TODO SERVER-73627: Remove once 7.0 becomes last LTS
@@ -248,8 +229,9 @@ void DropDatabaseCoordinator::_dropShardedCollection(
             **executor);
     }
 
+    _updateSession(opCtx);
     sharding_ddl_util::removeCollAndChunksMetadataFromConfig(
-        opCtx, coll, ShardingCatalogClient::kMajorityWriteConcern);
+        opCtx, coll, ShardingCatalogClient::kMajorityWriteConcern, getCurrentSession(), **executor);
 
     _updateSession(opCtx);
     sharding_ddl_util::removeTagsMetadataFromConfig(opCtx, nss, getCurrentSession());
@@ -474,8 +456,13 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                     _clearDatabaseInfoOnPrimary(opCtx);
                     _clearDatabaseInfoOnSecondaries(opCtx);
 
+                    _updateSession(opCtx);
                     removeDatabaseFromConfigAndUpdatePlacementHistory(
-                        opCtx, **executor, _dbName, *metadata().getDatabaseVersion());
+                        opCtx,
+                        **executor,
+                        _dbName,
+                        *metadata().getDatabaseVersion(),
+                        getCurrentSession());
 
                     VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
                 }

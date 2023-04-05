@@ -957,11 +957,6 @@ void Transaction::_primeTransaction(OperationContext* opCtx) {
                         {true} /* startTransaction */);
         _execContext = ExecutionContext::kClientSession;
     } else if (!clientInMultiDocumentTransaction) {
-        uassert(6648100,
-                "Cross-shard internal transactions are not supported when run under a retryable "
-                "write directly on a shard.",
-                !_txnClient->runsClusterOperations() || isMongos());
-
         _setSessionInfo(lg,
                         makeLogicalSessionIdWithTxnNumberAndUUID(*clientSession, *clientTxnNumber),
                         0 /* txnNumber */,

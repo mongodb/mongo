@@ -32,6 +32,7 @@
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/transaction/transaction_api.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/async_requests_sender.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
@@ -87,9 +88,12 @@ void removeTagsMetadataFromConfig_notIdempotent(OperationContext* opCtx,
  * Erase collection metadata from config server and invalidate the locally cached one.
  * In particular remove the collection and chunks metadata associated with the given namespace.
  */
-void removeCollAndChunksMetadataFromConfig(OperationContext* opCtx,
-                                           const CollectionType& coll,
-                                           const WriteConcernOptions& writeConcern);
+void removeCollAndChunksMetadataFromConfig(
+    OperationContext* opCtx,
+    const CollectionType& coll,
+    const WriteConcernOptions& writeConcern,
+    const OperationSessionInfo& osi,
+    const std::shared_ptr<executor::TaskExecutor>& executor = nullptr);
 
 /**
  * Erase collection metadata from config server and invalidate the locally cached one.
@@ -229,5 +233,16 @@ void sendDropCollectionParticipantCommandToShards(OperationContext* opCtx,
 
 BSONObj getCriticalSectionReasonForRename(const NamespaceString& from, const NamespaceString& to);
 
+/**
+ * Runs the given transaction chain on the catalog. Transaction will be remote if called by a shard.
+ * Important: StmtsIds must be set in the transactionChain if the OperationSessionId is not empty
+ * since we are spawning a transaction on behalf of a retryable operation.
+ */
+void runTransactionOnShardingCatalog(
+    OperationContext* opCtx,
+    txn_api::Callback&& transactionChain,
+    const WriteConcernOptions& writeConcern,
+    const OperationSessionInfo& osi,
+    const std::shared_ptr<executor::TaskExecutor>& inputExecutor = nullptr);
 }  // namespace sharding_ddl_util
 }  // namespace mongo

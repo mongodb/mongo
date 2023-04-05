@@ -2117,18 +2117,6 @@ TEST_F(TxnAPITest, DoNotAllowCrossShardTransactionsOnShardWhenInClientTransactio
         6648101);
 }
 
-TEST_F(TxnAPITest, DoNotAllowCrossShardTransactionsOnShardWhenInRetryableWrite) {
-    setMongos(false);
-    ON_BLOCK_EXIT([&] { setMongos(true); });
-
-    opCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
-    opCtx()->setTxnNumber(5);
-    ASSERT_THROWS_CODE(
-        resetTxnWithRetriesWithClient(std::make_unique<MockClusterOperationTransactionClient>()),
-        DBException,
-        6648100);
-}
-
 TEST_F(TxnAPITest, AllowCrossShardTransactionsOnMongosWhenInRetryableWrite) {
     setMongos(true);
     ON_BLOCK_EXIT([&] { setMongos(false); });

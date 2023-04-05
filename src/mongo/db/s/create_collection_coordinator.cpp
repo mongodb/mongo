@@ -347,25 +347,8 @@ void insertCollectionAndPlacementEntries(OperationContext* opCtx,
                                          const std::shared_ptr<executor::TaskExecutor>& executor,
                                          const std::shared_ptr<CollectionType>& coll,
                                          const ChunkVersion& placementVersion,
-                                         const std::shared_ptr<std::set<ShardId>>& shardIds) {
-    // Ensure that this function will only return once the transaction gets majority committed (and
-    // restore the original write concern on exit).
-    WriteConcernOptions originalWC = opCtx->getWriteConcern();
-    opCtx->setWriteConcern(WriteConcernOptions{WriteConcernOptions::kMajority,
-                                               WriteConcernOptions::SyncMode::UNSET,
-                                               WriteConcernOptions::kNoTimeout});
-    ScopeGuard guard([opCtx, &originalWC] { opCtx->setWriteConcern(originalWC); });
-
-    auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
-    auto sleepInlineExecutor = inlineExecutor->getSleepableExecutor(executor);
-
-    auto txnClient = std::make_unique<txn_api::details::SEPTransactionClient>(
-        opCtx,
-        inlineExecutor,
-        sleepInlineExecutor,
-        std::make_unique<txn_api::details::ClusterSEPTransactionClientBehaviors>(
-            opCtx->getServiceContext()));
-
+                                         const std::shared_ptr<std::set<ShardId>>& shardIds,
+                                         const OperationSessionInfo& osi) {
     /*
      * The insertionChain callback may be run on a separate thread than the one serving
      * insertCollectionAndPlacementEntries(). For this reason, all the referenced parameters have to
@@ -376,7 +359,7 @@ void insertCollectionAndPlacementEntries(OperationContext* opCtx,
                                     ExecutorPtr txnExec) {
         write_ops::InsertCommandRequest insertCollectionEntry(CollectionType::ConfigNS,
                                                               {coll->toBSON()});
-        return txnClient.runCRUDOp(insertCollectionEntry, {})
+        return txnClient.runCRUDOp(insertCollectionEntry, {0})
             .thenRunOn(txnExec)
             .then([&](const BatchedCommandResponse& insertCollectionEntryResponse) {
                 uassertStatusOK(insertCollectionEntryResponse.toStatus());
@@ -389,7 +372,7 @@ void insertCollectionAndPlacementEntries(OperationContext* opCtx,
 
                 write_ops::InsertCommandRequest insertPlacementEntry(
                     NamespaceString::kConfigsvrPlacementHistoryNamespace, {placementInfo.toBSON()});
-                return txnClient.runCRUDOp(insertPlacementEntry, {});
+                return txnClient.runCRUDOp(insertPlacementEntry, {1});
             })
             .thenRunOn(txnExec)
             .then([](const BatchedCommandResponse& insertPlacementEntryResponse) {
@@ -398,12 +381,13 @@ void insertCollectionAndPlacementEntries(OperationContext* opCtx,
             .semi();
     };
 
-    txn_api::SyncTransactionWithRetries txn(opCtx,
-                                            sleepInlineExecutor,
-                                            nullptr /*resourceYielder*/,
-                                            inlineExecutor,
-                                            std::move(txnClient));
-    txn.run(opCtx, insertionChain);
+    // Ensure that this function will only return once the transaction gets majority committed
+    auto wc = WriteConcernOptions{WriteConcernOptions::kMajority,
+                                  WriteConcernOptions::SyncMode::UNSET,
+                                  WriteConcernOptions::kNoTimeout};
+
+    sharding_ddl_util::runTransactionOnShardingCatalog(
+        opCtx, std::move(insertionChain), wc, osi, executor);
 }
 
 void broadcastDropCollection(OperationContext* opCtx,
@@ -1266,7 +1250,6 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx,
     }
 
     _updateSession(opCtx);
-
     try {
         notifyChangeStreamsOnShardCollection(opCtx,
                                              nss(),
@@ -1276,7 +1259,7 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx,
                                              *shardsHoldingData);
 
         insertCollectionAndPlacementEntries(
-            opCtx, executor, coll, placementVersion, shardsHoldingData);
+            opCtx, executor, coll, placementVersion, shardsHoldingData, getCurrentSession());
 
         notifyChangeStreamsOnShardCollection(
             opCtx, nss(), *_collectionUUID, _request.toBSON(), CommitPhase::kSuccessful);
