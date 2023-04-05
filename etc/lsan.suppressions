@@ -10,7 +10,3 @@ leak:mongo::Interruptible::installWaitListener
 leak::mongo::SSLThreadInfo::ThreadIDManager::idManager
 
 leak:glob64
-
-# Thread spawn to cancel ongoing migration is not joined at mongod shutdown.
-# TODO (SERVER-67732): Remove this suppression as soon as we have a consolidated solution.
-leak:mongo:MigrationDestinationManager::onStepDown
