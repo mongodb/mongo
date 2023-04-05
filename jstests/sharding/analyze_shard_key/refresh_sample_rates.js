@@ -43,6 +43,9 @@ function testBasic(createConnFn, rst, samplerNames) {
         conn.adminCommand({configureQueryAnalyzer: ns0, mode: "full", sampleRate: sampleRate0}));
     assert.commandWorked(
         conn.adminCommand({configureQueryAnalyzer: ns1, mode: "full", sampleRate: sampleRate1}));
+    const configColl = conn.getCollection("config.queryAnalyzers");
+    const startTime0 = configColl.findOne({ns: ns0}).startTime;
+    const startTime1 = configColl.findOne({ns: ns1}).startTime;
 
     // Query distribution after: [1, unknown, unknown]. Verify that refreshing returns
     // sampleRate / numSamplers.
@@ -53,8 +56,18 @@ function testBasic(createConnFn, rst, samplerNames) {
     }));
     let expectedRatio0 = 1.0 / 3;
     assert.sameMembers(res0.configurations, [
-        {ns: ns0, collectionUuid: collUuid0, sampleRate: expectedRatio0 * sampleRate0},
-        {ns: ns1, collectionUuid: collUuid1, sampleRate: expectedRatio0 * sampleRate1},
+        {
+            ns: ns0,
+            collectionUuid: collUuid0,
+            sampleRate: expectedRatio0 * sampleRate0,
+            startTime: startTime0
+        },
+        {
+            ns: ns1,
+            collectionUuid: collUuid1,
+            sampleRate: expectedRatio0 * sampleRate1,
+            startTime: startTime1
+        },
     ]);
 
     // Query distribution after: [1, 0, unknown]. Verify that refreshing returns
@@ -66,8 +79,18 @@ function testBasic(createConnFn, rst, samplerNames) {
     }));
     let expectedRatio1 = 1.0 / 3;
     assert.sameMembers(res1.configurations, [
-        {ns: ns0, collectionUuid: collUuid0, sampleRate: expectedRatio1 * sampleRate0},
-        {ns: ns1, collectionUuid: collUuid1, sampleRate: expectedRatio1 * sampleRate1},
+        {
+            ns: ns0,
+            collectionUuid: collUuid0,
+            sampleRate: expectedRatio1 * sampleRate0,
+            startTime: startTime0
+        },
+        {
+            ns: ns1,
+            collectionUuid: collUuid1,
+            sampleRate: expectedRatio1 * sampleRate1,
+            startTime: startTime1
+        },
     ]);
 
     // Query distribution after: [1, 0, 1] (no unknowns). Verify that refreshing returns correct
@@ -79,8 +102,18 @@ function testBasic(createConnFn, rst, samplerNames) {
     }));
     let expectedRatio2 = 1.0 / 2;
     assert.sameMembers(res2.configurations, [
-        {ns: ns0, collectionUuid: collUuid0, sampleRate: expectedRatio2 * sampleRate0},
-        {ns: ns1, collectionUuid: collUuid1, sampleRate: expectedRatio2 * sampleRate1},
+        {
+            ns: ns0,
+            collectionUuid: collUuid0,
+            sampleRate: expectedRatio2 * sampleRate0,
+            startTime: startTime0
+        },
+        {
+            ns: ns1,
+            collectionUuid: collUuid1,
+            sampleRate: expectedRatio2 * sampleRate1,
+            startTime: startTime1
+        },
     ]);
 
     // Query distribution after: [4.5, 0, 1] (one is fractional). Verify that refreshing returns
@@ -92,8 +125,18 @@ function testBasic(createConnFn, rst, samplerNames) {
     }));
     expectedRatio0 = 4.5 / 5.5;
     assert.sameMembers(res0.configurations, [
-        {ns: ns0, collectionUuid: collUuid0, sampleRate: expectedRatio0 * sampleRate0},
-        {ns: ns1, collectionUuid: collUuid1, sampleRate: expectedRatio0 * sampleRate1},
+        {
+            ns: ns0,
+            collectionUuid: collUuid0,
+            sampleRate: expectedRatio0 * sampleRate0,
+            startTime: startTime0
+        },
+        {
+            ns: ns1,
+            collectionUuid: collUuid1,
+            sampleRate: expectedRatio0 * sampleRate1,
+            startTime: startTime1
+        },
     ]);
 
     // Query distribution after: [4.5, 0, 1] (no change). Verify that refreshing doesn't
@@ -105,8 +148,8 @@ function testBasic(createConnFn, rst, samplerNames) {
     }));
     assert.eq(res1.configurations.length, 2);
     assert.sameMembers(res1.configurations, [
-        {ns: ns0, collectionUuid: collUuid0, sampleRate: 0},
-        {ns: ns1, collectionUuid: collUuid1, sampleRate: 0},
+        {ns: ns0, collectionUuid: collUuid0, sampleRate: 0, startTime: startTime0},
+        {ns: ns1, collectionUuid: collUuid1, sampleRate: 0, startTime: startTime1},
     ]);
 
     assert.commandWorked(conn.adminCommand({configureQueryAnalyzer: ns1, mode: "off"}));
@@ -120,7 +163,12 @@ function testBasic(createConnFn, rst, samplerNames) {
     }));
     expectedRatio1 = 1.5 / 6;
     assert.sameMembers(res2.configurations, [
-        {ns: ns0, collectionUuid: collUuid0, sampleRate: expectedRatio1 * sampleRate0},
+        {
+            ns: ns0,
+            collectionUuid: collUuid0,
+            sampleRate: expectedRatio1 * sampleRate0,
+            startTime: startTime0
+        },
     ]);
 
     assert.commandWorked(conn.adminCommand({configureQueryAnalyzer: ns0, mode: "off"}));
@@ -151,6 +199,8 @@ function testFailover(createConnFn, rst, samplerNames) {
     jsTest.log("Verify that configurations are persisted and available after failover");
     assert.commandWorked(
         conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", sampleRate: sampleRate}));
+    const configColl = conn.getCollection("config.queryAnalyzers");
+    const startTime = configColl.findOne({ns: ns}).startTime;
 
     assert.commandWorked(
         primary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
@@ -169,7 +219,7 @@ function testFailover(createConnFn, rst, samplerNames) {
     const expectedRatio = 1.0 / 3;
     assert.sameMembers(
         res.configurations,
-        [{ns: ns, collectionUuid: collUuid, sampleRate: expectedRatio * sampleRate}]);
+        [{ns: ns, collectionUuid: collUuid, sampleRate: expectedRatio * sampleRate, startTime}]);
 
     assert.commandWorked(conn.adminCommand({configureQueryAnalyzer: ns, mode: "off"}));
 }
@@ -191,6 +241,8 @@ function testRestart(createConnFn, rst, samplerNames) {
     jsTest.log("Verify that configurations are persisted and available after restart");
     assert.commandWorked(
         conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", sampleRate: sampleRate}));
+    const configColl = conn.getCollection("config.queryAnalyzers");
+    const startTime = configColl.findOne({ns: ns}).startTime;
 
     rst.stopSet(null /* signal */, true /*forRestart */);
     rst.startSet({restart: true});
@@ -208,7 +260,7 @@ function testRestart(createConnFn, rst, samplerNames) {
     const expectedRatio = 1.0 / 3;
     assert.sameMembers(
         res.configurations,
-        [{ns: ns, collectionUuid: collUuid, sampleRate: expectedRatio * sampleRate}]);
+        [{ns: ns, collectionUuid: collUuid, sampleRate: expectedRatio * sampleRate, startTime}]);
 
     assert.commandWorked(conn.adminCommand({configureQueryAnalyzer: ns, mode: "off"}));
 }

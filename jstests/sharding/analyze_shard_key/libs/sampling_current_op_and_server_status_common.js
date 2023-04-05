@@ -25,6 +25,7 @@ function validateCurrentOpMongos(currentOp) {
     assert(currentOp.hasOwnProperty("ns"), currentOp);
     assert(currentOp.hasOwnProperty("collUuid"), currentOp);
     assert(currentOp.hasOwnProperty("sampleRate"), currentOp);
+    assert(currentOp.hasOwnProperty("startTime"), currentOp);
     assert(currentOp.hasOwnProperty("sampledReadsCount"), currentOp);
     assert(currentOp.hasOwnProperty("sampledWritesCount"), currentOp);
     assert(!currentOp.hasOwnProperty("sampledReadsBytes"), currentOp);
@@ -36,6 +37,7 @@ function validateCurrentOpMongod(currentOp, isShardSvr) {
     assert(currentOp.hasOwnProperty("ns"), currentOp);
     assert(currentOp.hasOwnProperty("collUuid"), currentOp);
     assert.eq(currentOp.hasOwnProperty("sampleRate"), !isShardSvr, currentOp);
+    assert(currentOp.hasOwnProperty("startTime"), currentOp);
     assert(currentOp.hasOwnProperty("sampledReadsCount"), currentOp);
     assert(currentOp.hasOwnProperty("sampledWritesCount"), currentOp);
     assert(currentOp.hasOwnProperty("sampledReadsBytes"), currentOp);

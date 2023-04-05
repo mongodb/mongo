@@ -41,7 +41,6 @@
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/clock_source_mock.h"
 #include "mongo/util/periodic_runner_factory.h"
 #include "mongo/util/tick_source_mock.h"
 
@@ -438,6 +437,10 @@ protected:
     void advanceTime(Nanoseconds millis) {
         dynamic_cast<TickSourceMock<Nanoseconds>*>(getServiceContext()->getTickSource())
             ->advance(millis);
+    }
+
+    Date_t now() {
+        return getServiceContext()->getFastClockSource()->now();
     }
 
     /**
@@ -855,8 +858,11 @@ TEST_F(QueryAnalysisSamplerTest, RefreshQueryStatsAndConfigurations) {
     // _refreshQueryAnalyzerConfiguration command to get sent and update its configurations even
     // though the numQueriesExecutedPerSecond is 0.
     std::vector<CollectionQueryAnalyzerConfiguration> refreshedConfigurations1;
-    refreshedConfigurations1.push_back(CollectionQueryAnalyzerConfiguration{nss0, collUuid0, 1});
-    refreshedConfigurations1.push_back(CollectionQueryAnalyzerConfiguration{nss1, collUuid1, 0.5});
+    auto startTime = now();
+    refreshedConfigurations1.push_back(
+        CollectionQueryAnalyzerConfiguration{nss0, collUuid0, 1, startTime});
+    refreshedConfigurations1.push_back(
+        CollectionQueryAnalyzerConfiguration{nss1, collUuid1, 0.5, startTime});
     auto future1 = stdx::async(stdx::launch::async, [&] {
         expectConfigurationRefreshReturnSuccess(*queryStats1.getLastAvgCount(),
                                                 refreshedConfigurations1);
@@ -892,7 +898,8 @@ TEST_F(QueryAnalysisSamplerTest, RefreshQueryStatsAndConfigurations) {
     // Force the sampler to refresh its configurations. This should cause the sampler to send a
     // _refreshQueryAnalyzerConfiguration command to get sent and update its configurations.
     std::vector<CollectionQueryAnalyzerConfiguration> refreshedConfigurations2;
-    refreshedConfigurations2.push_back(CollectionQueryAnalyzerConfiguration{nss1, collUuid1, 1.5});
+    refreshedConfigurations2.push_back(
+        CollectionQueryAnalyzerConfiguration{nss1, collUuid1, 1.5, startTime});
     auto future2 = stdx::async(stdx::launch::async, [&] {
         expectConfigurationRefreshReturnSuccess(*queryStats2.getLastAvgCount(),
                                                 refreshedConfigurations2);
@@ -950,8 +957,9 @@ TEST_F(QueryAnalysisSamplerTest, TryGenerateSampleIdExternalClient) {
     auto& sampler = QueryAnalysisSampler::get(opCtx);
 
     std::vector<CollectionQueryAnalyzerConfiguration> configurations;
-    configurations.push_back(CollectionQueryAnalyzerConfiguration{nss0, collUuid0, 1});
-    configurations.push_back(CollectionQueryAnalyzerConfiguration{nss1, collUuid1, 0.5});
+    auto startTime = now();
+    configurations.push_back(CollectionQueryAnalyzerConfiguration{nss0, collUuid0, 1, startTime});
+    configurations.push_back(CollectionQueryAnalyzerConfiguration{nss1, collUuid1, 0.5, startTime});
     setUpConfigurations(&sampler, configurations);
 
     // Cannot sample if time has not elapsed.
@@ -1000,7 +1008,8 @@ TEST_F(QueryAnalysisSamplerTest, TryGenerateSampleIdInternalClient) {
     auto& sampler = QueryAnalysisSampler::get(opCtx);
 
     std::vector<CollectionQueryAnalyzerConfiguration> configurations;
-    configurations.push_back(CollectionQueryAnalyzerConfiguration{nss0, collUuid0, 1});
+    auto startTime = now();
+    configurations.push_back(CollectionQueryAnalyzerConfiguration{nss0, collUuid0, 1, startTime});
     setUpConfigurations(&sampler, configurations);
 
     advanceTime(Milliseconds(1000));
@@ -1033,9 +1042,11 @@ TEST_F(QueryAnalysisSamplerTest, RefreshConfigurationsNewCollectionUuid) {
     auto opCtx = opCtxHolder.get();
 
     auto& sampler = QueryAnalysisSampler::get(opCtx);
+    auto startTime = now();
 
     std::vector<CollectionQueryAnalyzerConfiguration> oldConfigurations;
-    oldConfigurations.push_back(CollectionQueryAnalyzerConfiguration{nss0, collUuid0, 2});
+    oldConfigurations.push_back(
+        CollectionQueryAnalyzerConfiguration{nss0, collUuid0, 2, startTime});
     setUpConfigurations(&sampler, oldConfigurations);
 
     auto oldRateLimiters = sampler.getRateLimitersForTest();
@@ -1054,7 +1065,8 @@ TEST_F(QueryAnalysisSamplerTest, RefreshConfigurationsNewCollectionUuid) {
     // time.
     auto queryStats = sampler.getQueryStatsForTest();
     std::vector<CollectionQueryAnalyzerConfiguration> newConfigurations;
-    newConfigurations.push_back(CollectionQueryAnalyzerConfiguration{nss0, UUID::gen(), 1.5});
+    newConfigurations.push_back(
+        CollectionQueryAnalyzerConfiguration{nss0, UUID::gen(), 1.5, startTime});
     auto future = stdx::async(stdx::launch::async, [&] {
         expectConfigurationRefreshReturnSuccess(*queryStats.getLastAvgCount(), newConfigurations);
     });

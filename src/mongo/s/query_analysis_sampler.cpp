@@ -36,7 +36,7 @@
 #include "mongo/s/analyze_shard_key_util.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/is_mongos.h"
-#include "mongo/s/query_analysis_sample_counters.h"
+#include "mongo/s/query_analysis_sample_tracker.h"
 #include "mongo/s/refresh_query_analyzer_configuration_cmd_gen.h"
 #include "mongo/util/net/socket_utils.h"
 
@@ -339,7 +339,7 @@ void QueryAnalysisSampler::_refreshConfigurations(OperationContext* opCtx) {
     }
     _sampleRateLimiters = std::move(sampleRateLimiters);
 
-    QueryAnalysisSampleCounters::get(opCtx).refreshConfigurations(configurations);
+    QueryAnalysisSampleTracker::get(opCtx).refreshConfigurations(configurations);
 }
 
 void QueryAnalysisSampler::_incrementCounters(OperationContext* opCtx,
@@ -350,12 +350,12 @@ void QueryAnalysisSampler::_incrementCounters(OperationContext* opCtx,
         case SampledCommandNameEnum::kAggregate:
         case SampledCommandNameEnum::kCount:
         case SampledCommandNameEnum::kDistinct:
-            QueryAnalysisSampleCounters::get(opCtx).incrementReads(nss);
+            QueryAnalysisSampleTracker::get(opCtx).incrementReads(opCtx, nss);
             break;
         case SampledCommandNameEnum::kUpdate:
         case SampledCommandNameEnum::kDelete:
         case SampledCommandNameEnum::kFindAndModify:
-            QueryAnalysisSampleCounters::get(opCtx).incrementWrites(nss);
+            QueryAnalysisSampleTracker::get(opCtx).incrementWrites(opCtx, nss);
             break;
         default:
             MONGO_UNREACHABLE;

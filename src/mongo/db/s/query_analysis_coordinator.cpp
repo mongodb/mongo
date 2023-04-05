@@ -80,7 +80,7 @@ void QueryAnalysisCoordinator::onConfigurationInsert(const QueryAnalyzerDocument
     }
 
     auto configuration = CollectionQueryAnalyzerConfiguration{
-        doc.getNs(), doc.getCollectionUuid(), *doc.getSampleRate()};
+        doc.getNs(), doc.getCollectionUuid(), *doc.getSampleRate(), doc.getStartTime()};
 
     _configurations.emplace(doc.getCollectionUuid(), std::move(configuration));
 }
@@ -97,7 +97,7 @@ void QueryAnalysisCoordinator::onConfigurationUpdate(const QueryAnalyzerDocument
         auto it = _configurations.find(doc.getCollectionUuid());
         if (it == _configurations.end()) {
             auto configuration = CollectionQueryAnalyzerConfiguration{
-                doc.getNs(), doc.getCollectionUuid(), *doc.getSampleRate()};
+                doc.getNs(), doc.getCollectionUuid(), *doc.getSampleRate(), doc.getStartTime()};
             _configurations.emplace(doc.getCollectionUuid(), std::move(configuration));
         } else {
             it->second.setSampleRate(*doc.getSampleRate());
@@ -179,7 +179,7 @@ void QueryAnalysisCoordinator::onStartup(OperationContext* opCtx) {
                                                     cursor->next());
             invariant(doc.getMode() != QueryAnalyzerModeEnum::kOff);
             auto configuration = CollectionQueryAnalyzerConfiguration{
-                doc.getNs(), doc.getCollectionUuid(), *doc.getSampleRate()};
+                doc.getNs(), doc.getCollectionUuid(), *doc.getSampleRate(), doc.getStartTime()};
             auto [_, inserted] =
                 _configurations.emplace(doc.getCollectionUuid(), std::move(configuration));
             invariant(inserted);
@@ -286,7 +286,8 @@ QueryAnalysisCoordinator::getNewConfigurationsForSampler(OperationContext* opCtx
     for (const auto& [_, configuration] : _configurations) {
         configurations.emplace_back(configuration.getNs(),
                                     configuration.getCollectionUuid(),
-                                    sampleRateRatio * configuration.getSampleRate());
+                                    sampleRateRatio * configuration.getSampleRate(),
+                                    configuration.getStartTime());
     }
     return configurations;
 }

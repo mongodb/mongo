@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/s/query_analysis_sample_counters.h"
+#include "mongo/s/query_analysis_sample_tracker.h"
 
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/is_mongos.h"
@@ -36,49 +36,51 @@ namespace mongo {
 namespace analyze_shard_key {
 namespace {
 
-const auto getQueryAnalysisSampleCounters =
-    ServiceContext::declareDecoration<QueryAnalysisSampleCounters>();
+const auto getQueryAnalysisSampleTracker =
+    ServiceContext::declareDecoration<QueryAnalysisSampleTracker>();
 
 }  // namespace
 
-QueryAnalysisSampleCounters& QueryAnalysisSampleCounters::get(OperationContext* opCtx) {
+QueryAnalysisSampleTracker& QueryAnalysisSampleTracker::get(OperationContext* opCtx) {
     return get(opCtx->getServiceContext());
 }
 
-QueryAnalysisSampleCounters& QueryAnalysisSampleCounters::get(ServiceContext* serviceContext) {
-    return getQueryAnalysisSampleCounters(serviceContext);
+QueryAnalysisSampleTracker& QueryAnalysisSampleTracker::get(ServiceContext* serviceContext) {
+    return getQueryAnalysisSampleTracker(serviceContext);
 }
 
-void QueryAnalysisSampleCounters::refreshConfigurations(
+void QueryAnalysisSampleTracker::refreshConfigurations(
     const std::vector<CollectionQueryAnalyzerConfiguration>& configurations) {
     stdx::lock_guard<Latch> lk(_mutex);
-    std::map<NamespaceString,
-             std::shared_ptr<QueryAnalysisSampleCounters::CollectionSampleCounters>>
-        newSampleCounters;
+    std::map<NamespaceString, std::shared_ptr<QueryAnalysisSampleTracker::CollectionSampleTracker>>
+        newTrackers;
 
     for (const auto& configuration : configurations) {
-        auto it = _sampleCounters.find(configuration.getNs());
-        if (it == _sampleCounters.end() ||
+        auto it = _trackers.find(configuration.getNs());
+        if (it == _trackers.end() ||
             it->second->getCollUuid() != configuration.getCollectionUuid()) {
-            newSampleCounters.emplace(std::make_pair(
+            newTrackers.emplace(std::make_pair(
                 configuration.getNs(),
-                std::make_shared<CollectionSampleCounters>(configuration.getNs(),
-                                                           configuration.getCollectionUuid(),
-                                                           configuration.getSampleRate())));
+                std::make_shared<CollectionSampleTracker>(configuration.getNs(),
+                                                          configuration.getCollectionUuid(),
+                                                          configuration.getSampleRate(),
+                                                          configuration.getStartTime())));
         } else {
             it->second->setSampleRate(configuration.getSampleRate());
-            newSampleCounters.emplace(std::make_pair(configuration.getNs(), it->second));
+            it->second->setStartTime(configuration.getStartTime());
+            newTrackers.emplace(std::make_pair(configuration.getNs(), it->second));
         }
         _sampledNamespaces.insert(configuration.getNs());
     }
-    _sampleCounters = std::move(newSampleCounters);
+    _trackers = std::move(newTrackers);
 }
 
-void QueryAnalysisSampleCounters::incrementReads(const NamespaceString& nss,
-                                                 const boost::optional<UUID>& collUuid,
-                                                 boost::optional<int64_t> size) {
+void QueryAnalysisSampleTracker::incrementReads(OperationContext* opCtx,
+                                                const NamespaceString& nss,
+                                                const boost::optional<UUID>& collUuid,
+                                                boost::optional<int64_t> size) {
     stdx::lock_guard<Latch> lk(_mutex);
-    auto counters = _getOrCreateCollectionSampleCounters(lk, nss, collUuid);
+    auto counters = _getOrCreateCollectionSampleTracker(lk, opCtx, nss, collUuid);
     counters->incrementReads(size);
     ++_totalSampledReadsCount;
     if (size) {
@@ -86,11 +88,12 @@ void QueryAnalysisSampleCounters::incrementReads(const NamespaceString& nss,
     }
 }
 
-void QueryAnalysisSampleCounters::incrementWrites(const NamespaceString& nss,
-                                                  const boost::optional<UUID>& collUuid,
-                                                  boost::optional<int64_t> size) {
+void QueryAnalysisSampleTracker::incrementWrites(OperationContext* opCtx,
+                                                 const NamespaceString& nss,
+                                                 const boost::optional<UUID>& collUuid,
+                                                 boost::optional<int64_t> size) {
     stdx::lock_guard<Latch> lk(_mutex);
-    auto counters = _getOrCreateCollectionSampleCounters(lk, nss, collUuid);
+    auto counters = _getOrCreateCollectionSampleTracker(lk, opCtx, nss, collUuid);
     counters->incrementWrites(size);
     ++_totalSampledWritesCount;
     if (size) {
@@ -98,32 +101,36 @@ void QueryAnalysisSampleCounters::incrementWrites(const NamespaceString& nss,
     }
 }
 
-std::shared_ptr<QueryAnalysisSampleCounters::CollectionSampleCounters>
-QueryAnalysisSampleCounters::_getOrCreateCollectionSampleCounters(
-    WithLock, const NamespaceString& nss, const boost::optional<UUID>& collUuid) {
-    auto it = _sampleCounters.find(nss);
-    if (it == _sampleCounters.end()) {
+std::shared_ptr<QueryAnalysisSampleTracker::CollectionSampleTracker>
+QueryAnalysisSampleTracker::_getOrCreateCollectionSampleTracker(
+    WithLock,
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const boost::optional<UUID>& collUuid) {
+    auto it = _trackers.find(nss);
+    if (it == _trackers.end()) {
         // Do not create a new set of counters without collUuid specified:
         invariant(collUuid);
-        it = _sampleCounters
+        auto startTime = opCtx->getServiceContext()->getFastClockSource()->now();
+        it = _trackers
                  .emplace(std::make_pair(
                      nss,
-                     std::make_shared<QueryAnalysisSampleCounters::CollectionSampleCounters>(
-                         nss, *collUuid)))
+                     std::make_shared<QueryAnalysisSampleTracker::CollectionSampleTracker>(
+                         nss, *collUuid, 0 /* sampleRate */, startTime)))
                  .first;
         _sampledNamespaces.insert(nss);
     }
     return it->second;
 }
 
-void QueryAnalysisSampleCounters::reportForCurrentOp(std::vector<BSONObj>* ops) const {
+void QueryAnalysisSampleTracker::reportForCurrentOp(std::vector<BSONObj>* ops) const {
     stdx::lock_guard<Latch> lk(_mutex);
-    for (auto const& it : _sampleCounters) {
+    for (auto const& it : _trackers) {
         ops->push_back(it.second->reportForCurrentOp());
     }
 }
 
-BSONObj QueryAnalysisSampleCounters::CollectionSampleCounters::reportForCurrentOp() const {
+BSONObj QueryAnalysisSampleTracker::CollectionSampleTracker::reportForCurrentOp() const {
     CollectionSampleCountersCurrentOp report;
     report.setNs(_nss);
     report.setCollUuid(_collUuid);
@@ -136,13 +143,14 @@ BSONObj QueryAnalysisSampleCounters::CollectionSampleCounters::reportForCurrentO
     if (isMongos() || serverGlobalParams.clusterRole.has(ClusterRole::None)) {
         report.setSampleRate(_sampleRate);
     }
+    report.setStartTime(_startTime);
 
     return report.toBSON();
 }
 
-BSONObj QueryAnalysisSampleCounters::reportForServerStatus() const {
+BSONObj QueryAnalysisSampleTracker::reportForServerStatus() const {
     QueryAnalysisServerStatus res;
-    res.setActiveCollections(static_cast<int64_t>(_sampleCounters.size()));
+    res.setActiveCollections(static_cast<int64_t>(_trackers.size()));
     res.setTotalCollections(static_cast<int64_t>(_sampledNamespaces.size()));
     res.setTotalSampledReadsCount(_totalSampledReadsCount);
     res.setTotalSampledWritesCount(_totalSampledWritesCount);

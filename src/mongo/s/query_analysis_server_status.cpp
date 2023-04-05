@@ -30,8 +30,8 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/commands/server_status.h"
-#include "mongo/s/is_mongos.h"
-#include "mongo/s/query_analysis_sampler.h"
+#include "mongo/s/analyze_shard_key_role.h"
+#include "mongo/s/query_analysis_sample_tracker.h"
 
 namespace mongo {
 namespace analyze_shard_key {
@@ -48,7 +48,7 @@ public:
     BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override {
         return supportsSamplingQueries(opCtx)
-            ? QueryAnalysisSampleCounters::get(opCtx).reportForServerStatus()
+            ? QueryAnalysisSampleTracker::get(opCtx).reportForServerStatus()
             : BSONObj();
     }
 

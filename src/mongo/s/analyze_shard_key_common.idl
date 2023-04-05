@@ -82,6 +82,9 @@ structs:
       sampleRate:
         type: double
         description: "The maximum number of queries to sample per second."
+      startTime:
+        type: date
+        description: "The time at which query sampling began."
 
   CollectionSampleCountersCurrentOp:
     description: "The per-collection report on number and size of sampled queries for the currentOp
@@ -103,6 +106,9 @@ structs:
         type: double
         description: "The maximum number of queries to sample per second. Only reported by mongos."
         optional: true
+      startTime:
+        type: date
+        description: "The time at which query sampling began."
       sampledReadsCount:
         type: long
         description: "The number of read queries sampled."

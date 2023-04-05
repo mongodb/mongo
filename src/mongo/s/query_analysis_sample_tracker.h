@@ -51,14 +51,15 @@ namespace analyze_shard_key {
  * enabled. Instances of this object on mongod will also count the number of bytes being
  * written to the sample collection.
  */
-class QueryAnalysisSampleCounters {
+class QueryAnalysisSampleTracker {
 public:
-    class CollectionSampleCounters {
+    class CollectionSampleTracker {
     public:
-        CollectionSampleCounters(const NamespaceString& nss,
-                                 const UUID& collUuid,
-                                 double sampleRate = 0.0)
-            : _nss(nss), _collUuid(collUuid), _sampleRate(sampleRate){};
+        CollectionSampleTracker(const NamespaceString& nss,
+                                const UUID& collUuid,
+                                double sampleRate,
+                                const Date_t& startTime)
+            : _nss(nss), _collUuid(collUuid), _sampleRate(sampleRate), _startTime(startTime){};
 
         NamespaceString getNs() const {
             return _nss;
@@ -68,28 +69,12 @@ public:
             return _collUuid;
         }
 
-        double getSampleRate() const {
-            return _sampleRate;
-        }
-
         void setSampleRate(double sampleRate) {
             _sampleRate = sampleRate;
         }
 
-        int64_t getSampledReadsCount() const {
-            return _sampledReadsCount;
-        }
-
-        int64_t getSampledReadsBytes() const {
-            return _sampledReadsBytes;
-        }
-
-        int64_t getSampledWritesCount() const {
-            return _sampledWritesCount;
-        }
-
-        int64_t getSampledWritesBytes() const {
-            return _sampledWritesBytes;
+        void setStartTime(Date_t startTime) {
+            _startTime = startTime;
         }
 
         /**
@@ -121,16 +106,17 @@ public:
         int64_t _sampledReadsBytes = 0;
         int64_t _sampledWritesCount = 0;
         int64_t _sampledWritesBytes = 0;
-        double _sampleRate = 0.0;
+        double _sampleRate;
+        Date_t _startTime;
     };
 
-    QueryAnalysisSampleCounters() {}
+    QueryAnalysisSampleTracker() {}
 
     /**
-     * Returns a reference to the service-wide QueryAnalysisSampleCounters instance.
+     * Returns a reference to the service-wide QueryAnalysisSampleTracker instance.
      */
-    static QueryAnalysisSampleCounters& get(OperationContext* opCtx);
-    static QueryAnalysisSampleCounters& get(ServiceContext* serviceContext);
+    static QueryAnalysisSampleTracker& get(OperationContext* opCtx);
+    static QueryAnalysisSampleTracker& get(ServiceContext* serviceContext);
 
     void refreshConfigurations(
         const std::vector<CollectionQueryAnalyzerConfiguration>& configurations);
@@ -140,10 +126,12 @@ public:
      * UUID. If the collection's sample counters do not exist, new counters are created for the
      * collection and returned.
      */
-    void incrementReads(const NamespaceString& nss,
+    void incrementReads(OperationContext* opCtx,
+                        const NamespaceString& nss,
                         const boost::optional<UUID>& collUuid = boost::none,
                         boost::optional<int64_t> size = boost::none);
-    void incrementWrites(const NamespaceString& nss,
+    void incrementWrites(OperationContext* opCtx,
+                         const NamespaceString& nss,
                          const boost::optional<UUID>& collUuid = boost::none,
                          boost::optional<int64_t> size = boost::none);
 
@@ -158,19 +146,22 @@ public:
     BSONObj reportForServerStatus() const;
 
 private:
-    std::shared_ptr<CollectionSampleCounters> _getOrCreateCollectionSampleCounters(
-        WithLock, const NamespaceString& nss, const boost::optional<UUID>& collUuid);
+    std::shared_ptr<CollectionSampleTracker> _getOrCreateCollectionSampleTracker(
+        WithLock,
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const boost::optional<UUID>& collUuid);
 
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("QueryAnalysisSampleCounters::_mutex");
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("QueryAnalysisSampleTracker::_mutex");
 
     int64_t _totalSampledReadsCount = 0;
     int64_t _totalSampledWritesCount = 0;
     int64_t _totalSampledReadsBytes = 0;
     int64_t _totalSampledWritesBytes = 0;
 
-    // Per-collection sample counters. When sampling for a collection is turned off,
-    // its counters will be removed from this map.
-    std::map<NamespaceString, std::shared_ptr<CollectionSampleCounters>> _sampleCounters;
+    // Per-collection sample trackers. When sampling for a collection is turned off, its tracker
+    // will be removed from this map.
+    std::map<NamespaceString, std::shared_ptr<CollectionSampleTracker>> _trackers;
 
     // Set of collections that have been sampled, for maintaining the total count of
     // collections sampled, reported in server status.

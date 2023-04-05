@@ -47,6 +47,7 @@
 #include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/s/analyze_shard_key_server_parameters_gen.h"
 #include "mongo/s/analyze_shard_key_util.h"
+#include "mongo/s/query_analysis_sample_tracker.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/future_util.h"
@@ -599,8 +600,8 @@ ExecutorFuture<void> QueryAnalysisWriter::_addReadQuery(
 
             stdx::lock_guard<Latch> lk(_mutex);
             if (_queries.add(doc)) {
-                QueryAnalysisSampleCounters::get(opCtx).incrementReads(
-                    sampledReadCmd.nss, *collUuid, doc.objsize());
+                QueryAnalysisSampleTracker::get(opCtx).incrementReads(
+                    opCtx, sampledReadCmd.nss, *collUuid, doc.objsize());
             }
         })
         .then([this] {
@@ -646,8 +647,8 @@ ExecutorFuture<void> QueryAnalysisWriter::addUpdateQuery(
 
             stdx::lock_guard<Latch> lk(_mutex);
             if (_queries.add(doc)) {
-                QueryAnalysisSampleCounters::get(opCtx).incrementWrites(
-                    sampledUpdateCmd.nss, *collUuid, doc.objsize());
+                QueryAnalysisSampleTracker::get(opCtx).incrementWrites(
+                    opCtx, sampledUpdateCmd.nss, *collUuid, doc.objsize());
             }
         })
         .then([this] {
@@ -702,8 +703,8 @@ ExecutorFuture<void> QueryAnalysisWriter::addDeleteQuery(
 
             stdx::lock_guard<Latch> lk(_mutex);
             if (_queries.add(doc)) {
-                QueryAnalysisSampleCounters::get(opCtx).incrementWrites(
-                    sampledDeleteCmd.nss, *collUuid, doc.objsize());
+                QueryAnalysisSampleTracker::get(opCtx).incrementWrites(
+                    opCtx, sampledDeleteCmd.nss, *collUuid, doc.objsize());
             }
         })
         .then([this] {
@@ -759,8 +760,8 @@ ExecutorFuture<void> QueryAnalysisWriter::addFindAndModifyQuery(
 
             stdx::lock_guard<Latch> lk(_mutex);
             if (_queries.add(doc)) {
-                QueryAnalysisSampleCounters::get(opCtx).incrementWrites(
-                    sampledFindAndModifyCmd.nss, *collUuid, doc.objsize());
+                QueryAnalysisSampleTracker::get(opCtx).incrementWrites(
+                    opCtx, sampledFindAndModifyCmd.nss, *collUuid, doc.objsize());
             }
         })
         .then([this] {

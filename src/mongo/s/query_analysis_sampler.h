@@ -34,7 +34,6 @@
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/analyze_shard_key_role.h"
 #include "mongo/s/analyze_shard_key_server_parameters_gen.h"
-#include "mongo/s/query_analysis_sample_counters.h"
 #include "mongo/util/periodic_runner.h"
 
 namespace mongo {
