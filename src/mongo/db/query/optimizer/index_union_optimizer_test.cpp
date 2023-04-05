@@ -335,14 +335,11 @@ TEST(LogicalRewriter, DisjunctionConversionDedup) {
 
     // We should see everything get reordered and deduped,
     // so each of the leaf predicates appears once.
-    // TODO SERVER-73827 We should get 2 leaf predicates instead of 3 here.
     ASSERT_EXPLAIN_V2_AUTO(
         "Root [{scan_0}]\n"
         "Sargable [Complete]\n"
         "|   |   requirements: \n"
         "|   |       {\n"
-        "|   |           {{scan_0, 'PathGet [a] PathIdentity []', {{{=Const [0]}}}}}\n"
-        "|   |        U \n"
         "|   |           {{scan_0, 'PathGet [a] PathIdentity []', {{{=Const [0]}}}}}\n"
         "|   |        U \n"
         "|   |           {{scan_0, 'PathGet [b] PathIdentity []', {{{=Const [1]}}}}}\n"
@@ -353,9 +350,7 @@ TEST(LogicalRewriter, DisjunctionConversionDedup) {
         "|               {\n"
         "|                   {{evalTemp_0, 'PathIdentity []', {{{=Const [0]}}}, entryIndex: 0}}\n"
         "|                U \n"
-        "|                   {{evalTemp_0, 'PathIdentity []', {{{=Const [0]}}}, entryIndex: 1}}\n"
-        "|                U \n"
-        "|                   {{evalTemp_1, 'PathIdentity []', {{{=Const [1]}}}, entryIndex: 2}}\n"
+        "|                   {{evalTemp_1, 'PathIdentity []', {{{=Const [1]}}}, entryIndex: 1}}\n"
         "|               }\n"
         "Scan [coll, {scan_0}]\n",
         optimized);
@@ -478,11 +473,11 @@ TEST(PhysRewriter, OptimizeSargableNodeWithTopLevelDisjunction) {
 
     ABT scanNode = make<ScanNode>("ptest", "test");
     ABT sargableNode1 = make<SargableNode>(
-        reqs1, CandidateIndexes(), scanParams, IndexReqTarget::Index, std::move(scanNode));
+        reqs1, CandidateIndexes(), scanParams, IndexReqTarget::Complete, std::move(scanNode));
     ABT sargableNode2 = make<SargableNode>(
-        reqs2, CandidateIndexes(), boost::none, IndexReqTarget::Index, std::move(sargableNode1));
+        reqs2, CandidateIndexes(), boost::none, IndexReqTarget::Complete, std::move(sargableNode1));
     ABT sargableNode3 = make<SargableNode>(
-        reqs3, CandidateIndexes(), boost::none, IndexReqTarget::Index, std::move(sargableNode2));
+        reqs3, CandidateIndexes(), boost::none, IndexReqTarget::Complete, std::move(sargableNode2));
     ABT rootNode = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"ptest"}},
                                   std::move(sargableNode3));
 
@@ -490,25 +485,24 @@ TEST(PhysRewriter, OptimizeSargableNodeWithTopLevelDisjunction) {
     // SargableNodes are correctly lowered to FilterNodes.
     auto prefixId = PrefixId::createForTests();
     auto phaseManager = makePhaseManager(
-        {OptPhase::MemoSubstitutionPhase,
-         OptPhase::MemoExplorationPhase,
-         OptPhase::MemoImplementationPhase},
+        {
+            OptPhase::MemoSubstitutionPhase, OptPhase::MemoExplorationPhase,
+            // OptPhase::MemoImplementationPhase,
+        },
         prefixId,
         {{{"test",
            createScanDef(
                {},
                {
-                   // For now, verify that we do not get an indexed plan even when there
-                   // are indexes available on the queried fields.
                    {"ab",
-                    IndexDefinition{{{makeIndexPath("a"), CollationOp::Ascending},
-                                     {makeIndexPath("b"), CollationOp::Ascending}},
+                    IndexDefinition{{{makeNonMultikeyIndexPath("a"), CollationOp::Ascending},
+                                     {makeNonMultikeyIndexPath("b"), CollationOp::Ascending}},
                                     false /*isMultiKey*/,
                                     {DistributionType::Centralized},
                                     {}}},
                    {"cd",
-                    IndexDefinition{{{makeIndexPath("c"), CollationOp::Ascending},
-                                     {makeIndexPath("d"), CollationOp::Ascending}},
+                    IndexDefinition{{{makeNonMultikeyIndexPath("c"), CollationOp::Ascending},
+                                     {makeNonMultikeyIndexPath("d"), CollationOp::Ascending}},
                                     false /*isMultiKey*/,
                                     {DistributionType::Centralized},
                                     {}}},
@@ -517,9 +511,17 @@ TEST(PhysRewriter, OptimizeSargableNodeWithTopLevelDisjunction) {
                    {"g", makeIndexDefinition("g", CollationOp::Ascending, false /*isMultiKey*/)},
                })}}},
         boost::none /*costModel*/,
-        DebugInfo::kDefaultForTests);
+        DebugInfo::kDefaultForTests,
+        QueryHints{
+            ._disableScan = true,
+        });
     phaseManager.optimize(rootNode);
 
+    // We should get an index union between 'ab' and 'cd'.
+    // TODO SERVER-75587 In the logical plan, we get an alternative where 'ab' and 'cd' are each
+    // satisfied by an intersection. Instead we should get a single scan of the compound indexes
+    // 'ab' and 'cd'. Hopefully that will work out once we enable the physical phase, which makes it
+    // possible to cost the alternatives.
     ASSERT_EXPLAIN_V2Compact_AUTO(
         "Root [{ptest}]\n"
         "Filter []\n"
@@ -534,23 +536,55 @@ TEST(PhysRewriter, OptimizeSargableNodeWithTopLevelDisjunction) {
         "|   EvalFilter []\n"
         "|   |   Variable [ptest]\n"
         "|   PathGet [e] PathCompare [Eq] Const [1]\n"
-        "Filter []\n"
-        "|   BinaryOp [Or]\n"
-        "|   |   BinaryOp [And]\n"
-        "|   |   |   EvalFilter []\n"
-        "|   |   |   |   Variable [ptest]\n"
-        "|   |   |   PathGet [d] PathCompare [Eq] Const [1]\n"
-        "|   |   EvalFilter []\n"
-        "|   |   |   Variable [ptest]\n"
-        "|   |   PathGet [c] PathCompare [Eq] Const [1]\n"
-        "|   BinaryOp [And]\n"
-        "|   |   EvalFilter []\n"
-        "|   |   |   Variable [ptest]\n"
-        "|   |   PathGet [b] PathCompare [Eq] Const [1]\n"
-        "|   EvalFilter []\n"
-        "|   |   Variable [ptest]\n"
-        "|   PathGet [a] PathCompare [Eq] Const [1]\n"
-        "PhysicalScan [{'<root>': ptest}, test]\n",
+        "RIDIntersect [ptest]\n"
+        "|   Scan [test, {ptest}]\n"
+        "RIDUnion [ptest]\n"
+        "|   RIDIntersect [ptest]\n"
+        "|   |   Sargable [Index]\n"
+        "|   |   |   |   |   requirements: \n"
+        "|   |   |   |   |       {{{ptest, 'PathGet [d] PathIdentity []', {{{=Const [1]}}}}}}\n"
+        "|   |   |   |   candidateIndexes: \n"
+        "|   |   |   |       candidateId: 1, cd, {'<indexKey> 1': evalTemp_49}, {Unbound, "
+        "Unbound}, {{{<fully open>}}}\n"
+        "|   |   |   |           residualReqs: \n"
+        "|   |   |   |               {{{evalTemp_49, 'PathIdentity []', {{{=Const [1]}}}, "
+        "entryIndex: 0}}}\n"
+        "|   |   |   scanParams: \n"
+        "|   |   |       {'d': evalTemp_50}\n"
+        "|   |   |           residualReqs: \n"
+        "|   |   |               {{{evalTemp_50, 'PathIdentity []', {{{=Const [1]}}}, entryIndex: "
+        "0}}}\n"
+        "|   |   Scan [test, {ptest}]\n"
+        "|   Sargable [Index]\n"
+        "|   |   |   |   requirements: \n"
+        "|   |   |   |       {{{ptest, 'PathGet [c] PathIdentity []', {{{=Const [1]}}}}}}\n"
+        "|   |   |   candidateIndexes: \n"
+        "|   |   |       candidateId: 1, cd, {}, {SimpleEquality, Unbound}, {{{[Const [1 | "
+        "minKey], Const [1 | maxKey]]}}}\n"
+        "|   |   scanParams: \n"
+        "|   |       {'c': evalTemp_44}\n"
+        "|   |           residualReqs: \n"
+        "|   |               {{{evalTemp_44, 'PathIdentity []', {{{=Const [1]}}}, entryIndex: "
+        "0}}}\n"
+        "|   Scan [test, {ptest}]\n"
+        "RIDIntersect [ptest]\n"
+        "|   Sargable [Index]\n"
+        "|   |   |   requirements: \n"
+        "|   |   |       {{{ptest, 'PathGet [b] PathIdentity []', {{{=Const [1]}}}}}}\n"
+        "|   |   candidateIndexes: \n"
+        "|   |       candidateId: 1, ab, {'<indexKey> 1': evalTemp_45}, {Unbound, Unbound}, "
+        "{{{<fully open>}}}\n"
+        "|   |           residualReqs: \n"
+        "|   |               {{{evalTemp_45, 'PathIdentity []', {{{=Const [1]}}}, entryIndex: "
+        "0}}}\n"
+        "|   Scan [test, {ptest}]\n"
+        "Sargable [Index]\n"
+        "|   |   requirements: \n"
+        "|   |       {{{ptest, 'PathGet [a] PathIdentity []', {{{=Const [1]}}}}}}\n"
+        "|   candidateIndexes: \n"
+        "|       candidateId: 1, ab, {}, {SimpleEquality, Unbound}, {{{[Const [1 | minKey], Const "
+        "[1 | maxKey]]}}}\n"
+        "Scan [test, {ptest}]\n",
         rootNode);
 }
 

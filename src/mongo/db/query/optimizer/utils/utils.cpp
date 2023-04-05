@@ -377,7 +377,7 @@ public:
                 }
             }
 
-            leftReqMap = std::move(*resultReqs.finish());
+            leftReqMap = PartialSchemaRequirements{std::move(*resultReqs.finish())};
             return leftResult;
         }
         // Left and right don't all use the same key.
@@ -979,7 +979,6 @@ bool isSubsetOfPartialSchemaReq(const PartialSchemaRequirements& lhs,
 
 bool intersectPartialSchemaReq(PartialSchemaRequirements& target,
                                const PartialSchemaRequirements& source) {
-    // TODO SERVER-69026 Consider implementing intersect for top-level disjunctions.
     if (!PSRExpr::isSingletonDisjunction(target.getRoot()) ||
         !PSRExpr::isSingletonDisjunction(source.getRoot())) {
         return false;
@@ -1007,7 +1006,7 @@ PartialSchemaRequirements unionPartialSchemaReq(PartialSchemaRequirements&& left
     resultNodes.insert(resultNodes.end(),
                        std::make_move_iterator(rightDisj.nodes().begin()),
                        std::make_move_iterator(rightDisj.nodes().end()));
-    return PSRExpr::make<PSRExpr::Disjunction>(std::move(resultNodes));
+    return PartialSchemaRequirements{PSRExpr::make<PSRExpr::Disjunction>(std::move(resultNodes))};
 }
 
 std::string encodeIndexKeyName(const size_t indexField) {
@@ -2659,10 +2658,10 @@ PhysPlanBuilder lowerEqPrefixes(PrefixId& prefixId,
     return lowerTransport.lower(eqPrefixes.at(eqPrefixIndex)._interval);
 }
 
-bool hasProperIntervals(const PartialSchemaRequirements& reqMap) {
+bool hasProperIntervals(const PSRExpr::Node& reqs) {
     // Compute if this node has any proper (not fully open) intervals.
     bool hasProperIntervals = false;
-    PSRExpr::visitDNF(reqMap.getRoot(), [&](const PartialSchemaEntry& e) {
+    PSRExpr::visitAnyShape(reqs, [&](const PartialSchemaEntry& e) {
         hasProperIntervals |= !isIntervalReqFullyOpenDNF(e.second.getIntervals());
     });
     return hasProperIntervals;

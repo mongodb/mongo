@@ -154,6 +154,7 @@ struct BoolExpr {
     using ChildVisitorConst = std::function<void(const Node& child, const size_t childIndex)>;
     using AtomVisitor = std::function<void(T& expr)>;
     using AtomVisitorConst = std::function<void(const T& expr)>;
+    using AtomPredConst = std::function<bool(const T& expr)>;
 
     static size_t visitConjuncts(const Node& node, const ChildVisitorConst& visitor) {
         size_t index = 0;
@@ -224,6 +225,18 @@ struct BoolExpr {
         algebra::transport<false>(node, impl);
     }
 
+    static bool any(const Node& node, const AtomPredConst& atomPred) {
+        bool result = false;
+        visitAnyShape(node, [&](const T& atom) { result = result || atomPred(atom); });
+        return result;
+    }
+
+    static bool all(const Node& node, const AtomPredConst& atomPred) {
+        bool result = true;
+        visitAnyShape(node, [&](const T& atom) { result = result && atomPred(atom); });
+        return result;
+    }
+
     static void visitCNF(Node& node, const AtomVisitor& visitor) {
         visitConjuncts(node, [&](Node& child, const size_t) {
             visitDisjuncts(child,
@@ -250,7 +263,6 @@ struct BoolExpr {
         AtomTransport impl{atomVisitor};
         algebra::transport<false>(node, impl);
     }
-
 
     static bool isCNF(const Node& n) {
         if (n.template is<Conjunction>()) {
@@ -327,6 +339,15 @@ struct BoolExpr {
                 value = Negator{}(std::move(value));
             }
             _result = make<Atom>(std::move(value));
+            maybeAddToParent();
+            return *this;
+        }
+
+        Builder& subtree(BoolExpr::Node expr) {
+            tassert(6902603,
+                    "BoolExpr::Builder::subtree does not support negation",
+                    !isCurrentlyNegated());
+            _result = std::move(expr);
             maybeAddToParent();
             return *this;
         }
