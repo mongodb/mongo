@@ -86,14 +86,9 @@ std::vector<MetadataInconsistencyItem> getHiddenCollectionsInconsistencies(
     inconsistencies.reserve(rawHiddenColls.size());
     for (auto&& rawHiddenColl : rawHiddenColls) {
         CollectionType coll{rawHiddenColl};
-        MetadataInconsistencyItem inco;
-        inco.setNs(coll.getNss());
-        inco.setType(MetadataInconsistencyTypeEnum::kHiddenShardedCollection);
-        inco.setShard(ShardId::kConfigServerId);
-        inco.setInfo(BSON(metadata_consistency_util::kDescriptionFieldName
-                          << "Found sharded collection but relative database does not exist"
-                          << "collection" << coll.toBSON()));
-        inconsistencies.emplace_back(std::move(inco));
+        inconsistencies.emplace_back(metadata_consistency_util::makeInconsistency(
+            MetadataInconsistencyTypeEnum::kHiddenShardedCollection,
+            HiddenShardedCollectionDetails{coll.getNss(), coll.toBSON()}));
     }
     return inconsistencies;
 }

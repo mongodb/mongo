@@ -31,20 +31,38 @@ global:
 
 imports:
     - "mongo/db/basic_types.idl"
+    - "mongo/s/sharding_types.idl"
 
 enums:
     MetadataInconsistencyType:
         description: "Type of metadata inconsistency."
         type: string
         values:
-            kUUIDMismatch: "UUIDMismatch"
+            kCollectionUUIDMismatch: "CollectionUUIDMismatch"
+            kCorruptedChunkShardKey: "CorruptedChunkShardKey"
+            kHiddenShardedCollection: "HiddenShardedCollection"
             kMisplacedCollection: "MisplacedCollection"
-            kHiddenShardedCollection: "HiddenShardedCollection" 
+            kMissingRoutingTable: "MissingRoutingTable"
             kMissingShardKeyIndex: "MissingShardKeyIndex"
-            kLastShardKeyIndexMultiKey: "LastShardKeyIndexMultiKey"
+            kRoutingTableMissingMaxKey: "RoutingTableMissingMaxKey"
+            kRoutingTableMissingMinKey: "RoutingTableMissingMinKey"
             kRoutingTableRangeGap: "RoutingTableRangeGap"
             kRoutingTableRangeOverlap: "RoutingTableRangeOverlap"
-            kCorruptedChunkShardKey: "CorruptedChunkShardKey"
+
+    MetadataInconsistencyDescription:
+        description: "Description of each metadata inconsistency."
+        type: string
+        values:
+            kCollectionUUIDMismatch: "Found collection on non primary shard with mismatching UUID"
+            kCorruptedChunkShardKey: "Found chunk with a shard key pattern violation"
+            kHiddenShardedCollection: "Found sharded collection but relative database does not exist"
+            kMisplacedCollection: "Unsharded collection found on shard different from database primary shard"
+            kMissingRoutingTable: "Found sharded collection without any chunk"
+            kMissingShardKeyIndex: "Found sharded collection without a shard key index"
+            kRoutingTableMissingMaxKey: "Routing table has a gap because last chunk boundary does not reach MaxKey"
+            kRoutingTableMissingMinKey: "Routing table has a gap because first chunk does not start from MinKey"
+            kRoutingTableRangeGap: "Found a gap between two consecutive chunks"
+            kRoutingTableRangeOverlap: "Found two overlapping consecutive chunks"
 
     MetadataConsistencyCommandLevel:
         description: "Level mode of the metadata consistency command."
@@ -55,19 +73,168 @@ enums:
             kCollectionLevel: "CollectionLevel"
 
 structs:
-    MetadataInconsistencyItem:
-        description: "Object representing a single metadata inconsistency found in a specific shard"
+    MisplacedCollectionDetails:
+        description: "Details about a misplaced collection inconsistency."
         strict: false
         fields:
             ns:
                 type: namespacestring
-                description: "Namespace of the collection."
+                description: "The namespace of the collection that is misplaced."
             shard:
-                type: string
-                description: "Shard name."
+                type: shard_id
+                description: "The shard where the collection is placed."
+            localUUID:
+                type: uuid
+                description: "The UUID of the collection that is misplaced."
+
+    CollectionUUIDMismatchDetails:
+        description: "Details about a UUID mismatch inconsistency."
+        strict: false
+        fields:
+            ns:
+                type: namespacestring
+                description: "The namespace of the collection that has a UUID mismatch."
+            shard:
+                type: shard_id
+                description: "The shard where the UUID mismatch inconsistency has been found."
+            localUUID:
+                type: uuid
+                description: "The UUID of the collection found on the shard."
+            uuid:
+                type: uuid
+                description: "The UUID of the collection found on the config server."
+
+    MissingShardKeyIndexDetails:
+        description: "Details about a missing shard key index inconsistency."
+        strict: false
+        fields:
+            ns:
+                type: namespacestring
+                description: "The namespace of the collection that is missing a shard key index."
+            shard:
+                type: shard_id
+                description: "The shard where the missing shard key index inconsistency has been found."
+            shardKey:
+                type: object
+                description: "The shard key of the collection."
+
+    RoutingTableRangeOverlapDetails:
+        description: "Details about a routing table range overlap inconsistency."
+        strict: false
+        fields:
+            ns:
+                type: namespacestring
+                description: "The namespace of the collection."
+            collectionUUID:
+                type: uuid
+                description: "The UUID of the collection."
+            chunkA:
+                type: object
+                description: "The first chunk that overlaps with the second chunk."
+            chunkB:
+                type: object
+                description: "The second chunk that overlaps with the first chunk."
+
+    RoutingTableRangeGapDetails:
+        description: "Details about a routing table range gap inconsistency."
+        strict: false
+        fields:
+            ns:
+                type: namespacestring
+                description: "The namespace of the collection."
+            collectionUUID:
+                type: uuid
+                description: "The UUID of the collection."
+            chunkA:
+                type: object
+                description: "The first chunk that has a gap with the second chunk."
+            chunkB:
+                type: object
+                description: "The second chunk that has a gap with the first chunk."
+
+    RoutingTableMissingMinKeyDetails:
+        description: "Details about a routing table missing min key inconsistency."
+        strict: false
+        fields:
+            ns:
+                type: namespacestring
+                description: "The namespace of the collection."
+            collectionUUID:
+                type: uuid
+                description: "The UUID of the collection."
+            minKeyObj:
+                type: object
+                description: "The min key of the collection."
+            globalMin:
+                type: object
+                description: "The expected min key of the collection."
+
+    RoutingTableMissingMaxKeyDetails:
+        description: "Details about a routing table missing max key inconsistency."
+        strict: false
+        fields:
+            ns:
+                type: namespacestring
+                description: "The namespace of the collection."
+            collectionUUID:
+                type: uuid
+                description: "The UUID of the collection."
+            maxKeyObj:
+                type: object
+                description: "The max key of the collection."
+            globalMax:
+                type: object
+                description: "The expected max key of the collection."
+
+    CorruptedChunkShardKeyDetails:
+        description: "Details about a corrupted chunk shard key inconsistency."
+        strict: false
+        fields:
+            ns:
+                type: namespacestring
+                description: "The namespace of the collection."
+            collectionUUID:
+                type: uuid
+                description: "The UUID of the collection."
+            chunk:
+                type: object
+                description: "The chunk with a corrupted shard key."
+            shardKeyPattern:
+                type: object
+                description: "The shard key pattern of the collection."
+
+    HiddenShardedCollectionDetails:
+        description: "Details about a hidden sharded collection inconsistency."
+        strict: false
+        fields:
+            ns:
+                type: namespacestring
+                description: "The namespace of the collection that is hidden."
+            collection:
+                type: object
+                description: "Information about the collection."
+
+    MissingRoutingTableDetails:
+        description: "Details about a missing routing table inconsistency."
+        strict: false
+        fields:
+            ns:
+                type: namespacestring
+                description: "The namespace of the collection that has no routing table."
+            collectionUUID:
+                type: uuid
+                description: "The UUID of the collection."
+
+    MetadataInconsistencyItem:
+        description: "Object representing a single metadata inconsistency found in a specific shard"
+        strict: false
+        fields:
             type:
                 type: MetadataInconsistencyType
                 description: "Type of the inconsistency."
-            info:
-                type: object_owned
-                description: "Info about the inconsistency."
+            description:
+                type: string
+                description: "Description about the inconsistency."
+            details:
+                type: object
+                description: "Details about the inconsistency."

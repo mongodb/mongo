@@ -40,9 +40,18 @@
 namespace mongo {
 namespace metadata_consistency_util {
 
-constexpr StringData kDescriptionFieldName = "description"_sd;
-constexpr StringData kMinField = "min"_sd;
-constexpr StringData kMaxField = "max"_sd;
+/**
+ * Creates a MetadataInconsistencyItem object from the given parameters.
+ */
+template <typename MetadataDetailsType>
+MetadataInconsistencyItem makeInconsistency(const MetadataInconsistencyTypeEnum& type,
+                                            const MetadataDetailsType& details) {
+    return {type,
+            MetadataInconsistencyDescription_serializer(
+                static_cast<MetadataInconsistencyDescriptionEnum>(type))
+                .toString(),
+            details.toBSON()};
+}
 
 /**
  * Creates a queued data plan executor for the given list of inconsistencies

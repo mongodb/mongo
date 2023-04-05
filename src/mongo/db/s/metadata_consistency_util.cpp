@@ -48,51 +48,6 @@ namespace mongo {
 namespace metadata_consistency_util {
 
 namespace {
-
-void _appendMisplacedCollectionInconsistency(
-    const ShardId& shardId,
-    const NamespaceString& localNss,
-    const UUID& localUUID,
-    std::vector<MetadataInconsistencyItem>& inconsistencies) {
-    MetadataInconsistencyItem val;
-    val.setNs(localNss);
-    val.setType(MetadataInconsistencyTypeEnum::kMisplacedCollection);
-    val.setShard(shardId);
-    val.setInfo(BSON(kDescriptionFieldName
-                     << "Unsharded collection found on shard different from db primary shard"
-                     << "localUUID" << localUUID));
-    inconsistencies.emplace_back(std::move(val));
-}
-
-void _appendUUIDMismatchInconsistency(const ShardId& shardId,
-                                      const NamespaceString& localNss,
-                                      const UUID& localUUID,
-                                      const UUID& UUID,
-                                      std::vector<MetadataInconsistencyItem>& inconsistencies) {
-    MetadataInconsistencyItem val;
-    val.setNs(localNss);
-    val.setType(MetadataInconsistencyTypeEnum::kUUIDMismatch);
-    val.setShard(shardId);
-    val.setInfo(BSON(kDescriptionFieldName
-                     << "Found collection on non primary shard with mismatching UUID"
-                     << "localUUID" << localUUID << "UUID" << UUID));
-    inconsistencies.emplace_back(std::move(val));
-}
-
-void _appendMissingShardKeyIndexInconsistency(
-    const ShardId& shardId,
-    const NamespaceString& localNss,
-    const BSONObj& shardKey,
-    std::vector<MetadataInconsistencyItem>& inconsistencies) {
-    MetadataInconsistencyItem val;
-    val.setNs(localNss);
-    val.setType(MetadataInconsistencyTypeEnum::kMissingShardKeyIndex);
-    val.setShard(shardId);
-    val.setInfo(BSON(kDescriptionFieldName << "Found sharded collection without a shard key index"
-                                           << "shardKey" << shardKey));
-    inconsistencies.emplace_back(val);
-}
-
 void _checkShardKeyIndexInconsistencies(OperationContext* opCtx,
                                         const NamespaceString& nss,
                                         const ShardId& shardId,
@@ -104,8 +59,9 @@ void _checkShardKeyIndexInconsistencies(OperationContext* opCtx,
         // Check that the collection has an index that supports the shard key. If so, check that
         // exists an index that supports the shard key and is not multikey.
         if (!findShardKeyPrefixedIndex(opCtx, localColl, shardKey, false /*requireSingleKey*/)) {
-            _appendMissingShardKeyIndexInconsistency(
-                shardId, localColl->ns(), shardKey, inconsistencies);
+            inconsistencies.emplace_back(metadata_consistency_util::makeInconsistency(
+                MetadataInconsistencyTypeEnum::kMissingShardKeyIndex,
+                MissingShardKeyIndexDetails{localColl->ns(), shardId, shardKey}));
         }
     };
 
@@ -161,78 +117,7 @@ void _checkShardKeyIndexInconsistencies(OperationContext* opCtx,
     tmpInconsistencies.clear();
     performChecks(*ac, inconsistencies);
 }
-
-void _appendRoutingTableRangeGapInconsistency(
-    const ShardId& shardId,
-    const NamespaceString& nss,
-    const UUID& uuid,
-    const ChunkType& chunk,
-    const ChunkType& previousChunk,
-    std::vector<MetadataInconsistencyItem>& inconsistencies) {
-    MetadataInconsistencyItem val;
-    val.setNs(nss);
-    val.setType(MetadataInconsistencyTypeEnum::kRoutingTableRangeGap);
-    val.setShard(shardId);
-    val.setInfo(BSON("description"
-                     << "Found chunk with a gap in the range"
-                     << "collectionUUID" << uuid << "chunkA" << previousChunk.toConfigBSON()
-                     << "chunkB" << chunk.toConfigBSON()));
-    inconsistencies.emplace_back(std::move(val));
-}
-
-void _appendMissingMinOrMaxKeyInconsistency(
-    const ShardId& shardId,
-    const NamespaceString& nss,
-    const UUID& uuid,
-    const StringData& missingKey,
-    std::vector<MetadataInconsistencyItem>& inconsistencies) {
-    MetadataInconsistencyItem val;
-    val.setNs(nss);
-    val.setType(MetadataInconsistencyTypeEnum::kRoutingTableRangeGap);
-    val.setShard(shardId);
-    val.setInfo(BSON("description"
-                     << "There is a range gap because there is no " + missingKey + " key"
-                     << "collectionUUID" << uuid));
-    inconsistencies.emplace_back(std::move(val));
-}
-
-void _appendRoutingTableRangeOverlapInconsistency(
-    const ShardId& shardId,
-    const NamespaceString& nss,
-    const UUID& uuid,
-    const ChunkType& chunk,
-    const ChunkType& previousChunk,
-    std::vector<MetadataInconsistencyItem>& inconsistencies) {
-    MetadataInconsistencyItem val;
-    val.setNs(nss);
-    val.setType(MetadataInconsistencyTypeEnum::kRoutingTableRangeOverlap);
-    val.setShard(shardId);
-    val.setInfo(BSON("description"
-                     << "Found chunk with an overlap in the range"
-                     << "collectionUUID" << uuid << "chunkA" << previousChunk.toConfigBSON()
-                     << "chunkB" << chunk.toConfigBSON()));
-    inconsistencies.emplace_back(std::move(val));
-}
-
-void _appendCorruptedChunkShardKeyInconsistency(
-    const ShardId& shardId,
-    const NamespaceString& nss,
-    const UUID& uuid,
-    const ChunkType& chunk,
-    const BSONObj& shardKeyPattern,
-    std::vector<MetadataInconsistencyItem>& inconsistencies) {
-    MetadataInconsistencyItem val;
-    val.setNs(nss);
-    val.setType(MetadataInconsistencyTypeEnum::kCorruptedChunkShardKey);
-    val.setShard(shardId);
-    val.setInfo(BSON("description"
-                     << "Found chunk with a shard key pattern violation"
-                     << "collectionUUID" << uuid << "chunk" << chunk.toConfigBSON()
-                     << "shardKeyPattern" << shardKeyPattern));
-    inconsistencies.emplace_back(std::move(val));
-}
 }  // namespace
-
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeQueuedPlanExecutor(
     OperationContext* opCtx,
@@ -263,7 +148,6 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeQueuedPlanExecutor(
                                     false, /* whether returned BSON must be owned */
                                     nss));
 }
-
 
 CursorInitialReply createInitialCursorReplyMongod(OperationContext* opCtx,
                                                   ClientCursorParams&& cursorParams,
@@ -343,8 +227,9 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataInconsistencies(
             // Check that local collection has the same UUID as the one in the catalog client.
             const auto& UUID = itCatalogCollections->getUuid();
             if (UUID != localUUID) {
-                _appendUUIDMismatchInconsistency(
-                    shardId, localNss, localUUID, UUID, inconsistencies);
+                inconsistencies.emplace_back(makeInconsistency(
+                    MetadataInconsistencyTypeEnum::kCollectionUUIDMismatch,
+                    CollectionUUIDMismatchDetails{localNss, shardId, localUUID, UUID}));
             }
 
             _checkShardKeyIndexInconsistencies(opCtx,
@@ -359,8 +244,9 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataInconsistencies(
         } else {
             // Case where we have found a local collection that is not in the catalog client.
             if (shardId != primaryShardId) {
-                _appendMisplacedCollectionInconsistency(
-                    shardId, localNss, localUUID, inconsistencies);
+                inconsistencies.emplace_back(
+                    makeInconsistency(MetadataInconsistencyTypeEnum::kMisplacedCollection,
+                                      MisplacedCollectionDetails{localNss, shardId, localUUID}));
             }
             itLocalCollections++;
         }
@@ -370,8 +256,9 @@ std::vector<MetadataInconsistencyItem> checkCollectionMetadataInconsistencies(
     // hidden unsharded collection inconsistency if we are not the db primary shard.
     while (itLocalCollections != localCollections.end() && shardId != primaryShardId) {
         const auto localColl = itLocalCollections->get();
-        _appendMisplacedCollectionInconsistency(
-            shardId, localColl->ns(), localColl->uuid(), inconsistencies);
+        inconsistencies.emplace_back(makeInconsistency(
+            MetadataInconsistencyTypeEnum::kMisplacedCollection,
+            MisplacedCollectionDetails{localColl->ns(), shardId, localColl->uuid()}));
         itLocalCollections++;
     }
 
@@ -399,17 +286,23 @@ std::vector<MetadataInconsistencyItem> checkChunksInconsistencies(
 
         if (!shardKeyPattern.isShardKey(chunk.getMin()) ||
             !shardKeyPattern.isShardKey(chunk.getMax())) {
-            _appendCorruptedChunkShardKeyInconsistency(
-                configShardId, nss, uuid, chunk, shardKeyPattern.toBSON(), inconsistencies);
+            inconsistencies.emplace_back(
+                makeInconsistency(MetadataInconsistencyTypeEnum::kCorruptedChunkShardKey,
+                                  CorruptedChunkShardKeyDetails{
+                                      nss, uuid, chunk.toConfigBSON(), shardKeyPattern.toBSON()}));
         }
 
         auto cmp = previousChunk->getMax().woCompare(chunk.getMin());
         if (cmp < 0) {
-            _appendRoutingTableRangeGapInconsistency(
-                configShardId, nss, uuid, chunk, *previousChunk, inconsistencies);
+            inconsistencies.emplace_back(makeInconsistency(
+                MetadataInconsistencyTypeEnum::kRoutingTableRangeGap,
+                RoutingTableRangeGapDetails{
+                    nss, uuid, previousChunk->toConfigBSON(), chunk.toConfigBSON()}));
         } else if (cmp > 0) {
-            _appendRoutingTableRangeOverlapInconsistency(
-                configShardId, nss, uuid, chunk, *previousChunk, inconsistencies);
+            inconsistencies.emplace_back(makeInconsistency(
+                MetadataInconsistencyTypeEnum::kRoutingTableRangeOverlap,
+                RoutingTableRangeOverlapDetails{
+                    nss, uuid, previousChunk->toConfigBSON(), chunk.toConfigBSON()}));
         }
 
         previousChunk = it;
@@ -417,21 +310,24 @@ std::vector<MetadataInconsistencyItem> checkChunksInconsistencies(
 
     // Check if the first and last chunk have MinKey and MaxKey respectively
     if (chunks.empty()) {
-        _appendMissingMinOrMaxKeyInconsistency(
-            configShardId, nss, uuid, kMinField, inconsistencies);
-        _appendMissingMinOrMaxKeyInconsistency(
-            configShardId, nss, uuid, kMaxField, inconsistencies);
+        inconsistencies.emplace_back(
+            makeInconsistency(MetadataInconsistencyTypeEnum::kMissingRoutingTable,
+                              MissingRoutingTableDetails{nss, uuid}));
     } else {
         const BSONObj& minKeyObj = chunks.front().getMin();
+        const auto globalMin = shardKeyPattern.getKeyPattern().globalMin();
         if (minKeyObj.woCompare(shardKeyPattern.getKeyPattern().globalMin()) != 0) {
-            _appendMissingMinOrMaxKeyInconsistency(
-                configShardId, nss, uuid, kMinField, inconsistencies);
+            inconsistencies.emplace_back(makeInconsistency(
+                MetadataInconsistencyTypeEnum::kRoutingTableMissingMinKey,
+                RoutingTableMissingMinKeyDetails{nss, uuid, minKeyObj, globalMin}));
         }
 
         const BSONObj& maxKeyObj = chunks.back().getMax();
-        if (maxKeyObj.woCompare(shardKeyPattern.getKeyPattern().globalMax()) != 0) {
-            _appendMissingMinOrMaxKeyInconsistency(
-                configShardId, nss, uuid, kMaxField, inconsistencies);
+        const auto globalMax = shardKeyPattern.getKeyPattern().globalMax();
+        if (maxKeyObj.woCompare(globalMax) != 0) {
+            inconsistencies.emplace_back(makeInconsistency(
+                MetadataInconsistencyTypeEnum::kRoutingTableMissingMaxKey,
+                RoutingTableMissingMaxKeyDetails{nss, uuid, maxKeyObj, globalMax}));
         }
     }
 

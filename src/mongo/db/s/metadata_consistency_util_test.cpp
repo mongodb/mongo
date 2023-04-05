@@ -74,8 +74,6 @@ protected:
         const ShardId& shard,
         const std::vector<MetadataInconsistencyItem>& inconsistencies) {
         ASSERT_EQ(1, inconsistencies.size());
-        ASSERT_EQ(nss, inconsistencies[0].getNs());
-        ASSERT_EQ(shard, inconsistencies[0].getShard());
         ASSERT_EQ(type, inconsistencies[0].getType());
     }
 };
@@ -114,7 +112,7 @@ TEST_F(MetadataConsistencyTest, FindMissingChunkWithMaxKeyInconsistency) {
         metadata_consistency_util::checkChunksInconsistencies(operationContext(), _coll, {chunk});
 
     assertOneInconsistencyFound(
-        MetadataInconsistencyTypeEnum::kRoutingTableRangeGap, _nss, _config, inconsistencies);
+        MetadataInconsistencyTypeEnum::kRoutingTableMissingMaxKey, _nss, _config, inconsistencies);
 }
 
 TEST_F(MetadataConsistencyTest, FindMissingChunkWithMinKeyInconsistency) {
@@ -129,7 +127,7 @@ TEST_F(MetadataConsistencyTest, FindMissingChunkWithMinKeyInconsistency) {
         metadata_consistency_util::checkChunksInconsistencies(operationContext(), _coll, {chunk});
 
     assertOneInconsistencyFound(
-        MetadataInconsistencyTypeEnum::kRoutingTableRangeGap, _nss, _config, inconsistencies);
+        MetadataInconsistencyTypeEnum::kRoutingTableMissingMinKey, _nss, _config, inconsistencies);
 }
 
 TEST_F(MetadataConsistencyTest, FindRoutingTableRangeOverlapInconsistency) {
@@ -173,11 +171,7 @@ TEST_F(MetadataConsistencyTest, FindCorruptedChunkShardKeyInconsistency) {
         operationContext(), _coll, {chunk1, chunk2});
 
     ASSERT_EQ(2, inconsistencies.size());
-    ASSERT_EQ(_nss, inconsistencies[0].getNs());
-    ASSERT_EQ(_config, inconsistencies[0].getShard());
     ASSERT_EQ(MetadataInconsistencyTypeEnum::kCorruptedChunkShardKey, inconsistencies[0].getType());
-    ASSERT_EQ(_nss, inconsistencies[1].getNs());
-    ASSERT_EQ(_config, inconsistencies[1].getShard());
     ASSERT_EQ(MetadataInconsistencyTypeEnum::kRoutingTableRangeGap, inconsistencies[1].getType());
 }
 
@@ -244,8 +238,11 @@ TEST_F(MetadataConsistencyRandomRoutingTableTest, FindRoutingTableRangeGapIncons
     try {
         ASSERT_LTE(1, inconsistencies.size());
         for (const auto& inconsistency : inconsistencies) {
-            ASSERT_EQ(MetadataInconsistencyTypeEnum::kRoutingTableRangeGap,
-                      inconsistency.getType());
+            const auto type = inconsistency.getType();
+            ASSERT_TRUE(type == MetadataInconsistencyTypeEnum::kRoutingTableRangeGap ||
+                        type == MetadataInconsistencyTypeEnum::kRoutingTableMissingMinKey ||
+                        type == MetadataInconsistencyTypeEnum::kRoutingTableMissingMaxKey ||
+                        type == MetadataInconsistencyTypeEnum::kMissingRoutingTable);
         }
     } catch (...) {
         LOGV2_INFO(7424600,
