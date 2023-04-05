@@ -84,41 +84,6 @@ void OplogBatcher::shutdown() {
     }
 }
 
-/**
- * Returns true if this oplog entry must be processed in its own batch and cannot be grouped with
- * other entries.
- *
- * Commands, in most cases, must be processed one at a time. The exceptions to this rule are
- * unprepared applyOps and unprepared commitTransaction for transactions that only contain CRUD
- * operations and commands found within large transactions (>16MB). The prior two cases expand to
- * CRUD operations, which can be safely batched with other CRUD operations. All other command oplog
- * entries, including unprepared applyOps/commitTransaction for transactions that contain commands,
- * must be processed in their own batch.
- * Note that 'unprepared applyOps' could mean a partial transaction oplog entry, or an implicit
- * commit applyOps oplog entry.
- *
- * Command operations inside large transactions do not need to be processed individually as long as
- * the final oplog entry in the transaction is processed individually, since the operations are not
- * actually run until the commit operation is reached.
- *
- * The ends of large transactions (> 16MB) should also be processed immediately on its own in order
- * to avoid scenarios where parts of the transaction is batched with other operations not in the
- * transaction.
- */
-/* static */
-bool OplogBatcher::mustProcessIndividually(const OplogEntry& entry) {
-    if (entry.isCommand()) {
-        // If none of the following cases is true, we'll return false to
-        // cover unprepared CRUD applyOps and unprepared CRUD commits.
-        return (entry.getCommandType() != OplogEntry::CommandType::kApplyOps) ||
-            entry.shouldPrepare() || entry.isSingleOplogEntryTransactionWithCommand() ||
-            entry.isEndOfLargeTransaction();
-    }
-
-    const auto nss = entry.getNss();
-    return nss.mustBeAppliedInOwnOplogBatch();
-}
-
 std::size_t OplogBatcher::getOpCount(const OplogEntry& entry) {
     // Get the number of operations enclosed in 'applyOps'. The 'count' field only exists in
     // the last applyOps oplog entry of a large transaction that has multiple oplog entries,
@@ -143,8 +108,7 @@ StatusWith<std::vector<OplogEntry>> OplogBatcher::getNextApplierBatch(
         return Status(ErrorCodes::InvalidOptions, "Batch size must be greater than 0.");
     }
 
-    std::size_t totalOps = 0;
-    std::uint32_t totalBytes = 0;
+    BatchStats batchStats;
     std::vector<OplogEntry> ops;
     BSONObj op;
     Date_t batchDeadline;
@@ -190,48 +154,58 @@ StatusWith<std::vector<OplogEntry>> OplogBatcher::getNextApplierBatch(
             }
         }
 
-        if (mustProcessIndividually(entry)) {
-            if (ops.empty()) {
-                ops.push_back(std::move(entry));
-                _consume(opCtx, _oplogBuffer);
-            }
-
-            // Otherwise, apply what we have so far and come back for this entry.
-            return std::move(ops);
+        BatchAction action = _getBatchActionForEntry(entry, batchStats);
+        switch (action) {
+            case BatchAction::kContinueBatch:
+                break;
+            case BatchAction::kStartNewBatch:
+                if (!ops.empty()) {
+                    return std::move(ops);
+                }
+                break;
+            case BatchAction::kProcessIndividually:
+                if (ops.empty()) {
+                    ops.push_back(std::move(entry));
+                    _consume(opCtx, _oplogBuffer);
+                }
+                return std::move(ops);
         }
 
         // Apply replication batch limits. Avoid returning an empty batch.
         auto opCount = getOpCount(entry);
         auto opBytes = entry.getRawObjSizeBytes();
-        if (totalOps > 0) {
-            if (totalOps + opCount > batchLimits.ops || totalBytes + opBytes > batchLimits.bytes) {
+        if (batchStats.totalOps > 0) {
+            if (batchStats.totalOps + opCount > batchLimits.ops ||
+                batchStats.totalBytes + opBytes > batchLimits.bytes) {
                 return std::move(ops);
             }
         }
 
         // If we have a forced batch boundary, apply it.
-        if (totalOps > 0 && !batchLimits.forceBatchBoundaryAfter.isNull() &&
+        if (batchStats.totalOps > 0 && !batchLimits.forceBatchBoundaryAfter.isNull() &&
             entry.getOpTime().getTimestamp() > batchLimits.forceBatchBoundaryAfter &&
             ops.back().getOpTime().getTimestamp() <= batchLimits.forceBatchBoundaryAfter) {
             return std::move(ops);
         }
 
         // Add op to buffer.
-        totalOps += opCount;
-        totalBytes += opBytes;
+        batchStats.totalOps += opCount;
+        batchStats.totalBytes += opBytes;
+        batchStats.prepareOps += entry.shouldPrepare();
         ops.push_back(std::move(entry));
         _consume(opCtx, _oplogBuffer);
+
         // At this point we either have a partial batch or an exactly full batch; if we are using
         // a wait to fill the batch, we should wait if and only if the batch is partial.
-        if (batchDeadline != Date_t() && totalOps < batchLimits.ops &&
-            totalBytes < batchLimits.bytes) {
+        if (batchDeadline != Date_t() && batchStats.totalOps < batchLimits.ops &&
+            batchStats.totalBytes < batchLimits.bytes) {
             LOGV2_DEBUG(6572301,
                         3,
                         "Waiting for batch to fill",
                         "deadline"_attr = batchDeadline,
                         "waitToFillBatch"_attr = waitToFillBatch,
-                        "totalOps"_attr = totalOps,
-                        "totalBytes"_attr = totalBytes);
+                        "totalOps"_attr = batchStats.totalOps,
+                        "totalBytes"_attr = batchStats.totalBytes);
             try {
                 _oplogBuffer->waitForDataUntil(batchDeadline, opCtx);
             } catch (const ExceptionForCat<ErrorCategory::CancellationError>& e) {
@@ -242,6 +216,48 @@ StatusWith<std::vector<OplogEntry>> OplogBatcher::getNextApplierBatch(
         }
     }
     return std::move(ops);
+}
+
+/**
+ * Commands, in most cases, must be processed one at a time, however there are some exceptions:
+ *
+ * 1) When in secondary steady state oplog application mode, a prepareTransaction entry can be
+ *    batched with other entries, while a prepared commitTransaction or abortTransaction entry
+ *    is always processed individually in its own batch.
+ * 2) An applyOps entry from batched writes or unprepared transactions will be expanded to CRUD
+ *    operation and thus can be safely batched with other CRUD operations in most cases, unless
+ *    it refers to the end of a large transaction (> 16MB) or a transaction that contains DDL
+ *    commands, which have to be processed individually (see SERVER-45565).
+ */
+OplogBatcher::BatchAction OplogBatcher::_getBatchActionForEntry(const OplogEntry& entry,
+                                                                const BatchStats& batchStats) {
+    if (!entry.isCommand()) {
+        return entry.getNss().mustBeAppliedInOwnOplogBatch()
+            ? OplogBatcher::BatchAction::kProcessIndividually
+            : OplogBatcher::BatchAction::kContinueBatch;
+    }
+
+    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
+    if (repl::feature_flags::gApplyPreparedTxnsInParallel.isEnabledAndIgnoreFCVUnsafe() &&
+        _oplogApplier->getOptions().mode == OplogApplication::Mode::kSecondary) {
+        if (entry.shouldPrepare()) {
+            // Grouping too many prepare ops in a batch may have performance implications,
+            // so we break the batch when it contains enough prepare ops.
+            return batchStats.prepareOps >= kMaxPrepareOpsPerBatch
+                ? OplogBatcher::BatchAction::kStartNewBatch
+                : OplogBatcher::BatchAction::kContinueBatch;
+        }
+        if (entry.isPreparedCommitOrAbort()) {
+            return OplogBatcher::BatchAction::kProcessIndividually;
+        }
+    }
+
+    bool processIndividually = (entry.getCommandType() != OplogEntry::CommandType::kApplyOps) ||
+        entry.shouldPrepare() || entry.isSingleOplogEntryTransactionWithCommand() ||
+        entry.isEndOfLargeTransaction();
+
+    return processIndividually ? OplogBatcher::BatchAction::kProcessIndividually
+                               : OplogBatcher::BatchAction::kContinueBatch;
 }
 
 /**

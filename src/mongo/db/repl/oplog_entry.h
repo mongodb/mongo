@@ -575,7 +575,23 @@ public:
      * Returns if this is a prepared 'abortTransaction' oplog entry.
      */
     bool isPreparedAbort() const {
-        return getCommandType() == DurableOplogEntry::CommandType::kAbortTransaction;
+        // Normally an 'abortTransaction' oplog entry represents an aborted prepared transaction.
+        // However during stepup, if the secondary sees that it didn't replicate the full oplog
+        // chain of a large unprepared transcation, it will abort this transaction and write an
+        // 'abortTransaction' oplog entry, even though it is an unprepared transcation. In this
+        // case, the entry will have a null prevOpTime.
+        if (getCommandType() != DurableOplogEntry::CommandType::kAbortTransaction) {
+            return false;
+        }
+        auto prevOptime = getPrevWriteOpTimeInTransaction();
+        return prevOptime && !prevOptime->isNull();
+    }
+
+    /**
+     * Returns if this is a prepared 'commitTransaction' or 'abortTransaction' oplog entry.
+     */
+    bool isPreparedCommitOrAbort() const {
+        return isPreparedCommit() || isPreparedAbort();
     }
 
     /**
@@ -784,6 +800,7 @@ public:
     bool isEndOfLargeTransaction() const;
     bool isPreparedCommit() const;
     bool isPreparedAbort() const;
+    bool isPreparedCommitOrAbort() const;
     bool isPreparedTransactionCommand() const;
     bool isTerminalApplyOps() const;
     bool isSingleOplogEntryTransaction() const;

@@ -863,16 +863,17 @@ TEST_F(StorageTimestampTest, SecondaryArrayInsertTimes) {
         NamespaceString::createNamespaceString_forTest("unittests.timestampedUpdates");
     create(nss);
 
-    AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
-
     const std::int32_t docsToInsert = 10;
     const LogicalTime firstInsertTime = _clock->tickClusterTime(docsToInsert);
-
     BSONObjBuilder oplogCommonBuilder;
-    oplogCommonBuilder << "v" << 2 << "op"
-                       << "i"
-                       << "ns" << nss.ns() << "ui" << autoColl.getCollection()->uuid() << "wall"
-                       << Date_t();
+
+    {
+        AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);
+        oplogCommonBuilder << "v" << 2 << "op"
+                           << "i"
+                           << "ns" << nss.ns() << "ui" << autoColl.getCollection()->uuid() << "wall"
+                           << Date_t();
+    }
     auto oplogCommon = oplogCommonBuilder.done();
 
     std::vector<repl::OplogEntry> oplogEntries;

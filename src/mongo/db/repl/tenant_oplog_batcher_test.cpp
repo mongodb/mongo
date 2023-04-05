@@ -172,9 +172,8 @@ TEST_F(TenantOplogBatcherTest, OplogBatcherFailsOnPreparedCommit) {
     auto batchFuture = batcher->getNextBatch(bigBatchLimits);
 
     std::vector<BSONObj> srcOps;
-    srcOps.push_back(makeCommitTransactionOplogEntry(1, dbName, true /* prepared*/, 1 /* count */)
-                         .getEntry()
-                         .toBSON());
+    srcOps.push_back(
+        makeCommitTransactionOplogEntry(1, dbName, true /* prepared */).getEntry().toBSON());
     _oplogBuffer.push(nullptr, srcOps.cbegin(), srcOps.cend());
     ASSERT_THROWS(batchFuture.get(), AssertionException);
 

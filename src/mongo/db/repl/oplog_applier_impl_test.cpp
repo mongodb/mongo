@@ -2086,35 +2086,6 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyAbortPreparedTransactio
                   DurableTxnStateEnum::kAborted);
 }
 
-DEATH_TEST_REGEX_F(MultiOplogEntryPreparedTransactionTest,
-                   MultiApplyAbortPreparedTransactionCheckTxnTableSingleBatch,
-                   "Invariant.*partialTxnOps.*abortTransaction") {
-    NoopOplogApplierObserver observer;
-    OplogApplierImpl oplogApplier(
-        nullptr,  // executor
-        nullptr,  // oplogBuffer
-        &observer,
-        ReplicationCoordinator::get(_opCtx.get()),
-        getConsistencyMarkers(),
-        getStorageInterface(),
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
-        _writerPool.get());
-
-    // Apply a batch with the entire lifecyle of the prepared transaction - this includes the
-    // insert operations with the subsequent commands to prepare and abort the transaction.
-    // Note that this combination of operations (applyOps, commitTransaction, and abortTransaction)
-    // in the same batch is not permissible under current oplog batching rules.
-    // See OplogBatcher::mustProcessIndividually().
-    ASSERT_FALSE(OplogBatcher::mustProcessIndividually(*_insertOp1));
-    ASSERT_FALSE(OplogBatcher::mustProcessIndividually(*_insertOp2));
-    ASSERT(OplogBatcher::mustProcessIndividually(*_prepareWithPrevOp));
-    ASSERT(OplogBatcher::mustProcessIndividually(*_abortPrepareWithPrevOp));
-    getStorageInterface()->oplogDiskLocRegister(
-        _opCtx.get(), _abortPrepareWithPrevOp->getTimestamp(), true);
-    (void)oplogApplier.applyOplogBatch(
-        _opCtx.get(), {*_insertOp1, *_insertOp2, *_prepareWithPrevOp, *_abortPrepareWithPrevOp});
-}
-
 TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyPreparedTransactionInitialSync) {
     NoopOplogApplierObserver observer;
     OplogApplierImpl oplogApplier(

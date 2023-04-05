@@ -289,20 +289,28 @@ OplogEntry makeApplyOpsOplogEntry(int t, bool prepare, const std::vector<OplogEn
  * Generates a commitTransaction/applyOps oplog entry, depending on whether this is for a prepared
  * transaction, with the given number used for the timestamp.
  */
-OplogEntry makeCommitTransactionOplogEntry(int t, StringData dbName, bool prepared, int count) {
+OplogEntry makeCommitTransactionOplogEntry(int t,
+                                           StringData dbName,
+                                           bool prepared,
+                                           boost::optional<int> count) {
     auto nss = NamespaceString::createNamespaceString_forTest(dbName).getCommandNS();
     BSONObj oField;
+    boost::optional<OpTime> prevWriteOpTime;
 
     if (prepared) {
+        invariant(!count);
         CommitTransactionOplogObject cmdObj;
         oField = cmdObj.toBSON();
+        prevWriteOpTime.emplace(OpTime(Timestamp(t, 0), 1));
     } else {
+        invariant(count);
         BSONArrayBuilder applyOpsBuilder;
-        for (int i = 0; i < count; i++) {
+        for (int i = 0; i < *count; i++) {
             applyOpsBuilder.append(BSONObj());
         }
         oField = BSON("applyOps" << applyOpsBuilder.done());
     }
+
     return {DurableOplogEntry(OpTime(Timestamp(t, 1), 1),  // optime
                               OpTypeEnum::kCommand,        // op type
                               nss,                         // namespace
@@ -315,12 +323,42 @@ OplogEntry makeCommitTransactionOplogEntry(int t, StringData dbName, bool prepar
                               boost::none,                 // upsert
                               Date_t() + Seconds(t),       // wall clock time
                               {},                          // statement ids
-                              boost::none,    // optime of previous write within same transaction
-                              boost::none,    // pre-image optime
-                              boost::none,    // post-image optime
-                              boost::none,    // ShardId of resharding recipient
-                              boost::none,    // _id
-                              boost::none)};  // needsRetryImage
+                              prevWriteOpTime,             // prevWriteOpTimeInTransaction
+                              boost::none,                 // pre-image optime
+                              boost::none,                 // post-image optime
+                              boost::none,                 // ShardId of resharding recipient
+                              boost::none,                 // _id
+                              boost::none)};               // needsRetryImage
+}
+
+/**
+ * Generates an abortTransaction oplog entry with the given number used for the timestamp.
+ */
+OplogEntry makeAbortTransactionOplogEntry(int t, StringData dbName) {
+    auto nss = NamespaceString::createNamespaceString_forTest(dbName).getCommandNS();
+    BSONObj oField;
+
+    AbortTransactionOplogObject cmdObj;
+    oField = cmdObj.toBSON();
+
+    return {DurableOplogEntry(OpTime(Timestamp(t, 2), 1),  // optime
+                              OpTypeEnum::kCommand,        // op type
+                              nss,                         // namespace
+                              boost::none,                 // uuid
+                              boost::none,                 // fromMigrate
+                              OplogEntry::kOplogVersion,   // version
+                              oField,                      // o
+                              boost::none,                 // o2
+                              {},                          // sessionInfo
+                              boost::none,                 // upsert
+                              Date_t() + Seconds(t),       // wall clock time
+                              {},                          // statement ids
+                              OpTime(Timestamp(t, 1), 1),  // prevWriteOpTimeInTransaction
+                              boost::none,                 // pre-image optime
+                              boost::none,                 // post-image optime
+                              boost::none,                 // ShardId of resharding recipient
+                              boost::none,                 // _id
+                              boost::none)};               // needsRetryImage
 }
 
 /**

@@ -97,6 +97,8 @@ private:
 
     StatusWith<TenantOplogBatch> _readNextBatch(BatchLimits limits);
 
+    bool _mustProcessIndividually(const OplogEntry& entry);
+
     void _consume(OperationContext* opCtx);
 
     void _pushEntry(OperationContext* opCtx, TenantOplogBatch* batch, OplogEntry&& op);

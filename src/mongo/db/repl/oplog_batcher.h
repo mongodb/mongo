@@ -39,6 +39,8 @@
 namespace mongo {
 namespace repl {
 
+constexpr std::size_t kMaxPrepareOpsPerBatch = 128;
+
 class OplogApplier;
 
 /**
@@ -181,11 +183,6 @@ public:
         Milliseconds waitToFillBatch = Milliseconds(0));
 
     /**
-     * Helper method indicating that this oplog entry must be in a batch of its own.
-     */
-    static bool mustProcessIndividually(const OplogEntry& entry);
-
-    /**
      * Returns the number of logical operations represented by an oplog entry.
      * This is usually one but may be greater than one in certain cases, such as in a
      * commitTransaction command.
@@ -193,6 +190,21 @@ public:
     static std::size_t getOpCount(const OplogEntry& entry);
 
 private:
+    enum class BatchAction { kContinueBatch, kStartNewBatch, kProcessIndividually };
+
+    class BatchStats {
+    public:
+        std::size_t totalOps = 0;
+        std::size_t totalBytes = 0;
+        std::size_t prepareOps = 0;
+    };
+
+    /**
+     * Returns how we should batch an oplog entry: grouping with the current batch, starting a new
+     * new batch, or processing it individually in its own batch.
+     */
+    BatchAction _getBatchActionForEntry(const OplogEntry& entry, const BatchStats& batchStats);
+
     /**
      * If secondaryDelaySecs is enabled, this function calculates the most recent timestamp of any
      * oplog entries that can be be returned in a batch.

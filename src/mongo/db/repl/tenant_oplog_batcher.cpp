@@ -153,6 +153,19 @@ void TenantOplogBatcher::_consume(OperationContext* opCtx) {
     invariant(_oplogBuffer->tryPop(opCtx, &opToPopAndDiscard) || _isShuttingDown() || !isActive());
 }
 
+bool TenantOplogBatcher::_mustProcessIndividually(const OplogEntry& entry) {
+    // See the comment of OplogBatcher::_getBatchActionForEntry() for details. The conditions
+    // here are similar to the kProcessIndividually case in that function.
+    if (entry.isCommand()) {
+        return (entry.getCommandType() != OplogEntry::CommandType::kApplyOps) ||
+            entry.shouldPrepare() || entry.isSingleOplogEntryTransactionWithCommand() ||
+            entry.isEndOfLargeTransaction();
+    }
+
+    const auto nss = entry.getNss();
+    return nss.mustBeAppliedInOwnOplogBatch();
+}
+
 StatusWith<TenantOplogBatch> TenantOplogBatcher::_readNextBatch(BatchLimits limits) {
     auto opCtx = cc().makeOperationContext();
     TenantOplogBatch batch;
@@ -176,7 +189,7 @@ StatusWith<TenantOplogBatch> TenantOplogBatcher::_readNextBatch(BatchLimits limi
         std::uint32_t totalBytes = 0;
         while (_oplogBuffer->peek(opCtx.get(), &op)) {
             auto entry = OplogEntry(op);
-            if (OplogBatcher::mustProcessIndividually(entry)) {
+            if (_mustProcessIndividually(entry)) {
                 if (batch.ops.empty()) {
                     _pushEntry(opCtx.get(), &batch, std::move(entry));
                     _consume(opCtx.get());

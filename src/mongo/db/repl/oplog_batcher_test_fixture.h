@@ -95,7 +95,14 @@ OplogEntry makeNoopOplogEntry(int t, const StringData& msg);
 OplogEntry makeApplyOpsOplogEntry(int t,
                                   bool prepare,
                                   const std::vector<OplogEntry>& innerOps = {});
-OplogEntry makeCommitTransactionOplogEntry(int t, StringData dbName, bool prepared, int count);
+
+OplogEntry makeCommitTransactionOplogEntry(int t,
+                                           StringData dbName,
+                                           bool prepared,
+                                           boost::optional<int> count = boost::none);
+
+OplogEntry makeAbortTransactionOplogEntry(int t, StringData dbName);
+
 std::vector<OplogEntry> makeMultiEntryTransactionOplogEntries(int t,
                                                               StringData dbName,
                                                               bool prepared,
