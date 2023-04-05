@@ -163,7 +163,6 @@ BaseCloner::AfterStageBehavior TenantAllDatabaseCloner::listExistingDatabasesSta
         clonedDatabases.emplace_back(dbName);
 
         BSONObj res;
-        // TODO SERVER-72945: Use dbName which is DatabaseName object already.
         client.runCommand(DatabaseName(boost::none, dbName), BSON("dbStats" << 1), res);
         if (auto status = getStatusFromCommandResult(res); !status.isOK()) {
             LOGV2_WARNING(5522900,
@@ -234,7 +233,6 @@ BaseCloner::AfterStageBehavior TenantAllDatabaseCloner::initializeStatsStage() {
     long long approxTotalDataSizeLeftOnRemote = 0;
     for (const auto& dbName : _databases) {
         BSONObj res;
-        // TODO SERVER-72945: Use dbName which is DatabaseName object already.
         getClient()->runCommand(DatabaseName(boost::none, dbName), BSON("dbStats" << 1), res);
         if (auto status = getStatusFromCommandResult(res); !status.isOK()) {
             LOGV2_WARNING(5426600,

@@ -87,7 +87,6 @@ BaseCloner::AfterStageBehavior TenantDatabaseCloner::listCollectionsStage() {
     // This will be set after a successful listCollections command.
     _operationTime = Timestamp();
 
-    // TODO SERVER-72945: Use the _dbName which is DatabaseName object already.
     auto collectionInfos = getClient()->getCollectionInfos(
         DatabaseName(boost::none, _dbName), ListCollectionsFilter::makeTypeCollectionFilter());
 
@@ -199,7 +198,6 @@ BaseCloner::AfterStageBehavior TenantDatabaseCloner::listExistingCollectionsStag
     long long approxTotalDBSizeOnDisk = 0;
 
     std::vector<UUID> clonedCollectionUUIDs;
-    // TODO SERVER-72945: Use the _dbName which is DatabaseName object already.
     auto collectionInfos = client.getCollectionInfos(
         DatabaseName(boost::none, _dbName), ListCollectionsFilter::makeTypeCollectionFilter());
     for (auto&& info : collectionInfos) {
@@ -227,7 +225,6 @@ BaseCloner::AfterStageBehavior TenantDatabaseCloner::listExistingCollectionsStag
         clonedCollectionUUIDs.emplace_back(result.getInfo().getUuid());
 
         BSONObj res;
-        // TODO SERVER-72945: Use the _dbName which is DatabaseName object already.
         client.runCommand(
             DatabaseName(boost::none, _dbName), BSON("collStats" << result.getName()), res);
         if (auto status = getStatusFromCommandResult(res); !status.isOK()) {
