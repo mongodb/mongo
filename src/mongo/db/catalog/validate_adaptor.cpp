@@ -130,6 +130,24 @@ void schemaValidationFailed(CollectionValidation::ValidateState* state,
     }
 }
 
+
+BSONObj rehydrateKey(const BSONObj& keyPattern, const BSONObj& indexKey) {
+    // We need to rehydrate the indexKey for improved readability.
+    // {"": ObjectId(...)} -> {"_id": ObjectId(...)}
+    auto keysIt = keyPattern.begin();
+    auto valuesIt = indexKey.begin();
+
+    BSONObjBuilder b;
+    while (keysIt != keyPattern.end()) {
+        // keysIt and valuesIt must have the same number of elements.
+        invariant(valuesIt != indexKey.end());
+        b.appendAs(*valuesIt, keysIt->fieldName());
+        keysIt++;
+        valuesIt++;
+    }
+
+    return b.obj();
+}
 }  // namespace
 
 Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
@@ -188,6 +206,26 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
             {multikeyMetadataKeys->begin(), multikeyMetadataKeys->end()},
             *documentMultikeyPaths);
 
+        auto printMultikeyMetadata = [&]() {
+            LOGV2(7556100,
+                  "Index is not multikey but document has multikey data",
+                  "indexName"_attr = descriptor->indexName(),
+                  "recordId"_attr = recordId,
+                  "record"_attr = redact(recordBson));
+            for (auto& key : *documentKeySet) {
+                auto indexKey = KeyString::toBsonSafe(key.getBuffer(),
+                                                      key.getSize(),
+                                                      iam->getSortedDataInterface()->getOrdering(),
+                                                      key.getTypeBits());
+                const BSONObj rehydratedKey = rehydrateKey(descriptor->keyPattern(), indexKey);
+                LOGV2(7556101,
+                      "Index key for document with multikey inconsistency",
+                      "indexName"_attr = descriptor->indexName(),
+                      "recordId"_attr = recordId,
+                      "indexKey"_attr = redact(rehydratedKey));
+            }
+        };
+
         if (!index->isMultikey(opCtx, coll) && shouldBeMultikey) {
             if (_validateState->fixErrors()) {
                 writeConflictRetry(opCtx, "setIndexAsMultikey", coll->ns().ns(), [&] {
@@ -205,10 +243,17 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
                                                           << " set to multikey.");
                 results->repaired = true;
             } else {
+                printMultikeyMetadata();
+
                 auto& curRecordResults = (results->indexResultsMap)[descriptor->indexName()];
-                std::string msg = str::stream() << "Index " << descriptor->indexName()
-                                                << " is not multikey but has more than one"
-                                                << " key in document " << recordId;
+                const std::string msg = fmt::format(
+                    "Index {} is not multikey but document with RecordId({}) and {} has multikey "
+                    "data, "
+                    "{} key(s)",
+                    descriptor->indexName(),
+                    recordId.toString(),
+                    recordBson.getField("_id").toString(),
+                    documentKeySet->size());
                 curRecordResults.errors.push_back(msg);
                 curRecordResults.valid = false;
                 if (crashOnMultikeyValidateFailure.shouldFail()) {
@@ -236,6 +281,8 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
                                                               << " multikey paths updated.");
                     results->repaired = true;
                 } else {
+                    printMultikeyMetadata();
+
                     std::string msg = str::stream()
                         << "Index " << descriptor->indexName()
                         << " multikey paths do not cover a document. RecordId: " << recordId;
