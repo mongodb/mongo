@@ -1844,7 +1844,7 @@ main(int argc, char *argv[])
              * purposes, so that we can see what we might have lost. If we are using LazyFS, the
              * underlying directory shows the state that we'd get after we clear the cache.
              */
-            if (!verify_only && use_lazyfs)
+            if (use_lazyfs)
                 testutil_lazyfs_clear_cache(&lazyfs);
 
             /*
