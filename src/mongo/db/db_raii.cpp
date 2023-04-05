@@ -1123,8 +1123,6 @@ ConsistentCatalogAndSnapshot getConsistentCatalogAndSnapshot(
                                       callerExpectedToConflictWithSecondaryBatchApplication,
                                       shouldReadAtLastApplied);
 
-        // TODO (SERVER-71660): Use a catalog version instead of pointer comparison for catalog
-        // before and after snapshot.
         const auto catalogAfterSnapshot = CollectionCatalog::get(opCtx);
 
         const auto replTermAfterSnapshot = repl::ReplicationCoordinator::get(opCtx)->getTerm();
