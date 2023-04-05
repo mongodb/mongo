@@ -56,8 +56,6 @@ using BSONNumeric = long long;
 
 namespace telemetry {
 
-bool isTelemetryEnabled();
-
 /**
  * An aggregated metric stores a compressed view of data. It balances the loss of information
  * with the reduction in required storage.

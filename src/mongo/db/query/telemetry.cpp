@@ -335,6 +335,7 @@ StatusWith<BSONObj> makeTelemetryKey(const FindCommandRequest& findCommand,
 }
 
 CounterMetric telemetryStoreSizeEstimateBytesMetric("telemetry.telemetryStoreSizeEstimateBytes");
+
 namespace {
 
 CounterMetric telemetryEvictedMetric("telemetry.numEvicted");
@@ -380,9 +381,9 @@ size_t getTelemetryStoreSize() {
 class TelemetryStoreManager {
 public:
     template <typename... TelemetryStoreArgs>
-    TelemetryStoreManager(TelemetryStoreArgs... args)
-        : _telemetryStore(
-              std::make_unique<TelemetryStore>(std::forward<TelemetryStoreArgs>(args)...)) {}
+    TelemetryStoreManager(size_t cacheSize, size_t numPartitions)
+        : _telemetryStore(std::make_unique<TelemetryStore>(cacheSize, numPartitions)),
+          _maxSize(cacheSize) {}
 
     /**
      * Acquire the instance of the telemetry store.
@@ -391,8 +392,27 @@ public:
         return *_telemetryStore;
     }
 
+    size_t getMaxSize() {
+        return _maxSize;
+    }
+
+    /**
+     * Resize the telemetry store and return the number of evicted
+     * entries.
+     */
+    size_t resetSize(size_t cacheSize) {
+        _maxSize = cacheSize;
+        return _telemetryStore->reset(cacheSize);
+    }
+
 private:
     std::unique_ptr<TelemetryStore> _telemetryStore;
+
+    /**
+     * Max size of the telemetry store. Tracked here to avoid having to recompute after it's divided
+     * up into partitions.
+     */
+    size_t _maxSize;
 };
 
 const auto telemetryStoreDecoration =
@@ -407,8 +427,7 @@ public:
         auto requestedSize = memory_util::convertToSizeInBytes(memSize);
         auto cappedSize = capTelemetryStoreSize(requestedSize);
         auto& telemetryStoreManager = telemetryStoreDecoration(serviceCtx);
-        auto&& telemetryStore = telemetryStoreManager->getTelemetryStore();
-        size_t numEvicted = telemetryStore.reset(cappedSize);
+        size_t numEvicted = telemetryStoreManager->resetSize(cappedSize);
         telemetryEvictedMetric.increment(numEvicted);
     }
 
@@ -454,12 +473,25 @@ ServiceContext::ConstructorActionRegisterer telemetryStoreManagerRegisterer{
     }};
 
 /**
+ * Top-level checks for whether telemetry collection is enabled. If this returns false, we must go
+ * no further.
+ */
+bool isTelemetryEnabled(const ServiceContext* serviceCtx) {
+    // During initialization FCV may not yet be setup but queries could be run. We can't
+    // check whether telemetry should be enabled without FCV, so default to not recording
+    // those queries.
+    return serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+        feature_flags::gFeatureFlagTelemetry.isEnabled(serverGlobalParams.featureCompatibility) &&
+        telemetryStoreDecoration(serviceCtx)->getMaxSize() > 0;
+}
+
+/**
  * Internal check for whether we should collect metrics. This checks the rate limiting
  * configuration for a global on/off decision and, if enabled, delegates to the rate limiter.
  */
 bool shouldCollect(const ServiceContext* serviceCtx) {
     // Quick escape if telemetry is turned off.
-    if (!isTelemetryEnabled()) {
+    if (!isTelemetryEnabled(serviceCtx)) {
         return false;
     }
     // Cannot collect telemetry if sampling rate is not greater than 0. Note that we do not
@@ -643,19 +675,6 @@ StatusWith<BSONObj> TelemetryMetrics::redactKey(const BSONObj& key,
     return *_redactedKey;
 }
 
-/**
- * Top-level checks for whether telemetry collection is enabled. If this returns false, we must go
- * no further.
- */
-bool isTelemetryEnabled() {
-    // During initialization FCV may not yet be setup but queries could be run. We can't
-    // check whether telemetry should be enabled without FCV, so default to not recording
-    // those queries.
-    return serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        feature_flags::gFeatureFlagTelemetry.isEnabled(serverGlobalParams.featureCompatibility) &&
-        getTelemetryStoreSize() != 0;
-}
-
 // The originating command/query does not persist through the end of query execution. In order to
 // pair the telemetry metrics that are collected at the end of execution with the original query, it
 // is necessary to register the original query during planning and persist it after
@@ -671,7 +690,7 @@ bool isTelemetryEnabled() {
 // Once query execution is complete, the telemetry context is grabbed from OpDebug, a telemetry key
 // is generated from this and metrics are paired to this key in the telemetry store.
 void registerAggRequest(const AggregateCommandRequest& request, OperationContext* opCtx) {
-    if (!isTelemetryEnabled()) {
+    if (!isTelemetryEnabled(opCtx->getServiceContext())) {
         return;
     }
 
@@ -711,7 +730,7 @@ void registerFindRequest(const FindCommandRequest& request,
                          const NamespaceString& collection,
                          OperationContext* opCtx,
                          const boost::intrusive_ptr<ExpressionContext>& expCtx) {
-    if (!isTelemetryEnabled()) {
+    if (!isTelemetryEnabled(opCtx->getServiceContext())) {
         return;
     }
 
@@ -740,7 +759,7 @@ TelemetryStore& getTelemetryStore(OperationContext* opCtx) {
     uassert(6579000,
             "Telemetry is not enabled without the feature flag on and a cache size greater than 0 "
             "bytes",
-            isTelemetryEnabled());
+            isTelemetryEnabled(opCtx->getServiceContext()));
     return telemetryStoreDecoration(opCtx->getServiceContext())->getTelemetryStore();
 }
 
