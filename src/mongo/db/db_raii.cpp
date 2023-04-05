@@ -1168,7 +1168,6 @@ getCollectionForLockFreeRead(OperationContext* opCtx,
                              boost::optional<Timestamp> readTimestamp,
                              const NamespaceStringOrUUID& nsOrUUID,
                              AutoGetCollection::Options options) {
-    DatabaseShardingState::assertMatchingDbVersion(opCtx, nsOrUUID.db());
 
     auto& hangBeforeAutoGetCollectionLockFreeShardedStateAccess =
         *globalFailPointRegistry().find("hangBeforeAutoGetCollectionLockFreeShardedStateAccess");
@@ -1306,6 +1305,8 @@ AutoGetCollectionForReadLockFreePITCatalog::AutoGetCollectionForReadLockFreePITC
     // in-memory state used across lock=free reads must be consistent.
     invariant(supportsLockFreeRead(opCtx) &&
               (!opCtx->recoveryUnit()->isActive() || _isLockFreeReadSubOperation));
+
+    DatabaseShardingState::assertMatchingDbVersion(opCtx, nsOrUUID.db());
 
     auto readConcernArgs = repl::ReadConcernArgs::get(opCtx);
     if (_isLockFreeReadSubOperation) {
