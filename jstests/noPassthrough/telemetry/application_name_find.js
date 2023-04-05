@@ -8,11 +8,11 @@
 const kApplicationName = "MongoDB Shell";
 const kHashedApplicationName = "dXRuJCwctavU";
 
-const getTelemetry = (conn, redactFieldNames = false) => {
+const getTelemetry = (conn, redactIdentifiers = false) => {
     const result = assert.commandWorked(conn.adminCommand({
         aggregate: 1,
         pipeline: [
-            {$telemetry: {redactFieldNames}},
+            {$telemetry: {redactIdentifiers}},
             // Sort on telemetry key so entries are in a deterministic order.
             {$sort: {key: 1}},
             {$match: {"key.applicationName": {$in: [kApplicationName, kHashedApplicationName]}}},

@@ -17,7 +17,7 @@ function runTest(conn) {
         const result = conn.adminCommand({
             aggregate: 1,
             pipeline: [
-                {$telemetry: {redactFieldNames: true}},
+                {$telemetry: {redactIdentifiers: true}},
                 // Filter out agg queries, including $telemetry.
                 {$match: {"key.find": {$exists: true}}},
                 // Sort on telemetry key so entries are in a deterministic order.
@@ -25,6 +25,7 @@ function runTest(conn) {
             ],
             cursor: {}
         });
+        assert.commandWorked(result);
         return result.cursor.firstBatch;
     };
 

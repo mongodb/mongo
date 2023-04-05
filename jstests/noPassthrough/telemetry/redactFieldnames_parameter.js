@@ -27,7 +27,7 @@ assert.eq(telStore.cursor.firstBatch[0]["key"]["pipeline"],
 
 // Turning on redaction should redact field names on all entries, even previously cached ones.
 telStore = assert.commandWorked(testDB.adminCommand(
-    {aggregate: 1, pipeline: [{$telemetry: {redactFieldNames: true}}], cursor: {}}));
+    {aggregate: 1, pipeline: [{$telemetry: {redactIdentifiers: true}}], cursor: {}}));
 telStore.cursor.firstBatch.forEach(element => {
     // Find the non-telemetry query and check its key to assert it matches requested redaction
     // strategy.
@@ -54,9 +54,9 @@ telStore.cursor.firstBatch.forEach(element => {
     }
 });
 
-// Explicitly set redactFieldNames to false.
+// Explicitly set redactIdentifiers to false.
 telStore = assert.commandWorked(testDB.adminCommand(
-    {aggregate: 1, pipeline: [{$telemetry: {redactFieldNames: false}}], cursor: {}}));
+    {aggregate: 1, pipeline: [{$telemetry: {redactIdentifiers: false}}], cursor: {}}));
 telStore.cursor.firstBatch.forEach(element => {
     // Find the non-telemetry query and check its key to assert it matches requested redaction
     // strategy.
@@ -73,23 +73,23 @@ assertAdminDBErrCodeAndErrMsgContains(
     coll,
     pipeline,
     ErrorCodes.FailedToParse,
-    "$telemetry parameters object may only contain 'redactFieldNames' option. Found: redactFields");
+    "$telemetry parameters object may only contain 'redactIdentifiers' option. Found: redactFields");
 
 // Wrong parameter type throws error.
-pipeline = [{$telemetry: {redactFieldNames: 1}}];
+pipeline = [{$telemetry: {redactIdentifiers: 1}}];
 assertAdminDBErrCodeAndErrMsgContains(
     coll,
     pipeline,
     ErrorCodes.FailedToParse,
-    "$telemetry redactFieldNames parameter must be boolean. Found type: double");
+    "$telemetry redactIdentifiers parameter must be boolean. Found type: double");
 
 // Parameter object with unrecognized key throws error.
-pipeline = [{$telemetry: {redactFieldNames: true, redactionStrategy: "on"}}];
+pipeline = [{$telemetry: {redactIdentifiers: true, redactionStrategy: "on"}}];
 assertAdminDBErrCodeAndErrMsgContains(
     coll,
     pipeline,
     ErrorCodes.FailedToParse,
-    "$telemetry parameters object may only contain one field, 'redactFieldNames'. Found: { redactFieldNames: true, redactionStrategy: \"on\" }");
+    "$telemetry parameters object may only contain one field, 'redactIdentifiers'. Found: { redactIdentifiers: true, redactionStrategy: \"on\" }");
 
 MongoRunner.stopMongod(conn);
 }());
