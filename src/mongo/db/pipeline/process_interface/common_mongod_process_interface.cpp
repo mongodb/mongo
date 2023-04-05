@@ -663,6 +663,12 @@ BSONObj CommonMongodProcessInterface::_reportCurrentOpForClient(
     OperationContext* clientOpCtx = client->getOperationContext();
 
     if (clientOpCtx) {
+        bool omitAndRedactInformation =
+            CurOp::get(clientOpCtx)->debug().shouldOmitDiagnosticInformation;
+        if (omitAndRedactInformation) {
+            return builder.obj();
+        }
+
         if (auto txnParticipant = TransactionParticipant::get(clientOpCtx)) {
             txnParticipant.reportUnstashedState(clientOpCtx, &builder);
         }

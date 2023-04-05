@@ -698,13 +698,41 @@ void CurOp::reportState(BSONObjBuilder* builder, bool truncateOps) {
     builder->append("op", logicalOpToString(_logicalOp));
     builder->append("ns", NamespaceStringUtil::serialize(_nss));
 
+    bool omitAndRedactInformation = CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation;
+    builder->append("redacted", omitAndRedactInformation);
+
     // When the currentOp command is run, it returns a single response object containing all current
     // operations; this request will fail if the response exceeds the 16MB document limit. By
     // contrast, the $currentOp aggregation stage does not have this restriction. If 'truncateOps'
     // is true, limit the size of each op to 1000 bytes. Otherwise, do not truncate.
     const boost::optional<size_t> maxQuerySize{truncateOps, 1000};
-    appendAsObjOrString(
-        "command", appendCommentField(opCtx, _opDescription), maxQuerySize, builder);
+
+    auto obj = appendCommentField(opCtx, _opDescription);
+
+    // If flag is true, add command field to builder without sensitive information.
+    if (omitAndRedactInformation) {
+        BSONObjBuilder bob;
+        bob.append(obj.firstElement());
+        bob.append(obj["$db"]);
+        auto commentElement = obj["comment"];
+        if (commentElement.ok()) {
+            bob.append(commentElement);
+        }
+
+        if (obj.firstElementFieldNameStringData() == "getMore"_sd) {
+            bob.append(obj["collection"]);
+        }
+
+        appendAsObjOrString("command", bob.done(), maxQuerySize, builder);
+    } else {
+        appendAsObjOrString("command", obj, maxQuerySize, builder);
+    }
+
+
+    // Omit information for for QE user collections, QE state collections and QE user operations.
+    if (omitAndRedactInformation) {
+        return;
+    }
 
     switch (_debug.queryFramework) {
         case PlanExecutor::QueryFramework::kClassicOnly:
