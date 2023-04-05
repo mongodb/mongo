@@ -1,7 +1,7 @@
 /**
  * Tests that basic validation within the $_analyzeShardKeyReadWriteDistribution aggregate stage.
  *
- * @tags: [requires_fcv_70, featureFlagAnalyzeShardKey]
+ * @tags: [requires_fcv_70]
  */
 (function() {
 "use strict";

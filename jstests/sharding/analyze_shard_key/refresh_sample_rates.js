@@ -3,7 +3,7 @@
  * primary mongod in a sharded cluster and the primary mongod in standalone replica set, and that
  * it returns correct sample rates.
  *
- * @tags: [requires_fcv_63, featureFlagAnalyzeShardKey, temporary_catalog_shard_incompatible]
+ * @tags: [requires_fcv_70, requires_persistence, temporary_catalog_shard_incompatible]
  */
 (function() {
 "use strict";

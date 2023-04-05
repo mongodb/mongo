@@ -38,4 +38,5 @@ feature_flags:
     featureFlagAnalyzeShardKey:
         description: When enabled, allows users to calculate metrics for evaluating a shard key.
         cpp_varname: gFeatureFlagAnalyzeShardKey
-        default: false
+        default: true
+        version: 7.0

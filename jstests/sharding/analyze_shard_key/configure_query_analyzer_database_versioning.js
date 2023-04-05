@@ -2,7 +2,7 @@
  * Tests that the configureQueryAnalyzer command uses database versioning when running the
  * listCollections command to validate the collection options.
  *
- * @tags: [requires_fcv_70, featureFlagAnalyzeShardKey]
+ * @tags: [requires_fcv_70]
  */
 (function() {
 "use strict";

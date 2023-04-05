@@ -3,7 +3,7 @@
  * in config.queryAnalyzers and that the document is deleted when the associated collection
  * is dropped.
  *
- * @tags: [requires_fcv_63, featureFlagAnalyzeShardKey]
+ * @tags: [requires_fcv_70]
  */
 
 (function() {

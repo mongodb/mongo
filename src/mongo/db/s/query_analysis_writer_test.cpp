@@ -493,7 +493,8 @@ private:
     }
 
     RAIIServerParameterControllerForTest _featureFlagController{"featureFlagAnalyzeShardKey", true};
-    FailPointEnableBlock _fp{"disableQueryAnalysisWriter"};
+    // This fixture manually flushes sampled queries and diffs.
+    FailPointEnableBlock _fp{"disableQueryAnalysisWriterFlusher"};
     PseudoRandom _random{SecureRandom{}.nextInt64()};
 };
 

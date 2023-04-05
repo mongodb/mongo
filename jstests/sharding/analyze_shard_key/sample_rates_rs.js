@@ -3,7 +3,7 @@
  * command, and that the number of queries sampled by each mongod in a standalone replica set is
  * proportional to the number of queries it executes.
  *
- * @tags: [requires_fcv_70, featureFlagAnalyzeShardKey]
+ * @tags: [requires_fcv_70]
  */
 (function() {
 "use strict";

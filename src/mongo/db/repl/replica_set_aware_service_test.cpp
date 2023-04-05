@@ -283,6 +283,11 @@ protected:
     // ServiceEntryPoint
     FailPointEnableBlock skipRecoverUserWriteCriticalSections{
         "skipRecoverUserWriteCriticalSections"};
+    // Disable the QueryAnalysisCoordinator for the same reason as the above.
+    FailPointEnableBlock disableQueryAnalysisCoordinator{"disableQueryAnalysisCoordinator"};
+    // Disable the QueryAnalysisWriter because the fixture doesn't construct the ServiceEntryPoint
+    // or the PeriodicRunner.
+    FailPointEnableBlock disableQueryAnalysisWriter{"disableQueryAnalysisWriter"};
 };
 
 

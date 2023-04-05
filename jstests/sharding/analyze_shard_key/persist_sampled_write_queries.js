@@ -2,7 +2,7 @@
  * Tests that shardsvr mongods support persisting sampled write queries and that non-shardsvr
  * mongods don't support that.
  *
- * @tags: [requires_fcv_63, featureFlagAnalyzeShardKey]
+ * @tags: [requires_fcv_70]
  */
 (function() {
 "use strict";

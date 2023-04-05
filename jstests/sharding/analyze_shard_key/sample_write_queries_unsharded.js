@@ -2,7 +2,7 @@
  * Tests basic support for sampling write queries against an unsharded collection on a sharded
  * cluster.
  *
- * @tags: [requires_fcv_63, featureFlagAnalyzeShardKey]
+ * @tags: [requires_fcv_70]
  */
 (function() {
 "use strict";

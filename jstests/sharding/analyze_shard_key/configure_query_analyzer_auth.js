@@ -2,7 +2,7 @@
  * Test to validate the privileges required by configureQueryAnalyzer command. Also tests the
  * internal command _refreshQueryAnalyzerConfigurations.
  *
- * @tags: [requires_fcv_70, featureFlagAnalyzeShardKey]
+ * @tags: [requires_fcv_70]
  */
 
 (function() {

@@ -2,7 +2,7 @@
  * Tests that the analyzeShardKey command returns monotonicity metrics for compound shard keys that
  * use hashed sharding.
  *
- * @tags: [requires_fcv_63, featureFlagAnalyzeShardKey, resource_intensive]
+ * @tags: [requires_fcv_70, resource_intensive]
  */
 (function() {
 "use strict";

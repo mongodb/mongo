@@ -3,7 +3,7 @@
  * command, and that the number of queries sampled by each mongos or shardsvr mongod in a sharded
  * cluster is proportional to the number of queries it executes.
  *
- * @tags: [requires_fcv_63, featureFlagAnalyzeShardKey]
+ * @tags: [requires_fcv_70]
  */
 (function() {
 "use strict";

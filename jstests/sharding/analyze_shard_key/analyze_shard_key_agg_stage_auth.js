@@ -2,7 +2,7 @@
  * Test to validate the privileges required by the analyzeShardKey aggregation stage,
  * $_analyzeShardKeyReadWriteDistribution.
  *
- * @tags: [requires_fcv_70, featureFlagAnalyzeShardKey]
+ * @tags: [requires_fcv_70]
  */
 
 (function() {

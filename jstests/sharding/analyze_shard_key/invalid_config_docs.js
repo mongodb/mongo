@@ -2,7 +2,7 @@
  * Tests that writing an invalid config.queryAnalyzers or config.mongos document only causes the
  * write to fail (i.e. doesn't cause the server to crash).
  *
- * @tags: [requires_fcv_70, featureFlagAnalyzeShardKey]
+ * @tags: [requires_fcv_70]
  */
 
 (function() {

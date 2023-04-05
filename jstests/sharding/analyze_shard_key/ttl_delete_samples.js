@@ -1,7 +1,7 @@
 /**
  * Tests for the query sampling and timely deletion of sampled query and diff documents.
  *
- * @tags: [requires_fcv_62, featureFlagAnalyzeShardKey]
+ * @tags: [requires_fcv_70]
  */
 
 (function() {

@@ -1,7 +1,7 @@
 /**
  * Tests that basic validation within the analyzeShardKey command.
  *
- * @tags: [requires_fcv_70, featureFlagAnalyzeShardKey]
+ * @tags: [requires_fcv_70, featureFlagColumnstoreIndexes]
  */
 (function() {
 "use strict";

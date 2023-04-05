@@ -1,7 +1,7 @@
 /**
  * Tests the currentOp and serverStatus for query sampling on a sharded cluster.
  *
- * @tags: [requires_fcv_70, featureFlagAnalyzeShardKey]
+ * @tags: [requires_fcv_70]
  */
 
 (function() {

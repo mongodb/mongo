@@ -1,7 +1,7 @@
 /**
  * Tests that retrying a retryable update doesn't cause it to have multiple sampled query documents.
  *
- * @tags: [requires_fcv_63, featureFlagAnalyzeShardKey]
+ * @tags: [requires_fcv_70]
  */
 (function() {
 "use strict";

@@ -10,7 +10,6 @@
  * suites with chunk migration and/or stepdown/kill/terminate.
  * @tags: [
  *  requires_fcv_70,
- *  featureFlagAnalyzeShardKey,
  *  featureFlagUpdateOneWithoutShardKey,
  *  uses_transactions,
  *  resource_intensive,

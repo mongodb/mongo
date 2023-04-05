@@ -2,7 +2,7 @@
  * Tests that the analyzeShardKey command correctly return the value and frequency of the most
  * common shard key values when their size exceeds the BSONObj size limit.
  *
- * @tags: [requires_fcv_63, featureFlagAnalyzeShardKey]
+ * @tags: [requires_fcv_70]
  */
 (function() {
 "use strict";

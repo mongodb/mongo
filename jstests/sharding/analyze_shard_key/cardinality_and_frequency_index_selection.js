@@ -2,7 +2,7 @@
  * Tests that the cardinality and frequency metrics calculation within the analyzeShardKey command
  * prioritizes indexes that allows it to infer if the shard key is unique.
  *
- * @tags: [requires_fcv_70, featureFlagAnalyzeShardKey]
+ * @tags: [requires_fcv_70]
  */
 (function() {
 "use strict";

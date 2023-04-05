@@ -3,7 +3,7 @@
  * distribution metrics, but on replica sets it does not since query sampling is only supported on
  * sharded clusters at this point.
  *
- * @tags: [requires_fcv_63, featureFlagAnalyzeShardKey, featureFlagUpdateOneWithoutShardKey]
+ * @tags: [requires_fcv_70, featureFlagUpdateOneWithoutShardKey]
  */
 (function() {
 "use strict";

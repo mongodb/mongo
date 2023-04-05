@@ -337,6 +337,14 @@ private:
 
     ReplSettings _settings;
     bool _callShutdown = false;
+
+    // Disable the QueryAnalysisCoordinator because this fixture doesn't construct the
+    // ServiceEntryPoint and this causes a segmentation fault when the QueryAnalysisCoordinator
+    // uses DBDirectClient to call into the ServiceEntryPoint.
+    FailPointEnableBlock _disableQueryAnalysisCoordinator{"disableQueryAnalysisCoordinator"};
+    // Disable the QueryAnalysisWriter because the fixture doesn't construct the ServiceEntryPoint
+    // or the PeriodicRunner.
+    FailPointEnableBlock _disableQueryAnalysisWriter{"disableQueryAnalysisWriter"};
 };
 
 }  // namespace repl

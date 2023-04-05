@@ -1,7 +1,7 @@
 /**
  * Tests that basic validation within the configureQueryAnalyzer command.
  *
- * @tags: [requires_fcv_70, featureFlagAnalyzeShardKey]
+ * @tags: [requires_fcv_70]
  */
 (function() {
 "use strict";

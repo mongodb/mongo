@@ -44,6 +44,7 @@ namespace analyze_shard_key {
 
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(disableQueryAnalysisCoordinator);
 MONGO_FAIL_POINT_DEFINE(queryAnalysisCoordinatorDistributeSampleRateEqually);
 
 const auto getQueryAnalysisCoordinator =
@@ -164,6 +165,10 @@ void QueryAnalysisCoordinator::onSamplerDelete(const MongosType& doc) {
 }
 
 void QueryAnalysisCoordinator::onStartup(OperationContext* opCtx) {
+    if (MONGO_unlikely(disableQueryAnalysisCoordinator.shouldFail())) {
+        return;
+    }
+
     stdx::lock_guard<Latch> lk(_mutex);
 
     DBDirectClient client(opCtx);
@@ -203,6 +208,10 @@ void QueryAnalysisCoordinator::onStartup(OperationContext* opCtx) {
 }
 
 void QueryAnalysisCoordinator::onSetCurrentConfig(OperationContext* opCtx) {
+    if (MONGO_unlikely(disableQueryAnalysisCoordinator.shouldFail())) {
+        return;
+    }
+
     if (serverGlobalParams.clusterRole.has(ClusterRole::None)) {
         stdx::lock_guard<Latch> lk(_mutex);
 

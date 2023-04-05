@@ -66,6 +66,7 @@ static ReplicaSetAwareServiceRegistry::Registerer<QueryAnalysisWriter>
     queryAnalysisWriterServiceRegisterer("QueryAnalysisWriter");
 
 MONGO_FAIL_POINT_DEFINE(disableQueryAnalysisWriter);
+MONGO_FAIL_POINT_DEFINE(disableQueryAnalysisWriterFlusher);
 MONGO_FAIL_POINT_DEFINE(hangQueryAnalysisWriterBeforeWritingLocally);
 MONGO_FAIL_POINT_DEFINE(hangQueryAnalysisWriterBeforeWritingRemotely);
 
@@ -266,6 +267,10 @@ bool QueryAnalysisWriter::shouldRegisterReplicaSetAwareService() const {
 }
 
 void QueryAnalysisWriter::onStartup(OperationContext* opCtx) {
+    if (MONGO_unlikely(disableQueryAnalysisWriter.shouldFail())) {
+        return;
+    }
+
     auto serviceContext = getQueryAnalysisWriter.owner(this);
     auto periodicRunner = serviceContext->getPeriodicRunner();
     invariant(periodicRunner);
@@ -275,7 +280,7 @@ void QueryAnalysisWriter::onStartup(OperationContext* opCtx) {
     PeriodicRunner::PeriodicJob queryWriterJob(
         "QueryAnalysisQueryWriter",
         [this](Client* client) {
-            if (MONGO_unlikely(disableQueryAnalysisWriter.shouldFail())) {
+            if (MONGO_unlikely(disableQueryAnalysisWriterFlusher.shouldFail())) {
                 return;
             }
             auto opCtx = client->makeOperationContext();
@@ -288,7 +293,7 @@ void QueryAnalysisWriter::onStartup(OperationContext* opCtx) {
     PeriodicRunner::PeriodicJob diffWriterJob(
         "QueryAnalysisDiffWriter",
         [this](Client* client) {
-            if (MONGO_unlikely(disableQueryAnalysisWriter.shouldFail())) {
+            if (MONGO_unlikely(disableQueryAnalysisWriterFlusher.shouldFail())) {
                 return;
             }
             auto opCtx = client->makeOperationContext();
@@ -326,6 +331,10 @@ void QueryAnalysisWriter::onShutdown() {
 }
 
 void QueryAnalysisWriter::onStepUpComplete(OperationContext* opCtx, long long term) {
+    if (MONGO_unlikely(disableQueryAnalysisWriter.shouldFail())) {
+        return;
+    }
+
     createTTLIndexes(opCtx).getAsync([](auto) {});
 }
 

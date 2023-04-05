@@ -2,7 +2,7 @@
  * Tests that the analyzeShardKey command returns monotonicity metrics for non-compound shard keys
  * that use range sharding.
  *
- * @tags: [requires_fcv_63, featureFlagAnalyzeShardKey]
+ * @tags: [requires_fcv_70]
  */
 (function() {
 "use strict";

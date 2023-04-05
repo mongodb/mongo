@@ -4,7 +4,7 @@
  * TODO (SERVER-74568): SdamServerSelector sometimes doesn't fully respect client readPreference for
  * config shard.
  *
- * @tags: [requires_fcv_70, featureFlagAnalyzeShardKey, temporary_catalog_shard_incompatible]
+ * @tags: [requires_fcv_70, temporary_catalog_shard_incompatible]
  */
 (function() {
 "use strict";

@@ -2,7 +2,7 @@
  * Tests that the analyzeShardKey command and the configureQueryAnalyzer command fail with expected
  * errors if the collection is dropped, renamed, recreated or emptied while they are running.
  *
- * @tags: [requires_fcv_70, featureFlagAnalyzeShardKey]
+ * @tags: [requires_fcv_70]
  */
 (function() {
 "use strict";

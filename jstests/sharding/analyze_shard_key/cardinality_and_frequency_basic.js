@@ -1,7 +1,7 @@
 /**
  * Tests that the analyzeShardKey command returns correct cardinality and frequency metrics.
  *
- * @tags: [requires_fcv_63, featureFlagAnalyzeShardKey]
+ * @tags: [requires_fcv_70]
  */
 (function() {
 "use strict";

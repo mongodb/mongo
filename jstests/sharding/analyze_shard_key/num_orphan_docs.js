@@ -2,7 +2,7 @@
  * Tests that the analyzeShardKey command only returns the number of orphan documents if the
  * collection is sharded.
  *
- * @tags: [requires_fcv_63, featureFlagAnalyzeShardKey]
+ * @tags: [requires_fcv_70]
  */
 (function() {
 "use strict";

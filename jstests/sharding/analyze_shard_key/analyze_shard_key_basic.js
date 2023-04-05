@@ -1,7 +1,7 @@
 /**
  * Tests support for the analyzeShardKey command.
  *
- * @tags: [requires_fcv_63, featureFlagAnalyzeShardKey, temporary_catalog_shard_incompatible]
+ * @tags: [requires_fcv_70, temporary_catalog_shard_incompatible]
  */
 (function() {
 "use strict";

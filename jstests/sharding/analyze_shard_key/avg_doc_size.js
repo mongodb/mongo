@@ -1,7 +1,7 @@
 /**
  * Tests that the analyzeShardKey command correctly returns the average document size in bytes.
  *
- * @tags: [requires_fcv_63, featureFlagAnalyzeShardKey]
+ * @tags: [requires_fcv_70]
  */
 (function() {
 "use strict";

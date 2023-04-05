@@ -1,7 +1,7 @@
 /**
  * Tests that the analyzeShardKey command uses database and shard versioning.
  *
- * @tags: [requires_fcv_70, featureFlagAnalyzeShardKey]
+ * @tags: [requires_fcv_70]
  */
 (function() {
 "use strict";
