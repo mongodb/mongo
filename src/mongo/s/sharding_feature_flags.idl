@@ -90,10 +90,12 @@ feature_flags:
     cpp_varname: feature_flags::gAutoMerger
     default: true
     version: 7.0
+  # TODO (SERVER-70396): Remove once 7.0 becomes last LTS
   featureFlagCheckMetadataConsistency:
     description: "Feature flag for checking metadata consistency in the cluster, database or collection"
     cpp_varname: feature_flags::gCheckMetadataConsistency
-    default: false
+    default: true
+    version: 7.0
   # TODO SERVER-73627: Remove once 7.0 becomes last LTS.
   featureFlagDropCollectionHoldingCriticalSection:
     description: "Feature flag for enabling the new implementation of the dropCollection DDL operation."

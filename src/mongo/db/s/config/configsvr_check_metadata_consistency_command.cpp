@@ -65,6 +65,13 @@ public:
         using InvocationBase::InvocationBase;
 
         Response typedRun(OperationContext* opCtx) {
+            uassert(ErrorCodes::IllegalOperation,
+                    str::stream() << Request::kCommandName
+                                  << " can only be run on the config server",
+                    serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
+
+            opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+
             const auto nss = ns();
 
             std::vector<MetadataInconsistencyItem> inconsistenciesMerged;
