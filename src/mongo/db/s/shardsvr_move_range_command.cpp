@@ -98,7 +98,7 @@ public:
             // Check if there is an existing migration running and if so, join it
             if (scopedMigration.mustExecute()) {
                 auto moveChunkComplete =
-                    ExecutorFuture<void>(_getExecutor())
+                    ExecutorFuture<void>(Grid::get(opCtx)->getExecutorPool()->getFixedExecutor())
                         .then([req = request(),
                                writeConcern = opCtx->getWriteConcern(),
                                scopedMigration = std::move(scopedMigration),
@@ -223,28 +223,6 @@ public:
             migrationSourceManager.enterCriticalSection();
             migrationSourceManager.commitChunkOnRecipient();
             migrationSourceManager.commitChunkMetadataOnConfig();
-        }
-
-        // Returns a single-threaded executor to be used to run moveChunk commands. The executor is
-        // initialized on the first call to this function. Uses a shared_ptr because a shared_ptr is
-        // required to work with ExecutorFutures.
-        static std::shared_ptr<ThreadPool> _getExecutor() {
-            static Mutex mutex = MONGO_MAKE_LATCH("MoveChunkExecutor::_mutex");
-            static std::shared_ptr<ThreadPool> executor;
-
-            stdx::lock_guard<Latch> lg(mutex);
-            if (!executor) {
-                ThreadPool::Options options;
-                options.poolName = "MoveChunk";
-                options.minThreads = 0;
-                // We limit the size of the thread pool to a single thread because currently there
-                // can only be one moveRange operation on a shard at a time.
-                options.maxThreads = 1;
-                executor = std::make_shared<ThreadPool>(std::move(options));
-                executor->startup();
-            }
-
-            return executor;
         }
     };
 
