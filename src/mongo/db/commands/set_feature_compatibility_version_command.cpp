@@ -123,6 +123,9 @@ MONGO_FAIL_POINT_DEFINE(failBeforeUpdatingFcvDoc);
 MONGO_FAIL_POINT_DEFINE(failDowngradingDuringIsCleaningServerMetadata);
 MONGO_FAIL_POINT_DEFINE(hangBeforeTransitioningToDowngraded);
 MONGO_FAIL_POINT_DEFINE(hangDowngradingBeforeIsCleaningServerMetadata);
+MONGO_FAIL_POINT_DEFINE(failAfterReachingTransitioningState);
+MONGO_FAIL_POINT_DEFINE(hangAtSetFCVStart);
+MONGO_FAIL_POINT_DEFINE(failAfterSendingShardsToDowngradingOrUpgrading);
 
 /**
  * Ensures that only one instance of setFeatureCompatibilityVersion can run at a given time.
@@ -265,6 +268,8 @@ public:
              const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
+        hangAtSetFCVStart.pauseWhileSet(opCtx);
+
         // Ensure that this operation will be killed by the RstlKillOpThread during step-up or
         // stepdown.
         opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
@@ -439,6 +444,11 @@ public:
                       "toVersion"_attr = requestedVersion);
             }
 
+            uassert(ErrorCodes::Error(7555200),
+                    "Failing upgrade or downgrade due to 'failAfterReachingTransitioningState' "
+                    "failpoint set",
+                    !failAfterReachingTransitioningState.shouldFail());
+
             if (request.getPhase() == SetFCVPhaseEnum::kStart) {
                 invariant(serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
 
@@ -475,6 +485,11 @@ public:
                     _shardServerPhase1Tasks(opCtx, requestedVersion);
                 }
             }
+
+            uassert(ErrorCodes::Error(7555202),
+                    "Failing downgrade due to "
+                    "'failAfterSendingShardsToDowngradingOrUpgrading' failpoint set",
+                    !failAfterSendingShardsToDowngradingOrUpgrading.shouldFail());
 
             // Any checks and actions that need to be performed before being able to downgrade needs
             // to be placed on the _prepareToUpgrade and _prepareToDowngrade functions. After the

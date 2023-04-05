@@ -32,12 +32,17 @@ function runStandaloneTest() {
     jsTestLog("current FCV (should be latest): " + tojson(fcvDoc));
     checkFCV(adminDB, latestFCV);
 
-    assert.commandWorked(
-        conn.adminCommand({configureFailPoint: 'failDowngrading', mode: "alwaysOn"}));
+    const hangAtSetFCVStartFailpoint = configureFailPoint(conn, "hangAtSetFCVStart");
+    assert.commandWorked(conn.adminCommand(
+        {configureFailPoint: 'failAfterReachingTransitioningState', mode: "alwaysOn"}));
 
     const parallelShell = startParallelShell(function() {
         db.getSiblingDB("admin").runCommand({setFeatureCompatibilityVersion: lastLTSFCV});
     }, conn.port);
+
+    // Make sure the setFCV command has started running.
+    hangAtSetFCVStartFailpoint.wait();
+    hangAtSetFCVStartFailpoint.off();
 
     // Check that we reach the downgrading FCV state within a few seconds.
     assert.soon(
@@ -63,12 +68,17 @@ function runReplicaSetTest() {
     jsTestLog("current FCV (should be latest): " + tojson(fcvDoc));
     checkFCV(primaryAdminDB, latestFCV);
 
-    assert.commandWorked(
-        primary.adminCommand({configureFailPoint: 'failDowngrading', mode: "alwaysOn"}));
+    const hangAtSetFCVStartFailpoint = configureFailPoint(primary, "hangAtSetFCVStart");
+    assert.commandWorked(primary.adminCommand(
+        {configureFailPoint: 'failAfterReachingTransitioningState', mode: "alwaysOn"}));
 
     const parallelShell = startParallelShell(function() {
         db.getSiblingDB("admin").runCommand({setFeatureCompatibilityVersion: lastLTSFCV});
     }, primary.port);
+
+    // Make sure the setFCV command has started running.
+    hangAtSetFCVStartFailpoint.wait();
+    hangAtSetFCVStartFailpoint.off();
 
     // Check that we reach the downgrading FCV state within a few seconds.
     assert.soon(
@@ -100,14 +110,17 @@ function runShardingTest() {
     checkFCV(shard0PrimaryAdminDB, latestFCV);
     checkFCV(shard1PrimaryAdminDB, latestFCV);
 
-    assert.commandWorked(
-        shard0Primary.adminCommand({configureFailPoint: 'failDowngrading', mode: "alwaysOn"}));
-    assert.commandWorked(
-        shard1Primary.adminCommand({configureFailPoint: 'failDowngrading', mode: "alwaysOn"}));
+    const hangAtSetFCVStartFailpoint = configureFailPoint(configPrimary, "hangAtSetFCVStart");
+    assert.commandWorked(configPrimary.adminCommand(
+        {configureFailPoint: 'failAfterSendingShardsToDowngradingOrUpgrading', mode: "alwaysOn"}));
 
     const parallelShell = startParallelShell(function() {
         db.getSiblingDB("admin").runCommand({setFeatureCompatibilityVersion: lastLTSFCV});
     }, st.s.port);
+
+    // Make sure the setFCV command has started running.
+    hangAtSetFCVStartFailpoint.wait();
+    hangAtSetFCVStartFailpoint.off();
 
     // Check that we reach the downgrading FCV state within a few seconds.
     assert.soon(
