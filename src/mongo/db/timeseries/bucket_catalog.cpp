@@ -1173,14 +1173,28 @@ BucketCatalog::Bucket* BucketCatalog::_allocateBucket(Stripe* stripe,
                                                       const CreationInfo& info) {
     _expireIdleBuckets(stripe, stripeLock, info.stats, info.closedBuckets);
 
-    auto [bucketId, roundedTime] = generateBucketId(info.time, info.options);
 
-    auto [it, inserted] =
-        stripe->allBuckets.try_emplace(bucketId, std::make_unique<Bucket>(bucketId, info.stripe));
-    tassert(6130900, "Expected bucket to be inserted", inserted);
+    // In rare cases duplicate bucket _id fields can be generated in the same stripe and fail to be
+    // inserted. We will perform a limited number of retries to minimize the probability of
+    // collision.
+    auto maxRetries = gTimeseriesInsertMaxRetriesOnDuplicates.load();
+    OID bucketId;
+    Date_t roundedTime;
+    stdx::unordered_map<OID, std::unique_ptr<Bucket>, OID::Hasher>::iterator it;
+    bool inserted = false;
+    for (int retryAttempts = 0; !inserted && retryAttempts < maxRetries; ++retryAttempts) {
+        std::tie(bucketId, roundedTime) = generateBucketId(info.time, info.options);
+        std::tie(it, inserted) = stripe->allBuckets.try_emplace(
+            bucketId, std::make_unique<Bucket>(bucketId, info.stripe));
+    }
+    uassert(6130900,
+            "Unable to insert documents due to internal OID generation collision. Increase the "
+            "value of server parameter 'timeseriesInsertMaxRetriesOnDuplicates' and try again",
+            inserted);
+
     Bucket* bucket = it->second.get();
     stripe->openBuckets[info.key] = bucket;
-    _initializeBucketState(bucketId);
+    _initializeBucketState(it->first);
 
     if (info.openedDuetoMetadata) {
         info.stats.incNumBucketsOpenedDueToMetadata();
