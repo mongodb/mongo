@@ -1142,23 +1142,36 @@ Bucket& allocateBucket(BucketCatalog& catalog,
                        const CreationInfo& info) {
     expireIdleBuckets(catalog, stripe, stripeLock, info.stats, *info.closedBuckets);
 
-    auto [oid, roundedTime] = generateBucketOID(info.time, info.options);
-    auto bucketId = BucketId{info.key.ns, oid};
+    // In rare cases duplicate bucket _id fields can be generated in the same stripe and fail to be
+    // inserted. We will perform a limited number of retries to minimize the probability of
+    // collision.
+    auto maxRetries = gTimeseriesInsertMaxRetriesOnDuplicates.load();
+    OID oid;
+    Date_t roundedTime;
+    stdx::unordered_map<BucketId, std::unique_ptr<Bucket>, BucketHasher>::iterator it;
+    bool inserted = false;
+    for (int retryAttempts = 0; !inserted && retryAttempts < maxRetries; ++retryAttempts) {
+        std::tie(oid, roundedTime) = generateBucketOID(info.time, info.options);
+        auto bucketId = BucketId{info.key.ns, oid};
+        std::tie(it, inserted) = stripe.openBucketsById.try_emplace(
+            bucketId,
+            std::make_unique<Bucket>(bucketId,
+                                     info.key,
+                                     info.options.getTimeField(),
+                                     roundedTime,
+                                     catalog.bucketStateRegistry));
+    }
+    uassert(6130900,
+            "Unable to insert documents due to internal OID generation collision. Increase the "
+            "value of server parameter 'timeseriesInsertMaxRetriesOnDuplicates' and try again",
+            inserted);
 
-    auto [it, inserted] =
-        stripe.openBucketsById.try_emplace(bucketId,
-                                           std::make_unique<Bucket>(bucketId,
-                                                                    info.key,
-                                                                    info.options.getTimeField(),
-                                                                    roundedTime,
-                                                                    catalog.bucketStateRegistry));
-    tassert(6130900, "Expected bucket to be inserted", inserted);
     Bucket* bucket = it->second.get();
     stripe.openBucketsByKey[info.key].emplace(bucket);
 
     auto state = changeBucketState(
         catalog.bucketStateRegistry,
-        bucketId,
+        it->first,
         [](boost::optional<BucketState> input, std::uint64_t) -> boost::optional<BucketState> {
             invariant(!input.has_value());
             return BucketState{};

@@ -2888,6 +2888,8 @@ TimeseriesAtomicWriteResult performOrderedTimeseriesWritesAtomically(
  * which were attempted in an update operation, but found no bucket to update. These indices
  * can be passed as the 'indices' parameter in a subsequent call to this function, in order
  * to to be retried.
+ * In rare cases due to collision from OID generation, we will also retry inserting those bucket
+ * documents for a limited number of times.
  */
 std::vector<size_t> performUnorderedTimeseriesWrites(
     OperationContext* opCtx,
@@ -2898,7 +2900,8 @@ std::vector<size_t> performUnorderedTimeseriesWrites(
     boost::optional<repl::OpTime>* opTime,
     boost::optional<OID>* electionId,
     bool* containsRetry,
-    const write_ops::InsertCommandRequest& request) {
+    const write_ops::InsertCommandRequest& request,
+    absl::flat_hash_map<int, int>& retryAttemptsForDup) {
     auto [batches, bucketStmtIds, _, canContinue] =
         insertIntoBucketCatalog(opCtx, start, numDocs, indices, errors, containsRetry, request);
 
@@ -2917,17 +2920,25 @@ std::vector<size_t> performUnorderedTimeseriesWrites(
             auto stmtIds = isTimeseriesWriteRetryable(opCtx)
                 ? std::move(bucketStmtIds[batch->bucketHandle.bucketId.oid])
                 : std::vector<StmtId>{};
-
-            canContinue = commitTimeseriesBucket(opCtx,
-                                                 batch,
-                                                 start,
-                                                 index,
-                                                 std::move(stmtIds),
-                                                 errors,
-                                                 opTime,
-                                                 electionId,
-                                                 &docsToRetry,
-                                                 request);
+            try {
+                canContinue = commitTimeseriesBucket(opCtx,
+                                                     batch,
+                                                     start,
+                                                     index,
+                                                     std::move(stmtIds),
+                                                     errors,
+                                                     opTime,
+                                                     electionId,
+                                                     &docsToRetry,
+                                                     request);
+            } catch (const ExceptionFor<ErrorCodes::DuplicateKey>&) {
+                // Automatically attempts to retry on DuplicateKey error.
+                if (retryAttemptsForDup[index]++ < gTimeseriesInsertMaxRetriesOnDuplicates.load()) {
+                    docsToRetry.push_back(index);
+                } else {
+                    throw;
+                }
+            }
             batch.reset();
             if (!canContinue) {
                 break;
@@ -2952,9 +2963,18 @@ void performUnorderedTimeseriesWritesWithRetries(OperationContext* opCtx,
                                                  bool* containsRetry,
                                                  const write_ops::InsertCommandRequest& request) {
     std::vector<size_t> docsToRetry;
+    absl::flat_hash_map<int, int> retryAttemptsForDup;
     do {
-        docsToRetry = performUnorderedTimeseriesWrites(
-            opCtx, start, numDocs, docsToRetry, errors, opTime, electionId, containsRetry, request);
+        docsToRetry = performUnorderedTimeseriesWrites(opCtx,
+                                                       start,
+                                                       numDocs,
+                                                       docsToRetry,
+                                                       errors,
+                                                       opTime,
+                                                       electionId,
+                                                       containsRetry,
+                                                       request,
+                                                       retryAttemptsForDup);
     } while (!docsToRetry.empty());
 }
 
