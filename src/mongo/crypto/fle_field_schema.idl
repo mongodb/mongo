@@ -337,11 +337,6 @@ structs:
             type: safeInt
             default: 1
             stability: unstable
-          deleteTokens:
-            description: "A map of field paths to FLEDeletePayload"
-            type: object_owned
-            optional: true
-            stability: unstable
           schema:
             description: "A map of NamespaceString to EncryptedFieldConfig"
             type: object_owned

@@ -889,10 +889,6 @@ write_ops::DeleteCommandReply processDelete(FLEQueryInterface* queryImpl,
 
     auto efc = EncryptionInformationHelpers::getAndValidateSchema(edcNss, ei);
 
-    if (ei.getDeleteTokens().has_value()) {
-        uasserted(7293102, "Illegal delete tokens encountered in EncryptionInformation");
-    }
-
     int32_t stmtId = getStmtIdForWriteAt(deleteRequest, 0);
 
     auto newDeleteRequest = deleteRequest;
@@ -950,10 +946,6 @@ write_ops::UpdateCommandReply processUpdate(FLEQueryInterface* queryImpl,
     auto ei = updateRequest.getEncryptionInformation().value();
 
     auto efc = EncryptionInformationHelpers::getAndValidateSchema(edcNss, ei);
-
-    if (ei.getDeleteTokens().has_value()) {
-        uasserted(7293201, "Illegal delete tokens encountered in EncryptionInformation");
-    }
 
     const auto updateOpEntry = updateRequest.getUpdates()[0];
 
@@ -1210,10 +1202,6 @@ write_ops::FindAndModifyCommandReply processFindAndModify(
     auto ei = findAndModifyRequest.getEncryptionInformation().value();
 
     auto efc = EncryptionInformationHelpers::getAndValidateSchema(edcNss, ei);
-
-    if (ei.getDeleteTokens().has_value()) {
-        uasserted(7293301, "Illegal delete tokens encountered in EncryptionInformation");
-    }
 
     int32_t stmtId = findAndModifyRequest.getStmtId().value_or(0);
 
