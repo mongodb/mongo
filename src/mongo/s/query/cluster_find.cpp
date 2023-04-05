@@ -27,20 +27,15 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/s/query/cluster_find.h"
 
 #include <fmt/format.h>
 
-#include <memory>
 #include <set>
 #include <vector>
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/client/connpool.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection_uuid_mismatch_info.h"
@@ -77,9 +72,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
-
 namespace mongo {
-
 namespace {
 
 using namespace fmt::literals;

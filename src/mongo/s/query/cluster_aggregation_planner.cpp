@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/s/query/cluster_aggregation_planner.h"
 
 #include "mongo/bson/util/bson_extract.h"
@@ -63,7 +61,6 @@
 #include "mongo/s/transaction_router.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
-
 
 namespace mongo {
 namespace cluster_aggregation_planner {

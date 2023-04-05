@@ -27,14 +27,10 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/s/query/establish_cursors.h"
 
 #include <set>
 
-#include "mongo/client/connpool.h"
 #include "mongo/client/remote_command_retry_scheduler.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/catalog/collection_uuid_mismatch_info.h"

@@ -491,7 +491,7 @@ public:
 private:
     // This group of values is only operated on for code paths that go through the
     // `ScopedCollectionAcquisition` constructor.
-    ScopedCollectionAcquisition* _acquisition;
+    ScopedCollectionAcquisition* _acquisition = nullptr;
     std::unique_ptr<ScopedLocalCatalogWriteFence> _fence;
 
     // If this class is instantiated with the constructors that take UUID or nss we need somewhere

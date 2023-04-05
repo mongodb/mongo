@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/client/replica_set_monitor.h"
 
 #include <algorithm>
@@ -37,7 +34,6 @@
 #include <random>
 
 #include "mongo/bson/simple_bsonelement_comparator.h"
-#include "mongo/client/connpool.h"
 #include "mongo/client/global_conn_pool.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/operation_context.h"
@@ -55,7 +51,6 @@
 #include "mongo/util/timer.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
-
 
 namespace mongo {
 

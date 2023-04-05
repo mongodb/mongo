@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/client/connpool.h"
 #include "mongo/client/global_conn_pool.h"
 #include "mongo/dbtests/mock/mock_conn_registry.h"
 #include "mongo/idl/server_parameter_test_util.h"

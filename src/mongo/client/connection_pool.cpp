@@ -27,12 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/client/connection_pool.h"
 
 #include "mongo/client/authenticate.h"
-#include "mongo/client/connpool.h"
 #include "mongo/client/mongo_uri.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/remote_command_request.h"

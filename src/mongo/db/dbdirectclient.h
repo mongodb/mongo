@@ -52,29 +52,47 @@ class DBDirectClient : public DBClientBase {
 public:
     DBDirectClient(OperationContext* opCtx);
 
+    using DBClientBase::createCollection;
+    using DBClientBase::createIndex;
+    using DBClientBase::createIndexes;
+    using DBClientBase::dropCollection;
+    using DBClientBase::dropDatabase;
     using DBClientBase::find;
+    using DBClientBase::findOne;
+    using DBClientBase::getCollectionInfos;
+    using DBClientBase::getDatabaseInfos;
+    using DBClientBase::getIndexSpecs;
     using DBClientBase::insert;
+    using DBClientBase::insertAcknowledged;
     using DBClientBase::remove;
+    using DBClientBase::removeAcknowledged;
     using DBClientBase::runCommand;
     using DBClientBase::update;
+    using DBClientBase::updateAcknowledged;
 
     std::unique_ptr<DBClientCursor> find(FindCommandRequest findRequest,
                                          const ReadPreferenceSetting& readPref,
                                          ExhaustMode exhaustMode) override;
 
+    long long count(NamespaceStringOrUUID nsOrUuid,
+                    const BSONObj& query = BSONObj(),
+                    int options = 0,
+                    int limit = 0,
+                    int skip = 0,
+                    boost::optional<BSONObj> readConcernObj = boost::none) override;
+
+    /**
+     * The insert, update, and remove commands only check the top level error status. The caller is
+     * responsible for checking the writeErrors element for errors during execution.
+     */
+    write_ops::InsertCommandReply insert(const write_ops::InsertCommandRequest& insert);
+    write_ops::UpdateCommandReply update(const write_ops::UpdateCommandRequest& update);
+    write_ops::DeleteCommandReply remove(const write_ops::DeleteCommandRequest& remove);
+
     write_ops::FindAndModifyCommandReply findAndModify(
         const write_ops::FindAndModifyCommandRequest& findAndModify);
 
-    /**
-     * insert, update, and remove only check the top level error status. The caller is responsible
-     * for checking the writeErrors element for errors during execution.
-     */
-    write_ops::InsertCommandReply insert(const write_ops::InsertCommandRequest& insert);
-
-    write_ops::UpdateCommandReply update(const write_ops::UpdateCommandRequest& update);
-
-    write_ops::DeleteCommandReply remove(const write_ops::DeleteCommandRequest& remove);
-
+private:
     bool isFailed() const override;
 
     bool isStillConnected() override;
@@ -84,13 +102,6 @@ public:
     std::string getServerAddress() const override;
 
     void say(Message& toSend, bool isRetry = false, std::string* actualServer = nullptr) override;
-
-    long long count(NamespaceStringOrUUID nsOrUuid,
-                    const BSONObj& query = BSONObj(),
-                    int options = 0,
-                    int limit = 0,
-                    int skip = 0,
-                    boost::optional<BSONObj> readConcernObj = boost::none) override;
 
     ConnectionString::ConnectionType type() const override;
 
@@ -116,10 +127,8 @@ public:
     }
 #endif
 
-protected:
     void _auth(const BSONObj& params) override;
 
-private:
     void _call(Message& toSend, Message& response, std::string* actualServer) override;
 
     OperationContext* _opCtx;
