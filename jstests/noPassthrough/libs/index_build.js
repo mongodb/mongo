@@ -226,6 +226,16 @@ var IndexBuildTest = class {
         return indexMap;
     }
 
+    static assertIndexesSoon(coll, numIndexes, readyIndexes, notReadyIndexes, options) {
+        var indexMap;
+        assert.soonNoExcept(function() {
+            indexMap = IndexBuildTest.assertIndexes(
+                coll, numIndexes, readyIndexes, notReadyIndexes, options);
+            return true;
+        });
+        return indexMap;
+    }
+
     /**
      * Prevent subsequent index builds from running to completion.
      */

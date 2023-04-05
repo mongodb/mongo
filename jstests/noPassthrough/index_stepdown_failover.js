@@ -32,8 +32,8 @@ const secondary = rst.getSecondary();
 const secondaryDB = secondary.getDB(testDB.getName());
 const secondaryColl = secondaryDB.getCollection(coll.getName());
 IndexBuildTest.waitForIndexBuildToStart(secondaryDB);
-const indexMap =
-    IndexBuildTest.assertIndexes(secondaryColl, 2, ["_id_"], ["a_1"], {includeBuildUUIDs: true});
+const indexMap = IndexBuildTest.assertIndexesSoon(
+    secondaryColl, 2, ["_id_"], ["a_1"], {includeBuildUUIDs: true});
 const indexBuildUUID = indexMap['a_1'].buildUUID;
 
 // Index build should be present in the config.system.indexBuilds collection.

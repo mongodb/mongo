@@ -929,20 +929,24 @@ void IndexBuildsCoordinator::abortAllIndexBuildsForInitialSync(OperationContext*
 
 namespace {
 
-// Interrupts the index builder thread and waits for it to clean up.
-void forceSelfAbortIndexBuild(OperationContext* opCtx,
+// Interrupts the index builder thread and waits for it to clean up. Returns true if the index was
+// aborted, and false if it was already committed or aborted.
+bool forceSelfAbortIndexBuild(OperationContext* opCtx,
                               std::shared_ptr<ReplIndexBuildState>& replState,
                               Status reason) {
-    if (replState->forceSelfAbort(opCtx, reason)) {
-        auto fut = replState->sharedPromise.getFuture();
-        auto waitStatus = fut.waitNoThrow();              // Result from waiting on future.
-        auto buildStatus = fut.getNoThrow().getStatus();  // Result from _runIndexBuildInner().
-        LOGV2(7419401,
-              "Index build: joined after forceful abort",
-              "buildUUID"_attr = replState->buildUUID,
-              "waitResult"_attr = waitStatus,
-              "status"_attr = buildStatus);
+    if (!replState->forceSelfAbort(opCtx, reason)) {
+        return false;
     }
+
+    auto fut = replState->sharedPromise.getFuture();
+    auto waitStatus = fut.waitNoThrow();              // Result from waiting on future.
+    auto buildStatus = fut.getNoThrow().getStatus();  // Result from _runIndexBuildInner().
+    LOGV2(7419401,
+          "Index build: joined after forceful abort",
+          "buildUUID"_attr = replState->buildUUID,
+          "waitResult"_attr = waitStatus,
+          "status"_attr = buildStatus);
+    return true;
 }
 
 }  // namespace
@@ -963,8 +967,10 @@ void IndexBuildsCoordinator::abortAllIndexBuildsDueToDiskSpace(OperationContext*
                            requiredBytes));
     for (auto&& replState : builds) {
         // Signals the index build to abort iself, which may involve signalling the current primary.
-        forceSelfAbortIndexBuild(opCtx, replState, abortStatus);
-        indexBuildsSSS.killedDueToInsufficentDiskSpace.addAndFetch(1);
+        if (forceSelfAbortIndexBuild(opCtx, replState, abortStatus)) {
+            // Increase metrics only if the build was actually aborted by the above call.
+            indexBuildsSSS.killedDueToInsufficientDiskSpace.addAndFetch(1);
+        }
     }
 }
 
@@ -2050,7 +2056,8 @@ void IndexBuildsCoordinator::verifyNoIndexBuilds_forTestOnly() const {
 // static
 void IndexBuildsCoordinator::updateCurOpOpDescription(OperationContext* opCtx,
                                                       const NamespaceString& nss,
-                                                      const std::vector<BSONObj>& indexSpecs) {
+                                                      const std::vector<BSONObj>& indexSpecs,
+                                                      boost::optional<BSONObj> curOpDesc) {
     BSONObjBuilder builder;
 
     // If the collection namespace is provided, add a 'createIndexes' field with the collection name
@@ -2070,7 +2077,7 @@ void IndexBuildsCoordinator::updateCurOpOpDescription(OperationContext* opCtx,
 
     stdx::unique_lock<Client> lk(*opCtx->getClient());
     auto curOp = CurOp::get(opCtx);
-    builder.appendElementsUnique(curOp->opDescription());
+    builder.appendElementsUnique(curOpDesc ? curOpDesc.value() : curOp->opDescription());
     auto opDescObj = builder.obj();
     curOp->setLogicalOp_inlock(LogicalOp::opCommand);
     curOp->setOpDescription_inlock(opDescObj);
@@ -3013,10 +3020,6 @@ CollectionPtr IndexBuildsCoordinator::_setUpForScanCollectionAndInsertSortedKeys
         CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, replState->collectionUUID));
     invariant(collection);
     collection.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, collection));
-
-    // Set up the thread's currentOp information to display createIndexes cmd information.
-    updateCurOpOpDescription(opCtx, collection->ns(), replState->indexSpecs);
-
     return collection;
 }
 

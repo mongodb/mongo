@@ -43,7 +43,7 @@ try {
 
     // Index build should be present in the config.system.indexBuilds collection.
     const indexMap =
-        IndexBuildTest.assertIndexes(coll, 2, ["_id_"], ["a_1"], {includeBuildUUIDs: true});
+        IndexBuildTest.assertIndexesSoon(coll, 2, ["_id_"], ["a_1"], {includeBuildUUIDs: true});
     const indexBuildUUID = indexMap['a_1'].buildUUID;
     assert(primary.getCollection('config.system.indexBuilds').findOne({_id: indexBuildUUID}));
 

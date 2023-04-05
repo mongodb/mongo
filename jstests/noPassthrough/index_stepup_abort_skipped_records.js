@@ -45,8 +45,8 @@ const createIdx = IndexBuildTest.startIndexBuild(primary,
 const kIndexName = "geometry_2dsphere";
 IndexBuildTest.waitForIndexBuildToStart(secondaryDB, secondaryColl.getName(), kIndexName);
 
-IndexBuildTest.assertIndexes(primaryColl, 2, ['_id_'], [kIndexName]);
-IndexBuildTest.assertIndexes(secondaryColl, 2, ['_id_'], [kIndexName]);
+IndexBuildTest.assertIndexesSoon(primaryColl, 2, ['_id_'], [kIndexName]);
+IndexBuildTest.assertIndexesSoon(secondaryColl, 2, ['_id_'], [kIndexName]);
 
 rst.stepUp(secondary);
 

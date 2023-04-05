@@ -514,8 +514,8 @@ bool ReplIndexBuildState::forceSelfAbort(OperationContext* opCtx, const Status& 
     if (_indexBuildState.isSettingUp() || _indexBuildState.isAborted() ||
         _indexBuildState.isCommitted() || _indexBuildState.isAwaitingPrimaryAbort() ||
         _indexBuildState.isApplyingCommitOplogEntry()) {
-        // If the index build has already passed a point of no return, interrupting will not be
-        // productive.
+        // If the build is setting up, it is not yet abortable. If the index build has already
+        // passed a point of no return, interrupting will not be productive.
         return false;
     }
 

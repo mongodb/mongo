@@ -58,7 +58,8 @@ assert.commandWorked(secondaryDB.adminCommand(
 const createIdx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1, b: 1});
 
 IndexBuildTest.waitForIndexBuildToStart(secondaryDB);
-IndexBuildTest.assertIndexes(secondaryColl, 2, ["_id_"], ["a_1_b_1"], {includeBuildUUIDs: true});
+IndexBuildTest.assertIndexesSoon(
+    secondaryColl, 2, ["_id_"], ["a_1_b_1"], {includeBuildUUIDs: true});
 
 // Step down the primary.
 const stepDown = startParallelShell(() => {

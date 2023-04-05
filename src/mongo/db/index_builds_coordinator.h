@@ -115,11 +115,15 @@ public:
     static IndexBuildsCoordinator* get(OperationContext* operationContext);
 
     /**
-     * Updates CurOp's 'opDescription' field with the current state of this index build.
+     * Updates CurOp's 'op' type to 'command', the 'nss' field, and the 'opDescription' field with
+     * 'createIndexes' command and index specs. Also ensures the timer is started. If provided,
+     * 'curOpDesc' is used as the base description upon which to perform the updates. Otherwise, the
+     * current 'opDescription' is used.
      */
     static void updateCurOpOpDescription(OperationContext* opCtx,
                                          const NamespaceString& nss,
-                                         const std::vector<BSONObj>& indexSpecs);
+                                         const std::vector<BSONObj>& indexSpecs,
+                                         boost::optional<BSONObj> curOpDesc = boost::none);
 
     /**
      * Returns index names listed from the index specs list "specs".
@@ -535,7 +539,7 @@ public:
 
             indexBuilds.append("total", registered.loadRelaxed());
             indexBuilds.append("killedDueToInsufficientDiskSpace",
-                               killedDueToInsufficentDiskSpace.loadRelaxed());
+                               killedDueToInsufficientDiskSpace.loadRelaxed());
 
             BSONObjBuilder phases;
             phases.append("scanCollection", scanCollection.loadRelaxed());
@@ -554,7 +558,7 @@ public:
         }
 
         AtomicWord<int> registered;
-        AtomicWord<int> killedDueToInsufficentDiskSpace;
+        AtomicWord<int> killedDueToInsufficientDiskSpace;
         AtomicWord<int> scanCollection;
         AtomicWord<int> drainSideWritesTable;
         AtomicWord<int> drainSideWritesTablePreCommit;

@@ -55,7 +55,8 @@ const secondary = rst.getSecondary();
 const secondaryDB = secondary.getDB(testDB.getName());
 const secondaryColl = secondaryDB.getCollection(coll.getName());
 IndexBuildTest.waitForIndexBuildToStart(secondaryDB);
-IndexBuildTest.assertIndexes(secondaryColl, 2, ["_id_"], ["a_1_b_1"], {includeBuildUUIDs: true});
+IndexBuildTest.assertIndexesSoon(
+    secondaryColl, 2, ["_id_"], ["a_1_b_1"], {includeBuildUUIDs: true});
 
 // Resolve the key generation error so that the index build succeeds on the primary before it scans
 // the invalid document.

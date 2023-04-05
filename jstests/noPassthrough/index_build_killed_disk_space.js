@@ -42,6 +42,9 @@ const createIdx = IndexBuildTest.startIndexBuild(
     primary, primaryColl.getFullName(), {a: 1}, null, [ErrorCodes.Interrupted]);
 IndexBuildTest.waitForIndexBuildToStart(primaryDB, primaryColl.getName(), 'a_1');
 
+// Ensure the index build is in an abortable state before the DiskSpaceMonitor runs.
+hangAfterInitFailPoint.wait();
+
 // Default indexBuildMinAvailableDiskSpaceMB is 500 MB.
 // Simulate a remaining disk space of 450MB.
 const simulateDiskSpaceFp =

@@ -49,9 +49,14 @@ IndexBuildTest.pauseIndexBuilds(primary);
 const tookActionCountBefore = secondaryDB.serverStatus().metrics.diskSpaceMonitor.tookAction;
 
 jsTestLog("Waiting for index build to start on secondary");
+const hangAfterInitFailPoint = configureFailPoint(secondaryDB, 'hangAfterInitializingIndexBuild');
 const createIdx = IndexBuildTest.startIndexBuild(
     primary, primaryColl.getFullName(), {a: 1}, null, [ErrorCodes.IndexBuildAborted]);
-IndexBuildTest.waitForIndexBuildToStart(secondaryDB);
+IndexBuildTest.waitForIndexBuildToStart(secondaryDB, secondaryColl.getName(), 'a_1');
+
+// Ensure the index build is in an abortable state before the DiskSpaceMonitor runs.
+hangAfterInitFailPoint.wait();
+hangAfterInitFailPoint.off();
 
 // Default indexBuildMinAvailableDiskSpaceMB is 500 MB.
 // Simulate a remaining disk space of 450MB on the secondary node.

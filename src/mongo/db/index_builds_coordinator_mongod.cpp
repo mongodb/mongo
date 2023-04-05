@@ -378,14 +378,12 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
 
     auto& oss = OperationShardingState::get(opCtx);
 
-    // Task in thread pool should have similar CurOp representation to the caller so that it can be
-    // identified as a createIndexes operation.
-    LogicalOp logicalOp = LogicalOp::opInvalid;
+    // The builder thread updates to curOp description to be that of a createIndexes command, but we
+    // still want to transfer whatever extra information there is available from the caller.
     BSONObj opDesc;
     {
         stdx::unique_lock<Client> lk(*opCtx->getClient());
         auto curOp = CurOp::get(opCtx);
-        logicalOp = curOp->getLogicalOp();
         opDesc = curOp->opDescription().getOwned();
     }
 
@@ -414,7 +412,6 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
                           dbName,
                           nss,
                           indexBuildOptions,
-                          logicalOp,
                           opDesc,
                           replState,
                           startPromise = std::move(startPromise),
@@ -442,6 +439,10 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
         // Indicate that the index build is scheduled and running under this opCtx.
         replState->onThreadScheduled(opCtx.get());
 
+        // Set up the thread's currentOp information to display createIndexes cmd information,
+        // merged with the caller's opDesc.
+        updateCurOpOpDescription(opCtx.get(), nss, replState->indexSpecs, opDesc);
+
         // Forward the forwardable operation metadata from the external client to this thread's
         // client.
         forwardableOpMetadata.setOn(opCtx.get());
@@ -454,13 +455,6 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
         }
 
         ScopedSetShardRole scopedSetShardRole(opCtx.get(), nss, shardVersion, dbVersion);
-
-        {
-            stdx::unique_lock<Client> lk(*opCtx->getClient());
-            auto curOp = CurOp::get(opCtx.get());
-            curOp->setLogicalOp_inlock(logicalOp);
-            curOp->setOpDescription_inlock(opDesc);
-        }
 
         while (MONGO_unlikely(hangBeforeInitializingIndexBuild.shouldFail())) {
             sleepmillis(100);

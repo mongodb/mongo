@@ -54,8 +54,8 @@ const secondary = rst.getSecondary();
 const secondaryDB = secondary.getDB(testDB.getName());
 const secondaryColl = secondaryDB.getCollection(coll.getName());
 IndexBuildTest.waitForIndexBuildToStart(secondaryDB);
-rst.awaitReplication();
-IndexBuildTest.assertIndexes(secondaryColl, 2, ["_id_"], ["a_1_b_1"], {includeBuildUUIDs: true});
+IndexBuildTest.assertIndexesSoon(
+    secondaryColl, 2, ["_id_"], ["a_1_b_1"], {includeBuildUUIDs: true});
 
 // Step down the primary.
 const stepDown = startParallelShell(() => {

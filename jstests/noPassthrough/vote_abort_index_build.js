@@ -43,18 +43,9 @@ const createIdx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {'
 const opId = IndexBuildTest.waitForIndexBuildToStart(testDB, coll.getName(), 'a_1');
 IndexBuildTest.assertIndexBuildCurrentOpContents(testDB, opId);
 
-// The above opId check does not guarantee the index has actually registered, so 'listIndexes' may
-// not list the index build in the below 'assertIndexes'. Make sure the build is registered to avoid
-// sporadic failures.
-assert.commandWorked(primary.adminCommand({
-    waitForFailPoint: "hangAfterStartingIndexBuild",
-    timesEntered: 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
-
 // Extract the index build UUID.
 const buildUUID =
-    IndexBuildTest.assertIndexes(coll, 2, ['_id_'], ['a_1'], {includeBuildUUIDs: true})['a_1']
+    IndexBuildTest.assertIndexesSoon(coll, 2, ['_id_'], ['a_1'], {includeBuildUUIDs: true})['a_1']
         .buildUUID;
 
 const abortReason = jsTestName();
