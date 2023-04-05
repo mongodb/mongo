@@ -14,17 +14,20 @@ const coll = db.cqf_disjunction;
 coll.drop();
 
 let docs = [];
-for (let a = 0; a < 10; ++a) {
-    for (let b = 0; b < 10; ++b) {
-        docs.push({a, b});
+for (let i = 0; i < 10; ++i) {
+    // Generate enough documents for an index to be preferable.
+    for (let a = 0; a < 10; ++a) {
+        for (let b = 0; b < 10; ++b) {
+            docs.push({a, b});
+        }
     }
 }
 assert.commandWorked(coll.insert(docs));
 
 let result = coll.find({$or: [{a: 2}, {b: 3}]}).toArray();
-assert.eq(result.length, 19, result);
+assert.eq(result.length, 190, result);
 for (const doc of result) {
-    assert(doc.a == 2 || doc.b == 3, "Query returned a doc not matching the predicate: ${doc}");
+    assert(doc.a === 2 || doc.b === 3, "Query returned a doc not matching the predicate: ${doc}");
 }
 
 assert.commandWorked(coll.createIndexes([
@@ -33,9 +36,9 @@ assert.commandWorked(coll.createIndexes([
 ]));
 
 result = coll.find({$or: [{a: 2}, {b: 3}]}).toArray();
-assert.eq(result.length, 19, result);
+assert.eq(result.length, 190, result);
 for (const doc of result) {
-    assert(doc.a == 2 || doc.b == 3, "Query returned a doc not matching the predicate: ${doc}");
+    assert(doc.a === 2 || doc.b === 3, "Query returned a doc not matching the predicate: ${doc}");
 }
 
 // At time of writing, queries that compare to literal array or MinKey/MaxKey are translated to
@@ -70,7 +73,7 @@ assert.eq(result.length, 0, result);
         () => coll.explain("executionStats")
                   .find({a: 2, $or: [{b: 2}, {no_such_field: 123}]})
                   .finish());
-    assert.eq(1, res.executionStats.nReturned);
+    assert.eq(10, res.executionStats.nReturned);
 
     // We get an index scan on 'a' and some expression for the $or.
     const expectedStr =
@@ -95,8 +98,6 @@ NestedLoopJoin [joinType: Inner, {rid_1}]
 IndexScan [{'<rid>': rid_1}, scanDefName: cqf_disjunction_, indexDefName: a_1, interval: {=Const [2]}]
 `;
     const actualStr = removeUUIDsFromExplain(db, res);
-    jsTestLog(actualStr);
-    assert.includes(actualStr, 'IndexScan');
     assert.eq(expectedStr, actualStr);
 }
 }());
