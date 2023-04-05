@@ -499,9 +499,8 @@ void ShardingInitializationMongoD::updateShardIdentityConfigString(
         write_ops::UpdateModification::parseFromClassicUpdate(updateObj));
 
     try {
-        AutoGetDb autoDb(opCtx, NamespaceString::kServerConfigurationNamespace.dbName(), MODE_X);
-
-        auto result = update(opCtx, autoDb.ensureDbExists(opCtx), updateReq);
+        AutoGetCollection autoColl(opCtx, NamespaceString::kServerConfigurationNamespace, MODE_IX);
+        auto result = update(opCtx, autoColl.ensureDbExists(opCtx), updateReq);
         if (result.numMatched == 0) {
             LOGV2_WARNING(22076,
                           "Failed to update config server connection string of shard identity "
