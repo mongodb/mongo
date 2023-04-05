@@ -369,14 +369,7 @@ Status _dropCollection(OperationContext* opCtx,
 
     try {
         return writeConflictRetry(opCtx, "drop", collectionName.ns(), [&] {
-            // If a change collection is to be dropped, that is, the change streams are being
-            // disabled for a tenant, acquire exclusive tenant lock.
-            AutoGetDb autoDb(opCtx,
-                             collectionName.dbName(),
-                             MODE_IX /* database lock mode*/,
-                             boost::make_optional(collectionName.tenantId() &&
-                                                      collectionName.isChangeCollection(),
-                                                  MODE_X));
+            AutoGetDb autoDb(opCtx, collectionName.dbName(), MODE_IX);
             auto db = autoDb.getDb();
             if (!db) {
                 return expectedUUID

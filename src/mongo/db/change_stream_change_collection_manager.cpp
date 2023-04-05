@@ -164,18 +164,14 @@ boost::optional<BSONObj> createChangeCollectionEntryFromOplog(const BSONObj& opl
     auto readyChangeCollDoc = changeCollDoc.freeze();
     return readyChangeCollDoc.toBson();
 }
-}  // namespace
 
 /**
- * Locks respective change collections, writes insert statements to respective change collections
- * based on tenant ids.
+ * Helper to write insert statements to respective change collections based on tenant ids.
  */
-class ChangeStreamChangeCollectionManager::ChangeCollectionsWriterInternal {
+class ChangeCollectionsWriter {
 public:
-    explicit ChangeCollectionsWriterInternal(OperationContext* opCtx,
-                                             OpDebug* opDebug,
-                                             const AutoGetChangeCollection::AccessMode& accessMode)
-        : _accessMode{accessMode}, _opCtx{opCtx}, _opDebug{opDebug} {}
+    explicit ChangeCollectionsWriter(const AutoGetChangeCollection::AccessMode& accessMode)
+        : _accessMode{accessMode} {}
 
     /**
      * Adds the insert statement for the provided tenant that will be written to the change
@@ -183,22 +179,8 @@ public:
      */
     void add(InsertStatement insertStatement) {
         if (auto tenantId = _extractTenantId(insertStatement); tenantId) {
-            _tenantToStatementsAndChangeCollectionMap[*tenantId].insertStatements.push_back(
-                std::move(insertStatement));
+            _tenantStatementsMap[*tenantId].push_back(std::move(insertStatement));
         }
-    }
-
-    /**
-     * Acquires locks to change collections of all tenants referred to by added insert statements.
-     */
-    void acquireLocks() {
-        tassert(6671503, "Locks cannot be acquired twice", !_locksAcquired);
-        for (auto&& [tenantId, insertStatementsAndChangeCollection] :
-             _tenantToStatementsAndChangeCollectionMap) {
-            insertStatementsAndChangeCollection.tenantChangeCollection.emplace(
-                _opCtx, _accessMode, tenantId);
-        }
-        _locksAcquired = true;
     }
 
     /**
@@ -206,15 +188,10 @@ public:
      * encountered, the write is skipped and the remaining inserts are attempted individually. Bails
      * out further writes if any other type of failure is encountered in writing to any change
      * collection.
-     *
-     * Locks should be acquired before calling this method by calling 'acquireLocks()'.
      */
-    Status write() {
-        tassert(6671504, "Locks should be acquired first", _locksAcquired);
-        for (auto&& [tenantId, insertStatementsAndChangeCollection] :
-             _tenantToStatementsAndChangeCollectionMap) {
-            AutoGetChangeCollection& tenantChangeCollection =
-                *insertStatementsAndChangeCollection.tenantChangeCollection;
+    Status write(OperationContext* opCtx, OpDebug* opDebug) {
+        for (auto&& [tenantId, insertStatements] : _tenantStatementsMap) {
+            AutoGetChangeCollection tenantChangeCollection(opCtx, _accessMode, tenantId);
 
             // The change collection does not exist for a particular tenant because either the
             // change collection is not enabled or is in the process of enablement. Ignore this
@@ -224,7 +201,7 @@ public:
             }
 
             // Writes to the change collection should not be replicated.
-            repl::UnreplicatedWritesBlock unReplBlock(_opCtx);
+            repl::UnreplicatedWritesBlock unReplBlock(opCtx);
 
             /**
              * For a serverless shard merge, we clone all change collection entries from the donor
@@ -233,9 +210,9 @@ public:
              * If we encounter a DuplicateKey error and the entry is identical to the existing one,
              * we can safely skip and continue.
              */
-            for (auto&& insertStatement : insertStatementsAndChangeCollection.insertStatements) {
+            for (auto&& insertStatement : insertStatements) {
                 Status status = collection_internal::insertDocument(
-                    _opCtx, *tenantChangeCollection, insertStatement, _opDebug, false);
+                    opCtx, *tenantChangeCollection, insertStatement, opDebug, false);
 
                 if (status.code() == ErrorCodes::DuplicateKey) {
                     const auto dupKeyInfo = status.extraInfo<DuplicateKeyErrorInfo>();
@@ -255,21 +232,11 @@ public:
                 }
             }
         }
+
         return Status::OK();
     }
 
 private:
-    /**
-     * Field 'insertStatements' contains insert statements to be written to the tenant's change
-     * collection associated with 'tenantChangeCollection' field.
-     */
-    struct TenantStatementsAndChangeCollection {
-
-        std::vector<InsertStatement> insertStatements;
-
-        boost::optional<AutoGetChangeCollection> tenantChangeCollection;
-    };
-
     boost::optional<TenantId> _extractTenantId(const InsertStatement& insertStatement) {
         // Parse the oplog entry to fetch the tenant id from 'tid' field. The oplog entry will not
         // written to the change collection if 'tid' field is missing.
@@ -288,75 +255,12 @@ private:
     // Mode required to access change collections.
     const AutoGetChangeCollection::AccessMode _accessMode;
 
-    // A mapping from a tenant id to insert statements and the change collection of the tenant.
-    stdx::unordered_map<TenantId, TenantStatementsAndChangeCollection, TenantId::Hasher>
-        _tenantToStatementsAndChangeCollectionMap;
-
-    // An operation context to use while performing all operations in this class.
-    OperationContext* const _opCtx;
-
-    // An OpDebug to use while performing all operations in this class.
-    OpDebug* const _opDebug;
-
-    // Indicates if locks have been acquired.
-    bool _locksAcquired{false};
+    // Maps inserts statements for each tenant.
+    stdx::unordered_map<TenantId, std::vector<InsertStatement>, TenantId::Hasher>
+        _tenantStatementsMap;
 };
 
-ChangeStreamChangeCollectionManager::ChangeCollectionsWriter::ChangeCollectionsWriter(
-    OperationContext* opCtx,
-    std::vector<InsertStatement>::const_iterator beginOplogEntries,
-    std::vector<InsertStatement>::const_iterator endOplogEntries,
-    OpDebug* opDebug) {
-    // This method must be called within a 'WriteUnitOfWork'. The caller must be responsible for
-    // commiting the unit of work.
-    invariant(opCtx->lockState()->inAWriteUnitOfWork());
-
-    _writer = std::make_unique<ChangeCollectionsWriterInternal>(
-        opCtx, opDebug, AutoGetChangeCollection::AccessMode::kWrite);
-
-    // Transform oplog entries to change collections entries and group them by tenant id.
-    for (auto oplogEntryIter = beginOplogEntries; oplogEntryIter != endOplogEntries;
-         oplogEntryIter++) {
-        auto& oplogDoc = oplogEntryIter->doc;
-
-        // The initial seed oplog insertion is not timestamped as such the 'oplogSlot' is not
-        // initialized. The corresponding change collection insertion will not be timestamped.
-        auto oplogSlot = oplogEntryIter->oplogSlot;
-
-        auto changeCollDoc = createChangeCollectionEntryFromOplog(oplogDoc);
-
-        if (changeCollDoc) {
-            _writer->add(InsertStatement{
-                std::move(*changeCollDoc), oplogSlot.getTimestamp(), oplogSlot.getTerm()});
-        }
-    }
-}
-
-ChangeStreamChangeCollectionManager::ChangeCollectionsWriter::ChangeCollectionsWriter(
-    ChangeStreamChangeCollectionManager::ChangeCollectionsWriter&& other) = default;
-
-ChangeStreamChangeCollectionManager::ChangeCollectionsWriter&
-ChangeStreamChangeCollectionManager::ChangeCollectionsWriter::operator=(
-    ChangeStreamChangeCollectionManager::ChangeCollectionsWriter&& other) = default;
-
-ChangeStreamChangeCollectionManager::ChangeCollectionsWriter::~ChangeCollectionsWriter() = default;
-
-void ChangeStreamChangeCollectionManager::ChangeCollectionsWriter::acquireLocks() {
-    _writer->acquireLocks();
-}
-
-Status ChangeStreamChangeCollectionManager::ChangeCollectionsWriter::write() {
-    return _writer->write();
-}
-
-ChangeStreamChangeCollectionManager::ChangeCollectionsWriter
-ChangeStreamChangeCollectionManager::createChangeCollectionsWriter(
-    OperationContext* opCtx,
-    std::vector<InsertStatement>::const_iterator beginOplogEntries,
-    std::vector<InsertStatement>::const_iterator endOplogEntries,
-    OpDebug* opDebug) {
-    return ChangeCollectionsWriter{opCtx, beginOplogEntries, endOplogEntries, opDebug};
-}
+}  // namespace
 
 BSONObj ChangeStreamChangeCollectionManager::PurgingJobStats::toBSON() const {
     return BSON("totalPass" << totalPass.load() << "docsDeleted" << docsDeleted.load()
@@ -422,8 +326,8 @@ void ChangeStreamChangeCollectionManager::insertDocumentsToChangeCollection(
     // commiting the unit of work.
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
 
-    ChangeCollectionsWriterInternal changeCollectionsWriter{
-        opCtx, nullptr /*opDebug*/, AutoGetChangeCollection::AccessMode::kWriteInOplogContext};
+    ChangeCollectionsWriter changeCollectionsWriter{
+        AutoGetChangeCollection::AccessMode::kWriteInOplogContext};
 
     for (size_t idx = 0; idx < oplogRecords.size(); idx++) {
         auto& record = oplogRecords[idx];
@@ -437,14 +341,48 @@ void ChangeStreamChangeCollectionManager::insertDocumentsToChangeCollection(
         }
     }
 
-    changeCollectionsWriter.acquireLocks();
-
     // Write documents to change collections and throw exception in case of any failure.
-    Status status = changeCollectionsWriter.write();
+    Status status = changeCollectionsWriter.write(opCtx, nullptr /* opDebug */);
     if (!status.isOK()) {
         LOGV2_FATAL(
             6612300, "Failed to write to change collection", "reason"_attr = status.reason());
     }
+}
+
+Status ChangeStreamChangeCollectionManager::insertDocumentsToChangeCollection(
+    OperationContext* opCtx,
+    std::vector<InsertStatement>::const_iterator beginOplogEntries,
+    std::vector<InsertStatement>::const_iterator endOplogEntries,
+    bool isGlobalIXLockAcquired,
+    OpDebug* opDebug) {
+    // This method must be called within a 'WriteUnitOfWork'. The caller must be responsible for
+    // commiting the unit of work.
+    invariant(opCtx->lockState()->inAWriteUnitOfWork());
+
+    // If the global IX lock is already acquired, then change collections entries will be written
+    // within the oplog context as such acquire the correct access mode for change collections.
+    const auto changeCollAccessMode = isGlobalIXLockAcquired
+        ? AutoGetChangeCollection::AccessMode::kWriteInOplogContext
+        : AutoGetChangeCollection::AccessMode::kWrite;
+    ChangeCollectionsWriter changeCollectionsWriter{changeCollAccessMode};
+
+    // Transform oplog entries to change collections entries and group them by tenant id.
+    for (auto oplogEntryIter = beginOplogEntries; oplogEntryIter != endOplogEntries;
+         oplogEntryIter++) {
+        auto& oplogDoc = oplogEntryIter->doc;
+
+        // The initial seed oplog insertion is not timestamped as such the 'oplogSlot' is not
+        // initialized. The corresponding change collection insertion will not be timestamped.
+        auto oplogSlot = oplogEntryIter->oplogSlot;
+
+        if (auto changeCollDoc = createChangeCollectionEntryFromOplog(oplogDoc)) {
+            changeCollectionsWriter.add(InsertStatement{
+                std::move(changeCollDoc.get()), oplogSlot.getTimestamp(), oplogSlot.getTerm()});
+        }
+    }
+
+    // Write documents to change collections.
+    return changeCollectionsWriter.write(opCtx, opDebug);
 }
 
 boost::optional<ChangeCollectionPurgingJobMetadata>

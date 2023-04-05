@@ -62,7 +62,7 @@ void createTestView(OperationContext* opCtx,
 void installDatabaseMetadata(OperationContext* opCtx,
                              const DatabaseName& dbName,
                              const DatabaseVersion& dbVersion) {
-    AutoGetDb autoDb(opCtx, dbName, MODE_X, {}, {});
+    AutoGetDb autoDb(opCtx, dbName, MODE_X, {});
     auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbName);
     scopedDss->setDbInfo(opCtx, {dbName.db(), ShardId("this"), dbVersion});
 }
@@ -306,7 +306,7 @@ TEST_F(ShardRoleTest, AcquireUnshardedCollWithIncorrectPlacementVersionThrows) {
 TEST_F(ShardRoleTest, AcquireUnshardedCollWhenShardDoesNotKnowThePlacementVersionThrows) {
     {
         // Clear the database metadata
-        AutoGetDb autoDb(opCtx(), dbNameTestDb, MODE_X, {}, {});
+        AutoGetDb autoDb(opCtx(), dbNameTestDb, MODE_X, {});
         auto scopedDss =
             DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx(), dbNameTestDb);
         scopedDss->clearDbInfo(opCtx());
@@ -333,7 +333,7 @@ TEST_F(ShardRoleTest, AcquireUnshardedCollWhenCriticalSectionIsActiveThrows) {
     const BSONObj criticalSectionReason = BSON("reason" << 1);
     {
         // Enter critical section.
-        AutoGetDb autoDb(opCtx(), dbNameTestDb, MODE_X, {}, {});
+        AutoGetDb autoDb(opCtx(), dbNameTestDb, MODE_X, {});
         auto scopedDss =
             DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx(), dbNameTestDb);
         scopedDss->enterCriticalSectionCatchUpPhase(opCtx(), criticalSectionReason);
@@ -361,7 +361,7 @@ TEST_F(ShardRoleTest, AcquireUnshardedCollWhenCriticalSectionIsActiveThrows) {
 
     {
         // Exit critical section.
-        AutoGetDb autoDb(opCtx(), dbNameTestDb, MODE_X, {}, {});
+        AutoGetDb autoDb(opCtx(), dbNameTestDb, MODE_X, {});
         const BSONObj criticalSectionReason = BSON("reason" << 1);
         auto scopedDss =
             DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx(), dbNameTestDb);

@@ -94,37 +94,13 @@ class AutoGetDb {
     AutoGetDb(OperationContext* opCtx,
               const DatabaseName& dbName,
               LockMode mode,
-              boost::optional<LockMode> tenantLockMode,
               Date_t deadline,
               Lock::DBLockSkipOptions options);
 
 public:
-    /**
-     * Acquires a lock on the specified database 'dbName' in the requested 'mode'.
-     *
-     * If the database belongs to a tenant, then acquires a tenant lock before the database lock.
-     * For 'mode' MODE_IS or MODE_S acquires tenant lock in intent-shared (IS) mode, otherwise,
-     * acquires a tenant lock in intent-exclusive (IX) mode.
-     */
     AutoGetDb(OperationContext* opCtx,
               const DatabaseName& dbName,
               LockMode mode,
-              Date_t deadline = Date_t::max());
-
-    /**
-     * Acquires a lock on the specified database 'dbName' in the requested 'mode'.
-     *
-     * If the database belongs to a tenant, then acquires a tenant lock before the database lock.
-     * For 'mode' MODE_IS or MODE_S acquires tenant lock in intent-shared (IS) mode, otherwise,
-     * acquires a tenant lock in intent-exclusive (IX) mode. A different, stronger tenant lock mode
-     * to acquire can be specified with 'tenantLockMode' parameter. Passing boost::none for the
-     * tenant lock mode does not skip the tenant lock, but indicates that the tenant lock in default
-     * mode should be acquired.
-     */
-    AutoGetDb(OperationContext* opCtx,
-              const DatabaseName& dbName,
-              LockMode mode,
-              boost::optional<LockMode> tenantLockMode,
               Date_t deadline = Date_t::max());
 
     AutoGetDb(AutoGetDb&&) = default;
@@ -609,10 +585,12 @@ private:
  * A RAII-style class to acquire lock to a particular tenant's change collection.
  *
  * A change collection can be accessed in the following modes:
- *   kWriteInOplogContext - assumes that the tenant IX lock has been pre-acquired. The user can
- *                          perform reads and writes to the change collection.
- *   kWrite - behaves the same as 'AutoGetCollection::AutoGetCollection()' with lock mode MODE_IX.
- *   kRead - behaves the same as 'AutoGetCollection::AutoGetCollection()' with lock mode MODE_IS.
+ *   kWriteInOplogContext - perform writes to the change collection by taking the IX lock on a
+ *                          tenant's change collection. The change collection is written along with
+ *                          the oplog in the same 'WriteUnitOfWork' and assumes that the global IX
+ *                          lock is already held.
+ *   kWrite - takes the IX lock on a tenant's change collection to perform any writes.
+ *   kRead  - takes the IS lock on a tenant's change collection to perform any reads.
  */
 class AutoGetChangeCollection {
 public:
@@ -620,7 +598,7 @@ public:
 
     AutoGetChangeCollection(OperationContext* opCtx,
                             AccessMode mode,
-                            const TenantId& tenantId,
+                            boost::optional<TenantId> tenantId,
                             Date_t deadline = Date_t::max());
 
     AutoGetChangeCollection(const AutoGetChangeCollection&) = delete;
@@ -631,10 +609,9 @@ public:
     explicit operator bool() const;
 
 private:
-    // Used when the 'kWrite' or 'kRead' access mode is used.
     boost::optional<AutoGetCollection> _coll;
-    // Used when the 'kWriteInOplogContext' access mode is used.
-    CollectionPtr _changeCollection;
+
+    boost::optional<AllowLockAcquisitionOnTimestampedUnitOfWork> _allowLockAcquisitionTsWuow;
 };
 
 }  // namespace mongo

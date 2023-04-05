@@ -6,8 +6,7 @@
  *  assumes_read_preference_unchanged,
  *  requires_replication,
  *  requires_fcv_62,
- *  # TODO SERVER-74811: Re-enable this test.
- *   __TEMPORARILY_DISABLED__,
+ *  __TEMPORARILY_DISABLED__
  * ]
  */
 (function() {

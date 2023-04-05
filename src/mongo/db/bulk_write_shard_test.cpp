@@ -115,7 +115,7 @@ void createTestCollection(OperationContext* opCtx, const NamespaceString& nss) {
 void installDatabaseMetadata(OperationContext* opCtx,
                              const DatabaseName& dbName,
                              const DatabaseVersion& dbVersion) {
-    AutoGetDb autoDb(opCtx, dbName, MODE_X);
+    AutoGetDb autoDb(opCtx, dbName, MODE_X, {});
     auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbName);
     scopedDss->setDbInfo(opCtx, {dbName.db(), ShardId("this"), dbVersion});
 }

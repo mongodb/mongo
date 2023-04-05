@@ -140,31 +140,14 @@ Status _insertDocumentsToOplogAndChangeCollections(
     std::vector<InsertStatement>::const_iterator end,
     bool skipWritesToOplog) {
     WriteUnitOfWork wunit(opCtx);
-    boost::optional<AutoGetOplog> autoOplog;
-    boost::optional<ChangeStreamChangeCollectionManager::ChangeCollectionsWriter>
-        changeCollectionWriter;
 
-    // Acquire locks. We must acquire the locks for all collections we intend to write to before
-    // performing any writes. This avoids potential deadlocks created by waiting for locks while
-    // having generated oplog holes.
     if (!skipWritesToOplog) {
-        autoOplog.emplace(opCtx, OplogAccessMode::kWrite);
-    }
-    const bool changeCollectionsMode =
-        change_stream_serverless_helpers::isChangeCollectionsModeActive();
-    if (changeCollectionsMode) {
-        changeCollectionWriter = boost::make_optional(
-            ChangeStreamChangeCollectionManager::get(opCtx).createChangeCollectionsWriter(
-                opCtx, begin, end, nullptr /* opDebug */));
-        changeCollectionWriter->acquireLocks();
-    }
-
-    // Write entries to the oplog.
-    if (!skipWritesToOplog) {
-        auto& oplogColl = autoOplog->getCollection();
+        AutoGetOplog autoOplog(opCtx, OplogAccessMode::kWrite);
+        auto& oplogColl = autoOplog.getCollection();
         if (!oplogColl) {
             return {ErrorCodes::NamespaceNotFound, "Oplog collection does not exist"};
         }
+
         auto status = collection_internal::insertDocuments(
             opCtx, oplogColl, begin, end, nullptr /* OpDebug */, false /* fromMigrate */);
         if (!status.isOK()) {
@@ -174,8 +157,14 @@ Status _insertDocumentsToOplogAndChangeCollections(
 
     // Write the corresponding oplog entries to tenants respective change
     // collections in the serverless.
-    if (changeCollectionsMode) {
-        auto status = changeCollectionWriter->write();
+    if (change_stream_serverless_helpers::isChangeCollectionsModeActive()) {
+        auto status =
+            ChangeStreamChangeCollectionManager::get(opCtx).insertDocumentsToChangeCollection(
+                opCtx,
+                begin,
+                end,
+                !skipWritesToOplog /* hasAcquiredGlobalIXLock */,
+                nullptr /* OpDebug */);
         if (!status.isOK()) {
             return status;
         }

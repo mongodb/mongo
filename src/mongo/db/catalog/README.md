@@ -925,14 +925,6 @@ synchronize shutdown, so that all operations are finished with the storage engin
 Certain types of global storage engine operations, such as recoverToStableTimestamp(), also require
 this lock to be held in exclusive mode.
 
-### Tenant Lock
-
-A resource of ResourceType Tenant is used when a database belongs to a tenant. It is used to synchronize
-change streams enablement and disablement for a tenant operation with other operations associated with the tenant.
-Enabling or disabling of change streams (by creating or dropping a change collection) for a tenant takes this lock
-in exclusive (X) mode. Acquiring this resource with an intent lock is an indication that the operation is doing reads (IS)
-or writes (IX) at the database or lower level.
-
 ### Database Lock
 
 Any resource of ResourceType Database protects certain database-wide operations such as database

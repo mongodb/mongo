@@ -148,7 +148,6 @@ bool LockerImpl::_shouldDelayUnlock(ResourceId resId, LockMode mode) const {
             return false;
 
         case RESOURCE_GLOBAL:
-        case RESOURCE_TENANT:
         case RESOURCE_DATABASE:
         case RESOURCE_COLLECTION:
         case RESOURCE_METADATA:
@@ -648,39 +647,11 @@ bool LockerImpl::isLockHeldForMode(ResourceId resId, LockMode mode) const {
     return isModeCovered(mode, getLockMode(resId));
 }
 
-boost::optional<bool> LockerImpl::_globalAndTenantLocksImplyDBOrCollectionLockedForMode(
-    const boost::optional<TenantId>& tenantId, LockMode lockMode) const {
-    if (isW()) {
-        return true;
-    }
-    if (isR() && isSharedLockMode(lockMode)) {
-        return true;
-    }
-    if (tenantId) {
-        const ResourceId tenantResourceId{ResourceType::RESOURCE_TENANT, *tenantId};
-        switch (getLockMode(tenantResourceId)) {
-            case MODE_NONE:
-                return false;
-            case MODE_X:
-                return true;
-            case MODE_S:
-                return isSharedLockMode(lockMode);
-            case MODE_IX:
-            case MODE_IS:
-                break;
-            default:
-                MONGO_UNREACHABLE_TASSERT(6671502);
-        }
-    }
-    return boost::none;
-}
-
 bool LockerImpl::isDbLockedForMode(const DatabaseName& dbName, LockMode mode) const {
-    if (auto lockedForMode =
-            _globalAndTenantLocksImplyDBOrCollectionLockedForMode(dbName.tenantId(), mode);
-        lockedForMode) {
-        return *lockedForMode;
-    }
+    if (isW())
+        return true;
+    if (isR() && isSharedLockMode(mode))
+        return true;
 
     const ResourceId resIdDb(RESOURCE_DATABASE, dbName);
     return isLockHeldForMode(resIdDb, mode);
@@ -689,17 +660,16 @@ bool LockerImpl::isDbLockedForMode(const DatabaseName& dbName, LockMode mode) co
 bool LockerImpl::isCollectionLockedForMode(const NamespaceString& nss, LockMode mode) const {
     invariant(nss.coll().size());
 
-    if (!shouldConflictWithSecondaryBatchApplication())
+    if (isW())
+        return true;
+    if (isR() && isSharedLockMode(mode))
         return true;
 
-    if (auto lockedForMode =
-            _globalAndTenantLocksImplyDBOrCollectionLockedForMode(nss.tenantId(), mode);
-        lockedForMode) {
-        return *lockedForMode;
-    }
-
     const ResourceId resIdDb(RESOURCE_DATABASE, nss.dbName());
+
     LockMode dbMode = getLockMode(resIdDb);
+    if (!shouldConflictWithSecondaryBatchApplication())
+        return true;
 
     switch (dbMode) {
         case MODE_NONE:
@@ -836,7 +806,6 @@ bool LockerImpl::saveLockStateAndUnlock(Locker::LockSnapshot* stateOut) {
 
         // We should never have to save and restore metadata locks.
         invariant(RESOURCE_DATABASE == resType || RESOURCE_COLLECTION == resType ||
-                  RESOURCE_TENANT == resType ||
                   (resId == resourceIdParallelBatchWriterMode && isSharedLockMode(it->mode)) ||
                   resId == resourceIdFeatureCompatibilityVersion ||
                   (resId == resourceIdReplicationStateTransitionLock && it->mode == MODE_IX));

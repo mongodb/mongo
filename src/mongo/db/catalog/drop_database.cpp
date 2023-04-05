@@ -158,11 +158,9 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
     // collections to drop.
     repl::OpTime latestDropPendingOpTime;
 
-    const auto tenantLockMode{boost::make_optional(
-        dbName.tenantId() && dbName.db() == DatabaseName::kConfig.db(), MODE_X)};
     {
         boost::optional<AutoGetDb> autoDB;
-        autoDB.emplace(opCtx, dbName, MODE_X /* database lock mode*/, tenantLockMode);
+        autoDB.emplace(opCtx, dbName, MODE_X);
 
         Database* db = autoDB->getDb();
         Status status = _checkNssAndReplState(opCtx, db, dbName);
@@ -180,7 +178,7 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
             20337, "dropDatabase {dbName} - starting", "dropDatabase - starting", logAttrs(dbName));
         db->setDropPending(opCtx, true);
 
-        // If Database::dropCollectionEvenIfSystem() fails, we should reset the drop-pending state
+        // If Database::dropCollectionEventIfSystem() fails, we should reset the drop-pending state
         // on Database.
         ScopeGuard dropPendingGuard([&db, opCtx] { db->setDropPending(opCtx, false); });
         auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
@@ -192,17 +190,15 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
                 // Create a scope guard to reset the drop-pending state on the database to false if
                 // there is a replica state change that kills this operation while the locks were
                 // yielded.
-                ScopeGuard dropPendingGuardWhileUnlocked(
-                    [dbName, opCtx, &dropPendingGuard, tenantLockMode] {
-                        // TODO (SERVER-71610): Fix to be interruptible or document exception.
-                        UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
-                        AutoGetDb autoDB(
-                            opCtx, dbName, MODE_X /* database lock mode*/, tenantLockMode);
-                        if (auto db = autoDB.getDb()) {
-                            db->setDropPending(opCtx, false);
-                        }
-                        dropPendingGuard.dismiss();
-                    });
+                ScopeGuard dropPendingGuardWhileUnlocked([dbName, opCtx, &dropPendingGuard] {
+                    // TODO (SERVER-71610): Fix to be interruptible or document exception.
+                    UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
+                    AutoGetDb autoDB(opCtx, dbName, MODE_IX);
+                    if (auto db = autoDB.getDb()) {
+                        db->setDropPending(opCtx, false);
+                    }
+                    dropPendingGuard.dismiss();
+                });
 
                 // Drop locks. The drop helper will acquire locks on our behalf.
                 autoDB = boost::none;
@@ -218,7 +214,7 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
                     dropDatabaseHangAfterWaitingForIndexBuilds.pauseWhileSet();
                 }
 
-                autoDB.emplace(opCtx, dbName, MODE_X /* database lock mode*/, tenantLockMode);
+                autoDB.emplace(opCtx, dbName, MODE_X);
                 db = autoDB->getDb();
 
                 dropPendingGuardWhileUnlocked.dismiss();
@@ -422,7 +418,7 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
         dropDatabaseHangAfterAllCollectionsDrop.pauseWhileSet();
     }
 
-    AutoGetDb autoDB(opCtx, dbName, MODE_X /* database lock mode*/, tenantLockMode);
+    AutoGetDb autoDB(opCtx, dbName, MODE_X);
     auto db = autoDB.getDb();
     if (!db) {
         return Status(ErrorCodes::NamespaceNotFound,
