@@ -516,7 +516,7 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
             textwrap.dedent("""\
         An IDL struct can either provide a view onto some underlying BSON data, or it can
         participate in owning that data. This function returns true if the struct participates in
-        owning the underlying data. 
+        owning the underlying data.
 
         Note that the underlying data is not synchronized with the IDL struct over its lifetime; to
         generate a BSON representation of an IDL struct, use its `serialize` member functions.
@@ -1671,6 +1671,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 # local _serializationContext obj used to init other structs, so it needs to be
                 # initialized first; don't move in the event a boost::none is supplied
                 initializer_vars.insert(0, '_%s(%s)' % (arg.name, initializer_var))
+            elif arg.name in ["nss", "nssOrUUID"]:
+                # TODO(SERVER-75669): Remove this denylist, prevent use-after-move by defining fields in the correct order.
+                initializer_vars.append('_%s(%s)' % (arg.name, arg.name))
             else:
                 initializer_vars.append('_%s(std::move(%s))' % (arg.name, arg.name))
 
