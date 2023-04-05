@@ -448,7 +448,6 @@ bool DBClientBase::auth(const string& dbname,
 }
 
 void DBClientBase::logout(const string& dbname, BSONObj& info) {
-    // TODO SERVER-72977: Use dbname which is DatabaseName object already.
     runCommand(DatabaseName(boost::none, dbname), BSON("logout" << 1), info);
 }
 
