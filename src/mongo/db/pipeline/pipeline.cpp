@@ -34,6 +34,7 @@
 #include <algorithm>
 
 #include "mongo/base/error_codes.h"
+#include "mongo/base/exact_cast.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/jsobj.h"
@@ -44,6 +45,7 @@
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_merge.h"
 #include "mongo/db/pipeline/document_source_out.h"
+#include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/search_helper.h"
@@ -678,8 +680,18 @@ DepsTracker Pipeline::getDependenciesForContainer(
             knowAllFields = status & DepsTracker::State::EXHAUSTIVE_FIELDS;
 
             // Check if this stage modifies any fields that we should track for use by later stages.
+            // Fields which are part of exclusion projections should not be marked as generated,
+            // despite them being modified.
             auto localGeneratedPaths = source->getModifiedPaths();
-            if (localGeneratedPaths.type == DocumentSource::GetModPathsReturn::Type::kFiniteSet) {
+            auto isExclusionProjection = [&]() {
+                const auto projStage =
+                    exact_pointer_cast<DocumentSourceSingleDocumentTransformation*>(source.get());
+                return projStage &&
+                    projStage->getType() ==
+                    TransformerInterface::TransformerType::kExclusionProjection;
+            };
+            if (localGeneratedPaths.type == DocumentSource::GetModPathsReturn::Type::kFiniteSet &&
+                !isExclusionProjection()) {
                 auto newPathNames = localGeneratedPaths.getNewNames();
                 generatedPaths.insert(newPathNames.begin(), newPathNames.end());
             }
