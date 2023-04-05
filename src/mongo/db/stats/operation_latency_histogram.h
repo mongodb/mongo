@@ -52,7 +52,9 @@ public:
     /**
      * Increments the bucket of the histogram based on the operation type.
      */
-    void increment(uint64_t latency, Command::ReadWriteType type);
+    void increment(uint64_t latency,
+                   Command::ReadWriteType type,
+                   bool isQuerableEncryptionOperation);
 
     /**
      * Appends the four histograms with latency totals and operation counts.
@@ -64,6 +66,8 @@ private:
         std::array<uint64_t, kMaxBuckets> buckets{};
         uint64_t entryCount = 0;
         uint64_t sum = 0;
+        // Sum of latency time spent doing Queryable Encryption operations
+        uint64_t sumQueryableEncryption = 0;
     };
 
     static int _getBucket(uint64_t latency);
@@ -76,7 +80,10 @@ private:
                  bool slowMSBucketsOnly,
                  BSONObjBuilder* builder) const;
 
-    void _incrementData(uint64_t latency, int bucket, HistogramData* data);
+    void _incrementData(uint64_t latency,
+                        int bucket,
+                        bool isQuerableEncryptionOperation,
+                        HistogramData* data);
 
     HistogramData _reads, _writes, _commands, _transactions;
 };

@@ -2304,6 +2304,7 @@ void TransactionParticipant::Participant::_abortTransactionOnSession(OperationCo
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
         o(lk).transactionMetricsObserver.onAbort(
+            opCtx,
             ServerTransactionsMetrics::get(opCtx->getServiceContext()),
             tickSource,
             &Top::get(opCtx->getServiceContext()));

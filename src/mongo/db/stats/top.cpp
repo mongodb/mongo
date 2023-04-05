@@ -51,6 +51,20 @@ namespace {
 
 const auto getTop = ServiceContext::declareDecoration<Top>();
 
+bool isQuerableEncryptionOperation(OperationContext* opCtx) {
+    auto curop = CurOp::get(opCtx);
+
+    while (curop != nullptr) {
+        if (curop->debug().shouldOmitDiagnosticInformation) {
+            return true;
+        }
+
+        curop = curop->parent();
+    }
+
+    return false;
+}
+
 }  // namespace
 
 Top::UsageData::UsageData(const UsageData& older, const UsageData& newer) {
@@ -236,9 +250,10 @@ void Top::appendGlobalLatencyStats(bool includeHistograms,
     _globalHistogramStats.append(includeHistograms, slowMSBucketsOnly, builder);
 }
 
-void Top::incrementGlobalTransactionLatencyStats(uint64_t latency) {
+void Top::incrementGlobalTransactionLatencyStats(OperationContext* opCtx, uint64_t latency) {
     stdx::lock_guard<SimpleMutex> guard(_lock);
-    _globalHistogramStats.increment(latency, Command::ReadWriteType::kTransaction);
+    _globalHistogramStats.increment(
+        latency, Command::ReadWriteType::kTransaction, isQuerableEncryptionOperation(opCtx));
 }
 
 void Top::_incrementHistogram(OperationContext* opCtx,
@@ -248,7 +263,7 @@ void Top::_incrementHistogram(OperationContext* opCtx,
     // Only update histogram if operation came from a user.
     Client* client = opCtx->getClient();
     if (client->isFromUserConnection() && !client->isInDirectClient()) {
-        histogram->increment(latency, readWriteType);
+        histogram->increment(latency, readWriteType, isQuerableEncryptionOperation(opCtx));
     }
 }
 }  // namespace mongo

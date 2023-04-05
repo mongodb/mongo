@@ -140,7 +140,7 @@ public:
     /**
      * Increments the global transactions histogram.
      */
-    void incrementGlobalTransactionLatencyStats(uint64_t latency);
+    void incrementGlobalTransactionLatencyStats(OperationContext* opCtx, uint64_t latency);
 
     /**
      * Appends the global latency statistics.

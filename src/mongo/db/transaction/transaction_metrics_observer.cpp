@@ -31,6 +31,7 @@
 
 #include "mongo/db/transaction/transaction_metrics_observer.h"
 
+#include "mongo/db/curop.h"
 #include "mongo/db/transaction/server_transactions_metrics.h"
 #include "mongo/db/transaction/transaction_participant.h"
 
@@ -129,15 +130,18 @@ void TransactionMetricsObserver::onCommit(OperationContext* opCtx,
 
     auto duration =
         durationCount<Microseconds>(_singleTransactionStats.getDuration(tickSource, curTick));
-    top->incrementGlobalTransactionLatencyStats(static_cast<uint64_t>(duration));
+    top->incrementGlobalTransactionLatencyStats(opCtx, static_cast<uint64_t>(duration));
 }
 
 void TransactionMetricsObserver::_onAbortActive(
-    ServerTransactionsMetrics* serverTransactionsMetrics, TickSource* tickSource, Top* top) {
+    OperationContext* opCtx,
+    ServerTransactionsMetrics* serverTransactionsMetrics,
+    TickSource* tickSource,
+    Top* top) {
 
     auto curTick = tickSource->getTicks();
     invariant(_singleTransactionStats.isActive());
-    _onAbort(serverTransactionsMetrics, curTick, tickSource, top);
+    _onAbort(opCtx, serverTransactionsMetrics, curTick, tickSource, top);
     //
     // Per transaction metrics.
     //
@@ -150,10 +154,13 @@ void TransactionMetricsObserver::_onAbortActive(
 }
 
 void TransactionMetricsObserver::_onAbortInactive(
-    ServerTransactionsMetrics* serverTransactionsMetrics, TickSource* tickSource, Top* top) {
+    OperationContext* opCtx,
+    ServerTransactionsMetrics* serverTransactionsMetrics,
+    TickSource* tickSource,
+    Top* top) {
     auto curTick = tickSource->getTicks();
     invariant(!_singleTransactionStats.isActive());
-    _onAbort(serverTransactionsMetrics, curTick, tickSource, top);
+    _onAbort(opCtx, serverTransactionsMetrics, curTick, tickSource, top);
 
     //
     // Server wide transactions metrics.
@@ -161,13 +168,14 @@ void TransactionMetricsObserver::_onAbortInactive(
     serverTransactionsMetrics->decrementCurrentInactive();
 }
 
-void TransactionMetricsObserver::onAbort(ServerTransactionsMetrics* serverTransactionsMetrics,
+void TransactionMetricsObserver::onAbort(OperationContext* opCtx,
+                                         ServerTransactionsMetrics* serverTransactionsMetrics,
                                          TickSource* tickSource,
                                          Top* top) {
     if (_singleTransactionStats.isActive()) {
-        _onAbortActive(serverTransactionsMetrics, tickSource, top);
+        _onAbortActive(opCtx, serverTransactionsMetrics, tickSource, top);
     } else {
-        _onAbortInactive(serverTransactionsMetrics, tickSource, top);
+        _onAbortInactive(opCtx, serverTransactionsMetrics, tickSource, top);
     }
 }
 
@@ -201,7 +209,8 @@ void TransactionMetricsObserver::onTransactionOperation(OperationContext* opCtx,
     _singleTransactionStats.updateLastClientInfo(opCtx->getClient());
 }
 
-void TransactionMetricsObserver::_onAbort(ServerTransactionsMetrics* serverTransactionsMetrics,
+void TransactionMetricsObserver::_onAbort(OperationContext* opCtx,
+                                          ServerTransactionsMetrics* serverTransactionsMetrics,
                                           TickSource::Tick curTick,
                                           TickSource* tickSource,
                                           Top* top) {
@@ -223,7 +232,7 @@ void TransactionMetricsObserver::_onAbort(ServerTransactionsMetrics* serverTrans
 
     auto latency =
         durationCount<Microseconds>(_singleTransactionStats.getDuration(tickSource, curTick));
-    top->incrementGlobalTransactionLatencyStats(static_cast<uint64_t>(latency));
+    top->incrementGlobalTransactionLatencyStats(opCtx, static_cast<uint64_t>(latency));
 }
 
 void TransactionMetricsObserver::onPrepare(ServerTransactionsMetrics* serverTransactionsMetrics,

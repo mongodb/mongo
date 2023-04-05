@@ -81,7 +81,8 @@ public:
      * Updates relevant metrics when a transaction aborts.
      * See _onAbortActive() and _onAbortInactive().
      */
-    void onAbort(ServerTransactionsMetrics* serverTransactionsMetrics,
+    void onAbort(OperationContext* opCtx,
+                 ServerTransactionsMetrics* serverTransactionsMetrics,
                  TickSource* tickSource,
                  Top* top);
 
@@ -126,7 +127,8 @@ private:
     /**
      * Updates relevant metrics for any generic transaction abort.
      */
-    void _onAbort(ServerTransactionsMetrics* serverTransactionsMetrics,
+    void _onAbort(OperationContext* opCtx,
+                  ServerTransactionsMetrics* serverTransactionsMetrics,
                   TickSource::Tick curTick,
                   TickSource* tickSource,
                   Top* top);
@@ -134,14 +136,16 @@ private:
     /**
      * Updates relevant metrics when an active transaction aborts.
      */
-    void _onAbortActive(ServerTransactionsMetrics* serverTransactionsMetrics,
+    void _onAbortActive(OperationContext* opCtx,
+                        ServerTransactionsMetrics* serverTransactionsMetrics,
                         TickSource* tickSource,
                         Top* top);
 
     /**
      * Updates relevant metrics when an inactive transaction aborts.
      */
-    void _onAbortInactive(ServerTransactionsMetrics* serverTransactionsMetrics,
+    void _onAbortInactive(OperationContext* opCtx,
+                          ServerTransactionsMetrics* serverTransactionsMetrics,
                           TickSource* tickSource,
                           Top* top);
 

@@ -142,6 +142,8 @@ void OperationLatencyHistogram::_append(const HistogramData& data,
 
     histogramBuilder.append("latency", static_cast<long long>(data.sum));
     histogramBuilder.append("ops", static_cast<long long>(data.entryCount));
+    histogramBuilder.append("queryableEncryptionLatencyMicros",
+                            static_cast<long long>(data.sumQueryableEncryption));
     histogramBuilder.doneFast();
 }
 
@@ -181,26 +183,35 @@ int OperationLatencyHistogram::_getBucket(uint64_t value) {
     }
 }
 
-void OperationLatencyHistogram::_incrementData(uint64_t latency, int bucket, HistogramData* data) {
+void OperationLatencyHistogram::_incrementData(uint64_t latency,
+                                               int bucket,
+                                               bool isQuerableEncryptionOperation,
+                                               HistogramData* data) {
     data->buckets[bucket]++;
     data->entryCount++;
     data->sum += latency;
+
+    if (isQuerableEncryptionOperation) {
+        data->sumQueryableEncryption += latency;
+    }
 }
 
-void OperationLatencyHistogram::increment(uint64_t latency, Command::ReadWriteType type) {
+void OperationLatencyHistogram::increment(uint64_t latency,
+                                          Command::ReadWriteType type,
+                                          bool isQuerableEncryptionOperation) {
     int bucket = _getBucket(latency);
     switch (type) {
         case Command::ReadWriteType::kRead:
-            _incrementData(latency, bucket, &_reads);
+            _incrementData(latency, bucket, isQuerableEncryptionOperation, &_reads);
             break;
         case Command::ReadWriteType::kWrite:
-            _incrementData(latency, bucket, &_writes);
+            _incrementData(latency, bucket, isQuerableEncryptionOperation, &_writes);
             break;
         case Command::ReadWriteType::kCommand:
-            _incrementData(latency, bucket, &_commands);
+            _incrementData(latency, bucket, isQuerableEncryptionOperation, &_commands);
             break;
         case Command::ReadWriteType::kTransaction:
-            _incrementData(latency, bucket, &_transactions);
+            _incrementData(latency, bucket, isQuerableEncryptionOperation, &_transactions);
             break;
         default:
             MONGO_UNREACHABLE;
