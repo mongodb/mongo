@@ -58,6 +58,7 @@
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {
+MONGO_FAIL_POINT_DEFINE(skipUpdateIndexMultikey);
 
 using std::string;
 
@@ -218,6 +219,10 @@ void IndexCatalogEntryImpl::setMultikey(OperationContext* opCtx,
             // '_indexMultikeyPaths', then there's nothing more for us to do.
             return;
         }
+    }
+
+    if (MONGO_unlikely(skipUpdateIndexMultikey.shouldFail())) {
+        return;
     }
 
     MultikeyPaths paths = _indexTracksMultikeyPathsInCatalog ? multikeyPaths : MultikeyPaths{};
