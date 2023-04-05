@@ -1,10 +1,11 @@
 /**
  * Tests that the global indexes API correctly creates and drops an index from the catalog.
  *
+ * TODO SERVER-75274: Enable with a catalog shard.
  * @tags: [
  *   multiversion_incompatible,
  *   featureFlagGlobalIndexesShardingCatalog,
- *   temporary_catalog_shard_incompatible,
+ *   catalog_shard_incompatible,
  * ]
  */
 

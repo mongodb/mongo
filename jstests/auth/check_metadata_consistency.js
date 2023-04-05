@@ -5,7 +5,7 @@
  *    featureFlagCheckMetadataConsistency,
  *    requires_fcv_70,
  *    # TODO SERVER-74445: Remove tag once the command will be compatible with catalog shard
- *    temporary_catalog_shard_incompatible,
+ *    catalog_shard_incompatible,
  * ]
  */
 

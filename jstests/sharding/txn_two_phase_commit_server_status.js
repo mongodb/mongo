@@ -1,5 +1,4 @@
 // Basic test that the two-phase commit coordinator metrics fields appear in serverStatus output.
-// @tags: [temporary_catalog_shard_incompatible]
 (function() {
 "use strict";
 
@@ -7,7 +6,9 @@ const st = new ShardingTest({shards: 1});
 
 const res = assert.commandWorked(st.shard0.adminCommand({serverStatus: 1}));
 assert.neq(null, res.twoPhaseCommitCoordinator);
-assert.eq(0, res.twoPhaseCommitCoordinator.totalCreated);
+// A catalog shard will have run config server metadata transactions, which are single shard but
+// create a two phase commit coordinator.
+assert.eq(TestData.catalogShard ? 1 : 0, res.twoPhaseCommitCoordinator.totalCreated);
 assert.eq(0, res.twoPhaseCommitCoordinator.totalStartedTwoPhaseCommit);
 assert.eq(0, res.twoPhaseCommitCoordinator.totalCommittedTwoPhaseCommit);
 assert.eq(0, res.twoPhaseCommitCoordinator.totalAbortedTwoPhaseCommit);

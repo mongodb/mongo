@@ -1,10 +1,7 @@
 /**
  * Tests that the config server connection string in the shard identity document of both the
  * primary and secondary will get updated whenever the config server membership changes.
- *
- * Shuts down the first shard but expects the config server to still be up. See if we can rework to
- * get coverage in catalog shard mode.
- * @tags: [requires_persistence, temporary_catalog_shard_incompatible]
+ * @tags: [requires_persistence]
  */
 
 // Checking UUID consistency involves talking to a shard node, which in this test is shutdown
@@ -15,9 +12,11 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
 load('jstests/replsets/rslib.js');
 
-var st = new ShardingTest({shards: {rs0: {nodes: 2}}});
+const notInMultiversionTest = !jsTestOptions().shardMixedBinVersions &&
+    jsTestOptions().mongosBinVersion !== "last-lts" &&
+    jsTestOptions().mongosBinVersion !== "last-continuous";
 
-var shardPri = st.rs0.getPrimary();
+var st = new ShardingTest({shards: {rs0: {nodes: 2}}});
 
 // Note: Adding new replica set member by hand because of SERVER-24011.
 
@@ -65,11 +64,32 @@ assert.soon(function() {
     return checkConfigStrUpdated(st.rs0.getPrimary(), expectedConfigStr);
 });
 
-var secConn = st.rs0.getSecondary();
-secConn.setSecondaryOk();
-assert.soon(function() {
-    return checkConfigStrUpdated(secConn, expectedConfigStr);
+st.rs0.getSecondaries().forEach(secConn => {
+    secConn.setSecondaryOk();
+    assert.soon(function() {
+        return checkConfigStrUpdated(secConn, expectedConfigStr);
+    });
 });
+
+// Config servers in 7.0 also maintain the connection string in their shard identity document.
+// TODO SERVER-75391: Always run config server assertions.
+if (notInMultiversionTest) {
+    assert.soon(function() {
+        return checkConfigStrUpdated(st.configRS.getPrimary(), expectedConfigStr);
+    });
+
+    st.configRS.getSecondaries().forEach(secConn => {
+        secConn.setSecondaryOk();
+        assert.soon(function() {
+            return checkConfigStrUpdated(secConn, expectedConfigStr);
+        });
+    });
+
+    newNode.setSecondaryOk();
+    assert.soon(function() {
+        return checkConfigStrUpdated(newNode, expectedConfigStr);
+    });
+}
 
 //
 // Remove the newly added member from the config replSet while the shards are down.
@@ -77,8 +97,12 @@ assert.soon(function() {
 // string when they come back up.
 //
 
-st.rs0.stop(0);
-st.rs0.stop(1);
+// We can't reconfigure the config server if some nodes are down, so skip in catalog shard mode and
+// just verify all nodes update the config string eventually.
+if (!TestData.catalogShard) {
+    st.rs0.stop(0);
+    st.rs0.stop(1);
+}
 
 MongoRunner.stopMongod(newNode);
 
@@ -88,8 +112,10 @@ replConfig.members.pop();
 
 reconfig(st.configRS, replConfig);
 
-st.rs0.restart(0, {shardsvr: ''});
-st.rs0.restart(1, {shardsvr: ''});
+if (!TestData.catalogShard) {
+    st.rs0.restart(0, {shardsvr: ''});
+    st.rs0.restart(1, {shardsvr: ''});
+}
 
 st.rs0.waitForPrimary();
 st.rs0.awaitSecondaryNodes();
@@ -98,11 +124,27 @@ assert.soon(function() {
     return checkConfigStrUpdated(st.rs0.getPrimary(), origConfigConnStr);
 });
 
-secConn = st.rs0.getSecondary();
-secConn.setSecondaryOk();
-assert.soon(function() {
-    return checkConfigStrUpdated(secConn, origConfigConnStr);
+st.rs0.getSecondaries().forEach(secConn => {
+    secConn.setSecondaryOk();
+    assert.soon(function() {
+        return checkConfigStrUpdated(secConn, origConfigConnStr);
+    });
 });
+
+// Config servers in 7.0 also maintain the connection string in their shard identity document.
+// TODO SERVER-75391: Always run config server assertions.
+if (notInMultiversionTest) {
+    assert.soon(function() {
+        return checkConfigStrUpdated(st.configRS.getPrimary(), origConfigConnStr);
+    });
+
+    st.configRS.getSecondaries().forEach(secConn => {
+        secConn.setSecondaryOk();
+        assert.soon(function() {
+            return checkConfigStrUpdated(secConn, origConfigConnStr);
+        });
+    });
+}
 
 st.stop();
 })();

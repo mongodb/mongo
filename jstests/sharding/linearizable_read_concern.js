@@ -19,8 +19,6 @@
  * document. This test is mainly trying to ensure that system behavior is
  * reasonable when executing linearizable reads in a sharded cluster, so as to
  * exercise possible (invalid) user behavior.
- *
- * @tags: [temporary_catalog_shard_incompatible]
  */
 
 load("jstests/replsets/rslib.js");
@@ -38,10 +36,9 @@ var testName = "linearizable_read_concern";
 
 var st = new ShardingTest({
     name: testName,
-    shards: 2,
     other: {rs0: {nodes: 3}, rs1: {nodes: 3}, useBridge: true},
     mongos: 1,
-    config: 1,
+    config: TestData.catalogShard ? undefined : 1,
     enableBalancer: false
 });
 
@@ -125,6 +122,12 @@ var result = testDB.runReadCommand({
     maxTimeMS: 3000
 });
 assert.commandFailedWithCode(result, ErrorCodes.MaxTimeMSExpired);
+
+if (TestData.catalogShard) {
+    // Reconnect so the config server is available for shutdown hooks.
+    secondaries[0].reconnect(primary);
+    secondaries[1].reconnect(primary);
+}
 
 st.stop();
 })();

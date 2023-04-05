@@ -5,7 +5,6 @@
  * @tags: [
  *   requires_majority_read_concern,
  *   requires_persistence,
- *   temporary_catalog_shard_incompatible,
  * ]
  */
 
@@ -42,7 +41,7 @@ const st = new ShardingTest({
         rs2: {nodes: 2},
     },
     mongos: 1,
-    config: 1,
+    config: TestData.catalogShard ? undefined : 1,
     other: {configOptions: nodeOptions, rsOptions: nodeOptions}
 });
 // Config sharded collections.

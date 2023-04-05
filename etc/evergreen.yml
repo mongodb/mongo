@@ -1615,7 +1615,7 @@ buildvariants:
     <<: *enterprise-rhel-80-64-bit-dynamic-expansions
     test_flags: >-
       --catalogShard=any
-      --excludeWithAnyTags=catalog_shard_incompatible,temporary_catalog_shard_incompatible
+      --excludeWithAnyTags=catalog_shard_incompatible
   tasks:
   - name: aggregation_mongos_passthrough
   - name: aggregation_one_shard_sharded_collections

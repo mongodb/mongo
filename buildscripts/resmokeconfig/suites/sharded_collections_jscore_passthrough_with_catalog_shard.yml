@@ -81,7 +81,6 @@ selector:
   # system.profile collection doesn't exist on mongos.
   - requires_profiling
   - catalog_shard_incompatible
-  - temporary_catalog_shard_incompatible
 
 executor:
   archive:
