@@ -48,6 +48,19 @@ namespace mongo {
 namespace metadata_consistency_util {
 
 namespace {
+
+/*
+ * Emit a warning log containing information about the given inconsistency
+ */
+void logMetadataInconsistency(const MetadataInconsistencyItem& inconsistencyItem) {
+    // Please do not change the error code of this log message if not strictly necessary.
+    // Automated log ingestion system relies on this specific log message to monitor cluster.
+    // inconsistencies
+    LOGV2_WARNING(7514800,
+                  "Detected sharding metadata inconsistency",
+                  "inconsistency"_attr = inconsistencyItem);
+}
+
 void _checkShardKeyIndexInconsistencies(OperationContext* opCtx,
                                         const NamespaceString& nss,
                                         const ShardId& shardId,
@@ -121,7 +134,7 @@ void _checkShardKeyIndexInconsistencies(OperationContext* opCtx,
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeQueuedPlanExecutor(
     OperationContext* opCtx,
-    const std::vector<MetadataInconsistencyItem>& inconsistencies,
+    std::vector<MetadataInconsistencyItem>&& inconsistencies,
     const NamespaceString& nss) {
 
     auto expCtx =
@@ -130,6 +143,9 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeQueuedPlanExecutor(
     auto root = std::make_unique<QueuedDataStage>(expCtx.get(), ws.get());
 
     for (auto&& inconsistency : inconsistencies) {
+        // Every inconsistency encountered need to be logged with the same format
+        // to allow log injestion systems to correctly detect them.
+        logMetadataInconsistency(inconsistency);
         WorkingSetID id = ws->allocate();
         WorkingSetMember* member = ws->get(id);
         member->keyData.clear();

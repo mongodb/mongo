@@ -58,7 +58,7 @@ MetadataInconsistencyItem makeInconsistency(const MetadataInconsistencyTypeEnum&
  */
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeQueuedPlanExecutor(
     OperationContext* opCtx,
-    const std::vector<MetadataInconsistencyItem>& inconsistencies,
+    std::vector<MetadataInconsistencyItem>&& inconsistencies,
     const NamespaceString& nss);
 
 /**
