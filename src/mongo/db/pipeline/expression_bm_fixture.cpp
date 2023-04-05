@@ -1395,6 +1395,45 @@ void ExpressionBenchmarkFixture::benchmarkValueLiteral(benchmark::State& state) 
                         std::vector<Document>(1, {{"value"_sd, "1"_sd}}));
 }
 
+void ExpressionBenchmarkFixture::benchmarkObjectToArray(benchmark::State& state) {
+    BSONObjBuilder builder{};
+    for (int i = 0; i < 10; ++i) {
+        auto key = "key" + std::to_string(i);
+        auto value = "value" + std::to_string(i);
+        builder.append(key, value);
+    }
+    benchmarkExpression(BSON("$objectToArray"
+                             << "$input"_sd),
+                        state,
+                        std::vector<Document>(1, {{"input"_sd, builder.obj()}}));
+}
+
+void ExpressionBenchmarkFixture::benchmarkArrayToObject1(benchmark::State& state) {
+    BSONArrayBuilder builder{};
+    for (int i = 0; i < 10; ++i) {
+        auto key = "key" + std::to_string(i);
+        auto value = "value" + std::to_string(i);
+        builder.append(BSON_ARRAY(key << value));
+    }
+    benchmarkExpression(BSON("$arrayToObject"
+                             << "$input"_sd),
+                        state,
+                        std::vector<Document>(1, {{"input"_sd, builder.arr()}}));
+}
+
+void ExpressionBenchmarkFixture::benchmarkArrayToObject2(benchmark::State& state) {
+    BSONArrayBuilder builder{};
+    for (int i = 0; i < 10; ++i) {
+        auto key = "key" + std::to_string(i);
+        auto value = "value" + std::to_string(i);
+        builder.append(BSON("k" << key << "v" << value));
+    }
+    benchmarkExpression(BSON("$arrayToObject"
+                             << "$input"_sd),
+                        state,
+                        std::vector<Document>(1, {{"input"_sd, builder.arr()}}));
+}
+
 void ExpressionBenchmarkFixture::testDateDiffExpression(long long startDate,
                                                         long long endDate,
                                                         std::string unit,

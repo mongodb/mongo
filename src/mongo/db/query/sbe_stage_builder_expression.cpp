@@ -844,10 +844,60 @@ public:
         unsupportedExpression(expr->getOpName());
     }
     void visit(const ExpressionObjectToArray* expr) final {
-        unsupportedExpression(expr->getOpName());
+        auto arg = _context->popABTExpr();
+        auto argName = makeLocalVariableName(_context->state.frameId(), 0);
+
+        // Create an expression to invoke the built-in function.
+        auto funcCall = makeABTFunction("objectToArray", makeVariable(argName));
+        auto funcName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto funcVar = makeVariable(funcName);
+
+        // Create validation checks when builtin returns nothing
+        auto validationExpr = buildABTMultiBranchConditional(
+            ABTCaseValuePair{generateABTNullOrMissing(argName), optimizer::Constant::null()},
+            ABTCaseValuePair{
+                generateABTNonObjectCheck(argName),
+                makeABTFail(ErrorCodes::Error{5153215}, "$objectToArray requires an object input")},
+            optimizer::Constant::nothing());
+
+        auto existCheck = makeABTFunction("exists", funcVar);
+
+        pushABT(optimizer::make<optimizer::Let>(
+            std::move(argName),
+            std::move(arg),
+            optimizer::make<optimizer::Let>(
+                std::move(funcName),
+                std::move(funcCall),
+                optimizer::make<optimizer::If>(
+                    existCheck, std::move(funcVar), std::move(validationExpr)))));
     }
     void visit(const ExpressionArrayToObject* expr) final {
-        unsupportedExpression(expr->getOpName());
+        auto arg = _context->popABTExpr();
+        auto argName = makeLocalVariableName(_context->state.frameId(), 0);
+
+        // Create an expression to invoke the built-in function.
+        auto funcCall = makeABTFunction("arrayToObject", makeVariable(argName));
+        auto funcName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto funcVar = makeVariable(funcName);
+
+        // Create validation checks when builtin returns nothing
+        auto validationExpr = buildABTMultiBranchConditional(
+            ABTCaseValuePair{generateABTNullOrMissing(argName), optimizer::Constant::null()},
+            ABTCaseValuePair{
+                generateABTNonArrayCheck(argName),
+                makeABTFail(ErrorCodes::Error{5153200}, "$arrayToObject requires an array input")},
+            optimizer::Constant::nothing());
+
+        auto existCheck = makeABTFunction("exists", funcVar);
+
+        pushABT(optimizer::make<optimizer::Let>(
+            std::move(argName),
+            std::move(arg),
+            optimizer::make<optimizer::Let>(
+                std::move(funcName),
+                std::move(funcCall),
+                optimizer::make<optimizer::If>(
+                    existCheck, std::move(funcVar), std::move(validationExpr)))));
     }
     void visit(const ExpressionBsonSize* expr) final {
         // Build an expression which evaluates the size of a BSON document and validates the input

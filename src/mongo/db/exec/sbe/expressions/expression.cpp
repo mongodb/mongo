@@ -774,7 +774,12 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
     {"_internalLeast",
      BuiltinFn{[](size_t n) { return n == 1 || n == 2; }, vm::Builtin::internalLeast, false}},
     {"_internalGreatest",
-     BuiltinFn{[](size_t n) { return n == 1 || n == 2; }, vm::Builtin::internalGreatest, false}}};
+     BuiltinFn{[](size_t n) { return n == 1 || n == 2; }, vm::Builtin::internalGreatest, false}},
+    {"objectToArray",
+     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::objectToArray, false}},
+    {"arrayToObject",
+     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::arrayToObject, false}},
+};
 
 /**
  * The code generation function.

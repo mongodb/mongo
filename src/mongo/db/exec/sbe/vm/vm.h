@@ -749,6 +749,8 @@ enum class Builtin : uint8_t {
     isoWeekYear,
     isoDayOfWeek,
     isoWeek,
+    objectToArray,
+    arrayToObject,
 };
 
 std::string builtinToString(Builtin b);
@@ -1541,6 +1543,8 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinISODayOfWeek(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinISOWeek(ArityType arity);
 
+    FastTuple<bool, value::TypeTags, value::Value> builtinObjectToArray(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinArrayToObject(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> dispatchBuiltin(Builtin f, ArityType arity);
 
     static constexpr size_t offsetOwned = 0;

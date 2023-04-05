@@ -194,6 +194,7 @@ env.CppUnitTest(
         'expressions/sbe_local_bind_test.cpp',
         'expressions/sbe_mod_expression_test.cpp',
         'expressions/sbe_new_array_from_range_builtin_test.cpp',
+        'expressions/sbe_object_array_conversion_test.cpp',
         'expressions/sbe_prim_binary_test.cpp',
         'expressions/sbe_prim_unary_test.cpp',
         'expressions/sbe_regex_test.cpp',

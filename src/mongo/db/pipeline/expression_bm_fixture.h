@@ -223,6 +223,10 @@ public:
     void benchmarkValueConst(benchmark::State& state);
     void benchmarkValueLiteral(benchmark::State& state);
 
+    void benchmarkObjectToArray(benchmark::State& state);
+    void benchmarkArrayToObject1(benchmark::State& state);
+    void benchmarkArrayToObject2(benchmark::State& state);
+
 private:
     void testDateDiffExpression(long long startDate,
                                 long long endDate,
@@ -803,6 +807,15 @@ private:
     }                                                                           \
     BENCHMARK_F(Fixture, ValueLiteral)(benchmark::State & state) {              \
         benchmarkValueLiteral(state);                                           \
+    }                                                                           \
+    BENCHMARK_F(Fixture, ObjectToArray)(benchmark::State & state) {             \
+        benchmarkObjectToArray(state);                                          \
+    }                                                                           \
+    BENCHMARK_F(Fixture, ArrayToObject1)(benchmark::State & state) {            \
+        benchmarkArrayToObject1(state);                                         \
+    }                                                                           \
+    BENCHMARK_F(Fixture, ArrayToObject2)(benchmark::State & state) {            \
+        benchmarkArrayToObject2(state);                                         \
     }
 
 }  // namespace mongo
