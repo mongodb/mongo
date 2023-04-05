@@ -68,6 +68,8 @@ public:
 
     struct Options {
         boost::optional<int64_t> batchSize;
+        bool pinConnection{false};
+        Options() {}
     };
 
     /**
@@ -78,7 +80,7 @@ public:
      * opCtx - The Logical Session Id from the initial command is carried over in all later stages.
      *         NOTE - the actual command must not include the lsid
      */
-    explicit TaskExecutorCursor(executor::TaskExecutor* executor,
+    explicit TaskExecutorCursor(std::shared_ptr<executor::TaskExecutor> executor,
                                 const RemoteCommandRequest& rcr,
                                 Options&& options = {});
 
@@ -87,8 +89,11 @@ public:
      * The executor is used for subsequent getMore calls. Uses the original RemoteCommandRequest
      * to build subsequent commands. Takes ownership of the CursorResponse and gives it to the new
      * cursor.
+     * If the cursor should reuse the original transport connection that opened the original
+     * cursor, make sure the pinning executor that was used to open that cursor is provided.
      */
-    TaskExecutorCursor(executor::TaskExecutor* executor,
+    TaskExecutorCursor(std::shared_ptr<executor::TaskExecutor> executor,
+                       std::shared_ptr<executor::TaskExecutor> underlyingExec,
                        CursorResponse&& response,
                        RemoteCommandRequest& rcr,
                        Options&& options = {});
@@ -191,7 +196,11 @@ private:
      */
     const RemoteCommandRequest& _createRequest(OperationContext* opCtx, const BSONObj& cmd);
 
-    executor::TaskExecutor* const _executor;
+    std::shared_ptr<executor::TaskExecutor> _executor;
+    // If we are pinning connections, we need to keep a separate reference to the
+    // non-pinning, normal executor, so that we can shut down the pinned executor
+    // out-of-line.
+    std::shared_ptr<executor::TaskExecutor> _underlyingExecutor;
 
     // Used as a scratch pad for the successive scheduleRemoteCommand calls
     RemoteCommandRequest _rcr;

@@ -231,6 +231,9 @@ private:
     // Lifecycle state of this executor.
     stdx::condition_variable _stateChange;
     State _state = preStart;
+
+    friend std::shared_ptr<TaskExecutor> makePinnedConnectionTaskExecutor(
+        std::shared_ptr<TaskExecutor>);
 };
 
 }  // namespace executor

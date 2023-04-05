@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/query/kill_cursors_gen.h"
+#include "mongo/executor/pinned_connection_task_executor_factory.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/time_support.h"
@@ -42,24 +43,38 @@
 
 namespace mongo {
 namespace executor {
+namespace {
+MONGO_FAIL_POINT_DEFINE(blockBeforePinnedExecutorIsDestroyedOnUnderlying);
+}  // namespace
 
-TaskExecutorCursor::TaskExecutorCursor(executor::TaskExecutor* executor,
+TaskExecutorCursor::TaskExecutorCursor(std::shared_ptr<executor::TaskExecutor> executor,
                                        const RemoteCommandRequest& rcr,
                                        Options&& options)
-    : _executor(executor), _rcr(rcr), _options(std::move(options)), _batchIter(_batch.end()) {
+    : _rcr(rcr), _options(std::move(options)), _batchIter(_batch.end()) {
 
     if (rcr.opCtx) {
         _lsid = rcr.opCtx->getLogicalSessionId();
+    }
+    if (_options.pinConnection) {
+        _executor = makePinnedConnectionTaskExecutor(executor);
+        _underlyingExecutor = std::move(executor);
+    } else {
+        _executor = std::move(executor);
     }
 
     _runRemoteCommand(_createRequest(_rcr.opCtx, _rcr.cmdObj));
 }
 
-TaskExecutorCursor::TaskExecutorCursor(executor::TaskExecutor* executor,
+TaskExecutorCursor::TaskExecutorCursor(std::shared_ptr<executor::TaskExecutor> executor,
+                                       std::shared_ptr<executor::TaskExecutor> underlyingExec,
                                        CursorResponse&& response,
                                        RemoteCommandRequest& rcr,
                                        Options&& options)
-    : _executor(executor), _rcr(rcr), _options(std::move(options)), _batchIter(_batch.end()) {
+    : _executor(std::move(executor)),
+      _underlyingExecutor(std::move(underlyingExec)),
+      _rcr(rcr),
+      _options(std::move(options)),
+      _batchIter(_batch.end()) {
 
     tassert(6253101, "rcr must have an opCtx to use construct cursor from response", rcr.opCtx);
     _lsid = rcr.opCtx->getLogicalSessionId();
@@ -67,7 +82,8 @@ TaskExecutorCursor::TaskExecutorCursor(executor::TaskExecutor* executor,
 }
 
 TaskExecutorCursor::TaskExecutorCursor(TaskExecutorCursor&& other)
-    : _executor(other._executor),
+    : _executor(std::move(other._executor)),
+      _underlyingExecutor(std::move(other._underlyingExecutor)),
       _rcr(other._rcr),
       _options(std::move(other._options)),
       _lsid(other._lsid),
@@ -98,15 +114,19 @@ TaskExecutorCursor::TaskExecutorCursor(TaskExecutorCursor&& other)
 
 TaskExecutorCursor::~TaskExecutorCursor() {
     try {
-        if (_cursorId < kMinLegalCursorId) {
+        if (_cursorId < kMinLegalCursorId || _options.pinConnection) {
             // The initial find to establish the cursor has to be canceled to avoid leaking cursors.
             // Once the cursor is established, killing the cursor will interrupt any ongoing
             // `getMore` operation.
+            // Additionally, in pinned mode, we should cancel any in-progress RPC if there is one,
+            // even at the cost of churning the connection, because it's the only way to interrupt
+            // the ongoing operation.
             if (_cmdState) {
                 _executor->cancel(_cmdState->cbHandle);
             }
-
-            return;
+            if (_cursorId < kMinLegalCursorId) {
+                return;
+            }
         }
 
         // We deliberately ignore failures to kill the cursor. This "best effort" is acceptable
@@ -115,15 +135,43 @@ TaskExecutorCursor::~TaskExecutorCursor() {
         // That timeout mechanism could be the default cursor timeout, or the logical session
         // timeout if an lsid is used.
         //
-        // Killing the cursor also interrupts any ongoing getMore operations on this cursor. Avoid
-        // canceling the remote command through its callback handle as that may close the underlying
-        // connection.
-        _executor
-            ->scheduleRemoteCommand(
-                _createRequest(nullptr,
-                               KillCursorsCommandRequest(_ns, {_cursorId}).toBSON(BSONObj{})),
-                [](const auto&) {})
-            .isOK();
+        // In non-pinned mode, killing the cursor also interrupts any ongoing getMore operations on
+        // this cursor. Avoid canceling the remote command through its callback handle as that may
+        // close the underlying connection.
+        //
+        // In pinned mode, we must await completion of the killCursors to safely reuse the pinned
+        // connection. This requires allocating an executor thread (from `_underlyingExecutor`) upon
+        // completion of the killCursors command to shutdown and destroy the pinned executor. This
+        // is necessary as joining an executor from its own threads results in a deadlock.
+        TaskExecutor::RemoteCommandCallbackFn callbackToRun = [](const auto&) {
+        };
+        if (_options.pinConnection) {
+            invariant(_underlyingExecutor,
+                      "TaskExecutorCursor in pinning mode must have an underlying executor");
+            callbackToRun = [main = _executor, underlying = _underlyingExecutor](const auto&) {
+                underlying->schedule([main = std::move(main)](const auto&) {
+                    if (MONGO_unlikely(
+                            blockBeforePinnedExecutorIsDestroyedOnUnderlying.shouldFail())) {
+                        LOGV2(7361300,
+                              "Hanging before destroying a TaskExecutorCursor's pinning executor.");
+                        blockBeforePinnedExecutorIsDestroyedOnUnderlying.pauseWhileSet();
+                    }
+                    // Returning from this callback will destroy the pinned executor on
+                    // underlying if this is the last TaskExecutorCursor using that pinned executor.
+                });
+            };
+        }
+        auto swCallback = _executor->scheduleRemoteCommand(
+            _createRequest(nullptr, KillCursorsCommandRequest(_ns, {_cursorId}).toBSON(BSONObj{})),
+            callbackToRun);
+
+        // It's possible the executor is already shutdown and rejects work. If so, run the callback
+        // inline.
+        if (!swCallback.isOK()) {
+            TaskExecutor::RemoteCommandCallbackArgs args(
+                _executor.get(), {}, {}, swCallback.getStatus());
+            callbackToRun(args);
+        }
     } catch (const DBException& ex) {
         LOGV2(6531704,
               "Encountered an error while destroying a cursor executor",
@@ -247,11 +295,17 @@ void TaskExecutorCursor::_getNextBatch(OperationContext* opCtx) {
     // them. Skip the first response, we used it to populate this cursor.
     // Ensure we update the RCR we give to each 'child cursor' with the current opCtx.
     auto freshRcr = _createRequest(opCtx, _rcr.cmdObj);
+    auto copyOptions = [&] {
+        TaskExecutorCursor::Options options;
+        options.pinConnection = _options.pinConnection;
+        return options;
+    };
     for (unsigned int i = 1; i < cursorResponses.size(); ++i) {
         _additionalCursors.emplace_back(_executor,
+                                        _underlyingExecutor,
                                         uassertStatusOK(std::move(cursorResponses[i])),
                                         freshRcr,
-                                        TaskExecutorCursor::Options());
+                                        copyOptions());
     }
 }
 

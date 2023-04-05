@@ -33,7 +33,6 @@
 #include "mongo/util/scoped_unlock.h"
 
 namespace mongo::executor {
-
 /**
  * Used as the state for callbacks _only_ for RPCs scheduled through this executor.
  */
@@ -68,15 +67,22 @@ public:
     }
 
     // Run callback with a CallbackCanceled error.
-    static void runCallbackCanceled(RequestAndCallback rcb, TaskExecutor* exec) {
+    static void runCallbackCanceled(stdx::unique_lock<Latch>& lk,
+                                    RequestAndCallback rcb,
+                                    TaskExecutor* exec) {
         CallbackHandle cbHandle;
         setCallbackForHandle(&cbHandle, rcb.second);
         auto errorResponse = RemoteCommandOnAnyResponse(boost::none, kCallbackCanceledErrorStatus);
-        rcb.second->callback({exec, cbHandle, rcb.first, errorResponse});
+        TaskExecutor::RemoteCommandOnAnyCallbackFn callback;
+        using std::swap;
+        swap(rcb.second->callback, callback);
+        ScopedUnlock guard(lk);
+        callback({exec, cbHandle, rcb.first, errorResponse});
     }
 
     // Run callback with the provided success result.
-    static void runCallbackSuccess(RequestAndCallback rcb,
+    static void runCallbackSuccess(stdx::unique_lock<Latch>& lk,
+                                   RequestAndCallback rcb,
                                    TaskExecutor* exec,
                                    const StatusWith<RemoteCommandResponse>& result,
                                    const HostAndPort& targetUsed) {
@@ -87,16 +93,21 @@ public:
         RemoteCommandOnAnyResponse asOnAnyRcr(targetUsed, asRcr);
         CallbackHandle cbHandle;
         setCallbackForHandle(&cbHandle, rcb.second);
-        rcb.second->callback({exec, cbHandle, rcb.first, asOnAnyRcr});
+        TaskExecutor::RemoteCommandOnAnyCallbackFn callback;
+        using std::swap;
+        swap(rcb.second->callback, callback);
+        ScopedUnlock guard(lk);
+        callback({exec, cbHandle, rcb.first, asOnAnyRcr});
     }
 
     // All fields except for "canceled" are guarded by the owning task executor's _mutex.
     enum class State { kWaiting, kRunning, kDone, kCanceled };
 
-    const RemoteCommandOnAnyCallbackFn callback;
+    RemoteCommandOnAnyCallbackFn callback;
     boost::optional<stdx::condition_variable> finishedCondition;
     State state{State::kWaiting};
     bool isNetworkOperation = true;
+    bool startedNetworking = false;
     BatonHandle baton;
 };
 
@@ -239,10 +250,17 @@ ExecutorFuture<void> PinnedConnectionTaskExecutor::_ensureStream(WithLock,
 }
 
 Future<executor::RemoteCommandResponse> PinnedConnectionTaskExecutor::_runSingleCommand(
-    RemoteCommandRequest command, BatonHandle baton) {
+    RemoteCommandRequest command, std::shared_ptr<CallbackState> cbState) {
     stdx::lock_guard lk{_mutex};
+    if (auto& state = cbState->state; MONGO_unlikely(state == CallbackState::State::kCanceled)) {
+        // It's possible this callback was canceled after it was moved
+        // out of the queue, but before we actually started work on the client.
+        // In that case, don't run it.
+        return kCallbackCanceledErrorStatus;
+    }
     auto client = _stream->getClient();
-    return client->runCommandRequest(command, baton);
+    cbState->startedNetworking = true;
+    return client->runCommandRequest(command, cbState->baton);
 }
 
 boost::optional<PinnedConnectionTaskExecutor::RequestAndCallback>
@@ -251,8 +269,7 @@ PinnedConnectionTaskExecutor::_getFirstUncanceledRequest(stdx::unique_lock<Latch
         auto req = std::move(_requestQueue.front());
         _requestQueue.pop_front();
         if (req.second->state == CallbackState::State::kCanceled) {
-            ScopedUnlock guard(lk);
-            CallbackState::runCallbackCanceled(req, this);
+            CallbackState::runCallbackCanceled(lk, req, this);
         } else {
             return req;
         }
@@ -276,32 +293,38 @@ void PinnedConnectionTaskExecutor::_doNetworking(stdx::unique_lock<Latch>&& lk) 
     invariant(req.second->state == CallbackState::State::kWaiting);
     req.second->state = CallbackState::State::kRunning;
     auto streamFut = _ensureStream(lk, req.first.target, req.first.timeout);
+    // Stash the in-progress operation before releasing the lock so we can
+    // access it if we're shutdown while it's in-progress.
+    _inProgressRequest = req.second;
     lk.unlock();
     std::move(streamFut)
-        .then([req, this]() { return _runSingleCommand(req.first, req.second->baton); })
+        .then([req, this]() { return _runSingleCommand(req.first, req.second); })
         .thenRunOn(makeGuaranteedExecutor(req.second->baton, _cancellationExecutor))
-        .getAsync([req, this](StatusWith<RemoteCommandResponse> result) {
+        .getAsync([req, this, self = shared_from_this()](StatusWith<RemoteCommandResponse> result) {
             stdx::unique_lock<Latch> lk{_mutex};
+            _inProgressRequest.reset();
             if (auto& state = req.second->state;
                 MONGO_unlikely(state == CallbackState::State::kCanceled)) {
-                ScopedUnlock guard(lk);
-                CallbackState::runCallbackCanceled(req, this);
+                CallbackState::runCallbackCanceled(lk, req, this);
             } else {
                 invariant(state == CallbackState::State::kRunning);
+                invariant(req.second->startedNetworking);
                 state = CallbackState::State::kDone;
                 auto target = _stream->getClient()->remote();
-                ScopedUnlock guard(lk);
-                CallbackState::runCallbackSuccess(req, this, result, target);
+                CallbackState::runCallbackSuccess(lk, req, this, result, target);
             }
-            if (auto status = result.getStatus(); status.isOK()) {
-                _stream->indicateUsed();
-                _stream->indicateSuccess();
-            } else {
-                // We didn't get a response from the remote.
-                // We assume the stream is broken and therefore can do no more work. Notify the
-                // stream of the failure, and shutdown.
-                _stream->indicateFailure(status);
-                _shutdown(lk);
+            // If we used the _stream, update it accordingly.
+            if (req.second->startedNetworking) {
+                if (auto status = result.getStatus(); status.isOK()) {
+                    _stream->indicateUsed();
+                    _stream->indicateSuccess();
+                } else {
+                    // We didn't get a response from the remote.
+                    // We assume the stream is broken and therefore can do no more work. Notify the
+                    // stream of the failure, and shutdown.
+                    _stream->indicateFailure(status);
+                    _shutdown(lk);
+                }
             }
             _isDoingNetworking = false;
             if (!_requestQueue.empty()) {
@@ -319,6 +342,10 @@ void PinnedConnectionTaskExecutor::_shutdown(WithLock lk) {
     _executor->shutdown();
     for (auto&& [_, cbState] : _requestQueue) {
         _cancel(lk, cbState.get());
+    }
+    if (_isDoingNetworking && _inProgressRequest) {
+        // Cancel the in-progress request that was already popped from the queue.
+        _cancel(lk, _inProgressRequest.get());
     }
 }
 

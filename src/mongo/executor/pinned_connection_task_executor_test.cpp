@@ -230,7 +230,6 @@ DEATH_TEST_REGEX_F(
 
     // Second command should invariant once the PCTE attempts to run it, because it has a different
     // remote target.
-
     // Should never be fulfilled.
     ASSERT_OK(pfTwo.future.getNoThrow());
 }
@@ -242,7 +241,7 @@ TEST_F(PinnedConnectionTaskExecutorTest, CancelRPC) {
     auto rcr = makeRCR(remote, BSONObj());
     auto pf = makePromiseFuture<void>();
 
-    // Schedule a command
+    // Schedule a command.
     auto swCbHandle = pinnedTE->scheduleRemoteCommand(
         std::move(rcr), [&](const TaskExecutor::RemoteCommandCallbackArgs& args) {
             pf.promise.setWith([&] { return args.response.status; });
@@ -253,6 +252,19 @@ TEST_F(PinnedConnectionTaskExecutorTest, CancelRPC) {
     ASSERT_EQ(pf.future.getNoThrow(), TaskExecutor::kCallbackCanceledErrorStatus);
 
     pinnedTE->shutdown();
+    pinnedTE->join();
+}
+
+TEST_F(PinnedConnectionTaskExecutorTest, ShutdownWithRPCInProgress) {
+    auto pinnedTE = makePinnedConnTaskExecutor();
+    auto pf = makePromiseFuture<void>();
+    ASSERT_OK(pinnedTE->scheduleRemoteCommand(
+        makeRCR(HostAndPort("mock"), BSONObj()),
+        [&](const TaskExecutor::RemoteCommandCallbackArgs& args) {
+            pf.promise.setWith([&] { return args.response.status; });
+        }));
+    pinnedTE->shutdown();
+    ASSERT_EQ(pf.future.getNoThrow(), TaskExecutor::kCallbackCanceledErrorStatus);
     pinnedTE->join();
 }
 
@@ -317,7 +329,7 @@ TEST_F(PinnedConnectionTaskExecutorTest, EnsureStreamIsUpdatedAfterUse) {
 TEST_F(PinnedConnectionTaskExecutorTest, StreamFailureShutsDownAndCancels) {
     auto pinnedTE = makePinnedConnTaskExecutor();
     HostAndPort remote("mock");
-    //
+
     // We haven't done any RPCs, so we shouldn't have touched any of the stream counters.
     ASSERT_EQ(_indicateSuccessCalls.load(), 0);
     ASSERT_EQ(_indicateUsedCalls.load(), 0);

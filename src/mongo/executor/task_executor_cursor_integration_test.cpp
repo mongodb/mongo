@@ -37,6 +37,7 @@
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/network_interface_thread_pool.h"
+#include "mongo/executor/pinned_connection_task_executor.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/integration_test.h"
@@ -55,20 +56,25 @@ public:
     }
 
     void setUp() override {
-        std::shared_ptr<NetworkInterface> ni = makeNetworkInterface("TaskExecutorCursorTest");
-        auto tp = std::make_unique<NetworkInterfaceThreadPool>(ni.get());
+        _ni = makeNetworkInterface("TaskExecutorCursorTest");
+        auto tp = std::make_unique<NetworkInterfaceThreadPool>(_ni.get());
 
-        _executor = std::make_unique<ThreadPoolTaskExecutor>(std::move(tp), std::move(ni));
+        _executor = std::make_shared<ThreadPoolTaskExecutor>(std::move(tp), _ni);
         _executor->startup();
     };
 
     void tearDown() override {
         _executor->shutdown();
+        _executor->join();
         _executor.reset();
     };
 
-    TaskExecutor* executor() {
-        return _executor.get();
+    std::shared_ptr<TaskExecutor> executor() {
+        return _executor;
+    }
+
+    auto net() {
+        return _ni.get();
     }
 
     auto makeOpCtx() {
@@ -93,7 +99,8 @@ public:
 
 private:
     ServiceContext::UniqueServiceContext _serviceCtx = ServiceContext::make();
-    std::unique_ptr<ThreadPoolTaskExecutor> _executor;
+    std::shared_ptr<ThreadPoolTaskExecutor> _executor;
+    std::shared_ptr<NetworkInterface> _ni;
     ServiceContext::UniqueClient _client = _serviceCtx->makeClient("TaskExecutorCursorTest");
 };
 
@@ -114,7 +121,7 @@ size_t createTestData(std::string ns, size_t numDocs) {
     return dbclient->count(nss);
 }
 
-// Test that we can actually use a TaskExecutorCursor to read multiple batches from a remote host
+// Test that we can actually use a TaskExecutorCursor to read multiple batches from a remote host.
 TEST_F(TaskExecutorCursorFixture, Basic) {
     const size_t numDocs = 100;
     ASSERT_EQ(createTestData("test.test", numDocs), numDocs);
@@ -139,6 +146,70 @@ TEST_F(TaskExecutorCursorFixture, Basic) {
     }
 
     ASSERT_EQUALS(count, numDocs);
+}
+
+// Test that we can actually use a TaskExecutorCursor that pins it's connection to read multiple
+// batches from a remote host.
+TEST_F(TaskExecutorCursorFixture, BasicPinned) {
+    const size_t numDocs = 100;
+    ASSERT_EQ(createTestData("test.test", numDocs), numDocs);
+
+    auto opCtx = makeOpCtx();
+    RemoteCommandRequest rcr(unittest::getFixtureConnectionString().getServers().front(),
+                             "test",
+                             BSON("find"
+                                  << "test"
+                                  << "batchSize" << 10),
+                             opCtx.get());
+
+    TaskExecutorCursor tec(executor(), rcr, [this] {
+        TaskExecutorCursor::Options opts;
+        opts.batchSize = 10;
+        opts.pinConnection = true;
+        return opts;
+    }());
+
+    size_t count = 0;
+    while (auto doc = tec.getNext(opCtx.get())) {
+        count++;
+    }
+
+    ASSERT_EQUALS(count, numDocs);
+}
+
+// Test that when a TaskExecutorCursor is used in pinning-mode, the pinned executor's destruction
+// is scheduled on the underlying executor.
+TEST_F(TaskExecutorCursorFixture, PinnedExecutorDestroyedOnUnderlying) {
+    const size_t numDocs = 100;
+    ASSERT_EQ(createTestData("test.test", numDocs), numDocs);
+
+    auto opCtx = makeOpCtx();
+    RemoteCommandRequest rcr(unittest::getFixtureConnectionString().getServers().front(),
+                             "test",
+                             BSON("find"
+                                  << "test"
+                                  << "batchSize" << 10),
+                             opCtx.get());
+
+    boost::optional<TaskExecutorCursor> tec;
+    tec.emplace(executor(), rcr, [] {
+        TaskExecutorCursor::Options opts;
+        opts.batchSize = 10;
+        opts.pinConnection = true;
+        return opts;
+    }());
+    // Fetch a documents to make sure the TEC was initialized properly.
+    ASSERT(tec->getNext(opCtx.get()));
+    // Enable the failpoint in the integration test process.
+    {
+        FailPointEnableBlock fpb("blockBeforePinnedExecutorIsDestroyedOnUnderlying");
+        auto initialTimesEntered = fpb.initialTimesEntered();
+        // Destroy the TEC and ensure we reach the code block that will destroy the pinned executor.
+        tec.reset();
+        LOGV2(7361301, "Waiting for TaskExecutorCursor to destroy its pinning executor.");
+        fpb->waitForTimesEntered(initialTimesEntered + 1);
+    }
+    // Allow the pinned executor's destruction to proceed.
 }
 
 /**
@@ -240,7 +311,7 @@ TEST_F(TaskExecutorCursorFixture, ConnectionRemainsOpenAfterKillingTheCursor) {
 
     const auto afterStats = getConnectionStatsForTarget();
     auto countOpenConns = [](const ConnectionStatsPer& stats) {
-        return stats.inUse + stats.available + stats.refreshing;
+        return stats.inUse + stats.available + stats.refreshing + stats.leased;
     };
 
     // Verify that no connection is created or closed.

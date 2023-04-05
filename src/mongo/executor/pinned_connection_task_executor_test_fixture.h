@@ -33,15 +33,16 @@
 #include "mongo/db/dbmessage.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/pinned_connection_task_executor.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
+#include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/transport/mock_session.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/thread_pool.h"
 
-#include "pinned_connection_task_executor.h"
 
 namespace mongo::executor {
 
@@ -66,8 +67,17 @@ public:
 
     Status sinkMessageCalled(Message message) {
         stdx::unique_lock lk{_mutex};
-        _cv.wait(lk, [&] { return !!_sinkMessageExpectation; });
+        _hasWaitingSinkMessage = true;
+        _cv.wait(lk, [&] { return !!_sinkMessageExpectation || _isCanceled; });
+        if (_isCanceled) {
+            // Consume the cancellation.
+            _isCanceled = false;
+            _sinkMessageExpectation = [&](auto&&) {
+                return _cancellationError;
+            };
+        }
         auto expectation = *std::exchange(_sinkMessageExpectation, {});
+        _hasWaitingSinkMessage = false;
         return expectation(message);
     }
 
@@ -80,8 +90,17 @@ public:
 
     StatusWith<Message> sourceMessageCalled() {
         stdx::unique_lock lk{_mutex};
-        _cv.wait(lk, [&] { return !!_sourceMessageExpectation; });
+        _hasWaitingSourceMessage = true;
+        _cv.wait(lk, [&] { return !!_sourceMessageExpectation || _isCanceled; });
+        if (_isCanceled) {
+            // Consume the cancellation.
+            _isCanceled = false;
+            _sourceMessageExpectation = [&]() {
+                return _cancellationError;
+            };
+        }
         auto expectation = *std::exchange(_sourceMessageExpectation, {});
+        _hasWaitingSourceMessage = false;
         return expectation();
     }
 
@@ -93,20 +112,14 @@ public:
     }
 
     void cancelAsyncOpsCalled() {
-        // If cancelAsyncOps was called on the session, we've already
-        // reached the "running" stage. So we can mock a response
-        // for source/sink message to allow the cancellation to take
-        // in the executor.
         stdx::unique_lock lk{_mutex};
-        _sourceMessageExpectation = []() {
-            rpc::OpMsgReplyBuilder replyBuilder;
-            replyBuilder.setCommandReply(BSONObj());
-            return replyBuilder.done();
-        };
-        _sinkMessageExpectation = [](auto&&) {
-            return Status::OK();
-        };
+        _isCanceled = true;
         _cv.notify_one();
+    }
+
+    bool hasReadyRequests() {
+        stdx::lock_guard lk{_mutex};
+        return _hasWaitingSinkMessage || _hasWaitingSourceMessage;
     }
 
     std::shared_ptr<PinnedConnectionTaskExecutor> makePinnedConnTaskExecutor() {
@@ -119,6 +132,10 @@ private:
     stdx::condition_variable _cv;
     boost::optional<SinkMessageCbT> _sinkMessageExpectation;
     boost::optional<SourceMessageCbT> _sourceMessageExpectation;
+    bool _hasWaitingSinkMessage = false;
+    bool _hasWaitingSourceMessage = false;
+    bool _isCanceled = false;
+    Status _cancellationError = Status{ErrorCodes::SocketException, "Socket closed"};
 
     class CustomMockSession : public transport::MockSessionBase {
     public:
