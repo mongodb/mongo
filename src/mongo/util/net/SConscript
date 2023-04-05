@@ -64,7 +64,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/auth/auth_options',
         '$BUILD_DIR/mongo/db/auth/cluster_auth_mode',
         '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/db/server_feature_flags',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
     ],
 )
@@ -112,6 +111,7 @@ if not get_option('ssl') == 'off':
             '$BUILD_DIR/mongo/base',
             '$BUILD_DIR/mongo/client/internal_auth',
             '$BUILD_DIR/mongo/db/auth/auth',
+            '$BUILD_DIR/mongo/db/server_feature_flags',
             '$BUILD_DIR/mongo/util/caching',
             '$BUILD_DIR/mongo/util/concurrency/thread_pool',
             '$BUILD_DIR/third_party/shim_asio',

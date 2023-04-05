@@ -1031,7 +1031,8 @@ void CmdUMCTyped<CreateUserCommand>::Invocation::typedRun(OperationContext* opCt
     auto& sslManager = opCtx->getClient()->session()->getSSLManager();
 
     if (isExternal && sslManager && sslGlobalParams.clusterAuthX509ExtensionValue.empty() &&
-        sslManager->getSSLConfiguration().isClusterMember(userName.getUser())) {
+        sslManager->getSSLConfiguration().isClusterMember(
+            userName.getUser(), boost::none /* clusterExtensionValue */)) {
         if (gEnforceUserClusterSeparation) {
             uasserted(ErrorCodes::BadValue,
                       "Cannot create an x.509 user with a subjectname that would be "

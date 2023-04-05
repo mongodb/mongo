@@ -3,7 +3,7 @@
  * to specify the X.509 subject attributes that should be matched to consider a connectin client
  * as a peer server node.
  *
- * @tags: [featureFlagConfigurableX509ClusterAuthn]
+ * @tags: [requires_fcv_70]
  */
 
 (function() {
@@ -89,7 +89,7 @@ function checkInvalidConfigurations() {
     jsTest.log('tlsX509ClusterAuthDNOverride also set');
     assertNoStart(
         invalidTlsX509ClusterAuthDNOverrideOpts,
-        'tlsClusterAuthX509Attributes and tlsX509ClusterAuthDNOverride cannot both be set at once');
+        'tlsX509ClusterAuthDNOverride cannot be set alongside tlsClusterAuthX509Attributes, tlsClusterAuthX509OverrideAttributes, tlsClusterAuthX509ExtensionValue, or tlsClusterAuthX509OverrideExtensionValue');
 
     // Check that the server fails to start if both tlsClusterAuthX509Attributes and
     // tlsClusterAuthX509ExtensionValue are set.
@@ -124,7 +124,7 @@ function checkInvalidConfigurations() {
     jsTest.log('Mismatched tlsCertificateKeyFile');
     assertNoStart(
         mismatchedTlsCertificateKeyFileOpts,
-        "The server's outgoing certificate's DN does not contain the attributes specified in tlsClusterAuthX509Attributes");
+        "The server certificate's DN does not contain the attributes specified in tlsClusterAuthX509Attributes");
 }
 
 function authX509(expectedUsername, port, clientCertificate) {
@@ -181,16 +181,33 @@ function runValidMongodTest(opts, allAttrsMatch, wrongAttrValue, missingAttr) {
 checkInvalidConfigurations();
 
 // First, run the tests with a valid set of member certificates that include one of
-// DC, O, and OU but don't rely on them for membership detection.
+// DC, O, and OU and rely on them for membership detection. Certificates missing these
+// should fail to authenticate as cluster members.
 let opts = {
     auth: '',
-    tlsClusterAuthX509Attributes: clusterMembershipAttributesDN,
     clusterAuthMode: 'x509',
     tlsMode: 'preferTLS',
-    tlsCertificateKeyFile: serverTitleFooCert,
+    tlsCertificateKeyFile: serverDefaultOnlyCert,
     tlsCAFile: serverCAFile,
-    tlsClusterFile: clusterTitleFooCert,
+    tlsClusterFile: clusterDefaultOnlyCert,
 };
+
+runValidMongodTest(opts,
+                   {user: '__system', certificate: serverDefaultOnlyCert},
+                   {
+                       user: 'L=New York City,ST=New York,C=US,title=foo,CN=server',
+                       certificate: serverTitleFooNoDefaultCert
+                   },
+                   {
+                       user: 'L=New York City,ST=New York,C=US,title=foo,CN=clustertest',
+                       certificate: clusterTitleFooNoDefaultCert
+                   });
+
+// Now, configure the server to accept certificates with 'title=foo,L=New York City,ST=New
+// York,C=US' as cluster members.
+opts.tlsClusterAuthX509Attributes = clusterMembershipAttributesDN;
+opts.tlsCertificateKeyFile = serverTitleFooCert;
+opts.tlsClusterFile = clusterTitleFooCert;
 runValidMongodTest(
     opts,
     {user: '__system', certificate: clusterTitleFooCert},

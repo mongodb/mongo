@@ -77,6 +77,11 @@ struct SSLParams {
 
     boost::optional<TLSCATrusts> tlsCATrusts;  // --setParameter tlsCATrusts
 
+    std::string clusterAuthX509OverrideExtensionValue;  // --setParameter
+                                                        // clusterAuthX509Override.extensionValue
+    std::string
+        clusterAuthX509OverrideAttributes;  // --setParameter clusterAuthX509Override.attributes
+
     struct CertificateSelector {
         std::string subject;
         std::vector<uint8_t> thumbprint;

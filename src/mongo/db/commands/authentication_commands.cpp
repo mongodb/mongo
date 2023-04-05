@@ -229,15 +229,7 @@ void _authenticateX509(OperationContext* opCtx, AuthenticationSession* session) 
         uassertStatusOK(authorizationSession->addAndAuthorizeUser(opCtx, request, boost::none));
     };
 
-    const bool isClusterMember = ([&] {
-        const auto& requiredValue = sslGlobalParams.clusterAuthX509ExtensionValue;
-        if (requiredValue.empty()) {
-            return sslConfiguration.isClusterMember(clientName);
-        }
-        return sslPeerInfo.getClusterMembership() == requiredValue;
-    })();
-
-    if (isClusterMember) {
+    if (sslConfiguration.isClusterMember(clientName, sslPeerInfo.getClusterMembership())) {
         // Handle internal cluster member auth, only applies to server-server connections
         if (!clusterAuthMode.allowsX509()) {
             uassert(ErrorCodes::AuthenticationFailed,
@@ -255,8 +247,7 @@ void _authenticateX509(OperationContext* opCtx, AuthenticationSession* session) 
                     "with cluster membership");
             }
 
-            if (gEnforceUserClusterSeparation &&
-                !sslGlobalParams.clusterAuthX509ExtensionValue.empty()) {
+            if (gEnforceUserClusterSeparation && sslConfiguration.isClusterExtensionSet()) {
                 auto* am = AuthorizationManager::get(opCtx->getServiceContext());
                 BSONObj ignored;
                 const bool userExists =

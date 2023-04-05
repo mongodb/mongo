@@ -34,6 +34,7 @@
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/overloaded_visitor.h"
 #include "mongo/util/synchronized_value.h"
 
 namespace mongo {
@@ -118,14 +119,40 @@ inline bool operator<(const SSLX509Name::Entry& lhs, const SSLX509Name::Entry& r
 
 class SSLConfiguration {
 public:
-    bool isClusterMember(StringData subjectName) const;
-    bool isClusterMember(SSLX509Name subjectName) const;
+    bool isClusterMember(StringData subjectName,
+                         const boost::optional<std::string>& clusterExtensionValue) const;
+    bool isClusterMember(SSLX509Name subjectName,
+                         const boost::optional<std::string>& clusterExtensionValue) const;
     void getServerStatusBSON(BSONObjBuilder*) const;
     Status setServerSubjectName(SSLX509Name name);
-    Status setClusterAuthX509Attributes();
 
-    const boost::optional<SSLX509Name>& getClusterAuthX509Attributes() {
-        return _clusterAuthX509Attributes;
+    // Sets the SSLX509Name representations of net.tls.clusterAuthX509.attributes &
+    // tlsClusterAuthX509Override.attributes and the string representations of
+    // net.tls.clusterAuthX509.extensionValue & tlsClusterAuthX509Override.extensionValue into the
+    // SSLConfiguration.
+    Status setClusterAuthX509Config();
+
+    // Returns true if the server currently accepts certificates with a certain value for the
+    // clusterMembership extension - either through the config option or the override.
+    bool isClusterExtensionSet() {
+        bool containsClusterMembershipConfig = false;
+        bool containsOverrideClusterMembershipConfig = false;
+        auto visitor = OverloadedVisitor{[](const SSLX509Name&) { return false; },
+                                         [](const std::string&) {
+                                             return true;
+                                         }};
+
+        if (_clusterAuthX509Config._configCriteria) {
+            containsClusterMembershipConfig =
+                stdx::visit(visitor, _clusterAuthX509Config._configCriteria.value());
+        }
+
+        if (_clusterAuthX509Config._overrideCriteria) {
+            containsOverrideClusterMembershipConfig =
+                stdx::visit(visitor, _clusterAuthX509Config._overrideCriteria.value());
+        }
+
+        return containsClusterMembershipConfig || containsOverrideClusterMembershipConfig;
     }
 
     const SSLX509Name& serverSubjectName() const {
@@ -139,8 +166,20 @@ public:
 private:
     SSLX509Name _serverSubjectName;
 
-    // DN provided via tlsClusterAuthX509.attributes.
-    boost::optional<SSLX509Name> _clusterAuthX509Attributes;
+    struct ClusterAuthX509Config {
+        ClusterAuthX509Config() = default;
+
+        // Optionally contains either an SSLX509Name representing net.tls.clusterAuthX509.attributes
+        // or a string representing net.tls.clusterAuthX509.extensionValue.
+        boost::optional<stdx::variant<SSLX509Name, std::string>> _configCriteria;
+
+        // Optionally contains either an SSLX509Name representing
+        // tlsClusterAuthX509Override.attributes or a string representing
+        // tlsClusterAuthX509Override.extensionValue.
+        boost::optional<stdx::variant<SSLX509Name, std::string>> _overrideCriteria;
+    };
+
+    ClusterAuthX509Config _clusterAuthX509Config;
 };
 
 }  // namespace mongo

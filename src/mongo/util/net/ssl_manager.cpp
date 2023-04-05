@@ -43,6 +43,7 @@
 #include "mongo/config.h"
 #include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/commands/server_status.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/overflow_arithmetic.h"
 #include "mongo/transport/asio/asio_transport_layer.h"
@@ -298,6 +299,15 @@ boost::optional<SSLX509Name> getClusterAuthDNOverrideParameter() {
     }
     return value;
 }
+
+StatusWith<SSLX509Name> parseClusterAuthX509Attributes(StringData attributes) try {
+    auto attributesAsDN = uassertStatusOK(parseDN(attributes));
+    uassertStatusOK(attributesAsDN.normalizeStrings());
+
+    return attributesAsDN;
+} catch (const DBException& ex) {
+    return ex.toStatus();
+}
 }  // namespace
 
 SSLManagerCoordinator* SSLManagerCoordinator::get() {
@@ -374,17 +384,18 @@ SSLManagerCoordinator::SSLManagerCoordinator()
     logSSLInfo(_manager->get()->getSSLInformationToLog());
 }
 
-void ClusterMemberDNOverride::append(OperationContext* opCtx,
-                                     BSONObjBuilder* b,
-                                     StringData name,
-                                     const boost::optional<TenantId>&) {
+void ClusterAuthDNOverrideParameter::append(OperationContext* opCtx,
+                                            BSONObjBuilder* b,
+                                            StringData name,
+                                            const boost::optional<TenantId>&) {
     auto value = clusterAuthDNOverride.get();
     if (value) {
         b->append(name, value->toString());
     }
 }
 
-Status ClusterMemberDNOverride::setFromString(StringData str, const boost::optional<TenantId>&) {
+Status ClusterAuthDNOverrideParameter::setFromString(StringData str,
+                                                     const boost::optional<TenantId>&) {
     if (str.empty()) {
         *clusterAuthDNOverride = boost::none;
         return Status::OK();
@@ -719,30 +730,54 @@ Status SSLConfiguration::setServerSubjectName(SSLX509Name name) {
     return Status::OK();
 }
 
-Status SSLConfiguration::setClusterAuthX509Attributes() try {
-    uassert(
-        ErrorCodes::InvalidSSLConfiguration,
-        "tlsClusterAuthX509Attributes and tlsX509ClusterAuthDNOverride cannot both be set at once",
-        sslGlobalParams.clusterAuthX509Attributes.empty() ||
-            getClusterAuthDNOverrideParameter() == boost::none);
+Status SSLConfiguration::setClusterAuthX509Config() try {
+    bool isAttrsSet = !sslGlobalParams.clusterAuthX509Attributes.empty();
+    bool isExtensionSet = !sslGlobalParams.clusterAuthX509ExtensionValue.empty();
+    bool isAttrsOverrideSet = !sslGlobalParams.clusterAuthX509OverrideAttributes.empty();
+    bool isExtensionOverrideSet = !sslGlobalParams.clusterAuthX509OverrideExtensionValue.empty();
 
-    if (!sslGlobalParams.clusterAuthX509Attributes.empty()) {
-        auto attributesAsDN = uassertStatusOK(parseDN(sslGlobalParams.clusterAuthX509Attributes));
-        uassertStatusOK(attributesAsDN.normalizeStrings());
+    bool isClusterAuthX509Set =
+        isAttrsSet || isExtensionSet || isAttrsOverrideSet || isExtensionOverrideSet;
+    bool isClusterAuthDNOverrideSet = getClusterAuthDNOverrideParameter().has_value();
 
-        // The server's outgoing certificate subject DN and incoming certificate subject DN should
-        // match the criteria being used to determine other cluster member nodes.
+    if (isClusterAuthX509Set) {
         uassert(ErrorCodes::InvalidSSLConfiguration,
-                "The server's outgoing certificate's DN does not contain the attributes specified "
-                "in tlsClusterAuthX509Attributes",
-                _serverSubjectName.contains(attributesAsDN));
-        uassert(ErrorCodes::InvalidSSLConfiguration,
-                "The server's incoming certificate's DN does not contain the attributes specified "
-                "in tlsClusterAuthX509Attributes",
-                clientSubjectName.contains(attributesAsDN));
-
-        _clusterAuthX509Attributes = std::move(attributesAsDN);
+                "tlsX509ClusterAuthDNOverride cannot be set alongside "
+                "tlsClusterAuthX509Attributes, "
+                "tlsClusterAuthX509OverrideAttributes, tlsClusterAuthX509ExtensionValue, or "
+                "tlsClusterAuthX509OverrideExtensionValue",
+                !isClusterAuthDNOverrideSet);
     }
+
+    auto setConfigOptions = [&]() {
+        if (isAttrsSet) {
+            auto attributesAsDN = uassertStatusOK(
+                parseClusterAuthX509Attributes(sslGlobalParams.clusterAuthX509Attributes));
+            uassert(ErrorCodes::InvalidSSLConfiguration,
+                    "The server certificate's DN does not contain the attributes specified "
+                    "in tlsClusterAuthX509Attributes",
+                    isAttrsOverrideSet || isExtensionOverrideSet ||
+                        (_serverSubjectName.contains(attributesAsDN) &&
+                         clientSubjectName.contains(attributesAsDN)));
+
+            _clusterAuthX509Config._configCriteria = std::move(attributesAsDN);
+        } else if (isExtensionSet) {
+            _clusterAuthX509Config._configCriteria = sslGlobalParams.clusterAuthX509ExtensionValue;
+        }
+    };
+
+    auto setOverrideOptions = [&]() {
+        if (isAttrsOverrideSet) {
+            _clusterAuthX509Config._overrideCriteria = uassertStatusOK(
+                parseClusterAuthX509Attributes(sslGlobalParams.clusterAuthX509OverrideAttributes));
+        } else if (isExtensionOverrideSet) {
+            _clusterAuthX509Config._overrideCriteria =
+                sslGlobalParams.clusterAuthX509OverrideExtensionValue;
+        }
+    };
+
+    setConfigOptions();
+    setOverrideOptions();
 
     return Status::OK();
 } catch (const DBException& ex) {
@@ -760,39 +795,63 @@ Status SSLConfiguration::setClusterAuthX509Attributes() try {
  * according to RFC4514 and compare that to the normalized/unescaped version of
  * the server's distinguished name.
  */
-bool SSLConfiguration::isClusterMember(SSLX509Name subject) const {
+bool SSLConfiguration::isClusterMember(
+    SSLX509Name subject, const boost::optional<std::string>& clusterExtensionValue) const {
     if (auto status = subject.normalizeStrings(); !status.isOK()) {
         LOGV2_WARNING(23220, "Unable to normalize client subject name", "error"_attr = status);
         return false;
     }
 
-    // If tlsClusterAuthX509Attributes have been specified, then subject is a cluster member as long
-    // as it contains all of the entries in _clusterAuthX509Attributes.
-    if (_clusterAuthX509Attributes) {
-        return subject.contains(*_clusterAuthX509Attributes);
+    auto visitor = OverloadedVisitor{
+        [&](const SSLX509Name& attributes) { return subject.contains(attributes); },
+        [&](const std::string& extensionValue) {
+            return clusterExtensionValue && (clusterExtensionValue == extensionValue);
+        }};
+
+    // If either net.tls.clusterAuthX509.attributes or net.tls.clusterAuthX509.extensionValue have
+    // been specified, use them to determine cluster membership. Otherwise, check whether DC, O,
+    // and/or OU from the server member certificate's subject DN match the client subject DN.
+    if (_clusterAuthX509Config._configCriteria &&
+        gFeatureFlagConfigurableX509ClusterAuthn.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        bool matchesClusterAuthX509Config =
+            stdx::visit(visitor, _clusterAuthX509Config._configCriteria.value());
+        if (matchesClusterAuthX509Config) {
+            return true;
+        }
+    } else {
+        auto defaultFilteredSubjectDN =
+            filterClusterDN(_serverSubjectName, defaultMatchingAttributes);
+        if (!defaultFilteredSubjectDN.empty() && subject.contains(defaultFilteredSubjectDN)) {
+            return true;
+        }
     }
 
-    // If not specified, check DC, O, and OU (the default matching attributes) from
-    // the server DN.
-    auto defaultFilteredSubjectDN = filterClusterDN(_serverSubjectName, defaultMatchingAttributes);
-    if (subject.contains(defaultFilteredSubjectDN)) {
-        return true;
+    // If the certificate did not meet either of the above criteria, then it can still be a cluster
+    // member if tlsClusterX509AuthOverride is specified and it meets the attribute or extension
+    // policy specified.
+    if (_clusterAuthX509Config._overrideCriteria &&
+        gFeatureFlagConfigurableX509ClusterAuthn.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        return stdx::visit(visitor, _clusterAuthX509Config._overrideCriteria.value());
     }
 
-    // If the certificate did not match DC, O, and OU from the server DN, then the only way that it
+    // If tlsClusterX509AuthOverride was not specified, then the only way that it
     // could still be accepted as a cluster member is if it contains the DC, O, and/or OU in the
     // tlsClusterAuthDNOverride DN.
     auto altClusterDN = getClusterAuthDNOverrideParameter();
     if (altClusterDN) {
         auto defaultFilteredAltClusterDN =
             filterClusterDN(*altClusterDN, defaultMatchingAttributes);
-        return subject.contains(defaultFilteredAltClusterDN);
+        return !defaultFilteredAltClusterDN.empty() &&
+            subject.contains(defaultFilteredAltClusterDN);
     }
 
     return false;
 }
 
-bool SSLConfiguration::isClusterMember(StringData subjectName) const {
+bool SSLConfiguration::isClusterMember(
+    StringData subjectName, const boost::optional<std::string>& clusterExtensionValue) const {
     auto swClient = parseDN(subjectName);
     if (!swClient.isOK()) {
         LOGV2_WARNING(23219,
@@ -802,7 +861,7 @@ bool SSLConfiguration::isClusterMember(StringData subjectName) const {
         return false;
     }
 
-    return isClusterMember(swClient.getValue());
+    return isClusterMember(swClient.getValue(), clusterExtensionValue);
 }
 
 void SSLConfiguration::getServerStatusBSON(BSONObjBuilder* security) const {

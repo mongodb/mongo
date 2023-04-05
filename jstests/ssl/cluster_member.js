@@ -1,6 +1,6 @@
 // Test configuration parameter tlsClusterAuthX509ExtensionValue
 // aka: net.tls.clusterAuthX509.extensionValue
-// @tags: [ featureFlagConfigurableX509ClusterAuthn ]
+// @tags: [ requires_fcv_70 ]
 
 (function() {
 'use strict';

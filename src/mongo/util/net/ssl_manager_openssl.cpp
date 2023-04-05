@@ -1815,7 +1815,7 @@ SSLManagerOpenSSL::SSLManagerOpenSSL(const SSLParams& params,
                                        << params.sslPEMKeyFile);
 
         uassertStatusOK(_sslConfiguration.setServerSubjectName(std::move(serverSubjectName)));
-        uassertStatusOK(_sslConfiguration.setClusterAuthX509Attributes());
+        uassertStatusOK(_sslConfiguration.setClusterAuthX509Config());
 
         CertificateExpirationMonitor::get()->updateExpirationDeadline(
             _sslConfiguration.serverCertificateExpirationDate);

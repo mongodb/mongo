@@ -2820,10 +2820,15 @@ var ReplSetTest = function(opts) {
             options.logFormat = jsTest.options().logFormat;
         }
 
-        // If restarting a node, use its existing options as the defaults.
+        // If restarting a node, use its existing options as the defaults unless remember is false.
         var baseOptions;
         if ((options && options.restart) || restart) {
-            baseOptions = _useBridge ? _unbridgedNodes[n].fullOptions : this.nodes[n].fullOptions;
+            if (options && options.remember === false) {
+                baseOptions = defaults;
+            } else {
+                baseOptions =
+                    _useBridge ? _unbridgedNodes[n].fullOptions : this.nodes[n].fullOptions;
+            }
         } else {
             baseOptions = defaults;
         }

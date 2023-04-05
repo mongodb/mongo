@@ -44,6 +44,21 @@ structs:
         sha256: sha256BlockHex
         roles: array<RoleName>
 
+  ClusterAuthX509Override:
+    description: >- 
+      Stores either attributes to be checked in a certificate's subject OR a value to be checked 
+      if a certificate contains the mongodbClusterMembership extension. This should only be
+      populated when net.tls.clusterAuthX509 is being updated via the recommended rolling restart
+      procedure.
+    strict: true
+    fields:
+        attributes: 
+            type: string
+            optional: true
+        extensionValue: 
+            type: string
+            optional: true
+
 server_parameters:
   opensslDiffieHellmanParameters:
     description: "OpenSSL Diffie-Hellman parameters"
@@ -147,7 +162,7 @@ server_parameters:
   tlsX509ClusterAuthDNOverride:
     description: "Distinguished name to use for cluster membership"
     set_at: [startup, runtime]
-    cpp_class: ClusterMemberDNOverride
+    cpp_class: ClusterAuthDNOverrideParameter
 
   tlsX509ExpirationWarningThresholdDays:
     description: >-
@@ -172,3 +187,16 @@ server_parameters:
         override_set: true
     condition:
         preprocessor: 'defined(__linux__)'
+
+  tlsClusterAuthX509Override:
+    description: >-
+        Distinguished name attributes + values that are checked against client certificate subject
+        DNs to determine cluster membership OR a value that is checked against the client
+        certificate's extension for OID 1.3.6.1.4.1.34601.2.1.2. This is expected to be used ONLY
+        when a user seeks to start using the net.tls.clusterAuthX509.attributes OR
+        net.tls.clusterAuthX509.extensionValue config options for peer node identification via X.509
+        intracluster auth.
+    set_at: startup
+    cpp_class: 
+        name: ClusterAuthX509OverrideParameter
+        override_set: true

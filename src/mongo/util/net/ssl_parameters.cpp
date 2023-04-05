@@ -214,6 +214,58 @@ Status TLSCATrustsSetParameter::setFromString(StringData json,
     return exceptionToStatus();
 }
 
+void ClusterAuthX509OverrideParameter::append(OperationContext* opCtx,
+                                              BSONObjBuilder* bob,
+                                              StringData name,
+                                              const boost::optional<TenantId>&) {
+    ClusterAuthX509Override currentValue;
+    if (!sslGlobalParams.clusterAuthX509OverrideAttributes.empty()) {
+        currentValue.setAttributes(StringData{sslGlobalParams.clusterAuthX509OverrideAttributes});
+    } else if (!sslGlobalParams.clusterAuthX509OverrideExtensionValue.empty()) {
+        currentValue.setExtensionValue(
+            StringData{sslGlobalParams.clusterAuthX509OverrideExtensionValue});
+    }
+
+    BSONObjBuilder subObjBuilder(bob->subobjStart(name));
+    currentValue.serialize(&subObjBuilder);
+    subObjBuilder.doneFast();
+}
+
+Status ClusterAuthX509OverrideParameter::set(const BSONElement& element,
+                                             const boost::optional<TenantId>&) try {
+    if ((element.type() != Object)) {
+        return {ErrorCodes::BadValue, "Value must be an object"};
+    }
+
+    IDLParserContext ctx("tlsClusterAuthX509Override");
+    auto overrideParam = ClusterAuthX509Override::parse(ctx, element.Obj());
+
+    // Valid override object can contain at most one of attributes or extensionValue.
+    uassert(ErrorCodes::BadValue,
+            "At most one of attributes or extensionValue can be specified for "
+            "tlsClusterAuthX509Override",
+            (!overrideParam.getAttributes() || !overrideParam.getExtensionValue()));
+
+    if (overrideParam.getAttributes()) {
+        sslGlobalParams.clusterAuthX509OverrideAttributes =
+            overrideParam.getAttributes()->toString();
+    } else if (overrideParam.getExtensionValue()) {
+        sslGlobalParams.clusterAuthX509OverrideExtensionValue =
+            overrideParam.getExtensionValue()->toString();
+    }
+
+    return Status::OK();
+} catch (...) {
+    return exceptionToStatus();
+}
+
+Status ClusterAuthX509OverrideParameter::setFromString(StringData json,
+                                                       const boost::optional<TenantId>&) try {
+    return set(BSON("" << fromjson(json)).firstElement(), boost::none);
+} catch (...) {
+    return exceptionToStatus();
+}
+
 }  // namespace mongo
 
 mongo::Status mongo::validateOpensslCipherConfig(const std::string&,

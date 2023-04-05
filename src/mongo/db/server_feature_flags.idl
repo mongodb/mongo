@@ -87,4 +87,5 @@ feature_flags:
             Enable configurable parameters for detection of peer server nodes using X.509 
             intracluster authentication.
         cpp_varname: gFeatureFlagConfigurableX509ClusterAuthn
-        default: false
+        default: true
+        version: 7.0
