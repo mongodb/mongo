@@ -141,8 +141,9 @@ TEST_F(TrialRunTrackerTest, TrialEndsDuringOpenPhaseOfBlockingStage) {
     auto hashAggStage = makeS<HashAggStage>(
         std::move(scanStage),
         makeSV(scanSlot),
-        makeSlotExprPairVec(
+        makeAggExprVector(
             countsSlot,
+            nullptr,
             stage_builder::makeFunction(
                 "sum",
                 makeE<EConstant>(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1)))),
@@ -212,8 +213,9 @@ TEST_F(TrialRunTrackerTest, OnlyDeepestNestedBlockingStageHasTrialRunTracker) {
     auto hashAggStage = makeS<HashAggStage>(
         std::move(unionStage),
         makeSV(unionSlot),
-        makeSlotExprPairVec(
+        makeAggExprVector(
             countsSlot,
+            nullptr,
             stage_builder::makeFunction(
                 "sum",
                 makeE<EConstant>(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1)))),
@@ -281,8 +283,9 @@ TEST_F(TrialRunTrackerTest, SiblingBlockingStagesBothGetTrialRunTracker) {
         auto hashAggStage = makeS<HashAggStage>(
             std::move(scanStage),
             makeSV(scanSlot),
-            makeSlotExprPairVec(
+            makeAggExprVector(
                 countsSlot,
+                nullptr,
                 stage_builder::makeFunction("sum",
                                             makeE<EConstant>(value::TypeTags::NumberInt64,
                                                              value::bitcastFrom<int64_t>(1)))),
@@ -413,8 +416,9 @@ TEST_F(TrialRunTrackerTest, DisablingTrackingForAChildStagePreventsEarlyExit) {
         auto hashAggStage = makeS<HashAggStage>(
             std::move(scanStage),
             makeSV(scanSlot),
-            makeSlotExprPairVec(
+            makeAggExprVector(
                 countsSlot,
+                nullptr,
                 stage_builder::makeFunction("sum",
                                             makeE<EConstant>(value::TypeTags::NumberInt64,
                                                              value::bitcastFrom<int64_t>(1)))),

@@ -41,9 +41,11 @@ namespace sbe {
 /**
  * Performs a hash-based aggregation. Appears as the "group" stage in debug output. Groups the input
  * based on the provided vector of group-by slots, 'gbs'. The 'aggs' parameter is a map from
- * 'SlotId' to expression. This defines a set of output slots whose values will be computed based on
- * the corresponding aggregate expressions. Each distinct grouping will produce a single output,
- * consisting of the values of the group-by keys and the results of the aggregate functions.
+ * 'SlotId' to a pair of expressions, where the first expression is an optional initializer,
+ * and the second expression aggregates the incoming rows. This defines a set of output slots whose
+ * values will be computed based on the corresponding aggregate expressions. Each distinct grouping
+ * will produce a single output, consisting of the values of the group-by keys and the results of
+ * the aggregate functions.
  *
  * Since the data must be buffered in a hash table, this is a "binding reflector". This means slots
  * from the 'input' tree are not visible higher in tree. Stages higher in the tree can only see the
@@ -81,9 +83,15 @@ namespace sbe {
  */
 class HashAggStage final : public PlanStage {
 public:
+    struct AggExprPair {
+        std::unique_ptr<EExpression> init;
+        std::unique_ptr<EExpression> acc;
+    };
+    using AggExprVector = std::vector<std::pair<value::SlotId, AggExprPair>>;
+
     HashAggStage(std::unique_ptr<PlanStage> input,
                  value::SlotVector gbs,
-                 SlotExprPairVector aggs,
+                 AggExprVector aggs,
                  value::SlotVector seekKeysSlots,
                  bool optimizedClose,
                  boost::optional<value::SlotId> collatorSlot,
@@ -195,7 +203,7 @@ private:
     void makeTemporaryRecordStore();
 
     const value::SlotVector _gbs;
-    const SlotExprPairVector _aggs;
+    const AggExprVector _aggs;
     const boost::optional<value::SlotId> _collatorSlot;
     const bool _allowDiskUse;
     const value::SlotVector _seekKeysSlots;
@@ -245,8 +253,10 @@ private:
     std::vector<value::SlotAccessor*> _seekKeysAccessors;
     value::MaterializedRow _seekKeys;
 
-    // Bytecode which gets executed to aggregate incoming rows into the hash table.
-    std::vector<std::unique_ptr<vm::CodeFragment>> _aggCodes;
+    // Bytecodes for the aggregate functions. The first code fragment is the aggregator initializer.
+    // The second code fragment aggregates incoming rows into the hash table.
+    std::vector<std::pair<std::unique_ptr<vm::CodeFragment>, std::unique_ptr<vm::CodeFragment>>>
+        _aggCodes;
     // Bytecode for the merging expressions, executed if partial aggregates are spilled to a record
     // store and need to be subsequently combined.
     std::vector<std::unique_ptr<vm::CodeFragment>> _mergingExprCodes;
@@ -300,6 +310,40 @@ private:
     // run is complete, this pointer is reset to nullptr.
     TrialRunTracker* _tracker{nullptr};
 };
+
+namespace detail {
+// base case
+template <typename R>
+inline void makeAggExprVectorHelper(R& result,
+                                    value::SlotId slot,
+                                    std::unique_ptr<EExpression> initExpr,
+                                    std::unique_ptr<EExpression> accExpr) {
+    result.push_back(
+        std::make_pair(slot, HashAggStage::AggExprPair{std::move(initExpr), std::move(accExpr)}));
+}
+
+// recursive case
+template <typename R, typename... Ts>
+inline void makeAggExprVectorHelper(R& result,
+                                    value::SlotId slot,
+                                    std::unique_ptr<EExpression> initExpr,
+                                    std::unique_ptr<EExpression> accExpr,
+                                    Ts&&... rest) {
+    result.push_back(
+        std::make_pair(slot, HashAggStage::AggExprPair{std::move(initExpr), std::move(accExpr)}));
+    makeAggExprVectorHelper(result, std::forward<Ts>(rest)...);
+}
+}  // namespace detail
+
+template <typename... Ts>
+auto makeAggExprVector(Ts&&... pack) {
+    HashAggStage::AggExprVector v;
+    if constexpr (sizeof...(pack) > 0) {
+        v.reserve(sizeof...(Ts) / 3);
+        detail::makeAggExprVectorHelper(v, std::forward<Ts>(pack)...);
+    }
+    return v;
+}
 
 }  // namespace sbe
 }  // namespace mongo

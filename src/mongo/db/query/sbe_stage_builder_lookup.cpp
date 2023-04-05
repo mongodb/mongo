@@ -368,8 +368,8 @@ std::pair<SlotId /* keyValuesSetSlot */, std::unique_ptr<sbe::PlanStage>> buildK
     EvalStage packedKeyValuesStage = makeHashAgg(
         EvalStage{std::move(keyValuesStage), SlotVector{}},
         makeSV(), /* groupBy slots - "none" means creating a single group */
-        makeSlotExprPairVec(keyValuesSetSlot,
-                            makeFunction("addToSet"_sd, makeVariable(keyValueSlot))),
+        makeAggExprVector(
+            keyValuesSetSlot, nullptr, makeFunction("addToSet"_sd, makeVariable(keyValueSlot))),
         boost::none /* we group _all_ key values into a single set, so collator is irrelevant */,
         allowDiskUse,
         makeSlotExprPairVec(spillSlot, makeFunction("aggSetUnion"_sd, makeVariable(spillSlot))),
@@ -418,10 +418,11 @@ std::pair<SlotId /* resultSlot */, std::unique_ptr<sbe::PlanStage>> buildForeign
     innerBranch = makeHashAgg(
         std::move(innerBranch),
         makeSV(), /* groupBy slots */
-        makeSlotExprPairVec(accumulatorSlot,
-                            makeFunction("addToArrayCapped"_sd,
-                                         makeVariable(foreignRecordSlot),
-                                         makeConstant(TypeTags::NumberInt32, sizeCap))),
+        makeAggExprVector(accumulatorSlot,
+                          nullptr,
+                          makeFunction("addToArrayCapped"_sd,
+                                       makeVariable(foreignRecordSlot),
+                                       makeConstant(TypeTags::NumberInt32, sizeCap))),
         {} /* collatorSlot, no collation here because we want to return all matches "as is" */,
         allowDiskUse,
         makeSlotExprPairVec(spillSlot,

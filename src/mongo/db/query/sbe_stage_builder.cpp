@@ -2302,9 +2302,10 @@ sbe::value::SlotVector generateAccumulator(StageBuilderState& state,
                                            const AccumulationStatement& accStmt,
                                            const PlanStageSlots& outputs,
                                            sbe::value::SlotIdGenerator* slotIdGenerator,
-                                           sbe::SlotExprPairVector& accSlotExprPairs) {
+                                           sbe::HashAggStage::AggExprVector& aggSlotExprs) {
     auto rootSlot = outputs.getIfExists(PlanStageSlots::kResult);
     auto argExpr = generateExpression(state, accStmt.expr.argument.get(), rootSlot, &outputs);
+    auto initExpr = generateExpression(state, accStmt.expr.initializer.get(), rootSlot, &outputs);
 
     // One accumulator may be translated to multiple accumulator expressions. For example, The
     // $avg will have two accumulators expressions, a sum(..) and a count which is implemented
@@ -2312,12 +2313,18 @@ sbe::value::SlotVector generateAccumulator(StageBuilderState& state,
     auto collatorSlot = state.data->env->getSlotIfExists("collator"_sd);
     auto accExprs = stage_builder::buildAccumulator(
         accStmt, argExpr.extractExpr(state), collatorSlot, *state.frameIdGenerator);
+    std::vector<std::unique_ptr<sbe::EExpression>> accInitExprs(accExprs.size());
 
+    tassert(7567301,
+            "The accumulation and initialization expression should have the same length",
+            accExprs.size() == accInitExprs.size());
     sbe::value::SlotVector aggSlots;
-    for (auto& accExpr : accExprs) {
+    for (size_t i = 0; i < accExprs.size(); i++) {
         auto slot = slotIdGenerator->generate();
         aggSlots.push_back(slot);
-        accSlotExprPairs.push_back({slot, std::move(accExpr)});
+        aggSlotExprs.push_back(std::make_pair(
+            slot,
+            sbe::HashAggStage::AggExprPair{std::move(accInitExprs[i]), std::move(accExprs[i])}));
     }
 
     return aggSlots;
@@ -2601,7 +2608,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // Translates accumulators which are executed inside the group stage and gets slots for
     // accumulators.
     stage_builder::EvalStage currentStage = std::move(groupByEvalStage);
-    sbe::SlotExprPairVector accSlotExprPairs;
+    sbe::HashAggStage::AggExprVector aggSlotExprs;
     std::vector<sbe::value::SlotVector> aggSlotsVec;
     // Since partial accumulator state may be spilled to disk and then merged, we must construct not
     // only the basic agg expressions for each accumulator, but also agg expressions that are used
@@ -2609,7 +2616,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     sbe::SlotExprPairVector mergingExprs;
     for (const auto& accStmt : accStmts) {
         sbe::value::SlotVector curAggSlots =
-            generateAccumulator(_state, accStmt, childOutputs, &_slotIdGenerator, accSlotExprPairs);
+            generateAccumulator(_state, accStmt, childOutputs, &_slotIdGenerator, aggSlotExprs);
 
         sbe::SlotExprPairVector curMergingExprs =
             generateMergingExpressions(_state, accStmt, curAggSlots.size());
@@ -2627,7 +2634,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // Builds a group stage with accumulator expressions and group-by slot(s).
     auto groupEvalStage = makeHashAgg(std::move(currentStage),
                                       dedupedGroupBySlots,
-                                      std::move(accSlotExprPairs),
+                                      std::move(aggSlotExprs),
                                       _state.data->env->getSlotIfExists("collator"_sd),
                                       _cq.getExpCtx()->allowDiskUse,
                                       std::move(mergingExprs),

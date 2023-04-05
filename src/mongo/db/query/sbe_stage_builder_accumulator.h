@@ -69,4 +69,13 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildCombinePartialAggregates(
 std::unique_ptr<sbe::EExpression> buildFinalize(StageBuilderState& state,
                                                 const AccumulationStatement& acc,
                                                 const sbe::value::SlotVector& aggSlots);
+
+/**
+ * Translates an input AccumulationStatement into an SBE EExpression for the initialization of the
+ * accumulator state.
+ */
+std::vector<std::unique_ptr<sbe::EExpression>> buildInitialize(
+    const AccumulationStatement& acc,
+    std::unique_ptr<sbe::EExpression> initExpr,
+    boost::optional<sbe::value::SlotId> collatorSlot);
 }  // namespace mongo::stage_builder

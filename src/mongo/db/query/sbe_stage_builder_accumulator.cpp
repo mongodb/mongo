@@ -684,4 +684,21 @@ std::unique_ptr<sbe::EExpression> buildFinalize(StageBuilderState& state,
         return nullptr;
     }
 }
+
+std::vector<std::unique_ptr<sbe::EExpression>> buildInitialize(
+    const AccumulationStatement& acc,
+    std::unique_ptr<sbe::EExpression> initExpr,
+    boost::optional<sbe::value::SlotId> collatorSlot) {
+    using BuildInitializeFn = std::function<std::vector<std::unique_ptr<sbe::EExpression>>(
+        std::unique_ptr<sbe::EExpression>, boost::optional<sbe::value::SlotId>)>;
+
+    static const StringDataMap<BuildInitializeFn> kAccumulatorBuilders = {};
+
+    auto accExprName = acc.expr.name;
+    uassert(7567300,
+            str::stream() << "Unsupported Accumulator in SBE accumulator builder: " << accExprName,
+            kAccumulatorBuilders.find(accExprName) != kAccumulatorBuilders.end());
+
+    return std::invoke(kAccumulatorBuilders.at(accExprName), std::move(initExpr), collatorSlot);
+}
 }  // namespace mongo::stage_builder

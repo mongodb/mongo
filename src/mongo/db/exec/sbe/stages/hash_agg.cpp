@@ -42,7 +42,7 @@ namespace mongo {
 namespace sbe {
 HashAggStage::HashAggStage(std::unique_ptr<PlanStage> input,
                            value::SlotVector gbs,
-                           SlotExprPairVector aggs,
+                           AggExprVector aggs,
                            value::SlotVector seekKeysSlots,
                            bool optimizedClose,
                            boost::optional<value::SlotId> collatorSlot,
@@ -78,10 +78,14 @@ HashAggStage::HashAggStage(std::unique_ptr<PlanStage> input,
 }
 
 std::unique_ptr<PlanStage> HashAggStage::clone() const {
-    SlotExprPairVector aggs;
+    AggExprVector aggs;
     aggs.reserve(_aggs.size());
-    for (auto& [k, v] : _aggs) {
-        aggs.push_back({k, v->clone()});
+    for (auto& [slot, expr] : _aggs) {
+        std::unique_ptr<EExpression> initExpr{nullptr};
+        if (expr.init) {
+            initExpr = expr.init->clone();
+        }
+        aggs.push_back(std::make_pair(slot, AggExprPair{std::move(initExpr), expr.acc->clone()}));
     }
 
     SlotExprPairVector mergingExprsClone;
@@ -212,7 +216,11 @@ void HashAggStage::prepare(CompileCtx& ctx) {
         ctx.root = this;
         ctx.aggExpression = true;
         ctx.accumulator = _outAggAccessors.back().get();
-        _aggCodes.emplace_back(expr->compile(ctx));
+        std::unique_ptr<vm::CodeFragment> initCode{nullptr};
+        if (expr.init) {
+            initCode = expr.init->compile(ctx);
+        }
+        _aggCodes.emplace_back(std::move(initCode), expr.acc->compile(ctx));
         ctx.aggExpression = false;
 
         ++counter;
@@ -434,12 +442,20 @@ void HashAggStage::open(bool reOpen) {
                 key.makeOwned();
                 auto [it, _] = _ht->emplace(std::move(key), value::MaterializedRow{0});
                 it->second.resize(_outAggAccessors.size());
+
+                // Run accumulator initializer if needed.
+                for (size_t idx = 0; idx < _outAggAccessors.size(); ++idx) {
+                    if (_aggCodes[idx].first) {
+                        auto [owned, tag, val] = _bytecode.run(_aggCodes[idx].first.get());
+                        _outHashAggAccessors[idx]->reset(owned, tag, val);
+                    }
+                }
                 _htIt = it;
             }
 
             // Accumulate state in '_ht'.
             for (size_t idx = 0; idx < _outAggAccessors.size(); ++idx) {
-                auto [owned, tag, val] = _bytecode.run(_aggCodes[idx].get());
+                auto [owned, tag, val] = _bytecode.run(_aggCodes[idx].second.get());
                 _outHashAggAccessors[idx]->reset(owned, tag, val);
             }
 
@@ -605,9 +621,19 @@ std::unique_ptr<PlanStageStats> HashAggStage::getStats(bool includeDebugInfo) co
         BSONObjBuilder bob;
         bob.append("groupBySlots", _gbs.begin(), _gbs.end());
         if (!_aggs.empty()) {
-            BSONObjBuilder childrenBob(bob.subobjStart("expressions"));
+            BSONObjBuilder exprBuilder(bob.subobjStart("expressions"));
             for (auto&& [slot, expr] : _aggs) {
-                childrenBob.append(str::stream() << slot, printer.print(expr->debugPrint()));
+                exprBuilder.append(str::stream() << slot, printer.print(expr.acc->debugPrint()));
+            }
+
+            BSONObjBuilder initExprBuilder(bob.subobjStart("initExprs"));
+            for (auto&& [slot, expr] : _aggs) {
+                if (expr.init) {
+                    initExprBuilder.append(str::stream() << slot,
+                                           printer.print(expr.init->debugPrint()));
+                } else {
+                    initExprBuilder.appendNull(str::stream() << slot);
+                }
             }
         }
 
@@ -675,7 +701,12 @@ std::vector<DebugPrinter::Block> HashAggStage::debugPrint() const {
 
         DebugPrinter::addIdentifier(ret, slot);
         ret.emplace_back("=");
-        DebugPrinter::addBlocks(ret, expr->debugPrint());
+        DebugPrinter::addBlocks(ret, expr.acc->debugPrint());
+        if (expr.init) {
+            ret.emplace_back(DebugPrinter::Block("(`"));
+            DebugPrinter::addBlocks(ret, expr.init->debugPrint());
+            ret.emplace_back(DebugPrinter::Block("`)"));
+        }
         first = false;
     }
     ret.emplace_back("`]");

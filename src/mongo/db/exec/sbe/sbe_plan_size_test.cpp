@@ -129,7 +129,7 @@ TEST_F(PlanSizeTest, Filter) {
 TEST_F(PlanSizeTest, HashAgg) {
     auto stage = makeS<HashAggStage>(mockS(),
                                      mockSV(),
-                                     makeSlotExprPairVec(generateSlotId(), mockE()),
+                                     makeAggExprVector(generateSlotId(), mockE(), mockE()),
                                      makeSV(),
                                      true,
                                      generateSlotId(),

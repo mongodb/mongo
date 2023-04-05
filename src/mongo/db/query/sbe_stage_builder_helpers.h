@@ -419,7 +419,7 @@ EvalStage makeUnion(std::vector<EvalStage> inputStages,
 
 EvalStage makeHashAgg(EvalStage stage,
                       sbe::value::SlotVector gbs,
-                      sbe::SlotExprPairVector aggs,
+                      sbe::HashAggStage::AggExprVector aggs,
                       boost::optional<sbe::value::SlotId> collatorSlot,
                       bool allowDiskUse,
                       sbe::SlotExprPairVector mergingExprs,

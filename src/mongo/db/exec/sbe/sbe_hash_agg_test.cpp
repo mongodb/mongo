@@ -87,8 +87,9 @@ void HashAggStageTest::performHashAggWithSpillChecking(
         auto hashAggStage = makeS<HashAggStage>(
             std::move(scanStage),
             makeSV(scanSlot),
-            makeSlotExprPairVec(
+            makeAggExprVector(
                 countsSlot,
+                nullptr,
                 stage_builder::makeFunction("sum",
                                             makeE<EConstant>(value::TypeTags::NumberInt64,
                                                              value::bitcastFrom<int64_t>(1)))),
@@ -184,16 +185,20 @@ TEST_F(HashAggStageTest, HashAggMinMaxTest) {
         auto hashAggStage = makeS<HashAggStage>(
             std::move(scanStage),
             makeSV(),
-            makeSlotExprPairVec(minSlot,
-                                stage_builder::makeFunction("min", makeE<EVariable>(scanSlot)),
-                                maxSlot,
-                                stage_builder::makeFunction("max", makeE<EVariable>(scanSlot)),
-                                collMinSlot,
-                                stage_builder::makeFunction(
-                                    "collMin", collExpr->clone(), makeE<EVariable>(scanSlot)),
-                                collMaxSlot,
-                                stage_builder::makeFunction(
-                                    "collMax", collExpr->clone(), makeE<EVariable>(scanSlot))),
+            makeAggExprVector(minSlot,
+                              nullptr,
+                              stage_builder::makeFunction("min", makeE<EVariable>(scanSlot)),
+                              maxSlot,
+                              nullptr,
+                              stage_builder::makeFunction("max", makeE<EVariable>(scanSlot)),
+                              collMinSlot,
+                              nullptr,
+                              stage_builder::makeFunction(
+                                  "collMin", collExpr->clone(), makeE<EVariable>(scanSlot)),
+                              collMaxSlot,
+                              nullptr,
+                              stage_builder::makeFunction(
+                                  "collMax", collExpr->clone(), makeE<EVariable>(scanSlot))),
             makeSV(),
             true,
             boost::none,
@@ -249,10 +254,10 @@ TEST_F(HashAggStageTest, HashAggAddToSetTest) {
         auto hashAggStage = makeS<HashAggStage>(
             std::move(scanStage),
             makeSV(),
-            makeSlotExprPairVec(hashAggSlot,
-                                stage_builder::makeFunction("collAddToSet",
-                                                            std::move(collExpr),
-                                                            makeE<EVariable>(scanSlot))),
+            makeAggExprVector(hashAggSlot,
+                              nullptr,
+                              stage_builder::makeFunction(
+                                  "collAddToSet", std::move(collExpr), makeE<EVariable>(scanSlot))),
             makeSV(),
             true,
             boost::none,
@@ -348,8 +353,9 @@ TEST_F(HashAggStageTest, HashAggSeekKeysTest) {
         auto hashAggStage = makeS<HashAggStage>(
             std::move(scanStage),
             makeSV(scanSlot),
-            makeSlotExprPairVec(
+            makeAggExprVector(
                 countsSlot,
+                nullptr,
                 stage_builder::makeFunction("sum",
                                             makeE<EConstant>(value::TypeTags::NumberInt64,
                                                              value::bitcastFrom<int64_t>(1)))),
@@ -414,8 +420,9 @@ TEST_F(HashAggStageTest, HashAggBasicCountNoSpill) {
     auto stage = makeS<HashAggStage>(
         std::move(scanStage),
         makeSV(scanSlot),
-        makeSlotExprPairVec(
+        makeAggExprVector(
             countsSlot,
+            nullptr,
             stage_builder::makeFunction(
                 "sum",
                 makeE<EConstant>(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1)))),
@@ -477,8 +484,9 @@ TEST_F(HashAggStageTest, HashAggBasicCountSpill) {
     auto stage = makeS<HashAggStage>(
         std::move(scanStage),
         makeSV(scanSlot),
-        makeSlotExprPairVec(
+        makeAggExprVector(
             countsSlot,
+            nullptr,
             stage_builder::makeFunction(
                 "sum",
                 makeE<EConstant>(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1)))),
@@ -555,8 +563,9 @@ TEST_F(HashAggStageTest, HashAggBasicCountNoSpillIfNoMemCheck) {
     auto stage = makeS<HashAggStage>(
         std::move(scanStage),
         makeSV(scanSlot),
-        makeSlotExprPairVec(
+        makeAggExprVector(
             countsSlot,
+            nullptr,
             stage_builder::makeFunction(
                 "sum",
                 makeE<EConstant>(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1)))),
@@ -618,8 +627,9 @@ TEST_F(HashAggStageTest, HashAggBasicCountSpillDouble) {
     auto stage = makeS<HashAggStage>(
         std::move(scanStage),
         makeSV(scanSlot),
-        makeSlotExprPairVec(
+        makeAggExprVector(
             countsSlot,
+            nullptr,
             stage_builder::makeFunction(
                 "sum",
                 makeE<EConstant>(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1)))),
@@ -684,8 +694,9 @@ TEST_F(HashAggStageTest, HashAggBasicCountNoSpillWithNoGroupByDouble) {
     auto stage = makeS<HashAggStage>(
         std::move(scanStage),
         makeSV(),
-        makeSlotExprPairVec(
+        makeAggExprVector(
             countsSlot,
+            nullptr,
             stage_builder::makeFunction(
                 "sum",
                 makeE<EConstant>(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1)))),
@@ -747,12 +758,14 @@ TEST_F(HashAggStageTest, HashAggMultipleAccSpill) {
     auto stage = makeS<HashAggStage>(
         std::move(scanStage),
         makeSV(scanSlot),
-        makeSlotExprPairVec(
+        makeAggExprVector(
             countsSlot,
+            nullptr,
             stage_builder::makeFunction(
                 "sum",
                 makeE<EConstant>(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1))),
             sumsSlot,
+            nullptr,
             stage_builder::makeFunction("sum", makeE<EVariable>(scanSlot))),
         makeSV(),  // Seek slot
         true,
@@ -825,12 +838,14 @@ TEST_F(HashAggStageTest, HashAggMultipleAccSpillAllToDisk) {
     auto stage = makeS<HashAggStage>(
         std::move(scanStage),
         makeSV(scanSlot),
-        makeSlotExprPairVec(
+        makeAggExprVector(
             countsSlot,
+            nullptr,
             stage_builder::makeFunction(
                 "sum",
                 makeE<EConstant>(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1))),
             sumsSlot,
+            nullptr,
             stage_builder::makeFunction("sum", makeE<EVariable>(scanSlot))),
         makeSV(),  // Seek slot
         true,
@@ -913,8 +928,8 @@ TEST_F(HashAggStageTest, HashAggSum10Groups) {
     auto stage = makeS<HashAggStage>(
         std::move(scanStage),
         makeSV(scanSlot),
-        makeSlotExprPairVec(sumsSlot,
-                            stage_builder::makeFunction("sum", makeE<EVariable>(scanSlot))),
+        makeAggExprVector(
+            sumsSlot, nullptr, stage_builder::makeFunction("sum", makeE<EVariable>(scanSlot))),
         makeSV(),  // Seek slot
         true,
         boost::none,
@@ -958,8 +973,9 @@ TEST_F(HashAggStageTest, HashAggBasicCountWithRecordIds) {
     auto stage = makeS<HashAggStage>(
         std::move(scanStage),
         makeSV(scanSlot),
-        makeSlotExprPairVec(
+        makeAggExprVector(
             countsSlot,
+            nullptr,
             stage_builder::makeFunction(
                 "sum",
                 makeE<EConstant>(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(1)))),
