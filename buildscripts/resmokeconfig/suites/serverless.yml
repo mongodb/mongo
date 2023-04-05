@@ -4,9 +4,7 @@ selector:
   roots:
   - jstests/serverless/*.js
   - jstests/serverless/change_streams/**/*.js
-  # TODO SERVER-74888 Re-enable once the encrypted shell can handle tenantIds regardless of
-  # multitenancySupport.
-  # - src/mongo/db/modules/*/jstests/serverless/**/*.js
+  - src/mongo/db/modules/*/jstests/serverless/**/*.js
 
 executor:
   config:
