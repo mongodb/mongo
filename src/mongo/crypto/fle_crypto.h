@@ -331,7 +331,7 @@ struct ESCDocument {
  */
 class FLETagQueryInterface {
 public:
-    enum class TagQueryType { kInsert, kQuery };
+    enum class TagQueryType { kInsert, kQuery, kCompact };
 
     virtual ~FLETagQueryInterface();
 
@@ -386,6 +386,8 @@ public:
     virtual bool existsById(PrfBlock block) const {
         return !getById(block).isEmpty();
     }
+
+    virtual ECStats getStats() const = 0;
 };
 
 class ESCCollection {

@@ -4744,7 +4744,7 @@ export const authCommandsLib = {
             tokens: [
                 {tokens: [{"s": BinData(0, "lUBO7Mov5Sb+c/D4cJ9whhhw/+PZFLCk/AQU2+BpumQ=")}]},
             ],
-            "forInsert": true,
+            "queryType": "insert",
         },
           skipTest: (conn) => {
               return !TestData.setParameters.featureFlagFLE2ProtocolVersion2;

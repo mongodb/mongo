@@ -31,6 +31,7 @@ global:
 
 imports:
     - "mongo/db/basic_types.idl"
+    - "mongo/crypto/fle_stats.idl"
 
 structs:
     QECountInfoReplyTokens:
@@ -49,6 +50,18 @@ structs:
             description: "EDCDerivedFromDataTokenAndContentionFactorToken"
             type: bindata_generic
             cpp_name: EDCDerivedFromDataTokenAndContentionFactorToken
+            optional: true
+          cpos:
+            description: "cpos argument returned from emuBinary"
+            type: long
+            optional: true
+          apos:
+            description: "cpos argument returned from emuBinary"
+            type: long
+            optional: true
+          stats:
+            description: "stats returned for compaction algorithm"
+            type: ECStats
             optional: true
 
     QECountInfoReplyTokenSet:
@@ -87,6 +100,14 @@ structs:
         fields:
             counts: array<QECountInfoReplyTokenSet>
 
+enums:
+    QECountInfoQueryType:
+        description: "query types"
+        type: string
+        values:
+            Insert: "insert"
+            Query: "query"
+            Compact: "compact"
 
 commands:
     getQueryableEncryptionCountInfo:
@@ -100,6 +121,7 @@ commands:
             tokens:
                 description: "Array of tokens to fetch"
                 type: array<QECountInfoRequestTokenSet>
-            forInsert:
-                description: Whether to return a count for insert or query
-                type: bool
+            queryType:
+                description: "Purpose of command, either for insert, query, or compact"
+                type: QECountInfoQueryType
+

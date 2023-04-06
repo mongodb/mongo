@@ -35,6 +35,7 @@
 
 #include "mongo/base/secure_allocator.h"
 #include "mongo/crypto/aead_encryption.h"
+#include "mongo/crypto/fle_stats_gen.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -261,10 +262,25 @@ struct FLEEdgeCountInfo {
                      boost::optional<EDCDerivedFromDataTokenAndContentionFactorToken> edcParam)
         : count(c), tagToken(t), edc(edcParam) {}
 
+    FLEEdgeCountInfo(uint64_t c,
+                     ESCTwiceDerivedTagToken t,
+                     boost::optional<uint64_t> cpos,
+                     boost::optional<uint64_t> apos,
+                     boost::optional<ECStats> stats,
+                     boost::optional<EDCDerivedFromDataTokenAndContentionFactorToken> edcParam)
+        : count(c), tagToken(t), cpos(cpos), apos(apos), stats(stats), edc(edcParam) {}
+
+
     // May reflect a value suitable for insert or query.
     uint64_t count;
 
     ESCTwiceDerivedTagToken tagToken;
+
+    boost::optional<uint64_t> cpos;
+
+    boost::optional<uint64_t> apos;
+
+    boost::optional<ECStats> stats;
 
     boost::optional<EDCDerivedFromDataTokenAndContentionFactorToken> edc;
 };

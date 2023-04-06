@@ -186,6 +186,30 @@ std::vector<QECountInfoRequestTokenSet> toTagSets(
     return nestedBlocks;
 }
 
+FLEEdgeCountInfo convertTokensToEdgeCount(const QECountInfoReplyTokens& token) {
+
+    boost::optional<EDCDerivedFromDataTokenAndContentionFactorToken> edc;
+    if (token.getEDCDerivedFromDataTokenAndContentionFactorToken()) {
+        edc = FLETokenFromCDR<FLETokenType::EDCDerivedFromDataTokenAndContentionFactorToken>(
+            token.getEDCDerivedFromDataTokenAndContentionFactorToken().value());
+    }
+
+    boost::optional<uint64_t> cpos;
+    if (token.getCpos()) {
+        cpos = token.getCpos();
+    }
+
+    boost::optional<uint64_t> apos;
+    if (token.getApos()) {
+        apos = token.getApos();
+    }
+
+    auto esc =
+        FLETokenFromCDR<FLETokenType::ESCTwiceDerivedTagToken>(token.getESCTwiceDerivedTagToken());
+
+    return FLEEdgeCountInfo(token.getCount(), esc, cpos, apos, token.getStats(), edc);
+}
+
 std::vector<std::vector<FLEEdgeCountInfo>> toEdgeCounts(
     const std::vector<QECountInfoReplyTokenSet>& tupleSet) {
 
@@ -200,16 +224,7 @@ std::vector<std::vector<FLEEdgeCountInfo>> toEdgeCounts(
         blocks.reserve(tuples.size());
 
         for (auto& tuple : tuples) {
-            blocks.emplace_back(tuple.getCount(),
-                                FLETokenFromCDR<FLETokenType::ESCTwiceDerivedTagToken>(
-                                    tuple.getESCTwiceDerivedTagToken()));
-            auto& p = blocks.back();
-
-            if (tuple.getEDCDerivedFromDataTokenAndContentionFactorToken().has_value()) {
-                p.edc =
-                    FLETokenFromCDR<FLETokenType::EDCDerivedFromDataTokenAndContentionFactorToken>(
-                        tuple.getEDCDerivedFromDataTokenAndContentionFactorToken().value());
-            }
+            blocks.emplace_back(convertTokensToEdgeCount(tuple));
         }
 
         nestedBlocks.emplace_back(std::move(blocks));
@@ -1467,6 +1482,19 @@ uint64_t FLEQueryInterfaceImpl::countDocuments(const NamespaceString& nss) {
     return static_cast<uint64_t>(signedDocCount);
 }
 
+QECountInfoQueryTypeEnum queryTypeTranslation(FLEQueryInterface::TagQueryType type) {
+    switch (type) {
+        case FLEQueryInterface::TagQueryType::kInsert:
+            return QECountInfoQueryTypeEnum::Insert;
+        case FLEQueryInterface::TagQueryType::kQuery:
+            return QECountInfoQueryTypeEnum::Query;
+        case FLEQueryInterface::TagQueryType::kCompact:
+            return QECountInfoQueryTypeEnum::Compact;
+        default:
+            uasserted(7517101, "Invalid TagQueryType value.");
+    }
+}
+
 std::vector<std::vector<FLEEdgeCountInfo>> FLEQueryInterfaceImpl::getTags(
     const NamespaceString& nss,
     const std::vector<std::vector<FLEEdgePrfBlock>>& tokensSets,
@@ -1480,7 +1508,7 @@ std::vector<std::vector<FLEEdgeCountInfo>> FLEQueryInterfaceImpl::getTags(
     }
 
     getCountsCmd.setTokens(toTagSets(tokensSets));
-    getCountsCmd.setForInsert(type == FLEQueryInterface::TagQueryType::kInsert);
+    getCountsCmd.setQueryType(queryTypeTranslation(type));
 
     auto response = _txnClient.runCommandSync(nss.db(), getCountsCmd.toBSON({}));
 
@@ -1756,7 +1784,7 @@ uint64_t FLETagNoTXNQuery::countDocuments(const NamespaceString& nss) {
 std::vector<std::vector<FLEEdgeCountInfo>> FLETagNoTXNQuery::getTags(
     const NamespaceString& nss,
     const std::vector<std::vector<FLEEdgePrfBlock>>& tokensSets,
-    TagQueryType type) {
+    FLEQueryInterface::TagQueryType type) {
 
     invariant(!_opCtx->inMultiDocumentTransaction());
 
@@ -1775,7 +1803,7 @@ std::vector<std::vector<FLEEdgeCountInfo>> FLETagNoTXNQuery::getTags(
     }
 
     getCountsCmd.setTokens(toTagSets(tokensSets));
-    getCountsCmd.setForInsert(type == FLEQueryInterface::TagQueryType::kInsert);
+    getCountsCmd.setQueryType(queryTypeTranslation(type));
 
     DBDirectClient directClient(opCtx.get());
 

@@ -521,7 +521,7 @@ let testCases = {
                                 [{"s": BinData(0, "lUBO7Mov5Sb+c/D4cJ9whhhw/+PZFLCk/AQU2+BpumQ=")}]
                         },
                     ],
-                    "forInsert": true
+                    "queryType": "insert"
                 };
             }
         }

@@ -105,34 +105,6 @@ void CompactStatsCounter<ECOCStats>::add(const ECOCStats& other) {
     addDeletes(other.getDeleted());
 }
 
-/**
- * Implementation of FLEStateCollectionReader for txn_api::TransactionClient
- */
-template <typename StatsType>
-class TxnCollectionReaderForCompact : public FLEStateCollectionReader {
-public:
-    TxnCollectionReaderForCompact(FLEQueryInterface* queryImpl,
-                                  const NamespaceString& nss,
-                                  StatsType* stats)
-        : _queryImpl(queryImpl), _nss(nss), _stats(stats) {}
-
-    uint64_t getDocumentCount() const override {
-        return _queryImpl->countDocuments(_nss);
-    }
-
-    BSONObj getById(PrfBlock block) const override {
-        auto doc = BSON("v" << BSONBinData(block.data(), block.size(), BinDataGeneral));
-        BSONElement element = doc.firstElement();
-        auto result = _queryImpl->getById(_nss, element);
-        _stats.addReads(1);
-        return result;
-    }
-
-private:
-    FLEQueryInterface* _queryImpl;
-    const NamespaceString& _nss;
-    mutable CompactStatsCounter<StatsType> _stats;
-};
 }  // namespace
 
 
@@ -209,47 +181,38 @@ void compactOneFieldValuePairV2(FLEQueryInterface* queryImpl,
                                 const ECOCCompactionDocumentV2& ecocDoc,
                                 const NamespaceString& escNss,
                                 ECStats* escStats) {
-    auto escTagToken = FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedTagToken(ecocDoc.esc);
     auto escValueToken =
         FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedValueToken(ecocDoc.esc);
 
+    std::vector<std::vector<FLEEdgePrfBlock>> tags;
+    {
+        FLEEdgePrfBlock edgeSet{ecocDoc.esc.data, boost::none};
+        tags.push_back({edgeSet});
+    }
+
+    auto countInfoSets =
+        queryImpl->getTags(escNss, tags, FLEQueryInterface::TagQueryType::kCompact);
+
+    uassert(7517100,
+            "CountInfoSets cannot be empty and must have one value.",
+            countInfoSets.size() == 1 && countInfoSets[0].size() == 1);
+
+    auto& val = countInfoSets[0][0];
     CompactStatsCounter<ECStats> stats(escStats);
-    TxnCollectionReaderForCompact reader(queryImpl, escNss, escStats);
 
-    auto positions = ESCCollection::emuBinaryV2(reader, escTagToken, escValueToken);
+    auto& tagToken = val.tagToken;
+    auto cpos = val.cpos;
 
-    // Handle case where cpos is none. This means that no new non-anchors have been inserted
-    // since since the last compact/cleanup.
-    // This could happen if a previous compact inserted an anchor, but the temp ECOC drop
-    // was interrupted. On restart, the compaction will run emuBinaryV2 again, but since the
-    // anchor was already inserted for this value, it may return null cpos if there have been no
-    // new insertions for that value since the first compact attempt.
-    if (!positions.cpos.has_value()) {
-        // No new non-anchors since the last compact/cleanup.
-        // There must be at least one anchor.
-        uassert(7293602,
-                "An ESC anchor document is expected but none is found",
-                !positions.apos.has_value() || positions.apos.value() > 0);
-        // the anchor with the latest cpos already exists so no more work needed
+    uassert(
+        7517103, "Stats cannot be empty for compacting a field value pair.", val.stats.has_value());
+    stats.add(val.stats.get());
+
+    if (!val.cpos) {
         return;
     }
 
-    uint64_t nextAnchorPos = 0;
-
-    if (!positions.apos.has_value()) {
-        auto r_esc = reader.getById(ESCCollection::generateNullAnchorId(escTagToken));
-
-        uassert(7293601, "ESC null anchor document not found", !r_esc.isEmpty());
-
-        auto nullAnchorDoc =
-            uassertStatusOK(ESCCollection::decryptAnchorDocument(escValueToken, r_esc));
-        nextAnchorPos = nullAnchorDoc.position + 1;
-    } else {
-        nextAnchorPos = positions.apos.value() + 1;
-    }
-
-    auto anchorDoc = ESCCollection::generateAnchorDocument(
-        escTagToken, escValueToken, nextAnchorPos, positions.cpos.value());
+    auto anchorDoc =
+        ESCCollection::generateAnchorDocument(tagToken, escValueToken, val.count, cpos.value());
     StmtId stmtId = kUninitializedStmtId;
 
     if (MONGO_unlikely(fleCompactHangBeforeESCAnchorInsert.shouldFail())) {
