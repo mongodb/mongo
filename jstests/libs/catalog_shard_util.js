@@ -38,9 +38,22 @@ var CatalogShardUtil = (function() {
         }, "failed to transition to dedicated config server within " + timeout + "ms", timeout);
     }
 
+    function waitForRangeDeletions(conn) {
+        assert.soon(() => {
+            const rangeDeletions = conn.getCollection("config.rangeDeletions").find().toArray();
+            if (rangeDeletions.length) {
+                print("Waiting for range deletions to complete: " + tojsononeline(rangeDeletions));
+                sleep(100);
+                return false;
+            }
+            return true;
+        });
+    }
+
     return {
         isEnabledIgnoringFCV,
         isTransitionEnabledIgnoringFCV,
         transitionToDedicatedConfigServer,
+        waitForRangeDeletions,
     };
 })();

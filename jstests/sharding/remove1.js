@@ -1,6 +1,8 @@
 (function() {
 'use strict';
 
+load("jstests/libs/catalog_shard_util.js");
+
 var s = new ShardingTest({shards: 2, other: {enableBalancer: true}});
 var config = s.s0.getDB('config');
 
@@ -36,6 +38,11 @@ s.s0.getDB('needToMove').dropDatabase();
 // Ensure the balancer moves the config.system.sessions collection chunks out of the shard being
 // removed
 s.awaitBalancerRound();
+
+if (TestData.catalogShard) {
+    // A catalog shard can't be removed until all range deletions have finished.
+    CatalogShardUtil.waitForRangeDeletions(s.s);
+}
 
 removeResult = assert.commandWorked(
     s.s0.adminCommand({[removeShardOrTransitionToDedicated]: s.shard0.shardName}));

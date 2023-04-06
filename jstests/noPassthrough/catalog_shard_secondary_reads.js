@@ -12,6 +12,7 @@
 // TODO SERVER-74534: Enable metadata consistency check when it works with a catalog shard.
 TestData.skipCheckMetadataConsistency = true;
 
+load("jstests/libs/catalog_shard_util.js");
 load("jstests/libs/fail_point_util.js");
 load('jstests/libs/chunk_manipulation_util.js');
 
@@ -57,13 +58,8 @@ assert.eq({_id: 5678}, doc);
 let removeRes = assert.commandWorked(st.s0.adminCommand({transitionToDedicatedConfigServer: 1}));
 assert.eq("started", removeRes.state, tojson(removeRes));
 
-let hangCollectionFlush = configureFailPoint(st.rs0.getPrimary(), 'hangCollectionFlush');
-
 assert.commandWorked(st.s0.adminCommand(
     {moveChunk: 'config.system.sessions', find: {_id: 0}, to: st.shard1.shardName}));
-
-let hangBeforePostMigrationCommitRefresh =
-    configureFailPoint(st.rs0.getPrimary(), 'hangBeforePostMigrationCommitRefresh');
 
 var joinMoveChunk = moveChunkParallel(staticMongod,
                                       st.s0.host,
@@ -73,24 +69,19 @@ var joinMoveChunk = moveChunkParallel(staticMongod,
                                       st.shard1.shardName,
                                       true /**Parallel should expect success */);
 
-hangBeforePostMigrationCommitRefresh.wait();
-let skipShardFilteringMetadataRefresh =
-    configureFailPoint(st.rs0.getPrimary(), 'skipShardFilteringMetadataRefresh');
-hangBeforePostMigrationCommitRefresh.off();
-
 joinMoveChunk();
 
 assert.commandWorked(st.s0.adminCommand({movePrimary: 'test', to: st.shard1.shardName}));
 assert.commandWorked(st.s0.adminCommand({movePrimary: 'sharded', to: st.shard1.shardName}));
+
+// A catalog shard can't be removed until all range deletions have finished.
+CatalogShardUtil.waitForRangeDeletions(st.s0);
 
 removeRes = assert.commandWorked(st.s0.adminCommand({transitionToDedicatedConfigServer: 1}));
 assert.eq("completed", removeRes.state, tojson(removeRes));
 
 const downgradeFCV = binVersionToFCV('last-lts');
 assert.commandWorked(st.s0.adminCommand({setFeatureCompatibilityVersion: downgradeFCV}));
-
-skipShardFilteringMetadataRefresh.off();
-hangCollectionFlush.off();
 
 // Connect directly to the config to simulate a stale mongos that thinks config server is
 // still a shard

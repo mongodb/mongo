@@ -62,6 +62,7 @@
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/s/add_shard_cmd_gen.h"
 #include "mongo/db/s/add_shard_util.h"
+#include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_state.h"
@@ -954,14 +955,28 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
 
         return {RemoveShardProgress::ONGOING,
                 boost::optional<RemoveShardProgress::DrainingShardUsage>(
-                    {chunkCount, databaseCount, jumboCount})};
+                    {chunkCount, databaseCount, jumboCount}),
+                boost::none};
     }
 
-    // Draining is done, now finish removing the shard.
-    LOGV2(
-        21949, "Going to remove shard: {shardId}", "Going to remove shard", "shardId"_attr = name);
-
     if (shardId == ShardId::kConfigServerId) {
+        // The config server may be added as a shard again, so we locally drop its drained
+        // sharded collections to enable that without user intervention. But we have to wait for
+        // the range deleter to quiesce to give queries and stale routers time to discover the
+        // migration, to match the usual probabilistic guarantees for migrations.
+        auto pendingRangeDeletions = [opCtx]() {
+            PersistentTaskStore<RangeDeletionTask> store(NamespaceString::kRangeDeletionNamespace);
+            return static_cast<long long>(store.count(opCtx, BSONObj()));
+        }();
+        if (pendingRangeDeletions > 0) {
+            LOGV2(7564600,
+                  "removeShard: waiting for range deletions",
+                  "pendingRangeDeletions"_attr = pendingRangeDeletions);
+
+            return {
+                RemoveShardProgress::PENDING_RANGE_DELETIONS, boost::none, pendingRangeDeletions};
+        }
+
         // Drop the drained collections locally so the config server can transition back to catalog
         // shard mode in the future without requiring users to manually drop them.
         LOGV2(7509600, "Locally dropping drained collections", "shardId"_attr = name);
@@ -982,6 +997,10 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
             hangAfterDroppingCollectionInTransitionToDedicatedConfigServer.pauseWhileSet(opCtx);
         }
     }
+
+    // Draining is done, now finish removing the shard.
+    LOGV2(
+        21949, "Going to remove shard: {shardId}", "Going to remove shard", "shardId"_attr = name);
 
     // Synchronize the control shard selection, the shard's document removal, and the topology time
     // update to exclude potential race conditions in case of concurrent add/remove shard
@@ -1077,6 +1096,12 @@ void ShardingCatalogManager::appendShardDrainingStatus(OperationContext* opCtx,
                                         << remainingCounts->databases << "jumboChunks"
                                         << remainingCounts->jumboChunks));
             result.appendElements(dbInfo);
+            break;
+        }
+        case RemoveShardProgress::PENDING_RANGE_DELETIONS: {
+            result.append("msg", "waiting for pending range deletions");
+            result.append("state", "pendingRangeDeletions");
+            result.append("pendingRangeDeletions", *shardDrainingStatus.pendingRangeDeletions);
             break;
         }
         case RemoveShardProgress::COMPLETED:
