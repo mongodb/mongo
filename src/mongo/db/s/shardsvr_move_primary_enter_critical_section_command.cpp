@@ -86,7 +86,7 @@ public:
                 // Waiting for the critical section on the database to complete is necessary to
                 // avoid the risk of invariant by attempting to enter the critical section as a
                 // dropDatabase operation may have already entered it.
-                waitForCriticalSectionToComplete(opCtx, dbName);
+                waitForCriticalSectionToComplete(opCtx, dbName, csReason);
 
                 ShardingRecoveryService::get(newOpCtx.get())
                     ->acquireRecoverableCriticalSectionBlockWrites(
@@ -130,14 +130,24 @@ public:
                                                            ActionType::internal));
         }
 
-        void waitForCriticalSectionToComplete(OperationContext* opCtx, const DatabaseName& dbName) {
-            boost::optional<SharedSemiFuture<void>> criticalSectionSignal = [&]() {
+        void waitForCriticalSectionToComplete(OperationContext* opCtx,
+                                              const DatabaseName& dbName,
+                                              const BSONObj& movePrimaryReason) {
+            auto criticalSectionSignal = [&]() -> boost::optional<SharedSemiFuture<void>> {
                 Lock::DBLock dbLock(opCtx, dbName, MODE_IS);
                 const auto scopedDss =
                     DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, dbName);
 
-                return scopedDss->getCriticalSectionSignal(
-                    ShardingMigrationCriticalSection::kWrite);
+                auto optCritSectionSignalSignal =
+                    scopedDss->getCriticalSectionSignal(ShardingMigrationCriticalSection::kWrite);
+                if (optCritSectionSignalSignal) {
+                    auto optCritSectionReason = scopedDss->getCriticalSectionReason();
+                    tassert(7578800, "Found critical section without reason", optCritSectionReason);
+                    if (movePrimaryReason.woCompare(*optCritSectionReason) == 0) {
+                        return boost::none;
+                    }
+                }
+                return optCritSectionSignalSignal;
             }();
 
             if (criticalSectionSignal) {

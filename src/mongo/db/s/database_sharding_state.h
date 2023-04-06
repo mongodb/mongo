@@ -178,7 +178,7 @@ public:
     }
 
     auto getCriticalSectionReason() const {
-        return _critSec.getReason() ? _critSec.getReason()->toString() : "Unknown";
+        return _critSec.getReason();
     }
 
     /**

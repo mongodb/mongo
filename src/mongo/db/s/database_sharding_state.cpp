@@ -176,6 +176,8 @@ void DatabaseShardingState::assertMatchingDbVersion(OperationContext* opCtx,
         const auto critSecSignal = scopedDss->getCriticalSectionSignal(
             opCtx->lockState()->isWriteLocked() ? ShardingMigrationCriticalSection::kWrite
                                                 : ShardingMigrationCriticalSection::kRead);
+        const auto optCritSecReason = scopedDss->getCriticalSectionReason();
+
         uassert(
             StaleDbRoutingVersion(dbName.toString(), receivedVersion, boost::none, critSecSignal),
             str::stream() << "The critical section for the database "
