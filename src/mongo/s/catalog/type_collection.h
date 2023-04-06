@@ -90,6 +90,7 @@ public:
     using CollectionTypeBase::kIndexVersionFieldName;
     using CollectionTypeBase::kKeyPatternFieldName;
     using CollectionTypeBase::kMaxChunkSizeBytesFieldName;
+    using CollectionTypeBase::kNoAutoSplitFieldName;
     using CollectionTypeBase::kNssFieldName;
     using CollectionTypeBase::kPermitMigrationsFieldName;
     using CollectionTypeBase::kReshardingFieldsFieldName;

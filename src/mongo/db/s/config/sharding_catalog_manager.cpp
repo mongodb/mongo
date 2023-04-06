@@ -803,8 +803,8 @@ Status ShardingCatalogManager::_initConfigSettings(OperationContext* opCtx) {
      *   oneOf: [
      *       {"properties": {_id: {enum: ["chunksize"]}},
      *                      {value: {bsonType: "number", minimum: 1, maximum: 1024}}},
-     *       {"properties": {_id: {enum: ["balancer", "automerge" "ReadWriteConcernDefaults",
-     * "audit"]}}}
+     *       {"properties": {_id: {enum: ["balancer", "autosplit", "ReadWriteConcernDefaults",
+     *                                    "audit"]}}}
      *   ]
      * }
      *
@@ -824,7 +824,7 @@ Status ShardingCatalogManager::_initConfigSettings(OperationContext* opCtx) {
         BSON("properties" << BSON(
                  "_id" << BSON("enum" << BSON_ARRAY(
                                    BalancerSettingsType::kKey
-                                   << AutoMergeSettingsType::kKey
+                                   << AutoSplitSettingsType::kKey << AutoMergeSettingsType::kKey
                                    << ReadWriteConcernDefaults::kPersistedDocumentId << "audit"))));
     const auto fullValidator =
         BSON("$jsonSchema" << BSON("oneOf" << BSON_ARRAY(chunkSizeValidator << noopValidator)));

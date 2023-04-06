@@ -701,7 +701,8 @@ ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
                                          const boost::optional<Timestamp>& requestTimestamp,
                                          const ChunkRange& range,
                                          const std::vector<BSONObj>& splitPoints,
-                                         const std::string& shardName) {
+                                         const std::string& shardName,
+                                         const bool fromChunkSplitter) {
 
     // Mark opCtx as interruptible to ensure that all reads and writes to the metadata collections
     // under the exclusive _kChunkOpLock happen on the same term.
@@ -720,6 +721,13 @@ ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
     }
 
     const auto [coll, version] = std::move(swCollAndVersion.getValue());
+
+    // Don't allow auto-splitting if the collection is being defragmented
+    uassert(ErrorCodes::ConflictingOperationInProgress,
+            str::stream() << "Can't commit auto-split while `" << nss.ns()
+                          << "` is undergoing a defragmentation.",
+            !(coll.getDefragmentCollection() && fromChunkSplitter));
+
     auto collPlacementVersion = version;
 
     // Return an error if collection epoch does not match epoch of request.

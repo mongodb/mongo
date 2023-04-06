@@ -276,7 +276,8 @@ public:
         const boost::optional<Timestamp>& requestTimestamp,
         const ChunkRange& range,
         const std::vector<BSONObj>& splitPoints,
-        const std::string& shardName);
+        const std::string& shardName,
+        bool fromChunkSplitter);
 
     /**
      * Updates metadata in the config.chunks collection so the chunks within the specified key range
@@ -456,6 +457,7 @@ public:
                                       const NamespaceString& nss,
                                       boost::optional<int32_t> chunkSizeMB,
                                       boost::optional<bool> defragmentCollection,
+                                      boost::optional<bool> enableAutoSplitter,
                                       boost::optional<bool> enableAutoMerger);
 
     /**

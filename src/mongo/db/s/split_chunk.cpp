@@ -168,7 +168,8 @@ StatusWith<boost::optional<ChunkRange>> splitChunk(
     std::vector<BSONObj>&& splitPoints,
     const std::string& shardName,
     const OID& expectedCollectionEpoch,
-    const boost::optional<Timestamp>& expectedCollectionTimestamp) {
+    const boost::optional<Timestamp>& expectedCollectionTimestamp,
+    const bool fromChunkSplitter) {
     auto scopedSplitOrMergeChunk(uassertStatusOK(
         ActiveMigrationsRegistry::get(opCtx).registerSplitOrMergeChunk(opCtx, nss, chunkRange)));
 
@@ -194,7 +195,8 @@ StatusWith<boost::optional<ChunkRange>> splitChunk(
                                      expectedCollectionEpoch,
                                      expectedCollectionTimestamp,
                                      chunkRange,
-                                     std::move(splitPoints));
+                                     std::move(splitPoints),
+                                     fromChunkSplitter);
 
     // Get the chunk containing a single document (if any) to perform the top-chunk optimization.
     auto topChunkRange = [&] {

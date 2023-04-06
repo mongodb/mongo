@@ -61,7 +61,7 @@ public:
         return "internal command usage only\n"
                "example:\n"
                " { splitChunk:\"db.foo\" , keyPattern: {a:1} , min : {a:100} , max: {a:200} { "
-               "splitKeys : [ {a:150} , ... ]}";
+               "splitKeys : [ {a:150} , ... ], fromChunkSplitter: <bool>}";
     }
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -153,6 +153,12 @@ public:
                 cmdObj, "timestamp", expectedCollectionTimestamp.get_ptr()));
         }
 
+        bool fromChunkSplitter = [&]() {
+            bool field = false;
+            Status status = bsonExtractBooleanField(cmdObj, "fromChunkSplitter", &field);
+            return status.isOK() && field;
+        }();
+
         // Check that the preconditions for split chunk are met and throw StaleShardVersion
         // otherwise.
         {
@@ -172,7 +178,8 @@ public:
                                                    std::move(splitKeys),
                                                    shardName,
                                                    expectedCollectionEpoch,
-                                                   expectedCollectionTimestamp));
+                                                   expectedCollectionTimestamp,
+                                                   fromChunkSplitter));
 
         // Otherwise, we want to check whether or not top-chunk optimization should be performed. If
         // yes, then we should have a ChunkRange that was returned. Regardless of whether it should
