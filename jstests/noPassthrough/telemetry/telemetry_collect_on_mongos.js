@@ -2,6 +2,9 @@
  * Test that mongos is collecting telemetry metrics.
  * @tags: [requires_fcv_70, featureFlagTelemetry]
  */
+
+load('jstests/libs/telemetry_utils.js');
+
 (function() {
 "use strict";
 
@@ -28,20 +31,6 @@ const setup = () => {
     coll.insert({v: 1});
     coll.insert({v: 4});
     return st;
-};
-
-// Get the telemetry for a given database, filtering out the actual $telemetry call.
-const getTelemetry = (conn) => {
-    const result = assert.commandWorked(conn.adminCommand({
-        aggregate: 1,
-        pipeline: [
-            {$telemetry: {}},
-            // Sort on telemetry key so entries are in a deterministic order.
-            {$sort: {key: 1}},
-        ],
-        cursor: {}
-    }));
-    return result.cursor.firstBatch;
 };
 
 const assertExpectedResults = (results,

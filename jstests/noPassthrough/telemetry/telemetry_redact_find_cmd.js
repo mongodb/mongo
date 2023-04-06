@@ -2,6 +2,7 @@
  * Test that $telemetry properly redacts find commands, on mongod and mongos.
  * @tags: [requires_fcv_70]
  */
+load("jstests/libs/telemetry_utils.js");
 (function() {
 "use strict";
 
@@ -13,22 +14,6 @@ function runTest(conn) {
     db.test.insert({v: 1});
 
     db.test.find({v: 1}).toArray();
-
-    const getTelemetryRedacted = (conn) => {
-        const result = conn.adminCommand({
-            aggregate: 1,
-            pipeline: [
-                {$telemetry: {redactIdentifiers: true}},
-                // Filter out agg queries, including $telemetry.
-                {$match: {"key.find": {$exists: true}}},
-                // Sort on telemetry key so entries are in a deterministic order.
-                {$sort: {key: 1}},
-            ],
-            cursor: {}
-        });
-        assert.commandWorked(result);
-        return result.cursor.firstBatch;
-    };
 
     let telemetry = getTelemetryRedacted(admin);
 
