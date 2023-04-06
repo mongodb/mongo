@@ -44,6 +44,14 @@ namespace mongo {
  */
 class APIVersionMetrics {
 public:
+    // To ensure that the BSONObject doesn't exceed the size limit, the 'appName' field has a limit
+    // of 128 bytes, which results in an output of approximately 128KB for app names.
+    static constexpr int KMaxNumOfOutputAppNames = 1000;
+
+    // To prevent unbounded memory usage, we limit the size of the saved app name to approximately
+    // 384KB, as it is stored for 24 hours.
+    static constexpr int KMaxNumOfSavedAppNames = KMaxNumOfOutputAppNames * 3;
+
     using APIVersionMetricsMap =
         stdx::unordered_map<std::string, stdx::unordered_map<std::string, Date_t>>;
 
@@ -58,10 +66,14 @@ public:
 
     APIVersionMetricsMap getAPIVersionMetrics_forTest();
 
+    void appendAPIVersionMetricsInfo_forTest(BSONObjBuilder* b);
+
     class APIVersionMetricsSSM;
 
 private:
     void _removeStaleTimestamps(WithLock lk, Date_t now);
+
+    void _appendAPIVersionData(BSONObjBuilder* b);
 
     mutable Mutex _mutex = MONGO_MAKE_LATCH("APIVersionMetrics::_mutex");
 

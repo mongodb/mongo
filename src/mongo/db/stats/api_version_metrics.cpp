@@ -43,6 +43,11 @@ APIVersionMetrics& APIVersionMetrics::get(ServiceContext* svc) {
 void APIVersionMetrics::update(const std::string& appName, const APIParameters& apiParams) {
     Date_t now = getGlobalServiceContext()->getFastClockSource()->now();
     stdx::lock_guard<Latch> lk(_mutex);
+    // Ensure that the number of saved app names does not exceed the limit.
+    if (!_apiVersionMetrics.count(appName) && _apiVersionMetrics.size() >= KMaxNumOfSavedAppNames) {
+        return;
+    }
+
     if (apiParams.getAPIVersion()) {
         _apiVersionMetrics[appName][*apiParams.getAPIVersion()] = now;
     } else {
@@ -81,8 +86,16 @@ void APIVersionMetrics::appendAPIVersionMetricsInfo(BSONObjBuilder* b) {
     stdx::lock_guard<Latch> lk(_mutex);
 
     _removeStaleTimestamps(lk, now);
+    _appendAPIVersionData(b);
+}
 
+void APIVersionMetrics::_appendAPIVersionData(BSONObjBuilder* b) {
+    int numOfEntries = 0;
     for (const auto& [appName, versionTimestamps] : _apiVersionMetrics) {
+        if (numOfEntries++ == KMaxNumOfOutputAppNames) {
+            break;
+        }
+
         BSONArrayBuilder subArrBuilder(b->subarrayStart(appName));
 
         if (versionTimestamps.find("default") != versionTimestamps.end()) {
@@ -100,6 +113,14 @@ void APIVersionMetrics::appendAPIVersionMetricsInfo(BSONObjBuilder* b) {
 
         subArrBuilder.done();
     }
+}
+
+void APIVersionMetrics::appendAPIVersionMetricsInfo_forTest(BSONObjBuilder* b) {
+    Date_t now = getGlobalServiceContext()->getFastClockSource()->now();
+    stdx::lock_guard<Latch> lk(_mutex);
+
+    _removeStaleTimestamps(lk, now);
+    _appendAPIVersionData(b);
 }
 
 APIVersionMetrics::APIVersionMetricsMap APIVersionMetrics::getAPIVersionMetrics_forTest() {
