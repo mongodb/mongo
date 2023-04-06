@@ -9,6 +9,7 @@ import pymongo
 from bson.objectid import ObjectId
 
 import buildscripts.resmokelib.testing.fixtures.interface as interface
+from buildscripts.resmokelib.testing.fixtures.fixturelib import with_naive_retry
 
 
 def _is_replica_set_fixture(fixture):
@@ -200,10 +201,11 @@ class ShardSplitFixture(interface.MultiClusterFixture):
             return self.fixtures[1:]
 
     def _create_client(self, fixture, **kwargs):
-        return fixture.mongo_client(
-            username=self.auth_options["username"], password=self.auth_options["password"],
-            authSource=self.auth_options["authenticationDatabase"],
-            authMechanism=self.auth_options["authenticationMechanism"], **kwargs)
+        return fixture.mongo_client(username=self.auth_options["username"],
+                                    password=self.auth_options["password"],
+                                    authSource=self.auth_options["authenticationDatabase"],
+                                    authMechanism=self.auth_options["authenticationMechanism"],
+                                    uuidRepresentation='standard', **kwargs)
 
     def add_recipient_nodes(self, recipient_set_name, recipient_tag_name=None):
         """Build recipient nodes, and reconfig them into the donor as non-voting members."""
@@ -245,63 +247,64 @@ class ShardSplitFixture(interface.MultiClusterFixture):
         # Reconfig the donor to add the recipient nodes as non-voting members
         donor_client = self._create_client(self.get_donor_rs())
 
-        while True:
-            try:
-                repl_config = donor_client.admin.command({"replSetGetConfig": 1})["config"]
-                repl_members = repl_config["members"]
+        repl_config = with_naive_retry(lambda: donor_client.admin.command({"replSetGetConfig": 1})[
+            "config"])
+        repl_members = repl_config["members"]
 
-                for recipient_node in recipient_nodes:
-                    # It is possible for the reconfig below to fail with a retryable error code like
-                    # 'InterruptedDueToReplStateChange'. In these cases, we need to run the reconfig
-                    # again, but some or all of the recipient nodes might have already been added to
-                    # the member list. Only add recipient nodes which have not yet been added on a
-                    # retry.
-                    recipient_host = recipient_node.get_internal_connection_string()
-                    recipient_entry = {
-                        "host": recipient_host, "votes": 0, "priority": 0, "hidden": True,
-                        "tags": {recipient_tag_name: str(ObjectId())}
-                    }
-                    member_exists = False
-                    for index, member in enumerate(repl_members):
-                        if member["host"] == recipient_host:
-                            repl_members[index] = recipient_entry
-                            member_exists = True
+        for recipient_node in recipient_nodes:
+            # It is possible for the reconfig below to fail with a retryable error code like
+            # 'InterruptedDueToReplStateChange'. In these cases, we need to run the reconfig
+            # again, but some or all of the recipient nodes might have already been added to
+            # the member list. Only add recipient nodes which have not yet been added on a
+            # retry.
+            recipient_host = recipient_node.get_internal_connection_string()
+            recipient_entry = {
+                "host": recipient_host, "votes": 0, "priority": 0, "hidden": True,
+                "tags": {recipient_tag_name: str(ObjectId())}
+            }
+            member_exists = False
+            for index, member in enumerate(repl_members):
+                if member["host"] == recipient_host:
+                    repl_members[index] = recipient_entry
+                    member_exists = True
 
-                    if not member_exists:
-                        repl_members.append(recipient_entry)
+            if not member_exists:
+                repl_members.append(recipient_entry)
 
-                # Re-index all members from 0
-                for idx, member in enumerate(repl_members):
-                    member["_id"] = idx
+        # Re-index all members from 0
+        for idx, member in enumerate(repl_members):
+            member["_id"] = idx
 
-                # Prepare the new config
-                repl_config["version"] = repl_config["version"] + 1
-                repl_config["members"] = repl_members
+        # Prepare the new config
+        repl_config["version"] = repl_config["version"] + 1
+        repl_config["members"] = repl_members
 
-                self.logger.info(
-                    f"Reconfiguring donor replica set to add non-voting recipient nodes: {repl_config}"
-                )
-                donor_client.admin.command({
-                    "replSetReconfig": repl_config,
-                    "maxTimeMS": self.AWAIT_REPL_TIMEOUT_MINS * 60 * 1000
-                })
+        self.logger.info(
+            f"Reconfiguring donor replica set to add non-voting recipient nodes: {repl_config}")
+        with_naive_retry(lambda: donor_client.admin.command({
+            "replSetReconfig": repl_config, "maxTimeMS": self.AWAIT_REPL_TIMEOUT_MINS * 60 * 1000
+        }))
 
-                # Wait for recipient nodes to become secondaries
-                self._await_recipient_nodes()
-                return
-            except pymongo.errors.ConnectionFailure as err:
-                self.logger.info(
-                    f"Retrying adding recipient nodes on replica set '{donor_rs_name}' after error: {str(err)}."
-                )
-                continue
+        # Wait for recipient nodes to become secondaries
+        self._await_recipient_nodes()
 
-    def _await_recipient_nodes(self):
+    def _await_recipient_nodes(self, timeout_secs=None):
         """Wait for recipient nodes to become available."""
+        if timeout_secs is None:
+            timeout_secs = self.AWAIT_REPL_TIMEOUT_MINS * 60
+
+        start = time.time()
         recipient_nodes = self.get_recipient_nodes()
         for recipient_node in recipient_nodes:
             recipient_client = self._create_client(recipient_node,
                                                    read_preference=pymongo.ReadPreference.SECONDARY)
             while True:
+                now = time.time()
+                if (now - start) >= timeout_secs:
+                    msg = f"Timed out while waiting for secondary on port {recipient_node.port} to become available."
+                    self.logger.error(msg)
+                    raise self.fixturelib.ServerFailure(msg)
+
                 self.logger.info(
                     f"Waiting for secondary on port {recipient_node.port} to become available.")
                 try:
@@ -311,8 +314,6 @@ class ShardSplitFixture(interface.MultiClusterFixture):
                 except pymongo.errors.OperationFailure as err:
                     if err.code != ShardSplitFixture._INTERRUPTED_DUE_TO_STORAGE_CHANGE:
                         raise
-                except pymongo.errors.ConnectionFailure:
-                    pass
 
                 time.sleep(0.1)  # Wait a little bit before trying again.
             self.logger.info(f"Secondary on port {recipient_node.port} is now available.")
@@ -333,39 +334,30 @@ class ShardSplitFixture(interface.MultiClusterFixture):
             self.fixtures = [donor_rs]
 
         donor_client = self._create_client(self.get_donor_rs())
-        while True:
-            try:
-                repl_config = donor_client.admin.command({"replSetGetConfig": 1})["config"]
-                repl_members = [
-                    member for member in repl_config["members"]
-                    if not 'tags' in member or not recipient_tag_name in member["tags"]
-                ]
+        repl_config = with_naive_retry(lambda: donor_client.admin.command({"replSetGetConfig": 1})[
+            "config"])
+        repl_members = [
+            member for member in repl_config["members"]
+            if not 'tags' in member or not recipient_tag_name in member["tags"]
+        ]
 
-                # Re-index all members from 0
-                for idx, member in enumerate(repl_members):
-                    member["_id"] = idx
+        # Re-index all members from 0
+        for idx, member in enumerate(repl_members):
+            member["_id"] = idx
 
-                # Prepare the new config
-                repl_config["version"] = repl_config["version"] + 1
-                repl_config["members"] = repl_members
+        # Prepare the new config
+        repl_config["version"] = repl_config["version"] + 1
+        repl_config["members"] = repl_members
 
-                # It's possible that the recipient config has been removed in a previous remove attempt.
-                if "recipientConfig" in repl_config:
-                    del repl_config["recipientConfig"]
+        # It's possible that the recipient config has been removed in a previous remove attempt.
+        if "recipientConfig" in repl_config:
+            del repl_config["recipientConfig"]
 
-                self.logger.info(
-                    f"Reconfiguring donor '{donor_rs_name}' to remove recipient nodes: {repl_config}"
-                )
-                donor_client.admin.command({
-                    "replSetReconfig": repl_config,
-                    "maxTimeMS": self.AWAIT_REPL_TIMEOUT_MINS * 60 * 1000
-                })
-                break
-            except pymongo.errors.ConnectionFailure as err:
-                self.logger.info(
-                    f"Retrying removing recipient nodes from donor '{donor_rs_name}' after error: {str(err)}."
-                )
-                continue
+        self.logger.info(
+            f"Reconfiguring donor '{donor_rs_name}' to remove recipient nodes: {repl_config}")
+        with_naive_retry(lambda: donor_client.admin.command({
+            "replSetReconfig": repl_config, "maxTimeMS": self.AWAIT_REPL_TIMEOUT_MINS * 60 * 1000
+        }))
 
         self.logger.info("Tearing down recipient nodes and removing data directories.")
         for recipient_node in reversed(recipient_nodes):

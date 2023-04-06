@@ -3,11 +3,14 @@
 import os.path
 
 import buildscripts.resmokelib.testing.fixtures.interface as interface
-from buildscripts.resmokelib.testing.fixtures.fixturelib import FixtureLib
+from buildscripts.resmokelib.testing.fixtures.fixturelib import with_naive_retry
 
 
 class TenantMigrationFixture(interface.MultiClusterFixture):
     """Fixture which provides JSTests with a set of replica sets to run tenant migration against."""
+
+    AWAIT_REPL_TIMEOUT_MINS = 5
+    AWAIT_REPL_TIMEOUT_FOREVER_MINS = 24 * 60
 
     def __init__(self, logger, job_num, fixturelib, common_mongod_options=None,
                  per_mongod_options=None, dbpath_prefix=None, preserve_dbpath=False,
@@ -155,18 +158,25 @@ class TenantMigrationFixture(interface.MultiClusterFixture):
         """Return the replica sets involved in the tenant migration."""
         return self.replica_sets.copy()
 
+    def _create_client(self, fixture, **kwargs):
+        return fixture.mongo_client(username=self.auth_options["username"],
+                                    password=self.auth_options["password"],
+                                    authSource=self.auth_options["authenticationDatabase"],
+                                    authMechanism=self.auth_options["authenticationMechanism"],
+                                    uuidRepresentation='standard', **kwargs)
+
     def _create_tenant_migration_donor_and_recipient_roles(self, rs):
         """Create a role for tenant migration donor and recipient."""
         primary = rs.get_primary()
-        primary_client = interface.build_client(primary, self.auth_options)
+        primary_client = self._create_client(primary)
 
         try:
-            primary_client.admin.command({
+            with_naive_retry(lambda: primary_client.admin.command({
                 "createRole": "tenantMigrationDonorRole", "privileges": [{
                     "resource": {"cluster": True}, "actions": ["runTenantMigration"]
                 }, {"resource": {"db": "admin", "collection": "system.keys"}, "actions": ["find"]}],
                 "roles": []
-            })
+            }))
         except:
             self.logger.exception(
                 "Error creating tenant migration donor role on primary on port %d of replica" +
@@ -174,7 +184,7 @@ class TenantMigrationFixture(interface.MultiClusterFixture):
             raise
 
         try:
-            primary_client.admin.command({
+            with_naive_retry(lambda: primary_client.admin.command({
                 "createRole": "tenantMigrationRecipientRole",
                 "privileges": [{
                     "resource": {"cluster": True},
@@ -184,7 +194,7 @@ class TenantMigrationFixture(interface.MultiClusterFixture):
                                    "resource": {"anyResource": True},
                                    "actions": ["dbStats", "collStats", "find", "listIndexes"]
                                }], "roles": []
-            })
+            }))
         except:
             self.logger.exception(
                 "Error creating tenant migration recipient role on primary on port %d of replica" +

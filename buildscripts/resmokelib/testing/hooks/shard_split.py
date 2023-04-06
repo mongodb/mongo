@@ -6,14 +6,14 @@ import threading
 import time
 import uuid
 
-import bson
-import pymongo.errors
-
+from bson.binary import Binary, UUID_SUBTYPE
 from bson.objectid import ObjectId
+from pymongo.errors import OperationFailure, PyMongoError
 
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.testing.fixtures import shard_split
 from buildscripts.resmokelib.testing.fixtures.replicaset import ReplicaSetFixture
+from buildscripts.resmokelib.testing.fixtures.fixturelib import with_naive_retry
 from buildscripts.resmokelib.testing.hooks import interface
 from buildscripts.resmokelib.testing.hooks import dbhash_tenant_migration
 
@@ -167,7 +167,7 @@ class _ShardSplitOptions:
 
     def get_migration_id_as_binary(self):
         """Return the migration id as BSON Binary."""
-        return bson.Binary(self.migration_id.bytes, 4)
+        return Binary(self.migration_id.bytes, UUID_SUBTYPE)
 
     def get_donor_rs(self):
         """Return the current donor for the split fixture."""
@@ -339,35 +339,33 @@ class _ShardSplitThread(threading.Thread):
                                   recipient_tag_name, recipient_set_name)
 
     def _create_client(self, fixture, **kwargs):
-        return fixture.mongo_client(
-            username=self._auth_options["username"], password=self._auth_options["password"],
-            authSource=self._auth_options["authenticationDatabase"],
-            authMechanism=self._auth_options["authenticationMechanism"], **kwargs)
+        return fixture.mongo_client(username=self._auth_options["username"],
+                                    password=self._auth_options["password"],
+                                    authSource=self._auth_options["authenticationDatabase"],
+                                    authMechanism=self._auth_options["authenticationMechanism"],
+                                    uuidRepresentation='standard', **kwargs)
 
     def _get_recipient_primary(self, split_opts, timeout_secs=None):
         if timeout_secs is None:
             timeout_secs = self._shard_split_fixture.AWAIT_REPL_TIMEOUT_MINS * 60
         nodes = split_opts.get_recipient_nodes()
-        start = time.time()
         clients = {}
-        while True:
+        start = time.monotonic()
+        while time.monotonic() - start < timeout_secs:
             for node in nodes:
-                now = time.time()
-                if (now - start) >= timeout_secs:
-                    msg = f"Timed out while waiting for a primary on replica set '{split_opts.recipient_set_name}'."
-                    self.logger.error(msg)
-                    raise errors.ServerFailure(msg)
+                if node.port not in clients:
+                    clients[node.port] = self._create_client(node)
 
-                try:
-                    if node.port not in clients:
-                        clients[node.port] = self._create_client(node)
+                client = clients[node.port]
+                is_master = client.admin.command("isMaster")["ismaster"]
+                if is_master:
+                    return node
 
-                    client = clients[node.port]
-                    is_master = client.admin.command("isMaster")["ismaster"]
-                    if is_master:
-                        return node
-                except pymongo.errors.ConnectionFailure:
-                    continue
+            time.sleep(self.POLL_INTERVAL_SECS)
+
+        raise errors.ServerFailure(
+            f"Timed out while waiting for a primary on replica set '{split_opts.recipient_set_name}'."
+        )
 
     def _check_split_dbhash(self, split_opts):
         # Set the donor connection string, recipient connection string, and migration uuid string
@@ -410,85 +408,71 @@ class _ShardSplitThread(threading.Thread):
         self.logger.info(f"Committing shard split '{split_opts.migration_id}' on replica set "
                          f"'{split_opts.get_donor_name()}'.")
 
-        while True:
-            try:
-                donor_client.admin.command({
-                    "commitShardSplit": 1, "migrationId": split_opts.get_migration_id_as_binary(),
-                    "tenantIds": split_opts.tenant_ids,
-                    "recipientTagName": split_opts.recipient_tag_name, "recipientSetName":
-                        split_opts.recipient_set_name
-                }, bson.codec_options.CodecOptions(uuid_representation=bson.binary.UUID_SUBTYPE))
+        try:
+            with_naive_retry(lambda: donor_client.admin.command({
+                "commitShardSplit": 1, "migrationId": split_opts.get_migration_id_as_binary(),
+                "tenantIds": split_opts.tenant_ids, "recipientTagName":
+                    split_opts.recipient_tag_name, "recipientSetName": split_opts.recipient_set_name
+            }))
 
-                self.logger.info(f"Shard split '{split_opts.migration_id}' on replica set "
-                                 f"'{split_opts.get_donor_name()}' has committed.")
-                return True
-            except pymongo.errors.OperationFailure as err:
-                if not self._is_fail_point_err(err):
-                    # This is an unexpected abort, raise it for debugging.
-                    raise
+            self.logger.info(f"Shard split '{split_opts.migration_id}' on replica set "
+                             f"'{split_opts.get_donor_name()}' has committed.")
+            return True
+        except OperationFailure as err:
+            if not self._is_fail_point_err(err):
+                # This is an unexpected abort, raise it for debugging.
+                raise
 
-                self.logger.info(
-                    f"Shard split '{split_opts.migration_id}' on replica set "
-                    f"'{split_opts.get_donor_name()}' has aborted due to failpoint: {str(err)}.")
-                return False
-            except pymongo.errors.ConnectionFailure:
-                self.logger.info(
-                    f"Retrying shard split '{split_opts.migration_id}' against replica set "
-                    f"'{split_opts.get_donor_name()}'.")
+            self.logger.info(
+                f"Shard split '{split_opts.migration_id}' on replica set "
+                f"'{split_opts.get_donor_name()}' has aborted due to failpoint: {str(err)}.")
+            return False
 
     def _forget_shard_split(self, donor_client, split_opts):
         self.logger.info(f"Forgetting shard split '{split_opts.migration_id}' on replica set "
                          f"'{split_opts.get_donor_name()}'.")
 
-        while True:
-            try:
-                donor_client.admin.command(
-                    {"forgetShardSplit": 1, "migrationId": split_opts.get_migration_id_as_binary()},
-                    bson.codec_options.CodecOptions(uuid_representation=bson.binary.UUID_SUBTYPE))
-                return
-            except pymongo.errors.ConnectionFailure:
-                self.logger.info(
-                    f"Retrying forget shard split '{split_opts.migration_id}' against replica "
-                    f"set '{split_opts.get_donor_name()}'.")
-                continue
-            except pymongo.errors.OperationFailure as err:
-                if err.code != self.NO_SUCH_MIGRATION_ERR_CODE:
-                    raise
-
-                self.logger.info(f"Could not find shard split '{split_opts.migration_id}' on "
-                                 f"replica set '{split_opts.get_donor_name()}': {str(err)}.")
-                return
-            except pymongo.errors.PyMongoError:
-                self.logger.exception(
-                    f"Error forgetting shard split '{split_opts.migration_id}' on "
-                    f"replica set '{split_opts.get_donor_name()}'.")
+        try:
+            with_naive_retry(lambda: donor_client.admin.command(
+                {"forgetShardSplit": 1, "migrationId": split_opts.get_migration_id_as_binary()}))
+            return
+        except OperationFailure as err:
+            if err.code != self.NO_SUCH_MIGRATION_ERR_CODE:
                 raise
 
+            self.logger.info(f"Could not find shard split '{split_opts.migration_id}' on "
+                             f"replica set '{split_opts.get_donor_name()}': {str(err)}.")
+        except PyMongoError:
+            self.logger.exception(f"Error forgetting shard split '{split_opts.migration_id}' on "
+                                  f"replica set '{split_opts.get_donor_name()}'.")
+            raise
+
     def _wait_for_garbage_collection(self, split_opts, is_committed):  # noqa: D205,D400
+        timeout_secs = self._shard_split_fixture.AWAIT_REPL_TIMEOUT_MINS * 60
+
+        def wait_for_gc_on_node(node, rs_name):
+            self.logger.info(
+                f"Waiting for shard split '{split_opts.migration_id}' to be garbage collected "
+                f"on donor node on port {node.port} of replica set "
+                f"'{rs_name}'.")
+
+            node_client = self._create_client(node)
+
+            start = time.monotonic()
+            while time.monotonic() - start < timeout_secs:
+                res = with_naive_retry(lambda: node_client.config.command(
+                    {"count": "shardSplitDonors", "query": {"tenantIds": split_opts.tenant_ids}}))
+                if res["n"] == 0:
+                    return
+                time.sleep(self.POLL_INTERVAL_SECS)
+
+            raise errors.ServerFailure(
+                f"Timed out while waiting for garbage collection for node on port {node.port}.")
+
         try:
             donor_nodes = split_opts.get_donor_nodes()
             for donor_node in donor_nodes:
-                self.logger.info(
-                    f"Waiting for shard split '{split_opts.migration_id}' to be garbage collected "
-                    f"on donor node on port {donor_node.port} of replica set "
-                    f"'{split_opts.get_donor_name()}'.")
-
-                donor_node_client = self._create_client(donor_node)
-                while True:
-                    try:
-                        res = donor_node_client.config.command({
-                            "count": "shardSplitDonors",
-                            "query": {"tenantIds": split_opts.tenant_ids}
-                        })
-                        if res["n"] == 0:
-                            break
-                    except pymongo.errors.ConnectionFailure:
-                        self.logger.info(
-                            f"Retrying waiting for shard split '{split_opts.migration_id}' to be "
-                            f"garbage collected on donor node on port {donor_node.port} of "
-                            f"replica set '{split_opts.get_donor_name()}'.")
-                        continue
-                    time.sleep(self.POLL_INTERVAL_SECS)
+                wait_for_gc_on_node(donor_node, split_opts.get_donor_name())
 
             # If a shard split operation is aborted then the recipient is expected to be torn down,
             # we should not expect the state document will be garbage collected.
@@ -497,29 +481,8 @@ class _ShardSplitThread(threading.Thread):
 
             recipient_nodes = split_opts.get_recipient_nodes()
             for recipient_node in recipient_nodes:
-                self.logger.info(
-                    f"Waiting for shard split '{split_opts.migration_id}' to be garbage collected "
-                    f"on recipient node on port {recipient_node.port} of replica set "
-                    f"'{split_opts.recipient_set_name}'.")
-
-                recipient_node_client = self._create_client(recipient_node)
-                while True:
-                    try:
-                        res = recipient_node_client.config.command({
-                            "count": "shardSplitDonors",
-                            "query": {"tenantIds": split_opts.tenant_ids}
-                        })
-                        if res["n"] == 0:
-                            break
-                    except pymongo.errors.ConnectionFailure:
-                        self.logger.info(
-                            f"Retrying waiting for shard split '{split_opts.migration_id}' to be "
-                            f"garbage collected on recipient node on port {recipient_node.port} of "
-                            f"replica set '{split_opts.recipient_set_name}'.")
-                        continue
-                    time.sleep(self.POLL_INTERVAL_SECS)
-
-        except pymongo.errors.PyMongoError:
+                wait_for_gc_on_node(recipient_node, split_opts.recipient_set_name)
+        except PyMongoError:
             self.logger.exception(
                 f"Error waiting for shard split '{split_opts.migration_id}' from donor replica set "
                 f"'{split_opts.get_donor_name()} to recipient replica set "
@@ -527,13 +490,12 @@ class _ShardSplitThread(threading.Thread):
             raise
 
     def _wait_for_reroute_or_test_completion(self, donor_client, split_opts):
-        start_time = time.time()
-
         self.logger.info(
             f"Waiting for shard split '{split_opts.migration_id}' on replica set "
             f"'{split_opts.get_donor_name()}' to reroute at least one conflicting command. "
             f"Stop waiting when the test finishes.")
 
+        start_time = time.monotonic()
         while not self.__lifecycle.is_test_finished():
             try:
                 # We are reusing the infrastructure originally developed for tenant migrations,
@@ -543,13 +505,8 @@ class _ShardSplitThread(threading.Thread):
                     {"_id": split_opts.get_migration_id_as_binary()})
                 if doc is not None:
                     return
-            except pymongo.errors.ConnectionFailure:
-                self.logger.info(
-                    f"Retrying waiting for shard split '{split_opts.migration_id}' on replica set "
-                    f"'{split_opts.get_donor_name()}' to reroute at least one conflicting command.")
-                continue
-            except pymongo.errors.PyMongoError:
-                end_time = time.time()
+            except PyMongoError:
+                end_time = time.monotonic()
                 self.logger.exception(
                     f"Error running find command on replica set '{split_opts.get_donor_name()}' "
                     f"after waiting for reroute for {(end_time - start_time) * 1000} ms")
