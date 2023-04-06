@@ -68,7 +68,7 @@ let assertResultsMatchWithAndWithoutPushdown = function(
 
     // Turn sbe on which will allow $group stages that contain supported accumulators to be pushed
     // down under certain conditions.
-    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"});
+    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"});
 
     let resultWithGroupPushdown = coll.aggregate(pipeline).toArray();
     assert.sameMembers(resultNoGroupPushdown, resultWithGroupPushdown);
@@ -91,7 +91,7 @@ let assertShardedGroupResultsMatch = function(coll, pipeline, expectedGroupCount
 
     const classicalRes = coll.runCommand(cmd).cursor.firstBatch;
     assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"}));
+        db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}));
     const explainCmd = {
         aggregate: coll.getName(),
         pipeline: pipeline,

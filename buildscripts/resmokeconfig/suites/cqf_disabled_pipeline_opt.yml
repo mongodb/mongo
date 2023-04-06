@@ -16,7 +16,9 @@ executor:
     shell_options:
       crashOnInvalidBSONError: ""
       objcheck: ""
-      eval: load("jstests/libs/override_methods/detect_spawning_own_mongod.js");
+      eval: |
+        load("jstests/libs/override_methods/detect_spawning_own_mongod.js");
+        load("jstests/libs/set_force_bonsai.js");
   hooks:
   - class: ValidateCollections
     shell_options:

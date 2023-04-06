@@ -29,6 +29,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
 
 namespace mongo {
@@ -41,7 +43,43 @@ void QueryFrameworkControl::append(OperationContext*,
 }
 
 Status QueryFrameworkControl::setFromString(StringData value, const boost::optional<TenantId>&) {
-    _data = QueryFrameworkControl_parse(IDLParserContext("internalQueryFrameworkControl"), value);
+    auto newVal =
+        QueryFrameworkControl_parse(IDLParserContext("internalQueryFrameworkControl"), value);
+
+    // To enable Bonsai, the feature flag must be enabled. Here, we return an error to the user if
+    // they try to set the framework control knob to use Bonsai while the feature flag is disabled.
+    //
+    // Note that we only check if the feature flag is enabled ignoring FCV. If, for example, the FCV
+    // is not initialized, then we don't want to fail here.
+    //
+    // The feature flag should be initialized by this point because
+    // server_options_detail::applySetParameterOptions(std::map ...)
+    // handles setParameters in alphabetical order, so "feature" comes before "internal".
+
+    // (Ignore FCV check): This is intentional because we always want to use this feature once the
+    // feature flag is enabled.
+    bool enabledWithoutFCV =
+        feature_flags::gFeatureFlagCommonQueryFramework.isEnabledAndIgnoreFCVUnsafe();
+    switch (newVal) {
+        case QueryFrameworkControlEnum::kForceClassicEngine:
+        case QueryFrameworkControlEnum::kTrySbeEngine:
+            break;
+        case QueryFrameworkControlEnum::kTryBonsai:
+            if (enabledWithoutFCV) {
+                break;
+            }
+            return {ErrorCodes::IllegalOperation,
+                    "featureFlagCommonQueryFramework must be enabled to run with tryBonsai"};
+        case QueryFrameworkControlEnum::kForceBonsai:
+            if (enabledWithoutFCV && getTestCommandsEnabled()) {
+                break;
+            }
+            return {ErrorCodes::IllegalOperation,
+                    "featureFlagCommonQueryFramework and testCommands must be enabled to run with "
+                    "forceBonsai"};
+    }
+
+    _data = std::move(newVal);
     return Status::OK();
 }
 

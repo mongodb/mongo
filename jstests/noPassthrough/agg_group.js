@@ -40,7 +40,7 @@ let assertShardedGroupResultsMatch = (coll, pipeline) => {
 
     // Turns to the SBE engine at the shard.
     assert.commandWorked(
-        dbAtShard.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"}));
+        dbAtShard.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}));
 
     // Verifies that the SBE engine's results are same as the expected results, executing the
     // pipeline at the mongos.

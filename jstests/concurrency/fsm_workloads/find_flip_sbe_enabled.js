@@ -1,8 +1,8 @@
 'use strict';
 
 /**
- * Sets the internalQueryFrameworkControl flag to "forceClassicEngine" and "trySbe", and asserts
- * that find queries using the plan cache produce the correct results.
+ * Sets the internalQueryFrameworkControl flag to "forceClassicEngine" and "trySbeEngine", and
+ * asserts that find queries using the plan cache produce the correct results.
  *
  * @tags: [
  *     # Our test infrastructure prevents tests which use the 'setParameter' command from running in
@@ -12,18 +12,22 @@
  */
 
 var $config = (function() {
-    let data = {originalParamValue: false};
+    let data = {originalParamValues: {}};
 
     function getCollectionName(collName) {
         return "find_flip_sbe_enabled_" + collName;
     }
 
     function setup(db, collName, cluster) {
-        const originalParamValue =
-            db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1});
-        assertAlways.commandWorked(originalParamValue);
-        assert(originalParamValue.hasOwnProperty("internalQueryFrameworkControl"));
-        this.originalParamValue = originalParamValue.internalQueryFrameworkControl;
+        cluster.executeOnMongodNodes((db) => {
+            const originalParamValue =
+                db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1});
+            assertAlways.commandWorked(originalParamValue);
+            assert(originalParamValue.hasOwnProperty("internalQueryFrameworkControl"));
+            this.originalParamValues[db.getMongo().host] =
+                originalParamValue.internalQueryFrameworkControl;
+        });
+
         const coll = db.getCollection(getCollectionName(collName));
         for (let i = 0; i < 10; ++i) {
             assertAlways.commandWorked(
@@ -122,11 +126,12 @@ var $config = (function() {
     };
 
     function teardown(db, collName, cluster) {
-        // Restore the original state of the ForceClassicEngine parameter.
-        const setParam = this.originalParamValue;
-        cluster.executeOnMongodNodes(function(db) {
-            assertAlways.commandWorked(
-                db.adminCommand({setParameter: 1, internalQueryFrameworkControl: setParam}));
+        // Restore the original state of the internalQueryFrameworkControl parameter.
+        cluster.executeOnMongodNodes((db) => {
+            assertAlways.commandWorked(db.adminCommand({
+                setParameter: 1,
+                internalQueryFrameworkControl: this.originalParamValues[db.getMongo().host]
+            }));
         });
     }
 

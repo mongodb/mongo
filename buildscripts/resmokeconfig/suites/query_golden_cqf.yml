@@ -16,6 +16,7 @@ executor:
       eval: |
         // Keep in sync with query_golden_classic.yml.
         load("jstests/libs/override_methods/detect_spawning_own_mongod.js");
+        load("jstests/libs/set_force_bonsai.js");
         load("jstests/libs/golden_test.js");
         _openGoldenData(jsTestName(), {relativePath: "jstests/query_golden/expected_output"});
   hooks:

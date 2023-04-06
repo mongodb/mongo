@@ -222,7 +222,7 @@ const groupStage = {
     assert.eq(matchEntry.planCacheKey, lookupEntry.planCacheKey, {matchEntry, lookupEntry});
 
     assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"}));
+        db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}));
 })();
 
 MongoRunner.stopMongod(conn);

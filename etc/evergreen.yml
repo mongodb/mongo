@@ -3201,8 +3201,8 @@ buildvariants:
     test_flags: >-
       --excludeWithAnyTags=cqf_incompatible
       --excludeWithAnyTags=resource_intensive
-      --mongosSetParameters="{featureFlagCommonQueryFramework: true}"
-      --mongodSetParameters="{featureFlagCommonQueryFramework: true}"
+      --mongosSetParameters="{featureFlagCommonQueryFramework: true, internalQueryFrameworkControl: 'tryBonsai'}"
+      --mongodSetParameters="{featureFlagCommonQueryFramework: true, internalQueryFrameworkControl: 'tryBonsai'}"
   tasks:
   - name: .aggregation .common
   - name: causally_consistent_jscore_txns_passthrough
@@ -3212,7 +3212,6 @@ buildvariants:
   - name: .jscore .common
   - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer.
   - name: noPassthrough_gen
-  - name: query_golden_classic
   - name: query_golden_cqf
   - name: retryable_writes_jscore_passthrough_gen
 

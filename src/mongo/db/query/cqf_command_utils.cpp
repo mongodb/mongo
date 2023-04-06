@@ -29,7 +29,6 @@
 
 #include "mongo/db/query/cqf_command_utils.h"
 
-#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/exec/add_fields_projection_executor.h"
 #include "mongo/db/exec/exclusion_projection_executor.h"
 #include "mongo/db/exec/inclusion_projection_executor.h"
@@ -1104,21 +1103,8 @@ bool isEligibleCommon(const RequestType& request,
 }
 
 boost::optional<bool> shouldForceEligibility() {
-    // Without the feature flag set, no queries are eligible for Bonsai.
-    if (!serverGlobalParams.featureCompatibility.isVersionInitialized() ||
-        !feature_flags::gFeatureFlagCommonQueryFramework.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        LOGV2_DEBUG(7325100,
-                    4,
-                    "Bonsai will not be forced because FCV initialized={fcv} and CQF flag={cqf}",
-                    "Bonsai will not be forced because FCV isn't initialized or CQF isn't enabled.",
-                    "fcv"_attr = serverGlobalParams.featureCompatibility.isVersionInitialized(),
-                    "cqf"_attr = !serverGlobalParams.featureCompatibility.isVersionInitialized() ||
-                        feature_flags::gFeatureFlagCommonQueryFramework.isEnabled(
-                            serverGlobalParams.featureCompatibility));
-        return false;
-    }
-
+    // We don't need to consult the feature flag here, since the framework control knob can only
+    // be set to enable bonsai if featureFlagCommonQueryFramework is enabled.
     auto queryControl = ServerParameterSet::getNodeParameterSet()->get<QueryFrameworkControl>(
         "internalQueryFrameworkControl");
 
@@ -1137,8 +1123,7 @@ boost::optional<bool> shouldForceEligibility() {
             // classic engine.
             return boost::none;
         case QueryFrameworkControlEnum::kForceBonsai:
-            // This option is only supported with test commands enabled.
-            return getTestCommandsEnabled();
+            return true;
     }
 
     MONGO_UNREACHABLE;

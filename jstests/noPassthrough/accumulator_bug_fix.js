@@ -81,7 +81,7 @@
 
         // Turns off the classical engine.
         assert.commandWorked(
-            db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"}));
+            db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}));
         const sbeRes = assert.commandWorked(db.runCommand(aggCmd)).cursor.firstBatch;
         assert.eq(sbeRes, expectedRes, testDesc);
     };
@@ -221,10 +221,10 @@
         assert.eq(classicRes, expectedRes, testDesc);
 
         // Turns to the SBE engine at the shards.
-        assert.commandWorked(
-            dbAtShard0.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"}));
-        assert.commandWorked(
-            dbAtShard1.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"}));
+        assert.commandWorked(dbAtShard0.adminCommand(
+            {setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}));
+        assert.commandWorked(dbAtShard1.adminCommand(
+            {setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}));
 
         // Verifies that the SBE engine's results are same as the expected results.
         const sbeRes = coll.aggregate(pipeline).toArray();

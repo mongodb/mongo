@@ -103,7 +103,7 @@ assert.gt(getParamRes[worksKnobSbe], numDocs);
 // reads to exceed the collection size as well. By construction of the test, this also means that
 // the trial period length exceeds both 'trialLengthFromCollFrac' and 'trialLengthFromWorksKnob'.
 assert.commandWorked(
-    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"}));
+    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"}));
 allPlans = getAllPlansExecution("2");
 verifySbeNumReads(allPlans, numDocs, assert.gt);
 

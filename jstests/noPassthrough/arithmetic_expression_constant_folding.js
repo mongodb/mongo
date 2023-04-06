@@ -99,6 +99,6 @@ for (let i = 0; i < 5; i++) {
 }
 // TODO: SERVER-67282 Randomized property testing should work after SBE is updated to match classic
 // engine, so remove this setParameter.
-testDB.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"});
+testDB.adminCommand({setParameter: 1, internalQueryFrameworkControl: "trySbeEngine"});
 MongoRunner.stopMongod(conn);
 })();
