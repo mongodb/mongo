@@ -96,7 +96,6 @@ private:
 // system.tenantMigration.oplogView} can be round tripped.
 TEST_F(DocumentSourceGraphLookUpTest, LookupReParseSerializedStageWithFromDBAndColl) {
     auto expCtx = getExpCtx();
-    // TODO SERVER-62491 Use system tenantId for nss 'local.system.tenantMigration.oplogView'.
     NamespaceString fromNs =
         NamespaceString::createNamespaceString_forTest("local", "system.tenantMigration.oplogView");
     expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
@@ -872,7 +871,6 @@ TEST_F(DocumentSourceGraphLookupServerlessTest,
         RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
                                                                    flagStatus);
 
-        // TODO SERVER-62491 Use system tenantId to construct nss.
         NamespaceString nss = NamespaceString::createNamespaceString_forTest(
             boost::none, expCtx->ns.dbName().toString(), _targetColl);
         auto liteParsedLookup =

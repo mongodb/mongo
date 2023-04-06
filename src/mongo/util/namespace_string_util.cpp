@@ -64,8 +64,6 @@ NamespaceString NamespaceStringUtil::deserialize(boost::optional<TenantId> tenan
 
     if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
         gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility)) {
-        // TODO SERVER-62491: Invariant for all databases. Remove the invariant bypass for
-        // admin, local, config dbs.
         StringData dbName = ns.substr(0, ns.find('.'));
         if (!(dbName == DatabaseName::kAdmin.db()) && !(dbName == DatabaseName::kLocal.db()) &&
             !(dbName == DatabaseName::kConfig.db())) {

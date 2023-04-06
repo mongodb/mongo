@@ -79,7 +79,6 @@ TEST(DatabaseNameUtilTest, SerializeMultitenancySupportOff) {
 
 // If the database is an inernal db, it's acceptable not to have a tenantId even if
 // multitenancySupport and featureFlagRequireTenantID are on.
-// TODO SERVER-62491 This test should throw once we use kSystemTenantId.
 TEST(DatabaseNameUtilTest,
      DeserializeInternalDbTenantIdSetMultitenancySupportOnFeatureFlagRequireTenantIDOn) {
     RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);

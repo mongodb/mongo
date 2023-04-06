@@ -2309,9 +2309,7 @@ void ReshardingCoordinator::_tellAllParticipantsToCommit(
 void ReshardingCoordinator::_tellAllParticipantsToAbort(
     const std::shared_ptr<executor::ScopedTaskExecutor>& executor, bool isUserAborted) {
     ShardsvrAbortReshardCollection abortCmd(_coordinatorDoc.getReshardingUUID(), isUserAborted);
-    // Empty tenant id is acceptable here as command's tenant id will not be serialized to BSON.
-    // TODO SERVER-62491: Use system tenant id.
-    abortCmd.setDbName(DatabaseName(boost::none, "admin"));
+    abortCmd.setDbName(DatabaseName::kAdmin);
     _sendCommandToAllParticipants(executor,
                                   abortCmd.toBSON(BSON(WriteConcernOptions::kWriteConcernField
                                                        << WriteConcernOptions::Majority)));

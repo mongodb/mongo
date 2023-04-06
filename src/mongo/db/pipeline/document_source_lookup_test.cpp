@@ -1608,7 +1608,6 @@ TEST_F(DocumentSourceLookUpServerlessTest,
                         << "as"
                         << "lookup1"));
 
-    // TODO SERVER-62491 Use system tenantId to construct nss.
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(
         boost::none, expCtx->ns.dbName().toString(), _targetColl);
 

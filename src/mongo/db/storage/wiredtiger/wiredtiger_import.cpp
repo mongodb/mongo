@@ -57,8 +57,6 @@ bool shouldImport(const NamespaceString& ns, const UUID& migrationId) {
     const auto tenantId =
         tenant_migration_access_blocker::parseTenantIdFromDatabaseName(ns.dbName());
 
-    // TODO SERVER-62491: Update this code path to handle TenantId::kSystemTenantId for internal
-    // collections.
     tenant_migration_access_blocker::validateNssIsBeingMigrated(tenantId, ns, migrationId);
 
     return !!tenantId;

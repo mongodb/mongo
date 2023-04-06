@@ -1118,9 +1118,7 @@ BSONObj TransactionRouter::Router::_handOffCommitToCoordinator(OperationContext*
     }
 
     CoordinateCommitTransaction coordinateCommitCmd;
-    // Empty tenant id is acceptable here as command's tenant id will not be serialized to BSON.
-    // TODO SERVER-62491: Use system tenant id.
-    coordinateCommitCmd.setDbName(DatabaseName(boost::none, "admin"));
+    coordinateCommitCmd.setDbName(DatabaseName::kAdmin);
     coordinateCommitCmd.setParticipants(participantList);
     const auto coordinateCommitCmdObj = coordinateCommitCmd.toBSON(
         BSON(WriteConcernOptions::kWriteConcernField << opCtx->getWriteConcern().toBSON()));
@@ -1536,9 +1534,7 @@ BSONObj TransactionRouter::Router::_commitWithRecoveryToken(OperationContext* op
 
     auto coordinateCommitCmd = [&] {
         CoordinateCommitTransaction coordinateCommitCmd;
-        // Empty tenant id is acceptable here as command's tenant id will not be serialized to BSON.
-        // TODO SERVER-62491: Use system tenant id.
-        coordinateCommitCmd.setDbName(DatabaseName(boost::none, "admin"));
+        coordinateCommitCmd.setDbName(DatabaseName::kAdmin);
         coordinateCommitCmd.setParticipants({});
 
         auto rawCoordinateCommit = coordinateCommitCmd.toBSON(
