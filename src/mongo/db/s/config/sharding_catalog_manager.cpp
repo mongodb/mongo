@@ -254,24 +254,6 @@ Status createIndexesForConfigChunks(OperationContext* opCtx) {
     return Status::OK();
 }
 
-Status createIndexForConfigPlacementHistory(OperationContext* opCtx, bool waitForMajority) {
-    auto status = createIndexOnConfigCollection(
-        opCtx,
-        NamespaceString::kConfigsvrPlacementHistoryNamespace,
-        BSON(NamespacePlacementType::kNssFieldName
-             << 1 << NamespacePlacementType::kTimestampFieldName << -1),
-        true /*unique*/);
-    if (status.isOK() && waitForMajority) {
-        auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
-        WriteConcernResult unusedResult;
-        status = waitForWriteConcern(opCtx,
-                                     replClient.getLastOp(),
-                                     ShardingCatalogClient::kMajorityWriteConcern,
-                                     &unusedResult);
-    }
-    return status;
-}
-
 // creates a vector of a vector of BSONObj (one for each batch) from the docs vector
 // each batch can only be as big as the maximum BSON Object size and be below the maximum
 // document count
@@ -703,12 +685,16 @@ Status ShardingCatalogManager::_initConfigIndexes(OperationContext* opCtx) {
         }
     }
 
-    if (feature_flags::gHistoricalPlacementShardingCatalog.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        result = createIndexForConfigPlacementHistory(opCtx, false /*waitForMajority*/);
-        if (!result.isOK()) {
-            return result;
-        }
+    auto status = createIndexOnConfigCollection(
+        opCtx,
+        NamespaceString::kConfigsvrPlacementHistoryNamespace,
+        BSON(NamespacePlacementType::kNssFieldName
+             << 1 << NamespacePlacementType::kTimestampFieldName << -1),
+        true /*unique*/);
+
+    if (!result.isOK()) {
+        return result.withContext(
+            "couldn't create nss_1_timestamp_-1 index on config.placementHistory");
     }
 
     return Status::OK();
@@ -1185,9 +1171,6 @@ void ShardingCatalogManager::withTransaction(
 
 
 void ShardingCatalogManager::initializePlacementHistory(OperationContext* opCtx) {
-    // Initialize the collection.
-    uassertStatusOK(createIndexForConfigPlacementHistory(opCtx, true /*waitForMajority*/));
-
     /**
      * This function will establish an initialization time to collect a consistent description of
      * the placement of each existing namespace through a snapshot read of the sharding catalog.

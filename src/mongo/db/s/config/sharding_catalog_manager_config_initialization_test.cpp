@@ -338,9 +338,6 @@ TEST_F(ConfigInitializationTest, BuildsNecessaryIndexes) {
 }
 
 TEST_F(ConfigInitializationTest, InizializePlacementHistory) {
-    RAIIServerParameterControllerForTest featureFlagHistoricalPlacementShardingCatalog{
-        "featureFlagHistoricalPlacementShardingCatalog", true};
-
     ASSERT_OK(ShardingCatalogManager::get(operationContext())
                   ->initializeConfigDatabaseIfNeeded(operationContext()));
 
