@@ -151,7 +151,7 @@ components:
     release_monitoring_id: 19117
     local_directory_path: src/third_party/grpc
     team_owner: "Service Architecture"
-    upgrade_suppression: TODO SERVER-75569
+    upgrade_suppression: TODO SERVER-75761
 
   "ICU for C/C++ (ICU4C)":
     homepage_url: http://site.icu-project.org/
@@ -230,6 +230,7 @@ components:
     release_monitoring_id: 1748
     local_directory_path: src/third_party/unwind
     team_owner: "Service Architecture"
+    upgrade_suppression: TODO SERVER-75786
 
   "MongoDB C Driver":
     homepage_url: https://github.com/mongodb/mongo-c-driver
@@ -293,7 +294,7 @@ components:
     release_monitoring_id: 3715
     local_directory_path: src/third_party/protobuf
     team_owner: "Service Architecture"
-    upgrade_suppression: TODO SERVER-75567
+    upgrade_suppression: TODO SERVER-75761
 
   python-testscenarios:
     homepage_url: https://launchpad.net/testscenarios
@@ -309,7 +310,7 @@ components:
     release_monitoring_id: 10500
     local_directory_path: src/third_party/re2
     team_owner: "Service Architecture"
-    upgrade_suppression: TODO SERVER-75570
+    upgrade_suppression: TODO SERVER-75761
 
   extras:
     homepage_url: https://github.com/testing-cabal/extras
