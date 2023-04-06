@@ -611,10 +611,21 @@ MigrateInfosWithReason BalancerPolicy::balance(
 
     for (const auto& tag : tagsPlusEmpty) {
         size_t totalNumberOfShardsWithTag = 0;
+        int64_t totalDataSizeOfShardsWithZone = 0;
 
         for (const auto& stat : shardStats) {
             if (tag.empty() || stat.shardTags.count(tag)) {
                 totalNumberOfShardsWithTag++;
+                if (collDataSizeInfo.has_value()) {
+                    const auto& shardSizeIt =
+                        collDataSizeInfo->shardToDataSizeMap.find(stat.shardId);
+                    if (shardSizeIt == collDataSizeInfo->shardToDataSizeMap.end()) {
+                        // Skip if stats not available (may happen if add|remove shard during a
+                        // round)
+                        continue;
+                    }
+                    totalDataSizeOfShardsWithZone += shardSizeIt->second;
+                }
             }
         }
 
@@ -636,13 +647,29 @@ MigrateInfosWithReason BalancerPolicy::balance(
             continue;
         }
 
+        const int64_t idealDataSizePerShardForZone =
+            totalDataSizeOfShardsWithZone / totalNumberOfShardsWithTag;
+
         auto singleZoneBalance = [&]() {
             if (collDataSizeInfo.has_value()) {
+                tassert(ErrorCodes::BadValue,
+                        str::stream()
+                            << "Total data size for shards in zone " << tag << " and collection "
+                            << distribution.nss() << " must be greater or equal than zero but is "
+                            << totalDataSizeOfShardsWithZone,
+                        totalDataSizeOfShardsWithZone >= 0);
+
+                if (totalDataSizeOfShardsWithZone == 0) {
+                    // No data to balance within this zone
+                    return false;
+                }
+
                 return _singleZoneBalanceBasedOnDataSize(
                     shardStats,
                     distribution,
                     *collDataSizeInfo,
                     tag,
+                    idealDataSizePerShardForZone,
                     &migrations,
                     availableShards,
                     forceJumbo ? MoveChunkRequest::ForceJumbo::kForceBalancer
@@ -794,6 +821,7 @@ bool BalancerPolicy::_singleZoneBalanceBasedOnDataSize(
     const DistributionStatus& distribution,
     const CollectionDataSizeInfoForBalancing& collDataSizeInfo,
     const string& tag,
+    const int64_t idealDataSizePerShardForZone,
     vector<MigrateInfo>* migrations,
     stdx::unordered_set<ShardId>* availableShards,
     MoveChunkRequest::ForceJumbo forceJumbo) {
@@ -815,16 +843,21 @@ bool BalancerPolicy::_singleZoneBalanceBasedOnDataSize(
         return false;
     }
 
-    LOGV2_DEBUG(6581601,
+    LOGV2_DEBUG(7548100,
                 1,
                 "Balancing single zone",
                 "namespace"_attr = distribution.nss().ns(),
                 "zone"_attr = tag,
+                "idealDataSizePerShardForZone"_attr = idealDataSizePerShardForZone,
                 "fromShardId"_attr = from,
                 "fromShardDataSize"_attr = fromSize,
                 "toShardId"_attr = to,
                 "toShardDataSize"_attr = toSize,
                 "maxChunkSizeBytes"_attr = collDataSizeInfo.maxChunkSizeBytes);
+
+    if (fromSize <= idealDataSizePerShardForZone) {
+        return false;
+    }
 
     if (fromSize - toSize < 3 * collDataSizeInfo.maxChunkSizeBytes) {
         // Do not balance if the collection's size differs too few between the chosen shards
