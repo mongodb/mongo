@@ -163,6 +163,14 @@ var $config = (function() {
             const inconsistencies = db.checkMetadataConsistency().toArray();
             assertAlways.eq(0, inconsistencies.length, tojson(inconsistencies));
         },
+        checkCollectionMetadataConsistency: function(db, collName, connCache) {
+            if (this.skipMetadataChecks) {
+                return;
+            }
+            jsTestLog('Check collection metadata state');
+            const inconsistencies = db.checkMetadataConsistency(collName).toArray();
+            assertAlways.eq(0, inconsistencies.length, tojson(inconsistencies));
+        },
         CRUD: function(db, collName, connCache) {
             let tid = this.tid;
             // Pick a tid at random until we pick one that doesn't target this thread's collection.

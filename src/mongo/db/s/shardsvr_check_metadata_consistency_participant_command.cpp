@@ -75,16 +75,33 @@ public:
             uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
-            const auto& nss = ns();
-            const auto& shardId = ShardingState::get(opCtx)->shardId();
+            const auto nss = ns();
+            const auto shardId = ShardingState::get(opCtx)->shardId();
             const auto& primaryShardId = request().getPrimaryShardId();
 
             // Get the list of collections from configsvr sorted by namespace
-            auto catalogClientCollections = Grid::get(opCtx)->catalogClient()->getCollections(
-                opCtx,
-                nss.db(),
-                repl::ReadConcernLevel::kMajorityReadConcern,
-                BSON(CollectionType::kNssFieldName << 1) /*sort*/);
+            const auto catalogClientCollections = [&] {
+                switch (metadata_consistency_util::getCommandLevel(nss)) {
+                    case MetadataConsistencyCommandLevelEnum::kDatabaseLevel:
+                        return Grid::get(opCtx)->catalogClient()->getCollections(
+                            opCtx,
+                            nss.db(),
+                            repl::ReadConcernLevel::kMajorityReadConcern,
+                            BSON(CollectionType::kNssFieldName << 1) /*sort*/);
+                    case MetadataConsistencyCommandLevelEnum::kCollectionLevel:
+                        try {
+                            auto collectionType =
+                                Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss);
+                            return std::vector<CollectionType>{std::move(collectionType)};
+                        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                            // If we don't find the nss, it means that the collection is not
+                            // sharded.
+                            return std::vector<CollectionType>{};
+                        }
+                    default:
+                        MONGO_UNREACHABLE;
+                }
+            }();
 
             auto inconsistencies = [&] {
                 auto collCatalogSnapshot = [&] {
@@ -99,20 +116,34 @@ public:
                 }();
 
                 std::vector<CollectionPtr> localCollections;
-                for (auto it = collCatalogSnapshot->begin(opCtx, nss.dbName());
-                     it != collCatalogSnapshot->end(opCtx);
-                     ++it) {
-                    const auto coll = *it;
-                    if (!coll || !coll->ns().isNormalCollection()) {
-                        continue;
+                switch (metadata_consistency_util::getCommandLevel(nss)) {
+                    case MetadataConsistencyCommandLevelEnum::kDatabaseLevel: {
+                        for (auto it = collCatalogSnapshot->begin(opCtx, nss.dbName());
+                             it != collCatalogSnapshot->end(opCtx);
+                             ++it) {
+                            const auto coll = *it;
+                            if (!coll || !coll->ns().isNormalCollection()) {
+                                continue;
+                            }
+                            localCollections.emplace_back(CollectionPtr(coll));
+                        }
+                        std::sort(localCollections.begin(),
+                                  localCollections.end(),
+                                  [](const CollectionPtr& prev, const CollectionPtr& next) {
+                                      return prev->ns() < next->ns();
+                                  });
+                        break;
                     }
-                    localCollections.emplace_back(CollectionPtr(coll));
+                    case MetadataConsistencyCommandLevelEnum::kCollectionLevel: {
+                        if (auto coll =
+                                collCatalogSnapshot->lookupCollectionByNamespace(opCtx, nss)) {
+                            localCollections.emplace_back(CollectionPtr(coll));
+                        }
+                        break;
+                    }
+                    default:
+                        MONGO_UNREACHABLE;
                 }
-                std::sort(localCollections.begin(),
-                          localCollections.end(),
-                          [](const CollectionPtr& prev, const CollectionPtr& next) {
-                              return prev->ns() < next->ns();
-                          });
 
                 // Check consistency between local metadata and configsvr metadata
                 return metadata_consistency_util::checkCollectionMetadataInconsistencies(

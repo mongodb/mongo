@@ -77,28 +77,26 @@ public:
             std::vector<MetadataInconsistencyItem> inconsistenciesMerged;
             const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
 
-            if (nss.isCollectionlessCursorNamespace()) {
-                // Cluster or database level mode command.
-                const auto collections = catalogClient->getCollections(opCtx, nss.db());
+            switch (metadata_consistency_util::getCommandLevel(nss)) {
+                case MetadataConsistencyCommandLevelEnum::kDatabaseLevel: {
+                    const auto collections = catalogClient->getCollections(opCtx, nss.db());
 
-                for (const auto& coll : collections) {
-                    // Look for chunks inconsistencies and append them to the merged vector.
-                    auto chunksInconsistencies =
-                        metadata_consistency_util::checkChunksInconsistencies(
-                            opCtx, coll, _getCollectionChunks(opCtx, coll));
-                    inconsistenciesMerged.insert(
-                        inconsistenciesMerged.end(),
-                        std::make_move_iterator(chunksInconsistencies.begin()),
-                        std::make_move_iterator(chunksInconsistencies.end()));
+                    for (const auto& coll : collections) {
+                        _runChecksForCollection(opCtx, coll, inconsistenciesMerged);
+                    }
+                    break;
                 }
-            } else {
-                // Collection level mode command.
-                const auto coll = catalogClient->getCollection(opCtx, nss);
-                auto chunksInconsistencies = metadata_consistency_util::checkChunksInconsistencies(
-                    opCtx, coll, _getCollectionChunks(opCtx, coll));
-                inconsistenciesMerged.insert(inconsistenciesMerged.end(),
-                                             std::make_move_iterator(chunksInconsistencies.begin()),
-                                             std::make_move_iterator(chunksInconsistencies.end()));
+                case MetadataConsistencyCommandLevelEnum::kCollectionLevel: {
+                    try {
+                        const auto coll = catalogClient->getCollection(opCtx, nss);
+                        _runChecksForCollection(opCtx, coll, inconsistenciesMerged);
+                    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                        // If we don't find the nss, it means that the collection is not sharded.
+                    }
+                    break;
+                }
+                default:
+                    MONGO_UNREACHABLE;
             }
 
             auto exec = metadata_consistency_util::makeQueuedPlanExecutor(
@@ -129,6 +127,18 @@ public:
         }
 
     private:
+        void _runChecksForCollection(
+            OperationContext* opCtx,
+            const CollectionType& coll,
+            std::vector<MetadataInconsistencyItem>& inconsistenciesMerged) {
+            auto chunksInconsistencies = metadata_consistency_util::checkChunksInconsistencies(
+                opCtx, coll, _getCollectionChunks(opCtx, coll));
+
+            inconsistenciesMerged.insert(inconsistenciesMerged.end(),
+                                         std::make_move_iterator(chunksInconsistencies.begin()),
+                                         std::make_move_iterator(chunksInconsistencies.end()));
+        }
+
         std::vector<ChunkType> _getCollectionChunks(OperationContext* opCtx,
                                                     const CollectionType& coll) {
             const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();

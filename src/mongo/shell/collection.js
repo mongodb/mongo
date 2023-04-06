@@ -45,6 +45,9 @@ DBCollection.prototype.help = function() {
         ".bulkWrite( operations, <optional params> ) - bulk execute write operations, optional parameters are: w, wtimeout, j");
     print(
         "\tdb." + shortName +
+        ".checkMetadataConsistency() - return metadata inconsistency information found in the collection.");
+    print(
+        "\tdb." + shortName +
         ".count( query = {}, <optional params> ) - count the number of documents that matches the query, optional parameters are: limit, skip, hint, maxTimeMS");
     print(
         "\tdb." + shortName +
@@ -1472,6 +1475,12 @@ DBCollection.prototype.watch = function(pipeline, options) {
     [changeStreamStage, aggOptions] = this.getMongo()._extractChangeStreamOptions(options);
     pipeline.unshift(changeStreamStage);
     return this.aggregate(pipeline, aggOptions);
+};
+
+DBCollection.prototype.checkMetadataConsistency = function() {
+    const res =
+        assert.commandWorked(this._db.runCommand({checkMetadataConsistency: this.getName()}));
+    return new DBCommandCursor(this._db, res);
 };
 
 /**

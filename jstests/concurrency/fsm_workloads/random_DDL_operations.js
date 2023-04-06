@@ -98,6 +98,17 @@ var $config = (function() {
             jsTestLog('Executing checkMetadataConsistency state for database: ' + db.getName());
             const inconsistencies = db.checkMetadataConsistency().toArray();
             assert.eq(0, inconsistencies.length, tojson(inconsistencies));
+        },
+        checkCollectionMetadataConsistency: function(db, collName, connCache) {
+            if (this.skipMetadataChecks) {
+                return;
+            }
+            db = getRandomDb(db);
+            const coll = getRandomCollection(db);
+            jsTestLog('Executing checkMetadataConsistency state for collection: ' +
+                      coll.getFullName());
+            const inconsistencies = db.checkMetadataConsistency(coll.getName()).toArray();
+            assert.eq(0, inconsistencies.length, tojson(inconsistencies));
         }
     };
 

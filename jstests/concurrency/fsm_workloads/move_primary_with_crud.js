@@ -178,6 +178,14 @@ const $config = (function() {
             const inconsistencies = db.checkMetadataConsistency().toArray();
             assert.eq(0, inconsistencies.length, tojson(inconsistencies));
         },
+        checkCollectionMetadataConsistency: function(db, collName, connCache) {
+            if (this.skipMetadataChecks) {
+                return;
+            }
+            jsTestLog('Executing checkMetadataConsistency state for collection: ' + collName);
+            const inconsistencies = db.checkMetadataConsistency(collName).toArray();
+            assert.eq(0, inconsistencies.length, tojson(inconsistencies));
+        },
         verifyDocuments: function(db, collName, connCache) {
             // Verify the correctness of the collection data by checking that each document matches
             // its copy in memory.
@@ -219,7 +227,8 @@ const $config = (function() {
         update: 0.20,
         delete: 0.20,
         movePrimary: 0.12,
-        checkDatabaseMetadataConsistency: 0.08,
+        checkDatabaseMetadataConsistency: 0.04,
+        checkCollectionMetadataConsistency: 0.04,
         verifyDocuments: 0.20,
     };
 
@@ -230,6 +239,7 @@ const $config = (function() {
         delete: standardTransition,
         movePrimary: standardTransition,
         checkDatabaseMetadataConsistency: standardTransition,
+        checkCollectionMetadataConsistency: standardTransition,
         verifyDocuments: standardTransition
     };
 

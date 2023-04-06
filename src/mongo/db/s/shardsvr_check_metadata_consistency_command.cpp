@@ -73,16 +73,6 @@ std::vector<DatabaseType> getDatabasesThisShardIsPrimaryFor(OperationContext* op
     return databases;
 }
 
-MetadataConsistencyCommandLevelEnum getCommandLevel(const NamespaceString& nss) {
-    if (nss.isAdminDB()) {
-        return MetadataConsistencyCommandLevelEnum::kClusterLevel;
-    } else if (nss.isCollectionlessCursorNamespace()) {
-        return MetadataConsistencyCommandLevelEnum::kDatabaseLevel;
-    } else {
-        return MetadataConsistencyCommandLevelEnum::kCollectionLevel;
-    }
-}
-
 class ShardsvrCheckMetadataConsistencyCommand final
     : public TypedCommand<ShardsvrCheckMetadataConsistencyCommand> {
 public:
@@ -121,13 +111,13 @@ public:
             ShardingDDLCoordinatorService::getService(opCtx)->waitForRecoveryCompletion(opCtx);
 
             const auto nss = ns();
-            switch (getCommandLevel(nss)) {
+            switch (metadata_consistency_util::getCommandLevel(nss)) {
                 case MetadataConsistencyCommandLevelEnum::kClusterLevel:
                     return _runClusterLevel(opCtx, nss);
                 case MetadataConsistencyCommandLevelEnum::kDatabaseLevel:
                     return _runDatabaseLevel(opCtx, nss);
                 case MetadataConsistencyCommandLevelEnum::kCollectionLevel:
-                    return _runCollectionLevel(nss);
+                    return _runCollectionLevel(opCtx, nss);
                 default:
                     MONGO_UNREACHABLE;
             }
@@ -172,13 +162,12 @@ public:
             return _mergeCursors(opCtx, nss, _establishCursorOnParticipants(opCtx, nss));
         }
 
-        Response _runCollectionLevel(const NamespaceString& nss) {
-            uasserted(ErrorCodes::NotImplemented,
-                      "collection level mode command is not implemented");
+        Response _runCollectionLevel(OperationContext* opCtx, const NamespaceString& nss) {
+            return _mergeCursors(opCtx, nss, _establishCursorOnParticipants(opCtx, nss));
         }
 
         /*
-         * Forwards metadata consitency command to all participants to establish remote cursors.
+         * Forwards metadata consistency command to all participants to establish remote cursors.
          * Forwarding is done under the DDL lock to serialize with concurrent DDL operations.
          */
         std::vector<RemoteCursor> _establishCursorOnParticipants(OperationContext* opCtx,

@@ -54,6 +54,11 @@ MetadataInconsistencyItem makeInconsistency(const MetadataInconsistencyTypeEnum&
 }
 
 /**
+ * Returns the command level for the given namespace.
+ */
+MetadataConsistencyCommandLevelEnum getCommandLevel(const NamespaceString& nss);
+
+/**
  * Creates a queued data plan executor for the given list of inconsistencies
  */
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makeQueuedPlanExecutor(

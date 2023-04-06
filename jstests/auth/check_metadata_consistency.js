@@ -12,21 +12,41 @@
 (function() {
 "use strict";
 
+const kClusterLevel = "clusterLevel";
+const kDatabaseLevel = "databaseLevel";
+const kCollectionLevel = "collectionLevel";
+
 // Helper function to assert that the checkMetadataConsistency command succeeds
-function assertAuthCommandWorked(adminDb, conn, user) {
+function assertAuthCommandWorked(adminDb, conn, user, level) {
     assert(adminDb.logout());
     assert(adminDb.auth(user, "pwd"));
-    const inconsistencies = conn.checkMetadataConsistency().toArray();
+    const cmd = () => {
+        if (level === kClusterLevel || level === kDatabaseLevel) {
+            return conn.checkMetadataConsistency().toArray();
+        } else {
+            return conn.coll.checkMetadataConsistency().toArray();
+        }
+    };
+    const inconsistencies = cmd();
     assert.eq(1, inconsistencies.length);
     assert.eq("MisplacedCollection", inconsistencies[0].type);
 }
 
 // Helper function to assert that the checkMetadataConsistency command fails
-function assertAuthCommandFailed(adminDb, conn, user) {
+function assertAuthCommandFailed(adminDb, conn, user, level) {
     assert(adminDb.logout());
     assert(adminDb.auth(user, "pwd"));
+
+    const cmd = () => {
+        if (level === kClusterLevel || level === kDatabaseLevel) {
+            return conn.runCommand({checkMetadataConsistency: 1});
+        } else {
+            return conn.runCommand({checkMetadataConsistency: "coll"});
+        }
+    };
+
     assert.commandFailedWithCode(
-        conn.runCommand({checkMetadataConsistency: 1}),
+        cmd(),
         ErrorCodes.Unauthorized,
         "user should no longer have privileges to execute checkMetadataConsistency command.");
 }
@@ -142,33 +162,45 @@ shardAdmin.logout();
 adminDb.logout();
 
 (function testClusterLevelModePrivileges() {
-    assertAuthCommandWorked(adminDb, adminDb, "clusterManagerUser");
-    assertAuthCommandWorked(adminDb, adminDb, "clusterAdminUser");
-    assertAuthCommandWorked(adminDb, adminDb, "userWithClusterLevelRole");
+    assertAuthCommandWorked(adminDb, adminDb, "clusterManagerUser", kClusterLevel);
+    assertAuthCommandWorked(adminDb, adminDb, "clusterAdminUser", kClusterLevel);
+    assertAuthCommandWorked(adminDb, adminDb, "userWithClusterLevelRole", kClusterLevel);
 
-    assertAuthCommandFailed(adminDb, adminDb, "userWithAllNonSystemCollectionsPrivileges");
-    assertAuthCommandFailed(adminDb, adminDb, "userWithDatabaseLevelRole");
-    assertAuthCommandFailed(adminDb, adminDb, "userWithCollectionLevelRole");
-    assertAuthCommandFailed(adminDb, adminDb, "userWithUnrelatedAction");
-    assertAuthCommandFailed(adminDb, adminDb, "userWithUnrelatedRole");
-    assertAuthCommandFailed(adminDb, adminDb, "userWithNoRoles");
+    assertAuthCommandFailed(
+        adminDb, adminDb, "userWithAllNonSystemCollectionsPrivileges", kClusterLevel);
+    assertAuthCommandFailed(adminDb, adminDb, "userWithDatabaseLevelRole", kClusterLevel);
+    assertAuthCommandFailed(adminDb, adminDb, "userWithCollectionLevelRole", kClusterLevel);
+    assertAuthCommandFailed(adminDb, adminDb, "userWithUnrelatedAction", kClusterLevel);
+    assertAuthCommandFailed(adminDb, adminDb, "userWithUnrelatedRole", kClusterLevel);
+    assertAuthCommandFailed(adminDb, adminDb, "userWithNoRoles", kClusterLevel);
 })();
 
 (function testDatabaseLevelModePrivileges() {
-    assertAuthCommandWorked(adminDb, db, "clusterManagerUser");
-    assertAuthCommandWorked(adminDb, db, "clusterAdminUser");
-    assertAuthCommandWorked(adminDb, db, "userWithClusterLevelRole");
-    assertAuthCommandWorked(adminDb, db, "userWithDatabaseLevelRole");
-    assertAuthCommandWorked(adminDb, db, "userWithAllNonSystemCollectionsPrivileges");
+    assertAuthCommandWorked(adminDb, db, "clusterManagerUser", kDatabaseLevel);
+    assertAuthCommandWorked(adminDb, db, "clusterAdminUser", kDatabaseLevel);
+    assertAuthCommandWorked(adminDb, db, "userWithClusterLevelRole", kDatabaseLevel);
+    assertAuthCommandWorked(adminDb, db, "userWithDatabaseLevelRole", kDatabaseLevel);
+    assertAuthCommandWorked(
+        adminDb, db, "userWithAllNonSystemCollectionsPrivileges", kDatabaseLevel);
 
-    assertAuthCommandFailed(adminDb, db, "userWithCollectionLevelRole");
-    assertAuthCommandFailed(adminDb, db, "userWithUnrelatedAction");
-    assertAuthCommandFailed(adminDb, db, "userWithUnrelatedRole");
-    assertAuthCommandFailed(adminDb, db, "userWithNoRoles");
+    assertAuthCommandFailed(adminDb, db, "userWithCollectionLevelRole", kDatabaseLevel);
+    assertAuthCommandFailed(adminDb, db, "userWithUnrelatedAction", kDatabaseLevel);
+    assertAuthCommandFailed(adminDb, db, "userWithUnrelatedRole", kDatabaseLevel);
+    assertAuthCommandFailed(adminDb, db, "userWithNoRoles", kDatabaseLevel);
 })();
 
 (function testCollectionLevelModePrivileges() {
-    // TODO: SERVER-74078: Implement collection level mode for checkMetadataConsistency.
+    assertAuthCommandWorked(adminDb, db, "clusterManagerUser", kCollectionLevel);
+    assertAuthCommandWorked(adminDb, db, "clusterAdminUser", kCollectionLevel);
+    assertAuthCommandWorked(adminDb, db, "userWithClusterLevelRole", kCollectionLevel);
+    assertAuthCommandWorked(adminDb, db, "userWithDatabaseLevelRole", kCollectionLevel);
+    assertAuthCommandWorked(adminDb, db, "userWithCollectionLevelRole", kCollectionLevel);
+    assertAuthCommandWorked(
+        adminDb, db, "userWithAllNonSystemCollectionsPrivileges", kCollectionLevel);
+
+    assertAuthCommandFailed(adminDb, db, "userWithUnrelatedAction", kCollectionLevel);
+    assertAuthCommandFailed(adminDb, db, "userWithUnrelatedRole", kCollectionLevel);
+    assertAuthCommandFailed(adminDb, db, "userWithNoRoles", kCollectionLevel);
 })();
 
 st.stop();
