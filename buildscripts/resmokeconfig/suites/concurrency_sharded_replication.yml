@@ -132,9 +132,7 @@ executor:
     mongos_options:
       set_parameters:
         enableTestCommands: 1
-        # TODO (SERVER-75503): Avoid setting query sampling server parameters in multiversion
-        # concurrency suites.
-        # queryAnalysisSamplerConfigurationRefreshSecs: 1
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
     shard_options:
       mongod_options:
         oplogSize: 1024
@@ -143,9 +141,7 @@ executor:
         enableTestCommands: 1
         roleGraphInvalidationIsFatal: 1
         receiveChunkWaitForRangeDeleterTimeoutMS: 90000
-        # TODO (SERVER-75503): Avoid setting query sampling server parameters in multiversion
-        # concurrency suites.
-        # queryAnalysisWriterIntervalSecs: 1
+        queryAnalysisWriterIntervalSecs: 1
     num_rs_nodes_per_shard: 3
     num_shards: 2
     num_mongos: 2
