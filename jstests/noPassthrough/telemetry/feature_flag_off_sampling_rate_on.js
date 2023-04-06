@@ -8,9 +8,9 @@ load("jstests/libs/feature_flag_util.js");
 (function() {
 "use strict";
 
-// Set sampling rate to MAX_INT.
+// Set sampling rate to -1.
 let options = {
-    setParameter: {internalQueryConfigureTelemetrySamplingRate: 2147483647},
+    setParameter: {internalQueryConfigureTelemetrySamplingRate: -1},
 };
 const conn = MongoRunner.runMongod(options);
 const testdb = conn.getDB('test');

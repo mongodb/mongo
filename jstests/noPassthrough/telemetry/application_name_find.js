@@ -25,7 +25,7 @@ const getTelemetry = (conn, redactIdentifiers = false) => {
 
 // Turn on the collecting of telemetry metrics.
 let options = {
-    setParameter: {internalQueryConfigureTelemetrySamplingRate: 2147483647},
+    setParameter: {internalQueryConfigureTelemetrySamplingRate: -1},
 };
 
 const conn = MongoRunner.runMongod(options);

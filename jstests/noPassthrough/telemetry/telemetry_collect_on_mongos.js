@@ -20,7 +20,7 @@ const setup = () => {
         rs: {nodes: 1},
         mongosOptions: {
             setParameter: {
-                internalQueryConfigureTelemetrySamplingRate: 2147483647,
+                internalQueryConfigureTelemetrySamplingRate: -1,
                 'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"
             }
         },

@@ -108,7 +108,7 @@ function telemetryStoreSizeEstimateTest(conn, testDB, coll, testOptions) {
 runTestWithMongodOptions({
     setParameter: {
         internalQueryConfigureTelemetryCacheSize: "1MB",
-        internalQueryConfigureTelemetrySamplingRate: 2147483647
+        internalQueryConfigureTelemetrySamplingRate: -1
     },
 },
                          evictionTest,
@@ -119,7 +119,7 @@ runTestWithMongodOptions({
 runTestWithMongodOptions({
     setParameter: {
         internalQueryConfigureTelemetryCacheSize: "4MB",
-        internalQueryConfigureTelemetrySamplingRate: 2147483647
+        internalQueryConfigureTelemetrySamplingRate: -1
     },
 },
                          evictionTest,
@@ -129,7 +129,7 @@ runTestWithMongodOptions({
  * In this configuration, every query is sampled, so no requests should be rate-limited.
  */
 runTestWithMongodOptions({
-    setParameter: {internalQueryConfigureTelemetrySamplingRate: 2147483647},
+    setParameter: {internalQueryConfigureTelemetrySamplingRate: -1},
 },
                          countRateLimitedRequestsTest,
                          {samplingRate: 2147483647, numRequests: 20});
@@ -149,7 +149,7 @@ runTestWithMongodOptions({
  * size
  */
 runTestWithMongodOptions({
-    setParameter: {internalQueryConfigureTelemetrySamplingRate: 2147483647},
+    setParameter: {internalQueryConfigureTelemetrySamplingRate: -1},
 },
                          telemetryStoreSizeEstimateTest);
 }());

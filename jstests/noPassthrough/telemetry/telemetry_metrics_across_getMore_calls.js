@@ -10,7 +10,7 @@ load("jstests/libs/telemetry_utils.js");  // For verifyMetrics.
 
 // Turn on the collecting of telemetry metrics.
 let options = {
-    setParameter: {internalQueryConfigureTelemetrySamplingRate: 2147483647},
+    setParameter: {internalQueryConfigureTelemetrySamplingRate: -1},
 };
 
 const conn = MongoRunner.runMongod(options);

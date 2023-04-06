@@ -85,7 +85,7 @@ Status onTelemetrySamplingRateUpdate(int samplingRate) {
     // context.
     if (auto client = Client::getCurrent()) {
         auto&& [serviceCtx, updater] = getUpdater(*client);
-        updater->updateSamplingRate(serviceCtx, samplingRate);
+        updater->updateSamplingRate(serviceCtx, samplingRate < 0 ? INT_MAX : samplingRate);
     }
 
     return Status::OK();

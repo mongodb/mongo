@@ -1020,14 +1020,14 @@ server_parameters:
   internalQueryConfigureTelemetrySamplingRate:
     description: "The maximum number of queries per second that are sampled for query telemetry.
       If the rate of queries goes above this number, then rate limiting will kick in, and any
-      further queries will not be sampled. To sample all queries, this can be set to the INT_MAX.
-      This can be set to 0 to turn telemetry off completely."
+      further queries will not be sampled. To sample all queries, this can be set to -1. This can be
+      set to 0 to turn telemetry off completely."
     set_at: [ startup, runtime ]
     cpp_varname: "queryTelemetrySamplingRate"
     cpp_vartype: AtomicWord<int>
     default: 0
     validator:
-      gte: 0
+      gte: -1
     on_update: telemetry_util::onTelemetrySamplingRateUpdate
 
   internalQueryConfigureTelemetryCacheSize:

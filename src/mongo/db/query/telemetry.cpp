@@ -468,8 +468,9 @@ ServiceContext::ConstructorActionRegisterer telemetryStoreManagerRegisterer{
             }
         }
         globalTelemetryStoreManager = std::make_unique<TelemetryStoreManager>(size, numPartitions);
-        telemetryRateLimiter(serviceCtx) =
-            std::make_unique<RateLimiting>(queryTelemetrySamplingRate.load());
+        auto configuredSamplingRate = queryTelemetrySamplingRate.load();
+        telemetryRateLimiter(serviceCtx) = std::make_unique<RateLimiting>(
+            configuredSamplingRate < 0 ? INT_MAX : configuredSamplingRate);
     }};
 
 /**
@@ -500,7 +501,8 @@ bool shouldCollect(const ServiceContext* serviceCtx) {
         return false;
     }
     // Check if rate limiting allows us to collect telemetry for this request.
-    if (!telemetryRateLimiter(serviceCtx)->handleRequestSlidingWindow()) {
+    if (telemetryRateLimiter(serviceCtx)->getSamplingRate() < INT_MAX &&
+        !telemetryRateLimiter(serviceCtx)->handleRequestSlidingWindow()) {
         telemetryRateLimitedRequestsMetric.increment();
         return false;
     }
