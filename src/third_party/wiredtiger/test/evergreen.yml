@@ -510,6 +510,11 @@ functions:
         # replay using the same data seed, should guarantee we have equivalent data created.
         set -o errexit
         set -o verbose
+        # Get a random value with leading zeroes removed, /bin/sh version.
+        rando() {
+          tr -cd 0-9 </dev/urandom | head -c 5 | sed -e 's/0*\(.\)/\1/'
+        }
+        # Fail, showing the configuration file.
         fail() {
           echo "======= FAILURE =========="
           for file; do
@@ -525,9 +530,9 @@ functions:
         config=../../../test/format/CONFIG.replay
         for i in $(seq ${times}); do
           echo Iteration $i/${times}
-          x2=$RANDOM$RANDOM
-          x3=$RANDOM$RANDOM
-          rm -rf RUNDIR_{1,2,3}
+          x2=$(rando)
+          x3=$(rando)
+          rm -rf RUNDIR_1 RUNDIR_2 RUNDIR_3
 
           first_run_args="-c $config runs.timer=$runtime"
           ./t -h RUNDIR_1 $first_run_args ${extra_args} || fail RUNDIR_1/CONFIG 2>&1

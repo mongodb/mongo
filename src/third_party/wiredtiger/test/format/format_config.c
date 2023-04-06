@@ -964,9 +964,10 @@ config_fix(TABLE *table)
 {
     /*
      * Fixed-length column stores don't support modify operations, and can't be used with
-     * predictable replay.
+     * predictable replay with insertions.
      */
-    return (!GV(RUNS_PREDICTABLE_REPLAY) && !config_explicit(table, "ops.pct.modify"));
+    return (!config_explicit(table, "ops.pct.modify") &&
+      (!GV(RUNS_PREDICTABLE_REPLAY) || !config_explicit(table, "ops.pct.insert")));
 }
 
 /*
