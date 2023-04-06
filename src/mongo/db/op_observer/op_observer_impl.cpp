@@ -1016,11 +1016,6 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
 
     OpTimeBundle opTime;
     if (inBatchedWrite) {
-        if (nss == NamespaceString::kSessionTransactionsTableNamespace) {
-            auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
-            mongoDSessionCatalog->observeDirectWriteToConfigTransactions(opCtx,
-                                                                         documentKey.getId());
-        }
         auto operation =
             MutableOplogEntry::makeDeleteOperation(nss, uuid, documentKey.getShardKeyAndId());
         operation.setDestinedRecipient(destinedRecipientDecoration(opCtx));
@@ -1135,7 +1130,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
     } else if (nss.isSystemDotViews()) {
         CollectionCatalog::get(opCtx)->reloadViews(opCtx, nss.dbName());
     } else if (nss == NamespaceString::kSessionTransactionsTableNamespace &&
-               !opTime.writeOpTime.isNull()) {
+               (inBatchedWrite || !opTime.writeOpTime.isNull())) {
         auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
         mongoDSessionCatalog->observeDirectWriteToConfigTransactions(opCtx, documentKey.getId());
     } else if (nss == NamespaceString::kConfigSettingsNamespace) {
