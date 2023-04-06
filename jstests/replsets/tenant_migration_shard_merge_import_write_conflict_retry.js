@@ -32,10 +32,6 @@ if (!isShardMergeEnabled(recipientPrimary.getDB("admin"))) {
     quit();
 }
 
-const kDataDir =
-    `${recipientPrimary.dbpath}/migrationTmpFiles.${extractUUIDFromObject(migrationId)}`;
-assert.eq(runNonMongoProgram("mkdir", "-p", kDataDir), 0);
-
 const tenantId = ObjectId();
 const dbName = `${tenantId.str}_myDatabase`;
 
