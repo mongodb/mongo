@@ -235,9 +235,10 @@ public:
         // frequent schema changes.
         commandBuilder.append("transactions", BSON("includeLastCommitted" << false));
 
-        // Exclude detailed query planning statistics.
+        // Exclude detailed query planning statistics and apiVersions.
         commandBuilder.append("metrics",
-                              BSON("query" << BSON("multiPlanner" << BSON("histograms" << false))));
+                              BSON("query" << BSON("multiPlanner" << BSON("histograms" << false))
+                                           << "apiVersions" << false));
 
         if (gDiagnosticDataCollectionEnableLatencyHistograms.load()) {
             BSONObjBuilder subObjBuilder(commandBuilder.subobjStart("opLatencies"));
