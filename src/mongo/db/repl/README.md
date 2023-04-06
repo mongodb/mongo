@@ -2118,10 +2118,12 @@ non-existent oplog, or already has the initial sync flag set when starting up, t
 startup recovery and go through [initial sync](#initial-sync) instead.
 
 If the node already has data, it will go through
-[startup recovery](https://github.com/mongodb/mongo/blob/r4.2.0/src/mongo/db/repl/replication_recovery.cpp).
-It will first get the **recovery timestamp** from the storage engine, which is the timestamp through
-which changes are reflected in the data at startup (and the timestamp used to set the
-`initialDataTimestamp`). The recovery timestamp will be a `stable_timestamp` so that the node
+[startup recovery](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/replication_recovery.h#L44-L48).
+It will first [get the **recovery timestamp**](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/replication_recovery.cpp#L469-L471)
+from the storage engine, which is the timestamp through
+which changes are reflected in the data at startup and the timestamp used to set the
+[`initialDataTimestamp`](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h#L504-L506).
+The recovery timestamp will be a `stable_timestamp` so that the node
 recovers from a **stable checkpoint**, which is a durable view of the data at a particular timestamp.
 It should be noted that due to journaling, the oplog and many collections in the local database are
 an exception and are up-to-date at startup rather than reflecting the recovery timestamp.
@@ -2133,45 +2135,54 @@ parallel, they can cause temporary gaps in the oplog from entries that are not y
 **oplog holes**. A node can crash while there are still **oplog holes** on disk.
 
 During startup, a node will not be able to tell which oplog entries were successfully persisted in
-the oplog and which were uncommitted on disk and disappeared. A primary may be unknowingly missing
+the oplog and which were uncommitted on disk and disappeared. It also may have failed before writing
+some oplog entries from memory to disk during secondary oplog application. Since a primary doesn't wait
+for oplog entries to be durable before replicating them to secondaries, it may be unknowingly missing
 oplog entries that the secondaries already replicated; or a secondary may lose oplog entries that it
 thought it had already replicated. This would make the recently crashed node inconsistent with the
-rest its replica set. To fix this, after getting the recovery timestamp, the node will truncate its
-oplog to a point that it can guarantee does not have any oplog holes using the
+rest its replica set. To fix this, after getting the recovery timestamp, the node will
+[truncate](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/replication_recovery.cpp#L474)
+its oplog to a point that it can guarantee does not have any oplog holes using the
 [`oplogTruncateAfterPoint`](#replication-timestamp-glossary) document. This document is journaled
 and untimestamped so that it will reflect information more recent than the latest stable checkpoint
 even after a shutdown.
 
 The `oplogTruncateAfterPoint` can be set in two scenarios. The first is during
 [oplog batch application](#oplog-entry-application). Before writing a batch of oplog entries to the
-oplog, the node will set the `oplogTruncateAfterPoint` to the `lastApplied` timestamp. If the node
-shuts down before it finishes writing the batch, then during startup recovery the node will truncate
+oplog, the node will [set the `oplogTruncateAfterPoint` to the `lastApplied` timestamp](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/oplog_applier_impl.cpp#L463-L464).
+If the node shuts down before it finishes writing the batch, then during startup recovery the node will truncate
 the oplog back to the point saved before the batch application began. If the node successfully
-finishes writing the batch to the oplog, it will reset the `oplogTruncateAfterPoint` to null since
-there are no oplog holes and the oplog will not need to be truncated if the node restarts.
+finishes writing the batch to the oplog, it will
+[reset the `oplogTruncateAfterPoint` to null](https://github.com/10gen/mongo/blob/r6.0.0/src/mongo/db/repl/oplog_applier_impl.cpp#L499)
+since there are no oplog holes and the oplog will not need to be truncated if the node restarts.
 
 The second scenario for setting the `oplogTruncateAfterPoint` is while primary. A primary allows
 secondaries to replicate one of its oplog entries as soon as there are no oplog holes in-memory
 behind the entry. However, secondaries do not have to wait for the oplog entry to make it to disk
 on the primary nor for there to be no holes behind it on disk on the primary. Therefore, some
 already replicated writes may disappear from the primary if the primary crashes. The primary will
-continually update the `oplogTruncateAfterPoint` in order to track and forward the no oplog holes
+continually [update the `oplogTruncateAfterPoint`](https://github.com/10gen/mongo/blob/r6.0.0/src/mongo/db/repl/replication_coordinator_external_state_impl.cpp#L1150-L1154)
+in order to track and forward the no oplog holes
 point on disk, in case of an unclean shutdown. Then startup recovery can take care of any oplog
 inconsistency with the rest of the replica set.
 
-After truncating the oplog, the node will see if the recovery timestamp differs from the top of the
-newly truncated oplog. If it does, this means that there are oplog entries that must be applied to
-make the data consistent with the oplog. The node will apply all the operations starting at the
+After truncating the oplog, the node will see if the recovery timestamp [differs from the top of the
+newly truncated oplog](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/replication_recovery.cpp#L660-L673).
+If it does, this means that there are oplog entries that must be applied to
+make the data consistent with the oplog. The [node will apply](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/replication_recovery.cpp#L684)
+all the operations starting at the
 recovery timestamp through the top of the oplog (the latest entry in the oplog). The one exception
-is that it will not apply `prepareTransaction` oplog entries. Similar to how a node reconstructs
+is that it will not apply `prepareTransaction` oplog entries. Similar to [how a node reconstructs](#recovering-prepared-transactions)
 prepared transactions during initial sync and rollback, the node will update the transactions table
 every time it sees a `prepareTransaction` oplog entry. Once the node has finished applying all the
-oplog entries through the top of the oplog, it will [reconstruct](#recovering-prepared-transactions)
+oplog entries through the top of the oplog, it will
+[reconstruct](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L537-L538)
 all transactions still in the prepare state.
 
-Finally, the node will finish loading the replica set configuration, set its `lastApplied` and
-`lastDurable` timestamps to the top of the oplog (the latest entry in the oplog) and start steady
-state replication.
+Finally, the node will [finish loading](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L547)
+the replica set configuration, [set its `lastApplied` and
+`lastDurable`](https://github.com/mongodb/mongo/blob/r6.0.0/src/mongo/db/repl/replication_coordinator_impl.cpp#L697-L698) timestamps
+to the top of the oplog (the latest entry in the oplog) and start steady state replication.
 
 ## Recover from Unstable Checkpoint
 We may not have a recovery timestamp if we need to recover from an **unstable checkpoint**. MongoDB
