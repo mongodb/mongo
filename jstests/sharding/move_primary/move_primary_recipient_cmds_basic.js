@@ -16,12 +16,12 @@ const recipient = st.shard1;
 
 const dbName = jsTestName();
 const testDB = donor.getDB(dbName);
-assert.commandWorked(testDB.dropDatabase());
+const collName = 'testcoll0';
 
 assert.commandWorked(mongos.adminCommand({enableSharding: dbName, primaryShard: donor.shardName}));
 
-const donorColl0 = assertDropAndRecreateCollection(testDB, 'testcoll0');
-const recipientColl0 = recipient.getDB(dbName).getCollection('testcoll0');
+const donorColl0 = assertDropAndRecreateCollection(testDB, collName);
+const recipientColl0 = recipient.getDB(dbName).getCollection(collName);
 
 assert.commandWorked(donorColl0.insert([{a: 1}, {b: 1}]));
 
@@ -73,6 +73,7 @@ assert.commandWorked(recipient.adminCommand({
 }));
 
 // Test that _movePrimaryRecipientAbortMigration command aborts an ongoing movePrimary op.
+assertDropCollection(recipient.getDB(dbName), collName);
 uuid = UUID();
 
 runRecipientSyncDataCmds(uuid);
@@ -95,6 +96,10 @@ assert.commandWorked(recipient.adminCommand({
 }));
 
 assert.eq(0, recipientColl0.count(), "Recipient has orphaned collections");
+
+// Cleanup to prevent metadata inconsistencies as we are not committing config changes.
+assert.commandWorked(recipient.getDB(dbName).dropDatabase());
+assert.commandWorked(donor.getDB(dbName).dropDatabase());
 
 st.stop();
 })();

@@ -45,10 +45,10 @@ inline Status validateTimestampNotNull(const Timestamp& ts) {
 }
 
 template <class T>
-void ensureFulfilledPromise(WithLock lk, SharedPromise<T>& sp) {
+void ensureFulfilledPromise(WithLock lk, SharedPromise<T>& sp, Status status) {
     auto future = sp.getFuture();
     if (!future.isReady()) {
-        sp.emplaceValue();
+        sp.setFrom(status);
     }
 }
 

@@ -524,7 +524,10 @@ error_codes:
     - {code: 396, name: IndexInformationTooLarge}
     
     - {code: 397, name: MovePrimaryAborted}
+    
     - {code: 398, name: StreamTerminated, categories: [CloseConnectionError]}
+
+    - {code: 399, name: MovePrimaryRecipientPastAbortableStage, categories: [InternalOnly]}
 
     # Error codes 4000-8999 are reserved.
 

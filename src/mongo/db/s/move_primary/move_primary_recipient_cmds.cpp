@@ -212,9 +212,17 @@ public:
                 MovePrimaryRecipientService::kMovePrimaryRecipientServiceName);
             auto instance = MovePrimaryRecipientService::MovePrimaryRecipient::lookup(
                 opCtx, service, BSON("_id" << migrationId));
+
             if (instance) {
                 instance.get()->abort();
-                instance.get()->getCompletionFuture().get(opCtx);
+                auto completionStatus = instance.get()->getCompletionFuture().getNoThrow(opCtx);
+                if (completionStatus == ErrorCodes::MovePrimaryAborted) {
+                    return;
+                }
+                uassert(ErrorCodes::MovePrimaryRecipientPastAbortableStage,
+                        "movePrimary operation could not be aborted",
+                        completionStatus != Status::OK());
+                uassertStatusOK(completionStatus);
             } else {
                 LOGV2(7270003,
                       "No instance of movePrimary recipient found to abort",

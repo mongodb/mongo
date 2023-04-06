@@ -151,9 +151,9 @@ public:
     explicit MovePrimaryRecipientService(ServiceContext* serviceContext);
     ~MovePrimaryRecipientService() = default;
 
-    StringData getServiceName() const final;
+    StringData getServiceName() const override;
 
-    NamespaceString getStateDocumentsNS() const final override {
+    NamespaceString getStateDocumentsNS() const override {
         return NamespaceString::kMovePrimaryRecipientNamespace;
     }
 
@@ -241,7 +241,7 @@ public:
         ExecutorFuture<void> _transitionToInitializingState(
             const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
-        ExecutorFuture<void> _transitionToCloningState(
+        ExecutorFuture<void> _transitionToCloningStateAndClone(
             const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
         ExecutorFuture<void> _initializeForCloningState(
