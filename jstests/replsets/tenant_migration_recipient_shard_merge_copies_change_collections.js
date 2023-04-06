@@ -2,11 +2,10 @@
  * Tests that recipient is able to copy and apply change collection entries from the donor for the
  * shard merge protocol.
  *
- * TODO SERVER-72828: remove this test from 'exclude_files' in 'replica_sets_large_txns_format.yml'
- *
  * @tags: [
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,
+ *   requires_fcv_70,
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   serverless,
@@ -173,6 +172,16 @@ donorSession2.getDatabase("database").collection.updateOne({_id: "tenant2_in_tra
 });
 donorSession2.commitTransaction();
 
+// Start a transaction and perform some large writes.
+const largePad = "a".repeat(10 * 1024 * 1024);
+donorSession2.startTransaction();
+donorSession2.getDatabase("database")
+    .collection.insertOne({_id: "tenant2_in_transaction_2", largePad});
+donorSession2.getDatabase("database").collection.updateOne({_id: "tenant2_in_transaction_2"}, {
+    $set: {updated: true, largePad: "b" + largePad}
+});
+donorSession2.commitTransaction_forTesting();
+
 fpBeforeMarkingCloneSuccess.off();
 
 TenantMigrationTest.assertCommitted(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
@@ -246,17 +255,21 @@ const recipientSecondaryTenantConn2 = ChangeStreamMultitenantReplicaSetTest.getT
 
 // Resume the second change stream on the Recipient primary.
 const recipientPrimaryCursor2 =
-    recipientPrimaryTenantConn2.getDB("database").collection.watch([], {resumeAfter: resumeToken2});
+    recipientPrimaryTenantConn2.getDB("database").collection.watch([{$unset: "largePad"}], {
+        resumeAfter: resumeToken2
+    });
 
 // Resume the second change stream on the Recipient secondary.
 const recipientSecondaryCursor2 =
-    recipientSecondaryTenantConn2.getDB("database").collection.watch([], {
+    recipientSecondaryTenantConn2.getDB("database").collection.watch([{$unset: "largePad"}], {
         resumeAfter: resumeToken2,
     });
 
 [{_id: "tenant2_2", operationType: "insert"},
  {_id: "tenant2_in_transaction_1", operationType: "insert"},
  {_id: "tenant2_in_transaction_1", operationType: "update"},
+ {_id: "tenant2_in_transaction_2", operationType: "insert"},
+ {_id: "tenant2_in_transaction_2", operationType: "update"},
 ].forEach(expectedEvent => {
     [recipientPrimaryCursor2, recipientSecondaryCursor2].forEach(cursor => {
         assert.soon(() => cursor.hasNext());
