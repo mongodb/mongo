@@ -497,6 +497,81 @@ AggregateCommandRequest createInitPlacementHistoryAggregationRequest(
     return pipeline.buildAsAggregateCommandRequest();
 }
 
+void setInitializationTimeOnPlacementHistory(
+    OperationContext* opCtx,
+    Timestamp initializationTime,
+    std::vector<ShardId> placementResponseForPreInitQueries) {
+    /*
+     * The initialization metadata of config.placementHistory is composed by two special docs,
+     * identified by kConfigsvrPlacementHistoryFcvMarkerNamespace:
+     * - initializationTimeInfo: contains the time of the initialization and an empty set of shards.
+     *   It will allow ShardingCatalogClient to serve accurate responses to historical placement
+     *   queries within the [initializationTime, +inf) range.
+     * - approximatedPlacementForPreInitQueries:  contains the cluster topology at the time of the
+     *   initialization and is marked with Timestamp(0,1).
+     *   It will be used by ShardingCatalogClient to serve approximated responses to historical
+     *   placement queries within the [-inf, initializationTime) range.
+     */
+    NamespacePlacementType initializationTimeInfo;
+    initializationTimeInfo.setNss(NamespaceString::kConfigsvrPlacementHistoryFcvMarkerNamespace);
+    initializationTimeInfo.setTimestamp(initializationTime);
+    initializationTimeInfo.setShards({});
+
+    NamespacePlacementType approximatedPlacementForPreInitQueries;
+    approximatedPlacementForPreInitQueries.setNss(
+        NamespaceString::kConfigsvrPlacementHistoryFcvMarkerNamespace);
+    approximatedPlacementForPreInitQueries.setTimestamp(Timestamp(0, 1));
+    approximatedPlacementForPreInitQueries.setShards(placementResponseForPreInitQueries);
+
+    auto transactionChain = [initializationTimeInfo = std::move(initializationTimeInfo),
+                             approximatedPlacementForPreInitQueries =
+                                 std::move(approximatedPlacementForPreInitQueries)](
+                                const txn_api::TransactionClient& txnClient,
+                                ExecutorPtr txnExec) -> SemiFuture<void> {
+        // Delete the current initialization metadata
+        write_ops::DeleteCommandRequest deleteRequest(
+            NamespaceString::kConfigsvrPlacementHistoryNamespace);
+        write_ops::DeleteOpEntry entryDelMarker;
+        entryDelMarker.setQ(
+            BSON(NamespacePlacementType::kNssFieldName
+                 << NamespaceString::kConfigsvrPlacementHistoryFcvMarkerNamespace.ns()));
+        entryDelMarker.setMulti(true);
+        deleteRequest.setDeletes({entryDelMarker});
+
+        return txnClient.runCRUDOp(deleteRequest, {})
+            .thenRunOn(txnExec)
+            .then([&](const BatchedCommandResponse& _) {
+                // Insert the new initialization metadata
+                write_ops::InsertCommandRequest insertMarkerRequest(
+                    NamespaceString::kConfigsvrPlacementHistoryNamespace);
+                insertMarkerRequest.setDocuments({initializationTimeInfo.toBSON(),
+                                                  approximatedPlacementForPreInitQueries.toBSON()});
+                return txnClient.runCRUDOp(insertMarkerRequest, {});
+            })
+            .thenRunOn(txnExec)
+            .then([&](const BatchedCommandResponse& _) { return; })
+            .semi();
+    };
+
+    WriteConcernOptions originalWC = opCtx->getWriteConcern();
+    opCtx->setWriteConcern(WriteConcernOptions{WriteConcernOptions::kMajority,
+                                               WriteConcernOptions::SyncMode::UNSET,
+                                               WriteConcernOptions::kNoTimeout});
+
+    ScopeGuard resetWriteConcerGuard([opCtx, &originalWC] { opCtx->setWriteConcern(originalWC); });
+
+    auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
+    auto sleepInlineExecutor = inlineExecutor->getSleepableExecutor(
+        Grid::get(opCtx)->getExecutorPool()->getFixedExecutor());
+
+    txn_api::SyncTransactionWithRetries txn(
+        opCtx, sleepInlineExecutor, nullptr /* resourceYielder */, inlineExecutor);
+    txn.run(opCtx, transactionChain);
+
+    LOGV2(7068807,
+          "Initialization metadata of placement.history have been updated",
+          "initializationTime"_attr = initializationTime);
+}
 }  // namespace
 
 void ShardingCatalogManager::create(ServiceContext* serviceContext,
@@ -567,7 +642,6 @@ void ShardingCatalogManager::startup() {
 
 void ShardingCatalogManager::shutDown() {
     Grid::get(_serviceContext)->setCustomConnectionPoolStatsFn(nullptr);
-
     _executorForAddShard->shutdown();
     _executorForAddShard->join();
 }
@@ -1169,7 +1243,6 @@ void ShardingCatalogManager::withTransaction(
     }
 }
 
-
 void ShardingCatalogManager::initializePlacementHistory(OperationContext* opCtx) {
     /**
      * This function will establish an initialization time to collect a consistent description of
@@ -1245,66 +1318,116 @@ void ShardingCatalogManager::initializePlacementHistory(OperationContext* opCtx)
     }
 
     /*
-     * config.placementHistory has now a full representation of the cluster at initializationTime,
-     * while earlier points in time have no consistent placement data persisted.
-     *
-     * As a final step, two extra "metadata documents" (identified by
-     * kConfigsvrPlacementHistoryFcvMarkerNamespace) are inserted to describe the operation
-     * boundaries of config.placementHistory:
-     * - initializationTimeInfo: contains the time of the initialization and an empty set of shards.
-     *   It will allow ShardingCatalogClient to serve accurate responses to historical placement
-     *   queries within the [initializationTime, +inf) range.
-     * - approximatedPlacementData: contains the cluster topology at the time of the
-     *   initialization and is marked with Timestamp(0,1).
-     *   It will be used by ShardingCatalogClient to serve approximated responses to historical
-     *   placement queries within the [-inf, initializationTime) range.
+     * config.placementHistory has now a full representation of the cluster at initializationTime.
+     * As a final step, persist also the initialization metadata so that the whole content may be
+     * consistently queried.
      */
-    auto transactionChain = [initializationTime,
-                             shardsAtInitializationTime = std::move(shardsAtInitializationTime)](
-                                const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
-        NamespacePlacementType approximatedPlacementData(
-            NamespaceString::kConfigsvrPlacementHistoryFcvMarkerNamespace,
-            Timestamp(0, 1),
-            std::move(shardsAtInitializationTime));
-        NamespacePlacementType initializationTimeInfo(
-            NamespaceString::kConfigsvrPlacementHistoryFcvMarkerNamespace, initializationTime, {});
-        write_ops::UpdateCommandRequest upsertInitializationMetadata(
-            NamespaceString::kConfigsvrPlacementHistoryNamespace);
-        auto buildOpEntryFor = [](const NamespacePlacementType& descriptor) {
-            write_ops::UpdateOpEntry entry;
-            entry.setUpsert(true);
-            entry.setQ(BSON(NamespacePlacementType::kNssFieldName
-                            << descriptor.getNss().ns()
-                            << NamespacePlacementType::kTimestampFieldName
-                            << descriptor.getTimestamp()));
-            entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(descriptor.toBSON()));
-            return entry;
-        };
+    setInitializationTimeOnPlacementHistory(
+        opCtx, initializationTime, std::move(shardsAtInitializationTime));
+}
 
-        upsertInitializationMetadata.setUpdates(
-            {buildOpEntryFor(approximatedPlacementData), buildOpEntryFor(initializationTimeInfo)});
-        return txnClient.runCRUDOp(upsertInitializationMetadata, {} /*stmtIds*/)
-            .thenRunOn(txnExec)
-            .then([&](const BatchedCommandResponse& insertPlacementEntryResponse) {
-                uassertStatusOK(insertPlacementEntryResponse.toStatus());
-            })
-            .semi();
+void ShardingCatalogManager::cleanUpPlacementHistory(OperationContext* opCtx,
+                                                     const Timestamp& earliestClusterTime) {
+    LOGV2(
+        7068803, "Cleaning up placement history", "earliestClusterTime"_attr = earliestClusterTime);
+    /*
+     * The method implements the following optimistic approach for data cleanup:
+     * 1. Set earliestOpTime as the new initialization time of config.placementHistory;
+     this will have the effect of hiding older(deletable) documents when the collection is queried
+     by the ShardingCatalogClient.*/
+    auto allShardIds = [&] {
+        const auto clusterPlacementAtEarliestClusterTime =
+            _localCatalogClient->getShardsThatOwnDataAtClusterTime(opCtx, earliestClusterTime);
+        return clusterPlacementAtEarliestClusterTime.getShards();
+    }();
+
+    setInitializationTimeOnPlacementHistory(opCtx, earliestClusterTime, std::move(allShardIds));
+
+    /*
+     * 2. Build up and execute the delete request to remove the disposable documents. This
+     * operation is not atomic and it may be interrupted by a stepdown event, but we rely on the
+     * fact that the cleanup is periodically invoked to ensure that the content in excess will be
+     *    eventually deleted.
+     *
+     * 2.1 For each namespace represented in config.placementHistory, collect the timestamp of its
+     *     most recent placement doc (initialization markers are not part of the output).
+     *
+     *     config.placementHistory.aggregate([
+     *      {
+     *          $group : {
+     *              _id : "$nss",
+     *              mostRecentTimestamp: {$max : "$timestamp"},
+     *          }
+     *      },
+     *      {
+     *          $match : {
+     *              _id : { $ne : "kConfigsvrPlacementHistoryFcvMarkerNamespace"}
+     *          }
+     *      }
+     *  ])
+     */
+    auto pipeline = PipelineBuilder(opCtx,
+                                    NamespaceString::kConfigsvrPlacementHistoryNamespace,
+                                    {NamespaceString::kConfigsvrPlacementHistoryNamespace});
+
+    pipeline.addStage<DocumentSourceGroup>(
+        BSON("_id"
+             << "$" + NamespacePlacementType::kNssFieldName << "mostRecentTimestamp"
+             << BSON("$max"
+                     << "$" + NamespacePlacementType::kTimestampFieldName)));
+    pipeline.addStage<DocumentSourceMatch>(
+        BSON("_id" << BSON(
+                 "$ne" << NamespaceString::kConfigsvrPlacementHistoryFcvMarkerNamespace.ns())));
+
+    auto aggRequest = pipeline.buildAsAggregateCommandRequest();
+
+    repl::ReadConcernArgs readConcernArgs(repl::ReadConcernLevel::kMajorityReadConcern);
+    aggRequest.setReadConcern(readConcernArgs.toBSONInner());
+
+    /*
+     * 2.2 For each namespace found, compose a delete statement.
+     */
+    std::vector<write_ops::DeleteOpEntry> deleteStatements;
+    auto callback = [&deleteStatements,
+                     &earliestClusterTime](const std::vector<BSONObj>& batch,
+                                           const boost::optional<BSONObj>& postBatchResumeToken) {
+        for (const auto& obj : batch) {
+            const auto nss = NamespaceString(obj["_id"].String());
+            const auto timeOfMostRecentDoc = obj["mostRecentTimestamp"].timestamp();
+            write_ops::DeleteOpEntry stmt;
+
+            const auto minTimeToPreserve = std::min(timeOfMostRecentDoc, earliestClusterTime);
+            stmt.setQ(BSON(NamespacePlacementType::kNssFieldName
+                           << nss.ns() << NamespacePlacementType::kTimestampFieldName
+                           << BSON("$lt" << minTimeToPreserve)));
+            stmt.setMulti(true);
+            deleteStatements.emplace_back(std::move(stmt));
+        }
+        return true;
     };
 
-    WriteConcernOptions originalWC = opCtx->getWriteConcern();
-    opCtx->setWriteConcern(WriteConcernOptions{WriteConcernOptions::kMajority,
-                                               WriteConcernOptions::SyncMode::UNSET,
-                                               WriteConcernOptions::kNoTimeout});
+    uassertStatusOK(_localConfigShard->runAggregation(opCtx, aggRequest, callback));
 
-    ScopeGuard resetWriteConcerGuard([opCtx, &originalWC] { opCtx->setWriteConcern(originalWC); });
+    LOGV2_DEBUG(7068806,
+                2,
+                "Cleaning up placement history - about to clean entries",
+                "timestamp"_attr = earliestClusterTime,
+                "numNssToClean"_attr = deleteStatements.size());
 
-    auto& executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
-    auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
-    auto sleepInlineExecutor = inlineExecutor->getSleepableExecutor(executor);
+    /*
+     * Send the delete request.
+     */
+    write_ops::DeleteCommandRequest deleteRequest(
+        NamespaceString::kConfigsvrPlacementHistoryNamespace);
+    deleteRequest.setDeletes(std::move(deleteStatements));
+    uassertStatusOK(_localConfigShard->runCommandWithFixedRetryAttempts(
+        opCtx,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        NamespaceString::kConfigsvrPlacementHistoryNamespace.db().toString(),
+        deleteRequest.toBSON({}),
+        Shard::RetryPolicy::kIdempotent));
 
-    txn_api::SyncTransactionWithRetries txn(
-        opCtx, sleepInlineExecutor, nullptr /*resourceYielder*/, inlineExecutor);
-    txn.run(opCtx, transactionChain);
+    LOGV2_DEBUG(7068808, 2, "Cleaning up placement history - done deleting entries");
 }
 
 void ShardingCatalogManager::_performLocalNoopWriteWithWAllWriteConcern(OperationContext* opCtx,

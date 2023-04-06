@@ -381,6 +381,7 @@ env.Library(
         'balancer/cluster_statistics_impl.cpp',
         'balancer/cluster_statistics.cpp',
         'config/initial_split_policy.cpp',
+        'config/placement_history_cleaner.cpp',
         'config/sharding_catalog_manager_chunk_operations.cpp',
         'config/sharding_catalog_manager_collection_operations.cpp',
         'config/sharding_catalog_manager_database_operations.cpp',

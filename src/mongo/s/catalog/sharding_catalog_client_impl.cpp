@@ -1513,10 +1513,10 @@ HistoricalPlacement ShardingCatalogClientImpl::getHistoricalPlacement(
             !gFeatureFlagCatalogShard.isEnabledAndIgnoreFCVUnsafe()) {
             // When the feature flag is on, the config server may read from a secondary which may
             // need to wait for replication, so we should use afterClusterTime.
-            return {repl::ReadConcernLevel::kMajorityReadConcern};
+            return {repl::ReadConcernLevel::kSnapshotReadConcern};
         } else {
-            const auto time = VectorClock::get(opCtx)->getTime();
-            return {time.configTime(), repl::ReadConcernLevel::kMajorityReadConcern};
+            const auto vcTime = VectorClock::get(opCtx)->getTime();
+            return {vcTime.configTime(), repl::ReadConcernLevel::kSnapshotReadConcern};
         }
     }();
 

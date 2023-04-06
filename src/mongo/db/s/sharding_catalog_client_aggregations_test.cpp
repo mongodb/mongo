@@ -30,8 +30,16 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/read_write_concern_defaults.h"
+#include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
+#include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
+#include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/transaction_coordinator_service.h"
+#include "mongo/db/session/logical_session_cache_noop.h"
+#include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_namespace_placement_gen.h"
@@ -55,6 +63,29 @@ public:
         std::string ns;
         std::vector<std::string> shardsIds;
     };
+
+    void setUp() override {
+        ConfigServerTestFixture::setUp();
+
+        DBDirectClient client(operationContext());
+        client.createCollection(NamespaceString::kSessionTransactionsTableNamespace);
+        client.createIndexes(NamespaceString::kSessionTransactionsTableNamespace,
+                             {MongoDSessionCatalog::getConfigTxnPartialIndexSpec()});
+
+        ReadWriteConcernDefaults::create(getServiceContext(), _lookupMock.getFetchDefaultsFn());
+
+        LogicalSessionCache::set(getServiceContext(), std::make_unique<LogicalSessionCacheNoop>());
+        TransactionCoordinatorService::get(operationContext())
+            ->onShardingInitialization(operationContext(), true);
+
+        WaitForMajorityService::get(getServiceContext()).startup(getServiceContext());
+    }
+
+    void tearDown() override {
+        TransactionCoordinatorService::get(operationContext())->onStepDown();
+        WaitForMajorityService::get(getServiceContext()).shutDown();
+        ConfigServerTestFixture::tearDown();
+    }
 
     /* Generate and insert the entries into the config.shards collection */
     void setupConfigShard(OperationContext* opCtx, int nShards) {
@@ -124,10 +155,14 @@ private:
 
         return configShardData;
     }
+
+    // Allows the usage of transactions.
+    ReadWriteConcernDefaultsLookupMock _lookupMock;
+
 };  // CatalogClientAggregationsTest
 
 void assertSameHistoricalPlacement(HistoricalPlacement historicalPlacement,
-                                   std::vector<std::string>&& expectedSet,
+                                   std::vector<std::string> expectedSet,
                                    bool expectedIsExact = true) {
     auto retrievedSet = historicalPlacement.getShards();
     ASSERT_EQ(retrievedSet.size(), expectedSet.size());
@@ -1008,6 +1043,10 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataAtClusterTime_RegexSta
 TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataAtClusterTime_EmptyHistory) {
     RAIIServerParameterControllerForTest featureFlagHistoricalPlacementShardingCatalog{
         "featureFlagHistoricalPlacementShardingCatalog", true};
+    // Setup a shard to perform a write into the config DB and initialize a committed OpTime
+    // (required to perform a snapshot read of the placementHistory).
+    setupShards({ShardType("shardName", "host01")});
+
     // Quering an empty placementHistory must return an empty vector
     auto opCtx = operationContext();
 
@@ -1063,6 +1102,136 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataAtClusterTime_InvalidO
         ErrorCodes::InvalidOptions);
 }
 
+// ######################## PlacementHistory: Clean-up #####################
+TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataAtClusterTime_CleanUp) {
+    RAIIServerParameterControllerForTest featureFlagHistoricalPlacementShardingCatalog{
+        "featureFlagHistoricalPlacementShardingCatalog", true};
+
+    auto opCtx = operationContext();
+
+    // Insert the initial content
+    setupConfigPlacementHistory(
+        opCtx,
+        {
+            // One DB created before the time chosen for the cleanup
+            {Timestamp(1, 0), "db", {"shard4"}},
+            // One collection with entries before and after the chosen time of the cleanup
+            {Timestamp(10, 0), "db.collection1", {"shard1"}},
+            {Timestamp(20, 0), "db.collection1", {"shard2", "shard3", "shard4"}},
+            // One collection with multiple entries before the chosen time of the cleanup
+            {Timestamp(11, 0), "db.collection2", {"shard2"}},
+            {Timestamp(19, 0), "db.collection2", {"shard1", "shard4"}},
+        });
+
+    setupConfigShard(opCtx, 5 /*nShards*/);
+
+    // Define the the earliest cluster time that needs to be preserved, then run the cleanup.
+    const auto earliestClusterTime = Timestamp(20, 0);
+    ShardingCatalogManager::get(opCtx)->cleanUpPlacementHistory(opCtx, earliestClusterTime);
+
+    // Verify the behaviour of the API after the cleanup.
+    // - Any query referencing a time >= earliestClusterTime is expected to return accurate data
+    // based on the content inserted during the setup.
+    // - Any query referencing a time < earliestClusterTime is expected to be answered with an
+    // approximated value.
+    const std::vector<std::string> approximatedPlacement{"shard1", "shard2", "shard3", "shard4"};
+
+    // db
+    assertSameHistoricalPlacement(
+        catalogClient()->getShardsThatOwnDataForDbAtClusterTime(
+            opCtx, NamespaceString::createNamespaceString_forTest("db"), earliestClusterTime),
+        {"shard1", "shard2", "shard3", "shard4"});
+    assertSameHistoricalPlacement(
+        catalogClient()->getShardsThatOwnDataForDbAtClusterTime(
+            opCtx, NamespaceString::createNamespaceString_forTest("db"), earliestClusterTime - 1),
+        approximatedPlacement,
+        false /* expectedIsExact*/);
+
+    // db.collection1
+    assertSameHistoricalPlacement(
+        catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
+            opCtx,
+            NamespaceString::createNamespaceString_forTest("db.collection1"),
+            earliestClusterTime),
+        {"shard2", "shard3", "shard4"});
+    assertSameHistoricalPlacement(
+        catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
+            opCtx,
+            NamespaceString::createNamespaceString_forTest("db.collection1"),
+            earliestClusterTime - 1),
+        approximatedPlacement,
+        false /* expectedIsExact*/);
+
+    // db.collection2
+    assertSameHistoricalPlacement(
+        catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
+            opCtx,
+            NamespaceString::createNamespaceString_forTest("db.collection2"),
+            earliestClusterTime),
+        {"shard1", "shard4"});
+    assertSameHistoricalPlacement(
+        catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
+            opCtx,
+            NamespaceString::createNamespaceString_forTest("db.collection2"),
+            Timestamp(11, 0)),
+        approximatedPlacement,
+        false /* expectedIsExact*/);
+
+    // Whole cluster
+    assertSameHistoricalPlacement(
+        catalogClient()->getShardsThatOwnDataAtClusterTime(opCtx, earliestClusterTime),
+        {"shard1", "shard2", "shard3", "shard4"});
+    assertSameHistoricalPlacement(
+        catalogClient()->getShardsThatOwnDataAtClusterTime(opCtx, Timestamp(11, 0)),
+        approximatedPlacement,
+        false /* expectedIsExact*/);
+}
+
+TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataAtClusterTime_CleanUp_NewMarkers) {
+    RAIIServerParameterControllerForTest featureFlagHistoricalPlacementShardingCatalog{
+        "featureFlagHistoricalPlacementShardingCatalog", true};
+
+    auto opCtx = operationContext();
+    PlacementDescriptor startFcvMarker = {
+        Timestamp(1, 0),
+        NamespaceString::kConfigsvrPlacementHistoryFcvMarkerNamespace.ns(),
+        {"shard1", "shard2", "shard3", "shard4"}};
+    PlacementDescriptor endFcvMarker = {
+        Timestamp(3, 0), NamespaceString::kConfigsvrPlacementHistoryFcvMarkerNamespace.ns(), {}};
+
+    // initialization
+    setupConfigPlacementHistory(
+        opCtx,
+        {startFcvMarker,
+         endFcvMarker,
+         {Timestamp(10, 0), "db2", {"shard1"}},
+         {Timestamp(10, 0), "db.collection2", {"shard1", "shard2"}},
+         {Timestamp(10, 0), "db.collection1", {"shard1", "shard2"}},
+         {Timestamp(30, 0), "db.collection1", {"shard1", "shard2", "shard3"}}});
+
+    setupConfigShard(opCtx, 3 /*nShards*/);
+
+    // Initialization markers are replaced at the earliestClusterTime
+    const auto earliestClusterTime = Timestamp(20, 0);
+    auto historicalPlacement_coll1 = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
+        opCtx,
+        NamespaceString::createNamespaceString_forTest("db.collection1"),
+        earliestClusterTime - 1);
+
+    ShardingCatalogManager::get(opCtx)->cleanUpPlacementHistory(opCtx, earliestClusterTime);
+
+    auto historicalPlacement_cleanup_coll1 =
+        catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
+            opCtx,
+            NamespaceString::createNamespaceString_forTest("db.collection1"),
+            earliestClusterTime - 1);
+
+    // before cleanup
+    assertSameHistoricalPlacement(historicalPlacement_coll1, {"shard1", "shard2"}, true /*exact*/);
+    // after cleanup
+    assertSameHistoricalPlacement(
+        historicalPlacement_cleanup_coll1, {"shard1", "shard2"}, false /*exact*/);
+}
 
 // ############################# Indexes #############################
 TEST_F(CatalogClientAggregationsTest, TestCollectionAndIndexesAggregationWithNoIndexes) {

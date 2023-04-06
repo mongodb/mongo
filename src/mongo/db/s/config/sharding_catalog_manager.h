@@ -598,6 +598,13 @@ public:
      */
     static Timestamp getOldestTimestampSupportedForSnapshotHistory(OperationContext* opCtx);
 
+    /**
+     * Removes from config.placementHistory any document that is no longer needed to describe
+     * the data distribution of the cluster from earliestClusterTime onwards (and updates the
+     * related initialization metadata).
+     **/
+    void cleanUpPlacementHistory(OperationContext* opCtx, const Timestamp& earliestClusterTime);
+
 private:
     /**
      * Performs the necessary checks for version compatibility and creates a new config.version
