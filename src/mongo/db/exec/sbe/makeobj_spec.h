@@ -29,72 +29,67 @@
 
 #pragma once
 
+#include <vector>
+
 #include "mongo/db/exec/sbe/makeobj_enums.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/util/indexed_string_vector.h"
 
-namespace mongo::sbe::value {
+namespace mongo::sbe {
 /**
- * MakeObjSpec is a wrapper around a FieldBehavior value, a list of fields, a list of projected
- * fields, and a StringMap object.
+ * MakeObjSpec is a wrapper around a FieldBehavior value and a list of field names / project names.
  */
 struct MakeObjSpec {
     using FieldBehavior = MakeObjFieldBehavior;
+
+    static IndexedStringVector buildIndexedFieldVector(std::vector<std::string> fields,
+                                                       std::vector<std::string> projects);
 
     MakeObjSpec(FieldBehavior fieldBehavior,
                 std::vector<std::string> fields,
                 std::vector<std::string> projects)
         : fieldBehavior(fieldBehavior),
-          fields(std::move(fields)),
-          projects(std::move(projects)),
-          allFieldsMap(buildAllFieldsMap()),
-          bloomFilter(buildBloomFilter()) {}
+          numFields(fields.size()),
+          fieldsAndProjects(buildIndexedFieldVector(std::move(fields), std::move(projects))) {}
 
     MakeObjSpec(const MakeObjSpec& other)
         : fieldBehavior(other.fieldBehavior),
-          fields(other.fields),
-          projects(other.projects),
-          allFieldsMap(buildAllFieldsMap()),
-          bloomFilter(buildBloomFilter()) {}
+          numFields(other.numFields),
+          fieldsAndProjects(other.fieldsAndProjects) {}
 
     MakeObjSpec(MakeObjSpec&& other)
         : fieldBehavior(other.fieldBehavior),
-          fields(std::move(other.fields)),
-          projects(std::move(other.projects)),
-          allFieldsMap(buildAllFieldsMap()),
-          bloomFilter(buildBloomFilter()) {}
+          numFields(other.numFields),
+          fieldsAndProjects(std::move(other.fieldsAndProjects)) {}
 
-    StringDataMap<size_t> buildAllFieldsMap() const;
+    std::string toString() const {
+        StringBuilder builder;
+        builder << (fieldBehavior == MakeObjSpec::FieldBehavior::keep ? "keep" : "drop") << ", [";
 
-    std::array<uint8_t, 128> buildBloomFilter() const;
+        for (size_t i = 0; i < fieldsAndProjects.size(); ++i) {
+            if (i == numFields) {
+                builder << "], [";
+            } else if (i != 0) {
+                builder << ", ";
+            }
+
+            builder << '"' << fieldsAndProjects[i] << '"';
+        }
+
+        if (fieldsAndProjects.size() == numFields) {
+            builder << "], [";
+        }
+
+        builder << "]";
+
+        return builder.str();
+    }
 
     size_t getApproximateSize() const;
 
-    std::string toString() const;
-
-    inline static size_t getLowestNBits(size_t val, size_t n) {
-        return val & ((1u << n) - 1u);
-    }
-
-    // This function assumes that 'length' is not 0.
-    inline static size_t computeBloomIdx1(const char* name, size_t length) {
-        // The lowest 5 bits of 'name[length - 1]' and the lowest 2 bits of 'length' are good
-        // sources of entropy. Combine them to generate a pseudo-random index between 0 and 127
-        // inclusive.
-        return getLowestNBits(size_t(name[length - 1]) + (length << 5u), 7);
-    }
-
-    // This function assumes that 'length' is not 0.
-    inline static size_t computeBloomIdx2(const char* name, size_t length, size_t bloomIdx1) {
-        // The lowest 5 bits of 'name[0]' are a good source of entropy. Multiply 'name[0]' by 3
-        // and add 'bloomIdx1' to generate a pseudo-random index between 0 and 127 inclusive.
-        return getLowestNBits(size_t(name[0]) + (size_t(name[0]) << 1u) + bloomIdx1, 7);
-    }
-
-    const FieldBehavior fieldBehavior;
-    const std::vector<std::string> fields;
-    const std::vector<std::string> projects;
-    const StringDataMap<size_t> allFieldsMap;
-    const std::array<uint8_t, 128> bloomFilter;
+    FieldBehavior fieldBehavior;
+    size_t numFields = 0;
+    IndexedStringVector fieldsAndProjects;
 };
-}  // namespace mongo::sbe::value
+}  // namespace mongo::sbe

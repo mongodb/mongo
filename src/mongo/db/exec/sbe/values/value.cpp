@@ -33,9 +33,9 @@
 
 #include "mongo/base/compare_numbers.h"
 #include "mongo/db/exec/js_function.h"
+#include "mongo/db/exec/sbe/makeobj_spec.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/sbe/values/bson.h"
-#include "mongo/db/exec/sbe/values/makeobj_spec.h"
 #include "mongo/db/exec/sbe/values/sort_spec.h"
 #include "mongo/db/exec/sbe/values/value_builder.h"
 #include "mongo/db/exec/sbe/values/value_printer.h"
@@ -230,97 +230,6 @@ size_t SortSpec::getApproximateSize() const {
     size += _sortKeyGen.getApproximateSize();
     size += _sortPatternBson.isOwned() ? _sortPatternBson.objsize() : 0;
     return size;
-}
-
-size_t MakeObjSpec::getApproximateSize() const {
-    auto size = sizeof(MakeObjSpec);
-    size += size_estimator::estimate(fields);
-    size += size_estimator::estimate(projects);
-    size += size_estimator::estimate(allFieldsMap);
-    return size;
-}
-
-StringDataMap<size_t> MakeObjSpec::buildAllFieldsMap() const {
-    StringDataMap<size_t> m;
-
-    for (auto& p : fields) {
-        // Mark the values from 'fields' with 'std::numeric_limits<size_t>::max()'.
-        auto [it, inserted] = m.emplace(StringData(p), std::numeric_limits<size_t>::max());
-        tassert(7522900, str::stream() << "duplicate field: " << p, inserted);
-    }
-
-    for (size_t idx = 0; idx < projects.size(); ++idx) {
-        auto& p = projects[idx];
-        // Mark the values from 'projects' with their corresponding arg index.
-        auto [it, inserted] = m.emplace(StringData(p), idx);
-        tassert(7522901, str::stream() << "duplicate field: " << p, inserted);
-    }
-
-    return m;
-}
-
-std::array<uint8_t, 128> MakeObjSpec::buildBloomFilter() const {
-    // Initialize 'bf' to all zeros.
-    std::array<uint8_t, 128> bf = {{0}};
-
-    // If there are more than 64 strings in 'allFieldsMap', don't bother with the bloom filter.
-    if (allFieldsMap.size() > 64) {
-        return bf;
-    }
-
-    // Update 'bf[idx]' to store 'fieldIdx', or, in the case of a collision, '1'.
-    auto updateBloomSlot = [](std::array<uint8_t, 128>& bf, size_t idx, size_t fieldIdx) {
-        if (bf[idx] != uint8_t(fieldIdx)) {
-            bf[idx] = !bf[idx] ? uint8_t(fieldIdx) : uint8_t(1);
-        }
-    };
-
-    size_t fieldIdx = 2;
-
-    for (auto& p : fields) {
-        auto bloomIdx1 = computeBloomIdx1(p.data(), p.size());
-        auto bloomIdx2 = computeBloomIdx2(p.data(), p.size(), bloomIdx1);
-        updateBloomSlot(bf, bloomIdx1, fieldIdx);
-        updateBloomSlot(bf, bloomIdx2, fieldIdx);
-
-        ++fieldIdx;
-    }
-
-    for (size_t idx = 0; idx < projects.size(); ++idx) {
-        auto& p = projects[idx];
-
-        auto bloomIdx1 = computeBloomIdx1(p.data(), p.size());
-        auto bloomIdx2 = computeBloomIdx2(p.data(), p.size(), bloomIdx1);
-        updateBloomSlot(bf, bloomIdx1, fieldIdx);
-        updateBloomSlot(bf, bloomIdx2, fieldIdx);
-
-        ++fieldIdx;
-    }
-
-    return bf;
-}
-
-std::string MakeObjSpec::toString() const {
-    StringBuilder builder;
-    builder << (fieldBehavior == MakeObjSpec::FieldBehavior::keep ? "keep" : "drop") << ", [";
-
-    for (size_t i = 0; i < fields.size(); ++i) {
-        if (i != 0) {
-            builder << ", ";
-        }
-        builder << '"' << fields[i] << '"';
-    }
-    builder << "], [";
-
-    for (size_t i = 0; i < projects.size(); ++i) {
-        if (i != 0) {
-            builder << ", ";
-        }
-        builder << '"' << projects[i] << '"';
-    }
-    builder << "]";
-
-    return builder.str();
 }
 
 std::pair<TypeTags, Value> makeCopyJsFunction(const JsFunction& jsFunction) {

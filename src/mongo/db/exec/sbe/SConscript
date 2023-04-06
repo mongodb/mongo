@@ -29,6 +29,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/datetime/date_time_support',
         '$BUILD_DIR/mongo/db/query/query_index_bounds',
         '$BUILD_DIR/mongo/db/storage/key_string',
+        '$BUILD_DIR/mongo/util/indexed_string_vector',
         '$BUILD_DIR/mongo/util/pcre_util',
     ],
 )
@@ -41,6 +42,7 @@ sbeEnv.Library(
         'expressions/compile_ctx.cpp',
         'expressions/expression.cpp',
         'expressions/runtime_environment.cpp',
+        'makeobj_spec.cpp',
         'size_estimator.cpp',
         'util/debug_print.cpp',
         'util/spilling.cpp',

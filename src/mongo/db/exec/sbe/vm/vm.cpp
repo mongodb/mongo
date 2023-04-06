@@ -42,10 +42,10 @@
 #include "mongo/db/client.h"
 #include "mongo/db/exec/js_function.h"
 #include "mongo/db/exec/sbe/accumulator_sum_value_enum.h"
+#include "mongo/db/exec/sbe/makeobj_spec.h"
 #include "mongo/db/exec/sbe/values/arith_common.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/columnar.h"
-#include "mongo/db/exec/sbe/values/makeobj_spec.h"
 #include "mongo/db/exec/sbe/values/sbe_pattern_value_cmp.h"
 #include "mongo/db/exec/sbe/values/sort_spec.h"
 #include "mongo/db/exec/sbe/values/util.h"
@@ -5286,83 +5286,20 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSortKeyComponent
     return {false, outTag, outVal};
 }
 
-std::pair<value::TypeTags, value::Value> ByteCode::produceBsonObject(const value::MakeObjSpec* mos,
+std::pair<value::TypeTags, value::Value> ByteCode::produceBsonObject(const MakeObjSpec* mos,
                                                                      value::TypeTags rootTag,
                                                                      value::Value rootVal,
                                                                      const size_t startIdx) {
-    auto& allFieldsMap = mos->allFieldsMap;
     auto& fieldBehavior = mos->fieldBehavior;
-    auto& fields = mos->fields;
-    auto& projects = mos->projects;
+    auto& fieldsAndProjects = mos->fieldsAndProjects;
+    auto numFields = mos->numFields;
 
-    const bool isInclusion = fieldBehavior == value::MakeObjSpec::FieldBehavior::keep;
-
-    auto isFieldProjectedOrRestricted = [&](StringData sv) {
-        // If 'bloomFilter' is initialized, check to see if it can answer our query.
-        if (allFieldsMap.size() <= 64) {
-            size_t bloomIdx = mos->computeBloomIdx1(sv.rawData(), sv.size());
-            size_t fieldIdx = mos->bloomFilter[bloomIdx];
-            size_t k = 0;
-
-            for (;; ++k) {
-                if (MONGO_likely(fieldIdx >= 2)) {
-                    // If fieldIdx >= 2, that means that we may have a match. If 'sv' matches a
-                    // string in 'fields', then we return '!isInclusion' (because if isInclusion is
-                    // true then the field is not restricted or projected, and if isInclusion is
-                    // false then the field is restricted). If 'sv' matches a string in 'projects',
-                    // we return 'true' (because the field is projected).
-                    //
-                    // If 'sv' doesn't match any of the strings in 'fields' or 'projects', then we
-                    // return 'isInclusion' (because if isInclusion is true then the field is
-                    // restricted, and if isInclusion is false then the field not restricted or
-                    // projected).
-                    auto singleName = (fieldIdx - 2 >= mos->fields.size())
-                        ? StringData(mos->projects[fieldIdx - 2 - mos->fields.size()])
-                        : StringData(mos->fields[fieldIdx - 2]);
-
-                    return sv == singleName ? (!isInclusion || fieldIdx - 2 >= mos->fields.size())
-                                            : isInclusion;
-                } else if (MONGO_likely(fieldIdx == 0)) {
-                    // If fieldIdx == 0, then we can deduce that 'sv' is not present in either
-                    // vector and we return 'isInclusion'.
-                    return isInclusion;
-                }
-
-                // If fieldIdx == 1, then we can't determine if 'sv' is present in either vector.
-                if (k == 0) {
-                    // If this was our first attempt, try again using computeBloomIdx2().
-                    bloomIdx = mos->computeBloomIdx2(sv.rawData(), sv.size(), bloomIdx);
-                    fieldIdx = mos->bloomFilter[bloomIdx];
-                } else {
-                    // After two attempts, give up and search for 'sv' in 'allFieldsMap'.
-                    break;
-                }
-            }
-        }
-
-        auto key = StringMapHasher{}.hashed_key(sv);
-
-        bool foundKey = false;
-        bool projected = false;
-        bool restricted = false;
-
-        if (auto it = allFieldsMap.find(key); it != allFieldsMap.end()) {
-            foundKey = true;
-            projected = it->second != std::numeric_limits<size_t>::max();
-            restricted = !isInclusion;
-        }
-
-        if (!foundKey) {
-            restricted = isInclusion;
-        }
-
-        return projected || restricted;
-    };
+    const bool isInclusion = fieldBehavior == MakeObjSpec::FieldBehavior::keep;
 
     UniqueBSONObjBuilder bob;
 
     if (value::isObject(rootTag)) {
-        size_t nFieldsIfInclusion = fields.size();
+        size_t nFieldsIfInclusion = numFields;
 
         if (rootTag == value::TypeTags::bsonObject) {
             if (!(nFieldsIfInclusion == 0 && isInclusion)) {
@@ -5375,7 +5312,17 @@ std::pair<value::TypeTags, value::Value> ByteCode::produceBsonObject(const value
                     auto sv = bson::fieldNameAndLength(be);
                     auto nextBe = bson::advance(be, sv.size());
 
-                    if (!isFieldProjectedOrRestricted(sv)) {
+                    bool isProjectedOrRestricted;
+                    size_t pos = fieldsAndProjects.findPos(sv);
+                    if (pos == IndexedStringVector::npos) {
+                        isProjectedOrRestricted = isInclusion;
+                    } else if (pos < numFields) {
+                        isProjectedOrRestricted = !isInclusion;
+                    } else {
+                        isProjectedOrRestricted = true;
+                    }
+
+                    if (!isProjectedOrRestricted) {
                         bob.append(BSONElement(be, sv.size() + 1, nextBe - be));
                         --nFieldsIfInclusion;
                     }
@@ -5393,7 +5340,17 @@ std::pair<value::TypeTags, value::Value> ByteCode::produceBsonObject(const value
                 for (size_t idx = 0; idx < objRoot->size(); ++idx) {
                     auto sv = StringData(objRoot->field(idx));
 
-                    if (!isFieldProjectedOrRestricted(sv)) {
+                    bool isProjectedOrRestricted;
+                    size_t pos = fieldsAndProjects.findPos(sv);
+                    if (pos == IndexedStringVector::npos) {
+                        isProjectedOrRestricted = isInclusion;
+                    } else if (pos < numFields) {
+                        isProjectedOrRestricted = !isInclusion;
+                    } else {
+                        isProjectedOrRestricted = true;
+                    }
+
+                    if (!isProjectedOrRestricted) {
                         auto [tag, val] = objRoot->getAt(idx);
                         bson::appendValueToBsonObj(bob, objRoot->field(idx), tag, val);
                         --nFieldsIfInclusion;
@@ -5407,10 +5364,10 @@ std::pair<value::TypeTags, value::Value> ByteCode::produceBsonObject(const value
         }
     }
 
-    for (size_t idx = 0; idx < projects.size(); ++idx) {
-        auto argIdx = startIdx + idx;
+    for (size_t idx = numFields; idx < fieldsAndProjects.size(); ++idx) {
+        auto argIdx = startIdx + (idx - numFields);
         auto [_, tag, val] = getFromStack(argIdx);
-        bson::appendValueToBsonObj(bob, projects[idx], tag, val);
+        bson::appendValueToBsonObj(bob, fieldsAndProjects[idx], tag, val);
     }
 
     bob.doneFast();

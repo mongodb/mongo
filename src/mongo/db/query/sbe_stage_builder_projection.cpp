@@ -32,6 +32,7 @@
 #include "mongo/db/query/sbe_stage_builder_projection.h"
 
 #include "mongo/base/exact_cast.h"
+#include "mongo/db/exec/sbe/makeobj_spec.h"
 #include "mongo/db/exec/sbe/stages/branch.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
 #include "mongo/db/exec/sbe/stages/filter.h"
@@ -42,7 +43,6 @@
 #include "mongo/db/exec/sbe/stages/traverse.h"
 #include "mongo/db/exec/sbe/stages/union.h"
 #include "mongo/db/exec/sbe/values/bson.h"
-#include "mongo/db/exec/sbe/values/makeobj_spec.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/query/sbe_stage_builder.h"
 #include "mongo/db/query/sbe_stage_builder_expression.h"
@@ -371,8 +371,8 @@ public:
         const bool isInclusion = _context->projectType == projection_ast::ProjectType::kInclusion;
 
         auto [fieldBehavior, fieldVector] = isInclusion
-            ? std::make_pair(sbe::value::MakeObjSpec::FieldBehavior::keep, std::move(keepFields))
-            : std::make_pair(sbe::value::MakeObjSpec::FieldBehavior::drop, std::move(dropFields));
+            ? std::make_pair(sbe::MakeObjSpec::FieldBehavior::keep, std::move(keepFields))
+            : std::make_pair(sbe::MakeObjSpec::FieldBehavior::drop, std::move(dropFields));
 
         auto lambdaFrame = _context->topLevel().lambdaFrame;
         tassert(6897005, "Expected lambda frame to be set", lambdaFrame);
@@ -390,10 +390,10 @@ public:
             _context->topLevel().subtreeContainsComputedField || containsComputedField;
 
         // Create a makeBsonObj() expression to generate the document for the current nested level.
-        auto makeObjSpecExpr = makeConstant(
-            sbe::value::TypeTags::makeObjSpec,
-            sbe::value::bitcastFrom<sbe::value::MakeObjSpec*>(new sbe::value::MakeObjSpec(
-                fieldBehavior, std::move(fieldVector), std::move(projectFields))));
+        auto makeObjSpecExpr =
+            makeConstant(sbe::value::TypeTags::makeObjSpec,
+                         sbe::value::bitcastFrom<sbe::MakeObjSpec*>(new sbe::MakeObjSpec(
+                             fieldBehavior, std::move(fieldVector), std::move(projectFields))));
 
         auto args = sbe::makeEs(std::move(makeObjSpecExpr), childInputExpr->clone());
         for (auto& expr : projectExprs) {
@@ -532,11 +532,11 @@ public:
         // Create a makeBsonObj() expression to generate the document for the current nested level.
         // Note that 'dropFields' is empty, so this call to makeBsonObj() will drop no fields and
         // append the computed 'projectFields'.
-        auto fieldBehavior = sbe::value::MakeObjSpec::FieldBehavior::drop;
-        auto makeObjSpecExpr = makeConstant(
-            sbe::value::TypeTags::makeObjSpec,
-            sbe::value::bitcastFrom<sbe::value::MakeObjSpec*>(new sbe::value::MakeObjSpec(
-                fieldBehavior, std::move(dropFields), std::move(projectFields))));
+        auto fieldBehavior = sbe::MakeObjSpec::FieldBehavior::drop;
+        auto makeObjSpecExpr =
+            makeConstant(sbe::value::TypeTags::makeObjSpec,
+                         sbe::value::bitcastFrom<sbe::MakeObjSpec*>(new sbe::MakeObjSpec(
+                             fieldBehavior, std::move(dropFields), std::move(projectFields))));
 
         auto args = sbe::makeEs(std::move(makeObjSpecExpr), childInputExpr->clone());
         for (auto& expr : projectExprs) {

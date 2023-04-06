@@ -28,7 +28,7 @@
  */
 #include <algorithm>
 
-#include "mongo/db/exec/sbe/values/makeobj_spec.h"
+#include "mongo/db/exec/sbe/makeobj_spec.h"
 #include "mongo/db/exec/sbe/values/sort_spec.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/values/value_printer.h"

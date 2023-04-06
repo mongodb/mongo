@@ -33,6 +33,7 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/docval_to_sbeval.h"
+#include "mongo/db/exec/sbe/makeobj_spec.h"
 #include "mongo/db/exec/sbe/match_path.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
 #include "mongo/db/exec/sbe/stages/column_scan.h"
@@ -46,7 +47,6 @@
 #include "mongo/db/exec/sbe/stages/sorted_merge.h"
 #include "mongo/db/exec/sbe/stages/union.h"
 #include "mongo/db/exec/sbe/stages/unique.h"
-#include "mongo/db/exec/sbe/values/makeobj_spec.h"
 #include "mongo/db/exec/sbe/values/sort_spec.h"
 #include "mongo/db/exec/shard_filterer.h"
 #include "mongo/db/fts/fts_index_format.h"
@@ -2875,12 +2875,10 @@ SlotBasedStageBuilder::buildShardFilterCovered(const QuerySolutionNode* root,
     }
 
     // Build an expression that creates a shard key object.
-    auto makeObjSpec =
-        makeConstant(sbe::value::TypeTags::makeObjSpec,
-                     sbe::value::bitcastFrom<sbe::value::MakeObjSpec*>(
-                         new sbe::value::MakeObjSpec(sbe::value::MakeObjSpec::FieldBehavior::drop,
-                                                     {} /* fields */,
-                                                     std::move(projectFields))));
+    auto makeObjSpec = makeConstant(
+        sbe::value::TypeTags::makeObjSpec,
+        sbe::value::bitcastFrom<sbe::MakeObjSpec*>(new sbe::MakeObjSpec(
+            sbe::MakeObjSpec::FieldBehavior::drop, {} /* fields */, std::move(projectFields))));
     auto makeObjRoot = makeConstant(sbe::value::TypeTags::Nothing, 0);
     sbe::EExpression::Vector makeObjArgs;
     makeObjArgs.reserve(2 + projectValues.size());
@@ -2991,10 +2989,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                          std::move(arrayChecks),
                          makeFunction("isArray", sbe::makeE<sbe::EVariable>(projectFrameId, ind)));
     }
-    auto makeObjSpec = makeConstant(
-        sbe::value::TypeTags::makeObjSpec,
-        sbe::value::bitcastFrom<sbe::value::MakeObjSpec*>(new sbe::value::MakeObjSpec(
-            sbe::value::MakeObjSpec::FieldBehavior::drop, {}, std::move(projectFields))));
+    auto makeObjSpec =
+        makeConstant(sbe::value::TypeTags::makeObjSpec,
+                     sbe::value::bitcastFrom<sbe::MakeObjSpec*>(new sbe::MakeObjSpec(
+                         sbe::MakeObjSpec::FieldBehavior::drop, {}, std::move(projectFields))));
     auto makeObjRoot = makeConstant(sbe::value::TypeTags::Nothing, 0);
     sbe::EExpression::Vector makeObjArgs;
     makeObjArgs.reserve(2 + projectValues.size());

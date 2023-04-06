@@ -91,6 +91,8 @@ struct FastTuple<A, B, C> {
     C c;
 };
 
+struct MakeObjSpec;
+
 using FrameId = int64_t;
 using SpoolId = int64_t;
 
@@ -100,7 +102,6 @@ using IndexKeysInclusionSet = std::bitset<Ordering::kMaxCompoundIndexKeys>;
 
 namespace value {
 class SortSpec;
-struct MakeObjSpec;
 struct CsiCell;
 
 static constexpr size_t kNewUUIDLength = 16;
