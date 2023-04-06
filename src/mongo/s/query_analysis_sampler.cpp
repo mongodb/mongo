@@ -218,7 +218,7 @@ void QueryAnalysisSampler::SampleRateLimiter::_refill(double numTokensPerSecond,
         _lastRefillTimeTicks = currTicks;
 
         LOGV2_DEBUG(7372303,
-                    2,
+                    3,
                     "Refilled the bucket",
                     logAttrs(_nss),
                     "collectionUUID"_attr = _collUuid,
@@ -236,7 +236,7 @@ bool QueryAnalysisSampler::SampleRateLimiter::tryConsume() {
     if (_lastNumTokens >= 1) {
         _lastNumTokens -= 1;
         LOGV2_DEBUG(7372304,
-                    2,
+                    3,
                     "Successfully consumed one token",
                     logAttrs(_nss),
                     "collectionUUID"_attr = _collUuid,
@@ -247,7 +247,7 @@ bool QueryAnalysisSampler::SampleRateLimiter::tryConsume() {
         // if there is nearly one.
         _lastNumTokens = 0;
         LOGV2_DEBUG(7372305,
-                    2,
+                    3,
                     "Successfully consumed approximately one token",
                     logAttrs(_nss),
                     "collectionUUID"_attr = _collUuid,
@@ -255,7 +255,7 @@ bool QueryAnalysisSampler::SampleRateLimiter::tryConsume() {
         return true;
     }
     LOGV2_DEBUG(7372306,
-                2,
+                3,
                 "Failed to consume one token",
                 logAttrs(_nss),
                 "collectionUUID"_attr = _collUuid,

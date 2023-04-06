@@ -285,7 +285,7 @@ QueryAnalysisCoordinator::getNewConfigurationsForSampler(OperationContext* opCtx
     // have executed any queries, each sampler gets an equal ratio of the sample rates. Otherwise,
     // the ratio is weighted based on the query distribution across samplers.
     double sampleRateRatio =
-        (numWeights < numActiveSamplers || totalWeight == 0 ||
+        ((numWeights < numActiveSamplers) || (totalWeight == 0) ||
          MONGO_unlikely(queryAnalysisCoordinatorDistributeSampleRateEqually.shouldFail()))
         ? (1.0 / numActiveSamplers)
         : (weight / totalWeight);

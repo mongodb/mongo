@@ -593,7 +593,7 @@ ExecutorFuture<void> QueryAnalysisWriter::_addReadQuery(
             auto collUuid =
                 CollectionCatalog::get(opCtx)->lookupUUIDByNSS(opCtx, sampledReadCmd.nss);
             if (!collUuid) {
-                LOGV2(7047301, "Found a sampled read query for non-existing collection");
+                LOGV2_WARNING(7047301, "Found a sampled read query for non-existing collection");
                 return;
             }
 
