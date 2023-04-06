@@ -378,6 +378,38 @@ TEST(BalancerPolicy, ParallelBalancingNotSchedulingOnInUseDestinationShards) {
     ASSERT_EQ(MigrationReason::chunksImbalance, reason);
 }
 
+TEST(BalancerPolicy, ParallelBalancingDoesNotMoveDataFromShardsBelowIdealZoneSize) {
+    auto cluster =
+        generateCluster({ShardStatistics(kShardId0,
+                                         100 * ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes,
+                                         false,
+                                         emptyZoneSet,
+                                         emptyShardVersion,
+                                         ShardStatistics::use_bytes_t()),
+                         ShardStatistics(kShardId1,
+                                         30 * ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes,
+                                         false,
+                                         emptyZoneSet,
+                                         emptyShardVersion,
+                                         ShardStatistics::use_bytes_t()),
+                         ShardStatistics(kShardId2,
+                                         5 * ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes,
+                                         false,
+                                         emptyZoneSet,
+                                         emptyShardVersion,
+                                         ShardStatistics::use_bytes_t()),
+                         ShardStatistics(kShardId3, 0, false, emptyZoneSet, emptyShardVersion)});
+
+    const auto [migrations, reason] =
+        balanceChunks(cluster.first, DistributionStatus(kNamespace, cluster.second), false, false);
+    ASSERT_EQ(1U, migrations.size());
+
+    ASSERT_EQ(kShardId0, migrations[0].from);
+    ASSERT_EQ(kShardId3, migrations[0].to);
+    ASSERT_BSONOBJ_EQ(cluster.second[kShardId0][0].getMin(), migrations[0].minKey);
+    ASSERT_EQ(MigrationReason::chunksImbalance, reason);
+}
+
 TEST(BalancerPolicy, JumboChunksNotMoved) {
     auto cluster =
         generateCluster({ShardStatistics(kShardId0,
