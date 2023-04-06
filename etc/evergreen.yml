@@ -1275,6 +1275,7 @@ buildvariants:
   - name: .aggfuzzer !.feature_flag_guarded
   - name: .aggregation !.feature_flag_guarded
   - name: aggregation_repeat_queries
+  - name: analyze_shard_key_jscore_passthrough_gen
   - name: audit
   - name: .auth
   - name: unittest_shell_hang_analyzer_gen
