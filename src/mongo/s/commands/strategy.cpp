@@ -650,7 +650,7 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
         // Preload generic ClientMetadata ahead of our first hello request. After the first
         // request, metaElement should always be empty.
         auto metaElem = request.body[kMetadataDocumentName];
-        ClientMetadata::setFromMetadata(opCtx->getClient(), metaElem);
+        ClientMetadata::setFromMetadata(opCtx->getClient(), metaElem, false);
     }
 
     enforceRequireAPIVersion(opCtx, command);

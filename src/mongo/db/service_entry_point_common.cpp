@@ -1462,7 +1462,8 @@ void ExecCommandDatabase::_initiateCommand() {
         // Preload generic ClientMetadata ahead of our first hello request. After the first
         // request, metaElement should always be empty.
         auto metaElem = request.body[kMetadataDocumentName];
-        ClientMetadata::setFromMetadata(opCtx->getClient(), metaElem);
+        auto isInternalClient = request.body["internalClient"_sd].ok();
+        ClientMetadata::setFromMetadata(opCtx->getClient(), metaElem, isInternalClient);
     }
 
     auto& apiParams = APIParameters::get(opCtx);

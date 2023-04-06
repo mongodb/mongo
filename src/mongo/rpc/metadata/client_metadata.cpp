@@ -488,7 +488,7 @@ void ClientMetadata::setFromMetadataForOperation(OperationContext* opCtx, BSONEl
     state.meta = std::move(inputMetadata);
 }
 
-void ClientMetadata::setFromMetadata(Client* client, BSONElement& elem) {
+void ClientMetadata::setFromMetadata(Client* client, BSONElement& elem, bool isInternalClient) {
     if (elem.eoo()) {
         return;
     }
@@ -502,6 +502,15 @@ void ClientMetadata::setFromMetadata(Client* client, BSONElement& elem) {
     }
 
     auto meta = ClientMetadata::readFromMetadata(elem);
+
+    if (!isInternalClient) {
+        uassert(ErrorCodes::ClientMetadataDocumentTooLarge,
+                str::stream() << "The client metadata document must be less than or equal to "
+                              << kMaxMongoSMetadataDocumentByteLength << " bytes",
+                static_cast<uint32_t>(meta->_document.objsize()) <=
+                    kMaxMongoSMetadataDocumentByteLength);
+    }
+
     if (meta && isMongos()) {
         // If we had a full ClientMetadata and we're on mongos, attach some additional client data.
         meta->setMongoSMetadata(getHostNameCachedAndPort(),

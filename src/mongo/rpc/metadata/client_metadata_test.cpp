@@ -387,4 +387,29 @@ TEST(ClientMetadataTest, TestEooElemAsValueToSetOpCtxMetadata) {
     ASSERT_FALSE(clientMetaDataPtr);
 }
 
+TEST(ClientMetadataTest, InternalClientLimit) {
+    auto svcCtx = ServiceContext::make();
+    svcCtx->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
+    auto client = svcCtx->makeClient("ClientMetadataTest");
+
+    std::string tooLargeValue(600, 'x');
+
+    auto doc = BSON(kMetadataDoc << BSON(kDriver << BSON(kName << "n1" << kVersion << "v1")
+                                                 << kOperatingSystem << BSON(kType << kUnknown)
+                                                 << "extra" << tooLargeValue));
+    auto el = doc.firstElement();
+
+    // Succeeds because default limit is 1024 unless mongos (unit tests are not mongos)
+    ASSERT_OK(ClientMetadata::parse(el).getStatus());
+
+    // Throws since the document is too large
+    ASSERT_THROWS_CODE(ClientMetadata::setFromMetadata(client.get(), el, false),
+                       DBException,
+                       ErrorCodes::ClientMetadataDocumentTooLarge);
+
+
+    // Succeeds because internal client allows 1024
+    ASSERT_DOES_NOT_THROW(ClientMetadata::setFromMetadata(client.get(), el, true));
+}
+
 }  // namespace mongo
