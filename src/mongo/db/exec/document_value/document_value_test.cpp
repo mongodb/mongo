@@ -1023,6 +1023,108 @@ TEST(MetaFields, ToAndFromBson) {
     ASSERT_BSONOBJ_EQ(BSON("a" << 42), fromBson.metadata().getSearchSortValues());
 }
 
+TEST(MetaFields, ToAndFromBsonTrivialConvertibility) {
+    Value sortKey{Document{{"token"_sd, "SOMENCODEDATA"_sd}}};
+    // Create a document with a backing BSONObj and separate metadata.
+    auto origObjNoMetadata = BSON("a" << 42);
+    ASSERT_FALSE(origObjNoMetadata.hasField(Document::metaFieldSortKey));
+
+    MutableDocument docBuilder;
+    docBuilder.reset(origObjNoMetadata, false);
+    docBuilder.metadata().setSortKey(sortKey, true);
+    Document docWithSeparateBsonAndMetadata = docBuilder.freeze();
+
+    BSONObj origObjWithMetadata = docWithSeparateBsonAndMetadata.toBsonWithMetaData();
+    ASSERT_TRUE(origObjWithMetadata.hasField(Document::metaFieldSortKey));
+    Document restoredDocWithMetadata = Document::fromBsonWithMetaData(origObjWithMetadata);
+    ASSERT_DOCUMENT_EQ(docWithSeparateBsonAndMetadata, restoredDocWithMetadata);
+
+    // Test the 'isTriviallyConvertible()' function.
+    // The original document is trivially convertible without metadata because the metadata was
+    // added to the document separately from the backing BSON object.
+    ASSERT_TRUE(docWithSeparateBsonAndMetadata.isTriviallyConvertible());
+    // The original document is NOT trivially convertible with metadata because the metadata was
+    // added to the document and does not exist in the BSONObj.
+    ASSERT_FALSE(docWithSeparateBsonAndMetadata.isTriviallyConvertibleWithMetadata());
+    // The restored document is trivially convertible with metadata because the underlying BSONObj
+    // contains the metadata serialized from the original document.
+    ASSERT_TRUE(restoredDocWithMetadata.isTriviallyConvertibleWithMetadata());
+    // The restored document is NOT trivially convertible without metadata because the metadata
+    // fields need to be stripped from the underlying BSONObj.
+    ASSERT_FALSE(restoredDocWithMetadata.isTriviallyConvertible());
+
+    // Test that the conversion with metadata 'origObjWithMetadata' -> 'restoredDocWithMetadata' ->
+    // 'restoredObjWithMetadata' is trivial because the backing BSON already contains metadata and
+    // neither the metadata nor the non-metadata fields have been modified.
+    BSONObj restoredObjWithMetadata = restoredDocWithMetadata.toBsonWithMetaData();
+    ASSERT_TRUE(restoredObjWithMetadata.hasField(Document::metaFieldSortKey));
+    // Test that 'restoredObjWithMetadata' is referring to the exact same memory location as
+    // 'origObjWithMetadata', i.e. both objdata() and objsize() match.
+    ASSERT_EQ(origObjWithMetadata.objdata(), restoredObjWithMetadata.objdata());
+    ASSERT_EQ(origObjWithMetadata.objsize(), restoredObjWithMetadata.objsize());
+
+    // Test that the conversion without metadata 'origObjWithMetadata' -> 'restoredDocWithMetadata'
+    // -> 'strippedRestoredObj' is NOT trivial because the backing BSON has metadata that must be
+    // omitted during serialization.
+    BSONObj strippedRestoredObj = restoredDocWithMetadata.toBson();
+    ASSERT_FALSE(strippedRestoredObj.hasField(Document::metaFieldSortKey));
+    // 'restoredDocWithMetadata' is trivially convertible with metadata and converting it to BSON
+    // without metadata will return a new BSON object.
+    ASSERT_TRUE(origObjNoMetadata.binaryEqual(strippedRestoredObj));
+    ASSERT_NE(origObjNoMetadata.objdata(), strippedRestoredObj.objdata());
+
+    // Test that the conversion without metadata 'origObjNoMetadata' ->
+    // 'docWithSeparateBsonAndMetadata' -> 'restoredObjNoMetadata' is trivial because
+    // 'origObjNoMetadata' does not contain any metadata.
+    BSONObj restoredObjNoMetadata = docWithSeparateBsonAndMetadata.toBson();
+    ASSERT_FALSE(restoredObjNoMetadata.hasField(Document::metaFieldSortKey));
+    // Test that 'restoredObjNoMetadata' is referring to the exact same memory location as
+    // 'origObjNoMetadata', i.e. both objdata() and objsize() match.
+    ASSERT_EQ(origObjNoMetadata.objdata(), restoredObjNoMetadata.objdata());
+    ASSERT_EQ(origObjNoMetadata.objsize(), restoredObjNoMetadata.objsize());
+}
+
+TEST(MetaFields, TrivialConvertibilityBsonWithoutMetadata) {
+    // Test that an unmodified document without metadata is trivially convertible to BSON with and
+    // without metadata.
+    auto bsonWithoutMetadata = BSON("a" << 42);
+    Document doc(bsonWithoutMetadata);
+    ASSERT_TRUE(doc.isTriviallyConvertible());
+    ASSERT_TRUE(doc.isTriviallyConvertibleWithMetadata());
+}
+
+TEST(MetaFields, TrivialConvertibilityNoBson) {
+    // A Document created with no backing BSON is not trivially convertible.
+    auto docNoBson = Document{{"a", 42}};
+    ASSERT_FALSE(docNoBson.isTriviallyConvertible());
+    ASSERT_FALSE(docNoBson.isTriviallyConvertibleWithMetadata());
+
+    // An empty Document is trivially convertible, since the default BSONObj is also empty.
+    auto emptyDoc = Document{};
+    ASSERT_TRUE(emptyDoc.isTriviallyConvertible());
+    ASSERT_TRUE(emptyDoc.isTriviallyConvertibleWithMetadata());
+}
+
+TEST(MetaFields, TrivialConvertibilityModified) {
+    // Modifying a document with a backing BSON renders it not trivially convertible.
+    MutableDocument mutDocModified(Document(BSON("a" << 42)));
+    mutDocModified.addField("b", Value(43));
+    auto modifiedDoc = mutDocModified.freeze();
+    ASSERT_FALSE(modifiedDoc.isTriviallyConvertible());
+    ASSERT_FALSE(modifiedDoc.isTriviallyConvertibleWithMetadata());
+}
+
+TEST(MetaFields, TrivialConvertibilityMetadataModified) {
+    // Modifying the metadata of a document with a backing BSON renders it not trivially convertible
+    // with metadata.
+    MutableDocument mutDocModifiedMd(
+        Document::fromBsonWithMetaData(BSON(Document::metaFieldTextScore << 10.0)));
+    mutDocModifiedMd.metadata().setRandVal(20.0);
+    auto modifiedMdDoc = mutDocModifiedMd.freeze();
+    ASSERT_FALSE(modifiedMdDoc.isTriviallyConvertible());
+    ASSERT_FALSE(modifiedMdDoc.isTriviallyConvertibleWithMetadata());
+}
+
 TEST(MetaFields, MetaFieldsIncludedInDocumentApproximateSize) {
     MutableDocument docBuilder;
     docBuilder.metadata().setSearchHighlights(DOC_ARRAY("abc"_sd

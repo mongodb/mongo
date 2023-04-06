@@ -224,7 +224,7 @@ public:
         expectedDocuments.reserve(expectedPairs.size());
         for (auto& [localDocument, matchedDocuments] : expectedPairs) {
             MutableDocument expectedDocument;
-            expectedDocument.reset(localDocument, false /* stripMetadata */);
+            expectedDocument.reset(localDocument, false /* bsonHasMetadata */);
 
             std::vector<mongo::Value> matchedValues{matchedDocuments.begin(),
                                                     matchedDocuments.end()};

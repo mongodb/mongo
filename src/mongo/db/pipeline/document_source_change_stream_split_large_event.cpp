@@ -123,23 +123,23 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamSplitLargeEvent::doGetNe
     // Process the event to see if it is within the size limit. We have to serialize the document to
     // perform this check, but the helper will also produce a new 'Document' which - if it is small
     // enough to be returned - will not need to be re-serialized by the plan executor.
-    // TODO SERVER-74301: Consider 'this->pExpCtx->forPerShardCursor' here.
     auto [eventDoc, eventBsonSize] = change_stream_split_event::processChangeEventBeforeSplit(
-        input.releaseDocument(), this->pExpCtx->needsMerge);
+        input.getDocument(), this->pExpCtx->needsMerge || this->pExpCtx->forPerShardCursor);
+
+    // Make sure to leave some space for the postBatchResumeToken in the cursor response object.
+    size_t tokenSize = eventDoc.metadata().getSortKey().getDocument().toBson().objsize();
 
     // If we are resuming from a split event, check whether this is it. If so, extract the fragment
     // number from which we are resuming. Otherwise, we have already scanned past the resume point,
     // which implies that it may be on another shard. Continue to split this event without skipping.
-    size_t skipFragments = _handleResumeAfterSplit(eventDoc, eventBsonSize);
+    size_t skipFragments = _handleResumeAfterSplit(eventDoc, eventBsonSize + tokenSize);
 
     // Before proceeding, check whether the event is small enough to be returned as-is.
-    if (eventBsonSize <= kBSONObjMaxChangeEventSize) {
+    if (eventBsonSize + tokenSize <= kBSONObjMaxChangeEventSize) {
         return std::move(eventDoc);
     }
 
-    // Split the event into N appropriately-sized fragments. Make sure to leave some space for the
-    // postBatchResumeToken in the cursor response object.
-    size_t tokenSize = eventDoc.metadata().getSortKey().getDocument().toBson().objsize();
+    // Split the event into N appropriately-sized fragments.
     _splitEventQueue = change_stream_split_event::splitChangeEvent(
         eventDoc, kBSONObjMaxChangeEventSize - tokenSize, skipFragments);
 

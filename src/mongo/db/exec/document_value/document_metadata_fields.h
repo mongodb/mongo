@@ -149,11 +149,7 @@ public:
     }
 
     void setTextScore(double score) {
-        if (!_holder) {
-            _holder = std::make_unique<MetadataHolder>();
-        }
-
-        _holder->metaFields.set(MetaType::kTextScore);
+        _setCommon(MetaType::kTextScore);
         _holder->textScore = score;
     }
 
@@ -167,11 +163,7 @@ public:
     }
 
     void setRandVal(double val) {
-        if (!_holder) {
-            _holder = std::make_unique<MetadataHolder>();
-        }
-
-        _holder->metaFields.set(MetaType::kRandVal);
+        _setCommon(MetaType::kRandVal);
         _holder->randVal = val;
     }
 
@@ -185,11 +177,7 @@ public:
     }
 
     void setSortKey(Value sortKey, bool isSingleElementKey) {
-        if (!_holder) {
-            _holder = std::make_unique<MetadataHolder>();
-        }
-
-        _holder->metaFields.set(MetaType::kSortKey);
+        _setCommon(MetaType::kSortKey);
         _holder->isSingleElementKey = isSingleElementKey;
         _holder->sortKey = std::move(sortKey);
     }
@@ -208,11 +196,7 @@ public:
     }
 
     void setGeoNearDistance(double dist) {
-        if (!_holder) {
-            _holder = std::make_unique<MetadataHolder>();
-        }
-
-        _holder->metaFields.set(MetaType::kGeoNearDist);
+        _setCommon(MetaType::kGeoNearDist);
         _holder->geoNearDistance = dist;
     }
 
@@ -226,11 +210,7 @@ public:
     }
 
     void setGeoNearPoint(Value point) {
-        if (!_holder) {
-            _holder = std::make_unique<MetadataHolder>();
-        }
-
-        _holder->metaFields.set(MetaType::kGeoNearPoint);
+        _setCommon(MetaType::kGeoNearPoint);
         _holder->geoNearPoint = std::move(point);
     }
 
@@ -244,11 +224,7 @@ public:
     }
 
     void setSearchScore(double score) {
-        if (!_holder) {
-            _holder = std::make_unique<MetadataHolder>();
-        }
-
-        _holder->metaFields.set(MetaType::kSearchScore);
+        _setCommon(MetaType::kSearchScore);
         _holder->searchScore = score;
     }
 
@@ -262,11 +238,7 @@ public:
     }
 
     void setSearchHighlights(Value highlights) {
-        if (!_holder) {
-            _holder = std::make_unique<MetadataHolder>();
-        }
-
-        _holder->metaFields.set(MetaType::kSearchHighlights);
+        _setCommon(MetaType::kSearchHighlights);
         _holder->searchHighlights = highlights;
     }
 
@@ -280,11 +252,7 @@ public:
     }
 
     void setIndexKey(BSONObj indexKey) {
-        if (!_holder) {
-            _holder = std::make_unique<MetadataHolder>();
-        }
-
-        _holder->metaFields.set(MetaType::kIndexKey);
+        _setCommon(MetaType::kIndexKey);
         _holder->indexKey = indexKey.getOwned();
     }
 
@@ -298,11 +266,7 @@ public:
     }
 
     void setRecordId(RecordId rid) {
-        if (!_holder) {
-            _holder = std::make_unique<MetadataHolder>();
-        }
-
-        _holder->metaFields.set(MetaType::kRecordId);
+        _setCommon(MetaType::kRecordId);
         _holder->recordId = std::move(rid);
     }
 
@@ -316,10 +280,7 @@ public:
     }
 
     void setSearchScoreDetails(BSONObj details) {
-        if (!_holder) {
-            _holder = std::make_unique<MetadataHolder>();
-        }
-        _holder->metaFields.set(MetaType::kSearchScoreDetails);
+        _setCommon(MetaType::kSearchScoreDetails);
         _holder->searchScoreDetails = details.getOwned();
     }
 
@@ -335,10 +296,7 @@ public:
     }
 
     void setTimeseriesBucketMinTime(Date_t time) {
-        if (!_holder) {
-            _holder = std::make_unique<MetadataHolder>();
-        }
-        _holder->metaFields.set(MetaType::kTimeseriesBucketMinTime);
+        _setCommon(MetaType::kTimeseriesBucketMinTime);
         _holder->timeseriesBucketMinTime = time;
     }
 
@@ -354,10 +312,7 @@ public:
     }
 
     void setTimeseriesBucketMaxTime(Date_t time) {
-        if (!_holder) {
-            _holder = std::make_unique<MetadataHolder>();
-        }
-        _holder->metaFields.set(MetaType::kTimeseriesBucketMaxTime);
+        _setCommon(MetaType::kTimeseriesBucketMaxTime);
         _holder->timeseriesBucketMaxTime = time;
     }
 
@@ -371,16 +326,34 @@ public:
     }
 
     void setSearchSortValues(BSONObj vals) {
-        if (!_holder) {
-            _holder = std::make_unique<MetadataHolder>();
-        }
-        _holder->metaFields.set(MetaType::kSearchSortValues);
+        _setCommon(MetaType::kSearchSortValues);
         _holder->searchSortValues = vals.getOwned();
     }
 
     void serializeForSorter(BufBuilder& buf) const;
 
+    bool isModified() const {
+        return _modified;
+    }
+
+    /**
+     * Sets the 'modified' flag to the given value. Necessary for implementing a lazy load
+     * optimization for the contained mutable 'DocumentMetadataFields' instance inside the
+     * 'Document' class.
+     */
+    void setModified(bool newValue) {
+        _modified = newValue;
+    }
+
 private:
+    inline void _setCommon(MetaType mt) {
+        if (!_holder) {
+            _holder = std::make_unique<MetadataHolder>();
+        }
+        _holder->metaFields.set(mt);
+        _modified = true;
+    }
+
     // A simple data struct housing all possible metadata fields.
     struct MetadataHolder {
         std::bitset<MetaType::kNumFields> metaFields;
@@ -407,6 +380,11 @@ private:
 
     // Null until the first setter is called, at which point a MetadataHolder struct is allocated.
     std::unique_ptr<MetadataHolder> _holder;
+
+    // This flag is set to true anytime a 'DocumentMetadataFields' instance is modified. It is used
+    // to optimize document conversion to BSON with metadata; i.e. if there are no modifications we
+    // can directly return the underlying BSON.
+    bool _modified{false};
 };
 
 using QueryMetadataBitSet = std::bitset<DocumentMetadataFields::MetaType::kNumFields>;

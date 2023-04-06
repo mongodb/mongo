@@ -35,39 +35,29 @@
 namespace mongo {
 namespace change_stream_split_event {
 
-std::pair<Document, size_t> processChangeEventBeforeSplit(Document event, bool withMetadata) {
-    BSONObj eventBson;
-    Document eventDocToReturn;
-    // If this stream needs merging, then we will need to serialize the metadata as well.
+std::pair<Document, size_t> processChangeEventBeforeSplit(const Document& event,
+                                                          bool withMetadata) {
     if (withMetadata) {
-        // TODO SERVER-74301: Use 'event.toBsonWithMetadata<BSONObj::LargeSizeTrait>()' here.
-        eventBson = event.toBson<BSONObj::LargeSizeTrait>();
-        eventDocToReturn = event;
+        auto eventBson = event.toBsonWithMetaData<BSONObj::LargeSizeTrait>();
+        return {Document::fromBsonWithMetaData(eventBson), eventBson.objsize()};
     } else {
         // Serialize just the user data, and add the metadata fields separately.
-        eventBson = event.toBson<BSONObj::LargeSizeTrait>();
+        auto eventBson = event.toBson<BSONObj::LargeSizeTrait>();
         MutableDocument mutDoc(Document{eventBson});
         mutDoc.copyMetaDataFrom(event);
-        eventDocToReturn = mutDoc.freeze();
+        return {mutDoc.freeze(), eventBson.objsize()};
     }
-    // Count the size of the _id field again since the output cursor will have a PBRT.
-    size_t eventBsonSize = eventBson.objsize() + eventBson["_id"].size();
-    return {eventDocToReturn, eventBsonSize};
-}
-
-size_t getBsonSizeWithMetaData(const Document& doc) {
-    // TODO SERVER-74301: Make sure each event is serialized only once in a pipeline.
-    return static_cast<size_t>(doc.toBsonWithMetaData().objsize());
-}
-
-size_t getFieldBsonSize(const Document& doc, const StringData& key) {
-    // TODO SERVER-74301: Make sure each event is serialized only once in a pipeline.
-    return static_cast<size_t>(doc.toBson<BSONObj::LargeSizeTrait>().getField(key).size());
 }
 
 std::queue<Document> splitChangeEvent(const Document& event,
                                       size_t maxFragmentBsonSize,
                                       size_t skipFirstFragments) {
+    // Extract the underlying BSON. We expect the event to be trivially convertible either with
+    // or without metadata, so we attempt to optimize the serialization here.
+    auto eventBson =
+        (event.isTriviallyConvertible() ? event.toBson<BSONObj::LargeSizeTrait>()
+                                        : event.toBsonWithMetaData<BSONObj::LargeSizeTrait>());
+
     // Construct a sorted map of fields ordered by size and key for a deterministic greedy strategy
     // to minimize the total number of fragments (the first fragment contains as many fields as
     // possible). Don't include the original '_id' field, since each fragment will have its own.
@@ -75,7 +65,7 @@ std::queue<Document> splitChangeEvent(const Document& event,
     for (auto it = event.fieldIterator(); it.more();) {
         auto&& [key, value] = it.next();
         if (key != kIdField) {
-            sortedFieldMap.emplace(std::make_pair(getFieldBsonSize(event, key), key), value);
+            sortedFieldMap.emplace(std::make_pair(eventBson[key].size(), key), value);
         }
     }
 
@@ -102,7 +92,7 @@ std::queue<Document> splitChangeEvent(const Document& event,
                           Value(Document{{kFragmentNumberField, static_cast<int>(fragments.size())},
                                          {kTotalFragmentsField, 0}}));
 
-        auto fragmentBsonSize = getBsonSizeWithMetaData(fragment.peek());
+        auto fragmentBsonSize = static_cast<size_t>(fragment.peek().toBsonWithMetaData().objsize());
 
         // Fill the fragment with as many fields as we can until we run out or exceed max size.
         // Always make sure we add at least one new field on each iteration.

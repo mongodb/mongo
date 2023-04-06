@@ -46,17 +46,7 @@ constexpr auto kTotalFragmentsField = "of"_sd;
  * re-usable. The parameter 'withMetadata' desides whether the metadata is counted.
  * Also returns a new document optimized for later serialization by PlanExecutorPipeline.
  */
-std::pair<Document, size_t> processChangeEventBeforeSplit(Document event, bool withMetadata);
-
-/**
- * Returns the size of the BSON object with metadata for the provided document.
- */
-size_t getBsonSizeWithMetaData(const Document& doc);
-
-/**
- * Returns the size of the BSON field for the provided 'key'.
- */
-size_t getFieldBsonSize(const Document& doc, const StringData& key);
+std::pair<Document, size_t> processChangeEventBeforeSplit(const Document& event, bool withMetadata);
 
 /**
  * Splits the given change stream 'event' to several sub-events, called fragments. The size of BSON

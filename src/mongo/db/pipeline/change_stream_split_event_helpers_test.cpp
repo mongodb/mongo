@@ -54,7 +54,11 @@ public:
         fragment.addField(kIdField, fragment.metadata().getSortKey());
         fragment.addField(kSplitEventField,
                           Value(Document{{kFragmentNumberField, 1}, {kTotalFragmentsField, 1}}));
-        minFragmentSize = getBsonSizeWithMetaData(fragment.peek());
+        minFragmentSize = static_cast<size_t>(fragment.peek().toBsonWithMetaData().objsize());
+    }
+
+    size_t getFieldBsonSize(const Document& doc, const StringData& key) {
+        return static_cast<size_t>(doc.toBson<BSONObj::LargeSizeTrait>().getField(key).size());
     }
 
     MutableDocument doc;

@@ -131,7 +131,7 @@ bool DocumentStorageIterator::shouldSkipDeleted() {
 
         // If we strip the metadata see if a field name matches the known list. All metadata fields
         // start with '$' so optimize for a quick bailout.
-        if (_storage->stripMetadata() && fieldName[0] == '$' &&
+        if (_storage->bsonHasMetadata() && fieldName[0] == '$' &&
             Document::allMetadataFieldNames.contains(fieldName)) {
             return true;
         }
@@ -344,8 +344,8 @@ void DocumentStorage::reserveFields(size_t expectedFields) {
 }
 
 intrusive_ptr<DocumentStorage> DocumentStorage::clone() const {
-    auto out =
-        make_intrusive<DocumentStorage>(_bson, _stripMetadata, _modified, _numBytesFromBSONInCache);
+    auto out = make_intrusive<DocumentStorage>(
+        _bson, _bsonHasMetadata, _modified, _numBytesFromBSONInCache);
 
     if (_cache) {
         // Make a copy of the buffer with the fields.
@@ -391,10 +391,10 @@ DocumentStorage::~DocumentStorage() {
     }
 }
 
-void DocumentStorage::reset(const BSONObj& bson, bool stripMetadata) {
+void DocumentStorage::reset(const BSONObj& bson, bool bsonHasMetadata) {
     _bson = bson;
     _numBytesFromBSONInCache = 0;
-    _stripMetadata = stripMetadata;
+    _bsonHasMetadata = bsonHasMetadata;
     _modified = false;
     _snapshottedSize = 0;
 
@@ -422,6 +422,8 @@ void DocumentStorage::loadLazyMetadata() const {
     if (_haveLazyLoadedMetadata) {
         return;
     }
+
+    bool oldModified = _metadataFields.isModified();
 
     BSONObjIterator it(_bson);
     while (it.more()) {
@@ -469,6 +471,7 @@ void DocumentStorage::loadLazyMetadata() const {
         }
     }
 
+    _metadataFields.setModified(oldModified);
     _haveLazyLoadedMetadata = true;
 }
 
@@ -535,37 +538,35 @@ constexpr StringData Document::metaFieldSearchHighlights;
 constexpr StringData Document::metaFieldSearchScoreDetails;
 constexpr StringData Document::metaFieldSearchSortValues;
 
-BSONObj Document::toBsonWithMetaData() const {
-    BSONObjBuilder bb;
-    toBson(&bb);
+void Document::toBsonWithMetaData(BSONObjBuilder* builder) const {
+    toBson(builder);
     if (!metadata()) {
-        return bb.obj();
+        return;
     }
 
     if (metadata().hasTextScore())
-        bb.append(metaFieldTextScore, metadata().getTextScore());
+        builder->append(metaFieldTextScore, metadata().getTextScore());
     if (metadata().hasRandVal())
-        bb.append(metaFieldRandVal, metadata().getRandVal());
+        builder->append(metaFieldRandVal, metadata().getRandVal());
     if (metadata().hasSortKey())
-        bb.append(metaFieldSortKey,
-                  DocumentMetadataFields::serializeSortKey(metadata().isSingleElementKey(),
-                                                           metadata().getSortKey()));
+        builder->append(metaFieldSortKey,
+                        DocumentMetadataFields::serializeSortKey(metadata().isSingleElementKey(),
+                                                                 metadata().getSortKey()));
     if (metadata().hasGeoNearDistance())
-        bb.append(metaFieldGeoNearDistance, metadata().getGeoNearDistance());
+        builder->append(metaFieldGeoNearDistance, metadata().getGeoNearDistance());
     if (metadata().hasGeoNearPoint())
-        metadata().getGeoNearPoint().addToBsonObj(&bb, metaFieldGeoNearPoint);
+        metadata().getGeoNearPoint().addToBsonObj(builder, metaFieldGeoNearPoint);
     if (metadata().hasSearchScore())
-        bb.append(metaFieldSearchScore, metadata().getSearchScore());
+        builder->append(metaFieldSearchScore, metadata().getSearchScore());
     if (metadata().hasSearchHighlights())
-        metadata().getSearchHighlights().addToBsonObj(&bb, metaFieldSearchHighlights);
+        metadata().getSearchHighlights().addToBsonObj(builder, metaFieldSearchHighlights);
     if (metadata().hasIndexKey())
-        bb.append(metaFieldIndexKey, metadata().getIndexKey());
+        builder->append(metaFieldIndexKey, metadata().getIndexKey());
     if (metadata().hasSearchScoreDetails())
-        bb.append(metaFieldSearchScoreDetails, metadata().getSearchScoreDetails());
+        builder->append(metaFieldSearchScoreDetails, metadata().getSearchScoreDetails());
     if (metadata().hasSearchSortValues()) {
-        bb.append(metaFieldSearchSortValues, metadata().getSearchSortValues());
+        builder->append(metaFieldSearchSortValues, metadata().getSearchSortValues());
     }
-    return bb.obj();
 }
 
 Document Document::fromBsonWithMetaData(const BSONObj& bson) {
