@@ -427,49 +427,53 @@ CommandSubmissionResult BalancerCommandsSchedulerImpl::_submit(
     LOGV2_DEBUG(
         5847203, 2, "Balancer command request submitted for execution", "reqId"_attr = params.id);
     bool distLockTaken = false;
-
-    const auto shardWithStatus =
-        Grid::get(opCtx)->shardRegistry()->getShard(opCtx, params.commandInfo->getTarget());
-    if (!shardWithStatus.isOK()) {
-        return CommandSubmissionResult(params.id, distLockTaken, shardWithStatus.getStatus());
-    }
-
-    const auto shardHostWithStatus = shardWithStatus.getValue()->getTargeter()->findHost(
-        opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly});
-    if (!shardHostWithStatus.isOK()) {
-        return CommandSubmissionResult(params.id, distLockTaken, shardHostWithStatus.getStatus());
-    }
-
-    if (params.commandInfo->requiresRecoveryOnCrash()) {
-        auto writeStatus = persistRecoveryInfo(opCtx, *(params.commandInfo));
-        if (!writeStatus.isOK()) {
-            return CommandSubmissionResult(params.id, distLockTaken, writeStatus);
+    try {
+        const auto shardWithStatus =
+            Grid::get(opCtx)->shardRegistry()->getShard(opCtx, params.commandInfo->getTarget());
+        if (!shardWithStatus.isOK()) {
+            return CommandSubmissionResult(params.id, distLockTaken, shardWithStatus.getStatus());
         }
-    }
 
-    const executor::RemoteCommandRequest remoteCommand =
-        executor::RemoteCommandRequest(shardHostWithStatus.getValue(),
-                                       params.commandInfo->getTargetDb(),
-                                       params.commandInfo->serialise(),
-                                       opCtx);
-    auto onRemoteResponseReceived =
-        [this,
-         requestId = params.id](const executor::TaskExecutor::RemoteCommandCallbackArgs& args) {
-            _applyCommandResponse(requestId, args.response);
-        };
-
-    if (params.commandInfo->requiresDistributedLock()) {
-        Status lockAcquisitionResponse =
-            _distributedLocks.acquireFor(opCtx, params.commandInfo->getNameSpace());
-        if (!lockAcquisitionResponse.isOK()) {
-            return CommandSubmissionResult(params.id, distLockTaken, lockAcquisitionResponse);
+        const auto shardHostWithStatus = shardWithStatus.getValue()->getTargeter()->findHost(
+            opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly});
+        if (!shardHostWithStatus.isOK()) {
+            return CommandSubmissionResult(
+                params.id, distLockTaken, shardHostWithStatus.getStatus());
         }
-        distLockTaken = true;
-    }
 
-    auto swRemoteCommandHandle =
-        (*_executor)->scheduleRemoteCommand(remoteCommand, onRemoteResponseReceived);
-    return CommandSubmissionResult(params.id, distLockTaken, swRemoteCommandHandle.getStatus());
+        if (params.commandInfo->requiresRecoveryOnCrash()) {
+            auto writeStatus = persistRecoveryInfo(opCtx, *(params.commandInfo));
+            if (!writeStatus.isOK()) {
+                return CommandSubmissionResult(params.id, distLockTaken, writeStatus);
+            }
+        }
+
+        const executor::RemoteCommandRequest remoteCommand =
+            executor::RemoteCommandRequest(shardHostWithStatus.getValue(),
+                                           params.commandInfo->getTargetDb(),
+                                           params.commandInfo->serialise(),
+                                           opCtx);
+        auto onRemoteResponseReceived =
+            [this,
+             requestId = params.id](const executor::TaskExecutor::RemoteCommandCallbackArgs& args) {
+                _applyCommandResponse(requestId, args.response);
+            };
+
+        if (params.commandInfo->requiresDistributedLock()) {
+            Status lockAcquisitionResponse =
+                _distributedLocks.acquireFor(opCtx, params.commandInfo->getNameSpace());
+            if (!lockAcquisitionResponse.isOK()) {
+                return CommandSubmissionResult(params.id, distLockTaken, lockAcquisitionResponse);
+            }
+            distLockTaken = true;
+        }
+
+        auto swRemoteCommandHandle =
+            (*_executor)->scheduleRemoteCommand(remoteCommand, onRemoteResponseReceived);
+        return CommandSubmissionResult(params.id, distLockTaken, swRemoteCommandHandle.getStatus());
+    } catch (const DBException& e) {
+        return CommandSubmissionResult(params.id, distLockTaken, e.toStatus());
+    }
 }
 
 void BalancerCommandsSchedulerImpl::_applySubmissionResult(
