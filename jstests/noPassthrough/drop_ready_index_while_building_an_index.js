@@ -42,10 +42,13 @@ IndexBuildTest.waitForIndexBuildToScanCollection(secondaryDB, collName, "y_1");
 
 IndexBuildTest.assertIndexes(
     coll, /*numIndexes=*/ 3, /*readyIndexes=*/["_id_", "x_1"], /*notReadyIndexes=*/["y_1"]);
-IndexBuildTest.assertIndexes(secondaryColl,
-                             /*numIndexes=*/ 3,
-                             /*readyIndexes=*/["_id_", "x_1"],
-                             /*notReadyIndexes=*/["y_1"]);
+// However unlikely, a secondary being in the scan collection phase does not guarantee the oplog
+// applier considers the 'startIndexBuild' applied, and as such an attempt to listIndexes might
+// fail.
+IndexBuildTest.assertIndexesSoon(secondaryColl,
+                                 /*numIndexes=*/ 3,
+                                 /*readyIndexes=*/["_id_", "x_1"],
+                                 /*notReadyIndexes=*/["y_1"]);
 
 // Drop the ready index while another index build is in-progress.
 assert.commandWorked(coll.dropIndex("x_1"));

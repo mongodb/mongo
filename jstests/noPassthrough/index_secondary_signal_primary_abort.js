@@ -53,10 +53,11 @@ const kIndexName = 'a_1';
 
 failpointHangAfterInit.wait();
 
-// Extract the index build UUID.
+// Extract the index build UUID. Use assertIndexesSoon to retry until the oplog applier is done with
+// the entry, and the index is visible to listIndexes. The failpoint does not ensure this.
 const buildUUID =
     IndexBuildTest
-        .assertIndexes(
+        .assertIndexesSoon(
             secondaryColl, 2, ['_id_'], [kIndexName], {includeBuildUUIDs: true})[kIndexName]
         .buildUUID;
 

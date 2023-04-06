@@ -53,10 +53,11 @@ const createIdx = IndexBuildTest.startIndexBuild(primary,
 
 failpointHangAfterInit.wait();
 
-// Extract the index build UUID.
+// Extract the index build UUID. Use assertIndexesSoon to retry until the oplog applier is done with
+// the entry, and the index is visible to listIndexes. The failpoint does not ensure this.
 const buildUUID =
     IndexBuildTest
-        .assertIndexes(secondaryColl, 2, ['_id_'], ['a_1'], {includeBuildUUIDs: true})['a_1']
+        .assertIndexesSoon(secondaryColl, 2, ['_id_'], ['a_1'], {includeBuildUUIDs: true})['a_1']
         .buildUUID;
 
 const hangBeforePrimarySignal =

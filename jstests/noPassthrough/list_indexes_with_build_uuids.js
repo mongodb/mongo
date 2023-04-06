@@ -76,19 +76,21 @@ const createIdx =
 const opId = IndexBuildTest.waitForIndexBuildToStart(secondaryDB);
 jsTestLog('Index builds started on secondary. Op ID of one of the builds: ' + opId);
 
-// Wait for the index build to be initialized, so it is shown in listIndexes.
-assert.commandWorked(secondary.adminCommand({
-    waitForFailPoint: "hangAfterStartingIndexBuild",
-    timesEntered: 1,
-    maxTimeMS: kDefaultWaitForFailPointTimeout
-}));
-
-// Check the listIndexes() output.
-let res = secondaryDB.runCommand({listIndexes: collName, includeBuildUUIDs: true});
-
-assert.commandWorked(res);
-let indexes = res.cursor.firstBatch;
-assert.eq(3, indexes.length, tojson(res));
+// Retry until the oplog applier is done with the entry, and the index is visible to listIndexes.
+// waitForIndexBuildToStart does not ensure this.
+var res;
+var indexes;
+assert.soon(
+    function() {
+        // Check the listIndexes() output.
+        res = assert.commandWorked(
+            secondaryDB.runCommand({listIndexes: collName, includeBuildUUIDs: true}));
+        indexes = res.cursor.firstBatch;
+        return 3 == indexes.length;
+    },
+    function() {
+        return tojson(res);
+    });
 
 jsTest.log(indexes);
 

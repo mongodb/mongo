@@ -30,8 +30,7 @@ const docFilter = {
 };
 
 jsTestLog("Do some document writes.");
-assert.commandWorked(
-        primaryColl.insert({_id: 0, x: 0}, {"writeConcern": {"w": "majority"}}));
+assert.commandWorked(primaryColl.insert({_id: 0, x: 0}, {"writeConcern": {"w": "majority"}}));
 rst.awaitReplication();
 
 function isIndexBuildInProgress(conn, indexName) {
@@ -72,6 +71,8 @@ const joinCreateIndexThread =
 
 jsTestLog("Waiting for Collection scan phase to complete");
 insertDumpFailPoint.wait();
+// Wait for the index to become visible in listIndexes, the above failpoint does not guarantee this.
+rst.awaitReplication();
 sanityChecks();
 const firstDrainFailPoint = configureFailPoint(secondary, "hangAfterIndexBuildFirstDrain");
 insertDumpFailPoint.off();

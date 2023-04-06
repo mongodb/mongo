@@ -72,14 +72,11 @@ replTest.start(secondary,
                true /* restart */);
 
 // Verify that we do not wait for the index build to complete on startup.
-assert.soonNoExcept(() => {
-    IndexBuildTest.assertIndexes(secondaryDB.getCollection(collectionName),
+IndexBuildTest.assertIndexesSoon(secondaryDB.getCollection(collectionName),
                                  4,
                                  ["_id_"],
                                  ["i_1", "x_1", "y_1"],
                                  {includeBuildUUIDs: true});
-    return true;
-});
 
 assert.commandWorked(secondary.adminCommand(
     {configureFailPoint: 'hangAfterSettingUpIndexBuildUnlocked', mode: 'off'}));
