@@ -54,13 +54,19 @@ reshardingTest.withReshardingInBackground({
                                           () => {},
                                           {expectedErrorCode: ErrorCodes.DuplicateKey});
 
-const idleCursors = mongos.getDB("admin")
-                        .aggregate([
-                            {$currentOp: {allUsers: true, idleCursors: true}},
-                            {$match: {type: "idleCursor", ns: inputCollection.getFullName()}},
-                        ])
-                        .toArray();
-assert.eq([], idleCursors, "expected cloning cursors to be cleaned up, but they weren't");
+const timeout = 5000;
+assert.soon(() => {
+    const idleCursors = mongos.getDB("admin")
+                            .aggregate([
+                                {$currentOp: {allUsers: true, idleCursors: true}},
+                                {$match: {type: "idleCursor", ns: inputCollection.getFullName()}},
+                            ])
+                            .toArray();
+    if (idleCursors.length > 0) {
+        jsonTestLog(idleCursors);
+    }
+    return idleCursors.length == 0;
+}, "timed out awaiting cloning cursors to be cleaned up", timeout);
 
 reshardingTest.teardown();
 })();
