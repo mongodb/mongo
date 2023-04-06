@@ -546,7 +546,15 @@ const mongosSetParametersOpts = {
         mongos: numMongoses,
         shards: numShards,
         rs: {nodes: 2, setParameter: mongodSetParameterOpts},
-        mongosOptions: {setParameter: mongosSetParametersOpts}
+        mongosOptions: {setParameter: mongosSetParametersOpts},
+        configOptions: {
+            setParameter: {
+                // This test expects every query to get sampled regardless of which mongos or
+                // mongod it runs against.
+                "failpoint.queryAnalysisCoordinatorDistributeSampleRateEqually":
+                    tojson({mode: "alwaysOn"})
+            }
+        }
     });
 
     const fixture = {
