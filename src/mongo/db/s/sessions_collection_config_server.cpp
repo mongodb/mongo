@@ -128,8 +128,7 @@ void SessionsCollectionConfigServer::setupSessionsCollection(OperationContext* o
             BSON("_id" << NamespaceString::kLogicalSessionsNamespace.ns()
                        << CollectionType::kMaxChunkSizeBytesFieldName << BSON("$exists" << false));
         auto updateQuery = BSON("$set" << BSON(CollectionType::kMaxChunkSizeBytesFieldName
-                                               << logical_sessions::kMaxChunkSizeBytes
-                                               << CollectionType::kNoAutoSplitFieldName << true));
+                                               << logical_sessions::kMaxChunkSizeBytes));
 
         const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
         uassertStatusOK(

@@ -109,17 +109,14 @@ TEST_F(BalancerConfigurationTestFixture, NoConfigurationDocuments) {
 
     expectSettingsQuery(BalancerSettingsType::kKey, boost::optional<BSONObj>());
     expectSettingsQuery(ChunkSizeSettingsType::kKey, boost::optional<BSONObj>());
-    expectSettingsQuery(AutoSplitSettingsType::kKey, boost::optional<BSONObj>());
     expectSettingsQuery(AutoMergeSettingsType::kKey, boost::optional<BSONObj>());
 
     future.default_timed_get();
 
     ASSERT(config.shouldBalance());
-    ASSERT(config.shouldBalanceForAutoSplit());
     ASSERT_EQ(MigrationSecondaryThrottleOptions::kDefault,
               config.getSecondaryThrottle().getSecondaryThrottle());
     ASSERT_EQ(ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes, config.getMaxChunkSizeBytes());
-    ASSERT(config.getShouldAutoSplit());
 }
 
 TEST_F(BalancerConfigurationTestFixture, ChunkSizeSettingsDocumentOnly) {
@@ -131,17 +128,14 @@ TEST_F(BalancerConfigurationTestFixture, ChunkSizeSettingsDocumentOnly) {
 
     expectSettingsQuery(BalancerSettingsType::kKey, boost::optional<BSONObj>());
     expectSettingsQuery(ChunkSizeSettingsType::kKey, boost::optional<BSONObj>(BSON("value" << 3)));
-    expectSettingsQuery(AutoSplitSettingsType::kKey, boost::optional<BSONObj>());
     expectSettingsQuery(AutoMergeSettingsType::kKey, boost::optional<BSONObj>());
 
     future.default_timed_get();
 
     ASSERT(config.shouldBalance());
-    ASSERT(config.shouldBalanceForAutoSplit());
     ASSERT_EQ(MigrationSecondaryThrottleOptions::kDefault,
               config.getSecondaryThrottle().getSecondaryThrottle());
     ASSERT_EQ(3 * 1024 * 1024ULL, config.getMaxChunkSizeBytes());
-    ASSERT(config.getShouldAutoSplit());
 }
 
 TEST_F(BalancerConfigurationTestFixture, BalancerSettingsDocumentOnly) {
@@ -154,62 +148,11 @@ TEST_F(BalancerConfigurationTestFixture, BalancerSettingsDocumentOnly) {
     expectSettingsQuery(BalancerSettingsType::kKey,
                         boost::optional<BSONObj>(BSON("stopped" << true)));
     expectSettingsQuery(ChunkSizeSettingsType::kKey, boost::optional<BSONObj>());
-    expectSettingsQuery(AutoSplitSettingsType::kKey, boost::optional<BSONObj>());
     expectSettingsQuery(AutoMergeSettingsType::kKey, boost::optional<BSONObj>());
 
     future.default_timed_get();
 
     ASSERT(!config.shouldBalance());
-    ASSERT(!config.shouldBalanceForAutoSplit());
-    ASSERT_EQ(MigrationSecondaryThrottleOptions::kDefault,
-              config.getSecondaryThrottle().getSecondaryThrottle());
-    ASSERT_EQ(ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes, config.getMaxChunkSizeBytes());
-    ASSERT(config.getShouldAutoSplit());
-}
-
-TEST_F(BalancerConfigurationTestFixture, AutoSplitSettingsDocumentOnly) {
-    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
-
-    BalancerConfiguration config;
-
-    auto future = launchAsync([&] { ASSERT_OK(config.refreshAndCheck(operationContext())); });
-
-    expectSettingsQuery(BalancerSettingsType::kKey, boost::optional<BSONObj>());
-    expectSettingsQuery(ChunkSizeSettingsType::kKey, boost::optional<BSONObj>());
-    expectSettingsQuery(AutoSplitSettingsType::kKey,
-                        boost::optional<BSONObj>(BSON("enabled" << false)));
-    expectSettingsQuery(AutoMergeSettingsType::kKey, boost::optional<BSONObj>());
-
-    future.default_timed_get();
-
-    ASSERT(config.shouldBalance());
-    ASSERT(config.shouldBalanceForAutoSplit());
-    ASSERT_EQ(MigrationSecondaryThrottleOptions::kDefault,
-              config.getSecondaryThrottle().getSecondaryThrottle());
-    ASSERT_EQ(ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes, config.getMaxChunkSizeBytes());
-    ASSERT(!config.getShouldAutoSplit());
-}
-
-TEST_F(BalancerConfigurationTestFixture, BalancerSettingsDocumentBalanceForAutoSplitOnly) {
-    configTargeter()->setFindHostReturnValue(HostAndPort("TestHost1"));
-
-    BalancerConfiguration config;
-
-    auto future = launchAsync([&] { ASSERT_OK(config.refreshAndCheck(operationContext())); });
-
-    expectSettingsQuery(BalancerSettingsType::kKey,
-                        boost::optional<BSONObj>(BSON("mode"
-                                                      << "autoSplitOnly")));
-    expectSettingsQuery(ChunkSizeSettingsType::kKey, boost::optional<BSONObj>());
-    expectSettingsQuery(AutoSplitSettingsType::kKey,
-                        boost::optional<BSONObj>(BSON("enabled" << true)));
-    expectSettingsQuery(AutoMergeSettingsType::kKey,
-                        boost::optional<BSONObj>(BSON("enabled" << true)));
-
-    future.default_timed_get();
-
-    ASSERT(!config.shouldBalance());
-    ASSERT(config.shouldBalanceForAutoSplit());
     ASSERT_EQ(MigrationSecondaryThrottleOptions::kDefault,
               config.getSecondaryThrottle().getSecondaryThrottle());
     ASSERT_EQ(ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes, config.getMaxChunkSizeBytes());
@@ -233,10 +176,6 @@ TEST(BalancerSettingsType, AllValidBalancerModeOptions) {
     ASSERT_EQ(BalancerSettingsType::kFull,
               assertGet(BalancerSettingsType::fromBSON(BSON("mode"
                                                             << "full")))
-                  .getMode());
-    ASSERT_EQ(BalancerSettingsType::kAutoSplitOnly,
-              assertGet(BalancerSettingsType::fromBSON(BSON("mode"
-                                                            << "autoSplitOnly")))
                   .getMode());
     ASSERT_EQ(BalancerSettingsType::kOff,
               assertGet(BalancerSettingsType::fromBSON(BSON("mode"

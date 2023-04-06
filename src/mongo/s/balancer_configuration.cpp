@@ -83,19 +83,17 @@ const char kAttemptToBalanceJumboChunks[] = "attemptToBalanceJumboChunks";
 }  // namespace
 
 const char BalancerSettingsType::kKey[] = "balancer";
+// TODO SERVER-75757: get rid of legacy `autoSplitOnly` mode
 const char* BalancerSettingsType::kBalancerModes[] = {"full", "autoSplitOnly", "off"};
 
 const char ChunkSizeSettingsType::kKey[] = "chunksize";
 const uint64_t ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes{128 * 1024 * 1024};
-
-const char AutoSplitSettingsType::kKey[] = "autosplit";
 
 const char AutoMergeSettingsType::kKey[] = "automerge";
 
 BalancerConfiguration::BalancerConfiguration()
     : _balancerSettings(BalancerSettingsType::createDefault()),
       _maxChunkSizeBytes(ChunkSizeSettingsType::kDefaultMaxChunkSizeBytes),
-      _shouldAutoSplit(true),
       _shouldAutoMerge(true) {}
 
 BalancerConfiguration::~BalancerConfiguration() = default;
@@ -130,28 +128,6 @@ Status BalancerConfiguration::setBalancerMode(OperationContext* opCtx,
     return Status::OK();
 }
 
-Status BalancerConfiguration::enableAutoSplit(OperationContext* opCtx, bool enable) {
-    auto updateStatus = Grid::get(opCtx)->catalogClient()->updateConfigDocument(
-        opCtx,
-        NamespaceString::kConfigSettingsNamespace,
-        BSON("_id" << AutoSplitSettingsType::kKey),
-        BSON("$set" << BSON(kEnabled << enable)),
-        true,
-        ShardingCatalogClient::kMajorityWriteConcern);
-
-    Status refreshStatus = refreshAndCheck(opCtx);
-    if (!refreshStatus.isOK()) {
-        return refreshStatus;
-    }
-
-    if (!updateStatus.isOK() && (getShouldAutoSplit() != enable)) {
-        return updateStatus.getStatus().withContext(
-            str::stream() << "Failed to " << (enable ? "enable" : "disable") << " auto split");
-    }
-
-    return Status::OK();
-}
-
 Status BalancerConfiguration::changeAutoMergeSettings(OperationContext* opCtx, bool enable) {
     auto updateStatus = Grid::get(opCtx)->catalogClient()->updateConfigDocument(
         opCtx,
@@ -177,15 +153,6 @@ Status BalancerConfiguration::changeAutoMergeSettings(OperationContext* opCtx, b
 bool BalancerConfiguration::shouldBalance() const {
     stdx::lock_guard<Latch> lk(_balancerSettingsMutex);
     if (_balancerSettings.getMode() != BalancerSettingsType::kFull) {
-        return false;
-    }
-
-    return _balancerSettings.isTimeInBalancingWindow(boost::posix_time::second_clock::local_time());
-}
-
-bool BalancerConfiguration::shouldBalanceForAutoSplit() const {
-    stdx::lock_guard<Latch> lk(_balancerSettingsMutex);
-    if (_balancerSettings.getMode() == BalancerSettingsType::kOff) {
         return false;
     }
 
@@ -227,12 +194,6 @@ Status BalancerConfiguration::refreshAndCheck(OperationContext* opCtx) {
     Status chunkSizeStatus = _refreshChunkSizeSettings(opCtx);
     if (!chunkSizeStatus.isOK()) {
         return chunkSizeStatus.withContext("Failed to refresh the chunk sizes settings");
-    }
-
-    // Global AutoSplit settings
-    Status autoSplitStatus = _refreshAutoSplitSettings(opCtx);
-    if (!autoSplitStatus.isOK()) {
-        return autoSplitStatus.withContext("Failed to refresh the autoSplit settings");
     }
 
     // Global auto merge settings
@@ -290,35 +251,6 @@ Status BalancerConfiguration::_refreshChunkSizeSettings(OperationContext* opCtx)
               "oldMaxChunkSizeMB"_attr = getMaxChunkSizeBytes() / (1024 * 1024));
 
         _maxChunkSizeBytes.store(settings.getMaxChunkSizeBytes());
-    }
-
-    return Status::OK();
-}
-
-Status BalancerConfiguration::_refreshAutoSplitSettings(OperationContext* opCtx) {
-    AutoSplitSettingsType settings = AutoSplitSettingsType::createDefault();
-
-    auto settingsObjStatus =
-        Grid::get(opCtx)->catalogClient()->getGlobalSettings(opCtx, AutoSplitSettingsType::kKey);
-    if (settingsObjStatus.isOK()) {
-        auto settingsStatus = AutoSplitSettingsType::fromBSON(settingsObjStatus.getValue());
-        if (!settingsStatus.isOK()) {
-            return settingsStatus.getStatus();
-        }
-
-        settings = std::move(settingsStatus.getValue());
-    } else if (settingsObjStatus != ErrorCodes::NoMatchingDocument) {
-        return settingsObjStatus.getStatus();
-    }
-
-    if (settings.getShouldAutoSplit() != getShouldAutoSplit()) {
-        LOGV2(22641,
-              "Changing ShouldAutoSplit setting to {newShouldAutoSplit} from {oldShouldAutoSplit}",
-              "Changing ShouldAutoSplit setting",
-              "newShouldAutoSplit"_attr = settings.getShouldAutoSplit(),
-              "oldShouldAutoSplit"_attr = getShouldAutoSplit());
-
-        _shouldAutoSplit.store(settings.getShouldAutoSplit());
     }
 
     return Status::OK();
@@ -521,24 +453,6 @@ bool ChunkSizeSettingsType::checkMaxChunkSizeValid(uint64_t maxChunkSizeBytes) {
     }
 
     return false;
-}
-
-AutoSplitSettingsType::AutoSplitSettingsType() = default;
-
-AutoSplitSettingsType AutoSplitSettingsType::createDefault() {
-    return AutoSplitSettingsType();
-}
-
-StatusWith<AutoSplitSettingsType> AutoSplitSettingsType::fromBSON(const BSONObj& obj) {
-    bool shouldAutoSplit;
-    Status status = bsonExtractBooleanField(obj, kEnabled, &shouldAutoSplit);
-    if (!status.isOK())
-        return status;
-
-    AutoSplitSettingsType settings;
-    settings._shouldAutoSplit = shouldAutoSplit;
-
-    return settings;
 }
 
 StatusWith<AutoMergeSettingsType> AutoMergeSettingsType::fromBSON(const BSONObj& obj) {

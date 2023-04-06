@@ -385,12 +385,11 @@ void ShardingCatalogManager::configureCollectionBalancing(
     const NamespaceString& nss,
     boost::optional<int32_t> chunkSizeMB,
     boost::optional<bool> defragmentCollection,
-    boost::optional<bool> enableAutoSplitter,
     boost::optional<bool> enableAutoMerger) {
 
     uassert(ErrorCodes::InvalidOptions,
             "invalid configure collection balancing update",
-            chunkSizeMB || defragmentCollection || enableAutoSplitter);
+            chunkSizeMB || defragmentCollection);
 
     // utility lambda to log the change
     auto logConfigureCollectionBalancing = [&]() {
@@ -401,10 +400,6 @@ void ShardingCatalogManager::configureCollectionBalancing(
 
         if (defragmentCollection) {
             logChangeDetail.append("defragmentCollection", defragmentCollection.get());
-        }
-
-        if (enableAutoSplitter) {
-            logChangeDetail.append("enableAutoSplitter", enableAutoSplitter.get());
         }
 
         ShardingLogging::get(opCtx)->logChange(opCtx,
@@ -440,11 +435,6 @@ void ShardingCatalogManager::configureCollectionBalancing(
             } else {
                 Balancer::get(opCtx)->abortCollectionDefragmentation(opCtx, nss);
             }
-        }
-        if (enableAutoSplitter) {
-            bool doSplit = enableAutoSplitter.value();
-            setClauseBuilder.append(CollectionType::kNoAutoSplitFieldName, !doSplit);
-            updatedFields++;
         }
         if (enableAutoMerger) {
             setClauseBuilder.append(CollectionType::kEnableAutoMergeFieldName,

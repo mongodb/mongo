@@ -61,7 +61,6 @@ using std::string;
  *   max: <BSONObj chunkToSplitMax>,
  *   splitPoints: [<BSONObj key>, ...],
  *   shard: <string shard>,
- *   fromChunkSplitter: <bool>,
  *   writeConcern: <BSONObj>
  * }
  */
@@ -124,16 +123,14 @@ public:
 
         auto parsedRequest = uassertStatusOK(SplitChunkRequest::parseFromConfigCommand(cmdObj));
 
-        auto shardAndCollVers =
-            uassertStatusOK(ShardingCatalogManager::get(opCtx)->commitChunkSplit(
-                opCtx,
-                parsedRequest.getNamespace(),
-                parsedRequest.getEpoch(),
-                parsedRequest.getTimestamp(),
-                parsedRequest.getChunkRange(),
-                parsedRequest.getSplitPoints(),
-                parsedRequest.getShardName(),
-                parsedRequest.isFromChunkSplitter()));
+        auto shardAndCollVers = uassertStatusOK(
+            ShardingCatalogManager::get(opCtx)->commitChunkSplit(opCtx,
+                                                                 parsedRequest.getNamespace(),
+                                                                 parsedRequest.getEpoch(),
+                                                                 parsedRequest.getTimestamp(),
+                                                                 parsedRequest.getChunkRange(),
+                                                                 parsedRequest.getSplitPoints(),
+                                                                 parsedRequest.getShardName()));
 
         shardAndCollVers.collectionPlacementVersion.serialize(kCollectionVersionField, &result);
         shardAndCollVers.shardPlacementVersion.serialize(ChunkVersion::kChunkVersionField, &result);
