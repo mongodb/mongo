@@ -791,7 +791,7 @@ private:
         }
     }
 
-    // TODO SERVER-69106 remove once v7.0 becomes last-lts
+    // TODO SERVER-68217 remove once v7.0 becomes last-lts
     void _initializePlacementHistory(
         OperationContext* opCtx,
         const multiversion::FeatureCompatibilityVersion requestedVersion,
