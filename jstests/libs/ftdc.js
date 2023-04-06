@@ -40,6 +40,14 @@ function verifyGetDiagnosticData(adminDb) {
             assert(data.hasOwnProperty("serverStatus"),
                    "does not have 'serverStatus' in '" + tojson(data) + "'");
             assert(data.hasOwnProperty("end"), "does not have 'end' in '" + tojson(data) + "'");
+
+            // 'apiVersions' section is omitted from serverStatus metrics.
+            assert(data["serverStatus"].hasOwnProperty("metrics"),
+                   "does not have 'serverStatus.metrics' in '" + tojson(data) + "'");
+            assert(!data["serverStatus"]["metrics"].hasOwnProperty("apiVersions"),
+                   "'serverStatus.metrics.apiVersions' should be omitted from FTDC data: '" +
+                       tojson(data) + "'");
+
             foundGoodDocument = true;
 
             jsTestLog("Got good getDiagnosticData: " + tojson(result));
