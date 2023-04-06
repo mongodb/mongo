@@ -117,7 +117,7 @@ NamespaceString parseLookupFromAndResolveNamespace(const BSONElement& elem,
     uassert(
         ErrorCodes::FailedToParse,
         str::stream() << "$lookup with syntax {from: {db:<>, coll:<>},..} is not supported for db: "
-                      << nss.db() << " and coll: " << nss.coll(),
+                      << nss.dbName().toStringForErrorMsg() << " and coll: " << nss.coll(),
         nss.isConfigDotCacheDotChunks() || nss == NamespaceString::kRsOplogNamespace ||
             nss == NamespaceString::kTenantMigrationOplogView ||
             nss == NamespaceString::kConfigsvrCollectionsNamespace);

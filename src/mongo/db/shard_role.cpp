@@ -477,7 +477,8 @@ std::vector<ScopedCollectionOrViewAcquisition> acquireCollectionsOrViews(
             tassert(7300400,
                     str::stream()
                         << "Cannot acquire locks for collections across different databases ('"
-                        << dbName << "' vs '" << nss.dbName() << "'",
+                        << dbName.toStringForErrorMsg() << "' vs '"
+                        << nss.dbName().toStringForErrorMsg() << "'",
                     dbName == nss.dbName());
 
             ar.second.dbLock = dbLock;

@@ -158,15 +158,10 @@ public:
             LOGV2(6859700, "Skipping hash computation for temporary collections");
         }
 
-        // For empty databasename on first command field, the following code depends on the "."
-        // on ns to find the invalid empty db name instead of checking empty db name directly.
-        const std::string ns = parseNs(dbName, cmdObj).ns();
-        const auto emptyDb = cmdObj.firstElement().type() == mongo::String &&
-            cmdObj.firstElement().valueStringData().empty();
         uassert(ErrorCodes::InvalidNamespace,
-                str::stream() << "Invalid db name: " << ns,
-                NamespaceString::validDBName(ns, NamespaceString::DollarInDbNameBehavior::Allow) &&
-                    !emptyDb);
+                "Cannot pass empty string for 'dbHash' field",
+                !(cmdObj.firstElement().type() == mongo::String &&
+                  cmdObj.firstElement().valueStringData().empty()));
 
         if (auto elem = cmdObj["$_internalReadAtClusterTime"]) {
             uassert(ErrorCodes::InvalidOptions,

@@ -104,8 +104,8 @@ Status checkSourceAndTargetNamespaces(OperationContext* opCtx,
     auto db = DatabaseHolder::get(opCtx)->getDb(opCtx, source.dbName());
     if (!db || db->isDropPending(opCtx))
         return Status(ErrorCodes::NamespaceNotFound,
-                      str::stream()
-                          << "Database " << source.db() << " does not exist or is drop pending");
+                      str::stream() << "Database " << source.dbName().toStringForErrorMsg()
+                                    << " does not exist or is drop pending");
 
     auto catalog = CollectionCatalog::get(opCtx);
     const auto sourceColl = catalog->lookupCollectionByNamespace(opCtx, source);

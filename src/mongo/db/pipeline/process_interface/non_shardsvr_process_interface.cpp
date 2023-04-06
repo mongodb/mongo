@@ -154,7 +154,8 @@ void NonShardServerProcessInterface::createIndexesOnEmptyCollection(
     writeConflictRetry(
         opCtx, "CommonMongodProcessInterface::createIndexesOnEmptyCollection", ns.ns(), [&] {
             uassert(ErrorCodes::DatabaseDropPending,
-                    str::stream() << "The database is in the process of being dropped " << ns.db(),
+                    str::stream() << "The database is in the process of being dropped "
+                                  << ns.dbName().toStringForErrorMsg(),
                     autoColl.getDb() && !autoColl.getDb()->isDropPending(opCtx));
 
             uassert(ErrorCodes::NamespaceNotFound,

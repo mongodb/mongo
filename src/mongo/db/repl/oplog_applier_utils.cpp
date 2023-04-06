@@ -435,7 +435,8 @@ Status OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
                     }
 
                     uassert(ErrorCodes::NamespaceNotFound,
-                            str::stream() << "missing database (" << nss.db() << ")",
+                            str::stream() << "missing database ("
+                                          << nss.dbName().toStringForErrorMsg() << ")",
                             db);
                     OldClientContext ctx(opCtx, autoColl->getNss(), db);
 

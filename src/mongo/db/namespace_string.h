@@ -437,6 +437,16 @@ public:
     }
 
     /**
+     * This function should only be used when logging a NamespaceString in an error message.
+     */
+    std::string toStringForErrorMsg() const {
+        if (auto tenantId = _dbName.tenantId())
+            return str::stream() << *tenantId << '_' << ns();
+
+        return ns();
+    }
+
+    /**
      * Method to be used only when logging a NamespaceString in a log message.
      * It is called anytime a NamespaceString is logged by logAttrs or otherwise.
      */

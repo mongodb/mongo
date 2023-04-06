@@ -106,8 +106,8 @@ Status checkValidatorCanBeUsedOnNs(const BSONObj& validator,
     if (nss.isOnInternalDb() && nss != NamespaceString::kConfigSettingsNamespace) {
         return {ErrorCodes::InvalidOptions,
                 str::stream() << "Document validators are not allowed on collection " << nss.ns()
-                              << " with UUID " << uuid << " in the " << nss.db()
-                              << " internal database"};
+                              << " with UUID " << uuid << " in the "
+                              << nss.dbName().toStringForErrorMsg() << " internal database"};
     }
     return Status::OK();
 }
@@ -136,7 +136,7 @@ Status validateIsNotInDbs(const NamespaceString& ns,
     if (std::find(disallowedDbs.begin(), disallowedDbs.end(), ns.dbName()) != disallowedDbs.end()) {
         return {ErrorCodes::InvalidOptions,
                 str::stream() << optionName << " collection option is not supported on the "
-                              << ns.db() << " database"};
+                              << ns.dbName().toStringForErrorMsg() << " database"};
     }
 
     return Status::OK();

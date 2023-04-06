@@ -560,9 +560,9 @@ Status StorageInterfaceImpl::renameCollection(OperationContext* opCtx,
         AutoGetDb autoDB(opCtx, fromNS.dbName(), MODE_X);
         if (!autoDB.getDb()) {
             return Status(ErrorCodes::NamespaceNotFound,
-                          str::stream()
-                              << "Cannot rename collection from " << fromNS.ns() << " to "
-                              << toNS.ns() << ". Database " << fromNS.db() << " not found.");
+                          str::stream() << "Cannot rename collection from " << fromNS.ns() << " to "
+                                        << toNS.ns() << ". Database "
+                                        << fromNS.dbName().toStringForErrorMsg() << " not found.");
         }
         WriteUnitOfWork wunit(opCtx);
         const auto status = autoDB.getDb()->renameCollection(opCtx, fromNS, toNS, stayTemp);

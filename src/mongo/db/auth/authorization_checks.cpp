@@ -105,7 +105,8 @@ Status checkAuthForGetMore(AuthorizationSession* authSession,
     // or does not need to be.
     if (!authSession->shouldIgnoreAuthChecks() && !authSession->isAuthenticated()) {
         return Status(ErrorCodes::Unauthorized,
-                      str::stream() << "not authorized for getMore on " << ns.db());
+                      str::stream()
+                          << "not authorized for getMore on " << ns.dbName().toStringForErrorMsg());
     }
 
     // Only internal clients (such as other nodes in a replica set) are allowed to use
