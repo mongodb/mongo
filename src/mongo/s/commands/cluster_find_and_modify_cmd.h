@@ -156,11 +156,13 @@ private:
                                  BSONObjBuilder* result);
 
     // Two-phase protocol to run a findAndModify command without a shard key or _id.
-    static void _runCommandWithoutShardKey(OperationContext* opCtx,
-                                           const NamespaceString& nss,
-                                           const BSONObj& cmdObj,
-                                           bool isExplain,
-                                           BSONObjBuilder* result);
+    static void _runCommandWithoutShardKey(
+        OperationContext* opCtx,
+        const NamespaceString& nss,
+        const BSONObj& cmdObj,
+        bool isExplain,
+        boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery,
+        BSONObjBuilder* result);
 
     // Command invocation to be used if a shard key is specified or the collection is unsharded.
     static void _runCommand(OperationContext* opCtx,
@@ -170,6 +172,7 @@ private:
                             const NamespaceString& nss,
                             const BSONObj& cmdObj,
                             bool isExplain,
+                            boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery,
                             BSONObjBuilder* result);
 
     // TODO SERVER-67429: Remove this function.

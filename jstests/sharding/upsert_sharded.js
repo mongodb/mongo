@@ -2,14 +2,9 @@
 // Upsert behavior tests for sharding. If updateOneWithoutShardKey feature flag is enabled, upsert
 // operations with queries that do not match on the entire shard key are successful. NOTE: Generic
 // upsert behavior tests belong in the core suite
-// Upsert behavior tests for sharding. If updateOneWithoutShardKey feature flag is enabled, upsert
-// operations with queries that do not match on the entire shard key are successful. NOTE: Generic
-// upsert behavior tests belong in the core suite
 //
 (function() {
 'use strict';
-
-load("jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js");
 
 load("jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js");
 
@@ -167,8 +162,11 @@ if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(coll.getDB
 // Shard key in query not extractable.
 assert.commandFailedWithCode(upsertedResult(coll, {x: undefined}, {$set: {a: 1}}),
                              ErrorCodes.BadValue);
+// With the introduction of PM-1632, we can execute upsert not targeted to a single shard, but since
+// shard key fields cannot contain arrays or array descendants, we will still throw
+// NotSingleValueField when we go to upsert the document.
 assert.commandFailedWithCode(upsertedResult(coll, {x: [1, 2]}, {$set: {a: 1}}),
-                             ErrorCodes.ShardKeyNotFound);
+                             [ErrorCodes.ShardKeyNotFound, ErrorCodes.NotSingleValueField]);
 
 coll.drop();
 
@@ -338,10 +336,13 @@ if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(coll.getDB
         upsertSuppliedResult(coll, {_id: {x: [1]}}, {}),
         ErrorCodes
             .ShardKeyNotFound);  // Shard key cannot contain array values or array descendants.
-    assert.commandFailedWithCode(
-        upsertSuppliedResult(coll, {"_id.x": [1]}, {}),
-        ErrorCodes
-            .ShardKeyNotFound);  // Shard key cannot contain array values or array descendants.
+    assert.commandFailedWithCode(upsertSuppliedResult(coll, {"_id.x": [1]}, {}), [
+        ErrorCodes.ShardKeyNotFound,
+        ErrorCodes.NotSingleValueField
+    ]);  // Shard key cannot contain array values or array descendants.
+    // With the introduction of PM-1632, we can execute upsert not targeted to a single shard,
+    // but since shard key fields cannot contain arrays or array descendants, we will still
+    // throw NotSingleValueField when we go to upsert the document.
     assert.commandFailedWithCode(upsertSuppliedResult(coll, {_id: [{x: 1}]}, {}),
                                  ErrorCodes.NotSingleValueField);
 
@@ -349,10 +350,13 @@ if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(coll.getDB
         upsertedResult(coll, {_id: {x: [1]}}, {$set: {y: 1}}),
         ErrorCodes
             .ShardKeyNotFound);  // Shard key cannot contain array values or array descendants.
-    assert.commandFailedWithCode(
-        upsertedResult(coll, {"_id.x": [1]}, {$set: {y: 1}}),
-        ErrorCodes
-            .ShardKeyNotFound);  // Shard key cannot contain array values or array descendants.
+    assert.commandFailedWithCode(upsertedResult(coll, {"_id.x": [1]}, {$set: {y: 1}}), [
+        ErrorCodes.ShardKeyNotFound,
+        ErrorCodes.NotSingleValueField
+    ]);  // Shard key cannot contain array values or array descendants.
+    // With the introduction of PM-1632, we can execute upsert not targeted to a single shard,
+    // but since shard key fields cannot contain arrays or array descendants, we will still
+    // throw NotSingleValueField when we go to upsert the document.
     assert.commandFailedWithCode(
         upsertedResult(coll, {_id: [{x: 1}]}, {$set: {y: 1}}),
         ErrorCodes

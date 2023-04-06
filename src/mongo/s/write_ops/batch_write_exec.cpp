@@ -117,7 +117,8 @@ std::vector<AsyncRequestsSender::Request> constructARSRequestsToSend(
     TargetedBatchMap& childBatches,
     TargetedBatchMap& pendingBatches,
     BatchWriteExecStats* stats,
-    BatchWriteOp& batchOp) {
+    BatchWriteOp& batchOp,
+    boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery) {
     std::vector<AsyncRequestsSender::Request> requests;
     // Get as many batches as we can at once
     for (auto&& childBatch : childBatches) {
@@ -136,9 +137,7 @@ std::vector<AsyncRequestsSender::Request> constructARSRequestsToSend(
 
         const auto request = [&] {
             const auto shardBatchRequest(batchOp.buildBatchRequest(
-                *nextBatch,
-                targeter,
-                boost::none /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */));
+                *nextBatch, targeter, allowShardKeyUpdatesWithoutFullShardKeyInQuery));
 
             BSONObjBuilder requestBuilder;
             shardBatchRequest.serialize(&requestBuilder);
@@ -291,7 +290,8 @@ void executeChildBatches(OperationContext* opCtx,
                          TargetedBatchMap& childBatches,
                          BatchWriteExecStats* stats,
                          BatchWriteOp& batchOp,
-                         bool& abortBatch) {
+                         bool& abortBatch,
+                         boost::optional<bool> allowShardKeyUpdatesWithoutFullShardKeyInQuery) {
     const size_t numToSend = childBatches.size();
     size_t numSent = 0;
 
@@ -299,8 +299,13 @@ void executeChildBatches(OperationContext* opCtx,
         // Collect batches out on the network, mapped by endpoint
         TargetedBatchMap pendingBatches;
 
-        auto requests = constructARSRequestsToSend(
-            opCtx, targeter, childBatches, pendingBatches, stats, batchOp);
+        auto requests = constructARSRequestsToSend(opCtx,
+                                                   targeter,
+                                                   childBatches,
+                                                   pendingBatches,
+                                                   stats,
+                                                   batchOp,
+                                                   allowShardKeyUpdatesWithoutFullShardKeyInQuery);
 
         bool isRetryableWrite = opCtx->getTxnNumber() && !TransactionRouter::get(opCtx);
 
@@ -381,7 +386,8 @@ void executeTwoPhaseWrite(OperationContext* opCtx,
                           TargetedBatchMap& childBatches,
                           BatchWriteExecStats* stats,
                           const BatchedCommandRequest& clientRequest,
-                          bool& abortBatch) {
+                          bool& abortBatch,
+                          bool allowShardKeyUpdatesWithoutFullShardKeyInQuery) {
     const auto targetedWriteBatch = [&] {
         // If there is a targeted write with a sampleId, use that write instead in order to pass the
         // sampleId to the two phase write protocol. Otherwise, just choose the first targeted
@@ -402,9 +408,6 @@ void executeTwoPhaseWrite(OperationContext* opCtx,
         }
         return childBatches.begin()->second.get();
     }();
-
-    auto allowShardKeyUpdatesWithoutFullShardKeyInQuery =
-        opCtx->isRetryableWrite() || opCtx->inMultiDocumentTransaction();
 
     auto cmdObj = batchOp
                       .buildBatchRequest(*targetedWriteBatch,
@@ -572,15 +575,44 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                 tassert(
                     6992000, "Executing write batches with a size of 0", childBatches.size() > 0u);
 
-                // Execute the two phase write protocol for writes that cannot directly target a
-                // shard. If there are any transaction errors, 'abortBatch' will be set.
-                executeTwoPhaseWrite(
-                    opCtx, targeter, batchOp, childBatches, stats, clientRequest, abortBatch);
+                auto allowShardKeyUpdatesWithoutFullShardKeyInQuery =
+                    opCtx->isRetryableWrite() || opCtx->inMultiDocumentTransaction();
+
+                // If there is only 1 targetable shard, we can skip using the two phase write
+                // protocol.
+                if (targeter.getNShardsOwningChunks() == 1) {
+                    executeChildBatches(opCtx,
+                                        targeter,
+                                        clientRequest,
+                                        childBatches,
+                                        stats,
+                                        batchOp,
+                                        abortBatch,
+                                        allowShardKeyUpdatesWithoutFullShardKeyInQuery);
+                } else {
+                    // Execute the two phase write protocol for writes that cannot directly target a
+                    // shard. If there are any transaction errors, 'abortBatch' will be set.
+                    executeTwoPhaseWrite(opCtx,
+                                         targeter,
+                                         batchOp,
+                                         childBatches,
+                                         stats,
+                                         clientRequest,
+                                         abortBatch,
+                                         allowShardKeyUpdatesWithoutFullShardKeyInQuery);
+                }
             } else {
                 // Tries to execute all of the child batches. If there are any transaction errors,
                 // 'abortBatch' will be set.
                 executeChildBatches(
-                    opCtx, targeter, clientRequest, childBatches, stats, batchOp, abortBatch);
+                    opCtx,
+                    targeter,
+                    clientRequest,
+                    childBatches,
+                    stats,
+                    batchOp,
+                    abortBatch,
+                    boost::none /* allowShardKeyUpdatesWithoutFullShardKeyInQuery */);
             }
         }
 
