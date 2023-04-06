@@ -49,6 +49,8 @@ std::shared_ptr<TenantMigrationRecipientAccessBlocker> getRecipientAccessBlocker
 std::shared_ptr<TenantMigrationRecipientAccessBlocker> getTenantMigrationRecipientAccessBlocker(
     ServiceContext* serviceContext, StringData tenantId);
 
+void fassertOnUnsafeInitialSync(const UUID& migrationId);
+
 /**
  * Add an access blocker if one does not already exist.
  */

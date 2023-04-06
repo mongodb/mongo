@@ -206,6 +206,28 @@ Status insertDocumentsForOplog(OperationContext* opCtx,
     return Status::OK();
 }
 
+void assertInitialSyncCanContinueDuringShardMerge(OperationContext* opCtx,
+                                                  const NamespaceString& nss,
+                                                  const OplogEntry& op) {
+    // Running shard merge during initial sync can lead to potential data loss on this node.
+    // So, we perform safety check during oplog catchup and at the end of initial sync
+    // recovery. (see recoverShardMergeRecipientAccessBlockers() for the detailed comment about the
+    // problematic scenario that can cause data loss.)
+    if (nss == NamespaceString::kShardMergeRecipientsNamespace) {
+        if (auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+            replCoord && replCoord->isReplEnabled() && replCoord->getMemberState().startup2()) {
+            BSONElement idField = op.getObject().getField("_id");
+            // If the 'o' field does not have an _id, then 'o2' should have it.
+            // Otherwise, the oplog entry is corrupted.
+            if (idField.eoo() && op.getObject2()) {
+                idField = op.getObject2()->getField("_id");
+            }
+            const auto& migrationId = uassertStatusOK(UUID::parse(idField));
+            tenant_migration_access_blocker::fassertOnUnsafeInitialSync(migrationId);
+        }
+    }
+}
+
 }  // namespace
 
 ApplyImportCollectionFn applyImportCollection = applyImportCollectionDefault;
@@ -1517,6 +1539,8 @@ Status applyOperation_inlock(OperationContext* opCtx,
         collection = CollectionPtr(
             CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, requestNss));
     }
+
+    assertInitialSyncCanContinueDuringShardMerge(opCtx, requestNss, op);
 
     BSONObj o = op.getObject();
 

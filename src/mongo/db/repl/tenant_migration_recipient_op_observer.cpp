@@ -160,46 +160,6 @@ void handleShardMergeDocInsertion(const TenantMigrationRecipientDocument& doc,
 }
 }  // namespace
 
-void TenantMigrationRecipientOpObserver::onCreateCollection(OperationContext* opCtx,
-                                                            const CollectionPtr& coll,
-                                                            const NamespaceString& collectionName,
-                                                            const CollectionOptions& options,
-                                                            const BSONObj& idIndex,
-                                                            const OplogSlot& createOpTime,
-                                                            bool fromMigrate) {
-    if (!shard_merge_utils::isDonatedFilesCollection(collectionName)) {
-        return;
-    }
-
-    auto collString = collectionName.coll().toString();
-    auto migrationUUID = uassertStatusOK(UUID::parse(collString.substr(collString.find('.') + 1)));
-    auto fileClonerTempDirPath = shard_merge_utils::fileClonerTempDir(migrationUUID);
-
-    // This is possible when a secondary restarts or rollback and the donated files collection
-    // is created as part of oplog replay.
-    if (boost::filesystem::exists(fileClonerTempDirPath)) {
-        LOGV2_DEBUG(6113316,
-                    1,
-                    "File cloner temp directory already exists",
-                    "directory"_attr = fileClonerTempDirPath.generic_string());
-
-        // Ignoring the errors because if this step fails, then the following step
-        // create_directory() will fail and that will throw an exception.
-        boost::system::error_code ec;
-        boost::filesystem::remove_all(fileClonerTempDirPath, ec);
-    }
-
-    try {
-        boost::filesystem::create_directory(fileClonerTempDirPath);
-    } catch (std::exception& e) {
-        LOGV2_ERROR(6113317,
-                    "Error creating file cloner temp directory",
-                    "directory"_attr = fileClonerTempDirPath.generic_string(),
-                    "error"_attr = e.what());
-        throw;
-    }
-}
-
 void TenantMigrationRecipientOpObserver::onInserts(
     OperationContext* opCtx,
     const CollectionPtr& coll,
@@ -229,18 +189,6 @@ void TenantMigrationRecipientOpObserver::onInserts(
                 handleShardMergeDocInsertion(recipientStateDoc, opCtx);
             }
         }
-    }
-
-    if (!shard_merge_utils::isDonatedFilesCollection(coll->ns())) {
-        return;
-    }
-
-    auto fileImporter = repl::TenantFileImporterService::get(opCtx->getServiceContext());
-    for (auto it = first; it != last; it++) {
-        const auto& metadataDoc = it->doc;
-        auto migrationId =
-            uassertStatusOK(UUID::parse(metadataDoc[shard_merge_utils::kMigrationIdFieldName]));
-        fileImporter->learnedFilename(migrationId, metadataDoc);
     }
 }
 

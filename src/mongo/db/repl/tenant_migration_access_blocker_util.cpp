@@ -194,6 +194,19 @@ bool recoverTenantMigrationDonorAccessBlockers(OperationContext* opCtx,
 
 bool recoverShardMergeRecipientAccessBlockers(OperationContext* opCtx,
                                               const ShardMergeRecipientDocument& doc) {
+    auto replCoord = repl::ReplicationCoordinator::get(getGlobalServiceContext());
+    invariant(replCoord && replCoord->isReplEnabled());
+
+    // If the initial syncing node (both FCBIS and logical initial sync) syncs from a sync source
+    // that's in the middle of file copy/import phase of shard merge, it can cause the initial
+    // syncing node to have only partial donor data. And, if this node went into initial sync (i.e,
+    // resync) after it sent `recipientVoteImportedFiles` to the recipient primary, the primary
+    // can commit the migration and cause permanent data loss on this node.
+    if (replCoord->getMemberState().startup2() &&
+        doc.getState() < ShardMergeRecipientStateEnum::kConsistent) {
+        fassertOnUnsafeInitialSync(doc.getId());
+    }
+
     // Do not create mtab for following cases. Otherwise, we can get into potential race
     // causing recovery procedure to fail with `ErrorCodes::ConflictingServerlessOperation`.
     // 1) The migration was skipped.
@@ -234,6 +247,14 @@ bool recoverShardMergeRecipientAccessBlockers(OperationContext* opCtx,
     return true;
 }
 }  // namespace
+
+void fassertOnUnsafeInitialSync(const UUID& migrationId) {
+    LOGV2_FATAL_NOTRACE(
+        7219900,
+        "Terminating this node as it not safe to run initial sync when shard merge is "
+        "active. Otherwise, it can lead to data loss.",
+        "migrationId"_attr = migrationId);
+}
 
 std::shared_ptr<TenantMigrationDonorAccessBlocker> getDonorAccessBlockerForMigration(
     ServiceContext* serviceContext, const UUID& migrationId) {
@@ -538,6 +559,13 @@ void recoverTenantMigrationAccessBlockers(OperationContext* opCtx) {
 
     recipientStore.forEach(opCtx, {}, [&](const TenantMigrationRecipientDocument& doc) {
         return recoverTenantMigrationRecipientAccessBlockers(opCtx, doc);
+    });
+
+    PersistentTaskStore<ShardMergeRecipientDocument> mergeRecipientStore(
+        NamespaceString::kShardMergeRecipientsNamespace);
+
+    mergeRecipientStore.forEach(opCtx, {}, [&](const ShardMergeRecipientDocument& doc) {
+        return recoverShardMergeRecipientAccessBlockers(opCtx, doc);
     });
 
     // Recover TenantMigrationDonorAccessBlockers for ShardSplit.

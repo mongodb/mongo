@@ -22,7 +22,7 @@ const tenantMigrationTest =
 
 const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 
-// Note: including this explicit early return here due to the fact that multiversion
+// Note: Including this explicit early return here due to the fact that multiversion
 // suites will execute this test without featureFlagShardMerge enabled (despite the
 // presence of the featureFlagShardMerge tag above), which means the test will attempt
 // to run a multi-tenant migration and fail.
@@ -59,6 +59,14 @@ assert.commandWorked(
 
 waitInFailPoint.wait();
 
+// Before transitioning to `kConsistent` state, check that all recipient nodes have
+// "importDoneMarker" collection.
+const importMarkerCollName = "importDoneMarker." + extractUUIDFromObject(migrationUuid);
+tenantMigrationTest.getRecipientRst().nodes.forEach(node => {
+    jsTestLog(`Checking if the local.${importMarkerCollName} collection exists on ${node}`);
+    assert.eq(1, node.getDB("local").getCollectionInfos({name: importMarkerCollName}).length);
+});
+
 tenantMigrationTest.assertRecipientNodesInExpectedState({
     nodes: tenantMigrationTest.getRecipientRst().nodes,
     migrationId: migrationUuid,
@@ -75,6 +83,7 @@ const donorPrimaryCountDocumentsResult = donorPrimary.getDB(tenantDB)[collName].
 const donorPrimaryCountResult = donorPrimary.getDB(tenantDB)[collName].count();
 
 tenantMigrationTest.getRecipientRst().nodes.forEach(node => {
+    jsTestLog(`Checking ${tenantDB}.${collName} on ${node}`);
     // Use "countDocuments" to check actual docs, "count" to check sizeStorer data.
     assert.eq(donorPrimaryCountDocumentsResult,
               node.getDB(tenantDB)[collName].countDocuments({}),

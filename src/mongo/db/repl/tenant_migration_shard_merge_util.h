@@ -47,6 +47,7 @@
 namespace mongo::repl::shard_merge_utils {
 
 inline constexpr StringData kDonatedFilesPrefix = "donatedFiles."_sd;
+inline constexpr StringData kImportDoneMarkerPrefix = "importDoneMarker."_sd;
 inline constexpr StringData kMigrationTmpDirPrefix = "migrationTmpFiles"_sd;
 inline constexpr StringData kMigrationIdFieldName = "migrationId"_sd;
 inline constexpr StringData kBackupIdFieldName = "backupId"_sd;
@@ -60,6 +61,10 @@ inline bool isDonatedFilesCollection(const NamespaceString& ns) {
 inline NamespaceString getDonatedFilesNs(const UUID& migrationUUID) {
     return NamespaceString::makeGlobalConfigCollection(kDonatedFilesPrefix +
                                                        migrationUUID.toString());
+}
+
+inline NamespaceString getImportDoneMarkerNs(const UUID& migrationUUID) {
+    return NamespaceString::makeLocalCollection(kImportDoneMarkerPrefix + migrationUUID.toString());
 }
 
 inline boost::filesystem::path fileClonerTempDir(const UUID& migrationId) {
@@ -102,6 +107,12 @@ struct MetadataInfo {
         return bob.obj();
     }
 };
+
+/**
+ * Helpers to create and drop the import done marker collection.
+ */
+void createImportDoneMarkerLocalCollection(OperationContext* opCtx, const UUID& migrationId);
+void dropImportDoneMarkerLocalCollection(OperationContext* opCtx, const UUID& migrationId);
 
 /**
  * Copy a file from the donor.

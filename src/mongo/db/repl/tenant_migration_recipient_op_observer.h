@@ -138,7 +138,7 @@ public:
                             const CollectionOptions& options,
                             const BSONObj& idIndex,
                             const OplogSlot& createOpTime,
-                            bool fromMigrate) final;
+                            bool fromMigrate) final{};
 
     void onCollMod(OperationContext* opCtx,
                    const NamespaceString& nss,

@@ -38,12 +38,17 @@ const isShardMergeEnabledOnDonorPrimary =
 const oplogBufferCollectionName = (migrationIdString) =>
     `repl.migration.oplog_${migrationIdString}`;
 const donatedFilesCollectionName = (migrationIdString) => `donatedFiles.${migrationIdString}`;
+const importMarkerCollName = (migrationIdString) => `importDoneMarker.${migrationIdString}`;
 
 const assertTempCollectionsExist = (conn, migrationIdString) => {
     const collections = conn.getDB("config").getCollectionNames();
     assert(collections.includes(oplogBufferCollectionName(migrationIdString)), collections);
     if (isShardMergeEnabledOnDonorPrimary) {
         assert(collections.includes(donatedFilesCollectionName(migrationIdString)), collections);
+        assert.eq(1,
+                  conn.getDB("local")
+                      .getCollectionInfos({name: importMarkerCollName(migrationIdString)})
+                      .length);
     }
 };
 
@@ -52,6 +57,10 @@ const assertTempCollectionsDoNotExist = (conn, migrationIdString) => {
     assert(!collections.includes(oplogBufferCollectionName(migrationIdString)), collections);
     if (isShardMergeEnabledOnDonorPrimary) {
         assert(!collections.includes(donatedFilesCollectionName(migrationIdString)), collections);
+        assert.eq(0,
+                  conn.getDB("local")
+                      .getCollectionInfos({name: importMarkerCollName(migrationIdString)})
+                      .length);
     }
 };
 

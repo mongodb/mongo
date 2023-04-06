@@ -121,6 +121,36 @@ std::string _getPathRelativeTo(const std::string& path, const std::string& baseP
 }
 }  // namespace
 
+void createImportDoneMarkerLocalCollection(OperationContext* opCtx, const UUID& migrationId) {
+    UnreplicatedWritesBlock writeBlock(opCtx);
+    // Collections in 'local' db should not expect any lock or prepare conflicts.
+    AllowLockAcquisitionOnTimestampedUnitOfWork allowAcquisitionOfLocks(opCtx->lockState());
+
+    auto status = StorageInterface::get(opCtx)->createCollection(
+        opCtx, getImportDoneMarkerNs(migrationId), CollectionOptions());
+
+    if (!status.isOK()) {
+        uassertStatusOK(status.withContext(
+            str::stream() << "Failed to create import done marker local collection for migration: "
+                          << migrationId));
+    }
+}
+
+void dropImportDoneMarkerLocalCollection(OperationContext* opCtx, const UUID& migrationId) {
+    UnreplicatedWritesBlock writeBlock(opCtx);
+    // Collections in 'local' db should not expect any lock or prepare conflicts.
+    AllowLockAcquisitionOnTimestampedUnitOfWork allowAcquisitionOfLocks(opCtx->lockState());
+
+    auto status =
+        StorageInterface::get(opCtx)->dropCollection(opCtx, getImportDoneMarkerNs(migrationId));
+
+    if (!status.isOK()) {
+        uassertStatusOK(status.withContext(
+            str::stream() << "Failed to drop import done marker local collection for migration: "
+                          << migrationId));
+    }
+}
+
 void wiredTigerImportFromBackupCursor(OperationContext* opCtx,
                                       const UUID& migrationId,
                                       const std::string& importPath,
