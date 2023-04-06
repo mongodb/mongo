@@ -332,6 +332,10 @@ std::string CommonMongodProcessInterface::getShardName(OperationContext* opCtx) 
     return std::string();
 }
 
+bool CommonMongodProcessInterface::inShardedEnvironment(OperationContext* opCtx) const {
+    return ShardingState::get(opCtx)->enabled();
+}
+
 std::vector<GenericCursor> CommonMongodProcessInterface::getIdleCursors(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, CurrentOpUserMode userMode) const {
     return CursorManager::get(expCtx->opCtx)->getIdleCursors(expCtx->opCtx, userMode);

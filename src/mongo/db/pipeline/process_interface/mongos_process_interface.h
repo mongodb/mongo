@@ -66,6 +66,10 @@ public:
 
     bool isSharded(OperationContext* opCtx, const NamespaceString& nss) final;
 
+    bool inShardedEnvironment(OperationContext*) const final {
+        return true;
+    }
+
     Status insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                   const NamespaceString& ns,
                   std::vector<BSONObj>&& objs,

@@ -159,6 +159,11 @@ public:
     virtual bool isSharded(OperationContext* opCtx, const NamespaceString& ns) = 0;
 
     /**
+     * Returns whether this process is running as part of a sharded cluster.
+     */
+    virtual bool inShardedEnvironment(OperationContext* opCtx) const = 0;
+
+    /**
      * Advances the proxied write time associated with the client in ReplClientInfo to
      * be at least as high as the one tracked by the OperationTimeTracker associated with the
      * given operation context.
