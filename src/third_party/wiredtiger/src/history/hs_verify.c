@@ -73,9 +73,10 @@ __hs_verify_id(
 
         if (ds_cbt->compare != 0) {
             F_SET(S2C(session), WT_CONN_DATA_CORRUPTION);
+            /* Note that we are reformatting the HS key here. */
             WT_ERR_PANIC(session, WT_PANIC,
               "the associated history store key %s was not found in the data store %s",
-              __wt_buf_set_printable(session, key.data, key.size, false, prev_key),
+              __wt_key_string(session, key.data, key.size, CUR2BT(ds_cbt)->key_format, &key),
               session->dhandle->name);
         }
 
