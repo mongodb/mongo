@@ -477,6 +477,7 @@ private:
         const DistributionStatus& distribution,
         const CollectionDataSizeInfoForBalancing& collDataSizeInfo,
         const std::string& zone,
+        int64_t idealDataSizePerShardForZone,
         std::vector<MigrateInfo>* migrations,
         stdx::unordered_set<ShardId>* availableShards,
         ForceJumbo forceJumbo);
