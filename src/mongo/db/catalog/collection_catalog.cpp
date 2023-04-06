@@ -2022,8 +2022,11 @@ void CollectionCatalog::_registerCollection(OperationContext* opCtx,
         _pendingCommitUUIDs = _pendingCommitUUIDs.erase(uuid);
     }
 
-    if (commitTime && !commitTime->isNull()) {
+    if (commitTime) {
         coll->setMinimumValidSnapshot(commitTime.value());
+
+        // When restarting from standalone mode to a replica set, the stable timestamp may be null.
+        // We still need to register the nss and UUID with the catalog.
         _pushCatalogIdForNSSAndUUID(nss, uuid, coll->getCatalogId(), commitTime);
     }
 
@@ -2218,6 +2221,17 @@ void CollectionCatalog::_pushCatalogIdForNSSAndUUID(const NamespaceString& nss,
             } else if (ids.size() == 1 && !catalogId) {
                 // This namespace or UUID was removed due to an untimestamped write, clear entries.
                 ids.clear();
+            } else if (ids.size() > 1 && catalogId && !storageGlobalParams.repair) {
+                // This namespace or UUID was added due to an untimestamped write. But this
+                // namespace or UUID already had some timestamped writes performed. In this case, we
+                // re-write the history. The only known area that does this today is when profiling
+                // is enabled (untimestamped collection creation), followed by dropping the database
+                // (timestamped collection drop).
+                // TODO SERVER-75740: Remove this branch.
+                invariant(!ids.back().ts.isNull());
+
+                ids.clear();
+                ids.push_back(TimestampedCatalogId{catalogId, Timestamp::min()});
             }
 
             return;
@@ -2237,6 +2251,10 @@ void CollectionCatalog::_pushCatalogIdForNSSAndUUID(const NamespaceString& nss,
         if (!ids.empty() && ids.back().id == catalogId) {
             return;
         }
+
+        // A drop entry can't be pushed in the container if it's empty. This is because we cannot
+        // initialize the namespace or UUID with a single drop.
+        invariant(!ids.empty() || catalogId);
 
         ids.push_back(TimestampedCatalogId{catalogId, *ts});
 
@@ -2435,16 +2453,11 @@ void CollectionCatalog::_markForCatalogIdCleanupIfNeeded(
         }
     };
 
-    // Cleanup may occur if we have more than one entry for the namespace or if the only entry is a
-    // drop.
+    // Cleanup may occur if we have more than one entry for the namespace.
     if (ids.size() > 1) {
         // When we have multiple entries, use the time at the second entry as the cleanup time,
         // when the oldest timestamp advances past this we no longer need the first entry.
         markForCleanup(ids.at(1).ts);
-    } else if (ids.front().id == boost::none) {
-        // If we just have a single delete, we can clean this up when the oldest timestamp advances
-        // past this time.
-        markForCleanup(ids.front().ts);
     }
 }
 
