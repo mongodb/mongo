@@ -43,12 +43,16 @@ namespace mongo::write_ops_exec {
  */
 class LastOpFixer {
 public:
-    LastOpFixer(OperationContext* opCtx, const NamespaceString& ns);
+    LastOpFixer(OperationContext* opCtx);
 
     ~LastOpFixer();
 
-    void startingOp();
+    // Called when we are starting an operation on the given namespace. The namespace is
+    // needed so we can check if it is local, since we do not need to fix lastOp for local
+    // writes.
+    void startingOp(const NamespaceString& ns);
 
+    // Called when we finish the operation that we last called startingOp() for.
     void finishedOpSuccessfully();
 
 private:
@@ -58,7 +62,6 @@ private:
 
     OperationContext* const _opCtx;
     bool _needToFixLastOp = true;
-    const bool _isOnLocalDb;
     repl::OpTime _opTimeAtLastOpStart;
 };
 

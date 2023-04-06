@@ -589,7 +589,7 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
             if (!collection->getCollection()->isCapped() && !inTxn && batch.size() > 1) {
                 // First try doing it all together. If all goes well, this is all we need to do.
                 // See Collection::_insertDocuments for why we do all capped inserts one-at-a-time.
-                lastOpFixer->startingOp();
+                lastOpFixer->startingOp(nss);
                 insertDocuments(opCtx,
                                 collection->getCollection(),
                                 batch.begin(),
@@ -629,7 +629,7 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
                     // Transactions are not allowed to operate on capped collections.
                     uassertStatusOK(
                         checkIfTransactionOnCappedColl(opCtx, collection->getCollection()));
-                    lastOpFixer->startingOp();
+                    lastOpFixer->startingOp(nss);
                     insertDocuments(opCtx,
                                     collection->getCollection(),
                                     it,
@@ -968,7 +968,7 @@ WriteResult performInserts(OperationContext* opCtx,
     DisableSafeContentValidationIfTrue safeContentValidationDisabler(
         opCtx, disableDocumentValidation, fleCrudProcessed);
 
-    LastOpFixer lastOpFixer(opCtx, wholeOp.getNamespace());
+    LastOpFixer lastOpFixer(opCtx);
 
     WriteResult out;
     out.results.reserve(wholeOp.getDocuments().size());
@@ -1347,7 +1347,7 @@ WriteResult performUpdates(OperationContext* opCtx,
     DisableSafeContentValidationIfTrue safeContentValidationDisabler(
         opCtx, disableDocumentValidation, fleCrudProcessed);
 
-    LastOpFixer lastOpFixer(opCtx, ns);
+    LastOpFixer lastOpFixer(opCtx);
 
     bool containsRetry = false;
     ON_BLOCK_EXIT([&] { updateRetryStats(opCtx, containsRetry); });
@@ -1401,7 +1401,7 @@ WriteResult performUpdates(OperationContext* opCtx,
         }
 
         try {
-            lastOpFixer.startingOp();
+            lastOpFixer.startingOp(ns);
 
             // A time-series insert can combine multiple writes into a single operation, and thus
             // can have multiple statement ids associated with it if it is retryable.
@@ -1615,7 +1615,7 @@ WriteResult performDeletes(OperationContext* opCtx,
     DisableSafeContentValidationIfTrue safeContentValidationDisabler(
         opCtx, disableDocumentValidation, fleCrudProcessed);
 
-    LastOpFixer lastOpFixer(opCtx, ns);
+    LastOpFixer lastOpFixer(opCtx);
 
     bool containsRetry = false;
     ON_BLOCK_EXIT([&] { updateRetryStats(opCtx, containsRetry); });
@@ -1675,7 +1675,7 @@ WriteResult performDeletes(OperationContext* opCtx,
         }
 
         try {
-            lastOpFixer.startingOp();
+            lastOpFixer.startingOp(ns);
 
             boost::optional<Timer> timer;
             if (singleOp.getMulti()) {
@@ -1731,8 +1731,8 @@ Status performAtomicTimeseriesWrites(
 
     DisableDocumentValidation disableDocumentValidation{opCtx};
 
-    LastOpFixer lastOpFixer{opCtx, ns};
-    lastOpFixer.startingOp();
+    LastOpFixer lastOpFixer(opCtx);
+    lastOpFixer.startingOp(ns);
 
     AutoGetCollection coll{opCtx, ns, MODE_IX};
     if (!coll) {

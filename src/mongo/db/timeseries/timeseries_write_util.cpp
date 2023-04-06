@@ -154,8 +154,8 @@ Status performAtomicWrites(OperationContext* opCtx,
 
     DisableDocumentValidation disableDocumentValidation{opCtx};
 
-    write_ops_exec::LastOpFixer lastOpFixer{opCtx, ns};
-    lastOpFixer.startingOp();
+    write_ops_exec::LastOpFixer lastOpFixer{opCtx};
+    lastOpFixer.startingOp(ns);
 
     auto curOp = CurOp::get(opCtx);
     curOp->raiseDbProfileLevel(CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(ns.dbName()));

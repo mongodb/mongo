@@ -35,18 +35,16 @@
 
 namespace mongo::write_ops_exec {
 
-LastOpFixer::LastOpFixer(OperationContext* opCtx, const NamespaceString& ns)
-    : _opCtx(opCtx), _isOnLocalDb(ns.isLocal()) {}
+LastOpFixer::LastOpFixer(OperationContext* opCtx) : _opCtx(opCtx) {}
 
 LastOpFixer::~LastOpFixer() {
     // We don't need to do this if we are in a multi-document transaction as read-only/noop
     // transactions will always write another noop entry at transaction commit time which we can
     // use to wait for writeConcern.
-    if (!_opCtx->inMultiDocumentTransaction() && _needToFixLastOp && !_isOnLocalDb) {
+    if (!_opCtx->inMultiDocumentTransaction() && _needToFixLastOp) {
         // If this operation has already generated a new lastOp, don't bother setting it
         // here. No-op updates will not generate a new lastOp, so we still need the
-        // guard to fire in that case. Operations on the local DB aren't replicated, so they
-        // don't need to bump the lastOp.
+        // guard to fire in that case.
         replClientInfo().setLastOpToSystemLastOpTimeIgnoringCtxInterrupted(_opCtx);
         LOGV2_DEBUG(20888,
                     5,
@@ -56,15 +54,17 @@ LastOpFixer::~LastOpFixer() {
     }
 }
 
-void LastOpFixer::startingOp() {
-    _needToFixLastOp = true;
+void LastOpFixer::startingOp(const NamespaceString& ns) {
+    // Operations on the local DB aren't replicated, so they don't need to bump the lastOp.
+    _needToFixLastOp = !ns.isLocal();
     _opTimeAtLastOpStart = replClientInfo().getLastOp();
 }
 
 void LastOpFixer::finishedOpSuccessfully() {
-    // If the op was successful and bumped LastOp, we don't need to do it again. However, we
-    // still need to for no-ops and all failing ops.
-    _needToFixLastOp = (replClientInfo().getLastOp() == _opTimeAtLastOpStart);
+    // If we intended to fix the LastOp for this operation when it started, fix it now
+    // if it was a no-op write. If the op was successful and already bumped LastOp itself,
+    // we don't need to do it again.
+    _needToFixLastOp = _needToFixLastOp && (replClientInfo().getLastOp() == _opTimeAtLastOpStart);
 }
 
 void assertCanWrite_inlock(OperationContext* opCtx, const NamespaceString& nss) {

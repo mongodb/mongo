@@ -91,8 +91,16 @@ public:
         std::function<void(OperationContext*, size_t, write_ops_exec::WriteResult&)>;
 
     InsertBatch() = delete;
-    InsertBatch(const BulkWriteCommandRequest& request, int capacity, ReplyHandler replyCallback)
-        : _req(request), _replyFn(replyCallback), _currentNs(), _batch(), _firstOpIdx() {
+    InsertBatch(const BulkWriteCommandRequest& request,
+                int capacity,
+                ReplyHandler replyCallback,
+                write_ops_exec::LastOpFixer& lastOpFixer)
+        : _req(request),
+          _replyFn(replyCallback),
+          _lastOpFixer(lastOpFixer),
+          _currentNs(),
+          _batch(),
+          _firstOpIdx() {
         _batch.reserve(capacity);
     }
 
@@ -113,14 +121,12 @@ public:
         auto size = _batch.size();
         out.results.reserve(size);
 
-        write_ops_exec::LastOpFixer lastOpFixer(opCtx, _currentNs.getNs());
-
         out.canContinue = write_ops_exec::insertBatchAndHandleErrors(opCtx,
                                                                      _currentNs.getNs(),
                                                                      _currentNs.getCollectionUUID(),
                                                                      _req.getOrdered(),
                                                                      _batch,
-                                                                     &lastOpFixer,
+                                                                     &_lastOpFixer,
                                                                      &out,
                                                                      OperationSource::kStandard);
         _batch.clear();
@@ -162,6 +168,7 @@ public:
 private:
     const BulkWriteCommandRequest& _req;
     ReplyHandler _replyFn;
+    write_ops_exec::LastOpFixer& _lastOpFixer;
     NamespaceInfoEntry _currentNs;
     std::vector<InsertStatement> _batch;
     boost::optional<int> _firstOpIdx;
@@ -823,7 +830,8 @@ std::vector<BulkWriteReplyItem> performWrites(OperationContext* opCtx,
 
     // Create a current insert batch.
     const size_t maxBatchSize = internalInsertMaxBatchSize.load();
-    auto batch = InsertBatch(req, std::min(ops.size(), maxBatchSize), insertCB);
+    write_ops_exec::LastOpFixer lastOpFixer(opCtx);
+    auto batch = InsertBatch(req, std::min(ops.size(), maxBatchSize), insertCB, lastOpFixer);
 
     size_t idx = 0;
 
