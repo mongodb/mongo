@@ -284,7 +284,7 @@ TEST_F(WiredTigerKVEngineTest, TestOplogTruncation) {
     auto opCtxPtr = _makeOperationContext();
     // The initial data timestamp has to be set to take stable checkpoints. The first stable
     // timestamp greater than this will also trigger a checkpoint. The following loop of the
-    // CheckpointThread will observe the new `checkpointDelaySecs` value.
+    // CheckpointThread will observe the new `syncdelay` value.
     _helper.getWiredTigerKVEngine()->setInitialDataTimestamp(Timestamp(1, 1));
 
 
@@ -297,7 +297,7 @@ TEST_F(WiredTigerKVEngineTest, TestOplogTruncation) {
 #endif
 #endif
     {
-        storageGlobalParams.checkpointDelaySecs = 1;
+        storageGlobalParams.syncdelay = 1;
     }
     ();
 

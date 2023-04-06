@@ -427,17 +427,18 @@ WiredTigerKVEngine::WiredTigerKVEngine(OperationContext* opCtx,
         // checkpoints more often.
         const double fourMinutesInSeconds = 240.0;
         int ckptsPerFourMinutes;
-        if (storageGlobalParams.checkpointDelaySecs <= 0.0) {
+        if (storageGlobalParams.syncdelay <= 0.0) {
             ckptsPerFourMinutes = 1;
         } else {
             ckptsPerFourMinutes =
-                static_cast<int>(fourMinutesInSeconds / storageGlobalParams.checkpointDelaySecs);
+                static_cast<int>(fourMinutesInSeconds / storageGlobalParams.syncdelay);
         }
 
         if (ckptsPerFourMinutes < 1) {
             LOGV2_WARNING(8423377,
                           "Unexpected value for checkpoint retention",
-                          "checkpointDelaySecs"_attr = storageGlobalParams.checkpointDelaySecs,
+                          "syncdelay"_attr =
+                              static_cast<std::int64_t>(storageGlobalParams.syncdelay),
                           "ckptsPerFourMinutes"_attr = ckptsPerFourMinutes);
             ckptsPerFourMinutes = 1;
         }

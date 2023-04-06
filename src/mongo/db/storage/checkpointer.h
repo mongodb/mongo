@@ -58,7 +58,7 @@ public:
     }
 
     /**
-     * Starts the checkpoint thread that runs every storageGlobalParams.checkpointDelaySecs seconds.
+     * Starts the checkpoint thread that runs every storageGlobalParams.syncdelay seconds.
      */
     void run() override;
 
@@ -66,9 +66,9 @@ public:
      * Triggers taking the first stable checkpoint if the stable timestamp has advanced past the
      * initial data timestamp.
      *
-     * The checkpoint thread runs automatically every storageGlobalParams.checkpointDelaySecs
-     * seconds. This function avoids potentially waiting that full duration for a stable checkpoint,
-     * initiating one immediately.
+     * The checkpoint thread runs automatically every storageGlobalParams.syncdelay seconds. This
+     * function avoids potentially waiting that full duration for a stable checkpoint, initiating
+     * one immediately.
      *
      * Do not call this function if hasTriggeredFirstStableCheckpoint() returns true.
      */

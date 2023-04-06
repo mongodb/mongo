@@ -80,18 +80,17 @@ void Checkpointer::run() {
             stdx::unique_lock<Latch> lock(_mutex);
             MONGO_IDLE_THREAD_BLOCK;
 
-            // Wait for 'storageGlobalParams.checkpointDelaySecs' seconds; or until either shutdown
-            // is signaled or a checkpoint is triggered.
-            _sleepCV.wait_for(lock,
-                              stdx::chrono::seconds(static_cast<std::int64_t>(
-                                  storageGlobalParams.checkpointDelaySecs)),
-                              [&] { return _shuttingDown || _triggerCheckpoint; });
+            // Wait for 'storageGlobalParams.syncdelay' seconds; or until either shutdown is
+            // signaled or a checkpoint is triggered.
+            _sleepCV.wait_for(
+                lock,
+                stdx::chrono::seconds(static_cast<std::int64_t>(storageGlobalParams.syncdelay)),
+                [&] { return _shuttingDown || _triggerCheckpoint; });
 
-            // If the checkpointDelaySecs is set to 0, that means we should skip checkpointing.
-            // However, checkpointDelaySecs is adjustable by a runtime server parameter, so we
-            // need to wake up to check periodically. The wakeup to check period is arbitrary.
-            while (storageGlobalParams.checkpointDelaySecs == 0 && !_shuttingDown &&
-                   !_triggerCheckpoint) {
+            // If the syncdelay is set to 0, that means we should skip checkpointing. However,
+            // syncdelay is adjustable by a runtime server parameter, so we need to wake up to check
+            // periodically. The wakeup to check period is arbitrary.
+            while (storageGlobalParams.syncdelay == 0 && !_shuttingDown && !_triggerCheckpoint) {
                 _sleepCV.wait_for(lock, stdx::chrono::seconds(static_cast<std::int64_t>(3)), [&] {
                     return _shuttingDown || _triggerCheckpoint;
                 });

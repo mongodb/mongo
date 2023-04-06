@@ -58,7 +58,6 @@ void StorageGlobalParams::reset() {
     oplogMinRetentionHours.store(0.0);
     allowOplogTruncation = true;
     disableLockFreeReads = false;
-    checkpointDelaySecs = 0;
     forceDisableTableLogging = false;
 }
 
