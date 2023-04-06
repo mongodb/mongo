@@ -7359,13 +7359,28 @@ tasks:
       aws_key_remote: ${repo_aws_key}
       aws_secret_remote: ${repo_aws_secret}
   - func: "f_expansions_write"
-  - func: "set up notary client credentials"
+
+  # login to container registry
+  - command: shell.exec
+    params:
+      shell: bash
+      script: |
+        set -oe
+        podman login --username ${release_tools_container_registry_username} --password ${release_tools_container_registry_password} ${release_tools_container_registry}
+
+  # signing windows artifacts
   - command: subprocess.exec
-    type: test
     params:
       binary: bash
       args:
-      - "./src/evergreen/notary_client_run.sh"
+      - "./src/evergreen/garasign_jsign_sign.sh"
+
+  # signing linux artifacts
+  - command: subprocess.exec
+    params:
+      binary: bash
+      args:
+      - "./src/evergreen/garasign_gpg_sign.sh"
 
   # Put the binaries tarball/zipfile
   - command: s3.put
