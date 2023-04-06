@@ -83,6 +83,9 @@ rst.start(secondary.nodeId, undefined, true /* restart */);
 secondary = rst.getSecondary();
 secondaryDB = secondary.getDB(testDB.getName());
 
+// Wait for the restarted secondary node to reach SECONDARY state again.
+rst.waitForState(secondary, ReplSetTest.State.SECONDARY);
+
 // Wait for the index build to complete on all nodes.
 rst.awaitReplication();
 
