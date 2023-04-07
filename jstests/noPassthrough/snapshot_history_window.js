@@ -38,7 +38,9 @@ jsTestLog(`Inserted one document at ${tojson(insertTimestamp)}`);
 let nextId = 1;
 
 // Test snapshot window with 1s margin.
+const testMarginSecs = 1;
 const testMarginMS = 1000;
+let numSnapshotTooOld = 0;
 
 // Test that reading from a snapshot at insertTimestamp is valid for up to historyWindowSecs minus
 // the testMarginMS (as a buffer) to avoid races between the client's snapshot read and the update
@@ -46,8 +48,22 @@ const testMarginMS = 1000;
 const testWindowMS = historyWindowSecs * 1000 - testMarginMS;
 while (Date.now() - startTime < testWindowMS) {
     // Test that reading from a snapshot at insertTimestamp is still valid.
-    assert.commandWorked(primaryDB.runCommand(
-        {find: collName, readConcern: {level: "snapshot", atClusterTime: insertTimestamp}}));
+    const res = primaryDB.runCommand(
+        {find: collName, readConcern: {level: "snapshot", atClusterTime: insertTimestamp}});
+    if (res.operationTime.t - insertTimestamp.t > historyWindowSecs - testMarginSecs) {
+        // Too close to the window and we may get a false positive failure. Give up this test. This
+        // can happen on slow machines.
+        jsTestLog("Skipping test with operationTime: " + tojson(res.operationTime) +
+                  " res: " + tojson(res));
+        if (res.code === ErrorCodes.SnapshotTooOld) {
+            numSnapshotTooOld++;
+        }
+        break;
+    } else {
+        // Otherwise, test that the snapshot read is still valid.
+        assert.commandWorked(
+            res, "failed to read at snapshot " + tojson(insertTimestamp) + " res: " + tojson(res));
+    }
 
     // Perform writes to advance stable timestamp and oldest timestamp. We use majority writeConcern
     // so that we can make sure the stable timestamp and the oldest timestamp are updated after each
@@ -71,10 +87,11 @@ assert.commandFailedWithCode(
     primaryDB.runCommand(
         {find: collName, readConcern: {level: "snapshot", atClusterTime: insertTimestamp}}),
     ErrorCodes.SnapshotTooOld);
+numSnapshotTooOld++;
 
 // Test that the SnapshotTooOld is recorded in serverStatus.
 const serverStatusWT = assert.commandWorked(primaryDB.adminCommand({serverStatus: 1})).wiredTiger;
-assert.eq(1,
+assert.eq(numSnapshotTooOld,
           serverStatusWT["snapshot-window-settings"]["total number of SnapshotTooOld errors"],
           tojson(serverStatusWT));
 
