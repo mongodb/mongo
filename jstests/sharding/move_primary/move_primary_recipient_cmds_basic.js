@@ -1,7 +1,10 @@
 /**
  * Tests that MovePrimaryRecipient commands work as intended.
  *
- * @tags: [featureFlagOnlineMovePrimaryLifecycle]
+ *  @tags: [
+ *    requires_fcv_70,
+ *    featureFlagOnlineMovePrimaryLifecycle
+ * ]
  */
 (function() {
 'use strict';
