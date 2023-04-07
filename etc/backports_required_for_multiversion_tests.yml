@@ -350,8 +350,6 @@ last-continuous:
     ticket: SERVER-74460
   - test_file: jstests/sharding/query/group_plan_cache_sharded.js
     ticket: SERVER-74245
-  - test_file: jstests/replsets/tenant_migration_metrics_output.js
-    ticket: SERVER-75601
   - test_file: jstests/noPassthrough/ttl_operation_metrics_multi_dbs.js
     ticket: SERVER-75277
   - test_file: jstests/core/map_reduce_subplanning.js
@@ -779,8 +777,6 @@ last-lts:
     ticket: SERVER-74461
   - test_file: src/mongo/db/modules/enterprise/jstests/fle2/top_command.js
     ticket: SERVER-74460
-  - test_file: jstests/replsets/tenant_migration_metrics_output.js
-    ticket: SERVER-75601
   - test_file: jstests/noPassthrough/ttl_operation_metrics_multi_dbs.js
     ticket: SERVER-75277
   - test_file: jstests/core/map_reduce_subplanning.js
