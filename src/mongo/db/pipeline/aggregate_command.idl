@@ -150,6 +150,10 @@ commands:
                     agg_stage: listCatalog
                     resource_pattern: any_system_buckets
                     action_type: [listCollections, listIndexes]
+                - privilege: # $listSampledQueries
+                    agg_stage: listSampledQueries
+                    resource_pattern: cluster
+                    action_type: [listSampledQueries]
                 - privilege: # $listSessions
                     resource_pattern: cluster
                     action_type: listSessions

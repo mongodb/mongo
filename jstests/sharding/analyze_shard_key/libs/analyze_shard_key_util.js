@@ -329,6 +329,19 @@ var AnalyzeShardKeyUtil = (function() {
         validateWriteDistributionMetrics(metrics.writeDistribution);
     }
 
+    function validateSampledQueryDocument(doc) {
+        const readCmdNames = new Set(["find", "aggregate", "count", "distinct"]);
+        assert(doc.hasOwnProperty("ns"), doc);
+        assert(doc.hasOwnProperty("collectionUuid"), doc);
+        assert(doc.hasOwnProperty("cmdName"), doc);
+        assert(doc.hasOwnProperty("cmd"), doc);
+        assert(doc.hasOwnProperty("expireAt"), doc);
+        if (readCmdNames.has(doc.cmdName)) {
+            assert(doc.cmd.hasOwnProperty("filter"));
+            assert(doc.cmd.hasOwnProperty("collation"));
+        }
+    }
+
     return {
         isHashedKeyPattern,
         isIdKeyPattern,
@@ -348,6 +361,7 @@ var AnalyzeShardKeyUtil = (function() {
         assertContainKeyCharacteristicsMetrics,
         assertKeyCharacteristicsMetrics,
         assertNotContainReadWriteDistributionMetrics,
-        assertContainReadWriteDistributionMetrics
+        assertContainReadWriteDistributionMetrics,
+        validateSampledQueryDocument
     };
 })();

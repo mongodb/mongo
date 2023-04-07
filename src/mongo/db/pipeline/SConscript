@@ -301,6 +301,7 @@ pipelineEnv.Library(
         'document_source_list_cached_and_active_users.cpp',
         'document_source_list_catalog.cpp',
         'document_source_list_local_sessions.cpp',
+        'document_source_list_sampled_queries.cpp',
         'document_source_list_sessions.cpp',
         'document_source_lookup.cpp',
         'document_source_match.cpp',
@@ -393,6 +394,7 @@ pipelineEnv.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
+        '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/fts/base_fts',
         '$BUILD_DIR/mongo/db/mongohasher',
         '$BUILD_DIR/mongo/db/query/optimizer/optimizer',
@@ -403,6 +405,7 @@ pipelineEnv.Library(
         '$BUILD_DIR/mongo/db/timeseries/timeseries_conversion_util',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
         '$BUILD_DIR/mongo/rpc/command_status',
+        '$BUILD_DIR/mongo/s/analyze_shard_key_util',
     ],
 )
 
@@ -476,6 +479,7 @@ env.Library(
         'document_source_fill.idl',
         'document_source_internal_all_collection_stats.idl',
         'document_source_internal_apply_oplog_update.idl',
+        'document_source_list_sampled_queries.idl',
         'document_source_list_sessions.idl',
         'document_source_merge.idl',
         'document_source_merge_modes.idl',

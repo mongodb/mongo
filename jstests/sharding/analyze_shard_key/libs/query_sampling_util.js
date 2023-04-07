@@ -331,6 +331,7 @@ var QuerySamplingUtil = (function() {
         waitForInactiveSampling,
         waitForActiveSamplingOnAllShards,
         waitForInactiveSamplingOnAllShards,
+        assertSubObject,
         assertSoonSampledQueryDocuments,
         assertSoonSampledQueryDocumentsAcrossShards,
         assertNoSampledQueryDocuments,
