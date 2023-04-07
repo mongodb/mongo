@@ -385,12 +385,14 @@ void ShardingCatalogManager::configureCollectionBalancing(
     const NamespaceString& nss,
     boost::optional<int32_t> chunkSizeMB,
     boost::optional<bool> defragmentCollection,
-    boost::optional<bool> enableAutoSplitter,
     boost::optional<bool> enableAutoMerger) {
 
-    uassert(ErrorCodes::InvalidOptions,
-            "invalid configure collection balancing update",
-            chunkSizeMB || defragmentCollection || enableAutoSplitter);
+    if (!chunkSizeMB && !defragmentCollection && !enableAutoMerger) {
+        // No-op in case no supported parameter has been specified.
+        // This allows not breaking backwards compatibility as command
+        // options may be added/removed over time.
+        return;
+    }
 
     // utility lambda to log the change
     auto logConfigureCollectionBalancing = [&]() {
@@ -401,10 +403,6 @@ void ShardingCatalogManager::configureCollectionBalancing(
 
         if (defragmentCollection) {
             logChangeDetail.append("defragmentCollection", defragmentCollection.get());
-        }
-
-        if (enableAutoSplitter) {
-            logChangeDetail.append("enableAutoSplitter", enableAutoSplitter.get());
         }
 
         ShardingLogging::get(opCtx)->logChange(opCtx,
@@ -440,11 +438,6 @@ void ShardingCatalogManager::configureCollectionBalancing(
             } else {
                 Balancer::get(opCtx)->abortCollectionDefragmentation(opCtx, nss);
             }
-        }
-        if (enableAutoSplitter) {
-            bool doSplit = enableAutoSplitter.value();
-            setClauseBuilder.append(CollectionType::kNoAutoSplitFieldName, !doSplit);
-            updatedFields++;
         }
         if (enableAutoMerger) {
             setClauseBuilder.append(CollectionType::kEnableAutoMergeFieldName,

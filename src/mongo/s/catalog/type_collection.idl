@@ -109,10 +109,6 @@ structs:
                 type: bool
                 description: "Balancer will merge chunks up to the configured maxChunkSizeBytes."
                 optional: true
-            noAutoSplit:
-                type: bool
-                description: "Specifies whether the auto-splitter should be running or not for this collection."
-                optional: true
             enableAutoMerge:
                 type: bool
                 description: "Specifies whether the auto-merger should be running or not for this collection."

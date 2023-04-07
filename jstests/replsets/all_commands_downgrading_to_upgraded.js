@@ -487,7 +487,7 @@ const allCommands = {
             assert.commandWorked(
                 conn.getDB('admin').runCommand({shardCollection: fullNs, key: {_id: 1}}));
         },
-        command: {configureCollectionBalancing: fullNs, enableAutoSplitter: true},
+        command: {configureCollectionBalancing: fullNs, chunkSize: 1},
         teardown: function(conn) {
             assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
         },

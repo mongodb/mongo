@@ -41,7 +41,6 @@ const char kCollEpoch[] = "collEpoch";
 const char kCollTimestamp[] = "collTimestamp";
 const char kSplitPoints[] = "splitPoints";
 const char kShardName[] = "shard";
-const char kFromChunkSplitter[] = "fromChunkSplitter";
 
 }  // namespace
 
@@ -50,15 +49,13 @@ SplitChunkRequest::SplitChunkRequest(NamespaceString nss,
                                      OID epoch,
                                      boost::optional<Timestamp> timestamp,
                                      ChunkRange chunkRange,
-                                     std::vector<BSONObj> splitPoints,
-                                     bool fromChunkSplitter)
+                                     std::vector<BSONObj> splitPoints)
     : _nss(std::move(nss)),
       _epoch(std::move(epoch)),
       _timestamp(std::move(timestamp)),
       _chunkRange(std::move(chunkRange)),
       _splitPoints(std::move(splitPoints)),
-      _shardName(std::move(shardName)),
-      _fromChunkSplitter(fromChunkSplitter) {}
+      _shardName(std::move(shardName)) {}
 
 StatusWith<SplitChunkRequest> SplitChunkRequest::parseFromConfigCommand(const BSONObj& cmdObj) {
     std::string ns;
@@ -114,19 +111,12 @@ StatusWith<SplitChunkRequest> SplitChunkRequest::parseFromConfigCommand(const BS
         return parseShardNameStatus;
     }
 
-    bool fromChunkSplitter = [&]() {
-        bool field = false;
-        Status status = bsonExtractBooleanField(cmdObj, kFromChunkSplitter, &field);
-        return status.isOK() && field;
-    }();
-
     auto request = SplitChunkRequest(NamespaceString(ns),
                                      std::move(shardName),
                                      std::move(epoch),
                                      std::move(timestamp),
                                      std::move(chunkRangeStatus.getValue()),
-                                     std::move(splitPoints),
-                                     fromChunkSplitter);
+                                     std::move(splitPoints));
     Status validationStatus = request._validate();
     if (!validationStatus.isOK()) {
         return validationStatus;
@@ -156,9 +146,6 @@ void SplitChunkRequest::appendAsConfigCommand(BSONObjBuilder* cmdBuilder) {
         }
     }
     cmdBuilder->append(kShardName, _shardName);
-    if (_fromChunkSplitter) {
-        cmdBuilder->append(kFromChunkSplitter, _fromChunkSplitter);
-    }
 }
 
 const NamespaceString& SplitChunkRequest::getNamespace() const {
@@ -179,10 +166,6 @@ const std::vector<BSONObj>& SplitChunkRequest::getSplitPoints() const {
 
 const std::string& SplitChunkRequest::getShardName() const {
     return _shardName;
-}
-
-bool SplitChunkRequest::isFromChunkSplitter() const {
-    return _fromChunkSplitter;
 }
 
 Status SplitChunkRequest::_validate() {
