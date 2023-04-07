@@ -56,6 +56,7 @@ MakeObjStageBase<O>::MakeObjStageBase(std::unique_ptr<PlanStage> input,
       _fieldBehavior(fieldBehavior),
       _fields(std::move(fields)),
       _projectFields(std::move(projectFields)),
+      _fieldNames(buildFieldNames(_fields, _projectFields)),
       _projectVars(std::move(projectVars)),
       _forceNewObject(forceNewObject),
       _returnOldObject(returnOldObject) {
@@ -109,19 +110,13 @@ void MakeObjStageBase<O>::prepare(CompileCtx& ctx) {
     if (_rootSlot) {
         _root = _children[0]->getAccessor(ctx, *_rootSlot);
     }
-    for (auto& p : _fields) {
-        // Mark the values from _fields with 'std::numeric_limits<size_t>::max()'.
-        auto [it, inserted] = _allFieldsMap.emplace(p, std::numeric_limits<size_t>::max());
-        uassert(4822818, str::stream() << "duplicate field: " << p, inserted);
-    }
 
     for (size_t idx = 0; idx < _projectFields.size(); ++idx) {
         auto& p = _projectFields[idx];
-        // Mark the values from _projectFields with their corresponding index.
-        auto [it, inserted] = _allFieldsMap.emplace(p, idx);
-        uassert(4822819, str::stream() << "duplicate field: " << p, inserted);
         _projects.emplace_back(p, _children[0]->getAccessor(ctx, _projectVars[idx]));
     }
+
+    _visited.resize(_projectFields.size());
 
     _compiled = true;
 }
@@ -169,75 +164,148 @@ void MakeObjStageBase<MakeObjOutputType::object>::produceObject() {
 
     _obj.reset(tag, val);
 
+    memset(_visited.data(), 0, _projectFields.size());
+
+    const bool isInclusion = _fieldBehavior == FieldBehavior::keep;
+
     if (_root) {
         auto [tag, val] = _root->getViewOfValue();
 
-        size_t computedFieldsSize = _projectFields.size();
-        size_t projectedFieldsSize = _fields.size();
-        size_t nFieldsNeededIfInclusion = projectedFieldsSize;
-        if (tag == value::TypeTags::bsonObject) {
-            if (!(nFieldsNeededIfInclusion == 0 && _fieldBehavior == FieldBehavior::keep)) {
-                auto be = value::bitcastTo<const char*>(val);
-                auto size = ConstDataView(be).read<LittleEndian<uint32_t>>();
-                auto end = be + size;
+        size_t numFieldsRemaining = _fields.size() + _projectFields.size();
+        size_t numComputedFieldsRemaining = _projectFields.size();
 
-                // Simple heuristic to determine number of fields.
-                size_t approximatedNumFieldsInRoot = (size / 16);
-                // If the field behaviour is 'keep', then we know that the output will have
-                // 'projectedFieldsSize + computedFieldsSize' fields. Otherwise, we use the
-                // approximated number of fields in the root document and then add
-                // 'projectedFieldsSize' to it to achieve a better approximation (Note: we don't
-                // subtract 'computedFieldsSize' from the result in the latter case, as it might
-                // lead to a negative number)
-                size_t numOutputFields = _fieldBehavior == FieldBehavior::keep
-                    ? projectedFieldsSize + computedFieldsSize
-                    : approximatedNumFieldsInRoot + projectedFieldsSize;
-                obj->reserve(numOutputFields);
-                // Skip document length.
-                be += sizeof(int32_t);
+        const size_t numFieldsRemainingThreshold = isInclusion ? 1 : 0;
+
+        if (tag == value::TypeTags::bsonObject) {
+            auto be = value::bitcastTo<const char*>(val);
+            const auto size = ConstDataView(be).read<LittleEndian<uint32_t>>();
+            const auto end = be + size;
+
+            // Skip document length.
+            be += sizeof(int32_t);
+
+            // Simple heuristic to approximate the number of fields in '_root'.
+            size_t approxNumFieldsInRoot = size / 16;
+
+            // If the field behaviour is 'keep', then we know that the output will have exactly
+            // '_fields.size() + _projectFields.size()' fields. Otherwise we use '_fields.size()'
+            // plus the approximated number of fields in '_root' to approximate the number of
+            // fields in the output object. (Note: we don't subtract '_projectFields.size()'
+            // from the result in the latter case, as it might lead to a negative number.)
+            size_t approxNumOutputFields = isInclusion ? _fields.size() + _projectFields.size()
+                                                       : _fields.size() + approxNumFieldsInRoot;
+            obj->reserve(approxNumOutputFields);
+
+            // Loop over _root's fields until numFieldsRemaining - numComputedFieldsRemaining == 0
+            // AND until one of the follow is true:
+            //   (1) numComputedFieldsRemaining == 1 and isInclusion == true; -OR-
+            //   (2) numComputedFieldsRemaining == 0.
+            if (numFieldsRemaining > numFieldsRemainingThreshold ||
+                numFieldsRemaining != numComputedFieldsRemaining) {
                 while (be != end - 1) {
                     auto sv = bson::fieldNameAndLength(be);
-                    auto key = StringMapHasher{}.hashed_key(StringData(sv));
+                    auto [found, projectIdx] = lookupField(sv);
 
-                    if (!isFieldProjectedOrRestricted(key)) {
-                        auto [tag, val] = bson::convertFrom<true>(be, end, sv.size());
-                        auto [copyTag, copyVal] = value::copyValue(tag, val);
-                        obj->push_back(sv, copyTag, copyVal);
-                        --nFieldsNeededIfInclusion;
+                    if (projectIdx == std::numeric_limits<size_t>::max()) {
+                        if (found == isInclusion) {
+                            auto [fieldTag, fieldVal] = bson::convertFrom<true>(be, end, sv.size());
+                            auto [copyTag, copyVal] = value::copyValue(fieldTag, fieldVal);
+                            obj->push_back(sv, copyTag, copyVal);
+                        }
+
+                        numFieldsRemaining -= found;
+                    } else {
+                        projectField(obj, projectIdx);
+                        _visited[projectIdx] = 1;
+                        --numFieldsRemaining;
+                        --numComputedFieldsRemaining;
                     }
 
-                    if (nFieldsNeededIfInclusion == 0 && _fieldBehavior == FieldBehavior::keep) {
+                    if (numFieldsRemaining <= numFieldsRemainingThreshold &&
+                        numFieldsRemaining == numComputedFieldsRemaining) {
+                        if (!isInclusion) {
+                            be = bson::advance(be, sv.size());
+                        }
+
                         break;
                     }
 
                     be = bson::advance(be, sv.size());
                 }
             }
-        } else if (tag == value::TypeTags::Object) {
-            if (!(nFieldsNeededIfInclusion == 0 && _fieldBehavior == FieldBehavior::keep)) {
-                auto objRoot = value::getObjectView(val);
-                auto numOutputFields = _fieldBehavior == FieldBehavior::keep
-                    ? projectedFieldsSize + computedFieldsSize
-                    : objRoot->size() + projectedFieldsSize;
-                obj->reserve(numOutputFields);
-                for (size_t idx = 0; idx < objRoot->size(); ++idx) {
-                    auto sv = objRoot->field(idx);
-                    auto key = StringMapHasher{}.hashed_key(StringData(sv));
 
-                    if (!isFieldProjectedOrRestricted(key)) {
-                        auto [tag, val] = objRoot->getAt(idx);
-                        auto [copyTag, copyVal] = value::copyValue(tag, val);
-                        obj->push_back(sv, copyTag, copyVal);
-                        --nFieldsNeededIfInclusion;
+            // If this is an exclusion projection and 'be' has not reached the end of the input
+            // object, copy over the remaining fields from the input object into 'bob'.
+            if (!isInclusion) {
+                while (be != end - 1) {
+                    auto sv = bson::fieldNameAndLength(be);
+
+                    auto [fieldTag, fieldVal] = bson::convertFrom<true>(be, end, sv.size());
+                    auto [copyTag, copyVal] = value::copyValue(fieldTag, fieldVal);
+                    obj->push_back(sv, copyTag, copyVal);
+
+                    be = bson::advance(be, sv.size());
+                }
+            }
+        } else if (tag == value::TypeTags::Object) {
+            auto objRoot = value::getObjectView(val);
+            size_t idx = 0;
+
+            // If the field behaviour is 'keep', then we know that the output will have exactly
+            // '_fields.size() + _projectFields.size()' fields. Otherwise use '_fields.size()'
+            // plus the number of fields in '_root' to approximate the number of fields in the
+            // output object. (Note: we don't subtract '_projectFields.size()' from the result
+            // in the latter case, as it might lead to a negative number.)
+            size_t approxNumOutputFields = isInclusion ? _fields.size() + _projectFields.size()
+                                                       : _fields.size() + objRoot->size();
+            obj->reserve(approxNumOutputFields);
+
+            // Loop over _root's fields until numFieldsRemaining - numComputedFieldsRemaining == 0
+            // AND until one of the follow is true:
+            //   (1) numComputedFieldsRemaining == 1 and isInclusion == true; -OR-
+            //   (2) numComputedFieldsRemaining == 0.
+            if (numFieldsRemaining > numFieldsRemainingThreshold ||
+                numFieldsRemaining != numComputedFieldsRemaining) {
+                for (idx = 0; idx < objRoot->size(); ++idx) {
+                    auto sv = StringData(objRoot->field(idx));
+                    auto [found, projectIdx] = lookupField(sv);
+
+                    if (projectIdx == std::numeric_limits<size_t>::max()) {
+                        if (found == isInclusion) {
+                            auto [fieldTag, fieldVal] = objRoot->getAt(idx);
+                            auto [copyTag, copyVal] = value::copyValue(fieldTag, fieldVal);
+                            obj->push_back(sv, copyTag, copyVal);
+                        }
+
+                        numFieldsRemaining -= found;
+                    } else {
+                        projectField(obj, projectIdx);
+                        _visited[projectIdx] = 1;
+                        --numFieldsRemaining;
+                        --numComputedFieldsRemaining;
                     }
 
-                    if (nFieldsNeededIfInclusion == 0 && _fieldBehavior == FieldBehavior::keep) {
-                        return;
+                    if (numFieldsRemaining <= numFieldsRemainingThreshold &&
+                        numFieldsRemaining == numComputedFieldsRemaining) {
+                        ++idx;
+                        break;
                     }
                 }
             }
+
+            // If this is an exclusion projection and 'idx' has not reached the end of the input
+            // object, copy over the remaining fields from the input object into 'bob'.
+            if (!isInclusion) {
+                for (; idx < objRoot->size(); ++idx) {
+                    auto sv = StringData(objRoot->field(idx));
+                    auto [fieldTag, fieldVal] = objRoot->getAt(idx);
+                    auto [copyTag, copyVal] = value::copyValue(fieldTag, fieldVal);
+
+                    obj->push_back(sv, copyTag, copyVal);
+                }
+            }
         } else {
-            for (size_t idx = 0; idx < _projects.size(); ++idx) {
+            for (size_t idx = 0; idx < _projectFields.size(); ++idx) {
                 projectField(obj, idx);
             }
             // If the result is non empty object return it.
@@ -254,8 +322,10 @@ void MakeObjStageBase<MakeObjOutputType::object>::produceObject() {
             return;
         }
     }
-    for (size_t idx = 0; idx < _projects.size(); ++idx) {
-        projectField(obj, idx);
+    for (size_t idx = 0; idx < _projectFields.size(); ++idx) {
+        if (!_visited[idx]) {
+            projectField(obj, idx);
+        }
     }
 }
 
@@ -269,54 +339,125 @@ void MakeObjStageBase<MakeObjOutputType::bsonObject>::produceObject() {
         _obj.reset(value::TypeTags::bsonObject, value::bitcastFrom<char*>(data));
     };
 
+    memset(_visited.data(), 0, _projectFields.size());
+
+    const bool isInclusion = _fieldBehavior == FieldBehavior::keep;
+
     if (_root) {
         auto [tag, val] = _root->getViewOfValue();
 
-        size_t nFieldsNeededIfInclusion = _fields.size();
+        size_t numFieldsRemaining = _fields.size() + _projectFields.size();
+        size_t numComputedFieldsRemaining = _projectFields.size();
+
+        const size_t numFieldsRemainingThreshold = isInclusion ? 1 : 0;
+
         if (tag == value::TypeTags::bsonObject) {
-            if (!(nFieldsNeededIfInclusion == 0 && _fieldBehavior == FieldBehavior::keep)) {
-                auto be = value::bitcastTo<const char*>(val);
-                const auto end = be + ConstDataView(be).read<LittleEndian<uint32_t>>();
+            auto be = value::bitcastTo<const char*>(val);
+            const auto size = ConstDataView(be).read<LittleEndian<uint32_t>>();
+            const auto end = be + size;
 
-                // Skip document length.
-                be += sizeof(int32_t);
+            // Skip document length.
+            be += sizeof(int32_t);
+
+            // Loop over _root's fields until numFieldsRemaining - numComputedFieldsRemaining == 0
+            // AND until one of the follow is true:
+            //   (1) numComputedFieldsRemaining == 1 and isInclusion == true; -OR-
+            //   (2) numComputedFieldsRemaining == 0.
+            if (numFieldsRemaining > numFieldsRemainingThreshold ||
+                numFieldsRemaining != numComputedFieldsRemaining) {
                 while (be != end - 1) {
+                    const char* nextBe = nullptr;
+
                     auto sv = bson::fieldNameAndLength(be);
-                    auto key = StringMapHasher{}.hashed_key(StringData(sv));
+                    auto [found, projectIdx] = lookupField(sv);
 
-                    auto nextBe = bson::advance(be, sv.size());
+                    if (projectIdx == std::numeric_limits<size_t>::max()) {
+                        if (found == isInclusion) {
+                            nextBe = bson::advance(be, sv.size());
+                            bob.append(BSONElement(be, sv.size() + 1, nextBe - be));
+                        }
 
-                    if (!isFieldProjectedOrRestricted(key)) {
-                        bob.append(BSONElement(be, sv.size() + 1, nextBe - be));
-                        --nFieldsNeededIfInclusion;
+                        numFieldsRemaining -= found;
+                    } else {
+                        projectField(&bob, projectIdx);
+                        _visited[projectIdx] = 1;
+                        --numFieldsRemaining;
+                        --numComputedFieldsRemaining;
                     }
 
-                    if (nFieldsNeededIfInclusion == 0 && _fieldBehavior == FieldBehavior::keep) {
+                    if (numFieldsRemaining <= numFieldsRemainingThreshold &&
+                        numFieldsRemaining == numComputedFieldsRemaining) {
+                        if (!isInclusion) {
+                            be = nextBe ? nextBe : bson::advance(be, sv.size());
+                        }
+
                         break;
                     }
+
+                    be = nextBe ? nextBe : bson::advance(be, sv.size());
+                }
+            }
+
+            // If this is an exclusion projection and 'be' has not reached the end of the input
+            // object, copy over the remaining fields from the input object into 'bob'.
+            if (!isInclusion) {
+                while (be != end - 1) {
+                    auto sv = bson::fieldNameAndLength(be);
+                    auto nextBe = bson::advance(be, sv.size());
+
+                    bob.append(BSONElement(be, sv.size() + 1, nextBe - be));
 
                     be = nextBe;
                 }
             }
         } else if (tag == value::TypeTags::Object) {
-            if (!(nFieldsNeededIfInclusion == 0 && _fieldBehavior == FieldBehavior::keep)) {
-                auto objRoot = value::getObjectView(val);
-                for (size_t idx = 0; idx < objRoot->size(); ++idx) {
-                    auto key = StringMapHasher{}.hashed_key(StringData(objRoot->field(idx)));
+            auto objRoot = value::getObjectView(val);
+            size_t idx = 0;
 
-                    if (!isFieldProjectedOrRestricted(key)) {
-                        auto [tag, val] = objRoot->getAt(idx);
-                        bson::appendValueToBsonObj(bob, objRoot->field(idx), tag, val);
-                        --nFieldsNeededIfInclusion;
+            // Loop over _root's fields until numFieldsRemaining - numComputedFieldsRemaining == 0
+            // AND until one of the follow is true:
+            //   (1) numComputedFieldsRemaining == 1 and isInclusion == true; -OR-
+            //   (2) numComputedFieldsRemaining == 0.
+            if (numFieldsRemaining > numFieldsRemainingThreshold ||
+                numFieldsRemaining != numComputedFieldsRemaining) {
+                for (idx = 0; idx < objRoot->size(); ++idx) {
+                    auto sv = StringData(objRoot->field(idx));
+                    auto [found, projectIdx] = lookupField(sv);
+
+                    if (projectIdx == std::numeric_limits<size_t>::max()) {
+                        if (found == isInclusion) {
+                            auto [fieldTag, fieldVal] = objRoot->getAt(idx);
+                            bson::appendValueToBsonObj(bob, sv, fieldTag, fieldVal);
+                        }
+
+                        numFieldsRemaining -= found;
+                    } else {
+                        projectField(&bob, projectIdx);
+                        _visited[projectIdx] = 1;
+                        --numFieldsRemaining;
+                        --numComputedFieldsRemaining;
                     }
 
-                    if (nFieldsNeededIfInclusion == 0 && _fieldBehavior == FieldBehavior::keep) {
+                    if (numFieldsRemaining <= numFieldsRemainingThreshold &&
+                        numFieldsRemaining == numComputedFieldsRemaining) {
+                        ++idx;
                         break;
                     }
                 }
             }
+
+            // If this is an exclusion projection and 'idx' has not reached the end of the input
+            // object, copy over the remaining fields from the input object into 'bob'.
+            if (!isInclusion) {
+                for (; idx < objRoot->size(); ++idx) {
+                    auto sv = StringData(objRoot->field(idx));
+                    auto [fieldTag, fieldVal] = objRoot->getAt(idx);
+
+                    bson::appendValueToBsonObj(bob, sv, fieldTag, fieldVal);
+                }
+            }
         } else {
-            for (size_t idx = 0; idx < _projects.size(); ++idx) {
+            for (size_t idx = 0; idx < _projectFields.size(); ++idx) {
                 projectField(&bob, idx);
             }
             // If the result is non empty object return it.
@@ -335,8 +476,10 @@ void MakeObjStageBase<MakeObjOutputType::bsonObject>::produceObject() {
             return;
         }
     }
-    for (size_t idx = 0; idx < _projects.size(); ++idx) {
-        projectField(&bob, idx);
+    for (size_t idx = 0; idx < _projectFields.size(); ++idx) {
+        if (!_visited[idx]) {
+            projectField(&bob, idx);
+        }
     }
     finish();
 }

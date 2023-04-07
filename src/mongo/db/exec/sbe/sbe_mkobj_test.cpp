@@ -239,22 +239,24 @@ public:
         }
 
         auto [expectedTag, expectedVal] =
-            stage_builder::makeValue(BSON_ARRAY(BSON("c" << 3 << "a"
-                                                         << "one"
-                                                         << "b"
-                                                         << "two")
-                                                << BSON("c" << 2 << "a"
-                                                            << "one"
-                                                            << "b"
-                                                            << "two")
-                                                << BSON("c" << 3 << "a"
-                                                            << "one"
-                                                            << "b"
-                                                            << "two")
-                                                << BSON("c" << 2 << "a"
-                                                            << "one"
-                                                            << "b"
-                                                            << "two")));
+            stage_builder::makeValue(BSON_ARRAY(BSON("a"
+                                                     << "one"
+                                                     << "b"
+                                                     << "two"
+                                                     << "c" << 3)
+                                                << BSON("a"
+                                                        << "one"
+                                                        << "c" << 2 << "b"
+                                                        << "two")
+                                                << BSON("a"
+                                                        << "one"
+                                                        << "b"
+                                                        << "two"
+                                                        << "c" << 3)
+                                                << BSON("a"
+                                                        << "one"
+                                                        << "c" << 2 << "b"
+                                                        << "two")));
         value::ValueGuard expectedGuard{expectedTag, expectedVal};
 
         inputGuard.reset();
