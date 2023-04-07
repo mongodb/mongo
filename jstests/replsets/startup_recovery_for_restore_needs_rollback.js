@@ -124,7 +124,26 @@ assert.docEq({_id: lastId, paddingStr: paddingStr},
 
 clearRawMongoProgramOutput();
 jsTestLog("Restarting restore node again, in repl set mode");
-restoreNode = rst.restart(restoreNode, {noReplSet: false, setParameter: startParams});
+restoreNode = rst.restart(restoreNode, {
+    noReplSet: false,
+    setParameter: Object.merge(startParams, {
+        'failpoint.hangBeforeUnrecoverableRollbackError': tojson({mode: 'alwaysOn'}),
+
+    })
+});
+
+// We need to wait until the node has done enough initialization before waiting on the failpoint.
+rst.waitForState(restoreNode, ReplSetTest.State.ROLLBACK);
+
+assert.commandWorked(restoreNode.adminCommand({
+    waitForFailPoint: 'hangBeforeUnrecoverableRollbackError',
+    timesEntered: 1,
+    maxTimeMS: kDefaultWaitForFailPointTimeout
+}));
+clearRawMongoProgramOutput();
+
+assert.commandWorked(restoreNode.adminCommand(
+    {'configureFailPoint': 'hangBeforeUnrecoverableRollbackError', 'mode': 'off'}));
 
 // This node should not come back up, because it has no stable timestamp to recover to.
 assert.soon(() => (rawMongoProgramOutput().search("UnrecoverableRollbackError") >= 0));

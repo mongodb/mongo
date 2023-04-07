@@ -124,6 +124,7 @@ MONGO_FAIL_POINT_DEFINE(WTSetOldestTSToStableTS);
 MONGO_FAIL_POINT_DEFINE(WTWriteConflictExceptionForImportCollection);
 MONGO_FAIL_POINT_DEFINE(WTWriteConflictExceptionForImportIndex);
 MONGO_FAIL_POINT_DEFINE(WTRollbackToStableReturnOnEBUSY);
+MONGO_FAIL_POINT_DEFINE(hangBeforeUnrecoverableRollbackError);
 
 const std::string kPinOldestTimestampAtStartupName = "_wt_startup";
 
@@ -2316,6 +2317,10 @@ StatusWith<Timestamp> WiredTigerKVEngine::recoverToStableTimestamp(OperationCont
     if (!_canRecoverToStableTimestamp()) {
         Timestamp stableTS(_stableTimestamp.load());
         Timestamp initialDataTS(_initialDataTimestamp.load());
+        if (MONGO_unlikely(hangBeforeUnrecoverableRollbackError.shouldFail())) {
+            LOGV2(6718000, "Hit hangBeforeUnrecoverableRollbackError failpoint");
+            hangBeforeUnrecoverableRollbackError.pauseWhileSet(opCtx);
+        }
         return Status(ErrorCodes::UnrecoverableRollbackError,
                       str::stream()
                           << "No stable timestamp available to recover to. Initial data timestamp: "
