@@ -60,3 +60,12 @@ server_parameters:
         validator:
             gte: 1
             lte: 256
+    movePrimaryClonerMetadataCollMaxBatchSizeBytes:
+        description: The max number of bytes of BSON documents containing collection names that can be batched together for an insert.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gMovePrimaryClonerMetadataCollMaxBatchSizeBytes
+        default:
+             expr: 100 * 1024
+        validator:
+            gte: 1

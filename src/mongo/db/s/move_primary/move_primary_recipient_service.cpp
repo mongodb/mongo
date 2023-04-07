@@ -70,6 +70,14 @@
 
 namespace mongo {
 
+namespace {
+
+bool wouldSurpassBatchLimit(int currSize, int nextDocSize) {
+    return (currSize + nextDocSize) >= gMovePrimaryClonerMetadataCollMaxBatchSizeBytes.load();
+}
+
+}  // anonymous namespace
+
 MONGO_FAIL_POINT_DEFINE(movePrimaryRecipientPauseBeforeRunning);
 MONGO_FAIL_POINT_DEFINE(movePrimaryRecipientPauseAfterInsertingStateDoc);
 MONGO_FAIL_POINT_DEFINE(movePrimaryRecipientPauseAfterCloningState);
@@ -581,7 +589,7 @@ void MovePrimaryRecipientService::MovePrimaryRecipient::_clearDatabaseMetadata(
 
 void MovePrimaryRecipientService::MovePrimaryRecipient::_createMetadataCollection(
     OperationContext* opCtx) {
-    resharding::data_copy::ensureCollectionExists(opCtx, getCollectionsToCloneNSS(), {});
+    resharding::data_copy::ensureCollectionExists(opCtx, _getCollectionsToCloneNSS(), {});
 }
 
 std::vector<NamespaceString>
@@ -626,12 +634,12 @@ void MovePrimaryRecipientService::MovePrimaryRecipient::_persistCollectionsToClo
     std::vector<InsertStatement> batch;
     int i = 0;
     int numBytes = 0;
+    auto collectionsToCloneNSS = _getCollectionsToCloneNSS();
     for (const auto& coll : collsToClone) {
         auto doc = BSON("_id" << i << "nss" << coll.ns());
         ++i;
-        // TODO SERVER-75654: Use a server paramter instead of BSONObjMaxUserSize.
-        if ((numBytes + doc.objsize()) >= BSONObjMaxUserSize) {
-            resharding::data_copy::insertBatch(opCtx, getCollectionsToCloneNSS(), batch);
+        if (wouldSurpassBatchLimit(numBytes, doc.objsize())) {
+            resharding::data_copy::insertBatch(opCtx, collectionsToCloneNSS, batch);
             batch.clear();
             numBytes = 0;
         }
@@ -639,13 +647,14 @@ void MovePrimaryRecipientService::MovePrimaryRecipient::_persistCollectionsToClo
         numBytes += doc.objsize();
     }
     if (!batch.empty())
-        resharding::data_copy::insertBatch(opCtx, getCollectionsToCloneNSS(), batch);
+        resharding::data_copy::insertBatch(opCtx, collectionsToCloneNSS, batch);
 }
 
 std::vector<NamespaceString>
-MovePrimaryRecipientService::MovePrimaryRecipient::_getCollectionsToClone(OperationContext* opCtx) {
+MovePrimaryRecipientService::MovePrimaryRecipient::_getCollectionsToClone(
+    OperationContext* opCtx) const {
     std::vector<NamespaceString> collsToClone;
-    auto collectionsToCloneNSS = getCollectionsToCloneNSS();
+    auto collectionsToCloneNSS = _getCollectionsToCloneNSS();
     AutoGetCollection autoColl(opCtx, collectionsToCloneNSS, MODE_IS);
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << "Collection '" << collectionsToCloneNSS << "' did not already exist",
@@ -663,7 +672,7 @@ MovePrimaryRecipientService::MovePrimaryRecipient::_getCollectionsToClone(Operat
 void MovePrimaryRecipientService::MovePrimaryRecipient::_cleanUpOrphanedDataOnRecipient(
     OperationContext* opCtx) {
     // Drop all the collections which might have been cloned on the recipient.
-    std::vector<NamespaceString> colls = _getCollectionsToClone(opCtx);
+    auto colls = _getCollectionsToClone(opCtx);
     for (const auto& coll : colls) {
         resharding::data_copy::ensureCollectionDropped(opCtx, coll);
     }
@@ -671,14 +680,15 @@ void MovePrimaryRecipientService::MovePrimaryRecipient::_cleanUpOrphanedDataOnRe
 
 void MovePrimaryRecipientService::MovePrimaryRecipient::_cleanUpOperationMetadata(
     OperationContext* opCtx, const std::shared_ptr<executor::ScopedTaskExecutor>& executor) {
-    // Drop collectionsToClone side collection.
-    resharding::data_copy::ensureCollectionDropped(opCtx, getCollectionsToCloneNSS());
 
-    // Drop temp oplog buffer.
+    // Drop collectionsToClone NSS
+    resharding::data_copy::ensureCollectionDropped(opCtx, _getCollectionsToCloneNSS());
+
+    // Drop temp oplog buffer
     resharding::data_copy::ensureCollectionDropped(
         opCtx, NamespaceString::makeMovePrimaryOplogBufferNSS(getMigrationId()));
 
-    // Drop oplog applier progress document.
+    // Drop oplog applier progress document
     PersistentTaskStore<MovePrimaryOplogApplierProgress> store(
         NamespaceString::kMovePrimaryApplierProgressNamespace);
     store.remove(opCtx,
@@ -908,7 +918,7 @@ NamespaceString MovePrimaryRecipientService::MovePrimaryRecipient::getDatabaseNa
     return _metadata.getDatabaseName();
 }
 
-NamespaceString MovePrimaryRecipientService::MovePrimaryRecipient::getCollectionsToCloneNSS()
+NamespaceString MovePrimaryRecipientService::MovePrimaryRecipient::_getCollectionsToCloneNSS()
     const {
     return NamespaceString::makeMovePrimaryCollectionsToCloneNSS(getMigrationId());
 }

@@ -233,8 +233,6 @@ public:
 
         NamespaceString getDatabaseName() const;
 
-        NamespaceString getCollectionsToCloneNSS() const;
-
         UUID getMigrationId() const;
 
     private:
@@ -274,7 +272,7 @@ public:
 
         void _persistCollectionsToClone(OperationContext* opCtx);
 
-        std::vector<NamespaceString> _getCollectionsToClone(OperationContext* opCtx);
+        std::vector<NamespaceString> _getCollectionsToClone(OperationContext* opCtx) const;
 
         void _cleanUpOrphanedDataOnRecipient(OperationContext* opCtx);
 
@@ -306,6 +304,7 @@ public:
 
         void _cloneDataFromDonor(OperationContext* opCtx);
 
+        NamespaceString _getCollectionsToCloneNSS() const;
         /**
          * Waits for majority write concern for client's last applied opTime. Cancels on stepDown.
          * This is needed after each state transition completes in future chain because disk updates
