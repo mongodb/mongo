@@ -481,13 +481,6 @@ public:
         BSONObj _getOplogFetcherFilter() const;
 
         /*
-         * Traverse backwards through the oplog to find the optime which tenant oplog application
-         * should resume from. The oplog applier should resume applying entries that have a greater
-         * optime than the returned value.
-         */
-        OpTime _getOplogResumeApplyingDonorOptime(const OpTime& cloneFinishedRecipientOpTime) const;
-
-        /*
          * Starts the tenant cloner.
          * Returns future that will be fulfilled when the cloner completes.
          */

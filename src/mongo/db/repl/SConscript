@@ -1451,7 +1451,6 @@ env.Library(
         'oplog_buffer_collection',
         'oplog_entry',
         'oplog_fetcher',
-        'oplog_interface_local',
         'primary_only_service',
         'repl_server_parameters',
         'replica_set_aware_service',
@@ -1492,7 +1491,6 @@ env.Library(
         'oplog_buffer_collection',
         'oplog_entry',
         'oplog_fetcher',
-        'oplog_interface_local',
         'primary_only_service',
         'repl_server_parameters',
         'replica_set_aware_service',
@@ -2081,6 +2079,7 @@ env.Library(
     source=[
         'tenant_oplog_batcher.cpp',
         'tenant_oplog_applier.cpp',
+        'tenant_oplog_applier_progress.idl',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
@@ -2091,6 +2090,7 @@ env.Library(
         'oplog',
         'oplog_application',
         'oplog_application_interface',
+        'oplog_interface_local',
         'repl_server_parameters',
     ],
 )
