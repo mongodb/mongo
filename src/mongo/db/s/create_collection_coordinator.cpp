@@ -1235,8 +1235,10 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx,
     const auto& placementVersion = _initialChunks->chunks.back().getVersion();
 
     if (_request.getTimeseries()) {
+        TimeseriesOptions timeseriesOptions = *_request.getTimeseries();
+        (void)timeseries::validateAndSetBucketingParameters(timeseriesOptions);
         TypeCollectionTimeseriesFields timeseriesFields;
-        timeseriesFields.setTimeseriesOptions(*_request.getTimeseries());
+        timeseriesFields.setTimeseriesOptions(std::move(timeseriesOptions));
         coll->setTimeseriesFields(std::move(timeseriesFields));
     }
 
