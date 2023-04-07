@@ -63,6 +63,7 @@ jsTestLog("Testing plain replica set node...");
         rst.restart(
             primary,
             {setParameter: "failpoint.failRWCDefaultsLookup=" + tojson({mode: "alwaysOn"})});
+        rst.getPrimary();
     });
 
     rst.stopSet();
