@@ -196,6 +196,14 @@ function analyzeShardKey(ns, shardKey, indexKey) {
             tojsononeline(res)}`);
         return res;
     }
+    if (res.code == 28799 || res.code == 4952606) {
+        // (WT-8003) 28799 is the error that $sample throws when it fails to find a
+        // non-duplicate document using a random cursor. 4952606 is the error that the sampling
+        // based split policy throws if it fails to find the specified number of split points.
+        print(`Failed to analyze the shard key due to duplicate keys returned by random cursor ${
+            tojsononeline(res)}`);
+        return res;
+    }
 
     assert.commandWorked(res);
     jsTest.log(`Finished analyzing the shard key: ${tojsononeline(res)}`);
