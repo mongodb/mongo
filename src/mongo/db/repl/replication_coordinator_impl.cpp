@@ -1650,9 +1650,14 @@ Status ReplicationCoordinatorImpl::waitUntilOpTimeForReadUntil(OperationContext*
                 "node needs to be a replica set member to use read concern"};
     }
 
-    if (_rsConfigState == kConfigUninitialized || _rsConfigState == kConfigInitiating) {
-        return {ErrorCodes::NotYetInitialized,
+    {
+        stdx::lock_guard lock(_mutex);
+        if (_rsConfigState == kConfigUninitialized || _rsConfigState == kConfigInitiating ||
+            (_rsConfigState == kConfigHBReconfiguring && !_rsConfig.isInitialized())) {
+            return {
+                ErrorCodes::NotYetInitialized,
                 "Cannot use non-local read concern until replica set is finished initializing."};
+        }
     }
 
     if (readConcern.getArgsAfterClusterTime() || readConcern.getArgsAtClusterTime()) {
