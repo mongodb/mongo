@@ -216,7 +216,8 @@ feature_flags:
     featureFlagTimeseriesDeletesSupport:
         description: "Enable support for arbitrary deletes on time-series collections"
         cpp_varname: feature_flags::gTimeseriesDeletesSupport
-        default: false
+        default: true
+        version: 7.0
     featureFlagTimeseriesUpdatesSupport:
         description: "Enable support for arbitrary updates on time-series collections"
         cpp_varname: feature_flags::gTimeseriesUpdatesSupport

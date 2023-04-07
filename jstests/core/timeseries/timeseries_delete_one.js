@@ -4,7 +4,7 @@
  * @tags: [
  *   # We need a timeseries collection.
  *   requires_timeseries,
- *   featureFlagTimeseriesDeletesSupport,
+ *   featureFlagUpdateOneWithoutShardKey,
  * ]
  */
 

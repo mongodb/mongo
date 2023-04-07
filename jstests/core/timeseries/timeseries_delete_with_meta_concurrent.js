@@ -115,15 +115,4 @@ validateDeleteIndex([objA],
                     [{q: {[metaFieldName]: {a: "A"}}, limit: 0}],
                     ErrorCodes.NamespaceNotFound,
                     testCases.REPLACE_COLLECTION);
-
-// TODO (SERVER-75379): Remove this test case.
-if (!FeatureFlagUtil.isPresentAndEnabled(db.getSiblingDB(dbName), "TimeseriesDeletesSupport")) {
-    // Attempt to delete from a collection that has been replaced with a new time-series collection
-    // with a different metaField.
-    validateDeleteIndex([objA],
-                        [{q: {[metaFieldName]: {a: "A"}}, limit: 0}],
-                        ErrorCodes.InvalidOptions,
-                        testCases.REPLACE_METAFIELD,
-                        "meta");
-}
 })();
