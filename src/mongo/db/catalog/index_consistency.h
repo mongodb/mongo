@@ -303,5 +303,12 @@ private:
      */
     uint32_t _hashKeyString(const KeyString::Value& ks, uint32_t indexNameHash) const;
 
+    /**
+     * Prints the collection document's and index entry's metadata.
+     */
+    void _printMetadata(OperationContext* opCtx,
+                        ValidateResults* results,
+                        const IndexEntryInfo& info);
+
 };  // KeyStringIndexConsistency
 }  // namespace mongo
