@@ -18,7 +18,6 @@ const commandsRemovedFromMongodSinceLastLTS = [
 const commandsAddedToMongodSinceLastLTS = [
     "_refreshQueryAnalyzerConfiguration",  // TODO (SERVER-68977): Remove upgrade/downgrade for
                                            // PM-1858.
-    "analyze",                             // TODO SERVER-67707: Remove once 7.0 becomes last LTS
     "analyzeShardKey",  // TODO (SERVER-68977): Remove upgrade/downgrade for PM-1858.
     "clusterAbortTransaction",
     "clusterAggregate",
