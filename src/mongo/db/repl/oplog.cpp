@@ -574,8 +574,6 @@ std::vector<OpTime> logInsertOps(
     std::function<boost::optional<ShardId>(const BSONObj& doc)> getDestinedRecipientFn,
     const CollectionPtr& collectionPtr) {
     invariant(begin != end);
-    invariant(std::distance(fromMigrate.begin(), fromMigrate.end()) == std::distance(begin, end),
-              oplogEntryTemplate->toReplOperation().toBSON().toString());
 
     auto nss = oplogEntryTemplate->getNss();
     auto replCoord = ReplicationCoordinator::get(opCtx);
@@ -587,6 +585,12 @@ std::vector<OpTime> logInsertOps(
                 begin->stmtIds.front() == kUninitializedStmtId);
         return {};
     }
+
+    // The number of entries in 'fromMigrate' should be consistent with the number of insert
+    // operations in [begin, end). Also, 'fromMigrate' is a sharding concept, so there is no
+    // need to check 'fromMigrate' for inserts that are not replicated.
+    invariant(std::distance(fromMigrate.begin(), fromMigrate.end()) == std::distance(begin, end),
+              oplogEntryTemplate->toReplOperation().toBSON().toString());
 
     // If this oplog entry is from a tenant migration, include the tenant migration
     // UUID.
