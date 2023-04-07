@@ -59,7 +59,7 @@ namespace mongo {
  *  + Because std::string data can be used to pass a substring around, one should never assume a
  *    rawData() terminates with a null.
  */
-class StringData {
+class MONGO_GSL_POINTER StringData {
     /** Tag used to bypass the invariant of the {c,len} constructor. */
     struct TrustedInitTag {};
     constexpr StringData(const char* c, size_t len, TrustedInitTag) : _data(c), _size(len) {}

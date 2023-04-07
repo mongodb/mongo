@@ -101,3 +101,9 @@
 #define MONGO_COMPILER_MALLOC [[gnu::malloc]]
 
 #define MONGO_COMPILER_ALLOC_SIZE(varindex) [[gnu::alloc_size(varindex)]]
+
+#if defined(__clang__)
+#define MONGO_GSL_POINTER [[gsl::Pointer]]
+#else
+#define MONGO_GSL_POINTER
+#endif

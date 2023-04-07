@@ -76,3 +76,5 @@
 #define MONGO_COMPILER_MALLOC __declspec(restrict)
 
 #define MONGO_COMPILER_ALLOC_SIZE(varindex)
+
+#define MONGO_GSL_POINTER
