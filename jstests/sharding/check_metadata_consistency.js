@@ -150,6 +150,48 @@ function getNewDb() {
     assert.eq(0, inconsistencies.length, tojson(inconsistencies));
 })();
 
+(function testMissingIndex() {
+    const db = getNewDb();
+    const coll = db.coll;
+    const shard0Coll = st.shard0.getDB(db.getName()).coll;
+    const shard1Coll = st.shard1.getDB(db.getName()).coll;
+    st.shardColl(coll, {skey: 1});
+
+    const checkOptions = {'checkIndexes': 1};
+
+    // Check missing index on one shard
+    assert.commandWorked(coll.createIndex({key1: 1}, 'index1'));
+    assert.commandWorked(shard1Coll.dropIndex('index1'));
+
+    let inconsistencies = db.checkMetadataConsistency(checkOptions).toArray();
+    assert.eq(1, inconsistencies.length, tojson(inconsistencies));
+    assert.eq("InconsistentIndex", inconsistencies[0].type, tojson(inconsistencies));
+    let collInconsistencies = coll.checkMetadataConsistency(checkOptions).toArray();
+    assert.eq(sortDoc(inconsistencies), sortDoc(collInconsistencies));
+
+    // Fix inconsistencies and assert none are left
+    assert.commandWorked(shard0Coll.dropIndex('index1'));
+    inconsistencies = db.checkMetadataConsistency({'checkIndexes': 1}).toArray();
+    assert.eq(0, inconsistencies.length, tojson(inconsistencies));
+
+    // Check inconsistent index property across shards
+    assert.commandWorked(shard0Coll.createIndex(
+        {key1: 1}, {name: 'index1', sparse: true, expireAfterSeconds: 3600}));
+    assert.commandWorked(shard1Coll.createIndex({key1: 1}, {name: 'index1', sparse: true}));
+
+    inconsistencies = db.checkMetadataConsistency(checkOptions).toArray();
+    assert.eq(1, inconsistencies.length, tojson(inconsistencies));
+    assert.eq("InconsistentIndex", inconsistencies[0].type, tojson(inconsistencies));
+    collInconsistencies = coll.checkMetadataConsistency(checkOptions).toArray();
+    assert.eq(sortDoc(inconsistencies), sortDoc(collInconsistencies));
+
+    // Fix inconsistencies and assert none are left
+    assert.commandWorked(shard0Coll.dropIndex('index1'));
+    assert.commandWorked(shard1Coll.dropIndex('index1'));
+    inconsistencies = db.checkMetadataConsistency({'checkIndexes': 1}).toArray();
+    assert.eq(0, inconsistencies.length, tojson(inconsistencies));
+})();
+
 (function testHiddenShardedCollections() {
     const kSourceCollName = "coll";
     const db1 = getNewDb();

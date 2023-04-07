@@ -118,6 +118,7 @@ public:
 
             std::vector<std::pair<ShardId, BSONObj>> requests;
             ShardsvrCheckMetadataConsistency shardsvrRequest{nss};
+            shardsvrRequest.setCommonFields(request().getCommonFields());
             shardsvrRequest.setCursor(request().getCursor());
 
             // Send a request to all shards that are primaries for at least one database
@@ -153,6 +154,7 @@ public:
 
             ShardsvrCheckMetadataConsistency shardsvrRequest{nss};
             shardsvrRequest.setDbName(nss.dbName());
+            shardsvrRequest.setCommonFields(request().getCommonFields());
             shardsvrRequest.setCursor(request().getCursor());
             // Attach db and shard version;
             auto cmdObj = appendDbVersionIfPresent(shardsvrRequest.toBSON({}), dbInfo);

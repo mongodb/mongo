@@ -176,6 +176,7 @@ public:
 
             // Shard requests
             ShardsvrCheckMetadataConsistencyParticipant participantRequest{nss};
+            participantRequest.setCommonFields(request().getCommonFields());
             participantRequest.setPrimaryShardId(ShardingState::get(opCtx)->shardId());
             participantRequest.setCursor(request().getCursor());
             const auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);

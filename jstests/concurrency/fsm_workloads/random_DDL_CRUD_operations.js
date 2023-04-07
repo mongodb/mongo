@@ -167,8 +167,15 @@ var $config = (function() {
             if (this.skipMetadataChecks) {
                 return;
             }
-            jsTestLog('Check collection metadata state');
-            const inconsistencies = db.checkMetadataConsistency(collName).toArray();
+
+            let tid = this.tid;
+            while (tid === this.tid)
+                tid = Random.randInt(this.threadCount);
+
+            const targetThreadColl = threadCollectionName(collName, tid);
+            jsTestLog('Check collection metadata state tid:' + tid + ' currentTid:' + this.tid +
+                      ' collection:' + targetThreadColl);
+            const inconsistencies = db[targetThreadColl].checkMetadataConsistency().toArray();
             assertAlways.eq(0, inconsistencies.length, tojson(inconsistencies));
         },
         CRUD: function(db, collName, connCache) {

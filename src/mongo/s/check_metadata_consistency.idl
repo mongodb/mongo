@@ -32,6 +32,7 @@ global:
 imports:
     - "mongo/db/basic_types.idl"
     - "mongo/db/query/cursor_response.idl"
+    - "mongo/db/metadata_consistency_types.idl"
 
 commands:
     checkMetadataConsistency:
@@ -42,6 +43,10 @@ commands:
         allow_global_collection_name: true
         api_version: ""
         reply_type: CursorInitialReply
+        strict: false
+        inline_chained_structs: true
+        chained_structs:
+            CommonCheckMetadataRequestFields: commonFields
         fields:
             cursor:
                 type: SimpleCursorOptions

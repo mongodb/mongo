@@ -1477,9 +1477,11 @@ DBCollection.prototype.watch = function(pipeline, options) {
     return this.aggregate(pipeline, aggOptions);
 };
 
-DBCollection.prototype.checkMetadataConsistency = function() {
-    const res =
-        assert.commandWorked(this._db.runCommand({checkMetadataConsistency: this.getName()}));
+DBCollection.prototype.checkMetadataConsistency = function(options = {}) {
+    assert(options instanceof Object,
+           `'options' parameter expected to be type object but found: ${typeof options}`);
+    const res = assert.commandWorked(
+        this._db.runCommand(Object.extend({checkMetadataConsistency: this.getName()}, options)));
     return new DBCommandCursor(this._db, res);
 };
 

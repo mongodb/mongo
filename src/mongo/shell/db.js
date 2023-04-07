@@ -1791,8 +1791,11 @@ DB.prototype.dropEncryptedCollection = function(name) {
     return this.getCollection(name).drop();
 };
 
-DB.prototype.checkMetadataConsistency = function() {
-    const res = assert.commandWorked(this.runCommand({checkMetadataConsistency: 1}));
+DB.prototype.checkMetadataConsistency = function(options = {}) {
+    assert(options instanceof Object,
+           `'options' parameter expected to be type object but found: ${typeof options}`);
+    const res = assert.commandWorked(
+        this.runCommand(Object.extend({checkMetadataConsistency: 1}, options)));
     return new DBCommandCursor(this, res);
 };
 }());

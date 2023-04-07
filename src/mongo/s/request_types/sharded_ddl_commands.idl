@@ -46,6 +46,7 @@ imports:
     - "mongo/s/resharding/common_types.idl"
     - "mongo/db/timeseries/timeseries.idl"
     - "mongo/db/query/cursor_response.idl"
+    - "mongo/db/metadata_consistency_types.idl"
 
 types:
     CollectionType:
@@ -525,6 +526,9 @@ commands:
         api_version: ""
         reply_type: CursorInitialReply
         strict: false
+        inline_chained_structs: true
+        chained_structs:
+            CommonCheckMetadataRequestFields: commonFields
         fields:
             cursor:
                 type: SimpleCursorOptions
@@ -539,6 +543,9 @@ commands:
         api_version: ""
         reply_type: CursorInitialReply
         strict: false
+        inline_chained_structs: true
+        chained_structs:
+            CommonCheckMetadataRequestFields: commonFields
         fields:
             cursor:
                 type: SimpleCursorOptions

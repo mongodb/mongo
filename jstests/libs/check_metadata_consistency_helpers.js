@@ -20,7 +20,16 @@ var MetadataConsistencyChecker = (function() {
         const checkMetadataConsistency = function() {
             jsTest.log('Started metadata consistency check');
 
-            const inconsistencies = adminDB.checkMetadataConsistency().toArray();
+            let checkOptions = {};
+            // TODO SERVER-75675 unconditionally perform index consistency checks and
+            // remove the skip flag from all tests
+            if (!jsTest.options().skipCheckingIndexesConsistentAcrossCluster) {
+                checkOptions['checkIndexes'] = true;
+            } else {
+                print("Skipping index consistency check across the cluster");
+            }
+
+            const inconsistencies = adminDB.checkMetadataConsistency(checkOptions).toArray();
             assert.eq(0,
                       inconsistencies.length,
                       `Found metadata inconsistencies: ${tojson(inconsistencies)}`);

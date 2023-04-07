@@ -58,8 +58,13 @@ class CheckMetadataConsistencyInBackground(jsfile.DataConsistencyHook):
         if self._background_job is None:
             return
 
+        # TODO SERVER-75675 do not skip index consistency check
+        shell_options = self._shell_options.copy() if self._shell_options is not None else {}
+        shell_options.update(
+            {'global_vars': {'TestData': {'skipCheckingIndexesConsistentAcrossCluster': True}}})
+
         hook_test_case = _ContinuousDynamicJSTestCase.create_before_test(
-            test.logger, test, self, self._js_filename, self._shell_options)
+            test.logger, test, self, self._js_filename, shell_options)
         hook_test_case.configure(self.fixture)
 
         self.logger.info("Resuming background metadata consistency checker thread")

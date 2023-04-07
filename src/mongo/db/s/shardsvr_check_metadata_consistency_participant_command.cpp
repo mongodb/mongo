@@ -32,17 +32,141 @@
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/cursor_manager.h"
+#include "mongo/db/s/ddl_lock_manager.h"
 #include "mongo/db/s/metadata_consistency_util.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/query/cluster_aggregate.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/s/stale_shard_version_helpers.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 
 namespace mongo {
 namespace {
+std::vector<MetadataInconsistencyItem> checkIndexesInconsistencies(
+    OperationContext* opCtx, const std::vector<CollectionType>& collections) {
+    static const auto rawPipelineStages = [] {
+        auto rawPipelineBSON = fromjson(R"({pipeline: [
+			{$indexStats: {}},
+			{$group: {
+					_id: null,
+					indexDoc: {$push: '$$ROOT'},
+					allShards: {$addToSet: '$shard'}
+			}},
+			{$unwind: '$indexDoc'},
+			{$group: {
+					'_id': '$indexDoc.name',
+					'shards': {$push: '$indexDoc.shard'},
+					'specs': {$push: {$objectToArray: {$ifNull: ['$indexDoc.spec', {}]}}},
+					'allShards': {$first: '$allShards'}
+			}},
+			{$project: {
+				missingFromShards: {$setDifference: ['$allShards', '$shards']},
+				inconsistentProperties: {
+					$setDifference: [
+						{$reduce: {
+							input: '$specs',
+							initialValue: {$arrayElemAt: ['$specs', 0]},
+							in: {$setUnion: ['$$value', '$$this']}}},
+						{$reduce: {
+							input: '$specs',
+							initialValue: {$arrayElemAt: ['$specs', 0]},
+							in: {$setIntersection: ['$$value', '$$this']}
+						}}
+					]
+				}
+			}},
+			{$match: {
+				$expr: {
+					$or: [
+						{$gt: [{$size: '$missingFromShards'}, 0]},
+						{$gt: [{$size: '$inconsistentProperties'}, 0]
+						}
+					]
+				}
+			}},
+			{$project: {
+				'_id': 0,
+				indexName: '$$ROOT._id',
+				inconsistentProperties: 1,
+				missingFromShards: 1
+			}}
+		]})");
+        return parsePipelineFromBSON(rawPipelineBSON.firstElement());
+    }();
+
+    static constexpr StringData kLockReason{"checkMetadataConsistency::indexCheck"_sd};
+    auto ddlLockManager = DDLLockManager::get(opCtx);
+    auto catalogCache = Grid::get(opCtx)->catalogCache();
+
+    std::vector<MetadataInconsistencyItem> indexIncons;
+    for (const auto& coll : collections) {
+        const auto& nss = coll.getNss();
+
+        // The only sharded collection in the config database with indexes is
+        // config.system.sessions. Unfortunately, the code path to run aggregation
+        // below would currently invariant if one of the targeted shards was the config
+        // server itself.
+        if (nss.isConfigDB()) {
+            continue;
+        }
+
+        // Serialize with concurrent DDL operations that modify indexes
+        const auto collectionDDLLock = ddlLockManager->lock(
+            opCtx, nss.toString(), kLockReason, DDLLockManager::kDefaultLockTimeout);
+
+        AggregateCommandRequest aggRequest{nss, rawPipelineStages};
+
+        std::vector<BSONObj> results;
+        shardVersionRetry(
+            opCtx, catalogCache, nss, "pipeline to detect inconsistent sharded indexes"_sd, [&] {
+                auto indexStatsCursor = [&] {
+                    BSONObjBuilder responseBuilder;
+                    auto status =
+                        ClusterAggregate::runAggregate(opCtx,
+                                                       ClusterAggregate::Namespaces{nss, nss},
+                                                       aggRequest,
+                                                       PrivilegeVector(),
+                                                       &responseBuilder);
+
+                    uassertStatusOKWithContext(
+                        status, "Failed to execute aggregation for checing index consistency");
+
+                    return uassertStatusOK(CursorResponse::parseFromBSON(responseBuilder.obj()));
+                }();
+
+                results = indexStatsCursor.releaseBatch();
+
+                if (!indexStatsCursor.getCursorId()) {
+                    return;
+                }
+
+                auto cursorPin = uassertStatusOK(
+                    CursorManager::get(opCtx)->pinCursor(opCtx, indexStatsCursor.getCursorId()));
+                auto exec = cursorPin->getExecutor();
+
+                BSONObj nextDoc;
+                while (!exec->isEOF()) {
+                    auto state = exec->getNext(&nextDoc, nullptr);
+                    if (state == PlanExecutor::ADVANCED) {
+                        results.emplace_back(nextDoc);
+                    }
+                }
+            });
+
+        indexIncons.reserve(results.size());
+        for (auto&& rawIndexIncon : results) {
+            indexIncons.emplace_back(metadata_consistency_util::makeInconsistency(
+                MetadataInconsistencyTypeEnum::kInconsistentIndex,
+                InconsistentIndexDetails{nss, std::move(rawIndexIncon)}));
+        }
+    }
+    return indexIncons;
+}
 
 class ShardsvrCheckMetadataConsistencyParticipantCommand final
     : public TypedCommand<ShardsvrCheckMetadataConsistencyParticipantCommand> {
@@ -149,6 +273,16 @@ public:
                 return metadata_consistency_util::checkCollectionMetadataInconsistencies(
                     opCtx, shardId, primaryShardId, catalogClientCollections, localCollections);
             }();
+
+            // If this is the primary shard of the db coordinate index check across shards
+            const auto& optionalCheckIndexes = request().getCommonFields().getCheckIndexes();
+            if (shardId == primaryShardId && optionalCheckIndexes && *optionalCheckIndexes) {
+                auto indexInconsistencies =
+                    checkIndexesInconsistencies(opCtx, catalogClientCollections);
+                inconsistencies.insert(inconsistencies.end(),
+                                       std::make_move_iterator(indexInconsistencies.begin()),
+                                       std::make_move_iterator(indexInconsistencies.end()));
+            }
 
             auto exec = metadata_consistency_util::makeQueuedPlanExecutor(
                 opCtx, std::move(inconsistencies), nss);

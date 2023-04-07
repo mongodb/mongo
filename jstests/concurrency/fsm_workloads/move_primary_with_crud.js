@@ -182,8 +182,9 @@ const $config = (function() {
             if (this.skipMetadataChecks) {
                 return;
             }
-            jsTestLog('Executing checkMetadataConsistency state for collection: ' + collName);
-            const inconsistencies = db.checkMetadataConsistency(collName).toArray();
+            let coll = db[this.collName];
+            jsTestLog(`Executing checkMetadataConsistency state for collection: ${coll}`);
+            const inconsistencies = coll.checkMetadataConsistency().toArray();
             assert.eq(0, inconsistencies.length, tojson(inconsistencies));
         },
         verifyDocuments: function(db, collName, connCache) {

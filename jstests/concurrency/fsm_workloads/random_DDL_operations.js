@@ -107,7 +107,7 @@ var $config = (function() {
             const coll = getRandomCollection(db);
             jsTestLog('Executing checkMetadataConsistency state for collection: ' +
                       coll.getFullName());
-            const inconsistencies = db.checkMetadataConsistency(coll.getName()).toArray();
+            const inconsistencies = coll.checkMetadataConsistency().toArray();
             assert.eq(0, inconsistencies.length, tojson(inconsistencies));
         }
     };

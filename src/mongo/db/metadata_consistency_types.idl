@@ -41,6 +41,7 @@ enums:
             kCollectionUUIDMismatch: "CollectionUUIDMismatch"
             kCorruptedChunkShardKey: "CorruptedChunkShardKey"
             kHiddenShardedCollection: "HiddenShardedCollection"
+            kInconsistentIndex: "InconsistentIndex"
             kMisplacedCollection: "MisplacedCollection"
             kMissingRoutingTable: "MissingRoutingTable"
             kMissingShardKeyIndex: "MissingShardKeyIndex"
@@ -56,6 +57,7 @@ enums:
             kCollectionUUIDMismatch: "Found collection on non primary shard with mismatching UUID"
             kCorruptedChunkShardKey: "Found chunk with a shard key pattern violation"
             kHiddenShardedCollection: "Found sharded collection but relative database does not exist"
+            kInconsistentIndex: "Found an index of a sharded collection that is inconsistent between different shards"
             kMisplacedCollection: "Unsharded collection found on shard different from database primary shard"
             kMissingRoutingTable: "Found sharded collection without any chunk"
             kMissingShardKeyIndex: "Found sharded collection without a shard key index"
@@ -214,6 +216,17 @@ structs:
                 type: object
                 description: "Information about the collection."
 
+    InconsistentIndexDetails:
+        description: "Details about index inconsistency."
+        strict: false
+        fields:
+            ns:
+                type: namespacestring
+                description: "The namespace of the affected collection."
+            info:
+                type: object
+                description: "Object containing infos about the inconsistent index."
+
     MissingRoutingTableDetails:
         description: "Details about a missing routing table inconsistency."
         strict: false
@@ -238,3 +251,13 @@ structs:
             details:
                 type: object
                 description: "Details about the inconsistency."
+
+    CommonCheckMetadataRequestFields:
+        description: "Common fields for all checkMetdataConsistency commands"
+        strict: false
+        fields:
+            # TODO SERVER-75675 remove this field and always perform index consistency checks
+            checkIndexes:
+                description: "Enable index consistency checks"
+                type: safeBool
+                optional: true
