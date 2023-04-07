@@ -42,6 +42,7 @@
 
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/query/serialization_options.h"
 #include "mongo/db/sorter/sorter_gen.h"
 #include "mongo/db/sorter/sorter_stats.h"
 #include "mongo/platform/atomic_word.h"
@@ -451,7 +452,7 @@ public:
     virtual std::pair<Key, Value> next() = 0;
 
     // Serialize the bound for explain output
-    virtual Document serializeBound() const = 0;
+    virtual Document serializeBound(SerializationOptions opts) const = 0;
 
     virtual size_t limit() const = 0;
 
@@ -530,8 +531,8 @@ public:
     std::pair<Key, Value> next();
 
     // Serialize the bound for explain output
-    Document serializeBound() const {
-        return {makeBound.serialize()};
+    Document serializeBound(SerializationOptions opts) const {
+        return {makeBound.serialize(opts)};
     };
 
     size_t limit() const {

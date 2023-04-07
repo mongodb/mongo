@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/query/serialization_options.h"
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/document_source_sort.h"
@@ -67,10 +68,10 @@ struct BoundMakerMin {
             doc.metadata().getTimeseriesBucketMinTime().toMillisSinceEpoch() + offset)};
     }
 
-    Document serialize() const {
+    Document serialize(SerializationOptions opts) const {
         // Convert from millis to seconds.
         return Document{{{"base"_sd, DocumentSourceSort::kMin},
-                         {DocumentSourceSort::kOffset, (offset / 1000)}}};
+                         {DocumentSourceSort::kOffset, opts.serializeLiteralValue(offset / 1000)}}};
     }
 };
 
@@ -83,10 +84,10 @@ struct BoundMakerMax {
             doc.metadata().getTimeseriesBucketMaxTime().toMillisSinceEpoch() + offset)};
     }
 
-    Document serialize() const {
+    Document serialize(SerializationOptions opts) const {
         // Convert from millis to seconds.
         return Document{{{"base"_sd, DocumentSourceSort::kMax},
-                         {DocumentSourceSort::kOffset, (offset / 1000)}}};
+                         {DocumentSourceSort::kOffset, opts.serializeLiteralValue(offset / 1000)}}};
     }
 };
 struct CompAsc {
@@ -284,9 +285,6 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceSort::clone(
 void DocumentSourceSort::serializeToArray(std::vector<Value>& array,
                                           SerializationOptions opts) const {
     auto explain = opts.verbosity;
-    if (opts.redactIdentifiers || opts.replacementForLiteralArgs) {
-        MONGO_UNIMPLEMENTED_TASSERT(7484310);
-    }
 
     if (_timeSorter) {
         tassert(6369900,
@@ -295,22 +293,26 @@ void DocumentSourceSort::serializeToArray(std::vector<Value>& array,
 
         // {$_internalBoundedSort: {sortKey, bound}}
         auto sortKey = _sortExecutor->sortPattern().serialize(
-            SortPattern::SortKeySerialization::kForPipelineSerialization);
+            SortPattern::SortKeySerialization::kForPipelineSerialization, opts);
 
         MutableDocument mutDoc{Document{{
             {"$_internalBoundedSort"_sd,
-             Document{{{"sortKey"_sd, std::move(sortKey)},
-                       {"bound"_sd, _timeSorter->serializeBound()},
-                       {"limit"_sd, static_cast<long long>(_timeSorter->limit())}}}},
+             Document{
+                 {{"sortKey"_sd, std::move(sortKey)},
+                  {"bound"_sd, _timeSorter->serializeBound(opts)},
+                  {"limit"_sd,
+                   opts.serializeLiteralValue(static_cast<long long>(_timeSorter->limit()))}}}},
         }}};
 
         if (explain >= ExplainOptions::Verbosity::kExecStats) {
-            mutDoc["totalDataSizeSortedBytesEstimate"] =
-                Value(static_cast<long long>(_timeSorter->stats().bytesSorted()));
-            mutDoc["usedDisk"] = Value(_timeSorter->stats().spilledRanges() > 0);
-            mutDoc["spills"] = Value(static_cast<long long>(_timeSorter->stats().spilledRanges()));
-            mutDoc["spilledDataStorageSize"] =
-                Value(static_cast<long long>(_sortExecutor->spilledDataStorageSize()));
+            mutDoc["totalDataSizeSortedBytesEstimate"] = opts.serializeLiteralValue(
+                static_cast<long long>(_timeSorter->stats().bytesSorted()));
+            mutDoc["usedDisk"] =
+                opts.serializeLiteralValue(_timeSorter->stats().spilledRanges() > 0);
+            mutDoc["spills"] = opts.serializeLiteralValue(
+                static_cast<long long>(_timeSorter->stats().spilledRanges()));
+            mutDoc["spilledDataStorageSize"] = opts.serializeLiteralValue(
+                static_cast<long long>(_sortExecutor->spilledDataStorageSize()));
         }
 
         array.push_back(Value{mutDoc.freeze()});
@@ -321,12 +323,12 @@ void DocumentSourceSort::serializeToArray(std::vector<Value>& array,
 
     if (!explain) {  // one Value for $sort and maybe a Value for $limit
         MutableDocument inner(_sortExecutor->sortPattern().serialize(
-            SortPattern::SortKeySerialization::kForPipelineSerialization));
+            SortPattern::SortKeySerialization::kForPipelineSerialization, opts));
         array.push_back(Value(DOC(kStageName << inner.freeze())));
 
         if (_sortExecutor->hasLimit()) {
             auto limitSrc = DocumentSourceLimit::create(pExpCtx, limit);
-            limitSrc->serializeToArray(array);
+            limitSrc->serializeToArray(array, opts);
         }
         return;
     }
@@ -334,20 +336,21 @@ void DocumentSourceSort::serializeToArray(std::vector<Value>& array,
     MutableDocument mutDoc(
         DOC(kStageName << DOC("sortKey"
                               << _sortExecutor->sortPattern().serialize(
-                                     SortPattern::SortKeySerialization::kForExplain)
+                                     SortPattern::SortKeySerialization::kForExplain, opts)
                               << "limit"
-                              << (_sortExecutor->hasLimit() ? Value(static_cast<long long>(limit))
-                                                            : Value()))));
+                              << (_sortExecutor->hasLimit()
+                                      ? opts.serializeLiteralValue(static_cast<long long>(limit))
+                                      : Value()))));
 
     if (explain >= ExplainOptions::Verbosity::kExecStats) {
         auto& stats = _sortExecutor->stats();
 
         mutDoc["totalDataSizeSortedBytesEstimate"] =
-            Value(static_cast<long long>(stats.totalDataSizeBytes));
-        mutDoc["usedDisk"] = Value(stats.spills > 0);
-        mutDoc["spills"] = Value(static_cast<long long>(stats.spills));
-        mutDoc["spilledDataStorageSize"] =
-            Value(static_cast<long long>(_sortExecutor->spilledDataStorageSize()));
+            opts.serializeLiteralValue(static_cast<long long>(stats.totalDataSizeBytes));
+        mutDoc["usedDisk"] = opts.serializeLiteralValue(stats.spills > 0);
+        mutDoc["spills"] = opts.serializeLiteralValue(static_cast<long long>(stats.spills));
+        mutDoc["spilledDataStorageSize"] = opts.serializeLiteralValue(
+            static_cast<long long>(_sortExecutor->spilledDataStorageSize()));
     }
 
     array.push_back(Value(mutDoc.freeze()));

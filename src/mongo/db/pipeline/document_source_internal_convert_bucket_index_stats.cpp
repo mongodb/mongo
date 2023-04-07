@@ -146,14 +146,12 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalConvertBucketIndexSta
 }
 
 Value DocumentSourceInternalConvertBucketIndexStats::serialize(SerializationOptions opts) const {
-    if (opts.redactIdentifiers || opts.replacementForLiteralArgs) {
-        MONGO_UNIMPLEMENTED_TASSERT(7484337);
-    }
-
     MutableDocument out;
-    out.addField(timeseries::kTimeFieldName, Value{_timeseriesOptions.timeField});
+    out.addField(timeseries::kTimeFieldName,
+                 Value{opts.serializeFieldPathFromString(_timeseriesOptions.timeField)});
     if (_timeseriesOptions.metaField) {
-        out.addField(timeseries::kMetaFieldName, Value{*_timeseriesOptions.metaField});
+        out.addField(timeseries::kMetaFieldName,
+                     Value{opts.serializeFieldPathFromString(*_timeseriesOptions.metaField)});
     }
     return Value(DOC(getSourceName() << out.freeze()));
 }

@@ -77,8 +77,11 @@ public:
     /*
      * Serialize and redact a document source.
      */
-    BSONObj redact(const DocumentSource& docSource, bool performRedaction = true) {
+    BSONObj redact(const DocumentSource& docSource,
+                   bool performRedaction = true,
+                   boost::optional<ExplainOptions::Verbosity> verbosity = boost::none) {
         SerializationOptions options;
+        options.verbosity = verbosity;
         if (performRedaction) {
             options.replacementForLiteralArgs = "?";
             options.identifierRedactionPolicy = [](StringData s) -> std::string {

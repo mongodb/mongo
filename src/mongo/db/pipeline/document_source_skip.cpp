@@ -73,11 +73,7 @@ DocumentSource::GetNextResult DocumentSourceSkip::doGetNext() {
 }
 
 Value DocumentSourceSkip::serialize(SerializationOptions opts) const {
-    if (opts.redactIdentifiers || opts.replacementForLiteralArgs) {
-        MONGO_UNIMPLEMENTED_TASSERT(7484311);
-    }
-
-    return Value(DOC(getSourceName() << _nToSkip));
+    return Value(DOC(getSourceName() << opts.serializeLiteralValue(_nToSkip)));
 }
 
 intrusive_ptr<DocumentSource> DocumentSourceSkip::optimize() {

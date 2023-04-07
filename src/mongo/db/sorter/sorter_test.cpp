@@ -1041,7 +1041,7 @@ public:
         Key operator()(Key k, const Doc&) const {
             return k - 10;
         }
-        Document serialize() const {
+        Document serialize(const SerializationOptions& opts = {}) const {
             MONGO_UNREACHABLE;
         }
     };
@@ -1049,7 +1049,7 @@ public:
         Key operator()(Key k, const Doc&) const {
             return k + 10;
         }
-        Document serialize() const {
+        Document serialize(const SerializationOptions& opts = {}) const {
             MONGO_UNREACHABLE;
         }
     };

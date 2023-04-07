@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/query/explain_options.h"
 #include "mongo/platform/basic.h"
 
 #include <boost/intrusive_ptr.hpp>
@@ -536,6 +537,84 @@ TEST_F(DocumentSourceSortExecutionTest, ShouldCorrectlyTrackMemoryUsageBetweenPa
     // The next should realize it's used too much memory.
     ASSERT_THROWS_CODE(
         sort->getNext(), AssertionException, ErrorCodes::QueryExceededMemoryLimitNoDiskUseAllowed);
+}
+std::string redactFieldNameForTest(StringData s) {
+    return str::stream() << "HASH<" << s << ">";
+}
+TEST_F(DocumentSourceSortTest, Redaction) {
+    createSort(BSON("a" << 1));
+    auto boundedSort = DocumentSourceSort::createBoundedSort(
+        sort()->getSortKeyPattern(), DocumentSourceSort::kMin, 1337, 10, getExpCtx());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  //
+        R"({"$sort":{"HASH<a>":1}})",
+        redact(*sort(), true));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$_internalBoundedSort": {
+                "sortKey": {
+                    "HASH<a>": 1
+                },
+                "bound": {
+                    "base": "min",
+                    "offsetSeconds": "?"
+                },
+                "limit": "?"
+            }
+        })",
+        redact(*boundedSort, true));
+
+    ASSERT_BSONOBJ_EQ_AUTO(  //
+        R"({"$sort":{"sortKey":{"HASH<a>":1}}})",
+        redact(*sort(), true, ExplainOptions::Verbosity::kQueryPlanner));
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$_internalBoundedSort": {
+                "sortKey": {
+                    "HASH<a>": 1
+                },
+                "bound": {
+                    "base": "min",
+                    "offsetSeconds": "?"
+                },
+                "limit": "?"
+            }
+        })",
+        redact(*boundedSort, true, ExplainOptions::Verbosity::kQueryPlanner));
+
+    ASSERT_BSONOBJ_EQ_AUTO(  //
+        R"({
+            "$sort": {
+                "sortKey": {
+                    "HASH<a>": 1
+                }
+            },
+            "totalDataSizeSortedBytesEstimate": "?",
+            "usedDisk": "?",
+            "spills": "?",
+            "spilledDataStorageSize": "?"
+        })",
+        redact(*sort(), true, ExplainOptions::Verbosity::kExecStats));
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$_internalBoundedSort": {
+                "sortKey": {
+                    "HASH<a>": 1
+                },
+                "bound": {
+                    "base": "min",
+                    "offsetSeconds": "?"
+                },
+                "limit": "?"
+            },
+            "totalDataSizeSortedBytesEstimate": "?",
+            "usedDisk": "?",
+            "spills": "?",
+            "spilledDataStorageSize": "?"
+        })",
+        redact(*boundedSort, true, ExplainOptions::Verbosity::kExecStats));
 }
 
 }  // namespace

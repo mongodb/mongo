@@ -156,13 +156,11 @@ Pipeline::SourceContainer::iterator DocumentSourceSequentialDocumentCache::doOpt
 }
 
 Value DocumentSourceSequentialDocumentCache::serialize(SerializationOptions opts) const {
-    if (opts.redactIdentifiers || opts.replacementForLiteralArgs) {
-        MONGO_UNIMPLEMENTED_TASSERT(7484315);
-    }
     if (opts.verbosity) {
         return Value(Document{
             {kStageName,
-             Document{{"maxSizeBytes"_sd, Value(static_cast<long long>(_cache->maxSizeBytes()))},
+             Document{{"maxSizeBytes"_sd,
+                       opts.serializeLiteralValue(static_cast<long long>(_cache->maxSizeBytes()))},
                       {"status"_sd,
                        _cache->isBuilding()      ? "kBuilding"_sd
                            : _cache->isServing() ? "kServing"_sd

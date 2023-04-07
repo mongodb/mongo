@@ -103,5 +103,12 @@ TEST_F(DocumentSourceSkipTest, SkipsChainedTogetherShouldNotOverFlowWhenOptimizi
     ASSERT_EQUALS(containerOptimized.size(), 1U);
     ASSERT_EQUALS(skipFirst->getSkip(), 2);
 }
+
+TEST_F(DocumentSourceSkipTest, Redaction) {
+    auto stage = DocumentSourceSkip::create(getExpCtx(), 1337);
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({"$skip":"?"})",
+        redact(*stage));
+}
 }  // namespace
 }  // namespace mongo

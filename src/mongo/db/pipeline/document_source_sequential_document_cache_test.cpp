@@ -34,9 +34,11 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/document_source_sequential_document_cache.h"
+#include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -73,6 +75,28 @@ TEST_F(DocumentSourceSequentialDocumentCacheTest, ReturnsEOFAfterCacheExhausted)
     ASSERT(documentCache->getNext().isAdvanced());
     ASSERT(documentCache->getNext().isEOF());
     ASSERT(documentCache->getNext().isEOF());
+}
+
+TEST_F(DocumentSourceSequentialDocumentCacheTest, Redaction) {
+    SequentialDocumentCache cache(kDefaultMaxCacheSize);
+    cache.add(DOC("_id" << 0));
+    cache.add(DOC("_id" << 1));
+    auto documentCache = DocumentSourceSequentialDocumentCache::create(getExpCtx(), &cache);
+    std::vector<Value> vals;
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({"$sequentialCache":{"maxSizeBytes":"?","status":"kBuilding"}})",
+        redact(*documentCache, true, ExplainOptions::Verbosity::kQueryPlanner));
+
+    cache.freeze();
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({"$sequentialCache":{"maxSizeBytes":"?","status":"kServing"}})",
+        redact(*documentCache, true, ExplainOptions::Verbosity::kQueryPlanner));
+
+    cache.abandon();
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({"$sequentialCache":{"maxSizeBytes":"?","status":"kAbandoned"}})",
+        redact(*documentCache, true, ExplainOptions::Verbosity::kQueryPlanner));
 }
 }  // namespace
 }  // namespace mongo
