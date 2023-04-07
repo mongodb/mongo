@@ -46,7 +46,7 @@ assert.commandWorked(bulk.execute());
     assert.eq(20, res.executionStats.nReturned);
 
     const indexUnionNode = navigateToPlanPath(res, "child.child.leftChild.child");
-    assertValueOnPath("Union", indexUnionNode, "nodeType");
+    assertValueOnPath("SortedMerge", indexUnionNode, "nodeType");
     assertValueOnPath("IndexScan", indexUnionNode, "children.0.nodeType");
     assertValueOnPath([2], indexUnionNode, "children.0.interval.lowBound.bound.0.value");
     assertValueOnPath("IndexScan", indexUnionNode, "children.1.nodeType");
@@ -57,7 +57,7 @@ assert.commandWorked(bulk.execute());
     const res = t.explain("executionStats").aggregate([{$match: {a: {$eq: []}}}]);
     assert.eq(20, res.executionStats.nReturned);
     const indexUnionNode = navigateToPlanPath(res, "child.child.leftChild.child");
-    assertValueOnPath("Union", indexUnionNode, "nodeType");
+    assertValueOnPath("SortedMerge", indexUnionNode, "nodeType");
     assertValueOnPath("IndexScan", indexUnionNode, "children.0.nodeType");
     assertValueOnPath(undefined, indexUnionNode, "children.0.interval.lowBound.bound.0.value");
     assertValueOnPath("IndexScan", indexUnionNode, "children.1.nodeType");
@@ -73,7 +73,7 @@ assert.commandWorked(t.createIndex({b: 1, a: 1}));
 
     // Verify we still get index scan even if the field appears as second index field.
     const indexUnionNode = navigateToPlanPath(res, "child.child.leftChild.child");
-    assertValueOnPath("Union", indexUnionNode, "nodeType");
+    assertValueOnPath("SortedMerge", indexUnionNode, "nodeType");
     assertValueOnPath("IndexScan", indexUnionNode, "children.0.nodeType");
     assertValueOnPath([2], indexUnionNode, "children.0.interval.lowBound.bound.1.value");
     assertValueOnPath("IndexScan", indexUnionNode, "children.1.nodeType");

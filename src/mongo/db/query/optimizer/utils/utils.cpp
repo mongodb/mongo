@@ -2260,11 +2260,13 @@ public:
                            ProjectionNameVector correlatedProjNames,
                            const std::map<size_t, SelectivityType>& indexPredSelMap,
                            const CEType currentGroupCE,
-                           const CEType scanGroupCE)
+                           const CEType scanGroupCE,
+                           const bool useSortedMerge)
         : _prefixId(prefixId),
           _ridProjName(ridProjName),
           _scanDefName(scanDefName),
           _indexDefName(indexDefName),
+          _useSortedMerge(useSortedMerge),
           _spoolId(spoolId),
           _indexFieldCount(indexFieldCount),
           _eqPrefixes(eqPrefixes),
@@ -2398,7 +2400,8 @@ public:
                                          currentCorrelatedProjNames,
                                          _indexPredSelMap,
                                          currentCE,
-                                         _scanGroupCE);
+                                         _scanGroupCE,
+                                         _useSortedMerge);
 
         auto result = generateDistinctScan(_scanDefName,
                                            _indexDefName,
@@ -2486,6 +2489,24 @@ public:
         const size_t inputSize = inputs.size();
         if (inputSize == 1) {
             return std::move(inputs.front());
+        }
+
+        if (_useSortedMerge) {
+            invariant(!isIntersect);
+            PhysPlanBuilder result;
+            ABTVector inputABTs;
+            for (auto& input : inputs) {
+                inputABTs.push_back(std::move(input._node));
+                result.merge(input);
+            }
+            // If we're lowering a disjunction and only have equality intervals, use a SortedMerge
+            // instead of a Union because the child streams will be sorted. Only applies when
+            // sorting on RID only.
+            result.make<SortedMergeNode>(
+                ce,
+                properties::CollationRequirement({{_ridProjName, CollationOp::Ascending}}),
+                std::move(inputABTs));
+            return result;
         }
 
         // The input projections names we will be combining from both sides.
@@ -2582,6 +2603,7 @@ private:
     const ProjectionName& _ridProjName;
     const std::string& _scanDefName;
     const std::string& _indexDefName;
+    const bool _useSortedMerge;
 
     // Equality-prefix and related.
     SpoolIdGenerator& _spoolId;
@@ -2617,7 +2639,8 @@ PhysPlanBuilder lowerEqPrefixes(PrefixId& prefixId,
                                 ProjectionNameVector correlatedProjNames,
                                 const std::map<size_t, SelectivityType>& indexPredSelMap,
                                 const CEType indexCE,
-                                const CEType scanGroupCE) {
+                                const CEType scanGroupCE,
+                                const bool useSortedMerge) {
     IntervalLowerTransport lowerTransport(prefixId,
                                           ridProjName,
                                           std::move(indexProjectionMap),
@@ -2631,7 +2654,8 @@ PhysPlanBuilder lowerEqPrefixes(PrefixId& prefixId,
                                           correlatedProjNames,
                                           indexPredSelMap,
                                           indexCE,
-                                          scanGroupCE);
+                                          scanGroupCE,
+                                          useSortedMerge);
     return lowerTransport.lower(eqPrefixes.at(eqPrefixIndex)._interval);
 }
 

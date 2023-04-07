@@ -601,7 +601,9 @@ private:
 
 /**
  * Merge Join node.
- * This is a physical node representing joining of two sorted inputs.
+ * This is a physical node representing joining of two sorted inputs. Applies an equality predicate
+ * left == right for each left and right key provided. Returns the same "bag" as an intersection,
+ * with the output being sorted.
  */
 class MergeJoinNode final : public ABTOpFixedArity<3>, public ExclusivelyPhysicalNode {
     using Base = ABTOpFixedArity<3>;
@@ -652,7 +654,8 @@ struct NodeChildrenHolder {
 
 /**
  * Sorted Merge node.
- * Used to merge an arbitrary number of sorted input streams.
+ * Used to merge an arbitrary number of sorted input streams. Returns the same "bag" as union, with
+ * the output being sorted.
  */
 class SortedMergeNode final : public ABTOpDynamicArity<2>, public ExclusivelyPhysicalNode {
     using Base = ABTOpDynamicArity<2>;

@@ -465,25 +465,22 @@ TEST_F(NodeSBE, Lower1) {
 TEST_F(NodeSBE, Lower2) {
     using namespace properties;
 
-    // Since we don't have rewrites for SortedMerge yet, we create a plan that will merge join RIDs
-    // from two equality index scans (which will produce sorted RIDs). Then we substitute in a
-    // SortedMerge for the MergeJoin in this plan, and lower that to SBE. We assert on this SBE
-    // plan.
-    // Eventually we will have rewrites for SortedMerge, so this test can be changed.
-    // TODO SERVER-70298: Remove manual swap of SortedMerge. We should be able to naturally rewrite
-    // to SortedMerge after this ticket is done.
+    const auto [arrTag, arrVal] = sbe::value::makeNewArray();
+    sbe::value::Array* arr = sbe::value::getArrayView(arrVal);
+    for (int i = 1; i < 4; i++) {
+        arr->push_back(sbe::value::TypeTags::NumberInt32, i);
+    }
+    ABT arrayConst = make<Constant>(arrTag, arrVal);
 
-    auto scanNode = _scan("root", "test");
-    auto evalNode = _eval("pa", _evalp(_get("a", _id()), "root"_var), scanNode);
-    auto filterNode1 = _filter(_evalf(_traverse1(_cmp("Eq", "1"_cint64)), "pa"_var), evalNode);
-    auto filterNode2 =
-        _filter(_evalf(_get("b", _traverse1(_cmp("Eq", "2"_cint64))), "root"_var), filterNode1);
-    auto root = _root("pa")(std::move(filterNode2));
+    // Test lowering of a SortedMerge node.
+    ABT root = NodeBuilder{}
+                   .root("root")
+                   .filter(_evalf(_get("a", _traverse1(_cmp("EqMember", ExprHolder{arrayConst}))),
+                                  "root"_var))
+                   .finish(_scan("root", "test"));
 
     // Optimize the logical plan.
     // We have to fake some metadata for this to work.
-    ScanDefOptions scanDefOptions = {
-        {"type", "mongod"}, {"database", "test"}, {"uuid", "11111111-1111-1111-1111-111111111111"}};
     auto prefixId = PrefixId::createForTests();
     auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
@@ -491,77 +488,31 @@ TEST_F(NodeSBE, Lower2) {
          OptPhase::MemoImplementationPhase},
         prefixId,
         {{{"test",
-           createScanDef(std::move(scanDefOptions),
+           createScanDef({},
                          {{"index1", makeIndexDefinition("a", CollationOp::Ascending, false)},
                           {"index2", makeIndexDefinition("b", CollationOp::Ascending, false)}})}}},
-        boost::none,
-        {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
-    PlanAndProps planAndProps = phaseManager.optimizeAndReturnProps(std::move(root));
+        boost::none /*costModel*/,
+        DebugInfo::kDefaultForTests);
 
-    ASSERT_EXPLAIN_V2_AUTO(
-        "Root [{pa}]\n"
-        "MergeJoin []\n"
-        "|   |   |   Condition\n"
-        "|   |   |       rid_0 = rid_1\n"
-        "|   |   Collation\n"
-        "|   |       Ascending\n"
-        "|   Union [{rid_1}]\n"
-        "|   Evaluation [{rid_1} = Variable [rid_0]]\n"
-        "|   IndexScan [{'<rid>': rid_0}, scanDefName: test, indexDefName: index2, interval: {=Co"
-        "nst [2]}]\n"
-        "IndexScan [{'<indexKey> 0': pa, '<rid>': rid_0}, scanDefName: test, indexDefName: index1"
-        ", interval: {=Const [1]}]\n",
-        planAndProps._node);
-
-    // Find the MergeJoin, replace it with SortedMerge. To do this we need to remove the Union and
-    // Evaluation on the right side.
-    {
-        ABT& mergeJoinABT = planAndProps._node.cast<RootNode>()->getChild();
-        MergeJoinNode* mergeJoinNode = mergeJoinABT.cast<MergeJoinNode>();
-
-        // Remove the Union and Evaluation.
-        ABT& unionABT = mergeJoinNode->getRightChild();
-        UnionNode* unionNode = unionABT.cast<UnionNode>();
-        ABT& ixScanABT = unionNode->nodes().front().cast<EvaluationNode>()->getChild();
-        std::swap(unionABT, ixScanABT);
-        // Swap the right leaf of the MergeJoin with Blackhole, so that it can be deleted. Without
-        // this it points to the IndexScan and cannot delete, since the IndexScan still exists under
-        // the new SortedMerge.
-        ABT blackHole = make<Blackhole>();
-        std::swap(unionNode->nodes().front().cast<EvaluationNode>()->getChild(), blackHole);
-
-        // Swap out the MergeJoin for SortedMerge.
-        ABT sortedMergeABT =
-            make<SortedMergeNode>(CollationRequirement({{"rid_0", CollationOp::Ascending}}),
-                                  ABTVector{std::move(mergeJoinNode->getLeftChild()),
-                                            std::move(mergeJoinNode->getRightChild())});
-        std::swap(mergeJoinABT, sortedMergeABT);
-
-        // mergeJoinABT now contains the SortedMerge.
-        SortedMergeNode* sortedMergeNode = mergeJoinABT.cast<SortedMergeNode>();
-
-        // Update nodeToGroupProps data.
-        auto& nodeToGroupProps = planAndProps._map;
-        // Make the metadata for the old MergeJoin use the SortedMerge now.
-        nodeToGroupProps.emplace(sortedMergeNode, nodeToGroupProps.find(mergeJoinNode)->second);
-        nodeToGroupProps.erase(mergeJoinNode);
-        // Update for the SortedMerge children.
-        auto unionProps = nodeToGroupProps.find(unionNode);
-        nodeToGroupProps.emplace(sortedMergeNode->nodes().back().cast<Node>(), unionProps->second);
-        nodeToGroupProps.emplace(sortedMergeNode->nodes().front().cast<Node>(), unionProps->second);
-    }
+    phaseManager.optimize(root);
 
     // Now we should have a plan with a SortedMerge in it.
     ASSERT_EXPLAIN_V2_AUTO(
-        "Root [{pa}]\n"
+        "Root [{root}]\n"
+        "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
+        "|   |   Const [true]\n"
+        "|   LimitSkip [limit: 1, skip: 0]\n"
+        "|   Seek [ridProjection: rid_0, {'<root>': root}, test]\n"
         "SortedMerge []\n"
-        "|   |   |   collation: \n"
-        "|   |   |       rid_0: Ascending\n"
-        "|   IndexScan [{'<rid>': rid_0}, scanDefName: test, indexDefName: index2, interval: {=Co"
-        "nst [2]}]\n"
-        "IndexScan [{'<indexKey> 0': pa, '<rid>': rid_0}, scanDefName: test, indexDefName: index1"
-        ", interval: {=Const [1]}]\n",
-        planAndProps._node);
+        "|   |   |   |   collation: \n"
+        "|   |   |   |       rid_0: Ascending\n"
+        "|   |   IndexScan [{'<rid>': rid_0}, scanDefName: test, indexDefName: index1, interval: "
+        "{=Const [3]}]\n"
+        "|   IndexScan [{'<rid>': rid_0}, scanDefName: test, indexDefName: index1, interval: "
+        "{=Const [2]}]\n"
+        "IndexScan [{'<rid>': rid_0}, scanDefName: test, indexDefName: index1, interval: {=Const "
+        "[1]}]\n",
+        root);
 
     // TODO SERVER-72010 fix test or SortedMergeNode logic so building VariableEnvironment succeeds
 

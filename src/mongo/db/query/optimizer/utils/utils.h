@@ -455,7 +455,8 @@ PhysPlanBuilder lowerEqPrefixes(PrefixId& prefixId,
                                 ProjectionNameVector correlatedProjNames,
                                 const std::map<size_t, SelectivityType>& indexPredSelMap,
                                 CEType indexCE,
-                                CEType scanGroupCE);
+                                CEType scanGroupCE,
+                                bool useSortedMerge);
 
 bool hasProperIntervals(const PartialSchemaRequirements& reqMap);
 }  // namespace mongo::optimizer

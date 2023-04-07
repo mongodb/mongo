@@ -64,6 +64,33 @@ static bool propertyAffectsProjection(const PhysProps& props,
     return propertyAffectsProjections<P>(props, ProjectionNameVector{projectionName});
 }
 
+// Checks that all leaves of the expression are equalities. This would indicate that we could use
+// SortedMerge and MergeJoin to produce a stream of sorted RIDs, allowing us to potentially
+// deduplicate with a streaming Unique.
+static bool canReturnSortedOutput(const CompoundIntervalReqExpr::Node& intervals) {
+    bool canBeSorted = true;
+    // TODO SERVER-73828 this pattern could use early return.
+    CompoundIntervalReqExpr::visitDisjuncts(
+        intervals, [&](const CompoundIntervalReqExpr::Node& conj, size_t) {
+            CompoundIntervalReqExpr::visitConjuncts(
+                conj, [&](const CompoundIntervalReqExpr::Node& atom, size_t i) {
+                    if (i > 0) {
+                        canBeSorted = false;
+                    } else {
+                        CompoundIntervalReqExpr::visitAtom(
+                            atom, [&](const CompoundIntervalRequirement& req) {
+                                if (!req.isEquality()) {
+                                    canBeSorted = false;
+                                }
+                            });
+                    }
+                });
+        });
+    // We shouldn't use a SortedMerge for a singleton disjunction, because with one child there is
+    // nothing to sort-merge.
+    return canBeSorted && !CompoundIntervalReqExpr::isSingletonDisjunction(intervals);
+}
+
 /**
  * Implement physical nodes based on existing logical nodes.
  */
@@ -576,22 +603,31 @@ public:
                  *
                  * If there is more than one equality prefix, and any of them needs a unique stage,
                  * we add one after we translate the combined eqPrefix plan.
-                 *
-                 * TODO SERVER-70298: Allow merge join of RIDs on interval level index intersection,
-                 * in which case we may need to worry about deduping.
                  */
                 const auto& eqPrefixes = candidateIndexEntry._eqPrefixes;
+
+                // For now we only use SortedMerge for one equality prefix. We also check the field
+                // projections for information about whether we need a GroupBy to perform
+                // aggregations, in which case a unique is unnecessary and therefore a SortedMerge
+                // is not needed. `canReturnSortedOutput` tells us if we have more than one
+                // predicate, and if all of these predicates are equalities.
+                const bool usedSortedMerge = eqPrefixes.size() == 1 &&
+                    canReturnSortedOutput(eqPrefixes.front()._interval) &&
+                    indexProjectionMap._fieldProjections.empty();
                 bool needsUniqueStage = indexDef.isMultiKey() && requirements.getDedupRID();
-                if (needsUniqueStage) {
+
+                // If we have decided to use SortedMerge and we need a unique stage, skip this check
+                // because we will not produce GroupBys to dedup. We always need the Unique.
+                if (needsUniqueStage && !usedSortedMerge) {
                     // TODO: consider pre-computing in "computeCandidateIndexes()".
-                    bool noSimpleRanges = true;
+                    bool simpleRanges = false;
                     for (const auto& eqPrefix : eqPrefixes) {
                         if (isSimpleRange(eqPrefix._interval)) {
-                            noSimpleRanges = false;
+                            simpleRanges = true;
                             break;
                         }
                     }
-                    if (noSimpleRanges) {
+                    if (!simpleRanges) {
                         needsUniqueStage = false;
                     }
                 }
@@ -620,7 +656,8 @@ public:
                                                candidateIndexEntry._correlatedProjNames.getVector(),
                                                std::move(indexPredSelMap),
                                                currentGroupCE,
-                                               scanGroupCE);
+                                               scanGroupCE,
+                                               usedSortedMerge);
 
                 if (residualReqs) {
                     auto reqsWithCE = createResidualReqsWithCE(*residualReqs, partialSchemaKeyCE);

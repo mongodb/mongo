@@ -153,32 +153,30 @@ runHistogramsTest(function testTypeCounts() {
 
     // The plan generated in the following two cases has the following shape:
     //
-    //  Root (CE: 7)
-    //  |
     //  Filter (CE: 7)
     //  |
-    //  Binary Join (CE: 16)
+    //  Nested Loop Join (CE: 17)
     //  |      |
-    //  |      GroupBy (CE: 1)
+    //  |      LimitSkip (CE: 17)
     //  |      |
-    //  |      Union (CE: 1) ___
-    //  |      |                |
-    //  |      Ixscan (CE: 1)   Ixscan (CE: 1)
-    //  |      [1, 1]           [[1, 2, 3], [1, 2, 3]]
+    //  |      Seek (CE: 17)
     //  |
-    //  LimitSkip (CE: 16)
+    //  Unique (CE: 1)
     //  |
-    //  Seek (CE: 16)
+    //  SortedMerge (CE: 1) __
+    //  |                     |
+    //  Ixscan (CE: 1)   Ixscan (CE: 1)
+    //  [1, 1]           [[1, 2, 3], [1, 2, 3]]
     //
     // We only care about the Ixscan estimation for now, so those nodes are the only ones we will
     // verify in this case. Based on the logs, it looks like we estimate the sargable node with both
-    // intervals together, and attach this estimate to both index scans and the union node above
-    // them. Therefore, we only look at the union node estimate in the test.
-    // Note that the intervals are combined disjunctively.
-    function getUnionNodeCE(explain) {
+    // intervals together, and attach this estimate to both index scans and the sorted merge node
+    // above them. Therefore, we only look at the sorted merge node estimate in the test. Note that
+    // the intervals are combined disjunctively.
+    function getSortedMergeNodeCE(explain) {
         const union = navigateToPlanPath(explain, "child.child.leftChild.child");
         assert.neq(union, null, tojson(explain));
-        assert.eq(union.nodeType, "Union", tojson(union));
+        assert.eq(union.nodeType, "SortedMerge", tojson(union));
         return [extractLogicalCEFromNode(union)];
     }
     verifyCEForMatchNodes({
@@ -186,7 +184,7 @@ runHistogramsTest(function testTypeCounts() {
         predicate: {a: [1, 2, 3]},
         expected: [{_id: 15, a: [1, 2, 3]}],
         hint,
-        getNodeCEs: getUnionNodeCE,
+        getNodeCEs: getSortedMergeNodeCE,
         CEs: [1],
     });
     verifyCEForMatchNodes({
@@ -194,7 +192,7 @@ runHistogramsTest(function testTypeCounts() {
         predicate: {a: [1, 2]},
         expected: [],
         hint,
-        getNodeCEs: getUnionNodeCE,
+        getNodeCEs: getSortedMergeNodeCE,
         CEs: [1],
     });
 
@@ -683,7 +681,7 @@ runHistogramsTest(function testTypeCounts() {
                 {_id: 10, a: [{}]},
                 {_id: 11, a: [[{}]]},
             ],
-            getNodeCEs: getUnionNodeCE,
+            getNodeCEs: getSortedMergeNodeCE,
             CEs,
             hint
         });
@@ -691,7 +689,7 @@ runHistogramsTest(function testTypeCounts() {
             coll,
             predicate: {a: [{c: 1}]},
             expected: [{_id: 13, a: [{c: 1}]}],
-            getNodeCEs: getUnionNodeCE,
+            getNodeCEs: getSortedMergeNodeCE,
             CEs,
             hint
         });
@@ -699,7 +697,7 @@ runHistogramsTest(function testTypeCounts() {
             coll,
             predicate: {a: [{d: 1}]},
             expected: [{_id: 15, a: [[{d: 1}]]}],
-            getNodeCEs: getUnionNodeCE,
+            getNodeCEs: getSortedMergeNodeCE,
             CEs,
             hint
         });
@@ -751,12 +749,18 @@ runHistogramsTest(function testTypeCounts() {
                 {_id: 20, a: [["a", "b", "c"]]},
                 {_id: 27, a: [null, true, false, [], [1, 2, 3], ["a", "b", "c"], {a: 1}, {}]},
             ],
-            getNodeCEs: getUnionNodeCE,
+            getNodeCEs: getSortedMergeNodeCE,
             CEs,
             hint
         });
-        verifyCEForMatchNodes(
-            {coll, predicate: {a: ["a"]}, expected: [], getNodeCEs: getUnionNodeCE, CEs, hint});
+        verifyCEForMatchNodes({
+            coll,
+            predicate: {a: ["a"]},
+            expected: [],
+            getNodeCEs: getSortedMergeNodeCE,
+            CEs,
+            hint
+        });
     }
 
     // In the following cases, we have two array intervals, each estimated as sqrt(count of nested
@@ -768,7 +772,7 @@ runHistogramsTest(function testTypeCounts() {
             coll,
             predicate: {a: [["a", "b", "c"]]},
             expected: [{_id: 20, a: [["a", "b", "c"]]}, {_id: 21, a: [[["a", "b", "c"]]]}],
-            getNodeCEs: getUnionNodeCE,
+            getNodeCEs: getSortedMergeNodeCE,
             CEs,
             hint
         });
@@ -776,7 +780,7 @@ runHistogramsTest(function testTypeCounts() {
             coll,
             predicate: {a: [[["a", "b", "c"]]]},
             expected: [{_id: 21, a: [[["a", "b", "c"]]]}],
-            getNodeCEs: getUnionNodeCE,
+            getNodeCEs: getSortedMergeNodeCE,
             CEs,
             hint
         });
