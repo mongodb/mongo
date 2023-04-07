@@ -227,7 +227,7 @@ void IndexConsistency::repairMissingIndexEntries(OperationContext* opCtx,
     }
 }
 
-void IndexConsistency::addIndexEntryErrors(ValidateResults* results) {
+void IndexConsistency::addIndexEntryErrors(OperationContext* opCtx, ValidateResults* results) {
     invariant(!_firstPhase);
 
     // We'll report up to 1MB for extra index entry errors and missing index entry errors.
@@ -281,6 +281,8 @@ void IndexConsistency::addIndexEntryErrors(ValidateResults* results) {
 
             missingIndexEntrySizeLimitWarning = true;
         }
+
+        _printMetadata(opCtx, results, entryInfo);
 
         std::string indexName = entry["indexName"].String();
         if (!results->indexResultsMap.at(indexName).valid) {
@@ -425,11 +427,6 @@ void IndexConsistency::addDocKey(OperationContext* opCtx,
         invariant(_missingIndexEntries.count(key) == 0);
         _missingIndexEntries.insert(
             std::make_pair(key, IndexEntryInfo(*indexInfo, recordId, idKeyBuilder.obj(), ks)));
-
-        // Prints the collection document's and index entry's metadata.
-        _validateState->getCollection()->getRecordStore()->printRecordMetadata(
-            opCtx, recordId, &(results->recordTimestamps));
-        indexInfo->accessMethod->getSortedDataInterface()->printIndexEntryMetadata(opCtx, ks);
     }
 }
 
@@ -630,4 +627,15 @@ uint32_t IndexConsistency::_hashKeyString(const KeyString::Value& ks,
                                           uint32_t indexNameHash) const {
     return ks.hash(indexNameHash);
 }
+
+void IndexConsistency::_printMetadata(OperationContext* opCtx,
+                                      ValidateResults* results,
+                                      const IndexEntryInfo& entryInfo) {
+    _validateState->getCollection()->getRecordStore()->printRecordMetadata(
+        opCtx, entryInfo.recordId, &(results->recordTimestamps));
+    getIndexInfo(entryInfo.indexName)
+        .accessMethod->getSortedDataInterface()
+        ->printIndexEntryMetadata(opCtx, entryInfo.keyString);
+}
+
 }  // namespace mongo

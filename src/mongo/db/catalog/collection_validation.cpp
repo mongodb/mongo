@@ -197,7 +197,7 @@ void _gatherIndexEntryErrors(OperationContext* opCtx,
 
     LOGV2_OPTIONS(20301, {LogComponent::kIndex}, "Finished traversing through all the indexes");
 
-    indexConsistency->addIndexEntryErrors(result);
+    indexConsistency->addIndexEntryErrors(opCtx, result);
 }
 
 void _validateIndexKeyCount(OperationContext* opCtx,
