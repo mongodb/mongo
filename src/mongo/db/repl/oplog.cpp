@@ -577,13 +577,6 @@ std::vector<OpTime> logInsertOps(
     invariant(std::distance(fromMigrate.begin(), fromMigrate.end()) == std::distance(begin, end),
               oplogEntryTemplate->toReplOperation().toBSON().toString());
 
-    // If this oplog entry is from a tenant migration, include the tenant migration
-    // UUID.
-    const auto& recipientInfo = tenantMigrationInfo(opCtx);
-    if (recipientInfo) {
-        oplogEntryTemplate->setFromTenantMigration(recipientInfo->uuid);
-    }
-
     auto nss = oplogEntryTemplate->getNss();
     auto replCoord = ReplicationCoordinator::get(opCtx);
     if (replCoord->isOplogDisabledFor(opCtx, nss)) {
@@ -593,6 +586,13 @@ std::vector<OpTime> logInsertOps(
                               << nss.ns(),
                 begin->stmtIds.front() == kUninitializedStmtId);
         return {};
+    }
+
+    // If this oplog entry is from a tenant migration, include the tenant migration
+    // UUID.
+    const auto& recipientInfo = tenantMigrationInfo(opCtx);
+    if (recipientInfo) {
+        oplogEntryTemplate->setFromTenantMigration(recipientInfo->uuid);
     }
 
     const size_t count = end - begin;
