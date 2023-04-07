@@ -270,8 +270,6 @@ last-continuous:
     ticket: SERVER-67105
   - test_file: jstests/core/clustered_collection_bounded_scan.js
     ticket: SERVER-67105
-  - test_file: jstests/replsets/tenant_migration_metrics_output.js
-    ticket: SERVER-75601
   - test_file: jstests/core/map_reduce_subplanning.js
     ticket: SERVER-74131
   - test_file: jstests/sharding/resharding_interrupt_before_create_state_machine.js
@@ -623,8 +621,6 @@ last-lts:
     ticket: SERVER-67105
   - test_file: jstests/core/clustered_collection_bounded_scan.js
     ticket: SERVER-67105
-  - test_file: jstests/replsets/tenant_migration_metrics_output.js
-    ticket: SERVER-75601
   - test_file: jstests/core/map_reduce_subplanning.js
     ticket: SERVER-74131
   - test_file: jstests/sharding/resharding_interrupt_before_create_state_machine.js
