@@ -23,7 +23,7 @@ cat << 'EOF' > jsign_signing_commands.sh
 function sign(){
   if [ -e $1 ]
   then
-    jsign -a mongo-authenticode-2021 $1
+    jsign -a mongo-authenticode-2021 --replace --tsaurl http://timestamp.digicert.com -d SHA-256 $1
   else
     echo "$1 does not exist. Skipping signing"
   fi

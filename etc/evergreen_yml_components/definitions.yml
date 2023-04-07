@@ -6958,7 +6958,7 @@ tasks:
       aws_secret: ${aws_secret}
       permissions: public-read
       build_variants: ["enterprise-windows", "windows"]
-      local_file: src/mongodb-${push_name}-${push_arch}-${suffix}-signed.msi
+      local_file: src/mongodb-${push_name}-${push_arch}-${suffix}.msi
       bucket: build-push-testing
       content_type: application/x-msi
       remote_file: ${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}-signed.msi
