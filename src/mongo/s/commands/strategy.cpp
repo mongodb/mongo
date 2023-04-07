@@ -1171,6 +1171,13 @@ public:
     Future<DbResponse> run();
 
 private:
+    std::string _getDatabaseStringForLogging() const try {
+        // `getDatabase` throws if the request doesn't have a '$db' field.
+        return _rec->getRequest().getDatabase().toString();
+    } catch (const DBException& ex) {
+        return ex.toString();
+    }
+
     void _parseMessage();
 
     Future<void> _execute();
@@ -1214,7 +1221,7 @@ Future<void> ClientCommand::_execute() {
                 3,
                 "Command begin db: {db} msg id: {headerId}",
                 "Command begin",
-                "db"_attr = _rec->getRequest().getDatabase().toString(),
+                "db"_attr = _getDatabaseStringForLogging(),
                 "headerId"_attr = _rec->getMessage().header().getId());
 
     return future_util::makeState<ParseAndRunCommand>(_rec, _errorBuilder)
@@ -1224,7 +1231,7 @@ Future<void> ClientCommand::_execute() {
                         3,
                         "Command end db: {db} msg id: {headerId}",
                         "Command end",
-                        "db"_attr = _rec->getRequest().getDatabase().toString(),
+                        "db"_attr = _getDatabaseStringForLogging(),
                         "headerId"_attr = _rec->getMessage().header().getId());
         })
         .tapError([this](Status status) {
@@ -1233,7 +1240,7 @@ Future<void> ClientCommand::_execute() {
                 1,
                 "Exception thrown while processing command on {db} msg id: {headerId} {error}",
                 "Exception thrown while processing command",
-                "db"_attr = _rec->getRequest().getDatabase().toString(),
+                "db"_attr = _getDatabaseStringForLogging(),
                 "headerId"_attr = _rec->getMessage().header().getId(),
                 "error"_attr = redact(status));
 
