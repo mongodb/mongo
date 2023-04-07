@@ -182,11 +182,7 @@ private:
 
     bool _isDifferentFromSavedNamespace(const NamespaceInfoEntry& newNs) const {
         if (newNs.getNs().ns().compare(_currentNs.getNs().ns()) == 0) {
-            auto newUUID = newNs.getCollectionUUID();
-            auto currentUUID = _currentNs.getCollectionUUID();
-            if (newUUID && currentUUID) {
-                return newUUID.get() != currentUUID.get();
-            }
+            return newNs.getCollectionUUID() != _currentNs.getCollectionUUID();
         }
         return true;
     }
