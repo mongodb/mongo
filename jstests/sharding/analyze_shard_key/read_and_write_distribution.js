@@ -8,6 +8,7 @@
 (function() {
 "use strict";
 
+load("jstests/libs/fail_point_util.js");
 load("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
 load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
 
@@ -526,9 +527,6 @@ const mongodSetParameterOpts = {
     queryAnalysisWriterIntervalSecs,
     analyzeShardKeyNumRanges,
     logComponentVerbosity: tojson({sharding: 2}),
-    // This test expects every query to get sampled regardless of which mongos or mongod it runs
-    // against.
-    "failpoint.queryAnalysisCoordinatorDistributeSampleRateEqually": tojson({mode: "alwaysOn"}),
 };
 const mongosSetParametersOpts = {
     queryAnalysisSamplerConfigurationRefreshSecs,
@@ -546,15 +544,12 @@ const mongosSetParametersOpts = {
         mongos: numMongoses,
         shards: numShards,
         rs: {nodes: 2, setParameter: mongodSetParameterOpts},
-        mongosOptions: {setParameter: mongosSetParametersOpts},
-        configOptions: {
-            setParameter: {
-                // This test expects every query to get sampled regardless of which mongos or
-                // mongod it runs against.
-                "failpoint.queryAnalysisCoordinatorDistributeSampleRateEqually":
-                    tojson({mode: "alwaysOn"})
-            }
-        }
+        mongosOptions: {setParameter: mongosSetParametersOpts}
+    });
+
+    // This test expects every query to get sampled regardless of which mongos or mongod routes it.
+    st.configRS.nodes.forEach(node => {
+        configureFailPoint(node, "queryAnalysisCoordinatorDistributeSampleRateEqually");
     });
 
     const fixture = {
@@ -623,6 +618,11 @@ const mongosSetParametersOpts = {
     rst.startSet();
     rst.initiate();
     const primary = rst.getPrimary();
+
+    // This test expects every query to get sampled regardless of which mongod it runs against.
+    rst.nodes.forEach(node => {
+        configureFailPoint(node, "queryAnalysisCoordinatorDistributeSampleRateEqually");
+    });
 
     const fixture = {
         conn: primary,
