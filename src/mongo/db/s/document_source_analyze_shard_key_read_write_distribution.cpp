@@ -66,7 +66,7 @@ std::unique_ptr<CollatorInterface> getDefaultCollator(OperationContext* opCtx,
  * the documents locally.
  */
 void fetchSplitPoints(OperationContext* opCtx,
-                      const NamespaceString& splitPointsNss,
+                      const BSONObj& splitPointsFilter,
                       const Timestamp& splitPointsAfterClusterTime,
                       boost::optional<ShardId> splitPointsShard,
                       std::function<void(const BSONObj&)> callbackFn) {
@@ -83,9 +83,10 @@ void fetchSplitPoints(OperationContext* opCtx,
             uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, *splitPointsShard));
 
         std::vector<BSONObj> pipeline;
-        pipeline.push_back(BSON("$match" << BSONObj()));
+        pipeline.push_back(BSON("$match" << splitPointsFilter));
         pipeline.push_back(BSON("$sort" << sort));
-        AggregateCommandRequest aggRequest(splitPointsNss, pipeline);
+        AggregateCommandRequest aggRequest(
+            NamespaceString::kConfigAnalyzeShardKeySplitPointsNamespace, pipeline);
         aggRequest.setReadConcern(readConcern.toBSONInner());
         aggRequest.setWriteConcern(WriteConcernOptions());
         aggRequest.setUnwrappedReadPref(ReadPreferenceSetting::get(opCtx).toContainingBSON());
@@ -104,7 +105,8 @@ void fetchSplitPoints(OperationContext* opCtx,
             repl::ReplicationCoordinator::get(opCtx)->waitUntilOpTimeForRead(opCtx, readConcern));
 
         DBDirectClient client(opCtx);
-        FindCommandRequest findRequest(splitPointsNss);
+        FindCommandRequest findRequest(NamespaceString::kConfigAnalyzeShardKeySplitPointsNamespace);
+        findRequest.setFilter(splitPointsFilter);
         findRequest.setSort(sort);
         auto cursor = client.find(std::move(findRequest));
         while (cursor->more()) {
@@ -114,14 +116,14 @@ void fetchSplitPoints(OperationContext* opCtx,
 }
 
 /**
- * Creates a CollectionRoutingInfoTargeter based on the split point documents in the
- * 'splitPointsNss' collection.
+ * Creates a CollectionRoutingInfoTargeter based on the split point documents matching the
+ * 'splitPointsFilter' in the split points collection.
  */
 CollectionRoutingInfoTargeter makeCollectionRoutingInfoTargeter(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const KeyPattern& shardKey,
-    const NamespaceString& splitPointsNss,
+    const BSONObj& splitPointsFilter,
     const Timestamp& splitPointsAfterClusterTime,
     boost::optional<ShardId> splitPointsShard) {
     std::vector<ChunkType> chunks;
@@ -150,7 +152,7 @@ CollectionRoutingInfoTargeter makeCollectionRoutingInfoTargeter(
 
     fetchSplitPoints(
         opCtx,
-        splitPointsNss,
+        splitPointsFilter,
         splitPointsAfterClusterTime,
         splitPointsShard,
         [&](const BSONObj& doc) {
@@ -330,7 +332,7 @@ DocumentSource::GetNextResult DocumentSourceAnalyzeShardKeyReadWriteDistribution
     auto targeter = makeCollectionRoutingInfoTargeter(pExpCtx->opCtx,
                                                       pExpCtx->ns,
                                                       _spec.getKey(),
-                                                      _spec.getSplitPointsNss(),
+                                                      _spec.getSplitPointsFilter(),
                                                       _spec.getSplitPointsAfterClusterTime(),
                                                       _spec.getSplitPointsShardId());
     ReadDistributionMetricsCalculator readDistributionCalculator(targeter);

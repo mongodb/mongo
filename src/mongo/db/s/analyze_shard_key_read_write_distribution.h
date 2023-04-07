@@ -34,6 +34,7 @@
 #include "mongo/s/analyze_shard_key_cmd_gen.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
+#include "mongo/s/analyze_shard_key_server_parameters_gen.h"
 #include "mongo/s/analyze_shard_key_util.h"
 #include "mongo/s/collection_routing_info_targeter.h"
 #include "mongo/s/shard_key_pattern_query_util.h"
@@ -250,12 +251,21 @@ inline bool operator==(const WriteSampleSize& l, const WriteSampleSize& r) {
 }
 
 template <typename T>
-std::vector<T> addElements(const std::vector<T>& l, const std::vector<T>& r) {
+std::vector<T> addNumByRange(const std::vector<T>& l, const std::vector<T>& r) {
     invariant(!l.empty());
     invariant(!r.empty());
-    invariant(l.size() == r.size(),
-              str::stream() << "Cannot add elements in vector of length " << l.size()
-                            << " to elements in vector of length " << r.size());
+    tassert(
+        7559401,
+        str::stream()
+            << "Failed to combine the 'numByRange' metrics from two shards since one has length "
+            << l.size() << " and the other one has length " << r.size()
+            << ". This is likely because one of the shard fetched the split point documents after "
+               "TTL deletions had started. The lifetime of the split point documents is "
+               "configurable via 'analyzeShardKeySplitPointExpirationSecs' which is currently set "
+               "to "
+            << gAnalyzeShardKeySplitPointExpirationSecs.load()
+            << ". Please retry the command again.",
+        l.size() == r.size());
 
     std::vector<T> result;
     result.reserve(l.size());
@@ -284,7 +294,7 @@ DistributionMetricsType addDistributionMetricsBase(DistributionMetricsType l,
         metrics.setPercentageOfScatterGather(calculatePercentage(numScatterGather, numTotal));
 
         if (l.getNumByRange() && r.getNumByRange()) {
-            metrics.setNumByRange(addElements(*l.getNumByRange(), *r.getNumByRange()));
+            metrics.setNumByRange(addNumByRange(*l.getNumByRange(), *r.getNumByRange()));
         } else if (l.getNumByRange()) {
             metrics.setNumByRange(*l.getNumByRange());
         } else if (r.getNumByRange()) {

@@ -506,39 +506,66 @@ TEST_F(QueryAnalysisWriterTest, CreateTTLIndexes) {
                          QueryAnalysisWriter::kSampledQueriesTTLIndexName);
     assertTTLIndexExists(NamespaceString::kConfigSampledQueriesDiffNamespace,
                          QueryAnalysisWriter::kSampledQueriesDiffTTLIndexName);
+    assertTTLIndexExists(NamespaceString::kConfigAnalyzeShardKeySplitPointsNamespace,
+                         QueryAnalysisWriter::kAnalyzeShardKeySplitPointsTTLIndexName);
 }
 
 TEST_F(QueryAnalysisWriterTest, CreateTTLIndexesWhenSampledQueriesIndexExists) {
     auto failCreateIndexes = globalFailPointRegistry().find("failCommand");
-    failCreateIndexes->setMode(FailPoint::nTimes,
-                               1,
-                               BSON("failCommands" << BSON_ARRAY("createIndexes") << "errorCode"
-                                                   << ErrorCodes::IndexAlreadyExists
-                                                   << "failInternalCommands" << true
-                                                   << "failLocalClients" << true));
+    failCreateIndexes->setMode(
+        FailPoint::alwaysOn,
+        0,
+        BSON("failCommands" << BSON_ARRAY("createIndexes") << "namespace"
+                            << NamespaceString::kConfigSampledQueriesNamespace.toString()
+                            << "errorCode" << ErrorCodes::IndexAlreadyExists
+                            << "failInternalCommands" << true << "failLocalClients" << true));
     auto& writer = *QueryAnalysisWriter::get(operationContext());
     auto future = writer.createTTLIndexes(operationContext());
     future.get();
     assertTTLIndexExists(NamespaceString::kConfigSampledQueriesDiffNamespace,
                          QueryAnalysisWriter::kSampledQueriesDiffTTLIndexName);
+    assertTTLIndexExists(NamespaceString::kConfigAnalyzeShardKeySplitPointsNamespace,
+                         QueryAnalysisWriter::kAnalyzeShardKeySplitPointsTTLIndexName);
 }
 
 TEST_F(QueryAnalysisWriterTest, CreateTTLIndexesWhenSampledQueriesDiffIndexExists) {
     auto failCreateIndexes = globalFailPointRegistry().find("failCommand");
-    failCreateIndexes->setMode(FailPoint::skip,
-                               1,
-                               BSON("failCommands" << BSON_ARRAY("createIndexes") << "errorCode"
-                                                   << ErrorCodes::IndexAlreadyExists
-                                                   << "failInternalCommands" << true
-                                                   << "failLocalClients" << true));
+    failCreateIndexes->setMode(
+        FailPoint::alwaysOn,
+        0,
+        BSON("failCommands" << BSON_ARRAY("createIndexes") << "namespace"
+                            << NamespaceString::kConfigSampledQueriesDiffNamespace.toString()
+                            << "errorCode" << ErrorCodes::IndexAlreadyExists
+                            << "failInternalCommands" << true << "failLocalClients" << true));
     auto& writer = *QueryAnalysisWriter::get(operationContext());
     auto future = writer.createTTLIndexes(operationContext());
     future.get();
     assertTTLIndexExists(NamespaceString::kConfigSampledQueriesNamespace,
                          QueryAnalysisWriter::kSampledQueriesTTLIndexName);
+    assertTTLIndexExists(NamespaceString::kConfigAnalyzeShardKeySplitPointsNamespace,
+                         QueryAnalysisWriter::kAnalyzeShardKeySplitPointsTTLIndexName);
 }
 
-TEST_F(QueryAnalysisWriterTest, CreateTTLIndexesWhenBothIndexesExist) {
+TEST_F(QueryAnalysisWriterTest, CreateTTLIndexesWhenAnalyzeShardKeySplitPointsIndexExists) {
+    auto failCreateIndexes = globalFailPointRegistry().find("failCommand");
+    failCreateIndexes->setMode(
+        FailPoint::alwaysOn,
+        0,
+        BSON(
+            "failCommands" << BSON_ARRAY("createIndexes") << "namespace"
+                           << NamespaceString::kConfigAnalyzeShardKeySplitPointsNamespace.toString()
+                           << "errorCode" << ErrorCodes::IndexAlreadyExists
+                           << "failInternalCommands" << true << "failLocalClients" << true));
+    auto& writer = *QueryAnalysisWriter::get(operationContext());
+    auto future = writer.createTTLIndexes(operationContext());
+    future.get();
+    assertTTLIndexExists(NamespaceString::kConfigSampledQueriesNamespace,
+                         QueryAnalysisWriter::kSampledQueriesTTLIndexName);
+    assertTTLIndexExists(NamespaceString::kConfigSampledQueriesDiffNamespace,
+                         QueryAnalysisWriter::kSampledQueriesDiffTTLIndexName);
+}
+
+TEST_F(QueryAnalysisWriterTest, CreateTTLIndexesWhenAllIndexesExist) {
     auto failCreateIndexes = globalFailPointRegistry().find("failCommand");
     failCreateIndexes->setMode(FailPoint::alwaysOn,
                                0,
@@ -566,27 +593,19 @@ TEST_F(QueryAnalysisWriterTest, CreateTTLIndexesRetriesOnIntermittentError) {
                          QueryAnalysisWriter::kSampledQueriesTTLIndexName);
     assertTTLIndexExists(NamespaceString::kConfigSampledQueriesDiffNamespace,
                          QueryAnalysisWriter::kSampledQueriesDiffTTLIndexName);
+    assertTTLIndexExists(NamespaceString::kConfigAnalyzeShardKeySplitPointsNamespace,
+                         QueryAnalysisWriter::kAnalyzeShardKeySplitPointsTTLIndexName);
 }
 
-TEST_F(QueryAnalysisWriterTest, CreateTTLIndexesStopsOnStepDownWhileCreatingSampledQueriesIndex) {
-    auto failCreateIndexes = globalFailPointRegistry().find("failCommand");
-    failCreateIndexes->setMode(FailPoint::alwaysOn,
-                               0,
-                               BSON("failCommands" << BSON_ARRAY("createIndexes") << "errorCode"
-                                                   << ErrorCodes::PrimarySteppedDown
-                                                   << "failInternalCommands" << true
-                                                   << "failLocalClients" << true));
-    auto& writer = *QueryAnalysisWriter::get(operationContext());
-    auto future = writer.createTTLIndexes(operationContext());
-    ASSERT_THROWS_CODE(future.get(), AssertionException, ErrorCodes::PrimarySteppedDown);
-    failCreateIndexes->setMode(FailPoint::off, 0);
-}
+TEST_F(QueryAnalysisWriterTest, CreateTTLIndexesStopsOnStepDown) {
+    // Make a random createIndexes command fail with a PrimarySteppedDown error.
+    static StaticImmortal<synchronized_value<PseudoRandom>> random{
+        PseudoRandom{SecureRandom().nextInt64()}};
+    auto numSkips = (*random)->nextInt64(QueryAnalysisWriter::kTTLIndexes.size());
 
-TEST_F(QueryAnalysisWriterTest,
-       CreateTTLIndexesStopsOnStepDownWhileCreatingSampledQueriesDiffIndex) {
     auto failCreateIndexes = globalFailPointRegistry().find("failCommand");
     failCreateIndexes->setMode(FailPoint::skip,
-                               1,
+                               numSkips,
                                BSON("failCommands" << BSON_ARRAY("createIndexes") << "errorCode"
                                                    << ErrorCodes::PrimarySteppedDown
                                                    << "failInternalCommands" << true

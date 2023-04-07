@@ -11,7 +11,6 @@
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");  // For 'extractUUIDFromObject'.
 load("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
-load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
 
 const numShards = 2;
 const analyzeShardKeyNumMostCommonValues = 5;
@@ -49,7 +48,6 @@ function setUpCollection() {
 
     const db = st.getDB(dbName);
     const coll = db.getCollection(collName);
-    const collUuid = QuerySamplingUtil.getCollectionUuid(db, collName);
 
     // The sampling-based initial split policy needs 10 samples per split point so
     // 10 * analyzeShardKeyNumRanges is the minimum number of distinct shard key values that the
@@ -64,7 +62,7 @@ function setUpCollection() {
     // runs the analyzeShardKey commands on secondaries.
     assert.commandWorked(coll.insert(docs, {writeConcern: {w: 3}}));
 
-    return {dbName, collName, collUuid};
+    return {dbName, collName};
 }
 
 /**
@@ -73,7 +71,7 @@ function setUpCollection() {
  * numbers of entries in 'numProfilerEntries' with the numbers of entries found.
  */
 function assertReadPreferenceBasedOnProfiling(
-    node, dbName, collName, collUuid, comment, expectedReadPref, numProfilerEntries) {
+    node, dbName, collName, comment, startTime, expectedReadPref, numProfilerEntries) {
     const ns = dbName + "." + collName;
 
     const analyzeShardKeyProfilerDocs =
@@ -101,10 +99,7 @@ function assertReadPreferenceBasedOnProfiling(
     const configAggregateProfilerDocs =
         node.getDB("config")
             .system.profile
-            .find({
-                "command.aggregate":
-                    {$regex: "^analyzeShardKey\.splitPoints\." + extractUUIDFromObject(collUuid)}
-            })
+            .find({"command.aggregate": "analyzeShardKeySplitPoints", "ts": {$gte: startTime}})
             .toArray();
     for (let doc of configAggregateProfilerDocs) {
         assert.eq(0,
@@ -117,10 +112,11 @@ function assertReadPreferenceBasedOnProfiling(
 {
     jsTest.log(
         `Test the analyzeShardKey command respects the readPreference specified by the client`);
-    const {dbName, collName, collUuid} = setUpCollection();
+    const {dbName, collName} = setUpCollection();
     const ns = dbName + "." + collName;
     // Used to identify the commands performed by the analyzeShardKey command in this test case.
     const comment = UUID();
+    const startTime = new Date();
     const analyzeShardKeyCmdObj = {
         analyzeShardKey: ns,
         key: {x: 1},
@@ -158,10 +154,20 @@ function assertReadPreferenceBasedOnProfiling(
 
     // Verify that the readPreference is as expected.
     let numProfilerEntries = {numAnalyzeShardKey: 0, numAggregate: 0, numConfigAggregate: 0};
-    assertReadPreferenceBasedOnProfiling(
-        st.rs0.nodes[2], dbName, collName, collUuid, comment, expectedReadPref, numProfilerEntries);
-    assertReadPreferenceBasedOnProfiling(
-        st.rs1.nodes[2], dbName, collName, collUuid, comment, expectedReadPref, numProfilerEntries);
+    assertReadPreferenceBasedOnProfiling(st.rs0.nodes[2],
+                                         dbName,
+                                         collName,
+                                         comment,
+                                         startTime,
+                                         expectedReadPref,
+                                         numProfilerEntries);
+    assertReadPreferenceBasedOnProfiling(st.rs1.nodes[2],
+                                         dbName,
+                                         collName,
+                                         comment,
+                                         startTime,
+                                         expectedReadPref,
+                                         numProfilerEntries);
     assert.gt(numProfilerEntries.numAnalyzeShardKey, 0, numProfilerEntries);
     assert.gt(numProfilerEntries.numAggregate, 0, numProfilerEntries);
     assert.gte(numProfilerEntries.numConfigAggregate, numShards, numProfilerEntries);
@@ -178,10 +184,11 @@ function assertReadPreferenceBasedOnProfiling(
 {
     jsTest.log(
         `Test the analyzeShardKey command uses readPreference "secondaryPreferred" by default`);
-    const {dbName, collName, collUuid} = setUpCollection();
+    const {dbName, collName} = setUpCollection();
     const ns = dbName + "." + collName;
     // Used to identify the commands performed by the analyzeShardKey command in this test case.
     const comment = UUID();
+    const startTime = new Date();
     const analyzeShardKeyCmdObj = {analyzeShardKey: ns, key: {x: 1}, comment};
     const expectedReadPref = {mode: "secondaryPreferred"};
 
@@ -198,11 +205,11 @@ function assertReadPreferenceBasedOnProfiling(
     let numProfilerEntries = {numAnalyzeShardKey: 0, numAggregate: 0, numConfigAggregate: 0};
     st.rs0.nodes.forEach(node => {
         assertReadPreferenceBasedOnProfiling(
-            node, dbName, collName, collUuid, comment, expectedReadPref, numProfilerEntries);
+            node, dbName, collName, comment, startTime, expectedReadPref, numProfilerEntries);
     });
     st.rs1.nodes.forEach(node => {
         assertReadPreferenceBasedOnProfiling(
-            node, dbName, collName, collUuid, comment, expectedReadPref, numProfilerEntries);
+            node, dbName, collName, comment, startTime, expectedReadPref, numProfilerEntries);
     });
     assert.gt(numProfilerEntries.numAnalyzeShardKey, 0, numProfilerEntries);
     assert.gt(numProfilerEntries.numAggregate, 0, numProfilerEntries);

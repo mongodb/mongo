@@ -118,14 +118,30 @@ structs:
         type: date
         description: "The time at which the document should be deleted by the TTL monitor."
 
+  AnalyzeShardKeySplitPointId:
+    description: "Represents the unique id for a document storing one of the split points created
+                  by an analyzeShardKey command."
+    strict: false
+    fields:
+      commandId:
+        type: uuid
+        description: "The unique id for the command that generated this split point."
+      splitPointId:
+        type: uuid
+        description: "The unique id for this split point."
+
   AnalyzeShardKeySplitPointDocument:
     description: "Represents a document storing one of the split points created by an
                   analyzeShardKey command."
     strict: false
     fields:
       _id:
-        type: uuid
-        description: "The unique id for the split point."
+        type: AnalyzeShardKeySplitPointId
         cpp_name: id
+      ns:
+        type: namespacestring
       splitPoint:
         type: object
+      expireAt:
+        type: date
+        description: "The time at which the document should be deleted by the TTL monitor."

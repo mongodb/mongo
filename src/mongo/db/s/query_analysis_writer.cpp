@@ -73,46 +73,22 @@ MONGO_FAIL_POINT_DEFINE(hangQueryAnalysisWriterBeforeWritingRemotely);
 const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 
 /**
- * Creates TTL index for the collection storing sampled queries.
+ * Creates index with the requested specs for the given collection.
  */
-BSONObj createSampledQueriesTTLIndex(OperationContext* opCtx) {
+BSONObj createIndex(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& indexSpec) {
     BSONObj resObj;
 
     DBDirectClient client(opCtx);
-    client.runCommand(NamespaceString::kConfigSampledQueriesNamespace.db(),
-                      BSON("createIndexes"
-                           << NamespaceString::kConfigSampledQueriesNamespace.coll().toString()
-                           << "indexes"
-                           << BSON_ARRAY(QueryAnalysisWriter::kSampledQueriesTTLIndexSpec)),
-                      resObj);
+    client.runCommand(
+        nss.db(),
+        BSON("createIndexes" << nss.coll().toString() << "indexes" << BSON_ARRAY(indexSpec)),
+        resObj);
 
     LOGV2_DEBUG(7078401,
                 1,
-                "Creation of the TTL index for the collection storing sampled queries",
-                logAttrs(NamespaceString::kConfigSampledQueriesNamespace),
-                "response"_attr = redact(resObj));
-
-    return resObj;
-}
-
-/**
- * Creates TTL index for the collection storing sampled diffs.
- */
-BSONObj createSampledQueriesDiffTTLIndex(OperationContext* opCtx) {
-    BSONObj resObj;
-
-    DBDirectClient client(opCtx);
-    client.runCommand(NamespaceString::kConfigSampledQueriesDiffNamespace.db(),
-                      BSON("createIndexes"
-                           << NamespaceString::kConfigSampledQueriesDiffNamespace.coll().toString()
-                           << "indexes"
-                           << BSON_ARRAY(QueryAnalysisWriter::kSampledQueriesDiffTTLIndexSpec)),
-                      resObj);
-
-    LOGV2_DEBUG(7078402,
-                1,
-                "Creation of the TTL index for the collection storing sampled diffs",
-                logAttrs(NamespaceString::kConfigSampledQueriesDiffNamespace),
+                "Finished running the command to create index",
+                logAttrs(nss),
+                "indexSpec"_attr = indexSpec,
                 "response"_attr = redact(resObj));
 
     return resObj;
@@ -242,15 +218,27 @@ SampledCommandRequest makeSampledFindAndModifyCommandRequest(
 }  // namespace
 
 const std::string QueryAnalysisWriter::kSampledQueriesTTLIndexName = "SampledQueriesTTLIndex";
+BSONObj QueryAnalysisWriter::kSampledQueriesTTLIndexSpec(
+    BSON("key" << BSON(SampledQueryDocument::kExpireAtFieldName << 1) << "expireAfterSeconds" << 0
+               << "name" << kSampledQueriesTTLIndexName));
+
 const std::string QueryAnalysisWriter::kSampledQueriesDiffTTLIndexName =
     "SampledQueriesDiffTTLIndex";
-BSONObj QueryAnalysisWriter::kSampledQueriesTTLIndexSpec(BSON("key"
-                                                              << BSON("expireAt" << 1)
-                                                              << "expireAfterSeconds" << 0 << "name"
-                                                              << kSampledQueriesTTLIndexName));
 BSONObj QueryAnalysisWriter::kSampledQueriesDiffTTLIndexSpec(
-    BSON("key" << BSON("expireAt" << 1) << "expireAfterSeconds" << 0 << "name"
-               << kSampledQueriesDiffTTLIndexName));
+    BSON("key" << BSON(SampledQueryDiffDocument::kExpireAtFieldName << 1) << "expireAfterSeconds"
+               << 0 << "name" << kSampledQueriesDiffTTLIndexName));
+
+const std::string QueryAnalysisWriter::kAnalyzeShardKeySplitPointsTTLIndexName =
+    "AnalyzeShardKeySplitPointsTTLIndex";
+BSONObj QueryAnalysisWriter::kAnalyzeShardKeySplitPointsTTLIndexSpec(
+    BSON("key" << BSON(AnalyzeShardKeySplitPointDocument::kExpireAtFieldName << 1)
+               << "expireAfterSeconds" << 0 << "name" << kAnalyzeShardKeySplitPointsTTLIndexName));
+
+const std::map<NamespaceString, BSONObj> QueryAnalysisWriter::kTTLIndexes = {
+    {NamespaceString::kConfigSampledQueriesNamespace, kSampledQueriesTTLIndexSpec},
+    {NamespaceString::kConfigSampledQueriesDiffNamespace, kSampledQueriesDiffTTLIndexSpec},
+    {NamespaceString::kConfigAnalyzeShardKeySplitPointsNamespace,
+     kAnalyzeShardKeySplitPointsTTLIndexSpec}};
 
 QueryAnalysisWriter* QueryAnalysisWriter::get(OperationContext* opCtx) {
     return get(opCtx->getServiceContext());
@@ -339,45 +327,31 @@ void QueryAnalysisWriter::onStepUpComplete(OperationContext* opCtx, long long te
 }
 
 ExecutorFuture<void> QueryAnalysisWriter::createTTLIndexes(OperationContext* opCtx) {
-    static unsigned int tryCount = 0;
     invariant(_executor);
+
+    static unsigned int tryCount = 0;
     auto future =
-        AsyncTry([this, opCtx] {
+        AsyncTry([this] {
             ++tryCount;
 
             auto opCtxHolder = cc().makeOperationContext();
             auto opCtx = opCtxHolder.get();
 
-            auto status = getStatusFromCommandResult(createSampledQueriesTTLIndex(opCtx));
-            if (!status.isOK() && status != ErrorCodes::IndexAlreadyExists) {
-                if (tryCount % 100 == 0) {
-                    LOGV2_WARNING(7078404,
-                                  "Still retrying to create sampled queries TTL index; "
-                                  "please create an index on {namespace} with specification "
-                                  "{specification}.",
-                                  logAttrs(NamespaceString::kConfigSampledQueriesNamespace),
-                                  "specification"_attr =
-                                      QueryAnalysisWriter::kSampledQueriesTTLIndexSpec,
-                                  "tries"_attr = tryCount);
+            for (const auto& [nss, indexSpec] : kTTLIndexes) {
+                auto status = getStatusFromCommandResult(createIndex(opCtx, nss, indexSpec));
+                if (!status.isOK() && status != ErrorCodes::IndexAlreadyExists) {
+                    if (tryCount % 100 == 0) {
+                        LOGV2_WARNING(7078402,
+                                      "Still retrying to create TTL index; "
+                                      "please create an index on {namespace} with specification "
+                                      "{specification}.",
+                                      logAttrs(nss),
+                                      "specification"_attr = indexSpec,
+                                      "tries"_attr = tryCount);
+                    }
+                    return status;
                 }
-                return status;
             }
-
-            status = getStatusFromCommandResult(createSampledQueriesDiffTTLIndex(opCtx));
-            if (!status.isOK() && status != ErrorCodes::IndexAlreadyExists) {
-                if (tryCount % 100 == 0) {
-                    LOGV2_WARNING(7078405,
-                                  "Still retrying to create sampled queries diff TTL index; "
-                                  "please create an index on {namespace} with specification "
-                                  "{specification}.",
-                                  logAttrs(NamespaceString::kConfigSampledQueriesDiffNamespace),
-                                  "specification"_attr =
-                                      QueryAnalysisWriter::kSampledQueriesDiffTTLIndexSpec,
-                                  "tries"_attr = tryCount);
-                }
-                return status;
-            }
-
             return Status::OK();
         })
             .until([](Status status) {

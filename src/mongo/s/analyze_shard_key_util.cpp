@@ -34,11 +34,8 @@
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/list_collections_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/async_requests_sender.h"
-#include "mongo/s/cluster_commands_helpers.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -234,27 +231,6 @@ void insertDocuments(OperationContext* opCtx,
     executeCommandOnPrimary(opCtx, nss.db(), std::move(insertCmdObj), [&](const BSONObj& resObj) {
         uassertCmdStatusFn(resObj);
     });
-}
-
-void dropCollection(OperationContext* opCtx, const NamespaceString& nss) {
-    auto dropCollectionCmdObj =
-        BSON("drop" << nss.coll().toString() << WriteConcernOptions::kWriteConcernField
-                    << kMajorityWriteConcern.toBSON());
-    executeCommandOnPrimary(
-        opCtx, nss.db(), std::move(dropCollectionCmdObj), [&](const BSONObj& resObj) {
-            BatchedCommandResponse res;
-            std::string errMsg;
-
-            if (!res.parseBSON(resObj, &errMsg)) {
-                uasserted(ErrorCodes::FailedToParse, errMsg);
-            }
-
-            auto status = res.toStatus();
-            if (status == ErrorCodes::NamespaceNotFound) {
-                return;
-            }
-            uassertStatusOK(status);
-        });
 }
 
 }  // namespace analyze_shard_key

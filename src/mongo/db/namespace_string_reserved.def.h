@@ -238,6 +238,12 @@ NSS_CONSTANT(kGlobalIndexClonerNamespace,
              DatabaseName::kConfig,
              "localGlobalIndexOperations.cloner"_sd)
 
+// Namespace used by an analyzeShardKey command to store the split points for the shard key being
+// analyzed.
+NSS_CONSTANT(kConfigAnalyzeShardKeySplitPointsNamespace,
+             DatabaseName::kConfig,
+             "analyzeShardKeySplitPoints"_sd)
+
 // Namespace used for storing query analyzer settings.
 NSS_CONSTANT(kConfigQueryAnalyzersNamespace, DatabaseName::kConfig, "queryAnalyzers"_sd)
 

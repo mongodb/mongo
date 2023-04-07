@@ -25,17 +25,18 @@ const st = new ShardingTest({
         }
     },
 });
+const shard0Primary = st.rs0.getPrimary();
 
 const dbName = "testDb";
 const collName = "testQuerySampling";
 const ns = dbName + "." + collName;
 const kNumDocs = 20;
 
-const mydb = st.s.getDB(dbName);
-const coll = mydb.getCollection(collName);
+const testDB = st.s.getDB(dbName);
+const testColl = testDB.getCollection(collName);
 
 // Insert documents
-const bulk = coll.initializeUnorderedBulkOp();
+const bulk = testColl.initializeUnorderedBulkOp();
 for (let i = 0; i < kNumDocs; i++) {
     bulk.insert({x: i, y: i});
 }
@@ -49,12 +50,12 @@ QuerySamplingUtil.waitForActiveSampling(st.s);
 
 // Find each document
 for (let i = 0; i < kNumDocs; i++) {
-    assert.commandWorked(mydb.runCommand({find: collName, filter: {x: i}}));
+    assert.commandWorked(testDB.runCommand({find: collName, filter: {x: i}}));
 }
 
 // Update each document
 for (let i = 0; i < kNumDocs; i++) {
-    assert.commandWorked(mydb.runCommand({
+    assert.commandWorked(testDB.runCommand({
         update: collName,
         updates: [{q: {x: i}, u: [{$set: {y: i + 1}}], multi: false, upsert: false}]
     }));
@@ -63,17 +64,14 @@ for (let i = 0; i < kNumDocs; i++) {
 // Assert that query sample documents exist
 let numQueryDocs = 0;
 let numDiffDocs = 0;
-let prevNumQueryDocs = -1;
-let prevNumDiffDocs = -1;
 assert.soon(() => {
     numQueryDocs = QuerySamplingUtil.getNumSampledQueryDocuments(st);
     numDiffDocs = QuerySamplingUtil.getNumSampledQueryDiffDocuments(st);
     return numQueryDocs > 0 && numDiffDocs > 0;
 });
-
 printjson({"numQueryDocs": numQueryDocs, "numDiffDocs": numDiffDocs});
 
-mydb.adminCommand({setParameter: 1, ttlMonitorSleepSecs: 1});
+assert.commandWorked(shard0Primary.adminCommand({setParameter: 1, ttlMonitorSleepSecs: 1}));
 
 // Assert that query sample documents have been deleted
 assert.soon(() => {

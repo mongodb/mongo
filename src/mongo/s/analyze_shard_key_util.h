@@ -129,13 +129,5 @@ void insertDocuments(OperationContext* opCtx,
                      const std::vector<BSONObj>& docs,
                      const std::function<void(const BSONObj&)>& uassertCmdStatusFn);
 
-/*
- * Drops the collection 'nss'. If this mongod is currently the primary, runs the dropCollection
- * command locally. Otherwise, runs the command on the remote primary. Internally asserts that the
- * top-level command is OK or the error is NamespaceNotFound. Internally retries the write command
- * on retryable errors.
- */
-void dropCollection(OperationContext* opCtx, const NamespaceString& nss);
-
 }  // namespace analyze_shard_key
 }  // namespace mongo

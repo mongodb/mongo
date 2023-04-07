@@ -36,6 +36,7 @@ function assertTTLIndexExists(node, collName, indexName) {
 function assertTTLIndexesExist(node) {
     assertTTLIndexExists(node, "sampledQueries", "SampledQueriesTTLIndex");
     assertTTLIndexExists(node, "sampledQueriesDiff", "SampledQueriesDiffTTLIndex");
+    assertTTLIndexExists(node, "analyzeShardKeySplitPoints", "AnalyzeShardKeySplitPointsTTLIndex");
 }
 
 for (let oldVersion of ["last-lts", "last-continuous"]) {

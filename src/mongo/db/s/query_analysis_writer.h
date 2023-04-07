@@ -69,9 +69,15 @@ class QueryAnalysisWriter final : public std::enable_shared_from_this<QueryAnaly
 
 public:
     static const std::string kSampledQueriesTTLIndexName;
-    static const std::string kSampledQueriesDiffTTLIndexName;
     static BSONObj kSampledQueriesTTLIndexSpec;
+
+    static const std::string kSampledQueriesDiffTTLIndexName;
     static BSONObj kSampledQueriesDiffTTLIndexSpec;
+
+    static const std::string kAnalyzeShardKeySplitPointsTTLIndexName;
+    static BSONObj kAnalyzeShardKeySplitPointsTTLIndexSpec;
+
+    static const std::map<NamespaceString, BSONObj> kTTLIndexes;
 
     /**
      * Temporarily stores documents to be written to disk.
