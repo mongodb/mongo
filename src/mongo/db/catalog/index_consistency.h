@@ -169,7 +169,7 @@ public:
      * Records the errors gathered from the second phase of index validation into the provided
      * ValidateResultsMap and ValidateResults.
      */
-    void addIndexEntryErrors(ValidateResults* results);
+    void addIndexEntryErrors(OperationContext* opCtx, ValidateResults* results);
 
     /**
      * Sets up this IndexConsistency object to limit memory usage in the second phase of index
@@ -242,5 +242,11 @@ private:
      */
     uint32_t _hashKeyString(const KeyString::Value& ks, uint32_t indexNameHash) const;
 
+    /**
+     * Prints the collection document's and index entry's metadata.
+     */
+    void _printMetadata(OperationContext* opCtx,
+                        ValidateResults* results,
+                        const IndexEntryInfo& info);
 };  // IndexConsistency
 }  // namespace mongo
