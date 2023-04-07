@@ -487,9 +487,14 @@ class GDBDumper(Dumper):
         # https://sourceware.org/git/?p=binutils-gdb.git;a=blob;f=gdb/gcore.in;h=34860de630cf0ee766e102eb82f7a3fddba6b368#l101
         skip_reading_symbols_on_take_dump = ["--readnever"] if take_dump else []
 
-        call([dbg, "--quiet", "--nx"] + skip_reading_symbols_on_take_dump + list(
-            itertools.chain.from_iterable([['-ex', b] for b in cmds])), logger,
-             self._timeout_seconds_for_gdb_process, pinfo)
+        # TODO: SERVER-75862
+        # Live process dumping is causing system unresponsive, which is resulting in loss of core dumps
+        # and other shutdown/clean up tasks failing to be run. Disabling the live process dump is a
+        # temporary workaround while the root cause of the system unresponsive is fully understood.
+        if take_dump:
+            call([dbg, "--quiet", "--nx"] + skip_reading_symbols_on_take_dump + list(
+                itertools.chain.from_iterable([['-ex', b] for b in cmds])), logger,
+                 self._timeout_seconds_for_gdb_process, pinfo)
 
         time_period = (datetime.now() - _start_time).total_seconds()
         self._reduce_timeout_for_gdb_process(time_period)
