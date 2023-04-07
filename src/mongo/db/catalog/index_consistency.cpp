@@ -301,6 +301,8 @@ void KeyStringIndexConsistency::addIndexEntryErrors(OperationContext* opCtx,
             missingIndexEntrySizeLimitWarning = true;
         }
 
+        _printMetadata(opCtx, results, entryInfo);
+
         std::string indexName = entry["indexName"].String();
         if (!results->indexResultsMap.at(indexName).valid) {
             continue;
@@ -444,12 +446,6 @@ void KeyStringIndexConsistency::addDocKey(OperationContext* opCtx,
         invariant(_missingIndexEntries.count(key) == 0);
         _missingIndexEntries.insert(
             std::make_pair(key, IndexEntryInfo(*indexInfo, recordId, idKeyBuilder.obj(), ks)));
-
-        // Prints the collection document's and index entry's metadata.
-        _validateState->getCollection()->getRecordStore()->printRecordMetadata(
-            opCtx, recordId, &(results->recordTimestamps));
-        indexInfo->accessMethod->asSortedData()->getSortedDataInterface()->printIndexEntryMetadata(
-            opCtx, ks);
     }
 }
 
@@ -1087,4 +1083,16 @@ uint32_t KeyStringIndexConsistency::_hashKeyString(const KeyString::Value& ks,
                                                    const uint32_t indexNameHash) const {
     return ks.hash(indexNameHash);
 }
+
+void KeyStringIndexConsistency::_printMetadata(OperationContext* opCtx,
+                                               ValidateResults* results,
+                                               const IndexEntryInfo& entryInfo) {
+    _validateState->getCollection()->getRecordStore()->printRecordMetadata(
+        opCtx, entryInfo.recordId, &(results->recordTimestamps));
+    getIndexInfo(entryInfo.indexName)
+        .accessMethod->asSortedData()
+        ->getSortedDataInterface()
+        ->printIndexEntryMetadata(opCtx, entryInfo.keyString);
+}
+
 }  // namespace mongo
