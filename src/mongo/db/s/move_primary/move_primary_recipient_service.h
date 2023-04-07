@@ -262,6 +262,12 @@ public:
         ExecutorFuture<void> _transitionToDoneStateAndFinishMovePrimaryOp(
             const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
 
+        /**
+         * Clears cached database info on recipient shard to trigger a refresh on next request with
+         * DB version. This is done before releasing critical section.
+         */
+        void _clearDatabaseMetadata(OperationContext* opCtx);
+
         void _createMetadataCollection(OperationContext* opCtx);
 
         std::vector<NamespaceString> _getUnshardedCollections(OperationContext* opCtx);

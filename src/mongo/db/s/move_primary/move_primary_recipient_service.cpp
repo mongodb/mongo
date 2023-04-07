@@ -29,6 +29,7 @@
 
 #include "mongo/db/s/move_primary/move_primary_recipient_service.h"
 
+#include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/move_primary/move_primary_util.h"
 #include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/executor/scoped_task_executor.h"
@@ -534,6 +535,8 @@ MovePrimaryRecipientService::MovePrimaryRecipient::_transitionToDoneStateAndFini
                 })
                 .then([this, factory, executor] {
                     auto opCtx = factory.makeOperationContext(Client::getCurrent());
+                    _clearDatabaseMetadata(opCtx.get());
+
                     ShardingRecoveryService::get(opCtx.get())
                         ->releaseRecoverableCriticalSection(
                             opCtx.get(),
@@ -566,6 +569,14 @@ MovePrimaryRecipientService::MovePrimaryRecipient::_transitionToDoneStateAndFini
             return _waitForMajority(executor).then(
                 [this, executor, status] { return ExecutorFuture<void>(**executor, status); });
         });
+}
+
+void MovePrimaryRecipientService::MovePrimaryRecipient::_clearDatabaseMetadata(
+    OperationContext* opCtx) {
+    auto dbName = getDatabaseName().dbName();
+    AutoGetDb autoDb(opCtx, dbName, MODE_IX);
+    auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbName);
+    scopedDss->clearDbInfo(opCtx);
 }
 
 void MovePrimaryRecipientService::MovePrimaryRecipient::_createMetadataCollection(
