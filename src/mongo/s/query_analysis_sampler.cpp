@@ -116,6 +116,8 @@ void QueryAnalysisSampler::onStartup() {
     auto periodicRunner = serviceContext->getPeriodicRunner();
     invariant(periodicRunner);
 
+    stdx::lock_guard<Latch> lk(_mutex);
+
     PeriodicRunner::PeriodicJob queryStatsRefresherJob(
         "QueryAnalysisQueryStatsRefresher",
         [this](Client* client) { _refreshQueryStats(); },

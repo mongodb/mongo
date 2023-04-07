@@ -149,6 +149,8 @@ BSONObj QueryAnalysisSampleTracker::CollectionSampleTracker::reportForCurrentOp(
 }
 
 BSONObj QueryAnalysisSampleTracker::reportForServerStatus() const {
+    stdx::lock_guard<Latch> lk(_mutex);
+
     QueryAnalysisServerStatus res;
     res.setActiveCollections(static_cast<int64_t>(_trackers.size()));
     res.setTotalCollections(static_cast<int64_t>(_sampledNamespaces.size()));
