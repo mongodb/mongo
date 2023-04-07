@@ -167,7 +167,7 @@ private:
     MirroringSampler _sampler;
     std::shared_ptr<executor::TaskExecutor> _executor;
     repl::TopologyVersionObserver _topologyVersionObserver;
-    PseudoRandom _random{SecureRandom{}.nextInt64()};
+    synchronized_value<PseudoRandom> _random{PseudoRandom(SecureRandom{}.nextInt64())};
 };
 
 const auto getMirrorMaestroImpl = ServiceContext::declareDecoration<MirrorMaestroImpl>();
@@ -417,7 +417,7 @@ void MirrorMaestroImpl::_mirror(const std::vector<HostAndPort>& hosts,
     }();
 
     // Mirror to a normalized subset of eligible hosts (i.e., secondaries).
-    const auto startIndex = _random.nextInt64(hosts.size());
+    const auto startIndex = (*_random)->nextInt64(hosts.size());
     const auto mirroringFactor = std::ceil(params.getSamplingRate() * hosts.size());
 
     for (auto i = 0; i < mirroringFactor; i++) {
