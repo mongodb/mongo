@@ -31,6 +31,7 @@
 
 #include "mongo/bson/json.h"
 #include "mongo/crypto/jwk_manager.h"
+#include "mongo/crypto/jwks_fetcher_mock.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/http_client.h"
@@ -38,20 +39,50 @@
 namespace mongo::crypto {
 namespace {
 
-constexpr auto source = "https://mongodbcorp.okta.com/oauth2/ausfgfhg2j9rtr0nT297/v1/keys"_sd;
+BSONObj getTestJWKSet() {
+    BSONObjBuilder set;
+    BSONArrayBuilder keys(set.subarrayStart("keys"_sd));
+
+    {
+        BSONObjBuilder key(keys.subobjStart());
+        key.append("kty", "RSA");
+        key.append("kid", "custom-key-1");
+        key.append("e", "AQAB");
+        key.append(
+            "n",
+            "ALtUlNS31SzxwqMzMR9jKOJYDhHj8zZtLUYHi3s1en3wLdILp1Uy8O6Jy0Z66tPyM1u8lke0JK5gS-40yhJ-"
+            "bvqioW8CnwbLSLPmzGNmZKdfIJ08Si8aEtrRXMxpDyz4Is7JLnpjIIUZ4lmqC3MnoZHd6qhhJb1v1Qy-"
+            "QGlk4NJy1ZI0aPc_uNEUM7lWhPAJABZsWc6MN8flSWCnY8pJCdIk_cAktA0U17tuvVduuFX_"
+            "94763nWYikZIMJS_cTQMMVxYNMf1xcNNOVFlUSJHYHClk46QT9nT8FWeFlgvvWhlXfhsp9aNAi3pX-"
+            "KxIxqF2wABIAKnhlMa3CJW41323Js");
+        key.doneFast();
+    }
+    {
+        BSONObjBuilder key(keys.subobjStart());
+        key.append("kty", "RSA");
+        key.append("kid", "custom-key-2");
+        key.append("e", "AQAB");
+        key.append(
+            "n",
+            "4Amo26gLJITvt62AXI7z224KfvfQjwpyREjtpA2DU2mN7pnlz-"
+            "ZDu0sygwkhGcAkRPVbzpEiliXtVo2dYN4vMKLSd5BVBXhtB41bZ6OUxni48uP5txm7w8BUWv8MxzPkzyW_"
+            "3dd8rOfzECdLCF5G3aA4u_XRu2ODUSAMcrxXngnNtAuC-"
+            "OdqgYmvZfgFwqbU0VKNR4bbkhSrw6p9Tct6CUW04Ml4HMacZUovJKXRvNqnHcx3sy4PtVe3CyKlbb4KhBtkj1U"
+            "U_"
+            "cwiosz8uboBbchp7wsATieGVF8x3BUtf0ry94BGYXKbCGY_Mq-TSxcM_3afZiJA1COVZWN7d4GTEw");
+        key.doneFast();
+    }
+
+    keys.doneFast();
+    return set.obj();
+}
 
 TEST(JWKManager, parseJWKSetBasicFromSource) {
     auto httpClient = HttpClient::createWithoutConnectionPool();
     httpClient->setHeaders({"Accept: */*"});
 
-    DataBuilder getJWKs = httpClient->get(source);
-
-    ConstDataRange cdr = getJWKs.getCursor();
-    StringData str;
-    cdr.readInto<StringData>(&str);
-
-    BSONObj data = fromjson(str);
-    JWKManager manager(source, true /* loadAtStartup */);
+    auto data = getTestJWKSet();
+    JWKManager manager(std::make_unique<MockJWKSFetcher>(data), true /* loadAtStartup */);
 
     BSONObjBuilder bob;
     manager.serialize(&bob);

@@ -180,6 +180,9 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
     ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
+    ],
 )
 
 if http_client == "off":
@@ -229,8 +232,10 @@ env.CppUnitTest(
     source=[
         'cidr_test.cpp',
         'hostandport_test.cpp',
+        'http_client_test.cpp',
     ],
     LIBDEPS=[
+        'http_client',
         'network',
     ],
 )

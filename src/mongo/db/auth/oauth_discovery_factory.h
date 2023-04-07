@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2021-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,60 +27,30 @@
  *    it in the license file.
  */
 
+#pragma once
+
+#include "mongo/base/string_data.h"
+#include "mongo/db/auth/oauth_authorization_server_metadata_gen.h"
 #include "mongo/util/net/http_client.h"
 
-#include "mongo/base/status.h"
-#include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/util/ctype.h"
+#include <string>
 
 namespace mongo {
 
-namespace {
-HttpClientProvider* _factory{nullptr};
-}
+/**
+ * Uses RFC8414 to acquire Authorization Server metadata for an issuer.
+ */
+class OAuthDiscoveryFactory {
+public:
+    OAuthDiscoveryFactory(std::unique_ptr<HttpClient> client) : _client(std::move(client)) {}
 
-HttpClientProvider::~HttpClientProvider() {}
+    /**
+     * Resolve the issuer provided into its metadata payload.
+     */
+    OAuthAuthorizationServerMetadata acquire(StringData issuer);
 
-void registerHTTPClientProvider(HttpClientProvider* factory) {
-    invariant(_factory == nullptr);
-    _factory = factory;
-}
-
-Status HttpClient::endpointIsSecure(StringData url) {
-    bool isAcceptableLocalhost = [url]() mutable {
-        constexpr StringData localhostPrefix = "http://localhost"_sd;
-        if (!url.startsWith(localhostPrefix)) {
-            return false;
-        }
-        url = url.substr(localhostPrefix.size());
-        if (url[0] == ':') {
-            url = url.substr(1);
-            while (!url.empty() && ctype::isDigit(url[0])) {
-                url = url.substr(1);
-            }
-        }
-        return url.empty() || url[0] == '/';
-    }();
-
-    if (url.startsWith("https://") || (isAcceptableLocalhost && getTestCommandsEnabled())) {
-        return Status::OK();
-    }
-    return Status(ErrorCodes::IllegalOperation, "Endpoint is not HTTPS");
-}
-
-std::unique_ptr<HttpClient> HttpClient::create() {
-    invariant(_factory != nullptr);
-    return _factory->create();
-}
-
-std::unique_ptr<HttpClient> HttpClient::createWithoutConnectionPool() {
-    invariant(_factory != nullptr);
-    return _factory->createWithoutConnectionPool();
-}
-
-BSONObj HttpClient::getServerStatus() {
-    invariant(_factory != nullptr);
-    return _factory->getServerStatus();
-}
+private:
+    std::unique_ptr<HttpClient> _client;
+};
 
 }  // namespace mongo

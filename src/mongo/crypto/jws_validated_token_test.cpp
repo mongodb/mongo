@@ -33,11 +33,14 @@
 #include <string>
 #include <vector>
 
+#include <openssl/opensslv.h>
+
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/config.h"
 #include "mongo/crypto/jwk_manager.h"
+#include "mongo/crypto/jwks_fetcher_mock.h"
 #include "mongo/crypto/jws_validator.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
@@ -133,8 +136,8 @@ TEST(JWKManager, validateTokenFromKeys) {
     auto validToken = validTokenHeader + "."_sd + validTokenBody + "."_sd + validTokenSignature;
     BSONObj keys = getTestJWKSet();
 
-    JWKManager manager(keys);
-    JWSValidatedToken validatedToken(manager, validToken);
+    JWKManager manager(std::make_unique<MockJWKSFetcher>(keys), true);
+    JWSValidatedToken validatedToken(&manager, validToken);
 
     auto headerString = base64url::decode(validTokenHeader);
     BSONObj headerBSON = fromjson(headerString);
@@ -156,8 +159,8 @@ TEST(JWKManager, failsWithExpiredToken) {
         expiredTokenHeader + "."_sd + expiredTokenBody + "."_sd + expiredTokenSignature;
     BSONObj keys = getTestJWKSet();
 
-    JWKManager manager(keys);
-    ASSERT_THROWS(JWSValidatedToken(manager, expiredToken), DBException);
+    JWKManager manager(std::make_unique<MockJWKSFetcher>(keys), true);
+    ASSERT_THROWS(JWSValidatedToken(&manager, expiredToken), DBException);
 }
 
 TEST(JWKManager, failsWithModifiedToken) {
@@ -165,8 +168,8 @@ TEST(JWKManager, failsWithModifiedToken) {
         validTokenHeader + "."_sd + validTokenBody + "."_sd + validTokenSignature + "a"_sd;
     BSONObj keys = getTestJWKSet();
 
-    JWKManager manager(keys);
-    ASSERT_THROWS(JWSValidatedToken(manager, modifiedToken), DBException);
+    JWKManager manager(std::make_unique<MockJWKSFetcher>(keys), true);
+    ASSERT_THROWS(JWSValidatedToken(&manager, modifiedToken), DBException);
 }
 
 TEST(JWKManager, failsWithModifiedHeaderForADifferentKey) {
@@ -174,8 +177,8 @@ TEST(JWKManager, failsWithModifiedHeaderForADifferentKey) {
         modifiedTokenHeader + "."_sd + validTokenBody + "."_sd + validTokenSignature;
     BSONObj keys = getTestJWKSet();
 
-    JWKManager manager(keys);
-    ASSERT_THROWS(JWSValidatedToken(manager, modifiedToken), DBException);
+    JWKManager manager(std::make_unique<MockJWKSFetcher>(keys), true);
+    ASSERT_THROWS(JWSValidatedToken(&manager, modifiedToken), DBException);
 }
 #endif
 }  // namespace mongo::crypto

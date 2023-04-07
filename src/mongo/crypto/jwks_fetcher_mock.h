@@ -29,28 +29,23 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
-#include "mongo/client/oauth_authorization_server_metadata_gen.h"
-#include "mongo/util/net/http_client.h"
+#include "mongo/crypto/jwks_fetcher.h"
 
-#include <string>
+namespace mongo::crypto {
 
-namespace mongo {
-
-/**
- * Uses RFC8414 to acquire Authorization Server metadata for an issuer.
+/** Mock JWKS fetcher.
+ *  Returns JWKSes which are pre-set at construction.
  */
-class OAuthDiscoveryFactory {
+class MockJWKSFetcher : public JWKSFetcher {
 public:
-    OAuthDiscoveryFactory(std::unique_ptr<HttpClient> client) : _client(std::move(client)) {}
+    MockJWKSFetcher(BSONObj keys) : _keys(std::move(keys)) {}
 
-    /**
-     * Resolve the issuer provided into its metadata payload.
-     */
-    OAuthAuthorizationServerMetadata acquire(StringData issuer);
+    JWKSet fetch() {
+        return JWKSet::parse(IDLParserContext("JWKSet"), _keys);
+    }
 
 private:
-    std::unique_ptr<HttpClient> _client;
+    BSONObj _keys;
 };
 
-}  // namespace mongo
+}  // namespace mongo::crypto

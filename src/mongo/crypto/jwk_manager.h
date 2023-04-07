@@ -29,11 +29,13 @@
 
 #pragma once
 
+#include "mongo/crypto/jwt_types_gen.h"
 #include <map>
 #include <string>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/crypto/jwks_fetcher.h"
 #include "mongo/crypto/jws_validator.h"
 
 
@@ -45,17 +47,11 @@ public:
     using KeyMap = std::map<std::string, BSONObj>;
 
     /**
-     * Fetch a JWKS file from the specified URL, parse them as keys, and instantiate JWSValidator
-     * instances if loadAtStartup is set as true. Otherwise the keys will be fetched from the source
-     * and JWSValidators initiated during the next JIT refresh.
+     * Fetch a JWKS file for the specified Issuer URL, parse them as keys, and instantiate
+     * JWSValidator instances if loadAtStartup is set as true. Otherwise the keys will be fetched
+     * from the source and JWSValidators initiated during the next JIT refresh.
      */
-    explicit JWKManager(StringData source, bool loadAtStartup);
-
-    /**
-     * Parse a BSONObj array of keys, and instantiate JWSValidator instances.
-     * This was added for testing purposes.
-     */
-    explicit JWKManager(BSONObj keys);
+    explicit JWKManager(std::unique_ptr<JWKSFetcher> fetcher, bool loadAtStartup);
 
     /**
      * Fetch a specific JWSValidator from the JWKManager by keyId.
@@ -85,17 +81,15 @@ public:
     void serialize(BSONObjBuilder* bob) const;
 
 private:
-    void _setAndValidateKeys(const BSONObj& keys);
-
-    void _loadKeysFromUri();
+    void _setAndValidateKeys(const JWKSet& keys);
 
     bool _haveKeysBeenModified(const KeyMap& newKeyMaterial) const;
 
-private:
+    std::unique_ptr<JWKSFetcher> _fetcher;
+
     // Stores the current key material of the manager, which may have been refreshed.
     std::shared_ptr<KeyMap> _keyMaterial;
 
-    boost::optional<std::string> _keyURI;
     std::shared_ptr<std::map<std::string, SharedValidator>> _validators;
 
     // If an existing key got deleted or modified while doing a just in time refresh, we activate

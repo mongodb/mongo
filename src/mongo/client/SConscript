@@ -111,19 +111,6 @@ if env['MONGO_BUILD_SASL_CLIENT']:
     if env.TargetOSIs('windows'):
         saslLibs.extend(['secur32'])
 
-env.Library(
-    target='oauth_client',
-    source=[
-        "oauth_authorization_server_metadata.idl",
-        "oauth_discovery_factory.cpp",
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/idl/idl_parser',
-        '$BUILD_DIR/mongo/util/net/http_client',
-    ],
-)
-
 saslClientEnv.Library(
     target='sasl_client',
     source=saslClientSource,
@@ -145,7 +132,6 @@ saslClientEnv.Library(
         '$BUILD_DIR/mongo/shell/program_runner',
         '$BUILD_DIR/mongo/util/net/http_client',
         'connection_string',
-        'oauth_client',
     ],
     SYSLIBDEPS=saslLibs,
 )
@@ -372,7 +358,6 @@ if wiredtiger:
             'fetcher_test.cpp',
             'index_spec_test.cpp',
             'mongo_uri_test.cpp',
-            'oauth_discovery_factory_test.cpp',
             'read_preference_test.cpp',
             'remote_command_retry_scheduler_test.cpp',
             'replica_set_monitor_server_parameters_test.cpp',
@@ -396,14 +381,12 @@ if wiredtiger:
             '$BUILD_DIR/mongo/transport/transport_layer_egress_init',
             '$BUILD_DIR/mongo/unittest/task_executor_proxy',
             '$BUILD_DIR/mongo/util/md5',
-            '$BUILD_DIR/mongo/util/net/mock_http_client',
             '$BUILD_DIR/mongo/util/net/network',
             'authentication',
             'clientdriver_minimal',
             'clientdriver_network',
             'connection_string',
             'fetcher',
-            'oauth_client',
             'read_preference',
             'remote_command_retry_scheduler',
             'remote_command_targeter_mock',

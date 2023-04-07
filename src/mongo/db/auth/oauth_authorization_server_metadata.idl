@@ -44,27 +44,27 @@ structs:
                 description: "The authorization server's issuer identifier"
                 cpp_name: issuer
                 type: string
-                validator: { callback: 'HttpClient::endpointIsHTTPS' }
+                validator: { callback: 'HttpClient::endpointIsSecure' }
             authorization_endpoint:
                 description: "URL of the authorization server's authorization endpoint"
                 cpp_name: authorizationEndpoint
                 type: string
-                validator: { callback: 'HttpClient::endpointIsHTTPS' }
+                validator: { callback: 'HttpClient::endpointIsSecure' }
                 optional: true
             token_endpoint:
                 description: "URL of the authorization server's token endpoint"
                 cpp_name: tokenEndpoint
                 type: string
-                validator: { callback: 'HttpClient::endpointIsHTTPS' }
+                validator: { callback: 'HttpClient::endpointIsSecure' }
             device_authorization_endpoint:
                 description: "URL of the authorization server's device authorization endpoint"
                 cpp_name: deviceAuthorizationEndpoint
                 type: string
-                validator: { callback: 'HttpClient::endpointIsHTTPS' }
+                validator: { callback: 'HttpClient::endpointIsSecure' }
                 optional: true
             jwks_uri:
                 description: "URL of the authorization server's jwks endpoint"
                 cpp_name: jwksUri
                 type: string
-                validator: { callback: 'HttpClient::endpointIsHTTPS' }
+                validator: { callback: 'HttpClient::endpointIsSecure' }
                 optional: true

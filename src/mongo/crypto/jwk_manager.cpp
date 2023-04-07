@@ -29,13 +29,10 @@
 
 #include "mongo/crypto/jwk_manager.h"
 
-#include "mongo/bson/json.h"
 #include "mongo/crypto/jws_validator.h"
 #include "mongo/crypto/jwt_types_gen.h"
-#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/base64.h"
-#include "mongo/util/net/http_client.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
 
@@ -56,30 +53,25 @@ StringData reduceInt(StringData value) {
 
 }  // namespace
 
-JWKManager::JWKManager(StringData source, bool loadAtStartup)
-    : _keyURI(source), _isKeyModified(false) {
+JWKManager::JWKManager(std::unique_ptr<JWKSFetcher> fetcher, bool loadAtStartup)
+    : _fetcher(std::move(fetcher)), _isKeyModified(false) {
     if (loadAtStartup) {
-        _loadKeysFromUri();
+        _setAndValidateKeys(_fetcher->fetch());
     } else {
         _keyMaterial = std::make_shared<KeyMap>();
         _validators = std::make_shared<SharedValidatorMap>();
     }
 }
 
-JWKManager::JWKManager(BSONObj keys) : _isKeyModified(false) {
-    _setAndValidateKeys(keys);
-}
-
 StatusWith<SharedValidator> JWKManager::getValidator(StringData keyId) {
     auto currentValidators = _validators;
     auto it = currentValidators->find(keyId.toString());
     if (it == currentValidators->end()) {
-        // If the JWKManager has been initialized with an URI, try refreshing.
-        if (_keyURI) {
-            _loadKeysFromUri();
-            currentValidators = _validators;
-            it = currentValidators->find(keyId.toString());
-        }
+        // We were asked to handle an unknown keyId. Try refreshing, to see if the JWKS has been
+        // updated.
+        _setAndValidateKeys(_fetcher->fetch());
+        currentValidators = _validators;
+        it = currentValidators->find(keyId.toString());
 
         // If it still cannot be found, return an error.
         if (it == currentValidators->end()) {
@@ -89,11 +81,9 @@ StatusWith<SharedValidator> JWKManager::getValidator(StringData keyId) {
     return it->second;
 }
 
-void JWKManager::_setAndValidateKeys(const BSONObj& keys) {
+void JWKManager::_setAndValidateKeys(const JWKSet& keysParsed) {
     auto newValidators = std::make_shared<SharedValidatorMap>();
     auto newKeyMaterial = std::make_shared<KeyMap>();
-
-    auto keysParsed = JWKSet::parse(IDLParserContext("JWKSet"), keys);
 
     for (const auto& key : keysParsed.getKeys()) {
         auto JWK = JWK::parse(IDLParserContext("JWK"), key);
@@ -142,28 +132,6 @@ void JWKManager::_setAndValidateKeys(const BSONObj& keys) {
     // atomically rather than both under a mutex.
     std::atomic_exchange(&_validators, std::move(newValidators));    // NOLINT
     std::atomic_exchange(&_keyMaterial, std::move(newKeyMaterial));  // NOLINT
-}
-
-void JWKManager::_loadKeysFromUri() {
-    try {
-        auto httpClient = HttpClient::createWithoutConnectionPool();
-        httpClient->setHeaders({"Accept: */*"});
-        httpClient->allowInsecureHTTP(getTestCommandsEnabled());
-
-        invariant(_keyURI);
-        auto getJWKs = httpClient->get(_keyURI.value());
-
-        ConstDataRange cdr = getJWKs.getCursor();
-        StringData str;
-        cdr.readInto<StringData>(&str);
-
-        BSONObj data = fromjson(str);
-        _setAndValidateKeys(data);
-    } catch (const DBException& ex) {
-        // throws
-        uassertStatusOK(ex.toStatus().withContext(str::stream() << "Failed loading keys from "
-                                                                << _keyURI.value()));
-    }
 }
 
 void JWKManager::serialize(BSONObjBuilder* bob) const {

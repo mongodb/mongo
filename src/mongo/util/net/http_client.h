@@ -73,9 +73,13 @@ public:
     virtual void allowInsecureHTTP(bool allow) = 0;
 
     /**
-     * Returns Status::OK iff the provided URL endpoint uses HTTPS.
+     * Returns Status::OK iff the provided URL endpoint is "secure".
+     *
+     * HTTPS endpoints are secure. If test commands are enabled, localhost endpoints
+     * over HTTP with only a host, optional port, and optionally a slash and trailing
+     * content are considered secure.
      */
-    static Status endpointIsHTTPS(StringData url);
+    static Status endpointIsSecure(StringData url);
 
     /**
      * Assign a set of headers for this request.

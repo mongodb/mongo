@@ -27,9 +27,10 @@
  *    it in the license file.
  */
 
+#include "mongo/idl/idl_parser.h"
 #include "mongo/platform/basic.h"
 
-#include "mongo/client/oauth_discovery_factory.h"
+#include "mongo/db/auth/oauth_discovery_factory.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/util/net/http_client_mock.h"
 
@@ -46,7 +47,7 @@ public:
         metadata.setAuthorizationEndpoint("https://idp.example/authorization"_sd);
         metadata.setTokenEndpoint("https://idp.example/token"_sd);
         metadata.setDeviceAuthorizationEndpoint("https://idp.example/dae"_sd);
-        metadata.setJwksUri("https://idp.example.com/jwks"_sd);
+        metadata.setJwksUri("https://idp.example/jwks"_sd);
         return metadata;
     }
 };
@@ -96,6 +97,31 @@ TEST_F(OAuthDiscoveryFactoryFixture, EndpointsMustBeSecure) {
 
         OAuthDiscoveryFactory factory(std::move(client));
         ASSERT_THROWS(factory.acquire("https://idp.example"), DBException);
+    }
+}
+
+TEST_F(OAuthDiscoveryFactoryFixture, EndpointMayBeInsecureLocalhostUnderTest) {
+    auto defaultMetadata = makeDefaultMetadata();
+
+    for (const auto& field : defaultMetadata.toBSON()) {
+        BSONObj splicedMetadata = [&] {
+            BSONObjBuilder builder;
+            builder.append(
+                field.fieldName(),
+                field.str().replace(0, "https://idp.example"_sd.size(), "http://localhost:9000"));
+            builder.appendElementsUnique(defaultMetadata.toBSON());
+            return builder.obj();
+        }();
+        OAuthAuthorizationServerMetadata precomputedMetadata =
+            OAuthAuthorizationServerMetadata::parse(IDLParserContext("metadata"), splicedMetadata);
+
+        std::unique_ptr<MockHttpClient> client = std::make_unique<MockHttpClient>();
+        client->expect(
+            {HttpClient::HttpMethod::kGET, "https://idp.example/.well-known/openid-configuration"},
+            {200, {}, splicedMetadata.jsonString()});
+
+        OAuthDiscoveryFactory factory(std::move(client));
+        ASSERT_EQ(precomputedMetadata, factory.acquire("https://idp.example"));
     }
 }
 }  // namespace

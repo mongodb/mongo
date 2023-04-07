@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2021-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,60 +27,31 @@
  *    it in the license file.
  */
 
+#include "mongo/unittest/unittest.h"
 #include "mongo/util/net/http_client.h"
-
-#include "mongo/base/status.h"
-#include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/util/ctype.h"
 
 namespace mongo {
 
-namespace {
-HttpClientProvider* _factory{nullptr};
+TEST(HttpClient, HTTPSIsSecure) {
+    ASSERT_OK(HttpClient::endpointIsSecure("https://example.com"));
 }
 
-HttpClientProvider::~HttpClientProvider() {}
-
-void registerHTTPClientProvider(HttpClientProvider* factory) {
-    invariant(_factory == nullptr);
-    _factory = factory;
+TEST(HttpClient, HTTPIsNotSecure) {
+    ASSERT_NOT_OK(HttpClient::endpointIsSecure("http://example.com"));
 }
 
-Status HttpClient::endpointIsSecure(StringData url) {
-    bool isAcceptableLocalhost = [url]() mutable {
-        constexpr StringData localhostPrefix = "http://localhost"_sd;
-        if (!url.startsWith(localhostPrefix)) {
-            return false;
-        }
-        url = url.substr(localhostPrefix.size());
-        if (url[0] == ':') {
-            url = url.substr(1);
-            while (!url.empty() && ctype::isDigit(url[0])) {
-                url = url.substr(1);
-            }
-        }
-        return url.empty() || url[0] == '/';
-    }();
-
-    if (url.startsWith("https://") || (isAcceptableLocalhost && getTestCommandsEnabled())) {
-        return Status::OK();
-    }
-    return Status(ErrorCodes::IllegalOperation, "Endpoint is not HTTPS");
+TEST(HttpClient, EvilHTTPIsNotSecure) {
+    ASSERT_NOT_OK(HttpClient::endpointIsSecure("http://localhost.example.com"));
+    ASSERT_NOT_OK(HttpClient::endpointIsSecure("http://localhost:password@example.com"));
 }
 
-std::unique_ptr<HttpClient> HttpClient::create() {
-    invariant(_factory != nullptr);
-    return _factory->create();
-}
-
-std::unique_ptr<HttpClient> HttpClient::createWithoutConnectionPool() {
-    invariant(_factory != nullptr);
-    return _factory->createWithoutConnectionPool();
-}
-
-BSONObj HttpClient::getServerStatus() {
-    invariant(_factory != nullptr);
-    return _factory->getServerStatus();
+TEST(HttpClient, LocalhostHTTPIsSecure) {
+    ASSERT_OK(HttpClient::endpointIsSecure("http://localhost"));
+    ASSERT_OK(HttpClient::endpointIsSecure("http://localhost/"));
+    ASSERT_OK(HttpClient::endpointIsSecure("http://localhost/resource"));
+    ASSERT_OK(HttpClient::endpointIsSecure("http://localhost:9001"));
+    ASSERT_OK(HttpClient::endpointIsSecure("http://localhost:9001/"));
+    ASSERT_OK(HttpClient::endpointIsSecure("http://localhost:9001/resource"));
 }
 
 }  // namespace mongo

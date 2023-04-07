@@ -27,33 +27,24 @@
  *    it in the license file.
  */
 
-#include "mongo/client/oauth_discovery_factory.h"
+#pragma once
 
-#include <fmt/format.h>
+#include "mongo/crypto/jwks_fetcher.h"
 
 #include "mongo/base/string_data.h"
-#include "mongo/bson/json.h"
 
-namespace mongo {
+namespace mongo::crypto {
 
-namespace {
-using namespace fmt::literals;
-}  // namespace
+/** JWKSFetcher implementation which acquires keys via HTTP.
+ */
+class JWKSFetcherImpl : public JWKSFetcher {
+public:
+    JWKSFetcherImpl(StringData issuer) : _issuer(issuer) {}
 
-OAuthAuthorizationServerMetadata OAuthDiscoveryFactory::acquire(StringData issuer) {
-    // RFC8414 declares that the well-known addresses defined by OpenID Connect are valid for
-    // compliant clients for legacy purposes. Newer clients should use
-    // '.well-known/oauth-authorization-server'. However, that endpoint uses a different URL
-    // construction scheme which doesn't seem to work with any of the authorization servers we've
-    // tested.
-    auto openIDConfiguationEndpoint = "{}/.well-known/openid-configuration"_format(issuer);
+    JWKSet fetch() final;
 
-    DataBuilder results = _client->get(openIDConfiguationEndpoint);
-    StringData textResult =
-        uassertStatusOK(results.getCursor().readAndAdvanceNoThrow<StringData>());
-    BSONObj bsonResults = fromjson(textResult);
-    IDLParserContext parserContext("metadata");
-    return OAuthAuthorizationServerMetadata::parse(parserContext, bsonResults);
-}
+private:
+    std::string _issuer;
+};
 
-}  // namespace mongo
+}  // namespace mongo::crypto

@@ -529,10 +529,14 @@ env.Library(
 
 env.Library(
     target='oidc_protocol',
-    source=['oidc_protocol.idl'],
+    source=[
+        "oauth_authorization_server_metadata.idl", "oauth_discovery_factory.cpp",
+        'oidc_protocol.idl'
+    ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/idl/idl_parser',
+        '$BUILD_DIR/mongo/util/net/http_client',
     ],
 )
 
@@ -549,6 +553,7 @@ env.CppUnitTest(
         'authorization_session_for_test.cpp',
         'authorization_session_test.cpp',
         'builtin_roles_test.cpp',
+        'oauth_discovery_factory_test.cpp',
         'privilege_parser_test.cpp',
         'restriction_test.cpp',
         'sasl_authentication_session_test.cpp',
@@ -571,6 +576,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
         '$BUILD_DIR/mongo/transport/transport_layer_common',
         '$BUILD_DIR/mongo/transport/transport_layer_mock',
+        '$BUILD_DIR/mongo/util/net/mock_http_client',
         '$BUILD_DIR/mongo/util/net/network',
         'address_restriction',
         'auth',
@@ -579,6 +585,7 @@ env.CppUnitTest(
         'authentication_restriction',
         'authentication_session',
         'authmocks',
+        'oidc_protocol',
         'saslauth',
         'security_file',
         'security_key',
