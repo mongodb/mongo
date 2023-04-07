@@ -46,9 +46,12 @@ namespace {
  * With sanitizers, run this in a diminished "correctness check" mode.
  */
 #if __has_feature(address_sanitizer) || __has_feature(thread_sanitizer)
-constexpr bool kNoLoops = true;
+const auto kMaxThreads = 1;
+const auto kMaxChainSize = 1;
 #else
-constexpr bool kNoLoops = false;
+/** 2x to benchmark the case of more threads than cores for curiosity's sake. */
+const auto kMaxThreads = 2 * ProcessInfo::getNumCores();
+const auto kMaxChainSize = 2 << 10;
 #endif
 
 struct Notification {
@@ -110,18 +113,13 @@ public:
     ServiceContext* sc;
 };
 
-/** 2x to benchmark the case of more threads than cores for curiosity's sake. */
-auto maxThreads = 2 * ProcessInfo::getNumCores();
-
 BENCHMARK_DEFINE_F(ServiceExecutorSynchronousBm, ScheduleTask)(benchmark::State& state) {
     for (auto _ : state) {
         auto runner = executor()->makeTaskRunner();
         runOnExec(&*runner, [](Status) {});
-        if constexpr (kNoLoops)
-            break;
     }
 }
-BENCHMARK_REGISTER_F(ServiceExecutorSynchronousBm, ScheduleTask)->ThreadRange(1, maxThreads);
+BENCHMARK_REGISTER_F(ServiceExecutorSynchronousBm, ScheduleTask)->ThreadRange(1, kMaxThreads);
 
 /** A simplified ChainedSchedule with only one task. */
 BENCHMARK_DEFINE_F(ServiceExecutorSynchronousBm, ScheduleAndWait)(benchmark::State& state) {
@@ -130,11 +128,9 @@ BENCHMARK_DEFINE_F(ServiceExecutorSynchronousBm, ScheduleAndWait)(benchmark::Sta
         Notification done;
         runOnExec(&*runner, [&](Status) { done.set(); });
         done.get();
-        if constexpr (kNoLoops)
-            break;
     }
 }
-BENCHMARK_REGISTER_F(ServiceExecutorSynchronousBm, ScheduleAndWait)->ThreadRange(1, maxThreads);
+BENCHMARK_REGISTER_F(ServiceExecutorSynchronousBm, ScheduleAndWait)->ThreadRange(1, kMaxThreads);
 
 BENCHMARK_DEFINE_F(ServiceExecutorSynchronousBm, ChainedSchedule)(benchmark::State& state) {
     int chainDepth = state.range(0);
@@ -172,13 +168,11 @@ BENCHMARK_DEFINE_F(ServiceExecutorSynchronousBm, ChainedSchedule)(benchmark::Sta
         state.ResumeTiming();
         loopState.startingLine.countDownAndWait();
         loopState.done.get();
-        if constexpr (kNoLoops)
-            break;
     }
 }
 BENCHMARK_REGISTER_F(ServiceExecutorSynchronousBm, ChainedSchedule)
-    ->Range(1, 2 << 10)
-    ->ThreadRange(1, maxThreads);
+    ->Range(1, kMaxChainSize)
+    ->ThreadRange(1, kMaxThreads);
 
 }  // namespace
 }  // namespace mongo::transport
