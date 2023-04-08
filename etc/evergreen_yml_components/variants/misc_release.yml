@@ -590,7 +590,7 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - rhel70
+    - rhel70-large
   - name: aggregation
   - name: .auth !.audit !.multiversion
   - name: causally_consistent_jscore_txns_passthrough

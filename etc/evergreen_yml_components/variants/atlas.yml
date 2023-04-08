@@ -27,10 +27,10 @@ buildvariants:
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
-    - rhel70
+    - rhel70-large
   - name: compile_build_tools_next_TG
     distros:
-    - rhel70
+    - rhel70-large
   - name: .aggfuzzer
   - name: audit
   - name: auth_audit_gen
