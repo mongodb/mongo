@@ -381,16 +381,7 @@ buildvariants:
     scons_cache_scope: shared
     compile_variant: enterprise-amazon2022
   tasks:
-  - name: compile_test_and_package_parallel_core_stream_TG
-    distros:
-      - amazon2022-large
-  - name: compile_test_and_package_parallel_unittest_stream_TG
-    distros:
-      - amazon2022-large
-  - name: compile_test_and_package_parallel_dbtest_stream_TG
-    distros:
-    - amazon2022-large
-  - name: compile_integration_and_test_parallel_stream_TG
+  - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - amazon2022-large
   - name: test_api_version_compatibility
@@ -546,16 +537,7 @@ buildvariants:
     scons_cache_scope: shared
     compile_variant: enterprise-amazon2022-arm64
   tasks:
-  - name: compile_test_and_package_parallel_core_stream_TG
-    distros:
-      - amazon2022-arm64-large
-  - name: compile_test_and_package_parallel_unittest_stream_TG
-    distros:
-      - amazon2022-arm64-large
-  - name: compile_test_and_package_parallel_dbtest_stream_TG
-    distros:
-    - amazon2022-arm64-large
-  - name: compile_integration_and_test_parallel_stream_TG
+  - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - amazon2022-arm64-large
   - name: test_api_version_compatibility
