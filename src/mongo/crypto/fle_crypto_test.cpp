@@ -606,10 +606,6 @@ public:
         return _docs.size();
     }
 
-    ECStats getStats() const override {
-        return ECStats();
-    }
-
     void setOverrideCount(int64_t count) {
         _overrideCount = count;
     }

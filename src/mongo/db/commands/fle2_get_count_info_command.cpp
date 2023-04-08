@@ -70,29 +70,6 @@ std::vector<std::vector<FLEEdgePrfBlock>> toNestedTokens(
     return nestedBlocks;
 }
 
-QECountInfoReplyTokens tokenFromCountInfo(const FLEEdgeCountInfo& countInfo) {
-    QECountInfoReplyTokens token(FLEUtil::vectorFromCDR(countInfo.tagToken.toCDR()),
-                                 countInfo.count);
-
-    if (countInfo.edc) {
-        token.setEDCDerivedFromDataTokenAndContentionFactorToken(countInfo.edc.value().toCDR());
-    }
-
-    if (countInfo.cpos) {
-        token.setCpos(countInfo.cpos.get());
-    }
-
-    if (countInfo.apos) {
-        token.setApos(countInfo.apos.get());
-    }
-
-    if (countInfo.stats) {
-        token.setStats(countInfo.stats.get());
-    }
-
-    return token;
-}
-
 std::vector<QECountInfoReplyTokenSet> toGetTagRequestTupleSet(
     const std::vector<std::vector<FLEEdgeCountInfo>>& countInfoSets) {
 
@@ -105,26 +82,20 @@ std::vector<QECountInfoReplyTokenSet> toGetTagRequestTupleSet(
         tokens.reserve(countInfos.size());
 
         for (auto& countInfo : countInfos) {
-            tokens.emplace_back(tokenFromCountInfo(countInfo));
+            tokens.emplace_back(FLEUtil::vectorFromCDR(countInfo.tagToken.toCDR()),
+                                countInfo.count);
+
+            if (countInfo.edc.has_value()) {
+                auto& replyTuple = tokens.back();
+                replyTuple.setEDCDerivedFromDataTokenAndContentionFactorToken(
+                    countInfo.edc.value().toCDR());
+            }
         }
 
         nestedBlocks.emplace_back(std::move(tokens));
     }
 
     return nestedBlocks;
-}
-
-FLEQueryInterface::TagQueryType queryTypeTranslation(QECountInfoQueryTypeEnum type) {
-    switch (type) {
-        case QECountInfoQueryTypeEnum::Insert:
-            return FLEQueryInterface::TagQueryType::kInsert;
-        case QECountInfoQueryTypeEnum::Query:
-            return FLEQueryInterface::TagQueryType::kQuery;
-        case QECountInfoQueryTypeEnum::Compact:
-            return FLEQueryInterface::TagQueryType::kCompact;
-        default:
-            uasserted(7517102, "Invalid QECountInfoQueryTypeEnum value.");
-    }
 }
 
 QECountInfosReply getTagsLocal(OperationContext* opCtx,
@@ -134,8 +105,12 @@ QECountInfosReply getTagsLocal(OperationContext* opCtx,
 
     auto nestedTokens = toNestedTokens(request.getTokens());
 
-    auto countInfoSets = getTagsFromStorage(
-        opCtx, request.getNamespace(), nestedTokens, queryTypeTranslation(request.getQueryType()));
+    auto countInfoSets =
+        getTagsFromStorage(opCtx,
+                           request.getNamespace(),
+                           nestedTokens,
+                           request.getForInsert() ? FLETagQueryInterface::TagQueryType::kInsert
+                                                  : FLETagQueryInterface::TagQueryType::kQuery);
 
     QECountInfosReply reply;
     reply.setCounts(toGetTagRequestTupleSet(countInfoSets));

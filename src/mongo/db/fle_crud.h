@@ -378,6 +378,32 @@ private:
 };
 
 /**
+ * Implementation of FLEStateCollectionReader for txn_api::TransactionClient
+ *
+ * Document count is cached since we only need it once per esc or ecc collection.
+ */
+class TxnCollectionReader : public FLEStateCollectionReader {
+public:
+    TxnCollectionReader(uint64_t count, FLETagQueryInterface* queryImpl, const NamespaceString& nss)
+        : _count(count), _queryImpl(queryImpl), _nss(nss) {}
+
+    uint64_t getDocumentCount() const override {
+        return _count;
+    }
+
+    BSONObj getById(PrfBlock block) const override {
+        auto doc = BSON("v" << BSONBinData(block.data(), block.size(), BinDataGeneral));
+        BSONElement element = doc.firstElement();
+        return _queryImpl->getById(_nss, element);
+    }
+
+private:
+    uint64_t _count;
+    FLETagQueryInterface* _queryImpl;
+    NamespaceString _nss;
+};
+
+/**
  * Creates a new SyncTransactionWithRetries object that runs a transaction on the
  * sharding fixed task executor.
  */

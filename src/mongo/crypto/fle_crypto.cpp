@@ -1806,61 +1806,6 @@ BSONObj runStateMachineForDecryption(mongocrypt_ctx_t* ctx, FLEKeyVault* keyVaul
     return result;
 }
 
-FLEEdgeCountInfo getEdgeCountInfoForCompact(const FLEStateCollectionReader& reader,
-                                            ConstDataRange tag,
-                                            const boost::optional<PrfBlock>& edc) {
-
-    auto escToken = EDCServerPayloadInfo::getESCToken(tag);
-
-    auto tagToken = FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedTagToken(escToken);
-    auto valueToken = FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedValueToken(escToken);
-
-    auto positions = ESCCollection::emuBinaryV2(reader, tagToken, valueToken);
-
-    // Handle case where cpos is none. This means that no new non-anchors have been inserted
-    // since since the last compact/cleanup.
-    // This could happen if a previous compact inserted an anchor, but the temp ECOC drop
-    // was interrupted. On restart, the compaction will run emuBinaryV2 again, but since the
-    // anchor was already inserted for this value, it may return null cpos if there have been no
-    // new insertions for that value since the first compact attempt.
-    if (!positions.cpos.has_value()) {
-        // No new non-anchors since the last compact/cleanup.
-        // There must be at least one anchor.
-        uassert(7293602,
-                "An ESC anchor document is expected but none is found",
-                !positions.apos.has_value() || positions.apos.value() > 0);
-        // the anchor with the latest cpos already exists so no more work needed
-
-        return FLEEdgeCountInfo(
-            0, tagToken, positions.cpos, positions.apos, reader.getStats(), boost::none);
-    }
-
-    uint64_t nextAnchorPos = 0;
-
-    if (!positions.apos.has_value()) {
-        auto r_esc = reader.getById(ESCCollection::generateNullAnchorId(tagToken));
-
-        uassert(7293601, "ESC null anchor document not found", !r_esc.isEmpty());
-
-        auto nullAnchorDoc =
-            uassertStatusOK(ESCCollection::decryptAnchorDocument(valueToken, r_esc));
-        nextAnchorPos = nullAnchorDoc.position + 1;
-    } else {
-        nextAnchorPos = positions.apos.value() + 1;
-    }
-
-    return FLEEdgeCountInfo(
-        nextAnchorPos,
-        tagToken,
-        positions.cpos,
-        positions.apos,
-        reader.getStats(),
-        edc.map([](const PrfBlock& prf) {
-            return FLETokenFromCDR<FLETokenType::EDCDerivedFromDataTokenAndContentionFactorToken>(
-                prf);
-        }));
-}
-
 FLEEdgeCountInfo getEdgeCountInfo(const FLEStateCollectionReader& reader,
                                   ConstDataRange tag,
                                   FLETagQueryInterface::TagQueryType type,
@@ -2771,11 +2716,7 @@ std::vector<std::vector<FLEEdgeCountInfo>> ESCCollection::getTags(
         countInfos.reserve(tokens.size());
 
         for (const auto& token : tokens) {
-            if (type == FLETagQueryInterface::TagQueryType::kCompact) {
-                countInfos.push_back(getEdgeCountInfoForCompact(reader, token.esc, token.edc));
-            } else {
-                countInfos.push_back(getEdgeCountInfo(reader, token.esc, type, token.edc));
-            }
+            countInfos.push_back(getEdgeCountInfo(reader, token.esc, type, token.edc));
         }
 
         countInfoSets.emplace_back(countInfos);

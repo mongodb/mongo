@@ -745,10 +745,6 @@ public:
         return _queryImpl.getById(_coll, doc.firstElement());
     }
 
-    ECStats getStats() const override {
-        return ECStats();
-    }
-
 private:
     NamespaceString _coll;
     FLEQueryInterfaceMock& _queryImpl;
