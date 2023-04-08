@@ -543,11 +543,9 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(
     tenant_migration_access_blocker::recoverTenantMigrationAccessBlockers(opCtx);
     ServerlessOperationLockRegistry::recoverLocks(opCtx);
     LOGV2(4280506, "Reconstructing prepared transactions");
-    reconstructPreparedTransactions(
-        opCtx,
-        stableTimestamp && lastShutdownState == StorageEngine::LastShutdownState::kClean
-            ? OplogApplication::Mode::kStableRecovering
-            : OplogApplication::Mode::kUnstableRecovering);
+    reconstructPreparedTransactions(opCtx,
+                                    stableTimestamp ? OplogApplication::Mode::kStableRecovering
+                                                    : OplogApplication::Mode::kUnstableRecovering);
 
     const auto lastOpTimeAndWallTimeResult = _externalState->loadLastOpTimeAndWallTime(opCtx);
 
