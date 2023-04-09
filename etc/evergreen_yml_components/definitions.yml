@@ -5476,7 +5476,7 @@ tasks:
 
 - <<: *task_template
   name: sharded_collections_jscore_passthrough_with_catalog_shard
-  tags: []
+  tags: ["sharding", "jscore"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -5499,7 +5499,7 @@ tasks:
 
 - <<: *task_template
   name: sharding_jscore_passthrough_with_catalog_shard
-  tags: []
+  tags: ["sharding", "jscore", "common"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -5878,7 +5878,7 @@ tasks:
 
 - <<: *gen_task_template
   name: concurrency_sharded_with_catalog_shard_gen
-  tags: ["catalog_shard", "large"]
+  tags: ["concurrency", "common", "read_concern_maj", "large", "sharded", "no_debug_mode"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -5905,7 +5905,7 @@ tasks:
 
 - <<: *gen_task_template
   name: concurrency_sharded_with_balancer_and_catalog_shard_gen
-  tags: ["catalog_shard", "large"]
+  tags: ["concurrency", "common", "read_concern_maj", "large", "sharded", "no_debug_mode"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -6226,7 +6226,7 @@ tasks:
 
 - <<: *gen_task_template
   name: sharding_catalog_shard_gen
-  tags: []
+  tags: ["sharding", "common"]
   commands:
   - func: "generate resmoke tasks"
     vars:
