@@ -3,7 +3,7 @@ load("jstests/replsets/rslib.js");
 /**
  * Test for making sure that the replica seed list in the config server does not
  * become invalid when a replica set reconfig happens.
- * @tags: [multiversion_incompatible, temporary_catalog_shard_incompatible]
+ * @tags: [multiversion_incompatible]
  */
 (function() {
 "use strict";

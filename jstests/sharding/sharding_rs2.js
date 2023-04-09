@@ -8,7 +8,6 @@
 // storage engines which do not support the command.
 // @tags: [
 //    requires_fsync,
-//    temporary_catalog_shard_incompatible,
 // ]
 
 (function() {
@@ -67,7 +66,11 @@ function countNodes() {
 assert.eq(2, countNodes(), "A1");
 
 var rs = s.rs0;
-rs.add({'shardsvr': ""});
+if (!TestData.catalogShard) {
+    rs.add({'shardsvr': ""});
+} else {
+    rs.add({'configsvr': ""});
+}
 try {
     rs.reInitiate();
 } catch (e) {

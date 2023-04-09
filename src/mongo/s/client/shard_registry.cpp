@@ -466,15 +466,6 @@ void ShardRegistry::updateReplicaSetOnConfigServer(ServiceContext* serviceContex
     auto const grid = Grid::get(opCtx.get());
     auto sr = grid->shardRegistry();
 
-    // First check if this is a config shard lookup.
-    {
-        stdx::lock_guard<Latch> lk(sr->_mutex);
-        if (auto shard = sr->_configShardData.findByRSName(connStr.getSetName())) {
-            // No need to tell the config servers their own connection string.
-            return;
-        }
-    }
-
     auto swRegistryData = sr->_getDataAsync().getNoThrow(opCtx.get());
     if (!swRegistryData.isOK()) {
         LOGV2_DEBUG(
@@ -500,7 +491,7 @@ void ShardRegistry::updateReplicaSetOnConfigServer(ServiceContext* serviceContex
         NamespaceString::kConfigsvrShardsNamespace,
         BSON(ShardType::name(shard->getId().toString())),
         BSON("$set" << BSON(ShardType::host(connStr.toString()))),
-        false,
+        false /* upsert */,
         ShardingCatalogClient::kMajorityWriteConcern);
     auto status = swWasUpdated.getStatus();
     if (!status.isOK()) {

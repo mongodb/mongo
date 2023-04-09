@@ -1,5 +1,4 @@
 // Tests that mongos and the shard discover changes to the shard's replica set membership.
-// @tags: [temporary_catalog_shard_incompatible]
 load("jstests/replsets/rslib.js");
 
 (function() {
