@@ -71,6 +71,12 @@ public:
                                                         OplogApplication::Mode::kInitialSync ||
                                                     OplogApplication::inRecovering(inputMode)),
               skipWritesToOplog(OplogApplication::inRecovering(inputMode)) {}
+        explicit Options(OplogApplication::Mode mode,
+                         bool allowNamespaceNotFoundErrorsOnCrudOps,
+                         bool skipWritesToOplog)
+            : mode(mode),
+              allowNamespaceNotFoundErrorsOnCrudOps(allowNamespaceNotFoundErrorsOnCrudOps),
+              skipWritesToOplog(skipWritesToOplog) {}
 
         // Used to determine which operations should be applied. Only initial sync will set this to
         // be something other than the null optime.

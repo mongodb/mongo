@@ -125,6 +125,7 @@ MONGO_FAIL_POINT_DEFINE(WTWriteConflictExceptionForImportCollection);
 MONGO_FAIL_POINT_DEFINE(WTWriteConflictExceptionForImportIndex);
 MONGO_FAIL_POINT_DEFINE(WTRollbackToStableReturnOnEBUSY);
 MONGO_FAIL_POINT_DEFINE(hangBeforeUnrecoverableRollbackError);
+MONGO_FAIL_POINT_DEFINE(WTDisableFastShutDown);
 
 const std::string kPinOldestTimestampAtStartupName = "_wt_startup";
 
@@ -726,6 +727,10 @@ void WiredTigerKVEngine::cleanShutdown() {
     std::string closeConfig = "";
 
     if (RUNNING_ON_VALGRIND) {  // NOLINT
+        leak_memory = false;
+    }
+
+    if (MONGO_unlikely(WTDisableFastShutDown.shouldFail())) {
         leak_memory = false;
     }
 
