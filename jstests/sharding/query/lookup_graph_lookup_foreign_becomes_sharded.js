@@ -174,9 +174,9 @@ for (let testCase of testCases) {
 const newStaleConfigErrorCount = assert.commandWorked(primaryDB.runCommand({serverStatus: 1}))
                                      .shardingStatistics.countStaleConfigErrors;
 
-// ... and a single StaleConfig exception for the foreign namespace. These StalecConfig errors are
-// not always reported in the profiler, but they are reflected in the serverStatus StaleConfig error
-// count.
+// ... and a single StaleConfig error for the foreign namespace. These StaleConfig errors are not
+// always reported in the profiler, but they are reflected in the serverStatus StaleConfig error
+// counter.
 assert.gt(
     newStaleConfigErrorCount, prevStaleConfigErrorCount, "StaleConfig errors must have happened");
 st.stop();

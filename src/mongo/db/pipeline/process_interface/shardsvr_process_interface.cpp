@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/pipeline/process_interface/shardsvr_process_interface.h"
 
 #include <fmt/format.h>
@@ -50,11 +47,10 @@
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/query/document_source_merge_cursors.h"
-#include "mongo/s/router.h"
+#include "mongo/s/router_role.h"
 #include "mongo/s/stale_shard_version_helpers.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
-
 
 namespace mongo {
 
@@ -243,8 +239,9 @@ BSONObj ShardServerProcessInterface::getCollectionOptions(OperationContext* opCt
             auto optionObj = optionsElement.Obj();
 
             // If the BSON object has field 'info' and the BSON element 'info' has field 'uuid',
-            // then extract the uuid and add to the BSON object to be return. This will ensure that
-            // the BSON object is complaint with the BSON object returned for non-sharded namespace.
+            // then extract the uuid and add to the BSON object to be return. This will ensure
+            // that the BSON object is complaint with the BSON object returned for non-sharded
+            // namespace.
             if (auto infoElement = bsonObj["info"]; infoElement && infoElement["uuid"]) {
                 return optionObj.addField(infoElement["uuid"]);
             }
@@ -264,8 +261,8 @@ BSONObj ShardServerProcessInterface::getCollectionOptions(OperationContext* opCt
 std::list<BSONObj> ShardServerProcessInterface::getIndexSpecs(OperationContext* opCtx,
                                                               const NamespaceString& ns,
                                                               bool includeBuildUUIDs) {
-    // Note that 'ns' must be an unsharded collection. The indexes for a sharded collection must be
-    // read from a shard with a chunk instead of the primary shard.
+    // Note that 'ns' must be an unsharded collection. The indexes for a sharded collection must
+    // be read from a shard with a chunk instead of the primary shard.
     auto cachedDbInfo =
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, ns.db()));
     auto shard = uassertStatusOK(

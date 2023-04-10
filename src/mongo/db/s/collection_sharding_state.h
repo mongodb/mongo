@@ -120,7 +120,7 @@ public:
 
     /**
      * If the shard currently doesn't know whether the collection is sharded or not, it will throw a
-     * StaleConfig exception.
+     * StaleConfig error.
      *
      * If the request doesn't have a shard version all collections will be treated as UNSHARDED.
      *
@@ -137,7 +137,7 @@ public:
      *
      * If the shard currently doesn't know whether the collection is sharded or not, or if the
      * expected shard version doesn't match with the one in the OperationShardingState, it will
-     * throw a StaleConfig exception.
+     * throw a StaleConfig error.
      *
      * If the operation context contains an 'atClusterTime', the returned filtering object will be
      * tied to a specific point in time. Otherwise, it will reference the latest cluster time
@@ -168,7 +168,7 @@ public:
 
     /**
      * Checks whether the shard version in the operation context is compatible with the shard
-     * version of the collection and if not, throws StaleConfigException populated with the received
+     * version of the collection and if not, throws StaleConfig error populated with the received
      * and wanted versions.
      *
      * If the request is not versioned all collections will be treated as UNSHARDED.

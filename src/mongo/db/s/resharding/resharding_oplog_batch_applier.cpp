@@ -27,12 +27,7 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/resharding/resharding_oplog_batch_applier.h"
-
-#include <memory>
 
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
@@ -42,7 +37,6 @@
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
-
 
 namespace mongo {
 
