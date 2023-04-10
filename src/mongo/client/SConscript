@@ -434,14 +434,16 @@ env.CppUnitTest(
     ],
 )
 
-env.CppUnitTest(
-    target='scoped_db_connection_pool_test',
-    source=['scoped_db_connection_test.cpp'],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/dbtests/mocklib',
-        'clientdriver_network',
-    ],
-)
+# TODO SERVER-75914: remove the condition when the test can reliably run on Windows.
+if not env.TargetOSIs('windows'):
+    env.CppUnitTest(
+        target='scoped_db_connection_pool_test',
+        source=['scoped_db_connection_test.cpp'],
+        LIBDEPS=[
+            '$BUILD_DIR/mongo/dbtests/mocklib',
+            'clientdriver_network',
+        ],
+    )
 
 # The following two tests cannot be combined because the second one
 # needs to be filtered out for the repl and sharding variants of the
