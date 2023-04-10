@@ -41,6 +41,7 @@
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/executor/task_executor_cursor_parameters_gen.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
 
@@ -68,7 +69,7 @@ public:
 
     struct Options {
         boost::optional<int64_t> batchSize;
-        bool pinConnection{false};
+        bool pinConnection{gPinTaskExecCursorConns.load()};
         Options() {}
     };
 
@@ -161,16 +162,6 @@ public:
 
     auto getNumAdditionalCursors() {
         return _additionalCursors.size();
-    }
-
-    /**
-     * Return the callback that this cursor is waiting on. Can be used to block on getting a
-     * response to this request. Can be boost::none.
-     */
-    boost::optional<TaskExecutor::CallbackHandle> getCallbackHandle() {
-        if (_cmdState)
-            return _cmdState->cbHandle;
-        return {};
     }
 
 private:

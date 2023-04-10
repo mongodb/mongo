@@ -570,6 +570,7 @@ public:
 
     TaskExecutorCursor makeTec(RemoteCommandRequest rcr,
                                TaskExecutorCursor::Options&& options = {}) {
+        options.pinConnection = false;
         return TaskExecutorCursor(getExecutorPtr(), rcr, std::move(options));
     }
 };

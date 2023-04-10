@@ -62,6 +62,7 @@ buildvariants:
   - name: sasl
   - name: search
   - name: search_auth
+  - name: search_pinned_connections_auth
   - name: search_ssl
   - name: sharding_auth_audit_gen
   - name: sharding_auth_gen
