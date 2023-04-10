@@ -135,7 +135,10 @@ private:
     // If we already have a _stream when this function is called, ensures the
     // remote is `target` and returns a ready-future. Otherwise asynchronously
     // initailizes _stream and returns a future that resolves once _stream is ready.
-    ExecutorFuture<void> _ensureStream(WithLock, HostAndPort target, Milliseconds timeout);
+    ExecutorFuture<void> _ensureStream(WithLock,
+                                       HostAndPort target,
+                                       Milliseconds timeout,
+                                       transport::ConnectSSLMode sslMode);
 
     // Start processing pending/queued RPCs.
     void _doNetworking(stdx::unique_lock<Latch>&&);

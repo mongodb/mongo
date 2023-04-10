@@ -7835,6 +7835,15 @@ tasks:
       resmoke_jobs_max: 1
 
 - <<: *task_template
+  name: search_pinned_connections_auth
+  tags: []
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_jobs_max: 1
+
+- <<: *task_template
   name: search_ssl
   tags: []
   commands:

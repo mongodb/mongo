@@ -80,12 +80,12 @@ public:
         callback({exec, cbHandle, rcb.first, errorResponse});
     }
 
-    // Run callback with the provided success result.
-    static void runCallbackSuccess(stdx::unique_lock<Latch>& lk,
-                                   RequestAndCallback rcb,
-                                   TaskExecutor* exec,
-                                   const StatusWith<RemoteCommandResponse>& result,
-                                   const HostAndPort& targetUsed) {
+    // Run callback with the provided result.
+    static void runCallbackFinished(stdx::unique_lock<Latch>& lk,
+                                    RequestAndCallback rcb,
+                                    TaskExecutor* exec,
+                                    const StatusWith<RemoteCommandResponse>& result,
+                                    boost::optional<HostAndPort> targetUsed) {
         // Convert the result into a RemoteCommandResponse unconditionally.
         RemoteCommandResponse asRcr =
             result.isOK() ? result.getValue() : RemoteCommandResponse(result.getStatus());
@@ -192,8 +192,10 @@ void PinnedConnectionTaskExecutor::_cancel(WithLock, CallbackState* cbState) {
         case CallbackState::State::kRunning: {
             // Cancel the ongoing operation.
             cbState->state = CallbackState::State::kCanceled;
-            auto client = _stream->getClient();
-            client->cancel(cbState->baton);
+            if (_stream) {
+                auto client = _stream->getClient();
+                client->cancel(cbState->baton);
+            }
             break;
         }
         case CallbackState::State::kCanceled:
@@ -216,11 +218,10 @@ void PinnedConnectionTaskExecutor::cancel(const CallbackHandle& cbHandle) {
     return _cancel(std::move(lk), cbState);
 }
 
-ExecutorFuture<void> PinnedConnectionTaskExecutor::_ensureStream(WithLock,
-                                                                 HostAndPort target,
-                                                                 Milliseconds timeout) {
+ExecutorFuture<void> PinnedConnectionTaskExecutor::_ensureStream(
+    WithLock, HostAndPort target, Milliseconds timeout, transport::ConnectSSLMode sslMode) {
     if (!_stream) {
-        auto streamFuture = _net->leaseStream(target, transport::kGlobalSSLMode, timeout);
+        auto streamFuture = _net->leaseStream(target, sslMode, timeout);
         // If the stream is ready, send the RPC immediately by continuing inline.
         if (streamFuture.isReady()) {
             auto stream = std::move(streamFuture).getNoThrow();
@@ -292,7 +293,7 @@ void PinnedConnectionTaskExecutor::_doNetworking(stdx::unique_lock<Latch>&& lk) 
     // Set req state to running
     invariant(req.second->state == CallbackState::State::kWaiting);
     req.second->state = CallbackState::State::kRunning;
-    auto streamFut = _ensureStream(lk, req.first.target, req.first.timeout);
+    auto streamFut = _ensureStream(lk, req.first.target, req.first.timeout, req.first.sslMode);
     // Stash the in-progress operation before releasing the lock so we can
     // access it if we're shutdown while it's in-progress.
     _inProgressRequest = req.second;
@@ -308,10 +309,18 @@ void PinnedConnectionTaskExecutor::_doNetworking(stdx::unique_lock<Latch>&& lk) 
                 CallbackState::runCallbackCanceled(lk, req, this);
             } else {
                 invariant(state == CallbackState::State::kRunning);
-                invariant(req.second->startedNetworking);
+                // Three possibilities here: we either finished the RPC
+                // successfully, got a local error from the stream after
+                // attempting to start networking, or never were able to acquire a
+                // stream. In any case, we first complete the current request
+                // by invoking it's callback:
                 state = CallbackState::State::kDone;
-                auto target = _stream->getClient()->remote();
-                CallbackState::runCallbackSuccess(lk, req, this, result, target);
+                // Get the target if we successfully acquired a stream.
+                boost::optional<HostAndPort> target = boost::none;
+                if (_stream) {
+                    target = _stream->getClient()->remote();
+                }
+                CallbackState::runCallbackFinished(lk, req, this, result, target);
             }
             // If we used the _stream, update it accordingly.
             if (req.second->startedNetworking) {
@@ -325,6 +334,10 @@ void PinnedConnectionTaskExecutor::_doNetworking(stdx::unique_lock<Latch>&& lk) 
                     _stream->indicateFailure(status);
                     _shutdown(lk);
                 }
+            }
+            // If we weren't able to acquire a stream, shut-down.
+            if (!_stream) {
+                _shutdown(lk);
             }
             _isDoingNetworking = false;
             if (!_requestQueue.empty()) {
