@@ -185,12 +185,20 @@ function hasRejectedPlans(root) {
  * Returns an array of execution stages from the given replset or sharded explain output.
  */
 function getExecutionStages(root) {
-    if (root.executionStats.executionStages.hasOwnProperty("shards")) {
+    if (root.hasOwnProperty("executionStats") &&
+        root.executionStats.executionStages.hasOwnProperty("shards")) {
         const executionStages = [];
         for (let shard of root.executionStats.executionStages.shards) {
             executionStages.push(Object.assign(
                 {shardName: shard.shardName, executionSuccess: shard.executionSuccess},
                 shard.executionStages));
+        }
+        return executionStages;
+    }
+    if (root.hasOwnProperty("shards")) {
+        const executionStages = [];
+        for (const shard in root.shards) {
+            executionStages.push(root.shards[shard].executionStats.executionStages);
         }
         return executionStages;
     }

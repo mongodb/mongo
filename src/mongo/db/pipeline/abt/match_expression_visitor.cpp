@@ -34,6 +34,7 @@
 #include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_internal_bucket_geo_within.h"
+#include "mongo/db/matcher/expression_internal_eq_hashed_key.h"
 #include "mongo/db/matcher/expression_internal_expr_comparison.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_text.h"
@@ -282,6 +283,10 @@ public:
     void visit(const InternalExprLTEMatchExpression* expr) override {
         // Ignored. Translate to "true".
         _ctx.push(make<PathConstant>(Constant::boolean(true)));
+    }
+
+    void visit(const InternalEqHashedKey* expr) override {
+        unsupportedExpression(expr);
     }
 
     void visit(const InternalSchemaAllElemMatchFromIndexMatchExpression* expr) override {

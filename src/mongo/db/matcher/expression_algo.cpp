@@ -608,6 +608,7 @@ std::unique_ptr<MatchExpression> splitMatchExpressionForColumns(
         case MatchExpression::INTERNAL_EXPR_GTE:
         case MatchExpression::INTERNAL_EXPR_LT:
         case MatchExpression::INTERNAL_EXPR_LTE:
+        case MatchExpression::INTERNAL_EQ_HASHED_KEY:
         case MatchExpression::INTERNAL_SCHEMA_ALLOWED_PROPERTIES:
         case MatchExpression::INTERNAL_SCHEMA_ALL_ELEM_MATCH_FROM_INDEX:
         case MatchExpression::INTERNAL_SCHEMA_BIN_DATA_ENCRYPTED_TYPE:

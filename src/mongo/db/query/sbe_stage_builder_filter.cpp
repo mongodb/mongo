@@ -46,6 +46,7 @@
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/expression_geo.h"
+#include "mongo/db/matcher/expression_internal_eq_hashed_key.h"
 #include "mongo/db/matcher/expression_internal_expr_comparison.h"
 #include "mongo/db/matcher/expression_text.h"
 #include "mongo/db/matcher/expression_text_noop.h"
@@ -583,6 +584,9 @@ public:
     void visit(const InternalExprGTEMatchExpression* expr) final {}
     void visit(const InternalExprLTMatchExpression* expr) final {}
     void visit(const InternalExprLTEMatchExpression* expr) final {}
+    void visit(const InternalEqHashedKey* expr) final {
+        unsupportedExpression(expr);
+    }
     void visit(const InternalSchemaAllElemMatchFromIndexMatchExpression* expr) final {
         unsupportedExpression(expr);
     }
@@ -991,6 +995,7 @@ public:
         generateAlwaysBoolean(_context, true);
     }
 
+    void visit(const InternalEqHashedKey* expr) final {}
     void visit(const InternalBucketGeoWithinMatchExpression* expr) final {}
     void visit(const InternalSchemaAllElemMatchFromIndexMatchExpression* expr) final {}
     void visit(const InternalSchemaAllowedPropertiesMatchExpression* expr) final {}
@@ -1155,6 +1160,7 @@ public:
     void visit(const InternalExprGTEMatchExpression* expr) final {}
     void visit(const InternalExprLTMatchExpression* expr) final {}
     void visit(const InternalExprLTEMatchExpression* expr) final {}
+    void visit(const InternalEqHashedKey* expr) final {}
     void visit(const InternalSchemaAllElemMatchFromIndexMatchExpression* expr) final {}
     void visit(const InternalSchemaAllowedPropertiesMatchExpression* expr) final {}
     void visit(const InternalSchemaBinDataEncryptedTypeExpression* expr) final {}

@@ -201,7 +201,8 @@ private:
             me->matchType() == MatchExpression::INTERNAL_EXPR_GT ||
             me->matchType() == MatchExpression::INTERNAL_EXPR_GTE ||
             me->matchType() == MatchExpression::INTERNAL_EXPR_LT ||
-            me->matchType() == MatchExpression::INTERNAL_EXPR_LTE;
+            me->matchType() == MatchExpression::INTERNAL_EXPR_LTE ||
+            me->matchType() == MatchExpression::INTERNAL_EQ_HASHED_KEY;
     }
 };
 

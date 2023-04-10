@@ -231,6 +231,9 @@ const char* encodeMatchType(MatchExpression::MatchType mt) {
         case MatchExpression::INTERNAL_EXPR_LTE:
             return "ele";
 
+        case MatchExpression::INTERNAL_EQ_HASHED_KEY:
+            return "ieh";
+
         case MatchExpression::INTERNAL_SCHEMA_ALL_ELEM_MATCH_FROM_INDEX:
             return "internalSchemaAllElemMatchFromIndex";
 
@@ -832,9 +835,13 @@ public:
     void visit(const InternalExprLTEMatchExpression* expr) final {}
     void visit(const InternalExprLTMatchExpression* expr) final {}
 
+
     /**
      * These node types are not yet supported in SBE.
      */
+    void visit(const InternalEqHashedKey* expr) final {
+        MONGO_UNREACHABLE_TASSERT(7281402);
+    }
     void visit(const GeoMatchExpression* expr) final {
         MONGO_UNREACHABLE_TASSERT(6142111);
     }

@@ -83,6 +83,7 @@ public:
         countParam(expr->getInputParamId());
     }
     void visit(const InternalBucketGeoWithinMatchExpression* expr) final {}
+    void visit(const InternalEqHashedKey*) final {}
     void visit(const InternalExprEqMatchExpression* expr) final {}
     void visit(const InternalExprGTMatchExpression* expr) final {}
     void visit(const InternalExprGTEMatchExpression* expr) final {}

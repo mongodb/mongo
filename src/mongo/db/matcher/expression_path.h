@@ -53,7 +53,7 @@ public:
                                   ElementPath(*path, leafArrBehavior, nonLeafArrayBehavior))
                             : boost::none) {}
 
-    bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const final {
+    bool matches(const MatchableDocument* doc, MatchDetails* details = nullptr) const override {
         invariant(_elementPath);
         MatchableDocument::IteratorHolder cursor(doc, &*_elementPath);
         while (cursor->more()) {

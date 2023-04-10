@@ -114,6 +114,9 @@ public:
     void visit(InternalExprGTEMatchExpression* expr) final {}
     void visit(InternalExprLTMatchExpression* expr) final {}
     void visit(InternalExprLTEMatchExpression* expr) final {}
+    void visit(InternalEqHashedKey* expr) final {
+        // Don't support parameterization of InternEqHashedKey because it is not implemented in SBE.
+    }
     void visit(InternalSchemaAllElemMatchFromIndexMatchExpression* expr) final {}
     void visit(InternalSchemaAllowedPropertiesMatchExpression* expr) final {}
     void visit(InternalSchemaBinDataEncryptedTypeExpression* expr) final {}

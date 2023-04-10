@@ -43,6 +43,7 @@
 #include "mongo/db/index/s2_common.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_internal_bucket_geo_within.h"
+#include "mongo/db/matcher/expression_internal_eq_hashed_key.h"
 #include "mongo/db/matcher/expression_internal_expr_comparison.h"
 #include "mongo/db/query/analyze_regex.h"
 #include "mongo/db/query/collation/collation_index_key.h"
@@ -974,6 +975,24 @@ void IndexBoundsBuilder::_translatePredicate(const MatchExpression* expr,
         Interval interval = makeRangeInterval(dataObj, BoundInclusion::kIncludeBothStartAndEndKeys);
         oilOut->intervals.push_back(interval);
         *tightnessOut = getInequalityPredicateTightness(interval, dataElt, index);
+    } else if (MatchExpression::INTERNAL_EQ_HASHED_KEY == expr->matchType()) {
+        ON_BLOCK_EXIT([ietBuilder, oilOut] {
+            if (ietBuilder != nullptr) {
+                ietBuilder->addConst(*oilOut);
+            }
+        });
+
+        tassert(7281403, "Expected a hashed index", index.type == INDEX_HASHED);
+
+        const auto* node = static_cast<const InternalEqHashedKey*>(expr);
+        BSONObj dataObj = BSON("" << node->getData());
+
+        Interval interval = makePointInterval(dataObj);
+        oilOut->intervals.push_back(interval);
+
+        // Technically this could be EXACT_FETCH, if such a thing existed. But we don't need to
+        // optimize this that much.
+        *tightnessOut = IndexBoundsBuilder::INEXACT_FETCH;
     } else if (MatchExpression::REGEX == expr->matchType()) {
         const RegexMatchExpression* rme = static_cast<const RegexMatchExpression*>(expr);
         translateRegex(rme, index, oilOut, tightnessOut);

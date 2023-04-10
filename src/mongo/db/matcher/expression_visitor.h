@@ -55,6 +55,7 @@ class InternalExprGTMatchExpression;
 class InternalExprGTEMatchExpression;
 class InternalExprLTMatchExpression;
 class InternalExprLTEMatchExpression;
+class InternalEqHashedKey;
 class InternalSchemaAllElemMatchFromIndexMatchExpression;
 class InternalSchemaAllowedPropertiesMatchExpression;
 class InternalSchemaBinDataEncryptedTypeExpression;
@@ -128,6 +129,7 @@ public:
     virtual void visit(MaybeConstPtr<InternalExprGTEMatchExpression> expr) = 0;
     virtual void visit(MaybeConstPtr<InternalExprLTMatchExpression> expr) = 0;
     virtual void visit(MaybeConstPtr<InternalExprLTEMatchExpression> expr) = 0;
+    virtual void visit(MaybeConstPtr<InternalEqHashedKey> expr) = 0;
     virtual void visit(MaybeConstPtr<InternalSchemaAllElemMatchFromIndexMatchExpression> expr) = 0;
     virtual void visit(MaybeConstPtr<InternalSchemaAllowedPropertiesMatchExpression> expr) = 0;
     virtual void visit(MaybeConstPtr<InternalSchemaBinDataEncryptedTypeExpression> expr) = 0;
@@ -213,6 +215,7 @@ struct SelectiveMatchExpressionVisitorBase : public MatchExpressionVisitor<IsCon
     void visit(MaybeConstPtr<InternalExprGTEMatchExpression> expr) override {}
     void visit(MaybeConstPtr<InternalExprLTMatchExpression> expr) override {}
     void visit(MaybeConstPtr<InternalExprLTEMatchExpression> expr) override {}
+    void visit(MaybeConstPtr<InternalEqHashedKey> expr) override {}
     void visit(MaybeConstPtr<InternalSchemaAllElemMatchFromIndexMatchExpression> expr) override {}
     void visit(MaybeConstPtr<InternalSchemaAllowedPropertiesMatchExpression> expr) override {}
     void visit(MaybeConstPtr<InternalSchemaBinDataEncryptedTypeExpression> expr) override {}

@@ -27,9 +27,12 @@
  *    it in the license file.
  */
 
+#include "mongo/db/matcher/expression_visitor.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/matcher/expression_expr.h"
+#include "mongo/db/matcher/expression_internal_eq_hashed_key.h"
 
 #include "mongo/util/fail_point.h"
 
@@ -131,6 +134,49 @@ bool ExprMatchExpression::isTriviallyTrue() const {
     return exprConst && exprConst->getValue().coerceToBool();
 }
 
+namespace {
+
+// Return nullptr on failure.
+std::unique_ptr<MatchExpression> attemptToRewriteEqHash(ExprMatchExpression& expr) {
+    auto childExpr = expr.getExpression();
+
+    // Looking for:
+    //                     $eq
+    //    $toHashedIndexKey   {$const: NumberLong(?)}
+    //           "$a"
+    //
+    // Where "a" can be any field path and ? can be any number.
+    if (auto eq = dynamic_cast<ExpressionCompare*>(childExpr.get());
+        eq && eq->getOp() == ExpressionCompare::CmpOp::EQ) {
+        auto children = eq->getChildren();
+        tassert(7281406, "should have 2 $eq children", children.size() == 2ul);
+
+        auto eqFirst = children[0].get();
+        auto eqSecond = children[1].get();
+        if (auto hashingExpr = dynamic_cast<ExpressionToHashedIndexKey*>(eqFirst)) {
+            // Matched $toHashedIndexKey - keep going.
+            tassert(7281407,
+                    "should have 1 $toHashedIndexKey child",
+                    hashingExpr->getChildren().size() == 1ul);
+            auto hashChild = hashingExpr->getChildren()[0].get();
+
+            if (auto fieldPath = dynamic_cast<ExpressionFieldPath*>(hashChild);
+                fieldPath && !fieldPath->isVariableReference() && !fieldPath->isROOT()) {
+                auto path = fieldPath->getFieldPathWithoutCurrentPrefix();
+
+                // Matched "$a" in the example above! Now look for the constant long:
+                if (auto constant = dynamic_cast<ExpressionConstant*>(eqSecond);
+                    constant && constant->getValue().getType() == BSONType::NumberLong) {
+                    long long hashTarget = constant->getValue().getLong();
+                    return std::make_unique<InternalEqHashedKey>(path.fullPath(), hashTarget);
+                }
+            }
+        }
+    }
+    return nullptr;
+}
+}  // namespace
+
 MatchExpression::ExpressionOptimizerFunc ExprMatchExpression::getOptimizer() const {
     return [](std::unique_ptr<MatchExpression> expression) {
         auto& exprMatchExpr = static_cast<ExprMatchExpression&>(*expression);
@@ -144,6 +190,10 @@ MatchExpression::ExpressionOptimizerFunc ExprMatchExpression::getOptimizer() con
         }
 
         exprMatchExpr._expression = exprMatchExpr._expression->optimize();
+        if (auto successfulEqHashRewrite = attemptToRewriteEqHash(exprMatchExpr)) {
+            return successfulEqHashRewrite;
+        }
+
         exprMatchExpr._rewriteResult =
             RewriteExpr::rewrite(exprMatchExpr._expression, exprMatchExpr._expCtx->getCollator());
 

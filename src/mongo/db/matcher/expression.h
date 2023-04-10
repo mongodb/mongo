@@ -119,6 +119,9 @@ public:
         INTERNAL_EXPR_LT,
         INTERNAL_EXPR_LTE,
 
+        // Used to represent the comparison to a hashed index key value.
+        INTERNAL_EQ_HASHED_KEY,
+
         // JSON Schema expressions.
         INTERNAL_SCHEMA_ALLOWED_PROPERTIES,
         INTERNAL_SCHEMA_ALL_ELEM_MATCH_FROM_INDEX,

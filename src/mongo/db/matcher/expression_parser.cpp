@@ -44,6 +44,7 @@
 #include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_internal_bucket_geo_within.h"
+#include "mongo/db/matcher/expression_internal_eq_hashed_key.h"
 #include "mongo/db/matcher/expression_internal_expr_comparison.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
@@ -1871,6 +1872,21 @@ StatusWithMatchExpression parseSubField(const BSONObj& context,
             return {std::move(exprLteExpr)};
         }
 
+        case PathAcceptingKeyword::INTERNAL_EQ_HASHED_KEY: {
+            if (e.type() != BSONType::NumberLong) {
+                return {Status(ErrorCodes::BadValue,
+                               str::stream()
+                                   << InternalEqHashedKey::kName
+                                   << " can only be used to compare to NumberLong. Was given: "
+                                   << typeName(e.type()))};
+            }
+
+            auto exprEqHash = std::make_unique<InternalEqHashedKey>(name, e);
+            exprEqHash->setCollator(expCtx->getCollator());
+            expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+            return {std::move(exprEqHash)};
+        }
+
         // Handles bitwise query operators.
         case PathAcceptingKeyword::BITS_ALL_SET: {
             return parseBitTest<BitsAllSetMatchExpression>(name, e, expCtx);
@@ -2181,6 +2197,7 @@ MONGO_INITIALIZER(MatchExpressionParser)(InitializerContext* context) {
             {"_internalExprGte", PathAcceptingKeyword::INTERNAL_EXPR_GTE},
             {"_internalExprLt", PathAcceptingKeyword::INTERNAL_EXPR_LT},
             {"_internalExprLte", PathAcceptingKeyword::INTERNAL_EXPR_LTE},
+            {"_internalEqHash", PathAcceptingKeyword::INTERNAL_EQ_HASHED_KEY},
             {"_internalSchemaAllElemMatchFromIndex",
              PathAcceptingKeyword::INTERNAL_SCHEMA_ALL_ELEM_MATCH_FROM_INDEX},
             {"_internalSchemaBinDataEncryptedType",

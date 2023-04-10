@@ -431,6 +431,10 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
         return false;
     }
 
+    if (exprtype == MatchExpression::INTERNAL_EQ_HASHED_KEY && index.type != INDEX_HASHED) {
+        return false;
+    }
+
     if (indexedFieldType.empty()) {
         // We can't use a sparse index for certain match expressions.
         if (index.sparse && !nodeIsSupportedBySparseIndex(node, isChildOfElemMatchValue)) {
@@ -740,6 +744,9 @@ bool QueryPlannerIXSelect::nodeIsSupportedByWildcardIndex(const MatchExpression*
 bool QueryPlannerIXSelect::nodeIsSupportedByHashedIndex(const MatchExpression* queryExpr) {
     // Hashed fields can answer simple equality predicates.
     if (ComparisonMatchExpressionBase::isEquality(queryExpr->matchType())) {
+        return true;
+    }
+    if (queryExpr->matchType() == MatchExpression::INTERNAL_EQ_HASHED_KEY) {
         return true;
     }
     // An $in can be answered so long as its operand contains only simple equalities.
