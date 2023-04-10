@@ -58,6 +58,7 @@
 #include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/oplog_buffer_collection.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
@@ -2104,55 +2105,37 @@ void ShardMergeRecipientService::Instance::_assertIfMigrationIsSafeToRunWithCurr
 void ShardMergeRecipientService::Instance::_startOplogApplier() {
     _stopOrHangOnFailPoint(&fpAfterFetchingCommittedTransactions);
 
-    boost::optional<OpTime> cloneFinishedRecipientOpTime;
-    boost::optional<OpTime> startApplyingDonorOpTime;
-    {
-        stdx::unique_lock lk(_mutex);
-        cloneFinishedRecipientOpTime = _stateDoc.getCloneFinishedRecipientOpTime();
-        startApplyingDonorOpTime = _stateDoc.getStartApplyingDonorOpTime();
-    }
-    invariant(cloneFinishedRecipientOpTime);
-    invariant(!cloneFinishedRecipientOpTime->isNull());
+    stdx::unique_lock lk(_mutex);
+    // Don't start the tenant oplog applier if the migration is interrupted.
+    uassertStatusOK(_getInterruptStatus());
+
+    const auto& startApplyingDonorOpTime = _stateDoc.getStartApplyingDonorOpTime();
     invariant(startApplyingDonorOpTime);
+    const auto& cloneFinishedRecipientOpTime = _stateDoc.getCloneFinishedRecipientOpTime();
+    invariant(cloneFinishedRecipientOpTime);
 
-    auto tenantOplogApplier =
-        std::make_shared<TenantOplogApplier>(_migrationUuid,
-                                             MigrationProtocolEnum::kShardMerge,
-                                             boost::none,
-                                             boost::none,
-                                             *startApplyingDonorOpTime,
-                                             _donorOplogBuffer.get(),
-                                             **_scopedExecutor,
-                                             _writerPool.get(),
-                                             *cloneFinishedRecipientOpTime);
-
-    // Ensure that we properly shut down tenantOplogApplier here if we are interrupted below.
-    ScopeGuard onExitGuard([&] {
-        tenantOplogApplier->shutdown();
-        tenantOplogApplier->join();
-    });
+    _tenantOplogApplier = std::make_shared<TenantOplogApplier>(_migrationUuid,
+                                                               MigrationProtocolEnum::kShardMerge,
+                                                               boost::none,
+                                                               *startApplyingDonorOpTime,
+                                                               _donorOplogBuffer.get(),
+                                                               **_scopedExecutor,
+                                                               _writerPool.get());
+    _tenantOplogApplier->setCloneFinishedRecipientOpTime(*cloneFinishedRecipientOpTime);
 
     LOGV2_DEBUG(7339750,
                 1,
                 "Recipient migration instance starting oplog applier",
                 "migrationId"_attr = getMigrationUUID(),
                 "startApplyingAfterDonorOpTime"_attr =
-                    tenantOplogApplier->getStartApplyingAfterOpTime());
+                    _tenantOplogApplier->getStartApplyingAfterOpTime());
 
-    uassertStatusOK(tenantOplogApplier->startup());
+    uassertStatusOK(_tenantOplogApplier->startup());
+    _oplogApplierReady = true;
+    _oplogApplierReadyCondVar.notify_all();
 
-    {
-        stdx::unique_lock lk(_mutex);
-        uassertStatusOK(_getInterruptStatus());
-        _tenantOplogApplier = std::move(tenantOplogApplier);
-
-        // Now that we have successfully started and set _tenantOplogApplier it will be properly
-        // cleaned up during the standard shutdown procedure.
-        onExitGuard.dismiss();
-        _oplogApplierReady = true;
-        _oplogApplierReadyCondVar.notify_all();
-        _stopOrHangOnFailPoint(&fpAfterStartingOplogApplierMigrationRecipientInstance);
-    }
+    lk.unlock();
+    _stopOrHangOnFailPoint(&fpAfterStartingOplogApplierMigrationRecipientInstance);
 }
 
 void ShardMergeRecipientService::Instance::_setup(ConnectionPair connectionPair) {

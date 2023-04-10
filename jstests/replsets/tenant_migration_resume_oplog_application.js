@@ -63,10 +63,10 @@ const migrationOpts = {
 
 // Configure fail point to have the recipient primary hang after the cloner completes and the oplog
 // applier has started.
-const waitAfterDatabaseClone = configureFailPoint(
+let waitAfterDatabaseClone = configureFailPoint(
     recipientPrimary, "fpAfterStartingOplogApplierMigrationRecipientInstance", {action: "hang"});
 // Configure fail point to hang the tenant oplog applier after it applies the first batch.
-const waitInOplogApplier = configureFailPoint(recipientPrimary, "hangInTenantOplogApplication");
+let waitInOplogApplier = configureFailPoint(recipientPrimary, "hangInTenantOplogApplication");
 
 // Start a migration and wait for recipient to hang in the tenant database cloner.
 const donorRstArgs = createRstArgs(donorRst);

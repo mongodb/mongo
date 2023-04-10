@@ -41,12 +41,10 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/op_observer/op_observer.h"
-#include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/cloner_utils.h"
 #include "mongo/db/repl/insert_group.h"
 #include "mongo/db/repl/oplog_applier_utils.h"
-#include "mongo/db/repl/oplog_interface_local.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/session_update_tracker.h"
@@ -72,23 +70,21 @@ MONGO_FAIL_POINT_DEFINE(fpBeforeTenantOplogApplyingBatch);
 TenantOplogApplier::TenantOplogApplier(const UUID& migrationUuid,
                                        const MigrationProtocolEnum& protocol,
                                        boost::optional<std::string> tenantId,
-                                       boost::optional<NamespaceString> progressNss,
                                        OpTime startApplyingAfterOpTime,
                                        RandomAccessOplogBuffer* oplogBuffer,
                                        std::shared_ptr<executor::TaskExecutor> executor,
                                        ThreadPool* writerPool,
-                                       OpTime cloneFinishedRecipientOpTime)
+                                       Timestamp resumeBatchingTs)
     : AbstractAsyncComponent(executor.get(),
                              std::string("TenantOplogApplier_") + migrationUuid.toString()),
       _migrationUuid(migrationUuid),
-      _progressNamespaceString(progressNss),
       _protocol(protocol),
       _tenantId(tenantId),
       _startApplyingAfterOpTime(startApplyingAfterOpTime),
       _oplogBuffer(oplogBuffer),
       _executor(std::move(executor)),
-      _cloneFinishedRecipientOpTime(cloneFinishedRecipientOpTime),
-      _writerPool(writerPool) {
+      _writerPool(writerPool),
+      _resumeBatchingTs(resumeBatchingTs) {
     if (_protocol != MigrationProtocolEnum::kShardMerge) {
         invariant(_tenantId);
     } else {
@@ -124,58 +120,21 @@ OpTime TenantOplogApplier::getStartApplyingAfterOpTime() const {
     return _startApplyingAfterOpTime;
 }
 
-boost::optional<TenantOplogApplierProgress> TenantOplogApplier::getStoredProgress(
-    OperationContext* opCtx) {
-    if (!_progressNamespaceString) {
-        return boost::none;
-    }
-
-    DBDirectClient client(opCtx);
-    const auto tenantOplogApplierProgress =
-        client.findOne(_progressNamespaceString.get(),
-                       BSON(TenantOplogApplierProgress::kMigrationUuidFieldName << _migrationUuid));
-    if (tenantOplogApplierProgress.isEmpty()) {
-        return boost::none;
-    }
-
-    IDLParserContext ctx("TenantOplogApplierProgress");
-    return TenantOplogApplierProgress::parse(ctx, tenantOplogApplierProgress);
+Timestamp TenantOplogApplier::getResumeBatchingTs() const {
+    return _resumeBatchingTs;
 }
 
-void TenantOplogApplier::recoverState() {
-    auto opCtx = cc().makeOperationContext();
-    const auto storedProgress = getStoredProgress(opCtx.get());
-    if (!storedProgress)
-        return;
-
-    auto donorOpTime = storedProgress->getDonorOpTime();
-
+void TenantOplogApplier::setCloneFinishedRecipientOpTime(OpTime cloneFinishedRecipientOpTime) {
     stdx::lock_guard lk(_mutex);
-    _startApplyingAfterOpTime = std::max(donorOpTime, _startApplyingAfterOpTime);
-    _resumeBatchingTimestamp = donorOpTime.getTimestamp();
-}
-
-void TenantOplogApplier::_storeProgress(OperationContext* opCtx, OpTime donorOpTime) {
-    if (!_progressNamespaceString) {
-        return;
-    }
-
-    PersistentTaskStore<TenantOplogApplierProgress> store(_progressNamespaceString.get());
-
-    BSONObjBuilder builder;
-    builder.append("$set", BSON(TenantOplogApplierProgress::kDonorOpTimeFieldName << donorOpTime));
-
-    store.upsert(opCtx,
-                 BSON(TenantOplogApplierProgress::kMigrationUuidFieldName << _migrationUuid),
-                 builder.obj());
+    invariant(!_isActive_inlock());
+    invariant(!cloneFinishedRecipientOpTime.isNull());
+    invariant(_cloneFinishedRecipientOpTime.isNull());
+    _cloneFinishedRecipientOpTime = cloneFinishedRecipientOpTime;
 }
 
 void TenantOplogApplier::_doStartup_inlock() {
-    _oplogBatcher = std::make_shared<TenantOplogBatcher>(_migrationUuid,
-                                                         _oplogBuffer,
-                                                         _executor,
-                                                         _resumeBatchingTimestamp,
-                                                         _startApplyingAfterOpTime);
+    _oplogBatcher = std::make_shared<TenantOplogBatcher>(
+        _migrationUuid, _oplogBuffer, _executor, _resumeBatchingTs, _startApplyingAfterOpTime);
     uassertStatusOK(_oplogBatcher->startup());
     auto fut = _oplogBatcher->getNextBatch(
         TenantOplogBatcher::BatchLimits(std::size_t(tenantApplierBatchSizeBytes.load()),
@@ -361,7 +320,6 @@ void TenantOplogApplier::_applyOplogBatch(TenantOplogBatch* batch) {
                 "Tenant Oplog Applier starting to write no-ops",
                 "protocol"_attr = _protocol,
                 "migrationId"_attr = _migrationUuid);
-
     auto lastBatchCompletedOpTimes = _writeNoOpEntries(opCtx.get(), *batch);
     stdx::lock_guard lk(_mutex);
     _lastAppliedOpTimesUpToLastBatch.donorOpTime = lastBatchCompletedOpTimes.donorOpTime;
@@ -373,8 +331,6 @@ void TenantOplogApplier::_applyOplogBatch(TenantOplogBatch* batch) {
     }
 
     _numOpsApplied += batch->ops.size();
-
-    _storeProgress(opCtx.get(), lastBatchCompletedOpTimes.donorOpTime);
 
     LOGV2_DEBUG(4886002,
                 1,
@@ -601,8 +557,6 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
     auto opCtx = cc().makeOperationContext();
     tenantMigrationInfo(opCtx.get()) = boost::make_optional<TenantMigrationInfo>(_migrationUuid);
 
-    invariant(!_cloneFinishedRecipientOpTime.isNull());
-
     // Since the client object persists across each noop write call and the same writer thread could
     // be reused to write noop entries with older optime, we need to clear the lastOp associated
     // with the client to avoid the invariant in replClientInfo::setLastOp that the optime only goes
@@ -615,6 +569,15 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
     // the loop, except when invalidated by multi-document transactions. This allows us to
     // track the statements in a retryable write.
     std::unique_ptr<MongoDSessionCatalog::Session> scopedSession;
+
+    // Make sure a partial session doesn't escape.
+    ON_BLOCK_EXIT([this, &scopedSession, &opCtx] {
+        if (scopedSession) {
+            auto txnParticipant = TransactionParticipant::get(opCtx.get());
+            invariant(txnParticipant);
+            txnParticipant.invalidate(opCtx.get());
+        }
+    });
 
     boost::optional<MutableOplogEntry> prePostImageEntry = boost::none;
     OpTime originalPrePostImageOpTime;
@@ -665,7 +628,7 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
             // Check out the session.
             if (!scopedSession) {
                 auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx.get());
-                scopedSession = mongoDSessionCatalog->checkOutSession(opCtx.get());
+                scopedSession = mongoDSessionCatalog->checkOutSessionWithoutOplogRead(opCtx.get());
             }
 
             auto txnParticipant = TransactionParticipant::get(opCtx.get());
@@ -675,24 +638,16 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
                                  "for transaction "
                               << txnNumber << " on session " << sessionId,
                 txnParticipant);
-
             // We should only write the noop entry for this transaction commit once.
-            // Out-of-order processing is not possible except in failover cases. In the event of a
-            // failover, we should skip writing noops for transaction numbers up to and including
-            // the active transaction number, since we will have already written noop entries for
-            // these transactions.
-            if (txnNumber <= txnParticipant.getActiveTxnNumberAndRetryCounter().getTxnNumber()) {
-                // It is safe to skip only if the current active transaction's last write opTime is
-                // after the oplog catchup phase of this migration attempt. Otherwise, it indicates
-                // potential data corruption.
-                invariant(txnParticipant.getLastWriteOpTime() > _cloneFinishedRecipientOpTime);
-                continue;
-            }
-
-            txnParticipant.beginOrContinue(opCtx.get(),
-                                           {txnNumber, optTxnRetryCounter},
-                                           false /* autocommit */,
-                                           true /* startTransaction */);
+            uassert(5351501,
+                    str::stream() << "Tenant oplog application cannot apply transaction "
+                                  << txnNumber << " on session " << sessionId
+                                  << " because the transaction with txnNumberAndRetryCounter "
+                                  << txnParticipant.getActiveTxnNumberAndRetryCounter().toBSON()
+                                  << " has already started",
+                    txnParticipant.getActiveTxnNumberAndRetryCounter().getTxnNumber() < txnNumber);
+            txnParticipant.beginOrContinueTransactionUnconditionally(
+                opCtx.get(), {txnNumber, optTxnRetryCounter});
 
             // Only set sessionId, txnNumber and txnRetryCounter for the final applyOp in a
             // transaction.
@@ -756,7 +711,7 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
                     // Don't write the no-op entry.
                     continue;
                 } else {
-                    // Otherwise this is a previously migrated retryable write. Avoid
+                    // Otherwise this is a previously migrated retryable write.  Avoid
                     // re-wrapping it.
                     uassert(5351003,
                             str::stream() << "Tenant Oplog Applier received unexpected Empty o2 "
@@ -779,7 +734,6 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
                     noopEntry.setObject2(o2Entry.toBSON());
                 }
             }
-
             stmtIds.insert(stmtIds.end(), entryStmtIds.begin(), entryStmtIds.end());
 
             if (!prePostImageEntry && (entry.getPreImageOpTime() || entry.getPostImageOpTime())) {
@@ -823,10 +777,9 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
                 opCtx->setLogicalSessionId(sessionId);
                 opCtx->setTxnNumber(txnNumber);
             }
-
             if (!scopedSession) {
                 auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx.get());
-                scopedSession = mongoDSessionCatalog->checkOutSession(opCtx.get());
+                scopedSession = mongoDSessionCatalog->checkOutSessionWithoutOplogRead(opCtx.get());
             }
 
             auto txnParticipant = TransactionParticipant::get(opCtx.get());
@@ -835,30 +788,28 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
                                      "for transaction "
                                   << txnNumber << " on session " << sessionId,
                     txnParticipant);
+            // beginOrContinue throws on failure, which will abort the migration. Failure should
+            // only result from out-of-order processing, which should not happen.
+            TxnNumberAndRetryCounter txnNumberAndRetryCounter{txnNumber};
+            txnParticipant.beginOrContinue(opCtx.get(),
+                                           txnNumberAndRetryCounter,
+                                           boost::none /* autocommit */,
+                                           boost::none /* startTransaction */);
 
-            if (txnParticipant.getLastWriteOpTime() <= _cloneFinishedRecipientOpTime) {
-                // We can end up here under the following circumstances:
-                // 1) LastWriteOpTime is not null.
-                //  - In the case of a back-to-back migration (rs0->rs1->rs0) OR a migration retry,
-                //  where txnNumber == txnParticipant.o().activeTxnNumber and rs0 happens to contain
-                //  the chain already. This requires a chain reset and invalidation of the in-memory
-                //  transaction state. Otherwise, we could have duplicate entries for the same
-                //  stmtId.
-                //
-                // 2) LastWriteOpTime is null.
-                //  - In a back-to-back migration (rs0->rs1->rs0), where
-                //  txnNumber < txnParticipant.o().activeTxnNumber or the first statement of the
-                //  active transaction failed previously in rs0 before migrating the tenant back to
-                //  rs0. This requires invalidating the in-memory transaction state. Otherwise, we
-                //  may skip writing the history chain for txnNumber.
-                //  - New session with no transaction started (this will be a noop).
-
-                // Reset retryable write history chain.
+            // We could have an existing lastWriteOpTime for the same retryable write chain from a
+            // previously aborted migration. This could also happen if the tenant being migrated has
+            // previously resided in this replica set. So we want to start a new history chain
+            // instead of linking the newly generated no-op to the existing chain before the current
+            // migration starts. Otherwise, we could have duplicate entries for the same stmtId.
+            invariant(!_cloneFinishedRecipientOpTime.isNull());
+            if (txnParticipant.getLastWriteOpTime() > _cloneFinishedRecipientOpTime) {
+                prevWriteOpTime = txnParticipant.getLastWriteOpTime();
+            } else {
                 prevWriteOpTime = OpTime();
 
-                // Reset the in-memory retryable write state in the txnParticipant so it can be
-                // built from scratch again (including the list of committed statements) with the
-                // new chain.
+                // Before we start a new history chain, reset the in-memory retryable write
+                // state in the txnParticipant so it can be built up from scratch again with
+                // the new chain.
                 LOGV2_DEBUG(5709800,
                             2,
                             "Tenant oplog applier resetting existing retryable write state",
@@ -866,69 +817,32 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
                             "_cloneFinishedRecipientOpTime"_attr = _cloneFinishedRecipientOpTime,
                             "sessionId"_attr = sessionId,
                             "txnNumber"_attr = txnNumber,
-                            "statementIds"_attr = stmtIds,
+                            "statementIds"_attr = entryStmtIds,
                             "protocol"_attr = _protocol,
                             "migrationId"_attr = _migrationUuid);
                 txnParticipant.invalidate(opCtx.get());
                 txnParticipant.refreshFromStorageIfNeededNoOplogEntryFetch(opCtx.get());
-            }
-
-            // If txnNumber is less than the active transaction number, this retryable write has
-            // likely been handled previously and we are seeing it again after the oplog applier
-            // resumed after a recipient failover.
-            if (txnNumber < txnParticipant.getActiveTxnNumberAndRetryCounter().getTxnNumber()) {
-                // It is safe to skip only if the current active transaction's last update happened
-                // during the oplog catchup phase of this migration attempt. Otherwise, it indicates
-                // potential data corruption.
-                invariant(txnParticipant.getLastWriteOpTime() > _cloneFinishedRecipientOpTime);
-                continue;
-            }
-
-            TxnNumberAndRetryCounter txnNumberAndRetryCounter{txnNumber};
-            txnParticipant.beginOrContinue(opCtx.get(),
-                                           txnNumberAndRetryCounter,
-                                           boost::none /* autocommit */,
-                                           boost::none /* startTransaction */);
-
-            if (!prevWriteOpTime) {
-                prevWriteOpTime = txnParticipant.getLastWriteOpTime();
+                TxnNumberAndRetryCounter txnNumberAndRetryCounter{txnNumber};
+                txnParticipant.beginOrContinue(opCtx.get(),
+                                               txnNumberAndRetryCounter,
+                                               boost::none /* autocommit */,
+                                               boost::none /* startTransaction */);
             }
 
             // We should never process the same donor statement twice, except in failover
-            // cases. In the event of a failover, it is possible that we were able to successfully
-            // log the noop but failed to persist progress checkpoint data. As a result, we can end
-            // up re-applying noop entries. We can safely skip the entry in this case.
-            //
-            // Statement ID sequence numbers are not guaranteed to be in order, so check that all
-            // statements have already been executed before we skip this oplog entry. If we end up
-            // in a state where only some of the statement ids have been executed, this suggests
-            // a programming error. As such, we don't want to skip the entry in order to allow the
-            // TransactionParticipant::onWriteOpCompletedOnPrimary call to still take place, where
-            // an error will be thrown.
-            auto shouldSkip = [&] {
-                for (auto&& stmtId : stmtIds) {
-                    if (!txnParticipant.checkStatementExecuted(opCtx.get(), stmtId))
-                        return false;
-                }
-                return true;
-            }();
-
-            if (shouldSkip) {
-                LOGV2_DEBUG(7262200,
-                            1,
-                            "Tenant Oplog Applier skipping previously processed retryable write",
-                            "protocol"_attr = _protocol,
-                            "migrationId"_attr = _migrationUuid,
-                            "txnNumber"_attr = txnNumber,
-                            "statement"_attr = entryStmtIds.front(),
-                            "sessionId"_attr = sessionId);
-                continue;
-            }
+            // cases where we'll also have "forgotten" the statement was executed.
+            uassert(5350902,
+                    str::stream() << "Tenant oplog application processed same retryable write "
+                                     "twice for transaction "
+                                  << txnNumber << " statement " << entryStmtIds.front()
+                                  << " on session " << sessionId,
+                    !txnParticipant.checkStatementExecutedNoOplogEntryFetch(opCtx.get(),
+                                                                            entryStmtIds.front()));
 
             // Set sessionId, txnNumber, and statementId for all ops in a retryable write.
             noopEntry.setSessionId(sessionId);
             noopEntry.setTxnNumber(txnNumber);
-            noopEntry.setStatementIds(stmtIds);
+            noopEntry.setStatementIds(entryStmtIds);
 
             // set fromMigrate on the no-op so the session update tracker recognizes it.
             noopEntry.setFromMigrate(true);
@@ -968,6 +882,7 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
                     TransactionParticipant::get(opCtx.get())
                         .onWriteOpCompletedOnPrimary(opCtx.get(), {stmtIds}, *sessionTxnRecord);
                 }
+
                 wuow.commit();
             });
         prePostImageEntry = boost::none;

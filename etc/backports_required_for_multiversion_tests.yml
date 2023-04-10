@@ -362,10 +362,6 @@ last-continuous:
     ticket: SERVER-75517
   - test_file: jstests/replsets/startup_recovery_for_restore_needs_rollback.js
     ticket: SERVER-67180
-  - test_file: jstests/replsets/tenant_migration_resume_oplog_application.js
-    ticket: SERVER-72622
-  - test_file: jstests/replsets/tenant_migration_retryable_write_retry_on_recipient.js
-    ticket: SERVER-72622
   suites: null
 last-lts:
   all:
@@ -795,8 +791,4 @@ last-lts:
     ticket: SERVER-75517
   - test_file: jstests/replsets/startup_recovery_for_restore_needs_rollback.js
     ticket: SERVER-67180
-  - test_file: jstests/replsets/tenant_migration_resume_oplog_application.js
-    ticket: SERVER-72622
-  - test_file: jstests/replsets/tenant_migration_retryable_write_retry_on_recipient.js
-    ticket: SERVER-72622
   suites: null
