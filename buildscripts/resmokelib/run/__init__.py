@@ -753,6 +753,11 @@ class RunPlugin(PluginInterface):
         parser.set_defaults(logger_file="console")
 
         parser.add_argument(
+            "--shellSeed", action="store", dest="shell_seed", default=None,
+            help=("Sets the seed for replset and sharding fixtures to use. "
+                  "This only works when only one test is input into resmoke."))
+
+        parser.add_argument(
             "--mongocryptdSetParameters", dest="mongocryptd_set_parameters", action="append",
             metavar="{key1: value1, key2: value2, ..., keyN: valueN}",
             help=("Passes one or more --setParameter options to all mongocryptd processes"

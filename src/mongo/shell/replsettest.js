@@ -684,7 +684,7 @@ var ReplSetTest = function(opts) {
             // Set the random seed to the value passed in by TestData. The seed is undefined
             // by default. For sharded clusters, the seed is already initialized as part of
             // ShardingTest.
-            Random.setRandomSeed(jsTest.options().seed);
+            Random.setRandomFixtureSeed();
         }
 
         // If the caller has explicitly set 'waitForConnect', then we prefer that. Otherwise we

@@ -104,6 +104,7 @@ DEFAULTS = {
     "shuffle": None,
     "stagger_jobs": None,
     "majority_read_concern": "on",
+    "shell_seed": None,
     "storage_engine": "wiredTiger",
     "storage_engine_cache_size_gb": None,
     "suite_files": "with_server",
@@ -461,6 +462,9 @@ SERVICE_EXECUTOR = None
 # If set, resmoke will override the default fixture and connect to the fixture specified by this
 # connection string instead.
 SHELL_CONN_STRING = None
+
+# If set, resmoke will override the random seed for jstests.
+SHELL_SEED = None
 
 # If true, then the order the tests run in is randomized. Otherwise the tests will run in
 # alphabetical (case-insensitive) order.

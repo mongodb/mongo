@@ -4,6 +4,7 @@ import logging
 import json
 import os
 import os.path
+import re
 import subprocess
 import sys
 import time
@@ -496,3 +497,47 @@ class TestForceExcludedTest(unittest.TestCase):
         result = execute_resmoke(resmoke_args)
 
         assert result.returncode == 0
+
+
+class TestSetShellSeed(unittest.TestCase):
+    def execute_resmoke_and_get_seed(self, resmoke_args):
+        process = execute_resmoke(resmoke_args)
+        self.assertEqual(process.returncode, 0)
+        match = re.search("setting random seed: ([0-9]+)", process.stdout)
+        if not match:
+            self.fail(
+                "No random seed message found in resmoke output. Was the message changed or the test altered?"
+            )
+
+        return match.group(1)
+
+    def test_set_shell_seed(self):
+        test_seed = "5000"
+
+        resmoke_args = [
+            "--suites=buildscripts/tests/resmoke_end2end/suites/resmoke_set_shellseed.yml",
+            "buildscripts/tests/resmoke_end2end/testfiles/random_with_seed.js",
+            f"--shellSeed={test_seed}"
+        ]
+
+        seed = self.execute_resmoke_and_get_seed(resmoke_args)
+
+        self.assertEqual(
+            seed, test_seed, msg=
+            "The found random seed does not match the seed passed with the --shellSeed resmoke argument."
+        )
+
+    def test_random_shell_seed(self):
+        resmoke_args = [
+            "--suites=buildscripts/tests/resmoke_end2end/suites/resmoke_set_shellseed.yml",
+            "buildscripts/tests/resmoke_end2end/testfiles/random_with_seed.js",
+        ]
+
+        random_seeds = set()
+
+        for _ in range(10):
+            seed = self.execute_resmoke_and_get_seed(resmoke_args)
+            random_seeds.add(seed)
+
+        self.assertTrue(
+            len(random_seeds) > 1, msg="Resmoke generated the same random seed 10 times in a row.")

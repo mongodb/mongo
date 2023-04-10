@@ -195,6 +195,9 @@ def mongo_shell_program(logger, executable=None, connection_string=None, filenam
         test_data["inEvergreen"] = True
         test_data["evergreenTaskId"] = config.EVERGREEN_TASK_ID
 
+    if config.SHELL_SEED is not None:
+        test_data["seed"] = int(config.SHELL_SEED)
+
     # Initialize setParameters for mongod and mongos, to be passed to the shell via TestData. Since
     # they are dictionaries, they will be converted to JavaScript objects when passed to the shell
     # by the _format_shell_vars() function.
