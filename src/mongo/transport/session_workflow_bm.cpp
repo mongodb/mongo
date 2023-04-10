@@ -62,11 +62,11 @@ constexpr bool enableInstrumentation = false;
 
 /** Benchmarks can't do this with command line flags like unit tests can. */
 void initializeInstrumentation() {
-    if constexpr (!enableInstrumentation)
-        return;
+    constexpr auto kLogLevel =
+        enableInstrumentation ? logv2::LogSeverity::Debug(4) : logv2::LogSeverity::Error();
     std::array components = {
-        std::pair{logv2::LogComponent::kExecutor, logv2::LogSeverity::Debug(4)},
-        std::pair{logv2::LogComponent::kNetwork, logv2::LogSeverity::Debug(4)},
+        std::pair{logv2::LogComponent::kExecutor, kLogLevel},
+        std::pair{logv2::LogComponent::kNetwork, kLogLevel},
     };
     for (auto&& [comp, sev] : components)
         logv2::LogManager::global().getGlobalSettings().setMinimumLoggedSeverity(comp, sev);
@@ -317,7 +317,16 @@ private:
     std::unique_ptr<MockCoordinator> _coordinator;
 };
 
-const int64_t benchmarkThreadMax = ProcessInfo::getNumAvailableCores() * 2;
+/**
+ * ASAN can't handle the # of threads the benchmark creates.
+ * With sanitizers, run this in a diminished "correctness check" mode.
+ */
+#if __has_feature(address_sanitizer) || __has_feature(thread_sanitizer)
+const auto kMaxThreads = 1;
+#else
+/** 2x to benchmark the case of more threads than cores for curiosity's sake. */
+const auto kMaxThreads = 2 * ProcessInfo::getNumCores();
+#endif
 
 BENCHMARK_DEFINE_F(SessionWorkflowBm, Loop)(benchmark::State& state) {
     run(state);
@@ -336,7 +345,7 @@ BENCHMARK_REGISTER_F(SessionWorkflowBm, Loop)->Apply([](auto* b) {
                 b->Args({exhaust, isDedicatedThread, reserved});
         }
     }
-    b->ThreadRange(1, benchmarkThreadMax);
+    b->ThreadRange(1, kMaxThreads);
 });
 
 }  // namespace
