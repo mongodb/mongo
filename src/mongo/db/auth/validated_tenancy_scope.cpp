@@ -61,13 +61,18 @@ MONGO_INITIALIZER(SecurityTokenOptionValidate)(InitializerContext*) {
             return boost::none;
         });
     }
+
+    if (gFeatureFlagSecurityToken.isEnabledAndIgnoreFCVUnsafeAtStartup()) {
+        LOGV2_WARNING(
+            7539600,
+            "featureFlagSecurityToken is enabled.  This flag MUST NOT be enabled in production");
+    }
 }
 }  // namespace
 
 ValidatedTenancyScope::ValidatedTenancyScope(BSONObj obj, InitTag tag) : _originalToken(obj) {
-    // (Ignore FCV check): TODO(SERVER-75396): add why FCV is ignored here.
-    const bool enabled =
-        gMultitenancySupport && gFeatureFlagSecurityToken.isEnabledAndIgnoreFCVUnsafe();
+    const bool enabled = gMultitenancySupport &&
+        gFeatureFlagSecurityToken.isEnabled(serverGlobalParams.featureCompatibility);
 
     uassert(ErrorCodes::InvalidOptions,
             "Multitenancy not enabled, refusing to accept securityToken",
