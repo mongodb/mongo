@@ -78,8 +78,8 @@ var AnalyzeShardKeyUtil = (function() {
         for (let fieldName in shardKey) {
             const isHashed = indexKey[fieldName] == "hashed";
             const value = AnalyzeShardKeyUtil.getDottedField(doc, fieldName);
-            // TODO (SERVER-70994): After SERVER-72814, make sure that the analyzeShardKey command
-            // doesn't return hash values in the case where the supporting index is hashed.
+            // TODO (SERVER-75886): Make analyzeShardKey command return shard key values correctly
+            // when the supporting index is hashed.
             shardKeyValue[fieldName] = isHashed ? convertShardKeyToHashed(value) : value;
         }
         return shardKeyValue;
