@@ -556,8 +556,7 @@ MovePrimaryRecipientService::MovePrimaryRecipient::_transitionToDoneStateAndFini
                     movePrimaryRecipientPauseBeforeDeletingStateDoc.pauseWhileSetAndNotCanceled(
                         opCtx.get(), _ctHolder->getStepdownToken());
                     _removeRecipientDocument(opCtx.get());
-                })
-                .then([this, executor] { return _waitForMajority(executor); });
+                });
         })
         .onTransientError([](const Status& status) {})
         .onUnrecoverableError([](const Status& status) {
@@ -573,12 +572,13 @@ MovePrimaryRecipientService::MovePrimaryRecipient::_transitionToDoneStateAndFini
                 // Override status code to aborted after logging the original error
                 status = {ErrorCodes::MovePrimaryAborted, "movePrimary operation aborted"};
             }
-            if (status.isOK()) {
-                stdx::lock_guard<Latch> lg(_mutex);
-                move_primary_util::ensureFulfilledPromise(lg, _completionPromise, Status::OK());
-            }
-            return _waitForMajority(executor).then(
-                [this, executor, status] { return ExecutorFuture<void>(**executor, status); });
+            return _waitForMajority(executor).then([this, executor, status] {
+                if (status.isOK()) {
+                    stdx::lock_guard<Latch> lg(_mutex);
+                    move_primary_util::ensureFulfilledPromise(lg, _completionPromise, Status::OK());
+                }
+                return ExecutorFuture<void>(**executor, status);
+            });
         });
 }
 
