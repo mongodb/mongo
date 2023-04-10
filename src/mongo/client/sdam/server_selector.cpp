@@ -78,7 +78,9 @@ void SdamServerSelector::_getCandidateServers(std::vector<ServerDescriptionPtr>*
             auto maxOpTime = (*maxIt)->getOpTime();
             if (maxOpTime->getTimestamp() < criteria.minClusterTime) {
                 // ignore minClusterTime
-                const_cast<ReadPreferenceSetting&>(criteria) = ReadPreferenceSetting(criteria.pref);
+                auto newCriteria = criteria;
+                newCriteria.minClusterTime = Timestamp{};
+                const_cast<ReadPreferenceSetting&>(criteria) = newCriteria;
             }
         }
     }

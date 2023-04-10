@@ -683,4 +683,76 @@ TEST_F(ServerSelectorTestFixture, ShouldFilterByTags) {
     selector.filterTags(&servers, tags);
     ASSERT_EQ(makeServerDescriptionList().size(), servers.size());
 }
+
+TEST_F(ServerSelectorTestFixture, ShouldIgnoreMinClusterTimeIfNotSatisfiable) {
+    TopologyStateMachine stateMachine(sdamConfiguration);
+    auto topologyDescription = std::make_shared<TopologyDescription>(sdamConfiguration);
+
+    const auto now = Date_t::now();
+
+    const auto s0 = ServerDescriptionBuilder()
+                        .withAddress(HostAndPort("s0"))
+                        .withType(ServerType::kRSPrimary)
+                        .withRtt(sdamConfiguration.getLocalThreshold())
+                        .withSetName("set")
+                        .withHost(HostAndPort("s0"))
+                        .withHost(HostAndPort("s1"))
+                        .withMinWireVersion(WireVersion::SUPPORTS_OP_MSG)
+                        .withMaxWireVersion(WireVersion::LATEST_WIRE_VERSION)
+                        .withLastUpdateTime(now)
+                        .withLastWriteDate(now)
+                        .withTag("tag", "primary")
+                        .withElectionId(kOidOne)
+                        .withSetVersion(100)
+                        .withOpTime(repl::OpTime())  // server has smallest possible op time
+                        .instance();
+    stateMachine.onServerDescription(*topologyDescription, s0);
+
+    const auto s1 = ServerDescriptionBuilder()
+                        .withAddress(HostAndPort("s1"))
+                        .withType(ServerType::kRSSecondary)
+                        .withRtt(sdamConfiguration.getLocalThreshold())
+                        .withSetName("set")
+                        .withHost(HostAndPort("s0"))
+                        .withHost(HostAndPort("s1"))
+                        .withMinWireVersion(WireVersion::SUPPORTS_OP_MSG)
+                        .withMaxWireVersion(WireVersion::LATEST_WIRE_VERSION)
+                        .withLastUpdateTime(now)
+                        .withLastWriteDate(now - Milliseconds(910000000))
+                        .withTag("tag", "secondary")
+                        .withElectionId(kOidOne)
+                        .withSetVersion(100)
+                        .withOpTime(repl::OpTime())  // server has smallest possible op time
+                        .instance();
+    stateMachine.onServerDescription(*topologyDescription, s1);
+
+    topologyDescription = TopologyDescription::clone(*topologyDescription);
+
+    // Ensure that minClusterTime is ignored if no server can satisfy it
+    auto readPref = ReadPreferenceSetting(ReadPreference::Nearest);
+    readPref.minClusterTime = repl::OpTime::max().getTimestamp();
+    auto result = selector.selectServers(topologyDescription, readPref);
+
+    ASSERT(result);
+    ASSERT_EQ(result->size(), 2);
+
+    // Ensure that tags are still respected if minClusterTime is ignored
+    readPref = ReadPreferenceSetting(ReadPreference::Nearest, TagSets::secondarySet);
+    readPref.minClusterTime = repl::OpTime::max().getTimestamp();
+    result = selector.selectServers(topologyDescription, readPref);
+
+    ASSERT(result);
+    ASSERT_EQ(result->size(), 1);
+    ASSERT_EQ((*result)[0]->getAddress(), s1->getAddress());
+
+    // Ensure that maxStaleness is still respected if minClusterTime is ignored
+    const auto maxStalenessSeconds = Seconds(90);
+    readPref =
+        ReadPreferenceSetting(ReadPreference::Nearest, TagSets::emptySet, maxStalenessSeconds);
+    readPref.minClusterTime = repl::OpTime::max().getTimestamp();
+    result = selector.selectServers(topologyDescription, readPref);
+
+    ASSERT_EQ(result->size(), 1);
+    ASSERT_EQ((*result)[0]->getAddress(), s0->getAddress());
+}
 }  // namespace mongo::sdam

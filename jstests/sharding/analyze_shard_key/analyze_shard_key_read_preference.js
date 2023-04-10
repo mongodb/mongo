@@ -1,9 +1,7 @@
 /**
  * Tests that the analyzeShardKey command respects the read preference specified by the client.
  *
- * TODO (SERVER-74568): SdamServerSelector sometimes doesn't fully respect client readPreference for
- * config shard.
- * @tags: [requires_fcv_70, catalog_shard_incompatible]
+ * @tags: [requires_fcv_70]
  */
 (function() {
 "use strict";
