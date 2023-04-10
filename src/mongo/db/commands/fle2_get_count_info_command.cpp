@@ -78,12 +78,15 @@ QECountInfoReplyTokens tokenFromCountInfo(const FLEEdgeCountInfo& countInfo) {
         token.setEDCDerivedFromDataTokenAndContentionFactorToken(countInfo.edc.value().toCDR());
     }
 
-    if (countInfo.cpos) {
-        token.setCpos(countInfo.cpos.get());
-    }
-
-    if (countInfo.apos) {
-        token.setApos(countInfo.apos.get());
+    if (countInfo.cpos || countInfo.apos) {
+        ESCOptionalPositionsPair spos;
+        if (countInfo.cpos) {
+            spos.setCpos(countInfo.cpos.get());
+        }
+        if (countInfo.apos) {
+            spos.setApos(countInfo.apos.get());
+        }
+        token.setSearchedPositions(spos);
     }
 
     if (countInfo.stats) {

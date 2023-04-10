@@ -34,6 +34,30 @@ imports:
     - "mongo/crypto/fle_stats.idl"
 
 structs:
+    ESCPositionsPair:
+        description: "A pair of non-anchor and anchor positions"
+        strict: true
+        fields:
+          cpos:
+            description: "non-anchor position"
+            type: long
+          apos:
+            description: "anchor position"
+            type: long
+
+    ESCOptionalPositionsPair:
+        description: "A pair of optional non-anchor and anchor positions"
+        strict: true
+        fields:
+          cpos:
+            description: "non-anchor position"
+            type: long
+            optional: true
+          apos:
+            description: "anchor position"
+            type: long
+            optional: true
+
     QECountInfoReplyTokens:
         description: "A tokens of ESC information"
         strict: true
@@ -51,13 +75,15 @@ structs:
             type: bindata_generic
             cpp_name: EDCDerivedFromDataTokenAndContentionFactorToken
             optional: true
-          cpos:
-            description: "cpos argument returned from emuBinary"
-            type: long
+          spos:
+            description: "positions returned from emuBinary"
+            type: ESCOptionalPositionsPair
+            cpp_name: SearchedPositions
             optional: true
-          apos:
-            description: "cpos argument returned from emuBinary"
-            type: long
+          npos:
+            description: "position pair retrieved from the null anchor"
+            type: ESCPositionsPair
+            cpp_name: NullAnchorPositions
             optional: true
           stats:
             description: "stats returned for compaction algorithm"

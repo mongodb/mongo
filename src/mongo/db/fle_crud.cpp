@@ -194,14 +194,11 @@ FLEEdgeCountInfo convertTokensToEdgeCount(const QECountInfoReplyTokens& token) {
             token.getEDCDerivedFromDataTokenAndContentionFactorToken().value());
     }
 
-    boost::optional<uint64_t> cpos;
-    if (token.getCpos()) {
-        cpos = token.getCpos();
-    }
-
-    boost::optional<uint64_t> apos;
-    if (token.getApos()) {
-        apos = token.getApos();
+    boost::optional<uint64_t> cpos, apos;
+    auto& spos = token.getSearchedPositions();
+    if (spos) {
+        cpos = spos->getCpos();
+        apos = spos->getApos();
     }
 
     auto esc =
