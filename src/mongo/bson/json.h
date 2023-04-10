@@ -508,6 +508,20 @@ private:
     bool isBase64String(StringData) const;
 
     /**
+     * Assumes there is a parse error at the current offset, appends a snippet of text from around
+     * the bad input to 'errorBuffer'.
+     */
+    void addBadInputSnippet(std::ostringstream& errorBuffer) const;
+
+    /**
+     * Assumes there is a parse error at the current offset, appends the full input, then a newline,
+     * then another line with a "^" character just below the offset of the problem. For example:
+     * {$and: [{a: {$eq: 2}, {b: {$eq: 3}}]}
+     *                       ^
+     */
+    void indicateOffsetPosition(std::ostringstream& errorBuffer) const;
+
+    /**
      * @return FailedToParse status with the given message and some
      * additional context information
      */
@@ -520,8 +534,12 @@ private:
     StatusWith<Date_t> parseDate();
 
 public:
-    inline int offset() {
+    inline int offset() const {
         return (_input - _buf);
+    }
+
+    inline int length() const {
+        return (_input_end - _buf);
     }
 
 private:

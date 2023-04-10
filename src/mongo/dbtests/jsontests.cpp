@@ -1225,6 +1225,71 @@ TEST(FromJsonTest, MinMaxKey) {
     });
 }
 
+/**
+ * Asserts 'inputjson' fails to parse, and that each of the 'expectedContextChars' are shown in a
+ * little snippet of the area we encountered the first parsing error.
+ */
+void assertErrorWithContext(std::string inputjson,
+                            std::initializer_list<char> expectedContextChars) {
+    try {
+        fromjson(inputjson);
+        ASSERT(false) << "Expected to fail to parse";
+    } catch (const DBException& ex) {
+        const auto status = ex.toStatus();
+        const StringData reason = status.reason();
+        LOGV2_DEBUG(7583700, 3, "Indeeded failed to parse", "reason"_attr = status);
+        for (auto&& expectedChar : expectedContextChars) {
+            auto contextStart = reason.find(':', reason.find("Bad character"_sd));
+            ASSERT_NE(contextStart, std::string::npos);
+            auto contextEnd = reason.find("Full input:");
+            ASSERT_NE(contextStart, std::string::npos);
+            auto index = reason.find(expectedChar, contextStart);
+            ASSERT(index < contextEnd)
+                << "Expected to find '" << expectedChar << "' in error message's context snippet: "
+                << reason.substr(contextStart, (contextEnd - contextStart));
+        }
+        // We expect to see this in each error message - showing the character position of the parse
+        // error, like clang error messages:
+        // "{a: 4"
+        //       ^
+        const char positionIndicator = '^';
+        ASSERT_NE(reason.find(positionIndicator), std::string::npos)
+            << "Expected to find the indicator character in the message: " << reason;
+    }
+}
+
+TEST(FromJsonTest, GivesErrorContext) {
+
+    // Missing close brace after 4. This is the easy case, the error is solidly in the middle of the
+    // string:
+    assertErrorWithContext("{$and: [{a: 4, {b: 3}]}", {'4'});
+    // Error right at the beginning:
+    assertErrorWithContext("answer: 4}", {'a'});
+    // Error right at the end:
+    assertErrorWithContext("{answer: 4", {'4'});
+    // Error in the middle of a short string:
+    assertErrorWithContext("{a 4}", {'a', '4'});
+    // Error at the beginning of a short string:
+    assertErrorWithContext("a: 4}", {'a'});
+    // Error at the end of a short string:
+    assertErrorWithContext("{a: 4", {'4'});
+    // Very large input string
+    assertErrorWithContext(R"({
+        a: 4,
+        b: 10,
+        c: [
+            {d: 1, e: 1},
+            {d: 2, e: 2},
+            {d: 3, e: 3}
+        ],
+        f: 5,
+        g: 6
+        z: 7,
+    })",
+                           // Error is missing comma after 6, before 'z'
+                           {'6', 'z'});
+}
+
 }  // namespace FromJsonTests
 }  // namespace
 }  // namespace mongo
