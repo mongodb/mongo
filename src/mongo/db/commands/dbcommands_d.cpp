@@ -382,7 +382,7 @@ public:
                     try {
                         // RELOCKED
                         ctx.reset(new AutoGetCollectionForReadCommand(opCtx, nss));
-                    } catch (const StaleConfigException&) {
+                    } catch (const ExceptionFor<ErrorCodes::StaleConfig>&) {
                         LOGV2_DEBUG(
                             20453,
                             1,

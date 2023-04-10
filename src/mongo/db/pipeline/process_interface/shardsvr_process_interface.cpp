@@ -29,8 +29,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/pipeline/process_interface/shardsvr_process_interface.h"
 
 #include <fmt/format.h>
@@ -51,7 +49,7 @@
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/query/document_source_merge_cursors.h"
-#include "mongo/s/router.h"
+#include "mongo/s/router_role.h"
 #include "mongo/s/stale_shard_version_helpers.h"
 
 namespace mongo {
@@ -76,14 +74,11 @@ void ShardServerProcessInterface::checkRoutingInfoEpochOrThrow(
     catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
         nss, targetCollectionVersion, shardId);
 
-    const auto routingInfo =
-        uassertStatusOK(catalogCache->getCollectionRoutingInfo(expCtx->opCtx, nss));
+    const auto cm = uassertStatusOK(catalogCache->getCollectionRoutingInfo(expCtx->opCtx, nss));
+    auto foundVersion = cm.isSharded() ? cm.getVersion() : ChunkVersion::UNSHARDED();
 
-    const auto foundVersion =
-        routingInfo.isSharded() ? routingInfo.getVersion() : ChunkVersion::UNSHARDED();
-
-    uassert(StaleEpochInfo(nss),
-            str::stream() << "Could not act as router for " << nss.ns() << ", wanted "
+    uassert(StaleEpochInfo(nss, targetCollectionVersion, foundVersion),
+            str::stream() << "Could not act as router for " << nss.ns() << ", received "
                           << targetCollectionVersion.toString() << ", but found "
                           << foundVersion.toString(),
             foundVersion.isSameCollection(targetCollectionVersion));

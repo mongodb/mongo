@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/exec/shard_filterer.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/namespace_string.h"

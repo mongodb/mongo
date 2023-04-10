@@ -6,8 +6,9 @@
  * We restart a mongod to cause it to forget that a collection was sharded. When restarted, we
  * expect it to still have all the previous data.
  *
+ * // TODO (SERVER-74380): Remove requires_fcv_70 once SERVER-74380 has been backported to v6.0
  * @tags: [
- *  requires_persistence
+ *  requires_persistence,
  * ]
  *
  */
@@ -18,7 +19,7 @@ load("jstests/noPassthrough/libs/server_parameter_helpers.js");  // For setParam
 load("jstests/libs/discover_topology.js");                       // For findDataBearingNodes.
 
 // Restarts the primary shard and ensures that it believes both collections are unsharded.
-function restartPrimaryShard(rs, localColl, foreignColl) {
+function restartPrimaryShard(rs, ...expectedCollections) {
     // Returns true if the shard is aware that the collection is sharded.
     function hasRoutingInfoForNs(shardConn, coll) {
         const res = shardConn.adminCommand({getShardVersion: coll, fullMetadata: true});
@@ -28,8 +29,11 @@ function restartPrimaryShard(rs, localColl, foreignColl) {
 
     rs.restart(0);
     rs.awaitSecondaryNodes();
-    assert(!hasRoutingInfoForNs(rs.getPrimary(), localColl.getFullName()));
-    assert(!hasRoutingInfoForNs(rs.getPrimary(), foreignColl.getFullName()));
+
+    expectedCollections.forEach(function(coll) {
+        assert(!hasRoutingInfoForNs(rs.getPrimary(), coll.getFullName()),
+               'Shard role not cleared for ' + coll.getFullName());
+    });
 }
 
 // Disable checking for index consistency to ensure that the config server doesn't trigger a
@@ -169,6 +173,56 @@ assert.eq(mongos0LocalColl.aggregate(pipeline).toArray(), expectedResults);
 // Verify $lookup results through the stale mongos.
 restartPrimaryShard(st.rs0, mongos0LocalColl, mongos0ForeignColl);
 assert.eq(mongos1LocalColl.aggregate(pipeline).toArray(), expectedResults);
+
+//
+// Test two-level $lookup with a stale shard handles the shard role recovery case.
+//
+jsTest.log("Running two-level $lookup with a shard that needs recovery");
+
+assert.commandWorked(st.s0.adminCommand({enableSharding: 'D'}));
+st.ensurePrimaryShard('D', st.shard0.shardName);
+
+const D = st.s0.getDB('D');
+
+assert.commandWorked(D.A.insert({Key: 1, Value: 1}));
+assert.commandWorked(D.B.insert({Key: 1, Value: 1}));
+assert.commandWorked(D.C.insert({Key: 1, Value: 1}));
+assert.commandWorked(D.D.insert({Key: 1, Value: 1}));
+
+const aggPipeline = [{
+    $lookup: {
+        from: 'B',
+        localField: 'Key',
+        foreignField: 'Value',
+        as: 'Joined',
+        pipeline: [
+            {
+                $lookup: {
+                    from: 'C',
+                    localField: 'Key',
+                    foreignField: 'Value',
+                    as: 'Joined',
+                }
+            },
+            {
+                $lookup: {
+                    from: 'D',
+                    localField: 'Key',
+                    foreignField: 'Value',
+                    as: 'Joined',
+                }
+            },
+        ],
+    }
+}];
+
+const resultBefore = D.A.aggregate(aggPipeline).toArray();
+
+// Restarting the shard primary in order for the shard role's cache to be cleared
+restartPrimaryShard(st.rs0, D.A, D.B, D.C, D.D);
+
+const resultAfter = D.A.aggregate(aggPipeline).toArray();
+assert.eq(resultBefore, resultAfter, "Before and after results do not match");
 
 st.stop();
 })();

@@ -30,7 +30,7 @@
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/s/query/sharded_agg_test_fixture.h"
-#include "mongo/s/router.h"
+#include "mongo/s/router_role.h"
 
 namespace mongo {
 namespace {

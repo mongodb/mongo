@@ -29,8 +29,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/resharding/resharding_collection_cloner.h"
 
 #include <utility>
@@ -276,7 +274,7 @@ bool ReshardingCollectionCloner::doOneBatch(OperationContext* opCtx, Pipeline& p
 
     // ReshardingOpObserver depends on the collection metadata being known when processing writes to
     // the temporary resharding collection. We attach shard version IGNORED to the insert operations
-    // and retry once on a StaleConfig exception to allow the collection metadata information to be
+    // and retry once on a StaleConfig error to allow the collection metadata information to be
     // recovered.
     ScopedSetShardRole scopedSetShardRole(opCtx,
                                           _outputNss,

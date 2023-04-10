@@ -29,11 +29,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/resharding/resharding_oplog_batch_applier.h"
-
-#include <memory>
 
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
@@ -83,8 +79,8 @@ SemiFuture<void> ReshardingOplogBatchApplier::applyBatch(
                            // ReshardingOpObserver depends on the collection metadata being known
                            // when processing writes to the temporary resharding collection. We
                            // attach shard version IGNORED to the write operations and retry once
-                           // on a StaleConfig exception to allow the collection metadata
-                           // information to be recovered.
+                           // on a StaleConfig error to allow the collection metadata information to
+                           // be recovered.
                            ScopedSetShardRole scopedSetShardRole(
                                opCtx.get(),
                                _crudApplication.getOutputNss(),

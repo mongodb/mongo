@@ -39,6 +39,18 @@ MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(StaleConfigInfo);
 MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(StaleEpochInfo);
 MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(StaleDbRoutingVersion);
 
+boost::optional<ChunkVersion> extractOptionalChunkVersion(const BSONObj& obj, StringData field) {
+    try {
+        return ChunkVersion::fromBSONLegacyOrNewerFormat(obj, field);
+    } catch (const DBException& ex) {
+        auto status = ex.toStatus();
+        if (status != ErrorCodes::NoSuchKey) {
+            throw;
+        }
+    }
+    return boost::none;
+}
+
 }  // namespace
 
 void StaleConfigInfo::serialize(BSONObjBuilder* bob) const {
@@ -56,31 +68,35 @@ std::shared_ptr<const ErrorExtraInfo> StaleConfigInfo::parse(const BSONObj& obj)
     const auto shardId = obj["shardId"].String();
     uassert(ErrorCodes::NoSuchKey, "The shardId field is missing", !shardId.empty());
 
-    auto extractOptionalChunkVersion = [&obj](StringData field) -> boost::optional<ChunkVersion> {
-        try {
-            return ChunkVersion::fromBSONLegacyOrNewerFormat(obj, field);
-        } catch (const DBException& ex) {
-            auto status = ex.toStatus();
-            if (status != ErrorCodes::NoSuchKey) {
-                throw;
-            }
-        }
-        return boost::none;
-    };
-
     return std::make_shared<StaleConfigInfo>(
         NamespaceString(obj["ns"].String()),
         ChunkVersion::fromBSONLegacyOrNewerFormat(obj, "vReceived"),
-        extractOptionalChunkVersion("vWanted"),
+        extractOptionalChunkVersion(obj, "vWanted"),
         ShardId(shardId));
 }
 
 void StaleEpochInfo::serialize(BSONObjBuilder* bob) const {
     bob->append("ns", _nss.ns());
+    if (_received)
+        _received->appendLegacyWithField(bob, "vReceived");
+    if (_wanted)
+        _wanted->appendLegacyWithField(bob, "vWanted");
 }
 
 std::shared_ptr<const ErrorExtraInfo> StaleEpochInfo::parse(const BSONObj& obj) {
-    return std::make_shared<StaleEpochInfo>(NamespaceString(obj["ns"].String()));
+    auto received = extractOptionalChunkVersion(obj, "vReceived");
+    auto wanted = extractOptionalChunkVersion(obj, "vWanted");
+
+    uassert(6375907,
+            str::stream() << "Either both vReceived (" << received << ")"
+                          << " and vWanted (" << wanted << ") must be present or none",
+            received.is_initialized() == wanted.is_initialized());
+
+    if (received)
+        return std::make_shared<StaleEpochInfo>(
+            NamespaceString(obj["ns"].String()), *received, *wanted);
+    else
+        return std::make_shared<StaleEpochInfo>(NamespaceString(obj["ns"].String()));
 }
 
 void StaleDbRoutingVersion::serialize(BSONObjBuilder* bob) const {

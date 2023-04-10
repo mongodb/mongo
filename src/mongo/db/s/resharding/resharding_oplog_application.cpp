@@ -29,8 +29,6 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kResharding
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/resharding/resharding_oplog_application.h"
 
 #include "mongo/db/concurrency/exception_util.h"
@@ -79,8 +77,8 @@ void runWithTransaction(OperationContext* opCtx,
 
     // ReshardingOpObserver depends on the collection metadata being known when processing writes to
     // the temporary resharding collection. We attach shard version IGNORED to the write operations
-    // and leave it to ReshardingOplogBatchApplier::applyBatch() to retry on a StaleConfig exception
-    // to allow the collection metadata information to be recovered.
+    // and leave it to ReshardingOplogBatchApplier::applyBatch() to retry on a StaleConfig error to
+    // allow the collection metadata information to be recovered.
     ScopedSetShardRole scopedSetShardRole(asr.opCtx(),
                                           nss,
                                           ChunkVersion::IGNORED() /* shardVersion */,

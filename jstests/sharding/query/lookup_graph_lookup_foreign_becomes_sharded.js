@@ -225,14 +225,14 @@ for (let testCase of testCases) {
 const newStaleConfigErrorCount = assert.commandWorked(primaryDB.runCommand({serverStatus: 1}))
                                      .shardingStatistics.countStaleConfigErrors;
 
-// ... and a single StaleConfig exception for the foreign namespace. Note that the 'ns' field of the
+// ... and a single StaleConfig error for the foreign namespace. Note that the 'ns' field of the
 // profiler entry is the source collection in both cases, because the $lookup's parent aggregation
 // produces the profiler entry, and it is always running on the source collection.
 // TODO SERVER-60018: When the feature flag is removed, remove the check and ensure the results are
 // expected.
 if (!isShardedLookupEnabled) {
-    // Both in the classic lookup and the SBE lookup, 'StaleConfig' error happens. In the classic
-    // lookup, profiling can properly report the 'StaleConfig' of the foreign collection.
+    // Both in the classic lookup and the SBE lookup, StaleConfig error happens. In the classic
+    // lookup, profiling can properly report the StaleConfig of the foreign collection.
     //
     // On the other hand, in the SBE lookup, profiling fails to report the error because the
     // profiling level is not set up properly according to the configured profiling level in case of
