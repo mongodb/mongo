@@ -132,10 +132,27 @@ Status getOnlySupportedOnTimeseriesError(StringData fieldName) {
             str::stream() << "option only supported on a time-series collection: " << fieldName};
 }
 
-StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(OperationContext* opCtx,
-                                                                         const NamespaceString& nss,
-                                                                         const CollectionPtr& coll,
-                                                                         const CollMod& cmd) {
+boost::optional<ShardKeyPattern> getShardKeyPattern(OperationContext* opCtx,
+                                                    const NamespaceStringOrUUID& nsOrUUID,
+                                                    const CollMod& cmd) {
+    try {
+        const NamespaceString nss =
+            CollectionCatalog::get(opCtx)->resolveNamespaceStringOrUUID(opCtx, nsOrUUID);
+        if (auto catalogClient = Grid::get(opCtx)->catalogClient()) {
+            return ShardKeyPattern(catalogClient->getCollection(opCtx, nss).getKeyPattern());
+        }
+    } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+        // The collection is unsharded or doesn't exist.
+    }
+    return boost::none;
+}
+
+StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const CollectionPtr& coll,
+    const CollMod& cmd,
+    const boost::optional<ShardKeyPattern>& shardKeyPattern) {
 
     bool isView = !coll;
     bool isTimeseries = coll && coll->getTimeseriesOptions() != boost::none;
@@ -357,20 +374,12 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(Operati
             // If the index is not hidden and we are trying to hide it, check if it is possible
             // to drop the shard key index, so it could be possible to hide it.
             if (!cmrIndex->idx->hidden() && *cmdIndex.getHidden()) {
-                if (auto catalogClient = Grid::get(opCtx)->catalogClient()) {
-                    try {
-                        auto shardedColl = catalogClient->getCollection(opCtx, nss);
-
-                        if (isLastNonHiddenShardKeyIndex(opCtx,
-                                                         coll,
-                                                         cmrIndex->idx->indexName(),
-                                                         shardedColl.getKeyPattern().toBSON())) {
-                            return {ErrorCodes::InvalidOptions,
-                                    "Can't hide the only compatible index for this collection's "
-                                    "shard key"};
-                        }
-                    } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-                        // The collection is unsharded or doesn't exist.
+                if (shardKeyPattern) {
+                    if (isLastNonHiddenShardKeyIndex(
+                            opCtx, coll, cmrIndex->idx->indexName(), shardKeyPattern->toBSON())) {
+                        return {ErrorCodes::InvalidOptions,
+                                "Can't hide the only compatible index for this collection's "
+                                "shard key"};
                     }
                 }
             }
@@ -391,21 +400,15 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(Operati
                 indexForOplog->setPrepareUnique(boost::none);
             } else {
                 // Checks if the index key pattern conflicts with the shard key pattern.
-                if (auto catalogClient = Grid::get(opCtx)->catalogClient()) {
-                    try {
-                        auto shardedColl = catalogClient->getCollection(opCtx, nss);
-                        const ShardKeyPattern shardKeyPattern(shardedColl.getKeyPattern());
-                        if (!shardKeyPattern.isIndexUniquenessCompatible(
-                                cmrIndex->idx->keyPattern())) {
-                            return {ErrorCodes::InvalidOptions,
-                                    fmt::format(
-                                        "cannot set 'prepareUnique' for index {} with shard key "
+                if (shardKeyPattern) {
+                    if (!shardKeyPattern->isIndexUniquenessCompatible(
+                            cmrIndex->idx->keyPattern())) {
+                        return {
+                            ErrorCodes::InvalidOptions,
+                            fmt::format("cannot set 'prepareUnique' for index {} with shard key "
                                         "pattern {}",
                                         cmrIndex->idx->keyPattern().toString(),
-                                        shardKeyPattern.toBSON().toString())};
-                        }
-                    } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-                        // The collection is unsharded or doesn't exist.
+                                        shardKeyPattern->toBSON().toString())};
                     }
                 }
                 cmrIndex->indexPrepareUnique = cmdIndex.getPrepareUnique();
@@ -637,6 +640,7 @@ void _setClusteredExpireAfterSeconds(
 Status _processCollModDryRunMode(OperationContext* opCtx,
                                  const NamespaceStringOrUUID& nsOrUUID,
                                  const CollMod& cmd,
+                                 const boost::optional<ShardKeyPattern>& shardKeyPattern,
                                  BSONObjBuilder* result,
                                  boost::optional<repl::OplogApplication::Mode> mode) {
     // Ensure that the unique option is specified before validation the rest of the request
@@ -661,7 +665,8 @@ Status _processCollModDryRunMode(OperationContext* opCtx,
     const auto& collection = coll.getCollection();
 
     // Validate collMod request and look up index descriptor for checking duplicates.
-    auto statusW = parseCollModRequest(opCtx, nss, collection, cmd);
+    auto statusW = parseCollModRequest(opCtx, nss, collection, cmd, shardKeyPattern);
+
     if (!statusW.isOK()) {
         return statusW.getStatus();
     }
@@ -683,9 +688,11 @@ Status _processCollModDryRunMode(OperationContext* opCtx,
     return Status::OK();
 }
 
-StatusWith<const IndexDescriptor*> _setUpCollModIndexUnique(OperationContext* opCtx,
-                                                            const NamespaceStringOrUUID& nsOrUUID,
-                                                            const CollMod& cmd) {
+StatusWith<const IndexDescriptor*> _setUpCollModIndexUnique(
+    OperationContext* opCtx,
+    const NamespaceStringOrUUID& nsOrUUID,
+    const CollMod& cmd,
+    const boost::optional<ShardKeyPattern>& shardKeyPattern) {
     // Acquires the MODE_IX lock with the intent to write to the collection later in the collMod
     // operation while still allowing concurrent writes. This also makes sure the operation is
     // killed during a stepdown.
@@ -700,7 +707,8 @@ StatusWith<const IndexDescriptor*> _setUpCollModIndexUnique(OperationContext* op
     }
 
     // Scan index for duplicates without exclusive access.
-    auto statusW = parseCollModRequest(opCtx, nss, collection, cmd);
+    auto statusW = parseCollModRequest(opCtx, nss, collection, cmd, shardKeyPattern);
+
     if (!statusW.isOK()) {
         return statusW.getStatus();
     }
@@ -727,8 +735,17 @@ Status _collModInternal(OperationContext* opCtx,
                         const CollMod& cmd,
                         BSONObjBuilder* result,
                         boost::optional<repl::OplogApplication::Mode> mode) {
+    // Get key pattern from the config server if we may need it for parsing checks if on the primary
+    // before taking any locks. The ddl lock will prevent the key pattern from changing.
+    boost::optional<ShardKeyPattern> shardKeyPattern;
+    bool mayNeedKeyPatternForParsing =
+        cmd.getIndex() && (cmd.getIndex()->getHidden() || cmd.getIndex()->getPrepareUnique());
+    if (!mode && mayNeedKeyPatternForParsing) {
+        shardKeyPattern = getShardKeyPattern(opCtx, nsOrUUID, cmd);
+    }
+
     if (cmd.getDryRun().value_or(false)) {
-        return _processCollModDryRunMode(opCtx, nsOrUUID, cmd, result, mode);
+        return _processCollModDryRunMode(opCtx, nsOrUUID, cmd, shardKeyPattern, result, mode);
     }
 
     // Before acquiring exclusive access to the collection for unique index conversion, we will
@@ -737,7 +754,7 @@ Status _collModInternal(OperationContext* opCtx,
     // the catalog.
     const IndexDescriptor* idx_first = nullptr;
     if (cmd.getIndex() && cmd.getIndex()->getUnique().value_or(false) && !mode) {
-        auto statusW = _setUpCollModIndexUnique(opCtx, nsOrUUID, cmd);
+        auto statusW = _setUpCollModIndexUnique(opCtx, nsOrUUID, cmd, shardKeyPattern);
         if (!statusW.isOK()) {
             return statusW.getStatus();
         }
@@ -807,7 +824,7 @@ Status _collModInternal(OperationContext* opCtx,
                       str::stream() << "Not primary while setting collection options on " << nss);
     }
 
-    auto statusW = parseCollModRequest(opCtx, nss, coll.getCollection(), cmd);
+    auto statusW = parseCollModRequest(opCtx, nss, coll.getCollection(), cmd, shardKeyPattern);
     if (!statusW.isOK()) {
         return statusW.getStatus();
     }
