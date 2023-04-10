@@ -164,27 +164,39 @@ function testQuerySampling(dbName, collNameNotSampled, collNameSampled) {
         }
         return true;
     });
-    jsTest.log("Finished waiting for sampled queries: " + tojsononeline({sampleSize}));
+    jsTest.log("Finished waiting for sampled queries: " +
+               tojsononeline({actualSampleSize: sampleSize}));
 
     // Verify that the difference between the actual and expected number of samples is within the
     // expected threshold.
     const expectedTotalCount = durationSecs * sampleRate;
-    const expectedFindCount = (actualNumFindPerSec / actualTotalQueriesPerSec) * expectedTotalCount;
-    const expectedDeleteCount =
-        (actualNumDeletePerSec / actualTotalQueriesPerSec) * expectedTotalCount;
-    const expectedAggCount = (actualNumAggPerSec / actualTotalQueriesPerSec) * expectedTotalCount;
+    const expectedFindPercentage =
+        AnalyzeShardKeyUtil.calculatePercentage(actualNumFindPerSec, actualTotalQueriesPerSec);
+    const expectedDeletePercentage =
+        AnalyzeShardKeyUtil.calculatePercentage(actualNumDeletePerSec, actualTotalQueriesPerSec);
+    const expectedAggPercentage =
+        AnalyzeShardKeyUtil.calculatePercentage(actualNumAggPerSec, actualTotalQueriesPerSec);
     jsTest.log("Checking that the number of sampled queries is within the threshold: " +
-               tojsononeline(
-                   {expectedTotalCount, expectedFindCount, expectedDeleteCount, expectedAggCount}));
+               tojsononeline({
+                   expectedSampleSize: {
+                       total: expectedTotalCount,
+                       find: expectedFindPercentage * expectedTotalCount / 100,
+                       delete: expectedDeletePercentage * expectedTotalCount / 100,
+                       aggregate: expectedAggPercentage * expectedTotalCount / 100
+                   }
+               }));
 
     AnalyzeShardKeyUtil.assertDiffPercentage(
         sampleSize.total, expectedTotalCount, 10 /* maxDiffPercentage */);
-    AnalyzeShardKeyUtil.assertDiffPercentage(
-        sampleSize.find, expectedFindCount, 15 /* maxDiffPercentage */);
-    AnalyzeShardKeyUtil.assertDiffPercentage(
-        sampleSize.delete, expectedDeleteCount, 15 /* maxDiffPercentage */);
-    AnalyzeShardKeyUtil.assertDiffPercentage(
-        sampleSize.aggregate, expectedAggCount, 15 /* maxDiffPercentage */);
+    const actualFindPercentage =
+        AnalyzeShardKeyUtil.calculatePercentage(sampleSize.find, sampleSize.total);
+    assertDiffWindow(actualFindPercentage, expectedFindPercentage, 5 /* maxDiff */);
+    const actualDeletePercentage =
+        AnalyzeShardKeyUtil.calculatePercentage(sampleSize.delete, sampleSize.total);
+    assertDiffWindow(actualDeletePercentage, expectedDeletePercentage, 5 /* maxDiff */);
+    const actualAggPercentage =
+        AnalyzeShardKeyUtil.calculatePercentage(sampleSize.aggregate, sampleSize.total);
+    assertDiffWindow(actualAggPercentage, expectedAggPercentage, 5 /* maxDiff */);
 
     QuerySamplingUtil.clearSampledQueryCollectionOnAllShards(st);
 }

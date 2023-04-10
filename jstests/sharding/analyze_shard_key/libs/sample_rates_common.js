@@ -72,3 +72,7 @@ function runNestedAggregateCmdsOnRepeat(
     };
     return QuerySamplingUtil.runCmdsOnRepeat(db, makeCmdObjFunc, targetNumPerSec, durationSecs);
 }
+
+function assertDiffWindow(actual, expected, maxDiff) {
+    return assert.lte(Math.abs(actual - expected), maxDiff, {actual, expected});
+}
