@@ -453,7 +453,7 @@ std::vector<BSONObj> ShardingCatalogClientImpl::runCatalogAggregation(
     aggRequest.setWriteConcern(WriteConcernOptions());
 
     const auto readPref = [&]() -> ReadPreferenceSetting {
-        // (Ignore FCV check): This is in mongos so we expect to ignore FCV.
+        // (Ignore FCV check): Config servers always use ShardRemote for themselves in 7.0.
         if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
             !gFeatureFlagCatalogShard.isEnabledAndIgnoreFCVUnsafe()) {
             // When the feature flag is on, the config server may read from any node in its replica
@@ -871,7 +871,11 @@ std::vector<NamespaceString> ShardingCatalogClientImpl::getAllNssThatHaveZonesFo
 
     // Run the aggregation
     const auto readConcern = [&]() -> repl::ReadConcernArgs {
-        if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
+        // (Ignore FCV check): Config servers always use ShardRemote for themselves in 7.0.
+        if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
+            !gFeatureFlagCatalogShard.isEnabledAndIgnoreFCVUnsafe()) {
+            // When the feature flag is on, the config server may read from a secondary which may
+            // need to wait for replication, so we should use afterClusterTime.
             return {repl::ReadConcernLevel::kMajorityReadConcern};
         } else {
             const auto time = VectorClock::get(opCtx)->getTime();
@@ -1508,7 +1512,7 @@ HistoricalPlacement ShardingCatalogClientImpl::getHistoricalPlacement(
 
     // Run the aggregation
     const auto readConcern = [&]() -> repl::ReadConcernArgs {
-        // (Ignore FCV check): This is in mongos so we expect to ignore FCV.
+        // (Ignore FCV check): Config servers always use ShardRemote for themselves in 7.0.
         if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
             !gFeatureFlagCatalogShard.isEnabledAndIgnoreFCVUnsafe()) {
             // When the feature flag is on, the config server may read from a secondary which may

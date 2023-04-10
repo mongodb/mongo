@@ -917,6 +917,7 @@ void runTransactionOnShardingCatalog(OperationContext* opCtx,
     // Instantiate the right custom TXN client to ensure that the queries to the config DB will be
     // routed to the CSRS.
     auto customTxnClient = [&]() -> std::unique_ptr<txn_api::TransactionClient> {
+        // TODO SERVER-75919: Investigate if this should always use the remote client.
         if (serverGlobalParams.clusterRole.exclusivelyHasShardRole()) {
             return std::make_unique<txn_api::details::SEPTransactionClient>(
                 newOpCtx.get(),

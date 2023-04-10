@@ -165,11 +165,10 @@ Status ShardingLogging::_log(OperationContext* opCtx,
     changeLog.setServer(serverName);
     if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
         changeLog.setShard("config");
-    } else {
-        auto shardingState = ShardingState::get(opCtx);
-        if (shardingState->enabled()) {
-            changeLog.setShard(shardingState->shardId().toString());
-        }
+    }
+    auto shardingState = ShardingState::get(opCtx);
+    if (shardingState->enabled()) {
+        changeLog.setShard(shardingState->shardId().toString());
     }
     changeLog.setClientAddr(opCtx->getClient()->clientAddress(true));
     changeLog.setTime(now);
