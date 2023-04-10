@@ -98,7 +98,7 @@ var EncryptedClient = class {
      * Get the namespaces of the state collections that are associated with the given
      * encrypted data collection namespace.
      * @param {string} name Name of the encrypted data collection
-     * @returns Object with fields "esc", "ecc", and "ecoc" whose values
+     * @returns Object with fields "esc" and "ecoc" whose values
      *          are the corresponding namespace strings.
      */
     getStateCollectionNamespaces(collName) {
@@ -199,11 +199,10 @@ var EncryptedClient = class {
      * @param {object} collection Collection object for EDC
      * @param {number} edc Number of documents in EDC
      * @param {number} esc Number of documents in ESC
-     * @param {number} ecc Number of documents in ECC
      * @param {number} ecoc Number of documents in ECOC
      */
     assertEncryptedCollectionCountsByObject(
-        sessionDB, name, expectedEdc, expectedEsc, expectedEcc, expectedEcoc, tenantId) {
+        sessionDB, name, expectedEdc, expectedEsc, expectedEcoc, tenantId) {
         let listCollCmdObj = {listCollections: 1, nameOnly: false, filter: {name: name}};
         if (tenantId) {
             Object.extend(listCollCmdObj, {"$tenant": tenantId});
@@ -255,13 +254,11 @@ var EncryptedClient = class {
      * @param {string} name Name of EDC
      * @param {number} edc Number of documents in EDC
      * @param {number} esc Number of documents in ESC
-     * @param {number} ecc Number of documents in ECC
      * @param {number} ecoc Number of documents in ECOC
      */
-    assertEncryptedCollectionCounts(
-        name, expectedEdc, expectedEsc, expectedEcc, expectedEcoc, tenantId) {
+    assertEncryptedCollectionCounts(name, expectedEdc, expectedEsc, expectedEcoc, tenantId) {
         this.assertEncryptedCollectionCountsByObject(
-            this._db, name, expectedEdc, expectedEsc, expectedEcc, expectedEcoc, tenantId);
+            this._db, name, expectedEdc, expectedEsc, expectedEcoc, tenantId);
     }
 
     /**
