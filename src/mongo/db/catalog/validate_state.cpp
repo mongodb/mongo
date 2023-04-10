@@ -51,6 +51,7 @@
 namespace mongo {
 
 MONGO_FAIL_POINT_DEFINE(hangDuringYieldingLocksForValidation);
+MONGO_FAIL_POINT_DEFINE(hangDuringHoldingLocksForValidation);
 
 namespace CollectionValidation {
 
@@ -76,6 +77,11 @@ ValidateState::ValidateState(OperationContext* opCtx,
     } else {
         _databaseLock.emplace(opCtx, _nss.dbName(), MODE_IX);
         _collectionLock.emplace(opCtx, _nss, MODE_X);
+    }
+
+    if (MONGO_unlikely(hangDuringHoldingLocksForValidation.shouldFail())) {
+        LOGV2(7490901, "Hanging on fail point 'hangDuringHoldingLocksForValidation'");
+        hangDuringHoldingLocksForValidation.pauseWhileSet();
     }
 
     _database = _databaseLock->getDb() ? _databaseLock->getDb() : nullptr;

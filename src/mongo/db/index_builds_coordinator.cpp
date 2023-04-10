@@ -79,6 +79,7 @@ namespace mongo {
 MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildFirstDrain);
 MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildSecondDrain);
 MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildDumpsInsertsFromBulk);
+MONGO_FAIL_POINT_DEFINE(hangAfterIndexBuildDumpsInsertsFromBulkLock);
 MONGO_FAIL_POINT_DEFINE(hangAfterInitializingIndexBuild);
 MONGO_FAIL_POINT_DEFINE(hangBeforeCompletingAbort);
 MONGO_FAIL_POINT_DEFINE(failIndexBuildOnCommit);
@@ -2979,6 +2980,12 @@ void IndexBuildsCoordinator::_scanCollectionAndInsertSortedKeysIntoIndex(
 
         uassertStatusOK(_indexBuildsManager.startBuildingIndex(
             opCtx, collection, replState->buildUUID, resumeAfterRecordId));
+
+        if (MONGO_unlikely(hangAfterIndexBuildDumpsInsertsFromBulkLock.shouldFail())) {
+            LOGV2(7490902,
+                  "Hanging while locking on failpoint hangAfterIndexBuildDumpsInsertsFromBulkLock");
+            hangAfterIndexBuildDumpsInsertsFromBulkLock.pauseWhileSet();
+        }
     }
 
     if (MONGO_unlikely(hangAfterIndexBuildDumpsInsertsFromBulk.shouldFail())) {

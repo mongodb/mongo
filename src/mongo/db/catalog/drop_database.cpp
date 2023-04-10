@@ -58,6 +58,7 @@ namespace mongo {
 MONGO_FAIL_POINT_DEFINE(dropDatabaseHangAfterAllCollectionsDrop);
 MONGO_FAIL_POINT_DEFINE(dropDatabaseHangBeforeInMemoryDrop);
 MONGO_FAIL_POINT_DEFINE(dropDatabaseHangAfterWaitingForIndexBuilds);
+MONGO_FAIL_POINT_DEFINE(dropDatabaseHangHoldingLock);
 MONGO_FAIL_POINT_DEFINE(throwWriteConflictExceptionDuringDropDatabase);
 
 namespace {
@@ -174,6 +175,13 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
             return Status(ErrorCodes::DatabaseDropPending,
                           str::stream() << "The database is currently being dropped. Database: "
                                         << dbName.toStringForErrorMsg());
+        }
+
+        if (MONGO_unlikely(dropDatabaseHangHoldingLock.shouldFail())) {
+            LOGV2(7490900,
+                  "dropDatabase - fail point dropDatabaseHangHoldingLock "
+                  "enabled");
+            dropDatabaseHangHoldingLock.pauseWhileSet();
         }
 
         LOGV2(
