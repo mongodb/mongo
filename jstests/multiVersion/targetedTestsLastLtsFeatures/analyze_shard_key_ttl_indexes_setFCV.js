@@ -1,8 +1,6 @@
-/*
+/**
  * Tests that version upgrade creates the TTL indexes for config.sampledQueries and
  * config.sampledQueriesDiff.
- *
- * @tags: [requires_fcv_70]
  */
 
 (function() {

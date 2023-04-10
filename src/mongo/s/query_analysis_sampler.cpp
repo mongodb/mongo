@@ -277,6 +277,10 @@ void QueryAnalysisSampler::_refreshConfigurations(OperationContext* opCtx) {
         return;
     }
 
+    if (!isFeatureFlagEnabled()) {
+        return;
+    }
+
     boost::optional<double> lastAvgCount;
     {
         stdx::lock_guard<Latch> lk(_mutex);

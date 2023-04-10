@@ -486,6 +486,10 @@ void QueryAnalysisWriter::_flush(OperationContext* opCtx, Buffer* buffer) {
 }
 
 bool QueryAnalysisWriter::Buffer::add(BSONObj doc) {
+    if (!isFeatureFlagEnabled()) {
+        return false;
+    }
+
     if (doc.objsize() > kMaxBSONObjSizePerInsertBatch) {
         LOGV2_DEBUG(7372301,
                     4,
