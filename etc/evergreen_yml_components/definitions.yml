@@ -7552,7 +7552,7 @@ tasks:
       aws_secret: ${aws_secret}
       permissions: public-read
       build_variants: ["enterprise-windows", "windows"]
-      local_file: src/mongodb-${push_name}-${push_arch}-${suffix}-signed.msi.sha1
+      local_file: src/mongodb-${push_name}-${push_arch}-${suffix}.msi.sha1
       bucket: build-push-testing
       content_type: text/plain
       remote_file: ${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}-signed.msi.sha1
@@ -7610,7 +7610,7 @@ tasks:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
       build_variants: ["enterprise-windows", "windows"]
-      local_file: src/mongodb-${push_name}-${push_arch}-${suffix}-signed.msi.sha256
+      local_file: src/mongodb-${push_name}-${push_arch}-${suffix}.msi.sha256
       bucket: build-push-testing
       permissions: public-read
       remote_file: ${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}-signed.msi.sha256
@@ -7669,7 +7669,7 @@ tasks:
       aws_key: ${aws_key}
       aws_secret: ${aws_secret}
       build_variants: ["enterprise-windows", "windows"]
-      local_file: src/mongodb-${push_name}-${push_arch}-${suffix}-signed.msi.md5
+      local_file: src/mongodb-${push_name}-${push_arch}-${suffix}.msi.md5
       bucket: build-push-testing
       permissions: public-read
       content_type: text/plain
