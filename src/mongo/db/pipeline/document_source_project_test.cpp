@@ -338,6 +338,46 @@ TEST_F(ProjectStageTest, CannotAddNestedDocumentExceedingDepthLimit) {
                        ErrorCodes::Overflow);
 }
 
+/**
+ * A default redaction strategy that generates easy to check results for testing purposes.
+ */
+std::string redactIdentifiersForTest(StringData s) {
+    return str::stream() << "HASH<" << s << ">";
+}
+
+TEST_F(ProjectStageTest, ShapifyAndRedact) {
+    auto inclusionProject = DocumentSourceProject::create(
+        fromjson("{a: true, x: '$b', y: {$and: ['$c','$d']}, z: {$meta: 'textScore'}}"),
+        getExpCtx(),
+        "$project"_sd);
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({ 
+            "$project": { 
+                "HASH<_id>": true, 
+                "HASH<a>": true, 
+                "HASH<x>": "$HASH<b>", 
+                "HASH<y>": { 
+                    "$and": [ "$HASH<c>", "$HASH<d>" ] 
+                    }, 
+                "HASH<z>": { "$meta": "textScore" } 
+            } 
+        })",
+        redact(*inclusionProject));
+
+    auto exclusionProject = DocumentSourceProject::create(
+        fromjson("{a: false, 'b.c': false}"), getExpCtx(), "$project"_sd);
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({ 
+            "$project": { 
+                "HASH<a>": false, 
+                "HASH<b>": { 
+                    "HASH<c>": false }, 
+                "HASH<_id>": true } 
+        })",
+        redact(*exclusionProject));
+}
+
 TEST_F(UnsetTest, AcceptsValidUnsetSpecWithArray) {
     auto spec = BSON("$unset" << BSON_ARRAY("a"
                                             << "b"

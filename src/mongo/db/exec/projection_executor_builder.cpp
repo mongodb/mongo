@@ -261,7 +261,7 @@ auto buildProjectionExecutor(boost::intrusive_ptr<ExpressionContext> expCtx,
                              const ProjectionPolicies policies,
                              const BuilderParamsBitSet params) {
     ProjectionExecutorVisitorContext<Executor> context{
-        {std::make_unique<Executor>(expCtx, policies, params[kAllowFastPath]), expCtx}};
+        {std::make_unique<Executor>(expCtx, policies, params[kAllowFastPath], *root), expCtx}};
     ProjectionExecutorVisitor<Executor> executorVisitor{&context};
     projection_ast::PathTrackingWalker walker{&context, {&executorVisitor}, {}};
     tree_walker::walk<true, projection_ast::ASTNode>(root, &walker);

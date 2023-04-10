@@ -272,7 +272,7 @@ StatusWith<BSONObj> makeTelemetryKey(const FindCommandRequest& findCommand,
                                             ProjectionPolicies::findProjectionPolicies());
 
         bob.append(FindCommandRequest::kProjectionFieldName,
-                   projection_ast::serialize(projection, opts));
+                   projection_ast::serialize(*projection.root(), opts));
     }
 
     // Assume the hint is correct and contains field names. It is possible that this hint
