@@ -47,6 +47,7 @@
 #include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/s/analyze_shard_key_server_parameters_gen.h"
 #include "mongo/s/analyze_shard_key_util.h"
+#include "mongo/s/query_analysis_client.h"
 #include "mongo/s/query_analysis_sample_tracker.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -441,39 +442,41 @@ void QueryAnalysisWriter::_flush(OperationContext* opCtx, Buffer* buffer) {
         LOGV2_DEBUG(
             6876102, 2, "Persisting samples", logAttrs(nss), "numDocs"_attr = docsToInsert.size());
 
-        insertDocuments(opCtx, nss, docsToInsert, [&](const BSONObj& resObj) {
-            BatchedCommandResponse res;
-            std::string errMsg;
+        QueryAnalysisClient::get(opCtx).insert(
+            opCtx, nss, docsToInsert, [&](const BSONObj& resObj) {
+                BatchedCommandResponse res;
+                std::string errMsg;
 
-            if (!res.parseBSON(resObj, &errMsg)) {
-                uasserted(ErrorCodes::FailedToParse, errMsg);
-            }
-
-            if (res.isErrDetailsSet() && res.sizeErrDetails() > 0) {
-                boost::optional<write_ops::WriteError> firstWriteErr;
-
-                for (const auto& err : res.getErrDetails()) {
-                    if (err.getStatus() == ErrorCodes::DuplicateKey ||
-                        err.getStatus() == ErrorCodes::BadValue) {
-                        LOGV2(7075402,
-                              "Ignoring insert error",
-                              "error"_attr = redact(err.getStatus()));
-                        invalid.insert(baseIndex - err.getIndex());
-                        continue;
-                    }
-                    if (!firstWriteErr) {
-                        // Save the error for later. Go through the rest of the errors to see if
-                        // there are any invalid documents so they can be discarded from the buffer.
-                        firstWriteErr.emplace(err);
-                    }
+                if (!res.parseBSON(resObj, &errMsg)) {
+                    uasserted(ErrorCodes::FailedToParse, errMsg);
                 }
-                if (firstWriteErr) {
-                    uassertStatusOK(firstWriteErr->getStatus());
+
+                if (res.isErrDetailsSet() && res.sizeErrDetails() > 0) {
+                    boost::optional<write_ops::WriteError> firstWriteErr;
+
+                    for (const auto& err : res.getErrDetails()) {
+                        if (err.getStatus() == ErrorCodes::DuplicateKey ||
+                            err.getStatus() == ErrorCodes::BadValue) {
+                            LOGV2(7075402,
+                                  "Ignoring insert error",
+                                  "error"_attr = redact(err.getStatus()));
+                            invalid.insert(baseIndex - err.getIndex());
+                            continue;
+                        }
+                        if (!firstWriteErr) {
+                            // Save the error for later. Go through the rest of the errors to see if
+                            // there are any invalid documents so they can be discarded from the
+                            // buffer.
+                            firstWriteErr.emplace(err);
+                        }
+                    }
+                    if (firstWriteErr) {
+                        uassertStatusOK(firstWriteErr->getStatus());
+                    }
+                } else {
+                    uassertStatusOK(res.toStatus());
                 }
-            } else {
-                uassertStatusOK(res.toStatus());
-            }
-        });
+            });
 
         tmpBuffer.truncate(lastIndex, objSize);
         baseIndex -= lastIndex;

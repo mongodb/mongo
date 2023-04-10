@@ -36,6 +36,7 @@
 #include "mongo/s/analyze_shard_key_util.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/is_mongos.h"
+#include "mongo/s/query_analysis_client.h"
 #include "mongo/s/query_analysis_sample_tracker.h"
 #include "mongo/s/refresh_query_analyzer_configuration_cmd_gen.h"
 #include "mongo/util/net/socket_utils.h"
@@ -86,7 +87,7 @@ StatusWith<std::vector<CollectionQueryAnalyzerConfiguration>> executeRefreshComm
         }
         resObj = swResponse.getValue().response;
     } else if (serverGlobalParams.clusterRole.has(ClusterRole::None)) {
-        resObj = executeCommandOnPrimary(
+        resObj = QueryAnalysisClient::get(opCtx).executeCommandOnPrimary(
             opCtx, DatabaseName::kAdmin, cmd.toBSON({}), [&](const BSONObj& resObj) {});
         if (auto status = getStatusFromCommandResult(resObj); !status.isOK()) {
             return status;

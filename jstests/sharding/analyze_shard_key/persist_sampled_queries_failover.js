@@ -25,7 +25,7 @@ function testStepDown(rst) {
     const collectionUuid = QuerySamplingUtil.getCollectionUuid(primaryDB, collName);
 
     const localWriteFp = configureFailPoint(
-        primary, "analyzeShardKeyUtilHangBeforeExecutingCommandLocally", {}, {times: 1});
+        primary, "queryAnalysisClientHangExecutingCommandLocally", {}, {times: 1});
 
     const originalCmdObj =
         {findAndModify: collName, query: {a: 0}, update: {a: 1}, sampleId: UUID()};
@@ -75,7 +75,7 @@ function testStepUp(rst) {
     }];
 
     const remoteWriteFp =
-        configureFailPoint(secondary, "analyzeShardKeyUtilHangBeforeExecutingCommandRemotely");
+        configureFailPoint(secondary, "queryAnalysisClientHangExecutingCommandRemotely");
     assert.commandWorked(secondaryTestDB.getCollection(collName).runCommand(originalCmdObj));
 
     remoteWriteFp.wait();

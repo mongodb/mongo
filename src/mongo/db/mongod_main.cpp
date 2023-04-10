@@ -205,6 +205,7 @@
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/query_analysis_client.h"
 #include "mongo/s/query_analysis_sampler.h"
 #include "mongo/scripting/dbdirectclient_factory.h"
 #include "mongo/scripting/engine.h"
@@ -1214,9 +1215,19 @@ void setUpReplication(ServiceContext* serviceContext) {
         SecureRandom().nextInt64());
     // Only create a ReplicaSetNodeExecutor if sharding is disabled and replication is enabled.
     // Note that sharding sets up its own executors for scheduling work to remote nodes.
-    if (serverGlobalParams.clusterRole.has(ClusterRole::None) && replCoord->isReplEnabled())
+    if (serverGlobalParams.clusterRole.has(ClusterRole::None) && replCoord->isReplEnabled()) {
         ReplicaSetNodeProcessInterface::setReplicaSetNodeExecutor(
             serviceContext, makeReplicaSetNodeExecutor(serviceContext));
+
+        // The check below ignores the FCV because FCV is not initialized until after the replica
+        // set is initiated.
+        if (analyze_shard_key::isFeatureFlagEnabled(true /* ignoreFCV */)) {
+            analyze_shard_key::QueryAnalysisClient::get(serviceContext)
+                .setTaskExecutor(
+                    serviceContext,
+                    ReplicaSetNodeProcessInterface::getReplicaSetNodeExecutor(serviceContext));
+        }
+    }
 
     repl::ReplicationCoordinator::set(serviceContext, std::move(replCoord));
 

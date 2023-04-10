@@ -53,6 +53,7 @@
 #include "mongo/s/analyze_shard_key_server_parameters_gen.h"
 #include "mongo/s/analyze_shard_key_util.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/query_analysis_client.h"
 #include "mongo/s/service_entry_point_mongos.h"
 #include "mongo/s/stale_shard_version_helpers.h"
 
@@ -701,10 +702,11 @@ std::pair<BSONObj, Timestamp> generateSplitPoints(OperationContext* opCtx,
 
         if (splitPoint.objsize() + objSize >= BSONObjMaxUserSize ||
             splitPointsToInsert.size() >= write_ops::kMaxWriteBatchSize) {
-            insertDocuments(opCtx,
-                            NamespaceString::kConfigAnalyzeShardKeySplitPointsNamespace,
-                            splitPointsToInsert,
-                            uassertWriteStatusFn);
+            QueryAnalysisClient::get(opCtx).insert(
+                opCtx,
+                NamespaceString::kConfigAnalyzeShardKeySplitPointsNamespace,
+                splitPointsToInsert,
+                uassertWriteStatusFn);
             splitPointsToInsert.clear();
         }
         AnalyzeShardKeySplitPointDocument doc;
@@ -716,10 +718,11 @@ std::pair<BSONObj, Timestamp> generateSplitPoints(OperationContext* opCtx,
         objSize += splitPoint.objsize();
     }
     if (!splitPointsToInsert.empty()) {
-        insertDocuments(opCtx,
-                        NamespaceString::kConfigAnalyzeShardKeySplitPointsNamespace,
-                        splitPointsToInsert,
-                        uassertWriteStatusFn);
+        QueryAnalysisClient::get(opCtx).insert(
+            opCtx,
+            NamespaceString::kConfigAnalyzeShardKeySplitPointsNamespace,
+            splitPointsToInsert,
+            uassertWriteStatusFn);
         splitPointsToInsert.clear();
     }
 

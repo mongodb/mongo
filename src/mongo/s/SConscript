@@ -130,6 +130,7 @@ env.Library(
         '$BUILD_DIR/mongo/executor/async_multicaster',
         '$BUILD_DIR/mongo/executor/connection_pool_executor',
         '$BUILD_DIR/mongo/executor/thread_pool_task_executor',
+        'analyze_shard_key_util',
         'catalog/sharding_catalog_client_impl',
         'coreshard',
         'sharding_task_executor',
@@ -190,6 +191,7 @@ env.Library(
     target='analyze_shard_key_util',
     source=[
         'analyze_shard_key_util.cpp',
+        'query_analysis_client.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/dbdirectclient',

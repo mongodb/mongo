@@ -29,95 +29,13 @@
 
 #include "mongo/s/analyze_shard_key_util.h"
 
-#include "mongo/client/connpool.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
 namespace analyze_shard_key {
-
-namespace {
-
-MONGO_FAIL_POINT_DEFINE(analyzeShardKeyUtilHangBeforeExecutingCommandLocally);
-MONGO_FAIL_POINT_DEFINE(analyzeShardKeyUtilHangBeforeExecutingCommandRemotely);
-
-const int kMaxRetriesOnRetryableErrors = 5;
-
-// The write concern for writes done as part of query sampling or analyzing a shard key.
-const Seconds writeConcernTimeout{60};
-const WriteConcernOptions kMajorityWriteConcern{
-    WriteConcernOptions::kMajority, WriteConcernOptions::SyncMode::UNSET, writeConcernTimeout};
-
-/*
- * Returns true if this mongod can accept writes to the database 'dbName'. Unless it is the "local"
- * database, this will only return true if this mongod is a primary (or a standalone).
- */
-bool canAcceptWrites(OperationContext* opCtx, const DatabaseName& dbName) {
-    ShouldNotConflictWithSecondaryBatchApplicationBlock noPBWMBlock(opCtx->lockState());
-    repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
-    return mongo::repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(
-        opCtx, dbName.toString());
-}
-
-/*
- * Runs the command 'cmdObj' against the database 'dbName' locally. Then asserts that command
- * status using the 'uassertCmdStatusFn' callback. Returns the command response.
- */
-BSONObj executeCommandOnPrimaryLocal(
-    OperationContext* opCtx,
-    const DatabaseName& dbName,
-    const BSONObj& cmdObj,
-    const std::function<void(const BSONObj&)>& uassertCmdStatusFn) {
-    DBDirectClient client(opCtx);
-    BSONObj resObj;
-    client.runCommand(dbName, cmdObj, resObj);
-    uassertCmdStatusFn(resObj);
-    return resObj;
-}
-
-/*
- * Runs the command 'cmdObj' against the database 'dbName' on the (remote) primary. Then asserts
- * that the command status using the given 'uassertCmdStatusFn' callback. Throws a
- * PrimarySteppedDown error if no primary is found. Returns the command response.
- */
-BSONObj executeCommandOnPrimaryRemote(
-    OperationContext* opCtx,
-    const DatabaseName& dbName,
-    const BSONObj& cmdObj,
-    const std::function<void(const BSONObj&)>& uassertCmdStatusFn) {
-    auto hostAndPort = repl::ReplicationCoordinator::get(opCtx)->getCurrentPrimaryHostAndPort();
-
-    if (hostAndPort.empty()) {
-        uasserted(ErrorCodes::PrimarySteppedDown, "No primary exists currently");
-    }
-
-    auto conn = std::make_unique<ScopedDbConnection>(hostAndPort.toString());
-
-    if (auth::isInternalAuthSet()) {
-        uassertStatusOK(conn->get()->authenticateInternalUser());
-    }
-
-    DBClientBase* client = conn->get();
-    ScopeGuard guard([&] { conn->done(); });
-    try {
-        BSONObj resObj;
-        client->runCommand(dbName, cmdObj, resObj);
-        uassertCmdStatusFn(resObj);
-        return resObj;
-    } catch (...) {
-        guard.dismiss();
-        conn->kill();
-        throw;
-    }
-}
-
-}  // namespace
 
 Status validateNamespace(const NamespaceString& nss) {
     if (nss.isOnInternalDb()) {
@@ -181,56 +99,6 @@ double calculatePercentage(double part, double whole) {
     invariant(whole > 0);
     invariant(part <= whole);
     return round(part / whole * 100, kMaxNumDecimalPlaces);
-}
-
-BSONObj executeCommandOnPrimary(OperationContext* opCtx,
-                                const DatabaseName& dbName,
-                                const BSONObj& cmdObj,
-                                const std::function<void(const BSONObj&)>& uassertCmdStatusFn) {
-    auto numRetries = 0;
-
-    while (true) {
-        try {
-            if (canAcceptWrites(opCtx, dbName)) {
-                // There is a window here where this mongod may step down after check above. In this
-                // case, a NotWritablePrimary error would be thrown. However, this is preferable to
-                // running the command while holding locks.
-                analyzeShardKeyUtilHangBeforeExecutingCommandLocally.pauseWhileSet(opCtx);
-                return executeCommandOnPrimaryLocal(opCtx, dbName, cmdObj, uassertCmdStatusFn);
-            }
-
-            analyzeShardKeyUtilHangBeforeExecutingCommandRemotely.pauseWhileSet(opCtx);
-            return executeCommandOnPrimaryRemote(opCtx, dbName, cmdObj, uassertCmdStatusFn);
-        } catch (DBException& ex) {
-            if (ErrorCodes::isRetriableError(ex) && numRetries < kMaxRetriesOnRetryableErrors) {
-                numRetries++;
-                continue;
-            }
-            throw;
-        }
-    }
-
-    return {};
-}
-
-void insertDocuments(OperationContext* opCtx,
-                     const NamespaceString& nss,
-                     const std::vector<BSONObj>& docs,
-                     const std::function<void(const BSONObj&)>& uassertCmdStatusFn) {
-    write_ops::InsertCommandRequest insertCmd(nss);
-    insertCmd.setDocuments(docs);
-    insertCmd.setWriteCommandRequestBase([&] {
-        write_ops::WriteCommandRequestBase wcb;
-        wcb.setOrdered(false);
-        wcb.setBypassDocumentValidation(false);
-        return wcb;
-    }());
-    auto insertCmdObj = insertCmd.toBSON(
-        {BSON(WriteConcernOptions::kWriteConcernField << kMajorityWriteConcern.toBSON())});
-
-    executeCommandOnPrimary(opCtx, nss.db(), std::move(insertCmdObj), [&](const BSONObj& resObj) {
-        uassertCmdStatusFn(resObj);
-    });
 }
 
 }  // namespace analyze_shard_key

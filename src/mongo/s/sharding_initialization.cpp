@@ -67,6 +67,7 @@
 #include "mongo/s/initialize_tenant_to_shard_cache.h"
 #include "mongo/s/mongod_and_mongos_server_parameters_gen.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
+#include "mongo/s/query_analysis_client.h"
 #include "mongo/s/query_analysis_sampler.h"
 #include "mongo/s/sharding_task_executor.h"
 #include "mongo/s/sharding_task_executor_pool_controller.h"
@@ -212,6 +213,12 @@ Status initializeGlobalShardingState(
     LogicalTimeValidator::set(service, std::make_unique<LogicalTimeValidator>(keyManager));
     initializeTenantToShardCache(service);
 
+    // The checks below ignore the FCV because FCV is not initialized until after the replica set
+    // is initiated.
+    if (analyze_shard_key::isFeatureFlagEnabled(true /* ignoreFCV */)) {
+        analyze_shard_key::QueryAnalysisClient::get(opCtx).setTaskExecutor(
+            service, Grid::get(service)->getExecutorPool()->getFixedExecutor());
+    }
     if (analyze_shard_key::supportsSamplingQueries(service, true /* ignoreFCV */)) {
         analyze_shard_key::QueryAnalysisSampler::get(service).onStartup();
     }
