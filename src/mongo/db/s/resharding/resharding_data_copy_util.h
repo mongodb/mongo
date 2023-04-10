@@ -161,8 +161,8 @@ void updateSessionRecord(OperationContext* opCtx,
 /**
  * Calls and returns the value from the supplied lambda function.
  *
- * If a StaleConfig exception is thrown during its execution, then this function will attempt to
- * refresh the collection and invoke the supplied lambda function a second time.
+ * If a StaleConfig error is thrown during its execution, then this function will attempt to refresh
+ * the collection and invoke the supplied lambda function a second time.
  */
 template <typename Callable>
 auto withOneStaleConfigRetry(OperationContext* opCtx, Callable&& callable) {

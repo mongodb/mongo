@@ -62,8 +62,7 @@
 #include "mongo/s/query/document_source_merge_cursors.h"
 #include "mongo/s/query/establish_cursors.h"
 #include "mongo/s/query_analysis_sampler_util.h"
-#include "mongo/s/router.h"
-#include "mongo/s/stale_exception.h"
+#include "mongo/s/router_role.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/overloaded_visitor.h"
@@ -1216,7 +1215,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
                                             ReadPreferenceSetting::get(opCtx),
                                             targetEveryShardServer);
 
-        } catch (const StaleConfigException& e) {
+        } catch (const ExceptionFor<ErrorCodes::StaleConfig>& e) {
             // Check to see if the command failed because of a stale shard version or something
             // else.
             auto staleInfo = e.extraInfo<StaleConfigInfo>();

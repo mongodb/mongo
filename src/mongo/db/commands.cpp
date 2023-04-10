@@ -149,7 +149,7 @@ BSONObj CommandHelpers::runCommandDirectly(OperationContext* opCtx, const OpMsgR
         invocation->run(opCtx, &replyBuilder);
         auto body = replyBuilder.getBodyBuilder();
         CommandHelpers::extractOrAppendOk(body);
-    } catch (const StaleConfigException&) {
+    } catch (const ExceptionFor<ErrorCodes::StaleConfig>&) {
         // These exceptions are intended to be handled at a higher level.
         throw;
     } catch (const DBException& ex) {

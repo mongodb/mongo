@@ -69,10 +69,31 @@ std::shared_ptr<const ErrorExtraInfo> StaleConfigInfo::parse(const BSONObj& obj)
 
 void StaleEpochInfo::serialize(BSONObjBuilder* bob) const {
     bob->append("ns", _nss.ns());
+    if (_received)
+        _received->serialize("vReceived", bob);
+    if (_wanted)
+        _wanted->serialize("vWanted", bob);
 }
 
 std::shared_ptr<const ErrorExtraInfo> StaleEpochInfo::parse(const BSONObj& obj) {
-    return std::make_shared<StaleEpochInfo>(NamespaceString(obj["ns"].String()));
+    boost::optional<ShardVersion> received;
+    if (auto vReceivedElem = obj["vReceived"])
+        received = ShardVersion::parse(vReceivedElem);
+
+    boost::optional<ShardVersion> wanted;
+    if (auto vWantedElem = obj["vWanted"])
+        wanted = ShardVersion::parse(vWantedElem);
+
+    uassert(6375907,
+            str::stream() << "Either both vReceived (" << received << ")"
+                          << " and vWanted (" << wanted << ") must be present or none",
+            received.is_initialized() == wanted.is_initialized());
+
+    if (received)
+        return std::make_shared<StaleEpochInfo>(
+            NamespaceString(obj["ns"].String()), *received, *wanted);
+    else
+        return std::make_shared<StaleEpochInfo>(NamespaceString(obj["ns"].String()));
 }
 
 void StaleDbRoutingVersion::serialize(BSONObjBuilder* bob) const {

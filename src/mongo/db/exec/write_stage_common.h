@@ -93,7 +93,7 @@ public:
     }
 
     /**
-     * Checks if the 'doc' is NOT writable and additionally handles the StaleConfig exception. This
+     * Checks if the 'doc' is NOT writable and additionally handles the StaleConfig error. This
      * method should be called in a context of single update / delete.
      *
      * Returns a pair of [optional immediate StageState return code, bool fromMigrate].

@@ -24,8 +24,8 @@ st.ensurePrimaryShard(coll.getDB().getName(), st.shard1.shardName);
 coll.createIndex({a: 1});
 
 // Shard the collection on {a: 1} and move one chunk to another shard. Updates need to be across
-// two shards to trigger an error, otherwise they are versioned and will succeed after raising
-// a StaleConfigException.
+// two shards to trigger an error, otherwise they are versioned and will succeed after raising a
+// StaleConfig error.
 st.shardColl(coll, {a: 1}, {a: 0}, {a: 1}, coll.getDB(), true);
 
 // Let the stale mongos see the collection state

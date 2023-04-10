@@ -39,8 +39,8 @@ namespace mongo {
 class OperationContext;
 
 /**
- * Must be invoked whenever code, which is executing on a shard encounters a StaleConfig exception
- * and should be passed the placement version from the 'version received' in the exception. If the
+ * Must be invoked whenever code, which is executing on a shard encounters a StaleConfig error and
+ * should be passed the placement version from the 'version received' in the exception. If the
  * shard's current placement version is behind 'chunkVersionReceived', causes the shard's filtering
  * metadata to be refreshed from the config server, otherwise does nothing and immediately returns.
  * If there are other threads currently performing refresh, blocks so that only one of them hits the

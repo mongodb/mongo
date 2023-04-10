@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/pipeline/process_interface/shardsvr_process_interface.h"
 
 #include <fmt/format.h>
@@ -50,12 +47,11 @@
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/query/document_source_merge_cursors.h"
-#include "mongo/s/router.h"
+#include "mongo/s/router_role.h"
 #include "mongo/s/shard_version_factory.h"
 #include "mongo/s/stale_shard_version_helpers.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
-
 
 namespace mongo {
 
@@ -74,31 +70,42 @@ void ShardServerProcessInterface::checkRoutingInfoEpochOrThrow(
     auto const shardId = ShardingState::get(expCtx->opCtx)->shardId();
     auto* catalogCache = Grid::get(expCtx->opCtx)->catalogCache();
 
-    // Since we are only checking the epoch, don't advance the time in store of the index cache
-    auto currentShardingIndexCatalogInfo =
-        uassertStatusOK(catalogCache->getCollectionRoutingInfo(expCtx->opCtx, nss)).sii;
+    auto receivedVersion = [&] {
+        // Since we are only checking the epoch, don't advance the time in store of the index cache
+        auto currentShardingIndexCatalogInfo =
+            uassertStatusOK(catalogCache->getCollectionRoutingInfo(expCtx->opCtx, nss)).sii;
 
-    // Mark the cache entry routingInfo for the 'nss' and 'shardId' if the entry is staler than
-    // 'targetCollectionPlacementVersion'.
-    const ShardVersion ignoreIndexVersion = ShardVersionFactory::make(
-        targetCollectionPlacementVersion,
-        currentShardingIndexCatalogInfo
-            ? boost::make_optional(currentShardingIndexCatalogInfo->getCollectionIndexes())
-            : boost::none);
-    catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
-        nss, ignoreIndexVersion, shardId);
+        // Mark the cache entry routingInfo for the 'nss' and 'shardId' if the entry is staler than
+        // 'targetCollectionPlacementVersion'.
+        auto ignoreIndexVersion = ShardVersionFactory::make(
+            targetCollectionPlacementVersion,
+            currentShardingIndexCatalogInfo
+                ? boost::make_optional(currentShardingIndexCatalogInfo->getCollectionIndexes())
+                : boost::none);
 
-    const auto routingInfo =
-        uassertStatusOK(catalogCache->getCollectionRoutingInfo(expCtx->opCtx, nss)).cm;
+        catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
+            nss, ignoreIndexVersion, shardId);
+        return ignoreIndexVersion;
+    }();
 
-    const auto foundVersion =
-        routingInfo.isSharded() ? routingInfo.getVersion() : ChunkVersion::UNSHARDED();
+    auto wantedVersion = [&] {
+        auto routingInfo =
+            uassertStatusOK(catalogCache->getCollectionRoutingInfo(expCtx->opCtx, nss));
+        auto foundVersion =
+            routingInfo.cm.isSharded() ? routingInfo.cm.getVersion() : ChunkVersion::UNSHARDED();
 
-    uassert(StaleEpochInfo(nss),
-            str::stream() << "Could not act as router for " << nss.ns() << ", wanted "
-                          << targetCollectionPlacementVersion.toString() << ", but found "
-                          << foundVersion.toString(),
-            foundVersion.isSameCollection(targetCollectionPlacementVersion));
+        auto ignoreIndexVersion = ShardVersionFactory::make(
+            foundVersion,
+            routingInfo.sii ? boost::make_optional(routingInfo.sii->getCollectionIndexes())
+                            : boost::none);
+        return ignoreIndexVersion;
+    }();
+
+    uassert(StaleEpochInfo(nss, receivedVersion, wantedVersion),
+            str::stream() << "Could not act as router for " << nss.ns() << ", received "
+                          << receivedVersion.toString() << ", but found "
+                          << wantedVersion.toString(),
+            wantedVersion.placementVersion().isSameCollection(receivedVersion.placementVersion()));
 }
 
 boost::optional<Document> ShardServerProcessInterface::lookupSingleDocument(

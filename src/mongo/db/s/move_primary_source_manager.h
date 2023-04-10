@@ -72,10 +72,10 @@ public:
      * Instantiates a new movePrimary source manager. Must be called with the distributed lock
      * acquired in advance (not asserted).
      *
-     * May throw any exception. Known exceptions (TODO) are:
+     * May throw any exception. Known exceptions are:
      *  - InvalidOptions if the operation context is missing database version
-     *  - StaleConfigException if the expected database version does not match what we find it
-     *      to be after acquiring the distributed lock.
+     *  - StaleConfig if the expected database version does not match what we find it to be after
+     *    acquiring the distributed lock
      */
     MovePrimarySourceManager(OperationContext* opCtx,
                              ShardMovePrimary requestArgs,

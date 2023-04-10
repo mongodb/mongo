@@ -50,7 +50,7 @@ Status getStatusFromCommandResult(const BSONObj& result) {
     BSONElement codeElement = result["code"];
     BSONElement errmsgElement = result["errmsg"];
 
-    // StaleConfigException doesn't pass "ok" in legacy servers
+    // StaleConfig doesn't pass "ok" in legacy servers
     BSONElement dollarErrElement = result["$err"];
 
     if (okElement.eoo() && dollarErrElement.eoo()) {

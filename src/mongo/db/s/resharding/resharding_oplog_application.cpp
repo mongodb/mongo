@@ -81,7 +81,7 @@ void runWithTransaction(OperationContext* opCtx,
     // ReshardingOpObserver depends on the collection metadata being known when processing writes to
     // the temporary resharding collection. We attach placement version IGNORED to the write
     // operations and leave it to ReshardingOplogBatchApplier::applyBatch() to retry on a
-    // StaleConfig exception to allow the collection metadata information to be recovered.
+    // StaleConfig error to allow the collection metadata information to be recovered.
     ScopedSetShardRole scopedSetShardRole(
         asr.opCtx(),
         nss,

@@ -86,7 +86,8 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContextWithDefaultsForTarg
  * Dispatches all the specified requests in parallel and waits until all complete, returning a
  * vector of the same size and positions as that of 'requests'.
  *
- * Throws StaleConfigException if any remote returns a stale shardVersion error.
+ * Throws StaleConfig if any of the remotes returns that error, regardless of what the other errors
+ * are.
  */
 std::vector<AsyncRequestsSender::Response> gatherResponses(
     OperationContext* opCtx,
@@ -170,7 +171,7 @@ std::vector<AsyncRequestsSender::Response> scatterGatherUnversionedTargetAllShar
  * the collection has query sampling enabled and the rate-limited sampler successfully generates a
  * sample id for it.
  *
- * Does not retry on StaleConfigException.
+ * Does not retry on StaleConfig errors.
  */
 [[nodiscard]] std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRoutingTable(
     OperationContext* opCtx,
@@ -191,7 +192,7 @@ std::vector<AsyncRequestsSender::Response> scatterGatherUnversionedTargetAllShar
  *
  * Callers can specify shards to skip, even if these shards would be otherwise targeted.
  *
- * Allows StaleConfigException errors to append to the response list.
+ * Allows StaleConfig errors to append to the response list.
  */
 std::vector<AsyncRequestsSender::Response>
 scatterGatherVersionedTargetByRoutingTableNoThrowOnStaleShardVersionErrors(
@@ -222,7 +223,7 @@ AsyncRequestsSender::Response executeCommandAgainstDatabasePrimary(
  * Utility for dispatching commands against the shard with the MinKey chunk for the namespace and
  * attaching the appropriate shard version.
  *
- * Does not retry on StaleConfigException.
+ * Does not retry on StaleConfig errors.
  */
 AsyncRequestsSender::Response executeCommandAgainstShardWithMinKeyChunk(
     OperationContext* opCtx,

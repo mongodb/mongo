@@ -280,8 +280,8 @@ bool ReshardingCollectionCloner::doOneBatch(OperationContext* opCtx, Pipeline& p
     int bytesInserted = resharding::data_copy::withOneStaleConfigRetry(opCtx, [&] {
         // ReshardingOpObserver depends on the collection metadata being known when processing
         // writes to the temporary resharding collection. We attach shard version IGNORED to the
-        // insert operations and retry once on a StaleConfig exception to allow the collection
-        // metadata information to be recovered.
+        // insert operations and retry once on a StaleConfig error to allow the collection metadata
+        // information to be recovered.
         auto [_, sii] = uassertStatusOK(
             Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, _outputNss));
         ScopedSetShardRole scopedSetShardRole(

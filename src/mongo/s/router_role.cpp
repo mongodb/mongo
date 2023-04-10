@@ -28,14 +28,13 @@
  */
 
 
-#include "mongo/s/router.h"
+#include "mongo/s/router_role.h"
 
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/stale_exception.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
-
 
 namespace mongo {
 namespace sharding {
@@ -71,31 +70,33 @@ CachedDatabaseInfo DBPrimaryRouter::_getRoutingInfo(OperationContext* opCtx) con
 }
 
 void DBPrimaryRouter::_onException(RouteContext* context, Status s) {
+    auto catalogCache = Grid::get(_service)->catalogCache();
+
+    if (s == ErrorCodes::StaleDbVersion) {
+        auto si = s.extraInfo<StaleDbRoutingVersion>();
+        tassert(6375900, "StaleDbVersion must have extraInfo", si);
+        tassert(6375901,
+                str::stream() << "StaleDbVersion on unexpected database. Expected " << _db
+                              << ", received " << si->getDb(),
+                si->getDb() == _db);
+
+        catalogCache->onStaleDatabaseVersion(si->getDb(), si->getVersionWanted());
+    } else {
+        uassertStatusOK(s);
+    }
+
     if (++context->numAttempts > kMaxNumStaleVersionRetries) {
         uassertStatusOKWithContext(
             s,
             str::stream() << "Exceeded maximum number of " << kMaxNumStaleVersionRetries
                           << " retries attempting \'" << context->comment << "\'");
     } else {
-        LOGV2_DEBUG(637590,
+        LOGV2_DEBUG(6375902,
                     3,
-                    "Retrying {description}. Got error: {status}",
-                    "description"_attr = context->comment,
+                    "Retrying database primary routing operation",
+                    "attempt"_attr = context->numAttempts,
+                    "comment"_attr = context->comment,
                     "status"_attr = s);
-    }
-
-    auto catalogCache = Grid::get(_service)->catalogCache();
-
-    if (s == ErrorCodes::StaleDbVersion) {
-        auto si = s.extraInfo<StaleDbRoutingVersion>();
-        invariant(si);
-        invariant(si->getDb() == _db,
-                  str::stream() << "StaleDbVersion on unexpected database. Expected " << _db
-                                << ", received " << si->getDb());
-
-        catalogCache->onStaleDatabaseVersion(si->getDb(), si->getVersionWanted());
-    } else {
-        uassertStatusOK(s);
     }
 }
 
@@ -122,41 +123,38 @@ CollectionRoutingInfo CollectionRouter::_getRoutingInfo(OperationContext* opCtx)
 }
 
 void CollectionRouter::_onException(RouteContext* context, Status s) {
+    auto catalogCache = Grid::get(_service)->catalogCache();
+
+    if (s == ErrorCodes::StaleDbVersion) {
+        auto si = s.extraInfo<StaleDbRoutingVersion>();
+        tassert(6375903, "StaleDbVersion must have extraInfo", si);
+        catalogCache->onStaleDatabaseVersion(si->getDb(), si->getVersionWanted());
+    } else if (s == ErrorCodes::StaleConfig) {
+        auto si = s.extraInfo<StaleConfigInfo>();
+        tassert(6375904, "StaleConfig must have extraInfo", si);
+        catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
+            si->getNss(), si->getVersionWanted(), si->getShardId());
+    } else if (s == ErrorCodes::StaleEpoch) {
+        auto si = s.extraInfo<StaleEpochInfo>();
+        tassert(6375905, "StaleEpoch must have extra info", si);
+        catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
+            si->getNss(), si->getVersionWanted(), ShardId());
+    } else {
+        uassertStatusOK(s);
+    }
+
     if (++context->numAttempts > kMaxNumStaleVersionRetries) {
         uassertStatusOKWithContext(
             s,
             str::stream() << "Exceeded maximum number of " << kMaxNumStaleVersionRetries
                           << " retries attempting \'" << context->comment << "\'");
     } else {
-        LOGV2_DEBUG(637591,
+        LOGV2_DEBUG(6375906,
                     3,
-                    "Retrying {description}. Got error: {status}",
-                    "description"_attr = context->comment,
+                    "Retrying collection routing operation",
+                    "attempt"_attr = context->numAttempts,
+                    "comment"_attr = context->comment,
                     "status"_attr = s);
-    }
-
-    auto catalogCache = Grid::get(_service)->catalogCache();
-
-    if (s.isA<ErrorCategory::StaleShardVersionError>()) {
-        if (auto si = s.extraInfo<StaleConfigInfo>()) {
-            invariant(si->getNss() == _nss,
-                      str::stream() << "StaleConfig on unexpected namespace. Expected " << _nss
-                                    << ", received " << si->getNss());
-            catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
-                _nss, si->getVersionWanted(), si->getShardId());
-        } else {
-            catalogCache->invalidateCollectionEntry_LINEARIZABLE(_nss);
-        }
-    } else if (s == ErrorCodes::StaleDbVersion) {
-        auto si = s.extraInfo<StaleDbRoutingVersion>();
-        invariant(si);
-        invariant(si->getDb() == _nss.db(),
-                  str::stream() << "StaleDbVersion on unexpected database. Expected " << _nss.db()
-                                << ", received " << si->getDb());
-
-        catalogCache->onStaleDatabaseVersion(si->getDb(), si->getVersionWanted());
-    } else {
-        uassertStatusOK(s);
     }
 }
 
