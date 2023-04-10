@@ -311,6 +311,7 @@ ALLOWED_STABLE_FIELDS_LIST: List[str] = [
     'listIndexes-reply-clustered',
     'create-param-encryptedFields',
     'create-param-bucketRoundingSeconds',
+    'create-param-temp',
     'endSessions-param-txnNumber',
     'endSessions-param-txnUUID',
     'refreshSessions-param-txnNumber',

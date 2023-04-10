@@ -198,10 +198,13 @@ commands:
                 optional: true
                 stability: stable
             temp:
-                description: "DEPRECATED"
+                description: "Internal field that can be used in the $out aggregation code."
                 type: safeBool
                 optional: true
-                stability: unstable
+                # The temp field is an internal field and not documented publicly, but we need to set
+                # the 'stability' to 'stable' because it can be used in the $out aggregation stage.
+                # This is due to the limitation of the API strict checking infrastructure.
+                stability: stable
             flags:
                 description: "DEPRECATED"
                 type: safeInt64
