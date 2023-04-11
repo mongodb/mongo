@@ -21,12 +21,10 @@ if(IMPORT_GCP_SDK_NONE)
     message(FATAL_ERROR "Cannot enable the GCP extension without specifying an IMPORT_GCP_SDK method (package, external).")
 endif()
 
-# FIXME-WT-10555: Importing GCP via package needs to be implemented.
 if(IMPORT_GCP_SDK_PACKAGE)
-    message(FATAL_ERROR "Importing the GCP via package is not currently implemented.")
-endif()
-
-if(IMPORT_GCP_SDK_EXTERNAL)
+    find_package(google_cloud_cpp_storage CONFIG REQUIRED)
+    find_package(google_cloud_cpp_common CONFIG REQUIRED)
+elseif(IMPORT_GCP_SDK_EXTERNAL)
     # Download and install the GCP CPP SDK into the build directory.
     ExternalProject_Add(
         gcp-sdk
@@ -55,19 +53,20 @@ if(IMPORT_GCP_SDK_EXTERNAL)
     # Set the path variables to be used for the GCP targets.
     set(gcp_storage_lib_location ${INSTALL_DIR}/${CMAKE_INSTALL_LIBDIR}/libgoogle_cloud_cpp_storage${CMAKE_SHARED_LIBRARY_SUFFIX})
     set(gcp_common_lib_location ${INSTALL_DIR}/${CMAKE_INSTALL_LIBDIR}/libgoogle_cloud_cpp_common${CMAKE_SHARED_LIBRARY_SUFFIX})
+
+    set(gcp_sdk_include_location ${INSTALL_DIR}/${CMAKE_INSTALL_INCLUDEDIR})
+
+    add_library(google-cloud-cpp::storage SHARED IMPORTED)
+    add_library(google-cloud-cpp::common SHARED IMPORTED)
+
+    # Declare the include directories under INTERFACE_INCLUDE_DIRECTORIES during the configuration phase.
+    set_target_properties(google-cloud-cpp::storage PROPERTIES
+        IMPORTED_LOCATION ${gcp_storage_lib_location}
+        INTERFACE_INCLUDE_DIRECTORIES ${gcp_sdk_include_location}
+    )
+    set_target_properties(google-cloud-cpp::common PROPERTIES
+        IMPORTED_LOCATION ${gcp_common_lib_location}
+        INTERFACE_INCLUDE_DIRECTORIES ${gcp_sdk_include_location}
+    )
+    add_dependencies(google-cloud-cpp::storage gcp-sdk)
 endif()
-
-set(gcp_sdk_include_location ${INSTALL_DIR}/${CMAKE_INSTALL_INCLUDEDIR})
-
-add_library(gcp_storage_lib SHARED IMPORTED)
-add_library(gcp_common_lib SHARED IMPORTED)
-
-# Declare the include directories under INTERFACE_INCLUDE_DIRECTORIES during the configuration phase.
-set_target_properties(gcp_storage_lib PROPERTIES
-    IMPORTED_LOCATION ${gcp_storage_lib_location}
-    INTERFACE_INCLUDE_DIRECTORIES ${gcp_sdk_include_location}
-)
-set_target_properties(gcp_common_lib PROPERTIES
-    IMPORTED_LOCATION ${gcp_common_lib_location}
-    INTERFACE_INCLUDE_DIRECTORIES ${gcp_sdk_include_location}
-)

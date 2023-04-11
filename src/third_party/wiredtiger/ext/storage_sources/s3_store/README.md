@@ -11,8 +11,8 @@ There are two different ways to build WiredTiger with S3 extension:
 There are two CMake flags associated with the S3 extension: `ENABLE_S3` and `IMPORT_S3_SDK`.
 * `ENABLE_S3=1` is required to build the S3 extension.
 * `IMPORT_S3_SDK={external,package}` is used to set the build method.
-    *   `external` tells the compiler to search for an existing system installation of the SDK.
-    *   `package` tells the compiler to download and install the SDK as part of the build.
+    *   `external` tells the compiler to download and install the SDK as part of the build.
+    *   `package` tells the compiler to search for an existing system installation of the SDK.
     *    This flag should be set alongside the `ENABLE_S3` flag.
     *    If the `IMPORT_S3_SDK` flag is not specified, the compiler will assume a system installation of the SDK.
 

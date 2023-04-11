@@ -16,18 +16,21 @@ This section describes how to build WiredTiger with the GCP extension enabled.
 * clang 6.0.0 or higher
 
 ### Building
-There is currently only 1 way to build WiredTiger with the GCP extension:
-This way manages the GCP SDK dependency as an external project. This method will download the
-GCP SDK, link to WiredTiger's build system, and build the extension.
+There are two ways to build WiredTiger with the GCP extension:
+
+1. Using a system installation of the GCP SDK. Information about how to perform a system install 
+to the SDK can be found [here](https://github.com/googleapis/google-cloud-cpp/blob/main/doc/packaging.md.).
+2. Letting CMake manage the GCP SDK as an external project. This method will download the SDK, 
+link to WiredTiger's build system, and build the extension.
 
 There are two CMake flags associated with the GCP extension: `ENABLE_GCP` and `IMPORT_GCP_SDK`.
 * `ENABLE_GCP=1` is required to build the GCP extension.
-* `IMPORT_GCP_SDK={external}` is used to set the build method.
-    *   `external` tells the compiler to search for an existing system installation of the SDK.
+* `IMPORT_GCP_SDK={external,package}` is used to set the build method.
+    *   `external` tells the compiler to download and install the SDK as part of the build.
+    *   `package` tells the compiler to search for an existing system installation of the SDK.
     *    This flag should be set alongside the `ENABLE_GCP` flag.
-    *    If the `IMPORT_GCP_SDK` flag is not specified, the compiler will assume a system
-          installation of the SDK which will be implemented at a later stage.
-
+    *    If the `IMPORT_GCP_SDK` flag is not specified,  the compiler will assume a system
+    *    installation of the SDK.
 ### Letting CMake manage the SDK dependency as an external project
 
 This method configures CMake to download, compile, and install the GCP SDK while building

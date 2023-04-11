@@ -15,17 +15,10 @@ if(IMPORT_AZURE_SDK_NONE)
     message(FATAL_ERROR "Cannot enable the Azure extension without specifying an IMPORT_AZURE_SDK method (package, external).")
 endif()
 
-set(azure_storage_lib_location)
-set(azure_core_lib_location)
-set(azure_storage_common_lib_location)
-set(azure_sdk_include_location)
-
 if(IMPORT_AZURE_SDK_PACKAGE)
-    # FIXME-WT-10555 The package import will be implemented in another ticket.
-    message(FATAL_ERROR "Azure SDK package import is not yet supported.")
-endif()
-
-if (IMPORT_AZURE_SDK_EXTERNAL)
+    find_package(azure-storage-blobs-cpp CONFIG REQUIRED)
+    find_package(azure-core-cpp CONFIG REQUIRED)
+elseif (IMPORT_AZURE_SDK_EXTERNAL)
     ExternalProject_Add(
         azure-sdk
         PREFIX azure-sdk-cpp
@@ -52,26 +45,28 @@ if (IMPORT_AZURE_SDK_EXTERNAL)
     set(azure_storage_lib_location ${INSTALL_DIR}/${CMAKE_INSTALL_LIBDIR}/libazure-storage-blobs${CMAKE_SHARED_LIBRARY_SUFFIX})
     set(azure_core_lib_location ${INSTALL_DIR}/${CMAKE_INSTALL_LIBDIR}/libazure-core${CMAKE_SHARED_LIBRARY_SUFFIX})
     set(azure_storage_common_lib_location ${INSTALL_DIR}/${CMAKE_INSTALL_LIBDIR}/libazure-storage-common${CMAKE_SHARED_LIBRARY_SUFFIX})
+
+    add_library(Azure::azure-storage-blobs SHARED IMPORTED)
+    add_library(Azure::azure-core SHARED IMPORTED)
+    add_library(Azure::azure-storage-common SHARED IMPORTED)
+
+    # Declare the include directories under INTERFACE_INCLUDE_DIRECTORIES during the configuration phase
+    # to set the IMPORTED_LOCATION for shared imported targets so that the linker knows where the shared
+    # libraries are located to build the intermediate library.
+    set_target_properties(Azure::azure-storage-blobs PROPERTIES
+        IMPORTED_LOCATION ${azure_storage_lib_location}
+        INTERFACE_INCLUDE_DIRECTORIES ${azure_sdk_include_location}
+    )
+
+    set_target_properties(Azure::azure-core  PROPERTIES
+        IMPORTED_LOCATION ${azure_core_lib_location}
+        INTERFACE_INCLUDE_DIRECTORIES ${azure_sdk_include_location}
+    )
+
+    set_target_properties(Azure::azure-storage-common PROPERTIES
+        IMPORTED_LOCATION ${azure_storage_common_lib_location}
+        INTERFACE_INCLUDE_DIRECTORIES ${azure_sdk_include_location}
+    )
+    add_dependencies(Azure::azure-storage-blobs azure-sdk)
+    add_dependencies(Azure::azure-core azure-sdk)
 endif()
-
-add_library(azure_storage_lib SHARED IMPORTED)
-add_library(azure_core_lib SHARED IMPORTED)
-add_library(azure_storage_common_lib SHARED IMPORTED)
-
-# Declare the include directories under INTERFACE_INCLUDE_DIRECTORIES during the configuration phase
-# to set the IMPORTED_LOCATION for shared imported targets so that the linker knows where the shared
-# libraries are located to build the intermediate library.
-set_target_properties(azure_storage_lib PROPERTIES
-    IMPORTED_LOCATION ${azure_storage_lib_location}
-    INTERFACE_INCLUDE_DIRECTORIES ${azure_sdk_include_location}
-)
-
-set_target_properties(azure_core_lib PROPERTIES
-    IMPORTED_LOCATION ${azure_core_lib_location}
-    INTERFACE_INCLUDE_DIRECTORIES ${azure_sdk_include_location}
-)
-
-set_target_properties(azure_storage_common_lib PROPERTIES
-    IMPORTED_LOCATION ${azure_storage_common_lib_location}
-    INTERFACE_INCLUDE_DIRECTORIES ${azure_sdk_include_location}
-)

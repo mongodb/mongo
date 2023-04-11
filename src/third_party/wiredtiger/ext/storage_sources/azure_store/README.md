@@ -13,18 +13,20 @@ This section describes how to build WiredTiger with the Azure extension enabled.
 * clang version 6.0.0 or higher
 
 ### Building
+There are two ways to build WiredTiger with the Azure extension:
 
-There is currently only 1 way to build WiredTiger with the Azure extension:
-This way manages the Azure SDK dependency as an external project. This method will download the
-Azure SDK, link to WiredTiger's build system, and build the extension.
+1. Using a system installation of the Azure SDK.
+2. Letting CMake manage the Azure SDK as an external project. This method will download the SDK, 
+link to WiredTiger's build system, and build the extension.
 
 There are two CMake flags associated with the Azure extension: `ENABLE_AZURE` and `IMPORT_AZURE_SDK`.
 * `ENABLE_AZURE=1` is required to build the Azure extension.
-* `IMPORT_AZURE_SDK={external}` is used to set the build method.
-    *   `external` tells the compiler to search for an existing system installation of the SDK.
+* `IMPORT_AZURE_SDK={external,package}` is used to set the build method.
+    *   `external` tells the compiler to download and install the SDK as part of the build.
+    *   `package` tells the compiler to search for an existing system installation of the SDK.
     *    This flag should be set alongside the `ENABLE_AZURE` flag.
     *    If the `IMPORT_AZURE_SDK` flag is not specified, the compiler will assume a system
-            installation of the SDK which will be implemented at a later stage.
+         installation of the SDK.
 
 ### Letting CMake manage the SDK dependency as an external project
 
