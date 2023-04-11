@@ -287,6 +287,21 @@ env.Library(
 )
 
 env.Library(
+    target='bulk_write_common',
+    source=[
+        'bulk_write_common.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/auth/authprivilege',
+        '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/logv2/logv2_options',
+        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
+        'bulk_write_parser',
+    ],
+)
+
+env.Library(
     target='bulk_write_command',
     source=[
         'bulk_write.cpp',
@@ -311,6 +326,7 @@ env.Library(
         '$BUILD_DIR/mongo/logv2/logv2_options',
         '$BUILD_DIR/mongo/util/log_and_backoff',
         '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
+        'bulk_write_common',
         'bulk_write_parser',
     ],
 )

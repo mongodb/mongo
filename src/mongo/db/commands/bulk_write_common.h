@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,29 +29,25 @@
 
 #pragma once
 
-#include "mongo/s/write_ops/batch_write_exec.h"
-#include "mongo/s/write_ops/bulk_write_exec.h"
+#include "mongo/db/commands/bulk_write_gen.h"
+#include "mongo/db/commands/bulk_write_parser.h"
+
+/**
+ * Contains common functionality shared between the bulkWrite command in mongos and mongod.
+ */
 
 namespace mongo {
-namespace cluster {
+namespace bulk_write_common {
 
 /**
- * If 'targetEpoch' is set, throws a 'StaleEpoch' error if the targeted namespace is found to no
- * longer have the epoch given by 'targetEpoch'.
+ * Validates the given bulkWrite command request and throws if the request is malformed.
  */
-void write(OperationContext* opCtx,
-           const BatchedCommandRequest& request,
-           BatchWriteExecStats* stats,
-           BatchedCommandResponse* response,
-           boost::optional<OID> targetEpoch = boost::none);
+void validateRequest(const BulkWriteCommandRequest& req);
 
 /**
- * Execute a bulkWrite request as a router.
- *
- * Note: Caller is responsible for passing in a valid BulkWriteCommandRequest.
+ * Get the privileges needed to perform the given bulkWrite command.
  */
-std::vector<BulkWriteReplyItem> bulkWrite(OperationContext* opCtx,
-                                          const BulkWriteCommandRequest& request);
+std::vector<Privilege> getPrivileges(const BulkWriteCommandRequest& req);
 
-}  // namespace cluster
+}  // namespace bulk_write_common
 }  // namespace mongo

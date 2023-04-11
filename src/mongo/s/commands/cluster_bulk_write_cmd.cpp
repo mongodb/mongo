@@ -37,7 +37,9 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection_operation_source.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/bulk_write_common.h"
 #include "mongo/db/commands/bulk_write_gen.h"
+#include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
@@ -94,14 +96,15 @@ public:
         }
 
         Reply typedRun(OperationContext* opCtx) final {
-            uassert(ErrorCodes::CommandNotSupported,
-                    "BulkWrite on mongos is not currently supported.",
-                    false);
+            uasserted(ErrorCodes::CommandNotSupported,
+                      "BulkWrite on mongos is not currently supported.");
 
             uassert(
                 ErrorCodes::CommandNotSupported,
                 "BulkWrite may not be run without featureFlagBulkWriteCommand enabled",
                 gFeatureFlagBulkWriteCommand.isEnabled(serverGlobalParams.featureCompatibility));
+
+            bulk_write_common::validateRequest(request());
 
             auto replyItems = cluster::bulkWrite(opCtx, request());
 
@@ -111,7 +114,15 @@ public:
             return reply;
         }
 
-        void doCheckAuthorization(OperationContext* opCtx) const final {}
+        void doCheckAuthorization(OperationContext* opCtx) const final try {
+            uassert(ErrorCodes::Unauthorized,
+                    "unauthorized",
+                    AuthorizationSession::get(opCtx->getClient())
+                        ->isAuthorizedForPrivileges(bulk_write_common::getPrivileges(request())));
+        } catch (const DBException& e) {
+            NotPrimaryErrorTracker::get(opCtx->getClient()).recordError(e.code());
+            throw;
+        }
     };
 
 } clusterBulkWriteCmd;

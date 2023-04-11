@@ -32,13 +32,13 @@
 #include <string>
 #include <vector>
 
-#include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection_operation_source.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/bulk_write.h"
+#include "mongo/db/commands/bulk_write_common.h"
 #include "mongo/db/commands/bulk_write_crud_op.h"
 #include "mongo/db/commands/bulk_write_gen.h"
 #include "mongo/db/commands/bulk_write_parser.h"
@@ -614,36 +614,8 @@ public:
                 gFeatureFlagBulkWriteCommand.isEnabled(serverGlobalParams.featureCompatibility));
 
             auto& req = request();
-            const auto& ops = req.getOps();
-            const auto& nsInfo = req.getNsInfo();
 
-            uassert(ErrorCodes::InvalidOptions,
-                    str::stream()
-                        << "May not specify both stmtId and stmtIds in bulkWrite command. Got "
-                        << BSON("stmtId" << *req.getStmtId() << "stmtIds" << *req.getStmtIds())
-                        << ". BulkWrite command: " << req.toBSON({}),
-                    !(req.getStmtId() && req.getStmtIds()));
-
-            if (const auto& stmtIds = req.getStmtIds()) {
-                uassert(
-                    ErrorCodes::InvalidLength,
-                    str::stream()
-                        << "Number of statement ids must match the number of batch entries. Got "
-                        << stmtIds->size() << " statement ids but " << ops.size()
-                        << " operations. Statement ids: " << BSON("stmtIds" << *stmtIds)
-                        << ". BulkWrite command: " << req.toBSON({}),
-                    stmtIds->size() == ops.size());
-            }
-
-            // Validate that every ops entry has a valid nsInfo index.
-            for (const auto& op : ops) {
-                const auto& bulkWriteOp = BulkWriteCRUDOp(op);
-                unsigned int nsInfoIdx = bulkWriteOp.getNsInfoIdx();
-                uassert(ErrorCodes::BadValue,
-                        str::stream() << "BulkWrite ops entry " << bulkWriteOp.toBSON()
-                                      << " has an invalid nsInfo index.",
-                        nsInfoIdx < nsInfo.size());
-            }
+            bulk_write_common::validateRequest(req);
 
             // Apply all of the write operations.
             auto replies = bulk_write::performWrites(opCtx, req);
@@ -653,7 +625,7 @@ public:
 
         void doCheckAuthorization(OperationContext* opCtx) const final try {
             auto session = AuthorizationSession::get(opCtx->getClient());
-            auto privileges = _getPrivileges();
+            auto privileges = bulk_write_common::getPrivileges(request());
 
             // Make sure all privileges are authorized.
             uassert(ErrorCodes::Unauthorized,
@@ -665,39 +637,6 @@ public:
         }
 
     private:
-        std::vector<Privilege> _getPrivileges() const {
-            const auto& ops = request().getOps();
-            const auto& nsInfo = request().getNsInfo();
-
-            std::vector<Privilege> privileges;
-            privileges.reserve(nsInfo.size());
-            ActionSet actions;
-            if (request().getBypassDocumentValidation()) {
-                actions.addAction(ActionType::bypassDocumentValidation);
-            }
-
-            // Create initial Privilege entry for each nsInfo entry.
-            for (const auto& ns : nsInfo) {
-                privileges.emplace_back(ResourcePattern::forExactNamespace(ns.getNs()), actions);
-            }
-
-            // Iterate over each op and assign the appropriate actions to the namespace privilege.
-            for (const auto& op : ops) {
-                const auto& bulkWriteOp = BulkWriteCRUDOp(op);
-                ActionSet newActions = bulkWriteOp.getActions();
-                unsigned int nsInfoIdx = bulkWriteOp.getNsInfoIdx();
-                uassert(ErrorCodes::BadValue,
-                        str::stream() << "BulkWrite ops entry " << bulkWriteOp.toBSON()
-                                      << " has an invalid nsInfo index.",
-                        nsInfoIdx < nsInfo.size());
-
-                auto& privilege = privileges[nsInfoIdx];
-                privilege.addActions(newActions);
-            }
-
-            return privileges;
-        }
-
         Reply _populateCursorReply(OperationContext* opCtx,
                                    const BulkWriteCommandRequest& req,
                                    std::vector<BulkWriteReplyItem> replies) {
@@ -773,7 +712,7 @@ public:
                  repl::ReadConcernArgs::get(opCtx),
                  ReadPreferenceSetting::get(opCtx),
                  unparsedRequest().body,
-                 _getPrivileges()});
+                 bulk_write_common::getPrivileges(req)});
             auto cursorId = pinnedCursor.getCursor()->cursorid();
 
             pinnedCursor->incNBatches();
