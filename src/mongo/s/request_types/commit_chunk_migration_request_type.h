@@ -81,6 +81,11 @@ public:
     const Timestamp& getCollectionTimestamp() {
         return _collectionTimestamp;
     }
+    /*
+     * NOTE: v7.0 is deprecating the _validAfter field of CommitChunkMigrationRequest
+     *       (see SERVER-74469 for details).
+     *       This method should not be used to develop new functionality.
+     */
     const boost::optional<Timestamp>& getValidAfter() {
         return _validAfter;
     }
