@@ -2638,7 +2638,6 @@ buildvariants:
   # - name: .auth  # Not passing
   # - name: burn_in_tags_gen # No burn in tests needed
   - name: buildscripts_test
-  # - name: resmoke_end2end_tests # Not passing
   # - name: unittest_shell_hang_analyzer_gen # Not passing
   # - name: .config_fuzzer # Not passing
   - name: config_fuzzer_jsCore
@@ -2745,7 +2744,6 @@ buildvariants:
   - name: .aggfuzzer !.feature_flag_guarded
   - name: .aggregation !.feature_flag_guarded
   - name: .auth
-  - name: resmoke_end2end_tests
   - name: unittest_shell_hang_analyzer_gen
   - name: .causally_consistent !.sharding
   - name: .change_streams
