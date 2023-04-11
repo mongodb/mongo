@@ -69,7 +69,7 @@ __tier_storage_remove_local(WT_SESSION_IMPL *session)
              */
             WT_ASSERT(session, entry->tiered != NULL && entry->tiered->bstorage != NULL);
             entry->op_val = now + entry->tiered->bstorage->retain_secs;
-            __wt_tiered_push_work(session, entry);
+            __wt_tiered_requeue_work(session, entry);
         } else {
             __wt_verbose_debug2(
               session, WT_VERB_TIERED, "REMOVE_LOCAL: actually remove %s", object);

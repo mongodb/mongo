@@ -1956,8 +1956,8 @@ extern void __wt_tiered_get_remove_local(
 extern void __wt_tiered_get_remove_shared(WT_SESSION_IMPL *session, WT_TIERED_WORK_UNIT **entryp);
 extern void __wt_tiered_pop_work(
   WT_SESSION_IMPL *session, uint32_t type, uint64_t maxval, WT_TIERED_WORK_UNIT **entryp);
-extern void __wt_tiered_push_work(WT_SESSION_IMPL *session, WT_TIERED_WORK_UNIT *entry);
 extern void __wt_tiered_remove_work(WT_SESSION_IMPL *session, WT_TIERED *tiered, bool locked);
+extern void __wt_tiered_requeue_work(WT_SESSION_IMPL *session, WT_TIERED_WORK_UNIT *entry);
 extern void __wt_tiered_work_free(WT_SESSION_IMPL *session, WT_TIERED_WORK_UNIT *entry);
 extern void __wt_timestamp_to_hex_string(wt_timestamp_t ts, char *hex_timestamp);
 extern void __wt_txn_bump_snapshot(WT_SESSION_IMPL *session);

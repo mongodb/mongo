@@ -36,6 +36,7 @@ __wt_tiered_work_free(WT_SESSION_IMPL *session, WT_TIERED_WORK_UNIT *entry)
     WT_CONNECTION_IMPL *conn;
 
     conn = S2C(session);
+    (void)__wt_atomic_subi32(&entry->tiered->iface.session_inuse, 1);
     __tiered_flush_state(session, entry->type, false);
     /* If all work is done signal any waiting thread waiting for sync. */
     if (WT_FLUSH_STATE_DONE(conn->flush_state))
@@ -71,11 +72,11 @@ __wt_tiered_remove_work(WT_SESSION_IMPL *session, WT_TIERED *tiered, bool locked
 }
 
 /*
- * __wt_tiered_push_work --
+ * __tiered_push_work_internal --
  *     Push a work unit to the queue. Assumes it is passed an already filled out structure.
  */
-void
-__wt_tiered_push_work(WT_SESSION_IMPL *session, WT_TIERED_WORK_UNIT *entry)
+static void
+__tiered_push_work_internal(WT_SESSION_IMPL *session, WT_TIERED_WORK_UNIT *entry)
 {
     WT_CONNECTION_IMPL *conn;
 
@@ -87,6 +88,36 @@ __wt_tiered_push_work(WT_SESSION_IMPL *session, WT_TIERED_WORK_UNIT *entry)
     __wt_spin_unlock(session, &conn->tiered_lock);
     __tiered_flush_state(session, entry->type, true);
     __wt_cond_signal(session, conn->tiered_cond);
+    return;
+}
+
+/*
+ * __wt_tiered_requeue_work --
+ *     Push an existing work unit to the queue. Assumes it was previously returned from one of the
+ *     get functions, and it is being re-queued.
+ */
+void
+__wt_tiered_requeue_work(WT_SESSION_IMPL *session, WT_TIERED_WORK_UNIT *entry)
+{
+    /* The dhandle was marked in use when the entry was first made, don't do that here. */
+    __tiered_push_work_internal(session, entry);
+    return;
+}
+
+/*
+ * __tiered_push_new_work --
+ *     Push a newly created work unit to the queue. Assumes it is passed an already filled out
+ *     structure.
+ */
+static void
+__tiered_push_new_work(WT_SESSION_IMPL *session, WT_TIERED_WORK_UNIT *entry)
+{
+    /*
+     * Bump the in use count lock on the dhandle, this is kept until the work unit is freed. This
+     * prevents the an otherwise idle dhandle from being swept and freed.
+     */
+    (void)__wt_atomic_addi32(&entry->tiered->iface.session_inuse, 1);
+    __tiered_push_work_internal(session, entry);
     return;
 }
 
@@ -221,7 +252,7 @@ __wt_tiered_put_flush_finish(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint32
     entry->type = WT_TIERED_WORK_FLUSH_FINISH;
     entry->id = id;
     entry->tiered = tiered;
-    __wt_tiered_push_work(session, entry);
+    __tiered_push_new_work(session, entry);
     return (0);
 }
 
@@ -243,7 +274,7 @@ __wt_tiered_put_remove_local(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint32
     /* Put a work unit in the queue with the time this object expires. */
     entry->op_val = now + tiered->bstorage->retain_secs;
     entry->tiered = tiered;
-    __wt_tiered_push_work(session, entry);
+    __tiered_push_new_work(session, entry);
     return (0);
 }
 
@@ -260,7 +291,7 @@ __wt_tiered_put_remove_shared(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint3
     entry->type = WT_TIERED_WORK_REMOVE_SHARED;
     entry->id = id;
     entry->tiered = tiered;
-    __wt_tiered_push_work(session, entry);
+    __tiered_push_new_work(session, entry);
     return (0);
 }
 
@@ -278,6 +309,6 @@ __wt_tiered_put_flush(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint32_t id)
     entry->type = WT_TIERED_WORK_FLUSH;
     entry->id = id;
     entry->tiered = tiered;
-    __wt_tiered_push_work(session, entry);
+    __tiered_push_new_work(session, entry);
     return (0);
 }
