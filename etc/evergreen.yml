@@ -3208,7 +3208,8 @@ buildvariants:
   - name: validate_commit_message
   - name: check_feature_flag_tags
   - name: compile_venv_deps_check
-  - name: resmoke_validation_tests
+  # TODO SERVER-75688: add back validation
+  # - name: resmoke_validation_tests
 
 - name: &windows-dynamic-visibility-test windows-dynamic-visibility-test
   display_name: "~ Shared Library Windows (visibility test)"

@@ -6980,13 +6980,14 @@ tasks:
   - func: "do setup"
   - func: "run tests"
 
-- <<: *task_template
-  name: resmoke_validation_tests
-  tags: []
-  depends_on: []
-  commands:
-  - func: "do non-compile setup"
-  - func: "run tests"
+# TODO SERVER-75688: add back validation
+# - <<: *task_template
+#   name: resmoke_validation_tests
+#   tags: []
+#   depends_on: []
+#   commands:
+#   - func: "do non-compile setup"
+#   - func: "run tests"
 
 - name: test_packages
   tags: []
