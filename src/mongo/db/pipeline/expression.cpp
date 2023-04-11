@@ -6222,12 +6222,6 @@ Value ExpressionTrunc::evaluate(const Document& root, Variables* variables) cons
         root, _children, getOpName(), Decimal128::kRoundTowardZero, &std::trunc, variables);
 }
 
-intrusive_ptr<Expression> ExpressionTrunc::parse(ExpressionContext* const expCtx,
-                                                 BSONElement elem,
-                                                 const VariablesParseState& vps) {
-    return ExpressionRangedArity<ExpressionTrunc, 1, 2>::parse(expCtx, elem, vps);
-}
-
 REGISTER_STABLE_EXPRESSION(trunc, ExpressionTrunc::parse);
 const char* ExpressionTrunc::getOpName() const {
     return "$trunc";

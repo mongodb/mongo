@@ -2433,11 +2433,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinFloor(ArityType 
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinTrunc(ArityType arity) {
-    invariant(arity == 1);
-
-    auto [_, tagOperand, valOperand] = getFromStack(0);
-
-    return genericTrunc(tagOperand, valOperand);
+    return genericRoundTrunc("$trunc", Decimal128::kRoundTowardZero, arity);
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinExp(ArityType arity) {
@@ -3876,7 +3872,8 @@ static int32_t convertNumericToInt32(const value::TypeTags tag, const value::Val
     }
 }
 
-FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinRound(ArityType arity) {
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericRoundTrunc(
+    std::string funcName, Decimal128::RoundingMode roundingMode, ArityType arity) {
     invariant(arity == 1 || arity == 2);
     int32_t place = 0;
     const auto [numOwn, numTag, numVal] = getFromStack(0);
@@ -3895,7 +3892,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinRound(ArityType 
         case value::TypeTags::NumberDecimal: {
             auto dec = value::bitcastTo<Decimal128>(numVal);
             if (!dec.isInfinite()) {
-                dec = dec.quantize(quantum, Decimal128::kRoundTiesToEven);
+                dec = dec.quantize(quantum, roundingMode);
             }
             auto [resultTag, resultValue] = value::makeCopyDecimal(dec);
             return {true, resultTag, resultValue};
@@ -3903,7 +3900,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinRound(ArityType 
         case value::TypeTags::NumberDouble: {
             auto asDec = Decimal128(value::bitcastTo<double>(numVal), Decimal128::kRoundTo34Digits);
             if (!asDec.isInfinite()) {
-                asDec = asDec.quantize(quantum, Decimal128::kRoundTiesToEven);
+                asDec = asDec.quantize(quantum, roundingMode);
             }
             return {
                 false, value::TypeTags::NumberDouble, value::bitcastFrom<double>(asDec.toDouble())};
@@ -3916,11 +3913,11 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinRound(ArityType 
             auto numericArgll = numTag == value::TypeTags::NumberInt32
                 ? static_cast<int64_t>(value::bitcastTo<int32_t>(numVal))
                 : value::bitcastTo<int64_t>(numVal);
-            auto out = Decimal128(numericArgll).quantize(quantum, Decimal128::kRoundTiesToEven);
+            auto out = Decimal128(numericArgll).quantize(quantum, roundingMode);
             uint32_t flags = 0;
             auto outll = out.toLong(&flags);
             uassert(5155302,
-                    "Invalid conversion to long during $round.",
+                    "Invalid conversion to long during " + funcName + ".",
                     !Decimal128::hasFlag(flags, Decimal128::kInvalid));
             if (numTag == value::TypeTags::NumberInt64 ||
                 outll > std::numeric_limits<int32_t>::max()) {
@@ -3934,6 +3931,10 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinRound(ArityType 
         default:
             return {false, value::TypeTags::Nothing, 0};
     }
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinRound(ArityType arity) {
+    return genericRoundTrunc("$round", Decimal128::kRoundTiesToEven, arity);
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinConcat(ArityType arity) {

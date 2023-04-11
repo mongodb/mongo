@@ -1096,8 +1096,6 @@ private:
                                                                value::Value operandValue);
     FastTuple<bool, value::TypeTags, value::Value> genericFloor(value::TypeTags operandTag,
                                                                 value::Value operandValue);
-    FastTuple<bool, value::TypeTags, value::Value> genericTrunc(value::TypeTags operandTag,
-                                                                value::Value operandValue);
     FastTuple<bool, value::TypeTags, value::Value> genericExp(value::TypeTags operandTag,
                                                               value::Value operandValue);
     FastTuple<bool, value::TypeTags, value::Value> genericLn(value::TypeTags operandTag,
@@ -1106,6 +1104,8 @@ private:
                                                                 value::Value operandValue);
     FastTuple<bool, value::TypeTags, value::Value> genericSqrt(value::TypeTags operandTag,
                                                                value::Value operandValue);
+    FastTuple<bool, value::TypeTags, value::Value> genericRoundTrunc(
+        std::string funcName, Decimal128::RoundingMode roundingMode, ArityType arity);
     std::pair<value::TypeTags, value::Value> genericNot(value::TypeTags tag, value::Value value);
     std::pair<value::TypeTags, value::Value> genericIsMember(value::TypeTags lhsTag,
                                                              value::Value lhsVal,
