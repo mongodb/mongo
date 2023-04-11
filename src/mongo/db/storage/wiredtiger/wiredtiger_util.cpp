@@ -808,11 +808,41 @@ int mdb_handle_progress(WT_EVENT_HANDLER* handler,
     return 0;
 }
 
+/**
+ * Defines a callback function that can be passed via a WT_EVENT_HANDLER*
+ * (WT_EVENT_HANDLER::handle_general) into WT::wiredtiger_open() call.
+ *
+ * The void* WT_SESSION::app_private is leveraged to inject MDB state into the WT code layer.
+ * Long running WT::compact operations will periodically use this callback function to check whether
+ * or not to quit early and fail the WT::compact operation.
+ */
+int mdb_handle_general(WT_EVENT_HANDLER* handler,
+                       WT_CONNECTION* wt_conn,
+                       WT_SESSION* session,
+                       WT_EVENT_TYPE type,
+                       void* arg) {
+    if (type != WT_EVENT_COMPACT_CHECK) {
+        return 0;
+    }
+
+    OperationContext* opCtx = reinterpret_cast<OperationContext*>(session->app_private);
+    invariant(opCtx);
+
+    Status status = opCtx->checkForInterruptNoAssert();
+    if (!status.isOK()) {
+        // Returning non-zero indicates an error to WT. The precise value is irrelevant.
+        return -1;
+    }
+
+    return 0;
+}
+
 WT_EVENT_HANDLER defaultEventHandlers() {
     WT_EVENT_HANDLER handlers = {};
     handlers.handle_error = mdb_handle_error;
     handlers.handle_message = mdb_handle_message;
     handlers.handle_progress = mdb_handle_progress;
+    handlers.handle_general = mdb_handle_general;
     return handlers;
 }
 }  // namespace
@@ -825,7 +855,7 @@ WiredTigerEventHandler::WiredTigerEventHandler() {
     handler->handle_message = mdb_handle_message;
     handler->handle_progress = mdb_handle_progress;
     handler->handle_close = nullptr;
-    handler->handle_general = nullptr;
+    handler->handle_general = mdb_handle_general;
 }
 
 WT_EVENT_HANDLER* WiredTigerEventHandler::getWtEventHandler() {

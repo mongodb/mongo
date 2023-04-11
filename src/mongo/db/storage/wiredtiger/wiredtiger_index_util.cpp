@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-
 #include "mongo/db/storage/wiredtiger/wiredtiger_index_util.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_prepare_conflict.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_session_data.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
@@ -86,7 +86,17 @@ Status WiredTigerIndexUtil::compact(OperationContext* opCtx, const std::string& 
     if (!cache->isEphemeral()) {
         WT_SESSION* s = WiredTigerRecoveryUnit::get(opCtx)->getSession()->getSession();
         opCtx->recoveryUnit()->abandonSnapshot();
+
+        // Set a pointer on the WT_SESSION to the opCtx, so that WT::compact can use a callback to
+        // check for interrupts.
+        SessionDataRAII sessionRaii(s, opCtx);
+
         int ret = s->compact(s, uri.c_str(), "timeout=0");
+        if (ret == WT_ERROR && !opCtx->checkForInterruptNoAssert().isOK()) {
+            return Status(ErrorCodes::Interrupted,
+                          str::stream() << "Storage compaction interrupted on " << uri.c_str());
+        }
+
         if (MONGO_unlikely(WTCompactIndexEBUSY.shouldFail())) {
             ret = EBUSY;
         }
@@ -96,6 +106,7 @@ Status WiredTigerIndexUtil::compact(OperationContext* opCtx, const std::string& 
                           str::stream() << "Compaction interrupted on " << uri.c_str()
                                         << " due to cache eviction pressure");
         }
+
         invariantWTOK(ret, s);
     }
     return Status::OK();

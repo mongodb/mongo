@@ -66,11 +66,11 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store_oplog_truncate_markers.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_session_data.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
-#include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/str.h"
@@ -1438,7 +1438,18 @@ Status WiredTigerRecordStore::doCompact(OperationContext* opCtx) {
     if (!cache->isEphemeral()) {
         WT_SESSION* s = WiredTigerRecoveryUnit::get(opCtx)->getSession()->getSession();
         opCtx->recoveryUnit()->abandonSnapshot();
+
+        // Set a pointer on the WT_SESSION to the opCtx, so that WT::compact can use a callback to
+        // check for interrupts.
+        SessionDataRAII sessionRaii(s, opCtx);
+
         int ret = s->compact(s, getURI().c_str(), "timeout=0");
+        if (ret == WT_ERROR && !opCtx->checkForInterruptNoAssert().isOK()) {
+            return Status(ErrorCodes::Interrupted,
+                          str::stream()
+                              << "Storage compaction interrupted on " << getURI().c_str());
+        }
+
         if (MONGO_unlikely(WTCompactRecordStoreEBUSY.shouldFail())) {
             ret = EBUSY;
         }
