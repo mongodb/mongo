@@ -43,6 +43,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/type_shard.h"
+#include "mongo/s/is_mongos.h"
 #include "mongo/s/router_transactions_metrics.h"
 #include "mongo/s/session_catalog_router.h"
 #include "mongo/s/sharding_router_test_fixture.h"
@@ -139,6 +140,13 @@ protected:
 
         _staleVersionAndSnapshotRetriesBlock = std::make_unique<FailPointEnableBlock>(
             "enableStaleVersionAndSnapshotRetriesWithinTransactions");
+
+        setMongos(true);
+    }
+
+    void tearDown() override {
+        setMongos(false);
+        ShardingTestFixture::tearDown();
     }
 
     void disableRouterRetriesFailPoint() {
@@ -5419,6 +5427,37 @@ TEST_F(TransactionRouterTest, EagerlyReapRetryableSessionsUponNewRetryableTransa
     ASSERT(doesExistInCatalog(parentLsid, sessionCatalog));
     ASSERT_FALSE(doesExistInCatalog(retryableChildLsid, sessionCatalog));
     ASSERT(doesExistInCatalog(higherRetryableChildLsid, sessionCatalog));
+}
+
+TEST_F(TransactionRouterTest, SkipEagerReapingOnMongod) {
+    setMongos(false);
+    ON_BLOCK_EXIT([] { setMongos(true); });
+
+    auto sessionCatalog = SessionCatalog::get(getServiceContext());
+    ASSERT_EQ(sessionCatalog->size(), 0);
+
+    // Add a parent session with one retryable child.
+
+    auto parentLsid = makeLogicalSessionIdForTest();
+    auto parentTxnNumber = 0;
+    runTransactionLeaveOpen(parentLsid, parentTxnNumber);
+
+    auto retryableChildLsid =
+        makeLogicalSessionIdWithTxnNumberAndUUIDForTest(parentLsid, parentTxnNumber);
+    runTransactionLeaveOpen(retryableChildLsid, 0);
+
+    ASSERT_EQ(sessionCatalog->size(), 1);
+    ASSERT(doesExistInCatalog(parentLsid, sessionCatalog));
+    ASSERT(doesExistInCatalog(retryableChildLsid, sessionCatalog));
+
+    // Start a higher txnNumber client transaction and verify the child was not erased.
+
+    parentTxnNumber++;
+    runTransactionLeaveOpen(parentLsid, parentTxnNumber);
+
+    ASSERT_EQ(sessionCatalog->size(), 1);
+    ASSERT(doesExistInCatalog(parentLsid, sessionCatalog));
+    ASSERT(doesExistInCatalog(retryableChildLsid, sessionCatalog));
 }
 
 }  // unnamed namespace

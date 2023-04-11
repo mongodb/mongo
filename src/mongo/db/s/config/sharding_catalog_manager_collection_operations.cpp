@@ -529,7 +529,7 @@ void ShardingCatalogManager::renameShardedMetadata(
         // Rename CSRS metadata in case the source collection is sharded
         auto collType = *optFromCollType;
         sharding_ddl_util::shardedRenameMetadata(
-            opCtx, _localConfigShard.get(), _localCatalogClient.get(), collType, to, writeConcern);
+            opCtx, _localConfigShard, _localCatalogClient.get(), collType, to, writeConcern);
         ShardingLogging::get(opCtx)->logChange(
             opCtx,
             "renameCollection.metadata",
@@ -543,9 +543,9 @@ void ShardingCatalogManager::renameShardedMetadata(
         // target collection was sharded
         // throws if the provided UUID does not match
         sharding_ddl_util::removeCollAndChunksMetadataFromConfig_notIdempotent(
-            opCtx, _localCatalogClient.get(), to, writeConcern);
+            opCtx, _localConfigShard, _localCatalogClient.get(), to, writeConcern);
         sharding_ddl_util::removeTagsMetadataFromConfig_notIdempotent(
-            opCtx, _localConfigShard.get(), to, writeConcern);
+            opCtx, _localConfigShard, to, writeConcern);
         ShardingLogging::get(opCtx)->logChange(opCtx,
                                                "renameCollection.metadata",
                                                str::stream()

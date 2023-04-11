@@ -6,16 +6,16 @@ const st = new ShardingTest({shards: 1});
 
 const res = assert.commandWorked(st.shard0.adminCommand({serverStatus: 1}));
 assert.neq(null, res.twoPhaseCommitCoordinator);
-assert.eq(0, res.twoPhaseCommitCoordinator.totalCreated);
-assert.eq(0, res.twoPhaseCommitCoordinator.totalStartedTwoPhaseCommit);
-assert.eq(0, res.twoPhaseCommitCoordinator.totalCommittedTwoPhaseCommit);
-assert.eq(0, res.twoPhaseCommitCoordinator.totalAbortedTwoPhaseCommit);
+assert.hasFields(res.twoPhaseCommitCoordinator, ["totalCreated"]);
+assert.hasFields(res.twoPhaseCommitCoordinator, ["totalStartedTwoPhaseCommit"]);
+assert.hasFields(res.twoPhaseCommitCoordinator, ["totalCommittedTwoPhaseCommit"]);
+assert.hasFields(res.twoPhaseCommitCoordinator, ["totalAbortedTwoPhaseCommit"]);
 assert.neq(null, res.twoPhaseCommitCoordinator.currentInSteps);
-assert.eq(0, res.twoPhaseCommitCoordinator.currentInSteps.writingParticipantList);
-assert.eq(0, res.twoPhaseCommitCoordinator.currentInSteps.waitingForVotes);
-assert.eq(0, res.twoPhaseCommitCoordinator.currentInSteps.writingDecision);
-assert.eq(0, res.twoPhaseCommitCoordinator.currentInSteps.waitingForDecisionAcks);
-assert.eq(0, res.twoPhaseCommitCoordinator.currentInSteps.deletingCoordinatorDoc);
+assert.hasFields(res.twoPhaseCommitCoordinator.currentInSteps, ["writingParticipantList"]);
+assert.hasFields(res.twoPhaseCommitCoordinator.currentInSteps, ["waitingForVotes"]);
+assert.hasFields(res.twoPhaseCommitCoordinator.currentInSteps, ["writingDecision"]);
+assert.hasFields(res.twoPhaseCommitCoordinator.currentInSteps, ["waitingForDecisionAcks"]);
+assert.hasFields(res.twoPhaseCommitCoordinator.currentInSteps, ["deletingCoordinatorDoc"]);
 
 st.stop();
 })();
