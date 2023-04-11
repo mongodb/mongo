@@ -135,29 +135,21 @@ void AccumulatorPercentile::processInternal(const Value& input, bool merging) {
     _memUsageBytes = sizeof(*this) + _algo->memUsageBytes();
 }
 
+Value AccumulatorPercentile::formatFinalValue(int nPercentiles, const std::vector<double>& pctls) {
+    if (pctls.empty()) {
+        std::vector<Value> nulls;
+        nulls.insert(nulls.end(), nPercentiles, Value(BSONNULL));
+        return Value(nulls);
+    }
+    return Value(std::vector<Value>(pctls.begin(), pctls.end()));
+}
+
 Value AccumulatorPercentile::getValue(bool toBeMerged) {
     if (toBeMerged) {
         return dynamic_cast<PartialPercentile<Value>*>(_algo.get())->serialize();
     }
-
-    // Compute the percentiles for each requested one in the order listed. Computing a percentile
-    // can only fail if there have been no numeric inputs, in which case we will return an array of
-    // null values.
-    std::vector<double> pctls;
-    for (double p : _percentiles) {
-        auto res = _algo->computePercentile(p);
-        if (!res) {
-            // Our input is non-numeric so computing the percentile will fail each time, and can
-            // directly return an array of null values without computing the rest of the
-            // percentiles.
-            std::vector<Value> nulls;
-            nulls.insert(nulls.end(), _percentiles.size(), Value(BSONNULL));
-            return Value(nulls);
-        }
-        pctls.push_back(res.value());
-    }
-
-    return Value(std::vector<Value>(pctls.begin(), pctls.end()));
+    return AccumulatorPercentile::formatFinalValue(_percentiles.size(),
+                                                   _algo->computePercentiles(_percentiles));
 }
 
 namespace {
@@ -281,25 +273,26 @@ intrusive_ptr<AccumulatorState> AccumulatorMedian::create(ExpressionContext* exp
     return new AccumulatorMedian(expCtx, {} /* unused */, method);
 }
 
-Value AccumulatorMedian::getValue(bool toBeMerged) {
-    auto result = AccumulatorPercentile::getValue(toBeMerged);
-
-    // $median only adjusts the output of the final result, the internal logic for merging is up to
-    // the implementation of $percentile.
-    if (toBeMerged) {
-        return result;
-    }
-
-    // Currently $percentile returns _scalar_ null if all inputs were non-numeric.
-    if (result.getType() == jstNULL) {
-        return result;
+Value AccumulatorMedian::formatFinalValue(int nPercentiles, const std::vector<double>& pctls) {
+    if (pctls.empty()) {
+        return Value(BSONNULL);
     }
 
     tassert(7436101,
             "the percentile method for median must return a single result.",
-            result.getArrayLength() == 1);
+            pctls.size() == 1);
+    return Value(pctls.front());
+}
 
-    return Value(result.getArray().front());
+Value AccumulatorMedian::getValue(bool toBeMerged) {
+    // $median only adjusts the output of the final result, the internal logic for merging is up to
+    // the implementation of $percentile.
+    if (toBeMerged) {
+        return AccumulatorPercentile::getValue(toBeMerged);
+    }
+
+    return AccumulatorMedian::formatFinalValue(_percentiles.size(),
+                                               _algo->computePercentiles(_percentiles));
 }
 
 Document AccumulatorMedian::serialize(boost::intrusive_ptr<Expression> initializer,

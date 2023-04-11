@@ -28,9 +28,7 @@
  */
 
 #include <algorithm>
-#include <boost/random/exponential_distribution.hpp>
 #include <boost/random/normal_distribution.hpp>
-#include <boost/random/uniform_real_distribution.hpp>
 #include <random>
 
 #include "mongo/db/pipeline/percentile_algo_bm_fixture.h"
@@ -43,7 +41,7 @@ using std::vector;
 
 // We'd like to test with "realistic" data so that tdigest has to do sorting and merging on a
 // regular basis. The particular distribution of data shouldn't matter much.
-vector<double> generateNormal(size_t n) {
+vector<double> generateNormal(size_t n, bool presorted) {
     std::mt19937 generator(2023u);
     boost::random::normal_distribution<double> dist(0.0 /* mean */, 1.0 /* sigma */);
 
@@ -53,61 +51,37 @@ vector<double> generateNormal(size_t n) {
         inputs.push_back(dist(generator));
     }
 
+    if (presorted) {
+        std::sort(inputs.begin(), inputs.end());
+    }
     return inputs;
 }
 
 void PercentileAlgoBenchmarkFixture::tdigest_normalData(benchmark::State& state,
                                                         TDigest::ScalingFunction k_limit,
-                                                        double delta) {
-    const vector<double> inputs = generateNormal(dataSizeLarge);
-    for (auto keepRunning : state) {
-        auto d = std::make_unique<TDigest>(k_limit, delta);
-        for (double input : inputs) {
-            d->incorporate(input);
-        }
-        benchmark::DoNotOptimize(d->computePercentile(0.5));
-        benchmark::ClobberMemory();
-    }
-}
+                                                        double delta,
+                                                        int dataSize,
+                                                        bool presorted,
+                                                        const std::vector<double>& ps) {
+    const vector<double> inputs = generateNormal(dataSize, presorted);
 
-void PercentileAlgoBenchmarkFixture::tdigest_normalData_expr(benchmark::State& state,
-                                                             TDigest::ScalingFunction k_limit,
-                                                             double delta,
-                                                             int dataSize,
-                                                             double p) {
-    const vector<double> inputs = generateNormal(dataSize);
     for (auto keepRunning : state) {
         auto d = std::make_unique<TDigest>(k_limit, delta);
         d->incorporate(inputs);
-        benchmark::DoNotOptimize(d->computePercentile(p));
+        benchmark::DoNotOptimize(d->computePercentiles(ps));
         benchmark::ClobberMemory();
     }
 }
 
-void PercentileAlgoBenchmarkFixture::sortAndRank_normalData_expr(benchmark::State& state,
-                                                                 int dataSize,
-                                                                 double p) {
-    const vector<double> inputs = generateNormal(dataSize);
+void PercentileAlgoBenchmarkFixture::discrete_normalData(benchmark::State& state,
+                                                         int dataSize,
+                                                         bool presorted,
+                                                         const std::vector<double>& ps) {
+    const vector<double> inputs = generateNormal(dataSize, presorted);
     for (auto keepRunning : state) {
-        auto d = createDiscreteSortAndRank();
+        auto d = createDiscretePercentile();
         d->incorporate(inputs);
-        benchmark::DoNotOptimize(d->computePercentile(p));
-        benchmark::ClobberMemory();
-    }
-}
-
-void PercentileAlgoBenchmarkFixture::tdigest_normalData_sorted(benchmark::State& state,
-                                                               TDigest::ScalingFunction k_limit,
-                                                               double delta) {
-    vector<double> inputs = generateNormal(dataSizeLarge);
-    std::sort(inputs.begin(), inputs.end());
-
-    for (auto keepRunning : state) {
-        auto d = std::make_unique<TDigest>(k_limit, delta);
-        for (double input : inputs) {
-            d->incorporate(input);
-        }
-        benchmark::DoNotOptimize(d->computePercentile(0.5));
+        benchmark::DoNotOptimize(d->computePercentiles(ps));
         benchmark::ClobberMemory();
     }
 }
@@ -115,7 +89,7 @@ void PercentileAlgoBenchmarkFixture::tdigest_normalData_sorted(benchmark::State&
 void PercentileAlgoBenchmarkFixture::tdigest_normalData_batched(benchmark::State& state,
                                                                 TDigest::ScalingFunction k_limit,
                                                                 double delta) {
-    const vector<double> inputs = generateNormal(dataSizeLarge);
+    const vector<double> inputs = generateNormal(nLarge, false /* presorted */);
 
     for (auto keepRunning : state) {
         auto d = std::make_unique<TDigest>(k_limit, delta);

@@ -1156,6 +1156,17 @@ server_parameters:
       gte: 0
       lte: 100000 # arbitrary, just to set an upper limit on the amount of memory used by t-digest
 
+  internalQueryPercentileExprSelectToSortThreshold:
+    description: "The discrete percentile algorithm uses selection from unsorted data to find a
+     single percentile and sorts the data when sufficiently many percentiles are requested as once.
+     The threshold has been determined empirically from benchmarks."
+    set_at: [ startup, runtime ]
+    cpp_varname: internalQueryPercentileExprSelectToSortThreshold
+    cpp_vartype: AtomicWord<int>
+    default: 20
+    validator:
+      gte: 0
+
   internalQueryAutoParameterizationMaxParameterCount:
     description: "The maximum numbers of parameters that query auto-parameterization can extract from a query. 
      If auto parameterizating a query would result in a greater number of parameters than the limit, 

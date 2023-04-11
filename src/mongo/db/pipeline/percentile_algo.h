@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <cmath>
+
 #include <boost/optional/optional.hpp>
 #include <memory>
 
@@ -41,6 +43,25 @@ namespace mongo {
  * The goal is to keep these algorithms MQL- and engine-agnostic with this interface.
  */
 struct PercentileAlgorithm {
+    // We define "percentile" as:
+    //   Percentile P(p) where 'p' is from [0.0, 1.0] on dataset 'D' with 'n', possibly duplicated,
+    //   samples is value 'P' such that at least ceil(p*n) samples from 'D' are _less or equal_ to
+    //   'P' and no more than ceil(p*n) samples that are strictly _less_ than 'P'. Thus, p = 0 maps
+    //   to the min of 'D' and p = 1 maps to the max of 'D'.
+    //
+    // Notice, that this definition is ambiguous. For example, on D = {1.0, 2.0, ..., 10.0} P(0.1)
+    // could be any value in [1.0, 2.0] range. For discrete percentiles the value 'P' _must_ be one
+    // of the samples from 'D' but it's still ambiguous as either 1.0 or 2.0 can be used.
+    //
+    // This definiton leads to the following computation of 0-based rank for percentile 'p' while
+    // resolving the ambiguity towards the lower rank.
+    static int computeTrueRank(int n, double p) {
+        if (p >= 1.0) {
+            return n - 1;
+        }
+        return std::max(0, static_cast<int>(std::ceil(n * p)) - 1);
+    }
+
     virtual ~PercentileAlgorithm() {}
 
     virtual void incorporate(double input) = 0;
@@ -63,6 +84,13 @@ struct PercentileAlgorithm {
      */
     virtual boost::optional<double> computePercentile(double p) = 0;
 
+    /**
+     * Computes multiple percentiles at once and might be more efficient than computing them one at
+     * a time. Same constraints apply as for 'computePercentile(double p)'. Returns an empty vector
+     * if no inputs have been incorporated.
+     */
+    virtual std::vector<double> computePercentiles(const std::vector<double>& ps) = 0;
+
     /*
      * The owner might need a rough estimate of how much memory the algorithm is using.
      */
@@ -83,8 +111,8 @@ struct PartialPercentile {
 /**
  * Factory methods for instantiating concrete algorithms.
  */
-std::unique_ptr<PercentileAlgorithm> createDiscreteSortAndRank();
-std::unique_ptr<PercentileAlgorithm> createDiscreteSortAndRankDistributedClassic();
+std::unique_ptr<PercentileAlgorithm> createDiscretePercentile();
+
 std::unique_ptr<PercentileAlgorithm> createTDigest();
 std::unique_ptr<PercentileAlgorithm> createTDigestDistributedClassic();
 

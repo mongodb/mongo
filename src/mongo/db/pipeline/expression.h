@@ -50,6 +50,7 @@
 #include "mongo/db/pipeline/expression_visitor.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/monotonic_expression.h"
+#include "mongo/db/pipeline/percentile_algo_discrete.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/datetime/date_time_support.h"
@@ -619,23 +620,44 @@ public:
     }
 
     Value evaluate(const Document& root, Variables* variables) const final {
-        // TODO SERVER-75144: investigate performance for this implementation
-        TAccumulator accum(this->getExpressionContext(), _ps, _method);
-
-        // Verify that '_input' produces an array and pass each element to 'process'.
         auto input = _input->evaluate(root, variables);
+        if (input.numeric()) {
+            // On a scalar value, all percentiles are the same for all methods.
+            return TAccumulator::formatFinalValue(
+                _ps.size(), std::vector<double>(_ps.size(), input.coerceToDouble()));
+        }
+
         if (input.isArray()) {
             uassert(7436202,
                     "Input to $percentile or $median cannot be an empty array.",
                     input.getArray().size() > 0);
-            for (const auto& item : input.getArray()) {
-                accum.process(item, false /* merging */);
+
+            if (_method != 2 /*continuous*/) {
+                std::vector<double> samples;
+                samples.reserve(input.getArrayLength());
+                for (const auto& item : input.getArray()) {
+                    if (item.numeric()) {
+                        samples.push_back(item.coerceToDouble());
+                    }
+                }
+                DiscretePercentile dp;
+                dp.incorporate(samples);
+                return TAccumulator::formatFinalValue(_ps.size(), dp.computePercentiles(_ps));
+            } else {
+                // Delegate to the accumulator. Note: it would be more efficient to use the
+                // percentile algorithms directly rather than an accumulator, as it would reduce
+                // heap alloc, virtual calls and avoid unnecessary for expressions memory tracking.
+                // However, on large datasets these overheads are less noticeable.
+                TAccumulator accum(this->getExpressionContext(), _ps, _method);
+                for (const auto& item : input.getArray()) {
+                    accum.process(item, false /* merging */);
+                }
+                return accum.getValue(false /* toBeMerged */);
             }
-        } else {
-            accum.process(input, false /* merging */);
         }
 
-        return accum.getValue(false /* toBeMerged */);
+        // No numeric values have been found for the expression to process.
+        return TAccumulator::formatFinalValue(_ps.size(), {});
     }
 
     void acceptVisitor(ExpressionMutableVisitor* visitor) final {
@@ -650,6 +672,7 @@ public:
 private:
     std::vector<double> _ps;
     boost::intrusive_ptr<Expression> _input;
+    // TODO SERVER-74894: This should be 'PercentileMethodEnum', not 'int32_t'.
     int32_t _method;
 };
 

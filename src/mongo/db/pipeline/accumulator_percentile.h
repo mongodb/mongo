@@ -78,10 +78,11 @@ public:
     void reset() final;
 
     /**
-     * Necessary for supporting $percentile as window functions.
+     * Necessary for supporting $percentile as window functions and/or as expression.
      */
     static std::pair<std::vector<double> /*ps*/, int32_t /*method*/> parsePercentileAndMethod(
         BSONElement elem);
+    static Value formatFinalValue(int nPercentiles, const std::vector<double>& pctls);
 
     /**
      * Serializes this accumulator to a valid MQL accumulation statement that would be legal
@@ -150,10 +151,12 @@ public:
     AccumulatorMedian(ExpressionContext* expCtx, const std::vector<double>& unused, int32_t method);
 
     /**
-     * Necessary for supporting $median as window functions.
+     * Necessary for supporting $median as window functions and/or as expression.
      */
     static std::pair<std::vector<double> /*ps*/, int32_t /*method*/> parsePercentileAndMethod(
         BSONElement elem);
+    static Value formatFinalValue(int nPercentiles, const std::vector<double>& pctls);
+
     /**
      * Modify the base-class implementation to return a single value rather than a single-element
      * array.

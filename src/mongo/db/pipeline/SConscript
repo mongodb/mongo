@@ -121,7 +121,7 @@ env.Library(
         'accumulator_std_dev.cpp',
         'accumulator_sum.cpp',
         'map_reduce_options.idl',
-        'percentile_algo_sort_and_rank.cpp',
+        'percentile_algo_discrete.cpp',
         'percentile_algo_tdigest.cpp',
         'percentile_algo_tdigest_distributed.cpp',
         'window_function/window_bounds.cpp',
@@ -749,6 +749,7 @@ env.CppUnitTest(
 env.CppUnitTest(
     target='db_percentile_algo_test',
     source=[
+        'percentile_algo_discrete_test.cpp',
         'percentile_algo_tdigest_test.cpp',
         'percentile_algo_tdigest_distributed_test.cpp',
     ],
@@ -791,6 +792,7 @@ env.Benchmark(
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
         '$BUILD_DIR/mongo/db/query_expressions',
         '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        'accumulator',
         'expression_bm_fixture',
     ],
 )

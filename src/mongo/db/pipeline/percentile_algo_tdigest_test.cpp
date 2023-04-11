@@ -97,8 +97,12 @@ void assertIsValid(const TDigest& digest,
     assertConformsToScaling(digest, k, delta, tag);
 }
 
+// The ranks computed by this function is 0-based.
 int computeRank(const vector<double>& sorted, double value) {
+    // std::lower_bound returns an iterator pointing to the first element in the range [first, last)
+    // that does _not_ satisfy element < value.
     auto lower = std::lower_bound(sorted.begin(), sorted.end(), value);
+
     ASSERT(lower != sorted.end()) << value << " is larger than the max input " << sorted.back();
     return std::distance(sorted.begin(), lower);
 }
@@ -113,15 +117,15 @@ void assertExpectedAccuracy(const vector<double>& sorted,
                             double accuracyError,
                             const char* msg) {
     for (double p : percentiles) {
-        const double trueRank = p * sorted.size();
+        const int trueRank = PercentileAlgorithm::computeTrueRank(sorted.size(), p);
         // If there are duplicates in the data, the true rank is a range of values so we need to
         // find its lower and upper bounds.
-        int lowerTrueRank = static_cast<int>(std::floor(trueRank));
+        int lowerTrueRank = trueRank;
         const double val = sorted[lowerTrueRank];
         while (lowerTrueRank > 0 && sorted[lowerTrueRank - 1] == val) {
             lowerTrueRank--;
         }
-        int upperTrueRank = static_cast<int>(std::floor(trueRank));
+        int upperTrueRank = trueRank;
         while (upperTrueRank + 1 < static_cast<int>(sorted.size()) &&
                sorted[upperTrueRank + 1] == val) {
             upperTrueRank++;
@@ -160,6 +164,7 @@ void assertExpectedAccuracy(const vector<double>& sorted,
 TEST(TDigestTest, GetPercentile_Empty) {
     TDigest digest(TDigest::k1_limit, 100);
     ASSERT(!digest.computePercentile(0.2));
+    ASSERT(digest.computePercentiles({0.2}).empty());
 }
 
 TEST(TDigestTest, GetPercentile_SingleCentroid_SinglePoint) {
@@ -199,28 +204,60 @@ TEST(TDigestTest, GetPercentile_SingleCentroid_Max) {
     ASSERT_EQ(5.0, digest.computePercentile(1));
 }
 
-// On a single centroid that could be interpreted as representing evenly distributed data between
-// min and max, t-digest should be computing "continuous percentiles".
+// On a single t-digest computes continuous percentiles.
 TEST(TDigestTest, GetPercentile_SingleCentroid_EvenlyDistributed) {
-    vector<double> inputs;
-    inputs.reserve(100);
-    for (int i = 0; i < 100; ++i) {
-        inputs.push_back(i + 1.0);
-    }
+    vector<double> inputs(100);
+    std::iota(inputs.begin(), inputs.end(), 1.0);  // {1, 2, ..., 100}
 
-    TDigest digest(0,      // negInfCount
-                   0,      // posInfCount
-                   1.0,    // min
-                   100.0,  // max
-                   {{100, (1.0 + 100.0) / 2}},
+    TDigest digest(0,                           // negInfCount
+                   0,                           // posInfCount
+                   1.0,                         // min
+                   100.0,                       // max
+                   {{100, (1.0 + 100.0) / 2}},  // the single centroid
                    nullptr /* k1_limit */,
                    1 /* delta */);
 
-    for (int i = 1; i < 100; ++i) {
-        const double p = i * 0.01;
+    for (int i = 1; i < 10; ++i) {
+        const double p = i / 10.0;
         const double res = digest.computePercentile(p).value();
-        ASSERT_APPROX_EQUAL(inputs[i - 1] * p + inputs[i] * (1 - p), res, epsilon) << p;
+        const double expected = inputs[i * 10 - 1] * p + inputs[i * 10] * (1 - p);
+        ASSERT_APPROX_EQUAL(expected, res, epsilon) << p << ":" << expected << "," << res;
     }
+}
+
+// On tiny inputs like these t-digest will create single-point centroids and compute accurate
+// results. The result should match the DiscretePercentile.
+TEST(TDigestTest, TinyInput1) {
+    vector<double> inputs = {1.0};
+
+    TDigest d{TDigest::k0_limit, 100 /*delta*/};
+    d.incorporate(inputs);
+
+    ASSERT_EQ(1.0, *d.computePercentile(0));
+    ASSERT_EQ(1.0, *d.computePercentile(0.5));
+    ASSERT_EQ(1.0, *d.computePercentile(1));
+}
+
+TEST(TDigestTest, TinyInput2) {
+    vector<double> inputs = {1.0, 2.0};
+
+    TDigest d{TDigest::k0_limit, 100 /*delta*/};
+    d.incorporate(inputs);
+
+    ASSERT_EQ(1.0, *d.computePercentile(0));
+    ASSERT_EQ(1.0, *d.computePercentile(0.5));
+    ASSERT_EQ(2.0, *d.computePercentile(1));
+}
+
+TEST(TDigestTest, TinyInput3) {
+    vector<double> inputs = {1.0, 2.0, 3.0};
+
+    TDigest d{TDigest::k0_limit, 100 /*delta*/};
+    d.incorporate(inputs);
+
+    ASSERT_EQ(1.0, *d.computePercentile(0));
+    ASSERT_EQ(2.0, *d.computePercentile(0.5));
+    ASSERT_EQ(3.0, *d.computePercentile(1));
 }
 
 // Single-point centroids should yield accurate discrete percentiles, even if the rest of the data
@@ -231,7 +268,7 @@ TEST(TDigestTest, GetPercentile_SinglePointCentroids) {
                    1,      // min
                    10000,  // max
                    {
-                       {1, 1},
+                       {1, 1},  // {weight, mean}
                        {1, 2},
                        {1, 3},
                        {37, 10.0},
@@ -265,7 +302,7 @@ TEST(TDigestTest, Incorporate_OnlyInfinities) {
         inputs[i] = inf;
     }
     auto seed = time(nullptr);
-    LOGV2(7429515, "{seed}", "Duplicates_two_clusters", "seed"_attr = seed);
+    LOGV2(7429515, "{seed}", "Incorporate_OnlyInfinities", "seed"_attr = seed);
     std::shuffle(inputs.begin(), inputs.end(), std::mt19937(seed));
 
     TDigest d{TDigest::k0_limit, delta};
@@ -280,14 +317,16 @@ TEST(TDigestTest, Incorporate_OnlyInfinities) {
     ASSERT_EQ(inf, d.max()) << "max of digest: " << d;
 
     // 70 out of 100 values are negative infinities
-    ASSERT_EQ(-inf, *d.computePercentile(0.001)) << "p = 0.001 from digest: " << d;
-    ASSERT_EQ(-inf, *d.computePercentile(0.1)) << "p = 0.1 from digest: " << d;
-    ASSERT_EQ(-inf, *d.computePercentile(0.7)) << "p = 0.7 from digest: " << d;
+    ASSERT_EQ(-inf, *d.computePercentile(0)) << " digest: " << d;
+    ASSERT_EQ(-inf, *d.computePercentile(0.001)) << " digest: " << d;
+    ASSERT_EQ(-inf, *d.computePercentile(0.1)) << " digest: " << d;
+    ASSERT_EQ(-inf, *d.computePercentile(0.7)) << " digest: " << d;
 
     // 30 out of 100 values are positive infinities
-    ASSERT_EQ(inf, *d.computePercentile(0.8)) << "p = 0.8 from digest: " << d;
-    ASSERT_EQ(inf, *d.computePercentile(0.9)) << "p = 0.9 from digest: " << d;
-    ASSERT_EQ(inf, *d.computePercentile(0.999)) << "p = 0.999 from digest: " << d;
+    ASSERT_EQ(inf, *d.computePercentile(0.71)) << " digest: " << d;
+    ASSERT_EQ(inf, *d.computePercentile(0.9)) << " digest: " << d;
+    ASSERT_EQ(inf, *d.computePercentile(0.999)) << " digest: " << d;
+    ASSERT_EQ(inf, *d.computePercentile(1)) << " digest: " << d;
 }
 
 TEST(TDigestTest, Incorporate_WithInfinities) {
@@ -304,9 +343,9 @@ TEST(TDigestTest, Incorporate_WithInfinities) {
     for (size_t i = 1300; i < 1500; ++i) {
         inputs[i] = inf;
     }
-    vector<double> sorted = inputs;  // sorted by creation
+    vector<double> sorted = inputs;  // sorted by construction
     auto seed = time(nullptr);
-    LOGV2(7429511, "{seed}", "Duplicates_two_clusters", "seed"_attr = seed);
+    LOGV2(7429511, "{seed}", "Incorporate_WithInfinities", "seed"_attr = seed);
     std::shuffle(inputs.begin(), inputs.end(), std::mt19937(seed));
 
     TDigest d{TDigest::k0_limit, delta};
@@ -321,20 +360,22 @@ TEST(TDigestTest, Incorporate_WithInfinities) {
     ASSERT_EQ(inf, d.max()) << "max of digest: " << d;
 
     // 300 out of 1500 values are negative infinities
-    ASSERT_EQ(-inf, *d.computePercentile(0.001)) << "p = 0.001 from digest: " << d;
-    ASSERT_EQ(-inf, *d.computePercentile(0.1)) << "p = 0.1 from digest: " << d;
-    ASSERT_EQ(-inf, *d.computePercentile(0.2)) << "p = 0.2 from digest: " << d;
+    ASSERT_EQ(-inf, *d.computePercentile(0.001)) << " digest: " << d;
+    ASSERT_EQ(-inf, *d.computePercentile(0.1)) << " digest: " << d;
+    const double pInfEnd = 300.0 / 1500;
+    ASSERT_EQ(-inf, *d.computePercentile(pInfEnd)) << "p:" << pInfEnd << " digest: " << d;
 
-    assertExpectedAccuracy(sorted,
-                           d,
-                           {0.3, 0.5, 0.8} /* percentiles */,
-                           0.020 /* accuracyError */,
-                           "Incorporate_Infinities");
+    const double pFirstNonInf = 301.0 / 1500;
+    ASSERT_NE(-inf, *d.computePercentile(pFirstNonInf)) << "p:" << pFirstNonInf << " digest " << d;
+
+    assertExpectedAccuracy(
+        sorted, d, {0.5} /* percentiles */, 0.020 /* accuracyError */, "Incorporate_Infinities");
 
     // 200 out of 1500 values are positive infinities
-    ASSERT_EQ(inf, *d.computePercentile(1 - 2.0 / 15)) << "p = 1 - 2/15 from digest: " << d;
-    ASSERT_EQ(inf, *d.computePercentile(0.9)) << "p = 0.9 from digest: " << d;
-    ASSERT_EQ(inf, *d.computePercentile(0.999)) << "p = 0.999 from digest: " << d;
+    const double pInfStart = 1 - 199.0 / 1500;
+    ASSERT_EQ(inf, *d.computePercentile(pInfStart)) << "p:" << pInfStart << " digest: " << d;
+    ASSERT_EQ(inf, *d.computePercentile(0.9)) << " digest: " << d;
+    ASSERT_EQ(inf, *d.computePercentile(0.999)) << " digest: " << d;
 }
 
 TEST(TDigestTest, Incorporate_Nan_ShouldSkip) {
@@ -359,12 +400,9 @@ TEST(TDigestTest, Incorporate_Nan_ShouldSkip) {
     ASSERT_EQ(oracle.min(), d.min()) << "min of digest: " << d;
     ASSERT_EQ(oracle.max(), d.max()) << "max of digest: " << d;
 
-    ASSERT_EQ(*oracle.computePercentile(0.1), *d.computePercentile(0.1))
-        << "p = 0.1 from digest: " << d;
-    ASSERT_EQ(*oracle.computePercentile(0.5), *d.computePercentile(0.5))
-        << "p = 0.5 from digest: " << d;
-    ASSERT_EQ(*oracle.computePercentile(0.9), *d.computePercentile(0.9))
-        << "p = 0.9 from digest: " << d;
+    ASSERT_EQ(*oracle.computePercentile(0.1), *d.computePercentile(0.1)) << " digest: " << d;
+    ASSERT_EQ(*oracle.computePercentile(0.5), *d.computePercentile(0.5)) << " digest: " << d;
+    ASSERT_EQ(*oracle.computePercentile(0.9), *d.computePercentile(0.9)) << " digest: " << d;
 }
 
 TEST(TDigestTest, Incorporate_Great_And_Small) {
@@ -691,18 +729,28 @@ TEST(TDigestTest, ScalingFunctionEffect) {
 constexpr size_t dataSize = 100;
 void runTestOnSmallDataset(TDigest& d) {
     vector<double> data(dataSize);
-    std::iota(data.begin(), data.end(), 1.0);
+    std::iota(data.begin(), data.end(), 1.0);  // {1.0, ..., 100.0}
 
     d.incorporate(data);
     d.flushBuffer();
 
     ASSERT_EQ(data.size(), d.centroids().size()) << "number of centroids in " << d;
     // Spot-check a few percentiles.
-    ASSERT_EQ(8, d.computePercentile(0.08).value()) << "p = 0.08 from " << d;
-    ASSERT_EQ(42, d.computePercentile(0.42).value()) << "p = 0.42 from " << d;
-    ASSERT_EQ(71, d.computePercentile(0.705).value()) << "p = 0.705 from " << d;
-    ASSERT_EQ(99, d.computePercentile(0.99).value()) << "p = 0.99 from " << d;
-    ASSERT_EQ(100, d.computePercentile(0.9999).value()) << "p = 0.9999 from " << d;
+    ASSERT_EQ(1, d.computePercentile(0.001).value()) << " digest: " << d;
+    ASSERT_EQ(8, d.computePercentile(0.08).value()) << " digest: " << d;
+    ASSERT_EQ(42, d.computePercentile(0.42).value()) << " digest: " << d;
+    ASSERT_EQ(71, d.computePercentile(0.705).value()) << " digest: " << d;
+    ASSERT_EQ(99, d.computePercentile(0.99).value()) << " digest: " << d;
+    ASSERT_EQ(100, d.computePercentile(0.9999).value()) << " digest: " << d;
+
+    // Check that asking for the same percentiles at once gives the same answers.
+    vector<double> pctls = d.computePercentiles({0.001, 0.08, 0.42, 0.705, 0.99, 0.9999});
+    ASSERT_EQ(1, pctls[0]) << "p:0.001 digest: " << d;
+    ASSERT_EQ(8, pctls[1]) << "p:0.08 digest: " << d;
+    ASSERT_EQ(42, pctls[2]) << "p:0.42 digest: " << d;
+    ASSERT_EQ(71, pctls[3]) << "p:0.705 digest: " << d;
+    ASSERT_EQ(99, pctls[4]) << "p:0.99 digest: " << d;
+    ASSERT_EQ(100, pctls[5]) << "p:0.9999 digest: " << d;
 }
 TEST(TDigestTest, PreciseOnSmallDataset_k0) {
     TDigest d{TDigest::k0_limit, dataSize + 1 /* delta */};
@@ -1099,14 +1147,9 @@ vector<int> computeError(vector<double> sorted,
     vector<int> errors;
     errors.reserve(percentiles.size());
     for (double p : percentiles) {
-        const double computedPercentile = digest.computePercentile(p).value();
-        for (size_t i = 0; i < sorted.size(); ++i) {
-            if (computedPercentile <= sorted[i]) {
-                const double rank = p * sorted.size();
-                errors.push_back(std::abs(i - rank));
-                break;
-            }
-        }
+        const double pctl = digest.computePercentile(p).value();
+        errors.push_back(std::abs(computeRank(sorted, pctl) -
+                                  PercentileAlgorithm::computeTrueRank(sorted.size(), p)));
     }
     return errors;
 }

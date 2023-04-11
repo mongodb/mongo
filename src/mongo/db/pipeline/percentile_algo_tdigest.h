@@ -67,9 +67,11 @@ public:
      * We compute percentile by linearly scanning centroids to find the one that matches the rank of
      * the requested percentile and then doing a linear interpolation between centroid means. We are
      * currently not optimizing for accessing multiple percentiles as we don't think that would
-     * result in noticeable performance gains for accumulators or expressions.
+     * result in noticeable performance gains for accumulators and expressions should not be using
+     * t-digest.
      */
     boost::optional<double> computePercentile(double p) final;
+    std::vector<double> computePercentiles(const std::vector<double>& ps) final;
 
     long memUsageBytes() const final;
 

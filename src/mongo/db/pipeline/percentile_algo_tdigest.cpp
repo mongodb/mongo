@@ -143,31 +143,29 @@ boost::optional<double> TDigest::computePercentile(double p) {
         return min();
     }
 
-    const double rank = p * (_n + _posInfCount + _negInfCount);
-    if (_negInfCount > 0 && rank <= _negInfCount) {
+    int rank = PercentileAlgorithm::computeTrueRank(_n + _posInfCount + _negInfCount, p);
+    if (_negInfCount > 0 && rank < _negInfCount) {
         return -std::numeric_limits<double>::infinity();
     } else if (_posInfCount > 0 && rank >= _n + _negInfCount) {
         return std::numeric_limits<double>::infinity();
     }
+    rank -= _negInfCount;
 
     // Even though strict ordering of centroids isn't guaranteed, the algorithm assumes it when
     // computing percentiles (this is the reason t-digest cannot guarantee the accuracy bounds). So,
     // under this assumption, let's find the centroid an input with rank 'rank' would have
     // contributed to.
-    size_t i = 0;             // index of the target centroid
-    double r = _negInfCount;  // cumulative weight of all centroids up to, and including, i_th one
+    size_t i = 0;  // index of the target centroid
+    double r = 0;  // cumulative weight of all centroids up to, and including, i_th one
     // TODO SERVER-74359 (tune t-digest): is it worth optimizing traversing the set of centroids
     // backwards for p > 0.5? This likely doesn't matter when TDigest is used by accumulator but
     // might become noticeable in expressions.
     for (; i < _centroids.size(); i++) {
         r += _centroids[i].weight;
-        if (r >= rank) {
+        if (r > rank) {
             break;
         }
     }
-    tassert(7429501,
-            "Upper boundary should not land among infinite values",
-            r > _negInfCount && r <= _n + _negInfCount);
 
     // If the i_th centroid has weight exactly 1, it hasn't lost any information and we can give it
     // out as the answer (if the centroids are strictly ordered, this answer would be accurate).
@@ -185,31 +183,44 @@ boost::optional<double> TDigest::computePercentile(double p) {
     double right = 0;
     double wLeft = 0;
     double wRight = 0;
-    // distance from the left centroid center to the true rank
-    double doubledInnerOffset = 0;
+    double doubledInnerRank = 0;
 
-    // (r - rank) is in [0.0, wCur] by construction of 'r'
+    // (r - rank) is in (0.0, wCur] by construction of 'r'
     if (r - rank >= wCur / 2) {
         // The target point sits between the previous and i_th centroids' means.
         left = (i == 0) ? _min : _centroids[i - 1].mean;
         right = _centroids[i].mean;
         wLeft = (i == 0 ? 0 : _centroids[i - 1].weight);
         wRight = wCur;
-        doubledInnerOffset = wLeft + 2 * wRight - 2 * (r - rank);  // [wLeft, wLeft + wRight]
+        doubledInnerRank = wLeft + 2 * wRight - 2 * (r - 1 - rank);  // [wLeft, wLeft + wRight]
     } else {
         // The target point sits between the i_th and the next centroids' means (or _max).
         left = _centroids[i].mean;
         right = (i == _centroids.size() - 1) ? _max : _centroids[i + 1].mean;
         wLeft = wCur;
         wRight = (i == _centroids.size() - 1 ? 0 : _centroids[i + 1].weight);
-        doubledInnerOffset = wLeft - 2 * (r - rank);  // [0.0, wLeft]
+        doubledInnerRank = wLeft - 2 * (r - 1 - rank);  // [0.0, wLeft]
     }
-    const double innerP = doubledInnerOffset / (wLeft + wRight);  // [0.0, 1.0]
+    const double innerP = doubledInnerRank / (wLeft + wRight);  // [0.0, 1.0]
 
     // Both (right - left) and innerP are non-negative, so the computation below is guaranteed to be
     // to the right of 'left' but the precision error might make it greater than 'right'...
     double res = left + (right - left) * innerP;
     return (res > right) ? right : res;
+}
+
+vector<double> TDigest::computePercentiles(const vector<double>& ps) {
+    vector<double> pctls;
+    pctls.reserve(ps.size());
+    for (double p : ps) {
+        auto pctl = computePercentile(p);
+        if (pctl) {
+            pctls.push_back(*pctl);
+        } else {
+            return {};
+        }
+    }
+    return pctls;
 }
 
 void TDigest::merge(const vector<double>& sorted) {
