@@ -2,7 +2,8 @@
  * Tests that a standalone mongod is able to pin code segments on startup when
  * 'lockCodeSegmentsInMemory=true'.
  * TODO (SERVER-75632): Re-enable this test on amazon linux once ulimits are configured.
- * @tags: [incompatible_with_macos, incompatible_with_windows_tls, incompatible_with_amazon_linux]
+ * @tags: [requires_increased_memlock_limits, incompatible_with_macos,
+ * incompatible_with_windows_tls, incompatible_with_amazon_linux]
  */
 
 (function() {
