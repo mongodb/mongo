@@ -2,8 +2,9 @@
  * Tests dbHash collisions in WT with full validation.
  * dbHash should not experience races on data, or EBUSY errors in the storage engine.
  * @tags: [
- *  requires_wiredtiger,
- *  requires_replication,
+ *   requires_wiredtiger,
+ *   requires_replication,
+ *   uses_full_validation,
  * ]
  */
 

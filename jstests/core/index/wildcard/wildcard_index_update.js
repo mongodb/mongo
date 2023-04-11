@@ -4,6 +4,7 @@
  * @tags: [
  *   requires_fcv_63,
  *   does_not_support_stepdowns,
+ *   uses_full_validation,
  * ]
  */
 

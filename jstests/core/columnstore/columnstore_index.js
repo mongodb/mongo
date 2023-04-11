@@ -21,6 +21,7 @@
  *   tenant_migration_incompatible,
  *   does_not_support_stepdowns,
  *   not_allowed_with_security_token,
+ *   uses_full_validation,
  * ]
  */
 (function() {
