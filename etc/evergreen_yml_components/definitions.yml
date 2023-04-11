@@ -6308,14 +6308,6 @@ tasks:
       use_large_distro: "true"
 
 - <<: *gen_task_template
-  name: sharding_auth_catalog_shard_gen
-  tags: []
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      use_large_distro: "true"
-
-- <<: *gen_task_template
   name: sharding_auth_audit_gen
   tags: ["sharding", "auth", "audit", "non_live_record", "no_debug_mode"]
   commands:
