@@ -53,7 +53,8 @@ const std::string dbNameStr = "testDb";
 
 class DatabaseClonerTest : public InitialSyncClonerTestFixture {
 public:
-    DatabaseClonerTest() : _dbName(boost::none, dbNameStr) {}
+    DatabaseClonerTest()
+        : _dbName(DatabaseName::createDatabaseName_forTest(boost::none, dbNameStr)) {}
 
 protected:
     void setUp() override {
@@ -513,7 +514,8 @@ TEST_F(DatabaseClonerTest, DatabaseAndCollectionStats) {
 
 class DatabaseClonerMultitenancyTest : public DatabaseClonerTest {
 public:
-    DatabaseClonerMultitenancyTest() : _dbName(TenantId(OID::gen()), dbNameStr) {}
+    DatabaseClonerMultitenancyTest()
+        : _dbName(DatabaseName::createDatabaseName_forTest(TenantId(OID::gen()), dbNameStr)) {}
 
 protected:
     void setUp() override {

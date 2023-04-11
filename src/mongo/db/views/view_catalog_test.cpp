@@ -78,7 +78,8 @@ const auto kTinyMatchStage = BSON("$match" << BSONObj());
 
 class ViewCatalogFixture : public CatalogTestFixture {
 public:
-    ViewCatalogFixture() : ViewCatalogFixture(DatabaseName(boost::none, "db")) {}
+    ViewCatalogFixture()
+        : ViewCatalogFixture(DatabaseName::createDatabaseName_forTest(boost::none, "db")) {}
 
     ViewCatalogFixture(DatabaseName dbName) : _dbName(std::move(dbName)) {}
 
@@ -86,8 +87,8 @@ public:
         CatalogTestFixture::setUp();
 
         _db = _createDatabase(_dbName);
-        _createDatabase({_dbName.tenantId(), "db1"});
-        _createDatabase({_dbName.tenantId(), "db2"});
+        _createDatabase(DatabaseName::createDatabaseName_forTest(_dbName.tenantId(), "db1"));
+        _createDatabase(DatabaseName::createDatabaseName_forTest(_dbName.tenantId(), "db2"));
     }
 
     void tearDown() override {
@@ -772,7 +773,9 @@ TEST_F(ViewCatalogFixture, ResolveViewCorrectlyExtractsDefaultCollation) {
 
 class ServerlessViewCatalogFixture : public ViewCatalogFixture {
 public:
-    ServerlessViewCatalogFixture() : ViewCatalogFixture(DatabaseName(TenantId(OID::gen()), "db")) {}
+    ServerlessViewCatalogFixture()
+        : ViewCatalogFixture(DatabaseName::createDatabaseName_forTest(TenantId(OID::gen()), "db")) {
+    }
 };
 
 TEST_F(ServerlessViewCatalogFixture, LookupExistingViewBeforeAndAfterDropFeatureFlagOff) {

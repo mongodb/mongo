@@ -573,9 +573,11 @@ TEST_F(AllDatabaseClonerTest, DatabaseStats) {
     auto stats = cloner->getStats();
     ASSERT_EQUALS(0, stats.databasesCloned);
     ASSERT_EQUALS(3, stats.databaseStats.size());
-    ASSERT_EQUALS(DatabaseName(boost::none, "admin"), stats.databaseStats[0].dbname);
-    ASSERT_EQUALS(DatabaseName(boost::none, "aab"), stats.databaseStats[1].dbname);
-    ASSERT_EQUALS(DatabaseName(boost::none, "a"), stats.databaseStats[2].dbname);
+    ASSERT_EQUALS(DatabaseName::kAdmin, stats.databaseStats[0].dbname);
+    ASSERT_EQUALS(DatabaseName::createDatabaseName_forTest(boost::none, "aab"),
+                  stats.databaseStats[1].dbname);
+    ASSERT_EQUALS(DatabaseName::createDatabaseName_forTest(boost::none, "a"),
+                  stats.databaseStats[2].dbname);
     ASSERT_EQUALS(_clock.now(), stats.databaseStats[0].start);
     ASSERT_EQUALS(Date_t(), stats.databaseStats[0].end);
     ASSERT_EQUALS(Date_t(), stats.databaseStats[1].start);
@@ -599,9 +601,11 @@ TEST_F(AllDatabaseClonerTest, DatabaseStats) {
     stats = cloner->getStats();
     ASSERT_EQUALS(1, stats.databasesCloned);
     ASSERT_EQUALS(3, stats.databaseStats.size());
-    ASSERT_EQUALS(DatabaseName(boost::none, "admin"), stats.databaseStats[0].dbname);
-    ASSERT_EQUALS(DatabaseName(boost::none, "aab"), stats.databaseStats[1].dbname);
-    ASSERT_EQUALS(DatabaseName(boost::none, "a"), stats.databaseStats[2].dbname);
+    ASSERT_EQUALS(DatabaseName::kAdmin, stats.databaseStats[0].dbname);
+    ASSERT_EQUALS(DatabaseName::createDatabaseName_forTest(boost::none, "aab"),
+                  stats.databaseStats[1].dbname);
+    ASSERT_EQUALS(DatabaseName::createDatabaseName_forTest(boost::none, "a"),
+                  stats.databaseStats[2].dbname);
     ASSERT_EQUALS(_clock.now(), stats.databaseStats[0].end);
     ASSERT_EQUALS(_clock.now(), stats.databaseStats[1].start);
     ASSERT_EQUALS(Date_t(), stats.databaseStats[1].end);
@@ -625,9 +629,11 @@ TEST_F(AllDatabaseClonerTest, DatabaseStats) {
     stats = cloner->getStats();
     ASSERT_EQUALS(2, stats.databasesCloned);
     ASSERT_EQUALS(3, stats.databaseStats.size());
-    ASSERT_EQUALS(DatabaseName(boost::none, "admin"), stats.databaseStats[0].dbname);
-    ASSERT_EQUALS(DatabaseName(boost::none, "aab"), stats.databaseStats[1].dbname);
-    ASSERT_EQUALS(DatabaseName(boost::none, "a"), stats.databaseStats[2].dbname);
+    ASSERT_EQUALS(DatabaseName::kAdmin, stats.databaseStats[0].dbname);
+    ASSERT_EQUALS(DatabaseName::createDatabaseName_forTest(boost::none, "aab"),
+                  stats.databaseStats[1].dbname);
+    ASSERT_EQUALS(DatabaseName::createDatabaseName_forTest(boost::none, "a"),
+                  stats.databaseStats[2].dbname);
     ASSERT_EQUALS(_clock.now(), stats.databaseStats[1].end);
     ASSERT_EQUALS(_clock.now(), stats.databaseStats[2].start);
     ASSERT_EQUALS(Date_t(), stats.databaseStats[2].end);
@@ -640,9 +646,11 @@ TEST_F(AllDatabaseClonerTest, DatabaseStats) {
 
     stats = cloner->getStats();
     ASSERT_EQUALS(3, stats.databasesCloned);
-    ASSERT_EQUALS(DatabaseName(boost::none, "admin"), stats.databaseStats[0].dbname);
-    ASSERT_EQUALS(DatabaseName(boost::none, "aab"), stats.databaseStats[1].dbname);
-    ASSERT_EQUALS(DatabaseName(boost::none, "a"), stats.databaseStats[2].dbname);
+    ASSERT_EQUALS(DatabaseName::kAdmin, stats.databaseStats[0].dbname);
+    ASSERT_EQUALS(DatabaseName::createDatabaseName_forTest(boost::none, "aab"),
+                  stats.databaseStats[1].dbname);
+    ASSERT_EQUALS(DatabaseName::createDatabaseName_forTest(boost::none, "a"),
+                  stats.databaseStats[2].dbname);
     ASSERT_EQUALS(_clock.now(), stats.databaseStats[2].end);
 }
 
@@ -701,9 +709,9 @@ TEST_F(AllDatabaseClonerTest,
 
     auto databases = getDatabasesFromCloner(cloner.get());
     // Expect 4 dbs, since "local" should be removed
-    DatabaseName adminWithTenantId = DatabaseName(tid, "admin");
-    DatabaseName aWithTenantId = DatabaseName(tid, "a");
-    DatabaseName aabWithTenantId = DatabaseName(tid, "aab");
+    DatabaseName adminWithTenantId = DatabaseName::createDatabaseName_forTest(tid, "admin");
+    DatabaseName aWithTenantId = DatabaseName::createDatabaseName_forTest(tid, "a");
+    DatabaseName aabWithTenantId = DatabaseName::createDatabaseName_forTest(tid, "aab");
     // Checks admin is first db.
     ASSERT_EQUALS(4u, databases.size());
     ASSERT_EQUALS("admin", databases[0].db());
@@ -714,7 +722,7 @@ TEST_F(AllDatabaseClonerTest,
     auto stats = cloner->getStats();
     ASSERT_EQUALS(0, stats.databasesCloned);
     ASSERT_EQUALS(4, stats.databaseStats.size());
-    ASSERT_EQUALS(DatabaseName(boost::none, "admin"), stats.databaseStats[0].dbname);
+    ASSERT_EQUALS(DatabaseName::kAdmin, stats.databaseStats[0].dbname);
     ASSERT_EQUALS(adminWithTenantId, stats.databaseStats[1].dbname);
     ASSERT_EQUALS(aabWithTenantId, stats.databaseStats[2].dbname);
     ASSERT_EQUALS(aWithTenantId, stats.databaseStats[3].dbname);
@@ -746,7 +754,7 @@ TEST_F(AllDatabaseClonerTest,
     stats = cloner->getStats();
     ASSERT_EQUALS(1, stats.databasesCloned);
     ASSERT_EQUALS(4, stats.databaseStats.size());
-    ASSERT_EQUALS(DatabaseName(boost::none, "admin"), stats.databaseStats[0].dbname);
+    ASSERT_EQUALS(DatabaseName::kAdmin, stats.databaseStats[0].dbname);
     ASSERT_EQUALS(adminWithTenantId, stats.databaseStats[1].dbname);
     ASSERT_EQUALS(aabWithTenantId, stats.databaseStats[2].dbname);
     ASSERT_EQUALS(aWithTenantId, stats.databaseStats[3].dbname);
@@ -776,7 +784,7 @@ TEST_F(AllDatabaseClonerTest,
     stats = cloner->getStats();
     ASSERT_EQUALS(2, stats.databasesCloned);
     ASSERT_EQUALS(4, stats.databaseStats.size());
-    ASSERT_EQUALS(DatabaseName(boost::none, "admin"), stats.databaseStats[0].dbname);
+    ASSERT_EQUALS(DatabaseName::kAdmin, stats.databaseStats[0].dbname);
     ASSERT_EQUALS(adminWithTenantId, stats.databaseStats[1].dbname);
     ASSERT_EQUALS(aabWithTenantId, stats.databaseStats[2].dbname);
     ASSERT_EQUALS(aWithTenantId, stats.databaseStats[3].dbname);
@@ -805,7 +813,7 @@ TEST_F(AllDatabaseClonerTest,
     stats = cloner->getStats();
     ASSERT_EQUALS(3, stats.databasesCloned);
     ASSERT_EQUALS(4, stats.databaseStats.size());
-    ASSERT_EQUALS(DatabaseName(boost::none, "admin"), stats.databaseStats[0].dbname);
+    ASSERT_EQUALS(DatabaseName::kAdmin, stats.databaseStats[0].dbname);
     ASSERT_EQUALS(adminWithTenantId, stats.databaseStats[1].dbname);
     ASSERT_EQUALS(aabWithTenantId, stats.databaseStats[2].dbname);
     ASSERT_EQUALS(aWithTenantId, stats.databaseStats[3].dbname);
@@ -821,7 +829,7 @@ TEST_F(AllDatabaseClonerTest,
 
     stats = cloner->getStats();
     ASSERT_EQUALS(4, stats.databasesCloned);
-    ASSERT_EQUALS(DatabaseName(boost::none, "admin"), stats.databaseStats[0].dbname);
+    ASSERT_EQUALS(DatabaseName::kAdmin, stats.databaseStats[0].dbname);
     ASSERT_EQUALS(adminWithTenantId, stats.databaseStats[1].dbname);
     ASSERT_EQUALS(aabWithTenantId, stats.databaseStats[2].dbname);
     ASSERT_EQUALS(aWithTenantId, stats.databaseStats[3].dbname);

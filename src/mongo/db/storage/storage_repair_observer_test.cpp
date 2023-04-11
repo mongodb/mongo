@@ -72,7 +72,7 @@ public:
 
     void createMockReplConfig(OperationContext* opCtx) {
         BSONObj replConfig;
-        Lock::DBLock dbLock(opCtx, DatabaseName(boost::none, "local"), MODE_X);
+        Lock::DBLock dbLock(opCtx, DatabaseName::kLocal, MODE_X);
         Helpers::putSingleton(
             opCtx,
             NamespaceString::createNamespaceString_forTest(boost::none, "local.system.replset"),
@@ -94,7 +94,7 @@ public:
 
     bool hasReplConfig(OperationContext* opCtx) {
         BSONObj replConfig;
-        Lock::DBLock dbLock(opCtx, DatabaseName(boost::none, "local"), MODE_IS);
+        Lock::DBLock dbLock(opCtx, DatabaseName::kLocal, MODE_IS);
         return Helpers::getSingleton(
             opCtx,
             NamespaceString::createNamespaceString_forTest(boost::none, "local.system.replset"),

@@ -472,8 +472,8 @@ TEST_F(CatalogRAIITestFixture, AutoGetDBDifferentTenantsConflictingNamespaces) {
     auto tenant1 = TenantId(OID::gen());
     auto tenant2 = TenantId(OID::gen());
 
-    DatabaseName dbName1(tenant1, db);
-    DatabaseName dbName2(tenant2, db);
+    DatabaseName dbName1 = DatabaseName::createDatabaseName_forTest(tenant1, db);
+    DatabaseName dbName2 = DatabaseName::createDatabaseName_forTest(tenant2, db);
 
     AutoGetDb db1(client1.second.get(), dbName1, MODE_X);
     AutoGetDb db2(client2.second.get(), dbName2, MODE_X);
@@ -484,7 +484,7 @@ TEST_F(CatalogRAIITestFixture, AutoGetDBDifferentTenantsConflictingNamespaces) {
 
 TEST_F(CatalogRAIITestFixture, AutoGetDBWithTenantHitsDeadline) {
     auto db = "db1";
-    DatabaseName dbName(TenantId(OID::gen()), db);
+    DatabaseName dbName = DatabaseName::createDatabaseName_forTest(TenantId(OID::gen()), db);
 
     Lock::DBLock dbLock1(client1.second.get(), dbName, MODE_X);
     ASSERT(client1.second->lockState()->isDbLockedForMode(dbName, MODE_X));

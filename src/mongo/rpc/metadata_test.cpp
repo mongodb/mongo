@@ -50,7 +50,9 @@ void checkUpconvert(const BSONObj& legacyCommand,
                     const int legacyQueryFlags,
                     BSONObj upconvertedCommand) {
     upconvertedCommand = addDollarDB(std::move(upconvertedCommand), "db");
-    auto converted = upconvertRequest({boost::none, "db"}, legacyCommand, legacyQueryFlags);
+    auto converted = upconvertRequest(DatabaseName::createDatabaseName_forTest(boost::none, "db"),
+                                      legacyCommand,
+                                      legacyQueryFlags);
 
     // We don't care about the order of the fields in the metadata object
     const auto sorted = [](const BSONObj& obj) {
@@ -99,9 +101,11 @@ TEST(Metadata, UpconvertDuplicateReadPreference) {
     bob.append("$queryOptions", BSON("$readPreference" << secondaryReadPref));
     bob.append("$readPreference", nearestReadPref);
 
-    ASSERT_THROWS_CODE(rpc::upconvertRequest({boost::none, "db"}, bob.obj(), 0),
-                       AssertionException,
-                       ErrorCodes::InvalidOptions);
+    ASSERT_THROWS_CODE(
+        rpc::upconvertRequest(
+            DatabaseName::createDatabaseName_forTest(boost::none, "db"), bob.obj(), 0),
+        AssertionException,
+        ErrorCodes::InvalidOptions);
 }
 
 TEST(Metadata, UpconvertUsesDocumentSequecesCorrectly) {
@@ -123,7 +127,8 @@ TEST(Metadata, UpconvertUsesDocumentSequecesCorrectly) {
     };
 
     for (const auto& cmd : valid) {
-        const auto converted = rpc::upconvertRequest({boost::none, "db"}, cmd, 0);
+        const auto converted = rpc::upconvertRequest(
+            DatabaseName::createDatabaseName_forTest(boost::none, "db"), cmd, 0);
         ASSERT_BSONOBJ_EQ(converted.body, fromjson("{insert: 'coll', $db: 'db'}"));
         ASSERT_EQ(converted.sequences.size(), 1u);
         ASSERT_EQ(converted.sequences[0].name, "documents");
@@ -145,7 +150,8 @@ TEST(Metadata, UpconvertUsesDocumentSequecesCorrectly) {
     }
 
     for (const auto& cmd : invalid) {
-        const auto converted = rpc::upconvertRequest({boost::none, "db"}, cmd, 0);
+        const auto converted = rpc::upconvertRequest(
+            DatabaseName::createDatabaseName_forTest(boost::none, "db"), cmd, 0);
         ASSERT_BSONOBJ_EQ(converted.body, addDollarDB(cmd, "db"));
         ASSERT_EQ(converted.sequences.size(), 0u);
     }

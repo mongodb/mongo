@@ -48,7 +48,7 @@ using namespace fmt::literals;
 
 TEST(NamespaceStringTest, CheckNamespaceStringLogAttrs) {
     TenantId tenantId(OID::gen());
-    DatabaseName dbName(tenantId, "foo");
+    DatabaseName dbName = DatabaseName::createDatabaseName_forTest(tenantId, "foo");
     NamespaceString nss = NamespaceString::createNamespaceString_forTest(dbName, "bar");
 
     startCapturingLogMessages();
@@ -302,7 +302,8 @@ TEST(NamespaceStringTest, NamespaceStringParse5) {
 }
 
 TEST(NamespaceStringTest, makeListCollectionsNSIsCorrect) {
-    NamespaceString ns = NamespaceString::makeListCollectionsNSS(DatabaseName(boost::none, "DB"));
+    NamespaceString ns = NamespaceString::makeListCollectionsNSS(
+        DatabaseName::createDatabaseName_forTest(boost::none, "DB"));
     ASSERT_EQUALS("DB", ns.db());
     ASSERT_EQUALS("$cmd.listCollections", ns.coll());
     ASSERT(ns.isValid());
@@ -332,7 +333,7 @@ TEST(NamespaceStringTest, NSSWithTenantId) {
     ASSERT(nss.tenantId());
     ASSERT_EQ(*nss.tenantId(), tenantId);
 
-    DatabaseName dbName(tenantId, "foo");
+    DatabaseName dbName = DatabaseName::createDatabaseName_forTest(tenantId, "foo");
     NamespaceString nss2 = NamespaceString::createNamespaceString_forTest(dbName, "bar");
     ASSERT_EQ(nss2.ns(), "foo.bar");
     ASSERT_EQ(nss2.toString(), "foo.bar");
@@ -366,7 +367,7 @@ TEST(NamespaceStringTest, NSSNoCollectionWithTenantId) {
     ASSERT(nss.tenantId());
     ASSERT_EQ(*nss.tenantId(), tenantId);
 
-    DatabaseName dbName(tenantId, "foo");
+    DatabaseName dbName = DatabaseName::createDatabaseName_forTest(tenantId, "foo");
     NamespaceString nss2 = NamespaceString::createNamespaceString_forTest(dbName, "");
     ASSERT(nss2.tenantId());
     ASSERT_EQ(*nss2.tenantId(), tenantId);

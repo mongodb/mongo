@@ -100,8 +100,8 @@ TEST(ChangeStreamEventTransformTest, TestDefaultUpdateTransform) {
 }
 
 TEST(ChangeStreamEventTransformTest, TestCreateViewTransform) {
-    const NamespaceString systemViewNss =
-        NamespaceString::makeSystemDotViewsNamespace({boost::none, "viewDB"});
+    const NamespaceString systemViewNss = NamespaceString::makeSystemDotViewsNamespace(
+        DatabaseName::createDatabaseName_forTest(boost::none, "viewDB"));
     const NamespaceString viewNss =
         NamespaceString::createNamespaceString_forTest(boost::none, "viewDB.view.name");
     const auto viewPipeline =
@@ -128,15 +128,16 @@ TEST(ChangeStreamEventTransformTest, TestCreateViewTransform) {
          Document{{"db", viewNss.db()}, {"coll", viewNss.coll()}}},
         {DocumentSourceChangeStream::kOperationDescriptionField, opDescription}};
 
-    ASSERT_DOCUMENT_EQ(applyTransformation(oplogEntry,
-                                           NamespaceString::makeCollectionlessAggregateNSS(
-                                               DatabaseName(boost::none, "viewDB"))),
-                       expectedDoc);
+    ASSERT_DOCUMENT_EQ(
+        applyTransformation(oplogEntry,
+                            NamespaceString::makeCollectionlessAggregateNSS(
+                                DatabaseName::createDatabaseName_forTest(boost::none, "viewDB"))),
+        expectedDoc);
 }
 
 TEST(ChangeStreamEventTransformTest, TestCreateViewOnSingleCollection) {
-    const NamespaceString systemViewNss =
-        NamespaceString::makeSystemDotViewsNamespace({boost::none, "viewDB"});
+    const NamespaceString systemViewNss = NamespaceString::makeSystemDotViewsNamespace(
+        DatabaseName::createDatabaseName_forTest(boost::none, "viewDB"));
     const NamespaceString viewNss =
         NamespaceString::createNamespaceString_forTest(boost::none, "viewDB.view.name");
     const auto viewPipeline =
@@ -363,8 +364,8 @@ TEST(ChangeStreamEventTransformTest, TestCreateViewTransformWithTenantId) {
 
     const auto tenantId = TenantId(OID::gen());
 
-    const NamespaceString systemViewNss =
-        NamespaceString::makeSystemDotViewsNamespace({tenantId, "viewDB"});
+    const NamespaceString systemViewNss = NamespaceString::makeSystemDotViewsNamespace(
+        DatabaseName::createDatabaseName_forTest(tenantId, "viewDB"));
     const NamespaceString viewNss =
         NamespaceString::createNamespaceString_forTest(tenantId, "viewDB.view.name");
     const auto viewPipeline =

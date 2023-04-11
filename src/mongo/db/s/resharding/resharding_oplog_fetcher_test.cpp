@@ -248,7 +248,10 @@ public:
             onCommand([&](const executor::RemoteCommandRequest& request) -> StatusWith<BSONObj> {
                 DBDirectClient client(cc().getOperationContext());
                 BSONObj result;
-                bool res = client.runCommand({boost::none, request.dbname}, request.cmdObj, result);
+                bool res = client.runCommand(
+                    DatabaseName::createDatabaseName_forTest(boost::none, request.dbname),
+                    request.cmdObj,
+                    result);
                 if (res == false || result.hasField("cursorsKilled") ||
                     result["cursor"]["id"].Long() == 0) {
                     hasMore = false;

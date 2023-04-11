@@ -419,7 +419,7 @@ TEST_F(ClusterServerParameterOpObserverTest, onDropDatabase) {
 
     // Reinitialize and drop the other tenant's config DB.
     initializeState();
-    doDropDatabase(DatabaseName(kTenantId, kConfigDB));
+    doDropDatabase(DatabaseName::createDatabaseName_forTest(kTenantId, kConfigDB));
 
     ASSERT_PARAMETER_STATE(boost::none, kInitialIntValue, kInitialStrValue);
     ASSERT_PARAMETER_STATE(kTenantId, kDefaultIntValue, kDefaultStrValue);
@@ -498,8 +498,10 @@ TEST_F(ClusterServerParameterOpObserverTest, abortsAfterObservation) {
     ASSERT_PARAMETER_STATE(boost::none, kInitialIntValue, kInitialStrValue);
     ASSERT_PARAMETER_STATE(kTenantId, kInitialTenantIntValue, kInitialTenantStrValue);
 
-    doDropDatabase(DatabaseName(boost::none, kConfigDB), false /* commit */);
-    doDropDatabase(DatabaseName(kTenantId, kConfigDB), false /* commit */);
+    doDropDatabase(DatabaseName::createDatabaseName_forTest(boost::none, kConfigDB),
+                   false /* commit */);
+    doDropDatabase(DatabaseName::createDatabaseName_forTest(kTenantId, kConfigDB),
+                   false /* commit */);
 
     ASSERT_PARAMETER_STATE(boost::none, kInitialIntValue, kInitialStrValue);
     ASSERT_PARAMETER_STATE(kTenantId, kInitialTenantIntValue, kInitialTenantStrValue);

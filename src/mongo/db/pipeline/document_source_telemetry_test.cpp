@@ -49,8 +49,7 @@ class DocumentSourceTelemetryTest : public AggregationContextFixture {
 public:
     DocumentSourceTelemetryTest()
         : AggregationContextFixture(
-              NamespaceString::makeCollectionlessAggregateNSS(DatabaseName(boost::none, "admin"))) {
-    }
+              NamespaceString::makeCollectionlessAggregateNSS(DatabaseName::kAdmin)) {}
 };
 
 TEST_F(DocumentSourceTelemetryTest, ShouldFailToParseIfSpecIsNotObject) {
@@ -61,8 +60,8 @@ TEST_F(DocumentSourceTelemetryTest, ShouldFailToParseIfSpecIsNotObject) {
 }
 
 TEST_F(DocumentSourceTelemetryTest, ShouldFailToParseIfNotRunOnAdmin) {
-    getExpCtx()->ns =
-        NamespaceString::makeCollectionlessAggregateNSS(DatabaseName(boost::none, "foo"));
+    getExpCtx()->ns = NamespaceString::makeCollectionlessAggregateNSS(
+        DatabaseName::createDatabaseName_forTest(boost::none, "foo"));
     ASSERT_THROWS_CODE(DocumentSourceTelemetry::createFromBson(
                            fromjson("{$telemetry: {}}").firstElement(), getExpCtx()),
                        AssertionException,

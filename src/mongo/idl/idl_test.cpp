@@ -2550,7 +2550,7 @@ TEST(IDLCommand, TestConcatentateWithDb_WithTenant) {
 
     auto testStruct =
         BasicConcatenateWithDbCommand::parse(ctxt, makeOMRWithTenant(testDoc, tenantId));
-    ASSERT_EQUALS(testStruct.getDbName(), DatabaseName(tenantId, "db"));
+    ASSERT_EQUALS(testStruct.getDbName(), DatabaseName::createDatabaseName_forTest(tenantId, "db"));
     ASSERT_EQUALS(testStruct.getNamespace(),
                   NamespaceString::createNamespaceString_forTest(tenantId, "db.coll1"));
 
@@ -2562,7 +2562,7 @@ TEST(IDLCommand, TestConcatentateWithDb_WithTenant) {
 
 TEST(IDLCommand, TestConcatentateWithDb_TestConstructor) {
     const auto tenantId = TenantId(OID::gen());
-    const DatabaseName dbName(tenantId, "db");
+    const DatabaseName dbName = DatabaseName::createDatabaseName_forTest(tenantId, "db");
 
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest(dbName, "coll1");
     BasicConcatenateWithDbCommand testRequest(nss);
@@ -2700,7 +2700,7 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestNSS_WithTenant) {
 
     auto testStruct =
         BasicConcatenateWithDbOrUUIDCommand::parse(ctxt, makeOMRWithTenant(testDoc, tenantId));
-    ASSERT_EQUALS(testStruct.getDbName(), DatabaseName(tenantId, "db"));
+    ASSERT_EQUALS(testStruct.getDbName(), DatabaseName::createDatabaseName_forTest(tenantId, "db"));
     ASSERT_EQUALS(testStruct.getNamespaceOrUUID().nss().value(),
                   NamespaceString::createNamespaceString_forTest(tenantId, "db.coll1"));
 
@@ -2775,8 +2775,9 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestUUID_WithTenant) {
 
     auto testStruct =
         BasicConcatenateWithDbOrUUIDCommand::parse(ctxt, makeOMRWithTenant(testDoc, tenantId));
-    ASSERT_EQUALS(testStruct.getDbName(), DatabaseName(tenantId, "db"));
-    ASSERT_EQUALS(testStruct.getNamespaceOrUUID().dbName().value(), DatabaseName(tenantId, "db"));
+    ASSERT_EQUALS(testStruct.getDbName(), DatabaseName::createDatabaseName_forTest(tenantId, "db"));
+    ASSERT_EQUALS(testStruct.getNamespaceOrUUID().dbName().value(),
+                  DatabaseName::createDatabaseName_forTest(tenantId, "db"));
 
     assert_same_types<decltype(testStruct.getNamespaceOrUUID()), const NamespaceStringOrUUID&>();
 
@@ -2787,7 +2788,7 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestUUID_WithTenant) {
 TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestConstructor) {
     const UUID uuid = UUID::gen();
     const auto tenantId = TenantId(OID::gen());
-    const DatabaseName dbName(tenantId, "db");
+    const DatabaseName dbName = DatabaseName::createDatabaseName_forTest(tenantId, "db");
 
     const NamespaceStringOrUUID withUUID(dbName, uuid);
     BasicConcatenateWithDbOrUUIDCommand testRequest1(withUUID);
@@ -2941,7 +2942,7 @@ void TestLoopbackCommandTypeVariant(TestT test_value) {
 
     // Test the constructor.
     CommandT constructed(test_value);
-    constructed.setDbName(DatabaseName(boost::none, "db"));
+    constructed.setDbName(DatabaseName::createDatabaseName_forTest(boost::none, "db"));
     if constexpr (std::is_same_v<TestT, BSONObj>) {
         ASSERT_BSONOBJ_EQ(stdx::get<TestT>(parsed.getValue()), test_value);
     } else {
@@ -3798,7 +3799,7 @@ TEST(IDLTypeCommand, TestString) {
         BSONObjBuilder builder;
         CommandTypeStringCommand one_new("foo");
         one_new.setField1(3);
-        one_new.setDbName(DatabaseName(boost::none, "db"));
+        one_new.setDbName(DatabaseName::createDatabaseName_forTest(boost::none, "db"));
         one_new.serialize(BSONObj(), &builder);
 
         auto serializedDoc = builder.obj();
@@ -3809,7 +3810,7 @@ TEST(IDLTypeCommand, TestString) {
     {
         CommandTypeStringCommand one_new("foo");
         one_new.setField1(3);
-        one_new.setDbName(DatabaseName(boost::none, "db"));
+        one_new.setDbName(DatabaseName::createDatabaseName_forTest(boost::none, "db"));
         OpMsgRequest reply = one_new.serialize(BSONObj());
         ASSERT_BSONOBJ_EQ(testDoc, serializeCmd(one_new));
     }
@@ -3839,7 +3840,7 @@ TEST(IDLTypeCommand, TestArrayObject) {
         vec.emplace_back(BSON("sample"
                               << "doc"));
         CommandTypeArrayObjectCommand one_new(vec);
-        one_new.setDbName(DatabaseName(boost::none, "db"));
+        one_new.setDbName(DatabaseName::createDatabaseName_forTest(boost::none, "db"));
         ASSERT_BSONOBJ_EQ(testDoc, serializeCmd(one_new));
     }
 }
@@ -3875,7 +3876,7 @@ TEST(IDLTypeCommand, TestStruct) {
         One_string os;
         os.setValue("sample");
         CommandTypeStructCommand one_new(os);
-        one_new.setDbName(DatabaseName(boost::none, "db"));
+        one_new.setDbName(DatabaseName::createDatabaseName_forTest(boost::none, "db"));
         ASSERT_BSONOBJ_EQ(testDoc, serializeCmd(one_new));
     }
 }
@@ -3905,7 +3906,7 @@ TEST(IDLTypeCommand, TestStructArray) {
         os.setValue("sample");
         vec.push_back(os);
         CommandTypeArrayStructCommand one_new(vec);
-        one_new.setDbName(DatabaseName(boost::none, "db"));
+        one_new.setDbName(DatabaseName::createDatabaseName_forTest(boost::none, "db"));
         ASSERT_BSONOBJ_EQ(testDoc, serializeCmd(one_new));
     }
 }
@@ -3935,7 +3936,7 @@ TEST(IDLTypeCommand, TestUnderscoreCommand) {
         BSONObjBuilder builder;
         WellNamedCommand one_new("foo");
         one_new.setField1(3);
-        one_new.setDbName(DatabaseName(boost::none, "db"));
+        one_new.setDbName(DatabaseName::createDatabaseName_forTest(boost::none, "db"));
         one_new.serialize(BSONObj(), &builder);
 
         auto serializedDoc = builder.obj();
@@ -3946,7 +3947,7 @@ TEST(IDLTypeCommand, TestUnderscoreCommand) {
     {
         WellNamedCommand one_new("foo");
         one_new.setField1(3);
-        one_new.setDbName(DatabaseName(boost::none, "db"));
+        one_new.setDbName(DatabaseName::createDatabaseName_forTest(boost::none, "db"));
         ASSERT_BSONOBJ_EQ(testDoc, serializeCmd(one_new));
     }
 }
@@ -4176,7 +4177,8 @@ TEST(IDLCommand,
     const auto tenantId = TenantId(OID::gen());
     auto testStruct =
         CommandTypeNamespaceCommand::parse(ctxt, makeOMRWithTenant(testDoc, tenantId));
-    ASSERT_EQUALS(testStruct.getDbName(), DatabaseName(tenantId, "admin"));
+    ASSERT_EQUALS(testStruct.getDbName(),
+                  DatabaseName::createDatabaseName_forTest(tenantId, "admin"));
     ASSERT_EQUALS(testStruct.getCommandParameter(),
                   NamespaceString::createNamespaceString_forTest(tenantId, "db.coll1"));
     assert_same_types<decltype(testStruct.getCommandParameter()), const NamespaceString&>();
@@ -4200,7 +4202,8 @@ TEST(IDLCommand, TestCommandTypeNamespaceCommand_WithMultitenancySupportOn) {
 
     auto testStruct = CommandTypeNamespaceCommand::parse(ctxt, makeOMR(testDoc));
 
-    ASSERT_EQUALS(testStruct.getDbName(), DatabaseName(tenantId, "admin"));
+    ASSERT_EQUALS(testStruct.getDbName(),
+                  DatabaseName::createDatabaseName_forTest(tenantId, "admin"));
     // Deserialize called from parse correctly sets the tenantId field.
     ASSERT_EQUALS(testStruct.getCommandParameter(),
                   NamespaceString::createNamespaceString_forTest(tenantId, "db.coll1"));

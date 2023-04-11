@@ -420,7 +420,9 @@ TEST(MockDBClientConnTest, SetCmdReply) {
     {
         MockDBClientConnection conn(&server);
         BSONObj response;
-        ASSERT(conn.runCommand({boost::none, "foo"}, BSON("serverStatus" << 1), response));
+        ASSERT(conn.runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "foo"),
+                               BSON("serverStatus" << 1),
+                               response));
         ASSERT_EQUALS(1, response["ok"].numberInt());
         ASSERT_EQUALS("local", response["host"].str());
 
@@ -431,7 +433,9 @@ TEST(MockDBClientConnTest, SetCmdReply) {
     {
         MockDBClientConnection conn(&server);
         BSONObj response;
-        ASSERT(conn.runCommand({boost::none, "foo"}, BSON("serverStatus" << 1), response));
+        ASSERT(conn.runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "foo"),
+                               BSON("serverStatus" << 1),
+                               response));
         ASSERT_EQUALS(1, response["ok"].numberInt());
         ASSERT_EQUALS("local", response["host"].str());
 
@@ -441,7 +445,9 @@ TEST(MockDBClientConnTest, SetCmdReply) {
     {
         MockDBClientConnection conn(&server);
         BSONObj response;
-        ASSERT(conn.runCommand({boost::none, "foo"}, BSON("serverStatus" << 1), response));
+        ASSERT(conn.runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "foo"),
+                               BSON("serverStatus" << 1),
+                               response));
         ASSERT_EQUALS(1, response["ok"].numberInt());
         ASSERT_EQUALS("local", response["host"].str());
 
@@ -466,7 +472,9 @@ TEST(MockDBClientConnTest, CyclingCmd) {
     {
         MockDBClientConnection conn(&server);
         BSONObj response;
-        ASSERT(conn.runCommand({boost::none, "foo"}, BSON("isMaster" << 1), response));
+        ASSERT(conn.runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "foo"),
+                               BSON("isMaster" << 1),
+                               response));
         ASSERT_EQUALS(1, response["ok"].numberInt());
         ASSERT_EQUALS("a", response["set"].str());
         ASSERT(response["isMaster"].trueValue());
@@ -477,7 +485,9 @@ TEST(MockDBClientConnTest, CyclingCmd) {
     {
         MockDBClientConnection conn(&server);
         BSONObj response;
-        ASSERT(conn.runCommand({boost::none, "foo"}, BSON("isMaster" << 1), response));
+        ASSERT(conn.runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "foo"),
+                               BSON("isMaster" << 1),
+                               response));
         ASSERT_EQUALS(1, response["ok"].numberInt());
         ASSERT_EQUALS("a", response["set"].str());
         ASSERT(!response["isMaster"].trueValue());
@@ -488,7 +498,9 @@ TEST(MockDBClientConnTest, CyclingCmd) {
     {
         MockDBClientConnection conn(&server);
         BSONObj response;
-        ASSERT(conn.runCommand({boost::none, "foo"}, BSON("isMaster" << 1), response));
+        ASSERT(conn.runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "foo"),
+                               BSON("isMaster" << 1),
+                               response));
         ASSERT_EQUALS(1, response["ok"].numberInt());
         ASSERT_EQUALS("a", response["set"].str());
         ASSERT(response["isMaster"].trueValue());
@@ -505,7 +517,7 @@ TEST(MockDBClientConnTest, MultipleStoredResponse) {
     MockDBClientConnection conn(&server);
     {
         BSONObj response;
-        ASSERT(conn.runCommand({boost::none, "foo"},
+        ASSERT(conn.runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "foo"),
                                BSON("isMaster"
                                     << "abc"),
                                response));
@@ -514,7 +526,9 @@ TEST(MockDBClientConnTest, MultipleStoredResponse) {
 
     {
         BSONObj response;
-        ASSERT(!conn.runCommand({boost::none, "a"}, BSON("serverStatus" << 1), response));
+        ASSERT(!conn.runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "a"),
+                                BSON("serverStatus" << 1),
+                                response));
     }
 }
 
@@ -527,14 +541,18 @@ TEST(MockDBClientConnTest, CmdCount) {
     {
         MockDBClientConnection conn(&server);
         BSONObj response;
-        ASSERT(conn.runCommand({boost::none, "foo"}, BSON("serverStatus" << 1), response));
+        ASSERT(conn.runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "foo"),
+                               BSON("serverStatus" << 1),
+                               response));
         ASSERT_EQUALS(1U, server.getCmdCount());
     }
 
     {
         MockDBClientConnection conn(&server);
         BSONObj response;
-        ASSERT(conn.runCommand({boost::none, "baz"}, BSON("serverStatus" << 1), response));
+        ASSERT(conn.runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "baz"),
+                               BSON("serverStatus" << 1),
+                               response));
         ASSERT_EQUALS(2U, server.getCmdCount());
     }
 }
@@ -558,7 +576,9 @@ TEST(MockDBClientConnTest, Shutdown) {
     {
         MockDBClientConnection conn(&server);
         BSONObj response;
-        ASSERT_THROWS(conn.runCommand({boost::none, "test"}, BSON("serverStatus" << 1), response),
+        ASSERT_THROWS(conn.runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "test"),
+                                      BSON("serverStatus" << 1),
+                                      response),
                       mongo::NetworkException);
     }
 
@@ -576,7 +596,9 @@ TEST(MockDBClientConnTest, Restart) {
     // new instance still has it
     conn1.find(FindCommandRequest(NamespaceString::createNamespaceString_forTest("test.user")));
     BSONObj response;
-    conn1.runCommand({boost::none, "test"}, BSON("serverStatus" << 1), response);
+    conn1.runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "test"),
+                     BSON("serverStatus" << 1),
+                     response);
 
     server.shutdown();
     ASSERT_THROWS(
@@ -620,7 +642,9 @@ TEST(MockDBClientConnTest, ClearCounter) {
     conn.find(FindCommandRequest(
         FindCommandRequest(NamespaceString::createNamespaceString_forTest("test.user"))));
     BSONObj response;
-    conn.runCommand({boost::none, "test"}, BSON("serverStatus" << 1), response);
+    conn.runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "test"),
+                    BSON("serverStatus" << 1),
+                    response);
 
     server.clearCounters();
     ASSERT_EQUALS(0U, server.getQueryCount());
@@ -647,7 +671,9 @@ TEST(MockDBClientConnTest, Delay) {
     {
         mongo::Timer timer;
         BSONObj response;
-        conn.runCommand({boost::none, "x"}, BSON("serverStatus" << 1), response);
+        conn.runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "x"),
+                        BSON("serverStatus" << 1),
+                        response);
         const int nowInMilliSec = timer.millis();
         ASSERT_GREATER_THAN_OR_EQUALS(nowInMilliSec, 130);
     }

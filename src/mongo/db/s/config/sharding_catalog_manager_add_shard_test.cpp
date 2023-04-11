@@ -228,7 +228,8 @@ protected:
         std::vector<std::string> dbnamesOnTarget;
         for (const auto& tenantId : tenantsOnTarget) {
             dbnamesOnTarget.push_back(
-                DatabaseName(tenantId, DatabaseName::kConfig.db()).toStringWithTenantId());
+                DatabaseName::createDatabaseName_forTest(tenantId, DatabaseName::kConfig.db())
+                    .toStringWithTenantId());
         }
 
         if (gMultitenancySupport) {
@@ -258,7 +259,8 @@ protected:
             ASSERT_EQ(results.size(), 1);
             ASSERT_EQ(results[0]["_id"].String(), "testStrClusterParameter");
             ASSERT_EQ(results[0]["strData"].String(),
-                      DatabaseName(tenantId, DatabaseName::kConfig.db()).toStringWithTenantId());
+                      DatabaseName::createDatabaseName_forTest(tenantId, DatabaseName::kConfig.db())
+                          .toStringWithTenantId());
         }
     }
 
@@ -313,7 +315,7 @@ protected:
             for (auto& param : params) {
                 SetClusterParameter setClusterParameterRequest(param);
                 setClusterParameterRequest.setDbName(
-                    DatabaseName(tenantId, DatabaseName::kAdmin.db()));
+                    DatabaseName::createDatabaseName_forTest(tenantId, DatabaseName::kAdmin.db()));
                 DBDirectClient client(operationContext());
                 ClusterParameterDBClientService dbService(client);
                 std::unique_ptr<ServerParameterService> parameterService =
@@ -378,13 +380,13 @@ protected:
                                               << BSON("level"
                                                       << "majority")));
                 auto cursorRes =
-                    CursorResponse(NamespaceString::createNamespaceString_forTest(
-                                       DatabaseName(request.dbname),
-                                       NamespaceString::kClusterParametersNamespace.coll()),
-                                   0,
-                                   {BSON("_id"
-                                         << "testStrClusterParameter"
-                                         << "strData" << request.dbname)});
+                    CursorResponse(
+                        NamespaceString::createNamespaceString_forTest(
+                            request.dbname, NamespaceString::kClusterParametersNamespace.coll()),
+                        0,
+                        {BSON("_id"
+                              << "testStrClusterParameter"
+                              << "strData" << request.dbname)});
                 return cursorRes.toBSON(CursorResponse::ResponseType::InitialResponse);
             });
         }

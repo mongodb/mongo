@@ -1135,7 +1135,7 @@ TEST_F(StorageTimestampTest, SecondaryCreateTwoCollections) {
 
     BSONObjBuilder resultBuilder;
     auto swResult =
-        doApplyOps(DatabaseName(dbName),
+        doApplyOps(DatabaseName::createDatabaseName_forTest(boost::none, dbName),
                    {
                        BSON("ts" << _presentTs << "t" << 1LL << "op"
                                  << "c"
@@ -2211,7 +2211,7 @@ TEST_F(StorageTimestampTest, TimestampMultiIndexBuildsDuringRename) {
     // Rename collection.
     BSONObj renameResult;
     ASSERT(client.runCommand(
-        DatabaseName(boost::none, "admin"),
+        DatabaseName::kAdmin,
         BSON("renameCollection" << nss.ns() << "to" << renamedNss.ns() << "dropTarget" << true),
         renameResult))
         << renameResult;
@@ -2957,8 +2957,8 @@ TEST_F(StorageTimestampTest, ViewCreationSeparateTransaction) {
 
     const NamespaceString viewNss =
         NamespaceString::createNamespaceString_forTest("unittests.view");
-    const NamespaceString systemViewsNss =
-        NamespaceString::makeSystemDotViewsNamespace({boost::none, "unittests"});
+    const NamespaceString systemViewsNss = NamespaceString::makeSystemDotViewsNamespace(
+        DatabaseName::createDatabaseName_forTest(boost::none, "unittests"));
 
     ASSERT_OK(createCollection(_opCtx,
                                viewNss.dbName(),

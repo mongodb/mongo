@@ -410,7 +410,7 @@ inline void kill_wrapper(ProcessId pid, int sig, int port, const BSONObj& opt) {
                 BSONObjBuilder b;
                 b.append("shutdown", 1);
                 b.append("force", 1);
-                conn.runCommand(DatabaseName(boost::none, "admin"), b.done(), info);
+                conn.runCommand(DatabaseName::kAdmin, b.done(), info);
             } catch (...) {
                 // Do nothing. This command never returns data to the client and the driver
                 // doesn't like that.

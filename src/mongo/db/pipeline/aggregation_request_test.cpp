@@ -256,8 +256,8 @@ TEST(AggregationRequestTest, ShouldSerializeBatchSizeIfSetAndExplainFalse) {
 }
 
 TEST(AggregationRequestTest, ShouldSerialiseAggregateFieldToOneIfCollectionIsAggregateOneNSS) {
-    NamespaceString nss =
-        NamespaceString::makeCollectionlessAggregateNSS(DatabaseName(boost::none, "a"));
+    NamespaceString nss = NamespaceString::makeCollectionlessAggregateNSS(
+        DatabaseName::createDatabaseName_forTest(boost::none, "a"));
     AggregateCommandRequest request(nss, std::vector<mongo::BSONObj>());
 
     auto expectedSerialization =
@@ -384,14 +384,15 @@ void parseNSHelper(const std::string& dbName,
                    const BSONObj& invalidFields,
                    ErrorCodes::Error expectedCode) {
     // Verify that 'validRequest' parses correctly.
-    auto shouldNotThrow =
-        aggregation_request_helper::parseNs(DatabaseName(boost::none, dbName), validRequest);
+    auto shouldNotThrow = aggregation_request_helper::parseNs(
+        DatabaseName::createDatabaseName_forTest(boost::none, dbName), validRequest);
 
     auto invalidRequest = constructInvalidRequest(validRequest, invalidFields);
 
     // Verify that the constructed invalid request fails to parse with 'expectedCode'.
     ASSERT_THROWS_CODE(
-        aggregation_request_helper::parseNs(DatabaseName(boost::none, "a"), invalidRequest),
+        aggregation_request_helper::parseNs(
+            DatabaseName::createDatabaseName_forTest(boost::none, "a"), invalidRequest),
         AssertionException,
         expectedCode);
 }
@@ -667,7 +668,8 @@ TEST(AggregationRequestTest, ParseNSShouldReturnAggregateOneNSIfAggregateFieldIs
     for (auto& one : ones) {
         const BSONObj inputBSON =
             fromjson(str::stream() << "{aggregate: " << one << ", pipeline: [], $db: 'a'}");
-        ASSERT(aggregation_request_helper::parseNs(DatabaseName(boost::none, "a"), inputBSON)
+        ASSERT(aggregation_request_helper::parseNs(
+                   DatabaseName::createDatabaseName_forTest(boost::none, "a"), inputBSON)
                    .isCollectionlessAggregateNS());
     }
 }

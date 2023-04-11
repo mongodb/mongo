@@ -127,6 +127,11 @@ public:
                 dbString.find('\0') == std::string::npos);
     }
 
+    static DatabaseName createDatabaseName_forTest(boost::optional<TenantId> tenantId,
+                                                   StringData dbString) {
+        return DatabaseName(tenantId, dbString);
+    }
+
     /**
      * Prefer to use the constructor above.
      * TODO SERVER-65456 Remove this constructor.

@@ -198,7 +198,8 @@ public:
         }
 
         int numEntries = 0;
-        for (auto it = catalog.begin(opCtx.get(), DatabaseName(boost::none, "resourceDb"));
+        for (auto it = catalog.begin(
+                 opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "resourceDb"));
              it != catalog.end(opCtx.get());
              it++) {
             auto coll = *it;
@@ -213,7 +214,8 @@ public:
 
     void tearDown() {
         std::vector<UUID> collectionsToDeregister;
-        for (auto it = catalog.begin(opCtx.get(), DatabaseName(boost::none, "resourceDb"));
+        for (auto it = catalog.begin(
+                 opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "resourceDb"));
              it != catalog.end(opCtx.get());
              ++it) {
             auto coll = *it;
@@ -230,7 +232,8 @@ public:
         }
 
         int numEntries = 0;
-        for (auto it = catalog.begin(opCtx.get(), DatabaseName(boost::none, "resourceDb"));
+        for (auto it = catalog.begin(
+                 opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "resourceDb"));
              it != catalog.end(opCtx.get());
              it++) {
             numEntries++;
@@ -248,7 +251,7 @@ protected:
 TEST_F(CollectionCatalogResourceTest, RemoveAllResources) {
     catalog.deregisterAllCollectionsAndViews(getServiceContext());
 
-    const DatabaseName dbName = DatabaseName(boost::none, "resourceDb");
+    const DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "resourceDb");
     auto rid = ResourceId(RESOURCE_DATABASE, dbName);
     ASSERT_EQ(boost::none, ResourceCatalog::get(getServiceContext()).name(rid));
 
@@ -261,7 +264,7 @@ TEST_F(CollectionCatalogResourceTest, RemoveAllResources) {
 }
 
 TEST_F(CollectionCatalogResourceTest, LookupDatabaseResource) {
-    const DatabaseName dbName = DatabaseName(boost::none, "resourceDb");
+    const DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "resourceDb");
     auto rid = ResourceId(RESOURCE_DATABASE, dbName);
     auto ridStr = ResourceCatalog::get(getServiceContext()).name(rid);
 
@@ -270,7 +273,7 @@ TEST_F(CollectionCatalogResourceTest, LookupDatabaseResource) {
 }
 
 TEST_F(CollectionCatalogResourceTest, LookupMissingDatabaseResource) {
-    const DatabaseName dbName = DatabaseName(boost::none, "missingDb");
+    const DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "missingDb");
     auto rid = ResourceId(RESOURCE_DATABASE, dbName);
     ASSERT(!ResourceCatalog::get(getServiceContext()).name(rid));
 }
@@ -304,18 +307,19 @@ TEST_F(CollectionCatalogResourceTest, RemoveCollection) {
 // Create an iterator over the CollectionCatalog and assert that all collections are present.
 // Iteration ends when the end of the catalog is reached.
 TEST_F(CollectionCatalogIterationTest, EndAtEndOfCatalog) {
-    checkCollections(DatabaseName(boost::none, "foo"));
+    checkCollections(DatabaseName::createDatabaseName_forTest(boost::none, "foo"));
 }
 
 // Create an iterator over the CollectionCatalog and test that all collections are present.
 // Iteration ends
 // when the end of a database-specific section of the catalog is reached.
 TEST_F(CollectionCatalogIterationTest, EndAtEndOfSection) {
-    checkCollections(DatabaseName(boost::none, "bar"));
+    checkCollections(DatabaseName::createDatabaseName_forTest(boost::none, "bar"));
 }
 
 TEST_F(CollectionCatalogIterationTest, GetUUIDWontRepositionEvenIfEntryIsDropped) {
-    auto it = catalog.begin(opCtx.get(), DatabaseName(boost::none, "bar"));
+    auto it =
+        catalog.begin(opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "bar"));
     auto collsIt = collsIterator("bar");
     auto uuid = collsIt->first;
     catalog.deregisterCollection(opCtx.get(), uuid, /*isDropPending=*/false, boost::none);
@@ -552,11 +556,12 @@ TEST_F(CollectionCatalogTest, GetAllCollectionNamesAndGetAllDbNames) {
     std::sort(res.begin(), res.end());
     ASSERT(res == dCollList);
 
-    std::vector<DatabaseName> dbNames = {DatabaseName(boost::none, "dbA"),
-                                         DatabaseName(boost::none, "dbB"),
-                                         DatabaseName(boost::none, "dbC"),
-                                         DatabaseName(boost::none, "dbD"),
-                                         DatabaseName(boost::none, "testdb")};
+    std::vector<DatabaseName> dbNames = {
+        DatabaseName::createDatabaseName_forTest(boost::none, "dbA"),
+        DatabaseName::createDatabaseName_forTest(boost::none, "dbB"),
+        DatabaseName::createDatabaseName_forTest(boost::none, "dbC"),
+        DatabaseName::createDatabaseName_forTest(boost::none, "dbD"),
+        DatabaseName::createDatabaseName_forTest(boost::none, "testdb")};
     ASSERT(catalog.getAllDbNames() == dbNames);
 
     catalog.deregisterAllCollectionsAndViews(getServiceContext());
@@ -578,10 +583,13 @@ TEST_F(CollectionCatalogTest, GetAllDbNamesForTenant) {
     }
 
     std::vector<DatabaseName> dbNamesForTid1 = {
-        DatabaseName(tid1, "dbA"), DatabaseName(tid1, "dbB"), DatabaseName(tid1, "dbC")};
+        DatabaseName::createDatabaseName_forTest(tid1, "dbA"),
+        DatabaseName::createDatabaseName_forTest(tid1, "dbB"),
+        DatabaseName::createDatabaseName_forTest(tid1, "dbC")};
     ASSERT(catalog.getAllDbNamesForTenant(tid1) == dbNamesForTid1);
 
-    std::vector<DatabaseName> dbNamesForTid2 = {DatabaseName(tid2, "dbB")};
+    std::vector<DatabaseName> dbNamesForTid2 = {
+        DatabaseName::createDatabaseName_forTest(tid2, "dbB")};
     ASSERT(catalog.getAllDbNamesForTenant(tid2) == dbNamesForTid2);
 
     catalog.deregisterAllCollectionsAndViews(getServiceContext());
@@ -589,8 +597,10 @@ TEST_F(CollectionCatalogTest, GetAllDbNamesForTenant) {
 
 // Test setting and fetching the profile level for a database.
 TEST_F(CollectionCatalogTest, DatabaseProfileLevel) {
-    DatabaseName testDBNameFirst(boost::none, "testdbfirst");
-    DatabaseName testDBNameSecond(boost::none, "testdbsecond");
+    DatabaseName testDBNameFirst =
+        DatabaseName::createDatabaseName_forTest(boost::none, "testdbfirst");
+    DatabaseName testDBNameSecond =
+        DatabaseName::createDatabaseName_forTest(boost::none, "testdbsecond");
 
     // Requesting a profile level that is not in the _databaseProfileLevel map should return the
     // default server-wide setting
@@ -632,13 +642,15 @@ TEST_F(CollectionCatalogTest, GetAllCollectionNamesAndGetAllDbNamesWithUncommitt
     invisibleCollA->setCommitted(false);
 
     Lock::DBLock dbLock(opCtx.get(), aColl.dbName(), MODE_S);
-    auto res = catalog.getAllCollectionNamesFromDb(opCtx.get(), DatabaseName(boost::none, "dbA"));
+    auto res = catalog.getAllCollectionNamesFromDb(
+        opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "dbA"));
     ASSERT(res.empty());
 
-    std::vector<DatabaseName> dbNames = {DatabaseName(boost::none, "dbB"),
-                                         DatabaseName(boost::none, "dbC"),
-                                         DatabaseName(boost::none, "dbD"),
-                                         DatabaseName(boost::none, "testdb")};
+    std::vector<DatabaseName> dbNames = {
+        DatabaseName::createDatabaseName_forTest(boost::none, "dbB"),
+        DatabaseName::createDatabaseName_forTest(boost::none, "dbC"),
+        DatabaseName::createDatabaseName_forTest(boost::none, "dbD"),
+        DatabaseName::createDatabaseName_forTest(boost::none, "testdb")};
     ASSERT(catalog.getAllDbNames() == dbNames);
 
     // One dbName with both visible and invisible collections is still visible.
@@ -656,7 +668,8 @@ TEST_F(CollectionCatalogTest, GetAllCollectionNamesAndGetAllDbNamesWithUncommitt
         invisibleCollD->setCommitted(false);
 
         Lock::DBLock dbLock(opCtx.get(), d1Coll.dbName(), MODE_S);
-        res = catalog.getAllCollectionNamesFromDb(opCtx.get(), DatabaseName(boost::none, "dbD"));
+        res = catalog.getAllCollectionNamesFromDb(
+            opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "dbD"));
         std::sort(res.begin(), res.end());
         ASSERT(res == dCollList);
 
@@ -675,7 +688,8 @@ TEST_F(CollectionCatalogTest, GetAllCollectionNamesAndGetAllDbNamesWithUncommitt
         invisibleColl->setCommitted(false);
     }
 
-    std::vector<DatabaseName> dbList = {DatabaseName(boost::none, "testdb")};
+    std::vector<DatabaseName> dbList = {
+        DatabaseName::createDatabaseName_forTest(boost::none, "testdb")};
     ASSERT(catalog.getAllDbNames() == dbList);
 
     catalog.deregisterAllCollectionsAndViews(getServiceContext());
@@ -713,7 +727,7 @@ TEST_F(ForEachCollectionFromDbTest, ForEachCollectionFromDb) {
     auto opCtx = operationContext();
 
     {
-        const DatabaseName dbName(boost::none, "db");
+        const DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "db");
         auto dbLock = std::make_unique<Lock::DBLock>(opCtx, dbName, MODE_IX);
         int numCollectionsTraversed = 0;
         catalog::forEachCollectionFromDb(opCtx, dbName, MODE_X, [&](const Collection* collection) {
@@ -726,7 +740,7 @@ TEST_F(ForEachCollectionFromDbTest, ForEachCollectionFromDb) {
     }
 
     {
-        const DatabaseName dbName(boost::none, "db2");
+        const DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "db2");
         auto dbLock = std::make_unique<Lock::DBLock>(opCtx, dbName, MODE_IX);
         int numCollectionsTraversed = 0;
         catalog::forEachCollectionFromDb(opCtx, dbName, MODE_IS, [&](const Collection* collection) {
@@ -739,7 +753,7 @@ TEST_F(ForEachCollectionFromDbTest, ForEachCollectionFromDb) {
     }
 
     {
-        const DatabaseName dbName(boost::none, "db3");
+        const DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "db3");
         auto dbLock = std::make_unique<Lock::DBLock>(opCtx, dbName, MODE_IX);
         int numCollectionsTraversed = 0;
         catalog::forEachCollectionFromDb(opCtx, dbName, MODE_S, [&](const Collection* collection) {
@@ -756,7 +770,7 @@ TEST_F(ForEachCollectionFromDbTest, ForEachCollectionFromDbWithPredicate) {
     auto opCtx = operationContext();
 
     {
-        const DatabaseName dbName(boost::none, "db");
+        const DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "db");
         auto dbLock = std::make_unique<Lock::DBLock>(opCtx, dbName, MODE_IX);
         int numCollectionsTraversed = 0;
         catalog::forEachCollectionFromDb(
@@ -779,7 +793,7 @@ TEST_F(ForEachCollectionFromDbTest, ForEachCollectionFromDbWithPredicate) {
     }
 
     {
-        const DatabaseName dbName(boost::none, "db");
+        const DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "db");
         auto dbLock = std::make_unique<Lock::DBLock>(opCtx, dbName, MODE_IX);
         int numCollectionsTraversed = 0;
         catalog::forEachCollectionFromDb(

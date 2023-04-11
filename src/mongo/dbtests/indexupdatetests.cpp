@@ -658,13 +658,14 @@ public:
         DBDirectClient client(opCtx.get());
         client.dropCollection(_nss);
         BSONObj cmdResult;
-        ASSERT_TRUE(client.runCommand({boost::none, "unittests"},
-                                      BSON("create"
-                                           << "indexupdate"
-                                           << "collation"
-                                           << BSON("locale"
-                                                   << "fr")),
-                                      cmdResult));
+        ASSERT_TRUE(
+            client.runCommand(DatabaseName::createDatabaseName_forTest(boost::none, "unittests"),
+                              BSON("create"
+                                   << "indexupdate"
+                                   << "collation"
+                                   << BSON("locale"
+                                           << "fr")),
+                              cmdResult));
         IndexSpec indexSpec;
         indexSpec.addKey("a");
         client.createIndex(_nss, indexSpec);

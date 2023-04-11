@@ -279,7 +279,8 @@ TEST_F(LockerImplTest, saveAndRestoreRSTL) {
 
     LockerImpl locker(opCtx->getServiceContext());
 
-    const ResourceId resIdDatabase(RESOURCE_DATABASE, DatabaseName(boost::none, "TestDB"));
+    const ResourceId resIdDatabase(RESOURCE_DATABASE,
+                                   DatabaseName::createDatabaseName_forTest(boost::none, "TestDB"));
 
     // Acquire locks.
     locker.lock(resourceIdReplicationStateTransitionLock, MODE_IX);
@@ -346,7 +347,8 @@ TEST_F(LockerImplTest, saveAndRestoreDBAndCollection) {
 
     LockerImpl locker(opCtx->getServiceContext());
 
-    const ResourceId resIdDatabase(RESOURCE_DATABASE, DatabaseName(boost::none, "TestDB"));
+    const ResourceId resIdDatabase(RESOURCE_DATABASE,
+                                   DatabaseName::createDatabaseName_forTest(boost::none, "TestDB"));
     const ResourceId resIdCollection(
         RESOURCE_COLLECTION,
         NamespaceString::createNamespaceString_forTest(boost::none, "TestDB.collection"));
@@ -378,7 +380,8 @@ TEST_F(LockerImplTest, releaseWriteUnitOfWork) {
 
     LockerImpl locker(opCtx->getServiceContext());
 
-    const ResourceId resIdDatabase(RESOURCE_DATABASE, DatabaseName(boost::none, "TestDB"));
+    const ResourceId resIdDatabase(RESOURCE_DATABASE,
+                                   DatabaseName::createDatabaseName_forTest(boost::none, "TestDB"));
     const ResourceId resIdCollection(
         RESOURCE_COLLECTION,
         NamespaceString::createNamespaceString_forTest(boost::none, "TestDB.collection"));
@@ -410,7 +413,8 @@ TEST_F(LockerImplTest, restoreWriteUnitOfWork) {
 
     LockerImpl locker(opCtx->getServiceContext());
 
-    const ResourceId resIdDatabase(RESOURCE_DATABASE, DatabaseName(boost::none, "TestDB"));
+    const ResourceId resIdDatabase(RESOURCE_DATABASE,
+                                   DatabaseName::createDatabaseName_forTest(boost::none, "TestDB"));
     const ResourceId resIdCollection(
         RESOURCE_COLLECTION,
         NamespaceString::createNamespaceString_forTest(boost::none, "TestDB.collection"));
@@ -454,7 +458,8 @@ TEST_F(LockerImplTest, releaseAndRestoreWriteUnitOfWorkWithoutUnlock) {
 
     LockerImpl locker(opCtx->getServiceContext());
 
-    const ResourceId resIdDatabase(RESOURCE_DATABASE, DatabaseName(boost::none, "TestDB"));
+    const ResourceId resIdDatabase(RESOURCE_DATABASE,
+                                   DatabaseName::createDatabaseName_forTest(boost::none, "TestDB"));
     const ResourceId resIdCollection(
         RESOURCE_COLLECTION,
         NamespaceString::createNamespaceString_forTest(boost::none, "TestDB.collection"));
@@ -574,7 +579,8 @@ TEST_F(LockerImplTest, releaseAndRestoreReadOnlyWriteUnitOfWork) {
 
     LockerImpl locker(opCtx->getServiceContext());
 
-    const ResourceId resIdDatabase(RESOURCE_DATABASE, DatabaseName(boost::none, "TestDB"));
+    const ResourceId resIdDatabase(RESOURCE_DATABASE,
+                                   DatabaseName::createDatabaseName_forTest(boost::none, "TestDB"));
     const ResourceId resIdCollection(
         RESOURCE_COLLECTION,
         NamespaceString::createNamespaceString_forTest(boost::none, "TestDB.collection"));
@@ -643,7 +649,8 @@ TEST_F(LockerImplTest, releaseAndRestoreWriteUnitOfWorkWithRecursiveLocks) {
 
     LockerImpl locker(opCtx->getServiceContext());
 
-    const ResourceId resIdDatabase(RESOURCE_DATABASE, DatabaseName(boost::none, "TestDB"));
+    const ResourceId resIdDatabase(RESOURCE_DATABASE,
+                                   DatabaseName::createDatabaseName_forTest(boost::none, "TestDB"));
     const ResourceId resIdCollection(
         RESOURCE_COLLECTION,
         NamespaceString::createNamespaceString_forTest(boost::none, "TestDB.collection"));
@@ -726,7 +733,8 @@ TEST_F(LockerImplTest, releaseAndRestoreWriteUnitOfWorkWithRecursiveLocks) {
 TEST_F(LockerImplTest, DefaultLocker) {
     auto opCtx = makeOperationContext();
 
-    const ResourceId resId(RESOURCE_DATABASE, DatabaseName(boost::none, "TestDB"));
+    const ResourceId resId(RESOURCE_DATABASE,
+                           DatabaseName::createDatabaseName_forTest(boost::none, "TestDB"));
 
     LockerImpl locker(opCtx->getServiceContext());
     locker.lockGlobal(opCtx.get(), MODE_IX);
@@ -750,8 +758,10 @@ TEST_F(LockerImplTest, SharedLocksShouldTwoPhaseLockIsTrue) {
 
     auto opCtx = makeOperationContext();
 
-    const ResourceId resId1(RESOURCE_DATABASE, DatabaseName(boost::none, "TestDB1"));
-    const ResourceId resId2(RESOURCE_DATABASE, DatabaseName(boost::none, "TestDB2"));
+    const ResourceId resId1(RESOURCE_DATABASE,
+                            DatabaseName::createDatabaseName_forTest(boost::none, "TestDB1"));
+    const ResourceId resId2(RESOURCE_DATABASE,
+                            DatabaseName::createDatabaseName_forTest(boost::none, "TestDB2"));
     const ResourceId resId3(
         RESOURCE_COLLECTION,
         NamespaceString::createNamespaceString_forTest(boost::none, "TestDB.collection3"));
@@ -810,8 +820,10 @@ TEST_F(LockerImplTest, ModeIXAndXLockParticipatesInTwoPhaseLocking) {
 
     auto opCtx = makeOperationContext();
 
-    const ResourceId resId1(RESOURCE_DATABASE, DatabaseName(boost::none, "TestDB1"));
-    const ResourceId resId2(RESOURCE_DATABASE, DatabaseName(boost::none, "TestDB2"));
+    const ResourceId resId1(RESOURCE_DATABASE,
+                            DatabaseName::createDatabaseName_forTest(boost::none, "TestDB1"));
+    const ResourceId resId2(RESOURCE_DATABASE,
+                            DatabaseName::createDatabaseName_forTest(boost::none, "TestDB2"));
     const ResourceId resId3(
         RESOURCE_COLLECTION,
         NamespaceString::createNamespaceString_forTest(boost::none, "TestDB.collection3"));
@@ -959,8 +971,10 @@ TEST_F(LockerImplTest, RSTLTwoPhaseLockingBehaviorModeIS) {
 TEST_F(LockerImplTest, OverrideLockRequestTimeout) {
     auto opCtx = makeOperationContext();
 
-    const ResourceId resIdFirstDB(RESOURCE_DATABASE, DatabaseName(boost::none, "FirstDB"));
-    const ResourceId resIdSecondDB(RESOURCE_DATABASE, DatabaseName(boost::none, "SecondDB"));
+    const ResourceId resIdFirstDB(RESOURCE_DATABASE,
+                                  DatabaseName::createDatabaseName_forTest(boost::none, "FirstDB"));
+    const ResourceId resIdSecondDB(
+        RESOURCE_DATABASE, DatabaseName::createDatabaseName_forTest(boost::none, "SecondDB"));
 
     LockerImpl locker1(opCtx->getServiceContext());
     LockerImpl locker2(opCtx->getServiceContext());
@@ -996,8 +1010,10 @@ TEST_F(LockerImplTest, OverrideLockRequestTimeout) {
 TEST_F(LockerImplTest, DoNotWaitForLockAcquisition) {
     auto opCtx = makeOperationContext();
 
-    const ResourceId resIdFirstDB(RESOURCE_DATABASE, DatabaseName(boost::none, "FirstDB"));
-    const ResourceId resIdSecondDB(RESOURCE_DATABASE, DatabaseName(boost::none, "SecondDB"));
+    const ResourceId resIdFirstDB(RESOURCE_DATABASE,
+                                  DatabaseName::createDatabaseName_forTest(boost::none, "FirstDB"));
+    const ResourceId resIdSecondDB(
+        RESOURCE_DATABASE, DatabaseName::createDatabaseName_forTest(boost::none, "SecondDB"));
 
     LockerImpl locker1(opCtx->getServiceContext());
     LockerImpl locker2(opCtx->getServiceContext());
@@ -1051,7 +1067,8 @@ bool lockerInfoContainsLock(const Locker::LockerInfo& lockerInfo,
 TEST_F(LockerImplTest, GetLockerInfoShouldReportHeldLocks) {
     auto opCtx = makeOperationContext();
 
-    const ResourceId dbId(RESOURCE_DATABASE, DatabaseName(boost::none, "TestDB"));
+    const ResourceId dbId(RESOURCE_DATABASE,
+                          DatabaseName::createDatabaseName_forTest(boost::none, "TestDB"));
     const ResourceId collectionId(
         RESOURCE_COLLECTION,
         NamespaceString::createNamespaceString_forTest(boost::none, "TestDB.collection"));
@@ -1079,7 +1096,8 @@ TEST_F(LockerImplTest, GetLockerInfoShouldReportHeldLocks) {
 TEST_F(LockerImplTest, GetLockerInfoShouldReportPendingLocks) {
     auto opCtx = makeOperationContext();
 
-    const ResourceId dbId(RESOURCE_DATABASE, DatabaseName(boost::none, "TestDB"));
+    const ResourceId dbId(RESOURCE_DATABASE,
+                          DatabaseName::createDatabaseName_forTest(boost::none, "TestDB"));
     const ResourceId collectionId(
         RESOURCE_COLLECTION,
         NamespaceString::createNamespaceString_forTest(boost::none, "TestDB.collection"));
@@ -1127,7 +1145,8 @@ TEST_F(LockerImplTest, GetLockerInfoShouldReportPendingLocks) {
 TEST_F(LockerImplTest, GetLockerInfoShouldSubtractBase) {
     auto opCtx = makeOperationContext();
     auto locker = opCtx->lockState();
-    const ResourceId dbId(RESOURCE_DATABASE, DatabaseName(boost::none, "SubtractTestDB"));
+    const ResourceId dbId(RESOURCE_DATABASE,
+                          DatabaseName::createDatabaseName_forTest(boost::none, "SubtractTestDB"));
 
     auto numAcquisitions = [&](boost::optional<SingleThreadedLockStats> baseStats) {
         Locker::LockerInfo info;

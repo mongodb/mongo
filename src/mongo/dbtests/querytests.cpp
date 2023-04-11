@@ -960,13 +960,13 @@ public:
         index();
     }
     void run() {
-        _client.dropDatabase({boost::none, "unittests"});
+        _client.dropDatabase(DatabaseName::createDatabaseName_forTest(boost::none, "unittests"));
         noIndex();
         checkIndex();
         _client.dropCollection(_nss);
         noIndex();
         checkIndex();
-        _client.dropDatabase({boost::none, "unittests"});
+        _client.dropDatabase(DatabaseName::createDatabaseName_forTest(boost::none, "unittests"));
         noIndex();
         checkIndex();
     }
@@ -1558,7 +1558,7 @@ public:
 
         BSONObj info;
         // Must use local db so that the collection is not replicated, to allow autoIndexId:false.
-        _client.runCommand({boost::none, "local"},
+        _client.runCommand(DatabaseName::kLocal,
                            BSON("create"
                                 << "oplog.querytests.findingstart"
                                 << "capped" << true << "size" << 4096 << "autoIndexId" << false),
@@ -1570,7 +1570,7 @@ public:
         // To ensure we are working with a clean oplog (an oplog without entries), we resort
         // to truncating the oplog instead.
         if (_opCtx.getServiceContext()->getStorageEngine()->supportsRecoveryTimestamp()) {
-            _client.runCommand({boost::none, "local"},
+            _client.runCommand(DatabaseName::kLocal,
                                BSON("emptycapped"
                                     << "oplog.querytests.findingstart"),
                                info);
@@ -1627,7 +1627,7 @@ public:
 
         BSONObj info;
         // Must use local db so that the collection is not replicated, to allow autoIndexId:false.
-        _client.runCommand({boost::none, "local"},
+        _client.runCommand(DatabaseName::kLocal,
                            BSON("create"
                                 << "oplog.querytests.findingstart"
                                 << "capped" << true << "size" << 4096 << "autoIndexId" << false),
@@ -1639,7 +1639,7 @@ public:
         // To ensure we are working with a clean oplog (an oplog without entries), we resort
         // to truncating the oplog instead.
         if (_opCtx.getServiceContext()->getStorageEngine()->supportsRecoveryTimestamp()) {
-            _client.runCommand({boost::none, "local"},
+            _client.runCommand(DatabaseName::kLocal,
                                BSON("emptycapped"
                                     << "oplog.querytests.findingstart"),
                                info);
@@ -1697,7 +1697,7 @@ public:
 
         BSONObj info;
         // Must use local db so that the collection is not replicated, to allow autoIndexId:false.
-        _client.runCommand({boost::none, "local"},
+        _client.runCommand(DatabaseName::kLocal,
                            BSON("create"
                                 << "oplog.querytests.findingstart"
                                 << "capped" << true << "size" << 4096 << "autoIndexId" << false),
@@ -1709,7 +1709,7 @@ public:
         // To ensure we are working with a clean oplog (an oplog without entries), we resort
         // to truncating the oplog instead.
         if (_opCtx.getServiceContext()->getStorageEngine()->supportsRecoveryTimestamp()) {
-            _client.runCommand({boost::none, "local"},
+            _client.runCommand(DatabaseName::kLocal,
                                BSON("emptycapped"
                                     << "oplog.querytests.findingstart"),
                                info);
@@ -1740,7 +1740,7 @@ public:
     WhatsMyUri() : CollectionBase("whatsmyuri") {}
     void run() {
         BSONObj result;
-        _client.runCommand({boost::none, "admin"}, BSON("whatsmyuri" << 1), result);
+        _client.runCommand(DatabaseName::kAdmin, BSON("whatsmyuri" << 1), result);
         ASSERT_EQUALS("", result["you"].str());
     }
 };
@@ -1750,7 +1750,7 @@ public:
     WhatsMySni() : CollectionBase("whatsmysni") {}
     void run() {
         BSONObj result;
-        _client.runCommand({boost::none, "admin"}, BSON("whatsmysni" << 1), result);
+        _client.runCommand(DatabaseName::kAdmin, BSON("whatsmysni" << 1), result);
         ASSERT_EQUALS("", result["sni"].str());
     }
 };
@@ -1910,7 +1910,7 @@ class CollectionInternalBase : public CollectionBase {
 public:
     CollectionInternalBase(const char* nsLeaf)
         : CollectionBase(nsLeaf),
-          _lk(&_opCtx, DatabaseName(boost::none, "unittests"), MODE_X),
+          _lk(&_opCtx, DatabaseName::createDatabaseName_forTest(boost::none, "unittests"), MODE_X),
           _ctx(&_opCtx, nss()) {}
 
 private:

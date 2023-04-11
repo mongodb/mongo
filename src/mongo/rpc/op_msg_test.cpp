@@ -943,7 +943,8 @@ TEST(OpMsgRequestBuilder, WithTenantInDatabaseName) {
                                                                    true);
     const TenantId tenantId(OID::gen());
     auto const body = fromjson("{ping: 1}");
-    OpMsgRequest msg = OpMsgRequestBuilder::create({tenantId, "testDb"}, body);
+    OpMsgRequest msg = OpMsgRequestBuilder::create(
+        DatabaseName::createDatabaseName_forTest(tenantId, "testDb"), body);
     ASSERT_EQ(msg.body.getField("$tenant").eoo(), false);
     ASSERT_EQ(TenantId::parseFromBSON(msg.body.getField("$tenant")), tenantId);
     ASSERT_EQ(msg.getDatabase(), "testDb");
@@ -955,7 +956,8 @@ TEST(OpMsgRequestBuilder, WithTenantInDatabaseName_FeatureFlagOff) {
                                                                    false);
     const TenantId tenantId(OID::gen());
     auto const body = fromjson("{ping: 1}");
-    OpMsgRequest msg = OpMsgRequestBuilder::create({tenantId, "testDb"}, body);
+    OpMsgRequest msg = OpMsgRequestBuilder::create(
+        DatabaseName::createDatabaseName_forTest(tenantId, "testDb"), body);
     ASSERT(msg.body.getField("$tenant").eoo());
     ASSERT_EQ(msg.getDatabase(), tenantId.toString() + "_testDb");
 }
@@ -966,7 +968,8 @@ TEST(OpMsgRequestBuilder, WithSameTenantInBody) {
                                                                    true);
     const TenantId tenantId(OID::gen());
     auto const body = BSON("ping" << 1 << "$tenant" << tenantId);
-    OpMsgRequest msg = OpMsgRequestBuilder::create({tenantId, "testDb"}, body);
+    OpMsgRequest msg = OpMsgRequestBuilder::create(
+        DatabaseName::createDatabaseName_forTest(tenantId, "testDb"), body);
     ASSERT_EQ(msg.body.getField("$tenant").eoo(), false);
     ASSERT_EQ(TenantId::parseFromBSON(msg.body.getField("$tenant")), tenantId);
 }
@@ -980,8 +983,8 @@ TEST(OpMsgRequestBuilder, WithVTS) {
 
     using VTS = auth::ValidatedTenancyScope;
     VTS vts = VTS(tenantId, VTS::TenantForTestingTag{});
-    OpMsgRequest msg =
-        OpMsgRequestBuilder::createWithValidatedTenancyScope({tenantId, "testDb"}, vts, body);
+    OpMsgRequest msg = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+        DatabaseName::createDatabaseName_forTest(tenantId, "testDb"), vts, body);
     ASSERT(msg.validatedTenancyScope);
     ASSERT_EQ(msg.validatedTenancyScope->tenantId(), tenantId);
     // Verify $tenant is added to the msg body, as the vts does not come from security token.
@@ -998,8 +1001,10 @@ TEST(OpMsgRequestBuilder, FailWithDiffTenantInBody) {
     const TenantId otherTenantId(OID::gen());
 
     auto const body = BSON("ping" << 1 << "$tenant" << tenantId);
-    ASSERT_THROWS_CODE(
-        OpMsgRequestBuilder::create({otherTenantId, "testDb"}, body), DBException, 8423373);
+    ASSERT_THROWS_CODE(OpMsgRequestBuilder::create(
+                           DatabaseName::createDatabaseName_forTest(otherTenantId, "testDb"), body),
+                       DBException,
+                       8423373);
 }
 
 TEST(OpMsgRequestBuilder, CreateDoesNotCopy) {
@@ -1009,7 +1014,8 @@ TEST(OpMsgRequestBuilder, CreateDoesNotCopy) {
     const TenantId tenantId(OID::gen());
     auto body = fromjson("{ping: 1}");
     const void* const bodyPtr = body.objdata();
-    auto msg = OpMsgRequestBuilder::create({tenantId, "db"}, std::move(body));
+    auto msg = OpMsgRequestBuilder::create(DatabaseName::createDatabaseName_forTest(tenantId, "db"),
+                                           std::move(body));
 
     auto const newBody = BSON("ping" << 1 << "$tenant" << tenantId << "$db"
                                      << "db");

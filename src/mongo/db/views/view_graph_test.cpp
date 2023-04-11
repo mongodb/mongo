@@ -46,7 +46,7 @@
 namespace mongo {
 namespace {
 constexpr auto kEmptyPipelineSize = 0;
-const auto kTestDb = DatabaseName(boost::none, "test");
+const auto kTestDb = DatabaseName::createDatabaseName_forTest(boost::none, "test");
 constexpr auto kFooName = "foo"_sd;
 constexpr auto kBarName = "bar"_sd;
 constexpr auto kQuxName = "qux"_sd;
@@ -249,8 +249,8 @@ TEST_F(ViewGraphFixture, DroppingViewPreservesNodeInGraphIfDependedOnByOtherView
 TEST_F(ViewGraphFixture, DifferentTenantsCanCreateViewWithConflictingNamespaces) {
     RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
 
-    DatabaseName db1(TenantId(OID::gen()), "test");
-    DatabaseName db2(TenantId(OID::gen()), "test");
+    DatabaseName db1 = DatabaseName::createDatabaseName_forTest(TenantId(OID::gen()), "test");
+    DatabaseName db2 = DatabaseName::createDatabaseName_forTest(TenantId(OID::gen()), "test");
 
     NamespaceString viewOn1 = NamespaceString::createNamespaceString_forTest(db1, kBarName);
     NamespaceString viewOn2 = NamespaceString::createNamespaceString_forTest(db2, kBarName);

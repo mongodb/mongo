@@ -197,7 +197,8 @@ protected:
     executor::NetworkInterfaceMock* _net;
     std::shared_ptr<executor::ThreadPoolTaskExecutor> _executor;
     std::string _tenantId = OID::gen().toString();
-    DatabaseName _dbName = DatabaseName(TenantId(OID(_tenantId)), "test");
+    DatabaseName _dbName =
+        DatabaseName::createDatabaseName_forTest(TenantId(OID(_tenantId)), "test");
     UUID _migrationUuid = UUID::gen();
     ServiceContext::UniqueOperationContext _opCtx;
     TenantOplogApplierTestOpObserver* _opObserver;  // Owned by service context opObserverRegistry
@@ -1358,7 +1359,7 @@ TEST_F(TenantOplogApplierTest, ApplyCRUD_WrongNSS_Merge) {
 
     // Should not be able to apply a CRUD operation to a namespace not belonging to us.
     NamespaceString nss =
-        NamespaceString::createNamespaceString_forTest(DatabaseName(invalidTenant, "test"), "bar");
+        NamespaceString::createNamespaceString_forTest(invalidTenant, "test", "bar");
     auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
     auto entry = makeInsertOplogEntry(1, nss, uuid);
     bool onInsertsCalled = false;

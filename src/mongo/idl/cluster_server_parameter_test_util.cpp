@@ -44,19 +44,21 @@ void upsert(BSONObj doc, const boost::optional<TenantId>& tenantId) {
 
     DBDirectClient client(opCtx);
 
-    auto opMsgRequest = OpMsgRequestBuilder::create(DatabaseName(tenantId, "config"), [&] {
-        write_ops::UpdateCommandRequest updateOp(
-            NamespaceString::makeClusterParametersNSS(tenantId));
-        updateOp.setUpdates({[&] {
-            write_ops::UpdateOpEntry entry;
-            entry.setQ(BSON(ClusterServerParameter::k_idFieldName << kCSPTest));
-            entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(BSON("$set" << doc)));
-            entry.setMulti(false);
-            entry.setUpsert(true);
-            return entry;
-        }()});
-        return updateOp.toBSON(kMajorityWriteConcern);
-    }());
+    auto opMsgRequest = OpMsgRequestBuilder::create(
+        DatabaseName::createDatabaseName_forTest(tenantId, "config"), [&] {
+            write_ops::UpdateCommandRequest updateOp(
+                NamespaceString::makeClusterParametersNSS(tenantId));
+            updateOp.setUpdates({[&] {
+                write_ops::UpdateOpEntry entry;
+                entry.setQ(BSON(ClusterServerParameter::k_idFieldName << kCSPTest));
+                entry.setU(
+                    write_ops::UpdateModification::parseFromClassicUpdate(BSON("$set" << doc)));
+                entry.setMulti(false);
+                entry.setUpsert(true);
+                return entry;
+            }()});
+            return updateOp.toBSON(kMajorityWriteConcern);
+        }());
 
     auto res = client.runCommand(opMsgRequest)->getCommandReply();
 
@@ -74,17 +76,18 @@ void remove(const boost::optional<TenantId>& tenantId) {
     auto uniqueOpCtx = cc().makeOperationContext();
     auto* opCtx = uniqueOpCtx.get();
 
-    auto opMsgRequest = OpMsgRequestBuilder::create(DatabaseName(tenantId, "config"), [&] {
-        write_ops::DeleteCommandRequest deleteOp(
-            NamespaceString::makeClusterParametersNSS(tenantId));
-        deleteOp.setDeletes({[] {
-            write_ops::DeleteOpEntry entry;
-            entry.setQ(BSON(ClusterServerParameter::k_idFieldName << kCSPTest));
-            entry.setMulti(true);
-            return entry;
-        }()});
-        return deleteOp.toBSON({});
-    }());
+    auto opMsgRequest = OpMsgRequestBuilder::create(
+        DatabaseName::createDatabaseName_forTest(tenantId, "config"), [&] {
+            write_ops::DeleteCommandRequest deleteOp(
+                NamespaceString::makeClusterParametersNSS(tenantId));
+            deleteOp.setDeletes({[] {
+                write_ops::DeleteOpEntry entry;
+                entry.setQ(BSON(ClusterServerParameter::k_idFieldName << kCSPTest));
+                entry.setMulti(true);
+                return entry;
+            }()});
+            return deleteOp.toBSON({});
+        }());
 
     auto res = DBDirectClient(opCtx).runCommand(opMsgRequest)->getCommandReply();
 

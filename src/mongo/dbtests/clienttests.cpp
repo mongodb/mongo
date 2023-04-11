@@ -51,7 +51,7 @@ public:
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient db(&opCtx);
 
-        db.dropDatabase({boost::none, "test"});
+        db.dropDatabase(DatabaseName::createDatabaseName_forTest(boost::none, "test"));
     }
 
     virtual ~Base() {

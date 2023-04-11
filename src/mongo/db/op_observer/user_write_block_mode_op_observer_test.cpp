@@ -153,7 +153,7 @@ protected:
                 opObserver.onCreateCollection(
                     opCtx, CollectionPtr(), nss, {}, BSONObj(), OplogSlot(), false);
                 opObserver.onCollMod(opCtx, nss, uuid, BSONObj(), {}, boost::none);
-                opObserver.onDropDatabase(opCtx, DatabaseName(boost::none, nss.db()));
+                opObserver.onDropDatabase(opCtx, nss.dbName());
                 opObserver.onDropCollection(
                     opCtx,
                     nss,
@@ -182,8 +182,7 @@ protected:
                           AssertionException);
             ASSERT_THROWS(opObserver.onCollMod(opCtx, nss, uuid, BSONObj(), {}, boost::none),
                           AssertionException);
-            ASSERT_THROWS(opObserver.onDropDatabase(opCtx, DatabaseName(boost::none, nss.db())),
-                          AssertionException);
+            ASSERT_THROWS(opObserver.onDropDatabase(opCtx, nss.dbName()), AssertionException);
             ASSERT_THROWS(opObserver.onDropCollection(
                               opCtx,
                               nss,

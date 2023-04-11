@@ -137,7 +137,7 @@ protected:
 };
 
 const DatabaseName ExternalDataSourceCommandsTest::kDatabaseName =
-    DatabaseName(boost::none, "external_data_source");
+    DatabaseName::createDatabaseName_forTest(boost::none, "external_data_source");
 
 TEST_F(ExternalDataSourceCommandsTest, SimpleScanAggRequest) {
     const auto nDocs = _random.nextInt32(100) + 1;

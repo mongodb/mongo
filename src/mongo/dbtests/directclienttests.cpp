@@ -81,7 +81,9 @@ public:
         BSONObj result;
         BSONObj cmdObj = BSON("count"
                               << "");
-        ASSERT(!client.runCommand({boost::none, ""}, cmdObj, result)) << result;
+        ASSERT(!client.runCommand(
+            DatabaseName::createDatabaseName_forTest(boost::none, ""), cmdObj, result))
+            << result;
         ASSERT_EQ(getStatusFromCommandResult(result), ErrorCodes::InvalidNamespace);
     }
 };
