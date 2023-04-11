@@ -1001,7 +1001,7 @@ void rollbackDropIndexes(OperationContext* opCtx,
               "uuid"_attr = uuid,
               "indexName"_attr = indexName);
 
-        createIndexForApplyOps(opCtx, indexSpec, *nss, OplogApplication::Mode::kStableRecovering);
+        createIndexForApplyOps(opCtx, indexSpec, *nss, OplogApplication::Mode::kRecovering);
 
         LOGV2_DEBUG(21676,
                     1,
