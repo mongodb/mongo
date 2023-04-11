@@ -9,6 +9,7 @@
 (function() {
 "use strict";
 load('jstests/libs/chunk_manipulation_util.js');
+load('jstests/replsets/rslib.js');
 load('jstests/sharding/libs/create_sharded_collection_util.js');
 load('jstests/sharding/libs/sharded_transactions_helpers.js');
 
@@ -92,6 +93,12 @@ let runTest = function(testMode) {
 
     if (testMode == TestMode.kWithStepUp) {
         st.rs0.stepUp(st.rs0.getSecondary());
+
+        // Wait for the config server to see the new primary.
+        // TODO SERVER-74177 Remove this once retry on NotWritablePrimary is implemented.
+        st.forEachConfigServer((conn) => {
+            awaitRSClientHosts(conn, st.rs0.getPrimary(), {ok: true, ismaster: true});
+        });
     } else if (testMode == TestMode.kWithRestart) {
         TestData.skipCollectionAndIndexValidation = true;
         st.rs0.restart(st.rs0.getPrimary());
