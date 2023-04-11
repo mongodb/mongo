@@ -64,11 +64,7 @@ const auto documentIdDecoration = OperationContext::declareDecoration<BSONObj>()
 
 bool isStandaloneOrPrimary(OperationContext* opCtx) {
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    const bool isReplSet =
-        replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
-    return !isReplSet ||
-        (repl::ReplicationCoordinator::get(opCtx)->getMemberState() ==
-         repl::MemberState::RS_PRIMARY);
+    return replCoord->canAcceptWritesForDatabase(opCtx, DatabaseName::kAdmin.toString());
 }
 
 /**
