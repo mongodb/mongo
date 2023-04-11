@@ -2290,7 +2290,7 @@ buildvariants:
     compile_variant: *rhel80-debug-asan-classic-engine
     test_flags: >-
       --mongodSetParameters="{internalQueryFrameworkControl: forceClassicEngine}"
-      --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling
+      --excludeWithAnyTags=requires_fast_memory,requires_ocsp_stapling,requires_increased_memlock_limits
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under ASAN build.
