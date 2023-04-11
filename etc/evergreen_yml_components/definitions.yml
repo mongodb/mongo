@@ -4739,22 +4739,6 @@ tasks:
       suite: change_streams_sharded_collections_passthrough
       run_no_feature_flag_tests: "true"
 
-- <<: *gen_task_template
-  name: multiversion_future_git_tag_gen
-  tags: ["multiversion", "no_version_combination", "multiversion_future_git_tag"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      suite: multiversion_future_git_tag
-
-- <<: *gen_task_template
-  name: multiversion_auth_future_git_tag_gen
-  tags: ["auth", "multiversion", "no_version_combination", "multiversion_future_git_tag"]
-  commands:
-  - func: "generate resmoke tasks"
-    vars:
-      suite: multiversion_auth_future_git_tag
-
 - <<: *task_template
   name: change_streams_whole_db_passthrough
   tags: ["change_streams"]

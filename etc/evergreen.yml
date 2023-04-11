@@ -1826,7 +1826,6 @@ buildvariants:
     distros:
     - rhel80-xlarge
   - name: .multiversion !.future_git_tag_incompatible
-  - name: .multiversion_future_git_tag
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: &enterprise-rhel-80-64-bit-suggested enterprise-rhel-80-64-bit-suggested
