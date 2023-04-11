@@ -130,8 +130,11 @@ void removeDatabaseFromConfigAndUpdatePlacementHistory(
     auto wc = WriteConcernOptions{WriteConcernOptions::kMajority,
                                   WriteConcernOptions::SyncMode::UNSET,
                                   WriteConcernOptions::kNoTimeout};
+    // This always runs in the shard role so should use a cluster transaction to guarantee targeting
+    // the config server.
+    bool useClusterTransaction = true;
     sharding_ddl_util::runTransactionOnShardingCatalog(
-        opCtx, std::move(transactionChain), wc, osi, executor);
+        opCtx, std::move(transactionChain), wc, osi, useClusterTransaction, executor);
 }
 
 // TODO SERVER-73627: Remove once 7.0 becomes last LTS
@@ -230,8 +233,19 @@ void DropDatabaseCoordinator::_dropShardedCollection(
     }
 
     _updateSession(opCtx);
+
+    // This always runs in the shard role so should use a cluster transaction to guarantee
+    // targeting the config server.
+    bool useClusterTransaction = true;
     sharding_ddl_util::removeCollAndChunksMetadataFromConfig(
-        opCtx, coll, ShardingCatalogClient::kMajorityWriteConcern, getCurrentSession(), **executor);
+        opCtx,
+        Grid::get(opCtx)->shardRegistry()->getConfigShard(),
+        Grid::get(opCtx)->catalogClient(),
+        coll,
+        ShardingCatalogClient::kMajorityWriteConcern,
+        getCurrentSession(),
+        useClusterTransaction,
+        **executor);
 
     _updateSession(opCtx);
     sharding_ddl_util::removeTagsMetadataFromConfig(opCtx, nss, getCurrentSession());

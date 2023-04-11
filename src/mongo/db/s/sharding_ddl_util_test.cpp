@@ -264,7 +264,7 @@ TEST_F(ShardingDDLUtilTest, ShardedRenameMetadata) {
     auto fromCollType = catalogClient->getCollection(opCtx, fromNss);
     // Perform the metadata rename
     sharding_ddl_util::shardedRenameMetadata(opCtx,
-                                             configShard.get(),
+                                             configShard,
                                              catalogClient,
                                              fromCollType,
                                              kToNss,

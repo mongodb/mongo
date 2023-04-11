@@ -79,7 +79,7 @@ void removeTagsMetadataFromConfig(OperationContext* opCtx,
  * Erase tags metadata from config server for the given namespace.
  */
 void removeTagsMetadataFromConfig_notIdempotent(OperationContext* opCtx,
-                                                Shard* configShard,
+                                                const std::shared_ptr<Shard>& configShard,
                                                 const NamespaceString& nss,
                                                 const WriteConcernOptions& writeConcern);
 
@@ -90,9 +90,12 @@ void removeTagsMetadataFromConfig_notIdempotent(OperationContext* opCtx,
  */
 void removeCollAndChunksMetadataFromConfig(
     OperationContext* opCtx,
+    const std::shared_ptr<Shard>& configShard,
+    ShardingCatalogClient* catalogClient,
     const CollectionType& coll,
     const WriteConcernOptions& writeConcern,
     const OperationSessionInfo& osi,
+    bool useClusterTransaction,
     const std::shared_ptr<executor::TaskExecutor>& executor = nullptr);
 
 /**
@@ -103,6 +106,7 @@ void removeCollAndChunksMetadataFromConfig(
  * Returns true if the collection existed before being removed.
  */
 bool removeCollAndChunksMetadataFromConfig_notIdempotent(OperationContext* opCtx,
+                                                         const std::shared_ptr<Shard>& configShard,
                                                          ShardingCatalogClient* catalogClient,
                                                          const NamespaceString& nss,
                                                          const WriteConcernOptions& writeConcern);
@@ -123,7 +127,7 @@ void removeQueryAnalyzerMetadataFromConfig(OperationContext* opCtx,
  * This function is idempotent and can just be invoked by the CSRS.
  */
 void shardedRenameMetadata(OperationContext* opCtx,
-                           Shard* configShard,
+                           const std::shared_ptr<Shard>& configShard,
                            ShardingCatalogClient* catalogClient,
                            CollectionType& fromCollType,
                            const NamespaceString& toNss,
@@ -243,6 +247,7 @@ void runTransactionOnShardingCatalog(
     txn_api::Callback&& transactionChain,
     const WriteConcernOptions& writeConcern,
     const OperationSessionInfo& osi,
+    bool useClusterTransaction,
     const std::shared_ptr<executor::TaskExecutor>& inputExecutor = nullptr);
 }  // namespace sharding_ddl_util
 }  // namespace mongo

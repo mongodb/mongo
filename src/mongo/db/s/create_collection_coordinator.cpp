@@ -386,8 +386,11 @@ void insertCollectionAndPlacementEntries(OperationContext* opCtx,
                                   WriteConcernOptions::SyncMode::UNSET,
                                   WriteConcernOptions::kNoTimeout};
 
+    // This always runs in the shard role so should use a cluster transaction to guarantee targeting
+    // the config server.
+    bool useClusterTransaction = true;
     sharding_ddl_util::runTransactionOnShardingCatalog(
-        opCtx, std::move(insertionChain), wc, osi, executor);
+        opCtx, std::move(insertionChain), wc, osi, useClusterTransaction, executor);
 }
 
 void broadcastDropCollection(OperationContext* opCtx,

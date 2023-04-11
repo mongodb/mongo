@@ -285,11 +285,18 @@ void DropCollectionCoordinator::_commitDropCollection(
     if (collIsSharded) {
         invariant(_doc.getCollInfo());
         const auto& coll = _doc.getCollInfo().value();
+
+        // This always runs in the shard role so should use a cluster transaction to guarantee
+        // targeting the config server.
+        bool useClusterTransaction = true;
         sharding_ddl_util::removeCollAndChunksMetadataFromConfig(
             opCtx,
+            Grid::get(opCtx)->shardRegistry()->getConfigShard(),
+            Grid::get(opCtx)->catalogClient(),
             coll,
             ShardingCatalogClient::kMajorityWriteConcern,
             getCurrentSession(),
+            useClusterTransaction,
             **executor);
     }
 
