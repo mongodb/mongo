@@ -302,7 +302,6 @@ Status OplogApplierUtils::applyOplogBatchCommon(
     InsertGroup insertGroup(
         ops, opCtx, oplogApplicationMode, isDataConsistent, applyOplogEntryOrGroupedInserts);
 
-    const bool inStableRecovery = oplogApplicationMode == OplogApplication::Mode::kStableRecovering;
     for (auto it = ops->cbegin(); it != ops->cend(); ++it) {
         const OplogEntry& entry = **it;
 
@@ -322,15 +321,9 @@ Status OplogApplierUtils::applyOplogBatchCommon(
             if (!status.isOK()) {
                 // Tried to apply an update operation but the document is missing, there must be
                 // a delete operation for the document later in the oplog.
-                // Server will crash on oplog application failure during recovery from stable
-                // checkpoint in the test environment.
                 if (status == ErrorCodes::UpdateOperationFailed &&
                     (oplogApplicationMode == OplogApplication::Mode::kInitialSync ||
-                     OplogApplication::inRecovering(oplogApplicationMode))) {
-                    if (inStableRecovery) {
-                        repl::OplogApplication::checkOnOplogFailureForRecovery(
-                            opCtx, redact(entry.toBSONForLogging()), redact(status));
-                    }
+                     oplogApplicationMode == OplogApplication::Mode::kRecovering)) {
                     continue;
                 }
 
@@ -344,14 +337,8 @@ Status OplogApplierUtils::applyOplogBatchCommon(
         } catch (const DBException& e) {
             // SERVER-24927 If we have a NamespaceNotFound exception, then this document will be
             // dropped before initial sync or recovery ends anyways and we should ignore it.
-            // Server will crash on oplog application failure during recovery from stable checkpoint
-            // in the test environment.
             if (e.code() == ErrorCodes::NamespaceNotFound && entry.isCrudOpType() &&
                 allowNamespaceNotFoundErrorsOnCrudOps) {
-                if (inStableRecovery) {
-                    repl::OplogApplication::checkOnOplogFailureForRecovery(
-                        opCtx, redact(entry.toBSONForLogging()), redact(e));
-                }
                 continue;
             }
 

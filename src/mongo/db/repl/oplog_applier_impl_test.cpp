@@ -767,7 +767,7 @@ TEST_F(MultiOplogEntryOplogApplierImplTest, MultiApplyUnpreparedTransactionAllAt
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kStableRecovering),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kRecovering),
         _writerPool.get());
 
     // Apply both inserts and the commit in a single batch.  We expect no oplog entries to
@@ -1249,7 +1249,7 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyPreparedTransactionReco
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kStableRecovering),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kRecovering),
         _writerPool.get());
 
     // Apply a batch with the insert operations.  This should have no effect, because this is
@@ -1483,7 +1483,7 @@ TEST_F(MultiOplogEntryPreparedTransactionTest,
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kStableRecovering),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kRecovering),
         _writerPool.get());
 
     const auto expectedStartOpTime = _singlePrepareApplyOp->getOpTime();
