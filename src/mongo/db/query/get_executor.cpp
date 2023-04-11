@@ -824,7 +824,9 @@ public:
             }
         }
 
-        if (1 == solutions.size()) {
+        // Force multiplanning (and therefore caching) if forcePlanCache is set. We could manually
+        // update the plan cache instead without multiplanning but this is simpler.
+        if (1 == solutions.size() && !_cq->getExpCtxRaw()->forcePlanCache) {
             // Only one possible plan. Build the stages from the solution.
             auto result = releaseResult();
             solutions[0]->indexFilterApplied = _plannerParams.indexFiltersApplied;

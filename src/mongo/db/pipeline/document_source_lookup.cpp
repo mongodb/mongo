@@ -595,6 +595,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> DocumentSourceLookUp::buildPipeline(
     const Document& inputDoc) {
     // Copy all 'let' variables into the foreign pipeline's expression context.
     _variables.copyToExpCtx(_variablesParseState, _fromExpCtx.get());
+    _fromExpCtx->forcePlanCache = true;
 
     // Resolve the 'let' variables to values per the given input document.
     resolveLetVariables(inputDoc, &_fromExpCtx->variables);
