@@ -1408,7 +1408,7 @@ TEST_F(StorageTimestampTest, SecondarySetWildcardIndexMultikeyOnInsert) {
         _coordinatorMock,
         _consistencyMarkers,
         storageInterface,
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kStableRecovering),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kRecovering),
         writerPool.get());
 
     uassertStatusOK(oplogApplier.applyOplogBatch(_opCtx, ops));
@@ -1507,7 +1507,7 @@ TEST_F(StorageTimestampTest, SecondarySetWildcardIndexMultikeyOnUpdate) {
         _coordinatorMock,
         _consistencyMarkers,
         storageInterface,
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kStableRecovering),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kRecovering),
         writerPool.get());
 
     uassertStatusOK(oplogApplier.applyOplogBatch(_opCtx, ops));
