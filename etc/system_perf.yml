@@ -131,7 +131,7 @@ modules:
   - name: enterprise
     repo: git@github.com:10gen/mongo-enterprise-modules.git
     prefix: src/mongo/db/modules
-    branch: master
+    branch: v7.0
   - name: mongo-tools
     repo: git@github.com:mongodb/mongo-tools.git
     prefix: mongo-tools/src/github.com/mongodb
