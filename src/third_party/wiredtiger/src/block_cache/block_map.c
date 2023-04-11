@@ -103,9 +103,9 @@ __wt_blkcache_map_read(
     WT_RET(__wt_block_addr_unpack(
       session, block, addr, addr_size, &objectid, &offset, &size, &checksum));
 
-    /* Swap file handles if reading from a different object. */
+    /* Swap block handles if reading from a different object. */
     if (block->objectid != objectid)
-        WT_RET(__wt_blkcache_get_handle(session, block, objectid, &block));
+        WT_RET(__wt_blkcache_get_handle(session, bm, objectid, &block));
 
     /* Map the block if it's possible. */
     handle = block->fh->handle;

@@ -11,34 +11,13 @@
 static void __bm_method_set(WT_BM *, bool);
 
 /*
- * __bm_close_block_remove --
- *     Remove a single block handle. Must be called with the block lock held.
- */
-static int
-__bm_close_block_remove(WT_SESSION_IMPL *session, WT_BLOCK *block)
-{
-    u_int i;
-
-    /* Discard any references we're holding. */
-    for (i = 0; i < block->related_next; ++i) {
-        --block->related[i]->ref;
-        block->related[i] = NULL;
-    }
-
-    /* Discard the block structure. */
-    return (__wt_block_close(session, block));
-}
-
-/*
  * __bm_close_block --
- *     Close a single block handle, removing the handle if it's no longer useful.
+ *     Close a block handle.
  */
 static int
 __bm_close_block(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
     WT_CONNECTION_IMPL *conn;
-    WT_DECL_RET;
-    bool found;
 
     conn = S2C(session);
 
@@ -49,28 +28,16 @@ __bm_close_block(WT_SESSION_IMPL *session, WT_BLOCK *block)
         __wt_spin_unlock(session, &conn->block_lock);
         return (0);
     }
+    __wt_spin_unlock(session, &conn->block_lock);
 
     /* You can't close files during a checkpoint. */
     WT_ASSERT(
       session, block->ckpt_state == WT_CKPT_NONE || block->ckpt_state == WT_CKPT_PANIC_ON_FAILURE);
 
-    /*
-     * Every time we remove a block, we may have sufficiently decremented other references to allow
-     * other blocks to be removed. It's unlikely for blocks to reference each other but it's not out
-     * of the question, either. Loop until we don't find anything to close.
-     */
-    do {
-        found = false;
-        TAILQ_FOREACH (block, &conn->blockqh, q)
-            if (block->ref == 0) {
-                found = true;
-                WT_TRET(__bm_close_block_remove(session, block));
-                break;
-            }
-    } while (found);
-    __wt_spin_unlock(session, &conn->block_lock);
+    if (block->sync_on_checkpoint)
+        WT_RET(__wt_fsync(session, block->fh, true));
 
-    return (ret);
+    return (__wt_block_close(session, block));
 }
 
 /*
@@ -123,38 +90,43 @@ static int
 __bm_checkpoint(
   WT_BM *bm, WT_SESSION_IMPL *session, WT_ITEM *buf, WT_CKPT *ckptbase, bool data_checksum)
 {
-    WT_BLOCK *block, *tblock;
-    WT_CONNECTION_IMPL *conn;
+    WT_BLOCK *block;
+    u_int i;
     bool found;
 
-    conn = S2C(session);
     block = bm->block;
 
     WT_RET(__wt_block_checkpoint(session, block, buf, ckptbase, data_checksum));
 
-    /*
-     * Close previous primary objects that are no longer being written, that is, ones where all
-     * in-flight writes have drained. We know all writes have drained when a subsequent checkpoint
-     * completes, and we know the metadata file is the last file to be checkpointed. After
-     * checkpointing the metadata file, review any previous primary objects, flushing writes and
-     * discarding the primary reference.
-     */
-    if (strcmp(WT_METAFILE, block->name) != 0)
+    if (!bm->is_multi_handle)
         return (0);
+    /*
+     * For tiered tables, we need to fsync any previous active files to ensure the full checkpoint
+     * is persisted. We wait until now because there may have been in-progress writes to old files.
+     * But now we know those writes must have completed. Checkpoint ensures that all dirty pages of
+     * the tree have been written and eviction is disabled at this point, so no new data is getting
+     * written.
+     *
+     * We don't hold the handle array lock across fsync calls since those could be slow and that
+     * would block a concurrent thread opening a new block handle
+     */
     do {
         found = false;
-        __wt_spin_lock(session, &conn->block_lock);
-        TAILQ_FOREACH (tblock, &conn->blockqh, q)
-            if (tblock->close_on_checkpoint) {
-                tblock->close_on_checkpoint = false;
-                __wt_spin_unlock(session, &conn->block_lock);
+        __wt_readlock(session, &bm->handle_array_lock);
+        for (i = 0; i < bm->handle_array_next; ++i) {
+            block = bm->handle_array[i];
+            if (block->sync_on_checkpoint) {
                 found = true;
-                WT_RET(__wt_fsync(session, tblock->fh, true));
-                WT_RET(__bm_close_block(session, tblock));
                 break;
             }
+        }
+        __wt_readunlock(session, &bm->handle_array_lock);
+
+        if (found) {
+            WT_RET(__wt_fsync(session, block->fh, true));
+            block->sync_on_checkpoint = false;
+        }
     } while (found);
-    __wt_spin_unlock(session, &conn->block_lock);
 
     return (0);
 }
@@ -286,11 +258,26 @@ static int
 __bm_close(WT_BM *bm, WT_SESSION_IMPL *session)
 {
     WT_DECL_RET;
+    u_int i;
 
     if (bm == NULL) /* Safety check */
         return (0);
 
-    ret = __bm_close_block(session, bm->block);
+    if (!bm->is_multi_handle)
+        ret = __bm_close_block(session, bm->block);
+    else {
+        /*
+         * Higher-level code ensures that we can only have one call to close a block manager. So we
+         * don't need to lock the block handle array here.
+         *
+         * We don't need to explicitly close the active handle; it is also in the handle array.
+         */
+        for (i = 0; i < bm->handle_array_next; ++i)
+            WT_TRET(__bm_close_block(session, bm->handle_array[i]));
+
+        __wt_rwlock_destroy(session, &bm->handle_array_lock);
+        __wt_free(session, bm->handle_array);
+    }
 
     __wt_overwrite_and_free(session, bm);
     return (ret);
@@ -600,36 +587,22 @@ __bm_switch_object(WT_BM *bm, WT_SESSION_IMPL *session, uint32_t objectid)
 
     current = bm->block;
 
-    WT_RET(__wt_blkcache_tiered_open(session, NULL, objectid, &block));
+    /* We shouldn't ask to switch objects unless we actually need to switch objects */
+    WT_ASSERT(session, current->objectid != objectid);
+
+    WT_RET(__wt_blkcache_get_handle(session, bm, objectid, &block));
 
     __wt_verbose(
       session, WT_VERB_TIERED, "block manager switching from %s to %s", current->name, block->name);
 
-    /* Fast-path switching to the current object, just undo the reference count increment. */
-    if (block == current)
-        return (__bm_close_block(session, block));
-
-    /* Load a new object. */
+    /* This will be the new writable object. Load its checkpoint */
     WT_RET(__wt_block_checkpoint_load(session, block, NULL, 0, NULL, &root_addr_size, false));
 
-    /*
-     * The previous object should be closed once writes have drained.
-     *
-     * FIXME: the old object does not participate in the upcoming checkpoint which has a couple of
-     * implications. First, the extent lists for the old object are discarded and never written,
-     * which makes it impossible to treat the old object as a standalone object, so, for example,
-     * you can't verify it. A solution to this is for the upper layers to checkpoint all modified
-     * objects in the logical object before the checkpoint updates the metadata, flushing all
-     * underlying writes to stable storage, but that means writing extent lists without a root page.
-     */
-    current->close_on_checkpoint = true;
+    /* The previous object must by synced to disk as part of the next checkpoint. */
+    current->sync_on_checkpoint = true;
 
     /*
      * Swap out the block manager's default handler.
-     *
-     * FIXME: the new block handle reasonably has different methods for objects in different backing
-     * sources. That's not the case today, but the current architecture lacks the ability to support
-     * multiple sources cleanly.
      *
      * FIXME: it should not be possible for a thread of control to copy the WT_BM value in the btree
      * layer, sleep until after a subsequent switch and a subsequent a checkpoint that would discard
@@ -838,18 +811,30 @@ __wt_blkcache_open(WT_SESSION_IMPL *session, const char *uri, const char *cfg[],
 
     WT_RET(__wt_calloc_one(session, &bm));
     __bm_method_set(bm, false);
+    bm->is_multi_handle = false;
 
     if (WT_PREFIX_MATCH(uri, "file:")) {
         uri += strlen("file:");
         WT_ERR(__wt_block_open(session, uri, WT_TIERED_OBJECTID_NONE, cfg, forced_salvage, readonly,
           false, allocsize, &bm->block));
-    } else
+    } else {
+        bm->is_multi_handle = true;
+        WT_ERR(__wt_rwlock_init(session, &bm->handle_array_lock));
+
+        /* Allocate space to store the handle (do first for simpler cleanup). */
+        WT_ERR(__wt_realloc_def(
+          session, &bm->handle_array_allocated, bm->handle_array_next + 1, &bm->handle_array));
+
+        /* Open the active file, and save in array */
         WT_ERR(__wt_blkcache_tiered_open(session, uri, 0, &bm->block));
+        bm->handle_array[bm->handle_array_next++] = bm->block;
+    }
 
     *bmp = bm;
     return (0);
 
 err:
+    __wt_rwlock_destroy(session, &bm->handle_array_lock);
     __wt_free(session, bm);
     return (ret);
 }

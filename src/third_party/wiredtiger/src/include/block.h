@@ -165,7 +165,7 @@ struct __wt_block_ckpt {
 
 /*
  * WT_BM --
- *	Block manager handle, references a single checkpoint in a file.
+ *	Block manager handle, references a single checkpoint in a btree.
  */
 struct __wt_bm {
     /* Methods */
@@ -205,11 +205,23 @@ struct __wt_bm {
     int (*write)(WT_BM *, WT_SESSION_IMPL *, WT_ITEM *, uint8_t *, size_t *, bool, bool);
     int (*write_size)(WT_BM *, WT_SESSION_IMPL *, size_t *);
 
-    WT_BLOCK *block; /* Underlying file */
+    WT_BLOCK *block; /* Underlying file. For a multi-handle tree this will be the writable file. */
 
     void *map; /* Mapped region */
     size_t maplen;
     void *mapped_cookie;
+
+    /*
+     * For trees, such as tiered tables, that are allowed to have more than one backing file or
+     * object, we maintain an array of the block handles used by the tree. We use a reader-writer
+     * mutex to protect the array. We lock it for reading when looking for a handle in the array and
+     * lock it for writing when adding or removing handles in the array.
+     */
+    bool is_multi_handle;
+    WT_BLOCK **handle_array;       /* Array of block handles */
+    size_t handle_array_allocated; /* Size of handle array */
+    WT_RWLOCK handle_array_lock;   /* Lock for block handle array */
+    u_int handle_array_next;       /* Next open slot */
 
     /*
      * There's only a single block manager handle that can be written, all others are checkpoints.
@@ -230,18 +242,13 @@ struct __wt_block {
     TAILQ_ENTRY(__wt_block) hashq; /* Hashed list of handles */
     bool linked;
 
-    WT_SPINLOCK cache_lock;   /* Block cache layer lock */
-    WT_BLOCK **related;       /* Related objects */
-    size_t related_allocated; /* Size of related object array */
-    u_int related_next;       /* Next open slot */
-
     WT_FH *fh;            /* Backing file handle */
     wt_off_t size;        /* File size */
     wt_off_t extend_size; /* File extended size */
     wt_off_t extend_len;  /* File extend chunk size */
 
-    bool close_on_checkpoint;   /* Close the handle after the next checkpoint */
     bool created_during_backup; /* Created during incremental backup */
+    bool sync_on_checkpoint;    /* fsync the handle after the next checkpoint */
 
     /* Configuration information, set when the file is opened. */
     uint32_t allocfirst; /* Allocation is first-fit */
