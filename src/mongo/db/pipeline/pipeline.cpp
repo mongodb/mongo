@@ -524,39 +524,11 @@ vector<Value> Pipeline::serializeContainer(const SourceContainer& container,
     return serializedSources;
 }
 
-vector<Value> Pipeline::serializeContainer(const SourceContainer& container,
-                                           boost::optional<ExplainOptions::Verbosity> explain) {
-    // TODO SERVER-75139 Remove this function once all calls have been removed.
-    vector<Value> serializedSources;
-    for (auto&& source : container) {
-        source->serializeToArray(serializedSources, explain);
-    }
-    return serializedSources;
-}
-
-vector<Value> Pipeline::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
-    // TODO SERVER-75139 Remove this function once all calls have been removed.
-    return serializeContainer(_sources, {explain});
-}
-
 vector<Value> Pipeline::serialize(boost::optional<SerializationOptions> opts) const {
     return serializeContainer(_sources, opts);
 }
 
-vector<BSONObj> Pipeline::serializeToBson(
-    boost::optional<ExplainOptions::Verbosity> explain) const {
-    const auto serialized = serialize(explain);
-    std::vector<BSONObj> asBson;
-    asBson.reserve(serialized.size());
-    for (auto&& stage : serialized) {
-        invariant(stage.getType() == BSONType::Object);
-        asBson.push_back(stage.getDocument().toBson());
-    }
-    return asBson;
-}
-
 vector<BSONObj> Pipeline::serializeToBson(boost::optional<SerializationOptions> opts) const {
-    // TODO SERVER-75139 Remove this function once all calls have been removed.
     const auto serialized = serialize(opts);
     std::vector<BSONObj> asBson;
     asBson.reserve(serialized.size());
@@ -598,16 +570,16 @@ boost::optional<Document> Pipeline::getNext() {
                               : boost::optional<Document>{nextResult.releaseDocument()};
 }
 
-vector<Value> Pipeline::writeExplainOps(ExplainOptions::Verbosity verbosity) const {
+vector<Value> Pipeline::writeExplainOps(SerializationOptions opts) const {
     vector<Value> array;
     for (auto&& stage : _sources) {
         auto beforeSize = array.size();
-        stage->serializeToArray(array, verbosity);
+        stage->serializeToArray(array, opts);
         auto afterSize = array.size();
         // Append execution stats to the serialized stage if the specified verbosity is
         // 'executionStats' or 'allPlansExecution'.
         invariant(afterSize - beforeSize == 1u);
-        if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
+        if (*opts.verbosity >= ExplainOptions::Verbosity::kExecStats) {
             auto serializedStage = array.back();
             array.back() = appendCommonExecStats(serializedStage, stage->getCommonStats());
         }

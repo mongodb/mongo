@@ -1024,47 +1024,59 @@ void DocumentSourceLookUp::appendSpecificExecStats(MutableDocument& doc) const {
 
 void DocumentSourceLookUp::serializeToArray(std::vector<Value>& array,
                                             SerializationOptions opts) const {
-    auto explain = opts.verbosity;
-    if (opts.redactIdentifiers || opts.replacementForLiteralArgs) {
-        MONGO_UNIMPLEMENTED_TASSERT(7484326);
-    }
-
     // Support alternative $lookup from config.cache.chunks* namespaces.
     //
     // Do not include the tenantId in serialized 'from' namespace.
     auto fromValue = (pExpCtx->ns.db() == _fromNs.db())
-        ? Value(_fromNs.coll())
-        : Value(Document{{"db", _fromNs.dbName().db()}, {"coll", _fromNs.coll()}});
+        ? Value(opts.serializeIdentifier(_fromNs.coll()))
+        : Value(Document{{"db", opts.serializeIdentifier(_fromNs.dbName().db())},
+                         {"coll", opts.serializeIdentifier(_fromNs.coll())}});
 
-    MutableDocument output(
-        Document{{getSourceName(), Document{{"from", fromValue}, {"as", _as.fullPath()}}}});
+    MutableDocument output(Document{
+        {getSourceName(), Document{{"from", fromValue}, {"as", opts.serializeFieldPath(_as)}}}});
 
     if (hasLocalFieldForeignFieldJoin()) {
-        output[getSourceName()]["localField"] = Value(_localField->fullPath());
-        output[getSourceName()]["foreignField"] = Value(_foreignField->fullPath());
+        output[getSourceName()]["localField"] = Value(opts.serializeFieldPath(_localField.value()));
+        output[getSourceName()]["foreignField"] =
+            Value(opts.serializeFieldPath(_foreignField.value()));
     }
 
     // Add a pipeline field if only-pipeline syntax was used (to ensure the output is valid $lookup
     // syntax) or if a $match was absorbed.
-    auto pipeline = _userPipeline.get_value_or(std::vector<BSONObj>());
+    auto serializedPipeline = [&]() -> std::vector<BSONObj> {
+        auto pipeline = _userPipeline.get_value_or(std::vector<BSONObj>());
+        if (opts.redactIdentifiers || opts.replacementForLiteralArgs) {
+            return Pipeline::parse(pipeline, _fromExpCtx)->serializeToBson(opts);
+        }
+        return pipeline;
+    }();
     if (_additionalFilter) {
-        pipeline.emplace_back(BSON("$match" << *_additionalFilter));
+        auto serializedFilter = [&]() -> BSONObj {
+            if (opts.redactIdentifiers || opts.replacementForLiteralArgs) {
+                auto filter =
+                    uassertStatusOK(MatchExpressionParser::parse(*_additionalFilter, pExpCtx));
+                return filter->serialize(opts);
+            }
+            return *_additionalFilter;
+        }();
+        serializedPipeline.emplace_back(BSON("$match" << serializedFilter));
     }
-    if (!hasLocalFieldForeignFieldJoin() || pipeline.size() > 0) {
+    if (!hasLocalFieldForeignFieldJoin() || serializedPipeline.size() > 0) {
         MutableDocument exprList;
         for (const auto& letVar : _letVariables) {
-            exprList.addField(letVar.name, letVar.expression->serialize(explain));
+            exprList.addField(opts.serializeFieldPathFromString(letVar.name),
+                              letVar.expression->serialize(opts));
         }
         output[getSourceName()]["let"] = Value(exprList.freeze());
 
-        output[getSourceName()]["pipeline"] = Value(pipeline);
+        output[getSourceName()]["pipeline"] = Value(serializedPipeline);
     }
 
     if (_hasExplicitCollation) {
         output[getSourceName()]["_internalCollation"] = Value(_fromExpCtx->getCollatorBSON());
     }
 
-    if (explain) {
+    if (opts.verbosity) {
         if (_unwindSrc) {
             const boost::optional<FieldPath> indexPath = _unwindSrc->indexPath();
             output[getSourceName()]["unwinding"] =
@@ -1073,7 +1085,7 @@ void DocumentSourceLookUp::serializeToArray(std::vector<Value>& array,
                           << (indexPath ? Value(indexPath->fullPath()) : Value())));
         }
 
-        if (explain.value() >= ExplainOptions::Verbosity::kExecStats) {
+        if (opts.verbosity.value() >= ExplainOptions::Verbosity::kExecStats) {
             appendSpecificExecStats(output);
         }
 

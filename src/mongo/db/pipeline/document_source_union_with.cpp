@@ -327,13 +327,8 @@ void DocumentSourceUnionWith::doDispose() {
 }
 
 Value DocumentSourceUnionWith::serialize(SerializationOptions opts) const {
-    auto explain = opts.verbosity;
-    if (opts.redactIdentifiers || opts.replacementForLiteralArgs) {
-        MONGO_UNIMPLEMENTED_TASSERT(7484307);
-    }
-
     auto collectionless = _pipeline->getContext()->ns.isCollectionlessAggregateNS();
-    if (explain) {
+    if (opts.verbosity) {
         // There are several different possible states depending on the explain verbosity as well as
         // the other stages in the pipeline:
         //  * If verbosity is queryPlanner, then the sub-pipeline should be untouched and we can
@@ -343,9 +338,9 @@ Value DocumentSourceUnionWith::serialize(SerializationOptions opts) const {
         //  $limit stage after the $unionWith which results in only reading from the base collection
         //  branch and not the sub-pipeline.
         Pipeline* pipeCopy = nullptr;
-        if (*explain == ExplainOptions::Verbosity::kQueryPlanner) {
+        if (*opts.verbosity == ExplainOptions::Verbosity::kQueryPlanner) {
             pipeCopy = Pipeline::create(_pipeline->getSources(), _pipeline->getContext()).release();
-        } else if (*explain >= ExplainOptions::Verbosity::kExecStats &&
+        } else if (*opts.verbosity >= ExplainOptions::Verbosity::kExecStats &&
                    _executionState > ExecutionProgress::kIteratingSource) {
             // We've either exhausted the sub-pipeline or at least started iterating it. Use the
             // cached pipeline to get the explain output since the '_pipeline' may have been
@@ -355,32 +350,33 @@ Value DocumentSourceUnionWith::serialize(SerializationOptions opts) const {
             // The plan does not require reading from the sub-pipeline, so just include the
             // serialization in the explain output.
             BSONArrayBuilder bab;
-            for (auto&& stage : _pipeline->serialize(explain))
+            for (auto&& stage : _pipeline->serialize(opts))
                 bab << stage;
             auto spec = collectionless
                 ? DOC("pipeline" << bab.arr())
-                : DOC("coll" << _pipeline->getContext()->ns.coll() << "pipeline" << bab.arr());
+                : DOC("coll" << opts.serializeIdentifier(_pipeline->getContext()->ns.coll())
+                             << "pipeline" << bab.arr());
             return Value(DOC(getSourceName() << spec));
         }
 
         invariant(pipeCopy);
         BSONObj explainLocal =
-            pExpCtx->mongoProcessInterface->preparePipelineAndExplain(pipeCopy, *explain);
+            pExpCtx->mongoProcessInterface->preparePipelineAndExplain(pipeCopy, *opts.verbosity);
         LOGV2_DEBUG(4553501, 3, "$unionWith attached cursor to pipeline for explain");
         // We expect this to be an explanation of a pipeline -- there should only be one field.
         invariant(explainLocal.nFields() == 1);
 
-        auto spec = collectionless ? DOC("pipeline" << explainLocal.firstElement())
-                                   : DOC("coll" << _pipeline->getContext()->ns.coll() << "pipeline"
-                                                << explainLocal.firstElement());
+        auto spec = collectionless
+            ? DOC("pipeline" << explainLocal.firstElement())
+            : DOC("coll" << opts.serializeIdentifier(_pipeline->getContext()->ns.coll())
+                         << "pipeline" << explainLocal.firstElement());
         return Value(DOC(getSourceName() << spec));
     } else {
-        BSONArrayBuilder bab;
-        for (auto&& stage : _pipeline->serialize())
-            bab << stage;
+        auto serializedPipeline = _pipeline->serializeToBson(opts);
         auto spec = collectionless
-            ? DOC("pipeline" << bab.arr())
-            : DOC("coll" << _pipeline->getContext()->ns.coll() << "pipeline" << bab.arr());
+            ? DOC("pipeline" << serializedPipeline)
+            : DOC("coll" << opts.serializeIdentifier(_pipeline->getContext()->ns.coll())
+                         << "pipeline" << serializedPipeline);
         return Value(DOC(getSourceName() << spec));
     }
 }

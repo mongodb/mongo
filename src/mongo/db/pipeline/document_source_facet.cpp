@@ -186,15 +186,11 @@ DocumentSource::GetNextResult DocumentSourceFacet::doGetNext() {
 }
 
 Value DocumentSourceFacet::serialize(SerializationOptions opts) const {
-    if (opts.redactIdentifiers || opts.replacementForLiteralArgs) {
-        MONGO_UNIMPLEMENTED_TASSERT(7484347);
-    }
-
     MutableDocument serialized;
     for (auto&& facet : _facets) {
-        serialized[facet.name] =
-            Value(opts.verbosity ? facet.pipeline->writeExplainOps(*opts.verbosity)
-                                 : facet.pipeline->serialize());
+        serialized[opts.serializeFieldPathFromString(facet.name)] =
+            Value(opts.verbosity ? facet.pipeline->writeExplainOps(opts)
+                                 : facet.pipeline->serialize(opts));
     }
     return Value(Document{{"$facet", serialized.freezeToValue()}});
 }

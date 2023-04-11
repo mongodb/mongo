@@ -609,6 +609,64 @@ TEST_F(DocumentSourceUnionWithTest, IncrementNestedAggregateOpCounterOnCreateBut
     testOpCounter(NamespaceString::createNamespaceString_forTest("local", "testColl"), 0);
 }
 
+TEST_F(DocumentSourceUnionWithTest, RedactsCorrectlyBasic) {
+    auto expCtx = getExpCtx();
+    auto nsToUnionWith =
+        NamespaceString::createNamespaceString_forTest(expCtx->ns.dbName(), "coll");
+    expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
+        {nsToUnionWith.coll().toString(), {nsToUnionWith, std::vector<BSONObj>()}}});
+
+    auto docSource = DocumentSourceUnionWith::createFromBson(
+        BSON("$unionWith" << nsToUnionWith.coll()).firstElement(), expCtx);
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$unionWith": {
+                "coll": "HASH<coll>",
+                "pipeline": []
+            }
+        })",
+        redact(*docSource));
+}
+
+TEST_F(DocumentSourceUnionWithTest, RedactsCorrectlyWithPipeline) {
+    auto expCtx = getExpCtx();
+    auto nsToUnionWith =
+        NamespaceString::createNamespaceString_forTest(expCtx->ns.dbName(), "coll");
+    expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
+        {nsToUnionWith.coll().toString(), {nsToUnionWith, std::vector<BSONObj>()}}});
+
+    BSONArrayBuilder pipeline;
+    pipeline << BSON("$match" << BSON("a" << 15));
+    pipeline << BSON("$project" << BSON("a" << 1 << "b" << 1));
+    auto docSource = DocumentSourceUnionWith::createFromBson(
+        BSON("$unionWith" << BSON("coll" << nsToUnionWith.coll() << "pipeline" << pipeline.arr()))
+            .firstElement(),
+        expCtx);
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$unionWith": {
+                "coll": "HASH<coll>",
+                "pipeline": [
+                    {
+                        "$match": {
+                            "HASH<a>": {
+                                "$eq": "?"
+                            }
+                        }
+                    },
+                    {
+                        "$project": {
+                            "HASH<_id>": true,
+                            "HASH<a>": true,
+                            "HASH<b>": true
+                        }
+                    }
+                ]
+            }
+        })",
+        redact(*docSource));
+}
+
 using DocumentSourceUnionWithServerlessTest = ServerlessAggregationContextFixture;
 
 TEST_F(DocumentSourceUnionWithServerlessTest,

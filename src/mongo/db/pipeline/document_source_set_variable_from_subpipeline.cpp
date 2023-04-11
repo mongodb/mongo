@@ -62,7 +62,7 @@ Value DocumentSourceSetVariableFromSubPipeline::serialize(SerializationOptions o
     SetVariableFromSubPipelineSpec spec;
     tassert(625298, "SubPipeline cannot be null during serialization", _subPipeline);
     spec.setSetVariable(var);
-    spec.setPipeline(_subPipeline->serializeToBson(opts.verbosity));
+    spec.setPipeline(_subPipeline->serializeToBson(opts));
     return Value(DOC(getSourceName() << spec.toBSON()));
 }
 

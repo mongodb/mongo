@@ -318,13 +318,9 @@ public:
     /**
      * Helpers to serialize a pipeline.
      */
-    std::vector<Value> serialize(boost::optional<ExplainOptions::Verbosity> explain) const;
     std::vector<Value> serialize(boost::optional<SerializationOptions> opts = boost::none) const;
-    std::vector<BSONObj> serializeToBson(boost::optional<ExplainOptions::Verbosity> explain) const;
     std::vector<BSONObj> serializeToBson(
         boost::optional<SerializationOptions> opts = boost::none) const;
-    static std::vector<Value> serializeContainer(
-        const SourceContainer& container, boost::optional<ExplainOptions::Verbosity> explain);
     static std::vector<Value> serializeContainer(
         const SourceContainer& container, boost::optional<SerializationOptions> opts = boost::none);
 
@@ -342,7 +338,7 @@ public:
      * Write the pipeline's operators to a std::vector<Value>, providing the level of detail
      * specified by 'verbosity'.
      */
-    std::vector<Value> writeExplainOps(ExplainOptions::Verbosity verbosity) const;
+    std::vector<Value> writeExplainOps(SerializationOptions opts = SerializationOptions()) const;
 
     /**
      * Returns the dependencies needed by this pipeline. 'unavailableMetadata' should reflect what

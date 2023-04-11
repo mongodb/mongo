@@ -905,5 +905,189 @@ TEST_F(DocumentSourceFacetTest, ShouldSurfaceStrictestRequirementsOfEachConstrai
     ASSERT_FALSE(
         facetStage->constraints(Pipeline::SplitState::kUnsplit).isAllowedInLookupPipeline());
 }
+
+TEST_F(DocumentSourceFacetTest, RedactsCorrectly) {
+    auto spec = fromjson(R"({
+        $facet: {
+            a: [
+                { $unwind: "$foo" },
+                { $sortByCount: "$foo" }
+            ],
+            b: [
+                {
+                    $match: {
+                        bar: { $exists: 1 }
+                    }
+                },
+                {
+                    $bucket: {
+                        groupBy: "$bar.foo",
+                        boundaries: [0, 50, 100, 200],
+                        output: {
+                            z: { $sum : 1 }
+                        }
+                    }
+                }
+            ],
+            c: [
+                {
+                    $bucketAuto: {
+                        groupBy: "$bar.baz",
+                        buckets: 4
+                    }
+                }
+            ]
+        }
+    })");
+    auto docSource = DocumentSourceFacet::createFromBson(spec.firstElement(), getExpCtx());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$facet": {
+                "HASH<a>": [
+                    {
+                        "$unwind": {
+                            "path": "$HASH<foo>"
+                        }
+                    },
+                    {
+                        "$group": {
+                            "_id": "$HASH<foo>",
+                            "HASH<count>": {
+                                "$sum": {
+                                    "$const": "?"
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "$sort": {
+                            "HASH<count>": -1
+                        }
+                    }
+                ],
+                "HASH<b>": [
+                    {
+                        "$match": {
+                            "HASH<bar>": {
+                                "$exists": "?"
+                            }
+                        }
+                    },
+                    {
+                        "$group": {
+                            "_id": {
+                                "$switch": {
+                                    "branches": [
+                                        {
+                                            "case": {
+                                                "$and": [
+                                                    {
+                                                        "$gte": [
+                                                            "$HASH<bar>.HASH<foo>",
+                                                            {
+                                                                "$const": "?"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "$lt": [
+                                                            "$HASH<bar>.HASH<foo>",
+                                                            {
+                                                                "$const": "?"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            "then": {
+                                                "$const": "?"
+                                            }
+                                        },
+                                        {
+                                            "case": {
+                                                "$and": [
+                                                    {
+                                                        "$gte": [
+                                                            "$HASH<bar>.HASH<foo>",
+                                                            {
+                                                                "$const": "?"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "$lt": [
+                                                            "$HASH<bar>.HASH<foo>",
+                                                            {
+                                                                "$const": "?"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            "then": {
+                                                "$const": "?"
+                                            }
+                                        },
+                                        {
+                                            "case": {
+                                                "$and": [
+                                                    {
+                                                        "$gte": [
+                                                            "$HASH<bar>.HASH<foo>",
+                                                            {
+                                                                "$const": "?"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "$lt": [
+                                                            "$HASH<bar>.HASH<foo>",
+                                                            {
+                                                                "$const": "?"
+                                                            }
+                                                        ]
+                                                    }
+                                                ]
+                                            },
+                                            "then": {
+                                                "$const": "?"
+                                            }
+                                        }
+                                    ]
+                                }
+                            },
+                            "HASH<z>": {
+                                "$sum": {
+                                    "$const": "?"
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "$sort": {
+                            "HASH<_id>": 1
+                        }
+                    }
+                ],
+                "HASH<c>": [
+                    {
+                        "$bucketAuto": {
+                            "groupBy": "$HASH<bar>.HASH<baz>",
+                            "buckets": "?",
+                            "output": {
+                                "HASH<count>": {
+                                    "$sum": {
+                                        "$const": "?"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                ]
+            }
+        })",
+        redact(*docSource));
+}
 }  // namespace
 }  // namespace mongo
