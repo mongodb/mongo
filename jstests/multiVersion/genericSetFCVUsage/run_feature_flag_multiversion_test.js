@@ -22,8 +22,11 @@ function runTest(downgradeFCV) {
 
     let primary = rst.getPrimary();
     let adminDB = primary.getDB("admin");
-    assert.commandWorked(adminDB.adminCommand({setFeatureCompatibilityVersion: downgradeFCV}));
-    checkFCV(adminDB, downgradeFCV);
+    assert.commandWorked(
+        primary.adminCommand({configureFailPoint: 'failDowngrading', mode: "alwaysOn"}));
+    assert.commandFailedWithCode(
+        adminDB.adminCommand({setFeatureCompatibilityVersion: downgradeFCV}), 549181);
+    checkFCV(adminDB, downgradeFCV, downgradeFCV);
     if (downgradeFCV === lastLTSFCV) {
         numLastLTSRuns++;
     }
