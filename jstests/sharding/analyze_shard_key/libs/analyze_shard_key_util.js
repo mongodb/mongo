@@ -73,14 +73,10 @@ var AnalyzeShardKeyUtil = (function() {
     /**
      * Extracts the shard key value from the given document.
      */
-    function extractShardKeyValueFromDocument(doc, shardKey, indexKey) {
+    function extractShardKeyValueFromDocument(doc, shardKey) {
         const shardKeyValue = {};
         for (let fieldName in shardKey) {
-            const isHashed = indexKey[fieldName] == "hashed";
-            const value = AnalyzeShardKeyUtil.getDottedField(doc, fieldName);
-            // TODO (SERVER-75886): Make analyzeShardKey command return shard key values correctly
-            // when the supporting index is hashed.
-            shardKeyValue[fieldName] = isHashed ? convertShardKeyToHashed(value) : value;
+            shardKeyValue[fieldName] = AnalyzeShardKeyUtil.getDottedField(doc, fieldName);
         }
         return shardKeyValue;
     }
