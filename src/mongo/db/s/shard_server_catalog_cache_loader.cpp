@@ -293,7 +293,7 @@ StatusWith<CollectionAndChangedChunks> getIncompletePersistedMetadataSinceVersio
         if (status == ErrorCodes::NamespaceNotFound) {
             return CollectionAndChangedChunks();
         }
-        return status.withContext(str::stream() << "Failed to load local metadata.");
+        return status.withContext(str::stream() << "Failed to read local metadata.");
     }
 }
 
