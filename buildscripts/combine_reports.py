@@ -25,7 +25,7 @@ def report_exit(combined_test_report):
     """Return report exit code.
 
     The exit code of this script is based on the following:
-        0:  All tests have status "pass", or only non-dynamic tests have status "silentfail".
+        0:  All tests have status "pass".
         31: At least one test has status "fail" or "timeout".
     Note: A test can be considered dynamic if its name contains a ":" character.
     """
