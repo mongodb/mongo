@@ -91,8 +91,7 @@ function testAnalyzeShardKeysUnshardedCollection(conn, mongodConns) {
 
         docs.push(doc);
         mostCommonValues.push({
-            value: AnalyzeShardKeyUtil.extractShardKeyValueFromDocument(
-                doc, candidateShardKey, candidateShardKey),
+            value: AnalyzeShardKeyUtil.extractShardKeyValueFromDocument(doc, candidateShardKey),
             frequency: 1
         });
     }
@@ -150,8 +149,7 @@ function testAnalyzeShardKeysShardedCollection(st, mongodConns) {
 
         docs.push(doc);
         mostCommonValues.push({
-            value: AnalyzeShardKeyUtil.extractShardKeyValueFromDocument(
-                doc, candidateShardKey, candidateShardKey),
+            value: AnalyzeShardKeyUtil.extractShardKeyValueFromDocument(doc, candidateShardKey),
             frequency: 1
         });
 

@@ -163,10 +163,10 @@ function assertReadQueryPlans(mongodConns, dbName, collName, comment) {
                 assert(!doc.usedDisk, doc);
                 if (firstStage.hasOwnProperty("$match") || firstStage.hasOwnProperty("$limit")) {
                     // This corresponds to the aggregation that the analyzeShardKey command runs
-                    // when analyzing a shard key with a unique supporting index, which should
-                    // fetch at most 'numMostCommonValues' documents.
+                    // to look up documents for a shard key with a unique or hashed supporting
+                    // index. For both cases, it should fetch at most 'numMostCommonValues'
+                    // documents.
                     assert(doc.hasOwnProperty("planSummary"), doc);
-                    assert(doc.planSummary.includes("COLLSCAN"), doc);
                     assert.lte(doc.docsExamined, numMostCommonValues, doc);
                 } else {
                     // This corresponds to the aggregation that the analyzeShardKey command runs
@@ -176,8 +176,8 @@ function assertReadQueryPlans(mongodConns, dbName, collName, comment) {
                         assert(doc.planSummary.includes("IXSCAN"), doc);
                     }
 
-                    // Verify that it did not fetch any documents.
-                    assert.eq(doc.docsExamined, 0, doc);
+                    // Verify that it fetched at most 'numMostCommonValues' documents.
+                    assert.lte(doc.docsExamined, numMostCommonValues, doc);
                     // Verify that it opted out of shard filtering.
                     assert.eq(doc.readConcern.level, "available", doc);
                 }
@@ -232,7 +232,9 @@ function testAnalyzeShardKeyNoUniqueIndex(conn, dbName, collName, currentShardKe
         const maxFrequency = shardKeyContainsId ? 1 : numDistinctValues;
         let sign = 1;
         for (let i = 1; i <= numDistinctValues; i++) {
-            const doc = makeDocument(fieldNames, sign * i);
+            // Test with integer field half of time and object field half of the time.
+            const val = sign * i;
+            const doc = makeDocument(fieldNames, Math.random() > 0.5 ? val : {foo: val});
 
             const frequency = shardKeyContainsId ? 1 : i;
             for (let j = 1; j <= frequency; j++) {
@@ -242,8 +244,8 @@ function testAnalyzeShardKeyNoUniqueIndex(conn, dbName, collName, currentShardKe
             const isMostCommon = (maxFrequency - frequency) < numMostCommonValues;
             if (testCase.expectMetrics && isMostCommon) {
                 mostCommonValues.push({
-                    value: AnalyzeShardKeyUtil.extractShardKeyValueFromDocument(
-                        doc, testCase.shardKey, testCase.indexKey),
+                    value: AnalyzeShardKeyUtil.extractShardKeyValueFromDocument(doc,
+                                                                                testCase.shardKey),
                     frequency
                 });
             }
@@ -324,11 +326,12 @@ function testAnalyzeShardKeyUniqueIndex(conn, dbName, collName, currentShardKey,
 
         let sign = 1;
         for (let i = 1; i <= numDistinctValues; i++) {
-            const doc = makeDocument(fieldNames, sign * i);
+            // Test with integer field half of time and object field half of the time.
+            const val = sign * i;
+            const doc = makeDocument(fieldNames, Math.random() > 0.5 ? val : {foo: val});
             docs.push(doc);
             mostCommonValues.push({
-                value: AnalyzeShardKeyUtil.extractShardKeyValueFromDocument(
-                    doc, testCase.shardKey, testCase.indexKey),
+                value: AnalyzeShardKeyUtil.extractShardKeyValueFromDocument(doc, testCase.shardKey),
                 frequency: 1
             });
 

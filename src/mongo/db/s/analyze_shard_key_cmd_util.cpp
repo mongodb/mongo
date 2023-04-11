@@ -68,6 +68,7 @@ MONGO_FAIL_POINT_DEFINE(analyzeShardKeyPauseBeforeCalculatingKeyCharacteristicsM
 MONGO_FAIL_POINT_DEFINE(analyzeShardKeyPauseBeforeCalculatingReadWriteDistributionMetrics);
 
 constexpr StringData kIndexKeyFieldName = "key"_sd;
+constexpr StringData kDocFieldName = "doc"_sd;
 constexpr StringData kNumDocsFieldName = "numDocs"_sd;
 constexpr StringData kNumBytesFieldName = "numBytes"_sd;
 constexpr StringData kNumDistinctValuesFieldName = "numDistinctValues"_sd;
@@ -79,6 +80,26 @@ const int64_t kEmptyDocSizeBytes = BSONObj().objsize();
 /**
  * Returns an aggregate command request for calculating the cardinality and frequency metrics for
  * the given shard key.
+ *
+ * If the hint index is a hashed index and the shard key contains the hashed field, the aggregation
+ * will return documents of the following format, where 'doc' is a document whose shard key value
+ * has the attached 'frequency'.
+ *   {
+ *      doc: <object>
+ *      frequency: <integer>
+ *      numDocs: <integer>
+ *      numDistinctValues: <integer>
+ *   }
+ * Otherwise, the aggregation will return documents of the following format, where 'key' is the
+ * hint index value for the shard key value that has the attached 'frequency'.
+ *   {
+ *      key: <object>
+ *      frequency: <integer>
+ *      numDocs: <integer>
+ *      numDistinctValues: <integer>
+ *   }
+ * The former case involves an additional FETCH for every document returned since it needs to look
+ * up a document from the index value.
  */
 AggregateCommandRequest makeAggregateRequestForCardinalityAndFrequency(const NamespaceString& nss,
                                                                        const BSONObj& shardKey,
@@ -94,11 +115,22 @@ AggregateCommandRequest makeAggregateRequestForCardinalityAndFrequency(const Nam
 
     BSONObjBuilder groupByBuilder;
     int fieldNum = 0;
+    boost::optional<std::string> origHashedFieldName;
+    boost::optional<std::string> tempHashedFieldName;
+    StringMap<std::string> origToTempFieldName;
     for (const auto& element : shardKey) {
-        const auto fieldName = element.fieldNameStringData();
-        groupByBuilder.append(kIndexKeyFieldName + std::to_string(fieldNum),
-                              BSON("$getField" << BSON("field" << fieldName << "input"
+        // Use a temporary field name since it is invalid to group by a field name that contains
+        // dots.
+        const auto origFieldName = element.fieldNameStringData();
+        const auto tempFieldName = kIndexKeyFieldName + std::to_string(fieldNum);
+        groupByBuilder.append(tempFieldName,
+                              BSON("$getField" << BSON("field" << origFieldName << "input"
                                                                << ("$" + kIndexKeyFieldName))));
+        if (ShardKeyPattern::isHashedPatternEl(hintIndexKey.getField(origFieldName))) {
+            origHashedFieldName.emplace(origFieldName);
+            tempHashedFieldName.emplace(tempFieldName);
+        }
+        origToTempFieldName.emplace(origFieldName, tempFieldName);
         fieldNum++;
     }
     pipeline.push_back(BSON("$group" << BSON("_id" << groupByBuilder.obj() << kFrequencyFieldName
@@ -112,6 +144,38 @@ AggregateCommandRequest makeAggregateRequestForCardinalityAndFrequency(const Nam
                                             << kNumDistinctValuesFieldName << BSON("$sum" << 1)))));
 
     pipeline.push_back(BSON("$limit" << numMostCommonValues));
+
+    if (origHashedFieldName) {
+        invariant(tempHashedFieldName);
+
+        BSONObjBuilder letBuilder;
+        BSONObjBuilder matchBuilder;
+        BSONArrayBuilder matchArrayBuilder(matchBuilder.subarrayStart("$and"));
+        for (const auto& [origFieldName, tempFieldName] : origToTempFieldName) {
+            letBuilder.append(tempFieldName, ("$_id." + tempFieldName));
+            auto eqArray = (origFieldName == *origHashedFieldName)
+                ? BSON_ARRAY(BSON("$toHashedIndexKey" << ("$" + *origHashedFieldName))
+                             << ("$$" + tempFieldName))
+                : BSON_ARRAY(("$" + origFieldName) << ("$$" + tempFieldName));
+            matchArrayBuilder.append(BSON("$expr" << BSON("$eq" << eqArray)));
+        }
+        matchArrayBuilder.done();
+
+        pipeline.push_back(BSON(
+            "$lookup" << BSON(
+                "from" << nss.coll().toString() << "let" << letBuilder.obj() << "pipeline"
+                       << BSON_ARRAY(BSON("$match" << matchBuilder.obj()) << BSON("$limit" << 1))
+                       << "as"
+                       << "docs")));
+        pipeline.push_back(BSON("$set" << BSON(kDocFieldName << BSON("$first"
+                                                                     << "$docs"))));
+        pipeline.push_back(BSON("$unset"
+                                << "docs"));
+    } else {
+        pipeline.push_back(BSON("$set" << BSON(kIndexKeyFieldName << "$_id")));
+    }
+    pipeline.push_back(BSON("$unset"
+                            << "_id"));
 
     AggregateCommandRequest aggRequest(nss, pipeline);
     aggRequest.setHint(hintIndexKey);
@@ -431,8 +495,17 @@ CardinalityFrequencyMetrics calculateCardinalityAndFrequencyGeneric(OperationCon
             invariant(metrics.numDistinctValues == numDistinctValues);
         }
 
-        auto value = dotted_path_support::extractElementsBasedOnTemplate(
-            doc.getObjectField("_id").replaceFieldNames(shardKey), shardKey);
+        auto value = [&] {
+            if (doc.hasField(kDocFieldName)) {
+                return dotted_path_support::extractElementsBasedOnTemplate(
+                    doc.getObjectField(kDocFieldName), shardKey);
+            } else if (doc.hasField(kIndexKeyFieldName)) {
+                return dotted_path_support::extractElementsBasedOnTemplate(
+                    doc.getObjectField(kIndexKeyFieldName).replaceFieldNames(shardKey), shardKey);
+            } else
+                uasserted(7588600,
+                          str::stream() << "Found a document with unexpected format " << doc);
+        }();
         if (value.objsize() > maxSizeBytesPerValue) {
             value = truncateBSONObj(value, maxSizeBytesPerValue);
         }
