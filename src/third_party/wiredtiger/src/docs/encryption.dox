@@ -136,19 +136,12 @@ memory while the database is running, and change it as well, so this limitation 
 necessarily important.)
 
 To use the encryptor, first install libsodium; then you can compile WiredTiger with the
-extension by passing the \c --enable-sodium option to configure, or the argument \c
--DENABLE_SODIUM=1 to cmake.
+extension by passing the argument \c -DENABLE_SODIUM=1 to cmake.
 
 If libsodium is installed in a location not normally searched by the compiler toolchain,
-you'll need to modify the \c CPPFLAGS and \c LDFLAGS to indicate these locations. For
+you'll need to modify the include and library paths to indicate these locations. For
 example, with the libsodium includes and libraries installed in \c /usr/local/include and
-\c /usr/local/lib, you would run configure with the following additional arguments:
-
-@code
---enable-sodium CPPFLAGS="-I/usr/local/include" LDFLAGS="-L/usr/local/include"
-@endcode
-
-Alternatively you would run cmake with the following additional arguments:
+\c /usr/local/lib, you would run cmake with the following additional arguments:
 
 @code
 -DENABLE_SODIUM=1 -DCMAKE_INCLUDE_PATH=/usr/local/include -DCMAKE_LIBRARY_PATH=/usr/local/lib
