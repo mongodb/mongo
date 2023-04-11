@@ -833,13 +833,21 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
         const bool inRetryableInternalTransaction =
             isInternalSessionForRetryableWrite(*opCtx->getLogicalSessionId());
 
+        invariant(
+            inRetryableInternalTransaction ||
+                args.retryableFindAndModifyLocation == RetryableFindAndModifyLocation::kNone,
+            str::stream()
+                << "Attempted a retryable write within a non-retryable multi-document transaction");
+
         auto operation = MutableOplogEntry::makeUpdateOperation(
             args.coll->ns(), args.coll->uuid(), args.updateArgs->update, args.updateArgs->criteria);
 
         if (inRetryableInternalTransaction) {
             operation.setInitializedStatementIds(args.updateArgs->stmtIds);
             if (args.updateArgs->storeDocOption == CollectionUpdateArgs::StoreDocOption::PreImage) {
-                invariant(!args.updateArgs->preImageDoc.isEmpty());
+                invariant(!args.updateArgs->preImageDoc.isEmpty(),
+                          str::stream()
+                              << "Pre-image document must be present for pre-image recording");
                 operation.setPreImage(args.updateArgs->preImageDoc.getOwned());
                 operation.setPreImageRecordedForRetryableInternalTransaction();
                 if (args.retryableFindAndModifyLocation ==
@@ -849,7 +857,9 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
             }
             if (args.updateArgs->storeDocOption ==
                 CollectionUpdateArgs::StoreDocOption::PostImage) {
-                invariant(!args.updateArgs->updatedDoc.isEmpty());
+                invariant(!args.updateArgs->updatedDoc.isEmpty(),
+                          str::stream()
+                              << "Update document must be present for pre-image recording");
                 operation.setPostImage(args.updateArgs->updatedDoc.getOwned());
                 if (args.retryableFindAndModifyLocation ==
                     RetryableFindAndModifyLocation::kSideCollection) {
@@ -859,7 +869,9 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
         }
 
         if (args.updateArgs->changeStreamPreAndPostImagesEnabledForCollection) {
-            invariant(!args.updateArgs->preImageDoc.isEmpty());
+            invariant(!args.updateArgs->preImageDoc.isEmpty(),
+                      str::stream()
+                          << "Pre-image document must be present for pre-image recording");
             operation.setPreImage(args.updateArgs->preImageDoc.getOwned());
             operation.setChangeStreamPreImageRecordingMode(
                 ChangeStreamPreImageRecordingMode::kPreImagesCollection);
@@ -930,7 +942,7 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
             args.updateArgs->source != OperationSource::kFromMigrate &&
             !args.coll->ns().isTemporaryReshardingCollection()) {
             const auto& preImageDoc = args.updateArgs->preImageDoc;
-            tassert(5868600, "PreImage must be set", !preImageDoc.isEmpty());
+            invariant(!preImageDoc.isEmpty(), str::stream() << "PreImage must be set");
 
             ChangeStreamPreImageId id(args.coll->uuid(), opTime.writeOpTime.getTimestamp(), 0);
             ChangeStreamPreImage preImage(id, opTime.wallClockTime, preImageDoc);
@@ -1025,10 +1037,11 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
         const bool inRetryableInternalTransaction =
             isInternalSessionForRetryableWrite(*opCtx->getLogicalSessionId());
 
-        tassert(5868700,
-                "Attempted a retryable write within a non-retryable multi-document transaction",
-                inRetryableInternalTransaction ||
-                    args.retryableFindAndModifyLocation == RetryableFindAndModifyLocation::kNone);
+        invariant(
+            inRetryableInternalTransaction ||
+                args.retryableFindAndModifyLocation == RetryableFindAndModifyLocation::kNone,
+            str::stream()
+                << "Attempted a retryable write within a non-retryable multi-document transaction");
 
         auto operation =
             MutableOplogEntry::makeDeleteOperation(nss, uuid, documentKey.getShardKeyAndId());
@@ -1037,9 +1050,9 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
             operation.setInitializedStatementIds({stmtId});
             if (args.retryableFindAndModifyLocation ==
                 RetryableFindAndModifyLocation::kSideCollection) {
-                tassert(6054000,
-                        "Deleted document must be present for pre-image recording",
-                        args.deletedDoc);
+                invariant(!args.deletedDoc->isEmpty(),
+                          str::stream()
+                              << "Deleted document must be present for pre-image recording");
                 operation.setPreImage(args.deletedDoc->getOwned());
                 operation.setPreImageRecordedForRetryableInternalTransaction();
                 operation.setNeedsRetryImage(repl::RetryImageEnum::kPreImage);
@@ -1047,9 +1060,8 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
         }
 
         if (args.changeStreamPreAndPostImagesEnabledForCollection) {
-            tassert(5869400,
-                    "Deleted document must be present for pre-image recording",
-                    args.deletedDoc);
+            invariant(!args.deletedDoc->isEmpty(),
+                      str::stream() << "Deleted document must be present for pre-image recording");
             operation.setPreImage(args.deletedDoc->getOwned());
             operation.setChangeStreamPreImageRecordingMode(
                 ChangeStreamPreImageRecordingMode::kPreImagesCollection);
@@ -1060,13 +1072,11 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
         txnParticipant.addTransactionOperation(opCtx, operation);
     } else {
         MutableOplogEntry oplogEntry;
-        boost::optional<BSONObj> deletedDocForOplog = boost::none;
 
         if (args.retryableFindAndModifyLocation ==
             RetryableFindAndModifyLocation::kSideCollection) {
-            tassert(5868703,
-                    "Deleted document must be present for pre-image recording",
-                    args.deletedDoc);
+            invariant(!args.deletedDoc->isEmpty(),
+                      str::stream() << "Deleted document must be present for pre-image recording");
             invariant(opCtx->getTxnNumber());
 
             oplogEntry.setNeedsRetryImage({repl::RetryImageEnum::kPreImage});
@@ -1098,7 +1108,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
         //    sync mode application).
         if (args.changeStreamPreAndPostImagesEnabledForCollection && !opTime.writeOpTime.isNull() &&
             !args.fromMigrate && !nss.isTemporaryReshardingCollection()) {
-            tassert(5868704, "Deleted document must be set", args.deletedDoc);
+            invariant(!args.deletedDoc->isEmpty(), str::stream() << "Deleted document must be set");
 
             ChangeStreamPreImageId id(uuid, opTime.writeOpTime.getTimestamp(), 0);
             ChangeStreamPreImage preImage(id, opTime.wallClockTime, *args.deletedDoc);
