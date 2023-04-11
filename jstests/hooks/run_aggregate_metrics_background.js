@@ -88,6 +88,7 @@ const aggregateMetricsBackground = function(host) {
 // which is why we sleep for 1 second here. This sleep is here rather than in
 // aggregate_metrics_background.py because the background job that file uses is designed to be run
 // continuously so it is easier and cleaner to just sleep here.
+// TODO SERVER-75983 move this logic into the test harness.
 sleep(1000);
 if (topology.type === Topology.kStandalone) {
     try {

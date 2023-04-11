@@ -144,14 +144,26 @@ DocumentSource::GetNextResult DocumentSourceTelemetry::doGetNext() {
         const auto partitionReadTime =
             Timestamp{Timestamp(Date_t::now().toMillisSinceEpoch() / 1000, 0)};
         for (auto&& [key, metrics] : *partition) {
-            auto swKey = metrics->redactKey(key, _redactIdentifiers, pExpCtx->opCtx);
+            StatusWith<BSONObj> swKey = Status{ErrorCodes::InternalError, "Uninitialized"};
+            try {
+                swKey = metrics->redactKey(key, _redactIdentifiers, pExpCtx->opCtx);
+            } catch (const DBException& ex) {
+                swKey = ex.toStatus();
+            }
             if (!swKey.isOK()) {
+                // We would like to print the whole key unredacted to debug, but of course the point
+                // of redacting it is to not leak PII, so we will use this raw/naive redaction
+                // algorithm which may cut things short. This will only do anything if log redaction
+                // is enabled.
                 LOGV2_DEBUG(7349403,
-                            3,
+                            1,
                             "Error encountered when redacting query shape, will not publish "
                             "telemetry for this entry.",
-                            "status"_attr = swKey.getStatus());
+                            "status"_attr = swKey.getStatus(),
+                            "rawKey"_attr = redact(key));
                 if (kDebugBuild) {
+                    LOGV2_DEBUG(
+                        7559600, 0, "Failed to redact telemetry", "rawKey"_attr = redact(key));
                     tasserted(7349401,
                               "Was not able to re-parse telemetry key when reading telemetry.");
                 }

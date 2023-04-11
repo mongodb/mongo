@@ -160,6 +160,12 @@ BSONObj redactHintComponent(BSONObj obj, const SerializationOptions& opts, bool 
             continue;
         }
 
+        // $natural doesn't need to be redacted.
+        if (elem.fieldNameStringData().compare(query_request_helper::kNaturalSortField) == 0) {
+            bob.append(elem);
+            continue;
+        }
+
         if (opts.replacementForLiteralArgs && redactValues) {
             bob.append(opts.serializeFieldPathFromString(elem.fieldName()),
                        opts.replacementForLiteralArgs.get());

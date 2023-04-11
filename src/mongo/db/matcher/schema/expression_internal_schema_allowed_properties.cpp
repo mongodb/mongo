@@ -140,7 +140,7 @@ void InternalSchemaAllowedPropertiesMatchExpression::serialize(BSONObjBuilder* b
     for (auto&& item : _patternProperties) {
         BSONObjBuilder itemBuilder(patternPropertiesBuilder.subobjStart());
         if (opts.replacementForLiteralArgs) {
-            itemBuilder.appendRegex("regex", opts.replacementForLiteralArgs.get());
+            itemBuilder.append("regex", opts.replacementForLiteralArgs.get());
         } else {
             itemBuilder.appendRegex("regex", item.first.rawRegex);
         }

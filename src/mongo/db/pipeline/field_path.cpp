@@ -109,8 +109,8 @@ void FieldPath::uassertValidFieldName(StringData fieldName) {
 
     if (fieldName[0] == '$' && !kAllowedDollarPrefixedFields.count(fieldName)) {
         uasserted(16410,
-                  str::stream() << "FieldPath field names may not start with '$'."
-                                << dotsAndDollarsHint);
+                  str::stream() << "FieldPath field names may not start with '$'. Got '"
+                                << fieldName << "'. " << dotsAndDollarsHint);
     }
 
     uassert(
