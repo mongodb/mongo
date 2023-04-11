@@ -142,7 +142,8 @@ buildvariants:
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
-- name: enterprise-rhel-83-s390x
+- &enterprise-rhel-83-s390x-template
+  name: enterprise-rhel-83-s390x
   display_name: Enterprise RHEL 8.3 s390x
   modules:
   - enterprise
@@ -150,7 +151,7 @@ buildvariants:
   - rhel83-zseries-small
   cron: "0 4 * * 0"
   stepback: false
-  expansions:
+  expansions: &enterprise-rhel-83-s390x-expansions-template
     additional_package_targets: >-
       archive-mongocryptd
       archive-mongocryptd-debug
@@ -179,7 +180,7 @@ buildvariants:
     multiversion_edition: enterprise
     compile_variant: enterprise-rhel-83-s390x
   tasks:
-  - name: compile_test_and_package_serial_TG
+  - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - rhel83-zseries-large
   - name: compile_integration_and_test_no_audit_parallel_stream_TG
@@ -202,3 +203,20 @@ buildvariants:
   - name: .publish_crypt
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
+
+- <<: *enterprise-rhel-83-s390x-template
+  name: enterprise-rhel-83-s390x-dynamic
+  display_name: Enterprise RHEL 8.3 s390x Shared
+  expansions:
+    <<: *enterprise-rhel-83-s390x-expansions-template
+    compile_flags: >-
+      --link-model=dynamic
+      --ssl
+      MONGO_DISTMOD=rhel83
+      -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc)
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --linker=gold
+  tasks:
+  - name: compile_test_and_package_serial_TG
+    distros:
+    - rhel83-zseries-large

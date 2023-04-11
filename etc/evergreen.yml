@@ -651,6 +651,7 @@ buildvariants:
       --experimental-optimization=*
       --experimental-runtime-hardening=*
       --disable-warnings-as-errors
+      --link-model=dynamic
     compile_variant: *enterprise-rhel80-gcc-cxx20-pm-1328-experimental
   tasks: &enterprise-rhel80-dynamic-gcc-debug-experimental-tasks-no-unittests
     - name: compile_test_and_package_parallel_core_stream_TG
