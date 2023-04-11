@@ -11,11 +11,11 @@
 static void __bm_method_set(WT_BM *, bool);
 
 /*
- * __bm_close_block --
+ * __wt_bm_close_block --
  *     Close a block handle.
  */
-static int
-__bm_close_block(WT_SESSION_IMPL *session, WT_BLOCK *block)
+int
+__wt_bm_close_block(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
     WT_CONNECTION_IMPL *conn;
 
@@ -264,7 +264,7 @@ __bm_close(WT_BM *bm, WT_SESSION_IMPL *session)
         return (0);
 
     if (!bm->is_multi_handle)
-        ret = __bm_close_block(session, bm->block);
+        ret = __wt_bm_close_block(session, bm->block);
     else {
         /*
          * Higher-level code ensures that we can only have one call to close a block manager. So we
@@ -273,7 +273,7 @@ __bm_close(WT_BM *bm, WT_SESSION_IMPL *session)
          * We don't need to explicitly close the active handle; it is also in the handle array.
          */
         for (i = 0; i < bm->handle_array_next; ++i)
-            WT_TRET(__bm_close_block(session, bm->handle_array[i]));
+            WT_TRET(__wt_bm_close_block(session, bm->handle_array[i]));
 
         __wt_rwlock_destroy(session, &bm->handle_array_lock);
         __wt_free(session, bm->handle_array);
