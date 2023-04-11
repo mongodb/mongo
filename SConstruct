@@ -2026,6 +2026,7 @@ if env.get('ENABLE_OOM_RETRY'):
             env['OOM_RETRY_MESSAGES'] = [
                 'LNK1102: out of memory',
                 'C1060: compiler is out of heap space',
+                'c1xx : fatal error C1063: INTERNAL COMPILER ERROR',
                 'LNK1171: unable to load mspdbcore.dll',
                 "LNK1201: error writing to program database ''",
             ]
