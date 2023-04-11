@@ -97,11 +97,10 @@ def pick_catalog_shard_node(catalog_shard, num_shards):
     if catalog_shard is None:
         return None
 
-    if num_shards is None or int(num_shards) <= 0:
-        raise ValueError("Num shards > 0 for catalog shard to exist")
-
     if catalog_shard == "any":
-        return random.randrange(0, num_shards)
+        if num_shards is None or num_shards == 0:
+            return 0
+        return random.randint(0, num_shards - 1)
 
     catalog_shard_index = int(catalog_shard)
     if catalog_shard_index < 0 or catalog_shard_index >= num_shards:
