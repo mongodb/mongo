@@ -1534,7 +1534,6 @@ buildvariants:
   - name: .concurrency .large !.ubsan !.no_txns !.debug_only
     distros:
     - rhel80-medium
-  - name: sharding_auth_catalog_shard_gen
   - name: .config_fuzzer !.large
   - name: disk_wiredtiger
   - name: .encrypt
@@ -1638,8 +1637,7 @@ buildvariants:
   - name: jstestfuzz_sharded_gen
   - name: sharded_causally_consistent_jscore_passthrough_gen
   - name: sharded_causally_consistent_read_concern_snapshot_passthrough_gen
-  - name: sharded_collections_jscore_passthrough_with_catalog_shard
-  - name: sharding_jscore_passthrough_with_catalog_shard
+  - name: sharding_auth_gen
   - name: .sharding .txns
   - name: .sharding .common
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
