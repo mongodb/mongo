@@ -253,13 +253,10 @@ public:
 
         boost::optional<AutoGetDb> autoDb;
         if (isPointInTimeRead) {
-            // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-            if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe()) {
-                // We only need to lock the database in intent mode and then collection in intent
-                // mode as well to ensure that none of the collections get dropped. This is no
-                // longer necessary with point-in-time catalog lookups.
-                autoDb.emplace(opCtx, dbName, MODE_IS);
-            }
+            // We only need to lock the database in intent mode and then collection in intent
+            // mode as well to ensure that none of the collections get dropped.
+            // TODO:SERVER-75848 Make this lock-free
+            autoDb.emplace(opCtx, dbName, MODE_IS);
         } else {
             // We lock the entire database in S-mode in order to ensure that the contents will not
             // change for the snapshot when not reading at a timestamp.
@@ -351,6 +348,8 @@ public:
                                 !minSnapshot || *readTimestamp >= *minSnapshot);
                     }
                 } else {
+                    // TODO:SERVER-75848 Make this lock-free
+                    Lock::CollectionLock clk(opCtx, *nss, MODE_IS);
                     coll = catalog->establishConsistentCollection(
                         opCtx,
                         {dbName, uuid},
