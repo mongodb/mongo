@@ -10,6 +10,8 @@
  *   does_not_support_add_remove_shards,
  *   # Requires all nodes to be running the latest binary.
  *   multiversion_incompatible,
+ *   # TODO (SERVER-75391) Re-enable this test.
+ *   config_shard_incompatible,
  *  ]
  */
 
