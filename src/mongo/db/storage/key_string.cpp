@@ -281,7 +281,7 @@ StringData readCStringWithNuls(BufReader* reader, std::string* scratch) {
         return initial;  // Don't alloc or copy for simple case with no NUL bytes.
 
     scratch->append(initial.rawData(), initial.size());
-    while (reader->peek<unsigned char>() == 0xFF) {
+    while (reader->remaining() && reader->peek<unsigned char>() == 0xFF) {
         // Each time we enter this loop it means we hit a NUL byte encoded as "\x00\xFF".
         *scratch += '\0';
         reader->skip(1);

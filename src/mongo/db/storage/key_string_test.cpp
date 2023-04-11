@@ -283,6 +283,18 @@ TEST_F(KeyStringBuilderTest, MaxElementsInCompoundKey) {
     KeyString::getKeySize(ks.getBuffer(), ks.getSize(), ALL_ASCENDING, ks.getTypeBits());
 }
 
+TEST_F(KeyStringBuilderTest, EmbeddedNullString) {
+    // Construct a KeyString where \x3c defines the type kStringLike then embedded with null
+    // characters and followed by \x00.
+    const char* data = "\x3c\x00\xff\x00";
+    const size_t size = 4;
+    KeyString::TypeBits typeBits(KeyString::Version::kLatestVersion);
+
+    // No exceptions should be thrown.
+    ASSERT_BSONOBJ_EQ(KeyString::toBson(data, size, ALL_ASCENDING, typeBits),
+                      BSON("" << StringData("\x00", 1)));
+};
+
 TEST_F(KeyStringBuilderTest, ExceededBSONDepth) {
     KeyString::Builder ks(KeyString::Version::V1);
 
