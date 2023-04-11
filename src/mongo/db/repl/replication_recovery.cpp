@@ -334,7 +334,7 @@ void ReplicationRecoveryImpl::recoverFromOplogAsStandalone(OperationContext* opC
 
     // Initialize the cached pointer to the oplog collection.
     acquireOplogCollectionForLogging(opCtx);
-    boost::optional<Timestamp> stableTimestamp = boost::none;
+
     if (recoveryTS || startupRecoveryForRestore) {
         if (startupRecoveryForRestore && !recoveryTS) {
             LOGV2_WARNING(5576601,
@@ -345,7 +345,8 @@ void ReplicationRecoveryImpl::recoverFromOplogAsStandalone(OperationContext* opC
 
         // We pass in "none" for the stable timestamp so that recoverFromOplog asks storage
         // for the recoveryTimestamp just like on replica set recovery.
-        stableTimestamp = recoverFromOplog(opCtx, boost::none);
+        const auto stableTimestamp = boost::none;
+        recoverFromOplog(opCtx, stableTimestamp);
     } else {
         if (gTakeUnstableCheckpointOnShutdown) {
             // Ensure 'recoverFromOplogAsStandalone' with 'takeUnstableCheckpointOnShutdown'
@@ -365,10 +366,7 @@ void ReplicationRecoveryImpl::recoverFromOplogAsStandalone(OperationContext* opC
 
     if (!_duringInitialSync) {
         // Initial sync will reconstruct prepared transactions when it is completely done.
-        reconstructPreparedTransactions(opCtx,
-                                        stableTimestamp
-                                            ? OplogApplication::Mode::kStableRecovering
-                                            : OplogApplication::Mode::kUnstableRecovering);
+        reconstructPreparedTransactions(opCtx, OplogApplication::Mode::kRecovering);
 
         // Two-phase index builds are built in the background, which may still be in-progress after
         // recovering from the oplog. To prevent crashing the server, skip enabling read-only mode.
@@ -440,14 +438,14 @@ void ReplicationRecoveryImpl::recoverFromOplogUpTo(OperationContext* opCtx, Time
         invariant(appliedUpTo <= endPoint);
     }
 
-    reconstructPreparedTransactions(opCtx, OplogApplication::Mode::kStableRecovering);
+    reconstructPreparedTransactions(opCtx, OplogApplication::Mode::kRecovering);
 }
 
-boost::optional<Timestamp> ReplicationRecoveryImpl::recoverFromOplog(
-    OperationContext* opCtx, boost::optional<Timestamp> stableTimestamp) try {
+void ReplicationRecoveryImpl::recoverFromOplog(OperationContext* opCtx,
+                                               boost::optional<Timestamp> stableTimestamp) try {
     if (_consistencyMarkers->getInitialSyncFlag(opCtx)) {
         LOGV2(21542, "No recovery needed. Initial sync flag set");
-        return stableTimestamp;  // Initial Sync will take over so no cleanup is needed.
+        return;  // Initial Sync will take over so no cleanup is needed.
     }
 
     const auto serviceCtx = getGlobalServiceContext();
@@ -489,7 +487,7 @@ boost::optional<Timestamp> ReplicationRecoveryImpl::recoverFromOplog(
         // Oplog is empty. There are no oplog entries to apply, so we exit recovery and go into
         // initial sync.
         LOGV2(21543, "No oplog entries to apply for recovery. Oplog is empty");
-        return stableTimestamp;
+        return;
     }
     fassert(40290, topOfOplogSW);
     const auto topOfOplog = topOfOplogSW.getValue();
@@ -503,7 +501,6 @@ boost::optional<Timestamp> ReplicationRecoveryImpl::recoverFromOplog(
         _recoverFromUnstableCheckpoint(
             opCtx, _consistencyMarkers->getAppliedThrough(opCtx), topOfOplog);
     }
-    return stableTimestamp;
 } catch (...) {
     LOGV2_FATAL_CONTINUE(21570,
                          "Caught exception during replication recovery: {error}",
@@ -716,10 +713,6 @@ Timestamp ReplicationRecoveryImpl::_applyOplogOperations(OperationContext* opCtx
 
     RecoveryOplogApplierStats stats;
 
-    auto oplogApplicationMode = (recoveryMode == RecoveryMode::kStartupFromStableTimestamp ||
-                                 recoveryMode == RecoveryMode::kRollbackFromStableTimestamp)
-        ? OplogApplication::Mode::kStableRecovering
-        : OplogApplication::Mode::kUnstableRecovering;
     auto writerPool = makeReplWriterPool();
     auto* replCoord = ReplicationCoordinator::get(opCtx);
     OplogApplierImpl oplogApplier(nullptr,
@@ -728,7 +721,7 @@ Timestamp ReplicationRecoveryImpl::_applyOplogOperations(OperationContext* opCtx
                                   replCoord,
                                   _consistencyMarkers,
                                   _storageInterface,
-                                  OplogApplier::Options(oplogApplicationMode),
+                                  OplogApplier::Options(OplogApplication::Mode::kRecovering),
                                   writerPool.get());
 
     OplogApplier::BatchLimits batchLimits;

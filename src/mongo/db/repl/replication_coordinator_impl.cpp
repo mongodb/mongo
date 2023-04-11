@@ -530,8 +530,8 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(
 
     LOGV2(4280504, "Cleaning up any partially applied oplog batches & reading last op from oplog");
     // Read the last op from the oplog after cleaning up any partially applied batches.
-    auto stableTimestamp =
-        _replicationProcess->getReplicationRecovery()->recoverFromOplog(opCtx, boost::none);
+    const auto stableTimestamp = boost::none;
+    _replicationProcess->getReplicationRecovery()->recoverFromOplog(opCtx, stableTimestamp);
     LOGV2(4280505,
           "Creating any necessary TenantMigrationAccessBlockers for unfinished migrations");
 
@@ -543,9 +543,7 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(
 
     tenant_migration_access_blocker::recoverTenantMigrationAccessBlockers(opCtx);
     LOGV2(4280506, "Reconstructing prepared transactions");
-    reconstructPreparedTransactions(opCtx,
-                                    stableTimestamp ? OplogApplication::Mode::kStableRecovering
-                                                    : OplogApplication::Mode::kUnstableRecovering);
+    reconstructPreparedTransactions(opCtx, OplogApplication::Mode::kRecovering);
 
     const auto lastOpTimeAndWallTimeResult = _externalState->loadLastOpTimeAndWallTime(opCtx);
 

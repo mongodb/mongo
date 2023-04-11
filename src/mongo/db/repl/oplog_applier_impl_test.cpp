@@ -421,14 +421,11 @@ TEST_F(OplogApplierImplTest, applyOplogEntryToRecordChangeStreamPreImages) {
         }
     };
     generateTestCasesForOperations(OplogApplication::Mode::kSecondary, {}, true);
-    generateTestCasesForOperations(OplogApplication::Mode::kUnstableRecovering, {}, true);
-    generateTestCasesForOperations(OplogApplication::Mode::kStableRecovering, {}, true);
+    generateTestCasesForOperations(OplogApplication::Mode::kRecovering, {}, true);
     generateTestCasesForOperations(OplogApplication::Mode::kInitialSync, {}, false);
     const auto kFromMigrate{true};
     generateTestCasesForOperations(OplogApplication::Mode::kSecondary, kFromMigrate, false);
-    generateTestCasesForOperations(
-        OplogApplication::Mode::kUnstableRecovering, kFromMigrate, false);
-    generateTestCasesForOperations(OplogApplication::Mode::kStableRecovering, kFromMigrate, false);
+    generateTestCasesForOperations(OplogApplication::Mode::kRecovering, kFromMigrate, false);
     generateTestCasesForOperations(OplogApplication::Mode::kInitialSync, kFromMigrate, false);
 
     int docId{0};
@@ -862,7 +859,7 @@ TEST_F(MultiOplogEntryOplogApplierImplTest, MultiApplyUnpreparedTransactionAllAt
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kStableRecovering),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kRecovering),
         _writerPool.get());
 
     // Apply both inserts and the commit in a single batch.  We expect no oplog entries to
@@ -1344,7 +1341,7 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyPreparedTransactionReco
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kStableRecovering),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kRecovering),
         _writerPool.get());
 
     // Apply a batch with the insert operations.  This should have no effect, because this is
@@ -1578,7 +1575,7 @@ TEST_F(MultiOplogEntryPreparedTransactionTest,
         ReplicationCoordinator::get(_opCtx.get()),
         getConsistencyMarkers(),
         getStorageInterface(),
-        repl::OplogApplier::Options(repl::OplogApplication::Mode::kStableRecovering),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kRecovering),
         _writerPool.get());
 
     const auto expectedStartOpTime = _singlePrepareApplyOp->getOpTime();
