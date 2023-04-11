@@ -7,6 +7,7 @@
  *   does_not_support_stepdowns,
  *   featureFlagCompoundWildcardIndexes,
  *   requires_fcv_70,
+ *   uses_full_validation,
  * ]
  */
 

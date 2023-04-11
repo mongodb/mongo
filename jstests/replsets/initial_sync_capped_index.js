@@ -22,6 +22,10 @@
  * 8. Once initial sync completes, ensure that capped collection indexes on the SECONDARY are valid.
  *
  * This is a regression test for SERVER-29197.
+ *
+ * @tags: [
+ *   uses_full_validation,
+ * ]
  */
 (function() {
 "use strict";
