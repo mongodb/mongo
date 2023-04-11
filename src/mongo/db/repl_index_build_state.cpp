@@ -531,6 +531,11 @@ bool ReplIndexBuildState::forceSelfAbort(OperationContext* opCtx, const Status& 
 
         LOGV2(7419400, "Forcefully aborting index build", "buildUUID"_attr = buildUUID);
 
+        // If there is a pending voteCommitIndexBuild request, cancel it and clear the callback.
+        // Otherwise the index build will try to issue a voteAbortIndexBuild, and set the callback
+        // handle, while the previous one is still valid.
+        _cancelAndClearVoteRequestCbk(lk, opCtx);
+
         // We don't pass IndexBuildAborted as the interruption error code because that would imply
         // that we are taking responsibility for cleaning up the index build, when in fact the index
         // builder thread is responsible.
@@ -551,9 +556,21 @@ void ReplIndexBuildState::onVoteRequestScheduled(OperationContext* opCtx,
     }
 }
 
+void ReplIndexBuildState::_clearVoteRequestCbk(WithLock) {
+    _voteCmdCbkHandle = executor::TaskExecutor::CallbackHandle();
+}
+
 void ReplIndexBuildState::clearVoteRequestCbk() {
     stdx::lock_guard lk(_mutex);
-    _voteCmdCbkHandle = executor::TaskExecutor::CallbackHandle();
+    _clearVoteRequestCbk(lk);
+}
+
+void ReplIndexBuildState::_cancelAndClearVoteRequestCbk(WithLock lk, OperationContext* opCtx) {
+    if (_voteCmdCbkHandle.isValid()) {
+        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        replCoord->cancelCbkHandle(_voteCmdCbkHandle);
+    }
+    _clearVoteRequestCbk(lk);
 }
 
 void ReplIndexBuildState::resetNextActionPromise() {
@@ -665,10 +682,7 @@ void ReplIndexBuildState::_setSignalAndCancelVoteRequestCbkIfActive(WithLock lk,
     _waitForNextAction->emplaceValue(signal);
     // Cancel the callback, as we are checking if it is valid, this should work even if it is a
     // loopback command.
-    if (_voteCmdCbkHandle.isValid()) {
-        auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-        replCoord->cancelCbkHandle(_voteCmdCbkHandle);
-    }
+    _cancelAndClearVoteRequestCbk(lk, opCtx);
 }
 
 }  // namespace mongo

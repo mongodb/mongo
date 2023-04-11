@@ -71,6 +71,7 @@ MONGO_FAIL_POINT_DEFINE(hangIndexBuildAfterSignalPrimaryForCommitReadiness);
 MONGO_FAIL_POINT_DEFINE(hangBeforeRunningIndexBuild);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildBeforeSignalingPrimaryForAbort);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildBeforeTransitioningReplStateTokAwaitPrimaryAbort);
+MONGO_FAIL_POINT_DEFINE(hangBeforeVoteCommitIndexBuild);
 
 const StringData kMaxNumActiveUserIndexBuildsServerParameterName = "maxNumActiveUserIndexBuilds"_sd;
 
@@ -554,6 +555,8 @@ Status IndexBuildsCoordinatorMongod::voteAbortIndexBuild(OperationContext* opCtx
 Status IndexBuildsCoordinatorMongod::voteCommitIndexBuild(OperationContext* opCtx,
                                                           const UUID& buildUUID,
                                                           const HostAndPort& votingNode) {
+    hangBeforeVoteCommitIndexBuild.pauseWhileSet(opCtx);
+
     auto swReplState = _getIndexBuild(buildUUID);
     if (!swReplState.isOK()) {
         // Index build might have got torn down.
@@ -778,8 +781,19 @@ void IndexBuildsCoordinatorMongod::_signalPrimaryForCommitReadiness(
     // Before voting see if we are eligible to skip voting and signal
     // to commit index build if the node is primary.
     if (_signalIfCommitQuorumNotEnabled(opCtx, replState)) {
+        LOGV2(7568001,
+              "Index build: skipping vote for commit readiness",
+              "buildUUID"_attr = replState->buildUUID,
+              logAttrs(replState->dbName),
+              "collectionUUID"_attr = replState->collectionUUID);
         return;
     }
+
+    LOGV2(7568000,
+          "Index build: vote for commit readiness",
+          "buildUUID"_attr = replState->buildUUID,
+          logAttrs(replState->dbName),
+          "collectionUUID"_attr = replState->collectionUUID);
 
     const auto generateCmd = [](const UUID& uuid, const std::string& address) {
         return BSON("voteCommitIndexBuild" << uuid << "hostAndPort" << address << "writeConcern"

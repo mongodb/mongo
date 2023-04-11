@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/stdx/mutex.h"
+#include "mongo/util/concurrency/with_lock.h"
 #include <algorithm>
 #include <list>
 #include <string>
@@ -533,6 +534,16 @@ private:
     void _setSignalAndCancelVoteRequestCbkIfActive(WithLock lk,
                                                    OperationContext* opCtx,
                                                    IndexBuildAction signal);
+
+    /**
+     * Clears vote request callback handle set in onVoteRequestScheduled().
+     */
+    void _clearVoteRequestCbk(WithLock);
+
+    /**
+     * Cancels the vote request if valid and clears its callback handle.
+     */
+    void _cancelAndClearVoteRequestCbk(WithLock, OperationContext* opCtx);
 
     // Protects the state below.
     mutable Mutex _mutex = MONGO_MAKE_LATCH("ReplIndexBuildState::_mutex");
