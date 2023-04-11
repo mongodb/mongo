@@ -510,6 +510,7 @@ std::pair<SortPattern, BSONArray> parseAccumulatorTopBottomNSortBy(ExpressionCon
 template <TopBottomSense sense, bool single>
 AccumulationExpression AccumulatorTopBottomN<sense, single>::parseTopBottomN(
     ExpressionContext* const expCtx, BSONElement elem, VariablesParseState vps) {
+    expCtx->sbeGroupCompatibility = SbeCompatibility::notCompatible;
     auto name = AccumulatorTopBottomN<sense, single>::getName();
     const auto [n, output, sortBy] =
         accumulatorNParseArgs<single>(expCtx, elem, name.rawData(), true, vps);

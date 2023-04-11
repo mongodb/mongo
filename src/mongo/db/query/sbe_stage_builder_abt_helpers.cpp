@@ -140,6 +140,11 @@ optimizer::ABT makeFillEmptyTrue(optimizer::ABT e) {
     return makeFillEmpty(std::move(e), true);
 }
 
+optimizer::ABT makeFillEmptyNull(optimizer::ABT e) {
+    return optimizer::make<optimizer::BinaryOp>(
+        optimizer::Operations::FillEmpty, std::move(e), optimizer::Constant::null());
+}
+
 optimizer::ABT makeNot(optimizer::ABT e) {
     return makeUnaryOp(optimizer::Operations::Not, std::move(e));
 }

@@ -75,6 +75,10 @@ optimizer::ABT makeFillEmptyFalse(optimizer::ABT e);
  * expression.
  */
 optimizer::ABT makeFillEmptyTrue(optimizer::ABT e);
+/**
+ * Check if expression returns Nothing and return null if so. Otherwise, return the expression.
+ */
+optimizer::ABT makeFillEmptyNull(optimizer::ABT e);
 optimizer::ABT makeNot(optimizer::ABT e);
 
 optimizer::ProjectionName makeVariableName(sbe::value::SlotId slotId);

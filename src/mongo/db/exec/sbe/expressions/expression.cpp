@@ -779,6 +779,7 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
      BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::objectToArray, false}},
     {"arrayToObject",
      BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::arrayToObject, false}},
+    {"array", BuiltinFn{kAnyNumberOfArgs, vm::Builtin::newArray, false}},
 };
 
 /**

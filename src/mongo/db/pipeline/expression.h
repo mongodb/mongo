@@ -1128,7 +1128,8 @@ class ExpressionArray final : public ExpressionVariadic<ExpressionArray> {
 public:
     explicit ExpressionArray(ExpressionContext* const expCtx)
         : ExpressionVariadic<ExpressionArray>(expCtx) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
+        expCtx->sbeCompatibility =
+            std::min(expCtx->sbeCompatibility, SbeCompatibility::flagGuarded);
     }
 
     ExpressionArray(ExpressionContext* const expCtx,

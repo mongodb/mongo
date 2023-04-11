@@ -820,7 +820,36 @@ public:
     }
 
     void visit(const ExpressionArray* expr) final {
-        unsupportedExpression(expr->getOpName());
+        auto arity = expr->getChildren().size();
+        _context->ensureArity(arity);
+
+        if (arity == 0) {
+            auto [emptyArrTag, emptyArrVal] = sbe::value::makeNewArray();
+            pushABT(makeABTConstant(emptyArrTag, emptyArrVal));
+            return;
+        }
+
+        std::vector<std::pair<optimizer::ProjectionName, optimizer::ABT>> binds;
+        for (size_t idx = 0; idx < arity; ++idx) {
+            binds.emplace_back(makeLocalVariableName(_context->state.frameId(), 0),
+                               _context->popABTExpr());
+        }
+        std::reverse(std::begin(binds), std::end(binds));
+
+        optimizer::ABTVector argVars;
+        for (auto& bind : binds) {
+            argVars.push_back(makeFillEmptyNull(makeVariable(bind.first)));
+        }
+
+        auto arrayExpr = optimizer::make<optimizer::FunctionCall>("newArray", std::move(argVars));
+
+        for (auto it = binds.begin(); it != binds.end(); it++) {
+            arrayExpr = optimizer::make<optimizer::Let>(
+                it->first, std::move(it->second), std::move(arrayExpr));
+        }
+
+        pushABT(std::move(arrayExpr));
+        return;
     }
     void visit(const ExpressionArrayElemAt* expr) final {
         unsupportedExpression(expr->getOpName());

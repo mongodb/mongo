@@ -2027,9 +2027,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinNewArray(ArityTy
     if (arity) {
         arr->reserve(arity);
         for (ArityType idx = 0; idx < arity; ++idx) {
-            auto [owned, tag, val] = getFromStack(idx);
-            auto [tagCopy, valCopy] = value::copyValue(tag, val);
-            arr->push_back(tagCopy, valCopy);
+            auto [tag, val] = moveOwnedFromStack(idx);
+            arr->push_back(tag, val);
         }
     }
 
