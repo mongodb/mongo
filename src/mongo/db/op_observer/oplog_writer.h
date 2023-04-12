@@ -29,17 +29,14 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
 #include <cstddef>  // for std::size_t
-#include <functional>
 #include <vector>
 
-#include "mongo/bson/bsonobj.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/oplog.h"                  // for InsertStatement and OplogLink
-#include "mongo/db/repl/oplog_entry.h"            // for MutableOplogEntry
+#include "mongo/db/repl/oplog.h"        // for InsertStatement and OplogLink
+#include "mongo/db/repl/oplog_entry.h"  // for MutableOplogEntry
+#include "mongo/db/s/sharding_write_router.h"
 #include "mongo/db/session/logical_session_id.h"  // for StmtId
-#include "mongo/db/shard_id.h"
 
 namespace mongo {
 
@@ -81,7 +78,7 @@ public:
         std::vector<InsertStatement>::const_iterator begin,
         std::vector<InsertStatement>::const_iterator end,
         std::vector<bool> fromMigrate,
-        std::function<boost::optional<ShardId>(const BSONObj& doc)> getDestinedRecipientFn,
+        const ShardingWriteRouter& shardingWriteRouter,
         const CollectionPtr& collectionPtr) = 0;
 
     /**

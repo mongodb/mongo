@@ -46,14 +46,13 @@ public:
                                    repl::OplogLink* oplogLink,
                                    const std::vector<StmtId>& stmtIds) override {}
 
-    std::vector<repl::OpTime> logInsertOps(
-        OperationContext* opCtx,
-        repl::MutableOplogEntry* oplogEntryTemplate,
-        std::vector<InsertStatement>::const_iterator begin,
-        std::vector<InsertStatement>::const_iterator end,
-        std::vector<bool> fromMigrate,
-        std::function<boost::optional<ShardId>(const BSONObj& doc)> getDestinedRecipientFn,
-        const CollectionPtr& collectionPtr) override {
+    std::vector<repl::OpTime> logInsertOps(OperationContext* opCtx,
+                                           repl::MutableOplogEntry* oplogEntryTemplate,
+                                           std::vector<InsertStatement>::const_iterator begin,
+                                           std::vector<InsertStatement>::const_iterator end,
+                                           std::vector<bool> fromMigrate,
+                                           const ShardingWriteRouter& shardingWriteRouter,
+                                           const CollectionPtr& collectionPtr) override {
         return {};
     }
 

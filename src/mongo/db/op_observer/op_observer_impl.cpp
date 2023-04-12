@@ -628,11 +628,6 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
             txnParticipant.addTransactionOperation(opCtx, operation);
         }
     } else {
-        std::function<boost::optional<ShardId>(const BSONObj& doc)> getDestinedRecipientFn =
-            [&shardingWriteRouter](const BSONObj& doc) {
-                return shardingWriteRouter.getReshardingDestinedRecipient(doc);
-            };
-
         // Ensure well-formed embedded ReplOperation for logging.
         // This means setting optype, nss, and object at the minimum.
         MutableOplogEntry oplogEntryTemplate;
@@ -650,7 +645,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
                                                 first,
                                                 last,
                                                 std::move(fromMigrate),
-                                                getDestinedRecipientFn,
+                                                shardingWriteRouter,
                                                 coll);
         if (!opTimeList.empty())
             lastOpTime = opTimeList.back();

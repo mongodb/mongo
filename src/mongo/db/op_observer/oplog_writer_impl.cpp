@@ -46,8 +46,14 @@ std::vector<repl::OpTime> OplogWriterImpl::logInsertOps(
     std::vector<InsertStatement>::const_iterator begin,
     std::vector<InsertStatement>::const_iterator end,
     std::vector<bool> fromMigrate,
-    std::function<boost::optional<ShardId>(const BSONObj& doc)> getDestinedRecipientFn,
+    const ShardingWriteRouter& shardingWriteRouter,
     const CollectionPtr& collectionPtr) {
+
+    std::function<boost::optional<ShardId>(const BSONObj& doc)> getDestinedRecipientFn =
+        [&shardingWriteRouter](const BSONObj& doc) {
+            return shardingWriteRouter.getReshardingDestinedRecipient(doc);
+        };
+
     return repl::logInsertOps(
         opCtx, oplogEntryTemplate, begin, end, fromMigrate, getDestinedRecipientFn, collectionPtr);
 }
