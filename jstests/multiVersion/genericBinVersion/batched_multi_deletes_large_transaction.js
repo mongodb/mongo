@@ -5,7 +5,7 @@
  * able to take advantage of this feature.
  *
  * @tags: [
- *     requires_replication,
+ *     requires_replication, DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE
  * ]
  */
 (function() {

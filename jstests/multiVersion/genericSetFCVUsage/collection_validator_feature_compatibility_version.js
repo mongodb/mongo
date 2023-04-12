@@ -3,7 +3,7 @@
  * the feature compatibility version is older than the latest version.
  *
  * We restart mongod during the test and expect it to have the same data after restarting.
- * @tags: [requires_persistence]
+ * @tags: [requires_persistence, DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE]
  */
 
 (function() {
@@ -32,12 +32,7 @@ const testCasesLastContinuous = [
     //
 ];
 const testCasesLastContinuousWithFeatureFlags = [
-    // TODO SERVER-70689: Remove this case when 7.0 becomes lastLTS.
-    {
-        validator: {$expr: {$eq: ["$$USER_ROLES", []]}},
-        nonMatchingDocument: {a: 1},
-        lastStableErrCode: 17276
-    }
+
 ];
 
 const testCasesLastStable = testCasesLastContinuous.concat([]);

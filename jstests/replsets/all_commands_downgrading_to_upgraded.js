@@ -29,6 +29,7 @@ const isAnInternalCommand = "internal command";
 const isDeprecated = "deprecated command";
 const commandIsDisabledOnLastLTS = "skip command on downgrading fcv";
 const requiresParallelShell = "requires parallel shell";
+const cannotRunWhileDowngrading = "cannot run command while downgrading";
 
 const allCommands = {
     _addShard: {skip: isAnInternalCommand},
@@ -1091,13 +1092,7 @@ const allCommands = {
         },
     },
     movePrimary: {
-        isShardedOnly: true,
-        fullScenario: function(conn, fixture) {
-            assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));
-            assert.commandWorked(conn.getDB('admin').runCommand(
-                {movePrimary: dbName, to: fixture.shard0.shardName}));
-            assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
-        }
+        skip: cannotRunWhileDowngrading,
     },
     moveRange: {
         isShardedOnly: true,

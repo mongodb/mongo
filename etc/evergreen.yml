@@ -1840,7 +1840,7 @@ buildvariants:
     # No feature flag tests since they aren't compatible with the older binaries.
     test_flags: >-
       --runNoFeatureFlagTests
-      --excludeWithAnyTags=incompatible_with_shard_merge
+      --excludeWithAnyTags=incompatible_with_shard_merge,DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE
 
 - <<: *linux-x86-multiversion-template
   name: &enterprise-rhel-80-64-bit-future-git-tag-multiversion enterprise-rhel-80-64-bit-future-git-tag-multiversion

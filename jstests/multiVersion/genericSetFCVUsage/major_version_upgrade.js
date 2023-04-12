@@ -8,7 +8,7 @@
  * - Insert a document into the new collection.
  * - Create an index on the new collection.
  *
- * @tags: [requires_v4_0]
+ * @tags: [requires_v4_0, DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE]
  */
 
 (function() {

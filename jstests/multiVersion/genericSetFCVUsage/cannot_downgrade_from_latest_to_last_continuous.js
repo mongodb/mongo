@@ -66,9 +66,11 @@ function runShardingTest() {
     st.stop();
 }
 
-runStandaloneTest();
-runReplicaSetTest();
-runShardingTest();
+if (lastContinuousFCV != lastLTSFCV) {
+    runStandaloneTest();
+    runReplicaSetTest();
+    runShardingTest();
+}
 
 TestData.setParameters.disableTransitionFromLatestToLastContinuous = false;
 })();
