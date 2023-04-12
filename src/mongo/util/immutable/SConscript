@@ -4,9 +4,25 @@ Import("env")
 
 env = env.Clone()
 
-env.Benchmark(
-    target='absl_comparison_bm',
+env.CppUnitTest(
+    target='immutable_test',
     source=[
-        'absl_comparison_bm.cpp',
+        'immutable_ordered_test.cpp',
+        'immutable_unordered_test.cpp',
+    ],
+    LIBDEPS=[],
+)
+
+env.Benchmark(
+    target='immutable_absl_comparison_bm',
+    source=[
+        'immutable_absl_comparison_bm.cpp',
+    ],
+)
+
+env.Benchmark(
+    target='immutable_std_comparison_bm',
+    source=[
+        'immutable_std_comparison_bm.cpp',
     ],
 )
