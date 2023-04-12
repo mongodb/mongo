@@ -291,13 +291,6 @@ def _add_run(subparsers):  # pylint: disable=too-many-statements
                                   help="Writes a JSON file with performance test results.")
 
     internal_options.add_argument(
-        "--reportFailureStatus", action="store", dest="report_failure_status",
-        choices=("fail", "silentfail"), metavar="STATUS",
-        help="Controls if the test failure status should be reported as failed"
-        " or be silently ignored (STATUS=silentfail). Dynamic test failures will"
-        " never be silently ignored. Defaults to STATUS=%%default.")
-
-    internal_options.add_argument(
         "--reportFile", dest="report_file", metavar="REPORT",
         help="Writes a JSON file with test status and timing information.")
 

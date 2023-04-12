@@ -212,7 +212,6 @@ or explicitly pass --installDir to the run subcommand of buildscripts/resmoke.py
     _config.REPEAT_TESTS_MAX = config.pop("repeat_tests_max")
     _config.REPEAT_TESTS_MIN = config.pop("repeat_tests_min")
     _config.REPEAT_TESTS_SECS = config.pop("repeat_tests_secs")
-    _config.REPORT_FAILURE_STATUS = config.pop("report_failure_status")
     _config.REPORT_FILE = config.pop("report_file")
     _config.SERVICE_EXECUTOR = config.pop("service_executor")
     _config.SHELL_READ_MODE = config.pop("shell_read_mode")

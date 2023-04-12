@@ -249,7 +249,6 @@ class TestLocalCommandLine(unittest.TestCase):
         cmdline = _parser.to_local_args([
             "run",
             "--suites=my_suite",
-            "--reportFailureStatus=fail",
             "--reportFile=report.json",
             "--perfReportFile=perf.json",
             "--storageEngine=my_storage_engine",

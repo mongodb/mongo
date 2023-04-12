@@ -76,7 +76,6 @@ DEFAULTS = {
     "repeat_tests_max": None,
     "repeat_tests_min": None,
     "repeat_tests_secs": None,
-    "report_failure_status": "fail",
     "report_file": None,
     "seed": int(time.time() * 256),  # Taken from random.py code in Python 2.7.
     "service_executor": None,
@@ -137,7 +136,6 @@ _SuiteOptions = collections.namedtuple("_SuiteOptions", [
     "num_repeat_tests_max",
     "num_repeat_tests_min",
     "time_repeat_tests_secs",
-    "report_failure_status",
 ])
 
 
@@ -204,7 +202,6 @@ class SuiteOptions(_SuiteOptions):
                     REPEAT_TESTS_MAX,
                     REPEAT_TESTS_MIN,
                     REPEAT_TESTS_SECS,
-                    REPORT_FAILURE_STATUS,
                 ])))
 
         options = self._asdict()
@@ -358,9 +355,6 @@ REPEAT_TESTS_MIN = None
 
 # If set, then each test is repeated the specified time (seconds) inside the suites.
 REPEAT_TESTS_SECS = None
-
-# Controls if the test failure status should be reported as failed or be silently ignored.
-REPORT_FAILURE_STATUS = None
 
 # If set, then resmoke.py will write out a report file with the status of each test that ran.
 REPORT_FILE = None

@@ -401,24 +401,11 @@ class TestRunnerEvg(TestRunner):
     additional options for running unreliable tests in Evergreen.
     """
 
-    UNRELIABLE_TAG = _TagInfo(
-        tag_name="unreliable",
-        evergreen_aware=True,
-        suite_options=config.SuiteOptions.ALL_INHERITED._replace(  # type: ignore
-            report_failure_status="silentfail"))
-
     RESOURCE_INTENSIVE_TAG = _TagInfo(
         tag_name="resource_intensive",
         evergreen_aware=False,
         suite_options=config.SuiteOptions.ALL_INHERITED._replace(  # type: ignore
             num_jobs=1))
-
-    RETRY_ON_FAILURE_TAG = _TagInfo(
-        tag_name="retry_on_failure",
-        evergreen_aware=True,
-        suite_options=config.SuiteOptions.ALL_INHERITED._replace(  # type: ignore
-            fail_fast=False, num_repeat_suites=2, num_repeat_tests=1,
-            report_failure_status="silentfail"))
 
     @staticmethod
     def _make_evergreen_aware_tags(tag_name):
@@ -454,29 +441,8 @@ class TestRunnerEvg(TestRunner):
 
         combinations = []
 
-        if config.EVERGREEN_PATCH_BUILD:
-            combinations.append(("unreliable and resource intensive",
-                                 ((cls.UNRELIABLE_TAG, True), (cls.RESOURCE_INTENSIVE_TAG, True))))
-            combinations.append(("unreliable and not resource intensive",
-                                 ((cls.UNRELIABLE_TAG, True), (cls.RESOURCE_INTENSIVE_TAG, False))))
-            combinations.append(("reliable and resource intensive",
-                                 ((cls.UNRELIABLE_TAG, False), (cls.RESOURCE_INTENSIVE_TAG, True))))
-            combinations.append(("reliable and not resource intensive",
-                                 ((cls.UNRELIABLE_TAG, False), (cls.RESOURCE_INTENSIVE_TAG,
-                                                                False))))
-        else:
-            combinations.append(("retry on failure and resource intensive",
-                                 ((cls.RETRY_ON_FAILURE_TAG, True), (cls.RESOURCE_INTENSIVE_TAG,
-                                                                     True))))
-            combinations.append(("retry on failure and not resource intensive",
-                                 ((cls.RETRY_ON_FAILURE_TAG, True), (cls.RESOURCE_INTENSIVE_TAG,
-                                                                     False))))
-            combinations.append(("run once and resource intensive",
-                                 ((cls.RETRY_ON_FAILURE_TAG, False), (cls.RESOURCE_INTENSIVE_TAG,
-                                                                      True))))
-            combinations.append(("run once and not resource intensive",
-                                 ((cls.RETRY_ON_FAILURE_TAG, False), (cls.RESOURCE_INTENSIVE_TAG,
-                                                                      False))))
+        combinations.append(("resource intensive", [(cls.RESOURCE_INTENSIVE_TAG, True)]))
+        combinations.append(("not resource intensive", [(cls.RESOURCE_INTENSIVE_TAG, False)]))
 
         return combinations
 
