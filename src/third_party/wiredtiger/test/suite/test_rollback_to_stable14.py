@@ -167,8 +167,7 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
         else:
             self.assertEqual(upd_aborted, 0)
         self.assertGreater(pages_visited, 0)
-        self.assertGreaterEqual(hs_removed, nrows)
-        self.assertGreaterEqual(hs_sweep, 0)
+        self.assertGreaterEqual(hs_removed + hs_sweep, nrows)
 
         # Check that the correct data is seen at and after the stable timestamp.
         self.check(value_a, uri, nrows, None, 20)
@@ -280,8 +279,7 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
         else:
             self.assertEqual(upd_aborted, 0)
         self.assertGreater(pages_visited, 0)
-        self.assertGreaterEqual(hs_removed, nrows * 3)
-        self.assertGreaterEqual(hs_sweep, 0)
+        self.assertGreaterEqual(hs_removed + hs_sweep, nrows * 3)
 
         # Check that the correct data is seen at and after the stable timestamp.
         self.check(value_a, uri, nrows, None, 20)
@@ -389,8 +387,7 @@ class test_rollback_to_stable14(test_rollback_to_stable_base):
         else:
             self.assertEqual(upd_aborted, 0)
         self.assertGreater(pages_visited, 0)
-        self.assertGreaterEqual(hs_removed, nrows * 3)
-        self.assertGreaterEqual(hs_sweep, 0)
+        self.assertGreaterEqual(hs_removed + hs_sweep, nrows * 3)
 
         # Check that the correct data is seen at and after the stable timestamp.
         self.check(value_a, uri, nrows, None, 20)

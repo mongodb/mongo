@@ -56,6 +56,31 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
         config = 'cache_size=25MB,statistics=(all),statistics_log=(json,on_close,wait=1),timing_stress_for_test=[history_store_checkpoint_delay],verbose=(rts:5)'
         return config
 
+    def check_hs_stats(self):
+        stat_cursor = self.session.open_cursor('statistics:', None, None)
+        calls = stat_cursor[stat.conn.txn_rts][2]
+        hs_removed = stat_cursor[stat.conn.txn_rts_hs_removed][2]
+        hs_sweep = stat_cursor[stat.conn.txn_rts_sweep_hs_keys][2]
+        keys_removed = stat_cursor[stat.conn.txn_rts_keys_removed][2]
+        keys_restored = stat_cursor[stat.conn.txn_rts_keys_restored][2]
+        pages_visited = stat_cursor[stat.conn.txn_rts_pages_visited][2]
+        upd_aborted = stat_cursor[stat.conn.txn_rts_upd_aborted][2]
+        stat_cursor.close()
+
+        self.assertEqual(calls, 0)
+        self.assertEqual(keys_removed, 0)
+        self.assertEqual(keys_restored, 0)
+        self.assertGreaterEqual(upd_aborted, 0)
+        self.assertGreater(pages_visited, 0)
+        # Each row that gets processed by RTS can be counted by either hs_removed or hs_sweep,
+        # but not both. If the data store page for the row appears in the last checkpoint, it
+        # gets counted in hs_removed; if not, it gets counted in hs_sweep, unless the history
+        # store page for the row didn't make it out, in which case nothing gets counted at all.
+        # We expect at least some history store pages to appear, so assert that some rows get
+        # processed, but the balance between the two counts depends on test timing and we
+        # should not depend on it.
+        self.assertGreater(hs_removed + hs_sweep, 0)
+
     def test_rollback_to_stable(self):
         nrows = 1000
 
@@ -167,23 +192,7 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
         self.check(value_b, uri_2, nrows, None, 40)
         self.check(value_d, uri_2, nrows, None, 20)
 
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        calls = stat_cursor[stat.conn.txn_rts][2]
-        hs_removed = stat_cursor[stat.conn.txn_rts_hs_removed][2]
-        hs_sweep = stat_cursor[stat.conn.txn_rts_sweep_hs_keys][2]
-        keys_removed = stat_cursor[stat.conn.txn_rts_keys_removed][2]
-        keys_restored = stat_cursor[stat.conn.txn_rts_keys_restored][2]
-        pages_visited = stat_cursor[stat.conn.txn_rts_pages_visited][2]
-        upd_aborted = stat_cursor[stat.conn.txn_rts_upd_aborted][2]
-        stat_cursor.close()
-
-        self.assertEqual(calls, 0)
-        self.assertEqual(keys_removed, 0)
-        self.assertEqual(keys_restored, 0)
-        self.assertGreaterEqual(upd_aborted, 0)
-        self.assertGreater(pages_visited, 0)
-        self.assertGreaterEqual(hs_removed, 0)
-        self.assertGreater(hs_sweep, 0)
+        self.check_hs_stats()
 
     def test_rollback_to_stable_prepare(self):
         nrows = 1000
@@ -351,29 +360,7 @@ class test_rollback_to_stable10(test_rollback_to_stable_base):
         self.check(value_c, uri_2, nrows, None, 30)
         self.check(value_d, uri_2, nrows, None, 20)
 
-        stat_cursor = self.session.open_cursor('statistics:', None, None)
-        calls = stat_cursor[stat.conn.txn_rts][2]
-        hs_removed = stat_cursor[stat.conn.txn_rts_hs_removed][2]
-        hs_sweep = stat_cursor[stat.conn.txn_rts_sweep_hs_keys][2]
-        keys_removed = stat_cursor[stat.conn.txn_rts_keys_removed][2]
-        keys_restored = stat_cursor[stat.conn.txn_rts_keys_restored][2]
-        pages_visited = stat_cursor[stat.conn.txn_rts_pages_visited][2]
-        upd_aborted = stat_cursor[stat.conn.txn_rts_upd_aborted][2]
-        stat_cursor.close()
-
-        self.assertEqual(calls, 0)
-        self.assertEqual(keys_removed, 0)
-        self.assertEqual(keys_restored, 0)
-        self.assertGreaterEqual(upd_aborted, 0)
-        self.assertGreater(pages_visited, 0)
-        # Each row that gets processed by RTS can be counted by either hs_removed or hs_sweep,
-        # but not both. If the data store page for the row appears in the last checkpoint, it
-        # gets counted in hs_removed; if not, it gets counted in hs_sweep, unless the history
-        # store page for the row didn't make it out, in which case nothing gets counted at all.
-        # We expect at least some history store pages to appear, so assert that some rows get
-        # processed, but the balance between the two counts depends on test timing and we
-        # should not depend on it.
-        self.assertGreater(hs_removed + hs_sweep, 0)
+        self.check_hs_stats()
 
 if __name__ == '__main__':
     wttest.run()
