@@ -514,10 +514,7 @@ void CollectionTruncateMarkersWithPartialExpiration::updateCurrentMarkerAfterIns
         collectionMarkers->_replaceNewHighestMarkingIfNecessary(recordId, wallTime);
         collectionMarkers->_currentRecords.addAndFetch(countInserted);
         int64_t newCurrentBytes = collectionMarkers->_currentBytes.addAndFetch(bytesInserted);
-        if (wallTime != Date_t() && newCurrentBytes >= collectionMarkers->_minBytesPerMarker) {
-            // When other transactions commit concurrently, an uninitialized wallTime may delay
-            // the creation of a new marker. This delay is limited to the number of concurrently
-            // running transactions, so the size difference should be inconsequential.
+        if (newCurrentBytes >= collectionMarkers->_minBytesPerMarker) {
             collectionMarkers->createNewMarkerIfNeeded(opCtx, recordId, wallTime);
         }
     });

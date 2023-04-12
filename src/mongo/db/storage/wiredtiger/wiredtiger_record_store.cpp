@@ -191,7 +191,9 @@ WiredTigerRecordStore::OplogTruncateMarkers::createOplogTruncateMarkers(Operatio
         minBytesPerTruncateMarker,
         [](const Record& record) {
             BSONObj obj = record.data.toBson();
-            auto wallTime = obj.hasField("wall") ? obj["wall"].Date() : obj["ts"].timestampTime();
+            auto wallTime = obj.hasField(repl::DurableOplogEntry::kWallClockTimeFieldName)
+                ? obj[repl::DurableOplogEntry::kWallClockTimeFieldName].Date()
+                : obj[repl::DurableOplogEntry::kTimestampFieldName].timestampTime();
             return RecordIdAndWallTime(record.id, wallTime);
         },
         numTruncateMarkersToKeep);
@@ -1035,7 +1037,7 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
     if (_oplogTruncateMarkers) {
         auto wall = [&] {
             BSONObj obj = highestIdRecord.data.toBson();
-            BSONElement ele = obj["wall"];
+            BSONElement ele = obj[repl::DurableOplogEntry::kWallClockTimeFieldName];
             if (!ele) {
                 // This shouldn't happen in normal cases, but this is needed because some tests do
                 // not add wall clock times. Note that, with this addition, it's possible that the
