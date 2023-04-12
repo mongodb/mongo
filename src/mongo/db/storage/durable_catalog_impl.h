@@ -88,6 +88,10 @@ public:
     boost::optional<DurableCatalogEntry> getParsedCatalogEntry(
         OperationContext* opCtx, const RecordId& catalogId) const override;
 
+    DurableCatalogEntry getParsedCatalogEntry(OperationContext* opCtx,
+                                              const RecordId& catalogId,
+                                              const BSONObj& obj) const override;
+
     std::shared_ptr<BSONCollectionCatalogEntry::MetaData> getMetaData(
         OperationContext* opCtx, const RecordId& catalogId) const;
     void putMetaData(OperationContext* opCtx,

@@ -564,7 +564,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/serverless/serverless_lock',
         '$BUILD_DIR/mongo/db/session/kill_sessions_local',
         '$BUILD_DIR/mongo/db/session/session_catalog_mongod',
-        '$BUILD_DIR/mongo/db/storage/historical_ident_tracker',
         '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         'drop_pending_collection_reaper',
     ],

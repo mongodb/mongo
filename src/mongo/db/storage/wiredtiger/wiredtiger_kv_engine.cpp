@@ -1051,6 +1051,11 @@ public:
 
     ~StreamingCursorImpl() = default;
 
+    void setCatalogEntries(const stdx::unordered_map<std::string, std::pair<NamespaceString, UUID>>&
+                               identsToNsAndUUID) {
+        _identsToNsAndUUID = std::move(identsToNsAndUUID);
+    }
+
     StatusWith<std::deque<BackupBlock>> getNextBatch(OperationContext* opCtx,
                                                      const std::size_t batchSize) {
         int wtRet = 0;
@@ -1112,9 +1117,11 @@ public:
                 // to an entire file. Full backups cannot open an incremental cursor, even if they
                 // are the initial incremental backup.
                 const std::uint64_t length = options.incrementalBackup ? fileSize : 0;
+                auto nsAndUUID = _getNsAndUUID(filePath.stem().string());
                 backupBlocks.push_back(BackupBlock(opCtx,
+                                                   nsAndUUID.first,
+                                                   nsAndUUID.second,
                                                    filePath.string(),
-                                                   _wtBackup->identToNamespaceAndUUIDMap,
                                                    _checkpointTimestamp,
                                                    0 /* offset */,
                                                    length,
@@ -1130,6 +1137,15 @@ public:
     }
 
 private:
+    std::pair<boost::optional<NamespaceString>, boost::optional<UUID>> _getNsAndUUID(
+        const std::string& ident) const {
+        auto it = _identsToNsAndUUID.find(ident);
+        if (it == _identsToNsAndUUID.end()) {
+            return std::make_pair(boost::none, boost::none);
+        }
+        return it->second;
+    }
+
     Status _getNextIncrementalBatchForFile(OperationContext* opCtx,
                                            const char* filename,
                                            boost::filesystem::path filePath,
@@ -1172,9 +1188,11 @@ private:
                         "offset"_attr = offset,
                         "size"_attr = size,
                         "type"_attr = type);
+            auto nsAndUUID = _getNsAndUUID(filePath.stem().string());
             backupBlocks->push_back(BackupBlock(opCtx,
+                                                nsAndUUID.first,
+                                                nsAndUUID.second,
                                                 filePath.string(),
-                                                _wtBackup->identToNamespaceAndUUIDMap,
                                                 _checkpointTimestamp,
                                                 offset,
                                                 size,
@@ -1184,9 +1202,11 @@ private:
         // If the file is unchanged, push a BackupBlock with offset=0 and length=0. This allows us
         // to distinguish between an unchanged file and a deleted file in an incremental backup.
         if (fileUnchangedFlag) {
+            auto nsAndUUID = _getNsAndUUID(filePath.stem().string());
             backupBlocks->push_back(BackupBlock(opCtx,
+                                                nsAndUUID.first,
+                                                nsAndUUID.second,
                                                 filePath.string(),
-                                                _wtBackup->identToNamespaceAndUUIDMap,
                                                 _checkpointTimestamp,
                                                 0 /* offset */,
                                                 0 /* length */,
@@ -1209,6 +1229,7 @@ private:
 
     WT_SESSION* _session;
     std::string _path;
+    stdx::unordered_map<std::string, std::pair<NamespaceString, UUID>> _identsToNsAndUUID;
     boost::optional<Timestamp> _checkpointTimestamp;
     WiredTigerBackup* _wtBackup;  // '_wtBackup' is an out parameter.
 };
@@ -1268,34 +1289,10 @@ WiredTigerKVEngine::beginNonBlockingBackup(OperationContext* opCtx,
 
     invariant(_wtBackup.logFilePathsSeenByExtendBackupCursor.empty());
     invariant(_wtBackup.logFilePathsSeenByGetNextBatch.empty());
-    invariant(_wtBackup.identToNamespaceAndUUIDMap.empty());
-
-    // Fetching the catalog entries requires reading from the storage engine. During cache pressure,
-    // this read could be rolled back. In that case, we need to clear the map.
-    ScopeGuard clearGuard([&] { _wtBackup.identToNamespaceAndUUIDMap.clear(); });
-
-    {
-        Lock::GlobalLock lk(opCtx, MODE_IS);
-        DurableCatalog* catalog = DurableCatalog::get(opCtx);
-        std::vector<DurableCatalog::EntryIdentifier> catalogEntries =
-            catalog->getAllCatalogEntries(opCtx);
-        for (const DurableCatalog::EntryIdentifier& e : catalogEntries) {
-            // Populate the collection ident with its namespace and UUID.
-            UUID uuid = catalog->getMetaData(opCtx, e.catalogId)->options.uuid.value();
-            _wtBackup.identToNamespaceAndUUIDMap.emplace(e.ident, std::make_pair(e.nss, uuid));
-
-            // Populate the collection's index idents with the collection's namespace and UUID.
-            std::vector<std::string> idxIdents = catalog->getIndexIdents(opCtx, e.catalogId);
-            for (const std::string& idxIdent : idxIdents) {
-                _wtBackup.identToNamespaceAndUUIDMap.emplace(idxIdent, std::make_pair(e.nss, uuid));
-            }
-        }
-    }
 
     auto streamingCursor = std::make_unique<StreamingCursorImpl>(
         session, _path, checkpointTimestamp, options, &_wtBackup);
 
-    clearGuard.dismiss();
     pinOplogGuard.dismiss();
     _backupSession = std::move(sessionRaii);
     _wtBackup.cursor = cursor;
@@ -1316,7 +1313,6 @@ void WiredTigerKVEngine::endNonBlockingBackup(OperationContext* opCtx) {
     _wtBackup.dupCursor = nullptr;
     _wtBackup.logFilePathsSeenByExtendBackupCursor = {};
     _wtBackup.logFilePathsSeenByGetNextBatch = {};
-    _wtBackup.identToNamespaceAndUUIDMap = {};
 
     boost::filesystem::remove(getOngoingBackupPath());
 }

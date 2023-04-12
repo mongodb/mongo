@@ -417,16 +417,6 @@ env.Library(
 )
 
 env.Library(
-    target='historical_ident_tracker',
-    source=[
-        'historical_ident_tracker.cpp',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/server_base',
-    ],
-)
-
-env.Library(
     target="write_unit_of_work",
     source=[
         "write_unit_of_work.cpp",
@@ -544,7 +534,6 @@ env.CppUnitTest(
         'external_record_store_test.cpp',
         'disk_space_monitor_test.cpp',
         'flow_control_test.cpp',
-        'historical_ident_tracker_test.cpp',
         'index_entry_comparison_test.cpp',
         'key_string_test.cpp',
         'kv/durable_catalog_test.cpp',
@@ -580,7 +569,6 @@ env.CppUnitTest(
         'disk_space_monitor',
         'flow_control',
         'flow_control_parameters',
-        'historical_ident_tracker',
         'key_string',
         'kv/kv_drop_pending_ident_reaper',
         'record_store_base',
@@ -668,7 +656,6 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/server_base',
-        'historical_ident_tracker',
         'storage_options',
     ],
 )
@@ -698,7 +685,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/storage/storage_repair_observer',
         '$BUILD_DIR/mongo/db/vector_clock',
         'backup_block',
-        'historical_ident_tracker',
         'storage_control',
         'storage_util',
         'two_phase_index_build_knobs_idl',

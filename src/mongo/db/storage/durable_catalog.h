@@ -136,6 +136,13 @@ public:
         OperationContext* opCtx, const RecordId& catalogId) const = 0;
 
     /**
+     * Parses the passed in catalog entry object.
+     */
+    virtual DurableCatalogEntry getParsedCatalogEntry(OperationContext* opCtx,
+                                                      const RecordId& catalogId,
+                                                      const BSONObj& obj) const = 0;
+
+    /**
      * Like 'getParsedCatalogEntry' above but only extracts the metadata component.
      */
     virtual std::shared_ptr<BSONCollectionCatalogEntry::MetaData> getMetaData(

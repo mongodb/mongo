@@ -35,7 +35,6 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/storage/durable_catalog.h"
-#include "mongo/db/storage/historical_ident_tracker.h"
 #include "mongo/db/storage/storage_options.h"
 
 namespace mongo {
@@ -50,17 +49,19 @@ const std::set<std::string> kRequiredMDBFiles = {"_mdb_catalog.wt", "sizeStorer.
 }  // namespace
 
 BackupBlock::BackupBlock(OperationContext* opCtx,
+                         boost::optional<NamespaceString> nss,
+                         boost::optional<UUID> uuid,
                          std::string filePath,
-                         const IdentToNamespaceAndUUIDMap& identToNamespaceAndUUIDMap,
                          boost::optional<Timestamp> checkpointTimestamp,
                          std::uint64_t offset,
                          std::uint64_t length,
                          std::uint64_t fileSize)
-    : _filePath(filePath), _offset(offset), _length(length), _fileSize(fileSize) {
-    boost::filesystem::path path(filePath);
-    _filenameStem = path.stem().string();
-    _initialize(opCtx, identToNamespaceAndUUIDMap, checkpointTimestamp);
-}
+    : _filePath(filePath),
+      _offset(offset),
+      _length(length),
+      _fileSize(fileSize),
+      _nss(nss),
+      _uuid(uuid) {}
 
 bool BackupBlock::isRequired() const {
     // Extract the filename from the path.
@@ -89,56 +90,21 @@ bool BackupBlock::isRequired() const {
         return true;
     }
 
+    if (!_nss) {
+        return false;
+    }
+
     // Check if collection resides in an internal database (admin, local, or config).
-    if (_nss.isOnInternalDb()) {
+    if (_nss->isOnInternalDb()) {
         return true;
     }
 
     // Check if collection is 'system.views'.
-    if (_nss.isSystemDotViews()) {
+    if (_nss->isSystemDotViews()) {
         return true;
     }
 
     return false;
-}
-
-void BackupBlock::_setNamespaceString(const NamespaceString& nss) {
-    // Remove "system.buckets." from time-series collection namespaces since it is an internal
-    // detail that is not intended to be visible externally.
-    if (nss.isTimeseriesBucketsCollection()) {
-        _nss = nss.getTimeseriesViewNamespace();
-        return;
-    }
-
-    _nss = nss;
-}
-
-void BackupBlock::_initialize(OperationContext* opCtx,
-                              const IdentToNamespaceAndUUIDMap& identToNamespaceAndUUIDMap,
-                              boost::optional<Timestamp> checkpointTimestamp) {
-    if (!opCtx) {
-        return;
-    }
-
-    // Fetch the latest values for the ident.
-    auto it = identToNamespaceAndUUIDMap.find(_filenameStem);
-    if (it != identToNamespaceAndUUIDMap.end()) {
-        _uuid = it->second.second;
-        _setNamespaceString(it->second.first);
-    }
-
-    if (!checkpointTimestamp) {
-        return;
-    }
-
-    // Check if the ident had a different value at the checkpoint timestamp. If so, we want to use
-    // that instead as that will be the ident's value when restoring from the backup.
-    boost::optional<std::pair<NamespaceString, UUID>> historicalEntry =
-        HistoricalIdentTracker::get(opCtx).lookup(_filenameStem, checkpointTimestamp.value());
-    if (historicalEntry) {
-        _uuid = historicalEntry->second;
-        _setNamespaceString(historicalEntry->first);
-    }
 }
 
 }  // namespace mongo

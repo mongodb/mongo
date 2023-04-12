@@ -446,10 +446,6 @@ private:
     // Listener for min of checkpoint and oldest timestamp changes.
     TimestampMonitor::TimestampListener _minOfCheckpointAndOldestTimestampListener;
 
-    // Listener for checkpoint timestamp changes to remove historical ident entries older than the
-    // checkpoint timestamp.
-    TimestampMonitor::TimestampListener _historicalIdentTimestampListener;
-
     // Listener for cleanup of CollectionCatalog when oldest timestamp advances.
     TimestampMonitor::TimestampListener _collectionCatalogCleanupTimestampListener;
 

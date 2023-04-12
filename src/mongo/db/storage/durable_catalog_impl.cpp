@@ -441,6 +441,16 @@ boost::optional<DurableCatalogEntry> DurableCatalogImpl::getParsedCatalogEntry(
                                _parseMetaData(obj["md"])};
 }
 
+DurableCatalogEntry DurableCatalogImpl::getParsedCatalogEntry(OperationContext* opCtx,
+                                                              const RecordId& catalogId,
+                                                              const BSONObj& obj) const {
+    BSONElement idxIdent = obj["idxIdent"];
+    return DurableCatalogEntry{catalogId,
+                               obj["ident"].String(),
+                               idxIdent.eoo() ? BSONObj() : idxIdent.Obj().getOwned(),
+                               _parseMetaData(obj["md"])};
+}
+
 std::shared_ptr<BSONCollectionCatalogEntry::MetaData> DurableCatalogImpl::getMetaData(
     OperationContext* opCtx, const RecordId& catalogId) const {
     BSONObj obj = _findEntry(opCtx, catalogId);

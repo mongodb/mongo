@@ -66,7 +66,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/db/storage/durable_catalog.h"
-#include "mongo/db/storage/historical_ident_tracker.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_init.h"
@@ -590,16 +589,6 @@ Status DatabaseImpl::_finishDropCollection(OperationContext* opCtx,
             opCtx, collection->ns(), collection->getCatalogId(), sharedIdent);
         if (!status.isOK())
             return status;
-
-        opCtx->recoveryUnit()->onCommit(
-            [nss, uuid, ident = sharedIdent->getIdent()](OperationContext* opCtx,
-                                                         boost::optional<Timestamp> commitTime) {
-                if (!commitTime) {
-                    return;
-                }
-
-                HistoricalIdentTracker::get(opCtx).recordDrop(ident, nss, uuid, commitTime.value());
-            });
     }
 
     CollectionCatalog::get(opCtx)->dropCollection(
@@ -652,27 +641,6 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
         return status;
 
     CollectionCatalog::get(opCtx)->onCollectionRename(opCtx, writableCollection, fromNss);
-
-    opCtx->recoveryUnit()->onCommit([fromNss,
-                                     writableCollection](OperationContext* opCtx,
-                                                         boost::optional<Timestamp> commitTime) {
-        if (!commitTime) {
-            return;
-        }
-
-        HistoricalIdentTracker::get(opCtx).recordRename(
-            writableCollection->getSharedIdent()->getIdent(),
-            fromNss,
-            writableCollection->uuid(),
-            commitTime.value());
-
-        const auto readyIndexes = writableCollection->getIndexCatalog()->getAllReadyEntriesShared();
-        for (const auto& readyIndex : readyIndexes) {
-            HistoricalIdentTracker::get(opCtx).recordRename(
-                readyIndex->getIdent(), fromNss, writableCollection->uuid(), commitTime.value());
-        }
-    });
-
     return status;
 }
 
