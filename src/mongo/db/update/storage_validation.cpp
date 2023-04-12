@@ -152,18 +152,29 @@ void scanDocument(const mutablebson::Document& doc,
     auto currElem = doc.root().leftChild();
     while (currElem.ok()) {
         if (currElem.getFieldName() == idFieldName && shouldValidate) {
-            uassertStatusOK(storageValidIdField(currElem.getValue()));
+            if (currElem.getType() == BSONType::Object) {
+                // We need to recursively validate the _id field while ensuring we disallow
+                // top-level $-prefix fields in the _id object.
+                scanDocument(currElem,
+                             true /* deep */,
+                             0 /* recursionLevel - forces _id fields to be treated as top-level. */,
+                             false /* Top-level _id fields cannot be $-prefixed. */,
+                             shouldValidate,
+                             containsDotsAndDollarsField);
+            } else {
+                uassertStatusOK(storageValidIdField(currElem.getValue()));
+            }
+        } else {
+            // Validate this child element.
+            const auto deep = true;
+            const uint32_t recursionLevel = 1;
+            scanDocument(currElem,
+                         deep,
+                         recursionLevel,
+                         allowTopLevelDollarPrefixes,
+                         shouldValidate,
+                         containsDotsAndDollarsField);
         }
-
-        // Validate this child element.
-        const auto deep = true;
-        const uint32_t recursionLevel = 1;
-        scanDocument(currElem,
-                     deep,
-                     recursionLevel,
-                     allowTopLevelDollarPrefixes,
-                     shouldValidate,
-                     containsDotsAndDollarsField);
 
         currElem = currElem.rightSibling();
     }
