@@ -591,15 +591,20 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetDelete(
                                      MatchExpressionParser::kAllowAllSpecialFeatures),
         str::stream() << "Could not parse delete query " << deleteQuery);
 
-    // Single deletes must target a single shard or be exact-ID.
+    // Regular single deletes must target a single shard or be exact-ID.
+    // Time-series single deletes must target a single shard.
+    auto isShardedTimeseriesCollection = isShardedTimeSeriesBucketsNamespace();
     uassert(ErrorCodes::ShardKeyNotFound,
-            str::stream() << "A single delete on a sharded collection must contain an exact match "
-                             "on _id (and have the collection default collation) or contain the "
-                             "shard key (and have the simple collation). Delete request: "
-                          << deleteOp.toBSON()
-                          << ", shard key pattern: " << _cri.cm.getShardKeyPattern().toString(),
+            fmt::format("A single delete on a sharded {} contain the shard key (and have the "
+                        "simple collation). Delete request: {}, shard key pattern: {}",
+                        isShardedTimeseriesCollection
+                            ? "time-series collection must"
+                            : "collection must contain an exact match on _id (and have the "
+                              "collection default collation) or",
+                        deleteOp.toBSON().toString(),
+                        _cri.cm.getShardKeyPattern().toString()),
             !_cri.cm.isSharded() || deleteOp.getMulti() ||
-                (isExactIdQuery(opCtx, *cq, _cri.cm) && !isShardedTimeSeriesBucketsNamespace()) ||
+                (isExactIdQuery(opCtx, *cq, _cri.cm) && !isShardedTimeseriesCollection) ||
                 feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
                     serverGlobalParams.featureCompatibility));
 
