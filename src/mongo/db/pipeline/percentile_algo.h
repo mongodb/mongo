@@ -29,9 +29,8 @@
 
 #pragma once
 
-#include <cmath>
-
 #include <boost/optional/optional.hpp>
+#include <cmath>
 #include <memory>
 
 namespace mongo {

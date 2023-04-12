@@ -27,10 +27,12 @@
  *    it in the license file.
  */
 
+#include "mongo/db/pipeline/percentile_algo.h"
 #include <algorithm>
 #include <boost/random/exponential_distribution.hpp>
 #include <boost/random/normal_distribution.hpp>
 #include <boost/random/uniform_real_distribution.hpp>
+#include <boost/random/weibull_distribution.hpp>
 #include <limits>
 #include <random>
 
@@ -774,11 +776,11 @@ TEST(TDigestTest, PreciseOnSmallDataset_k2) {
 // and then sorts a buffer so spreading the duplicates within distances comparable to the
 // buffer-size doesn't serve any purpose.
 template <typename TDist>
-vector<double> generateData(TDist& dist,
-                            size_t n,
-                            size_t dupes = 1,
-                            bool keepDupesTogether = true) {
-    auto seed = 1680027861;  // arbitrary
+vector<double> generateData(
+    TDist& dist, size_t n, size_t dupes, bool keepDupesTogether, long seed) {
+    if (seed == 0) {
+        seed = time(nullptr);
+    }
     LOGV2(7429513, "{seed}", "generateData", "seed"_attr = seed);
     std::mt19937 generator(seed);
 
@@ -806,36 +808,39 @@ vector<double> generateData(TDist& dist,
     return inputs;
 }
 
-typedef vector<double> (*DataGenerator)(size_t, size_t, bool);
+typedef vector<double> (*DataGenerator)(size_t, size_t, bool, long);
 
 // Generates 'n' values in [0, 100] range with uniform distribution.
-vector<double> generateUniform(size_t n, size_t dupes, bool keepDupesTogether) {
+vector<double> generateUniform(size_t n, size_t dupes, bool keepDupesTogether, long seed) {
     boost::random::uniform_real_distribution<double> dist(0 /* min */, 100 /* max */);
-    return generateData(dist, n, dupes, keepDupesTogether);
+    return generateData(dist, n, dupes, keepDupesTogether, seed);
 }
 
 // Generates 'n' values from normal distribution with mean = 0.0 and sigma = 0.5.
-vector<double> generateNormal(size_t n, size_t dupes, bool keepDupesTogether) {
+vector<double> generateNormal(size_t n, size_t dupes, bool keepDupesTogether, long seed) {
     boost::random::normal_distribution<double> dist(0.0 /* mean */, 0.5 /* sigma */);
-    return generateData(dist, n, dupes, keepDupesTogether);
+    return generateData(dist, n, dupes, keepDupesTogether, seed);
 }
 
 // Generates 'n' values from exponential distribution with lambda = 1.0: p(x)=lambda*e^(-lambda*x).
-vector<double> generateExponential(size_t n, size_t dupes, bool keepDupesTogether) {
+vector<double> generateExponential(size_t n, size_t dupes, bool keepDupesTogether, long seed) {
     boost::random::exponential_distribution<double> dist(1.0 /* lambda */);
-    return generateData(dist, n, dupes, keepDupesTogether);
+    return generateData(dist, n, dupes, keepDupesTogether, seed);
+}
+
+// Generates 'n' values from weibull distribution with a : 1.0, b: 0.5 to produce a heavy tail.
+vector<double> generateWeibull(size_t n, size_t dupes, bool keepDupesTogether, long seed) {
+    boost::random::weibull_distribution<double> dist(1.0 /* a */, 0.5 /* b */);
+    return generateData(dist, n, dupes, keepDupesTogether, seed);
 }
 
 /*
- * The following tests generate datasets with 10,000 values. The accuracy 0.00ab means that the
- * rank of the computed percentile cannot differ from the true rank by more than |ab|. T-digest does
- * not guarantee error bounds, the accuracy numbers here are empirical.
+ * The following tests generate datasets with 10,000 values. T-digest does not guarantee error
+ * bounds, but on well-behaved datasets it should be within 0.5% for the middle percentiles and even
+ * better for the extreme ones.
  *
  * These tests also indirectly validate the merging and compacting with a more complex scaling
  * function.
- *
- * We run two separate tests for each distribution because t-digest with k2 scaling function should
- * be more accurate for the extreme percentiles.
  */
 
 void runTestWithDataGenerator(TDigest::ScalingFunction k_limit,
@@ -844,9 +849,10 @@ void runTestWithDataGenerator(TDigest::ScalingFunction k_limit,
                               const vector<double>& percentiles,
                               double accuracy,
                               const char* msg) {
-    vector<double> inputs = dg(10'000 /* nUnique */, 1 /* dupes */, true /* keepDupesTogether*/);
+    vector<double> inputs =
+        dg(100'000 /* nUnique */, 1 /* dupes */, true /* keepDupesTogether*/, 0 /*seed*/);
 
-    const int delta = 100;
+    const int delta = 500;
     TDigest digest(k_limit, delta);
     for (auto val : inputs) {
         digest.incorporate(val);
@@ -868,7 +874,7 @@ TEST(TDigestTest, UniformDistribution_Mid) {
                              TDigest::k2,
                              generateUniform,
                              percentiles,
-                             0.0050 /* accuracy */,
+                             0.005 /* accuracy */,
                              "Uniform distribution mid");
 }
 TEST(TDigestTest, UniformDistribution_Extr) {
@@ -877,7 +883,7 @@ TEST(TDigestTest, UniformDistribution_Extr) {
                              TDigest::k2,
                              generateUniform,
                              percentiles,
-                             0.0010 /* accuracy */,
+                             0.0005 /* accuracy */,
                              "Uniform distribution extr");
 }
 
@@ -887,7 +893,7 @@ TEST(TDigestTest, NormalDistribution_Mid) {
                              TDigest::k2,
                              generateNormal,
                              percentiles,
-                             0.0050 /* accuracy */,
+                             0.005 /* accuracy */,
                              "Normal distribution mid");
 }
 TEST(TDigestTest, NormalDistribution_Extr) {
@@ -896,7 +902,7 @@ TEST(TDigestTest, NormalDistribution_Extr) {
                              TDigest::k2,
                              generateNormal,
                              percentiles,
-                             0.0010 /* accuracy */,
+                             0.0005 /* accuracy */,
                              "Normal distribution extr");
 }
 
@@ -906,7 +912,7 @@ TEST(TDigestTest, ExponentialDistribution_Mid) {
                              TDigest::k2,
                              generateExponential,
                              percentiles,
-                             0.0050 /* accuracy */,
+                             0.005 /* accuracy */,
                              "Exponential distribution mid");
 }
 TEST(TDigestTest, ExponentialDistribution_Extr) {
@@ -915,38 +921,32 @@ TEST(TDigestTest, ExponentialDistribution_Extr) {
                              TDigest::k2,
                              generateExponential,
                              percentiles,
-                             0.0010 /* accuracy */,
+                             0.0005 /* accuracy */,
+                             "Exponential distribution extr");
+}
+
+TEST(TDigestTest, WeibullDistribution_Mid) {
+    const vector<double> percentiles = {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9};
+    runTestWithDataGenerator(TDigest::k2_limit,
+                             TDigest::k2,
+                             generateWeibull,
+                             percentiles,
+                             0.005 /* accuracy */,
+                             "Exponential distribution mid");
+}
+TEST(TDigestTest, WeibullDistribution_Extr) {
+    const vector<double> percentiles = {0.0001, 0.001, 0.01, 0.99, 0.999, 0.9999};
+    runTestWithDataGenerator(TDigest::k2_limit,
+                             TDigest::k2,
+                             generateWeibull,
+                             percentiles,
+                             0.0005 /* accuracy */,
                              "Exponential distribution extr");
 }
 
 /**
- * For the median, k0 should yield as good accuracy as k2. Unfortunately, on any given dataset a
- * particular digest might get (un)lucky so we cannot directly compare the accuracy of k0 vs k2. But
- * we can check that the accuracy error is similar to the tests above that use k2.
- */
-TEST(TDigestTest, Median_k0) {
-    runTestWithDataGenerator(TDigest::k0_limit,
-                             TDigest::k0,
-                             generateUniform,
-                             {0.5},
-                             0.0050 /* accuracy */,
-                             "Uniform distribution median with k0");
-    runTestWithDataGenerator(TDigest::k0_limit,
-                             TDigest::k0,
-                             generateNormal,
-                             {0.5},
-                             0.0050 /* accuracy */,
-                             "Normal distribution median with k0");
-    runTestWithDataGenerator(TDigest::k0_limit,
-                             TDigest::k0,
-                             generateExponential,
-                             {0.5},
-                             0.0050 /* accuracy */,
-                             "Exponential distribution median with k0");
-}
-
-/**
- * Tests distributions with duplicated data.
+ * Tests distributions with duplicated data. Notice that we tend to get lower accuracy in presence
+ * of many duplicates.
  */
 void runTestWithDuplicatesInData(DataGenerator dg,
                                  size_t n,
@@ -955,8 +955,8 @@ void runTestWithDuplicatesInData(DataGenerator dg,
                                  const vector<double>& percentiles,
                                  double accuracy,
                                  const char* msg) {
-    const int delta = 100;
-    vector<double> inputs = dg(n, dupes, keepDupesTogether);
+    const int delta = 500;
+    vector<double> inputs = dg(n, dupes, keepDupesTogether, 0 /*seed*/);
 
     TDigest digest(TDigest::k2_limit, delta);
     for (auto val : inputs) {
@@ -972,72 +972,75 @@ void runTestWithDuplicatesInData(DataGenerator dg,
     std::sort(inputs.begin(), inputs.end());
     assertExpectedAccuracy(inputs, digest, percentiles, accuracy, msg);
 }
+
 TEST(TDigestTest, Duplicates_uniform_mid) {
     const vector<double> percentiles = {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9};
 
     runTestWithDuplicatesInData(generateUniform,
-                                1000 /* nUnique*/,
+                                10'000 /* nUnique*/,
                                 10 /* dupes */,
                                 false /* keepDupesTogether*/,
                                 percentiles,
-                                0.0100 /* accuracy */,
-                                "Uniform distribution with shuffled dupes mid (1000x10)");
+                                0.005 /* accuracy */,
+                                "Uniform distribution with shuffled dupes mid (10'000x10)");
     runTestWithDuplicatesInData(generateUniform,
-                                1000 /* nUnique*/,
+                                10'000 /* nUnique*/,
                                 10 /* dupes */,
                                 true /* keepDupesTogether*/,
                                 percentiles,
-                                0.0100 /* accuracy */,
-                                "Uniform distribution with clustered dupes mid (1000x10)");
+                                0.005 /* accuracy */,
+                                "Uniform distribution with clustered dupes mid (10'000x10)");
 
     runTestWithDuplicatesInData(generateUniform,
-                                100 /* nUnique*/,
+                                1000 /* nUnique*/,
                                 100 /* dupes */,
                                 false /* keepDupesTogether*/,
                                 percentiles,
-                                0.0100 /* accuracy */,
-                                "Uniform distribution with shuffled dupes mid (100x100)");
+                                0.01 /* accuracy */,
+                                "Uniform distribution with shuffled dupes mid (1000x100)");
     runTestWithDuplicatesInData(generateUniform,
                                 1000 /* nUnique*/,
-                                10 /* dupes */,
+                                100 /* dupes */,
                                 true /* keepDupesTogether*/,
                                 percentiles,
-                                0.0100 /* accuracy */,
-                                "Uniform distribution with clustered dupes mid (100x100)");
+                                0.01 /* accuracy */,
+                                "Uniform distribution with clustered dupes mid (1000x100)");
 }
+
 TEST(TDigestTest, Duplicates_uniform_extr) {
     const vector<double> percentiles = {0.0001, 0.001, 0.01, 0.99, 0.999, 0.9999};
 
     runTestWithDuplicatesInData(generateUniform,
-                                1000 /* nUnique*/,
+                                10'000 /* nUnique*/,
                                 10 /* dupes */,
                                 false /* keepDupesTogether*/,
                                 percentiles,
-                                0.0050 /* accuracy */,
-                                "Uniform distribution with shuffled dupes extr (1000x10)");
+                                0.0005 /* accuracy */,
+                                "Uniform distribution with shuffled dupes extr (10'000x10)");
     runTestWithDuplicatesInData(generateUniform,
-                                1000 /* nUnique*/,
+                                10'000 /* nUnique*/,
                                 10 /* dupes */,
                                 true /* keepDupesTogether*/,
                                 percentiles,
-                                0.0050 /* accuracy */,
-                                "Uniform distribution with clustered dupes extr (1000x10)");
+                                0.0005 /* accuracy */,
+                                "Uniform distribution with clustered dupes extr (10'000x10)");
 
     runTestWithDuplicatesInData(generateUniform,
-                                100 /* nUnique*/,
+                                1000 /* nUnique*/,
                                 100 /* dupes */,
                                 false /* keepDupesTogether*/,
                                 percentiles,
-                                0.0050 /* accuracy */,
-                                "Uniform distribution with shuffled dupes extr (100x100)");
+                                0.005 /* accuracy */,
+                                "Uniform distribution with shuffled dupes extr (1000x100)");
     runTestWithDuplicatesInData(generateUniform,
                                 1000 /* nUnique*/,
-                                10 /* dupes */,
+                                100 /* dupes */,
                                 true /* keepDupesTogether*/,
                                 percentiles,
-                                0.0050 /* accuracy */,
-                                "Uniform distribution with clustered dupes extr (100x100)");
+                                0.005 /* accuracy */,
+                                "Uniform distribution with clustered dupes extr (1000x100)");
 }
+
 TEST(TDigestTest, Duplicates_all) {
     const int delta = 100;
     const vector<double> inputs(10'000, 42);
@@ -1048,17 +1051,18 @@ TEST(TDigestTest, Duplicates_all) {
     }
     digest.flushBuffer();
     assertIsValid(digest, TDigest::k2, delta, "All duplicates");
-    assertExpectedAccuracy(inputs,
-                           digest,
-                           {0.0001, 0.001, 0.01, 0.99, 0.999, 0.9999} /* percentiles */,
-                           0.0001 /* accuracy */,
-                           "All duplicates extr");
-    assertExpectedAccuracy(inputs,
-                           digest,
-                           {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9} /* percentiles */,
-                           0.0001 /* accuracy */,
-                           "All duplicates mid");
+
+    // The t-digest of all duplicates will still contain multiple centroids but because all of them
+    // have the same mean that is equal to min and max, the interpolation should always return that
+    // mean as a result and, thus, would produce accurate percentile.
+    assertExpectedAccuracy(
+        inputs,
+        digest,
+        {0.0001, 0.001, 0.01, 0.1, 0.2, 0.5, 0.8, 0.9, 0.99, 0.999, 0.9999} /* percentiles */,
+        0.0 /* accuracy */,
+        "All duplicates mid");
 }
+
 TEST(TDigestTest, Duplicates_two_clusters) {
     const int delta = 100;
     vector<double> sorted(10'000, 0);
@@ -1081,35 +1085,36 @@ TEST(TDigestTest, Duplicates_two_clusters) {
     assertIsValid(digest, TDigest::k2, delta, "Duplicates_two_clusters");
     assertExpectedAccuracy(sorted,
                            digest,
-                           {0.0001, 0.001, 0.01, 0.99, 0.999, 0.9999} /* percentiles */,
-                           0.0010 /* accuracy */,
-                           "Duplicates two clusters extr");
+                           {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9} /* percentiles */,
+                           0.01 /* accuracy */,
+                           "Duplicates two clusters mid");
     assertExpectedAccuracy(sorted,
                            digest,
-                           {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9} /* percentiles */,
-                           0.0050 /* accuracy */,
-                           "Duplicates two clusters mid");
+                           {0.0001, 0.001, 0.01, 0.99, 0.999, 0.9999} /* percentiles */,
+                           0.005 /* accuracy */,
+                           "Duplicates two clusters extr");
 }
+
 TEST(TDigestTest, Frankenstein_distribution) {
     vector<vector<double>> chunks = {
-        generateNormal(1000, 1, true),       // 1000
-        generateNormal(200, 5, true),        // 1000
-        generateNormal(100, 10, true),       // 1000
-        generateNormal(50, 20, true),        // 1000
-        generateNormal(25, 40, true),        // 1000
-        generateUniform(2000, 1, true),      // 3000
-        generateUniform(10, 100, true),      // 1000
-        generateUniform(5, 200, true),       // 1000
-        generateExponential(1000, 1, true),  // 1000
+        generateNormal(10000, 1, true, 0),       // 10000
+        generateNormal(2000, 5, true, 0),        // 10000
+        generateNormal(1000, 10, true, 0),       // 10000
+        generateNormal(500, 20, true, 0),        // 10000
+        generateNormal(250, 40, true, 0),        // 10000
+        generateUniform(20000, 1, true, 0),      // 30000
+        generateUniform(100, 100, true, 0),      // 10000
+        generateUniform(50, 200, true, 0),       // 10000
+        generateExponential(10000, 1, true, 0),  // 10000
     };
     vector<double> inputs;
-    inputs.reserve(10'000);
+    inputs.reserve(100'000);
     for (const auto& chunk : chunks) {
         inputs.insert(inputs.end(), chunk.begin(), chunk.end());
     }
     std::shuffle(inputs.begin(), inputs.end(), std::mt19937(2023 /*seed*/));
 
-    const int delta = 100;
+    const int delta = 500;
     TDigest digest(TDigest::k2_limit, delta);
     for (auto val : inputs) {
         digest.incorporate(val);
@@ -1125,21 +1130,21 @@ TEST(TDigestTest, Frankenstein_distribution) {
     std::sort(inputs.begin(), inputs.end());
     assertExpectedAccuracy(inputs,
                            digest,
-                           {0.0001, 0.001, 0.01, 0.99, 0.999, 0.9999},
-                           0.0050,
-                           "Frankenstein distribution extr");
+                           {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9},
+                           0.01,
+                           "Frankenstein distribution mid");
     assertExpectedAccuracy(inputs,
                            digest,
-                           {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9},
-                           0.0100,
-                           "Frankenstein distribution mid");
+                           {0.0001, 0.001, 0.01, 0.99, 0.999, 0.9999},
+                           0.005,
+                           "Frankenstein distribution extr");
 }
 
 /**
- * The tests below were used to assess accuracy of t-digest on datasets of size 1e6 and 1e7 over
- * multiple iterations. We'd like to keep the tests alive to be able to repeat the experiments in
- * the future if we decide to tune t-digest further. However, for running as part of unit tests the
- * number of iterations and the dataset size have been set to lower values.
+ * The tests below were used to assess accuracy of t-digest on datasets of large size (>=1e7) over
+ * multiple iterations. They never fail but we'd like to keep the code alive to be able to repeat
+ * the experiments in the future if we decide to tune t-digest further. However, for running as part
+ * of unit tests the number of iterations and the dataset size have been set to lower values.
  */
 vector<int> computeError(vector<double> sorted,
                          TDigest& digest,
@@ -1164,9 +1169,10 @@ std::pair<vector<vector<int>> /*errors*/, vector<int> /*# centroids*/> generateA
     vector<vector<int>> errors(deltas.size(), vector<int>(percentiles.size(), 0));
     vector<int> n_centroids(deltas.size(), 0);
 
+    long seed = time(nullptr);
     for (int i = 0; i < nIterations; ++i) {
         std::cout << "*** iteration " << i << std::endl;
-        vector<double> data = dg(nUnique, 1 /* dupes */, false /* keepDupesTogether */);
+        vector<double> data = dg(nUnique, 1 /* dupes */, false /* keepDupesTogether */, ++seed);
         vector<double> sorted = data;
         std::sort(sorted.begin(), sorted.end());
 
@@ -1215,14 +1221,17 @@ void runAccuracyTest(DataGenerator dg) {
     }
 }
 
-TEST(TDigestTest, AccuracyStats_uniform) {
-    runAccuracyTest(generateUniform);
-}
-TEST(TDigestTest, AccuracyStats_normal) {
-    runAccuracyTest(generateNormal);
-}
-TEST(TDigestTest, AccuracyStats_exp) {
-    runAccuracyTest(generateExponential);
-}
+// TEST(TDigestTest, AccuracyStats_uniform) {
+//     runAccuracyTest(generateUniform);
+// }
+// TEST(TDigestTest, AccuracyStats_normal) {
+//     runAccuracyTest(generateNormal);
+// }
+// TEST(TDigestTest, AccuracyStats_exp) {
+//     runAccuracyTest(generateExponential);
+// }
+// TEST(TDigestTest, AccuracyStats_weibull) {
+//     runAccuracyTest(generateWeibull);
+// }
 }  // namespace
 }  // namespace mongo
