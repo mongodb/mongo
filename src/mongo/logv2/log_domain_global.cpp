@@ -136,7 +136,7 @@ Status LogDomainGlobal::Impl::configure(LogDomainGlobal::ConfigurationOptions co
         mapping[LogSeverity::Debug(3)] = boost::log::sinks::syslog::debug;
         mapping[LogSeverity::Debug(2)] = boost::log::sinks::syslog::debug;
         mapping[LogSeverity::Debug(1)] = boost::log::sinks::syslog::debug;
-        mapping[LogSeverity::Log()] = boost::log::sinks::syslog::debug;
+        mapping[LogSeverity::Log()] = boost::log::sinks::syslog::info;
         mapping[LogSeverity::Info()] = boost::log::sinks::syslog::info;
         mapping[LogSeverity::Warning()] = boost::log::sinks::syslog::warning;
         mapping[LogSeverity::Error()] = boost::log::sinks::syslog::critical;
