@@ -22,7 +22,6 @@ executor:
   - class: ValidateCollections
   - class: CleanEveryN
     n: 20
-  - class: RunTelemetry
   fixture:
     class: MongoDFixture
     mongod_options:
