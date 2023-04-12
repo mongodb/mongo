@@ -52,17 +52,27 @@ function getTelemetry(conn) {
         ],
         cursor: {}
     });
+    assert.commandWorked(result);
     return result.cursor.firstBatch;
 }
 
-function getTelemetryRedacted(conn) {
-    const kApplicationName = "dXRuJCwctavU";
+function getTelemetryRedacted(
+    conn,
+    redactIdentifiers = true,
+    redactionKey = BinData(0, "MjM0NTY3ODkxMDExMTIxMzE0MTUxNjE3MTgxOTIwMjE=")) {
+    // Hashed application name is generated using the default redactionKey argument.
+    const kApplicationName = "T1iwlAqhXYroi7HTycmBJvWZSETwKXnaNa5akM4q0H4=";
+    // Filter out agg queries, including $telemetry.
+    const match = {$match: {"key.find": {$exists: true}, "key.applicationName": kApplicationName}};
+    if (!redactIdentifiers) {
+        match.$match["key.applicationName"] = "MongoDB Shell";
+    }
+
     const result = conn.adminCommand({
         aggregate: 1,
         pipeline: [
-            {$telemetry: {redactIdentifiers: true}},
-            // Filter out agg queries, including $telemetry.
-            {$match: {"key.find": {$exists: true}, "key.applicationName": kApplicationName}},
+            {$telemetry: {redactIdentifiers: redactIdentifiers, redactionKey: redactionKey}},
+            match,
             // Sort on telemetry key so entries are in a deterministic order.
             {$sort: {key: 1}},
         ],

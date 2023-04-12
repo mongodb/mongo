@@ -47,9 +47,10 @@ public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec);
 
-        LiteParsed(std::string parseTimeName, bool redactIdentifiers)
+        LiteParsed(std::string parseTimeName, bool redactIdentifiers, std::string redactionKey)
             : LiteParsedDocumentSource(std::move(parseTimeName)),
-              _redactIdentifiers(redactIdentifiers) {}
+              _redactIdentifiers(redactIdentifiers),
+              _redactionKey(redactionKey) {}
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const override {
             return stdx::unordered_set<NamespaceString>();
@@ -75,6 +76,8 @@ public:
         }
 
         bool _redactIdentifiers;
+
+        std::string _redactionKey;
     };
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
@@ -112,8 +115,11 @@ public:
 
 private:
     DocumentSourceTelemetry(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                            bool redactIdentifiers = false)
-        : DocumentSource(kStageName, expCtx), _redactIdentifiers(redactIdentifiers) {}
+                            bool redactIdentifiers = false,
+                            std::string redactionKey = {})
+        : DocumentSource(kStageName, expCtx),
+          _redactIdentifiers(redactIdentifiers),
+          _redactionKey(redactionKey) {}
 
     GetNextResult doGetNext() final;
 
@@ -131,6 +137,11 @@ private:
 
     // When true, redact field names from returned query shapes.
     bool _redactIdentifiers;
+
+    /**
+     * Key used for SHA-256 HMAC redaction of field names.
+     */
+    std::string _redactionKey;
 };
 
 }  // namespace mongo

@@ -6,7 +6,7 @@
 "use strict";
 
 const kApplicationName = "MongoDB Shell";
-const kHashedApplicationName = "dXRuJCwctavU";
+const kHashedApplicationName = "piOJ84Zjy9dJP6snMI5X6NQ42VGim3vofK5awkuY5q8=";
 
 const getTelemetry = (conn, redactIdentifiers = false) => {
     const result = assert.commandWorked(conn.adminCommand({
@@ -53,11 +53,11 @@ assert.eq({
 
 telemetry = getTelemetry(conn, true);
 assert.eq(1, telemetry.length, telemetry);
-const hashedColl = "zF15YAUWbyIP";
+const hashedColl = "tU+RtrEU9QHrWsxNIL8OUDvfpUdavYkcuw7evPKfxdU=";
 assert.eq({
-    cmdNs: {db: "n4bQgYhMfWWa", coll: hashedColl},
+    cmdNs: {db: "Q7DO+ZJl+eNMEOqdNQGSbSezn1fG1nRWHYuiNueoGfs=", coll: hashedColl},
     find: hashedColl,
-    filter: {"TJRIXgwhrmxB": {"$eq": "?"}},
+    filter: {"ksdi13D4gc1BJ0Es4yX6QtG6MAwIeNLsCgeGRePOvFE=": {"$eq": "?"}},
     applicationName: kHashedApplicationName
 },
           telemetry[0].key,

@@ -70,7 +70,6 @@ static std::string hintSpecialField = "$hint";
 void addLiteralFieldsWithRedaction(BSONObjBuilder* bob,
                                    const FindCommandRequest& findCommand,
                                    StringData newLiteral) {
-
     if (findCommand.getLimit()) {
         bob->append(FindCommandRequest::kLimitFieldName, newLiteral);
     }
@@ -107,7 +106,6 @@ void addLiteralFieldsWithoutRedaction(BSONObjBuilder* bob, const FindCommandRequ
     }
 }
 
-
 static std::vector<
     std::pair<StringData, std::function<const OptionalBool(const FindCommandRequest&)>>>
     boolArgMap = {
@@ -121,6 +119,7 @@ static std::vector<
          &FindCommandRequest::getAllowPartialResults},
         {FindCommandRequest::kMirroredFieldName, &FindCommandRequest::getMirrored},
 };
+
 std::vector<std::pair<StringData, std::function<const BSONObj(const FindCommandRequest&)>>>
     objArgMap = {
         {FindCommandRequest::kCollationFieldName, &FindCommandRequest::getCollation},
@@ -142,6 +141,7 @@ void addRemainingFindCommandFields(BSONObjBuilder* bob, const FindCommandRequest
         bob->append(FindCommandRequest::kCollationFieldName, collation);
     }
 }
+
 boost::optional<std::string> getApplicationName(const OperationContext* opCtx) {
     if (auto metadata = ClientMetadata::get(opCtx->getClient())) {
         return metadata->getApplicationName().toString();
@@ -548,14 +548,15 @@ void throwIfEncounteringFLEPayload(const BSONElement& e) {
  */
 const stdx::unordered_set<std::string> kKeysToRedact = {"pipeline", "find"};
 
-std::string sha256StringDataHasher(const StringData& fieldName) {
-    auto hash = SHA256Block::computeHash({ConstDataRange(fieldName.rawData(), fieldName.size())});
-    return hash.toString().substr(0, 12);
+std::string sha256HmacStringDataHasher(std::string key, const StringData& sd) {
+    auto hashed = SHA256Block::computeHmac(
+        (const uint8_t*)key.data(), key.size(), (const uint8_t*)sd.rawData(), sd.size());
+    return hashed.toString();
 }
 
-std::string sha256FieldNameHasher(const BSONElement& e) {
+std::string sha256HmacFieldNameHasher(std::string key, const BSONElement& e) {
     auto&& fieldName = e.fieldNameStringData();
-    return sha256StringDataHasher(fieldName);
+    return sha256HmacStringDataHasher(key, fieldName);
 }
 
 std::string constantFieldNameHasher(const BSONElement& e) {
@@ -597,6 +598,7 @@ static const StringData replacementForLiteralArgs = "?"_sd;
 
 StatusWith<BSONObj> TelemetryMetrics::redactKey(const BSONObj& key,
                                                 bool redactIdentifiers,
+                                                std::string redactionKey,
                                                 OperationContext* opCtx) const {
     // The redacted key for each entry is cached on first computation. However, if the redaction
     // straegy has flipped (from no redaction to SHA256, vice versa), we just return the key passed
@@ -614,7 +616,9 @@ StatusWith<BSONObj> TelemetryMetrics::redactKey(const BSONObj& key,
         auto findCommand =
             query_request_helper::makeFromFindCommand(cmdObj, this->nss.nss().value(), false);
 
-        SerializationOptions options(sha256StringDataHasher, replacementForLiteralArgs);
+        SerializationOptions options(
+            [&](StringData sd) { return sha256HmacStringDataHasher(redactionKey, sd); },
+            replacementForLiteralArgs);
         auto nss = findCommand->getNamespaceOrUUID().nss();
         uassert(7349400, "Namespace must be defined", nss.has_value());
         auto expCtx = make_intrusive<ExpressionContext>(opCtx, nullptr, nss.value());
@@ -649,9 +653,10 @@ StatusWith<BSONObj> TelemetryMetrics::redactKey(const BSONObj& key,
             auto redactor = [&](BSONObjBuilder subObj, const BSONObj& obj) {
                 for (BSONElement e2 : obj) {
                     if (e2.type() == Object) {
-                        // Sha256 redaction strategy.
                         subObj.append(e2.fieldNameStringData(),
-                                      e2.Obj().redact(false, sha256FieldNameHasher));
+                                      e2.Obj().redact(false, [&](const BSONElement& e) {
+                                          return sha256HmacFieldNameHasher(redactionKey, e);
+                                      }));
                     } else {
                         subObj.append(e2);
                     }
