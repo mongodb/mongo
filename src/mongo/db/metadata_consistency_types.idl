@@ -79,7 +79,8 @@ structs:
         description: "Details about a misplaced collection inconsistency."
         strict: false
         fields:
-            ns:
+            namespace:
+                cpp_name: nss
                 type: namespacestring
                 description: "The namespace of the collection that is misplaced."
             shard:
@@ -93,7 +94,8 @@ structs:
         description: "Details about a UUID mismatch inconsistency."
         strict: false
         fields:
-            ns:
+            namespace:
+                cpp_name: nss
                 type: namespacestring
                 description: "The namespace of the collection that has a UUID mismatch."
             shard:
@@ -110,7 +112,8 @@ structs:
         description: "Details about a missing shard key index inconsistency."
         strict: false
         fields:
-            ns:
+            namespace:
+                cpp_name: nss
                 type: namespacestring
                 description: "The namespace of the collection that is missing a shard key index."
             shard:
@@ -124,7 +127,8 @@ structs:
         description: "Details about a routing table range overlap inconsistency."
         strict: false
         fields:
-            ns:
+            namespace:
+                cpp_name: nss
                 type: namespacestring
                 description: "The namespace of the collection."
             collectionUUID:
@@ -141,7 +145,8 @@ structs:
         description: "Details about a routing table range gap inconsistency."
         strict: false
         fields:
-            ns:
+            namespace:
+                cpp_name: nss
                 type: namespacestring
                 description: "The namespace of the collection."
             collectionUUID:
@@ -158,7 +163,8 @@ structs:
         description: "Details about a routing table missing min key inconsistency."
         strict: false
         fields:
-            ns:
+            namespace:
+                cpp_name: nss
                 type: namespacestring
                 description: "The namespace of the collection."
             collectionUUID:
@@ -175,7 +181,8 @@ structs:
         description: "Details about a routing table missing max key inconsistency."
         strict: false
         fields:
-            ns:
+            namespace:
+                cpp_name: nss
                 type: namespacestring
                 description: "The namespace of the collection."
             collectionUUID:
@@ -192,7 +199,8 @@ structs:
         description: "Details about a corrupted chunk shard key inconsistency."
         strict: false
         fields:
-            ns:
+            namespace:
+                cpp_name: nss
                 type: namespacestring
                 description: "The namespace of the collection."
             collectionUUID:
@@ -209,7 +217,8 @@ structs:
         description: "Details about a hidden sharded collection inconsistency."
         strict: false
         fields:
-            ns:
+            namespace:
+                cpp_name: nss
                 type: namespacestring
                 description: "The namespace of the collection that is hidden."
             collection:
@@ -220,7 +229,8 @@ structs:
         description: "Details about index inconsistency."
         strict: false
         fields:
-            ns:
+            namespace:
+                cpp_name: nss
                 type: namespacestring
                 description: "The namespace of the affected collection."
             info:
@@ -231,7 +241,8 @@ structs:
         description: "Details about a missing routing table inconsistency."
         strict: false
         fields:
-            ns:
+            namespace:
+                cpp_name: nss
                 type: namespacestring
                 description: "The namespace of the collection that has no routing table."
             collectionUUID:
