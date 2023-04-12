@@ -119,8 +119,6 @@ protected:
     const HostAndPort kShardHost2 = HostAndPort("TestHost2", 12347);
     const HostAndPort kShardHost3 = HostAndPort("TestHost3", 12348);
 
-    const long long kMaxSizeMB = 100;
-
     const BSONObj kShard0 =
         BSON(ShardType::name(kShardId0.toString()) << ShardType::host(kShardHost0.toString()));
     const BSONObj kShard1 =
