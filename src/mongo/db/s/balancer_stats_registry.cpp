@@ -233,7 +233,8 @@ void BalancerStatsRegistry::onRangeDeletionTaskDeletion(const UUID& collectionUU
     stdx::lock_guard lk{_mutex};
     auto collStatsIt = _collStatsMap.find(collectionUUID);
     if (collStatsIt == _collStatsMap.end()) {
-        LOGV2_ERROR(6419612,
+        LOGV2_DEBUG(6419612,
+                    1,
                     "Couldn't find cached range deletion tasks count during decrese attempt",
                     "collectionUUID"_attr = collectionUUID,
                     "numOrphanDocs"_attr = numOrphanDocs);
@@ -246,7 +247,8 @@ void BalancerStatsRegistry::onRangeDeletionTaskDeletion(const UUID& collectionUU
 
     if (stats.numRangeDeletionTasks <= 0) {
         if (MONGO_unlikely(stats.numRangeDeletionTasks < 0)) {
-            LOGV2_ERROR(6419613,
+            LOGV2_DEBUG(6419613,
+                        1,
                         "Cached count of range deletion tasks became negative. Resetting it to 0",
                         "collectionUUID"_attr = collectionUUID,
                         "numRangeDeletionTasks"_attr = stats.numRangeDeletionTasks,
