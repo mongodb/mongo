@@ -36,10 +36,9 @@
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
+#include "mongo/s/balancer_configuration.h"
 #include "mongo/s/request_types/get_stats_for_balancing_gen.h"
 #include "mongo/s/type_collection_common_types_gen.h"
-
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo {
 namespace {
@@ -57,6 +56,24 @@ protected:
           _clusterStats(std::make_unique<ClusterStatisticsImpl>(_random)),
           _chunkSelectionPolicy(
               std::make_unique<BalancerChunkSelectionPolicyImpl>(_clusterStats.get(), _random)) {}
+
+    /**
+     * Generates a default chunks distribution across shards with the form:
+     * [MinKey, 0), [0, 1), [1, 2) ... [N - 2, MaxKey)
+     */
+    std::map<ShardId, std::vector<ChunkRange>> generateDefaultChunkRanges(
+        const std::vector<ShardId>& shards) {
+
+        std::map<ShardId, std::vector<ChunkRange>> chunksPerShard;
+        for (auto i = 0U; i < shards.size(); ++i) {
+            const ShardId& shardId = shards[i];
+            const auto min = (i == 0 ? kKeyPattern.globalMin() : BSON(kPattern << int(i - 1)));
+            const auto max =
+                (i == shards.size() - 1 ? kKeyPattern.globalMax() : BSON(kPattern << int(i)));
+            chunksPerShard[shardId].push_back(ChunkRange(min, max));
+        }
+        return chunksPerShard;
+    }
 
     /**
      * Sets up mock network to expect a listDatabases command and returns a BSON response with
@@ -144,7 +161,7 @@ protected:
                 ShardId shardId = getShardIdByHost(request.target);
                 resultBuilder.append("shardId", shardId);
 
-                // Build `stats` array
+                // Build `stats` array: [ {"namespace": <nss>, "collSize": <collSize>}, ...]
                 {
                     BSONArrayBuilder statsArrayBuilder(resultBuilder.subarrayStart("stats"));
 
@@ -156,7 +173,8 @@ protected:
                              .Array()) {
                         const auto nss =
                             NamespaceWithOptionalUUID::parse(
-                                IDLParserContext("BalancerChunkSelectionPolicyTest"), reqColl.Obj())
+                                IDLParserErrorContext("BalancerChunkSelectionPolicyTest"),
+                                reqColl.Obj())
                                 .getNs();
 
                         statsArrayBuilder.append(CollStatsForBalancing(nss, collSize).toBSON());
@@ -168,13 +186,72 @@ protected:
     }
 
     /**
-     * Sets up a collection and its chunks according to the given range distribution across shards
+     * Same as expectGetStatsForBalancingCommands with the difference that this function will expect
+     * only one migration between the specified shards
+     */
+    void expectGetStatsForBalancingCommandsWithOneMigration(uint32_t numShards,
+                                                            ShardId donorShardId,
+                                                            ShardId recipientShardId) {
+        ASSERT_NE(donorShardId, recipientShardId);
+
+        const auto maxChunkSizeBytes =
+            Grid::get(operationContext())->getBalancerConfiguration()->getMaxChunkSizeBytes();
+        const auto defaultCollSizeOnShard = 2 * maxChunkSizeBytes;
+        const auto imbalancedCollSizeOnRecipient = maxChunkSizeBytes;
+        const auto imbalancedCollSizeOnDonor = 5 * maxChunkSizeBytes;
+
+        for (auto i = 0U; i < numShards; ++i) {
+            BSONObjBuilder resultBuilder;
+            CommandHelpers::appendCommandStatusNoThrow(resultBuilder, Status::OK());
+
+            // Build a response for every given request
+            onCommand([&](const RemoteCommandRequest& request) {
+                ASSERT(request.cmdObj[ShardsvrGetStatsForBalancing::kCommandName]);
+
+                // Get `shardId`
+                ShardId shardId = getShardIdByHost(request.target);
+                resultBuilder.append("shardId", shardId);
+
+                // Build `stats` array: [ {"namespace": <nss>, "collSize": <collSize>}, ...]
+                {
+                    bool firstColl = true;
+                    BSONArrayBuilder statsArrayBuilder(resultBuilder.subarrayStart("stats"));
+                    for (const auto& reqColl :
+                         request.cmdObj[ShardsvrGetStatsForBalancing::kCollectionsFieldName]
+                             .Array()) {
+                        const auto nss =
+                            NamespaceWithOptionalUUID::parse(
+                                IDLParserErrorContext("BalancerChunkSelectionPolicyTest"),
+                                reqColl.Obj())
+                                .getNs();
+
+                        const auto collSize = [&]() {
+                            if (firstColl && shardId == donorShardId) {
+                                return imbalancedCollSizeOnDonor;
+                            } else if (firstColl && shardId == recipientShardId) {
+                                return imbalancedCollSizeOnRecipient;
+                            }
+                            return defaultCollSizeOnShard;
+                        }();
+
+                        statsArrayBuilder.append(CollStatsForBalancing(nss, collSize).toBSON());
+                        firstColl = false;
+                    }
+                }
+                return resultBuilder.obj();
+            });
+        }
+    }
+
+    /**
+     * Sets up a collection and its chunks according to the given range distribution across
+     * shards
      */
     UUID setUpCollectionWithChunks(
         const NamespaceString& ns,
         const std::map<ShardId, std::vector<ChunkRange>>& chunksPerShard) {
         const UUID collUuid = UUID::gen();
-        ChunkVersion version({OID::gen(), Timestamp(42)}, {2, 0});
+        ChunkVersion version(2, 0, OID::gen(), Timestamp(42));
 
         for (const auto& [shardId, chunkRanges] : chunksPerShard) {
             for (const auto& chunkRange : chunkRanges) {
@@ -456,18 +533,18 @@ TEST_F(BalancerChunkSelectionTest, AllImbalancedCollectionsShouldEventuallyBeSel
     // Set up database
     setUpDatabase(kDbName, kShardId0);
 
-    // Set up N imbalanced collections (more than `kStatsForBalancingBatchSize`)
-    const int numCollections = 60;
-    const int maxIterations = 3000;
+    // Override collections batch size to 4 for speeding up the test
+    FailPointEnableBlock overrideBatchSizeGuard("overrideStatsForBalancingBatchSize",
+                                                BSON("size" << 4));
 
-    // Routing table for each collection:
-    //      Shard0 -> {minKey, maxKey}  (512 MB)
-    //      Shard1 -> {}                (  0 MB)
+    // Set up 7 imbalanced collections (more than `kStatsForBalancingBatchSize`)
+    const int numCollections = 7;
+    const int maxIterations = 1000;
+
     for (auto i = 0; i < numCollections; ++i) {
         const std::string collName = "TestColl" + std::to_string(i);
-        setUpCollectionWithChunks(
-            NamespaceString(kDbName, collName),
-            {{kShardId0, {{kKeyPattern.globalMin(), kKeyPattern.globalMax()}}}, {kShardId1, {}}});
+        setUpCollectionWithChunks(NamespaceString(kDbName, collName),
+                                  generateDefaultChunkRanges({kShardId0, kShardId1}));
     }
 
     std::set<NamespaceString> collectionsSelected;
@@ -499,6 +576,10 @@ TEST_F(BalancerChunkSelectionTest, AllImbalancedCollectionsShouldEventuallyBeSel
         });
 
         expectGetStatsCommands(2 /*numShards*/);
+
+        // Collection size distribution for each collection:
+        //      Shard0 -> 512 MB
+        //      Shard1 ->   0 MB
         expectGetStatsForBalancingCommands(
             {{kShardId0, 512 * 1024 * 1024 /*Bytes*/}, {kShardId1, 0 /*Bytes*/}});
 
@@ -532,16 +613,12 @@ TEST_F(BalancerChunkSelectionTest, SelectedCollectionsShouldBeCached) {
     // Set up database
     setUpDatabase(kDbName, kShardId0);
 
-    // Set up 10 imbalanced collections
-    // Routing table for each collection:
-    //      Shard0 -> {minKey, maxKey}  (512 MB)
-    //      Shard1 -> {}                (  0 MB)
-    const int numCollections = 10;
+    // Set up 4 collections
+    const int numCollections = 4;
     for (auto i = 0; i < numCollections; ++i) {
         const std::string collName = "TestColl" + std::to_string(i);
-        setUpCollectionWithChunks(
-            NamespaceString(kDbName, collName),
-            {{kShardId0, {{kKeyPattern.globalMin(), kKeyPattern.globalMax()}}}, {kShardId1, {}}});
+        setUpCollectionWithChunks(NamespaceString(kDbName, collName),
+                                  generateDefaultChunkRanges({kShardId0, kShardId1}));
     }
 
     std::set<NamespaceString> collectionsSelected;
@@ -572,6 +649,10 @@ TEST_F(BalancerChunkSelectionTest, SelectedCollectionsShouldBeCached) {
         });
 
         expectGetStatsCommands(2 /*numShards*/);
+
+        // Collection size distribution for each collection:
+        //      Shard0 -> 512 MB
+        //      Shard1 ->   0 MB
         expectGetStatsForBalancingCommands(
             {{kShardId0, 512 * 1024 * 1024 /*Bytes*/}, {kShardId1, 0 /*Bytes*/}});
 
@@ -602,14 +683,12 @@ TEST_F(BalancerChunkSelectionTest, CachedCollectionsShouldBeSelected) {
     _imbalancedCollectionsCache.clear();
     std::vector<NamespaceString> allCollections;
 
-    // Set up 10 imbalanced collections and add all them in the imbalanced collections cache
-    const int numCollections = 10;
+    // Set up 4 collections and add all them into the imbalanced collections cache
+    const int numCollections = 4;
     for (auto i = 0; i < numCollections; ++i) {
         NamespaceString nss(kDbName, "TestColl" + std::to_string(i));
         allCollections.push_back(nss);
-        setUpCollectionWithChunks(
-            nss,
-            {{kShardId0, {{kKeyPattern.globalMin(), kKeyPattern.globalMax()}}}, {kShardId1, {}}});
+        setUpCollectionWithChunks(nss, generateDefaultChunkRanges({kShardId0, kShardId1}));
 
         _imbalancedCollectionsCache.insert(nss);
     }
@@ -641,6 +720,10 @@ TEST_F(BalancerChunkSelectionTest, CachedCollectionsShouldBeSelected) {
         });
 
         expectGetStatsCommands(2 /*numShards*/);
+
+        // Collection size distribution for each collection:
+        //      Shard0 -> 512 MB
+        //      Shard1 ->   0 MB
         expectGetStatsForBalancingCommands(
             {{kShardId0, 512 * 1024 * 1024 /*Bytes*/}, {kShardId1, 0 /*Bytes*/}});
 
@@ -656,6 +739,155 @@ TEST_F(BalancerChunkSelectionTest, CachedCollectionsShouldBeSelected) {
         ASSERT_TRUE(collectionsSelected.count(nss));
     }
     ASSERT_EQ(allCollections.size(), collectionsSelected.size());
+}
+
+TEST_F(BalancerChunkSelectionTest, MaxTimeToScheduleBalancingOperationsExceeded) {
+    // Set up 4 shards in the metadata.
+    ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
+                                                    NamespaceString::kConfigsvrShardsNamespace,
+                                                    kShard0,
+                                                    kMajorityWriteConcern));
+    ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
+                                                    NamespaceString::kConfigsvrShardsNamespace,
+                                                    kShard1,
+                                                    kMajorityWriteConcern));
+    ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
+                                                    NamespaceString::kConfigsvrShardsNamespace,
+                                                    kShard2,
+                                                    kMajorityWriteConcern));
+    ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
+                                                    NamespaceString::kConfigsvrShardsNamespace,
+                                                    kShard3,
+                                                    kMajorityWriteConcern));
+
+    // Set up database
+    setUpDatabase(kDbName, kShardId0);
+
+    // Override collections batch size to 4 for speeding up the test
+    FailPointEnableBlock overrideBatchSizeGuard("overrideStatsForBalancingBatchSize",
+                                                BSON("size" << 4));
+
+    // Set up 5 collections to process more than 1 batch
+    for (auto i = 0U; i < 5; ++i) {
+        NamespaceString ns{kDbName, "coll" + std::to_string(i)};
+        setUpCollectionWithChunks(
+            ns, generateDefaultChunkRanges({kShardId0, kShardId1, kShardId2, kShardId3}));
+    }
+
+    auto future = launchAsync([&] {
+        ThreadClient tc(getServiceContext());
+        auto opCtx = Client::getCurrent()->makeOperationContext();
+
+        // Requesting chunks to be relocated requires running commands on each shard to get
+        // shard statistics. Set up dummy hosts for the source shards.
+        shardTargeterMock(opCtx.get(), kShardId0)->setFindHostReturnValue(kShardHost0);
+        shardTargeterMock(opCtx.get(), kShardId1)->setFindHostReturnValue(kShardHost1);
+        shardTargeterMock(opCtx.get(), kShardId2)->setFindHostReturnValue(kShardHost2);
+        shardTargeterMock(opCtx.get(), kShardId3)->setFindHostReturnValue(kShardHost3);
+
+        std::vector<ClusterStatistics::ShardStatistics> shardStats =
+            uassertStatusOK(_clusterStats.get()->getStats(opCtx.get()));
+        auto availableShards = getAllShardIds(shardStats);
+
+        _imbalancedCollectionsCache.clear();
+
+        // Forcing timeout to exceed by setting it to 0
+        RAIIServerParameterControllerForTest balancerChunksSelectionTimeoutMsIsZero(
+            "balancerChunksSelectionTimeoutMs", 0);
+
+        auto candidateChunksStatus = _chunkSelectionPolicy.get()->selectChunksToMove(
+            opCtx.get(), shardStats, &availableShards, &_imbalancedCollectionsCache);
+
+        ASSERT_OK(candidateChunksStatus.getStatus());
+
+        // We know that timeout exceeded because we only got 1 migration instead of the 2 migrations
+        // expected in a normal scenario with 4 shards
+        ASSERT_EQUALS(1U, candidateChunksStatus.getValue().size());
+    });
+
+    expectGetStatsCommands(4);
+
+    // We need to get at least 1 migration per batch since the timeout only exceeds when balancer
+    // has found at least one candidate migration On the other side, we must get less than 2
+    // migrations per batch since the maximum number of migrations per balancing round is 2 (with 4
+    // shards)
+    expectGetStatsForBalancingCommandsWithOneMigration(
+        4 /*numShards*/, kShardId0 /*donor*/, kShardId1 /*recipient*/);
+
+    future.default_timed_get();
+}
+
+TEST_F(BalancerChunkSelectionTest, MakeSureMoreThanOneBatchIsProcessedIfNeeded) {
+    // Set up 4 shards in the metadata.
+    ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
+                                                    NamespaceString::kConfigsvrShardsNamespace,
+                                                    kShard0,
+                                                    kMajorityWriteConcern));
+    ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
+                                                    NamespaceString::kConfigsvrShardsNamespace,
+                                                    kShard1,
+                                                    kMajorityWriteConcern));
+    ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
+                                                    NamespaceString::kConfigsvrShardsNamespace,
+                                                    kShard2,
+                                                    kMajorityWriteConcern));
+    ASSERT_OK(catalogClient()->insertConfigDocument(operationContext(),
+                                                    NamespaceString::kConfigsvrShardsNamespace,
+                                                    kShard3,
+                                                    kMajorityWriteConcern));
+
+    // Set up database
+    setUpDatabase(kDbName, kShardId0);
+
+    // Override collections batch size to 4 for speeding up the test
+    FailPointEnableBlock overrideBatchSizeGuard("overrideStatsForBalancingBatchSize",
+                                                BSON("size" << 4));
+
+    // Set up 5 collections to process 2 batches
+    for (auto i = 0; i < 5; ++i) {
+        NamespaceString ns{kDbName, "coll" + std::to_string(i)};
+        setUpCollectionWithChunks(
+            ns, generateDefaultChunkRanges({kShardId0, kShardId1, kShardId2, kShardId3}));
+    }
+
+    auto future = launchAsync([&] {
+        ThreadClient tc(getServiceContext());
+        auto opCtx = Client::getCurrent()->makeOperationContext();
+
+        // Requesting chunks to be relocated requires running commands on each shard to get
+        // shard statistics. Set up dummy hosts for the source shards.
+        shardTargeterMock(opCtx.get(), kShardId0)->setFindHostReturnValue(kShardHost0);
+        shardTargeterMock(opCtx.get(), kShardId1)->setFindHostReturnValue(kShardHost1);
+        shardTargeterMock(opCtx.get(), kShardId2)->setFindHostReturnValue(kShardHost2);
+        shardTargeterMock(opCtx.get(), kShardId3)->setFindHostReturnValue(kShardHost3);
+
+        std::vector<ClusterStatistics::ShardStatistics> shardStats =
+            uassertStatusOK(_clusterStats.get()->getStats(opCtx.get()));
+        auto availableShards = getAllShardIds(shardStats);
+
+        _imbalancedCollectionsCache.clear();
+
+        // Forcing timeout to exceed
+        auto candidateChunksStatus = _chunkSelectionPolicy.get()->selectChunksToMove(
+            opCtx.get(), shardStats, &availableShards, &_imbalancedCollectionsCache);
+
+        ASSERT_OK(candidateChunksStatus.getStatus());
+
+        // We know that timeout exceeded because we only got 1 migration instead of the 2 migrations
+        // expected in a normal scenario with 4 shards
+        ASSERT_EQUALS(2U, candidateChunksStatus.getValue().size());
+    });
+
+    expectGetStatsCommands(4);
+
+    // We are scheduling one migration on the first batch to make sure that the second batch is
+    // processed
+    expectGetStatsForBalancingCommandsWithOneMigration(
+        4 /*numShards*/, kShardId0 /*donor*/, kShardId1 /*recipient*/);
+    expectGetStatsForBalancingCommandsWithOneMigration(
+        4 /*numShards*/, kShardId2 /*donor*/, kShardId3 /*recipient*/);
+
+    future.default_timed_get();
 }
 }  // namespace
 }  // namespace mongo
