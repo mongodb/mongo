@@ -131,6 +131,25 @@ class MongoTidyTests(unittest.TestCase):
 
         self.run_clang_tidy()
 
+    def test_MongoCxx20BannedIncludesCheck(self):
+
+        self.write_config(
+            textwrap.dedent("""\
+                    Checks: '-*,mongo-cxx20-banned-includes-check'
+                    WarningsAsErrors: '*'
+                    HeaderFilterRegex: '(mongo/.*)'
+                    """))
+
+        self.expected_output = [
+            "Use of prohibited <syncstream> header.",
+            "Use of prohibited <ranges> header.",
+            "Use of prohibited <barrier> header.",
+            "Use of prohibited <latch> header.",
+            "Use of prohibited <semaphore> header.",
+        ]
+
+        self.run_clang_tidy()
+
     def test_MongoStdOptionalCheck(self):
 
         self.write_config(
@@ -181,7 +200,7 @@ class MongoTidyTests(unittest.TestCase):
         ]
 
         self.run_clang_tidy()
-        
+
     def test_MongoStdAtomicCheck(self):
 
         self.write_config(
@@ -227,6 +246,7 @@ class MongoTidyTests(unittest.TestCase):
         ]
 
         self.run_clang_tidy()
+
 
 if __name__ == '__main__':
 
