@@ -103,6 +103,7 @@ func_ok()
         -e '/int demo_file_sync$/d' \
         -e '/int demo_fs_directory_list_free$/d' \
         -e '/int demo_fs_exist$/d' \
+        -e '/int error_handler$/d' \
         -e '/int fail_file_lock$/d' \
         -e '/int fail_file_sync$/d' \
         -e '/int fail_fs_directory_list_free$/d' \
@@ -126,6 +127,7 @@ func_ok()
         -e '/int lz4_pre_size$/d' \
         -e '/int lz4_terminate$/d' \
         -e '/int main$/d' \
+        -e '/int message_handler$/d' \
         -e '/int nop_decompress$/d' \
         -e '/int nop_decrypt$/d' \
         -e '/int nop_error$/d' \
