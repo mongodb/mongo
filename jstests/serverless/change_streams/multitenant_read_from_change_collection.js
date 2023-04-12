@@ -67,6 +67,15 @@ assertDropAndRecreateCollection(
 assert(secondTenantTestDb.getCollectionInfos({name: "stockPrice"})[0]
            .options.changeStreamPreAndPostImages.enabled);
 
+// Verify that while the change streams are disabled for the tenant, performing update and delete
+// operations on a collection with change stream pre- and post-images enabled succeeds. The
+// pre-images collection shouldn't be affected either.
+replSetTest.setChangeStreamState(firstTenantConn, false);
+assert.commandWorked(firstTenantTestDb.stockPrice.insert({_id: "mdb", price: 350}));
+assert.commandWorked(firstTenantTestDb.stockPrice.updateOne({_id: "mdb"}, {$set: {price: 450}}));
+assert.commandWorked(firstTenantTestDb.stockPrice.deleteOne({_id: "mdb"}));
+assert(!firstTenantConn.getDB("config").getCollectionNames().includes("system.preimages"));
+
 // Create a new incarnation of the change collection for the first tenant.
 replSetTest.setChangeStreamState(firstTenantConn, false);
 replSetTest.setChangeStreamState(firstTenantConn, true);

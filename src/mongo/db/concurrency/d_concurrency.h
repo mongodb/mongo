@@ -322,6 +322,36 @@ public:
     using DBLockSkipOptions = GlobalLockSkipOptions;
 
     /**
+     *  Tenant lock.
+     *
+     *  Controls access to resources belonging to a tenant.
+     *
+     * This lock supports four modes (see Lock_Mode):
+     *   MODE_IS: concurrent access to tenant's resources, requiring further database read locks
+     *   MODE_IX: concurrent access to tenant's resources, requiring further database read or write
+     * locks
+     *   MODE_S: shared read access to tenant's resources, blocking any writers
+     *   MODE_X: exclusive access to tenant's resources, blocking all other readers and writers.
+     */
+    class TenantLock {
+        TenantLock(const TenantLock&) = delete;
+        TenantLock& operator=(const TenantLock&) = delete;
+
+    public:
+        TenantLock(OperationContext* opCtx,
+                   const TenantId& tenantId,
+                   LockMode mode,
+                   Date_t deadline = Date_t::max());
+
+        TenantLock(TenantLock&&);
+        ~TenantLock();
+
+    private:
+        ResourceId _id;
+        OperationContext* _opCtx;
+    };
+
+    /**
      * Database lock.
      *
      * This lock supports four modes (see Lock_Mode):
@@ -334,19 +364,28 @@ public:
      * for MODE_IX or MODE_X also acquires global lock in intent-exclusive (IX) mode.
      * For storage engines that do not support collection-level locking, MODE_IS will be
      * upgraded to MODE_S and MODE_IX will be upgraded to MODE_X.
+     *
+     * If the database belongs to a tenant, then acquires a tenant lock before the database lock.
+     * For 'mode' MODE_IS or MODE_S acquires tenant lock in intent-shared (IS) mode, otherwise,
+     * acquires a tenant lock in intent-exclusive (IX) mode. A different, stronger tenant lock mode
+     * to acquire can be specified with 'tenantLockMode' parameter. Passing boost::none for the
+     * tenant lock mode does not skip the tenant lock, but indicates that the tenant lock in default
+     * mode should be acquired.
      */
     class DBLock {
     public:
         DBLock(OperationContext* opCtx,
                const DatabaseName& dbName,
                LockMode mode,
-               Date_t deadline = Date_t::max());
+               Date_t deadline = Date_t::max(),
+               boost::optional<LockMode> tenantLockMode = boost::none);
 
         DBLock(OperationContext* opCtx,
                const DatabaseName& dbName,
                LockMode mode,
                Date_t deadline,
-               DBLockSkipOptions skipOptions);
+               DBLockSkipOptions skipOptions,
+               boost::optional<LockMode> tenantLockMode = boost::none);
 
         DBLock(DBLock&&);
         ~DBLock();
@@ -371,6 +410,9 @@ public:
 
         // Acquires the global lock on our behalf.
         boost::optional<GlobalLock> _globalLock;
+
+        // Acquires the tenant lock on behalf of this DB lock.
+        boost::optional<TenantLock> _tenantLock;
     };
 
     /**

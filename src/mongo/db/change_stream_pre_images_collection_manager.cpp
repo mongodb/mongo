@@ -170,6 +170,11 @@ void ChangeStreamPreImagesCollectionManager::insertPreImage(OperationContext* op
     AutoGetCollection preImagesCollectionRaii(
         opCtx, preImagesCollectionNamespace, LockMode::MODE_IX);
     auto& changeStreamPreImagesCollection = preImagesCollectionRaii.getCollection();
+    if (preImagesCollectionNamespace.tenantId() &&
+        !change_stream_serverless_helpers::isChangeStreamEnabled(
+            opCtx, *preImagesCollectionNamespace.tenantId())) {
+        return;
+    }
     tassert(6646201,
             "The change stream pre-images collection is not present",
             changeStreamPreImagesCollection);

@@ -32,6 +32,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/repl/abstract_async_component.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_buffer.h"
@@ -141,6 +142,15 @@ private:
                                             bool isDataConsistent);
     std::vector<std::vector<ApplierOperation>> _fillWriterVectors(OperationContext* opCtx,
                                                                   TenantOplogBatch* batch);
+
+    /**
+     * Acquires Intent Exclusive (IX) lock for each tenant referred to by oplog entries [entryBegin;
+     * entryEnd) and returns lock objects.
+     */
+    std::vector<Lock::TenantLock> _acquireIntentExclusiveTenantLocks(
+        OperationContext* opCtx,
+        std::vector<TenantNoOpEntry>::const_iterator entryBegin,
+        std::vector<TenantNoOpEntry>::const_iterator entryEnd) const;
 
     /**
      * Sets the _finalStatus to the new status if and only if the old status is "OK".

@@ -622,6 +622,87 @@ TEST_F(DConcurrencyTestFixture, DBLockSDoesNotSetGlobalWriteLockedOnOperationCon
     ASSERT_TRUE(opCtx->lockState()->wasGlobalLockTaken());
 }
 
+TEST_F(DConcurrencyTestFixture, TenantLock) {
+    auto opCtx = makeOperationContext();
+    getClient()->swapLockState(std::make_unique<LockerImpl>(opCtx->getServiceContext()));
+    TenantId tenantId{OID::gen()};
+    ResourceId tenantResourceId{ResourceType::RESOURCE_TENANT, tenantId};
+    struct TestCase {
+        LockMode globalLockMode;
+        LockMode tenantLockMode;
+    };
+    std::vector<TestCase> testCases{
+        {MODE_IX, MODE_IX}, {MODE_IX, MODE_X}, {MODE_IS, MODE_S}, {MODE_IS, MODE_IS}};
+    for (auto&& testCase : testCases) {
+        {
+            Lock::GlobalLock globalLock{opCtx.get(), testCase.globalLockMode};
+            Lock::TenantLock tenantLock{opCtx.get(), tenantId, testCase.tenantLockMode};
+            ASSERT_TRUE(
+                opCtx->lockState()->isLockHeldForMode(tenantResourceId, testCase.tenantLockMode));
+        }
+        ASSERT_FALSE(
+            opCtx->lockState()->isLockHeldForMode(tenantResourceId, testCase.tenantLockMode));
+    }
+}
+
+TEST_F(DConcurrencyTestFixture, DBLockTakesTenantLock) {
+    auto opCtx = makeOperationContext();
+    getClient()->swapLockState(std::make_unique<LockerImpl>(opCtx->getServiceContext()));
+    TenantId tenantId{OID::gen()};
+    ResourceId tenantResourceId{ResourceType::RESOURCE_TENANT, tenantId};
+    struct TestCase {
+        bool tenantOwned;
+        LockMode databaseLockMode;
+        boost::optional<LockMode> tenantLockMode;
+        LockMode expectedTenantLockMode;
+    };
+
+    StringData testDatabaseName{"test"};
+    const bool tenantOwned{true};
+    const bool tenantless{false};
+    const boost::optional<LockMode> none;
+    std::vector<TestCase> testCases{
+        {tenantless, MODE_S, none, MODE_NONE},
+        {tenantless, MODE_IS, none, MODE_NONE},
+        {tenantless, MODE_X, none, MODE_NONE},
+        {tenantless, MODE_IX, none, MODE_NONE},
+        {tenantOwned, MODE_S, none, MODE_IS},
+        {tenantOwned, MODE_IS, none, MODE_IS},
+        {tenantOwned, MODE_X, none, MODE_IX},
+        {tenantOwned, MODE_IX, none, MODE_IX},
+        {tenantOwned, MODE_X, MODE_X, MODE_X},
+        {tenantOwned, MODE_IX, MODE_X, MODE_X},
+    };
+    for (auto&& testCase : testCases) {
+        {
+            Lock::DBLock dbLock(
+                opCtx.get(),
+                DatabaseName(testCase.tenantOwned ? boost::make_optional(tenantId) : boost::none,
+                             testDatabaseName),
+                testCase.databaseLockMode,
+                Date_t::max(),
+                testCase.tenantLockMode);
+            ASSERT(opCtx->lockState()->getLockMode(tenantResourceId) ==
+                   testCase.expectedTenantLockMode)
+                << " db lock mode: " << modeName(testCase.databaseLockMode)
+                << ", tenant lock mode: "
+                << (testCase.tenantLockMode ? modeName(*testCase.tenantLockMode) : "-");
+        }
+        ASSERT(opCtx->lockState()->getLockMode(tenantResourceId) == MODE_NONE)
+            << " db lock mode: " << modeName(testCase.databaseLockMode) << ", tenant lock mode: "
+            << (testCase.tenantLockMode ? modeName(*testCase.tenantLockMode) : "-");
+    }
+
+    // Verify that tenant lock survives move.
+    {
+        auto lockBuilder = [&]() {
+            return Lock::DBLock{opCtx.get(), DatabaseName(tenantId, testDatabaseName), MODE_S};
+        };
+        Lock::DBLock dbLockCopy{lockBuilder()};
+        ASSERT(opCtx->lockState()->isLockHeldForMode(tenantResourceId, MODE_IS));
+    }
+}
+
 TEST_F(DConcurrencyTestFixture, GlobalLockXDoesNotSetGlobalWriteLockedWhenLockAcquisitionTimesOut) {
     auto clients = makeKClientsWithLockers(2);
 
@@ -1200,32 +1281,123 @@ TEST_F(DConcurrencyTestFixture, MultipleConflictingDBLocksOnSameThread) {
     ASSERT(lockState->isDbLockedForMode(dbName, MODE_S));
 }
 
-TEST_F(DConcurrencyTestFixture, IsDbLockedForSMode) {
-    DatabaseName dbName(boost::none, "db");
-
+TEST_F(DConcurrencyTestFixture, IsDbLockedForMode_IsCollectionLockedForMode) {
     auto opCtx = makeOperationContext();
     getClient()->swapLockState(std::make_unique<LockerImpl>(opCtx->getServiceContext()));
     auto lockState = opCtx->lockState();
-    Lock::DBLock dbLock(opCtx.get(), dbName, MODE_S);
 
-    ASSERT(lockState->isDbLockedForMode(dbName, MODE_IS));
-    ASSERT(!lockState->isDbLockedForMode(dbName, MODE_IX));
-    ASSERT(lockState->isDbLockedForMode(dbName, MODE_S));
-    ASSERT(!lockState->isDbLockedForMode(dbName, MODE_X));
-}
+    // Database ownership options to test.
+    enum DatabaseOwnershipOptions {
+        // Owned by a tenant and not.
+        kAll,
+        // Owned by a tenant only.
+        kTenantOwned
+    };
+    struct TestCase {
+        LockMode globalLockMode;
+        LockMode tenantLockMode;
+        DatabaseOwnershipOptions databaseOwnership;
+        LockMode databaseLockMode;
+        LockMode checkedDatabaseLockMode;
+        bool expectedResult;
+    };
 
-TEST_F(DConcurrencyTestFixture, IsDbLockedForXMode) {
-    DatabaseName dbName(boost::none, "db");
+    TenantId tenantId{OID::gen()};
+    StringData testDatabaseName{"test"};
+    std::vector<TestCase> testCases{
+        // Only global lock acquired.
+        {MODE_X, MODE_NONE, kAll, MODE_NONE, MODE_X, true},
+        {MODE_X, MODE_NONE, kAll, MODE_NONE, MODE_IX, true},
+        {MODE_X, MODE_NONE, kAll, MODE_NONE, MODE_S, true},
+        {MODE_X, MODE_NONE, kAll, MODE_NONE, MODE_IS, true},
+        {MODE_S, MODE_NONE, kAll, MODE_NONE, MODE_X, false},
+        {MODE_S, MODE_NONE, kAll, MODE_NONE, MODE_IX, false},
+        {MODE_S, MODE_NONE, kAll, MODE_NONE, MODE_S, true},
+        {MODE_S, MODE_NONE, kAll, MODE_NONE, MODE_IS, true},
+        // Global and tenant locks acquired.
+        {MODE_IX, MODE_NONE, kTenantOwned, MODE_NONE, MODE_X, false},
+        {MODE_IX, MODE_NONE, kTenantOwned, MODE_NONE, MODE_IX, false},
+        {MODE_IX, MODE_NONE, kTenantOwned, MODE_NONE, MODE_S, false},
+        {MODE_IX, MODE_NONE, kTenantOwned, MODE_NONE, MODE_IS, false},
+        {MODE_IX, MODE_X, kTenantOwned, MODE_NONE, MODE_X, true},
+        {MODE_IX, MODE_X, kTenantOwned, MODE_NONE, MODE_IX, true},
+        {MODE_IX, MODE_X, kTenantOwned, MODE_NONE, MODE_S, true},
+        {MODE_IX, MODE_X, kTenantOwned, MODE_NONE, MODE_IS, true},
+        {MODE_IS, MODE_NONE, kTenantOwned, MODE_NONE, MODE_X, false},
+        {MODE_IS, MODE_NONE, kTenantOwned, MODE_NONE, MODE_IX, false},
+        {MODE_IS, MODE_NONE, kTenantOwned, MODE_NONE, MODE_S, false},
+        {MODE_IS, MODE_NONE, kTenantOwned, MODE_NONE, MODE_IS, false},
+        {MODE_IS, MODE_S, kTenantOwned, MODE_NONE, MODE_X, false},
+        {MODE_IS, MODE_S, kTenantOwned, MODE_NONE, MODE_IX, false},
+        {MODE_IS, MODE_S, kTenantOwned, MODE_NONE, MODE_S, true},
+        {MODE_IS, MODE_S, kTenantOwned, MODE_NONE, MODE_IS, true},
+        // Global, tenant, db locks acquired.
+        {MODE_NONE, MODE_NONE, kAll, MODE_NONE, MODE_X, false},
+        {MODE_NONE, MODE_NONE, kAll, MODE_NONE, MODE_IX, false},
+        {MODE_NONE, MODE_NONE, kAll, MODE_NONE, MODE_S, false},
+        {MODE_NONE, MODE_NONE, kAll, MODE_NONE, MODE_IS, false},
+        {MODE_NONE, MODE_NONE, kAll, MODE_S, MODE_X, false},
+        {MODE_NONE, MODE_NONE, kAll, MODE_S, MODE_IX, false},
+        {MODE_NONE, MODE_NONE, kAll, MODE_S, MODE_S, true},
+        {MODE_NONE, MODE_NONE, kAll, MODE_S, MODE_IS, true},
+        {MODE_NONE, MODE_NONE, kAll, MODE_X, MODE_X, true},
+        {MODE_NONE, MODE_NONE, kAll, MODE_X, MODE_IX, true},
+        {MODE_NONE, MODE_NONE, kAll, MODE_X, MODE_S, true},
+        {MODE_NONE, MODE_NONE, kAll, MODE_X, MODE_IS, true},
+        {MODE_NONE, MODE_NONE, kAll, MODE_IX, MODE_X, false},
+        {MODE_NONE, MODE_NONE, kAll, MODE_IX, MODE_IX, true},
+        {MODE_NONE, MODE_NONE, kAll, MODE_IX, MODE_S, false},
+        {MODE_NONE, MODE_NONE, kAll, MODE_IX, MODE_IS, true},
+        {MODE_NONE, MODE_NONE, kAll, MODE_IS, MODE_X, false},
+        {MODE_NONE, MODE_NONE, kAll, MODE_IS, MODE_IX, false},
+        {MODE_NONE, MODE_NONE, kAll, MODE_IS, MODE_S, false},
+        {MODE_NONE, MODE_NONE, kAll, MODE_IS, MODE_IS, true},
+    };
+    for (auto&& testCase : testCases) {
+        {
+            for (auto&& tenantOwned : std::vector<bool>{false, true}) {
+                if (!tenantOwned && kTenantOwned == testCase.databaseOwnership) {
+                    continue;
+                }
+                const DatabaseName databaseName(
+                    tenantOwned ? boost::make_optional(tenantId) : boost::none, testDatabaseName);
+                boost::optional<Lock::GlobalLock> globalLock;
+                boost::optional<Lock::TenantLock> tenantLock;
+                boost::optional<Lock::DBLock> dbLock;
 
-    auto opCtx = makeOperationContext();
-    getClient()->swapLockState(std::make_unique<LockerImpl>(opCtx->getServiceContext()));
-    auto lockState = opCtx->lockState();
-    Lock::DBLock dbLock(opCtx.get(), dbName, MODE_X);
+                if (MODE_NONE != testCase.globalLockMode) {
+                    globalLock.emplace(opCtx.get(), testCase.globalLockMode);
+                }
+                if (MODE_NONE != testCase.tenantLockMode) {
+                    tenantLock.emplace(opCtx.get(), tenantId, testCase.tenantLockMode);
+                }
+                if (MODE_NONE != testCase.databaseLockMode) {
+                    dbLock.emplace(opCtx.get(), databaseName, testCase.databaseLockMode);
+                }
+                ASSERT(
+                    lockState->isDbLockedForMode(databaseName, testCase.checkedDatabaseLockMode) ==
+                    testCase.expectedResult)
+                    << " global lock mode: " << modeName(testCase.globalLockMode)
+                    << " tenant lock mode: " << modeName(testCase.tenantLockMode)
+                    << " db lock mode: " << modeName(testCase.databaseLockMode)
+                    << " tenant owned: " << tenantOwned
+                    << " checked lock mode: " << modeName(testCase.checkedDatabaseLockMode);
 
-    ASSERT(lockState->isDbLockedForMode(dbName, MODE_IS));
-    ASSERT(lockState->isDbLockedForMode(dbName, MODE_IX));
-    ASSERT(lockState->isDbLockedForMode(dbName, MODE_S));
-    ASSERT(lockState->isDbLockedForMode(dbName, MODE_X));
+                // If database is not locked with intent lock, a collection in the database is
+                // locked for the same lock mode.
+                ASSERT(testCase.databaseLockMode == MODE_IS ||
+                       testCase.databaseLockMode == MODE_IX ||
+                       lockState->isCollectionLockedForMode(
+                           NamespaceString::createNamespaceString_forTest(databaseName, "coll"),
+                           testCase.checkedDatabaseLockMode) == testCase.expectedResult)
+                    << " global lock mode: " << modeName(testCase.globalLockMode)
+                    << " tenant lock mode: " << modeName(testCase.tenantLockMode)
+                    << " db lock mode: " << modeName(testCase.databaseLockMode)
+                    << " tenant owned: " << tenantOwned
+                    << " checked lock mode: " << modeName(testCase.checkedDatabaseLockMode);
+            }
+        }
+    }
 }
 
 TEST_F(DConcurrencyTestFixture, IsCollectionLocked_DB_Locked_IS) {

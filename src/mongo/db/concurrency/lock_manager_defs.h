@@ -159,6 +159,9 @@ enum ResourceType {
     /**  Used for global exclusive operations */
     RESOURCE_GLOBAL,
 
+    /** Encompasses resources belonging to a tenant, if in multi-tenant mode.*/
+    RESOURCE_TENANT,
+
     /** Generic resources, used for multi-granularity locking, together with the above locks */
     RESOURCE_DATABASE,
     RESOURCE_COLLECTION,
@@ -191,7 +194,7 @@ enum class ResourceGlobalId : uint8_t {
  * Maps the resource id to a human-readable string.
  */
 static const char* ResourceTypeNames[] = {
-    "Invalid", "Global", "Database", "Collection", "Metadata", "Mutex"};
+    "Invalid", "Global", "Tenant", "Database", "Collection", "Metadata", "Mutex"};
 
 /**
  * Maps the global resource id to a human-readable string.
@@ -245,11 +248,16 @@ public:
     }
     ResourceId(ResourceType type, const std::string& str)
         : _fullHash(fullHash(type, hashStringData(str))) {
-        // Resources of type database or collection must never be passed as a raw string
-        invariant(type != RESOURCE_DATABASE && type != RESOURCE_COLLECTION);
+        // Resources of type database, collection, or tenant must never be passed as a raw string.
+        invariant(type != RESOURCE_DATABASE && type != RESOURCE_COLLECTION &&
+                  type != RESOURCE_TENANT);
         verifyNoResourceMutex(type);
     }
     ResourceId(ResourceType type, uint64_t hashId) : _fullHash(fullHash(type, hashId)) {
+        verifyNoResourceMutex(type);
+    }
+    ResourceId(ResourceType type, const TenantId& tenantId)
+        : _fullHash{fullHash(type, hashStringData(tenantId.toString()))} {
         verifyNoResourceMutex(type);
     }
 

@@ -331,6 +331,20 @@ private:
      */
     void _dumpLockerAndLockManagerRequests();
 
+    /**
+     * Determines whether global and tenant lock state implies that some database or lower level
+     * resource, such as a collection, belonging to a tenant identified by 'tenantId' is locked in
+     * 'lockMode'.
+     *
+     * Returns:
+     *   true, if the global and tenant locks imply that the resource is locked for 'mode';
+     *   false, if the global and tenant locks imply that the resource is not locked for 'mode';
+     *   boost::none, if the global and tenant lock state does not imply either outcome and lower
+     * level locks should be consulted.
+     */
+    boost::optional<bool> _globalAndTenantLocksImplyDBOrCollectionLockedForMode(
+        const boost::optional<TenantId>& tenantId, LockMode lockMode) const;
+
     // Used to disambiguate different lockers
     const LockerId _id;
 
