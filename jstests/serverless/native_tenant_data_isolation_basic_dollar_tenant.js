@@ -542,5 +542,62 @@ const testColl = testDb.getCollection(kCollName);
                                  31264);
 }
 
+// Test the fail command failpoint with $tenant.
+{
+    // We should not pass $tenant in the data field. Here it is passed twice.
+    assert.commandFailedWithCode(adminDb.runCommand({
+        configureFailPoint: "failCommand",
+        mode: {times: 1},
+        '$tenant': kTenant,
+        data: {
+            failCommands: ["find"],
+            namespace: testDb.getName() + "." + kCollName,
+            '$tenant': kTenant,
+        }
+    }),
+                                 7302300);
+
+    // We should not pass $tenant in the data field.
+    assert.commandFailedWithCode(adminDb.runCommand({
+        configureFailPoint: "failCommand",
+        mode: {times: 1},
+        data: {
+            failCommands: ["find"],
+            namespace: testDb.getName() + "." + kCollName,
+            '$tenant': kTenant,
+        }
+    }),
+                                 7302300);
+
+    // enable the failCommand failpoint for kTenant on myDb.myColl for the find command.
+    assert.commandWorked(adminDb.runCommand({
+        configureFailPoint: "failCommand",
+        mode: "alwaysOn",
+        '$tenant': kTenant,
+        data: {
+            errorCode: ErrorCodes.InternalError,
+            failCommands: ["find"],
+            namespace: testDb.getName() + "." + kCollName,
+        }
+    }));
+
+    // same tenant and same namespace should fail.
+    assert.commandFailedWithCode(testDb.runCommand({find: kCollName, '$tenant': kTenant}),
+                                 ErrorCodes.InternalError);
+
+    // same tenant different namespace.
+    assert.commandWorked(testDb.runCommand({find: "foo", '$tenant': kTenant}));
+
+    // different tenant passed and same namespace.
+    assert.commandWorked(testDb.runCommand({find: kCollName, '$tenant': kOtherTenant}));
+
+    // different tenant passed and different namespace.
+    assert.commandWorked(testDb.runCommand({find: "foo", '$tenant': kOtherTenant}));
+
+    // disable the failCommand failpoint.
+    assert.commandWorked(adminDb.runCommand({configureFailPoint: "failCommand", mode: "off"}));
+    assert.commandWorked(testDb.runCommand({find: kCollName, '$tenant': kTenant}));
+}
+
 rst.stopSet();
 })();

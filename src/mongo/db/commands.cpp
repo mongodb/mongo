@@ -640,8 +640,17 @@ bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
         return false;  // only activate failpoint on connection with a certain appName
     }
 
-    if (data.hasField("namespace") && (nss != NamespaceString(data.getStringField("namespace")))) {
-        return false;
+    if (data.hasField("namespace")) {
+        if (data.hasField("$tenant")) {
+            const auto tenantId = TenantId::parseFromBSON(data.getField("$tenant"));
+            const auto fpNss =
+                NamespaceStringUtil::deserialize(tenantId, data.getStringField("namespace"));
+            if (nss != fpNss) {
+                return false;
+            }
+        } else if (nss != NamespaceString(data.getStringField("namespace"))) {
+            return false;
+        }
     }
 
     if (!(data.hasField("failInternalCommands") && data.getBoolField("failInternalCommands")) &&

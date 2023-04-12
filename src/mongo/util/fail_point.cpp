@@ -245,6 +245,13 @@ StatusWith<FailPoint::ModeOptions> FailPoint::parseBSON(const BSONObj& obj) {
             return {ErrorCodes::TypeMismatch, "the 'data' option must be a JSON object"};
         }
         data = obj["data"].Obj().getOwned();
+        // insert a tenant specific namespace if a tenant is specified on the command.
+        uassert(7302300,
+                "$tenant should only be provided once, at the command level.",
+                !data.hasField("$tenant"));
+        if (obj.hasField("$tenant") && data.hasField("namespace")) {
+            data = data.addField(obj.getField("$tenant"));
+        }
     }
 
     return ModeOptions{mode, val, data};
