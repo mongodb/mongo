@@ -59,12 +59,12 @@ struct CollectionOrViewAcquisitionRequest {
           viewMode(viewMode) {}
 
     /**
-     * Overload, which acquires a collection by NSS/UUID combination, requiring that the UUID of the
-     * namespace matches exactly.
+     * Overload, which acquires a collection by NSS/UUID combination, requiring that, if specified,
+     * the UUID of the namespace matches exactly.
      */
     CollectionOrViewAcquisitionRequest(
         NamespaceString nss,
-        UUID uuid,
+        boost::optional<UUID> uuid,
         PlacementConcern placementConcern,
         repl::ReadConcernArgs readConcern,
         AcquisitionPrerequisites::OperationType operationType,
@@ -102,7 +102,8 @@ struct CollectionOrViewAcquisitionRequest {
         OperationContext* opCtx,
         NamespaceString nss,
         AcquisitionPrerequisites::OperationType operationType,
-        AcquisitionPrerequisites::ViewMode viewMode = AcquisitionPrerequisites::kCanBeView);
+        AcquisitionPrerequisites::ViewMode viewMode = AcquisitionPrerequisites::kCanBeView,
+        boost::optional<UUID> expectedUUID = boost::none);
 
     boost::optional<NamespaceString> nss;
 
@@ -130,11 +131,11 @@ struct CollectionAcquisitionRequest : public CollectionOrViewAcquisitionRequest 
                                              AcquisitionPrerequisites::kMustBeCollection) {}
 
     /**
-     * Overload, which acquires a collection by NSS/UUID combination, requiring that the UUID of the
-     * namespace matches exactly.
+     * Overload, which acquires a collection by NSS/UUID combination, requiring that, if specified,
+     * the UUID of the namespace matches exactly.
      */
     CollectionAcquisitionRequest(NamespaceString nss,
-                                 UUID uuid,
+                                 boost::optional<UUID> uuid,
                                  PlacementConcern placementConcern,
                                  repl::ReadConcernArgs readConcern,
                                  AcquisitionPrerequisites::OperationType operationType)
@@ -166,7 +167,8 @@ struct CollectionAcquisitionRequest : public CollectionOrViewAcquisitionRequest 
     static CollectionAcquisitionRequest fromOpCtx(
         OperationContext* opCtx,
         NamespaceString nss,
-        AcquisitionPrerequisites::OperationType operationType);
+        AcquisitionPrerequisites::OperationType operationType,
+        boost::optional<UUID> expectedUUID = boost::none);
 };
 
 class ScopedCollectionAcquisition {
@@ -336,7 +338,7 @@ private:
 /**
  * Serves as a temporary container for transaction resources which have been yielded via a call to
  * `yieldTransactionResources`. Must never be destroyed without having been restored and the
- * transaction resources properly committed/aborted.
+ * transaction resources properly committed/aborted, or disposed of.
  */
 class YieldedTransactionResources {
 public:
@@ -344,13 +346,26 @@ public:
 
     YieldedTransactionResources() = default;
 
+    YieldedTransactionResources(YieldedTransactionResources&&) = default;
+
     YieldedTransactionResources(
         std::unique_ptr<shard_role_details::TransactionResources>&& yieldedResources);
+
+    /**
+     * Releases the yielded TransactionResources.
+     */
+    void dispose();
 
     std::unique_ptr<shard_role_details::TransactionResources> _yieldedResources;
 };
 
-YieldedTransactionResources yieldTransactionResourcesFromOperationContext(OperationContext* opCtx);
+/**
+ * Yields the TransactionResources from the opCtx.
+ * Returns boost::none if the lock manager global lock has been recursively locked, meaning that
+ * yielding is not allowed. In this case, the opCtx's TransactionResources are left intact.
+ */
+boost::optional<YieldedTransactionResources> yieldTransactionResourcesFromOperationContext(
+    OperationContext* opCtx);
 
 void restoreTransactionResourcesToOperationContext(OperationContext* opCtx,
                                                    YieldedTransactionResources&& yieldedResources);

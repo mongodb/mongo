@@ -1725,11 +1725,18 @@ StatusWith<std::unique_ptr<projection_ast::Projection>> makeProjection(const BSO
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDelete(
     OpDebug* opDebug,
-    const CollectionPtr* coll,
+    stdx::variant<const CollectionPtr*, const ScopedCollectionAcquisition*> coll,
     ParsedDelete* parsedDelete,
     boost::optional<ExplainOptions::Verbosity> verbosity,
     DeleteStageParams::DocumentCounter&& documentCounter) {
-    const auto& collection = *coll;
+    const auto& collectionPtr =
+        *stdx::visit(OverloadedVisitor{
+                         [](const CollectionPtr* collectionPtr) { return collectionPtr; },
+                         [](const ScopedCollectionAcquisition* collectionAcquisition) {
+                             return &collectionAcquisition->getCollectionPtr();
+                         },
+                     },
+                     coll);
     auto expCtx = parsedDelete->expCtx();
     OperationContext* opCtx = expCtx->opCtx;
     const DeleteRequest* request = parsedDelete->getRequest();
@@ -1743,18 +1750,18 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
         }
     }
 
-    if (collection && collection->isCapped()) {
+    if (collectionPtr && collectionPtr->isCapped()) {
         expCtx->setIsCappedDelete();
     }
 
     // If the parsed delete does not have a user-specified collation, set it from the collection
     // default.
-    if (collection && parsedDelete->getRequest()->getCollation().isEmpty() &&
-        collection->getDefaultCollator()) {
-        parsedDelete->setCollator(collection->getDefaultCollator()->clone());
+    if (collectionPtr && parsedDelete->getRequest()->getCollation().isEmpty() &&
+        collectionPtr->getDefaultCollator()) {
+        parsedDelete->setCollator(collectionPtr->getDefaultCollator()->clone());
     }
 
-    if (collection && collection->isCapped() && opCtx->inMultiDocumentTransaction()) {
+    if (collectionPtr && collectionPtr->isCapped() && opCtx->inMultiDocumentTransaction()) {
         // This check is duplicated from collection_internal::deleteDocument() for two reasons:
         // - Performing a remove on an empty capped collection would not call
         //   collection_internal::deleteDocument().
@@ -1787,7 +1794,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
     std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
     const auto policy = parsedDelete->yieldPolicy();
 
-    if (!collection) {
+    if (!collectionPtr) {
         // Treat collections that do not exist as empty collections. Return a PlanExecutor which
         // contains an EOF stage.
         LOGV2_DEBUG(20927,
@@ -1812,7 +1819,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
             // create a CanonicalQuery.
             const BSONObj& unparsedQuery = request->getQuery();
 
-            const IndexDescriptor* descriptor = collection->getIndexCatalog()->findIdIndex(opCtx);
+            const IndexDescriptor* descriptor =
+                collectionPtr->getIndexCatalog()->findIdIndex(opCtx);
 
             // Construct delete request collator.
             std::unique_ptr<CollatorInterface> collator;
@@ -1825,24 +1833,25 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
                 collator = std::move(statusWithCollator.getValue());
             }
             const bool hasCollectionDefaultCollation = request->getCollation().isEmpty() ||
-                CollatorInterface::collatorsMatch(collator.get(), collection->getDefaultCollator());
+                CollatorInterface::collatorsMatch(collator.get(),
+                                                  collectionPtr->getDefaultCollator());
 
             if (descriptor && CanonicalQuery::isSimpleIdQuery(unparsedQuery) &&
                 request->getProj().isEmpty() && hasCollectionDefaultCollation) {
                 LOGV2_DEBUG(20928, 2, "Using idhack", "query"_attr = redact(unparsedQuery));
 
                 auto idHackStage = std::make_unique<IDHackStage>(
-                    expCtx.get(), unparsedQuery["_id"].wrap(), ws.get(), collection, descriptor);
+                    expCtx.get(), unparsedQuery["_id"].wrap(), ws.get(), collectionPtr, descriptor);
                 std::unique_ptr<DeleteStage> root =
                     std::make_unique<DeleteStage>(expCtx.get(),
                                                   std::move(deleteStageParams),
                                                   ws.get(),
-                                                  collection,
+                                                  collectionPtr,
                                                   idHackStage.release());
                 return plan_executor_factory::make(expCtx,
                                                    std::move(ws),
                                                    std::move(root),
-                                                   &collection,
+                                                   coll,
                                                    policy,
                                                    false /* whether owned BSON must be returned */);
             }
@@ -1861,7 +1870,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
 
     uassert(ErrorCodes::InternalErrorNotSupported,
             "delete command is not eligible for bonsai",
-            !isEligibleForBonsai(*cq, opCtx, collection));
+            !isEligibleForBonsai(*cq, opCtx, collectionPtr));
 
     // Transfer the explain verbosity level into the expression context.
     cq->getExpCtx()->explain = verbosity;
@@ -1884,7 +1893,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
 
     const size_t defaultPlannerOptions = QueryPlannerParams::DEFAULT;
     ClassicPrepareExecutionHelper helper{
-        opCtx, collection, ws.get(), cq.get(), nullptr, defaultPlannerOptions};
+        opCtx, collectionPtr, ws.get(), cq.get(), nullptr, defaultPlannerOptions};
     auto executionResult = helper.prepare();
 
     if (!executionResult.isOK()) {
@@ -1903,10 +1912,10 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
         (opCtx->recoveryUnit()->getState() == RecoveryUnit::State::kInactive ||
          opCtx->recoveryUnit()->getState() == RecoveryUnit::State::kActiveNotInUnitOfWork) &&
         !opCtx->inMultiDocumentTransaction() && !opCtx->isRetryableWrite() &&
-        !collection->isChangeStreamPreAndPostImagesEnabled() && !collection->ns().isConfigDB() &&
-        deleteStageParams->isMulti && !deleteStageParams->fromMigrate &&
-        !deleteStageParams->returnDeleted && deleteStageParams->sort.isEmpty() &&
-        !deleteStageParams->numStatsForDoc;
+        !collectionPtr->isChangeStreamPreAndPostImagesEnabled() &&
+        !collectionPtr->ns().isConfigDB() && deleteStageParams->isMulti &&
+        !deleteStageParams->fromMigrate && !deleteStageParams->returnDeleted &&
+        deleteStageParams->sort.isEmpty() && !deleteStageParams->numStatsForDoc;
 
     auto expCtxRaw = cq->getExpCtxRaw();
     if (parsedDelete->isEligibleForArbitraryTimeseriesDelete()) {
@@ -1917,19 +1926,19 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
             std::move(deleteStageParams),
             ws.get(),
             std::move(root),
-            collection,
-            BucketUnpacker(*collection->getTimeseriesOptions()),
+            collectionPtr,
+            BucketUnpacker(*collectionPtr->getTimeseriesOptions()),
             parsedDelete->releaseResidualExpr());
     } else if (batchDelete) {
         root = std::make_unique<BatchedDeleteStage>(expCtxRaw,
                                                     std::move(deleteStageParams),
                                                     std::make_unique<BatchedDeleteStageParams>(),
                                                     ws.get(),
-                                                    collection,
+                                                    collectionPtr,
                                                     root.release());
     } else {
         root = std::make_unique<DeleteStage>(
-            expCtxRaw, std::move(deleteStageParams), ws.get(), collection, root.release());
+            expCtxRaw, std::move(deleteStageParams), ws.get(), collectionPtr, root.release());
     }
 
     if (projection) {
@@ -1942,7 +1951,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
     return plan_executor_factory::make(std::move(cq),
                                        std::move(ws),
                                        std::move(root),
-                                       &collection,
+                                       coll,
                                        policy,
                                        defaultPlannerOptions,
                                        NamespaceString(),

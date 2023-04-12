@@ -73,6 +73,7 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/query_analysis_writer.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/server_write_concern_metrics.h"
 #include "mongo/db/stats/top.h"
@@ -813,7 +814,11 @@ long long writeConflictRetryRemove(OperationContext* opCtx,
     ParsedDelete parsedDelete(opCtx, deleteRequest);
     uassertStatusOK(parsedDelete.parseRequest());
 
-    AutoGetCollection collection(opCtx, nsString, MODE_IX);
+    const auto collection = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest::fromOpCtx(opCtx, nsString, AcquisitionPrerequisites::kWrite),
+        MODE_IX);
+    const auto& collectionPtr = collection.getCollectionPtr();
 
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
@@ -823,17 +828,17 @@ long long writeConflictRetryRemove(OperationContext* opCtx,
 
     assertCanWrite_inlock(opCtx, nsString);
 
-    if (collection && collection->isCapped()) {
+    if (collectionPtr && collectionPtr->isCapped()) {
         uassert(
             ErrorCodes::OperationNotSupportedInTransaction,
-            str::stream() << "Collection '" << collection->ns()
+            str::stream() << "Collection '" << collection.nss()
                           << "' is a capped collection. Writes in transactions are not allowed on "
                              "capped collections.",
             !inTransaction);
     }
 
-    const auto exec = uassertStatusOK(getExecutorDelete(
-        opDebug, &collection.getCollection(), &parsedDelete, boost::none /* verbosity */));
+    const auto exec = uassertStatusOK(
+        getExecutorDelete(opDebug, &collection, &parsedDelete, boost::none /* verbosity */));
 
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
@@ -847,7 +852,7 @@ long long writeConflictRetryRemove(OperationContext* opCtx,
 
     PlanSummaryStats summaryStats;
     exec->getPlanExplainer().getSummaryStats(&summaryStats);
-    if (const auto& coll = collection.getCollection()) {
+    if (const auto& coll = collectionPtr) {
         CollectionQueryInfo::get(coll).notifyOfQuery(opCtx, coll, summaryStats);
     }
     opDebug->setPlanSummaryMetrics(summaryStats);
@@ -1499,18 +1504,18 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
         uasserted(ErrorCodes::InternalError, "failAllRemoves failpoint active!");
     }
 
-    AutoGetCollection collection(opCtx,
-                                 ns,
-                                 fixLockModeForSystemDotViewsChanges(ns, MODE_IX),
-                                 AutoGetCollection::Options{}.expectedUUID(opCollectionUUID));
+    auto acquisitionRequest = CollectionAcquisitionRequest::fromOpCtx(
+        opCtx, ns, AcquisitionPrerequisites::kWrite, opCollectionUUID);
+    const auto collection = acquireCollection(
+        opCtx, acquisitionRequest, fixLockModeForSystemDotViewsChanges(ns, MODE_IX));
 
     DeleteStageParams::DocumentCounter documentCounter = nullptr;
 
     if (source == OperationSource::kTimeseriesDelete) {
         uassert(ErrorCodes::NamespaceNotFound,
                 "Could not find time-series buckets collection for write",
-                *collection);
-        auto timeseriesOptions = collection->getTimeseriesOptions();
+                collection.getCollectionPtr());
+        auto timeseriesOptions = collection.getCollectionPtr()->getTimeseriesOptions();
         uassert(ErrorCodes::InvalidOptions,
                 "Time-series buckets collection is missing time-series options",
                 timeseriesOptions);
@@ -1544,12 +1549,13 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
 
     ParsedDelete parsedDelete(opCtx,
                               &request,
-                              source == OperationSource::kTimeseriesDelete && collection
-                                  ? collection->getTimeseriesOptions()
+                              source == OperationSource::kTimeseriesDelete &&
+                                      collection.getCollectionPtr()
+                                  ? collection.getCollectionPtr()->getTimeseriesOptions()
                                   : boost::none);
     uassertStatusOK(parsedDelete.parseRequest());
 
-    if (collection.getDb()) {
+    if (DatabaseHolder::get(opCtx)->getDb(opCtx, ns.dbName())) {
         curOp.raiseDbProfileLevel(
             CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(ns.dbName()));
     }
@@ -1560,7 +1566,7 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
         &hangWithLockDuringBatchRemove, opCtx, "hangWithLockDuringBatchRemove");
 
     auto exec = uassertStatusOK(getExecutorDelete(&curOp.debug(),
-                                                  &collection.getCollection(),
+                                                  &collection,
                                                   &parsedDelete,
                                                   boost::none /* verbosity */,
                                                   std::move(documentCounter)));
@@ -1576,7 +1582,7 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
     PlanSummaryStats summary;
     auto&& explainer = exec->getPlanExplainer();
     explainer.getSummaryStats(&summary);
-    if (const auto& coll = collection.getCollection()) {
+    if (const auto& coll = collection.getCollectionPtr()) {
         CollectionQueryInfo::get(coll).notifyOfQuery(opCtx, coll, summary);
     }
     curOp.debug().setPlanSummaryMetrics(summary);

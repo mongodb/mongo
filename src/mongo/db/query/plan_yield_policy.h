@@ -171,6 +171,8 @@ public:
                                 << "'. UUID " << collUuid);
     }
 
+    class YieldThroughAcquisitions {};
+
     /**
      * Constructs a PlanYieldPolicy of the given 'policy' type. This class uses an ElapsedTracker
      * to keep track of elapsed time, which is initialized from the parameters 'cs',
@@ -183,7 +185,7 @@ public:
                     ClockSource* cs,
                     int yieldIterations,
                     Milliseconds yieldPeriod,
-                    const Yieldable* yieldable,
+                    stdx::variant<const Yieldable*, YieldThroughAcquisitions> yieldable,
                     std::unique_ptr<const YieldPolicyCallbacks> callbacks);
 
     virtual ~PlanYieldPolicy() = default;
@@ -273,7 +275,12 @@ public:
     }
 
     void setYieldable(const Yieldable* yieldable) {
+        invariant(!usesCollectionAcquisitions());
         _yieldable = yieldable;
+    }
+
+    bool usesCollectionAcquisitions() const {
+        return stdx::holds_alternative<YieldThroughAcquisitions>(_yieldable);
     }
 
 private:
@@ -303,9 +310,11 @@ private:
     void performYield(OperationContext* opCtx,
                       const Yieldable& yieldable,
                       std::function<void()> whileYieldingFn);
+    void performYieldWithAcquisitions(OperationContext* opCtx,
+                                      std::function<void()> whileYieldingFn);
 
     const YieldPolicy _policy;
-    const Yieldable* _yieldable;
+    stdx::variant<const Yieldable*, YieldThroughAcquisitions> _yieldable;
     std::unique_ptr<const YieldPolicyCallbacks> _callbacks;
 
     bool _forceYield = false;

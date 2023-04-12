@@ -46,6 +46,7 @@
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_settings.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/update/update_driver.h"
 
 namespace mongo {
@@ -310,7 +311,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
  */
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDelete(
     OpDebug* opDebug,
-    const CollectionPtr* collection,
+    stdx::variant<const CollectionPtr*, const ScopedCollectionAcquisition*> collection,
     ParsedDelete* parsedDelete,
     boost::optional<ExplainOptions::Verbosity> verbosity,
     DeleteStageParams::DocumentCounter&& documentCounter = nullptr);

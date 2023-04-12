@@ -843,11 +843,12 @@ TEST_F(ShardRoleTest, YieldAndRestoreAcquisitionWithLocks) {
 
     // Yield the resources
     auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx());
+    ASSERT(yieldedTransactionResources);
     ASSERT_FALSE(opCtx()->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
     ASSERT_FALSE(opCtx()->lockState()->isCollectionLockedForMode(nss, MODE_IX));
 
     // Restore the resources
-    restoreTransactionResourcesToOperationContext(opCtx(), std::move(yieldedTransactionResources));
+    restoreTransactionResourcesToOperationContext(opCtx(), std::move(*yieldedTransactionResources));
     ASSERT_TRUE(opCtx()->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
     ASSERT_TRUE(opCtx()->lockState()->isCollectionLockedForMode(nss, MODE_IX));
 }
@@ -863,6 +864,7 @@ TEST_F(ShardRoleTest, RestoreForWriteFailsIfPlacementConcernNoLongerMet) {
 
     // Yield the resources
     auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx());
+    ASSERT(yieldedTransactionResources);
 
     // Placement changes
     const auto newShardVersion = [&]() {
@@ -884,7 +886,7 @@ TEST_F(ShardRoleTest, RestoreForWriteFailsIfPlacementConcernNoLongerMet) {
 
     // Try to restore the resources should fail because placement concern is no longer met.
     ASSERT_THROWS_WITH_CHECK(restoreTransactionResourcesToOperationContext(
-                                 opCtx(), std::move(yieldedTransactionResources)),
+                                 opCtx(), std::move(*yieldedTransactionResources)),
                              ExceptionFor<ErrorCodes::StaleConfig>,
                              [&](const DBException& ex) {
                                  const auto exInfo = ex.extraInfo<StaleConfigInfo>();
@@ -919,6 +921,7 @@ TEST_F(ShardRoleTest, RestoreWithShardVersionIgnored) {
 
     // Yield the resources
     auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx());
+    ASSERT(yieldedTransactionResources);
 
     // Placement changes
     const auto newShardVersion = [&]() {
@@ -939,7 +942,7 @@ TEST_F(ShardRoleTest, RestoreWithShardVersionIgnored) {
         thisShardId);
 
     // Try to restore the resources should work because placement concern (IGNORED) can be met.
-    restoreTransactionResourcesToOperationContext(opCtx(), std::move(yieldedTransactionResources));
+    restoreTransactionResourcesToOperationContext(opCtx(), std::move(*yieldedTransactionResources));
     ASSERT_TRUE(opCtx()->lockState()->isCollectionLockedForMode(nss, MODE_IX));
 }
 
@@ -953,6 +956,7 @@ void ShardRoleTest::testRestoreFailsIfCollectionBecomesCreated(
 
     // Yield the resources
     auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx());
+    ASSERT(yieldedTransactionResources);
 
     // Create the collection
     createTestCollection(opCtx(), nss);
@@ -960,7 +964,7 @@ void ShardRoleTest::testRestoreFailsIfCollectionBecomesCreated(
     // Try to restore the resources should fail because the collection showed-up after a restore
     // where it didn't exist before that.
     ASSERT_THROWS_CODE(restoreTransactionResourcesToOperationContext(
-                           opCtx(), std::move(yieldedTransactionResources)),
+                           opCtx(), std::move(*yieldedTransactionResources)),
                        DBException,
                        743870);
 }
@@ -981,6 +985,7 @@ void ShardRoleTest::testRestoreFailsIfCollectionNoLongerExists(
 
     // Yield the resources
     auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx());
+    ASSERT(yieldedTransactionResources);
 
     // Drop the collection
     {
@@ -990,9 +995,9 @@ void ShardRoleTest::testRestoreFailsIfCollectionNoLongerExists(
 
     // Try to restore the resources should fail because the collection no longer exists.
     ASSERT_THROWS_CODE(restoreTransactionResourcesToOperationContext(
-                           opCtx(), std::move(yieldedTransactionResources)),
+                           opCtx(), std::move(*yieldedTransactionResources)),
                        DBException,
-                       ErrorCodes::NamespaceNotFound);
+                       ErrorCodes::CollectionUUIDMismatch);
 }
 TEST_F(ShardRoleTest, RestoreForReadFailsIfCollectionNoLongerExists) {
     testRestoreFailsIfCollectionNoLongerExists(AcquisitionPrerequisites::kRead);
@@ -1011,6 +1016,7 @@ void ShardRoleTest::testRestoreFailsIfCollectionRenamed(
 
     // Yield the resources
     auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx());
+    ASSERT(yieldedTransactionResources);
 
     // Rename the collection.
     {
@@ -1026,9 +1032,9 @@ void ShardRoleTest::testRestoreFailsIfCollectionRenamed(
 
     // Try to restore the resources should fail because the collection has been renamed.
     ASSERT_THROWS_CODE(restoreTransactionResourcesToOperationContext(
-                           opCtx(), std::move(yieldedTransactionResources)),
+                           opCtx(), std::move(*yieldedTransactionResources)),
                        DBException,
-                       ErrorCodes::NamespaceNotFound);
+                       ErrorCodes::CollectionUUIDMismatch);
 }
 TEST_F(ShardRoleTest, RestoreForReadFailsIfCollectionRenamed) {
     testRestoreFailsIfCollectionRenamed(AcquisitionPrerequisites::kRead);
@@ -1047,6 +1053,7 @@ void ShardRoleTest::testRestoreFailsIfCollectionDroppedAndRecreated(
 
     // Yield the resources
     auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx());
+    ASSERT(yieldedTransactionResources);
 
     // Drop the collection and create a new one with the same nss.
     {
@@ -1057,7 +1064,7 @@ void ShardRoleTest::testRestoreFailsIfCollectionDroppedAndRecreated(
 
     // Try to restore the resources should fail because the collection no longer exists.
     ASSERT_THROWS_CODE(restoreTransactionResourcesToOperationContext(
-                           opCtx(), std::move(yieldedTransactionResources)),
+                           opCtx(), std::move(*yieldedTransactionResources)),
                        DBException,
                        ErrorCodes::CollectionUUIDMismatch);
 }
@@ -1089,6 +1096,7 @@ TEST_F(ShardRoleTest, RestoreForReadSucceedsEvenIfPlacementHasChanged) {
 
         // Yield the resources
         auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx());
+        ASSERT(yieldedTransactionResources);
 
         ASSERT_FALSE(ongoingQueriesCompletionFuture.isReady());
         ASSERT_TRUE(acquisition.getShardingFilter().has_value());
@@ -1115,7 +1123,7 @@ TEST_F(ShardRoleTest, RestoreForReadSucceedsEvenIfPlacementHasChanged) {
 
         // Restore should work for reads even though placement has changed.
         restoreTransactionResourcesToOperationContext(opCtx(),
-                                                      std::move(yieldedTransactionResources));
+                                                      std::move(*yieldedTransactionResources));
 
         ASSERT_FALSE(ongoingQueriesCompletionFuture.isReady());
 
@@ -1151,6 +1159,7 @@ void ShardRoleTest::testRestoreFailsIfCollectionIsNowAView(
 
     // Yield the resources.
     auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx());
+    ASSERT(yieldedTransactionResources);
 
     // Drop collection and create a view in its place.
     {
@@ -1161,7 +1170,7 @@ void ShardRoleTest::testRestoreFailsIfCollectionIsNowAView(
 
     // Restore should fail.
     ASSERT_THROWS_CODE(restoreTransactionResourcesToOperationContext(
-                           opCtx(), std::move(yieldedTransactionResources)),
+                           opCtx(), std::move(*yieldedTransactionResources)),
                        DBException,
                        ErrorCodes::CollectionUUIDMismatch);
 }
