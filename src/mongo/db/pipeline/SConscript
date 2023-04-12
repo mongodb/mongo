@@ -769,6 +769,15 @@ env.Benchmark(
     ],
 )
 
+env.Benchmark(
+    target='window_function_percentile_bm',
+    source=['window_function/window_function_percentile_bm_fixture.cpp'],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query/query_test_service_context',
+        'accumulator',
+    ],
+)
+
 bmEnv = env.Clone()
 bmEnv.InjectThirdParty(libraries=["benchmark"])
 

@@ -30,7 +30,7 @@
 
 #pragma once
 
-#include "mongo/db/pipeline/accumulator_percentile.h"
+#include "mongo/db/pipeline/percentile_algo.h"
 #include "mongo/db/pipeline/window_function/window_function.h"
 
 namespace mongo {
@@ -70,22 +70,28 @@ public:
 
 protected:
     explicit WindowFunctionPercentileCommon(ExpressionContext* const expCtx)
-        : WindowFunctionState(expCtx), _values(std::multiset<double>()) {}
+        : WindowFunctionState(expCtx), _values(boost::container::flat_multiset<double>()) {}
 
     Value computePercentile(double p) const {
         // Calculate the rank.
         const double n = _values.size();
-        const double rank = std::max<double>(0, std::ceil(p * n) - 1);
+        const double rank = PercentileAlgorithm::computeTrueRank(n, p);
 
-        // std::multiset stores the values in ascending order, so we don't need to sort them before
-        // finding the value at index 'rank'.
+        // boost::container::flat_multiset stores the values in ascending order, so we don't need to
+        // sort them before finding the value at index 'rank'.
+        // boost::container::flat_multiset has random-access iterators, so std::advance has an
+        // expected runtime of O(1).
         auto it = _values.begin();
         std::advance(it, rank);
         return Value(*it);
     }
 
     // Holds all the values in the window in ascending order.
-    std::multiset<double> _values;
+    // A boost::container::flat_multiset stores elements in a contiguous array, so iterating through
+    // the set is faster than iterating through a std::multiset which stores its elements typically
+    // as a binary search tree. Thus, using a boost::container::flat_multiset significantly improved
+    // performance.
+    boost::container::flat_multiset<double> _values;
 };
 
 class WindowFunctionPercentile : public WindowFunctionPercentileCommon {
