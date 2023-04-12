@@ -125,10 +125,12 @@ public:
 
     private:
         Response _runClusterLevel(OperationContext* opCtx, const NamespaceString& nss) {
-            uassert(
-                ErrorCodes::InvalidNamespace,
-                "cluster level mode must be run against the 'admin' database with {aggregate: 1}",
-                nss.isCollectionlessCursorNamespace());
+            uassert(ErrorCodes::InvalidNamespace,
+                    str::stream() << Request::kCommandName
+                                  << " command on admin database can only be run without "
+                                     "collection name. Found unexpected collection name: "
+                                  << nss.coll(),
+                    nss.isCollectionlessCursorNamespace());
 
             std::vector<RemoteCursor> cursors;
 
