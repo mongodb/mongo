@@ -1133,9 +1133,8 @@ class Analyzer:
         for mcomp in self.third_party_components:
             # These components are known to be missing from Black Duck
             # Aladdin MD5 is a pair of C files for MD5 computation
-            # timelib is simply missing
             # Unicode is not code
-            if mcomp.name in ["Aladdin MD5", "timelib", "unicode"]:
+            if mcomp.name in ["Aladdin MD5", "unicode"]:
                 continue
 
             if mcomp.name not in comp_names:

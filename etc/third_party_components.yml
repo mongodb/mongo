@@ -365,7 +365,6 @@ components:
     release_monitoring_id: -1
     local_directory_path: src/third_party/timelib
     team_owner: "Query"
-    # Note: Not in Black Duck
 
   unicode:
     homepage_url: http://www.unicode.org
