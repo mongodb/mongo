@@ -709,7 +709,7 @@ std::tuple<std::unique_ptr<sbe::EExpression>, bool, bool, bool> _generateInExprI
     }
 
     auto&& [arrSetTag, arrSetVal, hasArray, hasObject, hasNull] =
-        convertInExpressionEqualities(expr);
+        convertInExpressionEqualities(expr, *state.data);
     sbe::value::ValueGuard arrSetGuard{arrSetTag, arrSetVal};
     auto equalities = sbe::makeE<sbe::EConstant>(arrSetTag, arrSetVal);
     arrSetGuard.reset();
@@ -1225,9 +1225,9 @@ EvalExpr generateFilter(StageBuilderState& state,
 }
 
 std::tuple<sbe::value::TypeTags, sbe::value::Value, bool, bool, bool> convertInExpressionEqualities(
-    const InMatchExpression* expr) {
+    const InMatchExpression* expr, const PlanStageData& data) {
     auto& equalities = expr->getEqualities();
-    auto [arrSetTag, arrSetVal] = sbe::value::makeNewArraySet();
+    auto [arrSetTag, arrSetVal] = sbe::value::makeNewArraySet(data.collator.get());
     sbe::value::ValueGuard arrSetGuard{arrSetTag, arrSetVal};
 
     auto arrSet = sbe::value::getArraySetView(arrSetVal);

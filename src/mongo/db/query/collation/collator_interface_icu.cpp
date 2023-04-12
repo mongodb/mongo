@@ -44,9 +44,13 @@ CollatorInterfaceICU::CollatorInterfaceICU(Collation spec, std::unique_ptr<icu::
     : CollatorInterface(std::move(spec)), _collator(std::move(collator)) {}
 
 std::unique_ptr<CollatorInterface> CollatorInterfaceICU::clone() const {
-    auto clone = std::make_unique<CollatorInterfaceICU>(
+    return std::make_unique<CollatorInterfaceICU>(
         getSpec(), std::unique_ptr<icu::Collator>(_collator->clone()));
-    return {std::move(clone)};
+}
+
+std::shared_ptr<CollatorInterface> CollatorInterfaceICU::cloneShared() const {
+    return std::make_shared<CollatorInterfaceICU>(
+        getSpec(), std::unique_ptr<icu::Collator>(_collator->clone()));
 }
 
 int CollatorInterfaceICU::compare(StringData left, StringData right) const {

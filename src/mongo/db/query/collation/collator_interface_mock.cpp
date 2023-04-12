@@ -70,8 +70,11 @@ CollatorInterfaceMock::CollatorInterfaceMock(MockType mockType)
       _mockType(mockType) {}
 
 std::unique_ptr<CollatorInterface> CollatorInterfaceMock::clone() const {
-    auto clone = std::make_unique<CollatorInterfaceMock>(_mockType);
-    return {std::move(clone)};
+    return std::make_unique<CollatorInterfaceMock>(_mockType);
+}
+
+std::shared_ptr<CollatorInterface> CollatorInterfaceMock::cloneShared() const {
+    return std::make_shared<CollatorInterfaceMock>(_mockType);
 }
 
 int CollatorInterfaceMock::compare(StringData left, StringData right) const {

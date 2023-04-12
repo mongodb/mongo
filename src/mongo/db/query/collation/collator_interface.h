@@ -93,6 +93,7 @@ public:
     virtual ~CollatorInterface() {}
 
     virtual std::unique_ptr<CollatorInterface> clone() const = 0;
+    virtual std::shared_ptr<CollatorInterface> cloneShared() const = 0;
 
     /**
      * Returns a number < 0 if 'left' is less than 'right' with respect to the collation, a number >

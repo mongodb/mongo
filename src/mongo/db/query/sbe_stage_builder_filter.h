@@ -73,7 +73,7 @@ EvalExpr generateFilter(StageBuilderState& state,
  * value.
  */
 std::tuple<sbe::value::TypeTags, sbe::value::Value, bool, bool, bool> convertInExpressionEqualities(
-    const InMatchExpression* expr);
+    const InMatchExpression* expr, const PlanStageData& data);
 
 /**
  * Converts the list of bit positions inside of any of the bit-test match expressions

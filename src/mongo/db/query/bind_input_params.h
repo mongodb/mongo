@@ -44,10 +44,7 @@ namespace mongo::input_params {
  * The caller should pass true for 'bindingCachedPlan' if we are binding-in new parameter values for
  * a plan that was recovered from the SBE plan cache.
  */
-void bind(const CanonicalQuery&,
-          const stage_builder::InputParamToSlotMap&,
-          sbe::RuntimeEnvironment*,
-          bool bindingCachedPlan);
+void bind(const CanonicalQuery&, stage_builder::PlanStageData&, bool bindingCachedPlan);
 
 /**
  * Binds index bounds evaluated from IETs to index bounds slots for the given query.
