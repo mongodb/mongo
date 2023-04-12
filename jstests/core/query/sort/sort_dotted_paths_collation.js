@@ -11,6 +11,9 @@
  * @tags: [
  *   does_not_support_transactions,
  *   assumes_no_implicit_collection_creation_after_drop,
+ *   # Fixes behavior which was buggy in 7.0, so multiversion incompatible for now.
+ *   # TODO SERVER-76127: Remove this tag.
+ *   multiversion_incompatible,
  * ]
  */
 (function() {
@@ -286,4 +289,42 @@ testSortAndSortWithLimit(
 testSortAndSortWithLimit(
     {"a.b.c": -1, _id: -1},
     [{_id: 8}, {_id: 6}, {_id: 9}, {_id: 5}, {_id: 1}, {_id: 4}, {_id: 7}, {_id: 3}, {_id: 2}]);
+
+// Tests for a case where all values are scalars and the sort components do not have a common
+// parent path.
+assert(coll.drop());
+assert.commandWorked(db.createCollection(coll.getName(), caseInsensitive));
+assert.commandWorked(coll.insert({_id: 1, a: "a", b: "X"}));
+assert.commandWorked(coll.insert({_id: 2, a: "a", b: "y"}));
+assert.commandWorked(coll.insert({_id: 3, a: "a", b: "Z"}));
+assert.commandWorked(coll.insert({_id: 4, a: "b", b: "x"}));
+assert.commandWorked(coll.insert({_id: 5, a: "B", b: "Y"}));
+assert.commandWorked(coll.insert({_id: 6, a: "B", b: "Z"}));
+testSortAndSortWithLimit({"a": 1, "b": 1},
+                         [{_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}, {_id: 5}, {_id: 6}]);
+testSortAndSortWithLimit({"a": 1, "b": -1},
+                         [{_id: 3}, {_id: 2}, {_id: 1}, {_id: 6}, {_id: 5}, {_id: 4}]);
+testSortAndSortWithLimit({"a": -1, "b": 1},
+                         [{_id: 4}, {_id: 5}, {_id: 6}, {_id: 1}, {_id: 2}, {_id: 3}]);
+testSortAndSortWithLimit({"a": -1, "b": -1},
+                         [{_id: 6}, {_id: 5}, {_id: 4}, {_id: 3}, {_id: 2}, {_id: 1}]);
+
+// Tests for a case where all values are scalar and the sort components have a common parent
+// path.
+assert(coll.drop());
+assert.commandWorked(db.createCollection(coll.getName(), caseInsensitive));
+assert.commandWorked(coll.insert({_id: 1, obj: {a: "a", b: "X"}}));
+assert.commandWorked(coll.insert({_id: 2, obj: {a: "a", b: "y"}}));
+assert.commandWorked(coll.insert({_id: 3, obj: {a: "a", b: "Z"}}));
+assert.commandWorked(coll.insert({_id: 4, obj: {a: "b", b: "x"}}));
+assert.commandWorked(coll.insert({_id: 5, obj: {a: "B", b: "Y"}}));
+assert.commandWorked(coll.insert({_id: 6, obj: {a: "B", b: "Z"}}));
+testSortAndSortWithLimit({"obj.a": 1, "obj.b": 1},
+                         [{_id: 1}, {_id: 2}, {_id: 3}, {_id: 4}, {_id: 5}, {_id: 6}]);
+testSortAndSortWithLimit({"obj.a": 1, "obj.b": -1},
+                         [{_id: 3}, {_id: 2}, {_id: 1}, {_id: 6}, {_id: 5}, {_id: 4}]);
+testSortAndSortWithLimit({"obj.a": -1, "obj.b": 1},
+                         [{_id: 4}, {_id: 5}, {_id: 6}, {_id: 1}, {_id: 2}, {_id: 3}]);
+testSortAndSortWithLimit({"obj.a": -1, "obj.b": -1},
+                         [{_id: 6}, {_id: 5}, {_id: 4}, {_id: 3}, {_id: 2}, {_id: 1}]);
 })();
