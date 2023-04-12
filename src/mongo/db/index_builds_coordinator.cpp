@@ -971,6 +971,9 @@ void IndexBuildsCoordinator::abortAllIndexBuildsDueToDiskSpace(OperationContext*
         if (forceSelfAbortIndexBuild(opCtx, replState, abortStatus)) {
             // Increase metrics only if the build was actually aborted by the above call.
             indexBuildsSSS.killedDueToInsufficientDiskSpace.addAndFetch(1);
+            LOGV2(7333601,
+                  "Index build: aborted due to insufficient disk space",
+                  "buildUUID"_attr = replState->buildUUID);
         }
     }
 }
@@ -2532,6 +2535,11 @@ void IndexBuildsCoordinator::_cleanUpAfterFailure(OperationContext* opCtx,
             // errors must be handled, or risk blocking shutdown due to the index build coordinator
             // waiting on index builds to finish because the index build state has not been updated
             // properly.
+
+            if (status.code() == ErrorCodes::DataCorruptionDetected) {
+                indexBuildsSSS.failedDueToDataCorruption.addAndFetch(1);
+                LOGV2(7333600, "Index build: data corruption detected", "status"_attr = status);
+            }
 
             if (IndexBuildProtocol::kSinglePhase == replState->protocol) {
                 _cleanUpSinglePhaseAfterNonShutdownFailure(

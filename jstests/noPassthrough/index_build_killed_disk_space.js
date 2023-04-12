@@ -64,6 +64,9 @@ jsTestLog("Waiting for threads to join");
 createIdx();
 simulateDiskSpaceFp.off();
 
+// "Index build: aborted due to insufficient disk space"
+checkLog.containsJson(primary, 7333601);
+
 assert.eq(1, primaryDB.serverStatus().indexBuilds.killedDueToInsufficientDiskSpace);
 
 rst.awaitReplication();

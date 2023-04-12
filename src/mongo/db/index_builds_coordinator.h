@@ -540,6 +540,8 @@ public:
             indexBuilds.append("total", registered.loadRelaxed());
             indexBuilds.append("killedDueToInsufficientDiskSpace",
                                killedDueToInsufficientDiskSpace.loadRelaxed());
+            indexBuilds.append("failedDueToDataCorruption",
+                               failedDueToDataCorruption.loadRelaxed());
 
             BSONObjBuilder phases;
             phases.append("scanCollection", scanCollection.loadRelaxed());
@@ -559,6 +561,7 @@ public:
 
         AtomicWord<int> registered;
         AtomicWord<int> killedDueToInsufficientDiskSpace;
+        AtomicWord<int> failedDueToDataCorruption;
         AtomicWord<int> scanCollection;
         AtomicWord<int> drainSideWritesTable;
         AtomicWord<int> drainSideWritesTablePreCommit;
