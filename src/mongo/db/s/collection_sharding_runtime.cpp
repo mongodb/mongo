@@ -365,7 +365,10 @@ Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
             // (Ignore FCV check): This feature doesn't have any upgrade/downgrade concerns. The
             // feature flag is used to turn on new range deleter on startup.
             if (feature_flags::gRangeDeleterService.isEnabledAndIgnoreFCVUnsafe()) {
-                return RangeDeleterService::get(opCtx)->getOverlappingRangeDeletionsFuture(
+                const auto rangeDeleterService = RangeDeleterService::get(opCtx);
+                rangeDeleterService->getRangeDeleterServiceInitializationFuture().get(opCtx);
+
+                return rangeDeleterService->getOverlappingRangeDeletionsFuture(
                     self->_metadataManager->getCollectionUuid(), orphanRange);
             } else {
                 return self->_metadataManager->trackOrphanedDataCleanup(orphanRange);
