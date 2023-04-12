@@ -108,7 +108,13 @@ KeyString::Value SortKeyGenerator::computeSortKeyString(const BSONObj& obj) {
     if (fastPathSucceeded) {
         KeyString::HeapBuilder builder(KeyString::Version::kLatestVersion, _ordering);
         for (auto elt : _localEltStorage) {
-            builder.appendBSONElement(elt);
+            if (_collator) {
+                builder.appendBSONElement(elt, [&](StringData stringData) {
+                    return _collator->getComparisonString(stringData);
+                });
+            } else {
+                builder.appendBSONElement(elt);
+            }
         }
 
         return builder.release();
