@@ -39,13 +39,13 @@ WiredTiger offers the following assertions:
 
 @section diagnostic_code_blocks Diagnostic Code Blocks
 
-Longer, more extensive checks are marked by \c `#ifdef HAVE_DIAGNOSTIC` or
+Longer, more extensive checks are marked by `#ifdef HAVE_DIAGNOSTIC` or
 \c EXTRA_DIAGNOSTICS_ENABLED blocks. Similar to assertions these checks are enabled either
 by running WiredTiger in diagnostic mode or by setting \c extra_diagnostics on the \c WT_CONNECTION.
 
 <table>
 @hrow{Check, Behavior in diagnostic mode, Behavior in release mode}
-@row{\c `#ifdef HAVE_DIAGNOSTIC`, Always run the code block, Never run the code block.}
+@row{`#ifdef HAVE_DIAGNOSTIC`, Always run the code block, Never run the code block.}
 @row{\c EXTRA_DIAGNOSTICS_ENABLED, Always run the code block,
     Takes a \c WT_DIAGNOSTIC_* category as an argument and only runs when the category
     is enabled on the \c WT_CONNECTION.}
