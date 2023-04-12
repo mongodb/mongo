@@ -46,3 +46,12 @@ server_parameters:
         validator:
           gte: 0
         default: 1000
+
+    balancerChunksSelectionTimeoutMs:
+        description: >-
+            Maximum time in milliseconds the balancer will spend deciding which ranges to move in
+            the current balancing round.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int32_t> 
+        cpp_varname: balancerChunksSelectionTimeoutMs 
+        default: 5000 # 5 seconds
