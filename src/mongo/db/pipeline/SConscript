@@ -596,6 +596,7 @@ env.CppUnitTest(
         'document_source_count_test.cpp',
         'document_source_current_op_test.cpp',
         'document_source_densify_test.cpp',
+        'document_source_documents_test.cpp',
         'document_source_exchange_test.cpp',
         'document_source_facet_test.cpp',
         'document_source_find_and_modify_image_lookup_test.cpp',

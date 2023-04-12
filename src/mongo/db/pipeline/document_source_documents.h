@@ -62,7 +62,7 @@ public:
 
 static constexpr StringData kStageName = "$documents"_sd;
 
-static std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(
+std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
 };  // namespace DocumentSourceDocuments

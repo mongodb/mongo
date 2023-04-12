@@ -782,6 +782,121 @@ TEST_F(DocumentSourceGraphLookUpTest, IncrementNestedAggregateOpCounterOnCreateB
     testOpCounter(NamespaceString::createNamespaceString_forTest("local", "testColl"), 0);
 }
 
+TEST_F(DocumentSourceGraphLookUpTest, RedactionStartWithSingleField) {
+    NamespaceString graphLookupNs(
+        NamespaceString::createNamespaceString_forTest(getExpCtx()->ns.dbName(), "coll"));
+    getExpCtx()->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
+        {graphLookupNs.coll().toString(), {graphLookupNs, std::vector<BSONObj>()}}});
+
+    auto spec = fromjson(R"({
+        "$graphLookup": {
+            "from": "coll",
+            "startWith": "$a.b",
+            "connectFromField": "c.d",
+            "connectToField": "e.f",
+            "as": "x",
+            "depthField": "y",
+            "maxDepth": 5,
+            "restrictSearchWithMatch": {
+                "foo": "abc",
+                "bar.baz": { "$gt": 5 }
+            }
+        }
+    })");
+    auto docSource = DocumentSourceGraphLookUp::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$graphLookup": {
+                "from": "HASH<coll>",
+                "as": "HASH<x>",
+                "connectToField": "HASH<e>.HASH<f>",
+                "connectFromField": "HASH<c>.HASH<d>",
+                "startWith": "$HASH<a>.HASH<b>",
+                "depthField": "HASH<y>",
+                "maxDepth": "?",
+                "restrictSearchWithMatch": {
+                    "$and": [
+                        { "HASH<foo>": { "$eq": "?" } },
+                        { "HASH<bar>.HASH<baz>": { "$gt": "?" } }
+                    ]
+                }
+            }
+        })",
+        redact(*docSource));
+}
+
+TEST_F(DocumentSourceGraphLookUpTest, RedactionStartWithArrayOfFields) {
+    NamespaceString graphLookupNs(
+        NamespaceString::createNamespaceString_forTest(getExpCtx()->ns.dbName(), "coll"));
+    getExpCtx()->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
+        {graphLookupNs.coll().toString(), {graphLookupNs, std::vector<BSONObj>()}}});
+
+    auto spec = fromjson(R"({
+        $graphLookup: {
+            from: "coll",
+            startWith: ["$a.b", "$bar.baz"],
+            connectFromField: "x",
+            connectToField: "y",
+            as: "z"
+        }
+    })");
+    auto docSource = DocumentSourceGraphLookUp::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$graphLookup": {
+                "from": "HASH<coll>",
+                "as": "HASH<z>",
+                "connectToField": "HASH<y>",
+                "connectFromField": "HASH<x>",
+                "startWith": ["$HASH<a>.HASH<b>", "$HASH<bar>.HASH<baz>"]
+            }
+        })",
+        redact(*docSource));
+}
+
+TEST_F(DocumentSourceGraphLookUpTest, RedactionWithAbsorbedUnwind) {
+    auto expCtx = getExpCtx();
+
+    NamespaceString graphLookupNs(
+        NamespaceString::createNamespaceString_forTest(expCtx->ns.dbName(), "coll"));
+    expCtx->setResolvedNamespaces(StringMap<ExpressionContext::ResolvedNamespace>{
+        {graphLookupNs.coll().toString(), {graphLookupNs, std::vector<BSONObj>()}}});
+
+    auto unwindStage = DocumentSourceUnwind::create(expCtx, "results", false, boost::none);
+    auto graphLookupStage = DocumentSourceGraphLookUp::create(
+        getExpCtx(),
+        graphLookupNs,
+        "results",
+        "from",
+        "to",
+        ExpressionFieldPath::deprecatedCreate(expCtx.get(), "startPoint"),
+        boost::none,
+        boost::none,
+        boost::none,
+        unwindStage);
+
+    auto serialized = redactToArray(*graphLookupStage);
+    ASSERT_EQ(2, serialized.size());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$graphLookup": {
+                "from": "HASH<coll>",
+                "as": "HASH<results>",
+                "connectToField": "HASH<to>",
+                "connectFromField": "HASH<from>",
+                "startWith": "$HASH<startPoint>"
+            }
+        })",
+        serialized[0].getDocument().toBson());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "$unwind": {
+                path: "$HASH<results>"
+            }
+        })",
+        serialized[1].getDocument().toBson());
+}
 
 using DocumentSourceGraphLookupServerlessTest = ServerlessAggregationContextFixture;
 

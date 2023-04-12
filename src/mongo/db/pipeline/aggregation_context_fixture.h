@@ -95,6 +95,21 @@ public:
         return serialized[0].getDocument().toBson().getOwned();
     }
 
+    std::vector<Value> redactToArray(const DocumentSource& docSource,
+                                     bool performRedaction = true) {
+        SerializationOptions options;
+        if (performRedaction) {
+            options.replacementForLiteralArgs = "?";
+            options.identifierRedactionPolicy = [](StringData s) -> std::string {
+                return str::stream() << "HASH<" << s << ">";
+            };
+            options.redactIdentifiers = true;
+        }
+        std::vector<Value> serialized;
+        docSource.serializeToArray(serialized, options);
+        return serialized;
+    }
+
 private:
     ServiceContext::UniqueOperationContext _opCtx;
     boost::intrusive_ptr<ExpressionContextForTest> _expCtx;

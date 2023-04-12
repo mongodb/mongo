@@ -583,50 +583,54 @@ void DocumentSourceGraphLookUp::checkMemoryUsage() {
 
 void DocumentSourceGraphLookUp::serializeToArray(std::vector<Value>& array,
                                                  SerializationOptions opts) const {
-    auto explain = opts.verbosity;
-    if (opts.redactIdentifiers || opts.replacementForLiteralArgs) {
-        MONGO_UNIMPLEMENTED_TASSERT(7484344);
-    }
-
     // Do not include tenantId in serialized 'from' namespace.
     auto fromValue = (pExpCtx->ns.db() == _from.db())
-        ? Value(_from.coll())
-        : Value(Document{{"db", _from.dbName().db()}, {"coll", _from.coll()}});
+        ? Value(opts.serializeIdentifier(_from.coll()))
+        : Value(Document{{"db", opts.serializeIdentifier(_from.dbName().db())},
+                         {"coll", opts.serializeIdentifier(_from.coll())}});
 
     // Serialize default options.
-    MutableDocument spec(DOC("from" << fromValue << "as" << _as.fullPath() << "connectToField"
-                                    << _connectToField.fullPath() << "connectFromField"
-                                    << _connectFromField.fullPath() << "startWith"
-                                    << _startWith->serialize(false)));
+    MutableDocument spec(DOC("from" << fromValue << "as" << opts.serializeFieldPath(_as)
+                                    << "connectToField" << opts.serializeFieldPath(_connectToField)
+                                    << "connectFromField"
+                                    << opts.serializeFieldPath(_connectFromField) << "startWith"
+                                    << _startWith->serialize(opts)));
 
     // depthField is optional; serialize it if it was specified.
     if (_depthField) {
-        spec["depthField"] = Value(_depthField->fullPath());
+        spec["depthField"] = Value(opts.serializeFieldPath(*_depthField));
     }
 
     if (_maxDepth) {
-        spec["maxDepth"] = Value(*_maxDepth);
+        spec["maxDepth"] = Value(opts.serializeLiteralValue(*_maxDepth));
     }
 
     if (_additionalFilter) {
-        spec["restrictSearchWithMatch"] = Value(*_additionalFilter);
+        if (opts.redactIdentifiers || opts.replacementForLiteralArgs) {
+            auto matchExpr =
+                uassertStatusOK(MatchExpressionParser::parse(*_additionalFilter, pExpCtx));
+            spec["restrictSearchWithMatch"] = Value(matchExpr->serialize(opts));
+        } else {
+            spec["restrictSearchWithMatch"] = Value(*_additionalFilter);
+        }
     }
 
     // If we are explaining, include an absorbed $unwind inside the $graphLookup specification.
-    if (_unwind && explain) {
+    if (_unwind && opts.verbosity) {
         const boost::optional<FieldPath> indexPath = (*_unwind)->indexPath();
         spec["unwinding"] =
             Value(DOC("preserveNullAndEmptyArrays"
-                      << (*_unwind)->preserveNullAndEmptyArrays() << "includeArrayIndex"
-                      << (indexPath ? Value((*indexPath).fullPath()) : Value())));
+                      << opts.serializeLiteralValue((*_unwind)->preserveNullAndEmptyArrays())
+                      << "includeArrayIndex"
+                      << (indexPath ? Value(opts.serializeFieldPath(*indexPath)) : Value())));
     }
 
     array.push_back(Value(DOC(getSourceName() << spec.freeze())));
 
     // If we are not explaining, the output of this method must be parseable, so serialize our
     // $unwind into a separate stage.
-    if (_unwind && !explain) {
-        (*_unwind)->serializeToArray(array);
+    if (_unwind && !opts.verbosity) {
+        (*_unwind)->serializeToArray(array, opts);
     }
 }
 

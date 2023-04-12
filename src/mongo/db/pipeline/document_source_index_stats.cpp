@@ -79,9 +79,6 @@ intrusive_ptr<DocumentSource> DocumentSourceIndexStats::createFromBson(
 }
 
 Value DocumentSourceIndexStats::serialize(SerializationOptions opts) const {
-    if (opts.redactIdentifiers || opts.replacementForLiteralArgs) {
-        MONGO_UNIMPLEMENTED_TASSERT(7484342);
-    }
     return Value(DOC(getSourceName() << Document()));
 }
 }  // namespace mongo
