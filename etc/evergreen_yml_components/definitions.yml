@@ -1084,6 +1084,30 @@ functions:
       files:
       - src/generated_resmoke_config/*.json
 
+  "generate version validation":
+  - *f_expansions_write
+  - *configure_evergreen_api_credentials
+  - command: subprocess.exec
+    type: test
+    params:
+      binary: bash
+      args:
+      - "./src/evergreen/generate_version.sh"
+  - command: archive.targz_pack
+    params:
+      target: generate_tasks_config.tgz
+      source_dir: src/generated_resmoke_config
+      include:
+      - "*"
+  - command: subprocess.exec
+    type: test
+    params:
+      binary: bash
+      args:
+      - "src/evergreen/run_python_script.sh"
+      - "buildscripts/validate_file_size.py"
+      - "generate_tasks_config.tgz"
+
   "generate version burn in":
   - *f_expansions_write
   - *configure_evergreen_api_credentials
@@ -4640,6 +4664,18 @@ tasks:
   - func: "set up venv"
   - func: "upload pip requirements"
   - func: "generate version"
+
+- name: version_gen_validation
+  commands:
+  - command: manifest.load
+  - *git_get_project
+  - *f_expansions_write
+  - *add_git_tag
+  - *kill_processes
+  - *cleanup_environment
+  - func: "set up venv"
+  - func: "upload pip requirements"
+  - func: "generate version validation"
 
 - name: version_burn_in_gen
   commands:

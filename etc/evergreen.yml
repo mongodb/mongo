@@ -3207,6 +3207,7 @@ buildvariants:
   - name: compile_venv_deps_check
   # TODO SERVER-75688: add back validation
   # - name: resmoke_validation_tests
+  - name: version_gen_validation
 
 - name: &windows-dynamic-visibility-test windows-dynamic-visibility-test
   display_name: "~ Shared Library Windows (visibility test)"
