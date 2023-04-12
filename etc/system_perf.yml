@@ -2271,7 +2271,7 @@ buildvariants:
   - &linux-microbenchmarks-standalone-arm
     name: linux-microbenchmarks-standalone-arm.2023-01
     display_name: MicroBenchmarks Arm Standalone inMemory.2023-01
-    cron: "0 */4 * * *" # Every 4 hours starting at midnight
+    cron: "0 0 * * 0"   # Weekly, Sundays at 12 AM
     modules: *modules
     expansions: &standalone-arm-expansions
       mongodb_setup_release: 2022-11
@@ -2321,7 +2321,7 @@ buildvariants:
   - &linux-microbenchmarks-repl-arm
     name: linux-microbenchmarks-repl-arm.2023-01
     display_name: MicroBenchmarks Arm 1-Node ReplSet inMemory.2023-01
-    cron: "0 */4 * * *" # Every 4 hours starting at midnight
+    cron: "0 0 * * 0"   # Weekly, Sundays at 12 AM
     modules: *modules
     expansions: &repl-arm-expansions
       mongodb_setup_release: 2022-11
@@ -2356,7 +2356,7 @@ buildvariants:
     <<: *linux-microbenchmarks-standalone-arm
     name: linux-microbenchmarks-standalone-intel.2023-01
     display_name: MicroBenchmarks Intel Standalone inMemory.2023-01
-    cron: "0 */12 * * *" # Every 12 hours starting at midnight
+    cron: "0 0 * * 0"   # Weekly, Sundays at 12 AM
     expansions: &standalone-intel-expansions
       <<: *standalone-arm-expansions
       infrastructure_provisioning: workload_client_mongod_combined_intel.2023-01
@@ -2372,7 +2372,7 @@ buildvariants:
     <<: *linux-microbenchmarks-repl-arm
     name: linux-microbenchmarks-repl-intel.2023-01
     display_name: MicroBenchmarks Intel 1-Node ReplSet inMemory.2023-01
-    cron: "0 */12 * * *" # Every 12 hours starting at midnight
+    cron: "0 0 * * 0"   # Weekly, Sundays at 12 AM
     expansions: &repl-intel-expansions
       <<: *repl-arm-expansions
       infrastructure_provisioning: workload_client_mongod_combined_intel.2023-01
