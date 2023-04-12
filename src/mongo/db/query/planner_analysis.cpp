@@ -1173,7 +1173,12 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAnalysis::analyzeSort(
     // Sort is not provided.  See if we provide the reverse of our sort pattern.
     // If so, we can reverse the scan direction(s).
     BSONObj reverseSort = QueryPlannerCommon::reverseSortObj(sortObj);
-    if (providedSorts.contains(reverseSort)) {
+    // The only collection scan that includes a sort order in 'providedSorts' is a scan on a
+    // clustered collection. However, we cannot reverse this scan if its direction is specified by a
+    // $natural hint.
+    const bool naturalCollScan = solnRoot->getType() == StageType::STAGE_COLLSCAN &&
+        query.getFindCommandRequest().getHint()[query_request_helper::kNaturalSortField];
+    if (providedSorts.contains(reverseSort) && !naturalCollScan) {
         QueryPlannerCommon::reverseScans(solnRoot.get());
         LOGV2_DEBUG(20951,
                     5,
