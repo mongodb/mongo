@@ -362,6 +362,8 @@ last-continuous:
     ticket: SERVER-75517
   - test_file: jstests/replsets/startup_recovery_for_restore_needs_rollback.js
     ticket: SERVER-67180
+  - test_file: jstests/sharding/analyze_shard_key/cardinality_and_frequency_basic.js
+    ticket: SERVER-75886
   suites: null
 last-lts:
   all:
@@ -791,4 +793,6 @@ last-lts:
     ticket: SERVER-75517
   - test_file: jstests/replsets/startup_recovery_for_restore_needs_rollback.js
     ticket: SERVER-67180
+  - test_file: jstests/sharding/analyze_shard_key/cardinality_and_frequency_basic.js
+    ticket: SERVER-75886
   suites: null
