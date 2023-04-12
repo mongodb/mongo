@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include "mongo/stdx/trusted_hasher.h"
-#include "mongo/util/immutable/memory_policy.h"
-
 #include <immer/map.hpp>
 #include <immer/map_transient.hpp>
+
+#include "mongo/stdx/trusted_hasher.h"
+#include "mongo/util/immutable/details/memory_policy.h"
 
 namespace mongo::immutable {
 

@@ -124,6 +124,25 @@ TEST(ImmutableUnorderedMap, BatchWrite) {
     ASSERT(v1.find(2));
 }
 
+TEST(ImmutableUnorderedMap, ExclusiveOwnership) {
+    immutable::unordered_map<int, int> v0;
+
+    auto v1 = v0.set(1, 1);
+    auto v2 = v1.set(2, 2);
+    auto v3 = v2.set(3, 3);
+
+    ASSERT(v1.find(1));
+    ASSERT(v2.find(1));
+    ASSERT(v3.find(1));
+
+    // Claiming exclusive ownership over v3 means v3 will no longer be valid after mutation, but
+    // older versions should be unperturbed.
+    auto v4 = std::move(v3).erase(1);
+    ASSERT(v1.find(1));
+    ASSERT(v2.find(1));
+    ASSERT(!v4.find(1));
+}
+
 TEST(ImmutableUnorderedSet, Basic) {
     // Insert some values and verify that the data structure is behaving as expected
     immutable::unordered_set<int> v0;
@@ -194,6 +213,22 @@ TEST(ImmutableUnorderedSet, BatchWrite) {
     ASSERT(v1.find(2));
 }
 
+TEST(ImmutableUnorderedSet, ExclusiveOwnership) {
+    immutable::unordered_set<int> v0;
+
+    auto v1 = v0.insert(1);
+    auto v2 = v1.insert(2);
+    auto v3 = v2.insert(3);
+
+    ASSERT(v1.find(1));
+    ASSERT(v2.find(1));
+    ASSERT(v3.find(1));
+
+    auto v4 = std::move(v3).erase(1);
+    ASSERT(v1.find(1));
+    ASSERT(v2.find(1));
+    ASSERT(!v4.find(1));
+}
 
 }  // namespace
 }  // namespace mongo
