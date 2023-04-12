@@ -206,12 +206,7 @@ class TestReport(unittest.TestResult):  # pylint: disable=too-many-instance-attr
 
             test_info = self.find_test_info(test)
             test_info.status = "fail"
-            if test_info.dynamic:
-                # Dynamic tests are used for data consistency checks, so the failures are never
-                # silenced.
-                test_info.evergreen_status = "fail"
-            else:
-                test_info.evergreen_status = self.suite_options.report_failure_status
+            test_info.evergreen_status = "fail"
             test_info.return_code = test.return_code
 
     def setFailure(self, test, return_code=1):  # pylint: disable=invalid-name
@@ -223,12 +218,7 @@ class TestReport(unittest.TestResult):  # pylint: disable=too-many-instance-attr
                 raise ValueError("stopTest was not called on %s" % (test.basename()))
 
             test_info.status = "fail"
-            if test_info.dynamic:
-                # Dynamic tests are used for data consistency checks, so the failures are never
-                # silenced.
-                test_info.evergreen_status = "fail"
-            else:
-                test_info.evergreen_status = self.suite_options.report_failure_status
+            test_info.evergreen_status = "fail"
             test_info.return_code = return_code
 
         # Recompute number of success, failures, and errors.
