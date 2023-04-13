@@ -35,17 +35,20 @@ function moveRange(st, coll, minKeyValue, maxKeyValue, toShard) {
 }
 
 /* Set `onCurrentShardSince` field to (refTimestamp + offsetInSeconds) */
-function setOnCurrentShardSince(configDB, coll, extraQuery, refTimestamp, offsetInSeconds) {
-    const collUuid = configDB.collections.findOne({_id: coll.getFullName()}).uuid;
+function setOnCurrentShardSince(mongoS, coll, extraQuery, refTimestamp, offsetInSeconds) {
+    // Use 'retryWrites' when writing to the configsvr because they are not automatically retried.
+    const mongosSession = mongoS.startSession({retryWrites: true});
+    const sessionConfigDB = mongosSession.getDatabase('config');
+    const collUuid = sessionConfigDB.collections.findOne({_id: coll.getFullName()}).uuid;
     const query = Object.assign({uuid: collUuid}, extraQuery);
     const newValue = new Timestamp(refTimestamp.getTime() + offsetInSeconds, 0);
-    assert.commandWorked(
-        configDB.chunks.updateMany(query, [{
-                                       $set: {
-                                           "onCurrentShardSince": newValue,
-                                           "history": [{validAfter: newValue, shard: "$shard"}]
-                                       }
-                                   }]));
+    assert.commandWorked(sessionConfigDB.chunks.updateMany(
+        query, [{
+            $set: {
+                "onCurrentShardSince": newValue,
+                "history": [{validAfter: newValue, shard: "$shard"}]
+            }
+        }]));
 }
 
 /* Set jumbo flag to true */
@@ -200,7 +203,7 @@ function mergeAllChunksOnShardTest(st, testDB) {
     const now = buildInitialScenario(st, coll, shard0, shard1, historyWindowInSeconds);
 
     // Make sure that all chunks are out of the history window
-    setOnCurrentShardSince(configDB, coll, {}, now, -historyWindowInSeconds - 1000);
+    setOnCurrentShardSince(st.s, coll, {}, now, -historyWindowInSeconds - 1000);
 
     // Merge all mergeable chunks on shard0
     assert.commandWorked(
@@ -259,7 +262,7 @@ function mergeAllChunksOnShardConsideringHistoryWindowTest(st, testDB) {
     const now = buildInitialScenario(st, coll, shard0, shard1);
 
     // Initially, make all chunks older than history window
-    setOnCurrentShardSince(configDB, coll, {}, now, -historyWindowInSeconds - 1000);
+    setOnCurrentShardSince(st.s, coll, {}, now, -historyWindowInSeconds - 1000);
 
     // Perform some move so that those chunks will fall inside the history window and won't be able
     // to be merged
@@ -304,7 +307,7 @@ function mergeAllChunksOnShardConsideringJumboFlagTest(st, testDB) {
     const now = buildInitialScenario(st, coll, shard0, shard1, historyWindowInSeconds);
 
     // Make sure that all chunks are out of the history window
-    setOnCurrentShardSince(configDB, coll, {}, now, -historyWindowInSeconds - 1000);
+    setOnCurrentShardSince(st.s, coll, {}, now, -historyWindowInSeconds - 1000);
 
     // Set jumbo flag to a couple of chunks
     // Setting a chunks as jumbo must prevent it from being merged
@@ -358,7 +361,7 @@ function balancerTriggersAutomergerWhenIsEnabledTest(st, testDB) {
         const now = buildInitialScenario(st, coll, shard0, shard1, historyWindowInSeconds);
 
         // Make sure that all chunks are out of the history window
-        setOnCurrentShardSince(configDB, coll, {}, now, -historyWindowInSeconds - 1000);
+        setOnCurrentShardSince(st.s, coll, {}, now, -historyWindowInSeconds - 1000);
     });
 
     // Override balancer round interval and merge throttling to speed up the test
