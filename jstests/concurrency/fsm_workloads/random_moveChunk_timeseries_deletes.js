@@ -44,6 +44,9 @@ var $config = extendWorkload($config, function($config, $super) {
             jsTestLog(
                 "Skipping executing this test as the requisite feature flags are not enabled.");
         }
+
+        this.arbitraryDeletesEnabled =
+            FeatureFlagUtil.isPresentAndEnabled(db, "TimeseriesDeletesSupport");
     };
 
     $config.states.doDelete = function doDelete(db, collName, connCache) {
@@ -51,15 +54,30 @@ var $config = extendWorkload($config, function($config, $super) {
             return;
         }
 
+        // Alternate between filtering on the meta field and filtering on a data field. This will
+        // cover both the timeseries batch delete and arbitrary delete paths.
+        const filterFieldName = !this.arbitraryDeletesEnabled || Random.randInt(2) == 0
+            ? "m.tid" + this.tid
+            : "f.tid" + this.tid;
         const filter = {
-            m: {
-                ["tid" + this.tid]: {
-                    $gte: Random.randInt($config.data.numMetaCount),
-                },
+            [filterFieldName]: {
+                $gte: Random.randInt($config.data.numMetaCount),
             },
         };
         assertAlways.commandWorked(db[collName].deleteMany(filter));
         assertAlways.commandWorked(db[this.nonShardCollName].deleteMany(filter));
+    };
+
+    $config.data.validateCollection = function validate(db, collName) {
+        // Since we can't use a 'snapshot' read concern for timeseries deletes, deletes on the
+        // sharded collection may not see the exact same records as the non-sharded, so the
+        // validation needs to be more lenient.
+        const count = db[collName].find().itcount();
+        const countNonSharded = db[this.nonShardCollName].find().itcount();
+        assertAlways.gte(
+            count,
+            countNonSharded,
+            "Expected sharded collection to have the same or more records than unsharded");
     };
 
     $config.transitions = {

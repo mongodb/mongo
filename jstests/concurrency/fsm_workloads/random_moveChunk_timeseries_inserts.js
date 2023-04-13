@@ -60,10 +60,12 @@ var $config = extendWorkload($config, function($config, $super) {
             // Generate a random timestamp between 'startTime' and largest timestamp we inserted.
             const timer =
                 this.startTime + Math.floor(Random.rand() * this.numInitialDocs * this.increment);
+            const metaVal = this.generateMetaFieldValueForInsertStage(this.tid);
             const doc = {
                 _id: new ObjectId(),
                 [this.timeField]: new Date(timer),
-                [this.metaField]: this.generateMetaFieldValueForInsertStage(this.tid),
+                [this.metaField]: metaVal,
+                f: metaVal,
             };
             assertAlways.commandWorked(db[collName].insert(doc));
             assertAlways.commandWorked(db[this.nonShardCollName].insert(doc));
@@ -112,6 +114,15 @@ var $config = extendWorkload($config, function($config, $super) {
         moveChunk: {insert: 1, moveChunk: 0}
     };
 
+    $config.data.validateCollection = function validate(db, collName) {
+        const pipeline =
+            [{$project: {_id: "$_id", m: "$m", t: "$t"}}, {$sort: {m: 1, t: 1, _id: 1}}];
+        const diff = DataConsistencyChecker.getDiff(db[collName].aggregate(pipeline),
+                                                    db[this.nonShardCollName].aggregate(pipeline));
+        assertAlways.eq(
+            diff, {docsWithDifferentContents: [], docsMissingOnFirst: [], docsMissingOnSecond: []});
+    };
+
     $config.teardown = function teardown(db, collName, cluster) {
         if (this.featureFlagDisabled) {
             return;
@@ -123,12 +134,9 @@ var $config = extendWorkload($config, function($config, $super) {
         jsTestLog("NumBuckets " + numBuckets + ", numDocs on sharded cluster" +
                   db[collName].find().itcount() + "numDocs on unsharded collection " +
                   db[this.nonShardCollName].find({}).itcount());
-        const pipeline =
-            [{$project: {_id: "$_id", m: "$m", t: "$t"}}, {$sort: {m: 1, t: 1, _id: 1}}];
-        const diff = DataConsistencyChecker.getDiff(db[collName].aggregate(pipeline),
-                                                    db[this.nonShardCollName].aggregate(pipeline));
-        assertAlways.eq(
-            diff, {docsWithDifferentContents: [], docsMissingOnFirst: [], docsMissingOnSecond: []});
+
+        // Validate the contents of the collection.
+        this.validateCollection(db, collName);
 
         // Make sure that queries using various indexes on time-series buckets collection return
         // buckets with all documents.
@@ -185,10 +193,12 @@ var $config = extendWorkload($config, function($config, $super) {
         for (let i = 0; i < this.numInitialDocs; ++i) {
             currentTimeStamp += this.increment;
 
+            const metaVal = this.generateMetaFieldValueForInitialInserts(i);
             const doc = {
                 _id: new ObjectId(),
                 [this.timeField]: new Date(currentTimeStamp),
-                [this.metaField]: this.generateMetaFieldValueForInitialInserts(i),
+                [this.metaField]: metaVal,
+                f: metaVal,
             };
             bulk.insert(doc);
             bulkUnsharded.insert(doc);
