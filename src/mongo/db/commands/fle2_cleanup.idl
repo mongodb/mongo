@@ -1,4 +1,4 @@
-# Copyright (C) 2022-present MongoDB, Inc.
+# Copyright (C) 2023-present MongoDB, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the Server Side Public License, version 1,
@@ -34,22 +34,22 @@ imports:
     - "mongo/crypto/fle_stats.idl"
 
 structs:
-    CompactStructuredEncryptionDataCommandReply:
-        description: "Reply from the {compactStructuredEncryptionData: ...} command"
+    CleanupStructuredEncryptionDataCommandReply:
+        description: "Reply from the {cleanupStructuredEncryptionData: ...} command"
         strict: true
         is_command_reply: true
         fields:
-            stats: CompactStats
+            stats: CleanupStats
 
 commands:
-    compactStructuredEncryptionData :
-        description: "Parser for the 'compactStructuredEncryptionData' command"
-        command_name: compactStructuredEncryptionData
+    cleanupStructuredEncryptionData:
+        description: "Parser for the 'cleanupStructuredEncryptionData' command"
+        command_name: cleanupStructuredEncryptionData
         api_version: ""
         namespace: concatenate_with_db
         strict: true
-        reply_type: CompactStructuredEncryptionDataCommandReply
+        reply_type: CleanupStructuredEncryptionDataCommandReply
         fields:
-            compactionTokens:
+            cleanupTokens:
                 description: "Map of field path to ECOCToken"
                 type: object

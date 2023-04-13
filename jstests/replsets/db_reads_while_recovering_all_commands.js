@@ -165,6 +165,7 @@ const allCommands = {
     checkShardingIndex: {skip: isPrimaryOnly},
     cleanupOrphaned: {skip: isPrimaryOnly},
     cleanupReshardCollection: {skip: isPrimaryOnly},
+    cleanupStructuredEncryptionData: {skip: isPrimaryOnly},
     clearLog: {skip: isNotAUserDataRead},
     cloneCollectionAsCapped: {skip: isPrimaryOnly},
     clusterAbortTransaction: {skip: "already tested by 'abortTransaction' tests on mongos"},

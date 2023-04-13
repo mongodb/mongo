@@ -3075,6 +3075,43 @@ export const authCommandsLib = {
           ]
         },
         {
+          testname: "cleanupStructuredEncryptionData",
+          command: {cleanupStructuredEncryptionData: "foo", cleanupTokens : {}},
+          skipSharded: true,
+          skipUnlessReplicaSet: true,
+          setup: function(db) {
+              assert.commandWorked(db.createCollection("foo", {
+                encryptedFields: {
+                    "fields": [
+                        {
+                            "path": "firstName",
+                            "keyId": UUID("11d58b8a-0c6c-4d69-a0bd-70c6d9befae9"),
+                            "bsonType": "string",
+                            "queries": {"queryType": "equality"}
+                        },
+                    ]
+                }
+              }));
+          },
+          teardown: function(db) {
+              assert.commandWorked(db.dropDatabase());
+          },
+          testcases: [
+              {
+                runOnDb: firstDbName,
+                roles: { readWrite : 1, readWriteAnyDatabase : 1, dbOwner : 1, root : 1, __system : 1 },
+                privileges:
+                    [{resource: {db: firstDbName, collection: "foo"}, actions: ["cleanupStructuredEncryptionData"]}]
+              },
+              {
+                runOnDb: secondDbName,
+                roles: { readWriteAnyDatabase : 1, root : 1, __system : 1 },
+                privileges:
+                    [{resource: {db: secondDbName, collection: "foo"}, actions: ["cleanupStructuredEncryptionData"]}]
+              }
+          ]
+        },
+        {
           testname: "connectionStatus",
           command: {connectionStatus: 1},
           testcases: [

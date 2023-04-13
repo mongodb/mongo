@@ -262,6 +262,7 @@ let viewsCommandTests = {
         skip: "Tested in views/views_sharded.js",
     },
     cleanupReshardCollection: {skip: isUnrelated},
+    cleanupStructuredEncryptionData: {skip: isUnrelated},
     clearJumboFlag: {
         command: {clearJumboFlag: "test.view"},
         skipStandalone: true,

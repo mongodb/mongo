@@ -24,6 +24,7 @@ const commandsAddedToMongosSinceLastLTS = [
     "bulkWrite",
     "checkMetadataConsistency",
     "cleanupReshardCollection",
+    "cleanupStructuredEncryptionData",
     "commitReshardCollection",
     "compactStructuredEncryptionData",
     "configureCollectionBalancing",

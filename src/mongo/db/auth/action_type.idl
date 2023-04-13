@@ -67,6 +67,7 @@ enums:
            checkMetadataConsistency :  "checkMetadataConsistency"
            cleanupOrphaned :  "cleanupOrphaned"
            clearJumboFlag :  "clearJumboFlag"
+           cleanupStructuredEncryptionData: "cleanupStructuredEncryptionData"
            closeAllDatabases :  "closeAllDatabases"  # Deprecated (backwards compatibility)
            collMod :  "collMod"
            collStats :  "collStats"
@@ -242,6 +243,7 @@ enums:
                         - analyze
                         - bypassDocumentValidation
                         - changeStream
+                        - cleanupStructuredEncryptionData
                         - collMod
                         - collStats
                         - compact
@@ -290,6 +292,7 @@ enums:
                         - analyze
                         - bypassDocumentValidation
                         - changeStream
+                        - cleanupStructuredEncryptionData
                         - collMod
                         - collStats
                         - compact
@@ -363,6 +366,7 @@ enums:
                         - analyze
                         - bypassDocumentValidation
                         - changeStream
+                        - cleanupStructuredEncryptionData
                         - collMod
                         - collStats
                         - compact

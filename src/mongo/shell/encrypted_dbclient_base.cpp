@@ -607,9 +607,10 @@ void EncryptedDBClientBase::cleanup(JSContext* cx, JS::CallArgs args) {
     builder.append("cleanupTokens",
                    efc ? FLEClientCrypto::generateCompactionTokens(*efc, this) : BSONObj());
 
-    // TODO SERVER-72937: Add call to cleanup function
-    mozjs::ValueReader(cx, args.rval()).fromBSON(BSONObj(), nullptr, false);
-    return;
+    BSONObj reply;
+    runCommand(nss.dbName(), builder.obj(), reply, 0);
+    reply = reply.getOwned();
+    mozjs::ValueReader(cx, args.rval()).fromBSON(reply, nullptr, false);
 }
 
 void EncryptedDBClientBase::trace(JSTracer* trc) {

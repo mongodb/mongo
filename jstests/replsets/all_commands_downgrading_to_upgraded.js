@@ -366,6 +366,7 @@ const allCommands = {
         // operation.
         skip: "requires additional setup through a failed resharding operation",
     },
+    cleanupStructuredEncryptionData: {skip: "requires additional encrypted collection setup"},
     clearJumboFlag: {
         isShardedOnly: true,
         fullScenario: function(conn, fixture) {

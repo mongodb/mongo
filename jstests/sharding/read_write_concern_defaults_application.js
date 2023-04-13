@@ -259,6 +259,7 @@ let testCases = {
     checkShardingIndex: {skip: "does not accept read or write concern"},
     cleanupOrphaned: {skip: "only on shard server"},
     cleanupReshardCollection: {skip: "does not accept read or write concern"},
+    cleanupStructuredEncryptionData: {skip: "does not accept read or write concern"},
     clearJumboFlag: {skip: "does not accept read or write concern"},
     clearLog: {skip: "does not accept read or write concern"},
     clone: {skip: "deprecated"},

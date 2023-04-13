@@ -48,6 +48,7 @@ env.Library(
     source=[
         'end_sessions_command.cpp',
         'fail_point_cmd.cpp',
+        'fle2_cleanup.idl',
         'fle2_compact.cpp',
         'fle2_compact.idl',
         'generic.cpp',
@@ -572,6 +573,7 @@ env.Library(
         'get_cluster_parameter_command.cpp',
         "internal_rename_if_options_and_indexes_match_cmd.cpp",
         "internal_transactions_test_command_d.cpp",
+        "fle2_cleanup_cmd.cpp",
         "fle2_compact_cmd.cpp",
         "map_reduce_command.cpp",
         "oplog_application_checks.cpp",
