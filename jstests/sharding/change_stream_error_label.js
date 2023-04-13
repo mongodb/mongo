@@ -4,6 +4,7 @@
  * @tags: [
  *   requires_sharding,
  *   uses_change_streams,
+ *    requires_persistence,
  * ]
  */
 (function() {
