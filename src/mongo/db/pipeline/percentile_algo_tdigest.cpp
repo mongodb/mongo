@@ -117,10 +117,9 @@ void TDigest::flushBuffer() {
         return;
     }
 
-    // TODO SERVER-74359: 'boost::sort::spreadsort::spreadsort' shows an observable perf improvement
-    // over std::sort and potentially might provide even more benefits if we separate accumulated
-    // data by type, as it can do radix sort on integers. However, we don't currently include
-    // boost::sort into out third_party libs.
+    // TODO SERVER-75565: 'boost::sort::spreadsort::spreadsort' shows an observable perf improvement
+    // over std::sort on large datasets. If switching to boost's spreadsort would need to re-tune
+    // the default delta setting and the size of the buffer.
     std::sort(_buffer.begin(), _buffer.end());
     merge(_buffer);
     _buffer.clear();
@@ -157,9 +156,11 @@ boost::optional<double> TDigest::computePercentile(double p) {
     // contributed to.
     size_t i = 0;  // index of the target centroid
     double r = 0;  // cumulative weight of all centroids up to, and including, i_th one
-    // TODO SERVER-74359 (tune t-digest): is it worth optimizing traversing the set of centroids
-    // backwards for p > 0.5? This likely doesn't matter when TDigest is used by accumulator but
-    // might become noticeable in expressions.
+
+    // We are not optimizing traversing the set of centroids for higher percentiles or when
+    // multiple percentiles have been requested because our benchmarks don't show this to be a
+    // problem in the accumulator context, and for expressions, where it might matter, we are not
+    // using t-digest.
     for (; i < _centroids.size(); i++) {
         r += _centroids[i].weight;
         if (r > rank) {
