@@ -22,20 +22,6 @@ variables:
     smp_command: -j $(echo "`grep -c ^processor /proc/cpuinfo` * 2" | bc)
     cmake_generator: Ninja
     make_command: ninja
-  tasks:
-    - name: compile
-    - name: ".btree-perf"
-    # FIXME-WT-8867 Disable LSM perf tests till the support for LSM is restored.
-    # - name: ".lsm-perf"
-    - name: ".stress-perf"
-    - name: ".checkpoint-perf"
-    - name: ".evict-perf"
-    - name: ".log-perf"
-    - name: ".long-perf"
-    - name: ".oplog-perf"
-    - name: many-dhandle-stress
-    - name: ".wt2853-perf"
-    - name: cppsuite-bounded-cursor-perf-stress
   display_tasks:
     - name: Wiredtiger-perf-btree-jobs
       execution_tasks:
@@ -76,6 +62,20 @@ buildvariants:
   expansions:
     <<: *ubuntu2004-perf-tests-expansions-template
     collection: AllPerfTests
+  tasks:
+    - name: compile
+    - name: ".btree-perf"
+    # FIXME-WT-8867 Disable LSM perf tests till the support for LSM is restored.
+    # - name: ".lsm-perf"
+    - name: ".stress-perf"
+    - name: ".checkpoint-perf"
+    - name: ".evict-perf"
+    - name: ".log-perf"
+    - name: ".long-perf"
+    - name: ".oplog-perf"
+    - name: many-dhandle-stress
+    - name: ".wt2853-perf"
+    - name: cppsuite-bounded-cursor-perf-stress
 
 - <<: *perf-tasks-template
   name: ubuntu2004-perf-tests-arm64
@@ -85,6 +85,22 @@ buildvariants:
   expansions:
     <<: *ubuntu2004-perf-tests-expansions-template
     collection: AllPerfTestsARM64
+  tasks:
+    - name: compile
+    - name: ".btree-perf"
+    # FIXME-WT-8867 Disable LSM perf tests till the support for LSM is restored.
+    # - name: ".lsm-perf"
+    - name: ".stress-perf"
+    - name: ".checkpoint-perf"
+    - name: ".evict-perf"
+    - name: ".log-perf"
+    - name: ".long-perf"
+    - name: ".oplog-perf"
+    - name: many-dhandle-stress
+    - name: ".wt2853-perf"
+    - name: cppsuite-bounded-cursor-perf-stress
+    - name: many-collection-test
+      distros: ubuntu2004-wt-large
 
 - name: documentation-update
   display_name: "~ Documentation update"

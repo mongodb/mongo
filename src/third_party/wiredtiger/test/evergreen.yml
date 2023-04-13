@@ -847,10 +847,17 @@ functions:
       params:
         file: ./wiredtiger/cmake_build/${test_path}.json
 
+  "convert-to-atlas-evergreen-format":
+    - command: shell.exec
+      params:
+        script: |
+          set -o errexit
+          set -o verbose
+          ${python_binary} wiredtiger/bench/perf_run_py/perf_json_converter_for_atlas_evergreen.py -i ${input_file} -n ${test_name} -o ${output_path}
+
   "upload-perf-test-stats":
     - command: shell.exec
       params:
-        working_dir: "wiredtiger/cmake_build/bench/wtperf"
         shell: bash
         silent: true
         script: |
@@ -863,17 +870,17 @@ functions:
           fi
           EVERGREEN_TASK_INFO='{ "evergreen_task_info": { "is_patch": "'${is_patch}'", "task_id": "'${task_id}'", "distro_id": "'${distro_id}'", "execution": "'${execution}'", "task_name": "'${task_name}'", "version_id": "'${version_id}'", "branch_name": "'${branch_name}'" } }'
           echo "EVERGREEN_TASK_INFO: $EVERGREEN_TASK_INFO"
-          ${python_binary} automation-scripts/evergreen/upload_stats_atlas.py -u ${atlas_perf_test_username} -p ${atlas_perf_test_password} -c ${collection|} -f test_stats/atlas_out_${perf-test-name}.json -t ${created_at} -i "$EVERGREEN_TASK_INFO" -g "../../../"
+          ${python_binary} automation-scripts/evergreen/upload_stats_atlas.py -u ${atlas_perf_test_username} -p ${atlas_perf_test_password} -c ${collection|} -f ${stats_dir|./wiredtiger/cmake_build/bench/wtperf/test_stats}/atlas_out_${perf-test-name}.json -t ${created_at} -i "$EVERGREEN_TASK_INFO" -g "./wiredtiger"
     - command: perf.send
       params:
-        file: ./wiredtiger/cmake_build/bench/wtperf/test_stats/evergreen_out_${perf-test-name}.json
+        file: ${stats_dir|./wiredtiger/cmake_build/bench/wtperf/test_stats}/evergreen_out_${perf-test-name}.json
     # Push the json results to the 'Files' tab of the task in Evergreen
     # Parameterised using the 'perf-test-name' variable
     - command: s3.put
       params:
         aws_secret: ${aws_secret}
         aws_key: ${aws_key}
-        local_files_include_filter: wiredtiger/cmake_build/bench/wtperf/test_stats/*_${perf-test-name}.json
+        local_file: ${stats_dir|wiredtiger/cmake_build/bench/wtperf/test_stats}/atlas_out_${perf-test-name}.json
         bucket: build_external
         permissions: public-read
         content_type: text/html
@@ -4125,9 +4132,6 @@ tasks:
         params:
           working_dir: mongo-tests/largescale
           shell: bash
-          include_expansions_in_env:
-            - atlas_wt_perf_test_user
-            - atlas_wt_perf_pass
           script: |
             set -o errexit
             set -o verbose
@@ -4138,9 +4142,15 @@ tasks:
             pip3 install lorem pymongo==3.12.2 "pymongo[srv]==3.12.2"
             mongod_path=$(find ../../mongo/build -executable -type f -path \*/bin/mongod)
             ./run_many_coll.sh $mongod_path mongodb.log config/many-collection-testing many-collection clean-and-populate
-            # upload the results
-            res_dir=`find ./ -type d -name "many-collection-artifacts" -print`
-            ./upload-results-atlas.py wt-perf-tests many-collection-test ${branch_name} $res_dir/results/results.json
+      - func: "convert-to-atlas-evergreen-format"
+        vars:
+          input_file: ./mongo-tests/largescale/many-collection-artifacts/results/results.json
+          test_name: many-collection-test
+          output_path: ./mongo-tests/largescale/many-collection-artifacts/results/
+      - func: "upload-perf-test-stats"
+        vars:
+          stats_dir: mongo-tests/largescale/many-collection-artifacts/results
+          perf-test-name: many-collection-test
 
   - name: cyclomatic-complexity
     commands:
@@ -5366,15 +5376,6 @@ buildvariants:
     - name: ".stress-test-4-nonstandalone"
     - name: ".stress-test-no-barrier-nonstandalone"
     - name: format-abort-recovery-stress-test-nonstandalone
-
-- name: large-scale-tests
-  display_name: "Large scale tests"
-  batchtime: 480 # 3 times a day
-  run_on:
-  - ubuntu2004-test
-  tasks:
-    - name: many-collection-test
-      distros: ubuntu2004-wt-large
 
 - name: cppsuite-stress-tests-ubuntu
   display_name: "Cppsuite Stress Tests Ubuntu 20.04"
