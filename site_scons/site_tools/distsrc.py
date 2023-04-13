@@ -20,18 +20,17 @@
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-import io
+import SCons
 import os
 import os.path as ospath
-import shutil
 import subprocess
+import shutil
 import tarfile
 import time
 import zipfile
+import io
 
 from distutils.spawn import find_executable
-
-import SCons
 
 __distsrc_callbacks = []
 
@@ -175,7 +174,6 @@ def distsrc_action_generator(source, target, env, for_signature):
     # This is done in two stages because env.WhereIs doesn't seem to work
     # correctly on Windows, but we still want to be able to override the PATH
     # using the env.
-
     git_path = env.WhereIs("git")
     if not git_path:
         git_path = find_executable("git")
@@ -194,22 +192,11 @@ def distsrc_action_generator(source, target, env, for_signature):
         print("Invalid file format for distsrc. Must be tar or zip file")
         env.Exit(1)
 
-    def create_archive(target=None, source=None, env=None):
-        stash_id = subprocess.check_output([git_path, "stash", "create"]).decode("utf-8").strip()
-        subprocess.check_call([
-            git_path,
-            "archive",
-            "--format",
-            target_ext,
-            "--output",
-            str(target[0]),
-            "--prefix",
-            env["MONGO_DIST_SRC_PREFIX"],
-            stash_id,
-        ])
+    git_cmd = ('"%s" archive --format %s --output %s --prefix ${MONGO_DIST_SRC_PREFIX} HEAD' %
+               (git_path, target_ext, target[0]))
 
     return [
-        SCons.Action.Action(create_archive, "Creating archive for $TARGET"),
+        SCons.Action.Action(git_cmd, "Running git archive for $TARGET"),
         SCons.Action.Action(
             run_distsrc_callbacks,
             "Running distsrc callbacks for $TARGET",

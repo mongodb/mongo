@@ -259,6 +259,23 @@ def get_test_args(package_manager: str, package_files: List[str]) -> TestArgs:
 def setup(test_args: TestArgs):
     logging.info("Setting up test environment.")
 
+    # TODO SERVER-70425: We can remove these once we have figured out why
+    # packager.py sometimes uses distro files from older revisions.
+    # Remove the PIDFile, PermissionsStartOnly, and Type configurations from
+    # the systemd service file because they are not needed for simple-type
+    # (non-forking) services and confuse the systemd emulator script.
+    run_and_log("sed -Ei '/^PIDFile=|PermissionsStartOnly=|Type=/d' {}/mongod.service".format(
+        test_args["systemd_units_dir"]))
+    # Ensure RuntimeDirectory has been added to the systemd unit file.
+    run_and_log("sed -Ei '/^ExecStart=.*/a RuntimeDirectory=mongodb' {}/mongod.service".format(
+        test_args["systemd_units_dir"]))
+    # Remove the journal: line (and the next) from mongod.conf, which is a
+    # removed configuration. The Debian version of the config never got updated.
+    run_and_log("sed -i '/journal:/,+1d' /etc/mongod.conf")
+    # Remove fork: and pidFilePath: from mongod.conf because we want mongod to be
+    # a non-forking service under systemd.
+    run_and_log("sed -Ei '/fork:|pidFilePath:/d' /etc/mongod.conf")
+
     # Ensure systemd doesn't try to start anything automatically so we can do
     # it in our tests
     run_and_log("mkdir -p /run/systemd/system")

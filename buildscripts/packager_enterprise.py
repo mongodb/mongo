@@ -28,14 +28,13 @@
 # echo "Now put the dist gnupg signing keys in ~root/.gnupg"
 
 import errno
+from glob import glob
 import os
 import re
 import shutil
 import sys
 import tempfile
 import time
-
-from glob import glob
 
 sys.path.append(os.getcwd())
 
@@ -255,8 +254,8 @@ def make_package(distro, build_os, arch, spec, srcdir):
         # FIXME: sh-dash-cee is bad. See if tarfile can do this.
         packager.sysassert([
             "sh", "-c",
-            "(cd \"%s\" && GIT_HASH=$(git stash create) && git archive \"${GIT_HASH}\" %s/ )"
-            "| (cd \"%s\" && tar xvf -)" % (srcdir, pkgdir, sdir)
+            "(cd \"%s\" && git archive %s %s/ ) | (cd \"%s\" && tar xvf -)" %
+            (srcdir, spec.metadata_gitspec(), pkgdir, sdir)
         ])
     # Splat the binaries under sdir.  The "build" stages of the
     # packaging infrastructure will move the files to wherever they
