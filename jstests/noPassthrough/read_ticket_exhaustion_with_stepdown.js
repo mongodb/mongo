@@ -39,6 +39,7 @@
  * @tags: [
  *   multiversion_incompatible,
  *   requires_replication,
+ *   requires_wiredtiger,
  * ]
  */
 (function() {
@@ -130,17 +131,11 @@ function runStepDown() {
     let stats = db.runCommand({serverStatus: 1});
     jsTestLog(stats.locks);
     jsTestLog(stats.wiredTiger.concurrentTransactions);
-    const stepDownSecs = 5;
-    assert.commandWorked(primaryAdmin.runCommand({"replSetStepDown": stepDownSecs, "force": true}));
-
-    // Wait until the primary transitioned to SECONDARY state.
-    replTest.waitForState(primary, ReplSetTest.State.SECONDARY);
-
-    // Enforce the replSetStepDown timer.
-    sleep(stepDownSecs * 1000);
-
-    replTest.waitForState(primary, ReplSetTest.State.PRIMARY);
-    replTest.getPrimary();
+    // Force primary to step down, then unfreeze and allow it to step up.
+    assert.commandWorked(
+        primaryAdmin.runCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
+    assert.commandWorked(primaryAdmin.runCommand({replSetFreeze: 0}));
+    return replTest.getPrimary();
 }
 
 /****************************************************/
@@ -198,7 +193,7 @@ assert.soon(
               .toArray()
               .length >= kNumReadTickets,
     "Expected more readers than read tickets.");
-runStepDown();
+primary = runStepDown();
 
 // 6) Stop Readers.
 jsTestLog("Stopping Readers");
