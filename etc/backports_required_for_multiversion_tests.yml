@@ -364,6 +364,8 @@ last-continuous:
     ticket: SERVER-67180
   - test_file: jstests/sharding/analyze_shard_key/cardinality_and_frequency_basic.js
     ticket: SERVER-75886
+  - test_file: jstests/core/clustered/clustered_collection_hint.js
+    ticket: SERVER-73482
   suites: null
 last-lts:
   all:
@@ -795,4 +797,6 @@ last-lts:
     ticket: SERVER-67180
   - test_file: jstests/sharding/analyze_shard_key/cardinality_and_frequency_basic.js
     ticket: SERVER-75886
+  - test_file: jstests/core/clustered/clustered_collection_hint.js
+    ticket: SERVER-73482
   suites: null
