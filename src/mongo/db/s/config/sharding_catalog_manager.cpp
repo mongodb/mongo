@@ -665,11 +665,9 @@ Status ShardingCatalogManager::initializeConfigDatabaseIfNeeded(OperationContext
         return status;
     }
 
-    if (feature_flags::gConfigSettingsSchema.isEnabled(serverGlobalParams.featureCompatibility)) {
-        status = _initConfigSettings(opCtx);
-        if (!status.isOK()) {
-            return status;
-        }
+    status = _initConfigSettings(opCtx);
+    if (!status.isOK()) {
+        return status;
     }
 
     // Make sure to write config.version last since we detect rollbacks of config.version and
@@ -684,10 +682,6 @@ Status ShardingCatalogManager::initializeConfigDatabaseIfNeeded(OperationContext
     _configInitialized = true;
 
     return Status::OK();
-}
-
-Status ShardingCatalogManager::upgradeConfigSettings(OperationContext* opCtx) {
-    return _initConfigSettings(opCtx);
 }
 
 ShardingCatalogClient* ShardingCatalogManager::localCatalogClient() {

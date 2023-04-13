@@ -82,11 +82,6 @@ feature_flags:
     cpp_varname: feature_flags::gResilientMovePrimary
     default: true
     version: 7.0
-  featureFlagConfigSettingsSchema:
-    description: "Feature flag for adding schema to config.settings collection"
-    cpp_varname: feature_flags::gConfigSettingsSchema
-    default: true
-    version: 6.2
   featureFlagAutoMerger:
     description: "Feature flag for enabling auto-merging of contiguous chunks belonging to the same shard"
     cpp_varname: feature_flags::gAutoMerger

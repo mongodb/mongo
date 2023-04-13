@@ -1,7 +1,7 @@
 /**
  * Tests that the schema on config.settings works as intended.
  *
- * @tags: [featureFlagConfigSettingsSchema, requires_fcv_62, does_not_support_stepdowns]
+ * @tags: [does_not_support_stepdowns]
  */
 (function() {
 'use strict';

@@ -566,11 +566,6 @@ public:
                               const Timestamp& validAfter);
 
     /**
-     * Creates config.settings (if needed) and adds a schema to the collection.
-     */
-    Status upgradeConfigSettings(OperationContext* opCtx);
-
-    /**
      * Set `onCurrentShardSince` to the same value as `history[0].validAfter` for all config.chunks
      * entries.
      * Only called on the FCV upgrade

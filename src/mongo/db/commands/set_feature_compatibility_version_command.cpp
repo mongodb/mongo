@@ -707,7 +707,6 @@ private:
         if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
             const auto actualVersion = serverGlobalParams.featureCompatibility.getVersion();
             _cleanupConfigVersionOnUpgrade(opCtx, requestedVersion, actualVersion);
-            _createSchemaOnConfigSettings(opCtx, requestedVersion, actualVersion);
             _setOnCurrentShardSinceFieldOnChunks(opCtx, requestedVersion, actualVersion);
             // Depends on _setOnCurrentShardSinceFieldOnChunks()
             _initializePlacementHistory(opCtx, requestedVersion, actualVersion);
@@ -812,18 +811,6 @@ private:
             if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
                 uassertStatusOK(sharding_util::createShardCollectionCatalogIndexes(opCtx));
             }
-        }
-    }
-
-    // TODO (SERVER-70763): Remove once FCV 7.0 becomes last-lts.
-    void _createSchemaOnConfigSettings(
-        OperationContext* opCtx,
-        const multiversion::FeatureCompatibilityVersion requestedVersion,
-        const multiversion::FeatureCompatibilityVersion actualVersion) {
-        if (feature_flags::gConfigSettingsSchema.isEnabledOnTargetFCVButDisabledOnOriginalFCV(
-                requestedVersion, actualVersion)) {
-            LOGV2(6885200, "Creating schema on config.settings");
-            uassertStatusOK(ShardingCatalogManager::get(opCtx)->upgradeConfigSettings(opCtx));
         }
     }
 
@@ -1257,7 +1244,6 @@ private:
         // roles aren't mutually exclusive.
         if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
             _dropInternalShardingIndexCatalogCollection(opCtx, requestedVersion, originalVersion);
-            _removeSchemaOnConfigSettings(opCtx, requestedVersion, originalVersion);
             // Always abort the reshardCollection regardless of version to ensure that it will
             // run on a consistent version from start to finish. This will ensure that it will
             // be able to apply the oplog entries correctly.
@@ -1362,23 +1348,6 @@ private:
                                   << causedBy(deletionStatus.reason()),
                     deletionStatus.isOK() ||
                         deletionStatus.code() == ErrorCodes::NamespaceNotFound);
-        }
-    }
-
-    // TODO (SERVER-70763): Remove once FCV 7.0 becomes last-lts.
-    void _removeSchemaOnConfigSettings(
-        OperationContext* opCtx,
-        const multiversion::FeatureCompatibilityVersion requestedVersion,
-        const multiversion::FeatureCompatibilityVersion originalVersion) {
-        if (feature_flags::gConfigSettingsSchema.isDisabledOnTargetFCVButEnabledOnOriginalFCV(
-                requestedVersion, originalVersion)) {
-            LOGV2(6885201, "Removing schema on config.settings");
-            CollMod collModCmd{NamespaceString::kConfigSettingsNamespace};
-            collModCmd.getCollModRequest().setValidator(BSONObj());
-            collModCmd.getCollModRequest().setValidationLevel(ValidationLevelEnum::off);
-            BSONObjBuilder builder;
-            uassertStatusOKIgnoreNSNotFound(processCollModCommand(
-                opCtx, {NamespaceString::kConfigSettingsNamespace}, collModCmd, &builder));
         }
     }
 
