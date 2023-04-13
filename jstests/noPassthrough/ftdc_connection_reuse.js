@@ -14,7 +14,7 @@ load("jstests/libs/parallelTester.js");
 
 const ftdcPath = MongoRunner.toRealPath('ftdc');
 const st = new ShardingTest({
-    shards: 1,
+    shards: {rs0: {nodes: 1}},
     mongos: {
         s0: {setParameter: {diagnosticDataCollectionDirectoryPath: ftdcPath}},
     }
@@ -27,11 +27,11 @@ const testDB = st.s.getDB(kDbName);
 const coll = testDB.getCollection(kCollName);
 
 function getDiagnosticData() {
+    let stats;
     assert.soon(() => {
-        let stats = verifyGetDiagnosticData(st.s.getDB("admin")).connPoolStats;
+        stats = verifyGetDiagnosticData(st.s.getDB("admin")).connPoolStats;
         return stats["pools"].hasOwnProperty('NetworkInterfaceTL-TaskExecutorPool-0');
     }, "Failed to load NetworkInterfaceTL-TaskExecutorPool-0 in FTDC within time limit");
-    const stats = verifyGetDiagnosticData(st.s.getDB("admin")).connPoolStats;
     assert(stats.hasOwnProperty('totalWasUsedOnce'));
     assert(stats.hasOwnProperty('totalConnUsageTimeMillis'));
     return stats["pools"]["NetworkInterfaceTL-TaskExecutorPool-0"];
@@ -74,8 +74,14 @@ function launchFinds({times, readPref, shouldFail}) {
 function resetPools() {
     const cfg = st.rs0.getPrimary().getDB('local').system.replset.findOne();
     const allHosts = cfg.members.map(x => x.host);
-
     assert.commandWorked(st.s.adminCommand({dropConnections: 1, hostAndPort: allHosts}));
+    // FTDC data is collected periodically. Check that the data returned reflects that the pools
+    // have been dropped before resuming testing.
+    assert.soon(() => {
+        const stats = getDiagnosticData();
+        // The shard has a single node in its replica set.
+        return !stats.hasOwnProperty(allHosts[0]);
+    }, "Failed to wait for pool stats to reflect dropped pools");
 }
 
 [1, 2, 3].forEach(v => assert.commandWorked(coll.insert({x: v})));
