@@ -196,6 +196,91 @@ function testClusteredCollectionHint(coll, clusterKey, clusterKeyName) {
             }
         });
 
+        // Find with $natural hints and sorts: we should scan the collection in the hinted
+        // direction regardless of sort direction, and provide a blocking sort if needed.
+        validateClusteredCollectionHint(coll, {
+            expectedNReturned: batchSize,
+            cmd: {find: collName, hint: {$natural: 1}, sort: {[clusterKeyFieldName]: 1}},
+            expectedWinningPlanStats: {
+                stage: "COLLSCAN",
+                direction: "forward",
+            },
+            unexpectedWinningPlanStats: ["SORT"]  // We shouldn't need a blocking sort here.
+        });
+        validateClusteredCollectionHint(coll, {
+            expectedNReturned: batchSize,
+            cmd: {find: collName, hint: {$natural: -1}, sort: {[clusterKeyFieldName]: 1}},
+            expectedWinningPlanStats: [
+                {stage: "SORT", sortPattern: {[clusterKeyFieldName]: 1}},
+                {
+                    stage: "COLLSCAN",
+                    direction: "backward",
+                }
+            ]
+        });
+        validateClusteredCollectionHint(coll, {
+            expectedNReturned: batchSize,
+            cmd: {find: collName, hint: {$natural: 1}, sort: {[clusterKeyFieldName]: -1}},
+            expectedWinningPlanStats: [
+                {stage: "SORT", sortPattern: {[clusterKeyFieldName]: -1}},
+                {
+                    stage: "COLLSCAN",
+                    direction: "forward",
+                }
+            ]
+        });
+        validateClusteredCollectionHint(coll, {
+            expectedNReturned: batchSize,
+            cmd: {find: collName, hint: {$natural: -1}, sort: {[clusterKeyFieldName]: -1}},
+            expectedWinningPlanStats: {
+                stage: "COLLSCAN",
+                direction: "backward",
+            },
+            unexpectedWinningPlanStats: ["SORT"]  // We shouldn't need a blocking sort here.
+        });
+
+        // We always need a blocking sort when the sort pattern does not match the provided sort for
+        // the clustered collection.
+        validateClusteredCollectionHint(coll, {
+            expectedNReturned: batchSize,
+            cmd: {find: collName, hint: {$natural: 1}, sort: {a: 1}},
+            expectedWinningPlanStats: [
+                {stage: "SORT", sortPattern: {a: 1}},
+                {
+                    stage: "COLLSCAN",
+                    direction: "forward",
+                }
+            ]
+        });
+        validateClusteredCollectionHint(coll, {
+            expectedNReturned: batchSize,
+            cmd: {find: collName, hint: {$natural: -1}, sort: {a: 1}},
+            expectedWinningPlanStats: [
+                {stage: "SORT", sortPattern: {a: 1}},
+                {
+                    stage: "COLLSCAN",
+                    direction: "backward",
+                }
+            ]
+        });
+        validateClusteredCollectionHint(coll, {
+            expectedNReturned: batchSize,
+            cmd: {find: collName, hint: {$natural: 1}, sort: {a: -1}},
+            expectedWinningPlanStats: [
+                {stage: "SORT", sortPattern: {a: -1}},
+                {
+                    stage: "COLLSCAN",
+                    direction: "forward",
+                }
+            ]
+        });
+        validateClusteredCollectionHint(coll, {
+            expectedNReturned: batchSize,
+            cmd: {find: collName, hint: {$natural: -1}, sort: {a: -1}},
+            expectedWinningPlanStats:
+                [{stage: "SORT", sortPattern: {a: -1}}, {stage: "COLLSCAN", direction: "backward"}],
+        });
+
         // Find on a standard index.
         validateClusteredCollectionHint(coll, {
             expectedNReturned: batchSize,
@@ -280,25 +365,39 @@ function testClusteredCollectionHint(coll, clusterKey, clusterKeyName) {
     return testHint(coll, clusterKey, clusterKeyName);
 }
 
-function validateClusteredCollectionHint(coll,
-                                         {expectedNReturned, cmd, expectedWinningPlanStats = {}}) {
+function validateClusteredCollectionHint(
+    coll,
+    {expectedNReturned, cmd, expectedWinningPlanStats = {}, unexpectedWinningPlanStats = []}) {
     const explain = assert.commandWorked(coll.runCommand({explain: cmd}));
     assert.eq(explain.executionStats.nReturned, expectedNReturned, tojson(explain));
 
     const actualWinningPlan = getWinningPlan(explain.queryPlanner);
-    const stageOfInterest = getPlanStage(actualWinningPlan, expectedWinningPlanStats.stage);
-    assert.neq(null, stageOfInterest);
 
-    for (const [key, value] of Object.entries(expectedWinningPlanStats)) {
-        assert(stageOfInterest[key] !== undefined, tojson(explain));
-        assert.eq(stageOfInterest[key], value, tojson(explain));
+    if (!Array.isArray(expectedWinningPlanStats)) {
+        expectedWinningPlanStats = [expectedWinningPlanStats];
     }
 
-    // Explicitly check that the plan is not bounded by default.
-    if (!expectedWinningPlanStats.hasOwnProperty("minRecord")) {
-        assert(!actualWinningPlan.hasOwnProperty("minRecord"), tojson(explain));
+    for (const excludedStage of unexpectedWinningPlanStats) {
+        const stageOfInterest = getPlanStage(actualWinningPlan, excludedStage);
+        assert.eq(null, stageOfInterest);
     }
-    if (!expectedWinningPlanStats.hasOwnProperty("maxRecord")) {
-        assert(!actualWinningPlan.hasOwnProperty("maxRecord"), tojson(explain));
+
+    for (const expectedWinningPlanStageStats of expectedWinningPlanStats) {
+        const stageOfInterest =
+            getPlanStage(actualWinningPlan, expectedWinningPlanStageStats.stage);
+        assert.neq(null, stageOfInterest);
+
+        for (const [key, value] of Object.entries(expectedWinningPlanStageStats)) {
+            assert(stageOfInterest[key] !== undefined, tojson(explain));
+            assert.eq(stageOfInterest[key], value, tojson(explain));
+        }
+
+        // Explicitly check that the plan is not bounded by default.
+        if (!expectedWinningPlanStageStats.hasOwnProperty("minRecord")) {
+            assert(!actualWinningPlan.hasOwnProperty("minRecord"), tojson(explain));
+        }
+        if (!expectedWinningPlanStageStats.hasOwnProperty("maxRecord")) {
+            assert(!actualWinningPlan.hasOwnProperty("maxRecord"), tojson(explain));
+        }
     }
 }
