@@ -3552,6 +3552,17 @@ tasks:
     - func: "send benchmark results"
 
 - <<: *benchmark_template
+  name: benchmarks_query
+  tags: ["benchmarks"]
+  commands:
+  - func: "do benchmark setup"
+  - func: "run tests"
+    vars:
+      suite: benchmarks_query
+      resmoke_jobs_max: 1
+  - func: "send benchmark results"
+
+- <<: *benchmark_template
   name: benchmarks_expression
   tags: ["benchmarks"]
   commands:
