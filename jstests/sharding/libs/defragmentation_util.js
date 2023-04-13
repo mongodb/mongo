@@ -7,11 +7,12 @@ var defragmentationUtil = (function() {
                                               numChunks,
                                               maxChunkFillMB,
                                               numZones,
-                                              docSizeBytes,
+                                              docSizeBytesRange,
                                               chunkSpacing,
                                               disableCollectionBalancing) {
-        jsTest.log("Creating fragmented collection " + ns + " with parameters: numChunks = " +
-                   numChunks + ", numZones = " + numZones + ", docSizeBytes = " + docSizeBytes +
+        jsTest.log("Creating fragmented collection " + ns +
+                   " with parameters: numChunks = " + numChunks + ", numZones = " + numZones +
+                   ", docSizeBytesRange = " + docSizeBytesRange +
                    ", maxChunkFillMB = " + maxChunkFillMB + ", chunkSpacing = " + chunkSpacing);
         assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {key: 1}}));
         // Turn off balancer for this collection
@@ -28,7 +29,7 @@ var defragmentationUtil = (function() {
         // Created zones will line up exactly with existing chunks so as not to trigger zone
         // violations in the balancer.
         createRandomZones(mongos, ns, numZones);
-        fillChunksToRandomSize(mongos, ns, docSizeBytes, maxChunkFillMB);
+        fillChunksToRandomSize(mongos, ns, docSizeBytesRange, maxChunkFillMB);
 
         const beginningNumberChunks = findChunksUtil.countChunksForNs(mongos.getDB('config'), ns);
         const beginningNumberZones = mongos.getDB('config').tags.countDocuments({ns: ns});
@@ -72,13 +73,17 @@ var defragmentationUtil = (function() {
         }
     };
 
-    let fillChunksToRandomSize = function(mongos, ns, docSizeBytes, maxChunkFillMB) {
+    let fillChunksToRandomSize = function(mongos, ns, docSizeBytesRange, maxChunkFillMB) {
         const chunks = findChunksUtil.findChunksByNs(mongos.getDB('config'), ns).toArray();
-        const bigString = "X".repeat(docSizeBytes);
         const coll = mongos.getCollection(ns);
         let bulk = coll.initializeUnorderedBulkOp();
+        assert.gte(docSizeBytesRange[1], docSizeBytesRange[0]);
         chunks.forEach((chunk) => {
             let chunkSize = Random.randInt(maxChunkFillMB);
+            let docSizeBytes = Random.randInt(docSizeBytesRange[1] - docSizeBytesRange[0] + 1) +
+                docSizeBytesRange[0];
+            docSizeBytes = docSizeBytes === 0 ? 1 : docSizeBytes;
+            let bigString = "X".repeat(docSizeBytes);
             let docsPerChunk = (chunkSize * 1024 * 1024) / docSizeBytes;
             if (docsPerChunk === 0) {
                 return;

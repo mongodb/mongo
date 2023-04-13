@@ -40,7 +40,7 @@ let runTest = function(numCollections, dbName) {
     for (let i = 0; i < numCollections; ++i) {
         const numChunks = Random.randInt(28) + 2;
         const numZones = Random.randInt(numChunks / 2);
-        const docSizeBytes = Random.randInt(1024 * 1024) + 50;
+        const docSizeBytesRange = [50, 1024 * 1024];
 
         const coll = db[coll_prefix + i];
 
@@ -49,7 +49,7 @@ let runTest = function(numCollections, dbName) {
                                                        numChunks,
                                                        maxChunkFillMB,
                                                        numZones,
-                                                       docSizeBytes,
+                                                       docSizeBytesRange,
                                                        chunkSpacing,
                                                        true);
 

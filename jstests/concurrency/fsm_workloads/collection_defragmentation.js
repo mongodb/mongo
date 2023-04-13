@@ -223,14 +223,14 @@ var $config = (function() {
                 const fullNs = dbName + "." + collPrefix + j;
                 const numChunks = Random.randInt(30);
                 const numZones = Random.randInt(numChunks / 2);
-                const docSizeBytes = Random.randInt(1024 * 1024) + 50;
+                const docSizeBytesRange = [50, 1024 * 1024];
                 defragmentationUtil.createFragmentedCollection(
                     mongos,
                     fullNs,
                     numChunks,
                     5 /* maxChunkFillMB */,
                     numZones,
-                    docSizeBytes,
+                    docSizeBytesRange,
                     1000 /* chunkSpacing */,
                     true /* disableCollectionBalancing*/);
             }
