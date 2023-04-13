@@ -79,6 +79,17 @@ using SetsockoptPtr = char*;
 using SetsockoptPtr = void*;
 #endif
 
+std::string loadFile(std::string filename) try {
+    std::ifstream f;
+    f.exceptions(f.exceptions() | std::ios::failbit);
+    f.open(filename);
+    return {std::istreambuf_iterator<char>{f}, std::istreambuf_iterator<char>{}};
+} catch (const std::ifstream::failure& ex) {
+    auto ec = lastSystemError();
+    FAIL("Failed to load file: \"{}\": {}: {}"_format(filename, ex.what(), errorMessage(ec)));
+    MONGO_UNREACHABLE;
+}
+
 class JoinThread : public stdx::thread {
 public:
     using stdx::thread::thread;
@@ -836,11 +847,7 @@ TEST_F(AsioTransportLayerWithServiceContextTest, ShutdownDuringSSLHandshake) {
     conn.setSoTimeout(1);  // 1 second timeout
 
     TransientSSLParams params;
-    params.sslClusterPEMPayload = [] {
-        std::ifstream input("jstests/libs/client.pem");
-        std::string str((std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
-        return str;
-    }();
+    params.sslClusterPEMPayload = loadFile("jstests/libs/client.pem");
     params.targetedClusterConnectionString = ConnectionString::forLocal();
 
     auto status = conn.connectSocketOnly({"localhost", port}, std::move(params));
