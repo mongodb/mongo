@@ -1,6 +1,10 @@
 /**
  * Basic tests for the $_internalEqHash match expression.
- * @tags: [requires_fcv_70]
+ * @tags: [
+ *   # explain doesn't support read concern
+ *   assumes_read_concern_unchanged,
+ *   requires_fcv_70,
+ * ]
  */
 (function() {
 "use strict";

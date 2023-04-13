@@ -2,7 +2,11 @@
  * Tests that $expr with equality of $toHashedIndexKey to a NumberLong results in an IXSCAN plan
  * with a point bound. This is because we rewrite this structure to a $_internalEqHash expression
  * and generate a tight index bound.
- * @tags: [requires_fcv_70]
+ * @tags: [
+ *   # explain doesn't support read concern
+ *   assumes_read_concern_unchanged,
+ *   requires_fcv_70,
+ * ]
  */
 (function() {
 "use strict";
