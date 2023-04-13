@@ -3205,8 +3205,7 @@ buildvariants:
   - name: validate_commit_message
   - name: check_feature_flag_tags
   - name: compile_venv_deps_check
-  # TODO SERVER-75688: add back validation
-  # - name: resmoke_validation_tests
+  - name: resmoke_validation_tests
   - name: version_gen_validation
 
 - name: &windows-dynamic-visibility-test windows-dynamic-visibility-test

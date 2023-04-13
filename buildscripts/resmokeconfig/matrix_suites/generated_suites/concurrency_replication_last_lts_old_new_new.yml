@@ -23,6 +23,8 @@ executor:
       oplogSize: 1024
       set_parameters:
         enableTestCommands: 1
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
+        queryAnalysisWriterIntervalSecs: 1
         roleGraphInvalidationIsFatal: 1
     num_nodes: 3
     old_bin_version: last_lts

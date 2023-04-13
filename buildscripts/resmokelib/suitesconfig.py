@@ -2,6 +2,7 @@
 import collections
 import copy
 import os
+import pathlib
 from threading import Lock
 from typing import Dict, List
 
@@ -234,23 +235,26 @@ class MatrixSuiteConfig(SuiteConfigInterface):
         if not config:
             return None
 
-        # TODO: SERVER-75688 add validation back
-        # generated_path = cls.get_generated_suite_path(suite_name)
-        # if not os.path.exists(generated_path):
-        #     raise errors.InvalidMatrixSuiteError(
-        #         f"No generated suite file was found for {suite_name}" +
-        #         "To (re)generate the matrix suite files use `python3 buildscripts/resmoke.py generate-matrix-suites`"
-        #     )
+        generated_path = cls.get_generated_suite_path(suite_name)
+        if not os.path.exists(generated_path):
+            raise errors.InvalidMatrixSuiteError(
+                f"No generated suite file was found for {suite_name}" +
+                "To (re)generate the matrix suite files use `python3 buildscripts/resmoke.py generate-matrix-suites`"
+            )
 
-        # new_text = cls.generate_matrix_suite_text(suite_name)
-        # with open(generated_path, "r") as file:
-        #     old_text = file.read()
-        #     if new_text != old_text:
-        #         raise errors.InvalidMatrixSuiteError(
-        #             f"The generated file found on disk did not match the mapping file for {suite_name}. "
-        #             +
-        #             "To (re)generate the matrix suite files use `python3 buildscripts/resmoke.py generate-matrix-suites`"
-        #         )
+        new_text = cls.generate_matrix_suite_text(suite_name)
+        with open(generated_path, "r") as file:
+            old_text = file.read()
+            if new_text != old_text:
+                loggers.ROOT_EXECUTOR_LOGGER.error("Generated file on disk:")
+                loggers.ROOT_EXECUTOR_LOGGER.error(old_text)
+                loggers.ROOT_EXECUTOR_LOGGER.error("Generated text from mapping file:")
+                loggers.ROOT_EXECUTOR_LOGGER.error(new_text)
+                raise errors.InvalidMatrixSuiteError(
+                    f"The generated file found on disk did not match the mapping file for {suite_name}. "
+                    +
+                    "To (re)generate the matrix suite files use `python3 buildscripts/resmoke.py generate-matrix-suites`"
+                )
 
         return config
 
@@ -418,6 +422,8 @@ class MatrixSuiteConfig(SuiteConfigInterface):
             print(f"Could not find mappings file for {suite_name}")
             return None
 
+        # This path needs to output the same text on both windows and linux/mac
+        mapping_path = pathlib.PurePath(mapping_path)
         yml = yaml.safe_dump(matrix_suite)
         comments = [
             "##########################################################",
@@ -425,7 +431,7 @@ class MatrixSuiteConfig(SuiteConfigInterface):
             "# IF YOU WISH TO MODIFY THIS SUITE, MODIFY THE CORRESPONDING MATRIX SUITE MAPPING FILE",
             "# AND REGENERATE THE MATRIX SUITES.",
             "#",
-            f"# matrix suite mapping file: {mapping_path}",
+            f"# matrix suite mapping file: {mapping_path.as_posix()}",
             "# regenerate matrix suites: buildscripts/resmoke.py generate-matrix-suites",
             "##########################################################",
         ]

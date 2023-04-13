@@ -25,6 +25,7 @@ selector:
   exclude_with_any_tags:
   - featureFlagToaster
   - featureFlagSpoon
+  - DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE
   roots:
   - jstests/multiVersion/**/*.js
   - src/mongo/db/modules/*/jstests/hot_backups/multiVersion/*.js

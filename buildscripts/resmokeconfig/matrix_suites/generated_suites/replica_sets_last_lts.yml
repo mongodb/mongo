@@ -25,6 +25,7 @@ selector:
   - multiversion_incompatible
   - backport_required_multiversion
   - replica_sets_multiversion_backport_required_multiversion
+  - DISABLED_TEMPORARILY_DUE_TO_FCV_UPGRADE
   roots:
   - jstests/replsets/*.js
 test_kind: js_test

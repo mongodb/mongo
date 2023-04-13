@@ -26,11 +26,13 @@ executor:
     mongod_options:
       set_parameters:
         enableTestCommands: 1
+        queryAnalysisWriterIntervalSecs: 1
         receiveChunkWaitForRangeDeleterTimeoutMS: 90000
         roleGraphInvalidationIsFatal: 1
     mongos_options:
       set_parameters:
         enableTestCommands: 1
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
     num_mongos: 2
     num_rs_nodes_per_shard: 2
     num_shards: 2

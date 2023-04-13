@@ -442,6 +442,9 @@ class TestRunner(Subcommand):
             self._resmoke_logger.error("Failed to parse YAML suite definition: %s", str(err))
             self.list_suites()
             self.exit(1)
+        except errors.InvalidMatrixSuiteError as err:
+            self._resmoke_logger.error("Failed to get matrix suite: %s", str(err))
+            self.exit(1)
         except errors.ResmokeError as err:
             self._resmoke_logger.error(
                 "Cannot run excluded test in suite config. Use '--force-excluded-tests' to override: %s",
