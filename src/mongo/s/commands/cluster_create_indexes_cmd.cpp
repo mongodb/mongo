@@ -121,8 +121,10 @@ public:
                 applyReadWriteConcern(opCtx, this, cmdToBeSent)),
             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
             Shard::RetryPolicy::kNoRetry,
-            BSONObj() /* query */,
-            BSONObj() /* collation */);
+            BSONObj() /*query*/,
+            BSONObj() /*collation*/,
+            boost::none /*letParameters*/,
+            boost::none /*runtimeConstants*/);
 
         std::string errmsg;
         const bool ok =

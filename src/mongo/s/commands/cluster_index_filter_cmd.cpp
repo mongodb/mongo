@@ -101,7 +101,9 @@ public:
             ReadPreferenceSetting::get(opCtx),
             Shard::RetryPolicy::kIdempotent,
             query,
-            CollationSpec::kSimpleSpec);
+            CollationSpec::kSimpleSpec,
+            boost::none /*letParameters*/,
+            boost::none /*runtimeConstants*/);
 
         // Sort shard responses by shard id.
         std::sort(shardResponses.begin(),

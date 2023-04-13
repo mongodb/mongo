@@ -91,8 +91,10 @@ public:
                 opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
             ReadPreferenceSetting::get(opCtx),
             Shard::RetryPolicy::kIdempotent,
-            {},
-            {});
+            {} /*query*/,
+            {} /*collation*/,
+            boost::none /*letParameters*/,
+            boost::none /*runtimeConstants*/);
 
         Status firstFailedShardStatus = Status::OK();
         bool isValid = true;

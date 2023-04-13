@@ -247,8 +247,10 @@ public:
                 opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObjToSend)),
             ReadPreferenceSetting::get(opCtx),
             Shard::RetryPolicy::kIdempotent,
-            {},
-            {});
+            {} /*query*/,
+            {} /*collation*/,
+            boost::none /*letParameters*/,
+            boost::none /*runtimeConstants*/);
 
         BSONObjBuilder shardStats;
         std::map<std::string, long long> counts;

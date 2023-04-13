@@ -107,7 +107,9 @@ public:
                                                            ReadPreferenceSetting::get(opCtx),
                                                            Shard::RetryPolicy::kIdempotent,
                                                            routingQuery,
-                                                           CollationSpec::kSimpleSpec);
+                                                           CollationSpec::kSimpleSpec,
+                                                           boost::none /*letParameters*/,
+                                                           boost::none /*runtimeConstants*/);
             invariant(shardResults.size() == 1);
             const auto shardResponse = uassertStatusOK(std::move(shardResults[0].swResponse));
             uassertStatusOK(shardResponse.status);

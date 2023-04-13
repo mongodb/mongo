@@ -366,6 +366,8 @@ last-continuous:
     ticket: SERVER-75886
   - test_file: jstests/core/clustered/clustered_collection_hint.js
     ticket: SERVER-73482
+  - test_file: jstests/core/command_let_variables.js
+    ticket: SERVER-75356
   suites: null
 last-lts:
   all:
@@ -799,4 +801,6 @@ last-lts:
     ticket: SERVER-75886
   - test_file: jstests/core/clustered/clustered_collection_hint.js
     ticket: SERVER-73482
+  - test_file: jstests/core/command_let_variables.js
+    ticket: SERVER-75356
   suites: null

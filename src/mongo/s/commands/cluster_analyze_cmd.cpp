@@ -91,8 +91,10 @@ public:
                     CommandHelpers::filterCommandRequestForPassthrough(unparsedRequest().body)),
                 ReadPreferenceSetting::get(opCtx),
                 Shard::RetryPolicy::kIdempotent,
-                BSONObj() /* query */,
-                BSONObj() /* collation */);
+                BSONObj() /*query*/,
+                BSONObj() /*collation*/,
+                boost::none /*letParameters*/,
+                boost::none /*runtimeConstants*/);
 
             for (const auto& shardResult : shardResponses) {
                 const auto& shardResponse = uassertStatusOK(std::move(shardResult.swResponse));
