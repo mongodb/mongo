@@ -111,7 +111,7 @@ __wt_block_compact_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, bool *skipp)
      * are unlikely to recover 10% of the file.
      */
     if (block->size <= WT_MEGABYTE) {
-        __wt_verbose_debug1(session, WT_VERB_COMPACT,
+        __wt_verbose_info(session, WT_VERB_COMPACT,
           "%s: skipping because the file size must be greater than 1MB: %" PRIuMAX "B.",
           block->name, (uintmax_t)block->size);
 

@@ -2226,16 +2226,6 @@ tasks:
         vars:
           test_name: wt10461_skip_list_stress
 
-  - name: csuite-wt10897-compact-quick-interrupt-test
-    tags: ["pull_request"]
-    depends_on:
-      - name: compile
-    commands:
-      - func: "fetch artifacts"
-      - func: "csuite test"
-        vars:
-          test_name: wt10897_compact_quick_interrupt
-
   # End of csuite test tasks
 
   # Start of Python unit test tasks
