@@ -38,6 +38,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/config.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_parser.h"
@@ -88,11 +89,7 @@ void ComparisonMatchExpressionBase::debugString(StringBuilder& debug, int indent
 }
 
 BSONObj ComparisonMatchExpressionBase::getSerializedRightHandSide(SerializationOptions opts) const {
-    if (opts.replacementForLiteralArgs) {
-        return BSON(name() << *opts.replacementForLiteralArgs);
-    } else {
-        return BSON(name() << _rhs);
-    }
+    return BSON(name() << opts.serializeLiteral(_rhs));
 }
 
 ComparisonMatchExpression::ComparisonMatchExpression(MatchType type,
@@ -278,10 +275,10 @@ void RegexMatchExpression::debugString(StringBuilder& debug, int indentationLeve
 
 BSONObj RegexMatchExpression::getSerializedRightHandSide(SerializationOptions opts) const {
     BSONObjBuilder regexBuilder;
-    regexBuilder.append("$regex", opts.replacementForLiteralArgs.value_or(_regex));
+    opts.appendLiteral(&regexBuilder, "$regex", _regex);
 
     if (!_flags.empty()) {
-        regexBuilder.append("$options", opts.replacementForLiteralArgs.value_or(_flags));
+        opts.appendLiteral(&regexBuilder, "$options", _flags);
     }
 
     return regexBuilder.obj();
@@ -353,11 +350,8 @@ void ModMatchExpression::debugString(StringBuilder& debug, int indentationLevel)
 }
 
 BSONObj ModMatchExpression::getSerializedRightHandSide(SerializationOptions opts) const {
-    if (auto str = opts.replacementForLiteralArgs) {
-        return BSON("$mod" << *str);
-    } else {
-        return BSON("$mod" << BSON_ARRAY(_divisor << _remainder));
-    }
+    return BSON(
+        "$mod" << BSON_ARRAY(opts.serializeLiteral(_divisor) << opts.serializeLiteral(_remainder)));
 }
 
 bool ModMatchExpression::equivalent(const MatchExpression* other) const {
@@ -388,11 +382,7 @@ void ExistsMatchExpression::debugString(StringBuilder& debug, int indentationLev
 }
 
 BSONObj ExistsMatchExpression::getSerializedRightHandSide(SerializationOptions opts) const {
-    if (opts.replacementForLiteralArgs) {
-        return BSON("$exists" << *opts.replacementForLiteralArgs);
-    } else {
-        return BSON("$exists" << true);
-    }
+    return BSON("$exists" << opts.serializeLiteral(true));
 }
 
 bool ExistsMatchExpression::equivalent(const MatchExpression* other) const {
@@ -471,10 +461,38 @@ void InMatchExpression::debugString(StringBuilder& debug, int indentationLevel) 
     _debugStringAttachTagInfo(&debug);
 }
 
+namespace {
+/**
+ * Reduces the potentially large vector of elements to just the first of each "canonical" type.
+ * Different types of numbers are not considered distinct.
+ *
+ * For example, collapses [2, 4, NumberInt(3), "string", "another", 3, 5] into just [2, "string"].
+ */
+std::vector<Value> justFirstOfEachType(std::vector<BSONElement> elems) {
+    stdx::unordered_set<int> seenTypes;
+    std::vector<Value> result;
+    for (auto&& elem : elems) {
+        bool inserted = seenTypes.insert(canonicalizeBSONType(elem.type())).second;
+        if (inserted) {
+            // A new type.
+            result.emplace_back(elem);
+        }
+    }
+    return result;
+}
+}  // namespace
+
+BSONObj InMatchExpression::serializeToShape(SerializationOptions opts) const {
+    std::vector<Value> firstOfEachType = justFirstOfEachType(_equalitySet);
+    if (hasRegex()) {
+        firstOfEachType.emplace_back(BSONRegEx());
+    }
+    return BSON("$in" << opts.serializeLiteral(firstOfEachType));
+}
+
 BSONObj InMatchExpression::getSerializedRightHandSide(SerializationOptions opts) const {
-    if (opts.replacementForLiteralArgs) {
-        // In this case, treat an '$in' with any number of arguments as equivalent.
-        return BSON("$in" << BSON_ARRAY(*opts.replacementForLiteralArgs));
+    if (opts.literalPolicy != LiteralSerializationPolicy::kUnchanged) {
+        return serializeToShape(opts);
     }
 
     BSONObjBuilder inBob;
@@ -846,17 +864,13 @@ BSONObj BitTestMatchExpression::getSerializedRightHandSide(SerializationOptions 
             MONGO_UNREACHABLE;
     }
 
-    if (opts.replacementForLiteralArgs) {
-        return BSON(opString << *opts.replacementForLiteralArgs);
-    }
-
     BSONArrayBuilder arrBob;
     for (auto bitPosition : _bitPositions) {
         arrBob.append(static_cast<int32_t>(bitPosition));
     }
     arrBob.doneFast();
 
-    return BSON(opString << arrBob.arr());
+    return BSON(opString << opts.serializeLiteral(arrBob.arr()));
 }
 
 bool BitTestMatchExpression::equivalent(const MatchExpression* other) const {

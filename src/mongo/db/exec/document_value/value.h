@@ -435,13 +435,16 @@ public:
     ImplicitValue(T&& arg) : Value(std::forward<T>(arg)) {}
 
     ImplicitValue(std::initializer_list<ImplicitValue> values) : Value(convertToValues(values)) {}
+    ImplicitValue(std::vector<ImplicitValue> values) : Value(convertToValues(values)) {}
 
-    ImplicitValue(std::vector<int> values) : Value(convertToValues(values)) {}
+    template <typename T>
+    ImplicitValue(std::vector<T> values) : Value(convertToValues(values)) {}
 
-    static std::vector<Value> convertToValues(const std::vector<int>& vec) {
+    template <typename T>
+    static std::vector<Value> convertToValues(const std::vector<T>& vec) {
         std::vector<Value> values;
         values.reserve(vec.size());
-        for_each(vec.begin(), vec.end(), ([&](const int& val) { values.emplace_back(val); }));
+        for_each(vec.begin(), vec.end(), ([&](const T& val) { values.emplace_back(val); }));
         return values;
     }
 

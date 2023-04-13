@@ -10,8 +10,6 @@ load('jstests/libs/telemetry_utils.js');
 
 // Redacted literal replacement string. This may change in the future, so it's factored out.
 const aggRedactString = "###";
-const findRedactString = "?";
-
 const setup = () => {
     const st = new ShardingTest({
         mongos: 1,
@@ -75,8 +73,8 @@ const assertExpectedResults = (results,
     const telemetryKey = {
         cmdNs: {db: "test", coll: "coll"},
         find: collName,
-        filter: {$and: [{v: {$gt: findRedactString}}, {v: {$lt: findRedactString}}]},
-        batchSize: findRedactString,
+        filter: {$and: [{v: {$gt: "?number"}}, {v: {$lt: "?number"}}]},
+        batchSize: "?number",
         readConcern: {level: "local", provenance: "implicitDefault"},
         applicationName: "MongoDB Shell",
     };
@@ -208,8 +206,8 @@ const assertExpectedResults = (results,
     const telemetryKey = {
         cmdNs: {db: "test", coll: "coll"},
         find: collName,
-        filter: {$and: [{v: {$gt: findRedactString}}, {v: {$lt: findRedactString}}]},
-        batchSize: findRedactString,
+        filter: {$and: [{v: {$gt: "?number"}}, {v: {$lt: "?number"}}]},
+        batchSize: "?number",
         readConcern: {level: "local", provenance: "implicitDefault"},
         applicationName: "MongoDB Shell"
     };

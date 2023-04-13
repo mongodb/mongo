@@ -74,12 +74,18 @@ using std::string;
 using std::vector;
 
 /// Helper function to easily wrap constants with $const.
-static Value serializeConstant(Value val) {
+Value ExpressionConstant::serializeConstant(const SerializationOptions& opts, Value val) {
     if (val.missing()) {
         return Value("$$REMOVE"_sd);
     }
+    if (opts.literalPolicy == LiteralSerializationPolicy::kToDebugTypeString) {
+        return opts.serializeLiteral(val);
+    }
 
-    return Value(DOC("$const" << val));
+    // Other serialization policies need to include this $const in order to be unambiguous for
+    // re-parsing this output later. If for example the constant was '$cashMoney' - we don't want to
+    // misinterpret it as a field path when parsing.
+    return opts.serializeLiteral(Value(DOC("$const" << val)));
 }
 
 /* --------------------------- Expression ------------------------------ */
@@ -639,8 +645,10 @@ Value ExpressionArray::evaluate(const Document& root, Variables* variables) cons
 }
 
 Value ExpressionArray::serialize(SerializationOptions options) const {
-    if (options.replacementForLiteralArgs && selfAndChildrenAreConstant()) {
-        return serializeConstant(Value(options.replacementForLiteralArgs.get()));
+    if (options.literalPolicy != LiteralSerializationPolicy::kUnchanged &&
+        selfAndChildrenAreConstant()) {
+        return ExpressionConstant::serializeConstant(
+            options, evaluate(Document{}, &(getExpressionContext()->variables)));
     }
     vector<Value> expressions;
     expressions.reserve(_children.size());
@@ -1223,10 +1231,7 @@ Value ExpressionConstant::evaluate(const Document& root, Variables* variables) c
 }
 
 Value ExpressionConstant::serialize(SerializationOptions options) const {
-    if (options.replacementForLiteralArgs) {
-        return serializeConstant(Value(options.replacementForLiteralArgs.get()));
-    }
-    return serializeConstant(_value);
+    return ExpressionConstant::serializeConstant(options, _value);
 }
 
 REGISTER_STABLE_EXPRESSION(const, ExpressionConstant::parse);
@@ -2385,8 +2390,9 @@ bool ExpressionObject::selfAndChildrenAreConstant() const {
 }
 
 Value ExpressionObject::serialize(SerializationOptions options) const {
-    if (options.replacementForLiteralArgs && selfAndChildrenAreConstant()) {
-        return serializeConstant(Value(options.replacementForLiteralArgs.get()));
+    if (options.literalPolicy != LiteralSerializationPolicy::kUnchanged &&
+        selfAndChildrenAreConstant()) {
+        return ExpressionConstant::serializeConstant(options, Value(Document{}));
     }
     MutableDocument outputDoc;
     for (auto&& pair : _expressions) {
@@ -7983,7 +7989,6 @@ Value ExpressionGetField::evaluate(const Document& root, Variables* variables) c
         return Value();
     }
 
-
     return inputValue.getDocument().getField(fieldValue.getString());
 }
 
@@ -7992,19 +7997,23 @@ intrusive_ptr<Expression> ExpressionGetField::optimize() {
 }
 
 Value ExpressionGetField::serialize(SerializationOptions options) const {
-    MutableDocument argDoc;
-    if (options.redactIdentifiers) {
-        // The parser guarantees that the '_children[_kField]' expression evaluates to a constant
-        // string.
-        auto strPath =
-            static_cast<ExpressionConstant*>(_children[_kField].get())->getValue().getString();
-        argDoc.addField("field"_sd, Value(options.serializeFieldPathFromString(strPath)));
-    } else {
-        argDoc.addField("field"_sd, _children[_kField]->serialize(options));
-    }
-    argDoc.addField("input"_sd, _children[_kInput]->serialize(options));
+    // The parser guarantees that the '_children[_kField]' expression evaluates to a constant
+    // string.
+    auto strPath =
+        static_cast<ExpressionConstant*>(_children[_kField].get())->getValue().getString();
 
-    return Value(Document{{"$getField"_sd, argDoc.freezeToValue()}});
+    Value maybeRedactedPath{options.serializeFieldPathFromString(strPath)};
+    // This is a pretty unique option to serialize. It is both a constant and a field path, which
+    // means that it:
+    //  - should be redacted (if that option is set).
+    //  - should *not* be wrapped in $const iff we are serializing for a debug string
+    if (options.literalPolicy != LiteralSerializationPolicy::kToDebugTypeString) {
+        maybeRedactedPath = Value(Document{{"$const"_sd, maybeRedactedPath}});
+    }
+
+    return Value(Document{{"$getField"_sd,
+                           Document{{"field"_sd, std::move(maybeRedactedPath)},
+                                    {"input"_sd, _children[_kInput]->serialize(options)}}}});
 }
 
 /* -------------------------- ExpressionSetField ------------------------------ */
@@ -8115,20 +8124,24 @@ intrusive_ptr<Expression> ExpressionSetField::optimize() {
 }
 
 Value ExpressionSetField::serialize(SerializationOptions options) const {
-    MutableDocument argDoc;
-    if (options.redactIdentifiers) {
-        // The parser guarantees that the '_children[_kField]' expression evaluates to a constant
-        // string.
-        auto strPath =
-            static_cast<ExpressionConstant*>(_children[_kField].get())->getValue().getString();
-        argDoc.addField("field"_sd, Value(options.serializeFieldPathFromString(strPath)));
-    } else {
-        argDoc.addField("field"_sd, _children[_kField]->serialize(options));
-    }
-    argDoc.addField("input"_sd, _children[_kInput]->serialize(options));
-    argDoc.addField("value"_sd, _children[_kValue]->serialize(options));
+    // The parser guarantees that the '_children[_kField]' expression evaluates to a constant
+    // string.
+    auto strPath =
+        static_cast<ExpressionConstant*>(_children[_kField].get())->getValue().getString();
 
-    return Value(Document{{"$setField"_sd, argDoc.freezeToValue()}});
+    Value maybeRedactedPath{options.serializeFieldPathFromString(strPath)};
+    // This is a pretty unique option to serialize. It is both a constant and a field path, which
+    // means that it:
+    //  - should be redacted (if that option is set).
+    //  - should *not* be wrapped in $const iff we are serializing for a debug string
+    if (options.literalPolicy != LiteralSerializationPolicy::kToDebugTypeString) {
+        maybeRedactedPath = Value(Document{{"$const"_sd, maybeRedactedPath}});
+    }
+
+    return Value(Document{{"$setField"_sd,
+                           Document{{"field"_sd, std::move(maybeRedactedPath)},
+                                    {"input"_sd, _children[_kInput]->serialize(options)},
+                                    {"value"_sd, _children[_kValue]->serialize(options)}}}});
 }
 
 /* ------------------------- ExpressionTsSecond ----------------------------- */

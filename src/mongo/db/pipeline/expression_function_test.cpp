@@ -49,6 +49,7 @@ TEST(ExpressionFunction, SerializeAndRedactArgs) {
 
     SerializationOptions options;
     std::string replacementChar = "?";
+    options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
     options.replacementForLiteralArgs = replacementChar;
     options.redactIdentifiers = true;
     options.identifierRedactionPolicy = redactFieldNameForTest;
@@ -61,7 +62,7 @@ TEST(ExpressionFunction, SerializeAndRedactArgs) {
     VariablesParseState vps = expCtx.variablesParseState;
     auto exprFunc = ExpressionFunction::parse(&expCtx, expr.firstElement(), vps);
     ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
-        R"({"$function":{"body":"?","args":["$HASH<age>"],"lang":"js"}})",
+        R"({"$function":{"body":"?string","args":["$HASH<age>"],"lang":"js"}})",
         exprFunc->serialize(options).getDocument());
 }
 }  // namespace

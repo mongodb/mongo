@@ -1609,6 +1609,7 @@ env.Library(
         'pipeline/make_js_function.cpp',
         'pipeline/monotonic_expression.cpp',
         'pipeline/variables.cpp',
+        'query/serialization_options.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson/util/bson_extract',

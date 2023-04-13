@@ -31,16 +31,31 @@
 
 namespace mongo::query_shape {
 
-BSONObj predicateShape(const MatchExpression* predicate) {
+BSONObj debugPredicateShape(const MatchExpression* predicate) {
     SerializationOptions opts;
-    opts.replacementForLiteralArgs = kLiteralArgString;
+    opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
+    return predicate->serialize(opts);
+}
+BSONObj representativePredicateShape(const MatchExpression* predicate) {
+    SerializationOptions opts;
+    opts.literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue;
     return predicate->serialize(opts);
 }
 
-BSONObj predicateShape(const MatchExpression* predicate,
-                       std::function<std::string(StringData)> identifierRedactionPolicy) {
+BSONObj debugPredicateShape(const MatchExpression* predicate,
+                            std::function<std::string(StringData)> identifierRedactionPolicy) {
     SerializationOptions opts;
-    opts.replacementForLiteralArgs = kLiteralArgString;
+    opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
+    opts.identifierRedactionPolicy = identifierRedactionPolicy;
+    opts.redactIdentifiers = true;
+    return predicate->serialize(opts);
+}
+
+BSONObj representativePredicateShape(
+    const MatchExpression* predicate,
+    std::function<std::string(StringData)> identifierRedactionPolicy) {
+    SerializationOptions opts;
+    opts.literalPolicy = LiteralSerializationPolicy::kToRepresentativeParseableValue;
     opts.identifierRedactionPolicy = identifierRedactionPolicy;
     opts.redactIdentifiers = true;
     return predicate->serialize(opts);

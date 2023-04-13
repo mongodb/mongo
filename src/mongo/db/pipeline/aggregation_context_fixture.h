@@ -83,6 +83,8 @@ public:
         SerializationOptions options;
         options.verbosity = verbosity;
         if (performRedaction) {
+            options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
+            // TODO SERVER-75399 Use only 'literalPolicy.'
             options.replacementForLiteralArgs = "?";
             options.identifierRedactionPolicy = [](StringData s) -> std::string {
                 return str::stream() << "HASH<" << s << ">";
@@ -99,7 +101,9 @@ public:
                                      bool performRedaction = true) {
         SerializationOptions options;
         if (performRedaction) {
+            // TODO SERVER-75399 Use only 'literalPolicy.'
             options.replacementForLiteralArgs = "?";
+            options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
             options.identifierRedactionPolicy = [](StringData s) -> std::string {
                 return str::stream() << "HASH<" << s << ">";
             };

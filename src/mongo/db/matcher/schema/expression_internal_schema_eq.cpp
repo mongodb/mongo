@@ -64,20 +64,15 @@ void InternalSchemaEqMatchExpression::debugString(StringBuilder& debug,
 
 BSONObj InternalSchemaEqMatchExpression::getSerializedRightHandSide(
     SerializationOptions opts) const {
-    BSONObjBuilder eqObj;
-    if (opts.redactIdentifiers || opts.replacementForLiteralArgs) {
-        if (_rhsElem.isABSONObj()) {
-            BSONObjBuilder exprSpec(eqObj.subobjStart(kName));
-            opts.redactObjToBuilder(&exprSpec, _rhsElem.Obj());
-            exprSpec.done();
-            return eqObj.obj();
-        } else if (opts.replacementForLiteralArgs) {
-            // If the element is not an object it must be a literal.
-            return BSON(kName << opts.replacementForLiteralArgs.get());
-        }
+    if (opts.literalPolicy != LiteralSerializationPolicy::kUnchanged && _rhsElem.isABSONObj()) {
+        BSONObjBuilder eqObj;
+        BSONObjBuilder exprSpec(eqObj.subobjStart(kName));
+        opts.redactObjToBuilder(&exprSpec, _rhsElem.Obj());
+        exprSpec.done();
+        return eqObj.obj();
     }
-    eqObj.appendAs(_rhsElem, kName);
-    return eqObj.obj();
+    // If the element is not an object it must be a literal.
+    return BSON(kName << opts.serializeLiteral(_rhsElem));
 }
 
 bool InternalSchemaEqMatchExpression::equivalent(const MatchExpression* other) const {

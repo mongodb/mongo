@@ -822,42 +822,20 @@ TEST(ExpressionConstantTest, ConstantOfValueMissingSerializesToRemoveSystemVar) 
 
 TEST(ExpressionConstantTest, ConstantRedaction) {
     SerializationOptions options;
-    std::string replacementChar = "?";
-    options.replacementForLiteralArgs = replacementChar;
+    options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
 
     // Test that a constant is replaced.
     auto expCtx = ExpressionContextForTest{};
     intrusive_ptr<Expression> expression = ExpressionConstant::create(&expCtx, Value("my_ssn"_sd));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({"field":{"$const":"?"}})",
+        R"({"field":"?string"})",
         BSON("field" << expression->serialize(options)));
 
     auto expressionBSON = BSON("$and" << BSON_ARRAY(BSON("$gt" << BSON_ARRAY("$foo" << 5))
                                                     << BSON("$lt" << BSON_ARRAY("$foo" << 10))));
     expression = Expression::parseExpression(&expCtx, expressionBSON, expCtx.variablesParseState);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({
-            "field": {
-                "$and": [
-                    {
-                        "$gt": [
-                            "$foo",
-                            {
-                                "$const": "?"
-                            }
-                        ]
-                    },
-                    {
-                        "$lt": [
-                            "$foo",
-                            {
-                                "$const": "?"
-                            }
-                        ]
-                    }
-                ]
-            }
-        })",
+        R"({"field":{"$and":[{"$gt":["$foo","?number"]},{"$lt":["$foo","?number"]}]}})",
         BSON("field" << expression->serialize(options)));
 }
 
@@ -3707,11 +3685,18 @@ TEST(ExpressionGetFieldTest, GetFieldSerializesStringArgumentCorrectly) {
     VariablesParseState vps = expCtx.variablesParseState;
     BSONObj expr = fromjson("{$meta: \"foo\"}");
     auto expression = ExpressionGetField::parse(&expCtx, expr.firstElement(), vps);
-    ASSERT_BSONOBJ_EQ(BSON("ignoredField" << BSON("$getField" << BSON("field" << BSON("$const"
-                                                                                      << "foo")
-                                                                              << "input"
-                                                                              << "$$CURRENT"))),
-                      BSON("ignoredField" << expression->serialize(false)));
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "ignoredField": {
+                "$getField": {
+                    "field": {
+                        "$const": "foo"
+                    },
+                    "input": "$$CURRENT"
+                }
+            }
+        })",
+        BSON("ignoredField" << expression->serialize(false)));
 }
 
 TEST(ExpressionGetFieldTest, GetFieldSerializesCorrectly) {
@@ -3719,20 +3704,29 @@ TEST(ExpressionGetFieldTest, GetFieldSerializesCorrectly) {
     VariablesParseState vps = expCtx.variablesParseState;
     BSONObj expr = fromjson("{$meta: {\"field\": \"foo\", \"input\": {a: 1}}}");
     auto expression = ExpressionGetField::parse(&expCtx, expr.firstElement(), vps);
-    ASSERT_BSONOBJ_EQ(
-        BSON("ignoredField" << BSON(
-                 "$getField" << BSON("field" << BSON("$const"
-                                                     << "foo")
-                                             << "input" << BSON("a" << BSON("$const" << 1))))),
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "ignoredField": {
+                "$getField": {
+                    "field": {
+                        "$const": "foo"
+                    },
+                    "input": {
+                        "a": {
+                            "$const": 1
+                        }
+                    }
+                }
+            }
+        })",
         BSON("ignoredField" << expression->serialize(false)));
 }
 
 TEST(ExpressionGetFieldTest, GetFieldSerializesAndRedactsCorrectly) {
     SerializationOptions options;
-    std::string replacementChar = "?";
-    options.replacementForLiteralArgs = replacementChar;
-    options.identifierRedactionPolicy = redactFieldNameForTest;
+    options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
     options.redactIdentifiers = true;
+    options.identifierRedactionPolicy = redactFieldNameForTest;
     auto expCtx = ExpressionContextForTest{};
     VariablesParseState vps = expCtx.variablesParseState;
 
@@ -3770,12 +3764,43 @@ TEST(ExpressionGetFieldTest, GetFieldSerializesAndRedactsCorrectly) {
             }
         })",
         BSON("field" << expression->serialize(options)));
+
+    // Test a field with a '$' character.
+    expressionBSON = BSON("$getField"
+                          << "a.$b.c");
+
+    expression = ExpressionGetField::parse(&expCtx, expressionBSON.firstElement(), vps);
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "field": {
+                "$getField": {
+                    "field": "HASH<dollarPlaceholder>",
+                    "input": "$$CURRENT"
+                }
+            }
+        })",
+        BSON("field" << expression->serialize(options)));
+
+    // Test a field with a trailing '.' character (invalid FieldPath).
+    expressionBSON = BSON("$getField"
+                          << "a.b.c.");
+
+    expression = ExpressionGetField::parse(&expCtx, expressionBSON.firstElement(), vps);
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "field": {
+                "$getField": {
+                    "field": "HASH<dollarPlaceholder>",
+                    "input": "$$CURRENT"
+                }
+            }
+        })",
+        BSON("field" << expression->serialize(options)));
 }
 
 TEST(ExpressionSetFieldTest, SetFieldRedactsCorrectly) {
     SerializationOptions options;
-    std::string replacementChar = "?";
-    options.replacementForLiteralArgs = replacementChar;
+    options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
     options.identifierRedactionPolicy = redactFieldNameForTest;
     options.redactIdentifiers = true;
     auto expCtx = ExpressionContextForTest{};
@@ -3811,12 +3836,8 @@ TEST(ExpressionSetFieldTest, SetFieldRedactsCorrectly) {
             "field": {
                 "$setField": {
                     "field": "HASH<a>",
-                    "input": {
-                        "$const": "?"
-                    },
-                    "value": {
-                        "$const": "?"
-                    }
+                    "input": "?object",
+                    "value": "?number"
                 }
             }
         })",
@@ -3833,12 +3854,8 @@ TEST(ExpressionSetFieldTest, SetFieldRedactsCorrectly) {
             "field": {
                 "$setField": {
                     "field": "HASH<a>",
-                    "input": {
-                        "$const": "?"
-                    },
-                    "value": {
-                        "$const": "?"
-                    }
+                    "input": "?object",
+                    "value": "?number"
                 }
             }
         })",
@@ -3860,9 +3877,7 @@ TEST(ExpressionSetFieldTest, SetFieldRedactsCorrectly) {
                     "input": {
                         "HASH<a>": "$HASH<field>"
                     },
-                    "value": {
-                        "$const": "?"
-                    }
+                    "value": "?number"
                 }
             }
         })",
@@ -3883,9 +3898,7 @@ TEST(ExpressionSetFieldTest, SetFieldRedactsCorrectly) {
             "field": {
                 "$setField": {
                     "field": "HASH<a>",
-                    "input": {
-                        "$const": "?"
-                    },
+                    "input": "?object",
                     "value": {
                         "HASH<c>": "$HASH<d>"
                     }
@@ -3905,12 +3918,8 @@ TEST(ExpressionSetFieldTest, SetFieldRedactsCorrectly) {
             "field": {
                 "$setField": {
                     "field": "HASH<a>",
-                    "input": {
-                        "$const": "?"
-                    },
-                    "value": {
-                        "$const": "?"
-                    }
+                    "input": "?object",
+                    "value": "?number"
                 }
             }
         })",

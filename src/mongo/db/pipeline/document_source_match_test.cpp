@@ -724,12 +724,12 @@ TEST_F(DocumentSourceMatchTest, RedactionWithAnd) {
                 "$and": [
                     {
                         "HASH<a>.HASH<c>": {
-                            "$eq": "?"
+                            "$eq": "?string"
                         }
                     },
                     {
                         "HASH<b>": {
-                            "$gt": "?"
+                            "$gt": "?number"
                         }
                     }
                 ]

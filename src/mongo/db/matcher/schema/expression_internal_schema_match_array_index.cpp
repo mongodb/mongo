@@ -68,28 +68,11 @@ bool InternalSchemaMatchArrayIndexMatchExpression::equivalent(const MatchExpress
 
 BSONObj InternalSchemaMatchArrayIndexMatchExpression::getSerializedRightHandSide(
     SerializationOptions opts) const {
-    BSONObjBuilder objBuilder;
-    {
-        BSONObjBuilder matchArrayElemSubobj(objBuilder.subobjStart(kName));
-        if (opts.replacementForLiteralArgs) {
-            matchArrayElemSubobj.append("index", opts.replacementForLiteralArgs.get());
-        } else {
-            matchArrayElemSubobj.append("index", _index);
-        }
-        if (auto placeHolder = _expression->getPlaceholder()) {
-            matchArrayElemSubobj.append("namePlaceholder",
-                                        opts.serializeFieldPathFromString(placeHolder.get()));
-        } else {
-            matchArrayElemSubobj.append("namePlaceholder", "");
-        }
-        {
-            BSONObjBuilder subexprSubObj(matchArrayElemSubobj.subobjStart("expression"));
-            _expression->getFilter()->serialize(&subexprSubObj, opts);
-            subexprSubObj.doneFast();
-        }
-        matchArrayElemSubobj.doneFast();
-    }
-    return objBuilder.obj();
+    return BSON(
+        kName << BSON(
+            "index" << opts.serializeLiteral(_index) << "namePlaceholder"
+                    << opts.serializeFieldPathFromString(_expression->getPlaceholder().value_or(""))
+                    << "expression" << _expression->getFilter()->serialize(opts)));
 }
 
 std::unique_ptr<MatchExpression> InternalSchemaMatchArrayIndexMatchExpression::clone() const {

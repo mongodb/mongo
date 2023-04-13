@@ -190,11 +190,7 @@ void InternalBucketGeoWithinMatchExpression::serialize(BSONObjBuilder* builder,
     // Serialize the geometry shape.
     BSONObjBuilder withinRegionBob(
         bob.subobjStart(InternalBucketGeoWithinMatchExpression::kWithinRegion));
-    if (opts.replacementForLiteralArgs) {
-        bob.append(_geoContainer->getGeoElement().fieldName(), *opts.replacementForLiteralArgs);
-    } else {
-        withinRegionBob.append(_geoContainer->getGeoElement());
-    }
+    opts.appendLiteral(&withinRegionBob, _geoContainer->getGeoElement());
     withinRegionBob.doneFast();
     // Serialize the field which is being searched over.
     bob.append(InternalBucketGeoWithinMatchExpression::kField,

@@ -816,8 +816,16 @@ TEST_F(DocumentSourceGraphLookUpTest, RedactionStartWithSingleField) {
                 "maxDepth": "?",
                 "restrictSearchWithMatch": {
                     "$and": [
-                        { "HASH<foo>": { "$eq": "?" } },
-                        { "HASH<bar>.HASH<baz>": { "$gt": "?" } }
+                        {
+                            "HASH<foo>": {
+                                "$eq": "?string"
+                            }
+                        },
+                        {
+                            "HASH<bar>.HASH<baz>": {
+                                "$gt": "?number"
+                            }
+                        }
                     ]
                 }
             }

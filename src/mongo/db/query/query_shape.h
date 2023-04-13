@@ -49,9 +49,13 @@ constexpr StringData kLiteralArgString = "?"_sd;
  * TODO better consider how this interacts with persistent query settings project, and document it.
  * TODO (TODO SERVER ticket) better distinguish this from a plan cache or CQ 'query shape'.
  */
-BSONObj predicateShape(const MatchExpression* predicate);
+BSONObj debugPredicateShape(const MatchExpression* predicate);
+BSONObj representativePredicateShape(const MatchExpression* predicate);
 
-BSONObj predicateShape(const MatchExpression* predicate,
-                       std::function<std::string(StringData)> identifierRedactionPolicy);
+BSONObj debugPredicateShape(const MatchExpression* predicate,
+                            std::function<std::string(StringData)> identifierRedactionPolicy);
+BSONObj representativePredicateShape(
+    const MatchExpression* predicate,
+    std::function<std::string(StringData)> identifierRedactionPolicy);
 
 }  // namespace mongo::query_shape

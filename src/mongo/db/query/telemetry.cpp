@@ -67,42 +67,27 @@ namespace telemetry {
  */
 namespace {
 static std::string hintSpecialField = "$hint";
-void addLiteralFieldsWithRedaction(BSONObjBuilder* bob,
-                                   const FindCommandRequest& findCommand,
-                                   StringData newLiteral) {
-    if (findCommand.getLimit()) {
-        bob->append(FindCommandRequest::kLimitFieldName, newLiteral);
-    }
-    if (findCommand.getSkip()) {
-        bob->append(FindCommandRequest::kSkipFieldName, newLiteral);
-    }
-    if (findCommand.getBatchSize()) {
-        bob->append(FindCommandRequest::kBatchSizeFieldName, newLiteral);
-    }
-    if (findCommand.getMaxTimeMS()) {
-        bob->append(FindCommandRequest::kMaxTimeMSFieldName, newLiteral);
-    }
-    if (findCommand.getNoCursorTimeout()) {
-        bob->append(FindCommandRequest::kNoCursorTimeoutFieldName, newLiteral);
-    }
-}
+void addLiteralFields(BSONObjBuilder* bob,
+                      const FindCommandRequest& findCommand,
+                      const SerializationOptions& opts) {
 
-void addLiteralFieldsWithoutRedaction(BSONObjBuilder* bob, const FindCommandRequest& findCommand) {
-    if (auto param = findCommand.getLimit()) {
-        bob->append(FindCommandRequest::kLimitFieldName, param.get());
+    if (auto limit = findCommand.getLimit()) {
+        opts.appendLiteral(
+            bob, FindCommandRequest::kLimitFieldName, static_cast<long long>(*limit));
     }
-    if (auto param = findCommand.getSkip()) {
-        bob->append(FindCommandRequest::kSkipFieldName, param.get());
+    if (auto skip = findCommand.getSkip()) {
+        opts.appendLiteral(bob, FindCommandRequest::kSkipFieldName, static_cast<long long>(*skip));
     }
-    if (auto param = findCommand.getBatchSize()) {
-        bob->append(FindCommandRequest::kBatchSizeFieldName, param.get());
+    if (auto batchSize = findCommand.getBatchSize()) {
+        opts.appendLiteral(
+            bob, FindCommandRequest::kBatchSizeFieldName, static_cast<long long>(*batchSize));
     }
-    if (auto param = findCommand.getMaxTimeMS()) {
-        bob->append(FindCommandRequest::kMaxTimeMSFieldName, param.get());
+    if (auto maxTimeMs = findCommand.getMaxTimeMS()) {
+        opts.appendLiteral(bob, FindCommandRequest::kMaxTimeMSFieldName, *maxTimeMs);
     }
-    if (findCommand.getNoCursorTimeout().has_value()) {
-        bob->append(FindCommandRequest::kNoCursorTimeoutFieldName,
-                    findCommand.getNoCursorTimeout().value_or(false));
+    if (auto noCursorTimeout = findCommand.getNoCursorTimeout()) {
+        opts.appendLiteral(
+            bob, FindCommandRequest::kNoCursorTimeoutFieldName, bool(noCursorTimeout));
     }
 }
 
@@ -126,19 +111,22 @@ std::vector<std::pair<StringData, std::function<const BSONObj(const FindCommandR
 
 };
 
-void addRemainingFindCommandFields(BSONObjBuilder* bob, const FindCommandRequest& findCommand) {
+void addRemainingFindCommandFields(BSONObjBuilder* bob,
+                                   const FindCommandRequest& findCommand,
+                                   const SerializationOptions& opts) {
     for (auto [fieldName, getterFunction] : boolArgMap) {
         auto optBool = getterFunction(findCommand);
         if (optBool.has_value()) {
-            bob->append(fieldName, optBool.value_or(false));
+            opts.appendLiteral(bob, fieldName, optBool.value_or(false));
         }
     }
     if (auto optObj = findCommand.getReadConcern()) {
+        // Read concern should not be considered a literal.
         bob->append(FindCommandRequest::kReadConcernFieldName, optObj.get());
     }
     auto collation = findCommand.getCollation();
     if (!collation.isEmpty()) {
-        bob->append(FindCommandRequest::kCollationFieldName, collation);
+        opts.appendLiteral(bob, FindCommandRequest::kCollationFieldName, collation);
     }
 }
 
@@ -305,15 +293,10 @@ StatusWith<BSONObj> makeTelemetryKey(const FindCommandRequest& findCommand,
     }
 
     // Fields for literal redaction. Adds limit, skip, batchSize, maxTimeMS, and noCursorTimeOut
-    if (opts.replacementForLiteralArgs) {
-        addLiteralFieldsWithRedaction(&bob, findCommand, opts.replacementForLiteralArgs.get());
-    } else {
-        addLiteralFieldsWithoutRedaction(&bob, findCommand);
-    }
+    addLiteralFields(&bob, findCommand, opts);
 
     // Add the fields that require no redaction.
-    addRemainingFindCommandFields(&bob, findCommand);
-
+    addRemainingFindCommandFields(&bob, findCommand, opts);
 
     auto appName = [&]() -> boost::optional<std::string> {
         if (existingMetrics.has_value()) {
@@ -618,7 +601,7 @@ StatusWith<BSONObj> TelemetryMetrics::redactKey(const BSONObj& key,
 
         SerializationOptions options(
             [&](StringData sd) { return sha256HmacStringDataHasher(redactionKey, sd); },
-            replacementForLiteralArgs);
+            LiteralSerializationPolicy::kToDebugTypeString);
         auto nss = findCommand->getNamespaceOrUUID().nss();
         uassert(7349400, "Namespace must be defined", nss.has_value());
         auto expCtx = make_intrusive<ExpressionContext>(opCtx, nullptr, nss.value());
@@ -751,6 +734,7 @@ void registerFindRequest(const FindCommandRequest& request,
     }
 
     SerializationOptions options;
+    options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
     options.replacementForLiteralArgs = replacementForLiteralArgs;
     auto swTelemetryKey = makeTelemetryKey(request, options, expCtx);
     tassert(7349402,

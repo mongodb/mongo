@@ -763,6 +763,12 @@ public:
 private:
     ExpressionOptimizerFunc getOptimizer() const final;
 
+    /**
+     * A helper to serialize to something like {$in: "?array<?number>"} or similar, depending on
+     * 'opts' and whether we have a mixed-type $in or not.
+     */
+    BSONObj serializeToShape(SerializationOptions opts) const;
+
     // Whether or not '_equalities' has a jstNULL element in it.
     bool _hasNull = false;
 

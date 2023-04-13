@@ -872,9 +872,7 @@ TEST_F(BucketAutoTests, RedactionWithoutOutputField) {
                 "granularity": "?",
                 "output": {
                     "HASH<count>": {
-                        "$sum": {
-                            "$const": "?"
-                        }
+                        "$sum": "?number"
                     }
                 }
             }
@@ -891,8 +889,7 @@ TEST_F(BucketAutoTests, RedactionWithOutputField) {
                     count: { $sum: 1 },
                     years: { $push: '$year' }
                 }
-            }
-        })");
+            }})");
     auto docSource = DocumentSourceBucketAuto::createFromBson(spec.firstElement(), getExpCtx());
 
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -902,9 +899,11 @@ TEST_F(BucketAutoTests, RedactionWithOutputField) {
                 "buckets": "?",
                 "output": {
                     "HASH<count>": {
-                        $sum: { "$const": "?" }
+                        "$sum": "?number"
                     },
-                    "HASH<years>": { $push: "$HASH<year>" }
+                    "HASH<years>": {
+                        "$push": "$HASH<year>"
+                    }
                 }
             }
         })",

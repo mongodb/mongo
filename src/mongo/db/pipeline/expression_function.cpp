@@ -47,17 +47,17 @@ ExpressionFunction::ExpressionFunction(ExpressionContext* const expCtx,
 }
 
 Value ExpressionFunction::serialize(SerializationOptions options) const {
-    MutableDocument d;
-    d["body"] = options.replacementForLiteralArgs ? Value(*options.replacementForLiteralArgs)
-                                                  : Value(_funcSource);
-    d["args"] = Value(_passedArgs->serialize(options));
-    d["lang"] = Value(_lang);
+    MutableDocument innerOpts(Document{{"body"_sd, options.serializeLiteral(_funcSource)},
+                                       {"args"_sd, _passedArgs->serialize(options)},
+                                       // "lang" is purposefully not treated as a literal since it
+                                       // is more of a selection of an enum
+                                       {"lang"_sd, _lang}});
 
     // This field will only be seralized when desugaring $where in $expr + $_internalJs
     if (_assignFirstArgToThis) {
-        d["_internalSetObjToThis"] = Value(_assignFirstArgToThis);
+        innerOpts["_internalSetObjToThis"] = options.serializeLiteral(_assignFirstArgToThis);
     }
-    return Value(Document{{kExpressionName, d.freezeToValue()}});
+    return Value(Document{{kExpressionName, innerOpts.freezeToValue()}});
 }
 
 boost::intrusive_ptr<Expression> ExpressionFunction::parse(ExpressionContext* const expCtx,

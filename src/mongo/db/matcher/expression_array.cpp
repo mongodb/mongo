@@ -206,11 +206,7 @@ void SizeMatchExpression::debugString(StringBuilder& debug, int indentationLevel
 }
 
 BSONObj SizeMatchExpression::getSerializedRightHandSide(SerializationOptions opts) const {
-    const char* opName = "$size";
-    if (opts.replacementForLiteralArgs) {
-        return BSON(opName << *opts.replacementForLiteralArgs);
-    }
-    return BSON(opName << _size);
+    return BSON("$size" << opts.serializeLiteral(_size));
 }
 
 bool SizeMatchExpression::equivalent(const MatchExpression* other) const {

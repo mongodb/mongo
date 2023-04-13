@@ -174,9 +174,9 @@ public:
      * PathMatchExpression.
      *
      * Serialization options should be respected for any descendent expressions. Eg, if the
-     * 'replacementForLiteralArgs' option is set, then any literal argument (like the number 1 in
-     * the example above), should be replaced with this string. 'literal' here is in contrast to
-     * another expression, if that is possible syntactically.
+     * 'literalPolicy' option is 'kToDebugTypeString', then any literal argument (like the number 1
+     * in the example above), should be "shapified" (e.g. "?number"). 'literal' here is in contrast
+     * to another expression, if that is possible syntactically.
      */
     virtual BSONObj getSerializedRightHandSide(SerializationOptions opts = {}) const = 0;
 

@@ -1540,7 +1540,7 @@ TEST_F(DocumentSourceLookUpTest, RedactsCorrectlyWithPipeline) {
                     {
                         "$match": {
                             "HASH<a>": {
-                                "$eq": "?"
+                                "$eq": "?string"
                             }
                         }
                     },

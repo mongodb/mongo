@@ -954,9 +954,7 @@ TEST_F(DocumentSourceFacetTest, RedactsCorrectly) {
                         "$group": {
                             "_id": "$HASH<foo>",
                             "HASH<count>": {
-                                "$sum": {
-                                    "$const": "?"
-                                }
+                                "$sum": "?number"
                             }
                         }
                     },
@@ -970,7 +968,7 @@ TEST_F(DocumentSourceFacetTest, RedactsCorrectly) {
                     {
                         "$match": {
                             "HASH<bar>": {
-                                "$exists": "?"
+                                "$exists": "?bool"
                             }
                         }
                     },
@@ -985,24 +983,18 @@ TEST_F(DocumentSourceFacetTest, RedactsCorrectly) {
                                                     {
                                                         "$gte": [
                                                             "$HASH<bar>.HASH<foo>",
-                                                            {
-                                                                "$const": "?"
-                                                            }
+                                                            "?number"
                                                         ]
                                                     },
                                                     {
                                                         "$lt": [
                                                             "$HASH<bar>.HASH<foo>",
-                                                            {
-                                                                "$const": "?"
-                                                            }
+                                                            "?number"
                                                         ]
                                                     }
                                                 ]
                                             },
-                                            "then": {
-                                                "$const": "?"
-                                            }
+                                            "then": "?number"
                                         },
                                         {
                                             "case": {
@@ -1010,24 +1002,18 @@ TEST_F(DocumentSourceFacetTest, RedactsCorrectly) {
                                                     {
                                                         "$gte": [
                                                             "$HASH<bar>.HASH<foo>",
-                                                            {
-                                                                "$const": "?"
-                                                            }
+                                                            "?number"
                                                         ]
                                                     },
                                                     {
                                                         "$lt": [
                                                             "$HASH<bar>.HASH<foo>",
-                                                            {
-                                                                "$const": "?"
-                                                            }
+                                                            "?number"
                                                         ]
                                                     }
                                                 ]
                                             },
-                                            "then": {
-                                                "$const": "?"
-                                            }
+                                            "then": "?number"
                                         },
                                         {
                                             "case": {
@@ -1035,32 +1021,24 @@ TEST_F(DocumentSourceFacetTest, RedactsCorrectly) {
                                                     {
                                                         "$gte": [
                                                             "$HASH<bar>.HASH<foo>",
-                                                            {
-                                                                "$const": "?"
-                                                            }
+                                                            "?number"
                                                         ]
                                                     },
                                                     {
                                                         "$lt": [
                                                             "$HASH<bar>.HASH<foo>",
-                                                            {
-                                                                "$const": "?"
-                                                            }
+                                                            "?number"
                                                         ]
                                                     }
                                                 ]
                                             },
-                                            "then": {
-                                                "$const": "?"
-                                            }
+                                            "then": "?number"
                                         }
                                     ]
                                 }
                             },
                             "HASH<z>": {
-                                "$sum": {
-                                    "$const": "?"
-                                }
+                                "$sum": "?number"
                             }
                         }
                     },
@@ -1077,9 +1055,7 @@ TEST_F(DocumentSourceFacetTest, RedactsCorrectly) {
                             "buckets": "?",
                             "output": {
                                 "HASH<count>": {
-                                    "$sum": {
-                                        "$const": "?"
-                                    }
+                                    "$sum": "?number"
                                 }
                             }
                         }

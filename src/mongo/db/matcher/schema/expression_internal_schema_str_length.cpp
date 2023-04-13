@@ -52,13 +52,7 @@ void InternalSchemaStrLengthMatchExpression::debugString(StringBuilder& debug,
 
 BSONObj InternalSchemaStrLengthMatchExpression::getSerializedRightHandSide(
     SerializationOptions opts) const {
-    BSONObjBuilder objBuilder;
-    if (opts.replacementForLiteralArgs) {
-        objBuilder.append(_name, opts.replacementForLiteralArgs.get());
-    } else {
-        objBuilder.append(_name, _strLen);
-    }
-    return objBuilder.obj();
+    return BSON(_name << opts.serializeLiteral(_strLen));
 }
 
 bool InternalSchemaStrLengthMatchExpression::equivalent(const MatchExpression* other) const {

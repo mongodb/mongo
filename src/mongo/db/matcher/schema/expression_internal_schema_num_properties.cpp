@@ -44,11 +44,7 @@ void InternalSchemaNumPropertiesMatchExpression::debugString(StringBuilder& debu
 
 void InternalSchemaNumPropertiesMatchExpression::serialize(BSONObjBuilder* out,
                                                            SerializationOptions opts) const {
-    if (opts.replacementForLiteralArgs) {
-        out->append(_name, opts.replacementForLiteralArgs.get());
-    } else {
-        out->append(_name, _numProperties);
-    }
+    opts.appendLiteral(out, _name, _numProperties);
 }
 
 bool InternalSchemaNumPropertiesMatchExpression::equivalent(const MatchExpression* other) const {

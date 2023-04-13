@@ -455,11 +455,7 @@ void NotMatchExpression::serializeNotExpressionToNor(MatchExpression* exp,
 
 void NotMatchExpression::serialize(BSONObjBuilder* out, SerializationOptions opts) const {
     if (_exp->matchType() == MatchType::AND && _exp->numChildren() == 0) {
-        if (opts.replacementForLiteralArgs) {
-            out->append("$alwaysFalse", *opts.replacementForLiteralArgs);
-        } else {
-            out->append("$alwaysFalse", 1);
-        }
+        opts.appendLiteral(out, "$alwaysFalse", 1);
         return;
     }
 

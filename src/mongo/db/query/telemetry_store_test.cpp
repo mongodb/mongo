@@ -129,7 +129,9 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
     FindCommandRequest fcr(NamespaceStringOrUUID(NamespaceString("testDB.testColl")));
     fcr.setFilter(BSON("a" << 1));
     SerializationOptions opts;
+    // TODO SERVER-75419 Use only 'literalPolicy.'
     opts.replacementForLiteralArgs = "?";
+    opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
     opts.redactIdentifiers = true;
     opts.identifierRedactionPolicy = redactFieldNameForTest;
 
@@ -144,7 +146,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
             "find": "HASH<testColl>",
             "filter": {
                 "HASH<a>": {
-                    "$eq": "?"
+                    "$eq": "?number"
                 }
             }
         })",
@@ -162,7 +164,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
             "find": "HASH<testColl>",
             "filter": {
                 "HASH<a>": {
-                    "$eq": "?"
+                    "$eq": "?number"
                 }
             },
             "sort": {
@@ -184,7 +186,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
             "find": "HASH<testColl>",
             "filter": {
                 "HASH<a>": {
-                    "$eq": "?"
+                    "$eq": "?number"
                 }
             },
             "projection": {
@@ -214,14 +216,12 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
             "find": "HASH<testColl>",
             "filter": {
                 "HASH<a>": {
-                    "$eq": "?"
+                    "$eq": "?number"
                 }
             },
             "let": {
                 "HASH<var1>": "$HASH<a>",
-                "HASH<var2>": {
-                    "$const": "?"
-                }
+                "HASH<var2>": "?string"
             },
             "projection": {
                 "HASH<e>": true,
@@ -249,14 +249,12 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
             "find": "HASH<testColl>",
             "filter": {
                 "HASH<a>": {
-                    "$eq": "?"
+                    "$eq": "?number"
                 }
             },
             "let": {
                 "HASH<var1>": "$HASH<a>",
-                "HASH<var2>": {
-                    "$const": "?"
-                }
+                "HASH<var2>": "?string"
             },
             "projection": {
                 "HASH<e>": true,
@@ -297,14 +295,12 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
             "find": "HASH<testColl>",
             "filter": {
                 "HASH<a>": {
-                    "$eq": "?"
+                    "$eq": "?number"
                 }
             },
             "let": {
                 "HASH<var1>": "$HASH<a>",
-                "HASH<var2>": {
-                    "$const": "?"
-                }
+                "HASH<var2>": "?string"
             },
             "projection": {
                 "HASH<e>": true,
@@ -325,10 +321,10 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                 "HASH<sortVal>": 1,
                 "HASH<otherSort>": -1
             },
-            "limit": "?",
-            "skip": "?",
-            "batchSize": "?",
-            "maxTimeMS": "?"
+            "limit": "?number",
+            "skip": "?number",
+            "batchSize": "?number",
+            "maxTimeMS": "?number"
         })",
         redacted);
 
@@ -349,14 +345,12 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
             "find": "HASH<testColl>",
             "filter": {
                 "HASH<a>": {
-                    "$eq": "?"
+                    "$eq": "?number"
                 }
             },
             "let": {
                 "HASH<var1>": "$HASH<a>",
-                "HASH<var2>": {
-                    "$const": "?"
-                }
+                "HASH<var2>": "?string"
             },
             "projection": {
                 "HASH<e>": true,
@@ -377,10 +371,10 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                 "HASH<sortVal>": 1,
                 "HASH<otherSort>": -1
             },
-            "limit": "?",
-            "skip": "?",
-            "batchSize": "?",
-            "maxTimeMS": "?"
+            "limit": "?number",
+            "skip": "?number",
+            "batchSize": "?number",
+            "maxTimeMS": "?number"
         })",
         redacted);
 }
@@ -391,7 +385,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsFindCommandRequestEmptyFields) {
     fcr.setSort(BSONObj());
     fcr.setProjection(BSONObj());
     SerializationOptions opts;
-    opts.replacementForLiteralArgs = "?";
+    opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
     opts.redactIdentifiers = true;
     opts.identifierRedactionPolicy = redactFieldNameForTest;
 
@@ -413,7 +407,9 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
     FindCommandRequest fcr(NamespaceStringOrUUID(NamespaceString("testDB.testColl")));
     fcr.setFilter(BSON("b" << 1));
     SerializationOptions opts;
+    // TODO SERVER-75419 Use only 'literalPolicy.'
     opts.replacementForLiteralArgs = "?";
+    opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
     fcr.setHint(BSON("z" << 1 << "c" << 1));
     fcr.setMax(BSON("z" << 25));
     fcr.setMin(BSON("z" << 80));
@@ -429,7 +425,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
             "find": "testColl",
             "filter": {
                 "b": {
-                    "$eq": "?"
+                    "$eq": "?number"
                 }
             },
             "hint": {
@@ -459,7 +455,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
             "find": "testColl",
             "filter": {
                 "b": {
-                    "$eq": "?"
+                    "$eq": "?number"
                 }
             },
             "hint": {
@@ -478,6 +474,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
     opts.identifierRedactionPolicy = redactFieldNameForTest;
     opts.redactIdentifiers = true;
     opts.replacementForLiteralArgs = boost::none;
+    opts.literalPolicy = LiteralSerializationPolicy::kUnchanged;
     redacted = uassertStatusOK(telemetry::makeTelemetryKey(fcr, opts, expCtx));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -504,33 +501,9 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
         })",
         redacted);
 
-    redacted = uassertStatusOK(telemetry::makeTelemetryKey(fcr, opts, expCtx));
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({
-            "cmdNs": {
-                "db": "HASH<testDB>",
-                "coll": "HASH<testColl>"
-            },
-            "find": "HASH<testColl>",
-            "filter": {
-                "HASH<b>": {
-                    "$eq": 1
-                }
-            },
-            "hint": {
-                "HASH<z>": 1,
-                "HASH<c>": 1
-            },
-            "max": {
-                "HASH<z>": 25
-            },
-            "min": {
-                "HASH<z>": 80
-            }
-        })",
-        redacted);
-
+    // TODO SERVER-75419 Use only 'literalPolicy.'
     opts.replacementForLiteralArgs = "?";
+    opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
     redacted = uassertStatusOK(telemetry::makeTelemetryKey(fcr, opts, expCtx));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -541,7 +514,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
             "find": "HASH<testColl>",
             "filter": {
                 "HASH<b>": {
-                    "$eq": "?"
+                    "$eq": "?number"
                 }
             },
             "hint": {
@@ -567,7 +540,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
             "find": "HASH<testColl>",
             "filter": {
                 "HASH<b>": {
-                    "$eq": "?"
+                    "$eq": "?number"
                 }
             },
             "hint": {

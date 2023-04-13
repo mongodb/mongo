@@ -650,7 +650,7 @@ TEST_F(DocumentSourceUnionWithTest, RedactsCorrectlyWithPipeline) {
                     {
                         "$match": {
                             "HASH<a>": {
-                                "$eq": "?"
+                                "$eq": "?number"
                             }
                         }
                     },

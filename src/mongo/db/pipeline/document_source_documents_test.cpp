@@ -50,14 +50,20 @@ TEST_F(DocumentSourceDocumentsTest, DocumentsStageRedactsCorrectly) {
     auto unwindStage = static_cast<DocumentSourceUnwind*>(docSourcesVec[2].get());
     ASSERT(unwindStage);
     auto generatedField = unwindStage->getUnwindPath();
-
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         "{$queue: '?'}",
         redact(*docSourcesVec[0]));
 
 
-    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        "{'$project': {'HASH<_id>': true, 'HASH<" + generatedField + ">': { $const: '?' }}}",
+    ASSERT_BSONOBJ_EQ(  // NOLINT
+        fromjson(R"({
+            "$project": {
+                "HASH<_id>": true,
+                "HASH<)" +
+                 generatedField +
+                 R"(>": "?array<?object>"
+            }
+        })"),
         redact(*docSourcesVec[1]));
 
 

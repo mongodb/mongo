@@ -77,15 +77,7 @@ public:
     }
 
     BSONObj getSerializedRightHandSide(SerializationOptions opts) const final {
-        BSONObjBuilder subBuilder;
-        if (opts.replacementForLiteralArgs) {
-            subBuilder.append(name(), opts.replacementForLiteralArgs.get());
-            return subBuilder.obj();
-        }
-        BSONArrayBuilder arrBuilder(subBuilder.subarrayStart(name()));
-        _typeSet.toBSONArray(&arrBuilder);
-        arrBuilder.doneFast();
-        return subBuilder.obj();
+        return BSON(name() << opts.serializeLiteral(_typeSet.toBSONArray()));
     }
 
     bool equivalent(const MatchExpression* other) const final {
@@ -247,13 +239,16 @@ public:
     }
 
     BSONObj getSerializedRightHandSide(SerializationOptions opts) const final {
-        BSONObjBuilder bob;
-        if (opts.replacementForLiteralArgs) {
-            bob.append(name(), opts.replacementForLiteralArgs.get());
+        if (opts.literalPolicy == LiteralSerializationPolicy::kUnchanged) {
+            return BSON(name() << _binDataSubType);
         } else {
-            bob.append(name(), _binDataSubType);
+            // There is some fancy serialization logic to get the above BSONObjBuilder append to
+            // work. We just want to make sure we're doing the same thing here.
+            static_assert(BSONObjAppendFormat<decltype(_binDataSubType)>::value == NumberInt,
+                          "Expecting that the BinData sub type should be specified and serialized "
+                          "as an int.");
+            return BSON(name() << opts.serializeLiteral(static_cast<int>(_binDataSubType)));
         }
-        return bob.obj();
     }
 
     bool equivalent(const MatchExpression* other) const final {

@@ -160,11 +160,7 @@ TEST_F(DocumentSourcePlanCacheStatsTest, RedactsSuccessfullyAfterAbsorbingMatch)
 
     ASSERT_BSONOBJ_EQ(specObj, serialized[0].getDocument().toBson());
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({
-            "$match": {
-                "HASH<foo>": { "$eq": "?" }
-            }
-        })",
+        R"({"$match":{"HASH<foo>":{"$eq":"?string"}}})",
         serialized[1].getDocument().toBson().getOwned());
 }
 

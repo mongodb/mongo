@@ -220,10 +220,10 @@ TEST(ExpressionTypeTest, InternalSchemaTypeExprWithMultipleTypesMatchesAllSuchTy
 TEST(ExpressionTypeTest, RedactsTypesCorrectly) {
     TypeMatchExpression type(""_sd, String);
     SerializationOptions opts;
-    opts.replacementForLiteralArgs = "?";
-    ASSERT_BSONOBJ_EQ(BSON("$type"
-                           << "?"),
-                      type.getSerializedRightHandSide(opts));
+    opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({"$type":"?array<?number>"})",
+        type.getSerializedRightHandSide(opts));
 }
 
 TEST(ExpressionBinDataSubTypeTest, MatchesBinDataGeneral) {
@@ -312,10 +312,10 @@ TEST(ExpressionBinDataSubTypeTest, Equivalent) {
 TEST(ExpressionBinDataSubTypeTest, RedactsCorrectly) {
     InternalSchemaBinDataSubTypeExpression e("b"_sd, BinDataType::newUUID);
     SerializationOptions opts;
-    opts.replacementForLiteralArgs = "?";
-    ASSERT_BSONOBJ_EQ(BSON("$_internalSchemaBinDataSubType"
-                           << "?"),
-                      e.getSerializedRightHandSide(opts));
+    opts.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({"$_internalSchemaBinDataSubType":"?number"})",
+        e.getSerializedRightHandSide(opts));
 }
 
 TEST(InternalSchemaBinDataEncryptedTypeTest, DoesNotTraverseLeafArrays) {

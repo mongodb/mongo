@@ -65,6 +65,7 @@ std::string redactFieldNameForTest(StringData s) {
 TEST(Redaction, ProjectionTest) {
     SerializationOptions options;
     options.replacementForLiteralArgs = "?";
+    options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
     options.redactIdentifiers = true;
 
     options.identifierRedactionPolicy = redactFieldNameForTest;
@@ -169,7 +170,7 @@ TEST(Redaction, ProjectionTest) {
     /// Add fields projection
     actual = redactProj("{a: \"hi\"}");
     ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
-        R"({"HASH<_id>":true,"HASH<a>":{"$const":"?"}})",
+        R"({"HASH<_id>":true,"HASH<a>":"?string"})",
         actual);
 
     actual = redactProj("{a: '$field'}");
@@ -180,55 +181,38 @@ TEST(Redaction, ProjectionTest) {
     // Dotted path
     actual = redactProj("{\"a.b\": \"hi\"}");
     ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
-        R"({"HASH<_id>":true,"HASH<a>":{"HASH<b>":{"$const":"?"}}})",
+        R"({"HASH<_id>":true,"HASH<a>":{"HASH<b>":"?string"}})",
         actual);
 
     // Two fields
     actual = redactProj("{a: \"hi\", b: \"hello\"}");
     ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
-        R"({"HASH<_id>":true,"HASH<a>":{"$const":"?"},"HASH<b>":{"$const":"?"}})",
+        R"({"HASH<_id>":true,"HASH<a>":"?string","HASH<b>":"?string"})",
         actual);
 
     // Explicit _id: 0
     actual = redactProj("{b: \"hi\", _id: \"hey\"}");
     ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
-        R"({"HASH<b>":{"$const":"?"},"HASH<_id>":{"$const":"?"}})",
+        R"({"HASH<b>":"?string","HASH<_id>":"?string"})",
         actual);
 
     // Two nested fields
     actual = redactProj("{\"b.d\": \"hello\", \"b.c\": \"world\"}");
     ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
-        R"({
-            "HASH<_id>": true,
-            "HASH<b>": {
-                "HASH<d>": {
-                    "$const": "?"
-                },
-                "HASH<c>": {
-                    "$const": "?"
-                }
-            }
-        })",
+        R"({"HASH<_id>":true,"HASH<b>":{"HASH<d>":"?string","HASH<c>":"?string"}})",
         actual);
 
     actual = redactProj("{\"b.d\": \"hello\", a: \"world\", \"b.c\": \"mongodb\"}");
     ASSERT_DOCUMENT_EQ_AUTO(  // NOLINT
         R"({
-            "HASH<_id>": true,
-            "HASH<b>": {
-                "HASH<d>": {
-                    "$const": "?"
-                },
-                "HASH<c>": {
-                    "$const": "?"
-                }
-            },
-            "HASH<a>": {
-                "$const": "?"
-            }
-        })",
+             "HASH<_id>": true,
+             "HASH<b>": {
+                 "HASH<d>": "?string",
+                 "HASH<c>": "?string"
+             },
+             "HASH<a>": "?string"
+         })",
         actual);
 }
-
 }  // namespace
 }  // namespace mongo

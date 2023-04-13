@@ -46,18 +46,18 @@ std::string redactFieldNameForTest(StringData sd) {
     return "REDACT_" + sd.toString();
 }
 
-static const SerializationOptions literalAndFieldRedactOpts{redactFieldNameForTest,
-                                                            query_shape::kLiteralArgString};
+static const SerializationOptions literalAndFieldRedactOpts{
+    redactFieldNameForTest, LiteralSerializationPolicy::kToDebugTypeString};
 
 
 BSONObj predicateShape(std::string filterJson) {
     ParsedMatchExpressionForTest expr(filterJson);
-    return query_shape::predicateShape(expr.get());
+    return query_shape::debugPredicateShape(expr.get());
 }
 
 BSONObj predicateShapeRedacted(std::string filterJson) {
     ParsedMatchExpressionForTest expr(filterJson);
-    return query_shape::predicateShape(expr.get(), redactFieldNameForTest);
+    return query_shape::debugPredicateShape(expr.get(), redactFieldNameForTest);
 }
 
 #define ASSERT_SHAPE_EQ_AUTO(expected, actual) \
@@ -70,23 +70,59 @@ BSONObj predicateShapeRedacted(std::string filterJson) {
 
 TEST(QueryPredicateShape, Equals) {
     ASSERT_SHAPE_EQ_AUTO(  // Implicit equals
-        R"({"a":{"$eq":"?"}})",
+        R"({"a":{"$eq":"?number"}})",
         "{a: 5}");
     ASSERT_SHAPE_EQ_AUTO(  // Explicit equals
-        R"({"a":{"$eq":"?"}})",
+        R"({"a":{"$eq":"?number"}})",
         "{a: {$eq: 5}}");
     ASSERT_SHAPE_EQ_AUTO(  // implicit $and
-        R"({"$and":[{"a":{"$eq":"?"}},{"b":{"$eq":"?"}}]})",
+        R"({"$and":[{"a":{"$eq":"?number"}},{"b":{"$eq":"?number"}}]})",
         "{a: 5, b: 6}");
     ASSERT_REDACTED_SHAPE_EQ_AUTO(  // Implicit equals
-        R"({"REDACT_a":{"$eq":"?"}})",
+        R"({"REDACT_a":{"$eq":"?number"}})",
         "{a: 5}");
     ASSERT_REDACTED_SHAPE_EQ_AUTO(  // Explicit equals
-        R"({"REDACT_a":{"$eq":"?"}})",
+        R"({"REDACT_a":{"$eq":"?number"}})",
         "{a: {$eq: 5}}");
     ASSERT_REDACTED_SHAPE_EQ_AUTO(  // NOLINT
-        R"({"$and":[{"REDACT_a":{"$eq":"?"}},{"REDACT_b":{"$eq":"?"}}]})",
+        R"({"$and":[{"REDACT_a":{"$eq":"?number"}},{"REDACT_b":{"$eq":"?number"}}]})",
         "{a: 5, b: 6}");
+}
+
+TEST(QueryPredicateShape, ArraySubTypes) {
+    ASSERT_SHAPE_EQ_AUTO(  // NOLINT
+        "{a: {$eq: '[]'}}",
+        "{a: []}");
+    ASSERT_SHAPE_EQ_AUTO(  // NOLINT
+        "{a: {$eq: '?array<?number>'}}",
+        "{a: [2]}");
+    ASSERT_SHAPE_EQ_AUTO(  // NOLINT
+        R"({"a":{"$eq":"?array<?number>"}})",
+        "{a: [2, 3]}");
+    ASSERT_SHAPE_EQ_AUTO(  // NOLINT
+        R"({"a":{"$eq":"?array<?object>"}})",
+        "{a: [{}]}");
+    ASSERT_SHAPE_EQ_AUTO(  // NOLINT
+        R"({"a":{"$eq":"?array<?object>"}})",
+        "{a: [{}, {}]}");
+    ASSERT_SHAPE_EQ_AUTO(  // NOLINT
+        R"({"a":{"$eq":"?array<?array>"}})",
+        "{a: [[], [], []]}");
+    ASSERT_SHAPE_EQ_AUTO(  // NOLINT
+        R"({"a":{"$eq":"?array<?array>"}})",
+        "{a: [[2, 3], ['string'], []]}");
+    ASSERT_SHAPE_EQ_AUTO(  // NOLINT
+        R"({"a":{"$eq":"?array<>"}})",
+        "{a: [{}, 2]}");
+    ASSERT_SHAPE_EQ_AUTO(  // NOLINT
+        R"({"a":{"$eq":"?array<>"}})",
+        "{a: [[], 2]}");
+    ASSERT_SHAPE_EQ_AUTO(  // NOLINT
+        R"({"a":{"$eq":"?array<>"}})",
+        "{a: [[{}, 'string'], 2]}");
+    ASSERT_SHAPE_EQ_AUTO(  // NOLINT
+        R"({"a":{"$eq":"?array<>"}})",
+        "{a: [[{}, 'string'], 2]}");
 }
 
 TEST(QueryPredicateShape, Comparisons) {
@@ -95,22 +131,22 @@ TEST(QueryPredicateShape, Comparisons) {
             "$and": [
                 {
                     "a": {
-                        "$lt": "?"
+                        "$lt": "?number"
                     }
                 },
                 {
                     "b": {
-                        "$gt": "?"
+                        "$gt": "?number"
                     }
                 },
                 {
                     "c": {
-                        "$gte": "?"
+                        "$gte": "?number"
                     }
                 },
                 {
                     "c": {
-                        "$lte": "?"
+                        "$lte": "?number"
                     }
                 }
             ]
@@ -121,114 +157,184 @@ TEST(QueryPredicateShape, Comparisons) {
 namespace {
 void assertShapeIs(std::string filterJson, BSONObj expectedShape) {
     ParsedMatchExpressionForTest expr(filterJson);
-    ASSERT_BSONOBJ_EQ(expectedShape, query_shape::predicateShape(expr.get()));
+    ASSERT_BSONOBJ_EQ(expectedShape, query_shape::debugPredicateShape(expr.get()));
 }
 
 void assertRedactedShapeIs(std::string filterJson, BSONObj expectedShape) {
     ParsedMatchExpressionForTest expr(filterJson);
     ASSERT_BSONOBJ_EQ(expectedShape,
-                      query_shape::predicateShape(expr.get(), redactFieldNameForTest));
+                      query_shape::debugPredicateShape(expr.get(), redactFieldNameForTest));
 }
 }  // namespace
 
 TEST(QueryPredicateShape, Regex) {
     // Note/warning: 'fromjson' will parse $regex into a /regex/, so these tests can't use
     // auto-updating BSON assertions.
-    assertShapeIs("{a: /a+/}", BSON("a" << BSON("$regex" << query_shape::kLiteralArgString)));
+    assertShapeIs("{a: /a+/}",
+                  BSON("a" << BSON("$regex"
+                                   << "?string")));
     assertShapeIs("{a: /a+/i}",
-                  BSON("a" << BSON("$regex" << query_shape::kLiteralArgString << "$options"
-                                            << query_shape::kLiteralArgString)));
+                  BSON("a" << BSON("$regex"
+                                   << "?string"
+                                   << "$options"
+                                   << "?string")));
     assertRedactedShapeIs("{a: /a+/}",
-                          BSON("REDACT_a" << BSON("$regex" << query_shape::kLiteralArgString)));
+                          BSON("REDACT_a" << BSON("$regex"
+                                                  << "?string")));
+    assertRedactedShapeIs("{a: /a+/}",
+                          BSON("REDACT_a" << BSON("$regex"
+                                                  << "?string")));
 }
 
 TEST(QueryPredicateShape, Mod) {
     ASSERT_SHAPE_EQ_AUTO(  // NOLINT
-        R"({"a":{"$mod":"?"}})",
+        R"({"a":{"$mod":["?number","?number"]}})",
         "{a: {$mod: [2, 0]}}");
 }
 
 TEST(QueryPredicateShape, Exists) {
     ASSERT_SHAPE_EQ_AUTO(  // NOLINT
-        R"({"a":{"$exists":"?"}})",
+        R"({"a":{"$exists":"?bool"}})",
         "{a: {$exists: true}}");
 }
 
 TEST(QueryPredicateShape, In) {
     // Any number of children is always the same shape
     ASSERT_SHAPE_EQ_AUTO(  // NOLINT
-        R"({"a":{"$in":["?"]}})",
+        R"({"a":{"$in":"?array<?number>"}})",
         "{a: {$in: [1]}}");
     ASSERT_SHAPE_EQ_AUTO(  // NOLINT
-        R"({"a":{"$in":["?"]}})",
+        R"({"a":{"$in":"?array<>"}})",
         "{a: {$in: [1, 4, 'str', /regex/]}}");
 }
 
 TEST(QueryPredicateShape, BitTestOperators) {
     ASSERT_SHAPE_EQ_AUTO(  // NOLINT
-        R"({"a":{"$bitsAllSet":"?"}})",
+        R"({"a":{"$bitsAllSet":"?array<?number>"}})",
         "{a: {$bitsAllSet: [1, 5]}}");
     ASSERT_SHAPE_EQ_AUTO(  // NOLINT
-        R"({"a":{"$bitsAllSet":"?"}})",
+        R"({"a":{"$bitsAllSet":"?array<?number>"}})",
         "{a: {$bitsAllSet: 50}}");
 
     ASSERT_SHAPE_EQ_AUTO(  // NOLINT
-        R"({"a":{"$bitsAnySet":"?"}})",
+        R"({"a":{"$bitsAnySet":"?array<?number>"}})",
         "{a: {$bitsAnySet: [1, 5]}}");
     ASSERT_SHAPE_EQ_AUTO(  // NOLINT
-        R"({"a":{"$bitsAnySet":"?"}})",
+        R"({"a":{"$bitsAnySet":"?array<?number>"}})",
         "{a: {$bitsAnySet: 50}}");
 
     ASSERT_SHAPE_EQ_AUTO(  // NOLINT
-        R"({"a":{"$bitsAllClear":"?"}})",
+        R"({"a":{"$bitsAllClear":"?array<?number>"}})",
         "{a: {$bitsAllClear: [1, 5]}}");
     ASSERT_SHAPE_EQ_AUTO(  // NOLINT
-        R"({"a":{"$bitsAllClear":"?"}})",
+        R"({"a":{"$bitsAllClear":"?array<?number>"}})",
         "{a: {$bitsAllClear: 50}}");
 
     ASSERT_SHAPE_EQ_AUTO(  // NOLINT
-        R"({"a":{"$bitsAnyClear":"?"}})",
+        R"({"a":{"$bitsAnyClear":"?array<?number>"}})",
         "{a: {$bitsAnyClear: [1, 5]}}");
     ASSERT_SHAPE_EQ_AUTO(  // NOLINT
-        R"({"a":{"$bitsAnyClear":"?"}})",
+        R"({"a":{"$bitsAnyClear":"?array<?number>"}})",
         "{a: {$bitsAnyClear: 50}}");
 }
 
 TEST(QueryPredicateShape, AlwaysBoolean) {
     ASSERT_SHAPE_EQ_AUTO(  // NOLINT
-        R"({"$alwaysTrue":"?"})",
+        R"({"$alwaysTrue":"?number"})",
         "{$alwaysTrue: 1}");
     ASSERT_SHAPE_EQ_AUTO(  // NOLINT
-        R"({"$alwaysFalse":"?"})",
+        R"({"$alwaysFalse":"?number"})",
         "{$alwaysFalse: 1}");
 }
 
 TEST(QueryPredicateShape, And) {
     ASSERT_SHAPE_EQ_AUTO(  // NOLINT
-        R"({"$and":[{"a":{"$lt":"?"}},{"b":{"$gte":"?"}},{"c":{"$lte":"?"}}]})",
+        R"({
+            "$and": [
+                {
+                    "a": {
+                        "$lt": "?number"
+                    }
+                },
+                {
+                    "b": {
+                        "$gte": "?number"
+                    }
+                },
+                {
+                    "c": {
+                        "$lte": "?number"
+                    }
+                }
+            ]
+        })",
         "{$and: [{a: {$lt: 5}}, {b: {$gte: 3}}, {c: {$lte: 10}}]}");
 }
 
 TEST(QueryPredicateShape, Or) {
     ASSERT_SHAPE_EQ_AUTO(  // NOLINT
-        R"({"$or":[{"a":{"$eq":"?"}},{"b":{"$in":["?"]}},{"c":{"$gt":"?"}}]})",
+        R"({
+            "$or": [
+                {
+                    "a": {
+                        "$eq": "?number"
+                    }
+                },
+                {
+                    "b": {
+                        "$in": "?array<?number>"
+                    }
+                },
+                {
+                    "c": {
+                        "$gt": "?number"
+                    }
+                }
+            ]
+        })",
         "{$or: [{a: 5}, {b: {$in: [1,2,3]}}, {c: {$gt: 10}}]}");
 }
 
 TEST(QueryPredicateShape, ElemMatch) {
     // ElemMatchObjectMatchExpression
     ASSERT_SHAPE_EQ_AUTO(  // NOLINT
-        R"({"a":{"$elemMatch":{"$and":[{"b":{"$eq":"?"}},{"c":{"$exists":"?"}}]}}})",
+        R"({
+            "a": {
+                "$elemMatch": {
+                    "$and": [
+                        {
+                            "b": {
+                                "$eq": "?number"
+                            }
+                        },
+                        {
+                            "c": {
+                                "$exists": "?bool"
+                            }
+                        }
+                    ]
+                }
+            }
+        })",
         "{a: {$elemMatch: {b: 5, c: {$exists: true}}}}");
 
     // ElemMatchValueMatchExpression
     ASSERT_SHAPE_EQ_AUTO(  // NOLINT
-        R"({"a":{"$elemMatch":{"$gt":"?","$lt":"?"}}})",
+        R"({"a":{"$elemMatch":{"$gt":"?number","$lt":"?number"}}})",
         "{a: {$elemMatch: {$gt: 5, $lt: 10}}}");
 
     // Nested
     ASSERT_REDACTED_SHAPE_EQ_AUTO(  // NOLINT
-        R"({"REDACT_a":{"$elemMatch":{"$elemMatch":{"$gt":"?","$lt":"?"}}}})",
+        R"({
+            "REDACT_a": {
+                "$elemMatch": {
+                    "$elemMatch": {
+                        "$gt": "?number",
+                        "$lt": "?number"
+                    }
+                }
+            }
+        })",
         "{a: {$elemMatch: {$elemMatch: {$gt: 5, $lt: 10}}}}");
 }
 
@@ -240,7 +346,7 @@ TEST(QueryPredicateShape, InternalBucketGeoWithinMatchExpression) {
         R"({
             "$_internalBucketGeoWithin": {
                 "withinRegion": {
-                    "$centerSphere": "?"
+                    "$centerSphere": "?array<>"
                 },
                 "field": "REDACT_a"
             }
@@ -250,26 +356,26 @@ TEST(QueryPredicateShape, InternalBucketGeoWithinMatchExpression) {
 
 TEST(QueryPredicateShape, NorMatchExpression) {
     ASSERT_REDACTED_SHAPE_EQ_AUTO(  // NOLINT
-        R"({"$nor":[{"REDACT_a":{"$lt":"?"}},{"REDACT_b":{"$gt":"?"}}]})",
+        R"({"$nor":[{"REDACT_a":{"$lt":"?number"}},{"REDACT_b":{"$gt":"?number"}}]})",
         "{ $nor: [ { a: {$lt: 5} }, { b: {$gt: 4} } ] }");
 }
 
 TEST(QueryPredicateShape, NotMatchExpression) {
     ASSERT_REDACTED_SHAPE_EQ_AUTO(  // NOLINT
-        R"({"REDACT_price":{"$not":{"$gt":"?"}}})",
+        R"({"REDACT_price":{"$not":{"$gt":"?number"}}})",
         "{ price: { $not: { $gt: 1.99 } } }");
     // Test the special case where NotMatchExpression::serialize() reduces to $alwaysFalse.
     auto emptyAnd = std::make_unique<AndMatchExpression>();
     const MatchExpression& notExpr = NotMatchExpression(std::move(emptyAnd));
     auto serialized = notExpr.serialize(literalAndFieldRedactOpts);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({"$alwaysFalse":"?"})",
+        R"({"$alwaysFalse":"?number"})",
         serialized);
 }
 
 TEST(QueryPredicateShape, SizeMatchExpression) {
     ASSERT_REDACTED_SHAPE_EQ_AUTO(  // NOLINT
-        R"({"REDACT_price":{"$size":"?"}})",
+        R"({"REDACT_price":{"$size":"?number"}})",
         "{ price: { $size: 2 } }");
 }
 
@@ -279,10 +385,10 @@ TEST(QueryPredicateShape, TextMatchExpression) {
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "$text": {
-                "$search": "?",
-                "$language": "?",
-                "$caseSensitive": "?",
-                "$diacriticSensitive": "?"
+                "$search": "?string",
+                "$language": "?string",
+                "$caseSensitive": "?bool",
+                "$diacriticSensitive": "?bool"
             }
         })",
         expr->serialize(literalAndFieldRedactOpts));
@@ -297,7 +403,7 @@ TEST(QueryPredicateShape, TwoDPtInAnnulusExpression) {
 
 TEST(QueryPredicateShape, WhereMatchExpression) {
     ASSERT_SHAPE_EQ_AUTO(  // NOLINT
-        R"({"$where":"?"})",
+        R"({"$where":"?javascript"})",
         "{$where: \"some_code()\"}");
 }
 
@@ -308,7 +414,7 @@ BSONObj queryShapeForOptimizedExprExpression(std::string exprPredicateJson) {
     // the computation on any MatchExpression, and this is the easiest way we can create this type
     // of MatchExpression node.
     auto optimized = MatchExpression::optimize(expr.release());
-    return query_shape::predicateShape(optimized.get());
+    return query_shape::debugPredicateShape(optimized.get());
 }
 
 TEST(QueryPredicateShape, OptimizedExprPredicates) {
@@ -317,16 +423,14 @@ TEST(QueryPredicateShape, OptimizedExprPredicates) {
             "$and": [
                 {
                     "a": {
-                        "$_internalExprEq": "?"
+                        "$_internalExprEq": "?number"
                     }
                 },
                 {
                     "$expr": {
                         "$eq": [
                             "$a",
-                            {
-                                "$const": "?"
-                            }
+                            "?number"
                         ]
                     }
                 }
@@ -339,16 +443,14 @@ TEST(QueryPredicateShape, OptimizedExprPredicates) {
             "$and": [
                 {
                     "a": {
-                        "$_internalExprLt": "?"
+                        "$_internalExprLt": "?number"
                     }
                 },
                 {
                     "$expr": {
                         "$lt": [
                             "$a",
-                            {
-                                "$const": "?"
-                            }
+                            "?number"
                         ]
                     }
                 }
@@ -361,16 +463,14 @@ TEST(QueryPredicateShape, OptimizedExprPredicates) {
             "$and": [
                 {
                     "a": {
-                        "$_internalExprLte": "?"
+                        "$_internalExprLte": "?number"
                     }
                 },
                 {
                     "$expr": {
                         "$lte": [
                             "$a",
-                            {
-                                "$const": "?"
-                            }
+                            "?number"
                         ]
                     }
                 }
@@ -383,16 +483,14 @@ TEST(QueryPredicateShape, OptimizedExprPredicates) {
             "$and": [
                 {
                     "a": {
-                        "$_internalExprGt": "?"
+                        "$_internalExprGt": "?number"
                     }
                 },
                 {
                     "$expr": {
                         "$gt": [
                             "$a",
-                            {
-                                "$const": "?"
-                            }
+                            "?number"
                         ]
                     }
                 }
@@ -405,16 +503,14 @@ TEST(QueryPredicateShape, OptimizedExprPredicates) {
             "$and": [
                 {
                     "a": {
-                        "$_internalExprGte": "?"
+                        "$_internalExprGte": "?number"
                     }
                 },
                 {
                     "$expr": {
                         "$gte": [
                             "$a",
-                            {
-                                "$const": "?"
-                            }
+                            "?number"
                         ]
                     }
                 }

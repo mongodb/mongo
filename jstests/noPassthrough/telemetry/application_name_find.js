@@ -45,7 +45,7 @@ assert.eq(1, telemetry.length, telemetry);
 assert.eq({
     cmdNs: {db: testDB.getName(), coll: coll.getName()},
     find: coll.getName(),
-    filter: {v: {"$eq": "?"}},
+    filter: {v: {"$eq": "?number"}},
     applicationName: kApplicationName
 },
           telemetry[0].key,
@@ -57,7 +57,7 @@ const hashedColl = "tU+RtrEU9QHrWsxNIL8OUDvfpUdavYkcuw7evPKfxdU=";
 assert.eq({
     cmdNs: {db: "Q7DO+ZJl+eNMEOqdNQGSbSezn1fG1nRWHYuiNueoGfs=", coll: hashedColl},
     find: hashedColl,
-    filter: {"ksdi13D4gc1BJ0Es4yX6QtG6MAwIeNLsCgeGRePOvFE=": {"$eq": "?"}},
+    filter: {"ksdi13D4gc1BJ0Es4yX6QtG6MAwIeNLsCgeGRePOvFE=": {"$eq": "?number"}},
     applicationName: kHashedApplicationName
 },
           telemetry[0].key,

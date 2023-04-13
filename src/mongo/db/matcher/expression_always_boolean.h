@@ -64,11 +64,7 @@ public:
     }
 
     void serialize(BSONObjBuilder* out, SerializationOptions opts) const final {
-        if (opts.replacementForLiteralArgs) {
-            out->append(name(), *opts.replacementForLiteralArgs);
-        } else {
-            out->append(name(), 1);
-        }
+        opts.appendLiteral(out, name(), 1);
     }
 
     bool equivalent(const MatchExpression* other) const final {
