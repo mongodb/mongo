@@ -537,11 +537,6 @@ public:
         return _requiresTimeseriesExtendedRangeSupport;
     }
 
-    // Returns true if the resolved collation of the context is simple.
-    bool isResolvedCollationSimple() const {
-        return getCollatorBSON().woCompare(CollationSpec::kSimpleSpec) == 0;
-    }
-
     // Forces the plan cache to be used even if there's only one solution available. Queries that
     // are ineligible will still not be cached.
     bool forcePlanCache = false;
