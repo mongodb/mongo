@@ -1,0 +1,14 @@
+# Query related google micro-benchmarks unless run in separate dedicated suites.
+test_kind: benchmark_test
+
+selector:
+  root: build/benchmarks.txt
+  include_files:
+  # The trailing asterisk is for handling the .exe extension on Windows.
+  - build/install/bin/percentile_algo_bm*
+  - build/install/bin/window_function_percentile_bm*
+
+executor:
+  config: {}
+  hooks:
+  - class: CombineBenchmarkResults
