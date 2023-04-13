@@ -79,6 +79,8 @@ selector:
   # TODO SERVER-72187: bulkWrite command does not support Tenant ID command
   - jstests/core/write/bulk/bulk_write_insert_cursor.js
   - jstests/core/write/bulk/bulk_write_update_cursor.js
+  - jstests/core/write/bulk/bulk_write_non_retryable_cursor.js
+  - jstests/core/write/bulk/bulk_write_getMore.js
   # This test looks for the presence of a log line that contains a db name. Injecting a tenantId in
   # the requests causes the test to fails due to a mismatch.
   - jstests/core/api//apitest_db_profile_level.js

@@ -795,6 +795,8 @@ var {
         } else if (cmdName === "findAndModify" || cmdName === "findandmodify") {
             // Operations that modify a single document (e.g. findOneAndUpdate()) can be retried.
             return true;
+        } else if (cmdName === "bulkWrite") {
+            return true;
         }
 
         return false;

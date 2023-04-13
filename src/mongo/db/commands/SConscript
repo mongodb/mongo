@@ -323,6 +323,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_feature_flags',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/session/logical_session_id_helpers',
+        '$BUILD_DIR/mongo/db/transaction/transaction',
         '$BUILD_DIR/mongo/logv2/logv2_options',
         '$BUILD_DIR/mongo/util/log_and_backoff',
         '$BUILD_DIR/mongo/util/namespace_string_database_name_util',

@@ -258,7 +258,7 @@ TEST_F(BulkWriteShardTest, ThreeSuccessfulInsertsOrdered) {
                 nssShardedCollection2, dbVersionTestDb2, shardVersionShardedCollection2),
         });
 
-    auto replyItems = bulk_write::performWrites(opCtx(), request);
+    const auto& [replyItems, retriedStmtIds] = bulk_write::performWrites(opCtx(), request);
 
     ASSERT_EQ(3, replyItems.size());
     for (const auto& reply : replyItems) {
@@ -278,7 +278,7 @@ TEST_F(BulkWriteShardTest, OneFailingShardedOneSkippedUnshardedSuccessInsertOrde
          nsInfoWithShardDatabaseVersions(
              nssUnshardedCollection1, dbVersionTestDb1, ShardVersion::UNSHARDED())});
 
-    auto replyItems = bulk_write::performWrites(opCtx(), request);
+    const auto& [replyItems, retriedStmtIds] = bulk_write::performWrites(opCtx(), request);
 
     ASSERT_EQ(1, replyItems.size());
     ASSERT_EQ(ErrorCodes::StaleConfig, replyItems.back().getStatus().code());
@@ -296,7 +296,7 @@ TEST_F(BulkWriteShardTest, TwoFailingShardedInsertsOrdered) {
                 nssShardedCollection1, dbVersionTestDb1, incorrectShardVersion),
         });
 
-    auto replyItems = bulk_write::performWrites(opCtx(), request);
+    const auto& [replyItems, retriedStmtIds] = bulk_write::performWrites(opCtx(), request);
 
     ASSERT_EQ(1, replyItems.size());
     ASSERT_EQ(ErrorCodes::StaleConfig, replyItems.back().getStatus().code());
@@ -314,7 +314,7 @@ TEST_F(BulkWriteShardTest, OneSuccessfulShardedOneFailingShardedOrdered) {
          nsInfoWithShardDatabaseVersions(
              nssShardedCollection2, dbVersionTestDb2, incorrectShardVersion)});
 
-    auto replyItems = bulk_write::performWrites(opCtx(), request);
+    const auto& [replyItems, retriedStmtIds] = bulk_write::performWrites(opCtx(), request);
 
     ASSERT_EQ(2, replyItems.size());
     ASSERT_OK(replyItems.front().getStatus());
@@ -332,7 +332,7 @@ TEST_F(BulkWriteShardTest, OneFailingShardedOneSkippedShardedUnordered) {
             nssShardedCollection1, dbVersionTestDb1, incorrectShardVersion)});
     request.setOrdered(false);
 
-    auto replyItems = bulk_write::performWrites(opCtx(), request);
+    const auto& [replyItems, retriedStmtIds] = bulk_write::performWrites(opCtx(), request);
 
     ASSERT_EQ(1, replyItems.size());
     ASSERT_EQ(ErrorCodes::StaleConfig, replyItems.back().getStatus().code());
@@ -351,7 +351,7 @@ TEST_F(BulkWriteShardTest, OneSuccessfulShardedOneFailingShardedUnordered) {
              nssShardedCollection2, dbVersionTestDb2, shardVersionShardedCollection2)});
     request.setOrdered(false);
 
-    auto replyItems = bulk_write::performWrites(opCtx(), request);
+    const auto& [replyItems, retriedStmtIds] = bulk_write::performWrites(opCtx(), request);
 
     ASSERT_EQ(1, replyItems.size());
     ASSERT_EQ(ErrorCodes::StaleConfig, replyItems.back().getStatus().code());
@@ -373,7 +373,7 @@ TEST_F(BulkWriteShardTest, InsertsAndUpdatesSuccessOrdered) {
          nsInfoWithShardDatabaseVersions(
              nssUnshardedCollection1, dbVersionTestDb1, ShardVersion::UNSHARDED())});
 
-    auto replyItems = bulk_write::performWrites(opCtx(), request);
+    const auto& [replyItems, retriedStmtIds] = bulk_write::performWrites(opCtx(), request);
 
     ASSERT_EQ(4, replyItems.size());
     for (const auto& reply : replyItems) {
@@ -399,7 +399,7 @@ TEST_F(BulkWriteShardTest, InsertsAndUpdatesSuccessUnordered) {
 
     request.setOrdered(false);
 
-    auto replyItems = bulk_write::performWrites(opCtx(), request);
+    const auto& [replyItems, retriedStmtIds] = bulk_write::performWrites(opCtx(), request);
 
     ASSERT_EQ(4, replyItems.size());
     for (const auto& reply : replyItems) {
@@ -425,7 +425,7 @@ TEST_F(BulkWriteShardTest, InsertsAndUpdatesFailUnordered) {
 
     request.setOrdered(false);
 
-    auto replyItems = bulk_write::performWrites(opCtx(), request);
+    const auto& [replyItems, retriedStmtIds] = bulk_write::performWrites(opCtx(), request);
 
     ASSERT_EQ(2, replyItems.size());
     ASSERT_OK(replyItems.front().getStatus());
@@ -449,7 +449,7 @@ TEST_F(BulkWriteShardTest, InsertsAndUpdatesFailUnordered) {
 
 //     request.setOrdered(false);
 
-//     auto replyItems = bulk_write::performWrites(opCtx(), request);
+//     const auto& [replyItems, retriedStmtIds] = bulk_write::performWrites(opCtx(), request);
 
 //     ASSERT_EQ(2, replyItems.size());
 //     ASSERT_OK(replyItems.front().getStatus());
@@ -470,7 +470,7 @@ TEST_F(BulkWriteShardTest, FirstFailsRestSkippedStaleDbVersionOrdered) {
          nsInfoWithShardDatabaseVersions(
              nssShardedCollection2, dbVersionTestDb2, shardVersionShardedCollection2)});
 
-    auto replyItems = bulk_write::performWrites(opCtx(), request);
+    const auto& [replyItems, retriedStmtIds] = bulk_write::performWrites(opCtx(), request);
 
     ASSERT_EQ(1, replyItems.size());
     ASSERT_EQ(ErrorCodes::StaleDbVersion, replyItems.back().getStatus().code());
@@ -491,7 +491,7 @@ TEST_F(BulkWriteShardTest, FirstFailsRestSkippedStaleDbVersionUnordered) {
              nssShardedCollection2, dbVersionTestDb2, shardVersionShardedCollection2)});
 
     request.setOrdered(false);
-    auto replyItems = bulk_write::performWrites(opCtx(), request);
+    const auto& [replyItems, retriedStmtIds] = bulk_write::performWrites(opCtx(), request);
 
     ASSERT_EQ(2, replyItems.size());
     ASSERT_OK(replyItems.front().getStatus());

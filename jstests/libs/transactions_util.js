@@ -17,6 +17,7 @@ var TransactionsUtil = (function() {
         'getMore',
         'insert',
         'update',
+        'bulkWrite',
     ]);
 
     const kCmdsThatWrite = new Set([
@@ -25,6 +26,7 @@ var TransactionsUtil = (function() {
         'findAndModify',
         'findandmodify',
         'delete',
+        'bulkWrite',
     ]);
 
     // Indicates an aggregation command with a pipeline that cannot run in a transaction but can
@@ -45,13 +47,33 @@ var TransactionsUtil = (function() {
             return false;
         }
 
-        if (dbName === 'local' || dbName === 'config' || dbName === 'admin') {
-            return false;
-        }
-
-        if (kCmdsThatWrite.has(cmdName)) {
-            if (cmdObj[cmdName].startsWith('system.')) {
+        // bulkWrite always operates on the admin DB so cannot check the dbName directly.
+        // Operating namespaces are also contained within a 'nsInfo' array in the command.
+        if (cmdName === 'bulkWrite') {
+            // 'nsInfo' does not exist in command.
+            if (!cmdObj['nsInfo']) {
                 return false;
+            }
+
+            // Loop through 'nsInfo'.
+            for (const ns of cmdObj['nsInfo']) {
+                if (!ns['ns']) {
+                    return false;
+                }
+                var db = ns['ns'].split('.', 1)[0];
+                if (db === 'local' || db === 'config' || db === 'system') {
+                    return false;
+                }
+            }
+        } else {
+            if (dbName === 'local' || dbName === 'config' || dbName === 'admin') {
+                return false;
+            }
+
+            if (kCmdsThatWrite.has(cmdName)) {
+                if (cmdObj[cmdName].startsWith('system.')) {
+                    return false;
+                }
             }
         }
 

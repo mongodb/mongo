@@ -33,7 +33,8 @@ var RetryableWritesUtil = (function() {
         "findAndModify",
         "insert",
         "update",
-        "testInternalTransactions"
+        "testInternalTransactions",
+        "bulkWrite"
     ]);
 
     /**

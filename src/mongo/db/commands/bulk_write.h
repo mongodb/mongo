@@ -37,8 +37,11 @@
 namespace mongo {
 namespace bulk_write {
 
-std::vector<BulkWriteReplyItem> performWrites(OperationContext* opCtx,
-                                              const BulkWriteCommandRequest& req);
+using RetriedStmtIds = std::vector<int32_t>;
+using BulkWriteReplyItems = std::vector<BulkWriteReplyItem>;
+using BulkWriteReply = std::tuple<BulkWriteReplyItems, RetriedStmtIds>;
+
+BulkWriteReply performWrites(OperationContext* opCtx, const BulkWriteCommandRequest& req);
 
 }  // namespace bulk_write
 }  // namespace mongo
