@@ -240,9 +240,8 @@ void IDLParserContext::throwAPIStrictErrorIfApplicable(StringData fieldName) con
             !_apiStrict);
 }
 
-NamespaceString IDLParserContext::parseNSCollectionRequired(const DatabaseName& dbName,
-                                                            const BSONElement& element,
-                                                            bool allowGlobalCollectionName) {
+StringData IDLParserContext::checkAndAssertCollectionName(const BSONElement& element,
+                                                          bool allowGlobalCollectionName) {
     const bool isUUID = (element.canonicalType() == canonicalizeBSONType(mongo::BinData) &&
                          element.binDataType() == BinDataType::newUUID);
     uassert(ErrorCodes::BadValue,
@@ -255,29 +254,23 @@ NamespaceString IDLParserContext::parseNSCollectionRequired(const DatabaseName& 
                 str::stream() << "Invalid command format: the '" << element.fieldNameStringData()
                               << "' field must specify a collection name or 1",
                 element.number() == 1);
-        return NamespaceString(dbName, collectionlessAggregateCursorCol);
+        return collectionlessAggregateCursorCol;
     }
 
     uassert(ErrorCodes::BadValue,
             str::stream() << "collection name has invalid type " << typeName(element.type()),
             element.canonicalType() == canonicalizeBSONType(mongo::String));
 
-    const NamespaceString nss(dbName, element.valueStringData());
-
-    uassert(ErrorCodes::InvalidNamespace,
-            str::stream() << "Invalid namespace specified '" << nss.toStringForErrorMsg() << "'",
-            nss.isValid());
-
-    return nss;
+    return element.valueStringData();
 }
 
-NamespaceStringOrUUID IDLParserContext::parseNsOrUUID(const DatabaseName& dbName,
-                                                      const BSONElement& element) {
+stdx::variant<UUID, StringData> IDLParserContext::checkAndAssertCollectionNameOrUUID(
+    const BSONElement& element) {
     if (element.type() == BinData && element.binDataType() == BinDataType::newUUID) {
-        return {dbName, uassertStatusOK(UUID::parse(element))};
+        return uassertStatusOK(UUID::parse(element));
     } else {
         // Ensure collection identifier is not a Command
-        return {parseNSCollectionRequired(dbName, element, false)};
+        return checkAndAssertCollectionName(element, false);
     }
 }
 

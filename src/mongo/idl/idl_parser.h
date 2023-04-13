@@ -362,18 +362,18 @@ public:
     void throwAPIStrictErrorIfApplicable(BSONElement fieldName) const;
 
     /**
-     * Equivalent to CommandHelpers::parseNsCollectionRequired.
-     * 'allowGlobalCollectionName' allows use of global collection name, e.g. {aggregate: 1}.
+     * Check that the collection name in 'element' is valid. Throws an exception if not valid.
+     * Returns the collection name otherwise.
      */
-    static NamespaceString parseNSCollectionRequired(const DatabaseName& dbname,
-                                                     const BSONElement& element,
-                                                     bool allowGlobalCollectionName);
+    static StringData checkAndAssertCollectionName(const BSONElement& element,
+                                                   bool allowGlobalCollectionName);
 
     /**
-     * Equivalent to CommandHelpers::parseNsOrUUID
+     * Check that the collection name or UUID in 'element' is valid. Throws an exception if not
+     * valid. Returns either the collection name or UUID otherwise.
      */
-    static NamespaceStringOrUUID parseNsOrUUID(const DatabaseName& dbname,
-                                               const BSONElement& element);
+    static stdx::variant<UUID, StringData> checkAndAssertCollectionNameOrUUID(
+        const BSONElement& element);
 
     /**
      * Take all the well known command generic arguments from commandPassthroughFields, but ignore

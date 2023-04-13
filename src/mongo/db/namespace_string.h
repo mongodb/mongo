@@ -48,7 +48,6 @@
 
 namespace mongo {
 class NamespaceStringUtil;
-class IDLParserContext;
 
 class NamespaceString {
 public:
@@ -797,9 +796,6 @@ public:
 
 private:
     friend NamespaceStringUtil;
-    // TODO SERVER-74897 IDLParserContext should no longer be a friend once IDL generated commands
-    // call into NamespaceStringUtil directly to construct NamespaceStrings.
-    friend IDLParserContext;
 
     /**
      * In order to construct NamespaceString objects, use NamespaceStringUtil. The functions

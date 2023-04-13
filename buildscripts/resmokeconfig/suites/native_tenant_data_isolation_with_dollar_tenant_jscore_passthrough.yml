@@ -74,6 +74,7 @@ selector:
   # These tests create a new thread, so $tenant won't be properly injected.
   - jstests/core/txns/transactions_block_ddl.js
   - jstests/core/txns/write_conflicts_with_non_txns.js
+  - jstests/core/txns/kill_op_on_txn_expiry.js
   # TODO SERVER-72357: cannot get the expected error due to an authorization contract issue.
   - jstests/core/txns/multi_statement_transaction_command_args.js
   # TODO SERVER-72187: bulkWrite command does not support Tenant ID command
