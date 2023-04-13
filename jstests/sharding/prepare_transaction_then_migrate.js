@@ -96,7 +96,7 @@ let runTest = function(testMode) {
 
         // Wait for the config server to see the new primary.
         // TODO SERVER-74177 Remove this once retry on NotWritablePrimary is implemented.
-        st.forEachConfigServer((conn) => {
+        st.configRS.nodes.forEach((conn) => {
             awaitRSClientHosts(conn, st.rs0.getPrimary(), {ok: true, ismaster: true});
         });
     } else if (testMode == TestMode.kWithRestart) {
