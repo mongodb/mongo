@@ -20,6 +20,8 @@ __wt_rts_history_delete_hs(WT_SESSION_IMPL *session, WT_ITEM *key, wt_timestamp_
     WT_DECL_ITEM(hs_key);
     WT_DECL_RET;
     WT_TIME_WINDOW *hs_tw;
+    char ts_string[2][WT_TS_INT_STRING_SIZE];
+    char tw_string[WT_TIME_STRING_SIZE];
     bool dryrun;
 
     dryrun = S2C(session)->rts->dryrun;
@@ -54,8 +56,17 @@ __wt_rts_history_delete_hs(WT_SESSION_IMPL *session, WT_ITEM *key, wt_timestamp_
         if (hs_tw->stop_ts <= ts)
             break;
 
-        if (!dryrun)
+        if (!dryrun) {
+            __wt_verbose_level_multi(session, WT_VERB_RECOVERY_RTS(session), WT_VERBOSE_DEBUG_3,
+              WT_RTS_VERB_TAG_HS_UPDATE_REMOVE
+              "deleting history store update with stop_timestamp=%s greater than "
+              "stable_timestamp=%s, time_window=%s",
+              __wt_timestamp_to_string(hs_tw->stop_ts, ts_string[0]),
+              __wt_timestamp_to_string(ts, ts_string[1]),
+              __wt_time_window_to_string(hs_tw, tw_string));
             WT_ERR(hs_cursor->remove(hs_cursor));
+        }
+
         WT_RTS_STAT_CONN_DATA_INCR(session, txn_rts_hs_removed);
 
         /*

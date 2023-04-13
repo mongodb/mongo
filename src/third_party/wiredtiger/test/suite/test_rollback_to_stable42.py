@@ -39,6 +39,7 @@ from test_rollback_to_stable01 import test_rollback_to_stable_base
 def custom_validator(data):
     acceptable = [
         "aborting update with txnid",
+        "btree object found with",
         "connection_logging_enabled",
         "deleted page walk skipped",
         "page with reconciled",
