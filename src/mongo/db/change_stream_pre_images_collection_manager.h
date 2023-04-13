@@ -52,6 +52,51 @@ RecordId toRecordId(ChangeStreamPreImageId id);
  */
 class ChangeStreamPreImagesCollectionManager {
 public:
+    struct PurgingJobStats {
+        /**
+         * Total number of deletion passes completed by the purging job.
+         */
+        AtomicWord<int64_t> totalPass;
+
+        /**
+         * Cumulative number of pre-image documents deleted by the purging job.
+         */
+        AtomicWord<int64_t> docsDeleted;
+
+        /**
+         * Cumulative size in bytes of all deleted documents from all pre-image collections by the
+         * purging job.
+         */
+        AtomicWord<int64_t> bytesDeleted;
+
+        /**
+         * Cumulative number of pre-image collections scanned by the purging job. In single-tenant
+         * environments this is the same as totalPass as there is 1 pre-image collection per tenant.
+         */
+        AtomicWord<int64_t> scannedCollections;
+
+        /**
+         * Cumulative number of internal pre-image collections scanned by the purging job. Internal
+         * collections are the segments of actual pre-images of collections within system.preimages.
+         */
+        AtomicWord<int64_t> scannedInternalCollections;
+
+        /**
+         * Cumulative number of milliseconds elapsed since the first pass by the purging job.
+         */
+        AtomicWord<int64_t> timeElapsedMillis;
+
+        /**
+         * Maximum wall time from the first document of each pre-image collection.
+         */
+        AtomicWord<Date_t> maxStartWallTime;
+
+        /**
+         * Serializes the purging job statistics to the BSON object.
+         */
+        BSONObj toBSON() const;
+    };
+
     /**
      * Creates the pre-images collection, clustered by the primary key '_id'. The collection is
      * created for the specific tenant if the 'tenantId' is specified.
@@ -78,5 +123,7 @@ public:
      * Scans the system pre-images collection and deletes the expired pre-images from it.
      */
     static void performExpiredChangeStreamPreImagesRemovalPass(Client* client);
+
+    static const PurgingJobStats& getPurgingJobStats();
 };
 }  // namespace mongo

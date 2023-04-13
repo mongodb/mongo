@@ -57,6 +57,10 @@ namespace {
 // Fail point to set current time for time-based expiration of pre-images.
 MONGO_FAIL_POINT_DEFINE(changeStreamPreImageRemoverCurrentTime);
 MONGO_FAIL_POINT_DEFINE(failPreimagesCollectionCreation);
+
+// Pre-image collections purging job stats.
+Date_t maxStartTime;
+ChangeStreamPreImagesCollectionManager::PurgingJobStats purgingJobStats;
 }  // namespace
 
 namespace change_stream_pre_image_helpers {
@@ -109,6 +113,18 @@ RecordId toRecordId(ChangeStreamPreImageId id) {
 }
 
 }  // namespace change_stream_pre_image_helpers
+
+BSONObj ChangeStreamPreImagesCollectionManager::PurgingJobStats::toBSON() const {
+    BSONObjBuilder builder;
+    builder.append("totalPass", totalPass.loadRelaxed())
+        .append("docsDeleted", docsDeleted.loadRelaxed())
+        .append("bytesDeleted", bytesDeleted.loadRelaxed())
+        .append("scannedCollections", scannedCollections.loadRelaxed())
+        .append("scannedInternalCollections", scannedInternalCollections.loadRelaxed())
+        .append("maxStartWallTimeMillis", maxStartWallTime.loadRelaxed().toMillisSinceEpoch())
+        .append("timeElapsedMillis", timeElapsedMillis.loadRelaxed());
+    return builder.obj();
+}
 
 void ChangeStreamPreImagesCollectionManager::createPreImagesCollection(
     OperationContext* opCtx, boost::optional<TenantId> tenantId) {
@@ -221,6 +237,10 @@ boost::optional<UUID> findNextCollectionUUID(OperationContext* opCtx,
     }
     auto parsedUUID = UUID::parse(preImageObj["_id"].Obj()["nsUUID"]);
     tassert(7027400, "Pre-image collection UUID must be of UUID type", parsedUUID.isOK());
+
+    auto objWallTime = preImageObj[ChangeStreamPreImage::kOperationTimeFieldName].date();
+    maxStartTime = std::max(maxStartTime, objWallTime);
+
     return {std::move(parsedUUID.getValue())};
 }
 
@@ -290,8 +310,13 @@ size_t _deleteExpiredChangeStreamPreImagesCommon(OperationContext* opCtx,
                     filterPtr,
                     filterPtr != nullptr);
                 numberOfRemovals += exec->executeDelete();
+                auto batchedDeleteStats = exec->getBatchedDeleteStats();
+                purgingJobStats.docsDeleted.fetchAndAddRelaxed(batchedDeleteStats.docsDeleted);
+                purgingJobStats.bytesDeleted.fetchAndAddRelaxed(batchedDeleteStats.bytesDeleted);
+                purgingJobStats.scannedInternalCollections.fetchAndAddRelaxed(1);
             });
     }
+    purgingJobStats.scannedCollections.fetchAndAddRelaxed(1);
     return numberOfRemovals;
 }
 
@@ -369,6 +394,10 @@ size_t deleteExpiredChangeStreamPreImagesForTenants(OperationContext* opCtx,
 
 void ChangeStreamPreImagesCollectionManager::performExpiredChangeStreamPreImagesRemovalPass(
     Client* client) {
+    // Stats initialisation for purging job metrics.
+    Timer timer;
+    maxStartTime = Date_t{};
+
     Date_t currentTimeForTimeBasedExpiration = Date_t::now();
 
     changeStreamPreImageRemoverCurrentTime.execute([&](const BSONObj& data) {
@@ -423,6 +452,17 @@ void ChangeStreamPreImagesCollectionManager::performExpiredChangeStreamPreImages
                         "reason"_attr = exception.reason());
         }
     }
+
+    if (maxStartTime != Date_t{}) {
+        purgingJobStats.maxStartWallTime.store(maxStartTime);
+    }
+    purgingJobStats.timeElapsedMillis.fetchAndAddRelaxed(timer.millis());
+    purgingJobStats.totalPass.fetchAndAddRelaxed(1);
+}
+
+const ChangeStreamPreImagesCollectionManager::PurgingJobStats&
+ChangeStreamPreImagesCollectionManager::getPurgingJobStats() {
+    return purgingJobStats;
 }
 
 }  // namespace mongo
