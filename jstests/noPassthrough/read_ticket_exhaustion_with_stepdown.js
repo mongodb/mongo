@@ -21,13 +21,13 @@
  * arriving reads are serviced without deadlocking.
  * queuedLongReadsFunc - Issues long read commands until told to stop.
  *    newLongReadsFunc - When told to begin, issues long read commands until told
-                         to stop.
+ *                       to stop.
  *
  * Test Steps:
  * 0) Start ReplSet with special params:
  *     - lower read ticket concurrency
  *     - increase yielding
- * 1) Insert 100 documents.
+ * 1) Insert 1000 documents.
  * 2) Kick off parallel readers that perform long collection scans, subject to yields.
  * 3) Sleep with global X Lock (including RSTL), thus queuing up reads.
  * 4) Signal new readers that will be received after the global lock is released.
@@ -36,13 +36,18 @@
  * <<Should have deadlocked by now for this scenario>>
  * 6) Stop Readers.
  *
- * @tags: [multiversion_incompatible]
+ * @tags: [
+ *   multiversion_incompatible,
+ *   requires_replication,
+ *   requires_wiredtiger,
+ * ]
  */
 (function() {
 "use strict";
 
 load("jstests/libs/parallel_shell_helpers.js");
 
+const kNumReadTickets = 5;
 const replTest = new ReplSetTest({
     name: jsTestName(),
     nodes: 1,
@@ -50,7 +55,7 @@ const replTest = new ReplSetTest({
         setParameter: {
             // This test seeks the minimum amount of concurrency to force ticket exhaustion.
             storageEngineConcurrencyAdjustmentAlgorithm: "",
-            storageEngineConcurrentReadTransactions: 5,
+            storageEngineConcurrentReadTransactions: kNumReadTickets,
             // Make yielding more common.
             internalQueryExecYieldPeriodMS: 1,
             internalQueryExecYieldIterations: 1
@@ -126,17 +131,11 @@ function runStepDown() {
     let stats = db.runCommand({serverStatus: 1});
     jsTestLog(stats.locks);
     jsTestLog(stats.wiredTiger.concurrentTransactions);
-    const stepDownSecs = 5;
-    assert.commandWorked(primaryAdmin.runCommand({"replSetStepDown": stepDownSecs, "force": true}));
-
-    // Wait until the primary transitioned to SECONDARY state.
-    replTest.waitForState(primary, ReplSetTest.State.SECONDARY);
-
-    // Enforce the replSetStepDown timer.
-    sleep(stepDownSecs * 1000);
-
-    replTest.waitForState(primary, ReplSetTest.State.PRIMARY);
-    replTest.getPrimary();
+    // Force primary to step down, then unfreeze and allow it to step up.
+    assert.commandWorked(
+        primaryAdmin.runCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
+    assert.commandWorked(primaryAdmin.runCommand({replSetFreeze: 0}));
+    return replTest.getPrimary();
 }
 
 /****************************************************/
@@ -153,12 +152,12 @@ let primaryColl = db[collName];
 let queuedReaders = [];
 let newReaders = [];
 
-// 1) Insert 100 documents.
-jsTestLog("Fill collection [" + dbName + "." + collName + "] with 100 docs");
-for (let i = 0; i < 100; i++) {
+// 1) Insert 1000 documents.
+jsTestLog("Fill collection [" + dbName + "." + collName + "] with 1000 docs");
+for (let i = 0; i < 1000; i++) {
     assert.commandWorked(primaryColl.insert({"x": i}));
 }
-jsTestLog("100 inserts done");
+jsTestLog("1000 inserts done");
 
 // 2) Kick off parallel readers that perform long collection scans, subject to yields.
 for (let i = 0; i < nQueuedReaders; i++) {
@@ -192,9 +191,10 @@ assert.soon(
     () => db.getSiblingDB("admin")
               .aggregate([{$currentOp: {}}, {$match: {"command.aggregate": TestData.collName}}])
               .toArray()
-              .length > 5,
+              .length >= kNumReadTickets,
     "Expected more readers than read tickets.");
-runStepDown();
+
+primary = runStepDown();
 
 // 6) Stop Readers.
 jsTestLog("Stopping Readers");
