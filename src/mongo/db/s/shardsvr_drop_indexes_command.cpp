@@ -201,8 +201,10 @@ ShardsvrDropIndexesCommand::Invocation::Response ShardsvrDropIndexesCommand::Inv
                         CommandHelpers::filterCommandRequestForPassthrough(cmdToBeSent)),
                     ReadPreferenceSetting::get(opCtx),
                     Shard::RetryPolicy::kNotIdempotent,
-                    BSONObj() /* query */,
-                    BSONObj() /* collation */);
+                    BSONObj() /*query*/,
+                    BSONObj() /*collation*/,
+                    boost::none /*letParameters*/,
+                    boost::none /*runtimeConstants*/);
 
             // Append responses we've received from previous retries of this operation due to a
             // stale config error.

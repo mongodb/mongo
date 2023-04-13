@@ -1192,7 +1192,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
             // shards, and should participate in the shard version protocol.
             invariant(executionNsRoutingInfo);
             shardResults =
-                scatterGatherVersionedTargetByRoutingTable(opCtx,
+                scatterGatherVersionedTargetByRoutingTable(expCtx,
                                                            expCtx->ns.db(),
                                                            expCtx->ns,
                                                            *executionNsRoutingInfo,

@@ -88,8 +88,10 @@ public:
                     CommandHelpers::filterCommandRequestForPassthrough(cmd.toBSON({}))),
                 ReadPreferenceSetting::get(opCtx),
                 Shard::RetryPolicy::kIdempotent,
-                {},
-                {});
+                {} /*query*/,
+                {} /*collation*/,
+                boost::none /*letParameters*/,
+                boost::none /*runtimeConstants*/);
 
             std::int64_t size = 0;
             std::int64_t numObjects = 0;

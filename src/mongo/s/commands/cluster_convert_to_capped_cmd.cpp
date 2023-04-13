@@ -60,8 +60,10 @@ bool nonShardedCollectionCommandPassthrough(OperationContext* opCtx,
                                                                 cmdObj,
                                                                 ReadPreferenceSetting::get(opCtx),
                                                                 retryPolicy,
-                                                                {},
-                                                                {});
+                                                                {} /*query*/,
+                                                                {} /*collation*/,
+                                                                boost::none /*letParameters*/,
+                                                                boost::none /*runtimeConstants*/);
     invariant(responses.size() == 1);
 
     const auto cmdResponse = uassertStatusOK(std::move(responses.front().swResponse));

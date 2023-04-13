@@ -161,7 +161,9 @@ public:
                     ReadPreferenceSetting::get(opCtx),
                     Shard::RetryPolicy::kIdempotent,
                     findCommand->getFilter(),
-                    findCommand->getCollation());
+                    findCommand->getCollation(),
+                    findCommand->getLet(),
+                    findCommand->getLegacyRuntimeConstants());
                 millisElapsed = timer.millis();
 
                 const char* mongosStageName =
