@@ -42,6 +42,7 @@
 #include "mongo/db/repl/oplog_entry_or_grouped_inserts.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/s/sharding_write_router.h"
 #include "mongo/db/session/logical_session_id.h"
 
 namespace mongo {
@@ -131,14 +132,13 @@ void createOplog(OperationContext* opCtx);
  * @param fromMigrate: a list of 'fromMigrate' values for the inserts.
  *
  */
-std::vector<OpTime> logInsertOps(
-    OperationContext* opCtx,
-    MutableOplogEntry* oplogEntryTemplate,
-    std::vector<InsertStatement>::const_iterator begin,
-    std::vector<InsertStatement>::const_iterator end,
-    const std::vector<bool>& fromMigrate,
-    std::function<boost::optional<ShardId>(const BSONObj& doc)> getDestinedRecipientFn,
-    const CollectionPtr& collectionPtr);
+std::vector<OpTime> logInsertOps(OperationContext* opCtx,
+                                 MutableOplogEntry* oplogEntryTemplate,
+                                 std::vector<InsertStatement>::const_iterator begin,
+                                 std::vector<InsertStatement>::const_iterator end,
+                                 const std::vector<bool>& fromMigrate,
+                                 const ShardingWriteRouter& shardingWriteRouter,
+                                 const CollectionPtr& collectionPtr);
 
 /**
  * Returns the optime of the oplog entry written to the oplog.

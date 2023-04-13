@@ -564,14 +564,13 @@ OpTime logOp(OperationContext* opCtx, MutableOplogEntry* oplogEntry) {
     return slot;
 }
 
-std::vector<OpTime> logInsertOps(
-    OperationContext* opCtx,
-    MutableOplogEntry* oplogEntryTemplate,
-    std::vector<InsertStatement>::const_iterator begin,
-    std::vector<InsertStatement>::const_iterator end,
-    const std::vector<bool>& fromMigrate,
-    std::function<boost::optional<ShardId>(const BSONObj& doc)> getDestinedRecipientFn,
-    const CollectionPtr& collectionPtr) {
+std::vector<OpTime> logInsertOps(OperationContext* opCtx,
+                                 MutableOplogEntry* oplogEntryTemplate,
+                                 std::vector<InsertStatement>::const_iterator begin,
+                                 std::vector<InsertStatement>::const_iterator end,
+                                 const std::vector<bool>& fromMigrate,
+                                 const ShardingWriteRouter& shardingWriteRouter,
+                                 const CollectionPtr& collectionPtr) {
     invariant(begin != end);
 
     auto nss = oplogEntryTemplate->getNss();
@@ -623,7 +622,8 @@ std::vector<OpTime> logInsertOps(
         oplogEntry.setObject(begin[i].doc);
         oplogEntry.setObject2(docKey);
         oplogEntry.setOpTime(insertStatementOplogSlot);
-        oplogEntry.setDestinedRecipient(getDestinedRecipientFn(begin[i].doc));
+        oplogEntry.setDestinedRecipient(
+            shardingWriteRouter.getReshardingDestinedRecipient(begin[i].doc));
         addDestinedRecipient.execute([&](const BSONObj& data) {
             auto recipient = data["destinedRecipient"].String();
             oplogEntry.setDestinedRecipient(boost::make_optional<ShardId>({recipient}));
