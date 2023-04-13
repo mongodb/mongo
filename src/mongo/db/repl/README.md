@@ -1187,6 +1187,47 @@ Note that secondaries can apply prepare oplog entries immediately but
 [recovering](#recovering-prepared-transactions) nodes must wait until they finish the process or
 see a commit oplog entry.
 
+Another major difference between secondary nodes and recovering nodes is that recovering nodes
+process prepare oplog entries one at a time and operations in a prepare oplog entry are applied in
+serial, while secondary nodes batch process prepare oplog entries and use multiple threads to
+parallelize the application of operations in each prepare oplog entry.
+
+In order to parallelize the application, a `prepareTransaction` oplog entry can be 
+[applied in the same batch](https://github.com/mongodb/mongo/blob/07e1e93c566243983b45385f5c85bc7df0026f39/src/mongo/db/repl/oplog_batcher.cpp#L243-L248)
+as other CRUD or `prepareTransaction` oplog entries, and operations in each `prepareTransaction`
+oplog entry are [split among the writer threads](https://github.com/mongodb/mongo/blob/07e1e93c566243983b45385f5c85bc7df0026f39/src/mongo/db/repl/oplog_applier_utils.cpp#L256)
+in the same way as [applying a normal oplog entry](https://github.com/mongodb/mongo/blob/07e1e93c566243983b45385f5c85bc7df0026f39/src/mongo/db/repl/README.md#oplog-entry-application).
+This splitting mechanism ensures operations on one document are applied by only one thread,
+together with the primary ensuring no prepare conflicts between concurrent prepared transactions
+and concurrent CRUD operations, we make it possible to fully parallelize the application of
+`prepareTransaction` oplog entries with other CRUD or `prepareTransaction` oplog entries. Each
+writer thread that gets assigned a subset of the transaction operations basically starts a split
+prepared transaction with a new session and apply it using the steps described above. This means
+that one `prepareTransaction` oplog entry might create multiple smaller prepared transactions.
+All the sessions of the original prepared transactions and their split sessions, as well as the IDs
+of those writer threads are tracked in the [SplitPrepareSessionManager](https://github.com/mongodb/mongo/blob/07e1e93c566243983b45385f5c85bc7df0026f39/src/mongo/db/repl/split_prepare_session_manager.h)
+class.
+
+A `commitTransaction` or `abortTransaction` oplog entry on steady state secondary nodes may refer
+to a non-split prepared transaction (e.g. prepared while being primary or during recovery) or a
+split prepared transaction. The former case is handled in the same way as on recovering nodes.
+For the latter case, we first query the `SplitPrepareSessionManager` to get the sessions and
+thread IDs that have been used when splitting and applying the corresponding `prepareTransaction`
+oplog entry, and then [split the commitTransaction or abortTransaction oplog entry](https://github.com/mongodb/mongo/blob/07e1e93c566243983b45385f5c85bc7df0026f39/src/mongo/db/repl/oplog_applier_utils.cpp#L340-L348)
+to the same threads to make sure that each split of the original prepared transaction is correctly
+committed or aborted.
+
+Note it is possible for a secondary node to step up after applying a split prepared transaction,
+thus when a primary node receives a `commitTransaction` command, it needs to
+[additionally commit all the splits](https://github.com/mongodb/mongo/blob/07e1e93c566243983b45385f5c85bc7df0026f39/src/mongo/db/transaction/transaction_participant.cpp#L1951-L1958)
+of the original prepared transaction if they exist. Another caveat due to step-up is that we need
+to prepare and commit/abort the original transaction (a.k.a. top-level transaction) in addition to
+its split transactions, so that on step-up the in-memory transaction states of the original
+transaction's session is correctly set, otherwise the session cannot be used to run new transaction
+commands. However we do not need to apply any operations in the original transaction (treated like
+an [empty transaction](https://github.com/mongodb/mongo/blob/07e1e93c566243983b45385f5c85bc7df0026f39/src/mongo/db/repl/transaction_oplog_application.cpp#L720-L731))
+since the operations should be applied by its split transactions.
+
 ## Transaction Errors
 
 ### PreparedTransactionInProgress Errors
@@ -1196,7 +1237,7 @@ the existing transaction to be **implicitly aborted**. Implicitly aborting a tra
 the transaction is aborted without an explicit `abortTransaction` command. However, prepared
 transactions cannot be implicitly aborted, since they can only complete after a `commitTransaction`
 or `abortTransaction` command from the `TransactionCoordinator`. As a result, any attempt to start a
-new transaction on a session that already has a prepared trasaction on it will fail with a
+new transaction on a session that already has a prepared transaction on it will fail with a
 `PreparedTransactionInProgress` error.
 
 Additionally, the only operations that can be run on a prepared transaction are
