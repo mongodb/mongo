@@ -9,6 +9,7 @@ env.CppUnitTest(
     source=[
         'immutable_ordered_test.cpp',
         'immutable_unordered_test.cpp',
+        'immutable_vector_test.cpp',
     ],
     LIBDEPS=[],
 )
