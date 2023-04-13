@@ -324,6 +324,11 @@ CollectionScanNode::CollectionScanNode()
 void CollectionScanNode::computeProperties() {
     if (clusteredIndex && hasCompatibleCollation) {
         auto sort = clustered_util::getSortPattern(*clusteredIndex);
+        if (direction == -1) {
+            // If we are scanning the collection in the descending direction, we provide the reverse
+            // sort order.
+            sort = QueryPlannerCommon::reverseSortObj(sort);
+        }
         sortSet = ProvidedSortSet(sort);
     }
 }
