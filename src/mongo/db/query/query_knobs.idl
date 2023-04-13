@@ -1147,11 +1147,15 @@ server_parameters:
     default: true
 
   internalQueryTdigestDelta:
-    description: "Compaction parameter the for t-digest algorithm."
+    description: "Compaction parameter the for t-digest algorithm. Increasing delta might improve
+     accuracy of the computed percentiles at the cost of using more memory (about 12KB per 1000 of
+     increase). Runtime of t-digest also depends on delta but non-linearly. The current default was
+     chosen empirically to yield good balance between runtime, memory consumption and accuracy on
+     most datasets."
     set_at: [ startup, runtime ]
     cpp_varname: internalQueryTdigestDelta
     cpp_vartype: AtomicWord<int>
-    default: 1000
+    default: 2000
     validator:
       gte: 0
       lte: 100000 # arbitrary, just to set an upper limit on the amount of memory used by t-digest
