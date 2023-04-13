@@ -508,8 +508,14 @@ TEST_F(ReshardingRecipientServiceTest, DropsTemporaryReshardingCollectionOnAbort
                   "isAlsoDonor"_attr = isAlsoDonor,
                   "waitForMetricsInitialized"_attr = waitForMetricsInitialized);
 
-            boost::optional<PauseDuringStateTransitions> doneTransitionGuard;
-            doneTransitionGuard.emplace(controller(), RecipientStateEnum::kDone);
+            boost::optional<PauseDuringStateTransitions> stateTransitionGuard;
+            if (waitForMetricsInitialized) {
+                std::vector<RecipientStateEnum> recipientStates{
+                    RecipientStateEnum::kDone, RecipientStateEnum::kCreatingCollection};
+                stateTransitionGuard.emplace(controller(), recipientStates);
+            } else {
+                stateTransitionGuard.emplace(controller(), RecipientStateEnum::kDone);
+            }
 
             auto doc = makeStateDocument(isAlsoDonor);
             auto instanceId = BSON(ReshardingRecipientDocument::kReshardingUUIDFieldName
@@ -532,12 +538,12 @@ TEST_F(ReshardingRecipientServiceTest, DropsTemporaryReshardingCollectionOnAbort
                 // Waiting for the metrics to be initialized here causes the second abort to occur
                 // before the metrics are initialized after the step up, thereby testing a different
                 // code path.
-                doneTransitionGuard->wait(RecipientStateEnum::kCreatingCollection);
+                stateTransitionGuard->wait(RecipientStateEnum::kCreatingCollection);
             }
 
             recipient->abort(false);
 
-            doneTransitionGuard->wait(RecipientStateEnum::kDone);
+            stateTransitionGuard->wait(RecipientStateEnum::kDone);
 
             stepDown();
 
@@ -551,7 +557,7 @@ TEST_F(ReshardingRecipientServiceTest, DropsTemporaryReshardingCollectionOnAbort
             ASSERT_TRUE(bool(maybeRecipient));
             recipient = *maybeRecipient;
 
-            doneTransitionGuard.reset();
+            stateTransitionGuard.reset();
             recipient->abort(false);
 
             ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
