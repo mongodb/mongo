@@ -31,6 +31,7 @@ class Checker:
 
     def __apply_check_tree(self, operation):
         tree = Tree(operation.file)
+        # FIXME - PM-3095 This check should be ignored until PM-3095.
         # if tree in self.visited_trees:
         #     raise Exception(f"visited file {operation.file} again, operation={operation}")
         self.visited_trees.add(tree)
