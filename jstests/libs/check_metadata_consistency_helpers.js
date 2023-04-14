@@ -12,12 +12,6 @@ var MetadataConsistencyChecker = (function() {
                 jsTest.log('Skipped metadata consistency check: feature disabled');
                 return;
             }
-
-            // TODO (SERVER-74534): Remove this once catalog shard supports this hook.
-            if (jsTestOptions().catalogShard) {
-                jsTest.log('Skipped metadata consistency check: catalog shard mode enabled');
-                return;
-            }
         } catch (err) {
             jsTest.log(`Skipped metadata consistency check: ${err}`);
             return;

@@ -109,8 +109,7 @@ executor:
       # - RunDBCheckInBackground
       - CheckReplDBHashInBackground
       - CheckReplDBHash
-      # TODO (SERVER-74534): Enable when this will work with co-located configsvr.
-      # - CheckMetadataConsistencyInBackground
+      - CheckMetadataConsistencyInBackground
       - ValidateCollections
     tests: true
   config:
@@ -123,8 +122,7 @@ executor:
   # - class: RunDBCheckInBackground
   - class: CheckReplDBHashInBackground
   - class: CheckReplDBHash
-  # TODO (SERVER-74534): Enable when this will work with co-located configsvr.
-  # - class: CheckMetadataConsistencyInBackground
+  - class: CheckMetadataConsistencyInBackground
   - class: CheckOrphansDeleted
   - class: CheckRoutingTableConsistency
   - class: CheckShardFilteringMetadata

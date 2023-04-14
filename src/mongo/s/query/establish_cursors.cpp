@@ -54,6 +54,8 @@ namespace mongo {
 
 namespace {
 
+constexpr StringData kOperationKeyField = "clientOperationKey"_sd;
+
 /**
  * This class wraps logic for establishing cursors using a MultiStatementTransactionRequestsSender.
  */
@@ -62,12 +64,14 @@ public:
     CursorEstablisher(OperationContext* opCtx,
                       std::shared_ptr<executor::TaskExecutor> executor,
                       const NamespaceString& nss,
-                      bool allowPartialResults)
+                      bool allowPartialResults,
+                      std::vector<OperationKey> providedOpKeys)
         : _opCtx(opCtx),
           _executor{std::move(executor)},
           _nss(nss),
           _allowPartialResults(allowPartialResults),
-          _opKey{UUID::gen()} {}
+          _defaultOpKey{UUID::gen()},
+          _providedOpKeys(std::move(providedOpKeys)) {}
 
     /**
      * Make a RequestSender and thus send requests.
@@ -105,7 +109,7 @@ public:
 
     static void killOpOnShards(ServiceContext* srvCtx,
                                std::shared_ptr<executor::TaskExecutor> executor,
-                               OperationKey opKey,
+                               std::vector<OperationKey> opKeys,
                                std::set<HostAndPort> remotes) noexcept;
 
 private:
@@ -122,7 +126,11 @@ private:
     const NamespaceString _nss;
     const bool _allowPartialResults;
 
-    const OperationKey _opKey;
+    // Callers may provide an array of OperationKeys already included in the given requests and
+    // those will be used to clean up cursors on failure, otherwise one key will be generated and
+    // appended to all requests.
+    const OperationKey _defaultOpKey;
+    const std::vector<OperationKey> _providedOpKeys;
 
     boost::optional<MultiStatementTransactionRequestsSender> _ars;
 
@@ -130,17 +138,6 @@ private:
     std::vector<RemoteCursor> _remoteCursors;
     std::vector<HostAndPort> _remotesToClean;
 };
-
-// Attach our OperationKey to a request. This will allow us to kill any outstanding
-// requests in case we're interrupted or one of the remotes returns an error. Note that although
-// the opCtx may have an OperationKey set on it already, do not inherit it here because we may
-// target ourselves which implies the same node receiving multiple operations with the same
-// opKey.
-BSONObj appendOpKey(const OperationKey& opKey, const BSONObj& request) {
-    BSONObjBuilder newCmd(request);
-    opKey.appendToBuilder(&newCmd, "clientOperationKey");
-    return newCmd.obj();
-}
 
 void CursorEstablisher::sendRequests(const ReadPreferenceSetting& readPref,
                                      const std::vector<std::pair<ShardId, BSONObj>>& remotes,
@@ -150,15 +147,30 @@ void CursorEstablisher::sendRequests(const ReadPreferenceSetting& readPref,
 
     // TODO SERVER-47261 management of the opKey should move to the ARS.
     for (const auto& remote : remotes) {
-        requests.emplace_back(remote.first, appendOpKey(_opKey, remote.second));
+        if (_providedOpKeys.size()) {
+            // Caller provided their own keys so skip appending the default key.
+            dassert(remote.second.hasField(kOperationKeyField));
+            requests.emplace_back(remote.first, remote.second);
+        } else {
+            requests.emplace_back(remote.first, appendOpKey(_defaultOpKey, remote.second));
+        }
     }
 
-    LOGV2_DEBUG(4625502,
-                3,
-                "Establishing cursors on remotes",
-                "opId"_attr = _opCtx->getOpID(),
-                "numRemotes"_attr = remotes.size(),
-                "opKey"_attr = _opKey);
+    if (shouldLog(MONGO_LOGV2_DEFAULT_COMPONENT, logv2::LogSeverity::Debug(3))) {
+        logv2::DynamicAttributes attrs;
+        attrs.add("opId", _opCtx->getOpID());
+        attrs.add("numRemotes", remotes.size());
+        if (_providedOpKeys.size()) {
+            BSONArrayBuilder bab;
+            for (auto&& opKey : _providedOpKeys) {
+                opKey.appendToArrayBuilder(&bab);
+            }
+            attrs.add("providedOpKeys", bab.arr());
+        } else {
+            attrs.add("defaultOpKey", _defaultOpKey);
+        }
+        LOGV2_DEBUG(4625502, 3, "Establishing cursors on remotes", attrs);
+    }
 
     // Send the requests
     _ars.emplace(_opCtx, _executor, _nss.dbName(), std::move(requests), readPref, retryPolicy);
@@ -208,11 +220,11 @@ void CursorEstablisher::waitForResponse() noexcept {
 StatusWith<executor::TaskExecutor::CallbackHandle> scheduleCursorCleanup(
     std::shared_ptr<executor::TaskExecutor> executor,
     ServiceContext* svcCtx,
-    OperationKey opKey,
+    std::vector<OperationKey> opKeys,
     std::set<HostAndPort>&& remotesToClean) {
     return executor->scheduleWork([svcCtx = svcCtx,
                                    executor = executor,
-                                   opKey = opKey,
+                                   opKeys = std::move(opKeys),
                                    remotesToClean = std::move(remotesToClean)](
                                       const executor::TaskExecutor::CallbackArgs& args) mutable {
         if (!args.status.isOK()) {
@@ -221,7 +233,7 @@ StatusWith<executor::TaskExecutor::CallbackHandle> scheduleCursorCleanup(
             return;
         }
         CursorEstablisher::killOpOnShards(
-            svcCtx, std::move(executor), std::move(opKey), std::move(remotesToClean));
+            svcCtx, std::move(executor), std::move(opKeys), std::move(remotesToClean));
     });
 }
 
@@ -244,8 +256,11 @@ void CursorEstablisher::checkForFailedRequests() {
     // Filter out duplicate hosts.
     auto remotes = std::set<HostAndPort>(_remotesToClean.begin(), _remotesToClean.end());
 
-    uassertStatusOK(
-        scheduleCursorCleanup(_executor, _opCtx->getServiceContext(), _opKey, std::move(remotes)));
+    uassertStatusOK(scheduleCursorCleanup(
+        _executor,
+        _opCtx->getServiceContext(),
+        _providedOpKeys.size() ? _providedOpKeys : std::vector<OperationKey>{_defaultOpKey},
+        std::move(remotes)));
 
     // Throw our failure.
     uassertStatusOK(*_maybeFailure);
@@ -310,18 +325,23 @@ void CursorEstablisher::_handleFailure(const AsyncRequestsSender::Response& resp
 
 void CursorEstablisher::killOpOnShards(ServiceContext* srvCtx,
                                        std::shared_ptr<executor::TaskExecutor> executor,
-                                       OperationKey opKey,
+                                       std::vector<OperationKey> opKeys,
                                        std::set<HostAndPort> remotes) noexcept try {
     ThreadClient tc("establishCursors cleanup", srvCtx);
     auto opCtx = tc->makeOperationContext();
 
     for (auto&& host : remotes) {
+        BSONArrayBuilder opKeyArrayBuilder;
+        for (auto&& opKey : opKeys) {
+            opKey.appendToArrayBuilder(&opKeyArrayBuilder);
+        }
+
         executor::RemoteCommandRequest::Options options;
         options.fireAndForget = true;
         executor::RemoteCommandRequest request(
             host,
             "admin",
-            BSON("_killOperations" << 1 << "operationKeys" << BSON_ARRAY(opKey)),
+            BSON("_killOperations" << 1 << "operationKeys" << opKeyArrayBuilder.arr()),
             opCtx.get(),
             executor::RemoteCommandRequestBase::kNoTimeout,
             options);
@@ -355,14 +375,27 @@ BSONObj appendReadPreferenceNearest(BSONObj cmdObj) {
 
 }  // namespace
 
+// Attach our OperationKey to a request. This will allow us to kill any outstanding
+// requests in case we're interrupted or one of the remotes returns an error. Note that although
+// the opCtx may have an OperationKey set on it already, do not inherit it here because we may
+// target ourselves which implies the same node receiving multiple operations with the same
+// opKey.
+BSONObj appendOpKey(const OperationKey& opKey, const BSONObj& request) {
+    BSONObjBuilder newCmd(request);
+    opKey.appendToBuilder(&newCmd, kOperationKeyField);
+    return newCmd.obj();
+}
+
 std::vector<RemoteCursor> establishCursors(OperationContext* opCtx,
                                            std::shared_ptr<executor::TaskExecutor> executor,
                                            const NamespaceString& nss,
                                            const ReadPreferenceSetting readPref,
                                            const std::vector<std::pair<ShardId, BSONObj>>& remotes,
                                            bool allowPartialResults,
-                                           Shard::RetryPolicy retryPolicy) {
-    auto establisher = CursorEstablisher(opCtx, executor, nss, allowPartialResults);
+                                           Shard::RetryPolicy retryPolicy,
+                                           std::vector<OperationKey> providedOpKeys) {
+    auto establisher =
+        CursorEstablisher(opCtx, executor, nss, allowPartialResults, std::move(providedOpKeys));
     establisher.sendRequests(readPref, remotes, retryPolicy);
     establisher.waitForResponses();
     establisher.checkForFailedRequests();
@@ -472,7 +505,7 @@ std::vector<RemoteCursor> establishCursorsOnAllHosts(
 
         if (!remotesToClean.empty()) {
             uassertStatusOK(scheduleCursorCleanup(
-                executor, opCtx->getServiceContext(), opKey, std::move(remotesToClean)));
+                executor, opCtx->getServiceContext(), {opKey}, std::move(remotesToClean)));
         }
 
         uassertStatusOK(failure.value());

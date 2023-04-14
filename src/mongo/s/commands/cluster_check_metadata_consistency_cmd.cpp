@@ -124,17 +124,21 @@ public:
             shardsvrRequest.setCursor(request().getCursor());
 
             // Send a request to all shards that are primaries for at least one database
+            const auto shardOpKey = UUID::gen();
+            auto shardRequestWithOpKey = appendOpKey(shardOpKey, shardsvrRequest.toBSON({}));
             for (auto&& shardId : getAllDbPrimaryShards(opCtx)) {
-                requests.emplace_back(std::move(shardId), shardsvrRequest.toBSON({}));
+                requests.emplace_back(std::move(shardId), shardRequestWithOpKey.getOwned());
             }
 
             // Send a request to the configsvr to check cluster metadata consistency.
+            const auto configOpKey = UUID::gen();
             ConfigsvrCheckClusterMetadataConsistency configsvrRequest;
             configsvrRequest.setDbName(DatabaseName::kAdmin);
             configsvrRequest.setCursor(request().getCursor());
-            requests.emplace_back(ShardId::kConfigServerId, configsvrRequest.toBSON({}));
+            requests.emplace_back(ShardId::kConfigServerId,
+                                  appendOpKey(configOpKey, configsvrRequest.toBSON({})));
 
-            auto ccc = _establishCursors(opCtx, nss, requests);
+            auto ccc = _establishCursors(opCtx, nss, requests, {shardOpKey, configOpKey});
             return _createInitialCursorReply(opCtx, nss, std::move(ccc));
         }
 
@@ -168,7 +172,8 @@ public:
         ClusterClientCursorGuard _establishCursors(
             OperationContext* opCtx,
             const NamespaceString& nss,
-            const std::vector<std::pair<ShardId, BSONObj>>& requests) {
+            const std::vector<std::pair<ShardId, BSONObj>>& requests,
+            std::vector<OperationKey> opKeys = {}) {
 
             ClusterClientCursorParams params(
                 nss,
@@ -182,7 +187,9 @@ public:
                 nss,
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly()),
                 requests,
-                false /*allowPartialResults*/);
+                false /*allowPartialResults*/,
+                Shard::RetryPolicy::kIdempotent,
+                std::move(opKeys));
 
             // Transfer the established cursors to a ClusterClientCursor.
             return ClusterClientCursorImpl::make(
