@@ -13,18 +13,12 @@
  *   does_not_support_transactions,
  *   # Command is not yet compatible with tenant migration.
  *   tenant_migration_incompatible,
+ *   # TODO SERVER-52419 Remove this tag.
+ *   featureFlagBulkWriteCommand,
  * ]
  */
 (function() {
 "use strict";
-load("jstests/libs/feature_flag_util.js");
-
-// Skip this test if the BulkWriteCommand feature flag is not enabled
-// TODO SERVER-67711: Remove feature flag check.
-if (!FeatureFlagUtil.isPresentAndEnabled(db, "BulkWriteCommand")) {
-    jsTestLog('Skipping test because the BulkWriteCommand feature flag is disabled.');
-    return;
-}
 
 var coll = db.getCollection("coll");
 var coll1 = db.getCollection("coll1");
