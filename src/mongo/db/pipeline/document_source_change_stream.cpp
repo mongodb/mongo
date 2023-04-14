@@ -369,8 +369,8 @@ void DocumentSourceChangeStream::assertIsLegalSpecification(
     const bool isNotBannedInternalDB =
         !expCtx->ns.isLocal() && (!expCtx->ns.isConfigDB() || spec.getAllowToRunOnConfigDB());
     uassert(ErrorCodes::InvalidNamespace,
-            str::stream() << "$changeStream may not be opened on the internal " << expCtx->ns.db()
-                          << " database",
+            str::stream() << "$changeStream may not be opened on the internal "
+                          << expCtx->ns.dbName().toStringForErrorMsg() << " database",
             expCtx->ns.isAdminDB() ? static_cast<bool>(spec.getAllChangesForCluster())
                                    : isNotBannedInternalDB);
 

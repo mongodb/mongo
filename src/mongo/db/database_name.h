@@ -157,10 +157,7 @@ public:
      * This function should only be used when logging a db name in an error message.
      */
     std::string toStringForErrorMsg() const {
-        if (_tenantId)
-            return str::stream() << *_tenantId << '_' << _dbString;
-
-        return _dbString;
+        return toStringWithTenantId();
     }
 
     /**

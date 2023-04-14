@@ -91,7 +91,8 @@ Status interpretTranslationError(DBException* ex, const MapReduceCommandRequest&
             break;
         case 31320:
         case 31321:
-            error = "Can't output mapReduce results to internal DB {}"_format(outNss.db());
+            error = "Can't output mapReduce results to internal DB {}"_format(
+                outNss.dbName().toStringForErrorMsg());
             break;
         default:
             // Prepend MapReduce context in the event of an unknown exception.

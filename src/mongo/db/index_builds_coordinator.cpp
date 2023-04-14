@@ -1926,7 +1926,7 @@ void IndexBuildsCoordinator::assertNoBgOpInProgForDb(const DatabaseName& dbName)
     uassert(ErrorCodes::BackgroundOperationInProgressForDatabase,
             fmt::format("cannot perform operation: an index build is currently running for "
                         "database {}. Found index build: {}",
-                        dbName.toString(),
+                        dbName.toStringForErrorMsg(),
                         firstIndexBuildUUID->toString()),
             indexBuilds.empty());
 }
@@ -2660,7 +2660,8 @@ void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterNonShutdownFailure(
                         fassert(51101,
                                 status.withContext(str::stream()
                                                    << "Index build: " << replState->buildUUID
-                                                   << "; Database: " << replState->dbName));
+                                                   << "; Database: "
+                                                   << replState->dbName.toStringForErrorMsg()));
                     }
                 }
 

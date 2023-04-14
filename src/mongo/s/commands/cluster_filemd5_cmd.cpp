@@ -172,7 +172,7 @@ public:
                 BSON("files_id" << cmdObj.firstElement() << "n" << numGridFSChunksProcessed));
 
             uassert(16246,
-                    str::stream() << "Shard for database " << nss.db()
+                    str::stream() << "Shard for database " << nss.dbName().toStringForErrorMsg()
                                   << " is too old to support GridFS sharded by {files_id:1, n:1}",
                     res.hasField("md5state"));
 

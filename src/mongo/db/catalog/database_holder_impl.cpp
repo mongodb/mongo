@@ -134,7 +134,7 @@ Database* DatabaseHolderImpl::openDb(OperationContext* opCtx,
     auto duplicates = _getNamesWithConflictingCasing_inlock(dbName);
     uassert(ErrorCodes::DatabaseDifferCase,
             str::stream() << "db already exists with different case already have: ["
-                          << (*duplicates.cbegin()) << "] trying to create ["
+                          << (*duplicates.cbegin()).toStringForErrorMsg() << "] trying to create ["
                           << dbName.toStringForErrorMsg() << "]",
             duplicates.empty());
 

@@ -110,12 +110,14 @@ ResolvedNamespaceOrViewAcquisitionRequestsMap resolveNamespaceOrViewAcquisitionR
             invariant(ar.uuid);
             auto coll = catalog->lookupCollectionByUUID(opCtx, *ar.uuid);
             uassert(ErrorCodes::NamespaceNotFound,
-                    str::stream() << "Namespace " << *ar.dbname << ":" << *ar.uuid << " not found",
+                    str::stream() << "Namespace " << (*ar.dbname).toStringForErrorMsg() << ":"
+                                  << *ar.uuid << " not found",
                     coll);
             uassert(ErrorCodes::NamespaceNotFound,
-                    str::stream() << "Database name mismatch for " << *ar.dbname << ":" << *ar.uuid
-                                  << ". Expected: " << *ar.dbname
-                                  << " Actual: " << coll->ns().dbName(),
+                    str::stream() << "Database name mismatch for "
+                                  << (*ar.dbname).toStringForErrorMsg() << ":" << *ar.uuid
+                                  << ". Expected: " << (*ar.dbname).toStringForErrorMsg()
+                                  << " Actual: " << coll->ns().dbName().toStringForErrorMsg(),
                     coll->ns().dbName() == *ar.dbname);
 
             if (ar.nss) {

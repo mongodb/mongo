@@ -64,8 +64,8 @@ public:
         }
         void doCheckAuthorization(OperationContext* opCtx) const final {
             uassert(ErrorCodes::Unauthorized,
-                    str::stream() << "Not authorized to drop database '" << request().getDbName()
-                                  << "'",
+                    str::stream() << "Not authorized to drop database '"
+                                  << request().getDbName().toStringForErrorMsg() << "'",
                     AuthorizationSession::get(opCtx->getClient())
                         ->isAuthorizedForActionsOnNamespace(ns(), ActionType::dropDatabase));
         }

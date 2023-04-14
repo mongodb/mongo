@@ -327,7 +327,7 @@ void CmdFindAndModify::Invocation::doCheckAuthorization(OperationContext* opCtx)
 
     uassert(ErrorCodes::Unauthorized,
             str::stream() << "Not authorized to find and modify on database'"
-                          << this->request().getDbName() << "'",
+                          << this->request().getDbName().toStringForErrorMsg() << "'",
             AuthorizationSession::get(opCtx->getClient())->isAuthorizedForPrivileges(privileges));
 }
 

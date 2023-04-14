@@ -439,7 +439,8 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMerge::create(
             (outputNs.isSystemStatsCollection() && isInternalClient(expCtx->opCtx->getClient())));
 
     uassert(31320,
-            "Cannot {} to internal database: {}"_format(kStageName, outputNs.db()),
+            "Cannot {} to internal database: {}"_format(kStageName,
+                                                        outputNs.dbName().toStringForErrorMsg()),
             !outputNs.isOnInternalDb() || isInternalClient(expCtx->opCtx->getClient()));
 
     if (whenMatched == WhenMatched::kPipeline) {

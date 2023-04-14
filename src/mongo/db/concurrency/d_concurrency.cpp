@@ -229,7 +229,7 @@ Lock::DBLock::DBLock(OperationContext* opCtx,
 
     tassert(6671501,
             str::stream() << "Tenant lock mode " << modeName(*tenantLockMode)
-                          << " specified for database " << dbName.db()
+                          << " specified for database " << dbName.toStringForErrorMsg()
                           << " that does not belong to a tenant",
             !tenantLockMode || dbName.tenantId());
 
@@ -239,11 +239,11 @@ Lock::DBLock::DBLock(OperationContext* opCtx,
             const auto defaultTenantLockMode = isSharedLockMode(_mode) ? MODE_IS : MODE_IX;
             if (tenantLockMode) {
                 tassert(6671505,
-                        str::stream()
-                            << "Requested tenant lock mode " << modeName(*tenantLockMode)
-                            << " that is weaker than the default one  "
-                            << modeName(defaultTenantLockMode) << " for database " << dbName.db()
-                            << " of tenant  " << dbName.tenantId()->toString(),
+                        str::stream() << "Requested tenant lock mode " << modeName(*tenantLockMode)
+                                      << " that is weaker than the default one  "
+                                      << modeName(defaultTenantLockMode) << " for database "
+                                      << dbName.toStringForErrorMsg() << " of tenant  "
+                                      << dbName.tenantId()->toString(),
                         isModeCovered(defaultTenantLockMode, *tenantLockMode));
                 return *tenantLockMode;
             } else {

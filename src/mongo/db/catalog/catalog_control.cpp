@@ -73,7 +73,8 @@ void reopenAllDatabasesAndReloadCollectionCatalog(OperationContext* opCtx,
     for (auto&& dbName : databasesToOpen) {
         LOGV2_FOR_RECOVERY(23992, 1, "openCatalog: dbholder reopening database", logAttrs(dbName));
         auto db = databaseHolder->openDb(opCtx, dbName);
-        invariant(db, str::stream() << "failed to reopen database " << dbName.toString());
+        invariant(db,
+                  str::stream() << "failed to reopen database " << dbName.toStringForErrorMsg());
         for (auto&& collNss : catalogWriter.value()->getAllCollectionNamesFromDb(opCtx, dbName)) {
             // Note that the collection name already includes the database component.
             auto collection = catalogWriter.value()->lookupCollectionByNamespace(opCtx, collNss);
