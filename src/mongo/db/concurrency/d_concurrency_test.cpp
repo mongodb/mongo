@@ -72,7 +72,7 @@ class UseReaderWriterGlobalThrottling {
 public:
     explicit UseReaderWriterGlobalThrottling(ServiceContext* svcCtx, int numTickets)
         : _svcCtx(svcCtx) {
-        gStorageEngineConcurrencyAdjustmentAlgorithm = "";
+        gStorageEngineConcurrencyAdjustmentAlgorithm = "fixedConcurrentTransactions";
         // TODO SERVER-72616: Remove ifdefs once PriorityTicketHolder is available cross-platform.
 #ifdef __linux__
         if constexpr (std::is_same_v<PriorityTicketHolder, TicketHolderImpl>) {

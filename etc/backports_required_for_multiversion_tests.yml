@@ -797,6 +797,16 @@ last-lts:
     ticket: SERVER-75517
   - test_file: jstests/replsets/startup_recovery_for_restore_needs_rollback.js
     ticket: SERVER-67180
+  - test_file: jstests/replsets/crud_ops_do_not_throw_locktimeout_on_ticket_exhaustion.js
+    ticket: SERVER-76012
+  - test_file: jstests/replsets/transactions_committed_with_tickets_exhausted.js
+    ticket: SERVER-76012
+  - test_file: jstests/replsets/transactions_reaped_with_tickets_exhausted.js
+    ticket: SERVER-76012
+  - test_file: jstests/sharding/cancel_coordinate_txn_commit_with_tickets_exhausted.js
+    ticket: SERVER-76012
+  - test_file: jstests/sharding/coordinate_txn_commit_with_tickets_exhausted.js
+    ticket: SERVER-76012
   - test_file: jstests/sharding/analyze_shard_key/cardinality_and_frequency_basic.js
     ticket: SERVER-75886
   - test_file: jstests/core/clustered/clustered_collection_hint.js

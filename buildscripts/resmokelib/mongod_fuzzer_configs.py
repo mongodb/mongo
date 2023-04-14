@@ -117,7 +117,7 @@ def generate_independent_parameters(rng, mode):
     ret = {}
     ret["wiredTigerCursorCacheSize"] = rng.randint(-100, 100)
     ret["wiredTigerSessionCloseIdleTimeSecs"] = rng.randint(0, 300)
-    ret["storageEngineConcurrencyAdjustmentAlgorithm"] = ""
+    ret["storageEngineConcurrencyAdjustmentAlgorithm"] = "fixedConcurrentTransactions"
     ret["wiredTigerConcurrentWriteTransactions"] = rng.randint(5, 32)
     ret["wiredTigerConcurrentReadTransactions"] = rng.randint(5, 32)
     ret["wiredTigerStressConfig"] = False if mode != 'stress' else rng.choice([True, False])

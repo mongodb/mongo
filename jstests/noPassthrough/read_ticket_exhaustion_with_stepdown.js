@@ -54,7 +54,7 @@ const replTest = new ReplSetTest({
     nodeOptions: {
         setParameter: {
             // This test seeks the minimum amount of concurrency to force ticket exhaustion.
-            storageEngineConcurrencyAdjustmentAlgorithm: "",
+            storageEngineConcurrencyAdjustmentAlgorithm: "fixedConcurrentTransactions",
             storageEngineConcurrentReadTransactions: kNumReadTickets,
             // Make yielding more common.
             internalQueryExecYieldPeriodMS: 1,

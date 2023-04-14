@@ -37,7 +37,7 @@ const st = new ShardingTest({
     rsOptions: {
         setParameter: {
             // This test requires a fixed ticket pool size.
-            storageEngineConcurrencyAdjustmentAlgorithm: "",
+            storageEngineConcurrencyAdjustmentAlgorithm: "fixedConcurrentTransactions",
             wiredTigerConcurrentWriteTransactions: kNumWriteTickets,
             // Lower transactionLifetimeLimitSeconds to cause TransactionCoordinators which haven't
             // yet made their commit or abort decision to time out and abort the transaction.

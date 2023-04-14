@@ -58,7 +58,7 @@ TicketHolderManager::TicketHolderManager(ServiceContext* svcCtx,
           switch (StorageEngineConcurrencyAdjustmentAlgorithm_parse(
               IDLParserContext{"storageEngineConcurrencyAdjustmentAlgorithm"},
               gStorageEngineConcurrencyAdjustmentAlgorithm)) {
-              case StorageEngineConcurrencyAdjustmentAlgorithmEnum::kNone:
+              case StorageEngineConcurrencyAdjustmentAlgorithmEnum::kFixedConcurrentTransactions:
                   return nullptr;
               case StorageEngineConcurrencyAdjustmentAlgorithmEnum::kThroughputProbing:
                   return std::make_unique<execution_control::ThroughputProbing>(
@@ -72,9 +72,16 @@ TicketHolderManager::TicketHolderManager(ServiceContext* svcCtx,
 }
 
 Status TicketHolderManager::updateConcurrentWriteTransactions(const int32_t& newWriteTransactions) {
+    auto concurrencyAlgorithm = StorageEngineConcurrencyAdjustmentAlgorithm_parse(
+        IDLParserContext{"storageEngineConcurrencyAdjustmentAlgorithm"},
+        gStorageEngineConcurrencyAdjustmentAlgorithm);
+
     // (Ignore FCV check): This feature flag doesn't have upgrade/downgrade concern.
     if (feature_flags::gFeatureFlagExecutionControl.isEnabledAndIgnoreFCVUnsafe() &&
-        !gStorageEngineConcurrencyAdjustmentAlgorithm.empty()) {
+        concurrencyAlgorithm ==
+            StorageEngineConcurrencyAdjustmentAlgorithmEnum::kThroughputProbing) {
+        // In order to manually set the number of read/write tickets, users must set the
+        // storageEngineConcurrencyAdjustmentAlgorithm to 'kFixedConcurrentTransactions'.
         return {ErrorCodes::IllegalOperation,
                 "Cannot modify concurrent write transactions limit when it is being dynamically "
                 "adjusted"};
@@ -106,9 +113,16 @@ Status TicketHolderManager::updateConcurrentWriteTransactions(const int32_t& new
 };
 
 Status TicketHolderManager::updateConcurrentReadTransactions(const int32_t& newReadTransactions) {
+    auto concurrencyAlgorithm = StorageEngineConcurrencyAdjustmentAlgorithm_parse(
+        IDLParserContext{"storageEngineConcurrencyAdjustmentAlgorithm"},
+        gStorageEngineConcurrencyAdjustmentAlgorithm);
+
     // (Ignore FCV check): This feature flag doesn't have upgrade/downgrade concern.
     if (feature_flags::gFeatureFlagExecutionControl.isEnabledAndIgnoreFCVUnsafe() &&
-        !gStorageEngineConcurrencyAdjustmentAlgorithm.empty()) {
+        concurrencyAlgorithm ==
+            StorageEngineConcurrencyAdjustmentAlgorithmEnum::kThroughputProbing) {
+        // In order to manually set the number of read/write tickets, users must set the
+        // storageEngineConcurrencyAdjustmentAlgorithm to 'kFixedConcurrentTransactions'.
         return {ErrorCodes::IllegalOperation,
                 "Cannot modify concurrent read transactions limit when it is being dynamically "
                 "adjusted"};

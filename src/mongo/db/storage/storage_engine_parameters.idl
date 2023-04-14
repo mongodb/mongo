@@ -36,8 +36,14 @@ enums:
   StorageEngineConcurrencyAdjustmentAlgorithm:
     description: "Algorithm for adjusting the number of concurrent storage engine transactions"
     type: string
+    # 'kFixedConcurrentTransactions': Number of concurrent transactions are controlled by
+    # storageEngineConcurrentWriteTransactions/storageEngineConcurrentReadTransactions and will
+    # not be adjusted automatically based on overall system throughput.
+    #
+    # 'kThroughputProbing': Number of concurrent transactions are dynamically adjusted, either
+    # increasing or decreasing concurrency in the storage engine, based on system throughput.
     values:
-      kNone: ""
+      kFixedConcurrentTransactions: "fixedConcurrentTransactions"
       kThroughputProbing: "throughputProbing"
 
 server_parameters:
@@ -51,6 +57,8 @@ server_parameters:
     deprecated_name:
       - wiredTigerConcurrentWriteTransactions
     # Default value being 0 means we're allowing the underlying storage engines to use their default values.
+    # This parameter is only compatible with the 'kFixedConcurrentTransactions' option for
+    # storageEngineConcurrencyAdjustmentAlgorithm.
     default: 0
     validator:
       gte: 5
@@ -64,6 +72,8 @@ server_parameters:
     deprecated_name:
       - wiredTigerConcurrentReadTransactions
     # Default value being 0 means we're allowing the underlying storage engines to use their default values.
+    # This parameter is only compatible with the 'kFixedConcurrentTransactions' option for
+    # storageEngineConcurrencyAdjustmentAlgorithm.
     default: 0
     validator:
       gte: 5

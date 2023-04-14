@@ -23,7 +23,7 @@ const rst = new ReplSetTest({
     nodeOptions: {
         setParameter: {
             // This test requires a fixed ticket pool size.
-            storageEngineConcurrencyAdjustmentAlgorithm: "",
+            storageEngineConcurrencyAdjustmentAlgorithm: "fixedConcurrentTransactions",
             wiredTigerConcurrentWriteTransactions: kNumWriteTickets,
 
             // Setting a transaction lifetime of 20 seconds works fine locally because the

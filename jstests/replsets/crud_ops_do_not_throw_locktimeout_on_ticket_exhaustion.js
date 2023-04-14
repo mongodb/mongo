@@ -24,7 +24,7 @@ const rst = new ReplSetTest({
     nodeOptions: {
         setParameter: {
             // This test requires a fixed ticket pool size.
-            storageEngineConcurrencyAdjustmentAlgorithm: "",
+            storageEngineConcurrencyAdjustmentAlgorithm: "fixedConcurrentTransactions",
             wiredTigerConcurrentWriteTransactions: kNumWriteTickets,
             wiredTigerConcurrentReadTransactions: kNumReadTickets,
             logComponentVerbosity: tojson({storage: 1, command: 2})
