@@ -26,7 +26,7 @@ const st = new ShardingTest({
     rsOptions: {
         setParameter: {
             // This test requires a fixed ticket pool size.
-            storageEngineConcurrencyAdjustmentAlgorithm: "",
+            storageEngineConcurrencyAdjustmentAlgorithm: "fixedConcurrentTransactions",
             wiredTigerConcurrentWriteTransactions: kNumWriteTickets,
             // Raise maxTransactionLockRequestTimeoutMillis to prevent the transactions in prepare
             // conflict state from aborting early due to being unable to acquire a write ticket.

@@ -97,7 +97,7 @@ executor:
         # system running out of WiredTiger write tickets. We intentionally lower the number of
         # WiredTiger write tickets available to below the maximum number of database clients to
         # trigger this situation at least some of the time.
-        storageEngineConcurrencyAdjustmentAlgorithm: ""
+        storageEngineConcurrencyAdjustmentAlgorithm: "fixedConcurrentTransactions"
         wiredTigerConcurrentWriteTransactions: 64
         # Setting this parameter to "1" disables cursor caching in WiredTiger, and sets the cache
         # size to "1" in MongoDB. This forces all resources to be released when done.

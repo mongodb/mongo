@@ -64,7 +64,7 @@ namespace mongo {
 ServiceContextMongoDTest::ServiceContextMongoDTest(Options options)
     : _journalListener(std::move(options._journalListener)),
       _tempDir("service_context_d_test_fixture") {
-    gStorageEngineConcurrencyAdjustmentAlgorithm = "";
+    gStorageEngineConcurrencyAdjustmentAlgorithm = "fixedConcurrentTransactions";
 
     if (options._forceDisableTableLogging) {
         storageGlobalParams.forceDisableTableLogging = true;

@@ -32,5 +32,5 @@ executor:
         internalQueryFrameworkControl: "forceBonsai"
         internalQueryDefaultDOP: 5
         # TODO: SERVER-75423: Allow exchange to work independently on the storage concurrency settings.
-        storageEngineConcurrencyAdjustmentAlgorithm: ""
+        storageEngineConcurrencyAdjustmentAlgorithm: "fixedConcurrentTransactions"
         storageEngineConcurrentReadTransactions: 128

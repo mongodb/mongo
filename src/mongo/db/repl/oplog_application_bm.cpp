@@ -80,7 +80,7 @@ class TestServiceContext {
 public:
     TestServiceContext() {
         // Disable execution control.
-        gStorageEngineConcurrencyAdjustmentAlgorithm = "";
+        gStorageEngineConcurrencyAdjustmentAlgorithm = "fixedConcurrentTransactions";
 
         // Disable server info logging so that the benchmark output is cleaner.
         logv2::LogManager::global().getGlobalSettings().setMinimumLoggedSeverity(

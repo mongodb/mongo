@@ -33,7 +33,9 @@ replTest.stopSet();
 replTest = new ReplSetTest({
     name: jsTestName(),
     nodes: 1,
-    nodeOptions: {setParameter: {storageEngineConcurrencyAdjustmentAlgorithm: ""}},
+    nodeOptions: {
+        setParameter: {storageEngineConcurrencyAdjustmentAlgorithm: "fixedConcurrentTransactions"}
+    },
 });
 replTest.startSet();
 replTest.initiate();
