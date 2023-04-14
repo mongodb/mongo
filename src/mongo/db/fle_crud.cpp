@@ -1507,7 +1507,7 @@ std::vector<std::vector<FLEEdgeCountInfo>> FLEQueryInterfaceImpl::getTags(
     getCountsCmd.setTokens(toTagSets(tokensSets));
     getCountsCmd.setQueryType(queryTypeTranslation(type));
 
-    auto response = _txnClient.runCommandSync(nss.db(), getCountsCmd.toBSON({}));
+    auto response = _txnClient.runCommandSync(DatabaseName{nss.db()}, getCountsCmd.toBSON({}));
 
     auto status = getStatusFromWriteCommandReply(response);
     uassertStatusOK(status);

@@ -117,7 +117,7 @@ void installDatabaseMetadata(OperationContext* opCtx,
                              const DatabaseVersion& dbVersion) {
     AutoGetDb autoDb(opCtx, dbName, MODE_X);
     auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbName);
-    scopedDss->setDbInfo(opCtx, {dbName.db(), ShardId("this"), dbVersion});
+    scopedDss->setDbInfo(opCtx, {dbName.db().toString(), ShardId("this"), dbVersion});
 }
 
 void installUnshardedCollectionMetadata(OperationContext* opCtx, const NamespaceString& nss) {

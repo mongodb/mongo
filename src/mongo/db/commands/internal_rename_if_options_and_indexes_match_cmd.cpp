@@ -78,7 +78,7 @@ public:
             }
 
             // Check if the receiving shard is still the primary for the database
-            DatabaseShardingState::assertIsPrimaryShardForDb(opCtx, fromNss.db());
+            DatabaseShardingState::assertIsPrimaryShardForDb(opCtx, DatabaseName{fromNss.db()});
 
             // Acquiring the local part of the distributed locks for involved namespaces allows:
             // - Serialize with sharded DDLs, ensuring no concurrent modifications of the

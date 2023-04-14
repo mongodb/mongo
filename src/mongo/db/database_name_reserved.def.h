@@ -46,4 +46,6 @@ DBNAME_CONSTANT(kConfig, "config"_sd)
 
 DBNAME_CONSTANT(kSystem, "system"_sd)
 
+DBNAME_CONSTANT(kExternal, "$external"_sd)
+
 DBNAME_CONSTANT(kEmpty, ""_sd)

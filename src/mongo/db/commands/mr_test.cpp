@@ -112,7 +112,7 @@ void _testConfigParseOutputOptions(const std::string& dbname,
     _compareOutputOptionField(dbname,
                               cmdObjStr,
                               "finalNamespace",
-                              outputOptions.finalNamespace.ns(),
+                              outputOptions.finalNamespace.ns().toString(),
                               expectedFinalNamespace);
     _compareOutputOptionField(
         dbname, cmdObjStr, "outNonAtomic", outputOptions.outNonAtomic, expectedOutNonAtomic);

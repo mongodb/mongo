@@ -118,7 +118,8 @@ TEST(ViewDefinitionTest, SetViewOnSucceedsIfNewViewOnIsInSameDatabaseAsView) {
 }
 
 TEST(ViewDefinitionTest, SetPipelineSucceedsOnValidArrayBSONElement) {
-    ViewDefinition viewDef(viewNss.db(), viewNss.coll(), backingNss.coll(), BSONObj(), nullptr);
+    ViewDefinition viewDef(
+        DatabaseName{viewNss.db()}, viewNss.coll(), backingNss.coll(), BSONObj(), nullptr);
     ASSERT(viewDef.pipeline().empty());
 
     BSONObj matchStage = BSON("match" << BSON("x" << 9));

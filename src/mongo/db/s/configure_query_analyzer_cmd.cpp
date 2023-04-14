@@ -62,7 +62,7 @@ constexpr int kMaxSampleRate = 1'000'000;
 StatusWith<UUID> validateCollectionOptionsOnPrimaryShard(OperationContext* opCtx,
                                                          const NamespaceString& nss) {
     ListCollections listCollections;
-    listCollections.setDbName(nss.db());
+    listCollections.setDbName(DatabaseName{nss.db()});
     listCollections.setFilter(BSON("name" << nss.coll()));
     auto listCollectionsCmdObj =
         CommandHelpers::filterCommandRequestForPassthrough(listCollections.toBSON({}));

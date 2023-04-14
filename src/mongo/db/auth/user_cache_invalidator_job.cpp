@@ -197,7 +197,7 @@ void UserCacheInvalidator::run() {
                           "users in cache",
                           "error"_attr = refreshStatus);
             try {
-                _authzManager->invalidateUsersFromDB(opCtx.get(), "$external"_sd);
+                _authzManager->invalidateUsersFromDB(opCtx.get(), DatabaseName::kExternal);
             } catch (const DBException& e) {
                 LOGV2_WARNING(5914805,
                               "Error invalidating $external users from user cache",

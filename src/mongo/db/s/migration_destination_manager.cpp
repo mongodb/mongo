@@ -1700,7 +1700,7 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx, const
     if (xfer["deleted"].isABSONObj()) {
         boost::optional<RemoveSaver> rs;
         if (serverGlobalParams.moveParanoia) {
-            rs.emplace("moveChunk", _nss.ns(), "removedDuring");
+            rs.emplace("moveChunk", _nss.ns().toString(), "removedDuring");
         }
 
         BSONObjIterator i(xfer["deleted"].Obj());

@@ -240,8 +240,8 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionSecondaryNamespacesSingleDb) {
     ASSERT(opCtx1->lockState()->isRSTLLocked());
     ASSERT(opCtx1->lockState()->isReadLocked());  // Global lock check
     ASSERT(opCtx1->lockState()->isDbLockedForMode(nss.dbName(), MODE_IS));
-    ASSERT(opCtx1->lockState()->isDbLockedForMode(kSecondaryNss1.db(), MODE_IS));
-    ASSERT(opCtx1->lockState()->isDbLockedForMode(kSecondaryNss2.db(), MODE_IS));
+    ASSERT(opCtx1->lockState()->isDbLockedForMode(DatabaseName{kSecondaryNss1.db()}, MODE_IS));
+    ASSERT(opCtx1->lockState()->isDbLockedForMode(DatabaseName{kSecondaryNss2.db()}, MODE_IS));
     ASSERT(opCtx1->lockState()->isCollectionLockedForMode(nss, MODE_IS));
     ASSERT(opCtx1->lockState()->isCollectionLockedForMode(kSecondaryNss1, MODE_IS));
     ASSERT(opCtx1->lockState()->isCollectionLockedForMode(kSecondaryNss2, MODE_IS));
@@ -249,8 +249,10 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionSecondaryNamespacesSingleDb) {
     ASSERT(!opCtx1->lockState()->isRSTLExclusive());
     ASSERT(!opCtx1->lockState()->isGlobalLockedRecursively());
     ASSERT(!opCtx1->lockState()->isWriteLocked());
-    ASSERT(!opCtx1->lockState()->isDbLockedForMode(kSecondaryNssOtherDb1.db(), MODE_IS));
-    ASSERT(!opCtx1->lockState()->isDbLockedForMode(kSecondaryNssOtherDb2.db(), MODE_IS));
+    ASSERT(
+        !opCtx1->lockState()->isDbLockedForMode(DatabaseName{kSecondaryNssOtherDb1.db()}, MODE_IS));
+    ASSERT(
+        !opCtx1->lockState()->isDbLockedForMode(DatabaseName{kSecondaryNssOtherDb2.db()}, MODE_IS));
     ASSERT(!opCtx1->lockState()->isCollectionLockedForMode(kSecondaryNssOtherDb1, MODE_IS));
     ASSERT(!opCtx1->lockState()->isCollectionLockedForMode(kSecondaryNssOtherDb2, MODE_IS));
 
@@ -276,16 +278,18 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionMultiNamespacesMODEIX) {
     ASSERT(opCtx1->lockState()->isRSTLLocked());
     ASSERT(opCtx1->lockState()->isWriteLocked());  // Global lock check
     ASSERT(opCtx1->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
-    ASSERT(opCtx1->lockState()->isDbLockedForMode(kSecondaryNss1.db(), MODE_IX));
-    ASSERT(opCtx1->lockState()->isDbLockedForMode(kSecondaryNss2.db(), MODE_IX));
+    ASSERT(opCtx1->lockState()->isDbLockedForMode(DatabaseName{kSecondaryNss1.db()}, MODE_IX));
+    ASSERT(opCtx1->lockState()->isDbLockedForMode(DatabaseName{kSecondaryNss2.db()}, MODE_IX));
     ASSERT(opCtx1->lockState()->isCollectionLockedForMode(nss, MODE_IX));
     ASSERT(opCtx1->lockState()->isCollectionLockedForMode(kSecondaryNss1, MODE_IX));
     ASSERT(opCtx1->lockState()->isCollectionLockedForMode(kSecondaryNss2, MODE_IX));
 
     ASSERT(!opCtx1->lockState()->isRSTLExclusive());
     ASSERT(!opCtx1->lockState()->isGlobalLockedRecursively());
-    ASSERT(!opCtx1->lockState()->isDbLockedForMode(kSecondaryNssOtherDb1.db(), MODE_IX));
-    ASSERT(!opCtx1->lockState()->isDbLockedForMode(kSecondaryNssOtherDb2.db(), MODE_IX));
+    ASSERT(
+        !opCtx1->lockState()->isDbLockedForMode(DatabaseName{kSecondaryNssOtherDb1.db()}, MODE_IX));
+    ASSERT(
+        !opCtx1->lockState()->isDbLockedForMode(DatabaseName{kSecondaryNssOtherDb2.db()}, MODE_IX));
     ASSERT(!opCtx1->lockState()->isCollectionLockedForMode(kSecondaryNssOtherDb1, MODE_IX));
     ASSERT(!opCtx1->lockState()->isCollectionLockedForMode(kSecondaryNssOtherDb2, MODE_IX));
 
@@ -303,11 +307,11 @@ TEST_F(CatalogRAIITestFixture, AutoGetDbSecondaryNamespacesSingleDb) {
     ASSERT(opCtx1->lockState()->isRSTLLocked());
     ASSERT(opCtx1->lockState()->isReadLocked());  // Global lock check
     ASSERT(opCtx1->lockState()->isDbLockedForMode(nss.dbName(), MODE_IS));
-    ASSERT(opCtx1->lockState()->isDbLockedForMode(kSecondaryNss1.db(), MODE_IS));
-    ASSERT(opCtx1->lockState()->isDbLockedForMode(kSecondaryNss2.db(), MODE_IS));
+    ASSERT(opCtx1->lockState()->isDbLockedForMode(kSecondaryNss1.dbName(), MODE_IS));
+    ASSERT(opCtx1->lockState()->isDbLockedForMode(kSecondaryNss2.dbName(), MODE_IS));
 
-    ASSERT(!opCtx1->lockState()->isDbLockedForMode(kSecondaryNssOtherDb1.db(), MODE_IS));
-    ASSERT(!opCtx1->lockState()->isDbLockedForMode(kSecondaryNssOtherDb2.db(), MODE_IS));
+    ASSERT(!opCtx1->lockState()->isDbLockedForMode(kSecondaryNssOtherDb1.dbName(), MODE_IS));
+    ASSERT(!opCtx1->lockState()->isDbLockedForMode(kSecondaryNssOtherDb2.dbName(), MODE_IS));
     ASSERT(!opCtx1->lockState()->isRSTLExclusive());
     ASSERT(!opCtx1->lockState()->isGlobalLockedRecursively());
     ASSERT(!opCtx1->lockState()->isWriteLocked());
@@ -321,7 +325,8 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionMultiNssCollLockDeadline) {
     // Take a MODE_X collection lock on kSecondaryNss1.
     boost::optional<AutoGetCollection> autoGetCollWithXLock;
     autoGetCollWithXLock.emplace(client1.second.get(), kSecondaryNss1, MODE_X);
-    ASSERT(client1.second->lockState()->isDbLockedForMode(kSecondaryNss1.db(), MODE_IX));
+    ASSERT(
+        client1.second->lockState()->isDbLockedForMode(DatabaseName{kSecondaryNss1.db()}, MODE_IX));
     ASSERT(client1.second->lockState()->isCollectionLockedForMode(kSecondaryNss1, MODE_X));
 
     // Now trying to take a MODE_IS lock on kSecondaryNss1 as a secondary collection should fail.

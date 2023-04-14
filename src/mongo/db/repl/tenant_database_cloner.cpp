@@ -304,7 +304,7 @@ void TenantDatabaseCloner::postStage() {
         _stats.collectionStats.reserve(_collections.size());
         for (const auto& coll : _collections) {
             _stats.collectionStats.emplace_back();
-            _stats.collectionStats.back().ns = coll.first.ns();
+            _stats.collectionStats.back().ns = coll.first.ns().toString();
         }
     }
     for (const auto& coll : _collections) {

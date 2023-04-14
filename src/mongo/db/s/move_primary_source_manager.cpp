@@ -345,7 +345,8 @@ Status MovePrimarySourceManager::_commitOnConfig(OperationContext* opCtx,
     notifyChangeStreamsOnMovePrimary(opCtx, getNss().dbName(), _fromShard, _toShard);
 
     const auto commitStatus = [&] {
-        ConfigsvrCommitMovePrimary commitRequest(_dbname, expectedDbVersion, _toShard);
+        ConfigsvrCommitMovePrimary commitRequest(
+            DatabaseName{_dbname}, expectedDbVersion, _toShard);
         commitRequest.setDbName(DatabaseName::kAdmin);
 
         const auto commitResponse =
@@ -465,7 +466,7 @@ Status MovePrimarySourceManager::cleanStaleData(OperationContext* opCtx) {
     DBDirectClient client(opCtx);
     for (auto& coll : _clonedColls) {
         BSONObj dropCollResult;
-        client.runCommand(_dbname, BSON("drop" << coll.coll()), dropCollResult);
+        client.runCommand(DatabaseName{_dbname}, BSON("drop" << coll.coll()), dropCollResult);
         Status dropStatus = getStatusFromCommandResult(dropCollResult);
         if (!dropStatus.isOK()) {
             LOGV2(22045,

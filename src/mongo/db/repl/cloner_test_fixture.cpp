@@ -49,9 +49,10 @@ BSONObj ClonerTestFixture::createCountResponse(int documentCount) {
 }
 
 /* static */
-BSONObj ClonerTestFixture::createCursorResponse(const std::string& nss, const BSONArray& docs) {
-    return BSON("cursor" << BSON("id" << CursorId(0) << "ns" << nss << "firstBatch" << docs) << "ok"
-                         << 1);
+BSONObj ClonerTestFixture::createCursorResponse(StringData nss, const BSONArray& docs) {
+    return BSON(
+        "cursor" << BSON("id" << CursorId(0) << "ns" << nss.toString() << "firstBatch" << docs)
+                 << "ok" << 1);
 }
 
 void ClonerTestFixture::setUp() {

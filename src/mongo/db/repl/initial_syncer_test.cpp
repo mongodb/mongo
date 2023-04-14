@@ -330,7 +330,7 @@ protected:
         _storageInterface->dropCollFn = [this](OperationContext* opCtx,
                                                const NamespaceString& nss) {
             LockGuard lock(_storageInterfaceWorkDoneMutex);
-            _storageInterfaceWorkDone.droppedCollections.push_back(nss.ns());
+            _storageInterfaceWorkDone.droppedCollections.push_back(nss.ns().toString());
             return Status::OK();
         };
         _storageInterface->dropUserDBsFn = [this](OperationContext* opCtx) {

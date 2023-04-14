@@ -91,7 +91,7 @@ public:
                 request().getDropTarget());
 
             ShardsvrRenameCollection renameCollRequest(fromNss);
-            renameCollRequest.setDbName(fromNss.db());
+            renameCollRequest.setDbName(DatabaseName{fromNss.db()});
             renameCollRequest.setRenameCollectionRequest(renameCollReq);
             renameCollRequest.setAllowEncryptedCollectionRename(
                 AuthorizationSession::get(opCtx->getClient())

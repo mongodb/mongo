@@ -132,7 +132,7 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
 
     if (serverGlobalParams.moveParanoia) {
         deleteStageParams->removeSaver =
-            std::make_unique<RemoveSaver>("moveChunk", nss.ns(), "cleaning");
+            std::make_unique<RemoveSaver>("moveChunk", nss.ns().toString(), "cleaning");
     }
 
     auto exec =
@@ -261,9 +261,10 @@ ExecutorFuture<void> deleteRangeInBatchesWithExecutor(
     return ExecutorFuture<void>(executor).then([=] {
         return withTemporaryOperationContext(
             [=](OperationContext* opCtx) {
-                return deleteRangeInBatches(opCtx, nss.db(), collectionUuid, keyPattern, range);
+                return deleteRangeInBatches(
+                    opCtx, DatabaseName{nss.db()}, collectionUuid, keyPattern, range);
             },
-            nss.db(),
+            DatabaseName{nss.db()},
             collectionUuid);
     });
 }
@@ -291,7 +292,7 @@ ExecutorFuture<void> waitForDeletionsToMajorityReplicate(
                 .waitUntilMajority(clientOpTime, CancellationToken::uncancelable())
                 .thenRunOn(executor);
         },
-        nss.db(),
+        DatabaseName{nss.db()},
         collectionUuid);
 }
 
@@ -545,7 +546,7 @@ SharedSemiFuture<void> removeDocumentsInRange(
                     [&](OperationContext* opCtx) {
                         removePersistentRangeDeletionTask(opCtx, collectionUuid, range);
                     },
-                    nss.db(),
+                    DatabaseName{nss.db()},
                     collectionUuid);
             } catch (const DBException& e) {
                 LOGV2_ERROR(23770,

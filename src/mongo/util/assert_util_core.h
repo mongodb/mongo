@@ -87,12 +87,9 @@ MONGO_COMPILER_NORETURN void invariantFailedWithMsg(const char* expr,
 //
 //       Invariant failure !condition "hello!" some/file.cpp 528
 //
-#define MONGO_invariant_2(Expression, contextExpr)                                           \
-    ::mongo::invariantWithContextAndLocation((Expression),                                   \
-                                             #Expression,                                    \
-                                             [&]() -> std::string { return (contextExpr); }, \
-                                             __FILE__,                                       \
-                                             __LINE__)
+#define MONGO_invariant_2(Expression, contextExpr) \
+    ::mongo::invariantWithContextAndLocation(      \
+        (Expression), #Expression, [&] { return std::string{contextExpr}; }, __FILE__, __LINE__)
 
 template <typename T, typename ContextExpr>
 inline void invariantWithContextAndLocation(

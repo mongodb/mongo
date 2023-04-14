@@ -1013,7 +1013,7 @@ void CmdUMCTyped<CreateUserCommand>::Invocation::typedRun(OperationContext* opCt
             cmd.getCommandParameter().find('\0') == std::string::npos);
     UserName userName(cmd.getCommandParameter(), dbname);
 
-    const bool isExternal = dbname.db() == NamespaceString::kExternalDb;
+    const bool isExternal = dbname.db() == DatabaseName::kExternal.db();
     uassert(ErrorCodes::BadValue,
             "Must provide a 'pwd' field for all user documents, except those"
             " with '$external' as the user's source db",
@@ -1505,7 +1505,7 @@ void CmdUMCTyped<CreateRoleCommand>::Invocation::typedRun(OperationContext* opCt
 
     uassert(ErrorCodes::BadValue,
             "Cannot create roles in the $external database",
-            dbname.db() != NamespaceString::kExternalDb);
+            dbname.db() != DatabaseName::kExternal.db());
 
     uassert(ErrorCodes::BadValue,
             "Cannot create roles with the same name as a built-in role",

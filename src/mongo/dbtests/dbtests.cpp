@@ -181,7 +181,7 @@ Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj
 WriteContextForTests::WriteContextForTests(OperationContext* opCtx, StringData ns)
     : _opCtx(opCtx), _nss(ns) {
     // Lock the database and collection
-    _autoDb.emplace(opCtx, _nss.db(), MODE_IX);
+    _autoDb.emplace(opCtx, DatabaseName{_nss.db()}, MODE_IX);
     _collLock.emplace(opCtx, _nss, MODE_IX);
 
     const bool doShardVersionCheck = false;

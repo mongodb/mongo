@@ -202,7 +202,7 @@ public:
             const auto dbDDLLock = ddlLockManager->lock(
                 opCtx, nss.db(), kLockReason, DDLLockManager::kDefaultLockTimeout);
 
-            DatabaseShardingState::assertIsPrimaryShardForDb(opCtx, nss.dbName());
+            DatabaseShardingState::assertIsPrimaryShardForDb(opCtx, DatabaseName{nss.db()});
 
             return establishCursors(opCtx,
                                     Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),

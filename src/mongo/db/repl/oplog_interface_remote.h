@@ -52,7 +52,7 @@ public:
 
     OplogInterfaceRemote(HostAndPort hostAndPort,
                          GetConnectionFn getConnection,
-                         const std::string& collectionName,
+                         StringData collectionName,
                          int batchSize);
     std::string toString() const override;
     std::unique_ptr<OplogInterface::Iterator> makeIterator() const override;

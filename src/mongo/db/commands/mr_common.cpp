@@ -269,7 +269,7 @@ auto translateOut(boost::intrusive_ptr<ExpressionContext> expCtx,
 
 }  // namespace
 
-OutputOptions parseOutputOptions(const std::string& dbname, const BSONObj& cmdObj) {
+OutputOptions parseOutputOptions(StringData dbname, const BSONObj& cmdObj) {
     OutputOptions outputOptions;
 
     outputOptions.outNonAtomic = true;

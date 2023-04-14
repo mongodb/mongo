@@ -70,8 +70,9 @@ protected:
         auto db = databaseHolder->openDb(operationContext(), kTestNss.dbName(), &justCreated);
         auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(
             operationContext(), kTestNss.dbName());
-        scopedDss->setDbInfo(operationContext(),
-                             DatabaseType{kTestNss.dbName().db(), ShardId("this"), dbVersion1});
+        scopedDss->setDbInfo(
+            operationContext(),
+            DatabaseType{kTestNss.dbName().db().toString(), ShardId("this"), dbVersion1});
         ASSERT_TRUE(db);
         ASSERT_TRUE(justCreated);
 

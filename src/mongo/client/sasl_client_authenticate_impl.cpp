@@ -147,7 +147,7 @@ Status saslConfigureSession(SaslClientSession* session,
     status = bsonExtractStringField(saslParameters, saslCommandUserFieldName, &value);
     if (status.isOK()) {
         session->setParameter(SaslClientSession::parameterUser, value);
-    } else if ((targetDatabase != NamespaceString::kExternalDb) ||
+    } else if ((targetDatabase != DatabaseName::kExternal.db()) ||
                ((mechanism != auth::kMechanismMongoAWS) &&
                 (mechanism != auth::kMechanismMongoOIDC))) {
         return status;
@@ -164,7 +164,7 @@ Status saslConfigureSession(SaslClientSession* session,
     if (status.isOK()) {
         session->setParameter(SaslClientSession::parameterPassword, value);
     } else if (!(status == ErrorCodes::NoSuchKey &&
-                 targetDatabase == NamespaceString::kExternalDb)) {
+                 targetDatabase == DatabaseName::kExternal.db())) {
         // $external users do not have passwords, hence NoSuchKey is expected
         return status;
     }

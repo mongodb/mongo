@@ -169,7 +169,7 @@ void QueryAnalysisClient::insert(OperationContext* opCtx,
     auto insertCmdObj = insertCmd.toBSON(
         {BSON(WriteConcernOptions::kWriteConcernField << kMajorityWriteConcern.toBSON())});
 
-    executeCommandOnPrimary(opCtx, nss.db(), std::move(insertCmdObj), uassertCmdStatusFn);
+    executeCommandOnPrimary(opCtx, nss.dbName(), std::move(insertCmdObj), uassertCmdStatusFn);
 }
 
 }  // namespace analyze_shard_key

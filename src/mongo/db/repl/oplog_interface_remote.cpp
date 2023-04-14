@@ -69,7 +69,7 @@ StatusWith<OplogInterface::Iterator::Value> OplogIteratorRemote::next() {
 
 OplogInterfaceRemote::OplogInterfaceRemote(HostAndPort hostAndPort,
                                            GetConnectionFn getConnection,
-                                           const std::string& collectionName,
+                                           StringData collectionName,
                                            int batchSize)
     : _hostAndPort(hostAndPort),
       _getConnection(getConnection),

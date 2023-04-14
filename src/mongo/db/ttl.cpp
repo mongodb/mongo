@@ -898,8 +898,8 @@ void TTLMonitor::onStepUp(OperationContext* opCtx) {
 
                 // processCollModCommand() will acquire MODE_X access to the collection.
                 BSONObjBuilder builder;
-                uassertStatusOK(
-                    processCollModCommand(opCtx, {nss->db(), uuid}, collModCmd, &builder));
+                uassertStatusOK(processCollModCommand(
+                    opCtx, {DatabaseName{nss->db()}, uuid}, collModCmd, &builder));
                 auto result = builder.obj();
                 LOGV2(
                     6847701,

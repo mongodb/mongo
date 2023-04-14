@@ -543,7 +543,7 @@ private:
 
             collection = catalog->establishConsistentCollection(
                 opCtx,
-                {info.nss.db(), info.uuid},
+                {DatabaseName{info.nss.db()}, info.uuid},
                 opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx));
         } else {
             autoColl.emplace(opCtx, info.nss, MODE_IS);

@@ -111,7 +111,7 @@ public:
                    ExplainOptions::Verbosity verbosity,
                    rpc::ReplyBuilderInterface* result) const override {
         const BSONObj& cmdObj = opMsgRequest.body;
-        const NamespaceString nss(parseNs(opMsgRequest.getDatabase(), cmdObj));
+        const NamespaceString nss(parseNs(DatabaseName{opMsgRequest.getDatabase()}, cmdObj));
 
         auto parsedDistinctCmd =
             ParsedDistinct::parse(opCtx, nss, cmdObj, ExtensionsCallbackNoop(), true);

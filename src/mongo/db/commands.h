@@ -165,7 +165,7 @@ struct CommandHelpers {
      * pattern or a database resource pattern, depending on whether parseNs returns a fully qualifed
      * collection name or just a database name.
      */
-    static ResourcePattern resourcePatternForNamespace(const std::string& ns);
+    static ResourcePattern resourcePatternForNamespace(StringData ns);
 
     static Command* findCommand(StringData name);
 

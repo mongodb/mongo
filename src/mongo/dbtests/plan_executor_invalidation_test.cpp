@@ -129,7 +129,7 @@ public:
         return res;
     }
 
-    bool dropCollection(const std::string& ns) {
+    bool dropCollection(StringData ns) {
         bool res = _client.dropCollection(NamespaceString(ns));
         _refreshCollection();
         return res;

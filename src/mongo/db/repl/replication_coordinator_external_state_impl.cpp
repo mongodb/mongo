@@ -779,7 +779,7 @@ StatusWith<OpTimeAndWallTime> ReplicationCoordinatorExternalStateImpl::loadLastO
         BSONObj oplogEntry;
 
         if (!writeConflictRetry(
-                opCtx, "Load last opTime", NamespaceString::kRsOplogNamespace.ns().c_str(), [&] {
+                opCtx, "Load last opTime", NamespaceString::kRsOplogNamespace.ns(), [&] {
                     return Helpers::getLast(opCtx, NamespaceString::kRsOplogNamespace, oplogEntry);
                 })) {
             return StatusWith<OpTimeAndWallTime>(ErrorCodes::NoMatchingDocument,

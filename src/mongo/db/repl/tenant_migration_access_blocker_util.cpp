@@ -714,7 +714,7 @@ boost::optional<std::string> extractTenantFromDatabaseName(const DatabaseName& d
         return boost::none;
     }
 
-    return dbName.db().substr(0, pos);
+    return dbName.db().substr(0, pos).toString();
 }
 
 }  // namespace tenant_migration_access_blocker

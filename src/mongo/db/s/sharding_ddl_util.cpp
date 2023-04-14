@@ -111,8 +111,8 @@ void updateTags(OperationContext* opCtx,
                 const NamespaceString& fromNss,
                 const NamespaceString& toNss,
                 const WriteConcernOptions& writeConcern) {
-    const auto query = BSON(TagsType::ns(fromNss.ns()));
-    const auto update = BSON("$set" << BSON(TagsType::ns(toNss.ns())));
+    const auto query = BSON(TagsType::ns(fromNss.ns().toString()));
+    const auto update = BSON("$set" << BSON(TagsType::ns(toNss.ns().toString())));
 
     BatchedCommandRequest request([&] {
         write_ops::UpdateCommandRequest updateOp(TagsType::ConfigNS);
@@ -474,7 +474,7 @@ void removeTagsMetadataFromConfig_notIdempotent(OperationContext* opCtx,
                                                 const NamespaceString& nss,
                                                 const WriteConcernOptions& writeConcern) {
     // Remove config.tags entries
-    const auto query = BSON(TagsType::ns(nss.ns()));
+    const auto query = BSON(TagsType::ns(nss.ns().toString()));
     const auto hint = BSON(TagsType::ns() << 1 << TagsType::min() << 1);
 
     BatchedCommandRequest request([&] {

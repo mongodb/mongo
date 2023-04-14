@@ -131,19 +131,19 @@ public:
      * Prefer to use the constructor above.
      * TODO SERVER-65456 Remove this constructor.
      */
-    DatabaseName(StringData dbName, boost::optional<TenantId> tenantId = boost::none)
+    explicit DatabaseName(StringData dbName, boost::optional<TenantId> tenantId = boost::none)
         : DatabaseName(std::move(tenantId), dbName) {}
 
     const boost::optional<TenantId>& tenantId() const {
         return _tenantId;
     }
 
-    const std::string& db() const {
+    StringData db() const {
         return _dbString;
     }
 
-    const std::string& toString() const {
-        return db();
+    std::string toString() const {
+        return db().toString();
     }
 
     std::string toStringWithTenantId() const {

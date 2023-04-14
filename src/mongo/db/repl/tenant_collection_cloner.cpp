@@ -104,7 +104,7 @@ TenantCollectionCloner::TenantCollectionCloner(const NamespaceString& sourceNss,
     invariant(ClonerUtils::isNamespaceForTenant(sourceNss, tenantId));
     invariant(collectionOptions.uuid);
     _sourceDbAndUuid = NamespaceStringOrUUID(sourceNss.dbName(), *collectionOptions.uuid);
-    _stats.ns = _sourceNss.ns();
+    _stats.ns = _sourceNss.ns().toString();
 }
 
 BaseCloner::ClonerStages TenantCollectionCloner::getStages() {

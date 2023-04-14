@@ -239,7 +239,7 @@ bool ReshardingCoordinatorCleaner::_checkExistsTempReshardingCollection(
 void ReshardingCoordinatorCleaner::_dropTemporaryReshardingCollection(
     OperationContext* opCtx, const NamespaceString& tempReshardingNss) {
     ShardsvrDropCollection dropCollectionCommand(tempReshardingNss);
-    dropCollectionCommand.setDbName(tempReshardingNss.db());
+    dropCollectionCommand.setDbName(DatabaseName{tempReshardingNss.db()});
 
     const auto dbInfo = uassertStatusOK(
         Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, tempReshardingNss.db()));

@@ -483,7 +483,7 @@ AutoGetCollectionLockFree::AutoGetCollectionLockFree(OperationContext* opCtx,
     // Check that the sharding database version matches our read.
     // Note: this must always be checked, regardless of whether the collection exists, so that the
     // dbVersion of this node or the caller gets updated quickly in case either is stale.
-    DatabaseShardingState::assertMatchingDbVersion(opCtx, _resolvedNss.db());
+    DatabaseShardingState::assertMatchingDbVersion(opCtx, DatabaseName{_resolvedNss.db()});
 
     checkCollectionUUIDMismatch(opCtx, _resolvedNss, _collectionPtr, options._expectedUUID);
 

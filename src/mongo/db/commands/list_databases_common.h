@@ -99,7 +99,8 @@ int64_t setReplyItems(OperationContext* opCtx,
         }
 
         // If setTenantId is true, always return the dbName without the tenantId
-        ReplyItemType item(setTenantId ? dbName.db() : DatabaseNameUtil::serialize(dbName));
+        ReplyItemType item(setTenantId ? dbName.db().toString()
+                                       : DatabaseNameUtil::serialize(dbName));
         if (setTenantId) {
             initializeItemWithTenantId(item, dbName);
         }

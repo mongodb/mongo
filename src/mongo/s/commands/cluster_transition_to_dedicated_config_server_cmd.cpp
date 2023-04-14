@@ -90,7 +90,7 @@ public:
         auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
         ConfigsvrTransitionToDedicatedConfig transitionToDedicatedConfigServer;
-        transitionToDedicatedConfigServer.setDbName({"admin"});
+        transitionToDedicatedConfigServer.setDbName(DatabaseName::kAdmin);
 
         // Force a reload of this node's shard list cache at the end of this command.
         auto cmdResponseWithStatus = configShard->runCommandWithFixedRetryAttempts(

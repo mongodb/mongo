@@ -43,7 +43,7 @@ namespace repl {
 
 RollbackSourceImpl::RollbackSourceImpl(GetConnectionFn getConnection,
                                        const HostAndPort& source,
-                                       const std::string& collectionName,
+                                       StringData collectionName,
                                        int batchSize)
     : _getConnection(getConnection),
       _source(source),

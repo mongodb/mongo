@@ -1270,7 +1270,7 @@ void RunCommandImpl::_epilogue() {
                                             _ecd->getLastOpBeforeRun(),
                                             _ecd->getLastOpAfterRun());
         appendAdditionalParticipants(
-            opCtx, &body, command->getName(), _ecd->getInvocation()->ns().ns());
+            opCtx, &body, command->getName(), _ecd->getInvocation()->ns().ns().toString());
     }
 
     auto commandBodyBob = replyBuilder->getBodyBuilder();
@@ -1945,7 +1945,7 @@ void ExecCommandDatabase::_handleFailure(Status status) {
                                         getLastOpBeforeRun(),
                                         getLastOpAfterRun());
     appendAdditionalParticipants(
-        opCtx, &_extraFieldsBuilder, command->getName(), _execContext->nsString().ns());
+        opCtx, &_extraFieldsBuilder, command->getName(), _execContext->nsString().ns().toString());
 
     BSONObjBuilder metadataBob;
     behaviors.appendReplyMetadata(opCtx, request, &metadataBob);

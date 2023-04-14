@@ -121,7 +121,7 @@ void OpObserverShardingImpl::shardObserveInsertsOp(
 
     auto* const css = shardingWriteRouter.getCss();
     css->checkShardVersionOrThrow(opCtx);
-    DatabaseShardingState::assertMatchingDbVersion(opCtx, nss.db());
+    DatabaseShardingState::assertMatchingDbVersion(opCtx, DatabaseName{nss.db()});
 
     auto* const csr = checked_cast<CollectionShardingRuntime*>(css);
     auto metadata = csr->getCurrentMetadataIfKnown();
@@ -163,7 +163,7 @@ void OpObserverShardingImpl::shardObserveUpdateOp(OperationContext* opCtx,
                                                   const bool inMultiDocumentTransaction) {
     auto* const css = shardingWriteRouter.getCss();
     css->checkShardVersionOrThrow(opCtx);
-    DatabaseShardingState::assertMatchingDbVersion(opCtx, nss.db());
+    DatabaseShardingState::assertMatchingDbVersion(opCtx, DatabaseName{nss.db()});
 
     auto* const csr = checked_cast<CollectionShardingRuntime*>(css);
     auto metadata = csr->getCurrentMetadataIfKnown();
@@ -199,7 +199,7 @@ void OpObserverShardingImpl::shardObserveDeleteOp(OperationContext* opCtx,
                                                   const bool inMultiDocumentTransaction) {
     auto* const css = shardingWriteRouter.getCss();
     css->checkShardVersionOrThrow(opCtx);
-    DatabaseShardingState::assertMatchingDbVersion(opCtx, nss.db());
+    DatabaseShardingState::assertMatchingDbVersion(opCtx, DatabaseName{nss.db()});
 
     auto* const csr = checked_cast<CollectionShardingRuntime*>(css);
     auto metadata = csr->getCurrentMetadataIfKnown();

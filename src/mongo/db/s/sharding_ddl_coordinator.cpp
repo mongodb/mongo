@@ -289,7 +289,8 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
                     metadata().getDatabaseVersion() /* databaseVersion */);
 
                 // Check under the dbLock if this is still the primary shard for the database
-                DatabaseShardingState::assertIsPrimaryShardForDb(opCtx, originalNss().db());
+                DatabaseShardingState::assertIsPrimaryShardForDb(opCtx,
+                                                                 DatabaseName{originalNss().db()});
             };
         })
         .then([this, executor, token, anchor = shared_from_this()] {

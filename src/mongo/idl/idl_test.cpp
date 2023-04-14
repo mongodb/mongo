@@ -2877,7 +2877,7 @@ TEST(IDLCommand, TestIgnore) {
         BasicIgnoredCommand one_new;
         one_new.setField1(3);
         one_new.setField2("five");
-        one_new.setDbName(DatabaseName(boost::none, "admin"));
+        one_new.setDbName(DatabaseName::kAdmin);
         ASSERT_BSONOBJ_EQ(testDocWithDB, serializeCmd(one_new));
     }
 }

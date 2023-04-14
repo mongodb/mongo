@@ -407,7 +407,7 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                     }
 
                     auto dropDatabaseParticipantCmd = ShardsvrDropDatabaseParticipant();
-                    dropDatabaseParticipantCmd.setDbName(_dbName);
+                    dropDatabaseParticipantCmd.setDbName(DatabaseName{_dbName});
                     const auto cmdObj = CommandHelpers::appendMajorityWriteConcern(
                         dropDatabaseParticipantCmd.toBSON({}));
 
@@ -494,7 +494,7 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                 FlushDatabaseCacheUpdatesWithWriteConcern flushDbCacheUpdatesCmd(
                     _dbName.toString());
                 flushDbCacheUpdatesCmd.setSyncFromConfig(true);
-                flushDbCacheUpdatesCmd.setDbName(_dbName);
+                flushDbCacheUpdatesCmd.setDbName(DatabaseName{_dbName});
 
                 IgnoreAPIParametersBlock ignoreApiParametersBlock{opCtx};
                 sharding_ddl_util::sendAuthenticatedCommandToShards(

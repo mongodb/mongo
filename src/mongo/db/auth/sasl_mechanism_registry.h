@@ -405,7 +405,7 @@ private:
     using MechList = std::vector<std::unique_ptr<ServerFactoryBase>>;
 
     MechList& _getMapRef(StringData dbName) {
-        return _getMapRef(dbName != "$external"_sd);
+        return _getMapRef(dbName != DatabaseName::kExternal.db());
     }
 
     MechList& _getMapRef(bool internal) {

@@ -502,7 +502,7 @@ std::unique_ptr<DBClientCursor> DBClientReplicaSet::find(FindCommandRequest find
                                                          const ReadPreferenceSetting& readPref,
                                                          ExhaustMode exhaustMode) {
     invariant(findRequest.getNamespaceOrUUID().nss());
-    const std::string nss = findRequest.getNamespaceOrUUID().nss()->ns();
+    const std::string nss = findRequest.getNamespaceOrUUID().nss()->ns().toString();
     if (_isSecondaryQuery(nss, findRequest.toBSON(BSONObj{}), readPref)) {
         LOGV2_DEBUG(5951202,
                     3,

@@ -163,7 +163,7 @@ void abortAllReshardCollection(OperationContext* opCtx) {
 
     std::vector<std::string> nsWithReshardColl;
     store.forEach(opCtx, {}, [&](const ReshardingCoordinatorDocument& doc) {
-        nsWithReshardColl.push_back(doc.getSourceNss().ns());
+        nsWithReshardColl.push_back(doc.getSourceNss().ns().toString());
         return true;
     });
 
@@ -843,7 +843,7 @@ private:
             ConfigsvrSetClusterParameter configsvrSetClusterParameter(
                 BSON("shardedClusterCardinalityForDirectConns"
                      << BSON("hasTwoOrMoreShards" << expectedValue)));
-            configsvrSetClusterParameter.setDbName(DatabaseName(boost::none, "admin"));
+            configsvrSetClusterParameter.setDbName(DatabaseName::kAdmin);
 
             const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
             const auto cmdResponse =

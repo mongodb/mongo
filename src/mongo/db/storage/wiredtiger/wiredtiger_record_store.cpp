@@ -600,7 +600,7 @@ std::string WiredTigerRecordStore::ns(OperationContext* opCtx) const {
     if (!nss)
         return "";
 
-    return nss->ns();
+    return nss->ns().toString();
 }
 
 void WiredTigerRecordStore::checkSize(OperationContext* opCtx) {

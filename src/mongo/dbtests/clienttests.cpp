@@ -66,8 +66,8 @@ public:
         return _nss;
     }
 
-    const std::string& ns() {
-        return _nss.toString();
+    StringData ns() {
+        return _nss.ns();
     }
 
     const NamespaceString _nss;

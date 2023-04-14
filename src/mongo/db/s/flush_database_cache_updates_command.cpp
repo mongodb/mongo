@@ -143,7 +143,7 @@ public:
                     "Can't call _flushDatabaseCacheUpdates if in read-only mode",
                     !opCtx->readOnly());
 
-            if (_dbName() == DatabaseName::kAdmin || _dbName() == DatabaseName::kConfig) {
+            if (_dbName() == DatabaseName::kAdmin.db() || _dbName() == DatabaseName::kConfig.db()) {
                 // The admin and config databases have fixed metadata that does not need to be
                 // refreshed.
 
@@ -157,7 +157,8 @@ public:
                                 1,
                                 "Inserting a database collection entry with fixed metadata",
                                 "db"_attr = _dbName());
-                    uassertStatusOK(insertDatabaseEntryForBackwardCompatibility(opCtx, _dbName()));
+                    uassertStatusOK(insertDatabaseEntryForBackwardCompatibility(
+                        opCtx, DatabaseName{_dbName()}));
                 }
 
                 return;
@@ -166,7 +167,7 @@ public:
             boost::optional<SharedSemiFuture<void>> criticalSectionSignal;
 
             {
-                AutoGetDb autoDb(opCtx, _dbName(), MODE_IS);
+                AutoGetDb autoDb(opCtx, DatabaseName{_dbName()}, MODE_IS);
 
                 // If the primary is in the critical section, secondaries must wait for the commit
                 // to finish on the primary in case a secondary's caller has an afterClusterTime

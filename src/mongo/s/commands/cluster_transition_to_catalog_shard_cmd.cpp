@@ -67,7 +67,7 @@ public:
                     gFeatureFlagCatalogShard.isEnabled(serverGlobalParams.featureCompatibility));
 
             ConfigsvrTransitionToCatalogShard cmdToSend;
-            cmdToSend.setDbName({"admin"});
+            cmdToSend.setDbName(DatabaseName::kAdmin);
 
             auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 

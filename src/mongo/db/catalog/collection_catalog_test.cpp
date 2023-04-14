@@ -396,7 +396,8 @@ TEST_F(CollectionCatalogTest, OnDropCollection) {
 
 TEST_F(CollectionCatalogTest, RenameCollection) {
     auto uuid = UUID::gen();
-    NamespaceString oldNss = NamespaceString::createNamespaceString_forTest(nss.db(), "oldcol");
+    NamespaceString oldNss =
+        NamespaceString::createNamespaceString_forTest(DatabaseName{nss.db()}, "oldcol");
     std::shared_ptr<Collection> collShared = std::make_shared<CollectionMock>(uuid, oldNss);
     auto collection = collShared.get();
     catalog.registerCollection(opCtx.get(), uuid, std::move(collShared), boost::none);
@@ -1110,7 +1111,7 @@ private:
     }
 
     void _dropCollection(OperationContext* opCtx, const NamespaceString& nss, Timestamp timestamp) {
-        Lock::DBLock dbLk(opCtx, nss.db(), MODE_IX);
+        Lock::DBLock dbLk(opCtx, DatabaseName{nss.db()}, MODE_IX);
         Lock::CollectionLock collLk(opCtx, nss, MODE_X);
         CollectionWriter collection(opCtx, nss);
 
@@ -1146,7 +1147,7 @@ private:
                            const NamespaceString& from,
                            const NamespaceString& to,
                            Timestamp timestamp) {
-        Lock::DBLock dbLk(opCtx, from.db(), MODE_IX);
+        Lock::DBLock dbLk(opCtx, DatabaseName{from.db()}, MODE_IX);
         Lock::CollectionLock fromLk(opCtx, from, MODE_X);
         Lock::CollectionLock toLk(opCtx, to, MODE_X);
 
@@ -2704,9 +2705,11 @@ TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingInsert) {
         CollectionCatalog::get(opCtx.get())
             ->establishConsistentCollection(opCtx.get(), nss, Timestamp(1, 17));
         CollectionCatalog::get(opCtx.get())
-            ->establishConsistentCollection(opCtx.get(), {nss.db(), firstUUID}, Timestamp(1, 17));
+            ->establishConsistentCollection(
+                opCtx.get(), {DatabaseName{nss.db()}, firstUUID}, Timestamp(1, 17));
         CollectionCatalog::get(opCtx.get())
-            ->establishConsistentCollection(opCtx.get(), {nss.db(), secondUUID}, Timestamp(1, 17));
+            ->establishConsistentCollection(
+                opCtx.get(), {DatabaseName{nss.db()}, secondUUID}, Timestamp(1, 17));
 
         // Lookups before the inserted timestamp is still unknown
         ASSERT_EQ(lookupCatalogId(nss, firstUUID, Timestamp(1, 11)).result,
@@ -2737,9 +2740,11 @@ TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingInsert) {
         CollectionCatalog::get(opCtx.get())
             ->establishConsistentCollection(opCtx.get(), nss, Timestamp(1, 12));
         CollectionCatalog::get(opCtx.get())
-            ->establishConsistentCollection(opCtx.get(), {nss.db(), firstUUID}, Timestamp(1, 12));
+            ->establishConsistentCollection(
+                opCtx.get(), {DatabaseName{nss.db()}, firstUUID}, Timestamp(1, 12));
         CollectionCatalog::get(opCtx.get())
-            ->establishConsistentCollection(opCtx.get(), {nss.db(), secondUUID}, Timestamp(1, 12));
+            ->establishConsistentCollection(
+                opCtx.get(), {DatabaseName{nss.db()}, secondUUID}, Timestamp(1, 12));
 
         // We should now have extended the range from Timestamp(1, 17) to Timestamp(1, 12)
         ASSERT_EQ(lookupCatalogId(nss, firstUUID, Timestamp(1, 12)).result,
@@ -2769,9 +2774,11 @@ TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingInsert) {
         CollectionCatalog::get(opCtx.get())
             ->establishConsistentCollection(opCtx.get(), nss, Timestamp(1, 25));
         CollectionCatalog::get(opCtx.get())
-            ->establishConsistentCollection(opCtx.get(), {nss.db(), firstUUID}, Timestamp(1, 25));
+            ->establishConsistentCollection(
+                opCtx.get(), {DatabaseName{nss.db()}, firstUUID}, Timestamp(1, 25));
         CollectionCatalog::get(opCtx.get())
-            ->establishConsistentCollection(opCtx.get(), {nss.db(), secondUUID}, Timestamp(1, 25));
+            ->establishConsistentCollection(
+                opCtx.get(), {DatabaseName{nss.db()}, secondUUID}, Timestamp(1, 25));
 
         // Check the entries, most didn't change
         ASSERT_EQ(lookupCatalogId(nss, firstUUID, Timestamp(1, 17)).result,
@@ -2805,9 +2812,11 @@ TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingInsert) {
         CollectionCatalog::get(opCtx.get())
             ->establishConsistentCollection(opCtx.get(), nss, Timestamp(1, 26));
         CollectionCatalog::get(opCtx.get())
-            ->establishConsistentCollection(opCtx.get(), {nss.db(), firstUUID}, Timestamp(1, 26));
+            ->establishConsistentCollection(
+                opCtx.get(), {DatabaseName{nss.db()}, firstUUID}, Timestamp(1, 26));
         CollectionCatalog::get(opCtx.get())
-            ->establishConsistentCollection(opCtx.get(), {nss.db(), secondUUID}, Timestamp(1, 26));
+            ->establishConsistentCollection(
+                opCtx.get(), {DatabaseName{nss.db()}, secondUUID}, Timestamp(1, 26));
 
         // We should not have re-written the existing entry at Timestamp(1, 26)
         ASSERT_EQ(lookupCatalogId(nss, firstUUID, Timestamp(1, 17)).result,
@@ -3934,7 +3943,7 @@ TEST_F(CollectionCatalogTimestampTest, ResolveNamespaceStringOrUUIDAtLatest) {
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
     const Timestamp createCollectionTs = Timestamp(10, 10);
     const UUID uuid = createCollection(opCtx.get(), nss, createCollectionTs);
-    const NamespaceStringOrUUID nssOrUUID = NamespaceStringOrUUID(nss.db(), uuid);
+    const NamespaceStringOrUUID nssOrUUID = NamespaceStringOrUUID(DatabaseName{nss.db()}, uuid);
 
     NamespaceString resolvedNss =
         CollectionCatalog::get(opCtx.get())->resolveNamespaceStringOrUUID(opCtx.get(), nssOrUUID);

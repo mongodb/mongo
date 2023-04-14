@@ -705,7 +705,8 @@ std::pair<BSONObj, Timestamp> generateSplitPoints(OperationContext* opCtx,
             str::stream() << "Cannot analyze a shard key for a non-existing collection",
             origCollUuid);
     // Perform best-effort validation that the collection has not been dropped and recreated.
-    uassert(CollectionUUIDMismatchInfo(nss.db(), collUuid, nss.coll().toString(), boost::none),
+    uassert(CollectionUUIDMismatchInfo(
+                DatabaseName{nss.db()}, collUuid, nss.coll().toString(), boost::none),
             str::stream() << "Found that the collection UUID has changed from " << collUuid
                           << " to " << origCollUuid << " since the command started",
             origCollUuid == collUuid);
@@ -823,7 +824,8 @@ KeyCharacteristicsMetrics calculateKeyCharacteristicsMetrics(OperationContext* o
                 str::stream() << "Cannot analyze a shard key for a non-existing collection",
                 collection);
         // Perform best-effort validation that the collection has not been dropped and recreated.
-        uassert(CollectionUUIDMismatchInfo(nss.db(), collUuid, nss.coll().toString(), boost::none),
+        uassert(CollectionUUIDMismatchInfo(
+                    DatabaseName{nss.db()}, collUuid, nss.coll().toString(), boost::none),
                 str::stream() << "Found that the collection UUID has changed from " << collUuid
                               << " to " << collection->uuid() << " since the command started",
                 collection->uuid() == collUuid);

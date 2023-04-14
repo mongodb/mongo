@@ -349,7 +349,7 @@ TEST_F(AuthorizationManagerTest, testRefreshExternalV2User) {
 
     // Assert that all checked-out $external users are now marked invalid.
     for (const auto& checkedOutUser : checkedOutUsers) {
-        if (checkedOutUser->getName().getDB() == "$external"_sd) {
+        if (checkedOutUser->getName().getDB() == DatabaseName::kExternal.db()) {
             ASSERT(!checkedOutUser.isValid());
         } else {
             ASSERT(checkedOutUser.isValid());
@@ -368,7 +368,7 @@ TEST_F(AuthorizationManagerTest, testRefreshExternalV2User) {
         ASSERT(user.isValid());
 
         RoleNameIterator cachedUserRolesIt = user->getRoles();
-        if (userDoc.getStringField(kDbFieldName) == "$external"_sd) {
+        if (userDoc.getStringField(kDbFieldName) == DatabaseName::kExternal.db()) {
             for (const auto& userDocRole : updatedRoles) {
                 ASSERT_EQUALS(cachedUserRolesIt.next(),
                               RoleName(userDocRole.getStringField(kRoleFieldName),

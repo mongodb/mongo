@@ -403,7 +403,7 @@ TEST_F(StorageInterfaceImplTest, InsertDocumentsReturnsOKWhenNoOperationsAreGive
 
     StorageInterfaceImpl storage;
     ASSERT_OK(storage.insertDocuments(opCtx, nss, {}));
-    ASSERT_OK(storage.insertDocuments(opCtx, {nss.db().toString(), *options.uuid}, {}));
+    ASSERT_OK(storage.insertDocuments(opCtx, {DatabaseName{nss.db()}, *options.uuid}, {}));
 }
 
 TEST_F(StorageInterfaceImplTest,
@@ -425,7 +425,7 @@ TEST_F(StorageInterfaceImplTest,
     // Again, but specify the collection with its UUID.
     ASSERT_EQ(ErrorCodes::InternalError,
               storage.insertDocuments(
-                  opCtx, {nss.db().toString(), *options.uuid}, transformInserts({op})));
+                  opCtx, {DatabaseName{nss.db()}, *options.uuid}, transformInserts({op})));
 }
 
 TEST_F(StorageInterfaceImplTest,
@@ -487,7 +487,7 @@ TEST_F(StorageInterfaceImplTest, InsertDocumentsSavesOperationsWhenCollSpecified
     auto op1 = makeOplogEntry({Timestamp(Seconds(1), 0), 1LL});
     auto op2 = makeOplogEntry({Timestamp(Seconds(1), 0), 1LL});
     ASSERT_OK(storage.insertDocuments(
-        opCtx, {nss.db().toString(), *options.uuid}, transformInserts({op1, op2})));
+        opCtx, {DatabaseName{nss.db()}, *options.uuid}, transformInserts({op1, op2})));
 
     // Check contents of oplog.
     _assertDocumentsInCollectionEquals(opCtx, nss, {op1.obj, op2.obj});
@@ -538,7 +538,7 @@ TEST_F(StorageInterfaceImplTest, InsertDocWorksWithExistingCappedCollectionSpeci
 
     StorageInterfaceImpl storage;
     ASSERT_OK(storage.insertDocument(opCtx,
-                                     {nss.db().toString(), *options.uuid},
+                                     {DatabaseName{nss.db()}, *options.uuid},
                                      {BSON("_id" << 1), Timestamp(1)},
                                      OpTime::kUninitializedTerm));
     AutoGetCollectionForReadCommand autoColl(opCtx, nss);
@@ -746,11 +746,11 @@ TEST_F(StorageInterfaceImplTest, DropCollectionWorksWithMissingCollection) {
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;
     auto nss = makeNamespace(_agent);
-    ASSERT_FALSE(AutoGetDb(opCtx, nss.db(), MODE_IS).getDb());
+    ASSERT_FALSE(AutoGetDb(opCtx, DatabaseName{nss.db()}, MODE_IS).getDb());
     ASSERT_OK(storage.dropCollection(opCtx, nss));
     ASSERT_FALSE(AutoGetCollectionForReadCommand(opCtx, nss).getCollection());
     // Database should not be created after running dropCollection.
-    ASSERT_FALSE(AutoGetDb(opCtx, nss.db(), MODE_IS).getDb());
+    ASSERT_FALSE(AutoGetDb(opCtx, DatabaseName{nss.db()}, MODE_IS).getDb());
 }
 
 TEST_F(StorageInterfaceImplTest, DropCollectionWorksWithSystemCollection) {
@@ -2553,7 +2553,7 @@ TEST_F(StorageInterfaceImplTest, FindByIdReturnsNoSuchKeyWhenDocumentIsNotFound)
     ASSERT_EQUALS(ErrorCodes::NoSuchKey, storage.findById(opCtx, nss, doc2["_id"]).getStatus());
     ASSERT_EQUALS(
         ErrorCodes::NoSuchKey,
-        storage.findById(opCtx, {nss.db().toString(), *options.uuid}, doc2["_id"]).getStatus());
+        storage.findById(opCtx, {DatabaseName{nss.db()}, *options.uuid}, doc2["_id"]).getStatus());
 }
 
 TEST_F(StorageInterfaceImplTest, FindByIdReturnsDocumentWhenDocumentExists) {
@@ -2575,7 +2575,7 @@ TEST_F(StorageInterfaceImplTest, FindByIdReturnsDocumentWhenDocumentExists) {
     ASSERT_BSONOBJ_EQ(doc2, unittest::assertGet(storage.findById(opCtx, nss, doc2["_id"])));
     ASSERT_BSONOBJ_EQ(doc2,
                       unittest::assertGet(storage.findById(
-                          opCtx, {nss.db().toString(), *options.uuid}, doc2["_id"])));
+                          opCtx, {DatabaseName{nss.db()}, *options.uuid}, doc2["_id"])));
 }
 
 TEST_F(StorageInterfaceImplTest, FindByIdReturnsBadStatusIfPlanExecutorFails) {
@@ -2643,9 +2643,9 @@ TEST_F(StorageInterfaceImplTest, DeleteByIdReturnsNoSuchKeyWhenDocumentIsNotFoun
                                       {{doc1, Timestamp(0), OpTime::kUninitializedTerm},
                                        {doc3, Timestamp(0), OpTime::kUninitializedTerm}}));
     ASSERT_EQUALS(ErrorCodes::NoSuchKey, storage.deleteById(opCtx, nss, doc2["_id"]).getStatus());
-    ASSERT_EQUALS(
-        ErrorCodes::NoSuchKey,
-        storage.deleteById(opCtx, {nss.db().toString(), *options.uuid}, doc2["_id"]).getStatus());
+    ASSERT_EQUALS(ErrorCodes::NoSuchKey,
+                  storage.deleteById(opCtx, {DatabaseName{nss.db()}, *options.uuid}, doc2["_id"])
+                      .getStatus());
     _assertDocumentsInCollectionEquals(opCtx, nss, {doc1, doc3});
 }
 
@@ -2698,7 +2698,8 @@ TEST_F(StorageInterfaceImplTest,
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("mydb.coll");
-    NamespaceString wrongColl(nss.db(), "wrongColl"_sd);
+    NamespaceString wrongColl =
+        NamespaceString::createNamespaceString_forTest(DatabaseName{nss.db()}, "wrongColl"_sd);
     ASSERT_OK(storage.createCollection(opCtx, nss, generateOptionsWithUuid()));
     auto doc = BSON("_id" << 0 << "x" << 1);
     auto status = storage.upsertById(opCtx, wrongColl, doc["_id"], doc);
@@ -2732,7 +2733,7 @@ TEST_F(StorageInterfaceImplTest, UpsertSingleDocumentReplacesExistingDocumentInC
 
     // Again, but specify the collection's UUID.
     ASSERT_OK(storage.upsertById(
-        opCtx, {nss.db().toString(), *options.uuid}, originalDoc["_id"], BSON("x" << 200)));
+        opCtx, {DatabaseName{nss.db()}, *options.uuid}, originalDoc["_id"], BSON("x" << 200)));
     _assertDocumentsInCollectionEquals(opCtx,
                                        nss,
                                        {BSON("_id" << 0 << "x" << 0),
@@ -2765,7 +2766,7 @@ TEST_F(StorageInterfaceImplTest, UpsertSingleDocumentInsertsNewDocumentInCollect
                                         BSON("_id" << 1 << "x" << 100)});
 
     ASSERT_OK(storage.upsertById(opCtx,
-                                 {nss.db().toString(), *options.uuid},
+                                 {DatabaseName{nss.db()}, *options.uuid},
                                  BSON("" << 3).firstElement(),
                                  BSON("x" << 300)));
     _assertDocumentsInCollectionEquals(opCtx,
@@ -2805,7 +2806,7 @@ TEST_F(StorageInterfaceImplTest,
                                         BSON("_id" << 2 << "x" << 2)});
 
     ASSERT_OK(storage.upsertById(
-        opCtx, {nss.db().toString(), *options.uuid}, originalDoc["_id"], BSON("x" << 200)));
+        opCtx, {DatabaseName{nss.db()}, *options.uuid}, originalDoc["_id"], BSON("x" << 200)));
     _assertDocumentsInCollectionEquals(opCtx,
                                        nss,
                                        {BSON("_id" << 0 << "x" << 0),
@@ -2828,7 +2829,7 @@ TEST_F(StorageInterfaceImplTest, UpsertSingleDocumentReturnsFailedToParseOnNonSi
                            "Unable to update document with a non-simple _id query:");
 
     ASSERT_EQ(storage.upsertById(opCtx,
-                                 {nss.db().toString(), *options.uuid},
+                                 {DatabaseName{nss.db()}, *options.uuid},
                                  BSON("" << BSON("$gt" << 3)).firstElement(),
                                  BSON("x" << 100)),
               ErrorCodes::InvalidIdField);
@@ -2850,7 +2851,7 @@ TEST_F(StorageInterfaceImplTest,
     ASSERT_STRING_CONTAINS(status.reason(),
                            "Unable to update document in a collection without an _id index.");
 
-    ASSERT_EQ(storage.upsertById(opCtx, {nss.db().toString(), *options.uuid}, doc["_id"], doc),
+    ASSERT_EQ(storage.upsertById(opCtx, {DatabaseName{nss.db()}, *options.uuid}, doc["_id"], doc),
               ErrorCodes::IndexNotFound);
 }
 
@@ -2872,7 +2873,7 @@ TEST_F(StorageInterfaceImplTest,
         "update specified as an array");
 
     ASSERT_THROWS_CODE(storage.upsertById(opCtx,
-                                          {nss.db().toString(), *options.uuid},
+                                          {DatabaseName{nss.db()}, *options.uuid},
                                           BSON("" << 1).firstElement(),
                                           unknownUpdateOp),
                        DBException,
@@ -2975,7 +2976,8 @@ TEST_F(StorageInterfaceImplTest, DeleteByFilterReturnsNamespaceNotFoundWhenColle
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("mydb.coll");
-    NamespaceString wrongColl(nss.db(), "wrongColl"_sd);
+    NamespaceString wrongColl =
+        NamespaceString::createNamespaceString_forTest(DatabaseName{nss.db()}, "wrongColl"_sd);
     ASSERT_OK(storage.createCollection(opCtx, nss, generateOptionsWithUuid()));
     auto filter = BSON("x" << 1);
     auto status = storage.deleteByFilter(opCtx, wrongColl, filter);
@@ -3145,7 +3147,8 @@ TEST_F(StorageInterfaceImplTest,
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;
     auto nss = makeNamespace(_agent);
-    NamespaceString wrongColl(nss.db(), "wrongColl"_sd);
+    NamespaceString wrongColl =
+        NamespaceString::createNamespaceString_forTest(DatabaseName{nss.db()}, "wrongColl"_sd);
     ASSERT_OK(storage.createCollection(opCtx, nss, generateOptionsWithUuid()));
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
                   storage.getCollectionCount(opCtx, wrongColl).getStatus());
@@ -3188,7 +3191,8 @@ TEST_F(StorageInterfaceImplTest,
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;
     auto nss = makeNamespace(_agent);
-    NamespaceString wrongColl(nss.db(), "wrongColl"_sd);
+    NamespaceString wrongColl =
+        NamespaceString::createNamespaceString_forTest(DatabaseName{nss.db()}, "wrongColl"_sd);
     ASSERT_OK(storage.createCollection(opCtx, nss, generateOptionsWithUuid()));
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound, storage.setCollectionCount(opCtx, wrongColl, 3));
 }
@@ -3206,7 +3210,8 @@ TEST_F(StorageInterfaceImplTest,
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;
     auto nss = makeNamespace(_agent);
-    NamespaceString wrongColl(nss.db(), "wrongColl"_sd);
+    NamespaceString wrongColl =
+        NamespaceString::createNamespaceString_forTest(DatabaseName{nss.db()}, "wrongColl"_sd);
     ASSERT_OK(storage.createCollection(opCtx, nss, generateOptionsWithUuid()));
     ASSERT_EQUALS(ErrorCodes::NamespaceNotFound,
                   storage.getCollectionSize(opCtx, wrongColl).getStatus());
@@ -3249,7 +3254,8 @@ TEST_F(StorageInterfaceImplTest, SetIndexIsMultikeyReturnsNamespaceNotFoundForMi
     auto opCtx = getOperationContext();
     StorageInterfaceImpl storage;
     auto nss = makeNamespace(_agent);
-    NamespaceString wrongColl(nss.db(), "wrongColl"_sd);
+    NamespaceString wrongColl =
+        NamespaceString::createNamespaceString_forTest(DatabaseName{nss.db()}, "wrongColl"_sd);
     ASSERT_OK(storage.createCollection(opCtx, nss, CollectionOptions()));
     ASSERT_EQUALS(
         ErrorCodes::NamespaceNotFound,
@@ -3262,7 +3268,8 @@ TEST_F(StorageInterfaceImplTest, SetIndexIsMultikeyLooksUpCollectionByUUID) {
     auto nss = makeNamespace(_agent);
     auto options = generateOptionsWithUuid();
     ASSERT_OK(storage.createCollection(opCtx, nss, options));
-    NamespaceString wrongColl(nss.db(), "wrongColl"_sd);
+    NamespaceString wrongColl =
+        NamespaceString::createNamespaceString_forTest(DatabaseName{nss.db()}, "wrongColl"_sd);
     ASSERT_EQUALS(ErrorCodes::IndexNotFound,
                   storage.setIndexIsMultikey(
                       opCtx, wrongColl, *options.uuid, "foo", {}, {}, Timestamp(3, 3)));

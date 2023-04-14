@@ -277,7 +277,7 @@ void MovePrimaryDonorExternalState::syncDataOnRecipient(OperationContext* opCtx,
                                                         boost::optional<Timestamp> timestamp) {
     MovePrimaryRecipientSyncData request;
     request.setMovePrimaryCommonMetadata(getMetadata());
-    request.setDbName(getMetadata().getDatabaseName().db());
+    request.setDbName(DatabaseName{getMetadata().getDatabaseName().db()});
     if (timestamp) {
         request.setReturnAfterReachingDonorTimestamp(*timestamp);
     }
@@ -287,14 +287,14 @@ void MovePrimaryDonorExternalState::syncDataOnRecipient(OperationContext* opCtx,
 void MovePrimaryDonorExternalState::abortMigrationOnRecipient(OperationContext* opCtx) {
     MovePrimaryRecipientAbortMigration request;
     request.setMovePrimaryCommonMetadata(getMetadata());
-    request.setDbName(getMetadata().getDatabaseName().db());
+    request.setDbName(DatabaseName{getMetadata().getDatabaseName().db()});
     _runCommandOnRecipient(opCtx, request.toBSON({}));
 }
 
 void MovePrimaryDonorExternalState::forgetMigrationOnRecipient(OperationContext* opCtx) {
     MovePrimaryRecipientForgetMigration request;
     request.setMovePrimaryCommonMetadata(getMetadata());
-    request.setDbName(getMetadata().getDatabaseName().db());
+    request.setDbName(DatabaseName{getMetadata().getDatabaseName().db()});
     _runCommandOnRecipient(opCtx, request.toBSON({}));
 }
 
@@ -364,7 +364,7 @@ bool MovePrimaryDonor::_matchesArguments(const std::shared_ptr<MovePrimaryDonor>
                                          const DatabaseName& dbName,
                                          const ShardId& toShard) {
     const auto& metadata = instance->getMetadata();
-    if (dbName != metadata.getDatabaseName().db()) {
+    if (dbName != metadata.getDatabaseName().dbName()) {
         return false;
     }
     if (toShard.toString() != metadata.getToShardName()) {
