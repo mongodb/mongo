@@ -157,14 +157,6 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
 
                 uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(std::move(cmdResponse)));
             }))
-        .onError([this, anchor = shared_from_this()](const Status& status) {
-            LOGV2_ERROR(5277700,
-                        "Error running refine collection shard key",
-                        logAttrs(nss()),
-                        "error"_attr = redact(status));
-
-            return status;
-        })
         .onCompletion([this, anchor = shared_from_this()](const Status& status) {
             auto opCtxHolder = cc().makeOperationContext();
             auto* opCtx = opCtxHolder.get();

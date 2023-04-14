@@ -417,6 +417,13 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
 
             if (cleanup()) {
                 try {
+                    if (!completionStatus.isOK()) {
+                        LOGV2_ERROR(7524000,
+                                    "Failed sharding DDL coordinator",
+                                    "coordinatorId"_attr = _coordId,
+                                    "reason"_attr = redact(completionStatus));
+                    }
+
                     LOGV2(5565601,
                           "Releasing sharding DDL coordinator",
                           "coordinatorId"_attr = _coordId);

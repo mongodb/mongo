@@ -173,16 +173,6 @@ ExecutorFuture<void> DropCollectionCoordinator::_runImpl(
                                [this, executor = executor, anchor = shared_from_this()] {
                                    _exitCriticalSection(executor);
                                })();
-        })
-        .onError([this, anchor = shared_from_this()](const Status& status) {
-            if (!status.isA<ErrorCategory::NotPrimaryError>() &&
-                !status.isA<ErrorCategory::ShutdownError>()) {
-                LOGV2_ERROR(5280901,
-                            "Error running drop collection",
-                            logAttrs(nss()),
-                            "error"_attr = redact(status));
-            }
-            return status;
         });
 }
 

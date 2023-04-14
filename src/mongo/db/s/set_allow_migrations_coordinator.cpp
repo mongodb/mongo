@@ -73,57 +73,47 @@ void SetAllowMigrationsCoordinator::appendCommandInfo(BSONObjBuilder* cmdInfoBui
 ExecutorFuture<void> SetAllowMigrationsCoordinator::_runImpl(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
-    return ExecutorFuture<void>(**executor)
-        .then([this, anchor = shared_from_this()] {
-            auto opCtxHolder = cc().makeOperationContext();
-            auto* opCtx = opCtxHolder.get();
-            getForwardableOpMetadata().setOn(opCtx);
+    return ExecutorFuture<void>(**executor).then([this, anchor = shared_from_this()] {
+        auto opCtxHolder = cc().makeOperationContext();
+        auto* opCtx = opCtxHolder.get();
+        getForwardableOpMetadata().setOn(opCtx);
 
-            uassert(ErrorCodes::NamespaceNotSharded,
-                    "Collection must be sharded so migrations can be blocked",
-                    isCollectionSharded(opCtx, nss()));
+        uassert(ErrorCodes::NamespaceNotSharded,
+                "Collection must be sharded so migrations can be blocked",
+                isCollectionSharded(opCtx, nss()));
 
-            const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+        const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
-            BatchedCommandRequest updateRequest([&]() {
-                write_ops::UpdateCommandRequest updateOp(CollectionType::ConfigNS);
-                updateOp.setUpdates({[&] {
-                    write_ops::UpdateOpEntry entry;
-                    entry.setQ(BSON(CollectionType::kNssFieldName << nss().ns()));
-                    if (_allowMigrations) {
-                        entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(BSON(
-                            "$unset" << BSON(CollectionType::kPermitMigrationsFieldName << true))));
-                    } else {
-                        entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(BSON(
-                            "$set" << BSON(CollectionType::kPermitMigrationsFieldName << false))));
-                    }
-                    entry.setMulti(false);
-                    return entry;
-                }()});
-                return updateOp;
-            }());
+        BatchedCommandRequest updateRequest([&]() {
+            write_ops::UpdateCommandRequest updateOp(CollectionType::ConfigNS);
+            updateOp.setUpdates({[&] {
+                write_ops::UpdateOpEntry entry;
+                entry.setQ(BSON(CollectionType::kNssFieldName << nss().ns()));
+                if (_allowMigrations) {
+                    entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(BSON(
+                        "$unset" << BSON(CollectionType::kPermitMigrationsFieldName << true))));
+                } else {
+                    entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
+                        BSON("$set" << BSON(CollectionType::kPermitMigrationsFieldName << false))));
+                }
+                entry.setMulti(false);
+                return entry;
+            }()});
+            return updateOp;
+        }());
 
-            updateRequest.setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
+        updateRequest.setWriteConcern(ShardingCatalogClient::kMajorityWriteConcern.toBSON());
 
-            auto response = configShard->runBatchWriteCommand(opCtx,
-                                                              Shard::kDefaultConfigCommandTimeout,
-                                                              updateRequest,
-                                                              Shard::RetryPolicy::kIdempotent);
+        auto response = configShard->runBatchWriteCommand(opCtx,
+                                                          Shard::kDefaultConfigCommandTimeout,
+                                                          updateRequest,
+                                                          Shard::RetryPolicy::kIdempotent);
 
-            uassertStatusOK(response.toStatus());
+        uassertStatusOK(response.toStatus());
 
-            ShardingLogging::get(opCtx)->logChange(opCtx,
-                                                   "setPermitMigrations",
-                                                   nss().ns(),
-                                                   BSON("permitMigrations" << _allowMigrations));
-        })
-        .onError([this, anchor = shared_from_this()](const Status& status) {
-            LOGV2_ERROR(5622700,
-                        "Error running set allow migrations",
-                        logAttrs(nss()),
-                        "error"_attr = redact(status));
-            return status;
-        });
+        ShardingLogging::get(opCtx)->logChange(
+            opCtx, "setPermitMigrations", nss().ns(), BSON("permitMigrations" << _allowMigrations));
+    });
 }
 
 }  // namespace mongo

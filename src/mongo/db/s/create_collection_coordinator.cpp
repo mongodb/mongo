@@ -626,11 +626,6 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
 
             if (!status.isA<ErrorCategory::NotPrimaryError>() &&
                 !status.isA<ErrorCategory::ShutdownError>()) {
-                LOGV2_ERROR(5458702,
-                            "Error running create collection",
-                            logAttrs(originalNss()),
-                            "error"_attr = redact(status));
-
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
 

@@ -507,16 +507,6 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
 
             ShardingLogging::get(opCtx)->logChange(opCtx, "dropDatabase", _dbName);
             LOGV2(5494506, "Database dropped", "db"_attr = _dbName);
-        })
-        .onError([this, anchor = shared_from_this()](const Status& status) {
-            if (!status.isA<ErrorCategory::NotPrimaryError>() &&
-                !status.isA<ErrorCategory::ShutdownError>()) {
-                LOGV2_ERROR(5494507,
-                            "Error running drop database",
-                            "db"_attr = _dbName,
-                            "error"_attr = redact(status));
-            }
-            return status;
         });
 }
 
