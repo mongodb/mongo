@@ -53,8 +53,7 @@ CollectionType createTempReshardingCollectionType(
     const BSONObj& collation,
     boost::optional<CollectionIndexes> indexVersion);
 
-void cleanupSourceConfigCollections(OperationContext* opCtx,
-                                    const ReshardingCoordinatorDocument& coordinatorDoc);
+void removeChunkDocs(OperationContext* opCtx, const UUID& collUUID);
 
 void writeDecisionPersistedState(OperationContext* opCtx,
                                  ReshardingMetrics* metrics,
