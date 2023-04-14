@@ -39,8 +39,8 @@ class test_backup29(backup_base):
     create_config = 'allocation_size=512,key_format=i,value_format=S'
     # Backup directory name. Uncomment if actually taking a backup.
     # dir='backup.dir'
-    uri = 'test_backup29'
-    uri2 = 'test_other'
+    uri1 = 'test_first'
+    uri2 = 'test_second'
     value_base = '-abcdefghijkl'
 
     few = 100
@@ -59,22 +59,37 @@ class test_backup29(backup_base):
         self.pr("block bitmap: " + blocks)
         return blocks
 
+    def compare_bitmap(self, orig, new):
+        # Compare the bitmaps from the metadata. Once a bit is set, it should never
+        # be cleared. But new bits could be set. So the check is only: if the original
+        # bitmap has a bit set then the current bitmap must be set for that bit also. 
+        #
+        # First convert both bitmaps to a binary string, accounting for any possible leading
+        # zeroes (that would be truncated off). Then compare bit by bit.
+        orig_bits = bin(int('1'+orig, 16))[3:]
+        new_bits = bin(int('1'+new, 16))[3:]
+        self.pr("Original bitmap in binary: " + orig_bits)
+        self.pr("Reopened bitmap in binary: " + new_bits)
+        for o_bit, n_bit in zip(orig_bits, new_bits):
+            if o_bit != '0':
+                self.assertTrue(n_bit != '0')
+
     def test_backup29(self):
 
         # Create and populate the table.
-        file_uri = 'file:' + self.uri + '.wt'
+        file1_uri = 'file:' + self.uri1 + '.wt'
         file2_uri = 'file:' + self.uri2 + '.wt'
-        table_uri = 'table:' + self.uri
+        table1_uri = 'table:' + self.uri1
         table2_uri = 'table:' + self.uri2
-        self.session.create(table_uri, self.create_config)
+        self.session.create(table1_uri, self.create_config)
         self.session.create(table2_uri, self.create_config)
-        c = self.session.open_cursor(table_uri)
+        c1 = self.session.open_cursor(table1_uri)
         c2 = self.session.open_cursor(table2_uri)
         # Only add a few entries.
         self.pr("Write: " + str(self.few) + " initial data items")
         for i in range(1, self.few):
             val = str(i) + self.value_base
-            c[i] = val
+            c1[i] = val
             c2[i] = val
         self.session.checkpoint()
 
@@ -93,14 +108,15 @@ class test_backup29(backup_base):
         self.pr("Write: " + str(self.nentries) + " additional data items")
         for i in range(self.few, self.nentries):
             val = str(i) + self.value_base
-            c[i] = val
+            c1[i] = val
             c2[i] = val
         last_i = self.nentries
-        c.close()
+        c1.close()
         c2.close()
         self.session.checkpoint()
         # Get the block mod bitmap from the file URI.
-        orig_bitmap = self.parse_blkmods(file2_uri)
+        orig1_bitmap = self.parse_blkmods(file1_uri)
+        orig2_bitmap = self.parse_blkmods(file2_uri)
         self.pr("CLOSE and REOPEN conn")
         self.reopen_conn()
         self.pr("Reopened conn")
@@ -108,37 +124,27 @@ class test_backup29(backup_base):
         # After reopening we want to open both tables, but only modify one of them for
         # the first checkpoint. Then modify the other table, checkpoint, and then check the
         # that the block mod bitmap remains correct for the other table.
-        c = self.session.open_cursor(table_uri)
+        c1 = self.session.open_cursor(table1_uri)
         c2 = self.session.open_cursor(table2_uri)
 
-        # Change one table and checkpoint. Keep the other table clean.
+        # Change the first table and checkpoint. Keep the second table clean.
         self.pr("Update only table 1: " + str(last_i))
         val = str(last_i) + self.value_base
-        c[last_i] = val
+        c1[last_i] = val
         self.session.checkpoint()
+        new1_bitmap = self.parse_blkmods(file1_uri)
 
-        # Now change the other table and checkpoint again.
+        # Now change the second table and checkpoint again.
         self.pr("Update second table: " + str(last_i))
         c2[last_i] = val
         self.session.checkpoint()
-        new_bitmap = self.parse_blkmods(file2_uri)
+        new2_bitmap = self.parse_blkmods(file2_uri)
 
-        c.close()
+        c1.close()
         c2.close()
 
-        # Compare the bitmaps from the metadata. Once a bit is set, it should never
-        # be cleared. But new bits could be set. So the check is only: if the original
-        # bitmap has a bit set then the current bitmap must be set for that bit also. 
-        #
-        # First convert both bitmaps to a binary string, accounting for any possible leading
-        # zeroes (that would be truncated off). Then compare bit by bit.
-        orig_bits = bin(int('1'+orig_bitmap, 16))[3:]
-        new_bits = bin(int('1'+new_bitmap, 16))[3:]
-        self.pr("Original bitmap in binary: " + orig_bits)
-        self.pr("Reopened bitmap in binary: " + new_bits)
-        for orig, new in zip(orig_bits, new_bits):
-            if orig != '0':
-                self.assertTrue(new != '0')
+        self.compare_bitmap(orig1_bitmap, new1_bitmap)
+        self.compare_bitmap(orig2_bitmap, new2_bitmap)
 
 if __name__ == '__main__':
     wttest.run()
