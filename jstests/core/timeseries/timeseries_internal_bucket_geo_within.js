@@ -4,8 +4,6 @@
  * collection.
  *
  * @tags: [
- *   # TODO (SERVER-73321): remove
- *   assumes_against_mongod_not_mongos,
  *   # Explain of a resolved view must be executed by mongos.
  *   directly_against_shardsvrs_incompatible,
  *   # Time series geo functionality requires optimization.
@@ -53,10 +51,6 @@ for (let collScanStage of collScanStages) {
             "field": "loc"
         }
     };
-    // TODO SERVER-60373 Fix duplicate predicates for sharded time-series collection
-    if (FixtureHelpers.isSharded(bucketsColl)) {
-        expectedPredicate = {$and: [expectedPredicate, expectedPredicate]};
-    }
     assert.docEq(expectedPredicate, collScanStage.filter, collScanStages);
 }
 
