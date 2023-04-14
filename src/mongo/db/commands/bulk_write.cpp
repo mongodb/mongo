@@ -76,6 +76,7 @@ namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(hangBeforeBulkWritePerformsUpdate);
+MONGO_FAIL_POINT_DEFINE(hangBetweenProcessingBulkWriteOps);
 
 using UpdateCallback = std::function<void(int /* currentOpIdx */,
                                           const UpdateResult&,
@@ -523,6 +524,7 @@ bool handleUpdateOp(OperationContext* opCtx,
                     const BulkWriteUpdateOp* op,
                     const BulkWriteCommandRequest& req,
                     size_t currentOpIdx,
+                    write_ops_exec::LastOpFixer& lastOpFixer,
                     ErrorCallback errorCB,
                     UpdateCallback replyCB) {
     const auto& nsInfo = req.getNsInfo();
@@ -596,6 +598,7 @@ bool handleUpdateOp(OperationContext* opCtx,
         // Although usually the PlanExecutor handles WCE internally, it will throw WCEs when it
         // is executing an update. This is done to ensure that we can always match,
         // modify, and return the document under concurrency, if a matching document exists.
+        lastOpFixer.startingOp(nsString);
         return writeConflictRetry(opCtx, "bulkWriteUpdate", nsString.ns(), [&] {
             if (MONGO_unlikely(hangBeforeBulkWritePerformsUpdate.shouldFail())) {
                 CurOpFailpointHelpers::waitWhileFailPointEnabled(
@@ -622,6 +625,7 @@ bool handleUpdateOp(OperationContext* opCtx,
                                                                            updateRequest.isUpsert(),
                                                                            docFound,
                                                                            &parsedUpdate);
+                    lastOpFixer.finishedOpSuccessfully();
                     replyCB(currentOpIdx, result, docFound, boost::none);
                     return true;
                 } catch (const ExceptionFor<ErrorCodes::DuplicateKey>& ex) {
@@ -661,6 +665,7 @@ bool handleDeleteOp(OperationContext* opCtx,
                     const BulkWriteDeleteOp* op,
                     const BulkWriteCommandRequest& req,
                     size_t currentOpIdx,
+                    write_ops_exec::LastOpFixer& lastOpFixer,
                     ErrorCallback errorCB,
                     DeleteCallback replyCB) {
     const auto& nsInfo = req.getNsInfo();
@@ -730,11 +735,12 @@ bool handleDeleteOp(OperationContext* opCtx,
         deleteRequest.setStmtId(stmtId);
 
         const bool inTransaction = opCtx->inMultiDocumentTransaction();
-
+        lastOpFixer.startingOp(nsString);
         return writeConflictRetry(opCtx, "bulkWriteDelete", nsString.ns(), [&] {
             boost::optional<BSONObj> docFound;
             auto nDeleted = write_ops_exec::writeConflictRetryRemove(
                 opCtx, nsString, &deleteRequest, curOp, opDebug, inTransaction, docFound);
+            lastOpFixer.finishedOpSuccessfully();
             replyCB(currentOpIdx, nDeleted, docFound, boost::none);
             return true;
         });
@@ -1005,6 +1011,11 @@ BulkWriteReply performWrites(OperationContext* opCtx, const BulkWriteCommandRequ
     }
 
     for (; idx < ops.size(); ++idx) {
+        if (MONGO_unlikely(hangBetweenProcessingBulkWriteOps.shouldFail())) {
+            CurOpFailpointHelpers::waitWhileFailPointEnabled(
+                &hangBetweenProcessingBulkWriteOps, opCtx, "hangBetweenProcessingBulkWriteOps");
+        }
+
         auto op = BulkWriteCRUDOp(ops[idx]);
         auto opType = op.getType();
 
@@ -1018,7 +1029,8 @@ BulkWriteReply performWrites(OperationContext* opCtx, const BulkWriteCommandRequ
             if (!batch.flush(opCtx)) {
                 break;
             }
-            if (!handleUpdateOp(opCtx, curOp, op.getUpdate(), req, idx, errorCB, updateCB)) {
+            if (!handleUpdateOp(
+                    opCtx, curOp, op.getUpdate(), req, idx, lastOpFixer, errorCB, updateCB)) {
                 // Update write failed can no longer continue.
                 break;
             }
@@ -1027,7 +1039,8 @@ BulkWriteReply performWrites(OperationContext* opCtx, const BulkWriteCommandRequ
             if (!batch.flush(opCtx)) {
                 break;
             }
-            if (!handleDeleteOp(opCtx, curOp, op.getDelete(), req, idx, errorCB, deleteCB)) {
+            if (!handleDeleteOp(
+                    opCtx, curOp, op.getDelete(), req, idx, lastOpFixer, errorCB, deleteCB)) {
                 // Delete write failed can no longer continue.
                 break;
             }

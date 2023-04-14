@@ -258,56 +258,6 @@ commands.push({
     }
 });
 
-// Skip these tests if the BulkWriteCommand feature flag is not enabled
-// TODO SERVER-67711: Remove feature flag check.
-if (FeatureFlagUtil.isPresentAndEnabled(db, "BulkWriteCommand")) {
-    // 'bulkWrite' where the document with the same _id has already been inserted.
-    commands.push({
-        req: {
-            bulkWrite: 1,
-            ops: [{insert: 0, document: {_id: 1}}],
-            nsInfo: [{ns: `${dbName}.${collName}`}]
-        },
-        setupFunc: function() {
-            assert.commandWorked(coll.insert({_id: 1}));
-        },
-        confirmFunc: function(res) {
-            assert.commandWorkedIgnoringWriteErrorsAndWriteConcernErrors(res);
-            assert.eq(res.cursor.firstBatch[0].code, ErrorCodes.DuplicateKey);
-            assert.eq(coll.count({_id: 1}), 1);
-        }
-    });
-
-    // 'bulkWrite' where we are doing a mix of local and non-local writes
-    // and the last op is an insert of a non-local doc with the _id of an
-    // existing doc.
-    var localDBName = "local";
-    var localDB = primary.getDB("local");
-    var localColl = localDB[collName];
-    localColl.drop();
-
-    commands.push({
-        req: {
-            bulkWrite: 1,
-            ops: [{insert: 0, document: {_id: 1}}, {insert: 1, document: {_id: 1}}],
-            nsInfo: [{ns: `${localDBName}.${collName}`}, {ns: `${dbName}.${collName}`}]
-        },
-        setupFunc: function() {
-            assert.commandWorked(coll.insert({_id: 1}));
-        },
-        confirmFunc: function(res) {
-            assert.commandWorkedIgnoringWriteErrorsAndWriteConcernErrors(res);
-            // the local insert happened
-            assert.eq(res.cursor.firstBatch[0].ok, 1);
-            assert.eq(res.cursor.firstBatch[0].n, 1);
-            assert.eq(localColl.count({_id: 1}), 1);
-            // the non-local insert failed
-            assert.eq(res.cursor.firstBatch[1].code, ErrorCodes.DuplicateKey);
-            assert.eq(coll.count({_id: 1}), 1);
-        }
-    });
-}
-
 function testCommandWithWriteConcern(cmd) {
     // Provide a small wtimeout that we expect to time out.
     cmd.req.writeConcern = {w: 3, wtimeout: 1000};
