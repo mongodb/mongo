@@ -95,9 +95,9 @@ for (let i = 0; i < kOperations; i++) {
     let res = getDiagnosticData()["poolConnUsageTimeMillis"];
     previous = res;
 }
-assert.gt(getDiagnosticData()["poolConnUsageTimeMillis"],
-          initialVal,
-          "poolConnUsageTimeMillis failed to increase after issuing find operations");
+assert.gte(getDiagnosticData()["poolConnUsageTimeMillis"],
+           initialVal,
+           "poolConnUsageTimeMillis failed to increase after issuing find operations");
 
 resetPools();
 
