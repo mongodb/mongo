@@ -56,8 +56,8 @@ for (let orderType0 of kOrderTypes) {
 // This test requires the collection to contain at least a few thousands of documents to smooth out
 // the noise in the insertion order caused by the oplog application batching on secondaries.
 const numDocsRange = {
-    min: 2500,
-    max: 5000
+    min: 7500,
+    max: 10000
 };
 
 const setParameterOpts = {
