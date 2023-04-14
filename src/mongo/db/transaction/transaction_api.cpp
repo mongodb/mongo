@@ -273,12 +273,29 @@ std::string errorHandlingStepToString(Transaction::ErrorHandlingStep nextStep) {
     MONGO_UNREACHABLE;
 }
 
-void logNextStep(Transaction::ErrorHandlingStep nextStep, const BSONObj& txnInfo, int attempts) {
-    LOGV2(5918600,
-          "Chose internal transaction error handling step",
-          "nextStep"_attr = errorHandlingStepToString(nextStep),
-          "txnInfo"_attr = txnInfo,
-          "attempts"_attr = attempts);
+void logNextStep(Transaction::ErrorHandlingStep nextStep,
+                 const BSONObj& txnInfo,
+                 int attempts,
+                 const StatusWith<CommitResult>& swResult,
+                 StringData errorHandler) {
+    // DynamicAttributes doesn't allow rvalues, so make some local variables.
+    auto nextStepString = errorHandlingStepToString(nextStep);
+    auto commitWCError = Status::OK();
+
+    logv2::DynamicAttributes attr;
+    attr.add("nextStep", nextStepString);
+    attr.add("txnInfo", txnInfo);
+    attr.add("attempts", attempts);
+    if (!swResult.isOK()) {
+        attr.add("error", swResult.getStatus());
+    } else {
+        attr.add("commitError", swResult.getValue().cmdStatus);
+        commitWCError = swResult.getValue().wcError.toStatus();
+        attr.add("commitWCError", commitWCError);
+    }
+    attr.add("errorHandler", errorHandler);
+
+    LOGV2(5918600, "Chose internal transaction error handling step", attr);
 }
 
 SemiFuture<CommitResult> TransactionWithRetries::run(OperationContext* opCtx,
@@ -310,7 +327,8 @@ ExecutorFuture<void> TransactionWithRetries::_runBodyHandleErrors(int bodyAttemp
     return _internalTxn->runCallback().thenRunOn(_executor).onError(
         [this, bodyAttempts](Status bodyStatus) {
             auto nextStep = _internalTxn->handleError(bodyStatus, bodyAttempts);
-            logNextStep(nextStep, _internalTxn->reportStateForLog(), bodyAttempts);
+            logNextStep(
+                nextStep, _internalTxn->reportStateForLog(), bodyAttempts, bodyStatus, "runBody");
 
             if (nextStep == Transaction::ErrorHandlingStep::kDoNotRetry) {
                 iassert(bodyStatus);
@@ -342,7 +360,11 @@ ExecutorFuture<CommitResult> TransactionWithRetries::_runCommitHandleErrors(int 
             }
 
             auto nextStep = _internalTxn->handleError(swCommitResult, commitAttempts);
-            logNextStep(nextStep, _internalTxn->reportStateForLog(), commitAttempts);
+            logNextStep(nextStep,
+                        _internalTxn->reportStateForLog(),
+                        commitAttempts,
+                        swCommitResult,
+                        "runCommit");
 
             if (nextStep == Transaction::ErrorHandlingStep::kDoNotRetry) {
                 return ExecutorFuture<CommitResult>(_executor, swCommitResult);
@@ -712,8 +734,6 @@ Transaction::ErrorHandlingStep Transaction::handleError(const StatusWith<CommitR
                 "Internal transaction handling error",
                 "error"_attr = swResult.isOK() ? swResult.getValue().getEffectiveStatus()
                                                : swResult.getStatus(),
-                "hasTransientTransactionErrorLabel"_attr =
-                    _latestResponseHasTransientTransactionErrorLabel,
                 "txnInfo"_attr = _reportStateForLog(lg),
                 "attempts"_attr = attemptCounter);
 
@@ -904,7 +924,13 @@ BSONObj Transaction::reportStateForLog() const {
 
 BSONObj Transaction::_reportStateForLog(WithLock) const {
     return BSON("execContext" << execContextToString(_execContext) << "sessionInfo"
-                              << _sessionInfo.toBSON() << "state" << _state.toString());
+                              << _sessionInfo.toBSON() << "state" << _state.toString()
+                              << "lastOperationTime" << _lastOperationTime.toString()
+                              << "latestResponseHasTransientTransactionErrorLabel"
+                              << _latestResponseHasTransientTransactionErrorLabel << "deadline"
+                              << (_opDeadline ? _opDeadline->toString() : "none") << "writeConcern"
+                              << _writeConcern << "readConcern" << _readConcern << "APIParameters"
+                              << _apiParameters.toBSON() << "canceled" << _token.isCanceled());
 }
 
 void Transaction::_setSessionInfo(WithLock,
