@@ -411,7 +411,7 @@ StatusWith<UserHandle> AuthorizationManagerImpl::acquireUser(OperationContext* o
     // X.509 will give us our roles for initial acquire, but we have to lose them during
     // reacquire (for now) so reparse those roles into the request if not already present.
     if ((request.roles == boost::none) && request.mechanismData.empty() &&
-        (userName.getDB() == "$external"_sd)) {
+        (userName.getDB() == DatabaseName::kExternal.db())) {
         userRequest = getX509UserRequest(opCtx, std::move(userRequest));
     }
 #endif
@@ -530,7 +530,7 @@ Status AuthorizationManagerImpl::refreshExternalUsers(OperationContext* opCtx) {
     // First, get a snapshot of the UserHandles in the cache.
     auto cachedUsers =
         _userCache.peekLatestCachedIf([&](const UserRequest& userRequest, const User&) {
-            return userRequest.name.getDB() == "$external"_sd;
+            return userRequest.name.getDB() == DatabaseName::kExternal.db();
         });
 
     // Then, retrieve the corresponding Users from the backing store for users in the $external

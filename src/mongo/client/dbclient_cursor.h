@@ -190,7 +190,7 @@ public:
         return _originalHost;
     }
 
-    std::string getns() const {
+    StringData getns() const {
         return _ns.ns();
     }
 

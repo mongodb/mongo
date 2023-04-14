@@ -318,7 +318,7 @@ void TenantFileImporterService::_voteImportedFiles(OperationContext* opCtx,
 
     auto voteResponse = replCoord->runCmdOnPrimaryAndAwaitResponse(
         opCtx,
-        DatabaseName::kAdmin.db(),
+        DatabaseName::kAdmin.db().toString(),
         cmd.toBSON({}),
         [](executor::TaskExecutor::CallbackHandle handle) {},
         [](executor::TaskExecutor::CallbackHandle handle) {});

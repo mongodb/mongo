@@ -86,7 +86,7 @@ Status notifyShardsOfSecondShardIfNeeded(OperationContext* opCtx) {
     // Set the cluster parameter to disallow direct writes to shards
     ConfigsvrSetClusterParameter configsvrSetClusterParameter(
         BSON("shardedClusterCardinalityForDirectConns" << BSON("hasTwoOrMoreShards" << true)));
-    configsvrSetClusterParameter.setDbName(DatabaseName(boost::none, "admin"));
+    configsvrSetClusterParameter.setDbName(DatabaseName::kAdmin);
 
     const auto cmdResponse = shardRegistry->getConfigShard()->runCommandWithFixedRetryAttempts(
         opCtx,

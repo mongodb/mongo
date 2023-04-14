@@ -155,7 +155,7 @@ public:
      * @param ns the namespace to be associated with the uuid.
      * @param uuid the uuid to associate with the namespace.
      */
-    void assignCollectionUuid(const std::string& ns, const mongo::UUID& uuid);
+    void assignCollectionUuid(StringData ns, const mongo::UUID& uuid);
 
     //
     // DBClientBase methods

@@ -82,7 +82,7 @@ ExecutorFuture<void> MovePrimaryCoordinatorNoResilient::_runImpl(
             // same name.
             shardRegistry->reload(opCtx);
 
-            const auto& dbName = nss().dbName().db();
+            const auto& dbName = nss().dbName();
             const auto& toShard =
                 uassertStatusOK(shardRegistry->getShard(opCtx, _doc.getToShardId()));
 
@@ -90,7 +90,7 @@ ExecutorFuture<void> MovePrimaryCoordinatorNoResilient::_runImpl(
             if (selfShardId == toShard->getId()) {
                 LOGV2(5275803,
                       "Database already on the requested primary shard",
-                      logAttrs(nss().dbName()),
+                      logAttrs(dbName),
                       "shardId"_attr = _doc.getToShardId());
                 // The database primary is already the `to` shard
                 return;
@@ -105,7 +105,7 @@ ExecutorFuture<void> MovePrimaryCoordinatorNoResilient::_runImpl(
             auto primaryId = selfShardId;
             auto toId = toShard->getId();
             MovePrimarySourceManager movePrimarySourceManager(
-                opCtx, movePrimaryRequest, dbName, primaryId, toId);
+                opCtx, movePrimaryRequest, dbName.db(), primaryId, toId);
             uassertStatusOK(movePrimarySourceManager.clone(opCtx));
             uassertStatusOK(movePrimarySourceManager.enterCriticalSection(opCtx));
             uassertStatusOK(movePrimarySourceManager.commitOnConfig(opCtx));

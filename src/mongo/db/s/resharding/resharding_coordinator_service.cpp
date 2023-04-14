@@ -696,7 +696,7 @@ void executeMetadataChangesInTxn(
 BSONObj makeFlushRoutingTableCacheUpdatesCmd(const NamespaceString& nss) {
     auto cmd = FlushRoutingTableCacheUpdatesWithWriteConcern(nss);
     cmd.setSyncFromConfig(true);
-    cmd.setDbName(nss.db());
+    cmd.setDbName(nss.dbName());
     return cmd.toBSON(
         BSON(WriteConcernOptions::kWriteConcernField << kMajorityWriteConcern.toBSON()));
 }
@@ -751,8 +751,8 @@ void cleanupSourceConfigCollections(OperationContext* opCtx,
          Arr{createTagFilter(V{StringData("$min")}),
              createTagFilter(V{Doc{{"$literal", coordinatorDoc.getReshardingKey().toBSON()}}})}}};
 
-    const auto removeTagsQuery =
-        BSON(TagsType::ns(coordinatorDoc.getSourceNss().ns()) << "$expr" << skipNewTagsFilter);
+    const auto removeTagsQuery = BSON(TagsType::ns(coordinatorDoc.getSourceNss().ns().toString())
+                                      << "$expr" << skipNewTagsFilter);
 
     removeChunkAndTagsDocs(opCtx, removeTagsQuery, coordinatorDoc.getSourceUUID());
 }
@@ -808,11 +808,11 @@ void updateTagsDocsForTempNss(OperationContext* opCtx,
     auto hint = BSON("ns" << 1 << "min" << 1);
     auto tagsRequest = BatchedCommandRequest::buildUpdateOp(
         TagsType::ConfigNS,
-        BSON(TagsType::ns(coordinatorDoc.getTempReshardingNss().ns())),    // query
-        BSON("$set" << BSON("ns" << coordinatorDoc.getSourceNss().ns())),  // update
-        false,                                                             // upsert
-        true,                                                              // multi
-        hint                                                               // hint
+        BSON(TagsType::ns(coordinatorDoc.getTempReshardingNss().ns().toString())),  // query
+        BSON("$set" << BSON("ns" << coordinatorDoc.getSourceNss().ns())),           // update
+        false,                                                                      // upsert
+        true,                                                                       // multi
+        hint                                                                        // hint
     );
 
     // Update the 'ns' field to be the original collection namespace for all tags documents that
@@ -866,7 +866,8 @@ void writeParticipantShardsAndTempCollInfo(
     std::vector<ChunkType> initialChunks,
     std::vector<BSONObj> zones,
     boost::optional<CollectionIndexes> indexVersion) {
-    const auto tagsQuery = BSON(TagsType::ns(updatedCoordinatorDoc.getTempReshardingNss().ns()));
+    const auto tagsQuery =
+        BSON(TagsType::ns(updatedCoordinatorDoc.getTempReshardingNss().ns().toString()));
 
     removeChunkAndTagsDocs(opCtx, tagsQuery, updatedCoordinatorDoc.getReshardingUUID());
     insertChunkAndTagDocsForTempNss(opCtx, initialChunks, zones);
@@ -949,7 +950,8 @@ void removeCoordinatorDocAndReshardingFields(OperationContext* opCtx,
     updatedCoordinatorDoc.setState(CoordinatorStateEnum::kDone);
     emplaceTruncatedAbortReasonIfExists(updatedCoordinatorDoc, abortReason);
 
-    const auto tagsQuery = BSON(TagsType::ns(coordinatorDoc.getTempReshardingNss().ns()));
+    const auto tagsQuery =
+        BSON(TagsType::ns(coordinatorDoc.getTempReshardingNss().ns().toString()));
     // Once the decision has been persisted, the coordinator would have modified the
     // config.chunks and config.collections entry. This means that the UUID of the
     // non-temp collection is now the UUID of what was previously the UUID of the temp

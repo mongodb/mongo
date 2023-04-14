@@ -64,7 +64,7 @@ void installDatabaseMetadata(OperationContext* opCtx,
                              const DatabaseVersion& dbVersion) {
     AutoGetDb autoDb(opCtx, dbName, MODE_X, {});
     auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbName);
-    scopedDss->setDbInfo(opCtx, {dbName.db(), ShardId("this"), dbVersion});
+    scopedDss->setDbInfo(opCtx, {dbName.db().toString(), ShardId("this"), dbVersion});
 }
 
 void installUnshardedCollectionMetadata(OperationContext* opCtx, const NamespaceString& nss) {
@@ -838,17 +838,17 @@ TEST_F(ShardRoleTest, YieldAndRestoreAcquisitionWithLocks) {
                                                },
                                                MODE_IX);
 
-    ASSERT_TRUE(opCtx()->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
+    ASSERT_TRUE(opCtx()->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
     ASSERT_TRUE(opCtx()->lockState()->isCollectionLockedForMode(nss, MODE_IX));
 
     // Yield the resources
     auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx());
-    ASSERT_FALSE(opCtx()->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
+    ASSERT_FALSE(opCtx()->lockState()->isDbLockedForMode(DatabaseName{nss.db()}, MODE_IX));
     ASSERT_FALSE(opCtx()->lockState()->isCollectionLockedForMode(nss, MODE_IX));
 
     // Restore the resources
     restoreTransactionResourcesToOperationContext(opCtx(), std::move(yieldedTransactionResources));
-    ASSERT_TRUE(opCtx()->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
+    ASSERT_TRUE(opCtx()->lockState()->isDbLockedForMode(DatabaseName{nss.db()}, MODE_IX));
     ASSERT_TRUE(opCtx()->lockState()->isCollectionLockedForMode(nss, MODE_IX));
 }
 
@@ -896,7 +896,7 @@ TEST_F(ShardRoleTest, RestoreForWriteFailsIfPlacementConcernNoLongerMet) {
                                  ASSERT_FALSE(exInfo->getCriticalSectionSignal().is_initialized());
                              });
 
-    ASSERT_FALSE(opCtx()->lockState()->isDbLockedForMode(nss.db(), MODE_IX));
+    ASSERT_FALSE(opCtx()->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
     ASSERT_FALSE(opCtx()->lockState()->isCollectionLockedForMode(nss, MODE_IX));
 }
 

@@ -67,7 +67,7 @@ PlanCache* getPlanCache(OperationContext* opCtx, const CollectionPtr& collection
 Status clear(OperationContext* opCtx,
              const CollectionPtr& collection,
              PlanCache* planCache,
-             const std::string& ns,
+             StringData ns,
              const BSONObj& cmdObj) {
     invariant(planCache);
 

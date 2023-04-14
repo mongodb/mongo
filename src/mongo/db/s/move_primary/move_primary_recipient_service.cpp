@@ -720,7 +720,7 @@ void MovePrimaryRecipientService::MovePrimaryRecipient::_cleanUpOperationMetadat
     const auto nssPrefix =
         NamespaceString::makeMovePrimaryTempCollectionsPrefix(getMigrationId()).toString();
     for (const auto& nss : colls) {
-        if (!nss.ns().starts_with(nssPrefix)) {
+        if (!nss.ns().startsWith(nssPrefix)) {
             continue;
         }
         LOGV2(7621600, "MovePrimaryRecipient dropping collection", "ns"_attr = nss);

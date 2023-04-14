@@ -53,7 +53,7 @@ public:
 
     // Since the DBClient handles the cursor iterating, we assume that works for the purposes of the
     // cloner unit test and just use a single batch for all mock responses.
-    static BSONObj createCursorResponse(const std::string& nss, const BSONArray& docs);
+    static BSONObj createCursorResponse(StringData nss, const BSONArray& docs);
 
 protected:
     void setUp() override;

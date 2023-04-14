@@ -57,7 +57,7 @@ void dropDatabase(OperationContext* opCtx, const NamespaceString& nss) {
     }
 }
 
-bool collectionExists(OperationContext* opCtx, OldClientContext* ctx, const std::string& ns) {
+bool collectionExists(OperationContext* opCtx, OldClientContext* ctx, StringData ns) {
     return (bool)CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx,
                                                                             NamespaceString(ns));
 }

@@ -74,7 +74,7 @@ Status checkForOverlappingZonedKeyRange(OperationContext* opCtx,
                                                           kConfigPrimarySelector,
                                                           repl::ReadConcernLevel::kLocalReadConcern,
                                                           TagsType::ConfigNS,
-                                                          BSON(TagsType::ns(nss.ns())),
+                                                          BSON(TagsType::ns(nss.ns().toString())),
                                                           BSONObj(),
                                                           0);
     if (!tagStatus.isOK()) {
@@ -362,7 +362,7 @@ void ShardingCatalogManager::assignKeyRangeToZone(OperationContext* opCtx,
     uassertStatusOK(_localCatalogClient->updateConfigDocument(
         opCtx,
         TagsType::ConfigNS,
-        BSON(TagsType::ns(nss.ns()) << TagsType::min(actualRange.getMin())),
+        BSON(TagsType::ns(nss.ns().toString()) << TagsType::min(actualRange.getMin())),
         updateBuilder.obj(),
         true,
         kNoWaitWriteConcern));

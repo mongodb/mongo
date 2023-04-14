@@ -59,7 +59,6 @@
 namespace mongo {
 namespace {
 
-constexpr auto kExternalDB = "$external"_sd;
 constexpr auto kDBFieldName = "db"_sd;
 
 /**
@@ -122,7 +121,7 @@ public:
 
             as->logoutDatabase(
                 opCtx->getClient(), dbname.toStringWithTenantId(), "Logging out on user request");
-            if (getTestCommandsEnabled() && (dbname == kAdminDB)) {
+            if (getTestCommandsEnabled() && (dbname.db() == kAdminDB)) {
                 // Allows logging out as the internal user against the admin database, however
                 // this actually logs out of the local database as well. This is to
                 // support the auth passthrough test framework on mongos (since you can't use the
@@ -213,7 +212,7 @@ void _authenticateX509(OperationContext* opCtx, AuthenticationSession* session) 
 
     uassert(ErrorCodes::ProtocolError,
             "X.509 authentication must always use the $external database.",
-            userName.getDB() == kExternalDB);
+            userName.getDB() == DatabaseName::kExternal.db());
 
     auto isInternalClient = [&]() -> bool {
         return opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient;
@@ -396,7 +395,7 @@ void doSpeculativeAuthenticate(OperationContext* opCtx,
 
     if (!hasDBField) {
         // No "db" field was provided, so default to "$external"
-        cmd.append(AuthenticateCommand::kDbNameFieldName, kExternalDB);
+        cmd.append(AuthenticateCommand::kDbNameFieldName, DatabaseName::kExternal.db());
     }
 
     auto authCmdObj =

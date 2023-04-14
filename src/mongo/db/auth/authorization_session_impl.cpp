@@ -732,7 +732,8 @@ void AuthorizationSessionImpl::_refreshUserInfoAsNeeded(OperationContext* opCtx)
         // backing LDAP host, it should be cleared from _authenticatedUser. This
         // guarantees that no operations can be performed until the LDAP host comes back up.
         // TODO SERVER-72678 avoid this edge case hack when rearchitecting user acquisition.
-        if (name.getDB() == "$external"_sd && currentUser->getUserRequest().mechanismData.empty()) {
+        if (name.getDB() == DatabaseName::kExternal.db() &&
+            currentUser->getUserRequest().mechanismData.empty()) {
             clearUser();
             LOGV2(5914804,
                   "Removed external user from session cache of user information because of "

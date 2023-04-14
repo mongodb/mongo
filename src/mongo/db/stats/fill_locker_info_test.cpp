@@ -92,7 +92,7 @@ DEATH_TEST(FillLockerInfo, ShouldFailIfLocksAreNotSortedAppropriately, "Invarian
 }
 
 TEST(FillLockerInfo, DoesReportLocksHeld) {
-    const ResourceId dbId(RESOURCE_DATABASE, "TestDB"_sd);
+    const ResourceId dbId(RESOURCE_DATABASE, DatabaseName{"TestDB"_sd});
     LockerInfo info;
     info.locks = {OneLock{resourceIdGlobal, MODE_IX}, OneLock{dbId, MODE_IX}};
 
@@ -109,8 +109,8 @@ TEST(FillLockerInfo, DoesReportLocksHeld) {
 }
 
 TEST(FillLockerInfo, ShouldReportMaxTypeHeldForResourceType) {
-    const ResourceId firstDbId(RESOURCE_DATABASE, "FirstDB"_sd);
-    const ResourceId secondDbId(RESOURCE_DATABASE, "SecondDB"_sd);
+    const ResourceId firstDbId(RESOURCE_DATABASE, DatabaseName{"FirstDB"_sd});
+    const ResourceId secondDbId(RESOURCE_DATABASE, DatabaseName{"SecondDB"_sd});
     LockerInfo info;
     info.locks = {OneLock{resourceIdGlobal, MODE_IX},
                   OneLock{firstDbId, MODE_IX},

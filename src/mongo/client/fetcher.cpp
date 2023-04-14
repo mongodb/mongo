@@ -167,7 +167,7 @@ Status parseCursorResponse(const BSONObj& obj,
 
 Fetcher::Fetcher(executor::TaskExecutor* executor,
                  const HostAndPort& source,
-                 const std::string& dbname,
+                 StringData dbname,
                  const BSONObj& findCmdObj,
                  CallbackFn work,
                  const BSONObj& metadata,

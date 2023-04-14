@@ -243,9 +243,8 @@ public:
         : _fullHash(fullHash(type, hashStringData(dbName.toStringWithTenantId()))) {
         verifyNoResourceMutex(type);
     }
-    ResourceId(ResourceType type, const std::string& str)
-        : _fullHash(fullHash(type, hashStringData(str))) {
-        // Resources of type database or collection must never be passed as a raw string
+    ResourceId(ResourceType type, StringData str) : _fullHash(fullHash(type, hashStringData(str))) {
+        // Resources of type database, collection, or tenant must never be passed as a raw string.
         invariant(type != RESOURCE_DATABASE && type != RESOURCE_COLLECTION);
         verifyNoResourceMutex(type);
     }

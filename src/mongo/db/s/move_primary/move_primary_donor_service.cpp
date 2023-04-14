@@ -277,7 +277,7 @@ void MovePrimaryDonorExternalState::syncDataOnRecipient(OperationContext* opCtx,
                                                         boost::optional<Timestamp> timestamp) {
     MovePrimaryRecipientSyncData request;
     request.setMovePrimaryCommonMetadata(getMetadata());
-    request.setDbName(getMetadata().getDatabaseName().db());
+    request.setDbName(getMetadata().getDatabaseName().dbName());
     if (timestamp) {
         request.setReturnAfterReachingDonorTimestamp(*timestamp);
     }
@@ -287,14 +287,14 @@ void MovePrimaryDonorExternalState::syncDataOnRecipient(OperationContext* opCtx,
 void MovePrimaryDonorExternalState::abortMigrationOnRecipient(OperationContext* opCtx) {
     MovePrimaryRecipientAbortMigration request;
     request.setMovePrimaryCommonMetadata(getMetadata());
-    request.setDbName(getMetadata().getDatabaseName().db());
+    request.setDbName(getMetadata().getDatabaseName().dbName());
     _runCommandOnRecipient(opCtx, request.toBSON({}));
 }
 
 void MovePrimaryDonorExternalState::forgetMigrationOnRecipient(OperationContext* opCtx) {
     MovePrimaryRecipientForgetMigration request;
     request.setMovePrimaryCommonMetadata(getMetadata());
-    request.setDbName(getMetadata().getDatabaseName().db());
+    request.setDbName(getMetadata().getDatabaseName().dbName());
     _runCommandOnRecipient(opCtx, request.toBSON({}));
 }
 
@@ -364,7 +364,7 @@ bool MovePrimaryDonor::_matchesArguments(const std::shared_ptr<MovePrimaryDonor>
                                          const DatabaseName& dbName,
                                          const ShardId& toShard) {
     const auto& metadata = instance->getMetadata();
-    if (dbName != metadata.getDatabaseName().db()) {
+    if (dbName != metadata.getDatabaseName().dbName()) {
         return false;
     }
     if (toShard.toString() != metadata.getToShardName()) {
@@ -380,8 +380,8 @@ MovePrimaryDonor::MovePrimaryDonor(ServiceContext* serviceContext,
                                    MovePrimaryDonorDependencies dependencies)
     : _serviceContext{serviceContext},
       _donorService{donorService},
-      _metadata{std::move(initialState.getMetadata())},
-      _mutableFields{std::move(initialState.getMutableFields())},
+      _metadata{initialState.getMetadata()},
+      _mutableFields{initialState.getMutableFields()},
       _metrics{MovePrimaryMetrics::initializeFrom(initialState, _serviceContext)},
       _cleanupExecutor{cleanupExecutor},
       _externalState{std::move(dependencies.externalState)} {

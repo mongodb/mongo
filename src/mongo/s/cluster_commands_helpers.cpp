@@ -214,7 +214,7 @@ std::vector<AsyncRequestsSender::Response> gatherResponsesImpl(
     MultiStatementTransactionRequestsSender ars(
         opCtx,
         Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
-        dbName,
+        DatabaseName{dbName},
         requests,
         readPref,
         retryPolicy);

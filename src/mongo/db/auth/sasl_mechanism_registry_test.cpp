@@ -251,7 +251,7 @@ public:
     SASLServerMechanismRegistry registry;
 
     const UserName internalSajack = {"sajack"_sd, "test"_sd};
-    const UserName externalSajack = {"sajack"_sd, "$external"_sd};
+    const UserName externalSajack = {"sajack"_sd, DatabaseName::kExternal.db()};
 };
 
 TEST_F(MechanismRegistryTest, acquireInternalMechanism) {

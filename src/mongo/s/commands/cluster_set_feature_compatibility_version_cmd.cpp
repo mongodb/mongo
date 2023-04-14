@@ -99,7 +99,7 @@ public:
             auto response = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
                 opCtx,
                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                cmd.getDbName().db(),
+                cmd.getDbName().db().toString(),
                 CommandHelpers::appendMajorityWriteConcern(cmd.toBSON({}),
                                                            opCtx->getWriteConcern()),
                 Shard::RetryPolicy::kIdempotent));

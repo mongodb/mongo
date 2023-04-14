@@ -53,7 +53,7 @@
 namespace mongo {
 namespace {
 
-void insertOplogDocument(OperationContext* opCtx, Timestamp ts, const char* ns) {
+void insertOplogDocument(OperationContext* opCtx, Timestamp ts, StringData ns) {
     AutoGetCollection coll(opCtx, NamespaceString{ns}, MODE_IX);
     WriteUnitOfWork wuow(opCtx);
     auto doc = BSON("ts" << ts);
@@ -730,7 +730,7 @@ public:
                                     << "oplog.querytests.OplogScanWithGtTimstampPred"),
                                info);
         }
-        const char* ns = _nss.ns().c_str();
+        const auto ns = _nss.ns();
         insertOplogDocument(&_opCtx, Timestamp(1000, 0), ns);
         insertOplogDocument(&_opCtx, Timestamp(1000, 1), ns);
         insertOplogDocument(&_opCtx, Timestamp(1000, 2), ns);
@@ -783,7 +783,7 @@ public:
                                info);
         }
 
-        const char* ns = _nss.ns().c_str();
+        const auto ns = _nss.ns();
         insertOplogDocument(&_opCtx, Timestamp(1000, 0), ns);
         insertOplogDocument(&_opCtx, Timestamp(1000, 1), ns);
         insertOplogDocument(&_opCtx, Timestamp(1000, 2), ns);
@@ -1347,8 +1347,8 @@ public:
         return CursorManager::get(&_opCtx)->numCursors();
     }
 
-    const char* ns() {
-        return _nss.ns().c_str();
+    StringData ns() {
+        return _nss.ns();
     }
     const NamespaceString& nss() {
         return _nss;

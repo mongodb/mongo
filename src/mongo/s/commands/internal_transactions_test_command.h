@@ -102,7 +102,7 @@ public:
                             continue;
                         }
 
-                        const auto res = txnClient.runCommandSync(dbName, command);
+                        const auto res = txnClient.runCommandSync(DatabaseName{dbName}, command);
 
                         sharedBlock->responses.emplace_back(
                             CommandHelpers::filterCommandReplyForPassthrough(

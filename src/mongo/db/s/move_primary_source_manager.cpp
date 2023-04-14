@@ -92,8 +92,8 @@ Status MovePrimarySourceManager::clone(OperationContext* opCtx) {
     auto logChangeCheckedStatus = ShardingLogging::get(opCtx)->logChangeChecked(
         opCtx,
         "movePrimary.start",
-        _dbname.toString(),
-        _buildMoveLogEntry(_dbname.toString(), _fromShard.toString(), _toShard.toString()),
+        _dbname,
+        _buildMoveLogEntry(_dbname, _fromShard.toString(), _toShard.toString()),
         ShardingCatalogClient::kMajorityWriteConcern);
 
     if (!logChangeCheckedStatus.isOK()) {
@@ -258,7 +258,7 @@ Status MovePrimarySourceManager::commitOnConfig(OperationContext* opCtx) {
             opCtx,
             "movePrimary.validating",
             getNss().ns(),
-            _buildMoveLogEntry(_dbname.toString(), _fromShard.toString(), _toShard.toString()),
+            _buildMoveLogEntry(_dbname, _fromShard.toString(), _toShard.toString()),
             ShardingCatalogClient::kMajorityWriteConcern);
 
         if ((ErrorCodes::isInterruption(validateStatus.code()) ||
@@ -321,8 +321,8 @@ Status MovePrimarySourceManager::commitOnConfig(OperationContext* opCtx) {
     uassertStatusOK(ShardingLogging::get(opCtx)->logChangeChecked(
         opCtx,
         "movePrimary.commit",
-        _dbname.toString(),
-        _buildMoveLogEntry(_dbname.toString(), _fromShard.toString(), _toShard.toString()),
+        _dbname,
+        _buildMoveLogEntry(_dbname, _fromShard.toString(), _toShard.toString()),
         ShardingCatalogClient::kMajorityWriteConcern));
 
     scopedGuard.dismiss();
@@ -345,7 +345,8 @@ Status MovePrimarySourceManager::_commitOnConfig(OperationContext* opCtx,
     notifyChangeStreamsOnMovePrimary(opCtx, getNss().dbName(), _fromShard, _toShard);
 
     const auto commitStatus = [&] {
-        ConfigsvrCommitMovePrimary commitRequest(_dbname, expectedDbVersion, _toShard);
+        ConfigsvrCommitMovePrimary commitRequest(
+            DatabaseName{_dbname}, expectedDbVersion, _toShard);
         commitRequest.setDbName(DatabaseName::kAdmin);
 
         const auto commitResponse =
@@ -465,7 +466,7 @@ Status MovePrimarySourceManager::cleanStaleData(OperationContext* opCtx) {
     DBDirectClient client(opCtx);
     for (auto& coll : _clonedColls) {
         BSONObj dropCollResult;
-        client.runCommand(_dbname, BSON("drop" << coll.coll()), dropCollResult);
+        client.runCommand(DatabaseName{_dbname}, BSON("drop" << coll.coll()), dropCollResult);
         Status dropStatus = getStatusFromCommandResult(dropCollResult);
         if (!dropStatus.isOK()) {
             LOGV2(22045,
@@ -488,8 +489,8 @@ void MovePrimarySourceManager::cleanupOnError(OperationContext* opCtx) {
     ShardingLogging::get(opCtx)->logChange(
         opCtx,
         "movePrimary.error",
-        _dbname.toString(),
-        _buildMoveLogEntry(_dbname.toString(), _fromShard.toString(), _toShard.toString()),
+        _dbname,
+        _buildMoveLogEntry(_dbname, _fromShard.toString(), _toShard.toString()),
         ShardingCatalogClient::kMajorityWriteConcern);
 
     try {

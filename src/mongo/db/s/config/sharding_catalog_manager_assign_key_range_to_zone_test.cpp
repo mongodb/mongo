@@ -225,12 +225,13 @@ TEST_F(AssignKeyRangeToZoneTestFixture, RemoveZoneWithDollarPrefixedShardKeysSho
 
     // Manually insert a zone with illegal keys in order to bypass the checks performed by
     // assignKeyRangeToZone
-    BSONObj updateQuery(BSON("_id" << BSON(TagsType::ns(shardedNS().ns())
+    BSONObj updateQuery(BSON("_id" << BSON(TagsType::ns(shardedNS().ns().toString())
                                            << TagsType::min(zoneWithDollarKeys.getMin()))));
 
     BSONObjBuilder updateBuilder;
-    updateBuilder.append(
-        "_id", BSON(TagsType::ns(shardedNS().ns()) << TagsType::min(zoneWithDollarKeys.getMin())));
+    updateBuilder.append("_id",
+                         BSON(TagsType::ns(shardedNS().ns().toString())
+                              << TagsType::min(zoneWithDollarKeys.getMin())));
     updateBuilder.append(TagsType::ns(), shardedNS().ns());
     updateBuilder.append(TagsType::min(), zoneWithDollarKeys.getMin());
     updateBuilder.append(TagsType::max(), zoneWithDollarKeys.getMax());

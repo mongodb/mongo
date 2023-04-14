@@ -96,7 +96,7 @@ public:
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
         auto request = MovePrimary::parse(IDLParserContext("MovePrimary"), cmdObj);
-        const string db = parseNs(dbName, cmdObj).dbName().db();
+        const string db = parseNs(dbName, cmdObj).dbName().db().toString();
         const StringData toShard(request.getTo());
 
         // Invalidate the routing table cache entry for this database so that we reload the

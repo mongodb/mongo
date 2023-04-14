@@ -90,48 +90,47 @@ bool NamespaceString::isCollectionlessAggregateNS() const {
 
 bool NamespaceString::isLegalClientSystemNS(
     const ServerGlobalParams::FeatureCompatibility& currentFCV) const {
-    auto dbname = dbName().db();
-
-    if (dbname == DatabaseName::kAdmin.db()) {
-        if (coll() == "system.roles")
+    auto collectionName = coll();
+    if (isAdminDB()) {
+        if (collectionName == "system.roles")
             return true;
-        if (coll() == kServerConfigurationNamespace.coll())
+        if (collectionName == kServerConfigurationNamespace.coll())
             return true;
-        if (coll() == kKeysCollectionNamespace.coll())
+        if (collectionName == kKeysCollectionNamespace.coll())
             return true;
-        if (coll() == "system.backup_users")
+        if (collectionName == "system.backup_users")
             return true;
-    } else if (dbname == DatabaseName::kConfig.db()) {
-        if (coll() == "system.sessions")
+    } else if (isConfigDB()) {
+        if (collectionName == "system.sessions")
             return true;
-        if (coll() == kIndexBuildEntryNamespace.coll())
+        if (collectionName == kIndexBuildEntryNamespace.coll())
             return true;
-        if (coll().find(".system.resharding.") != std::string::npos)
+        if (collectionName.find(".system.resharding.") != std::string::npos)
             return true;
-        if (coll() == kShardingDDLCoordinatorsNamespace.coll())
+        if (collectionName == kShardingDDLCoordinatorsNamespace.coll())
             return true;
-        if (coll() == kConfigsvrCoordinatorsNamespace.coll())
+        if (collectionName == kConfigsvrCoordinatorsNamespace.coll())
             return true;
-    } else if (dbname == DatabaseName::kLocal.db()) {
-        if (coll() == kSystemReplSetNamespace.coll())
+    } else if (isLocalDB()) {
+        if (collectionName == kSystemReplSetNamespace.coll())
             return true;
-        if (coll() == kLocalHealthLogNamespace.coll())
+        if (collectionName == kLocalHealthLogNamespace.coll())
             return true;
-        if (coll() == kConfigsvrRestoreNamespace.coll())
+        if (collectionName == kConfigsvrRestoreNamespace.coll())
             return true;
     }
 
-    if (coll() == "system.users")
+    if (collectionName == "system.users")
         return true;
-    if (coll() == "system.js")
+    if (collectionName == "system.js")
         return true;
-    if (coll() == kSystemDotViewsCollectionName)
+    if (collectionName == kSystemDotViewsCollectionName)
         return true;
     if (isTemporaryReshardingCollection()) {
         return true;
     }
     if (isTimeseriesBucketsCollection() &&
-        validCollectionName(coll().substr(kTimeseriesBucketsCollectionPrefix.size()))) {
+        validCollectionName(collectionName.substr(kTimeseriesBucketsCollectionPrefix.size()))) {
         return true;
     }
     if (isChangeStreamPreImagesCollection()) {
@@ -167,12 +166,13 @@ bool NamespaceString::isLegalClientSystemNS(
  * with creating tenant access blockers on secondaries.
  */
 bool NamespaceString::mustBeAppliedInOwnOplogBatch() const {
+    auto ns = this->ns();
     return isSystemDotViews() || isServerConfigurationCollection() || isPrivilegeCollection() ||
-        _ns == kDonorReshardingOperationsNamespace.ns() ||
-        _ns == kForceOplogBatchBoundaryNamespace.ns() ||
-        _ns == kTenantMigrationDonorsNamespace.ns() || _ns == kShardMergeRecipientsNamespace.ns() ||
-        _ns == kTenantMigrationRecipientsNamespace.ns() || _ns == kShardSplitDonorsNamespace.ns() ||
-        _ns == kConfigsvrShardsNamespace.ns();
+        ns == kDonorReshardingOperationsNamespace.ns() ||
+        ns == kForceOplogBatchBoundaryNamespace.ns() ||
+        ns == kTenantMigrationDonorsNamespace.ns() || ns == kShardMergeRecipientsNamespace.ns() ||
+        ns == kTenantMigrationRecipientsNamespace.ns() || ns == kShardSplitDonorsNamespace.ns() ||
+        ns == kConfigsvrShardsNamespace.ns();
 }
 
 NamespaceString NamespaceString::makeBulkWriteNSS() {
@@ -305,7 +305,7 @@ NamespaceString NamespaceString::makeDropPendingNamespace(const repl::OpTime& op
 StatusWith<repl::OpTime> NamespaceString::getDropPendingNamespaceOpTime() const {
     if (!isDropPendingNamespace()) {
         return Status(ErrorCodes::BadValue,
-                      str::stream() << "Not a drop-pending namespace: " << _ns);
+                      str::stream() << "Not a drop-pending namespace: " << ns());
     }
 
     auto collectionName = coll();
@@ -318,20 +318,20 @@ StatusWith<repl::OpTime> NamespaceString::getDropPendingNamespaceOpTime() const 
     auto incrementSeparatorIndex = opTimeStr.find('i');
     if (std::string::npos == incrementSeparatorIndex) {
         return Status(ErrorCodes::FailedToParse,
-                      str::stream() << "Missing 'i' separator in drop-pending namespace: " << _ns);
+                      str::stream() << "Missing 'i' separator in drop-pending namespace: " << ns());
     }
 
     auto termSeparatorIndex = opTimeStr.find('t', incrementSeparatorIndex);
     if (std::string::npos == termSeparatorIndex) {
         return Status(ErrorCodes::FailedToParse,
-                      str::stream() << "Missing 't' separator in drop-pending namespace: " << _ns);
+                      str::stream() << "Missing 't' separator in drop-pending namespace: " << ns());
     }
 
     long long seconds;
     auto status = NumberParser{}(opTimeStr.substr(0, incrementSeparatorIndex), &seconds);
     if (!status.isOK()) {
         return status.withContext(
-            str::stream() << "Invalid timestamp seconds in drop-pending namespace: " << _ns);
+            str::stream() << "Invalid timestamp seconds in drop-pending namespace: " << ns());
     }
 
     unsigned int increment;
@@ -340,14 +340,14 @@ StatusWith<repl::OpTime> NamespaceString::getDropPendingNamespaceOpTime() const 
                             &increment);
     if (!status.isOK()) {
         return status.withContext(
-            str::stream() << "Invalid timestamp increment in drop-pending namespace: " << _ns);
+            str::stream() << "Invalid timestamp increment in drop-pending namespace: " << ns());
     }
 
     long long term;
     status = mongo::NumberParser{}(opTimeStr.substr(termSeparatorIndex + 1), &term);
     if (!status.isOK()) {
         return status.withContext(str::stream()
-                                  << "Invalid term in drop-pending namespace: " << _ns);
+                                  << "Invalid term in drop-pending namespace: " << ns());
     }
 
     return repl::OpTime(Timestamp(Seconds(seconds), increment), term);
@@ -393,11 +393,11 @@ bool NamespaceString::isTimeseriesBucketsCollection() const {
 }
 
 bool NamespaceString::isChangeStreamPreImagesCollection() const {
-    return _dbName.db() == DatabaseName::kConfig.db() && coll() == kPreImagesCollectionName;
+    return isConfigDB() && coll() == kPreImagesCollectionName;
 }
 
 bool NamespaceString::isChangeCollection() const {
-    return _dbName.db() == DatabaseName::kConfig.db() && coll() == kChangeCollectionName;
+    return isConfigDB() && coll() == kChangeCollectionName;
 }
 
 bool NamespaceString::isConfigImagesCollection() const {

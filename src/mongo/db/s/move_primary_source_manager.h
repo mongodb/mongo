@@ -183,7 +183,7 @@ private:
     const ShardMovePrimary _requestArgs;
 
     // The database whose primary we are moving.
-    const StringData _dbname;
+    std::string _dbname;
 
     // The donor shard
     const ShardId& _fromShard;

@@ -80,7 +80,7 @@ BSONObj createIndex(OperationContext* opCtx, const NamespaceString& nss, const B
 
     DBDirectClient client(opCtx);
     client.runCommand(
-        nss.db(),
+        nss.dbName(),
         BSON("createIndexes" << nss.coll().toString() << "indexes" << BSON_ARRAY(indexSpec)),
         resObj);
 

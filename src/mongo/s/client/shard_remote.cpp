@@ -506,7 +506,8 @@ StatusWith<ShardRemote::AsyncCmdHandle> ShardRemote::_scheduleCommand(
     const auto readPrefWithConfigTime = [&]() -> ReadPreferenceSetting {
         // TODO SERVER-74281: Append this higher up when we know we're targeting the config to read
         // metadata or use a better filter to avoid matching logical sessions collection.
-        if (isConfig() && (dbName == DatabaseName::kConfig || dbName == DatabaseName::kAdmin)) {
+        if (isConfig() &&
+            (dbName == DatabaseName::kConfig.db() || dbName == DatabaseName::kAdmin.db())) {
             const auto vcTime = VectorClock::get(opCtx)->getTime();
             ReadPreferenceSetting readPrefToReturn{readPref};
             readPrefToReturn.minClusterTime = vcTime.configTime().asTimestamp();

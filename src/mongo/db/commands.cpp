@@ -280,7 +280,7 @@ std::string CommandHelpers::parseNsFullyQualified(const BSONObj& cmdObj) {
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "Invalid namespace specified '" << nss.ns() << "'",
             nss.isValid());
-    return nss.ns();
+    return nss.ns().toString();
 }
 
 NamespaceString CommandHelpers::parseNsCollectionRequired(const DatabaseName& dbName,
@@ -321,7 +321,7 @@ NamespaceStringOrUUID CommandHelpers::parseNsOrUUID(const DatabaseName& dbName,
 }
 
 std::string CommandHelpers::parseNsFromCommand(StringData dbname, const BSONObj& cmdObj) {
-    return parseNsFromCommand({boost::none, dbname}, cmdObj).ns();
+    return parseNsFromCommand({boost::none, dbname}, cmdObj).ns().toString();
 }
 
 NamespaceString CommandHelpers::parseNsFromCommand(const DatabaseName& dbName,
@@ -333,7 +333,7 @@ NamespaceString CommandHelpers::parseNsFromCommand(const DatabaseName& dbName,
                                                           cmdObj.firstElement().valueStringData());
 }
 
-ResourcePattern CommandHelpers::resourcePatternForNamespace(const std::string& ns) {
+ResourcePattern CommandHelpers::resourcePatternForNamespace(StringData ns) {
     if (!NamespaceString::validCollectionComponent(ns)) {
         return ResourcePattern::forDatabaseName(ns);
     }

@@ -149,8 +149,8 @@ public:
         return BSONObj();
     }
 
-    const char* ns() {
-        return _nss.ns().c_str();
+    StringData ns() {
+        return _nss.ns();
     }
     const NamespaceString& nss() {
         return _nss;

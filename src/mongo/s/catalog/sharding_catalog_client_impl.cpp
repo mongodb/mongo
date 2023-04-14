@@ -808,7 +808,7 @@ StatusWith<std::vector<TagsType>> ShardingCatalogClientImpl::getTagsForCollectio
                                               kConfigReadSelector,
                                               repl::ReadConcernLevel::kMajorityReadConcern,
                                               TagsType::ConfigNS,
-                                              BSON(TagsType::ns(nss.ns())),
+                                              BSON(TagsType::ns(nss.ns().toString())),
                                               BSON(TagsType::min() << 1),
                                               boost::none);  // no limit
     if (!findStatus.isOK()) {

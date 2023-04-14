@@ -153,7 +153,7 @@ const stdx::unordered_set<RoleName> kAdminBuiltinRoles = {
 // Therefore, granting privileges on this database does not make sense.
 bool isValidDB(const DatabaseName& dbname) {
     return NamespaceString::validDBName(dbname, NamespaceString::DollarInDbNameBehavior::Allow) &&
-        (dbname.db() != NamespaceString::kExternalDb);
+        (dbname.db() != DatabaseName::kExternal.db());
 }
 
 }  // namespace

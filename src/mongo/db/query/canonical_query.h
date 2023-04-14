@@ -120,11 +120,11 @@ public:
      */
     static Status isValidNormalized(const MatchExpression* root);
 
-    NamespaceString nss() const {
+    const NamespaceString& nss() const {
         invariant(_findCommand->getNamespaceOrUUID().nss());
         return *_findCommand->getNamespaceOrUUID().nss();
     }
-    std::string ns() const {
+    StringData ns() const {
         return nss().ns();
     }
 

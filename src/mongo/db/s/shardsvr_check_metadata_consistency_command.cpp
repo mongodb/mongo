@@ -72,8 +72,9 @@ std::vector<DatabaseType> getDatabasesThisShardIsPrimaryFor(OperationContext* op
     }
     if (thisShardId == ShardId::kConfigServerId) {
         // Config database
-        databases.emplace_back(
-            DatabaseName::kConfig.db(), ShardId::kConfigServerId, DatabaseVersion::makeFixed());
+        databases.emplace_back(DatabaseName::kConfig.db().toString(),
+                               ShardId::kConfigServerId,
+                               DatabaseVersion::makeFixed());
     }
     return databases;
 }

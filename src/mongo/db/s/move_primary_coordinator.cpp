@@ -589,7 +589,7 @@ std::vector<NamespaceString> MovePrimaryCoordinator::cloneDataToRecipient(
     const auto cloneResponse =
         toShard->runCommand(opCtx,
                             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                            DatabaseName::kAdmin.db(),
+                            DatabaseName::kAdmin.db().toString(),
                             cloneCommand,
                             Shard::RetryPolicy::kNoRetry);
 
@@ -638,7 +638,7 @@ void MovePrimaryCoordinator::commitMetadataToConfig(
     const auto commitResponse =
         config->runCommandWithFixedRetryAttempts(opCtx,
                                                  ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                                 DatabaseName::kAdmin.db(),
+                                                 DatabaseName::kAdmin.db().toString(),
                                                  commitCommand,
                                                  Shard::RetryPolicy::kIdempotent);
 

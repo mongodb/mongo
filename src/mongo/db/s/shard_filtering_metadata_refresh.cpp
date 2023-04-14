@@ -241,11 +241,12 @@ void onDbVersionMismatch(OperationContext* opCtx,
 
         {
             boost::optional<Lock::DBLock> dbLock;
-            dbLock.emplace(opCtx, dbName, MODE_IS);
+            dbLock.emplace(opCtx, DatabaseName{dbName}, MODE_IS);
 
             if (receivedDbVersion) {
-                auto scopedDss = boost::make_optional(
-                    DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, dbName));
+                auto scopedDss =
+                    boost::make_optional(DatabaseShardingState::assertDbLockedAndAcquireShared(
+                        opCtx, DatabaseName{dbName}));
 
                 if (joinDbVersionOperation(opCtx, &dbLock, &scopedDss)) {
                     // Waited for another thread to exit from the critical section or to complete an
@@ -270,8 +271,9 @@ void onDbVersionMismatch(OperationContext* opCtx,
                 return;
             }
 
-            auto scopedDss = boost::make_optional(
-                DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbName));
+            auto scopedDss =
+                boost::make_optional(DatabaseShardingState::assertDbLockedAndAcquireExclusive(
+                    opCtx, DatabaseName{dbName}));
 
             if (joinDbVersionOperation(opCtx, &dbLock, &scopedDss)) {
                 // Waited for another thread to exit from the critical section or to complete an
@@ -288,7 +290,7 @@ void onDbVersionMismatch(OperationContext* opCtx,
             CancellationToken cancellationToken = cancellationSource.token();
             (*scopedDss)
                 ->setDbMetadataRefreshFuture(
-                    recoverRefreshDbVersion(opCtx, dbName, cancellationToken),
+                    recoverRefreshDbVersion(opCtx, DatabaseName{dbName}, cancellationToken),
                     std::move(cancellationSource));
             dbMetadataRefreshFuture = (*scopedDss)->getDbMetadataRefreshFuture();
         }

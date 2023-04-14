@@ -109,7 +109,8 @@ public:
             .onError([](Status s) -> StatusWith<std::vector<HostAndPort>> {
                 return Status{AsyncRPCErrorInfo(s), "Remote command execution failed"};
             })
-            .then([=, f = std::move(f), p = std::move(p)](auto&& targets) mutable {
+            .then([=, f = std::move(f), p = std::move(p), dbName = dbName.toString()](
+                      auto&& targets) mutable {
                 stdx::lock_guard lg{_m};
                 *targetsAttempted = targets;
                 _requests.emplace_back(cmdBSON, dbName, targets[0], std::move(p));

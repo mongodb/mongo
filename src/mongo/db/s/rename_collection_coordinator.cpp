@@ -361,7 +361,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 // - Locally rename source to target
                 ShardsvrRenameCollectionParticipant renameCollParticipantRequest(
                     fromNss, _doc.getSourceUUID().value());
-                renameCollParticipantRequest.setDbName(fromNss.db());
+                renameCollParticipantRequest.setDbName(fromNss.dbName());
                 renameCollParticipantRequest.setTargetUUID(_doc.getTargetUUID());
                 renameCollParticipantRequest.setRenameCollectionRequest(_request);
                 const auto cmdObj = CommandHelpers::appendMajorityWriteConcern(
@@ -460,7 +460,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 // - Unblock CRUD on participants for both source and destination collections
                 ShardsvrRenameCollectionUnblockParticipant unblockParticipantRequest(
                     fromNss, _doc.getSourceUUID().value());
-                unblockParticipantRequest.setDbName(fromNss.db());
+                unblockParticipantRequest.setDbName(fromNss.dbName());
                 unblockParticipantRequest.setRenameCollectionRequest(_request);
                 auto const cmdObj = CommandHelpers::appendMajorityWriteConcern(
                     unblockParticipantRequest.toBSON({}));
