@@ -233,14 +233,13 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
                                      auto* opCtx = opCtxHolder.get();
                                      getForwardableOpMetadata().setOn(opCtx);
 
-                                     _updateSession(opCtx);
                                      if (!_firstExecution) {
                                          // Perform a noop write on the recipient in order to
                                          // advance the txnNumber for this coordinator's logical
                                          // session. This prevents requests with older txnNumbers
                                          // from being processed.
                                          _performNoopRetryableWriteOnAllShardsAndConfigsvr(
-                                             opCtx, getCurrentSession(), **executor);
+                                             opCtx, getNewSession(opCtx), **executor);
                                      }
 
                                      blockReads(opCtx);
@@ -286,14 +285,13 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
                                      auto* opCtx = opCtxHolder.get();
                                      getForwardableOpMetadata().setOn(opCtx);
 
-                                     _updateSession(opCtx);
                                      if (!_firstExecution) {
                                          // Perform a noop write on the recipient in order to
                                          // advance the txnNumber for this coordinator's logical
                                          // session. This prevents requests with older txnNumbers
                                          // from being processed.
                                          _performNoopRetryableWriteOnAllShardsAndConfigsvr(
-                                             opCtx, getCurrentSession(), **executor);
+                                             opCtx, getNewSession(opCtx), **executor);
                                      }
 
                                      unblockReadsAndWrites(opCtx);
@@ -399,9 +397,8 @@ ExecutorFuture<void> MovePrimaryCoordinator::_cleanupOnAbort(
             auto* opCtx = opCtxHolder.get();
             getForwardableOpMetadata().setOn(opCtx);
 
-            _updateSession(opCtx);
             _performNoopRetryableWriteOnAllShardsAndConfigsvr(
-                opCtx, getCurrentSession(), **executor);
+                opCtx, getNewSession(opCtx), **executor);
 
             if (useOnlineCloner()) {
                 cleanupOnAbortWithOnlineCloner(opCtx, token, status);
@@ -722,15 +719,14 @@ void MovePrimaryCoordinator::dropOrphanedDataOnRecipient(
         return;
     }
 
-    // Make a copy of this container since `_updateSession` changes the coordinator document.
+    // Make a copy of this container since `getNewSession` changes the coordinator document.
     const auto collectionsToClone = *_doc.getCollectionsToClone();
     for (const auto& nss : collectionsToClone) {
-        _updateSession(opCtx);
         sharding_ddl_util::sendDropCollectionParticipantCommandToShards(opCtx,
                                                                         nss,
                                                                         {_doc.getToShardId()},
                                                                         **executor,
-                                                                        getCurrentSession(),
+                                                                        getNewSession(opCtx),
                                                                         false /* fromMigrate */);
     }
 }
@@ -762,14 +758,14 @@ void MovePrimaryCoordinator::unblockReadsAndWrites(OperationContext* opCtx) cons
         opCtx, NamespaceString(_dbName), _csReason, ShardingCatalogClient::kLocalWriteConcern);
 }
 
-void MovePrimaryCoordinator::enterCriticalSectionOnRecipient(OperationContext* opCtx) const {
+void MovePrimaryCoordinator::enterCriticalSectionOnRecipient(OperationContext* opCtx) {
     const auto enterCriticalSectionCommand = [&] {
         ShardsvrMovePrimaryEnterCriticalSection request(_dbName);
         request.setDbName(DatabaseName::kAdmin);
         request.setReason(_csReason);
 
         auto command = CommandHelpers::appendMajorityWriteConcern(request.toBSON({}));
-        return command.addFields(getCurrentSession().toBSON());
+        return command.addFields(getNewSession(opCtx).toBSON());
     }();
 
     const auto& toShardId = _doc.getToShardId();
@@ -792,14 +788,14 @@ void MovePrimaryCoordinator::enterCriticalSectionOnRecipient(OperationContext* o
             _dbName.toStringForErrorMsg(), toShardId.toString()));
 }
 
-void MovePrimaryCoordinator::exitCriticalSectionOnRecipient(OperationContext* opCtx) const {
+void MovePrimaryCoordinator::exitCriticalSectionOnRecipient(OperationContext* opCtx) {
     const auto exitCriticalSectionCommand = [&] {
         ShardsvrMovePrimaryExitCriticalSection request(_dbName);
         request.setDbName(DatabaseName::kAdmin);
         request.setReason(_csReason);
 
         auto command = CommandHelpers::appendMajorityWriteConcern(request.toBSON({}));
-        return command.addFields(getCurrentSession().toBSON());
+        return command.addFields(getNewSession(opCtx).toBSON());
     }();
 
     const auto& toShardId = _doc.getToShardId();

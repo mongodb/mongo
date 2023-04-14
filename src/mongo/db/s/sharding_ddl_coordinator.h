@@ -409,6 +409,11 @@ protected:
         return osi;
     }
 
+    OperationSessionInfo getNewSession(OperationContext* opCtx) {
+        _updateSession(opCtx);
+        return getCurrentSession();
+    }
+
     virtual boost::optional<Status> getAbortReason() const override {
         const auto& status = _doc.getAbortReason();
         invariant(!status || !status->isOK(), "when persisted, status must be an error");
