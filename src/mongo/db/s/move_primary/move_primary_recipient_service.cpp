@@ -208,7 +208,11 @@ SemiFuture<void> MovePrimaryRecipientService::MovePrimaryRecipient::run(
         return _abortCalled;
     }();
 
-    if (abortCalled || shouldAbort) {
+    if (shouldAbort) {
+        _internalAbort();
+    }
+
+    if (abortCalled) {
         abort();
     }
 
@@ -288,6 +292,14 @@ void MovePrimaryRecipientService::MovePrimaryRecipient::abort() {
     }
 }
 
+void MovePrimaryRecipientService::MovePrimaryRecipient::_internalAbort() {
+    {
+        stdx::lock_guard<Latch> lg(_mutex);
+        invariant(_state < MovePrimaryRecipientStateEnum::kPrepared);
+    }
+    abort();
+}
+
 void MovePrimaryRecipientService::MovePrimaryRecipient::_cloneDataFromDonor(
     OperationContext* opCtx) {
     // Enable write blocking bypass to allow cloning of catalog data even if writes are disallowed.
@@ -332,7 +344,7 @@ MovePrimaryRecipientService::MovePrimaryRecipient::_transitionToCloningStateAndC
                 "MovePrimaryRecipient encountered unrecoverable error in _transitionToCloningState",
                 "_metadata"_attr = _metadata,
                 "_error"_attr = status);
-            abort();
+            _internalAbort();
         })
         .until<Status>([](const Status& status) { return status.isOK(); })
         .on(**executor, _ctHolder->getAbortToken())
@@ -372,7 +384,7 @@ ExecutorFuture<void> MovePrimaryRecipientService::MovePrimaryRecipient::_transit
                         "_transitionToApplyingState",
                         "_metadata"_attr = _metadata,
                         "_error"_attr = status);
-            abort();
+            _internalAbort();
         })
         .until<Status>([](const Status& status) { return status.isOK(); })
         .on(**executor, _ctHolder->getAbortToken())
@@ -426,7 +438,7 @@ ExecutorFuture<void> MovePrimaryRecipientService::MovePrimaryRecipient::
                         "_transitionToBlockingStateAndAcquireCriticalSection",
                         "_metadata"_attr = _metadata,
                         "_error"_attr = status);
-            abort();
+            _internalAbort();
         })
         .until<Status>([](const Status& status) { return status.isOK(); })
         .on(**executor, _ctHolder->getAbortToken())
@@ -461,7 +473,7 @@ ExecutorFuture<void> MovePrimaryRecipientService::MovePrimaryRecipient::_transit
                         "_transitionToPreparedState",
                         "_metadata"_attr = _metadata,
                         "_error"_attr = status);
-            abort();
+            _internalAbort();
         })
         .until<Status>([](const Status& status) { return status.isOK(); })
         .on(**executor, _ctHolder->getAbortToken())
@@ -791,7 +803,7 @@ MovePrimaryRecipientService::MovePrimaryRecipient::_transitionToInitializingStat
                   "MovePrimaryRecipient received unrecoverable error in "
                   "_transitionToInitializingState",
                   "error"_attr = status);
-            abort();
+            _internalAbort();
         })
         .until<Status>([](const Status& status) { return status.isOK(); })
         .on(**executor, _ctHolder->getAbortToken())
@@ -830,7 +842,7 @@ ExecutorFuture<void> MovePrimaryRecipientService::MovePrimaryRecipient::_initial
             LOGV2(7306801,
                   "Received unrecoverable error while initializing for cloning state",
                   "error"_attr = status);
-            abort();
+            _internalAbort();
         })
         .until<Status>([](const Status& status) { return status.isOK(); })
         .on(**executor, _ctHolder->getAbortToken());

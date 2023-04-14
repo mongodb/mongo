@@ -186,7 +186,7 @@ public:
         void interrupt(Status status) override{};
 
         /**
-         * Aborts the ongoing movePrimary operation which may be user initiated.
+         * Aborts the ongoing movePrimary operation which should be user initiated.
          */
         void abort();
 
@@ -259,6 +259,12 @@ public:
 
         ExecutorFuture<void> _transitionToDoneStateAndFinishMovePrimaryOp(
             const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+
+        /**
+         * This function is called if the recipient service decides to abort due to unrecoverable
+         * errors.
+         */
+        void _internalAbort();
 
         /**
          * Clears cached database info on recipient shard to trigger a refresh on next request with
