@@ -125,12 +125,22 @@ struct SerializationOptions {
 
     std::string serializeFieldPathFromString(StringData path) const;
 
+    std::vector<std::string> serializeFieldPathFromString(
+        const std::vector<std::string>& paths) const {
+        std::vector<std::string> result;
+        result.reserve(paths.size());
+        for (auto& p : paths) {
+            result.push_back(serializeFieldPathFromString(p));
+        }
+        return result;
+    }
+
     template <class T>
     Value serializeLiteralValue(T n) const {
         if (replacementForLiteralArgs) {
             return Value(*replacementForLiteralArgs);
         }
-        return Value(n);
+        return ImplicitValue(n);
     }
 
     // Helper functions for redacting BSONObj. Does not take into account anything to do with MQL
@@ -173,7 +183,7 @@ struct SerializationOptions {
         if (replacementForLiteralArgs) {
             return Value(*replacementForLiteralArgs);
         }
-        return Value(n);
+        return ImplicitValue(n);
     }
 
     /**

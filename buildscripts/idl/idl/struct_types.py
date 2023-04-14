@@ -327,14 +327,19 @@ class _StructTypeInfo(StructTypeInfoBase):
 
     def get_serializer_method(self):
         # type: () -> MethodInfo
+        args = ['BSONObjBuilder* builder']
+        if self._struct.query_shape_component:
+            args.append("SerializationOptions options = {}")
         return MethodInfo(
-            common.title_case(self._struct.cpp_name), 'serialize', ['BSONObjBuilder* builder'],
-            'void', const=True)
+            common.title_case(self._struct.cpp_name), 'serialize', args, 'void', const=True)
 
     def get_to_bson_method(self):
         # type: () -> MethodInfo
+        args = []
+        if self._struct.query_shape_component:
+            args.append("SerializationOptions options = {}")
         return MethodInfo(
-            common.title_case(self._struct.cpp_name), 'toBSON', [], 'BSONObj', const=True)
+            common.title_case(self._struct.cpp_name), 'toBSON', args, 'BSONObj', const=True)
 
     def get_op_msg_request_serializer_method(self):
         # type: () -> Optional[MethodInfo]

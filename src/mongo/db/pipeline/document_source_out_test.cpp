@@ -116,7 +116,7 @@ TEST_F(DocumentSourceOutTest, SerializeToString) {
 }
 
 TEST_F(DocumentSourceOutTest, Redaction) {
-    // TODO SERVER-75110 test support for redaction with timeseries options
+    // TODO SERVER-75138 test support for redaction with timeseries options
     auto spec = fromjson(R"({
             $out: {
                 db: "foo",

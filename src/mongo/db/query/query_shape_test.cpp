@@ -34,6 +34,8 @@
 #include "mongo/db/matcher/parsed_match_expression_for_test.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/query_shape.h"
+#include "mongo/db/query/query_shape_test_gen.h"
+#include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -517,6 +519,132 @@ TEST(QueryPredicateShape, OptimizedExprPredicates) {
             ]
         })",
         queryShapeForOptimizedExprExpression("{$expr: {$gte: ['$a', 2]}}"));
+}
+
+TEST(QueryShapeIDL, ShapifyIDLStruct) {
+    SerializationOptions options;
+    options.redactIdentifiers = true;
+    options.identifierRedactionPolicy = [](StringData s) -> std::string {
+        return str::stream() << "HASH<" << s << ">";
+    };
+    options.replacementForLiteralArgs = "?"_sd;
+
+    auto nested = NestedStruct("value",
+                               ExampleEnumEnum::Value1,
+                               1337,
+                               "hello",
+                               {1, 2, 3, 4},
+                               "field.path",
+                               {"field.path.1", "fieldpath2"});
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "stringField": "value",
+            "enumField": "EnumValue1",
+            "stringIntVariant": 1337,
+            "stringIntVariantEnum": "hello",
+            "arrayOfInts": [
+                1,
+                2,
+                3,
+                4
+            ],
+            "fieldpath": "field.path",
+            "fieldpathList": [
+                "field.path.1",
+                "fieldpath2"
+            ]
+        })",
+        nested.toBSON());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "stringField": "?",
+            "enumField": "EnumValue1",
+            "stringIntVariant": "?",
+            "stringIntVariantEnum": "hello",
+            "arrayOfInts": "?",
+            "fieldpath": "HASH<field>.HASH<path>",
+            "fieldpathList": [
+                "HASH<field>.HASH<path>.HASH<1>",
+                "HASH<fieldpath2>"
+            ]
+        })",
+        nested.toBSON(options));
+
+
+    auto parent = ParentStruct(nested, nested);
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "nested_shape": {
+                "stringField": "value",
+                "enumField": "EnumValue1",
+                "stringIntVariant": 1337,
+                "stringIntVariantEnum": "hello",
+                "arrayOfInts": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "fieldpath": "field.path",
+                "fieldpathList": [
+                    "field.path.1",
+                    "fieldpath2"
+                ]
+            },
+            "nested_no_shape": {
+                "stringField": "value",
+                "enumField": "EnumValue1",
+                "stringIntVariant": 1337,
+                "stringIntVariantEnum": "hello",
+                "arrayOfInts": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "fieldpath": "field.path",
+                "fieldpathList": [
+                    "field.path.1",
+                    "fieldpath2"
+                ]
+            }
+        })",
+        parent.toBSON());
+
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "nested_shape": {
+                "stringField": "?",
+                "enumField": "EnumValue1",
+                "stringIntVariant": "?",
+                "stringIntVariantEnum": "hello",
+                "arrayOfInts": "?",
+                "fieldpath": "HASH<field>.HASH<path>",
+                "fieldpathList": [
+                    "HASH<field>.HASH<path>.HASH<1>",
+                    "HASH<fieldpath2>"
+                ]
+            },
+            "nested_no_shape": {
+                "stringField": "value",
+                "enumField": "EnumValue1",
+                "stringIntVariant": 1337,
+                "stringIntVariantEnum": "hello",
+                "arrayOfInts": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "fieldpath": "field.path",
+                "fieldpathList": [
+                    "field.path.1",
+                    "fieldpath2"
+                ]
+            }
+        })",
+        parent.toBSON(options));
 }
 
 }  // namespace mongo

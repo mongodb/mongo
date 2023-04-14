@@ -272,6 +272,7 @@ def _bind_struct_common(ctxt, parsed_spec, struct, ast_struct):
     ast_struct.allow_global_collection_name = struct.allow_global_collection_name
     ast_struct.non_const_getter = struct.non_const_getter
     ast_struct.is_command_reply = struct.is_command_reply
+    ast_struct.query_shape_component = struct.query_shape_component
     if struct.is_generic_cmd_list:
         if struct.is_generic_cmd_list == "arg":
             ast_struct.generic_list_type = ast.GenericListType.ARG
@@ -324,6 +325,21 @@ def _bind_struct_common(ctxt, parsed_spec, struct, ast_struct):
             if not _is_duplicate_field(ctxt, ast_struct.name, ast_struct.fields, ast_field):
                 ast_struct.fields.append(ast_field)
 
+            # Verify that each field on the struct defines a query shape type on the field if and only if
+            # query_shape_component is defined on the struct.
+            defined_query_shape_type = ast_field.query_shape_literal is not None or ast_field.query_shape_fieldpath is not None
+            if not field.hidden and struct.query_shape_component and not defined_query_shape_type:
+                ctxt.add_must_declare_shape_type(ast_field, ast_struct.name, ast_field.name)
+
+            if not struct.query_shape_component and defined_query_shape_type:
+                ctxt.add_must_be_query_shape_component(ast_field, ast_struct.name, ast_field.name)
+
+            if ast_field.query_shape_fieldpath and ast_field.type.cpp_type not in [
+                    "std::string", "std::vector<std::string>"
+            ]:
+                ctxt.add_query_shape_fieldpath_must_be_string(ast_field, ast_field.name,
+                                                              ast_field.type.cpp_type)
+
     # Fill out the field comparison_order property as needed
     if ast_struct.generate_comparison_operators and ast_struct.fields:
         # If the user did not specify an ordering of fields, then number all fields in
@@ -363,6 +379,7 @@ def _inject_hidden_fields(struct):
     serialization_context_field.cpp_name = "serializationContext"
     serialization_context_field.optional = False
     serialization_context_field.default = "SerializationContext()"
+    serialization_context_field.hidden = True
 
     struct.fields.append(serialization_context_field)
 
@@ -1027,6 +1044,8 @@ def _bind_field(ctxt, parsed_spec, field):
     ast_field.stability = field.stability
     ast_field.always_serialize = field.always_serialize
     ast_field.preparse = field.preparse
+    ast_field.query_shape_literal = field.query_shape_literal
+    ast_field.query_shape_fieldpath = field.query_shape_fieldpath
 
     ast_field.cpp_name = field.name
     if field.cpp_name:
@@ -1035,6 +1054,13 @@ def _bind_field(ctxt, parsed_spec, field):
     # Validate naming restrictions
     if ast_field.name.startswith("array<"):
         ctxt.add_array_not_valid_error(ast_field, "field", ast_field.name)
+
+    # Validate that 'field' is not both a query shape literal and query shape fieldpath. The two are mutually exclusive.
+    if ast_field.query_shape_literal is not None and ast_field.query_shape_fieldpath is not None:
+        ctxt.add_field_cannot_be_literal_and_fieldpath(ast_field, ast_field.name)
+
+    if ast_field.query_shape_fieldpath is False:
+        ctxt.add_field_cannot_have_query_shape_fieldpath_false(ast_field)
 
     if field.ignore:
         ast_field.ignore = field.ignore

@@ -140,6 +140,8 @@ class Struct(common.SourceLocation):
         self.cpp_validator_func = None  # type: str
         self.is_command_reply = False  # type: bool
         self.generic_list_type = None  # type: Optional[GenericListType]
+        # Determines whether or not this IDL struct can be a component of a query shape. See WRITING-13831.
+        self.query_shape_component = False  # type: bool
         super(Struct, self).__init__(file_name, line, column)
 
 
@@ -245,7 +247,18 @@ class Field(common.SourceLocation):
         # Extra info for generic fields.
         self.generic_field_info = None  # type: Optional[GenericFieldInfo]
 
+        # Determines whether or not this field represents a literal value that should be abstracted when serializing a query shape.
+        # See WRITING-13831 for details on query shape.
+        self.query_shape_literal = None  # type: Optional[bool]
+        # Determines whether or not this field represents a fieldpath that should be anonymized.
+        self.query_shape_fieldpath = None  # type: Optional[bool]
+
         super(Field, self).__init__(file_name, line, column)
+
+    @property
+    def should_serialize_query_shape(self):
+        # type: () -> bool
+        return self.query_shape_fieldpath or self.query_shape_literal
 
 
 class Privilege(common.SourceLocation):
