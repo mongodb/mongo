@@ -176,64 +176,66 @@ function testDeleteExplain({
     });
 })();
 
-// TODO SERVER-75518: Enable following three test cases.
-/*
-(function testDeleteOneWithEmptyBucketFilter() {
-    testDeleteExplain({
-        singleDeleteOp: {
-            // The non-meta field filter leads to a COLLSCAN below the TS_MODIFY stage and so
-            // 'expectedNumUnpacked' is 2.
-            q: {_id: 3},
-            limit: 1,
-        },
-        expectedDeleteStageName: "TS_MODIFY",
-        expectedOpType: "deleteOne",
-        // TODO SERVER-75424: The bucket filter should be further optimized to "control.min._id: 3"
-        expectedBucketFilter: {},
-        expectedResidualFilter: {_id: {$eq: 3}},
-        expectedNumDeleted: 1,
-        expectedNumUnpacked: 2
-    });
-})();
+if (FeatureFlagUtil.isPresentAndEnabled(db, "UpdateOneWithoutShardKey")) {
+    (function testDeleteOneWithEmptyBucketFilter() {
+        testDeleteExplain({
+            singleDeleteOp: {
+                // The non-meta field filter leads to a COLLSCAN below the TS_MODIFY stage and so
+                // 'expectedNumUnpacked' is 2.
+                q: {_id: 3},
+                limit: 1,
+            },
+            expectedDeleteStageName: "TS_MODIFY",
+            expectedOpType: "deleteOne",
+            // TODO SERVER-75424: The bucket filter should be further optimized to "control.min._id:
+            // 3"
+            expectedBucketFilter: {},
+            expectedResidualFilter: {_id: {$eq: 3}},
+            expectedNumDeleted: 1,
+            expectedNumUnpacked: 2
+        });
+    })();
 
-(function testDeleteOneWithBucketFilter() {
-    testDeleteExplain({
-        singleDeleteOp: {
-            // The meta field filter leads to a FETCH/IXSCAN below the TS_MODIFY stage and so
-            // 'expectedNumUnpacked' is exactly 1.
-            q: {[metaFieldName]: 2, _id: {$gte: 1}},
-            limit: 1,
-        },
-        expectedDeleteStageName: "TS_MODIFY",
-        expectedOpType: "deleteOne",
-        // The bucket filter is the one with metaFieldName translated to 'meta'.
-        // TODO SERVER-75424: The bucket filter should be further optimized to "control.min._id: 2"
-        expectedBucketFilter: {meta: {$eq: 2}},
-        expectedResidualFilter: {_id: {$gte: 1}},
-        expectedNumDeleted: 1,
-        expectedNumUnpacked: 1
-    });
-})();
+    (function testDeleteOneWithBucketFilter() {
+        testDeleteExplain({
+            singleDeleteOp: {
+                // The meta field filter leads to a FETCH/IXSCAN below the TS_MODIFY stage and so
+                // 'expectedNumUnpacked' is exactly 1.
+                q: {[metaFieldName]: 2, _id: {$gte: 1}},
+                limit: 1,
+            },
+            expectedDeleteStageName: "TS_MODIFY",
+            expectedOpType: "deleteOne",
+            // The bucket filter is the one with metaFieldName translated to 'meta'.
+            // TODO SERVER-75424: The bucket filter should be further optimized to "control.min._id:
+            // 2"
+            expectedBucketFilter: {meta: {$eq: 2}},
+            expectedResidualFilter: {_id: {$gte: 1}},
+            expectedNumDeleted: 1,
+            expectedNumUnpacked: 1
+        });
+    })();
 
-(function testDeleteOneWithBucketFilterAndIndexHint() {
-    testDeleteExplain({
-        singleDeleteOp: {
-            // The meta field filter leads to a FETCH/IXSCAN below the TS_MODIFY stage and so
-            // 'expectedNumUnpacked' is exactly 1.
-            q: {[metaFieldName]: 2, _id: {$gte: 1}},
-            limit: 1,
-            hint: {[metaFieldName]: 1}
-        },
-        expectedDeleteStageName: "TS_MODIFY",
-        expectedOpType: "deleteOne",
-        // The bucket filter is the one with metaFieldName translated to 'meta'.
-        // TODO SERVER-75424: The bucket filter should be further optimized to "control.min._id: 3"
-        expectedBucketFilter: {meta: {$eq: 2}},
-        expectedResidualFilter: {_id: {$gte: 1}},
-        expectedNumDeleted: 1,
-        expectedNumUnpacked: 1,
-        expectedUsedIndexName: metaFieldName + "_1"
-    });
-})();
-*/
+    (function testDeleteOneWithBucketFilterAndIndexHint() {
+        testDeleteExplain({
+            singleDeleteOp: {
+                // The meta field filter leads to a FETCH/IXSCAN below the TS_MODIFY stage and so
+                // 'expectedNumUnpacked' is exactly 1.
+                q: {[metaFieldName]: 2, _id: {$gte: 1}},
+                limit: 1,
+                hint: {[metaFieldName]: 1}
+            },
+            expectedDeleteStageName: "TS_MODIFY",
+            expectedOpType: "deleteOne",
+            // The bucket filter is the one with metaFieldName translated to 'meta'.
+            // TODO SERVER-75424: The bucket filter should be further optimized to "control.min._id:
+            // 3"
+            expectedBucketFilter: {meta: {$eq: 2}},
+            expectedResidualFilter: {_id: {$gte: 1}},
+            expectedNumDeleted: 1,
+            expectedNumUnpacked: 1,
+            expectedUsedIndexName: metaFieldName + "_1"
+        });
+    })();
+}
 })();
