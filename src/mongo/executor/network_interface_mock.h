@@ -41,6 +41,7 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/transport/mock_session.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/time_support.h"
@@ -148,10 +149,18 @@ public:
 
     void testEgress(const HostAndPort&, transport::ConnectSSLMode, Milliseconds, Status) override {}
 
-    // Stream-leasing functionality is not mocked at this time.
+    using LeasedStreamMaker =
+        std::function<std::unique_ptr<NetworkInterface::LeasedStream>(HostAndPort)>;
+
+    void setLeasedStreamMaker(LeasedStreamMaker lsm) {
+        _leasedStreamMaker = std::move(lsm);
+    }
+
     SemiFuture<std::unique_ptr<NetworkInterface::LeasedStream>> leaseStream(
-        const HostAndPort&, transport::ConnectSSLMode, Milliseconds) override {
-        MONGO_UNREACHABLE;
+        const HostAndPort& hp, transport::ConnectSSLMode, Milliseconds) override {
+        invariant(_leasedStreamMaker,
+                  "Tried to lease a stream from NetworkInterfaceMock without providing one");
+        return (*_leasedStreamMaker)(hp);
     }
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -452,6 +461,8 @@ private:
 
     // The handshake replies set for each host.
     stdx::unordered_map<HostAndPort, RemoteCommandResponse> _handshakeReplies;  // (M)
+
+    boost::optional<LeasedStreamMaker> _leasedStreamMaker;
 };
 
 /**
