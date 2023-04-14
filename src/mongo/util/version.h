@@ -185,6 +185,11 @@ std::string mongoShellVersion(const VersionInfoInterface& provider);
 std::string mongosVersion(const VersionInfoInterface& provider);
 
 /**
+ * Returns a pretty string describing the current mongocrypt version.
+ */
+std::string mongocryptVersion(const VersionInfoInterface& provider);
+
+/**
  * Returns a pretty string describing the current mongod version.
  */
 std::string mongodVersion(const VersionInfoInterface& provider);

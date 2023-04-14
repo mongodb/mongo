@@ -257,6 +257,10 @@ std::string mongosVersion(const VersionInfoInterface& provider) {
     return formatVersionString("mongos", provider);
 }
 
+std::string mongocryptVersion(const VersionInfoInterface& provider) {
+    return formatVersionString("mongocrypt", provider);
+}
+
 std::string mongodVersion(const VersionInfoInterface& provider) {
     return formatVersionString("db", provider);
 }
