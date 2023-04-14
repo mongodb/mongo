@@ -28,7 +28,7 @@ tasks:
   crash_method: kill
 
 - name: powercycle_last_lts_fcv
-  fcv: "6.0"
+  fcv: "7.0"
 
 - name: powercycle_replication
   repl_set: powercycle
