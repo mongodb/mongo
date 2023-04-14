@@ -56,6 +56,17 @@ const std::vector<HostAndPort> kTestShardHosts = {HostAndPort("FakeShard1Host", 
                                                   HostAndPort("FakeShard2Host", 12345),
                                                   HostAndPort("FakeShard3Host", 12345)};
 
+std::vector<UUID> extractOperationKeys(BSONObj obj) {
+    ASSERT_TRUE(obj.hasField("operationKeys")) << obj;
+
+    std::vector<UUID> opKeys;
+    for (auto&& elem : obj["operationKeys"].Array()) {
+        auto opKey = unittest::assertGet(UUID::parse(elem));
+        opKeys.push_back(std::move(opKey));
+    }
+    return opKeys;
+}
+
 class EstablishCursorsTest : public ShardingTestFixture {
 public:
     EstablishCursorsTest() : _nss("testdb.testcoll") {}
@@ -89,11 +100,23 @@ public:
     /**
      * Mock a response for a killOperations command.
      */
-    void expectKillOperations(size_t expected) {
+    void expectKillOperations(size_t expected, std::vector<UUID> expectedOpKeys = {}) {
         for (size_t i = 0; i < expected; i++) {
-            onCommand([this](const RemoteCommandRequest& request) {
+            onCommand([&](const RemoteCommandRequest& request) {
                 ASSERT_EQ("admin", request.dbname) << request;
                 ASSERT_TRUE(request.cmdObj.hasField("_killOperations")) << request;
+
+                ASSERT_TRUE(request.cmdObj.hasField("operationKeys")) << request;
+                if (expectedOpKeys.size()) {
+                    auto sentOpKeys = extractOperationKeys(request.cmdObj);
+                    ASSERT_EQ(expectedOpKeys.size(), sentOpKeys.size());
+                    std::sort(expectedOpKeys.begin(), expectedOpKeys.end());
+                    std::sort(sentOpKeys.begin(), sentOpKeys.end());
+                    for (size_t i = 0; i < expectedOpKeys.size(); i++) {
+                        ASSERT_EQ(expectedOpKeys[i], sentOpKeys[i]);
+                    }
+                }
+
                 return BSON("ok" << 1);
             });
         }
@@ -182,8 +205,12 @@ TEST_F(EstablishCursorsTest, SingleRemoteInterruptedWhileCommandInFlight) {
         barrier->countDownAndWait();
     });
 
+    auto seenOpKey = UUID::gen();
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(_nss.coll(), request.cmdObj.firstElement().valueStringData());
+
+        ASSERT_TRUE(request.cmdObj.hasField("clientOperationKey")) << request;
+        seenOpKey = unittest::assertGet(UUID::parse(request.cmdObj["clientOperationKey"]));
 
         // Now that our "remote" has received the request, interrupt the opCtx which the cursor is
         // running under.
@@ -201,7 +228,7 @@ TEST_F(EstablishCursorsTest, SingleRemoteInterruptedWhileCommandInFlight) {
     });
 
     // We were interrupted so establishCursors is forced to send a killOperations out of paranoia.
-    expectKillOperations(1);
+    expectKillOperations(1, {seenOpKey});
 
     future.default_timed_get();
 }
@@ -400,8 +427,12 @@ TEST_F(EstablishCursorsTest, MultipleRemotesOneRemoteRespondsWithNonretriableErr
     });
 
     // First remote responds with success.
+    auto seenOpKey = UUID::gen();
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(_nss.coll(), request.cmdObj.firstElement().valueStringData());
+
+        ASSERT_TRUE(request.cmdObj.hasField("clientOperationKey")) << request;
+        seenOpKey = unittest::assertGet(UUID::parse(request.cmdObj["clientOperationKey"]));
 
         std::vector<BSONObj> batch = {fromjson("{_id: 1}"), fromjson("{_id: 2}")};
         CursorResponse cursorResponse(_nss, CursorId(123), batch);
@@ -409,8 +440,14 @@ TEST_F(EstablishCursorsTest, MultipleRemotesOneRemoteRespondsWithNonretriableErr
     });
 
     // Second remote responds with a non-retriable error.
-    onCommand([this](const RemoteCommandRequest& request) {
+    onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(_nss.coll(), request.cmdObj.firstElement().valueStringData());
+
+        // All commands receive the same opKey.
+        ASSERT_TRUE(request.cmdObj.hasField("clientOperationKey")) << request;
+        auto opKey = unittest::assertGet(UUID::parse(request.cmdObj["clientOperationKey"]));
+        ASSERT_EQ(seenOpKey, opKey);
+
         return createErrorCursorResponse(Status(ErrorCodes::FailedToParse, "failed to parse"));
     });
 
@@ -418,13 +455,94 @@ TEST_F(EstablishCursorsTest, MultipleRemotesOneRemoteRespondsWithNonretriableErr
     onCommand([&](const RemoteCommandRequest& request) {
         ASSERT_EQ(_nss.coll(), request.cmdObj.firstElement().valueStringData());
 
+        // All commands receive the same opKey.
+        ASSERT_TRUE(request.cmdObj.hasField("clientOperationKey")) << request;
+        auto opKey = unittest::assertGet(UUID::parse(request.cmdObj["clientOperationKey"]));
+        ASSERT_EQ(seenOpKey, opKey);
+
         std::vector<BSONObj> batch = {fromjson("{_id: 1}"), fromjson("{_id: 2}")};
         CursorResponse cursorResponse(_nss, CursorId(123), batch);
         return cursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
     });
 
     // Expect two killOperation commands, one for each remote which responded with a cursor.
-    expectKillOperations(2);
+    expectKillOperations(2, {seenOpKey});
+
+    future.default_timed_get();
+}
+
+TEST_F(EstablishCursorsTest, AcceptsCustomOpKeys) {
+    std::vector<UUID> providedOpKeys = {UUID::gen(), UUID::gen()};
+    auto cmdObj0 = BSON("find"
+                        << "testcoll"
+                        << "clientOperationKey" << providedOpKeys[0]);
+    auto cmdObj1 = BSON("find"
+                        << "testcoll"
+                        << "clientOperationKey" << providedOpKeys[1]);
+    auto cmdObj2 = BSON("find"
+                        << "testcoll"
+                        << "clientOperationKey" << providedOpKeys[1]);
+    std::vector<std::pair<ShardId, BSONObj>> remotes{
+        {kTestShardIds[0], cmdObj0}, {kTestShardIds[1], cmdObj1}, {kTestShardIds[2], cmdObj2}};
+
+    auto future = launchAsync([&] {
+        ASSERT_THROWS(establishCursors(operationContext(),
+                                       executor(),
+                                       _nss,
+                                       ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                       remotes,
+                                       false,  // allowPartialResults
+                                       Shard::RetryPolicy::kIdempotent,
+                                       providedOpKeys),
+                      ExceptionFor<ErrorCodes::FailedToParse>);
+    });
+
+    // First remote responds with success.
+    onCommand([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(_nss.coll(), request.cmdObj.firstElement().valueStringData());
+
+        // All commands use the opKey they were given.
+        ASSERT_TRUE(request.cmdObj.hasField("clientOperationKey")) << request;
+        auto opKey = unittest::assertGet(UUID::parse(request.cmdObj["clientOperationKey"]));
+        ASSERT_TRUE(std::find(providedOpKeys.begin(), providedOpKeys.end(), opKey) !=
+                    providedOpKeys.end());
+
+        std::vector<BSONObj> batch = {fromjson("{_id: 1}"), fromjson("{_id: 2}")};
+        CursorResponse cursorResponse(_nss, CursorId(123), batch);
+        return cursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
+    });
+
+    // Second remote responds with a non-retriable error.
+    onCommand([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(_nss.coll(), request.cmdObj.firstElement().valueStringData());
+
+        // All commands use the opKey they were given.
+        ASSERT_TRUE(request.cmdObj.hasField("clientOperationKey")) << request;
+        auto opKey = unittest::assertGet(UUID::parse(request.cmdObj["clientOperationKey"]));
+        ASSERT_TRUE(std::find(providedOpKeys.begin(), providedOpKeys.end(), opKey) !=
+                    providedOpKeys.end());
+
+        return createErrorCursorResponse(Status(ErrorCodes::FailedToParse, "failed to parse"));
+    });
+
+    // Third remote responds with success (must give some response to mock network for each remote).
+    onCommand([&](const RemoteCommandRequest& request) {
+        ASSERT_EQ(_nss.coll(), request.cmdObj.firstElement().valueStringData());
+
+        // All commands use the opKey they were given.
+        ASSERT_TRUE(request.cmdObj.hasField("clientOperationKey")) << request;
+        auto opKey = unittest::assertGet(UUID::parse(request.cmdObj["clientOperationKey"]));
+        ASSERT_TRUE(std::find(providedOpKeys.begin(), providedOpKeys.end(), opKey) !=
+                    providedOpKeys.end());
+
+        std::vector<BSONObj> batch = {fromjson("{_id: 1}"), fromjson("{_id: 2}")};
+        CursorResponse cursorResponse(_nss, CursorId(123), batch);
+        return cursorResponse.toBSON(CursorResponse::ResponseType::InitialResponse);
+    });
+
+    // Expect two killOperation commands, one for each remote which responded with a cursor. Both
+    // should include all provided opKeys.
+    expectKillOperations(2, providedOpKeys);
 
     future.default_timed_get();
 }

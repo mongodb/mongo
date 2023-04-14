@@ -59,6 +59,10 @@ class CursorResponse;
  * On success, the ownership of the cursors is transferred to the caller. This means the caller is
  * now responsible for either exhausting the cursors or sending killCursors to them.
  *
+ * If providedOpKeys are given, this assumes all requests have been given an operation key and will
+ * use the provided keys to kill operations on failure. Otherwise a unique operation key is
+ * generated and attached to all requests.
+ *
  * @param allowPartialResults: If true, unreachable hosts are ignored, and only cursors established
  *                             on reachable hosts are returned.
  *
@@ -70,7 +74,8 @@ std::vector<RemoteCursor> establishCursors(
     ReadPreferenceSetting readPref,
     const std::vector<std::pair<ShardId, BSONObj>>& remotes,
     bool allowPartialResults,
-    Shard::RetryPolicy retryPolicy = Shard::RetryPolicy::kIdempotent);
+    Shard::RetryPolicy retryPolicy = Shard::RetryPolicy::kIdempotent,
+    std::vector<OperationKey> providedOpKeys = {});
 
 /**
  * Establishes cursors on every host in the remote shards by issuing requests in parallel with the
@@ -102,5 +107,10 @@ void killRemoteCursor(OperationContext* opCtx,
                       executor::TaskExecutor* executor,
                       RemoteCursor&& cursor,
                       const NamespaceString& nss);
+
+/**
+ * Appends the given operation key to the given request.
+ */
+BSONObj appendOpKey(const OperationKey& opKey, const BSONObj& request);
 
 }  // namespace mongo

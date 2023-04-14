@@ -11,10 +11,6 @@
 (function() {
 "use strict";
 
-// TODO (SERVER-74534): Enable the metadata consistency check when it will work with co-located
-// configsvr.
-TestData.skipCheckMetadataConsistency = true;
-
 load("jstests/libs/catalog_shard_util.js");
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/write_concern_util.js");

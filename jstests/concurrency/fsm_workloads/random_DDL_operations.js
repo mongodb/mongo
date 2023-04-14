@@ -121,9 +121,7 @@ var $config = (function() {
         this.skipMovePrimary = !FeatureFlagUtil.isEnabled(db.getMongo(), 'ResilientMovePrimary');
         this.skipMetadataChecks =
             // TODO SERVER-70396: remove this flag
-            !FeatureFlagUtil.isEnabled(db.getMongo(), 'CheckMetadataConsistency') ||
-            // TODO SERVER-74445: re-enable metadata checks on catalog shard deployments
-            cluster.hasCatalogShard();
+            !FeatureFlagUtil.isEnabled(db.getMongo(), 'CheckMetadataConsistency');
 
         for (var i = 0; i < dbCount; i++) {
             const dbName = dbPrefix + i;
