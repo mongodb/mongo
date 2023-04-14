@@ -124,7 +124,7 @@ std::pair<GroupIdType, NodeIdSet> LogicalRewriter::addNode(const ABT& node,
                                                            const GroupIdType targetGroupId,
                                                            const LogicalRewriteType rule,
                                                            const bool addExistingNodeWithNewChild) {
-    NodeIdSet insertNodeIds;
+    NodeIdSet insertedNodeIds;
 
     Memo::NodeTargetGroupMap targetGroupMap;
     if (targetGroupId >= 0) {
@@ -135,15 +135,18 @@ std::pair<GroupIdType, NodeIdSet> LogicalRewriter::addNode(const ABT& node,
         Memo::Context{&_metadata, &_debugInfo, &_logicalPropsDerivation, &_cardinalityEstimator},
         node,
         std::move(targetGroupMap),
-        insertNodeIds,
-        rule,
-        addExistingNodeWithNewChild);
+        insertedNodeIds,
+        rule);
 
     uassert(6624046,
             "Result group is not the same as target group",
             targetGroupId < 0 || targetGroupId == resultGroupId);
 
-    for (const MemoLogicalNodeId& nodeMemoId : insertNodeIds) {
+    // Every memo group that was extended with a new node may have new rewrites that can apply to
+    // it, so enqueue each of these groups to be visited by a rewrite later.
+    for (const MemoLogicalNodeId& nodeMemoId : insertedNodeIds) {
+        // However, if 'addExistingNodeWithNewChild' then don't schedule the 'targetGroupId' for new
+        // rewrites, to avoid applying the same rewrite forever.
         if (addExistingNodeWithNewChild && nodeMemoId._groupId == targetGroupId) {
             continue;
         }
@@ -156,7 +159,7 @@ std::pair<GroupIdType, NodeIdSet> LogicalRewriter::addNode(const ABT& node,
         }
     }
 
-    return {resultGroupId, std::move(insertNodeIds)};
+    return {resultGroupId, std::move(insertedNodeIds)};
 }
 
 void LogicalRewriter::clearGroup(const GroupIdType groupId) {
@@ -705,6 +708,10 @@ static void convertFilterToSargableNode(ABT::reference_type node,
                                           IndexReqTarget::Complete,
                                           filterNode.getChild());
     if (conversion->_retainPredicate) {
+        // '_retainPredicate' means the 'sargableNode' is an over-approximation, so we also have to
+        // keep the original Filter node. But this means the Filter-to-Sargable rewrite could apply
+        // again, to avoid rewriting endlessly we need to avoid scheduling this rewrite. So we pass
+        // 'addExistingNodeWithNewChild = true'.
         ABT newNode = node;
         newNode.cast<FilterNode>()->getChild() = std::move(sargableNode);
         ctx.addNode(newNode, true /*substitute*/, true /*addExistingNodeWithNewChild*/);

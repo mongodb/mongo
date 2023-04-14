@@ -42,16 +42,24 @@ namespace mongo::optimizer::cascades {
  * the memo itself.
  */
 
+/**
+ * Deep hashing, compatible with deep equality comparison.
+ */
 struct MemoNodeRefHash {
     size_t operator()(const ABT::reference_type& nodeRef) const;
 };
 
+/**
+ * Deep equality comparison.
+ */
 struct MemoNodeRefCompare {
     bool operator()(const ABT::reference_type& left, const ABT::reference_type& right) const;
 };
 
 /**
- * A set of ABT nodes which keeps track of the order in which we inserted them.
+ * A set of ABT which keeps track of the order in which we inserted them.
+ *
+ * Compares ABTs using deep equality.
  */
 class OrderPreservingABTSet {
 public:

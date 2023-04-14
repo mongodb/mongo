@@ -123,7 +123,14 @@ const ExpressionBinder& Group::binder() const {
 }
 
 /**
- * TODO SERVER-70407: Improve documentation around the Memo and related classes.
+ * MemoIntegrator adds a logical plan to a Memo, by putting each node (stage) in the appropriate
+ * group, and returning the group ID where the root node can be found.
+ *
+ * It works recursively: to add a node to a Memo, first add each child, and replace each child with
+ * a MemoLogicalDelegator that refers to the group where that child was put.
+ *
+ * After stubbing out the children it relies on 'Memo::addNode' to ensure that if a syntactically
+ * equal node is already in some group, we reuse it.
  */
 class MemoIntegrator {
 public:
@@ -131,14 +138,12 @@ public:
                             Memo& memo,
                             Memo::NodeTargetGroupMap targetGroupMap,
                             NodeIdSet& insertedNodeIds,
-                            const LogicalRewriteType rule,
-                            const bool addExistingNodeWithNewChild)
+                            const LogicalRewriteType rule)
         : _ctx(std::move(ctx)),
           _memo(memo),
           _insertedNodeIds(insertedNodeIds),
           _targetGroupMap(std::move(targetGroupMap)),
-          _rule(rule),
-          _addExistingNodeWithNewChild(addExistingNodeWithNewChild) {}
+          _rule(rule) {}
 
     // This is a transient structure. We do not allow copying or moving.
     MemoIntegrator(const MemoIntegrator& /*other*/) = delete;
@@ -149,9 +154,6 @@ public:
     /**
      * Nodes
      */
-    void prepare(const ABT& n, const ScanNode& node, const VariableEnvironment& /*env*/) {
-        // noop
-    }
 
     GroupIdType transport(const ABT& n,
                           const ScanNode& node,
@@ -160,21 +162,11 @@ public:
         return addNodes(n, node, n, env, {});
     }
 
-    void prepare(const ABT& n, const ValueScanNode& node, const VariableEnvironment& /*env*/) {
-        // noop
-    }
-
     GroupIdType transport(const ABT& n,
                           const ValueScanNode& node,
                           const VariableEnvironment& env,
                           GroupIdType /*binder*/) {
         return addNodes(n, node, n, env, {});
-    }
-
-    void prepare(const ABT& n,
-                 const MemoLogicalDelegatorNode& node,
-                 const VariableEnvironment& /*env*/) {
-        // noop
     }
 
     GroupIdType transport(const ABT& n,
@@ -187,20 +179,12 @@ public:
         return addNodes(n, node, n, env, {});
     }
 
-    void prepare(const ABT& n, const FilterNode& node, const VariableEnvironment& /*env*/) {
-        updateTargetGroupMapUnary(n, node);
-    }
-
     GroupIdType transport(const ABT& n,
                           const FilterNode& node,
                           const VariableEnvironment& env,
                           GroupIdType child,
                           GroupIdType /*binder*/) {
         return addNode(n, node, env, child);
-    }
-
-    void prepare(const ABT& n, const EvaluationNode& node, const VariableEnvironment& /*env*/) {
-        updateTargetGroupMapUnary(n, node);
     }
 
     GroupIdType transport(const ABT& n,
@@ -211,10 +195,6 @@ public:
         return addNode(n, node, env, child);
     }
 
-    void prepare(const ABT& n, const SargableNode& node, const VariableEnvironment& /*env*/) {
-        updateTargetGroupMapUnary(n, node);
-    }
-
     GroupIdType transport(const ABT& n,
                           const SargableNode& node,
                           const VariableEnvironment& env,
@@ -222,14 +202,6 @@ public:
                           GroupIdType /*binder*/,
                           GroupIdType /*references*/) {
         return addNode(n, node, env, child);
-    }
-
-    void prepare(const ABT& n, const RIDIntersectNode& node, const VariableEnvironment& /*env*/) {
-        // noop.
-    }
-
-    void prepare(const ABT& n, const RIDUnionNode& node, const VariableEnvironment& /*env*/) {
-        // noop.
     }
 
     GroupIdType transport(const ABT& n,
@@ -248,10 +220,6 @@ public:
         return addNodes(n, node, env, leftChild, rightChild);
     }
 
-    void prepare(const ABT& n, const BinaryJoinNode& node, const VariableEnvironment& /*env*/) {
-        updateTargetGroupMapBinary(n, node);
-    }
-
     GroupIdType transport(const ABT& n,
                           const BinaryJoinNode& node,
                           const VariableEnvironment& env,
@@ -261,10 +229,6 @@ public:
         return addNodes(n, node, env, leftChild, rightChild);
     }
 
-    void prepare(const ABT& n, const UnionNode& node, const VariableEnvironment& /*env*/) {
-        updateTargetGroupMapNary(n, node);
-    }
-
     GroupIdType transport(const ABT& n,
                           const UnionNode& node,
                           const VariableEnvironment& env,
@@ -272,10 +236,6 @@ public:
                           GroupIdType /*binder*/,
                           GroupIdType /*refs*/) {
         return addNodes(n, node, env, std::move(children));
-    }
-
-    void prepare(const ABT& n, const GroupByNode& node, const VariableEnvironment& /*env*/) {
-        updateTargetGroupMapUnary(n, node);
     }
 
     GroupIdType transport(const ABT& n,
@@ -289,10 +249,6 @@ public:
         return addNode(n, node, env, child);
     }
 
-    void prepare(const ABT& n, const UnwindNode& node, const VariableEnvironment& /*env*/) {
-        updateTargetGroupMapUnary(n, node);
-    }
-
     GroupIdType transport(const ABT& n,
                           const UnwindNode& node,
                           const VariableEnvironment& env,
@@ -300,10 +256,6 @@ public:
                           GroupIdType /*binder*/,
                           GroupIdType /*refs*/) {
         return addNode(n, node, env, child);
-    }
-
-    void prepare(const ABT& n, const CollationNode& node, const VariableEnvironment& /*env*/) {
-        updateTargetGroupMapUnary(n, node);
     }
 
     GroupIdType transport(const ABT& n,
@@ -314,19 +266,11 @@ public:
         return addNode(n, node, env, child);
     }
 
-    void prepare(const ABT& n, const LimitSkipNode& node, const VariableEnvironment& /*env*/) {
-        updateTargetGroupMapUnary(n, node);
-    }
-
     GroupIdType transport(const ABT& n,
                           const LimitSkipNode& node,
                           const VariableEnvironment& env,
                           GroupIdType child) {
         return addNode(n, node, env, child);
-    }
-
-    void prepare(const ABT& n, const ExchangeNode& node, const VariableEnvironment& /*env*/) {
-        updateTargetGroupMapUnary(n, node);
     }
 
     GroupIdType transport(const ABT& n,
@@ -335,10 +279,6 @@ public:
                           GroupIdType child,
                           GroupIdType /*refs*/) {
         return addNode(n, node, env, child);
-    }
-
-    void prepare(const ABT& n, const RootNode& node, const VariableEnvironment& /*env*/) {
-        updateTargetGroupMapUnary(n, node);
     }
 
     GroupIdType transport(const ABT& n,
@@ -359,11 +299,6 @@ public:
                           Ts&&...) {
         static_assert(!canBeLogicalNode<T>(), "Logical node must implement its transport.");
         return -1;
-    }
-
-    template <typename T, typename... Ts>
-    void prepare(const ABT& n, const T& /*node*/, const VariableEnvironment& /*env*/) {
-        static_assert(!canBeLogicalNode<T>(), "Logical node must implement its prepare.");
     }
 
     GroupIdType integrate(const ABT& n) {
@@ -430,105 +365,20 @@ private:
         return addNodes(n, node, std::move(forMemo), env, {leftGroupId, rightGroupId});
     }
 
-    template <class T>
-    ABT::reference_type findExistingNodeFromTargetGroupMap(const ABT& n, const T& node) {
-        auto it = _targetGroupMap.find(n.ref());
-        if (it == _targetGroupMap.cend()) {
-            return nullptr;
-        }
-        if (const auto index = _memo.findNodeInGroup(it->second, n.ref())) {
-            ABT::reference_type result = _memo.getNode({it->second, *index});
-            uassert(6624049, "Node type in memo does not match target type", result.is<T>());
-            return result;
-        }
-        return nullptr;
-    }
-
-    void updateTargetGroupRefs(
-        const std::vector<std::pair<ABT::reference_type, GroupIdType>>& childGroups) {
-        for (auto [childRef, targetGroupId] : childGroups) {
-            auto it = _targetGroupMap.find(childRef);
-            if (it == _targetGroupMap.cend()) {
-                _targetGroupMap.emplace(childRef, targetGroupId);
-            } else if (it->second != targetGroupId) {
-                uasserted(6624050, "Incompatible target groups for parent and child");
-            }
-        }
-    }
-
-    template <class T>
-    void updateTargetGroupMapUnary(const ABT& n, const T& node) {
-        if (_addExistingNodeWithNewChild) {
-            return;
-        }
-
-        ABT::reference_type existing = findExistingNodeFromTargetGroupMap(n, node);
-        if (!existing.empty()) {
-            const GroupIdType targetGroupId = existing.cast<T>()
-                                                  ->getChild()
-                                                  .template cast<MemoLogicalDelegatorNode>()
-                                                  ->getGroupId();
-            updateTargetGroupRefs({{node.getChild().ref(), targetGroupId}});
-        }
-    }
-
-    template <class T>
-    void updateTargetGroupMapNary(const ABT& n, const T& node) {
-        ABT::reference_type existing = findExistingNodeFromTargetGroupMap(n, node);
-        if (!existing.empty()) {
-            const ABTVector& existingChildren = existing.cast<T>()->nodes();
-            const ABTVector& targetChildren = node.nodes();
-            uassert(6624051,
-                    "Different number of children between existing and target node",
-                    existingChildren.size() == targetChildren.size());
-
-            std::vector<std::pair<ABT::reference_type, GroupIdType>> childGroups;
-            for (size_t i = 0; i < existingChildren.size(); i++) {
-                const ABT& existingChild = existingChildren.at(i);
-                const ABT& targetChild = targetChildren.at(i);
-                childGroups.emplace_back(
-                    targetChild.ref(),
-                    existingChild.cast<MemoLogicalDelegatorNode>()->getGroupId());
-            }
-            updateTargetGroupRefs(childGroups);
-        }
-    }
-
-    template <class T>
-    void updateTargetGroupMapBinary(const ABT& n, const T& node) {
-        ABT::reference_type existing = findExistingNodeFromTargetGroupMap(n, node);
-        if (existing.empty()) {
-            return;
-        }
-
-        const T& existingNode = *existing.cast<T>();
-        const GroupIdType leftGroupId =
-            existingNode.getLeftChild().template cast<MemoLogicalDelegatorNode>()->getGroupId();
-        const GroupIdType rightGroupId =
-            existingNode.getRightChild().template cast<MemoLogicalDelegatorNode>()->getGroupId();
-        updateTargetGroupRefs(
-            {{node.getLeftChild().ref(), leftGroupId}, {node.getRightChild().ref(), rightGroupId}});
-    }
-
-    /**
-     * We do not own any of these.
-     */
+    // Contains several resources required for calling Memo::addNode.
     Memo::Context _ctx;
+    // The memo to be updated.
     Memo& _memo;
+    // An out param, for reporting nodes we insert to the memo.
     NodeIdSet& _insertedNodeIds;
 
-    /**
-     * We own this.
-     */
+    // Each [node, groupId] entry means force the given node to go into the given group.
+    // This is only used for the root node passed in to Memo::integrate(), so there should be
+    // at most 1 entry.
     Memo::NodeTargetGroupMap _targetGroupMap;
 
     // Rewrite rule that triggered this node to be created.
     const LogicalRewriteType _rule;
-
-    // If set we enable modification of target group based on existing nodes. In practical terms, we
-    // would not assume that if F(x) = F(y) then x = y. This is currently used in conjunction with
-    // $elemMatch rewrite (PathTraverse over PathCompose).
-    bool _addExistingNodeWithNewChild;
 };
 
 Memo::Context::Context(const Metadata* metadata,
@@ -565,28 +415,9 @@ Group& Memo::getGroup(const GroupIdType groupId) {
     return *_groups.at(groupId);
 }
 
-boost::optional<size_t> Memo::findNodeInGroup(GroupIdType groupId, ABT::reference_type node) const {
-    return getGroup(groupId)._logicalNodes.find(node);
-}
-
 GroupIdType Memo::addGroup(ProjectionNameSet projections) {
     _groups.emplace_back(std::make_unique<Group>(std::move(projections)));
     return _groups.size() - 1;
-}
-
-std::pair<MemoLogicalNodeId, bool> Memo::addNode(GroupIdType groupId,
-                                                 ABT n,
-                                                 LogicalRewriteType rule) {
-    uassert(6624052, "Attempting to insert a physical node", !n.is<ExclusivelyPhysicalNode>());
-
-    Group& group = *_groups.at(groupId);
-    OrderPreservingABTSet& nodes = group._logicalNodes;
-
-    const auto [index, inserted] = nodes.emplace_back(std::move(n));
-    if (inserted) {
-        group._rules.push_back(rule);
-    }
-    return {{groupId, index}, inserted};
 }
 
 ABT::reference_type Memo::getNode(const MemoLogicalNodeId nodeMemoId) const {
@@ -682,6 +513,7 @@ MemoLogicalNodeId Memo::addNode(const Context& ctx,
                                 NodeIdSet& insertedNodeIds,
                                 ABT n,
                                 const LogicalRewriteType rule) {
+    uassert(6624052, "Attempting to insert a physical node", !n.is<ExclusivelyPhysicalNode>());
     for (const GroupIdType groupId : groupVector) {
         // Invalid tree: node is its own child.
         uassert(6624127, "Target group appears inside group vector", groupId != targetGroupId);
@@ -703,7 +535,14 @@ MemoLogicalNodeId Memo::addNode(const Context& ctx,
 
     // Current node is not in the memo. Insert unchanged.
     const GroupIdType groupId = noTargetGroup ? addGroup(std::move(projections)) : targetGroupId;
-    auto [newId, inserted] = addNode(groupId, std::move(n), rule);
+    Group& group = *_groups.at(groupId);
+    OrderPreservingABTSet& nodes = group._logicalNodes;
+    const auto [index, inserted] = nodes.emplace_back(std::move(n));
+    if (inserted) {
+        group._rules.push_back(rule);
+    }
+    auto newId = MemoLogicalNodeId{groupId, index};
+
     if (inserted || noTargetGroup) {
         insertedNodeIds.insert(newId);
         _inputGroupsToNodeIdMap[groupVector].insert(newId);
@@ -731,11 +570,9 @@ GroupIdType Memo::integrate(const Memo::Context& ctx,
                             const ABT& node,
                             NodeTargetGroupMap targetGroupMap,
                             NodeIdSet& insertedNodeIds,
-                            const LogicalRewriteType rule,
-                            const bool addExistingNodeWithNewChild) {
+                            const LogicalRewriteType rule) {
     _stats._numIntegrations++;
-    MemoIntegrator integrator(
-        ctx, *this, std::move(targetGroupMap), insertedNodeIds, rule, addExistingNodeWithNewChild);
+    MemoIntegrator integrator(ctx, *this, std::move(targetGroupMap), insertedNodeIds, rule);
     return integrator.integrate(node);
 }
 

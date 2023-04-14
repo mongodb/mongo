@@ -37,7 +37,7 @@
 namespace mongo::optimizer::cascades {
 
 /**
- * Keeps track of candidate physical rewrites.
+ * Represents a logical rewrite that will be attempted at a particular node, in a particular group.
  */
 struct LogicalRewriteEntry {
     LogicalRewriteEntry(double priority, LogicalRewriteType type, MemoLogicalNodeId nodeId);

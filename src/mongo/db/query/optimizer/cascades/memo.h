@@ -87,30 +87,87 @@ private:
     opt::unordered_map<properties::PhysProps, size_t, PhysPropsHasher> _physPropsToPhysNodeMap;
 };
 
+/**
+ * Represents a set of equivalent query plans.  See 'class Memo' for more detail.
+ */
 struct Group {
     explicit Group(ProjectionNameSet projections);
 
     Group(const Group&) = delete;
     Group(Group&&) = default;
 
+    // Returns the set of bindings that all plans in this group are expected to produce.
+    // (Since all plans in a Group are equivalent, they all must produce the same bindings.)
     const ExpressionBinder& binder() const;
 
-    // Associated logical nodes.
+    // Contains a set of equivalent logical plans. Each element is a LogicalNode, and its immediate
+    // immediate children are MemoLogicalDelegatorNode. This ensures every logical node has an
+    // associated group. For example we would never have (Filter B (Filter A (Delegator _))) here
+    // because 'Filter A' would have no associated group.
     OrderPreservingABTSet _logicalNodes;
-    // Rule that triggered each logical node.
+    // Stores, for each logical node, the rewrite rule that first caused that node to be created.
+    // '_rules[i]' corresponds to '_logicalNodes[i]'.
+    // Used only for explain / debugging.
     std::vector<LogicalRewriteType> _rules;
-    // Group logical properties.
+    // Contains logical properties that are derived bottom-up from the first logical plan in the
+    // group. Since all plans in the group are expected to be equivalent, the logical properties are
+    // expected to be true for all plans in the group.
     properties::LogicalProps _logicalProperties;
+
+    // Same as 'binder()'.
     ABT _binder;
 
+    // A collection of 'LogicalRewriteEntry', indicating which rewrites we will attempt next, and at
+    // which node.
+    //
+    // Each entry represents a specific rewrite rule, and a specific node. Typically there are many
+    // entries pointing to the same node, but each for a different rewrite rule. In
+    // 'LogicalRewriter::addNode', for every newly added node we schedule all possible rewrites
+    // which transform it or reorder it against other nodes. The goal is to try all possible ways to
+    // generate new plans using this new node.
     LogicalRewriteQueue _logicalRewriteQueue;
 
     // Best physical plan for given physical properties: aka "Winner's circle".
+    //
+    // Unlike '_logicalNodes', the immediate children of physical nodes are not required to be
+    // delegator nodes. Each entry in '_physicalNode' can be a complex tree of nodes, which may or
+    // may not end in 'MemoPhysicalDelegatorNode' at the leaves.
     PhysNodes _physicalNodes;
 };
 
 /**
- * TODO SERVER-70407: Improve documentation around the Memo and related classes.
+ * A Memo holds all the alternative plans for a query, and for all of its subqueries.
+ *
+ * A Memo is made of 'groups': a group is a set of alternative plans that produce the same result
+ * (the same bag of rows). You can think of a group as representing a question: "what is the best
+ * plan for this query?". During optimization a group holds several possible answers, and at the end
+ * we will choose the best answer based on cost estimates.
+ *
+ * The logical plans in a group are all interchangeable, since they compute the same bag. Anywhere
+ * one logical plan can appear, so can an equivalent one: it doesn't change the overall result.
+ * So, the logical plans in a group are all stored together in one ABTVector.
+ *
+ * By contrast, not all physical plans are interchangeable. For example, the MergeJoin algorithm
+ * requires sorted input. So the physical plans in a group are stored separately, to answer separate
+ * questions:
+ * - "What is the best physical plan whose results are sorted by <x>?"
+ * - "What is the best physical plan that uses an index?"
+ * - "What is the best physical plan whose results are sorted by (<x>, <y>), and uses an index?"
+ * - "What is the best physical plan (with no constraints)?"
+ * etc. Each set of physical properties is a different optimization question. So a group has a
+ * mapping from set of physical properties, to the best physical plan discovered so far that
+ * produces the same logical result and satisfies those properties. For optimization we only need
+ * the best plan for each set of properties, but if 'keepRejectedPlans' is enabled then we keep the
+ * non-best plans for debugging.
+ *
+ * Typically a Memo is populated by calling 'integrate()' to add the initial logical plan, and then
+ * letting rewrite rules add more plans.
+ * - In the substitution phase, 'RewriteContext' uses 'Memo::clearLogicalNodes()' and
+ *   'Memo::integrate()' to replace a group with a single logical node.
+ * - In the exploration phase, 'RewriteContext' uses 'Memo::integrate()' to add alternative logical
+ *   plans to a group.
+ * - In the implementation phase, 'PhysicalRewriter' uses 'PhysNodes::addOptimizationResult()' to
+ *   update the set of physical plans.
  */
 class Memo : public MemoExplainInterface, public MemoGroupBinderInterface {
     // To be able to access _stats field.
@@ -178,8 +235,6 @@ public:
 
     LogicalRewriteQueue& getLogicalRewriteQueue(GroupIdType groupId);
 
-    boost::optional<size_t> findNodeInGroup(GroupIdType groupId, ABT::reference_type node) const;
-
     ABT::reference_type getNode(MemoLogicalNodeId nodeMemoId) const;
 
     /**
@@ -189,20 +244,20 @@ public:
      */
     void estimateCE(const Context& ctx, GroupIdType groupId);
 
-    MemoLogicalNodeId addNode(const Context& ctx,
-                              GroupIdVector groupVector,
-                              ProjectionNameSet projections,
-                              GroupIdType targetGroupId,
-                              NodeIdSet& insertedNodeIds,
-                              ABT n,
-                              LogicalRewriteType rule);
-
+    /**
+     * Takes a logical plan, and adds each Node to the appropriate group.
+     *
+     * Caller can use 'targetGroupMap' to force a node to go into a desired group.
+     * The out-param 'insertedNodeIds' tells the caller which nodes were newly inserted.
+     * Optional 'rule' is used to annotate any newly inserted nodes, for debugging.
+     *
+     * See 'class MemoIntegrator' for more details.
+     */
     GroupIdType integrate(const Context& ctx,
                           const ABT& node,
                           NodeTargetGroupMap targetGroupMap,
                           NodeIdSet& insertedNodeIds,
-                          LogicalRewriteType rule = LogicalRewriteType::Root,
-                          bool addExistingNodeWithNewChild = false);
+                          LogicalRewriteType rule = LogicalRewriteType::Root);
 
     void clearLogicalNodes(GroupIdType groupId);
 
@@ -215,12 +270,39 @@ public:
     size_t getPhysicalNodeCount() const;
 
 private:
+    // MemoIntegrator is a helper / transport for 'Memo::integrate()'.
+    friend class MemoIntegrator;
+
+    /**
+     * Ensures the logical node 'n' is present in some Group.
+     *
+     * 'groupVector' should be the set of group IDs that contain the immediate children of 'n'. This
+     * is used to maintain '_inputGroupsToNodeIdMap' and '_nodeIdToInputGroupsMap'.
+     *
+     * 'projections' should be the set of output bindings of 'n'. It's used to initialize the
+     * ProjectionAvailability property in the case where a new Group is created.
+     *
+     * Optional 'targetGroupId' means force the node to be added to the given group,
+     * and raise an error if it's already present in some other group. '-1' means use an existing
+     * group if possible or create a new one otherwise.
+     *
+     * 'rule' is for explain/debugging only: it identifies the rewrite that introduced the node 'n'.
+     *
+     * The out-param 'insertedNodeIds' is appended to if a new logical node was added to any group
+     * (existing or new).
+     */
+    MemoLogicalNodeId addNode(const Context& ctx,
+                              GroupIdVector groupVector,
+                              ProjectionNameSet projections,
+                              GroupIdType targetGroupId,
+                              NodeIdSet& insertedNodeIds,
+                              ABT n,
+                              LogicalRewriteType rule);
+
     const Group& getGroup(GroupIdType groupId) const;
     Group& getGroup(GroupIdType groupId);
 
     GroupIdType addGroup(ProjectionNameSet projections);
-
-    std::pair<MemoLogicalNodeId, bool> addNode(GroupIdType groupId, ABT n, LogicalRewriteType rule);
 
     boost::optional<MemoLogicalNodeId> findNode(const GroupIdVector& groups, const ABT& node);
 
