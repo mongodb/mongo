@@ -34,6 +34,7 @@ namespace audit {
 std::function<void(OperationContext*)> initializeManager;
 std::function<void(OpObserverRegistry*)> opObserverRegistrar;
 std::function<void(ServiceContext*)> initializeSynchronizeJob;
+std::function<void(OperationContext*)> updateAuditConfigOnDowngrade;
 
 #if !MONGO_ENTERPRISE_AUDIT
 

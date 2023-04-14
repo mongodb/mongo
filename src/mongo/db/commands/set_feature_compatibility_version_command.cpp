@@ -33,6 +33,7 @@
 #include <fmt/format.h>
 
 #include "mongo/crypto/fle_crypto.h"
+#include "mongo/db/audit.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/coll_mod.h"
 #include "mongo/db/catalog/collection_catalog_helper.h"
@@ -80,6 +81,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/serverless/shard_split_donor_service.h"
 #include "mongo/db/session/session_catalog.h"
@@ -1037,6 +1039,24 @@ private:
         const auto& [originalVersion, _] =
             getTransitionFCVFromAndTo(serverGlobalParams.featureCompatibility.getVersion());
 
+        if (feature_flags::gFeatureFlagAuditConfigClusterParameter
+                .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion, originalVersion)) {
+            // Ensure audit config cluster parameter is unset on disk.
+            AutoGetCollection clusterParametersColl(
+                opCtx, NamespaceString::kClusterParametersNamespace, MODE_IS);
+            BSONObj _result;
+            if (Helpers::findOne(opCtx,
+                                 clusterParametersColl.getCollection(),
+                                 BSON("_id"
+                                      << "auditConfig"),
+                                 _result)) {
+                uasserted(ErrorCodes::CannotDowngrade,
+                          "Cannot downgrade the cluster when the auditConfig cluster parameter is "
+                          "set. Drop the auditConfig document from the config.clusterParameters "
+                          "collection before downgrading.");
+            }
+        }
+
         // Note the config server is also considered a shard, so the ConfigServer and ShardServer
         // roles aren't mutually exclusive.
         if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
@@ -1216,6 +1236,20 @@ private:
         }
     }
 
+    void _updateAuditConfigOnDowngrade(
+        OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
+        invariant(serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading());
+        const auto& [fromVersion, _] =
+            getTransitionFCVFromAndTo(serverGlobalParams.featureCompatibility.getVersion());
+
+        if (feature_flags::gFeatureFlagAuditConfigClusterParameter
+                .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion, fromVersion)) {
+            if (audit::updateAuditConfigOnDowngrade) {
+                audit::updateAuditConfigOnDowngrade(opCtx);
+            }
+        }
+    }
+
     // This helper function is for any internal server downgrade cleanup, such as dropping
     // collections or aborting. This cleanup will happen after user collection downgrade
     // cleanup.
@@ -1243,6 +1277,7 @@ private:
         // Note the config server is also considered a shard, so the ConfigServer and ShardServer
         // roles aren't mutually exclusive.
         if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
+            _updateAuditConfigOnDowngrade(opCtx, requestedVersion);
             _dropInternalShardingIndexCatalogCollection(opCtx, requestedVersion, originalVersion);
             // Always abort the reshardCollection regardless of version to ensure that it will
             // run on a consistent version from start to finish. This will ensure that it will
@@ -1262,6 +1297,8 @@ private:
                     ->waitForOngoingCoordinatorsToFinish(opCtx);
             }
             _dropInternalShardingIndexCatalogCollection(opCtx, requestedVersion, originalVersion);
+        } else {
+            _updateAuditConfigOnDowngrade(opCtx, requestedVersion);
         }
     }
 

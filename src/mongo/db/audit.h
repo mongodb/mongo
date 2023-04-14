@@ -66,6 +66,7 @@ namespace audit {
 extern std::function<void(OperationContext*)> initializeManager;
 extern std::function<void(OpObserverRegistry*)> opObserverRegistrar;
 extern std::function<void(ServiceContext*)> initializeSynchronizeJob;
+extern std::function<void(OperationContext*)> updateAuditConfigOnDowngrade;
 
 /**
  * Struct that temporarily stores client information when an audit hook
