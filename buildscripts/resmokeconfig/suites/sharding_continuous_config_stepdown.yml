@@ -241,8 +241,8 @@ selector:
   # set takes a while.
   - jstests/sharding/move_chunk_respects_maxtimems.js
 
-  # TODO (SERVER-75863): Investigate the timeout issue for read_and_write_distribution.js in the
-  # config stepdown suite
+  # TODO (SERVER-76157): ClusterServerParameterRefresher can result in dangling internal
+  # transactions on the config server.
   - jstests/sharding/analyze_shard_key/read_and_write_distribution.js
 
   exclude_with_any_tags:
