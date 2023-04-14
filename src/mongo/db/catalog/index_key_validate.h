@@ -79,7 +79,12 @@ static std::set<StringData> allowedFieldNames = {
     IndexDescriptor::kPrepareUniqueFieldName,
     IndexDescriptor::kColumnStoreCompressorFieldName,
     // Index creation under legacy writeMode can result in an index spec with an _id field.
-    "_id"};
+    "_id",
+    // TODO SERVER-76108: Field names are not validated to match index type. This was used for the
+    // removed 'geoHaystack' index type, but users could have set it for other index types as well.
+    // We need to keep allowing it until FCV upgrade is implemented to clean this up.
+    "bucketSize"_sd,
+};
 
 /**
  * Checks if the key is valid for building an index according to the validation rules for the given
