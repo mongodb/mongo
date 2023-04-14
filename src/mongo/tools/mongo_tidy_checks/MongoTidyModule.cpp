@@ -30,6 +30,7 @@
 #include "MongoAssertCheck.h"
 #include "MongoCctypeCheck.h"
 #include "MongoCxx20BannedIncludesCheck.h"
+#include "MongoFCVConstantCheck.h"
 #include "MongoHeaderBracketCheck.h"
 #include "MongoMutexCheck.h"
 #include "MongoStdAtomicCheck.h"
@@ -61,6 +62,7 @@ public:
         CheckFactories.registerCheck<MongoStdAtomicCheck>("mongo-std-atomic-check");
         CheckFactories.registerCheck<MongoMutexCheck>("mongo-mutex-check");
         CheckFactories.registerCheck<MongoAssertCheck>("mongo-assert-check");
+        CheckFactories.registerCheck<MongoFCVConstantCheck>("mongo-fcv-constant-check");
     }
 };
 

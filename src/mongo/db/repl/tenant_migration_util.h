@@ -250,14 +250,6 @@ inline void protocolTenantIdCompatibilityCheck(const MigrationProtocolEnum proto
 
 inline void protocolTenantIdsCompatibilityCheck(
     const MigrationProtocolEnum protocol, const boost::optional<std::vector<TenantId>>& tenantIds) {
-    if (serverGlobalParams.featureCompatibility.isLessThan(
-            multiversion::FeatureCompatibilityVersion::kVersion_6_3)) {
-        uassert(ErrorCodes::InvalidOptions,
-                "'tenantIds' is not supported for FCV below 6.3'",
-                !tenantIds);
-        return;
-    }
-
     switch (protocol) {
         case MigrationProtocolEnum::kShardMerge: {
             {

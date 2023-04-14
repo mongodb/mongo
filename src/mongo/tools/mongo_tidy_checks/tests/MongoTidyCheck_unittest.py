@@ -247,6 +247,19 @@ class MongoTidyTests(unittest.TestCase):
 
         self.run_clang_tidy()
 
+    def test_MongoFCVConstantCheck(self):
+
+        self.write_config(
+            textwrap.dedent("""\
+                Checks: '-*,mongo-fcv-constant-check'
+                WarningsAsErrors: '*'
+                """))
+
+        self.expected_output = [
+            "error: Illegal use of FCV constant in FCV comparison check functions. FCV gating should be done through feature flags instead.",
+        ]
+
+        self.run_clang_tidy()
 
 if __name__ == '__main__':
 

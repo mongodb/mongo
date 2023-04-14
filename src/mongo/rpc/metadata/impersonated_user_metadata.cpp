@@ -103,17 +103,8 @@ void writeAuthDataToImpersonatedUserMetadata(OperationContext* opCtx, BSONObjBui
     }
 
     ImpersonatedUserMetadata metadata;
-    if (serverGlobalParams.featureCompatibility.isLessThanOrEqualTo(
-            multiversion::FeatureCompatibilityVersion::kVersion_6_2)) {
-        if (userName) {
-            metadata.setUsers({{userName.value()}});
-        } else {
-            metadata.setUsers({});
-        }
-    } else {
-        if (userName) {
-            metadata.setUser(userName.value());
-        }
+    if (userName) {
+        metadata.setUser(userName.value());
     }
 
     metadata.setRoles(roleNameIteratorToContainer<std::vector<RoleName>>(roleNames));
