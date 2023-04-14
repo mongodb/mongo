@@ -50,8 +50,7 @@ CollectionType createTempReshardingCollectionType(
     const ChunkVersion& chunkVersion,
     const BSONObj& collation);
 
-void cleanupSourceConfigCollections(OperationContext* opCtx,
-                                    const ReshardingCoordinatorDocument& coordinatorDoc);
+void removeChunkDocs(OperationContext* opCtx, const UUID& collUUID);
 
 void writeDecisionPersistedState(OperationContext* opCtx,
                                  const ReshardingCoordinatorDocument& coordinatorDoc,
