@@ -259,6 +259,9 @@ authenticate to them. If `net.tls.clusterFile` is not specified, then
 [`net.tls.certificateKeyFile`](https://docs.mongodb.com/manual/reference/configuration-options/#net.tls.certificateKeyFile) 
 will be used.
 
-Member and client certificates are basically the same, content-wise. Nodes will only consider a peer certificate to be a
-member certificate if the _Organization (O)_, _Organizational Unit (OU)_, and _Domain Component (DC)_ that might be 
-contained in the certificate's _Subject Name_ match those contained in _its own_ subject name.
+By default, nodes will only consider a peer certificate to be a member certificate if the 
+_Organization (O)_, _Organizational Unit (OU)_, and _Domain Component (DC)_ that might be contained 
+in the certificate's _Subject Name_ match those contained in _its own_ subject name. This behavior 
+can be customized to check for different attributes via `net.tls.clusterAuthX509.attributes` or 
+`net.tls.clusterAuthX509.extensionValue`. See the [`auth`](../../db/auth/README.md) documentation 
+for more information about X.509 intracluster auth.

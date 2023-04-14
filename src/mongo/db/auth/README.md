@@ -9,6 +9,8 @@
     - [SASL Supported Mechs](#sasl-supported-mechs)
   - [X509 Authentication](#x509-authentication)
   - [Cluster Authentication](#cluster-authentication)
+    - [X509 Intracluster Auth](#x509-intracluster-auth-and-member-certificate-rotation)
+    - [Keyfile Intracluster Auth](#keyfile-intracluster-auth)
   - [Localhost Auth Bypass](#localhost-auth-bypass)
 - [Authorization](#authorization)
   - [AuthName](#authname) (`UserName` and `RoleName`)
@@ -203,11 +205,23 @@ The specific properties that each SASL mechanism provides is outlined in this ta
 certificate key exchange. When the peer certificate validation happens during the SSL handshake, an
 [`SSLPeerInfo`](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/util/net/ssl_types.h#L113-L143)
 is created and attached to the transport layer SessionHandle. During `MONGODB-X509` auth, the server
-grabs the client's username from the `SSLPeerInfo` struct and, if the client is a driver, verifies
-that the client name matches the username provided by the command object. If the client is
-performing intracluster authentication, see the details below in the authentication section and the
-code comments
-[here](https://github.com/mongodb/mongo/blob/r4.4.0/src/mongo/db/commands/authentication_commands.cpp#L74-L139).
+first determines whether or not the client is a driver or a peer server. The server inspects the 
+following criteria in this order to determine whether the connecting client is a peer server node:
+1. `net.tls.clusterAuthX509.attributes` is set on the server and the parsed certificate's subject name
+    contains all of the attributes and values specified in that option.
+2. `net.tls.clusterAuthX509.extensionValue` is set on the server and the parsed certificate contains
+    the OID 1.3.6.1.4.1.34601.2.1.2 with a value matching the one specified in that option. This OID
+    is reserved for the MongoDB cluster membership extension.
+3. Neither of the above options are set on the server and the parsed certificate's subject name contains
+   the same DC, O, and OU as the certificate the server presents to inbound connections (`tls.certificateKeyFile`).
+4. `tlsClusterAuthX509Override.attributes` is set on the server and the parsed certificate's subject name
+    contains all of the attributes and values specified in that option.
+5. `tlsClusterAuthX509Override.extensionValue` is set on the server and the parsed certificate contains
+    the OID 1.3.6.1.4.1.34601.2.1.2 with a value matching the one specified in that option.
+If all of these conditions fail, then the server grabs the client's username from the `SSLPeerInfo` 
+struct and verifies that the client name matches the username provided by the command object and exists
+in the `$external` database. In that case, the client is authenticated as that user in `$external`.
+Otherwise, authentication fails with ErrorCodes.UserNotFound.
 
 ### Cluster Authentication
 
@@ -217,9 +231,43 @@ a server, they can use any of the authentication mechanisms described [below in 
 section](#sasl). When a mongod or a mongos needs to authenticate to a mongodb server, it does not
 pass in distinguishing user credentials to authenticate (all servers authenticate to other servers
 as the `__system` user), so most of the options described below will not necessarily work. However,
-two options are available for authentication - keyfile auth and X509 auth. X509 auth is described in
-more detail above, but a precondition to using it is having TLS enabled.
+two options are available for authentication - keyfile auth and X509 auth. 
 
+#### X509 Intracluster Auth and Member Certificate Rotation
+`X509` auth is described in more detail above, but a precondition to using it is having TLS enabled.
+It is possible for customers to rotate their certificates or change the criteria that is used to
+determine X.509 cluster membership without any downtime. When the server uses the default criteria
+(matching DC, O, and OU), its certificates can be rotated via the following procedure:
+
+1. Update server nodes' config files to contain the old certificate subject DN in
+   `setParameter.tlsX509ClusterAuthDNOverride`.
+2. Perform a rolling restart of server nodes so that they all load in the override value.
+3. Update server nodes' config files to contain the new certificates in `net.tls.clusterFile`
+   and `net.tls.certificateKeyFile`.
+4. Perform a rolling restart of server nodes. During this process, some nodes will use new certificates
+   while others will use old, but they will still all recognize each other as cluster members either
+   via the standard process or the override, respectively.
+5. Remove `setParameter.tlsX509ClusterAuthDNOverride` from all server node config files.
+6. Perform a rolling restart of server nodes so they stop treating clients presenting the old certificate
+   as peers.
+
+An administrator can update the criteria the server uses to determine cluster membership alongside
+certificate rotation without downtime via the following procedure:
+1. Update server nodes' config files to contain the old certificate subject DN attributes or extension
+   value in `setParameter.tlsClusterAuthX509Override` and the new certificate subject DN attributes
+   or extension value in `net.tls.clusterAuthX509.attributes` or `net.tls.clusterAuthX509.extensionValue`. 
+2. Perform a rolling restart of server nodes so that they all load in the override value and new
+   config options.
+3. Update server nodes' config files to contain the new certificates in `net.tls.clusterFile`
+   and `net.tls.certificateKeyFile`.
+4. Perform a rolling restart of server nodes so that they start using the new certificates. During
+   this process, some nodes will use new certificates while others will use old, but they will still
+   recognize each other via the new config option or the override.
+5. Remove `setParameter.tlsClusterAuthX509Override` from all server node config files.
+6. Perform a rolling restart of server nodes so they stop treating clients presenting certificates
+   meeting the old criteria as peers.
+
+#### Keyfile Intracluster Auth
 `keyfile` auth instructors servers to authenticate to each other using the `SCRAM-SHA-256` mechanism
 as the `local.__system` user who's password can be found in the named key file. A keyfile is a file
 stored on disk that servers load on startup, sending them when they behave as clients to another
