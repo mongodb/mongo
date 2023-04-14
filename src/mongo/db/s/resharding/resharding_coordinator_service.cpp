@@ -664,21 +664,22 @@ void insertChunkAndTagDocsForTempNss(OperationContext* opCtx,
     ShardingCatalogManager::get(opCtx)->insertConfigDocuments(opCtx, TagsType::ConfigNS, newZones);
 }
 
+void removeTagsDocs(OperationContext* opCtx, const BSONObj& tagsQuery) {
+    // Remove tag documents with the specified tagsQuery.
+    const auto tagDeleteOperationHint = BSON(TagsType::ns() << 1 << TagsType::min() << 1);
+    const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
+
+    uassertStatusOK(catalogClient->removeConfigDocuments(
+        opCtx, TagsType::ConfigNS, tagsQuery, kMajorityWriteConcern, tagDeleteOperationHint));
+}
+
 // Requires that there be no session information on the opCtx.
 void removeChunkAndTagsDocs(OperationContext* opCtx,
                             const BSONObj& tagsQuery,
                             const UUID& collUUID) {
-    // Remove all chunk documents for the original nss. We do not know how many chunk docs
-    // currently exist, so cannot pass a value for expectedNumModified
-    const auto chunksQuery = BSON(ChunkType::collectionUUID() << collUUID);
-    const auto tagDeleteOperationHint = BSON(TagsType::ns() << 1 << TagsType::min() << 1);
-
-    const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
-
-    uassertStatusOK(catalogClient->removeConfigDocuments(
-        opCtx, ChunkType::ConfigNS, chunksQuery, kMajorityWriteConcern));
-    uassertStatusOK(catalogClient->removeConfigDocuments(
-        opCtx, TagsType::ConfigNS, tagsQuery, kMajorityWriteConcern, tagDeleteOperationHint));
+    // Remove all chunk documents and specified tag documents.
+    resharding::removeChunkDocs(opCtx, collUUID);
+    removeTagsDocs(opCtx, tagsQuery);
 }
 
 /**
@@ -733,28 +734,14 @@ CollectionType createTempReshardingCollectionType(
     return collType;
 }
 
-void cleanupSourceConfigCollections(OperationContext* opCtx,
-                                    const ReshardingCoordinatorDocument& coordinatorDoc) {
-    using Doc = Document;
-    using Arr = std::vector<Value>;
-    using V = Value;
+void removeChunkDocs(OperationContext* opCtx, const UUID& collUUID) {
+    // Remove all chunk documents for the specified collUUID. We do not know how many chunk docs
+    // currently exist, so cannot pass a value for expectedNumModified
+    const auto chunksQuery = BSON(ChunkType::collectionUUID() << collUUID);
+    const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
 
-    auto createTagFilter = [](const V value) {
-        return V{Doc{{"$map",
-                      V{Doc{{"input", V{Doc{{"$objectToArray", value}}}},
-                            {"in", V{StringData("$$this.k")}}}}}}};
-    };
-
-
-    auto skipNewTagsFilter = Doc{
-        {"$ne",
-         Arr{createTagFilter(V{StringData("$min")}),
-             createTagFilter(V{Doc{{"$literal", coordinatorDoc.getReshardingKey().toBSON()}}})}}};
-
-    const auto removeTagsQuery =
-        BSON(TagsType::ns(coordinatorDoc.getSourceNss().ns()) << "$expr" << skipNewTagsFilter);
-
-    removeChunkAndTagsDocs(opCtx, removeTagsQuery, coordinatorDoc.getSourceUUID());
+    uassertStatusOK(catalogClient->removeConfigDocuments(
+        opCtx, ChunkType::ConfigNS, chunksQuery, kMajorityWriteConcern));
 }
 
 void writeDecisionPersistedState(OperationContext* opCtx,
@@ -800,6 +787,14 @@ void writeDecisionPersistedState(OperationContext* opCtx,
                                                         newCollectionTimestamp,
                                                         reshardedCollectionPlacement,
                                                         txnNumber);
+
+            // Delete all of the config.tags entries for the user collection namespace.
+            const auto removeTagsQuery = BSON(TagsType::ns(coordinatorDoc.getSourceNss().ns()));
+            removeTagsDocs(opCtx, removeTagsQuery);
+
+            // Update all of the config.tags entries for the temporary resharding namespace
+            // to refer to the user collection namespace.
+            updateTagsDocsForTempNss(opCtx, coordinatorDoc);
         });
 }
 
@@ -1483,12 +1478,8 @@ ExecutorFuture<void> ReshardingCoordinator::_commitAndFinishReshardOperation(
     const ReshardingCoordinatorDocument& updatedCoordinatorDoc) noexcept {
     return resharding::WithAutomaticRetry([this, executor, updatedCoordinatorDoc] {
                return ExecutorFuture<void>(**executor)
-                   .then([this, executor, updatedCoordinatorDoc] {
-                       _commit(updatedCoordinatorDoc);
-
-                       auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-                       resharding::updateTagsDocsForTempNss(opCtx.get(), updatedCoordinatorDoc);
-                   })
+                   .then(
+                       [this, executor, updatedCoordinatorDoc] { _commit(updatedCoordinatorDoc); })
                    .then([this] { return _waitForMajority(_ctHolder->getStepdownToken()); })
                    .thenRunOn(**executor)
                    .then([this, executor] {
@@ -1497,8 +1488,8 @@ ExecutorFuture<void> ReshardingCoordinator::_commitAndFinishReshardOperation(
                    .then([this] { _updateChunkImbalanceMetrics(_coordinatorDoc.getSourceNss()); })
                    .then([this, updatedCoordinatorDoc] {
                        auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-                       resharding::cleanupSourceConfigCollections(opCtx.get(),
-                                                                  updatedCoordinatorDoc);
+                       resharding::removeChunkDocs(opCtx.get(),
+                                                   updatedCoordinatorDoc.getSourceUUID());
                        return Status::OK();
                    })
                    .then([this, executor] { return _awaitAllParticipantShardsDone(executor); })
