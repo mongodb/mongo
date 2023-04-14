@@ -3775,7 +3775,7 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientReceivesNonRetriableClonerE
     checkStateDocPersisted(opCtx.get(), instance.get());
 }
 
-TEST_F(TenantMigrationRecipientServiceTest, IncrementNumRestartsDueToRecipientFailureCounter) {
+TEST_F(TenantMigrationRecipientServiceTest, MigrationFailsOnRecipientFailover) {
     FailPointEnableBlock createIndexesFailpointBlock("skipCreatingIndexDuringRebuildService");
     stopFailPointEnableBlock fp("fpAfterPersistingTenantMigrationRecipientInstanceStateDoc");
     // Hang before deleting the state doc so that we can check the state doc was persisted.
@@ -3796,10 +3796,9 @@ TEST_F(TenantMigrationRecipientServiceTest, IncrementNumRestartsDueToRecipientFa
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
-    // Starting a migration where the state is not 'kUninitialized' indicates that we are restarting
-    // from failover.
+    // Starting a migration where the state is not 'kUninitialized' indicates that we are attempting
+    // to restart from recipient failover.
     initialStateDocument.setState(TenantMigrationRecipientStateEnum::kStarted);
-    ASSERT_EQ(0, initialStateDocument.getNumRestartsDueToRecipientFailure());
 
     auto opCtx = makeOperationContext();
     CollectionOptions collectionOptions;
@@ -3822,13 +3821,8 @@ TEST_F(TenantMigrationRecipientServiceTest, IncrementNumRestartsDueToRecipientFa
         opCtx.get(), _service, initialStateDocument.toBSON());
     ASSERT(instance.get());
 
-    ASSERT_EQ(stopFailPointErrorCode, instance->getDataSyncCompletionFuture().getNoThrow().code());
-    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
-
-    const auto stateDoc = getStateDoc(instance.get());
-    ASSERT_EQ(stateDoc.getNumRestartsDueToDonorConnectionFailure(), 0);
-    ASSERT_EQ(stateDoc.getNumRestartsDueToRecipientFailure(), 1);
-    checkStateDocPersisted(opCtx.get(), instance.get());
+    ASSERT_EQ(ErrorCodes::TenantMigrationAborted,
+              instance->getDataSyncCompletionFuture().getNoThrow().code());
 }
 
 TEST_F(TenantMigrationRecipientServiceTest,
