@@ -317,7 +317,7 @@ public:
             return false;
         }
 
-        if (isMongos() || serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             if (isConfigDB() 
                 && (coll() == "actionlog" || coll() == "changelog"
                     || coll() == "chunks" || coll() == "collections"
