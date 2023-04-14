@@ -53,6 +53,7 @@
 #include "mongo/util/debug_util.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/system_clock_source.h"
+#include "query_shape.h"
 #include <optional>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -145,6 +146,12 @@ BSONObj redactHintComponent(BSONObj obj, const SerializationOptions& opts, bool 
                     "Hinted field must be a string with $hint operator",
                     elem.type() == BSONType::String);
             bob.append(hintSpecialField, opts.serializeFieldPathFromString(elem.String()));
+            continue;
+        }
+
+        // $natural doesn't need to be redacted.
+        if (elem.fieldNameStringData().compare(query_request_helper::kNaturalSortField) == 0) {
+            bob.append(elem);
             continue;
         }
 
@@ -281,15 +288,9 @@ StatusWith<BSONObj> makeTelemetryKey(const FindCommandRequest& findCommand,
     }
 
     // Sort.
-    {
-        auto sortSpec = findCommand.getSort();
-        if (!sortSpec.isEmpty()) {
-            auto sort = SortPattern(sortSpec, expCtx);
-            bob.append(
-                FindCommandRequest::kSortFieldName,
-                sort.serialize(SortPattern::SortKeySerialization::kForPipelineSerialization, opts)
-                    .toBson());
-        }
+    if (!findCommand.getSort().isEmpty()) {
+        bob.append(FindCommandRequest::kSortFieldName,
+                   query_shape::sortShape(findCommand.getSort(), expCtx, opts));
     }
 
     // Fields for literal redaction. Adds limit, skip, batchSize, maxTimeMS, and noCursorTimeOut

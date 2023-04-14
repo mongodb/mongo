@@ -23,7 +23,7 @@ env.SConscript(
 
 env.Library(
     target='canonical_query',
-    source=['canonical_query.cpp', 'canonical_query_encoder.cpp', 'query_shape.cpp'],
+    source=['canonical_query.cpp', 'canonical_query_encoder.cpp'],
     LIBDEPS=[
         '$BUILD_DIR/mongo/crypto/encrypted_field_config',
         '$BUILD_DIR/mongo/db/cst/cst',
@@ -363,8 +363,9 @@ env.Library(
 env.Library(
     target='op_metrics',
     source=[
-        'telemetry.cpp',
         '$BUILD_DIR/mongo/db/curop.cpp',
+        'query_shape.cpp',
+        'telemetry.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

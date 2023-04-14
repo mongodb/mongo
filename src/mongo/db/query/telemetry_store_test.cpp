@@ -530,6 +530,8 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
         })",
         redacted);
 
+    // Test that $natural comes through unmodified.
+    fcr.setHint(BSON("$natural" << -1));
     redacted = uassertStatusOK(telemetry::makeTelemetryKey(fcr, opts, expCtx));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
@@ -544,8 +546,7 @@ TEST_F(TelemetryStoreTest, CorrectlyRedactsHintsWithOptions) {
                 }
             },
             "hint": {
-                "HASH<z>": 1,
-                "HASH<c>": 1
+                "$natural": -1
             },
             "max": {
                 "HASH<z>": "?"
