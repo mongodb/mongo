@@ -2989,11 +2989,15 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                            // If our state is initialized and we haven't fulfilled the
                            // '_stateDocPersistedPromise' yet, it means we are restarting the future
                            // chain due to recipient failover.
-                           _stateDocPersistedPromise.emplaceValue();
-                           uasserted(ErrorCodes::TenantMigrationAborted,
-                                     str::stream() << "Recipient failover happened during "
-                                                      "migration :: migrationId: "
-                                                   << getMigrationUUID());
+                           _stateDoc.setNumRestartsDueToRecipientFailure(
+                               _stateDoc.getNumRestartsDueToRecipientFailure() + 1);
+                           const auto stateDoc = _stateDoc;
+                           lk.unlock();
+                           // Update the state document outside the mutex to avoid a deadlock in the
+                           // case of a concurrent stepdown.
+                           uassertStatusOK(tenantMigrationRecipientEntryHelpers::updateStateDoc(
+                               opCtx.get(), stateDoc));
+                           return SemiFuture<void>::makeReady();
                        }
                        return _initializeStateDoc(lk);
                    })

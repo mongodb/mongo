@@ -105,7 +105,6 @@ function testRetryOnRecipient(ordered) {
     jsTest.log("Waiting for migration to complete");
     pauseTenantMigrationBeforeLeavingDataSyncState.off();
     TenantMigrationTest.assertCommitted(migrationThread.returnData());
-    tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString);
 
     // Print the no-op oplog entries for debugging purposes.
     jsTestLog("Recipient oplog migration entries.");
@@ -132,6 +131,8 @@ function testRetryOnRecipient(ordered) {
     jsTestLog("Run retryable write on secondary after the migration");
     testRecipientRetryableWrites(recipientRst.getPrimary().getDB(kDbName), beforeWrites);
     testRecipientRetryableWrites(recipientRst.getPrimary().getDB(kDbName), duringWrites);
+
+    tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString);
 
     jsTestLog("Trying a back-to-back migration");
     const tenantMigrationTest2 = new TenantMigrationTest(

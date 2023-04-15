@@ -177,58 +177,55 @@ const migrationX509Options = makeX509OptionsForTest();
     tenantMigrationTest.stop();
 })();
 
-// TODO SERVER-76128: Tenant Migrations are not robust to recipient failover.
-// (() => {
-//     jsTest.log("Test that the donor and recipient correctly copy each other's cluster time keys "
-//     +
-//                "when there is recipient failover.");
-//     const recipientRst = new ReplSetTest({
-//         nodes: 3,
-//         name: "recipientRst",
-//         serverless: true,
-//         nodeOptions: migrationX509Options.recipient
-//     });
-//     recipientRst.startSet();
-//     recipientRst.initiate();
-//     if (isShardMergeEnabled(recipientRst.getPrimary().getDB("adminDB"))) {
-//         jsTestLog("Skip: featureFlagShardMerge enabled, but shard merge does not survive
-//         failover");
-//         recipientRst.stopSet();
-//         return;
-//     }
+(() => {
+    jsTest.log("Test that the donor and recipient correctly copy each other's cluster time keys " +
+               "when there is recipient failover.");
+    const recipientRst = new ReplSetTest({
+        nodes: 3,
+        name: "recipientRst",
+        serverless: true,
+        nodeOptions: migrationX509Options.recipient
+    });
+    recipientRst.startSet();
+    recipientRst.initiate();
+    if (isShardMergeEnabled(recipientRst.getPrimary().getDB("adminDB"))) {
+        jsTestLog("Skip: featureFlagShardMerge enabled, but shard merge does not survive failover");
+        recipientRst.stopSet();
+        return;
+    }
 
-//     const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), recipientRst});
+    const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), recipientRst});
 
-//     const recipientPrimary = recipientRst.getPrimary();
-//     const fp = configureFailPoint(recipientPrimary,
-//                                   "fpAfterPersistingTenantMigrationRecipientInstanceStateDoc",
-//                                   {action: "hang"});
+    const recipientPrimary = recipientRst.getPrimary();
+    const fp = configureFailPoint(recipientPrimary,
+                                  "fpAfterPersistingTenantMigrationRecipientInstanceStateDoc",
+                                  {action: "hang"});
 
-//     const migrationId = UUID();
-//     const migrationOpts = {
-//         migrationIdString: extractUUIDFromObject(migrationId),
-//         tenantId: kTenantId1,
-//     };
-//     assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
-//     fp.wait();
+    const migrationId = UUID();
+    const migrationOpts = {
+        migrationIdString: extractUUIDFromObject(migrationId),
+        tenantId: kTenantId1,
+    };
+    assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
+    fp.wait();
 
-//     assert.commandWorked(
-//         recipientPrimary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
-//     assert.commandWorked(recipientPrimary.adminCommand({replSetFreeze: 0}));
+    assert.commandWorked(
+        recipientPrimary.adminCommand({replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
+    assert.commandWorked(recipientPrimary.adminCommand({replSetFreeze: 0}));
 
-//     fp.off();
-//     TenantMigrationTest.assertCommitted(tenantMigrationTest.waitForMigrationToComplete(
-//         migrationOpts, true /* retryOnRetryableErrors */));
+    fp.off();
+    TenantMigrationTest.assertCommitted(tenantMigrationTest.waitForMigrationToComplete(
+        migrationOpts, true /* retryOnRetryableErrors */));
 
-//     assertCopiedExternalKeys(tenantMigrationTest, migrationId);
+    assertCopiedExternalKeys(tenantMigrationTest, migrationId);
 
-//     // After another migration, the first's keys should still exist.
-//     runMigrationAndAssertExternalKeysCopied(tenantMigrationTest, kTenantId2);
-//     assertCopiedExternalKeys(tenantMigrationTest, migrationId);
+    // After another migration, the first's keys should still exist.
+    runMigrationAndAssertExternalKeysCopied(tenantMigrationTest, kTenantId2);
+    assertCopiedExternalKeys(tenantMigrationTest, migrationId);
 
-//     recipientRst.stopSet();
-//     tenantMigrationTest.stop();
-// })();
+    recipientRst.stopSet();
+    tenantMigrationTest.stop();
+})();
 
 (() => {
     jsTest.log("Test that the donor waits for copied external keys to replicate to every node");
