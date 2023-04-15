@@ -160,6 +160,7 @@ class Test:
     python_command: str = dataclasses.field(default="", repr=False)
     packages_urls: List[str] = dataclasses.field(default_factory=list)
     packages_paths: List[Path] = dataclasses.field(default_factory=list)
+    attempts: int = dataclasses.field(default=0)
 
     def __post_init__(self) -> None:
         assert OS_DOCKER_LOOKUP[self.os_name] is not None
@@ -206,7 +207,7 @@ def join_commands(commands: List[str], sep: str = ' && ') -> str:
     return sep.join(commands)
 
 
-def run_test(test: Test, client: DockerClient) -> Result:
+def run_test(test: Test, client: DockerClient) -> Tuple[Test, Result]:
     result = Result(status="pass", test_file=test.name(), start=time.time(), log_raw="")
 
     log_name = f"logs/{test.name()}_{test.version}_{uuid.uuid4().hex}.log"
@@ -265,7 +266,7 @@ def run_test(test: Test, client: DockerClient) -> Result:
         result["end"] = time.time()
         result['status'] = 'fail'
         result["exit_code"] = 1
-        return result
+        return test, result
 
     try:
         with open(log_external_path, 'r') as log_raw:
@@ -277,7 +278,7 @@ def run_test(test: Test, client: DockerClient) -> Result:
         logging.error("Failed test %s with exit code %s", test, exit_code)
         result['status'] = 'fail'
     result["end"] = time.time()
-    return result
+    return test, result
 
 
 logging.info("Attempting to download current mongo releases json")
@@ -361,6 +362,8 @@ parser = argparse.ArgumentParser(
     'Test packages on various hosts. This will spin up docker containers and test the installs.')
 parser.add_argument("--arch", type=str, help="Arch of packages to test",
                     choices=["auto"] + list(arches), default="auto")
+parser.add_argument("-r", "--retries", type=int, help="Number of times to retry failed tests",
+                    default=3)
 subparsers = parser.add_subparsers(dest="command")
 release_test_parser = subparsers.add_parser("release")
 release_test_parser.add_argument(
@@ -531,16 +534,23 @@ else:
 
 report = Report(results=[], failures=0)
 with futures.ThreadPoolExecutor() as tpe:
-    test_futures = [tpe.submit(run_test, test, docker_client) for test in tests]
+    test_futures = {tpe.submit(run_test, test, docker_client) for test in tests}
     completed_tests = 0  # pylint: disable=invalid-name
-    for f in futures.as_completed(test_futures):
-        completed_tests += 1
-        test_result = f.result()
-        if test_result["exit_code"] != 0:
-            report["failures"] += 1
+    while test_futures:
+        finished_futures, test_futures = futures.wait(test_futures, timeout=None,
+                                                      return_when="FIRST_COMPLETED")
+        for f in finished_futures:
+            completed_test, test_result = f.result()
+            if test_result["exit_code"] != 0:
+                if completed_test.attempts < args.retries:
+                    completed_test.attempts += 1
+                    test_futures.add(tpe.submit(run_test, completed_test, docker_client))
+                    continue
+                report["failures"] += 1
 
-        report["results"].append(test_result)
-        logging.info("Completed %s/%s tests", completed_tests, len(test_futures))
+            completed_tests += 1
+            report["results"].append(test_result)
+            logging.info("Completed %s/%s tests", completed_tests, len(test_futures))
 
 with open("report.json", "w") as fh:
     json.dump(report, fh)
