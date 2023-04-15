@@ -106,6 +106,11 @@ public:
         invariant(_pos >= _start);
     }
 
+    /** back up to beginging of buffer */
+    void rewindToStart() {
+        _pos = _start;
+    }
+
     /** return current position pointer, and advance by len */
     const void* skip(unsigned len) {
         ConstDataRangeCursor cdrc(_pos, _end);
@@ -122,6 +127,14 @@ public:
 
     void readStr(std::string& s) {
         s = readCStr().toString();
+    }
+
+    /**
+     * Return a view of the next len bytes and advance by len.
+     */
+    StringData readBytes(size_t len) {
+        // Note: the call to skip() includes a check that at least 'len' bytes remain in the buffer.
+        return StringData(reinterpret_cast<const char*>(skip(len)), len);
     }
 
     const void* pos() {
