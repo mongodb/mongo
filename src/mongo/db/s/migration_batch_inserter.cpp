@@ -165,6 +165,7 @@ void MigrationBatchInserter::run(Status status) const try {
             repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp());
 
         ShardingStatistics::get(opCtx).countDocsClonedOnRecipient.addAndFetch(batchNumCloned);
+        ShardingStatistics::get(opCtx).countBytesClonedOnRecipient.addAndFetch(batchClonedBytes);
         LOGV2(6718408,
               "Incrementing numCloned count by {batchNumCloned} and numClonedBytes by "
               "{batchClonedBytes}",
