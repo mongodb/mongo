@@ -274,6 +274,7 @@ executor:
         enableTestCommands: 1
         enableElectionHandoff: 0
         roleGraphInvalidationIsFatal: 1
+        receiveChunkWaitForRangeDeleterTimeoutMS: 90000
         collectionClonerBatchSize: 10
         initialSyncOplogFetcherBatchSize: 10
         queryAnalysisWriterIntervalSecs: 1

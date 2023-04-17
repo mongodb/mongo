@@ -7,3 +7,5 @@
           global_vars:
             TestData:
               auditDestination: 'console'
+              setParameters:
+                receiveChunkWaitForRangeDeleterTimeoutMS: 90000
