@@ -33,7 +33,6 @@
 #include "mongo/db/s/balancer/migration_test_fixture.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/random.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/request_types/get_stats_for_balancing_gen.h"
 #include "mongo/s/type_collection_common_types_gen.h"
@@ -52,10 +51,9 @@ const int kSizeOnDisk = 1;
 class BalancerChunkSelectionTest : public MigrationTestFixture {
 protected:
     BalancerChunkSelectionTest()
-        : _random(std::random_device{}()),
-          _clusterStats(std::make_unique<ClusterStatisticsImpl>(_random)),
+        : _clusterStats(std::make_unique<ClusterStatisticsImpl>()),
           _chunkSelectionPolicy(
-              std::make_unique<BalancerChunkSelectionPolicyImpl>(_clusterStats.get(), _random)) {}
+              std::make_unique<BalancerChunkSelectionPolicyImpl>(_clusterStats.get())) {}
 
     /**
      * Generates a default chunks distribution across shards with the form:
@@ -296,7 +294,6 @@ protected:
         return appendedShardBSON.obj();
     }
 
-    BalancerRandomSource _random;
     std::unique_ptr<ClusterStatistics> _clusterStats;
     std::unique_ptr<BalancerChunkSelectionPolicy> _chunkSelectionPolicy;
     stdx::unordered_set<NamespaceString> _imbalancedCollectionsCache;

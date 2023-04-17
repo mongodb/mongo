@@ -1275,7 +1275,9 @@ MigrateInfoVector BalancerDefragmentationPolicyImpl::selectChunksToMove(
         for (const auto& defragState : _defragmentationStates) {
             collectionUUIDs.push_back(defragState.first);
         }
-        std::shuffle(collectionUUIDs.begin(), collectionUUIDs.end(), _random);
+
+        auto client = opCtx->getClient();
+        std::shuffle(collectionUUIDs.begin(), collectionUUIDs.end(), client->getPrng().urbg());
 
         auto popCollectionUUID =
             [&](std::vector<UUID>::iterator elemIt) -> std::vector<UUID>::iterator {
@@ -1351,8 +1353,8 @@ boost::optional<BalancerStreamAction> BalancerDefragmentationPolicyImpl::getNext
     auto stateIt = [&] {
         auto it = _defragmentationStates.begin();
         if (_defragmentationStates.size() > 1) {
-            std::uniform_int_distribution<size_t> uniDist{0, _defragmentationStates.size() - 1};
-            std::advance(it, uniDist(_random));
+            auto client = opCtx->getClient();
+            std::advance(it, client->getPrng().nextInt32(_defragmentationStates.size()));
         }
         return it;
     }();
