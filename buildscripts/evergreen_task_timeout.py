@@ -357,6 +357,8 @@ def main():
                         help="Evergreen project task is being executed on.")
     parser.add_argument("--evg-alias", dest="evg_alias", required=True,
                         help="Evergreen alias used to trigger build.")
+    parser.add_argument("--test-flags", dest="test_flags",
+                        help="Test flags that are used for `resmoke.py run` command call.")
     parser.add_argument("--timeout", dest="timeout", type=int, help="Timeout to use (in sec).")
     parser.add_argument("--exec-timeout", dest="exec_timeout", type=int,
                         help="Exec timeout to use (in sec).")
@@ -393,7 +395,9 @@ def main():
                     parse_evergreen_file(os.path.expanduser(options.evg_project_config)))
         binder.bind(
             ResmokeProxyService,
-            ResmokeProxyService(run_options=f"--installDir={shlex.quote(options.install_dir)}"))
+            ResmokeProxyService(
+                run_options=f"--installDir={shlex.quote(options.install_dir)} {options.test_flags}")
+        )
 
     inject.configure(dependencies)
 
