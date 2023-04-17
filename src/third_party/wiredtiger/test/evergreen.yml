@@ -5147,6 +5147,7 @@ buildvariants:
   tasks:
     - name: ".pull_request !.pull_request_compilers"
     - name: ".unit_test_long"
+      distros: ubuntu2004-large
     - name: compile
     - name: doc-compile
     - name: make-check-test
