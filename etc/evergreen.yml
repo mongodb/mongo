@@ -7854,6 +7854,7 @@ tasks:
 
 
 - name: publish_packages
+  run_on: rhel80-small
   tags: ["publish"]
   # This should prevent this task from running in patch builds, where we
   # don't want to publish packages.
@@ -7889,6 +7890,7 @@ tasks:
           ./curator repo submit --service ${barque_url} --config ./etc/repo_config.yaml --distro ${packager_distro} --edition ${repo_edition} --version ${version} --arch ${packager_arch} --packages https://s3.amazonaws.com/mciuploads/${project}/${build_variant}/${revision}/artifacts/${build_id}-packages.tgz
 
 - name: push
+  run_on: rhel80-small
   tags: ["publish"]
   patchable: false
   depends_on:
@@ -8892,8 +8894,6 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: .publish
-    distros:
-    - ubuntu1804-small
 
 - name: enterprise-ubuntu1804-64
   display_name: Enterprise Ubuntu 18.04
@@ -8949,8 +8949,6 @@ buildvariants:
   - name: snmp
   - name: .watchdog
   - name: .publish
-    distros:
-    - ubuntu1804-small
 
 - name: ubuntu1604
   display_name: Ubuntu 16.04
@@ -9010,8 +9008,6 @@ buildvariants:
   - name: .stitch
   - name: .ssl
   - name: .publish
-    distros:
-    - ubuntu1604-small
 
 - name: enterprise-ubuntu1604-arm64
   display_name: Enterprise Ubuntu 16.04 arm64
@@ -9052,8 +9048,6 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: .publish
-    distros:
-    - ubuntu1604-test
 
 - name: enterprise-ubuntu1804-arm64
   display_name: Enterprise Ubuntu 18.04 arm64
@@ -9101,8 +9095,6 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: .publish
-    distros:
-    - ubuntu1804-test
 
 - name: ubuntu1804-arm64
   display_name: Ubuntu 18.04 arm64
@@ -9132,8 +9124,6 @@ buildvariants:
   - name: jsCore
   - name: replica_sets_jscore_passthrough
   - name: .publish
-    distros:
-    - ubuntu1804-test
 
 - name: ubuntu2004
   display_name: Ubuntu 20.04
@@ -9179,8 +9169,6 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: .publish
-    distros:
-    - ubuntu2004-small
 
 - name: enterprise-ubuntu2004-64
   display_name: Enterprise Ubuntu 20.04
@@ -9231,8 +9219,6 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .publish
-    distros:
-    - ubuntu2004-small
 
 - name: enterprise-ubuntu2004-arm64
   display_name: Enterprise Ubuntu 20.04 arm64
@@ -9279,8 +9265,6 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: .publish
-    distros:
-    - ubuntu2004-test
 
 - name: ubuntu2004-arm64
   display_name: Ubuntu 20.04 arm64
@@ -9309,8 +9293,6 @@ buildvariants:
   - name: jsCore
   - name: replica_sets_jscore_passthrough
   - name: .publish
-    distros:
-    - ubuntu2004-test
 
 - name: enterprise-linux-64-amazon-ami
   display_name: "Enterprise Amazon Linux"
@@ -9361,8 +9343,6 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .publish
-    distros:
-    - amazon1-2018-small
 
 - name: amazon
   display_name: Amazon Linux
@@ -9410,8 +9390,6 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: .publish
-    distros:
-    - amazon1-2018-small
 
 - name: enterprise-amazon2
   display_name: "Enterprise Amazon Linux 2"
@@ -9462,8 +9440,6 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .publish
-    distros:
-    - amazon2-small
 
 - name: amazon2
   display_name: Amazon Linux 2
@@ -9512,8 +9488,6 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: .publish
-    distros:
-    - amazon2-small
 
 - name: enterprise-amazon2-arm64
   display_name: "Enterprise Amazon Linux 2 arm64"
@@ -9562,8 +9536,6 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .publish
-    distros:
-    - rhel80-small
 
 - name: amazon2-arm64
   display_name: Amazon Linux 2 arm64
@@ -9606,8 +9578,6 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: .publish
-    distros:
-    - rhel80-small
 
 - name: tig-daily-cron
   modules:
@@ -9796,8 +9766,6 @@ buildvariants:
     - name: snmp
     - name: unittest_shell_hang_analyzer_gen
     - name: push
-      distros:
-        - rhel70-small
 
 - <<: *enterprise-windows-nopush-template
   name: enterprise-windows-benchmarks
@@ -9912,8 +9880,6 @@ buildvariants:
   - name: .stitch
   - name: .updatefuzzer
   - name: push
-    distros:
-    - rhel70-small
 
 - name: enterprise-windows-debug-unoptimized
   display_name: Enterprise Windows DEBUG (Unoptimized)
@@ -9990,8 +9956,6 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: push
-    distros:
-    - rhel70-small
 
 - name: macos-debug
   display_name: "* macOS DEBUG"
@@ -10048,8 +10012,6 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: push
-    distros:
-    - rhel70-small
 
 ###########################################
 #          Embedded SDK buildvariants     #
@@ -10213,8 +10175,6 @@ buildvariants:
   - name: .stitch
   - name: secondary_reads_passthrough_gen
   - name: .publish
-    distros:
-        - rhel62-small
   - name: server_discovery_and_monitoring_json_test_TG
   - name: server_selection_json_test_TG
 
@@ -10738,8 +10698,6 @@ buildvariants:
   - name: .stitch
   - name: .updatefuzzer
   - name: .publish
-    distros:
-    - rhel70-small
 
 - &enterprise-rhel-80-64-bit-template
   name: enterprise-rhel-80-64-bit
@@ -10792,8 +10750,6 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .publish
-    distros:
-    - rhel80-small
 
 - name: enterprise-rhel-82-arm64
   display_name: "Enterprise RHEL 8.2 arm64"
@@ -10842,8 +10798,6 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .publish
-    distros:
-    - rhel80-small
 
 - <<: *enterprise-rhel-70-64-bit-template
   name: hot_backups-rhel-70-64-bit
@@ -10949,8 +10903,6 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .publish
-    distros:
-    - rhel70-small
 
 - name: ubuntu1604-debug
   display_name: "* Ubuntu 16.04 DEBUG"
@@ -11040,8 +10992,6 @@ buildvariants:
   - name: .sharding .common !.op_query !.csrs
   - name: .ssl
   - name: .publish
-    distros:
-    - rhel62-small
 
 - name: rhel70
   display_name: RHEL 7.0
@@ -11087,8 +11037,6 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: .publish
-    distros:
-    - rhel70-small
 
 - name: rhel80
   display_name: RHEL 8.0
@@ -11134,8 +11082,6 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: .publish
-    distros:
-    - rhel80-small
 
 - name: rhel-82-arm64
   display_name: RHEL 8.2 arm64
@@ -11178,8 +11124,6 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: .publish
-    distros:
-    - rhel80-small
 
 # This variant compiles on RHEL 7.0 and runs tests on RHEL 7.6
 - name: rhel76_compile_rhel70
@@ -11244,8 +11188,6 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .publish
-    distros:
-    - rhel70-small
 
 - name: enterprise-rhel-72-s390x
   display_name: Enterprise RHEL 7.2 s390x
@@ -11295,8 +11237,6 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .publish
-    distros:
-    - rhel70-small
 
 ###########################################
 #          Ubuntu buildvariants           #
@@ -11346,8 +11286,6 @@ buildvariants:
   - name: .stitch
   - name: .watchdog
   - name: .publish
-    distros:
-    - ubuntu1604-small
 
 
 - name: enterprise-ubuntu-dynamic-1604-clang
@@ -11465,8 +11403,6 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .publish
-    distros:
-    - suse12-sp5-small
 
 - name: suse12
   display_name: SUSE 12
@@ -11514,8 +11450,6 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: .publish
-    distros:
-    - suse12-sp5-small
 
 - name: enterprise-suse15-64
   display_name: Enterprise SLES 15
@@ -11554,8 +11488,6 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .publish
-    distros:
-    - suse15-small
 
 - name: suse15
   display_name: SUSE 15
@@ -11600,8 +11532,6 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: .publish
-    distros:
-    - suse15-small
 
 ###########################################
 #          Debian buildvariants           #
@@ -11647,8 +11577,6 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .publish
-    distros:
-    - debian92-small
 
 - name: debian92
   display_name: Debian 9.2
@@ -11694,8 +11622,6 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: .publish
-    distros:
-    - debian92-small
 
 - name: enterprise-debian10-64
   display_name: Enterprise Debian 10
@@ -11737,8 +11663,6 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .publish
-    distros:
-    - debian10-small
 
 - name: debian10
   display_name: Debian 10
@@ -11784,8 +11708,6 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: .publish
-    distros:
-    - debian10-small
 
 ################################
 # storage engine buildvariants #
