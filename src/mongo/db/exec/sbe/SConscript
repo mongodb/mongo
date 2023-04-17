@@ -307,3 +307,15 @@ env.Benchmark(
         'query_sbe_abt',
     ],
 )
+
+env.Benchmark(
+    target='sbe_vm_bm',
+    source=[
+        'vm/vm_bm.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query/collation/collator_icu',
+        '$BUILD_DIR/mongo/unittest/unittest',
+        'query_sbe',
+    ],
+)
