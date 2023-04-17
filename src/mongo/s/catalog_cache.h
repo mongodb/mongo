@@ -399,6 +399,12 @@ private:
 
     void _triggerIndexVersionRefresh(OperationContext* opCtx, const NamespaceString& nss);
 
+    // Same as getCollectionRoutingInfo but will fetch the index information from the cache even if
+    // the placement information is not sharded. Used internally when the a refresh is requested for
+    // the index component.
+    StatusWith<CollectionRoutingInfo> _getCollectionRoutingInfoWithoutOptimization(
+        OperationContext* opCtx, const NamespaceString& nss);
+
     // Interface from which chunks will be retrieved
     CatalogCacheLoader& _cacheLoader;
 

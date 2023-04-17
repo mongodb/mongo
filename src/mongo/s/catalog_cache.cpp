@@ -409,6 +409,11 @@ StatusWith<CollectionRoutingInfo> CatalogCache::getCollectionRoutingInfoAt(
     OperationContext* opCtx, const NamespaceString& nss, Timestamp atClusterTime) {
     try {
         auto cm = uassertStatusOK(_getCollectionPlacementInfoAt(opCtx, nss, atClusterTime));
+        if (!cm.isSharded()) {
+            // If the collection is unsharded, it cannot have global indexes so there is no need to
+            // fetch the index information.
+            return CollectionRoutingInfo{std::move(cm), boost::none};
+        }
         auto sii = _getCollectionIndexInfoAt(opCtx, nss);
         return retryUntilConsistentRoutingInfo(opCtx, nss, std::move(cm), std::move(sii));
     } catch (const DBException& ex) {
@@ -422,7 +427,23 @@ StatusWith<CollectionRoutingInfo> CatalogCache::getCollectionRoutingInfo(Operati
     try {
         auto cm =
             uassertStatusOK(_getCollectionPlacementInfoAt(opCtx, nss, boost::none, allowLocks));
+        if (!cm.isSharded()) {
+            // If the collection is unsharded, it cannot have global indexes so there is no need to
+            // fetch the index information.
+            return CollectionRoutingInfo{std::move(cm), boost::none};
+        }
         auto sii = _getCollectionIndexInfoAt(opCtx, nss, allowLocks);
+        return retryUntilConsistentRoutingInfo(opCtx, nss, std::move(cm), std::move(sii));
+    } catch (const DBException& ex) {
+        return ex.toStatus();
+    }
+}
+
+StatusWith<CollectionRoutingInfo> CatalogCache::_getCollectionRoutingInfoWithoutOptimization(
+    OperationContext* opCtx, const NamespaceString& nss) {
+    try {
+        auto cm = uassertStatusOK(_getCollectionPlacementInfoAt(opCtx, nss, boost::none));
+        auto sii = _getCollectionIndexInfoAt(opCtx, nss);
         return retryUntilConsistentRoutingInfo(opCtx, nss, std::move(cm), std::move(sii));
     } catch (const DBException& ex) {
         return ex.toStatus();
@@ -541,7 +562,7 @@ StatusWith<CollectionRoutingInfo> CatalogCache::getCollectionRoutingInfoWithRefr
     try {
         _triggerPlacementVersionRefresh(opCtx, nss);
         _triggerIndexVersionRefresh(opCtx, nss);
-        return getCollectionRoutingInfo(opCtx, nss, false);
+        return _getCollectionRoutingInfoWithoutOptimization(opCtx, nss);
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
@@ -561,7 +582,7 @@ StatusWith<CollectionRoutingInfo> CatalogCache::getCollectionRoutingInfoWithInde
     OperationContext* opCtx, const NamespaceString& nss) {
     try {
         _triggerIndexVersionRefresh(opCtx, nss);
-        return getCollectionRoutingInfo(opCtx, nss, false);
+        return _getCollectionRoutingInfoWithoutOptimization(opCtx, nss);
     } catch (const DBException& ex) {
         return ex.toStatus();
     }
