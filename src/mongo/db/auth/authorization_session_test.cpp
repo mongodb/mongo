@@ -1397,15 +1397,17 @@ TEST_F(AuthorizationSessionTest, ExpiredSessionWithReauth) {
 
 
 TEST_F(AuthorizationSessionTest, ExpirationWithSecurityTokenNOK) {
+    const auto kTenantOID = OID::gen();
+    const TenantId kTenantId(kTenantOID);
+
     // Tests authorization flow from unauthenticated to active (via token) to unauthenticated to
     // active (via stateful connection) to unauthenticated.
     using VTS = auth::ValidatedTenancyScope;
 
     // Create and authorize a security token user.
     constexpr auto authUserFieldName = auth::SecurityToken::kAuthenticatedUserFieldName;
-    auto kOid = OID::gen();
-    auto body = BSON("ping" << 1 << "$tenant" << kOid);
-    const UserName user("spencer", "test", TenantId(kOid));
+    auto body = BSON("ping" << 1 << "$tenant" << kTenantOID);
+    const UserName user("spencer", "test", kTenantId);
     const UserRequest userRequest(user, boost::none);
     const UserName adminUser("admin", "admin");
     const UserRequest adminUserRequest(adminUser, boost::none);
@@ -1423,7 +1425,10 @@ TEST_F(AuthorizationSessionTest, ExpirationWithSecurityTokenNOK) {
     ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), userRequest, boost::none));
 
     // Assert that the session is authenticated and authorized as expected.
-    assertSecurityToken(testFooCollResource, ActionType::insert);
+    const auto kFooCollNss =
+        NamespaceString::createNamespaceStringForAuth(kTenantId, "test"_sd, "foo"_sd);
+    const auto kFooCollRsrc = ResourcePattern::forExactNamespace(kFooCollNss);
+    assertSecurityToken(kFooCollRsrc, ActionType::insert);
 
     // Assert that another user can't be authorized while the security token is auth'd.
     ASSERT_NOT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), adminUserRequest, boost::none));
@@ -1436,16 +1441,15 @@ TEST_F(AuthorizationSessionTest, ExpirationWithSecurityTokenNOK) {
 
     // Assert that a connection-based user with an expiration policy can be authorized after token
     // logout.
+    const auto kSomeCollNss =
+        NamespaceString::createNamespaceStringForAuth(boost::none, "anydb"_sd, "somecollection"_sd);
+    const auto kSomeCollRsrc = ResourcePattern::forExactNamespace(kSomeCollNss);
     ASSERT_OK(authzSession->addAndAuthorizeUser(_opCtx.get(), adminUserRequest, expirationTime));
-    assertActive(ResourcePattern::forExactNamespace(
-                     NamespaceString::createNamespaceString_forTest("anydb.somecollection")),
-                 ActionType::insert);
+    assertActive(kSomeCollRsrc, ActionType::insert);
 
     // Check that logout proceeds normally.
     authzSession->logoutDatabase(_client.get(), "admin", "Kill the test!");
-    assertLogout(ResourcePattern::forExactNamespace(
-                     NamespaceString::createNamespaceString_forTest("anydb.somecollection")),
-                 ActionType::insert);
+    assertLogout(kSomeCollRsrc, ActionType::insert);
 }
 
 class SystemBucketsTest : public AuthorizationSessionTest {

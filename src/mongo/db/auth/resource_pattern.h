@@ -95,7 +95,9 @@ public:
      * "ns" for which ns.isSystem() is false and ns.db() == dbname.
      */
     static ResourcePattern forDatabaseName(const DatabaseName& dbName) {
-        return ResourcePattern(MatchTypeEnum::kMatchDatabaseName, NamespaceString(dbName));
+        return ResourcePattern(
+            MatchTypeEnum::kMatchDatabaseName,
+            NamespaceString::createNamespaceStringForAuth(dbName.tenantId(), dbName.db(), ""_sd));
     }
 
     static ResourcePattern forDatabaseName(StringData dbName) {
@@ -306,6 +308,16 @@ public:
             return true;
         }
         return (_matchType == other._matchType) && (_ns < other._ns);
+    }
+
+    /**
+     * Perform an equality comparison ignoring the TenantID component of NamespaceString.
+     * This is necessary during migration of ResourcePattern to be tenant aware.
+     * TODO (SERVER-76195) Remove legacy non-tenant aware APIs from ResourcePattern
+     */
+    bool matchesIgnoringTenant(const ResourcePattern& other) const {
+        return (_matchType == other._matchType) && (_ns.db() == other._ns.db()) &&
+            (_ns.coll() == other._ns.coll());
     }
 
     template <typename H>

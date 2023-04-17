@@ -830,7 +830,7 @@ bool AuthorizationSessionImpl::_isAuthorizedForPrivilege(const Privilege& privil
     ActionSet unmetRequirements = privilege.getActions();
     for (const auto& priv : _getDefaultPrivileges()) {
         for (auto patternIt = search.cbegin(); patternIt != search.cend(); ++patternIt) {
-            if (priv.getResourcePattern() != *patternIt) {
+            if (!priv.getResourcePattern().matchesIgnoringTenant(*patternIt)) {
                 continue;
             }
 

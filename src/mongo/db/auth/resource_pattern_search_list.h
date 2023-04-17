@@ -78,7 +78,7 @@ private:
 public:
     ResourcePatternSearchList() = delete;
     explicit ResourcePatternSearchList(const ResourcePattern& target) {
-        _list[_size++] = ResourcePattern::forAnyResource();
+        _list[_size++] = ResourcePattern::forAnyResource(target.tenantId());
         if (target.isExactNamespacePattern()) {
             const auto& nss = target.ns();
 
@@ -89,25 +89,27 @@ public:
                 // used to store special system collections, which user level
                 // administrators should not be able to manipulate.
                 if (!nss.isLocalDB() && !nss.isConfigDB()) {
-                    _list[_size++] = ResourcePattern::forAnyNormalResource();
+                    _list[_size++] = ResourcePattern::forAnyNormalResource(target.tenantId());
                 }
-                _list[_size++] = ResourcePattern::forDatabaseName(nss.db());
+                _list[_size++] = ResourcePattern::forDatabaseName(nss.dbName());
             } else if ((nss.coll().size() > kSystemBucketsPrefix.size()) &&
                        nss.coll().startsWith(kSystemBucketsPrefix)) {
                 // System bucket patterns behave similar to any/db/coll/exact patterns,
                 // But with a fixed "system.buckets." prefix to the collection name.
                 StringData coll = nss.coll().substr(kSystemBucketsPrefix.size());
-                _list[_size++] = ResourcePattern::forExactSystemBucketsCollection(nss.db(), coll);
-                _list[_size++] = ResourcePattern::forAnySystemBuckets();
-                _list[_size++] = ResourcePattern::forAnySystemBucketsInDatabase(nss.db());
-                _list[_size++] = ResourcePattern::forAnySystemBucketsInAnyDatabase(coll);
+                _list[_size++] = ResourcePattern::forExactSystemBucketsCollection(
+                    NamespaceStringUtil::parseNamespaceFromRequest(nss.dbName(), coll));
+                _list[_size++] = ResourcePattern::forAnySystemBuckets(target.tenantId());
+                _list[_size++] = ResourcePattern::forAnySystemBucketsInDatabase(nss.dbName());
+                _list[_size++] =
+                    ResourcePattern::forAnySystemBucketsInAnyDatabase(target.tenantId(), coll);
             }
 
             // All collections can be matched by a collection resource for their name
-            _list[_size++] = ResourcePattern::forCollectionName(nss.coll());
+            _list[_size++] = ResourcePattern::forCollectionName(target.tenantId(), nss.coll());
         } else if (target.isDatabasePattern()) {
             if (!target.ns().isLocalDB() && !target.ns().isConfigDB()) {
-                _list[_size++] = ResourcePattern::forAnyNormalResource();
+                _list[_size++] = ResourcePattern::forAnyNormalResource(target.tenantId());
             }
         }
 

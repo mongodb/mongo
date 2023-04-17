@@ -95,6 +95,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/crypto/sha_block_${MONGO_CRYPTO}',
+        '$BUILD_DIR/mongo/db/server_base',
         'auth',
         'authentication_restriction',
         'authprivilege',
@@ -144,6 +145,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         'auth',
         'auth_options',
         'authprivilege',

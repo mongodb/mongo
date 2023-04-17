@@ -75,7 +75,7 @@ std::shared_ptr<UserHandle> createSystemUserHandle() {
     ActionSet allActions;
     allActions.addAllActions();
     PrivilegeVector privileges;
-    auth::generateUniversalPrivileges(&privileges);
+    auth::generateUniversalPrivileges(&privileges, boost::none /* tenantId */);
     (*user)->addPrivileges(privileges);
 
     if (internalSecurity.credentials) {
