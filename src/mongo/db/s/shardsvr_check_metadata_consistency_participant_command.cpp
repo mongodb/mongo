@@ -50,6 +50,26 @@ namespace {
 std::vector<MetadataInconsistencyItem> checkIndexesInconsistencies(
     OperationContext* opCtx, const std::vector<CollectionType>& collections) {
     static const auto rawPipelineStages = [] {
+        /**
+         * The following pipeline is used to check for inconsistencies in the indexes of all the
+         * collections across all shards in the cluster. In particular, it checks that:
+         *      1. All shards have the same set of indexes.
+         *      2. All shards have the same properties for each index.
+         *
+         * The pipeline is structured as follows:
+         *      1. Use the $indexStats stage to gather statistics about each index in all shards.
+         *      2. Group all the indexes together and collect them into an array. Also, collect the
+         *      names of all the shards in the cluster.
+         *      3. Create a new document for each index in the array created by the previous stage.
+         *      4. Group all the indexes by name.
+         *      5. For each index, create two new fields:
+         *          - `missingFromShards`: array of differences between all shards that are expected
+         *          to have the index and the shards that actually contain the index.
+         *          - `inconsistentProperties`: array of differences between the properties of each
+         *          index across all shards.
+         *      6. Filter out indexes that are consistent across all shards.
+         *      7. Project the final result.
+         */
         auto rawPipelineBSON = fromjson(R"({pipeline: [
 			{$indexStats: {}},
 			{$group: {
