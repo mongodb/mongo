@@ -1,6 +1,7 @@
 /**
  * Tests that the cluster collStats command returns timeseries statistics in the expected format.
  *
+ * For legacy collStats command:
  * {
  *     ....,
  *     "ns" : ...,
@@ -20,15 +21,43 @@
  *     ....
  * }
  *
+ * For aggregate $collStats stage:
+ * [
+ *  {
+ *     ....,
+ *     "ns" : ...,
+ *     "shard" : ...,
+ *     "latencyStats" : {
+ *         ....
+ *     },
+ *     "storageStats" : {
+ *         ...,
+ *        "timeseries" : {
+ *         ...,
+ *         },
+ *     },
+ *     "count" : {
+ *         ....
+ *     },
+ *     "queryExecStats" : {
+ *         ....
+ *     },
+ *  },
+ *  {
+ *   .... (Other shard's result)
+ *  },
+ *  ...
+ * ]
+ *
  * @tags: [
- *   requires_fcv_51
+ *   requires_fcv_71
  * ]
  */
 
 (function() {
 load("jstests/core/timeseries/libs/timeseries.js");
-
-const st = new ShardingTest({shards: 2});
+const numShards = 2;
+const st = new ShardingTest({shards: numShards});
 
 if (!TimeseriesTest.shardedtimeseriesCollectionsEnabled(st.shard0)) {
     jsTestLog("Skipping test because the sharded time-series collection feature flag is disabled");
@@ -83,14 +112,14 @@ assert.commandWorked(st.s.adminCommand({
     key: {[metaField]: 1},
 }));
 
-// Force splitting two chunks.
+// Force splitting numShards chunks.
 const splitPoint = {
-    meta: numberDoc / 2
+    meta: numberDoc / numShards
 };
 assert.commandWorked(st.s.adminCommand({split: bucketNs, middle: splitPoint}));
 // Ensure that currently both chunks reside on the primary shard.
 let counts = st.chunkCounts(`system.buckets.${collName}`, dbName);
-assert.eq(2, counts[primaryShard.shardName]);
+assert.eq(numShards, counts[primaryShard.shardName]);
 // Move one of the chunks into the second shard.
 assert.commandWorked(st.s.adminCommand(
     {movechunk: bucketNs, find: splitPoint, to: otherShard.name, _waitForDelete: true}));
@@ -105,20 +134,13 @@ for (let i = 0; i < numberDoc; i++) {
 }
 assert.eq(mongosColl.find().itcount(), numberDoc * 2);
 
-clusterCollStatsResult = assert.commandWorked(mongosDB.runCommand({collStats: collName}));
-jsTestLog("Sharded cluster collStats command result: " + tojson(clusterCollStatsResult));
+function checkAllFieldsAreInResult(result) {
+    assert(result.hasOwnProperty("latencyStats"), result);
+    assert(result.hasOwnProperty("storageStats"), result);
+    assert(result.hasOwnProperty("count"), result);
+    assert(result.hasOwnProperty("queryExecStats"), result);
+}
 
-// Check that the top-level 'timeseries' fields match the sum of two shard's, that the stats were
-// correctly aggregated.
-assert(clusterCollStatsResult.shards[primaryShard.shardName].timeseries,
-       "Expected a shard 'timeseries' field on shard " + primaryShard.shardName +
-           " but didn't find one: " + tojson(clusterCollStatsResult));
-assert(clusterCollStatsResult.shards[otherShard.shardName].timeseries,
-       "Expected a shard 'timeseries' field on shard " + otherShard.shardName +
-           " but didn't find one: " + tojson(clusterCollStatsResult));
-assert(clusterCollStatsResult.timeseries,
-       "Expected an aggregated 'timeseries' field but didn't find one: " +
-           tojson(clusterCollStatsResult));
 function assertTimeseriesAggregationCorrectness(total, shards) {
     assert(shards.every(x => x.bucketNs === total.bucketNs));
     assert.eq(total.bucketCount,
@@ -166,10 +188,69 @@ function assertTimeseriesAggregationCorrectness(total, shards) {
     assert(total.numCommits > 0);
     assert(total.numMeasurementsCommitted > 0);
 }
-assertTimeseriesAggregationCorrectness(clusterCollStatsResult.timeseries, [
-    clusterCollStatsResult.shards[primaryShard.shardName].timeseries,
-    clusterCollStatsResult.shards[otherShard.shardName].timeseries
-]);
+
+function verifyClusterCollStatsResult(
+    clusterCollStatsResult, sumTimeseriesStatsAcrossShards, isAggregation) {
+    if (isAggregation) {
+        // $collStats should output one document per shard.
+        assert.eq(clusterCollStatsResult.length,
+                  numShards,
+                  "Expected " + numShards +
+                      "documents to be returned: " + tojson(clusterCollStatsResult));
+
+        checkAllFieldsAreInResult(clusterCollStatsResult[0]);
+        checkAllFieldsAreInResult(clusterCollStatsResult[1]);
+    }
+
+    assert(sumTimeseriesStatsAcrossShards,
+           "Expected an aggregated 'timeseries' field but didn't find one: " +
+               tojson(clusterCollStatsResult));
+
+    const primaryShardStats = isAggregation
+        ? clusterCollStatsResult[0].storageStats.timeseries
+        : clusterCollStatsResult.shards[primaryShard.shardName].timeseries;
+
+    const otherShardStats = isAggregation
+        ? clusterCollStatsResult[1].storageStats.timeseries
+        : clusterCollStatsResult.shards[otherShard.shardName].timeseries;
+
+    // Check that the top-level 'timeseries' fields match the sum of two shard's, that the stats
+    // were correctly aggregated.
+    assert(primaryShardStats,
+           "Expected a shard 'timeseries' field on shard " + primaryShard.shardName +
+               " but didn't find one: " + tojson(clusterCollStatsResult));
+    assert(otherShardStats,
+           "Expected a shard 'timeseries' field on shard " + otherShard.shardName +
+               " but didn't find one: " + tojson(clusterCollStatsResult));
+
+    assertTimeseriesAggregationCorrectness(sumTimeseriesStatsAcrossShards,
+                                           [primaryShardStats, otherShardStats]);
+}
+
+//  Tests that the output of the collStats command returns results from both the shards and
+//  includes all the expected fields.
+clusterCollStatsResult = assert.commandWorked(mongosDB.runCommand({collStats: collName}));
+jsTestLog("Sharded cluster collStats command result: " + tojson(clusterCollStatsResult));
+const sumTimeseriesStatsAcrossShards = clusterCollStatsResult.timeseries;
+verifyClusterCollStatsResult(
+    clusterCollStatsResult, sumTimeseriesStatsAcrossShards, false  // isAggregation
+);
+
+// Tests that the output of the $collStats stage returns results from both the shards and includes
+// all the expected fields.
+clusterCollStatsResult =
+    mongosColl
+        .aggregate(
+            [{$collStats: {latencyStats: {}, storageStats: {}, count: {}, queryExecStats: {}}}])
+        .toArray();
+jsTestLog("Sharded cluster collStats aggregation result: " + tojson(clusterCollStatsResult));
+
+// Use the same sumTimeseriesStatsAcrossShards value as the collStats command since
+// aggregation does not sum up timeseries stats results. This will also verify that the results
+// output by collStats in find and aggregation are the same.
+verifyClusterCollStatsResult(
+    clusterCollStatsResult, sumTimeseriesStatsAcrossShards, true  // isAggregation
+);
 
 st.stop();
 })();
