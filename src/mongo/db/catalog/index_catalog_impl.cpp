@@ -297,15 +297,6 @@ void IndexCatalogImpl::init(OperationContext* opCtx,
             IndexCatalogEntry* entry =
                 createIndexEntry(opCtx, collection, std::move(descriptor), flags);
             fassert(17340, entry->isReady(opCtx));
-            // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-            if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe() &&
-                recoveryTs && !entry->descriptor()->isIdIndex()) {
-                // When initializing indexes from disk, we conservatively set the
-                // minimumVisibleSnapshot to non _id indexes to the recovery timestamp. The _id
-                // index is left visible. It's assumed if the collection is visible, it's _id is
-                // valid to be used.
-                entry->setMinimumVisibleSnapshot(recoveryTs.value());
-            }
         }
     }
 
@@ -1684,13 +1675,6 @@ const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
 
     // Last rebuild index data for CollectionQueryInfo for this Collection.
     CollectionQueryInfo::get(collection).rebuildIndexData(opCtx, CollectionPtr(collection));
-
-    opCtx->recoveryUnit()->onCommit(
-        [newEntry](OperationContext*, boost::optional<Timestamp> commitTime) {
-            if (commitTime) {
-                newEntry->setMinimumVisibleSnapshot(*commitTime);
-            }
-        });
 
     // Return the new descriptor.
     return newEntry->descriptor();

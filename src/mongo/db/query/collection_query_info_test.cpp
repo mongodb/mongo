@@ -150,14 +150,6 @@ public:
         MONGO_UNIMPLEMENTED;
     }
 
-    boost::optional<Timestamp> getMinimumVisibleSnapshot() const override {
-        MONGO_UNIMPLEMENTED;
-    }
-
-    void setMinimumVisibleSnapshot(Timestamp name) override {
-        MONGO_UNIMPLEMENTED;
-    }
-
     const UpdateIndexData& getIndexedPaths() const override {
         MONGO_UNIMPLEMENTED;
     }

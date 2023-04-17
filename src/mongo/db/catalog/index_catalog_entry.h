@@ -185,14 +185,6 @@ public:
      */
     virtual bool shouldValidateDocument() const = 0;
 
-    /**
-     * If return value is not boost::none, reads with majority read concern using an older snapshot
-     * must treat this index as unfinished.
-     */
-    virtual boost::optional<Timestamp> getMinimumVisibleSnapshot() const = 0;
-
-    virtual void setMinimumVisibleSnapshot(Timestamp name) = 0;
-
     virtual const UpdateIndexData& getIndexedPaths() const = 0;
 };
 

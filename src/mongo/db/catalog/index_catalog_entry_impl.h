@@ -175,20 +175,6 @@ public:
 
     bool isReadyInMySnapshot(OperationContext* opCtx) const final;
 
-    /**
-     * If return value is not boost::none, reads with majority read concern using an older snapshot
-     * must treat this index as unfinished.
-     */
-    boost::optional<Timestamp> getMinimumVisibleSnapshot() const final {
-        return _minVisibleSnapshot;
-    }
-
-    /**
-     * Updates the minimum visible snapshot. The 'newMinimumVisibleSnapshot' is ignored if it would
-     * set the minimum visible snapshot backwards in time.
-     */
-    void setMinimumVisibleSnapshot(Timestamp newMinimumVisibleSnapshot) final;
-
     const UpdateIndexData& getIndexedPaths() const final {
         return _indexedPaths;
     }
@@ -241,9 +227,6 @@ private:
     bool _isFrozen;
     bool _shouldValidateDocument;
     AtomicWord<bool> _isDropped;  // Whether the index drop is committed.
-
-    // The earliest snapshot that is allowed to read this index.
-    boost::optional<Timestamp> _minVisibleSnapshot;
 
     // Offset of this index within the Collection metadata.
     // Used to improve lookups without having to search for the index name

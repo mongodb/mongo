@@ -183,17 +183,6 @@ Status IndexBuildBlock::init(OperationContext* opCtx, Collection* collection, bo
         indexCatalogEntry->setIndexBuildInterceptor(_indexBuildInterceptor.get());
     }
 
-    if (isBackgroundIndex) {
-        opCtx->recoveryUnit()->onCommit(
-            [entry = indexCatalogEntry, coll = collection](OperationContext*,
-                                                           boost::optional<Timestamp> commitTime) {
-                // This will prevent the unfinished index from being visible on index iterators.
-                if (commitTime) {
-                    entry->setMinimumVisibleSnapshot(commitTime.value());
-                }
-            });
-    }
-
     _completeInit(opCtx, collection);
 
     return Status::OK();
@@ -278,10 +267,6 @@ void IndexBuildBlock::success(OperationContext* opCtx, Collection* collection) {
                   "ident"_attr = entry->getIdent(),
                   "collectionIdent"_attr = coll->getSharedIdent()->getIdent(),
                   "commitTimestamp"_attr = commitTime);
-
-            if (commitTime) {
-                entry->setMinimumVisibleSnapshot(commitTime.value());
-            }
 
             // Add the index to the TTLCollectionCache upon successfully committing the index build.
             // TTL indexes are not compatible with capped collections.  Note that TTL deletion is

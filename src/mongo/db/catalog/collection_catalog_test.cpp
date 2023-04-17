@@ -1372,14 +1372,6 @@ TEST_F(CollectionCatalogTimestampTest, MinimumValidSnapshot) {
     ASSERT_EQ(coll->getMinimumVisibleSnapshot(), createCollectionTs);
     ASSERT_EQ(coll->getMinimumValidSnapshot(), createYIndexTs);
 
-    const IndexDescriptor* desc = coll->getIndexCatalog()->findIndexByName(opCtx.get(), "x_1");
-    const IndexCatalogEntry* entry = coll->getIndexCatalog()->getEntry(desc);
-    ASSERT_EQ(entry->getMinimumVisibleSnapshot(), createXIndexTs);
-
-    desc = coll->getIndexCatalog()->findIndexByName(opCtx.get(), "y_1");
-    entry = coll->getIndexCatalog()->getEntry(desc);
-    ASSERT_EQ(entry->getMinimumVisibleSnapshot(), createYIndexTs);
-
     dropIndex(opCtx.get(), nss, "x_1", dropIndexTs);
     dropIndex(opCtx.get(), nss, "y_1", dropIndexTs);
 

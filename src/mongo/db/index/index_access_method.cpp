@@ -1231,20 +1231,6 @@ Status SortedDataIndexAccessMethod::_indexKeysOrWriteToSideTable(
             *keysInsertedOut += inserted;
         }
     } else {
-        // Ensure that our snapshot is compatible with the index's minimum visibile snapshot.
-        // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-        if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe()) {
-            const auto minVisibleTimestamp = _indexCatalogEntry->getMinimumVisibleSnapshot();
-            const auto readTimestamp =
-                opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx).value_or(
-                    opCtx->recoveryUnit()->getCatalogConflictingTimestamp());
-            if (minVisibleTimestamp && !readTimestamp.isNull() &&
-                readTimestamp < *minVisibleTimestamp) {
-                throwWriteConflictException(
-                    "Unable to read from a snapshot due to pending catalog changes.");
-            }
-        }
-
         int64_t numInserted = 0;
         status = insertKeysAndUpdateMultikeyPaths(
             opCtx,
@@ -1300,20 +1286,6 @@ void SortedDataIndexAccessMethod::_unindexKeysOrWriteToSideTable(
     //
     // We need to disable blind-deletes if 'checkRecordId' is explicitly set 'On'.
     options.dupsAllowed = options.dupsAllowed || checkRecordId == CheckRecordId::On;
-
-    // Ensure that our snapshot is compatible with the index's minimum visibile snapshot.
-    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-    if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe()) {
-        const auto minVisibleTimestamp = _indexCatalogEntry->getMinimumVisibleSnapshot();
-        const auto readTimestamp =
-            opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx).value_or(
-                opCtx->recoveryUnit()->getCatalogConflictingTimestamp());
-        if (minVisibleTimestamp && !readTimestamp.isNull() &&
-            readTimestamp < *minVisibleTimestamp) {
-            throwWriteConflictException(
-                "Unable to read from a snapshot due to pending catalog changes.");
-        }
-    }
 
     int64_t removed = 0;
     Status status = removeKeys(opCtx, keys, options, &removed);
