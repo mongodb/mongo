@@ -146,6 +146,9 @@ const allCommands = {
     _shardsvrCheckMetadataConsistency: {skip: isAnInternalCommand},
     _shardsvrCheckMetadataConsistencyParticipant: {skip: isAnInternalCommand},
     _startStreamProcessor: {skip: isAnInternalCommand},
+    streams_startStreamSample: {skip: isAnInternalCommand},
+    streams_getMoreStreamSample: {skip: isAnInternalCommand},
+    streams_testOnlyInsert: {skip: isAnInternalCommand},
     _transferMods: {skip: isAnInternalCommand},
     _vectorClockPersist: {skip: isAnInternalCommand},
     abortReshardCollection: {
