@@ -44,7 +44,6 @@
 
 
 namespace mongo {
-namespace {
 
 class GetDatabaseVersionCmd final : public TypedCommand<GetDatabaseVersionCmd> {
 public:
@@ -90,6 +89,10 @@ public:
                 versionObj = dbVersion->toBSON();
             }
             result->getBodyBuilder().append("dbVersion", versionObj);
+
+            if (const auto isPrimaryShardForDb = scopedDss->_isPrimaryShardForDb(opCtx)) {
+                result->getBodyBuilder().append("isPrimaryShardForDb", *isPrimaryShardForDb);
+            }
         }
 
         StringData _targetDb() const {
@@ -110,5 +113,4 @@ public:
     }
 } getDatabaseVersionCmd;
 
-}  // namespace
 }  // namespace mongo

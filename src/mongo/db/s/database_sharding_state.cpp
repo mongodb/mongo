@@ -303,4 +303,10 @@ void DatabaseShardingState::_cancelDbMetadataRefresh() {
     }
 }
 
+boost::optional<bool> DatabaseShardingState::_isPrimaryShardForDb(OperationContext* opCtx) const {
+    return _dbInfo
+        ? boost::optional<bool>(_dbInfo->getPrimary() == ShardingState::get(opCtx)->shardId())
+        : boost::none;
+}
+
 }  // namespace mongo

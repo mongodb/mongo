@@ -3,6 +3,10 @@
 var CheckShardFilteringMetadataHelpers = (function() {
     function run(mongosConn, nodeConn, shardId, skipCheckShardedCollections = false) {
         function checkDatabase(configDatabasesEntry) {
+            // No shard other than the db-primary shard can believe to be the db-primary. Non
+            // db-primary shards are allowed to have a stale notion of the dbVersion, as long as
+            // they believe they are not primary.
+
             const dbName = configDatabasesEntry._id;
             print(`CheckShardFilteringMetadata: checking database '${dbName}' on node '${
                 nodeConn.host}' of shard '${shardId}'`);
@@ -10,24 +14,40 @@ var CheckShardFilteringMetadataHelpers = (function() {
             const nodeMetadata =
                 assert.commandWorked(nodeConn.adminCommand({getDatabaseVersion: dbName}));
 
-            if (nodeMetadata.dbVersion.timestamp === undefined) {
-                // Shards are allowed to not know the dbVersion.
+            // Skip this test if isPrimaryShardForDb is not present. Multiversion incompatible.
+            if (nodeMetadata.dbVersion.isPrimaryShardForDb === undefined) {
                 return;
             }
 
-            assert.eq(nodeMetadata.dbVersion.uuid,
-                      configDatabasesEntry.version.uuid,
-                      `Unexpected dbVersion.uuid for db '${dbName}' on node '${nodeConn.host}'`);
-            assert.eq(timestampCmp(nodeMetadata.dbVersion.timestamp,
-                                   configDatabasesEntry.version.timestamp),
-                      0,
-                      `Unexpected dbVersion timestamp for db '${dbName}' on node '${
-                          nodeConn.host}'. Found '${
-                          tojson(nodeMetadata.dbVersion.timestamp)}'; expected '${
-                          tojson(configDatabasesEntry.version.timestamp)}'`);
-            assert.eq(nodeMetadata.dbVersion.lastMod,
-                      configDatabasesEntry.version.lastMod,
-                      `Unexpected dbVersion lastMod for db '${dbName}' on node '${nodeConn.host}'`);
+            if (nodeMetadata.dbVersion.timestamp === undefined) {
+                // Node has no knowledge of the database.
+                return;
+            }
+
+            assert.eq(
+                configDatabasesEntry.primary === shardId,
+                nodeMetadata.isPrimaryShardForDb,
+                `Unexpected isPrimaryShardForDb for db '${dbName}' on node '${nodeConn.host}'`);
+
+            // If the node is the primary shard for the database, it should know the correct
+            // database version.
+            if (configDatabasesEntry.primary === shardId) {
+                assert.eq(
+                    nodeMetadata.dbVersion.uuid,
+                    configDatabasesEntry.version.uuid,
+                    `Unexpected dbVersion.uuid for db '${dbName}' on node '${nodeConn.host}'`);
+                assert.eq(timestampCmp(nodeMetadata.dbVersion.timestamp,
+                                       configDatabasesEntry.version.timestamp),
+                          0,
+                          `Unexpected dbVersion timestamp for db '${dbName}' on node '${
+                              nodeConn.host}'. Found '${
+                              tojson(nodeMetadata.dbVersion.timestamp)}'; expected '${
+                              tojson(configDatabasesEntry.version.timestamp)}'`);
+                assert.eq(
+                    nodeMetadata.dbVersion.lastMod,
+                    configDatabasesEntry.version.lastMod,
+                    `Unexpected dbVersion lastMod for db '${dbName}' on node '${nodeConn.host}'`);
+            }
 
             print(`CheckShardFilteringMetadata: Database '${dbName}' on '${nodeConn.host}' OK`);
         }
@@ -87,10 +107,9 @@ var CheckShardFilteringMetadataHelpers = (function() {
         const configDB = mongosConn.getDB('config');
 
         // Check shards know correct database versions.
-        // TODO: SERVER-73991 Reenable this check.
-        // configDB.databases.find({primary: shardId}).forEach(configDatabasesEntry => {
-        //     checkDatabase(configDatabasesEntry);
-        // });
+        configDB.databases.find().forEach(configDatabasesEntry => {
+            checkDatabase(configDatabasesEntry);
+        });
 
         // Check that shards have correct filtering metadata for sharded collections.
         if (!skipCheckShardedCollections) {

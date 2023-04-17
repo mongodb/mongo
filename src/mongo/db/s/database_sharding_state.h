@@ -258,6 +258,18 @@ private:
     // Tracks the ongoing database metadata refresh. Possibly keeps a future for other threads to
     // wait on it, and a cancellation source to cancel the ongoing database metadata refresh.
     boost::optional<DbMetadataRefresh> _dbMetadataRefresh;
+
+    /**
+     * If there is cached database info, returns `true` if the current shard is the primary shard
+     * for the database of the current sharding state. If there is no cached database info, returns
+     * `boost::none`.
+     *
+     * This method is unsafe to use since it doesn't honor the critical section.
+     */
+    boost::optional<bool> _isPrimaryShardForDb(OperationContext* opCtx) const;
+
+    // Permit the `getDatabaseVersion` command to access the private method `_isPrimaryShardForDb`.
+    friend class GetDatabaseVersionCmd;
 };
 
 }  // namespace mongo
