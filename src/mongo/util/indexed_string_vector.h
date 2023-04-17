@@ -136,7 +136,7 @@ public:
                     }
 
                     return encodedIdx - 2;
-                } else if (MONGO_likely(encodedIdx < 0)) {
+                } else if (MONGO_likely(encodedIdx < 1)) {
                     // If encodedIdx == 0, then we know 'str' is not present in _strings.
                     return npos;
                 }
