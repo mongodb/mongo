@@ -130,6 +130,12 @@ void WatchdogPeriodicThread::doLoop() {
     Client::initThread(_threadName);
     Client* client = &cc();
 
+    // TODO(SERVER-74659): Please revisit if this thread could be made killable.
+    {
+        stdx::lock_guard<Client> lk(*client);
+        client->setSystemOperationUnkillableByStepdown(lk);
+    }
+
     auto preciseClockSource = client->getServiceContext()->getPreciseClockSource();
 
     {

@@ -50,6 +50,12 @@ std::string ClusterCursorCleanupJob::name() const {
 void ClusterCursorCleanupJob::run() {
     ThreadClient tc(name(), getGlobalServiceContext());
 
+    // TODO(SERVER-74662): Please revisit if this thread could be made killable.
+    {
+        stdx::lock_guard<Client> lk(*tc.get());
+        tc.get()->setSystemOperationUnkillableByStepdown(lk);
+    }
+
     auto* const client = Client::getCurrent();
     auto* const manager = Grid::get(client->getServiceContext())->getCursorManager();
     invariant(manager);

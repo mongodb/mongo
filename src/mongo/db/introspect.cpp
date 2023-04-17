@@ -95,6 +95,13 @@ void profile(OperationContext* opCtx, NetworkOp op) {
         // killed or timed out. Those are the case we want to have profiling data.
         auto newClient = opCtx->getServiceContext()->makeClient("profiling");
         auto newCtx = newClient->makeOperationContext();
+
+        // TODO(SERVER-74657): Please revisit if this thread could be made killable.
+        {
+            stdx::lock_guard<Client> lk(*newClient.get());
+            newClient.get()->setSystemOperationUnkillableByStepdown(lk);
+        }
+
         // We swap the lockers as that way we preserve locks held in transactions and any other
         // options set for the locker like maxLockTimeout.
         auto oldLocker = opCtx->getClient()->swapLockState(

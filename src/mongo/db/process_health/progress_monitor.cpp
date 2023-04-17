@@ -141,6 +141,12 @@ void ProgressMonitor::_progressMonitorLoop() {
     Client::initThread("FaultManagerProgressMonitor"_sd, _svcCtx, nullptr);
     static const int kSleepsPerInterval = 10;
 
+    // TODO(SERVER-74659): Please revisit if this thread could be made killable.
+    {
+        stdx::lock_guard<Client> lk(cc());
+        cc().setSystemOperationUnkillableByStepdown(lk);
+    }
+
     while (!_terminate.load()) {
         progressMonitorCheck(_crashCb);
 

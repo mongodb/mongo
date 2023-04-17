@@ -73,6 +73,11 @@ void Checkpointer::run() {
     ThreadClient tc(name(), getGlobalServiceContext());
     LOGV2_DEBUG(22307, 1, "Starting thread", "threadName"_attr = name());
 
+    {
+        stdx::lock_guard<Client> lk(*tc.get());
+        tc.get()->setSystemOperationUnkillableByStepdown(lk);
+    }
+
     while (true) {
         auto opCtx = tc->makeOperationContext();
 

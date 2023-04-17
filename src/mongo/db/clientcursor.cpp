@@ -357,6 +357,13 @@ public:
 
     void run() {
         ThreadClient tc("clientcursormon", getGlobalServiceContext());
+
+        // TODO(SERVER-74662): Please revisit if this thread could be made killable.
+        {
+            stdx::lock_guard<Client> lk(*tc.get());
+            tc.get()->setSystemOperationUnkillableByStepdown(lk);
+        }
+
         while (!globalInShutdownDeprecated()) {
             {
                 const ServiceContext::UniqueOperationContext opCtx = cc().makeOperationContext();

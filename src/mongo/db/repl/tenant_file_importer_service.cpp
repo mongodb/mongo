@@ -134,6 +134,13 @@ void TenantFileImporterService::startMigration(const UUID& migrationId) {
 
     _workerThread = std::make_unique<stdx::thread>([this, migrationId] {
         Client::initThread("TenantFileImporterService");
+
+        // TODO(SERVER-74661): Please revisit if this thread could be made killable.
+        {
+            stdx::lock_guard<Client> lk(cc());
+            cc().setSystemOperationUnkillableByStepdown(lk);
+        }
+
         try {
             _handleEvents(migrationId);
         } catch (const DBException& err) {

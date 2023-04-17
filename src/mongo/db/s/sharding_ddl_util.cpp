@@ -910,12 +910,6 @@ void runTransactionOnShardingCatalog(OperationContext* opCtx,
     // passed Operation context. We opt for creating a new one to avoid any possible side
     // effects.
     auto newClient = opCtx->getServiceContext()->makeClient("ShardingCatalogTransaction");
-
-    {
-        stdx::lock_guard<Client> lk(*newClient.get());
-        newClient.get()->setSystemOperationKillableByStepdown(lk);
-    }
-
     AuthorizationSession::get(newClient.get())->grantInternalAuthorization(newClient.get());
     AlternativeClientRegion acr(newClient);
 

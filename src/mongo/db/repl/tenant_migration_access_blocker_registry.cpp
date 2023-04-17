@@ -72,6 +72,10 @@ TenantMigrationAccessBlockerRegistry::TenantMigrationAccessBlockerRegistry() {
     threadPoolOptions.poolName = "TenantMigrationBlockerAsyncThreadPool";
     threadPoolOptions.onCreateThread = [](const std::string& threadName) {
         Client::initThread(threadName.c_str());
+
+        // TODO(SERVER-74661): Please revisit if this thread could be made killable.
+        stdx::lock_guard<Client> lk(cc());
+        cc().setSystemOperationUnkillableByStepdown(lk);
     };
     _asyncBlockingOperationsExecutor = std::make_shared<executor::ThreadPoolTaskExecutor>(
         std::make_unique<ThreadPool>(threadPoolOptions),

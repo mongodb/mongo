@@ -226,6 +226,11 @@ void BackgroundSync::_run() {
     Client::initThread("BackgroundSync");
     AuthorizationSession::get(cc())->grantInternalAuthorization(&cc());
 
+    {
+        stdx::lock_guard<Client> lk(cc());
+        cc().setSystemOperationUnkillableByStepdown(lk);
+    }
+
     while (!inShutdown()) {
         try {
             _runProducer();

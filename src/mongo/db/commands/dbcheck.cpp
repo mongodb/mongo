@@ -302,12 +302,6 @@ protected:
     virtual void run() override {
         // Every dbCheck runs in its own client.
         ThreadClient tc(name(), getGlobalServiceContext());
-
-        {
-            stdx::lock_guard<Client> lk(*tc.get());
-            tc.get()->setSystemOperationKillableByStepdown(lk);
-        }
-
         auto uniqueOpCtx = tc->makeOperationContext();
         auto opCtx = uniqueOpCtx.get();
 

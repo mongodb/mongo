@@ -164,6 +164,13 @@ ExecutorFuture<void> ReshardingOplogFetcher::_reschedule(
                                             _reshardingUUID.toString(),
                                             _donorShard.toString()),
                                 _service());
+
+            // TODO(SERVER-74658): Please revisit if this thread could be made killable.
+            {
+                stdx::lock_guard<Client> lk(*client.get());
+                client.get()->setSystemOperationUnkillableByStepdown(lk);
+            }
+
             return iterate(client.get(), factory);
         })
         .then([executor, cancelToken](bool moreToCome) {
@@ -327,6 +334,12 @@ bool ReshardingOplogFetcher::consume(Client* client,
                                 nullptr);
             auto opCtxRaii = factory.makeOperationContext(client.get());
             auto opCtx = opCtxRaii.get();
+
+            // TODO(SERVER-74658): Please revisit if this thread could be made killable.
+            {
+                stdx::lock_guard<Client> lk(*client.get());
+                client.get()->setSystemOperationUnkillableByStepdown(lk);
+            }
 
             // Noting some possible optimizations:
             //

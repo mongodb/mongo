@@ -88,7 +88,10 @@ public:
 
 void RollbackTest::setUp() {
     ServiceContextMongoDTest::setUp();
-
+    {
+        stdx::lock_guard<Client> lk(cc());
+        cc().setSystemOperationUnkillableByStepdown(lk);
+    }
     _storageInterface = new StorageInterfaceRollback();
     auto serviceContext = getServiceContext();
     auto consistencyMarkers = std::make_unique<ReplicationConsistencyMarkersMock>();

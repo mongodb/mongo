@@ -356,6 +356,12 @@ void FSyncLockThread::run() {
     stdx::lock_guard<SimpleMutex> lkf(filesLockedFsync);
     stdx::unique_lock<Latch> stateLock(fsyncStateMutex);
 
+    // TODO(SERVER-74657): Please revisit if this thread could be made killable.
+    {
+        stdx::lock_guard<Client> lk(*tc.get());
+        tc.get()->setSystemOperationUnkillableByStepdown(lk);
+    }
+
     invariant(fsyncCmd.getLockCount_inLock() == 1);
 
     try {

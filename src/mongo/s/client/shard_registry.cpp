@@ -462,6 +462,12 @@ void ShardRegistry::updateReplicaSetOnConfigServer(ServiceContext* serviceContex
                                                    const ConnectionString& connStr) noexcept {
     ThreadClient tc("UpdateReplicaSetOnConfigServer", serviceContext);
 
+    // TODO(SERVER-74658): Please revisit if this thread could be made killable.
+    {
+        stdx::lock_guard<Client> lk(*tc.get());
+        tc.get()->setSystemOperationUnkillableByStepdown(lk);
+    }
+
     auto opCtx = tc->makeOperationContext();
     auto const grid = Grid::get(opCtx.get());
     auto sr = grid->shardRegistry();

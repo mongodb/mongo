@@ -145,6 +145,12 @@ auto makeThreadPool(const std::string& poolName, const std::string& threadName) 
     threadPoolOptions.poolName = poolName;
     threadPoolOptions.onCreateThread = [](const std::string& threadName) {
         Client::initThread(threadName.c_str());
+
+        {
+            stdx::lock_guard<Client> lk(cc());
+            cc().setSystemOperationUnkillableByStepdown(lk);
+        }
+
         AuthorizationSession::get(cc())->grantInternalAuthorization(&cc());
     };
     return std::make_unique<ThreadPool>(threadPoolOptions);

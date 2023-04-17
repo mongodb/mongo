@@ -173,6 +173,12 @@ Future<ConfigServerHealthObserver::CheckResult> ConfigServerHealthObserver::_che
     checkCtx->opCtx = checkCtx->client->makeOperationContext();
     checkCtx->opCtx->setDeadlineAfterNowBy(kObserverTimeout, ErrorCodes::ExceededTimeLimit);
 
+    // TODO(SERVER-74659): Please revisit if this thread could be made killable.
+    {
+        stdx::lock_guard<Client> lk(*checkCtx->client.get());
+        checkCtx->client.get()->setSystemOperationUnkillableByStepdown(lk);
+    }
+
     LOGV2_DEBUG(5939001, 3, "Checking Config server health");
 
     _runSmokeReadShardsCommand(checkCtx);

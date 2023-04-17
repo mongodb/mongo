@@ -230,6 +230,13 @@ private:
 
 
             ThreadClient tc("updateShardIdentityConfigString", _serviceContext);
+
+            // TODO(SERVER-74658): Please revisit if this thread could be made killable.
+            {
+                stdx::lock_guard<Client> lk(*tc.get());
+                tc.get()->setSystemOperationUnkillableByStepdown(lk);
+            }
+
             auto opCtx = tc->makeOperationContext();
             ShardingInitializationMongoD::updateShardIdentityConfigString(opCtx.get(), update);
         } catch (const ExceptionForCat<ErrorCategory::ShutdownError>& e) {

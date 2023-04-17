@@ -341,11 +341,6 @@ protected:
             Client::initThread(threadName.c_str());
             auto* client = Client::getCurrent();
             AuthorizationSession::get(*client)->grantInternalAuthorization(client);
-
-            {
-                stdx::lock_guard<Client> lk(*client);
-                client->setSystemOperationKillableByStepdown(lk);
-            }
         };
 
         auto hookList = std::make_unique<rpc::EgressMetadataHookList>();

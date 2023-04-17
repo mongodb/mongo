@@ -195,7 +195,9 @@ void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyCheck
                       "error"_attr = ex.toStatus());
             }
         },
-        Milliseconds(shardedIndexConsistencyCheckIntervalMS));
+        Milliseconds(shardedIndexConsistencyCheckIntervalMS),
+        // TODO(SERVER-74658): Please revisit if this periodic job could be made killable.
+        false /*isKillableByStepdown*/);
     _shardedIndexConsistencyChecker = periodicRunner->makeJob(std::move(job));
     _shardedIndexConsistencyChecker.start();
 }

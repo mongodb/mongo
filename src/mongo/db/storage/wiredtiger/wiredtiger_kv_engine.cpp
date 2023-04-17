@@ -251,6 +251,13 @@ public:
 
     virtual void run() {
         ThreadClient tc(name(), getGlobalServiceContext());
+
+        // TODO(SERVER-74657): Please revisit if this thread could be made killable.
+        {
+            stdx::lock_guard<Client> lk(*tc.get());
+            tc.get()->setSystemOperationUnkillableByStepdown(lk);
+        }
+
         LOGV2_DEBUG(22303, 1, "starting {name} thread", "name"_attr = name());
 
         while (!_shuttingDown.load()) {

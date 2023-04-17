@@ -336,8 +336,14 @@ stitch_support_v1_matcher* matcher_create(stitch_support_v1_lib* const lib,
                                      "is not yet initialized."};
     }
 
-    return new stitch_support_v1_matcher(
-        lib->serviceContext->makeClient("stitch_support"), filter, collator);
+    auto client = lib->serviceContext->makeClient("stitch_support");
+    // TODO(SERVER-74662): Please revisit if this thread could be made killable.
+    {
+        stdx::lock_guard<mongo::Client> lk(*client.get());
+        client.get()->setSystemOperationUnkillableByStepdown(lk);
+    }
+
+    return new stitch_support_v1_matcher(std::move(client), filter, collator);
 }
 
 stitch_support_v1_projection* projection_create(stitch_support_v1_lib* const lib,
@@ -356,9 +362,14 @@ stitch_support_v1_projection* projection_create(stitch_support_v1_lib* const lib
                                      "Library is not yet initialized."};
     }
 
+    auto client = lib->serviceContext->makeClient("stitch_support");
+    // TODO(SERVER-74662): Please revisit if this thread could be made killable.
+    {
+        stdx::lock_guard<mongo::Client> lk(*client.get());
+        client.get()->setSystemOperationUnkillableByStepdown(lk);
+    }
 
-    return new stitch_support_v1_projection(
-        lib->serviceContext->makeClient("stitch_support"), spec, matcher, collator);
+    return new stitch_support_v1_projection(std::move(client), spec, matcher, collator);
 }
 
 stitch_support_v1_update* update_create(stitch_support_v1_lib* const lib,
@@ -378,11 +389,15 @@ stitch_support_v1_update* update_create(stitch_support_v1_lib* const lib,
             "Cannot create a new udpate when the Stitch Support Library is not yet initialized."};
     }
 
-    return new stitch_support_v1_update(lib->serviceContext->makeClient("stitch_support"),
-                                        updateExpr,
-                                        arrayFilters,
-                                        matcher,
-                                        collator);
+    auto client = lib->serviceContext->makeClient("stitch_support");
+    // TODO(SERVER-74662): Please revisit if this thread could be made killable.
+    {
+        stdx::lock_guard<mongo::Client> lk(*client.get());
+        client.get()->setSystemOperationUnkillableByStepdown(lk);
+    }
+
+    return new stitch_support_v1_update(
+        std::move(client), updateExpr, arrayFilters, matcher, collator);
 }
 
 int capi_status_get_error(const stitch_support_v1_status* const status) noexcept {

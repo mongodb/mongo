@@ -77,7 +77,7 @@ public:
 
     auto makeStoppedJob() {
         PeriodicRunner::PeriodicJob job(
-            "job", [](Client* client) {}, Seconds{1});
+            "job", [](Client* client) {}, Seconds{1}, false);
         auto jobAnchor = runner().makeJob(std::move(job));
         jobAnchor.start();
         jobAnchor.stop();
@@ -102,7 +102,8 @@ TEST_F(PeriodicRunnerImplTest, OneJobTest) {
             }
             cv.notify_all();
         },
-        interval);
+        interval,
+        false);
 
     auto jobAnchor = runner().makeJob(std::move(job));
     jobAnchor.start();
@@ -136,7 +137,8 @@ TEST_F(PeriodicRunnerImplTest, OnePausableJobDoesNotRunWithoutStart) {
             }
             cv.notify_all();
         },
-        interval);
+        interval,
+        false);
 
     auto jobAnchor = runner().makeJob(std::move(job));
     clockSource().advance(interval);
@@ -162,7 +164,8 @@ TEST_F(PeriodicRunnerImplTest, OnePausableJobRunsCorrectlyWithStart) {
             }
             cv.notify_all();
         },
-        interval);
+        interval,
+        false);
 
     auto jobAnchor = runner().makeJob(std::move(job));
     jobAnchor.start();
@@ -198,7 +201,8 @@ TEST_F(PeriodicRunnerImplTest, OnePausableJobPausesCorrectly) {
             }
             cv.notify_all();
         },
-        interval);
+        interval,
+        false);
 
     auto jobAnchor = runner().makeJob(std::move(job));
     jobAnchor.start();
@@ -241,7 +245,8 @@ TEST_F(PeriodicRunnerImplTest, OnePausableJobResumesCorrectly) {
             }
             cv.notify_all();
         },
-        interval);
+        interval,
+        false);
 
     auto jobAnchor = runner().makeJob(std::move(job));
     jobAnchor.start();
@@ -309,7 +314,8 @@ TEST_F(PeriodicRunnerImplTest, TwoJobsTest) {
             }
             cv.notify_all();
         },
-        intervalA);
+        intervalA,
+        false);
 
     PeriodicRunner::PeriodicJob jobB(
         "job",
@@ -320,7 +326,8 @@ TEST_F(PeriodicRunnerImplTest, TwoJobsTest) {
             }
             cv.notify_all();
         },
-        intervalB);
+        intervalB,
+        false);
 
     auto jobAnchorA = runner().makeJob(std::move(jobA));
     auto jobAnchorB = runner().makeJob(std::move(jobB));
@@ -357,7 +364,8 @@ TEST_F(PeriodicRunnerImplTest, TwoJobsDontDeadlock) {
             cv.wait(lk, [&] { return b; });
             doneCv.notify_one();
         },
-        Milliseconds(1));
+        Milliseconds(1),
+        false);
 
     PeriodicRunner::PeriodicJob jobB(
         "job",
@@ -369,7 +377,8 @@ TEST_F(PeriodicRunnerImplTest, TwoJobsDontDeadlock) {
             cv.wait(lk, [&] { return a; });
             doneCv.notify_one();
         },
-        Milliseconds(1));
+        Milliseconds(1),
+        false);
 
     auto jobAnchorA = runner().makeJob(std::move(jobA));
     auto jobAnchorB = runner().makeJob(std::move(jobB));
@@ -406,7 +415,8 @@ TEST_F(PeriodicRunnerImplTest, ChangingIntervalWorks) {
             }
             cv.notify_one();
         },
-        Milliseconds(5));
+        Milliseconds(5),
+        false);
 
     auto jobAnchor = runner().makeJob(std::move(job));
     jobAnchor.start();
@@ -485,7 +495,8 @@ TEST_F(PeriodicRunnerImplTest, StopProperlyInterruptsOpCtx) {
 
             MONGO_UNREACHABLE;
         },
-        interval);
+        interval,
+        false);
 
     auto jobAnchor = runner().makeJob(std::move(job));
     jobAnchor.start();

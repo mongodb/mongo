@@ -165,6 +165,12 @@ void FreeMonProcessor::run() {
         Client::initThread("FreeMonProcessor");
         Client* client = &cc();
 
+        // TODO(SERVER-74659): Please revisit if this thread could be made killable.
+        {
+            stdx::lock_guard<Client> lk(*client);
+            client->setSystemOperationUnkillableByStepdown(lk);
+        }
+
         while (true) {
             auto item = _queue.dequeue(client->getServiceContext()->getPreciseClockSource());
             if (!item.has_value()) {

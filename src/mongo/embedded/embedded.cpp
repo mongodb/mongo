@@ -158,6 +158,12 @@ void shutdown(ServiceContext* srvContext) {
         auto const client = Client::getCurrent();
         auto const serviceContext = client->getServiceContext();
 
+        // TODO(SERVER-74659): Please revisit if this thread could be made killable.
+        {
+            stdx::lock_guard<Client> lk(*tc.get());
+            tc.get()->setSystemOperationUnkillableByStepdown(lk);
+        }
+
         serviceContext->setKillAllOperations();
 
         // We should always be able to acquire the global lock at shutdown.
@@ -202,6 +208,13 @@ ServiceContext* initialize(const char* yaml_config) {
     setGlobalServiceContext(ServiceContext::make());
 
     Client::initThread("initandlisten");
+
+    // TODO(SERVER-74659): Please revisit if this thread could be made killable.
+    {
+        stdx::lock_guard<Client> lk(cc());
+        cc().setSystemOperationUnkillableByStepdown(lk);
+    }
+
     // Make sure current thread have no client set in thread_local when we leave this function
     ScopeGuard clientGuard([] { Client::releaseCurrent(); });
 
