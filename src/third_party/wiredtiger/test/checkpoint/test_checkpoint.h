@@ -46,6 +46,18 @@
 typedef enum { MIX = 0, COL, FIX, LSM, ROW } table_type; /* File type */
 
 /*
+ * For a predictable run we reserve timestamps for each thread for the entire run. The timestamp for
+ * the i-th key that a thread writes is given by the macro below. In a given iteration for each
+ * thread, there are three timestamps available. We never use the second and only sometimes use the
+ * third. The first is used as the commit and optionally as the prepared timestamp. The third as the
+ * durable timestamp ahead of the commit timestamp.
+ */
+#define RESERVED_TIMESTAMPS_FOR_ITERATION(threadcount, td, iter) \
+    (((iter) * (uint64_t)(threadcount) + (uint64_t)((td)->info)) * 3 + 1)
+
+#define PRED_REPLAY_STABLE_PERIOD 100
+
+/*
  * Per-table cookie structure.
  */
 typedef struct {
@@ -53,6 +65,15 @@ typedef struct {
     table_type type; /* Type for table. */
     char uri[128];
 } COOKIE;
+
+typedef struct {
+    int info;
+    u_int start_key;
+    u_int key_range;
+    uint64_t ts; /* Only used for runs with predictable replay. */
+    WT_RAND_STATE data_rnd;
+    WT_RAND_STATE extra_rnd;
+} THREAD_DATA;
 
 typedef struct {
     TEST_OPTS opts;              /* Shared test options */
@@ -82,9 +103,12 @@ typedef struct {
     bool prepare;                                      /* Use prepare transactions */
     bool race_timestamps;                              /* Async update to oldest timestamp */
 
-    bool use_timestamps; /* Use txn timestamps. Start clock thread */
+    bool use_timestamps;     /* Use txn timestamps. Start clock thread */
+    bool predictable_replay; /* Run such that a predictable replay is possible. */
+    uint64_t stop_ts; /* Run a replay until the stable timestamp reaches this stop timestamp. */
 
-    COOKIE *cookies;               /* Per-thread info */
+    COOKIE *cookies;               /* Per-table info */
+    THREAD_DATA *td;               /* Per-thread info */
     WT_RWLOCK clock_lock;          /* Clock synchronization */
     wt_thread_t checkpoint_thread; /* Checkpoint thread */
     wt_thread_t clock_thread;      /* Clock thread */

@@ -31,7 +31,7 @@
 #define MAX_MODIFY_ENTRIES 5
 
 static char modify_repl[256];
-static int real_worker(void);
+static int real_worker(THREAD_DATA *);
 static WT_THREAD_RET worker(void *);
 
 /*
@@ -120,9 +120,9 @@ start_workers(void)
 
     (void)gettimeofday(&start, NULL);
 
-    /* Create threads. */
+    /* Create threads. The N workers have ID 0 to N - 1. */
     for (i = 0; i < g.nworkers; ++i)
-        testutil_check(__wt_thread_create(NULL, &tids[i], worker, &g.cookies[i]));
+        testutil_check(__wt_thread_create(NULL, &tids[i], worker, &g.td[i]));
 
     /* Wait for the threads. */
     for (i = 0; i < g.nworkers; ++i)
@@ -334,15 +334,17 @@ worker_op(WT_CURSOR *cursor, table_type type, uint64_t keyno, u_int new_val)
 static WT_THREAD_RET
 worker(void *arg)
 {
+    THREAD_DATA *td;
     char tid[128];
 
-    WT_UNUSED(arg);
+    td = (THREAD_DATA *)arg;
 
     testutil_check(__wt_thread_str(tid, sizeof(tid)));
-    printf("worker thread starting: tid: %s\n", tid);
+    printf("worker thread starting: tid: %s key-range: %" PRIu32 " - %" PRIu32 "\n", tid,
+      td->start_key, td->start_key + td->key_range);
     fflush(stdout);
 
-    (void)real_worker();
+    (void)real_worker(td);
     return (WT_THREAD_RET_VALUE);
 }
 
@@ -351,11 +353,11 @@ worker(void *arg)
  *     A single worker thread that transactionally updates all tables with consistent values.
  */
 static int
-real_worker(void)
+real_worker(THREAD_DATA *td)
 {
     WT_CURSOR **cursors;
-    WT_RAND_STATE rnd;
     WT_SESSION *session;
+    uint64_t base_ts;
     u_int i, keyno, next_rnd;
     int j, ret, t_ret;
     char buf[128];
@@ -379,11 +381,15 @@ real_worker(void)
     if (g.use_timestamps) {
         if (g.no_ts_deletes)
             begin_cfg = "no_timestamp=true,read_timestamp=1,roundup_timestamps=(read=true)";
-        else
+        else if (!g.predictable_replay)
             begin_cfg = "read_timestamp=1,roundup_timestamps=(read=true)";
+        /*
+         * Note: For predictable replays we do not specify a read timestamp, hence reading the
+         * latest committed values. This is important for a predictable outcome as reading at the
+         * oldest timestamp depends on where the clock and the checkpoint threads have placed the
+         * oldest at this moment.
+         */
     }
-
-    __wt_random_init_seed((WT_SESSION_IMPL *)session, &rnd);
 
     for (j = 0; j < g.ntables; j++)
         if ((ret = session->open_cursor(session, g.cookies[j].uri, NULL, NULL, &cursors[j])) != 0) {
@@ -391,7 +397,15 @@ real_worker(void)
             goto err;
         }
 
-    for (i = 0; i < g.nops && g.opts.running; ++i, __wt_yield()) {
+    for (i = 0; g.opts.running; ++i, __wt_yield()) {
+        /*
+         * If a stop timestamp has been provided, the workers will continue to run until the clock
+         * thread reaches a stable equal to the stop timestamp. Ignore the provided operation count
+         * in such a case.
+         */
+        if (g.stop_ts == 0 && i >= g.nops)
+            break;
+
         if (i > 0 && i % (5 * WT_THOUSAND) == 0)
             printf("Worker %u of %u ops\n", i, g.nops);
         if (start_txn) {
@@ -402,9 +416,10 @@ real_worker(void)
             new_txn = true;
             start_txn = false;
         }
-        keyno = __wt_random(&rnd) % g.nkeys + 1;
+        keyno = __wt_random(&td->data_rnd) % td->key_range + td->start_key;
         /* If we have specified to run with mix mode deletes we need to do it in it's own txn. */
-        if (g.use_timestamps && g.no_ts_deletes && new_txn && __wt_random(&rnd) % 72 == 0) {
+        if (g.use_timestamps && g.no_ts_deletes && new_txn &&
+          __wt_random(&td->data_rnd) % 72 == 0) {
             new_txn = false;
             for (j = 0; j < g.ntables; j++) {
                 ret = worker_no_ts_delete(cursors[j], keyno);
@@ -436,41 +451,60 @@ real_worker(void)
             (void)log_print_err("worker op failed", ret, 1);
             goto err;
         } else if (ret == 0) {
-            next_rnd = __wt_random(&rnd);
+            next_rnd = __wt_random(&td->data_rnd);
             if (next_rnd % 7 == 0) {
                 if (g.use_timestamps) {
-                    if (__wt_try_readlock((WT_SESSION_IMPL *)session, &g.clock_lock) == 0) {
-                        next_rnd = __wt_random(&rnd);
+                    /*
+                     * For a predictable run, the timestamps for worker's operations are managed by
+                     * reserving them across the threads and the iterations, such that they don't
+                     * overlap. For a regular run, the timestamp thread manages the advance of the
+                     * global clock. The workers synchronize with the clock using a reader - writer
+                     * lock, and decide the operation timestamp based on the global clock.
+                     */
+                    if (g.predictable_replay ||
+                      (__wt_try_readlock((WT_SESSION_IMPL *)session, &g.clock_lock) == 0)) {
+                        if (g.predictable_replay)
+                            /* i + 1 because we don't want a thread to start with commit-ts of 1 */
+                            base_ts = RESERVED_TIMESTAMPS_FOR_ITERATION(g.nworkers, td, i + 1);
+                        else
+                            base_ts = g.ts_stable + 1;
+                        next_rnd = __wt_random(&td->data_rnd);
                         if (g.prepare && next_rnd % 2 == 0) {
                             testutil_check(__wt_snprintf(
-                              buf, sizeof(buf), "prepare_timestamp=%" PRIx64, g.ts_stable + 1));
+                              buf, sizeof(buf), "prepare_timestamp=%" PRIx64, base_ts));
                             if ((ret = session->prepare_transaction(session, buf)) != 0) {
-                                __wt_readunlock((WT_SESSION_IMPL *)session, &g.clock_lock);
+                                if (!g.predictable_replay)
+                                    __wt_readunlock((WT_SESSION_IMPL *)session, &g.clock_lock);
                                 (void)log_print_err("real_worker:prepare_transaction", ret, 1);
                                 goto err;
                             }
                             testutil_check(__wt_snprintf(buf, sizeof(buf),
                               "durable_timestamp=%" PRIx64 ",commit_timestamp=%" PRIx64,
-                              g.ts_stable + 3, g.ts_stable + 1));
+                              base_ts + 2, base_ts));
                         } else
                             testutil_check(__wt_snprintf(
-                              buf, sizeof(buf), "commit_timestamp=%" PRIx64, g.ts_stable + 1));
+                              buf, sizeof(buf), "commit_timestamp=%" PRIx64, base_ts));
 
                         /* Commit majority of times. */
                         if (next_rnd % 49 != 0) {
                             if ((ret = session->commit_transaction(session, buf)) != 0) {
-                                __wt_readunlock((WT_SESSION_IMPL *)session, &g.clock_lock);
+                                if (!g.predictable_replay)
+                                    __wt_readunlock((WT_SESSION_IMPL *)session, &g.clock_lock);
                                 (void)log_print_err("real_worker:commit_transaction", ret, 1);
                                 goto err;
                             }
+                            if (g.predictable_replay)
+                                WT_PUBLISH(td->ts, base_ts);
                         } else {
                             if ((ret = session->rollback_transaction(session, NULL)) != 0) {
-                                __wt_readunlock((WT_SESSION_IMPL *)session, &g.clock_lock);
+                                if (!g.predictable_replay)
+                                    __wt_readunlock((WT_SESSION_IMPL *)session, &g.clock_lock);
                                 (void)log_print_err("real_worker:rollback_transaction", ret, 1);
                                 goto err;
                             }
                         }
-                        __wt_readunlock((WT_SESSION_IMPL *)session, &g.clock_lock);
+                        if (!g.predictable_replay)
+                            __wt_readunlock((WT_SESSION_IMPL *)session, &g.clock_lock);
                         start_txn = true;
                         /* Occasionally reopen cursors after transaction finish. */
                         if (next_rnd % 13 == 0)

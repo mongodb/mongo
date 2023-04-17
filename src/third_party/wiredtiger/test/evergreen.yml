@@ -776,6 +776,54 @@ functions:
         set -o verbose
         ${test_env_vars|} ./test_checkpoint ${checkpoint_args} 2>&1
 
+  "checkpoint test predictable":
+    command: shell.exec
+    params:
+      working_dir: "wiredtiger/cmake_build/test/checkpoint"
+      script: |
+        # Get a random value with leading zeroes removed, /bin/sh version.
+        rando() {
+          tr -cd 0-9 </dev/urandom | head -c 5 | sed -e 's/0*\(.\)/\1/'
+        }
+
+        # Run test/checkpoint in a way that can test predictable replay.
+        set -o errexit
+        set -o verbose
+
+        toolsdir=../../../tools
+        wtutil=../../wt
+
+        r=$(rando)$(rando)
+        x0=$(rando)$(rando)
+
+        # Always run with timestamps and in the predictable mode
+        base_args="-x -R"
+
+        rm -rf RUNDIR_0
+        # The first run is for calibration only.  We just want to run for the designated
+        # time and get an approriate stop timestamp that can be used in later runs.
+        calibration_run_args="-PSD$r,E$x0"
+        ${test_env_vars|} ./test_checkpoint -h RUNDIR_0 $base_args ${checkpoint_args} $calibration_run_args || exit 1
+        echo "Finished calibration run"
+        stable_hex=$($toolsdir/wt_timestamps RUNDIR_0 | sed -e '/stable=/!d' -e 's/.*=//')
+        stop_ts=$(echo $((0x$stable_hex)))
+        for i in $(seq ${times}); do
+          echo Iteration $i/${times}
+          x1=$(rando)$(rando)
+          x2=$(rando)$(rando)
+          rm -rf RUNDIR_1 RUNDIR_2
+          # Do two runs up to the stable timestamp, using the same data seed,
+          # but with a different extra seed.  Compare it when done.
+          first_run_args="-PSD$r,E$x1 -S $stop_ts"
+          echo "First run with args $base_args ${checkpoint_args} $first_run_args"
+          ${test_env_vars|} ./test_checkpoint -h RUNDIR_1 $base_args ${checkpoint_args} $first_run_args || exit 1
+          second_run_args="-PSD$r,E$x2 -S $stop_ts"
+          echo "Second run with args $base_args ${checkpoint_args} $second_run_args"
+          ${test_env_vars|} ./test_checkpoint -h RUNDIR_2 $base_args ${checkpoint_args} $second_run_args || exit 1
+          # Compare the runs.
+          $toolsdir/wt_cmp_dir RUNDIR_1 RUNDIR_2 || exit 1
+        done
+
   "checkpoint stress test":
     command: shell.exec
     params:
@@ -4115,6 +4163,31 @@ tasks:
         vars:
           times: 5
 
+  - name: checkpoint-filetypes-predictable-test
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          # Don't use diagnostic - this test looks for timing problems that are more likely to occur without it
+          HAVE_DIAGNOSTIC: -DHAVE_DIAGNOSTIC=0
+      # FIXME-WT-10936: Enable once predictable replay supports column store
+      #- func: "checkpoint test predictable"
+      #  vars:
+      #    checkpoint_args: -t m -n 1000000 -k 5000000 -C cache_size=100MB
+      #    times: 5
+      #- func: "checkpoint test predictable"
+      #  vars:
+      #    checkpoint_args: -t c -n 1000000 -k 5000000 -C cache_size=100MB
+      #    times: 5
+      #- func: "checkpoint test predictable"
+      #  vars:
+      #    checkpoint_args: -n 1000000 -k 5000000 -C cache_size=100MB
+      #    times: 5
+      - func: "checkpoint test predictable"
+        vars:
+          checkpoint_args: -t r -n 1000000 -k 5000000 -C cache_size=100MB
+          times: 5
+
   - name: many-collection-test
     commands:
       - command: timeout.update
@@ -5346,6 +5419,8 @@ buildvariants:
     # FIXME-WT-10822
     # - name: format-tiered-test
     - name: schema-abort-predictable-test
+    - name: checkpoint-filetypes-predictable-test
+
 
 # When running the Python tests on this variant tcmalloc must be preloaded otherwise the wiredtiger library
 # fails to load and resolve its dependency.
