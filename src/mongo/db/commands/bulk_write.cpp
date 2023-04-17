@@ -166,7 +166,6 @@ public:
                     const NamespaceInfoEntry& nsInfo,
                     const BSONObj& op) {
         // If this is a different namespace we have to flush the current batch.
-        // TODO SERVER-72682 refactor insertBatchAndHandleErrors to batch across namespaces.
         if (_isDifferentFromSavedNamespace(nsInfo)) {
             // Write the current batch since we have a different namespace to process.
             if (!flush(opCtx)) {
