@@ -21,9 +21,7 @@ assert.neq(null, conn, 'mongod was unable to start up');
 sleep(10 * 1000);
 
 // Then verify that no registrations happened since we haven't runtime enabled yed.
-assert.eq('undecided',
-          conn.getDB('admin').getFreeMonitoringStatus().state,
-          "Initial state should be 'undecided'");
+assert.eq('undecided', FreeMonGetStatus(conn).state, "Initial state should be 'undecided'");
 assert.eq(0, mock_web.queryStats().registers, "mongod registered without enabling free_mod");
 
 assert.commandWorked(conn.adminCommand({setFreeMonitoring: 1, action: "enable"}));
@@ -31,8 +29,7 @@ assert.commandWorked(conn.adminCommand({setFreeMonitoring: 1, action: "enable"})
 WaitForFreeMonServerStatusState(conn, 'enabled');
 
 // The command should either timeout or suceed after registration is complete
-const retStatus1 = conn.adminCommand({getFreeMonitoringStatus: 1});
-assert.commandWorked(retStatus1);
+const retStatus1 = FreeMonGetStatus(conn);
 assert.eq(retStatus1.state, "enabled", tojson(retStatus1));
 
 const stats = mock_web.queryStats();
@@ -64,8 +61,7 @@ assert.soon(function() {
     return regDoc.state == "disabled";
 }, "Failed to unregister", 60 * 1000);
 
-const retStatus2 = conn.adminCommand({getFreeMonitoringStatus: 1});
-assert.commandWorked(retStatus2);
+const retStatus2 = FreeMonGetStatus(conn);
 assert.eq(retStatus2.state, "disabled", tojson(retStatus1));
 
 MongoRunner.stopMongod(conn);
