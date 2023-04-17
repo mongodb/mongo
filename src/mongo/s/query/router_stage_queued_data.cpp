@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,43 +27,49 @@
  *    it in the license file.
  */
 
-#include "mongo/db/commands/server_status_metric.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/query/cluster_cursor_manager.h"
+
+#include "mongo/platform/basic.h"
+
+#include "mongo/s/query/router_stage_queued_data.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
 
 namespace mongo {
-namespace {
 
-//
-// ServerStatus metric cursor counts.
-//
-
-class ClusterCursorStats final : public ServerStatusMetric {
-public:
-    ClusterCursorStats() : ServerStatusMetric("cursor") {}
-
-    void appendAtLeaf(BSONObjBuilder& b) const final {
-        auto grid = Grid::get(getGlobalServiceContext());
-        BSONObjBuilder cursorBob(b.subobjStart(_leafName));
-        cursorBob.append("timedOut",
-                         static_cast<long long>(grid->getCursorManager()->cursorsTimedOut()));
-        {
-            BSONObjBuilder openBob(cursorBob.subobjStart("open"));
-            auto stats = grid->getCursorManager()->stats();
-            openBob.append("multiTarget", static_cast<long long>(stats.cursorsMultiTarget));
-            openBob.append("singleTarget", static_cast<long long>(stats.cursorsSingleTarget));
-            openBob.append("queuedData", static_cast<long long>(stats.cursorsQueuedData));
-            openBob.append("pinned", static_cast<long long>(stats.cursorsPinned));
-            openBob.append(
-                "total",
-                static_cast<long long>(stats.cursorsMultiTarget + stats.cursorsSingleTarget));
-            openBob.doneFast();
-        }
-        cursorBob.done();
+void RouterStageQueuedData::queueResult(const ClusterQueryResult& result) {
+    auto resultObj = result.getResult();
+    if (resultObj) {
+        invariant(resultObj->isOwned());
     }
-};
+    _resultsQueue.push({result});
+}
 
-ClusterCursorStats& clusterCursorStats = addMetricToTree(std::make_unique<ClusterCursorStats>());
+void RouterStageQueuedData::queueError(Status status) {
+    _resultsQueue.push({status});
+}
 
-}  // namespace
+StatusWith<ClusterQueryResult> RouterStageQueuedData::next() {
+    if (_resultsQueue.empty()) {
+        return {ClusterQueryResult()};
+    }
+
+    auto out = _resultsQueue.front();
+    _resultsQueue.pop();
+    return out;
+}
+
+void RouterStageQueuedData::kill(OperationContext* opCtx) {
+    // No child to kill.
+}
+
+bool RouterStageQueuedData::remotesExhausted() {
+    // No underlying remote cursor.
+    return true;
+}
+
+std::size_t RouterStageQueuedData::getNumRemotes() const {
+    return 0;
+}
+
 }  // namespace mongo

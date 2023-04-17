@@ -455,6 +455,9 @@ ClusterCursorManager::Stats ClusterCursorManager::stats() const {
             case CursorType::MultiTarget:
                 ++stats.cursorsMultiTarget;
                 break;
+            case CursorType::QueuedData:
+                ++stats.cursorsQueuedData;
+                break;
         }
     }
 

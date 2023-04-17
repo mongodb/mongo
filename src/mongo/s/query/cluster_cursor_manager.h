@@ -85,6 +85,9 @@ public:
 
         // Represents a cursor retrieving data from multiple remote sources.
         MultiTarget,
+
+        // Represents a cursor retrieving data queued in memory on the router.
+        QueuedData,
     };
 
     enum class CursorLifetime {
@@ -109,6 +112,9 @@ public:
 
         // Count of open cursors registered with CursorType::SingleTarget.
         size_t cursorsSingleTarget = 0;
+
+        // Count of open cursors registered with CursorType::QueuedData.
+        size_t cursorsQueuedData = 0;
 
         // Count of pinned cursors.
         size_t cursorsPinned = 0;

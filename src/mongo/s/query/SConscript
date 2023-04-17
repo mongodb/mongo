@@ -62,6 +62,7 @@ env.Library(
         'router_stage_limit.cpp',
         'router_stage_mock.cpp',
         'router_stage_pipeline.cpp',
+        'router_stage_queued_data.cpp',
         'router_stage_remove_metadata_fields.cpp',
         'router_stage_skip.cpp',
     ],

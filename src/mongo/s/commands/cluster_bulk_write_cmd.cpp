@@ -40,11 +40,16 @@
 #include "mongo/db/commands/bulk_write_common.h"
 #include "mongo/db/commands/bulk_write_gen.h"
 #include "mongo/db/not_primary_error_tracker.h"
+#include "mongo/db/query/find_common.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/s/cluster_write.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/query/cluster_client_cursor_impl.h"
+#include "mongo/s/query/cluster_cursor_manager.h"
+#include "mongo/s/query/router_stage_queued_data.h"
 
 namespace mongo {
 namespace {
@@ -107,11 +112,7 @@ public:
             bulk_write_common::validateRequest(request(), opCtx->isRetryableWrite());
 
             auto replyItems = cluster::bulkWrite(opCtx, request());
-
-            auto reply = Reply();
-            // TODO(SERVER-72794): Support cursor response for bulkWrite on mongos.
-            reply.setCursor(BulkWriteCommandResponseCursor(0, replyItems));
-            return reply;
+            return _populateCursorReply(opCtx, std::move(replyItems));
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const final try {
@@ -122,6 +123,82 @@ public:
         } catch (const DBException& e) {
             NotPrimaryErrorTracker::get(opCtx->getClient()).recordError(e.code());
             throw;
+        }
+
+    private:
+        Reply _populateCursorReply(OperationContext* opCtx,
+                                   std::vector<BulkWriteReplyItem> replyItems) {
+            const auto& req = request();
+            auto reqObj = unparsedRequest().body;
+
+            const NamespaceString cursorNss = NamespaceString::makeBulkWriteNSS();
+            ClusterClientCursorParams params(cursorNss,
+                                             APIParameters::get(opCtx),
+                                             ReadPreferenceSetting::get(opCtx),
+                                             repl::ReadConcernArgs::get(opCtx));
+
+            long long batchSize = std::numeric_limits<long long>::max();
+            if (req.getCursor() && req.getCursor()->getBatchSize()) {
+                params.batchSize = request().getCursor()->getBatchSize();
+                batchSize = *req.getCursor()->getBatchSize();
+            }
+            params.originatingCommandObj = reqObj.getOwned();
+            params.originatingPrivileges = bulk_write_common::getPrivileges(req);
+            params.lsid = opCtx->getLogicalSessionId();
+            params.txnNumber = opCtx->getTxnNumber();
+
+            auto queuedDataStage = std::make_unique<RouterStageQueuedData>(opCtx);
+            for (auto& replyItem : replyItems) {
+                queuedDataStage->queueResult(replyItem.toBSON());
+            }
+
+            auto ccc =
+                ClusterClientCursorImpl::make(opCtx, std::move(queuedDataStage), std::move(params));
+
+            size_t numRepliesInFirstBatch = 0;
+            FindCommon::BSONArrayResponseSizeTracker responseSizeTracker;
+            for (long long objCount = 0; objCount < batchSize; objCount++) {
+                auto next = uassertStatusOK(ccc->next());
+
+                if (next.isEOF()) {
+                    break;
+                }
+
+                auto nextObj = *next.getResult();
+                if (!responseSizeTracker.haveSpaceForNext(nextObj)) {
+                    ccc->queueResult(nextObj);
+                    break;
+                }
+
+                numRepliesInFirstBatch++;
+                responseSizeTracker.add(nextObj);
+            }
+            if (numRepliesInFirstBatch == replyItems.size()) {
+                collectTelemetryMongos(opCtx, reqObj, numRepliesInFirstBatch);
+                return BulkWriteCommandReply(BulkWriteCommandResponseCursor(
+                    0, std::vector<BulkWriteReplyItem>(std::move(replyItems))));
+            }
+
+            ccc->detachFromOperationContext();
+            ccc->incNBatches();
+            collectTelemetryMongos(opCtx, ccc, numRepliesInFirstBatch);
+
+            auto authUser =
+                AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserName();
+            auto cursorId = uassertStatusOK(Grid::get(opCtx)->getCursorManager()->registerCursor(
+                opCtx,
+                ccc.releaseCursor(),
+                cursorNss,
+                ClusterCursorManager::CursorType::QueuedData,
+                ClusterCursorManager::CursorLifetime::Mortal,
+                authUser));
+
+            // Record the cursorID in CurOp.
+            CurOp::get(opCtx)->debug().cursorid = cursorId;
+
+            replyItems.resize(numRepliesInFirstBatch);
+            return BulkWriteCommandReply(BulkWriteCommandResponseCursor(
+                cursorId, std::vector<BulkWriteReplyItem>(std::move(replyItems))));
         }
     };
 
