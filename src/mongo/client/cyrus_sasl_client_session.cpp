@@ -49,7 +49,8 @@ void saslSetError(sasl_conn_t* conn, const std::string& msg) {
 
 SaslClientSession* createCyrusSaslClientSession(const std::string& mech) {
     if ((mech == auth::kMechanismScramSha1) || (mech == auth::kMechanismScramSha256) ||
-        (mech == auth::kMechanismMongoAWS) || (mech == auth::kMechanismMongoOIDC)) {
+        (mech == auth::kMechanismSaslPlain) || (mech == auth::kMechanismMongoAWS) ||
+        (mech == auth::kMechanismMongoOIDC)) {
         return new NativeSaslClientSession();
     }
     return new CyrusSaslClientSession();
