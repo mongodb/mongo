@@ -3026,11 +3026,13 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         self.write_empty_line()
 
         # Generate mongo includes third
-        header_list = [
-            'mongo/bson/bsonobjbuilder.h', 'mongo/db/auth/authorization_contract.h',
-            'mongo/db/commands.h', 'mongo/idl/command_generic_argument.h',
-            'mongo/util/overloaded_visitor.h'
-        ]
+        header_list = ['mongo/util/overloaded_visitor.h']
+
+        if spec.commands:
+            header_list.append('mongo/db/auth/authorization_contract.h')
+            header_list.append('mongo/idl/command_generic_argument.h')
+        elif len([s for s in spec.structs if s.is_command_reply]) > 0:
+            header_list.append('mongo/idl/command_generic_argument.h')
 
         if spec.server_parameters:
             header_list.append('mongo/db/server_parameter.h')

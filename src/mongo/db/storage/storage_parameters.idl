@@ -30,6 +30,7 @@ global:
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/bson/bson_depth.h"
+        - "mongo/db/storage/storage_options.h"
 
 server_parameters:
     notablescan:

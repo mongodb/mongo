@@ -27,6 +27,8 @@
 
 global:
     cpp_namespace: "mongo::crypto"
+    cpp_includes:
+        - "mongo/util/base64.h"
 
 imports:
     - "mongo/db/basic_types.idl"
