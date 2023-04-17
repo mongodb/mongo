@@ -844,6 +844,7 @@ void persistCommitDecision(OperationContext* opCtx,
     store.upsert(opCtx,
                  BSON(MigrationCoordinatorDocument::kIdFieldName << migrationDoc.getId()),
                  migrationDoc.toBSON());
+    ShardingStatistics::get(opCtx).countDonorMoveChunkCommitted.addAndFetch(1);
 
     if (hangInPersistMigrateCommitDecisionThenSimulateErrorUninterruptible.shouldFail()) {
         hangInPersistMigrateCommitDecisionThenSimulateErrorUninterruptible.pauseWhileSet(opCtx);
@@ -863,6 +864,7 @@ void persistAbortDecision(OperationContext* opCtx,
     store.upsert(opCtx,
                  BSON(MigrationCoordinatorDocument::kIdFieldName << migrationDoc.getId()),
                  migrationDoc.toBSON());
+    ShardingStatistics::get(opCtx).countDonorMoveChunkAborted.addAndFetch(1);
 
     if (hangInPersistMigrateAbortDecisionThenSimulateErrorUninterruptible.shouldFail()) {
         hangInPersistMigrateAbortDecisionThenSimulateErrorUninterruptible.pauseWhileSet(opCtx);

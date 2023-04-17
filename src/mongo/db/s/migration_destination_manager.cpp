@@ -1407,6 +1407,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
                 if (!_applyMigrateOp(opCtx, nextBatch)) {
                     return true;
                 }
+                ShardingStatistics::get(opCtx).countBytesClonedOnCatchUpOnRecipient.addAndFetch(
+                    nextBatch["size"].number());
 
                 const int maxIterations = 3600 * 50;
 
@@ -1671,6 +1673,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
 bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx, const BSONObj& xfer) {
     bool didAnything = false;
     long long changeInOrphans = 0;
+    long long totalDocs = 0;
 
     // Deleted documents
     if (xfer["deleted"].isABSONObj()) {
@@ -1681,6 +1684,7 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx, const
 
         BSONObjIterator i(xfer["deleted"].Obj());
         while (i.more()) {
+            totalDocs++;
             AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
             uassert(ErrorCodes::ConflictingOperationInProgress,
                     str::stream() << "Collection " << _nss.ns()
@@ -1723,6 +1727,7 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx, const
     if (xfer["reload"].isABSONObj()) {
         BSONObjIterator i(xfer["reload"].Obj());
         while (i.more()) {
+            totalDocs++;
             AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
             uassert(ErrorCodes::ConflictingOperationInProgress,
                     str::stream() << "Collection " << _nss.ns()
@@ -1777,6 +1782,9 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx, const
         migrationutil::persistUpdatedNumOrphans(
             opCtx, _migrationId.get(), *_collectionUuid, changeInOrphans);
     }
+
+    ShardingStatistics::get(opCtx).countDocsClonedOnCatchUpOnRecipient.addAndFetch(totalDocs);
+
     return didAnything;
 }
 
