@@ -2434,21 +2434,6 @@ tasks:
       task_compile_flags: >-
         PREFIX=dist-test
 
-## compile - build all scons targets except unittests ##
-- name: compile_dist_test_half
-  tags: []
-  depends_on:
-  - name: version_expansions_gen
-    variant: generate-tasks-for-version
-  commands:
-  - func: "scons compile"
-    vars:
-      targets: >-
-        compile_first_half_non_test_source
-        ${additional_compile_targets|}
-      task_compile_flags: >-
-        PREFIX=dist-test
-
 - name: compile_upload_benchmarks
   tags: []
   depends_on:
@@ -8271,29 +8256,6 @@ task_groups:
   - compile_dist_test
   - archive_dist_test
   - archive_dist_test_debug
-  - compile_dbtest
-  - run_dbtest
-  - archive_dbtest
-  - compile_all_but_not_unittests
-  - package
-
-# SERVER-76006
-# This is a compile stream meant for non-cached and/or underpowered systems.
-# It joins most of the compile tasks together under a single host spread out
-# across different tasks.
-- <<: *compile_task_group_template
-  name: small_compile_test_and_package_serial_no_unittests_TG
-  tasks:
-  - compile_dist_test_half
-  - compile_dist_test
-  - archive_dist_test
-  - archive_dist_test_debug
-  - compile_integration_test
-  - integration_tests_standalone
-  - integration_tests_standalone_audit
-  - integration_tests_replset
-  - integration_tests_replset_ssl_auth
-  - integration_tests_sharded
   - compile_dbtest
   - run_dbtest
   - archive_dbtest

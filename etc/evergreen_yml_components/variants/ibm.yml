@@ -118,7 +118,10 @@ buildvariants:
     multiversion_edition: enterprise
     compile_variant: enterprise-rhel-72-s390x
   tasks:
-  - name: small_compile_test_and_package_serial_no_unittests_TG
+  - name: compile_test_and_package_serial_no_unittests_TG
+    distros:
+    - rhel72-zseries-build
+  - name: compile_integration_and_test_no_audit_parallel_stream_TG
     distros:
     - rhel72-zseries-build
   - name: .aggregation .common
