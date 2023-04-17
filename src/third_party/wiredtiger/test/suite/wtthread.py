@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import os, queue, shutil, threading, time, wiredtiger, wttest
+import os, queue, random, shutil, threading, time, wiredtiger, wttest
 from helper import compare_tables
 
 class checkpoint_thread(threading.Thread):
@@ -58,18 +58,22 @@ class named_checkpoint_thread(threading.Thread):
             sess.checkpoint('name=' + self.ckpt_name)
         sess.close()
 
-class flush_tier_thread(threading.Thread):
-    def __init__(self, conn, done):
+class flush_checkpoint_thread(threading.Thread):
+    def __init__(self, conn, done, prob):
         self.conn = conn
         self.done = done
+        self.flush_probability = prob
         threading.Thread.__init__(self)
 
     def run(self):
         sess = self.conn.open_session()
         while not self.done.isSet():
-            # Sleep for 25 milliseconds.
-            time.sleep(0.0025)
-            sess.flush_tier()
+            # Sleep for 10 milliseconds.
+            time.sleep(0.001)
+            if random.randint(0, 100) < self.flush_probability:
+                sess.checkpoint('flush_tier=(enabled)')
+            else:
+                sess.checkpoint()
         sess.close()
 
 class backup_thread(threading.Thread):

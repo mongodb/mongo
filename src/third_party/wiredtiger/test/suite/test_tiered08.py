@@ -35,12 +35,12 @@
 import os, threading, time, wttest
 from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources, get_conn_config
 from wiredtiger import stat
-from wtthread import checkpoint_thread, flush_tier_thread
+from wtthread import flush_checkpoint_thread
 from wtscenario import make_scenarios
 
 
 # test_tiered08.py
-#   Run background checkpoints and flush_tier operations while inserting
+#   Run background checkpoints, sometimes with flush operations while inserting
 #   data into a table from another thread.
 class test_tiered08(wttest.WiredTigerTestCase, TieredConfigMixin):
 
@@ -51,9 +51,9 @@ class test_tiered08(wttest.WiredTigerTestCase, TieredConfigMixin):
 
     batch_size = 100000
 
-    # Keep inserting keys until we've done this many flush and checkpoint ops.
-    ckpt_target = 1000
-    flush_target = 500
+    # Keep inserting keys until we've done this many checkpoints and flushes.
+    ckpt_target = 200
+    flush_target = 50
 
     uri = "table:test_tiered08"
 
@@ -105,24 +105,16 @@ class test_tiered08(wttest.WiredTigerTestCase, TieredConfigMixin):
 
     def test_tiered08(self):
 
-        # FIXME-WT-9823, FIXME-WT-9837
-        # This part of the test multi-threads checkpoint, flush, and insert
-        # operations, creating races in tiered storage. It triggers several 
-        # bugs that occur frequently in our testing. We will re-enable this
-        # testing when the bugs have been addressed.
-        self.skipTest('Concurrent flush_tier, checkpoint, and insert operations cause races.')
-
         cfg = self.conn_config()
         self.pr('Config is: ' + cfg)
         self.session.create(self.uri,
             'key_format=S,value_format=S,internal_page_max=4096,leaf_page_max=4096')
 
         done = threading.Event()
-        ckpt = checkpoint_thread(self.conn, done)
-        flush = flush_tier_thread(self.conn, done)
+        # Flush on approximately 1/4 of checkpoints.
+        flush = flush_checkpoint_thread(self.conn, done, 25)
 
-        # Start background threads and give them a chance to start.
-        ckpt.start()
+        # Start background thread and give it a chance to start.
         flush.start()
         time.sleep(0.5)
 
@@ -130,7 +122,6 @@ class test_tiered08(wttest.WiredTigerTestCase, TieredConfigMixin):
 
         done.set()
         flush.join()
-        ckpt.join()
 
         self.verify(key_count)
 
