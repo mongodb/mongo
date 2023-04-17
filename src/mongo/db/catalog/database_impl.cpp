@@ -569,11 +569,16 @@ Status DatabaseImpl::_finishDropCollection(OperationContext* opCtx,
                                            const NamespaceString& nss,
                                            Collection* collection) const {
     UUID uuid = collection->uuid();
-    LOGV2(20318,
-          "Finishing collection drop for {namespace} ({uuid}).",
-          "Finishing collection drop",
-          "namespace"_attr = nss,
-          "uuid"_attr = uuid);
+
+    // Reduce log verbosity for virtual collections
+    auto debugLevel = collection->getSharedIdent() ? 0 : 1;
+
+    LOGV2_DEBUG(20318,
+                debugLevel,
+                "Finishing collection drop for {namespace} ({uuid}).",
+                "Finishing collection drop",
+                "namespace"_attr = nss,
+                "uuid"_attr = uuid);
 
     // A virtual collection does not have a durable catalog entry.
     if (auto sharedIdent = collection->getSharedIdent()) {
@@ -825,14 +830,18 @@ Collection* DatabaseImpl::_createCollection(
     assertNoMovePrimaryInProgress(opCtx, nss);
     audit::logCreateCollection(opCtx->getClient(), nss);
 
-    LOGV2(20320,
-          "createCollection: {namespace} with {generatedUUID_generated_provided} UUID: "
-          "{optionsWithUUID_uuid_get} and options: {options}",
-          "createCollection",
-          "namespace"_attr = nss,
-          "uuidDisposition"_attr = (generatedUUID ? "generated" : "provided"),
-          "uuid"_attr = optionsWithUUID.uuid.value(),
-          "options"_attr = options);
+    // Reduce log verbosity for virtual collections
+    auto debugLevel = vopts ? 1 : 0;
+
+    LOGV2_DEBUG(20320,
+                debugLevel,
+                "createCollection: {namespace} with {generatedUUID_generated_provided} UUID: "
+                "{optionsWithUUID_uuid_get} and options: {options}",
+                "createCollection",
+                "namespace"_attr = nss,
+                "uuidDisposition"_attr = (generatedUUID ? "generated" : "provided"),
+                "uuid"_attr = optionsWithUUID.uuid.value(),
+                "options"_attr = options);
 
     // Create Collection object
     auto ownedCollection = [&]() -> std::shared_ptr<Collection> {
