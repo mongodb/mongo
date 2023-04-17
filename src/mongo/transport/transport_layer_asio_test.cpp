@@ -527,20 +527,21 @@ TEST(TransportLayerASIO, EgressConnectionResetByPeerDuringSessionCtor) {
 
     // `fp` pauses the `ASIOSession` constructor immediately prior to its
     // `setsockopt` sequence, to allow time for the peer reset to propagate.
-    FailPoint& fp = transport::transportLayerASIOSessionPauseBeforeSetSocketOption;
+    auto fp = std::make_unique<FailPointEnableBlock>(
+        "transportLayerASIOSessionPauseBeforeSetSocketOption");
 
     Acceptor server(ioContext);
     server.setOnAccept([&](std::shared_ptr<Acceptor::Connection> conn) {
+        LOGV2(7598701, "waiting for the client to reach the fail-point");
+        (*fp)->waitForTimesEntered(fp->initialTimesEntered() + 1);
         LOGV2(6101604, "handling a connection by resetting it");
         conn->socket.set_option(asio::socket_base::linger(true, 0));
         conn->socket.close();
-        sleepFor(Seconds{1});
-        fp.setMode(FailPoint::off);
+        fp.reset();
     });
     JoinThread ioThread{[&] { ioContext.run(); }};
     ScopeGuard ioContextStop = [&] { ioContext.stop(); };
 
-    fp.setMode(FailPoint::alwaysOn);
     LOGV2(6101602, "Connecting", "port"_attr = server.port());
     using namespace unittest::match;
     // On MacOS, calling `setsockopt` on a peer-reset connection yields an
