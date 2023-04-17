@@ -45,8 +45,9 @@ static const char table_config[] =
   "allocation_size=4KB,leaf_page_max=4KB,key_format=Q,value_format=" WT_UNCHECKED_STRING(QS);
 
 static char data_str[1024] = "";
-static bool skipped_compaction = false;
 static bool interrupted_compaction = false;
+static bool skipped_compaction = false;
+static bool do_interrupt_compaction = false;
 
 /*
  * error_handler --
@@ -96,7 +97,7 @@ handle_general(WT_EVENT_HANDLER *handler, WT_CONNECTION *conn, WT_SESSION *sessi
     (void)(session);
     (void)(arg);
 
-    if (type == WT_EVENT_COMPACT_CHECK)
+    if (do_interrupt_compaction && type == WT_EVENT_COMPACT_CHECK)
         return (-1);
 
     return (0);
@@ -204,6 +205,7 @@ main(int argc, char *argv[])
     testutil_check(session->checkpoint(session, NULL));
     remove_records(session, 0, NUM_RECORDS1 + NUM_RECORDS2 / 2);
 
+    do_interrupt_compaction = true;
     interrupted_compaction = false;
     skipped_compaction = false;
     ret = session->compact(session, TABLE_URI, NULL);
@@ -219,6 +221,14 @@ main(int argc, char *argv[])
     testutil_check(stat->get_value(stat, &desc, &pvalue, &pages_reviewed));
     testutil_check(stat->close(stat));
     testutil_assert(pages_reviewed == 0);
+
+    /* Now actually compact. */
+    do_interrupt_compaction = false;
+    interrupted_compaction = false;
+    skipped_compaction = false;
+    testutil_check(session->compact(session, TABLE_URI, NULL));
+    testutil_assert(!interrupted_compaction);
+    testutil_assert(!skipped_compaction);
 
     /* Finish the test and clean up. */
     testutil_check(session->close(session, NULL));

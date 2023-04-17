@@ -323,8 +323,17 @@ __wt_compact(WT_SESSION_IMPL *session)
     if (skip) {
         WT_STAT_CONN_INCR(session, session_table_compact_skipped);
         WT_STAT_DATA_INCR(session, btree_compact_skipped);
-        __wt_verbose_info(session, WT_VERB_COMPACT,
-          "%s: there is no useful work to do - skipping compaction", bm->block->name);
+
+        /*
+         * Print the "skipping compaction" message only if this is the first time we are working on
+         * this table.
+         */
+        __wt_block_compact_get_progress_stats(
+          session, bm, &stats_pages_reviewed, &stats_pages_skipped, &stats_pages_rewritten);
+        if (stats_pages_reviewed == 0)
+            __wt_verbose_info(session, WT_VERB_COMPACT,
+              "%s: there is no useful work to do - skipping compaction", bm->block->name);
+
         return (0);
     }
 
