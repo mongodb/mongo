@@ -889,6 +889,12 @@ void runTransactionOnShardingCatalog(OperationContext* opCtx,
     // passed Operation context. We opt for creating a new one to avoid any possible side
     // effects.
     auto newClient = opCtx->getServiceContext()->makeClient("ShardingCatalogTransaction");
+
+    {
+        stdx::lock_guard<Client> lk(*newClient.get());
+        newClient.get()->setSystemOperationKillableByStepdown(lk);
+    }
+
     AuthorizationSession::get(newClient.get())->grantInternalAuthorization(newClient.get());
     AlternativeClientRegion acr(newClient);
 
@@ -904,8 +910,10 @@ void runTransactionOnShardingCatalog(OperationContext* opCtx,
     auto sleepInlineExecutor = inlineExecutor->getSleepableExecutor(executor);
 
     // if osi is provided, use it. Otherwise, use the one from the opCtx.
-    CancelableOperationContext newOpCtx(
-        cc().makeOperationContext(), opCtx->getCancellationToken(), executor);
+    auto newOpCtxHolder = cc().makeOperationContext();
+    auto newOpCtx = newOpCtxHolder.get();
+    newOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+
     if (osi.getSessionId()) {
         newOpCtx->setLogicalSessionId(*osi.getSessionId());
         newOpCtx->setTxnNumber(*osi.getTxnNumber());
@@ -920,7 +928,7 @@ void runTransactionOnShardingCatalog(OperationContext* opCtx,
         // TODO SERVER-75919: Investigate if this should always use the remote client.
         if (serverGlobalParams.clusterRole.exclusivelyHasShardRole()) {
             return std::make_unique<txn_api::details::SEPTransactionClient>(
-                newOpCtx.get(),
+                newOpCtx,
                 inlineExecutor,
                 sleepInlineExecutor,
                 std::make_unique<txn_api::details::ClusterSEPTransactionClientBehaviors>(
@@ -931,12 +939,12 @@ void runTransactionOnShardingCatalog(OperationContext* opCtx,
         return nullptr;
     }();
 
-    txn_api::SyncTransactionWithRetries txn(newOpCtx.get(),
+    txn_api::SyncTransactionWithRetries txn(newOpCtx,
                                             sleepInlineExecutor,
                                             nullptr /*resourceYielder*/,
                                             inlineExecutor,
                                             std::move(customTxnClient));
-    txn.run(newOpCtx.get(), std::move(transactionChain));
+    txn.run(newOpCtx, std::move(transactionChain));
 }
 
 }  // namespace sharding_ddl_util
