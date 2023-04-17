@@ -2,7 +2,7 @@
  * Test that a reconfig for a shard that would change the implicit default write concern to w:1
  * fails if CWWC is not set.
  *
- * Temporary catalog shard incompatible because it hits a sharding metadata hook failure on cluster
+ * Temporary config shard incompatible because it hits a sharding metadata hook failure on cluster
  * shutdown.
  * @tags: [
  *   requires_majority_read_concern,
@@ -89,7 +89,7 @@ shardServer = new ReplSetTest(
 shardServer.startSet();
 shardServer.initiateWithHighElectionTimeout();
 
-const st = new ShardingTest({shards: TestData.catalogShard ? 1 : 0, mongos: 1});
+const st = new ShardingTest({shards: TestData.configShard ? 1 : 0, mongos: 1});
 var admin = st.getDB('admin');
 
 jsTestLog("Adding the shard to the cluster should succeed.");

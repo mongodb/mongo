@@ -6,7 +6,7 @@ selector:
   exclude_files:
   - jstests/sharding/**/libs/**/*.js
   exclude_with_any_tags:
-  - catalog_shard_incompatible
+  - config_shard_incompatible
 
 executor:
   archive:
@@ -16,5 +16,5 @@ executor:
     shell_options:
       global_vars:
         TestData:
-          catalogShard: true
+          configShard: true
       nodb: ''

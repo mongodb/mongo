@@ -7,7 +7,7 @@
  * shard, therefore the node would need to be restarted as a configsvr and then transitioned to be
  * a config shard node. The ShardingTest and ReplSetTest API currently doesn't support doing that.
  *
- * @tags: [requires_fcv_70, requires_persistence, catalog_shard_incompatible]
+ * @tags: [requires_fcv_70, requires_persistence, config_shard_incompatible]
  */
 (function() {
 "use strict";

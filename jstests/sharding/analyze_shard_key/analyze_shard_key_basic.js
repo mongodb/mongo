@@ -6,7 +6,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/catalog_shard_util.js");
+load("jstests/libs/config_shard_util.js");
 
 const setParameterOpts = {
     analyzeShardKeyNumRanges: 100
@@ -223,16 +223,16 @@ function testNotSupportReadWriteConcern(writeConn, testCases) {
     });
 
     // The analyzeShardKey command is not supported on dedicated configsvr mongods.
-    const isCatalogShardEnabled = CatalogShardUtil.isEnabledIgnoringFCV(st);
+    const isConfigShardEnabled = ConfigShardUtil.isEnabledIgnoringFCV(st);
     st.configRS.nodes.forEach(node => {
-        // If catalog shard mode isn't enabled, don't expect a sharded collection since the config
+        // If config shard mode isn't enabled, don't expect a sharded collection since the config
         // server isn't enabled as a shard and won't have chunks.
         testCases.push({
             conn: node,
-            isSupported: isCatalogShardEnabled,
-            // The config server is shard0 in catalog shard mode.
-            isPrimaryShardMongod: TestData.catalogShard,
-            doNotExpectColl: !TestData.catalogShard
+            isSupported: isConfigShardEnabled,
+            // The config server is shard0 in config shard mode.
+            isPrimaryShardMongod: TestData.configShard,
+            doNotExpectColl: !TestData.configShard
         });
     });
 

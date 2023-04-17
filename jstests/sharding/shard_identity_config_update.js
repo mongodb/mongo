@@ -97,9 +97,9 @@ if (notInMultiversionTest) {
 // string when they come back up.
 //
 
-// We can't reconfigure the config server if some nodes are down, so skip in catalog shard mode and
+// We can't reconfigure the config server if some nodes are down, so skip in config shard mode and
 // just verify all nodes update the config string eventually.
-if (!TestData.catalogShard) {
+if (!TestData.configShard) {
     st.rs0.stop(0);
     st.rs0.stop(1);
 }
@@ -112,7 +112,7 @@ replConfig.members.pop();
 
 reconfig(st.configRS, replConfig);
 
-if (!TestData.catalogShard) {
+if (!TestData.configShard) {
     st.rs0.restart(0, {shardsvr: ''});
     st.rs0.restart(1, {shardsvr: ''});
 }

@@ -14,7 +14,7 @@ let st = new ShardingTest({shards: 2});
 // Validate the initial state.
 validateSessionsCollection(st.shard0, true, true);
 validateSessionsCollection(st.shard1, false, false);
-validateSessionsCollection(st.configRS.getPrimary(), TestData.catalogShard, TestData.catalogShard);
+validateSessionsCollection(st.configRS.getPrimary(), TestData.configShard, TestData.configShard);
 
 // Drop the TTL index on shard0.
 assert.commandWorked(st.shard0.getDB("config").system.sessions.dropIndex({lastUse: 1}));

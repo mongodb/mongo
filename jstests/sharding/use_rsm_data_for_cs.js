@@ -21,7 +21,7 @@ rs.nodes.forEach(function(node) {
 });
 
 // add a node to shard rs
-if (TestData.catalogShard) {
+if (TestData.configShard) {
     rs.add({'configsvr': ''});
 } else {
     rs.add({'shardsvr': ''});

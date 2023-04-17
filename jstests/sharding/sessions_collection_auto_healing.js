@@ -1,7 +1,7 @@
 /**
  * Requires no shards.
  * @tags: [
- *   catalog_shard_incompatible,
+ *   config_shard_incompatible,
  *   requires_fcv_70,
  * ]
  */

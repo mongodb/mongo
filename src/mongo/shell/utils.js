@@ -437,7 +437,7 @@ jsTestOptions = function() {
             backupOnRestartDir: TestData.backupOnRestartDir || false,
 
             evergreenTaskId: TestData.evergreenTaskId || null,
-            catalogShard: TestData.catalogShard || false,
+            configShard: TestData.configShard || false,
         });
     }
     return _jsTestOptions;

@@ -6,7 +6,7 @@
 'use strict';
 
 load("jstests/core/timeseries/libs/timeseries.js");
-load("jstests/libs/catalog_shard_util.js");
+load("jstests/libs/config_shard_util.js");
 load("jstests/libs/fail_point_util.js");
 
 const dbName = 'testDB';
@@ -26,7 +26,7 @@ function useBucketingParametersOnLowerFCV() {
     }
     assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
 
-    const isCatalogShardEnabled = CatalogShardUtil.isEnabledIgnoringFCV(st);
+    const isConfigShardEnabled = ConfigShardUtil.isEnabledIgnoringFCV(st);
 
     let coll = db.getCollection(collName);
     coll.drop();
@@ -41,7 +41,7 @@ function useBucketingParametersOnLowerFCV() {
 
     const configDirectDb = st.configRS.getPrimary().getDB(dbName);
     const configDirectColl = configDirectDb.getCollection(collName);
-    if (isCatalogShardEnabled) {
+    if (isConfigShardEnabled) {
         // Verify we cannot downgrade if the config server has a timeseries collection with
         // bucketing.
         assert.commandWorked(configDirectDb.createCollection(collName, {
@@ -66,7 +66,7 @@ function useBucketingParametersOnLowerFCV() {
     coll = db.getCollection(collName);
     coll.drop();
 
-    if (isCatalogShardEnabled) {
+    if (isConfigShardEnabled) {
         // We should still fail to downgrade if we have a collection on the config server with
         // custom bucketing parameters set.
         assert.commandFailedWithCode(

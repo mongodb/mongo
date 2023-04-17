@@ -38,7 +38,7 @@ var st = new ShardingTest({
     name: testName,
     other: {rs0: {nodes: 3}, rs1: {nodes: 3}, useBridge: true},
     mongos: 1,
-    config: TestData.catalogShard ? undefined : 1,
+    config: TestData.configShard ? undefined : 1,
     enableBalancer: false
 });
 
@@ -123,7 +123,7 @@ var result = testDB.runReadCommand({
 });
 assert.commandFailedWithCode(result, ErrorCodes.MaxTimeMSExpired);
 
-if (TestData.catalogShard) {
+if (TestData.configShard) {
     // Reconnect so the config server is available for shutdown hooks.
     secondaries[0].reconnect(primary);
     secondaries[1].reconnect(primary);

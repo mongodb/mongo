@@ -1,6 +1,6 @@
 /**
- * Verifies the transitionToCatalogShard feature flag guards running the catalog shard transition
- * commands.
+ * Verifies the transitionFromDedicatedConfigServer feature flag guards running the config shard
+ * transition commands.
  *
  * @tags: [requires_fcv_70]
  */
@@ -21,13 +21,14 @@ const st = new ShardingTest({
 });
 
 // None of the transition commands can be run on mongos or the config server.
-assert.commandFailedWithCode(st.s.adminCommand({transitionToCatalogShard: 1}),
+assert.commandFailedWithCode(st.s.adminCommand({transitionFromDedicatedConfigServer: 1}),
                              ErrorCodes.CommandNotFound);
 assert.commandFailedWithCode(st.s.adminCommand({transitionToDedicatedConfigServer: 1}), 7368401);
 
 const configPrimary = st.configRS.getPrimary();
-assert.commandFailedWithCode(configPrimary.adminCommand({_configsvrTransitionToCatalogShard: 1}),
-                             ErrorCodes.CommandNotFound);
+assert.commandFailedWithCode(
+    configPrimary.adminCommand({_configsvrTransitionFromDedicatedConfigServer: 1}),
+    ErrorCodes.CommandNotFound);
 assert.commandFailedWithCode(
     configPrimary.adminCommand({_configsvrTransitionToDedicatedConfigServer: 1}), 7368402);
 

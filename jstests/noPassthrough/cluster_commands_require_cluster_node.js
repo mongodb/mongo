@@ -9,7 +9,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/catalog_shard_util.js");
+load("jstests/libs/config_shard_util.js");
 
 const kDBName = "foo";
 const kCollName = "bar";
@@ -96,12 +96,12 @@ function runTestCaseExpectSuccess(conn, testCase) {
     }
 
     //
-    // Cluster commands are allowed on a catalog shard enabled config server.
+    // Cluster commands are allowed on a config shard enabled config server.
     //
 
-    const isCatalogShardEnabled = CatalogShardUtil.isEnabledIgnoringFCV(st);
+    const isConfigShardEnabled = ConfigShardUtil.isEnabledIgnoringFCV(st);
     for (let testCase of clusterCommandsCases) {
-        if (isCatalogShardEnabled) {
+        if (isConfigShardEnabled) {
             if (testCase.expectedErr) {
                 runTestCaseExpectFail(st.rs0.getPrimary(), testCase, testCase.expectedErr);
             } else {

@@ -39,8 +39,8 @@ const assertAddShardFailed = function(res, shardName) {
     // If a shard name was specified in the addShard, make sure no shard with its name shows up
     // in config.shards.
     if (shardName) {
-        if (TestData.catalogShard && shardName === "config") {
-            // In catalog shard mode there's always an entry for config for the config server.
+        if (TestData.configShard && shardName === "config") {
+            // In config shard mode there's always an entry for config for the config server.
             assert.neq(null, st.s.getDB('config').shards.findOne({_id: shardName}));
         } else {
             assert.eq(null,
@@ -52,7 +52,7 @@ const assertAddShardFailed = function(res, shardName) {
 };
 
 const st = new ShardingTest({
-    shards: TestData.catalogShard ? 1 : 0,
+    shards: TestData.configShard ? 1 : 0,
     mongos: 1,
 });
 

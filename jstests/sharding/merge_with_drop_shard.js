@@ -22,7 +22,7 @@ st.ensurePrimaryShard(mongosDB.getName(), st.shard0.name);
 
 function setAggHang(mode) {
     // Match on the output namespace to avoid hanging the sharding metadata refresh aggregation when
-    // shard0 is a catalog shard.
+    // shard0 is a config shard.
     assert.commandWorked(st.shard0.adminCommand({
         configureFailPoint: "hangWhileBuildingDocumentSourceMergeBatch",
         mode: mode,

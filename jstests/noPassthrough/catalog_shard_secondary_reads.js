@@ -1,5 +1,5 @@
 /**
- * Tests catalog shard topology.
+ * Tests config shard topology.
  *
  * @tags: [
  *   requires_fcv_70,
@@ -9,7 +9,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/catalog_shard_util.js");
+load("jstests/libs/config_shard_util.js");
 load("jstests/libs/fail_point_util.js");
 load('jstests/libs/chunk_manipulation_util.js');
 
@@ -19,7 +19,7 @@ const st = new ShardingTest({
     shards: {rs0: {nodes: 2}, rs1: {nodes: 2}},
     config: 2,
     mongos: 1,
-    catalogShard: true,
+    configShard: true,
 });
 
 assert.commandWorked(st.s0.getDB('test').user.insert({_id: 1234}));
@@ -71,8 +71,8 @@ joinMoveChunk();
 assert.commandWorked(st.s0.adminCommand({movePrimary: 'test', to: st.shard1.shardName}));
 assert.commandWorked(st.s0.adminCommand({movePrimary: 'sharded', to: st.shard1.shardName}));
 
-// A catalog shard can't be removed until all range deletions have finished.
-CatalogShardUtil.waitForRangeDeletions(st.s0);
+// A config shard can't be removed until all range deletions have finished.
+ConfigShardUtil.waitForRangeDeletions(st.s0);
 
 removeRes = assert.commandWorked(st.s0.adminCommand({transitionToDedicatedConfigServer: 1}));
 assert.eq("completed", removeRes.state, tojson(removeRes));
@@ -119,7 +119,7 @@ assert.commandWorked(st.s0.adminCommand({setFeatureCompatibilityVersion: upgrade
 // Need to drop the database before it can become a shard again.
 assert.commandWorked(st.configRS.getPrimary().getDB('sharded').dropDatabase());
 
-assert.commandWorked(st.s0.adminCommand({transitionToCatalogShard: 1}));
+assert.commandWorked(st.s0.adminCommand({transitionFromDedicatedConfigServer: 1}));
 assert.commandWorked(st.s0.adminCommand({movePrimary: 'test', to: st.shard0.shardName}));
 assert.commandWorked(
     st.s0.adminCommand({moveChunk: 'sharded.user', find: {_id: 0}, to: st.shard0.shardName}));

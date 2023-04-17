@@ -7,7 +7,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/catalog_shard_util.js");
+load("jstests/libs/config_shard_util.js");
 load("jstests/libs/fail_point_util.js");
 load("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
 load("jstests/sharding/analyze_shard_key/libs/validation_common.js");

@@ -13,8 +13,7 @@ TestData.skipCheckShardFilteringMetadata = true;
 (function() {
 "use strict";
 
-var st =
-    new ShardingTest({name: 'sync_conn_cmd', shards: TestData.catalogShard ? 1 : 0, config: 3});
+var st = new ShardingTest({name: 'sync_conn_cmd', shards: TestData.configShard ? 1 : 0, config: 3});
 st.s.setSecondaryOk();
 
 var configDB = st.config;

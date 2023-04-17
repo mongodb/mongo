@@ -17,7 +17,7 @@ import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.j
 import {donorStartMigrationWithProtocol} from "jstests/replsets/libs/tenant_migration_util.js";
 
 (function() {
-load("jstests/libs/catalog_shard_util.js");
+load("jstests/libs/config_shard_util.js");
 
 const st = new ShardingTest({shards: 1});
 const donorRstShard = st.rs0;

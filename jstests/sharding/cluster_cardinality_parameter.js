@@ -2,9 +2,9 @@
  * Tests that the cluster parameter "shardedClusterCardinalityForDirectConns" has the correct value
  * after upgrade, downgrade, and addShard.
  *
- * TODO SERVER-75391: Enable when catalog shards can downgrade FCV
+ * TODO SERVER-75391: Enable when config shards can downgrade FCV
  * @tags: [multiversion_incompatible, featureFlagClusterCardinalityParameter,
- * catalog_shard_incompatible]
+ * config_shard_incompatible]
  */
 
 (function() {

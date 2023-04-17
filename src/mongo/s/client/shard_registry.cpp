@@ -190,7 +190,7 @@ ShardRegistry::Cache::LookupResult ShardRegistry::_lookup(OperationContext* opCt
 
         auto name = shard->getConnString().getSetName();
         if (shardId != ShardId::kConfigServerId) {
-            // Don't remove the catalog shard's RSM because it is used to target the config server.
+            // Don't remove the config shard's RSM because it is used to target the config server.
             ReplicaSetMonitor::remove(name);
         }
         _removeReplicaSet(name);

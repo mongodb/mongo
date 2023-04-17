@@ -4,13 +4,13 @@
  * Tests that a schema is added to the config.settings collection on upgrade and removed on
  * downgrade.
  *
- * Incompatible with a catalog shard because catalog shards can't downgrade FCV below 7.0, and this
+ * Incompatible with a config shard because config shards can't downgrade FCV below 7.0, and this
  * test is only for that particular transition.
  * @tags: [
  *   multiversion_incompatible,
  *   featureFlagConfigSettingsSchema,
  *   does_not_support_stepdowns,
- *   catalog_shard_incompatible,
+ *   config_shard_incompatible,
  * ]
  */
 (function() {

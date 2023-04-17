@@ -142,9 +142,9 @@ assertMigrationStatusOnServerStatus(shard0ServerStatus,
                                     {"_id": {"$maxKey": 1}},
                                     coll + "");
 // Background metadata operations on the config server can throw off the count, so just assert the
-// fields are present for a catalog shard.
-const expectedEntriesMigrated = TestData.catalogShard ? undefined : 2400;
-const expectedEntriesSkipped = TestData.catalogShard ? undefined : 2600;
+// fields are present for a config shard.
+const expectedEntriesMigrated = TestData.configShard ? undefined : 2400;
+const expectedEntriesSkipped = TestData.configShard ? undefined : 2600;
 assertSessionMigrationStatusSource(
     shard0ServerStatus, expectedEntriesMigrated, expectedEntriesSkipped);
 

@@ -1,13 +1,13 @@
 /**
  * Tests to make sure that the mongos does not allow certain commands on the config and admin
- * databases when catalogShard is enabled.
+ * databases when configShard is enabled.
  *
  * @tags: [requires_fcv_70, featureFlagCatalogShard, featureFlagTransitionToCatalogShard]
  */
 (function() {
 "use strict";
 
-var st = new ShardingTest({mongos: 1, shards: 1, config: 1, catalogShard: true});
+var st = new ShardingTest({mongos: 1, shards: 1, config: 1, configShard: true});
 
 let mongosAdminDB = st.s0.getDB("admin");
 let mongosConfigDB = st.s0.getDB("config");
@@ -20,7 +20,7 @@ var res = mongosAdminDB.runCommand(cmdObj);
 assert.commandWorked(res);
 
 // Commands that should fail when run on collections in the config database when
-// catalogShard is enabled
+// configShard is enabled
 {
     assert.commandFailedWithCode(
         mongosAdminDB.runCommand({renameCollection: "config.shards", to: "config.joe"}),
@@ -41,7 +41,7 @@ assert.commandWorked(res);
 }
 
 // Commands that should fail when run on collections in the admin database when
-// catalogShard is enabled
+// configShard is enabled
 {
     assert.commandFailedWithCode(
         mongosAdminDB.runCommand({renameCollection: "admin.system.roles", to: "admin.joe"}),

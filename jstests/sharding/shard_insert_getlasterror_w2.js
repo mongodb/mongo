@@ -44,10 +44,10 @@ var mongosConn = shardingTest.s;
 var testDB = mongosConn.getDB(testDBName);
 
 // Add replSet1 as only shard
-if (!TestData.catalogShard) {
+if (!TestData.configShard) {
     assert.commandWorked(mongosConn.adminCommand({addshard: replSet1.getURL()}));
 } else {
-    assert.commandWorked(mongosConn.adminCommand({transitionToCatalogShard: 1}));
+    assert.commandWorked(mongosConn.adminCommand({transitionFromDedicatedConfigServer: 1}));
 }
 
 // Enable sharding on test db and its collection foo

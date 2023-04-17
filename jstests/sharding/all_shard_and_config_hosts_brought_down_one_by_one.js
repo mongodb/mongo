@@ -44,8 +44,8 @@ assert.commandWorked(st.s0.getDB('TestDB').TestColl.update(
 count += 1;
 assert.eq([{_id: 0, count}], st.s0.getDB('TestDB').TestColl.find().toArray());
 
-if (!TestData.catalogShard) {
-    // For a catalog shard, the config server is the shard, so we can't have a different number up.
+if (!TestData.configShard) {
+    // For a config shard, the config server is the shard, so we can't have a different number up.
     jsTest.log('Config nodes up: 1 of 3, shard nodes up: 2 of 2: ' +
                'Inserts and queries must work');
     st.configRS.stop(1, undefined, undefined, {forRestart: true});
@@ -63,8 +63,8 @@ st.restartMongos(0);
 st.s0.setSecondaryOk();
 assert.eq([{_id: 0, count}], st.s0.getDB('TestDB').TestColl.find().toArray());
 
-if (!TestData.catalogShard) {
-    // For a catalog shard, the config server is the shard, so we can't have a different number up.
+if (!TestData.configShard) {
+    // For a config shard, the config server is the shard, so we can't have a different number up.
     jsTest.log('Config nodes up: 1 of 3, shard nodes up: 0 of 2: ' +
                'MongoS must start, but no operations will work (no shard nodes available)');
     st.rs0.stop(1);
@@ -76,9 +76,9 @@ if (!TestData.catalogShard) {
 
 jsTest.log('Config nodes up: 0 of 3, shard nodes up: 0 of 2: ' +
            'Metadata cannot be loaded at all, no operations will work');
-if (!TestData.catalogShard) {
+if (!TestData.configShard) {
     st.configRS.stop(2);
-} else if (TestData.catalogShard) {
+} else if (TestData.configShard) {
     st.configRS.stop(1, undefined, undefined, {forRestart: true});
     // Restart mongos while a config server is still up.
     st.restartMongos(0);

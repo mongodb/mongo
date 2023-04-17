@@ -10,6 +10,9 @@ selector:
   - jstests/concurrency/fsm_workloads/distinct_noindex.js
   - jstests/concurrency/fsm_workloads/distinct_projection.js
 
+  # SERVER-14669 Multi-removes that use $where miscount removed documents
+  - jstests/concurrency/fsm_workloads/remove_where.js
+
   # Disabled due to SERVER-33753, '.count() without a predicate can be wrong on sharded
   # collections'. This bug is problematic for these workloads because they assert on count()
   # values:
@@ -65,6 +68,9 @@ selector:
   # our .remove(query, {justOne: true}) calls lack shard keys
   - jstests/concurrency/fsm_workloads/remove_single_document.js
 
+  # SERVER-20361 Improve the behaviour of multi-update/delete against a sharded collection
+  - jstests/concurrency/fsm_workloads/update_where.js
+
   # cannot use upsert command with $where with sharded collections
   - jstests/concurrency/fsm_workloads/upsert_where.js
 
@@ -88,25 +94,18 @@ selector:
   # Time-series collections are not supported on mongos.
   - jstests/concurrency/fsm_workloads/create_timeseries_collection.js
 
-  # This test concurrently creates views and collections on the same namespace, which causes issues
-  # for dbCheck. TODO (SERVER-63951): Remove this exclusion.
-  - jstests/concurrency/fsm_workloads/create_collection_and_view.js
-
-
   exclude_with_any_tags:
+  - assumes_balancer_off
   - requires_replication
-  - assumes_balancer_on
   # mongos has no system.profile collection.
   - requires_profiling
   - assumes_unsharded_collection
-  # TODO SERVER-73279: Remove after branching 7.0 and a catalog shard can be downgraded.
+  # TODO SERVER-73279: Remove after branching 7.0 and a config shard can be downgraded.
   - multiversion_incompatible
 
 executor:
   archive:
     hooks:
-      # TODO (SERVER-63855): remove 'RunDBCheckInBackground' or put it back.
-      # - RunDBCheckInBackground
       - CheckReplDBHashInBackground
       - CheckReplDBHash
       - CheckMetadataConsistencyInBackground
@@ -116,10 +115,8 @@ executor:
     shell_options:
       global_vars:
         TestData:
-          runningWithBalancer: false
+          runningWithBalancer: true
   hooks:
-  # TODO (SERVER-63855): remove 'RunDBCheckInBackground' or put it back.
-  # - class: RunDBCheckInBackground
   - class: CheckReplDBHashInBackground
   - class: CheckReplDBHash
   - class: CheckMetadataConsistencyInBackground
@@ -130,8 +127,7 @@ executor:
   - class: CleanupConcurrencyWorkloads
   fixture:
     class: ShardedClusterFixture
-    catalog_shard: "any"
-    enable_balancer: false
+    config_shard: "any"
     mongos_options:
       set_parameters:
         enableTestCommands: 1

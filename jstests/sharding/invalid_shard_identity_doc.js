@@ -11,7 +11,7 @@
 (function() {
 "use strict";
 
-const st = new ShardingTest({shards: 2, catalogShard: true});
+const st = new ShardingTest({shards: 2, configShard: true});
 const rs = new ReplSetTest({name: "new-shard-rs", nodes: 1, nodeOptions: {shardsvr: ""}});
 
 rs.startSet();

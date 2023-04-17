@@ -4,7 +4,7 @@
  * A config server can't have arbiter nodes.
  * @tags: [
  *   uses_transactions,
- *   catalog_shard_incompatible,
+ *   config_shard_incompatible,
  * ]
  */
 

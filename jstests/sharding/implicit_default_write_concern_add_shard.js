@@ -41,7 +41,7 @@ function testAddShard(CWWCSet, isPSASet, fixAddShard) {
     shardServer.initiate();
 
     const st = new ShardingTest({
-        shards: TestData.catalogShard ? 1 : 0,
+        shards: TestData.configShard ? 1 : 0,
         mongos: 1,
     });
     var admin = st.getDB('admin');

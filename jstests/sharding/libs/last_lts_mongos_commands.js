@@ -49,7 +49,7 @@ const commandsAddedToMongosSinceLastLTS = [
     "testRemoval",
     "testVersions1And2",
     "testVersion2",
-    "transitionToCatalogShard",
+    "transitionFromDedicatedConfigServer",
     "transitionToDedicatedConfigServer",
     "updateSearchIndex",
 ];

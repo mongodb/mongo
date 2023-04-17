@@ -7,7 +7,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/catalog_shard_util.js");
+load("jstests/libs/config_shard_util.js");
 load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
 
 // Set this to allow sample ids to be set by an external client.
@@ -229,7 +229,7 @@ function testInsertCmd(rst) {
     testInsertCmd(st.rs0);
 
     const configTests =
-        CatalogShardUtil.isEnabledIgnoringFCV(st) ? supportedTestCases : unsupportedTestCases;
+        ConfigShardUtil.isEnabledIgnoringFCV(st) ? supportedTestCases : unsupportedTestCases;
     testUpdateCmd(st.configRS, configTests);
     testDeleteCmd(st.configRS, configTests);
     testFindAndModifyCmd(st.configRS, configTests);

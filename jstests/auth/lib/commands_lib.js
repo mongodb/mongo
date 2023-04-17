@@ -425,8 +425,8 @@ export const authCommandsLib = {
           ]
         },
         {
-          testname: 'transitionToCatalogShard',
-          command: {transitionToCatalogShard: 1},
+          testname: 'transitionFromDedicatedConfigServer',
+          command: {transitionFromDedicatedConfigServer: 1},
           skipUnlessSharded: true,
           skipTest: (conn) => {
             return !TestData.setParameters.featureFlagCatalogShard;
@@ -435,15 +435,15 @@ export const authCommandsLib = {
             {
               runOnDb: adminDbName, 
               roles: roles_clusterManager, 
-              privileges: [{resource: {cluster: true}, actions: ["transitionToCatalogShard"]}]
+              privileges: [{resource: {cluster: true}, actions: ["transitionFromDedicatedConfigServer"]}]
             },
             {runOnDb: firstDbName, roles: {}},
             {runOnDb: secondDbName, roles: {}}
           ]
         },
         {
-          testname: "_configsvrTransitionToCatalogShard",
-          command: {_configsvrTransitionToCatalogShard: 1},
+          testname: "_configsvrTransitionFromDedicatedConfigServer",
+          command: {_configsvrTransitionFromDedicatedConfigServer: 1},
           skipSharded: true,
           skipTest: (conn) => {
             return !TestData.setParameters.featureFlagCatalogShard;

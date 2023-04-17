@@ -56,7 +56,7 @@ public:
     // Returns true if this mongod was started with --shardsvr, false otherwise.
     bool exclusivelyHasShardRole();
 
-    // Returns true if this mongod was started with --configsvr in a non-catalog shard topology,
+    // Returns true if this mongod was started with --configsvr in a non-config shard topology,
     // false otherwise.
     // TODO SERVER-75391: Remove.
     bool exclusivelyHasConfigRole();

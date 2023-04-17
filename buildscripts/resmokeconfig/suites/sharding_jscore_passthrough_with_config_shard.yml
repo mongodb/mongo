@@ -44,7 +44,7 @@ selector:
   - assumes_against_mongod_not_mongos
   # system.profile collection doesn't exist on mongos.
   - requires_profiling
-  - catalog_shard_incompatible
+  - config_shard_incompatible
 
 executor:
   archive:
@@ -59,7 +59,7 @@ executor:
     n: 20
   fixture:
     class: ShardedClusterFixture
-    catalog_shard: "any"
+    config_shard: "any"
     mongos_options:
       set_parameters:
         enableTestCommands: 1

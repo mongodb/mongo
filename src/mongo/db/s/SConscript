@@ -509,7 +509,7 @@ env.Library(
         'config/configsvr_set_cluster_parameter_command.cpp',
         'config/configsvr_set_user_write_block_mode_command.cpp',
         'config/configsvr_split_chunk_command.cpp',
-        'config/configsvr_transition_to_catalog_shard_command.cpp',
+        'config/configsvr_transition_from_dedicated_config_server_command.cpp',
         'config/configsvr_transition_to_dedicated_config_server_command.cpp',
         'config/configsvr_update_zone_key_range_command.cpp',
         'config/set_cluster_parameter_coordinator_document.idl',

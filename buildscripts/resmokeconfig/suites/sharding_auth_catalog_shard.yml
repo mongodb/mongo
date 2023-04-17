@@ -36,8 +36,8 @@ selector:
   # blocking.
   - jstests/sharding/set_user_write_block_mode.js
   exclude_with_any_tags:
-  - catalog_shard_incompatible
-  - temporary_catalog_shard_incompatible
+  - config_shard_incompatible
+  - temporary_config_shard_incompatible
 
 executor:
   archive:
@@ -49,7 +49,7 @@ executor:
         TestData:
           auth: true
           authMechanism: SCRAM-SHA-256
-          catalogShard: true
+          configShard: true
           keyFile: *keyFile
           keyFileData: *keyFileData
           roleGraphInvalidationIsFatal: true

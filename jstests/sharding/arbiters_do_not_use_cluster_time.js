@@ -2,7 +2,7 @@
  * Tests that arbiters do not gossip clusterTime or operationTime.
  *
  * A config server can't have arbiter nodes.
- * @tags: [catalog_shard_incompatible]
+ * @tags: [config_shard_incompatible]
  */
 
 (function() {

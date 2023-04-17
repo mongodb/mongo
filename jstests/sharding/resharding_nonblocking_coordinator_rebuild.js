@@ -3,7 +3,7 @@
  * ReshardingCoordinatorService to be rebuilt.
  *
  * TODO SERVER-75885: Investigate if this test can be enabled or reworked.
- * @tags: [catalog_shard_incompatible]
+ * @tags: [config_shard_incompatible]
  */
 (function() {
 "use strict";

@@ -301,8 +301,8 @@ function runTest(createConnFn, rst, samplerNames) {
         numQueriesExecutedPerSecond: 1
     };
     assert.commandFailedWithCode(st.s.adminCommand(cmdObj), ErrorCodes.CommandNotFound);
-    if (!TestData.catalogShard) {
-        // Shard0 is the config server in catalog shard mode.
+    if (!TestData.configShard) {
+        // Shard0 is the config server in config shard mode.
         st.rs0.nodes.forEach(node => {
             assert.commandFailedWithCode(node.adminCommand(cmdObj), ErrorCodes.IllegalOperation);
         });

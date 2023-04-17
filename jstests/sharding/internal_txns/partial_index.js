@@ -93,7 +93,7 @@ function runTest(st, alwaysCreateFeatureFlagEnabled) {
         });
     }
 
-    if (TestData.catalogShard) {
+    if (TestData.configShard) {
         // A config server does internal txns, clear the transaction table to make sure it's
         // empty before dropping the index, otherwise it can't be recreated automatically.
 

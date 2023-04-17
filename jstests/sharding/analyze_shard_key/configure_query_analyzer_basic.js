@@ -107,11 +107,11 @@ function testExistingCollection(writeConn, testCases) {
         testCases.push(
             {conn: node, isSupported: false, expectedErrorCode: ErrorCodes.NotWritablePrimary});
     });
-    // If there's a catalog shard, shard0 will be the config server and can accept
+    // If there's a config shard, shard0 will be the config server and can accept
     // configureQueryAnalyzer.
     testCases.push(
         Object.assign({conn: shard0Primary},
-                      TestData.catalogShard
+                      TestData.configShard
                           ? {isSupported: true}
                           : {isSupported: false, expectedErrorCode: ErrorCodes.IllegalOperation}));
     shard0Secondaries.forEach(node => {

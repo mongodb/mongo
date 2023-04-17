@@ -1849,7 +1849,7 @@ private:
     // The cached value of the 'counter' field in the server's TopologyVersion.
     AtomicWord<int64_t> _cachedTopologyVersionCounter;  // (S)
 
-    // This should be set during sharding initialization except on catalog shard.
+    // This should be set during sharding initialization except on config shard.
     boost::optional<bool> _wasCWWCSetOnConfigServerOnStartup;
 
     InitialSyncerInterface::OnCompletionFn _onCompletion;

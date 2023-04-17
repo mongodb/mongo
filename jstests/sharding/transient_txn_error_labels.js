@@ -17,7 +17,7 @@ const collName = "no_error_labels_outside_txn";
 // We are testing coordinateCommitTransaction, which requires the nodes to be started with
 // --shardsvr.
 const st = new ShardingTest({
-    config: TestData.catalogShard ? undefined : 1,
+    config: TestData.configShard ? undefined : 1,
     mongos: 1,
     shards: {rs0: {nodes: [{}, {rsConfig: {priority: 0}}]}}
 });

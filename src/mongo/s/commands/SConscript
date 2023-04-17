@@ -97,7 +97,7 @@ env.Library(
         'cluster_set_user_write_block_mode_command.cpp',
         'cluster_shard_collection_cmd.cpp',
         'cluster_shutdown_cmd.cpp',
-        'cluster_transition_to_catalog_shard_cmd.cpp',
+        'cluster_transition_from_dedicated_config_server_cmd.cpp',
         'cluster_transition_to_dedicated_config_server_cmd.cpp',
         'cluster_validate_cmd.cpp',
         'cluster_validate_db_metadata_cmd.cpp',

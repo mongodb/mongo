@@ -350,7 +350,7 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
     std::shared_ptr<RemoteCommandTargeter> targeter,
     const std::string* shardProposedName,
     const ConnectionString& connectionString,
-    bool isCatalogShard) {
+    bool isConfigShard) {
     auto swCommandResponse = _runCommandForAddShard(
         opCtx, targeter.get(), DatabaseName::kAdmin.db(), BSON("isMaster" << 1));
     if (swCommandResponse.getStatus() == ErrorCodes::IncompatibleServerVersion) {
@@ -434,7 +434,7 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
     }
 
     // Is it a config server?
-    if (resIsMaster.hasField("configsvr") && !isCatalogShard) {
+    if (resIsMaster.hasField("configsvr") && !isConfigShard) {
         return {ErrorCodes::OperationFailed,
                 str::stream() << "Cannot add " << connectionString.toString()
                               << " as a shard since it is a config server"};
@@ -531,7 +531,7 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
     }
 
     // Disallow adding shard replica set with name 'config'
-    if (!isCatalogShard && actualShardName == DatabaseName::kConfig.db()) {
+    if (!isConfigShard && actualShardName == DatabaseName::kConfig.db()) {
         return {ErrorCodes::BadValue, "use of shard replica set with name 'config' is not allowed"};
     }
 
@@ -627,7 +627,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
     OperationContext* opCtx,
     const std::string* shardProposedName,
     const ConnectionString& shardConnectionString,
-    bool isCatalogShard) {
+    bool isConfigShard) {
     if (!shardConnectionString) {
         return {ErrorCodes::BadValue, "Invalid connection string"};
     }
@@ -677,7 +677,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
 
     // Validate the specified connection string may serve as shard at all
     auto shardStatus = _validateHostAsShard(
-        opCtx, targeter, shardProposedName, shardConnectionString, isCatalogShard);
+        opCtx, targeter, shardProposedName, shardConnectionString, isConfigShard);
     if (!shardStatus.isOK()) {
         return shardStatus.getStatus();
     }
@@ -734,7 +734,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         return Shard::CommandResponse::processBatchWriteResponse(commandResponse, &batchResponse);
     };
 
-    if (!isCatalogShard) {
+    if (!isConfigShard) {
         AddShard addShardCmd = add_shard_util::createAddShardCmd(opCtx, shardType.getName());
 
         // Use the _addShard command to add the shard, which in turn inserts a shardIdentity
@@ -760,16 +760,16 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
         // while blocking on the network).
         FixedFCVRegion fcvRegion(opCtx);
 
-        // Prevent the race where an FCV downgrade happens concurrently with the catalogShard
-        // being added and the FCV downgrade finishes before the catalogShard is added.
+        // Prevent the race where an FCV downgrade happens concurrently with the configShard
+        // being added and the FCV downgrade finishes before the configShard is added.
         uassert(
             5563604,
-            "Cannot add catalog shard because it is not supported in featureCompatibilityVersion: {}"_format(
+            "Cannot add config shard because it is not supported in featureCompatibilityVersion: {}"_format(
                 multiversion::toString(serverGlobalParams.featureCompatibility.getVersion())),
             gFeatureFlagCatalogShard.isEnabled(serverGlobalParams.featureCompatibility) ||
-                !isCatalogShard);
+                !isConfigShard);
 
-        if (isCatalogShard) {
+        if (isConfigShard) {
             // TODO SERVER-75391: Remove.
             //
             // At this point we know the config primary is in the latest FCV, but secondaries may
@@ -781,7 +781,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
             // metadata, which contains synchronization to prevent secondaries from serving reads
             // for owned chunks that have not yet replicated to them.
             _performLocalNoopWriteWithWAllWriteConcern(
-                opCtx, "w:all write barrier in transitionToCatalogShard");
+                opCtx, "w:all write barrier in transitionFromDedicatedConfigServer");
         }
 
         uassert(5563603,
@@ -793,7 +793,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
                   fcvRegion == multiversion::GenericFCV::kLastContinuous ||
                   fcvRegion == multiversion::GenericFCV::kLastLTS);
 
-        if (!isCatalogShard) {
+        if (!isConfigShard) {
             SetFeatureCompatibilityVersion setFcvCmd(fcvRegion->getVersion());
             setFcvCmd.setDbName(DatabaseName::kAdmin);
             setFcvCmd.setFromConfigServer(true);
@@ -1038,7 +1038,7 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     Grid::get(opCtx)->shardRegistry()->reload(opCtx);
 
     if (shardId != ShardId::kConfigServerId) {
-        // Don't remove the catalog shard's RSM because it is used to target the config server.
+        // Don't remove the config shard's RSM because it is used to target the config server.
         ReplicaSetMonitor::remove(name);
     }
 

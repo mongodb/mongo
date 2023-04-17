@@ -3,7 +3,7 @@
 (function() {
 'use strict';
 
-var shardingTest = new ShardingTest({shards: TestData.catalogShard ? 1 : 0});
+var shardingTest = new ShardingTest({shards: TestData.configShard ? 1 : 0});
 
 assert(shardingTest.configRS, 'this test requires config servers to run in CSRS mode');
 

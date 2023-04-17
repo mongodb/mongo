@@ -14,7 +14,7 @@ load("jstests/sharding/libs/sharding_state_test.js");
 const st = new ShardingTest({config: 1, shards: {rs0: {nodes: 1}}});
 const rs = st.rs0;
 
-const serverTypeFlag = TestData.catalogShard ? "configsvr" : "shardsvr";
+const serverTypeFlag = TestData.configShard ? "configsvr" : "shardsvr";
 const newNode = ShardingStateTest.addReplSetNode({replSet: rs, serverTypeFlag});
 
 jsTestLog("Checking sharding state before failover.");

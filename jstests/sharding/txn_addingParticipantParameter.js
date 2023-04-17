@@ -14,7 +14,7 @@ const dbName = "test";
 const collName = "foo";
 const ns = dbName + "." + collName;
 
-const shard0Name = TestData.catalogShard ? "config" : "txn_addingParticipantParameter-rs0";
+const shard0Name = TestData.configShard ? "config" : "txn_addingParticipantParameter-rs0";
 const shard1Name = "txn_addingParticipantParameter-rs1";
 const shard2Name = "txn_addingParticipantParameter-rs2";
 const shard3Name = "txn_addingParticipantParameter-rs3";
