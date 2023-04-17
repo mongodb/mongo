@@ -6224,6 +6224,7 @@ tasks:
 
 
 - name: publish_packages
+  run_on: rhel80-small
   tags: ["publish"]
   # This should prevent this task from running in patch builds, where we
   # don't want to publish packages.
@@ -6256,6 +6257,7 @@ tasks:
           - "./src/evergreen/packages_publish.sh"
 
 - name: push
+  run_on: rhel80-small
   tags: ["publish"]
   patchable: false
   depends_on:
@@ -7352,8 +7354,6 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: .publish
-    distros:
-    - ubuntu1804-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-ubuntu1804-64
@@ -7422,8 +7422,6 @@ buildvariants:
   - name: snmp
   - name: .watchdog
   - name: .publish
-    distros:
-    - ubuntu1804-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: tla-plus
@@ -7484,8 +7482,6 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: .publish
-    distros:
-    - ubuntu1804-test
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: ubuntu1804-arm64
@@ -7517,8 +7513,6 @@ buildvariants:
   - name: jsCore
   - name: replica_sets_jscore_passthrough
   - name: .publish
-    distros:
-    - ubuntu1804-test
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: ubuntu2004
@@ -7566,8 +7560,6 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: .publish
-    distros:
-    - ubuntu2004-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-ubuntu2004-64
@@ -7616,8 +7608,6 @@ buildvariants:
   - name: sharding_auth_gen
   - name: snmp
   - name: .publish
-    distros:
-    - ubuntu2004-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-ubuntu2004-arm64
@@ -7666,8 +7656,6 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: .publish
-    distros:
-    - ubuntu2004-test
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: ubuntu2004-arm64
@@ -7698,8 +7686,6 @@ buildvariants:
   - name: jsCore
   - name: replica_sets_jscore_passthrough
   - name: .publish
-    distros:
-    - ubuntu2004-test
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-linux-64-amazon-ami
@@ -7753,8 +7739,6 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .publish
-    distros:
-    - amazon1-2018-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: amazon
@@ -7805,8 +7789,6 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: .publish
-    distros:
-    - amazon1-2018-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-amazon2
@@ -7859,8 +7841,6 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .publish
-    distros:
-    - amazon2-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: amazon2
@@ -7911,8 +7891,6 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: .publish
-    distros:
-    - amazon2-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-amazon2-arm64
@@ -7964,8 +7942,6 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .publish
-    distros:
-    - rhel80-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: amazon2-arm64
@@ -8011,8 +7987,6 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: .publish
-    distros:
-    - rhel80-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: stm-daily-cron
@@ -8341,8 +8315,6 @@ buildvariants:
   - name: .stitch
   - name: .updatefuzzer
   - name: push
-    distros:
-    - rhel70-small
 
 - name: enterprise-windows
   display_name: "Enterprise Windows"
@@ -8406,8 +8378,6 @@ buildvariants:
   - name: .stitch
   - name: .updatefuzzer
   - name: push
-    distros:
-    - rhel70-small
 
 - name: enterprise-windows-debug-unoptimized
   display_name: Enterprise Windows DEBUG (Unoptimized)
@@ -8494,8 +8464,6 @@ buildvariants:
   - name: .stitch
   - name: unittest_shell_hang_analyzer_gen
   - name: push
-    distros:
-    - rhel70-small
 
 - &macos-debug-template
   name: macos-debug-suggested
@@ -8561,8 +8529,6 @@ buildvariants:
   - name: replica_sets_jscore_passthrough
   - name: sasl
   - name: push
-    distros:
-    - rhel70-small
 
 - name: enterprise-macos-rosetta-2
   display_name: "Enterprise macOS Via Rosetta 2"
@@ -9363,8 +9329,6 @@ buildvariants:
   - name: .stitch
   - name: unittest_shell_hang_analyzer_gen
   - name: .publish
-    distros:
-    - rhel70-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: ubi8
@@ -9491,8 +9455,6 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .publish
-    distros:
-    - rhel80-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 # This variant is to intentionally test uncommon features nightly
@@ -9669,8 +9631,6 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: .publish
-    distros:
-    - rhel70-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: rhel80
@@ -9718,8 +9678,6 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: .publish
-    distros:
-    - rhel80-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: rhel-82-arm64
@@ -9764,8 +9722,6 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: .publish
-    distros:
-    - rhel80-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: ubuntu1804-ninja-build-profiles
@@ -9859,8 +9815,6 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .publish
-    distros:
-    - rhel70-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-rhel-81-ppc64le
@@ -9912,8 +9866,6 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .publish
-    distros:
-    - rhel70-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-rhel-72-s390x-compile
@@ -9996,8 +9948,6 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .publish
-    distros:
-    - rhel70-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-rhel-83-s390x
@@ -10049,8 +9999,6 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .publish
-    distros:
-    - rhel80-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 ###########################################
@@ -10123,8 +10071,6 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .publish
-    distros:
-    - suse12-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: suse12
@@ -10174,8 +10120,6 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: .publish
-    distros:
-    - suse12-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-suse15-64
@@ -10216,8 +10160,6 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .publish
-    distros:
-    - suse15-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: suse15
@@ -10264,8 +10206,6 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: .publish
-    distros:
-    - suse15-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 ###########################################
@@ -10314,8 +10254,6 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .publish
-    distros:
-    - debian92-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: debian92
@@ -10364,8 +10302,6 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: .publish
-    distros:
-    - debian92-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-debian10-64
@@ -10409,8 +10345,6 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .publish
-    distros:
-    - debian10-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: debian10
@@ -10458,8 +10392,6 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: .publish
-    distros:
-    - debian10-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-debian11-64
@@ -10503,8 +10435,6 @@ buildvariants:
   - name: snmp
   - name: .stitch
   - name: .publish
-    distros:
-    - debian11-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: debian11
@@ -10551,8 +10481,6 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: .publish
-    distros:
-    - debian11-small
   - name: generate_buildid_to_debug_symbols_mapping
 ################################
 # storage engine buildvariants #
