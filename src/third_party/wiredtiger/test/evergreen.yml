@@ -136,6 +136,34 @@ functions:
           DEFINED_EVERGREEN_CONFIG_FLAGS=${DEFINED_EVERGREEN_CONFIG_FLAGS/\-DHAVE_BUILTIN_EXTENSION_ZSTD=1/}
         fi
 
+        if [ "${build_variant|}" = "macos-1100" ]; then
+          # For mac builds, we want explicitly tell cmake which python to use, as
+          # well as the matching library directory and header files. The find_libpython
+          # module gives us the library.
+          SYSPY=${python_binary}
+          $SYSPY -mvenv venv
+          source venv/bin/activate
+          pip3 install find_libpython
+          SYSPYLIB=`find_libpython`
+          SYSPYINCDEF=
+
+          # We have the shared library to link to, it may be named simply 'Python3' or 'Python'.
+          # If that's the case, use the associated dylib symlink found in an expected relative
+          # location. Also get the location of the header files. We'll give this all to cmake.
+          base=$(basename $SYSPYLIB)
+          if [ "$base" = 'Python3' -o "$base" = 'Python' ]; then
+             SYSPYDIR=$(dirname $SYSPYLIB)
+             NSYSPYLIB=$(ls $SYSPYDIR/lib/libpython*.dylib 2>/dev/null | head -1)
+             if [ -f "$NSYSPYLIB" ]; then
+                 SYSPYLIB=$NSYSPYLIB
+             fi
+             if [ -d "$SYSPYDIR/Headers" ]; then
+                 SYSPYINCDEF="-DPYTHON_INCLUDE_DIR=$SYSPYDIR/Headers"
+             fi
+          fi
+          DEFINED_EVERGREEN_CONFIG_FLAGS="$DEFINED_EVERGREEN_CONFIG_FLAGS -DPYTHON_EXECUTABLE:FILEPATH=$SYSPY -DPYTHON_LIBRARY=$SYSPYLIB $SYSPYINCDEF"
+        fi
+
         if [ "$OS" = "Windows_NT" ]; then
           # Use the Windows powershell script to configure the CMake build.
           # We execute it in a powershell environment as its easier to detect and source the Visual Studio
@@ -160,6 +188,32 @@ functions:
           cd cmake_build
 
           ${configure_env_vars|} $CMAKE $DEFINED_EVERGREEN_CONFIG_FLAGS ${posix_configure_flags|} -G "${cmake_generator|Ninja}" ./..
+        fi
+  "python config check":
+    command: shell.exec
+    params:
+      working_dir: "wiredtiger/cmake_build"
+      shell: bash
+      script: |
+        set -o errexit
+        set -o verbose
+        # Note: ${var} is used for expansions of evergreen variables, whereas $var are /bin/sh variables.
+        python_configured=$(grep PYTHON_EXECUTABLE: ./CMakeCache.txt | sed -e 's/.*=//')
+        if [ "${python_binary}" = '' -o "$python_configured" = '' -o "$(${python_binary} -V -V)" != "$($python_configured -V -V)" ]; then
+           echo "Python versions do not match."
+           echo "Python version used by cmake builds ($python_configured):"
+           if [ "$python_configured" = '' ]; then
+               echo "No python configured"
+           else
+               $python_configured -V -V
+           fi
+           echo "Python version used in shell commands (${python_binary}):"
+           if [ "${python_binary}" = '' ]; then
+               echo "No python set in Expansions"
+           else
+               ${python_binary} -V -V
+           fi
+           exit 1
         fi
   "make wiredtiger": &make_wiredtiger
     command: shell.exec
@@ -1122,7 +1176,7 @@ variables:
 #######################################
 
 tasks:
-
+  # Check the python configuration
   # Base compile task on posix flavours
   - name: compile
     tags: ["pull_request"]
@@ -2302,6 +2356,7 @@ tasks:
     - name: compile
     commands:
       - func: "fetch artifacts"
+      - func: "python config check"
       - func: "unit test"
         vars:
            smp_command: -j $(echo $(sysctl -n hw.logicalcpu) / 2 | bc)
@@ -5588,10 +5643,11 @@ buildvariants:
   - macos-1100
   batchtime: 120 # 2 hours
   expansions:
-    # The cmake toolchain file is set to the mongodb toolchain gcc by defualt.
+    # The cmake toolchain file is set to the mongodb toolchain gcc by default.
     # Remove that configuration here and let MacOS use the default Xcode toolchain instead.
+    # We'll explicitly use the python3 in /usr/bin, we use the same in configuring cmake.
     CMAKE_TOOLCHAIN_FILE:
-    python_binary: 'python3'
+    python_binary: '/usr/bin/python3'
     smp_command: -j $(sysctl -n hw.logicalcpu)
     cmake_generator: "Unix Makefiles"
     make_command: make
