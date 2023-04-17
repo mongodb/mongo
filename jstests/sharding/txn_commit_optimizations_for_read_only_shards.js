@@ -65,10 +65,7 @@ let st = new ShardingTest({
     // Create shards with more than one node because we test for writeConcern majority failing.
     config: TestData.catalogShard ? undefined : 1,
     other: {
-        mongosOptions: {
-            verbose: 3,
-            setParameter: {'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"}
-        },
+        mongosOptions: {verbose: 3},
         rs0: {nodes: [{}, {rsConfig: {priority: 0}}]},
         rs1: {nodes: [{}, {rsConfig: {priority: 0}}]},
         rs2: {nodes: [{}, {rsConfig: {priority: 0}}]},

@@ -33,21 +33,14 @@
 
 #include "mongo/db/audit.h"
 #include "mongo/db/commands/list_databases_for_all_tenants_gen.h"
-#include "mongo/db/feature_compatibility_version_parser.h"
 #include "mongo/db/multitenancy_gen.h"
-#include "mongo/db/transaction/transaction_api.h"
-#include "mongo/db/vector_clock.h"
 #include "mongo/idl/cluster_server_parameter_common.h"
 #include "mongo/idl/cluster_server_parameter_refresher_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/is_mongos.h"
-#include "mongo/util/stacktrace.h"
-#include "mongo/util/version/releases.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
-MONGO_FAIL_POINT_DEFINE(skipClusterParameterRefresh);
 namespace mongo {
 namespace {
 
@@ -58,97 +51,44 @@ Seconds loadInterval() {
     return Seconds(clusterServerParameterRefreshIntervalSecs.load());
 }
 
-std::pair<multiversion::FeatureCompatibilityVersion,
-          TenantIdMap<stdx::unordered_map<std::string, BSONObj>>>
-getFCVAndClusterParametersFromConfigServer() {
-    // Use an alternative client region, because we call refreshParameters both from the internal
-    // refresher process and from getClusterParameter.
-    auto altClient = getGlobalServiceContext()->makeClient("clusterParameterRefreshTransaction");
-    AlternativeClientRegion clientRegion(altClient);
-    auto opCtx = cc().makeOperationContext();
-    auto as = AuthorizationSession::get(cc());
-    as->grantInternalAuthorization(opCtx.get());
+StatusWith<TenantIdMap<stdx::unordered_map<std::string, BSONObj>>>
+getClusterParametersFromConfigServer(OperationContext* opCtx) {
+    // Attempt to retrieve cluster parameter documents from the config server.
+    // exhaustiveFindOnConfig makes up to 3 total attempts if it receives a retriable error before
+    // giving up.
+    LOGV2_DEBUG(6226404, 3, "Retrieving cluster server parameters from config server");
+    auto configServers = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+    auto swTenantIds = getTenantsWithConfigDbsOnShard(opCtx, configServers.get());
+    if (!swTenantIds.isOK()) {
+        return swTenantIds.getStatus();
+    }
+    auto tenantIds = std::move(swTenantIds.getValue());
 
-    auto configServers = Grid::get(opCtx.get())->shardRegistry()->getConfigShard();
-    // Note that we get the list of tenants outside of the transaction. This should be okay, as if
-    // we miss out on some new tenants created between this call and the transaction, we are just
-    // getting slightly old data. Importantly, different tenants' cluster parameters don't interact
-    // with each other, so we don't need a consistent snapshot of cluster parameters across all
-    // tenants, just a consistent snapshot per tenant.
-    auto tenantIds =
-        uassertStatusOK(getTenantsWithConfigDbsOnShard(opCtx.get(), configServers.get()));
+    TenantIdMap<stdx::unordered_map<std::string, BSONObj>> allDocs;
+    for (const auto& tenantId : tenantIds) {
+        auto swFindResponse = configServers->exhaustiveFindOnConfig(
+            opCtx,
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            repl::ReadConcernLevel::kMajorityReadConcern,
+            NamespaceString::makeClusterParametersNSS(tenantId),
+            BSONObj(),
+            BSONObj(),
+            boost::none);
 
-    auto allDocs = std::make_shared<TenantIdMap<stdx::unordered_map<std::string, BSONObj>>>();
-    auto fcv = std::make_shared<multiversion::FeatureCompatibilityVersion>();
-    auto doFetch = [allDocs, fcv, &tenantIds](const txn_api::TransactionClient& txnClient,
-                                              ExecutorPtr txnExec) {
-        FindCommandRequest findFCV{NamespaceString("admin.system.version")};
-        findFCV.setFilter(BSON("_id"
-                               << "featureCompatibilityVersion"));
-        return txnClient.exhaustiveFind(findFCV)
-            .thenRunOn(txnExec)
-            .then([fcv, allDocs, &tenantIds, &txnClient, txnExec](
-                      const std::vector<BSONObj>& foundDocs) {
-                uassert(7410710,
-                        "Expected to find FCV in admin.system.version but found nothing!",
-                        !foundDocs.empty());
-                *fcv = FeatureCompatibilityVersionParser::parseVersion(
-                    foundDocs[0]["version"].String());
+        // If the error is not retriable or persists beyond the max number of retry attempts, give
+        // up and throw an error.
+        if (!swFindResponse.isOK()) {
+            return swFindResponse.getStatus();
+        }
+        stdx::unordered_map<std::string, BSONObj> docsMap;
+        for (const auto& doc : swFindResponse.getValue().docs) {
+            auto name = doc["_id"].String();
+            docsMap.insert({std::move(name), doc});
+        }
+        allDocs.insert({std::move(tenantId), std::move(docsMap)});
+    }
 
-                // Fetch one tenant, then call doFetchTenants for the rest of the tenants within
-                // then() recursively.
-                auto doFetchTenants = [](auto it,
-                                         const auto& tenantIds,
-                                         auto allDocs,
-                                         const auto& txnClient,
-                                         ExecutorPtr txnExec,
-                                         auto& doFetchTenants_ref) mutable {
-                    if (it == tenantIds.end()) {
-                        return SemiFuture<void>::makeReady();
-                    }
-                    FindCommandRequest findClusterParametersTenant{
-                        NamespaceString::makeClusterParametersNSS(*it)};
-                    // We don't specify a filter as we want all documents.
-                    return txnClient.exhaustiveFind(findClusterParametersTenant)
-                        .thenRunOn(txnExec)
-                        .then([&doFetchTenants_ref, &txnClient, &tenantIds, txnExec, it, allDocs](
-                                  const std::vector<BSONObj>& foundDocs) {
-                            stdx::unordered_map<std::string, BSONObj> docsMap;
-                            for (const auto& doc : foundDocs) {
-                                auto name = doc["_id"].String();
-                                docsMap.insert({std::move(name), doc.getOwned()});
-                            }
-                            allDocs->insert({*it, std::move(docsMap)});
-                            return doFetchTenants_ref(std::next(it),
-                                                      tenantIds,
-                                                      allDocs,
-                                                      txnClient,
-                                                      txnExec,
-                                                      doFetchTenants_ref);
-                        })
-                        .semi();
-                };
-                return doFetchTenants(
-                    tenantIds.begin(), tenantIds, allDocs, txnClient, txnExec, doFetchTenants);
-            })
-            .semi();
-    };
-
-    repl::ReadConcernArgs::get(opCtx.get()) =
-        repl::ReadConcernArgs(repl::ReadConcernLevel::kSnapshotReadConcern);
-
-    // We need to commit w/ writeConcern = majority for readConcern = snapshot to work.
-    opCtx->setWriteConcern(WriteConcernOptions{WriteConcernOptions::kMajority,
-                                               WriteConcernOptions::SyncMode::UNSET,
-                                               WriteConcernOptions::kNoTimeout});
-
-    auto executor = Grid::get(opCtx.get())->getExecutorPool()->getFixedExecutor();
-    auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
-    auto sleepInlineExecutor = inlineExecutor->getSleepableExecutor(executor);
-    txn_api::SyncTransactionWithRetries txn(
-        opCtx.get(), sleepInlineExecutor, nullptr, inlineExecutor);
-    txn.run(opCtx.get(), doFetch);
-    return {*fcv, *allDocs};
+    return allDocs;
 }
 
 }  // namespace
@@ -181,56 +121,30 @@ void ClusterServerParameterRefresher::setPeriod(Milliseconds period) {
 }
 
 Status ClusterServerParameterRefresher::refreshParameters(OperationContext* opCtx) {
-    invariant(isMongos());
-    multiversion::FeatureCompatibilityVersion fcv;
-    TenantIdMap<stdx::unordered_map<std::string, BSONObj>> clusterParameterDocs;
-
-    try {
-        std::tie(fcv, clusterParameterDocs) = getFCVAndClusterParametersFromConfigServer();
-    } catch (const DBException& ex) {
-        LOGV2_WARNING(
-            7410719,
-            "Could not refresh cluster server parameters from config servers due to failure in "
-            "getFCVAndClusterParametersFromConfigServer. Will retry after refresh interval",
-            "ex"_attr = ex.toStatus());
-        return ex.toStatus();
+    // Query the config servers for all cluster parameter documents.
+    auto swClusterParameterDocs = getClusterParametersFromConfigServer(opCtx);
+    if (!swClusterParameterDocs.isOK()) {
+        LOGV2_WARNING(6226401,
+                      "Could not refresh cluster server parameters from config servers. Will retry "
+                      "after refresh interval elapses",
+                      "clusterServerParameterRefreshIntervalSecs"_attr = loadInterval(),
+                      "reason"_attr = swClusterParameterDocs.getStatus().reason());
+        return swClusterParameterDocs.getStatus();
     }
 
     // Set each in-memory cluster parameter that was returned in the response.
     bool isSuccessful = true;
     Status status = Status::OK();
     ServerParameterSet* clusterParameterCache = ServerParameterSet::getClusterParameterSet();
-    bool fcvChanged = fcv != _lastFcv;
-    if (fcvChanged) {
-        LOGV2_DEBUG(7410705,
-                    3,
-                    "Cluster's FCV was different from last during refresh",
-                    "oldFCV"_attr = multiversion::toString(_lastFcv),
-                    "newFCV"_attr = multiversion::toString(fcv));
-    }
+
+    auto clusterParameterDocs = std::move(swClusterParameterDocs.getValue());
     std::vector<BSONObj> allUpdatedParameters;
     allUpdatedParameters.reserve(clusterParameterDocs.size());
 
     for (const auto& [tenantId, tenantParamDocs] : clusterParameterDocs) {
         std::vector<BSONObj> updatedParameters;
         updatedParameters.reserve(tenantParamDocs.size());
-        for (auto [name, sp] : clusterParameterCache->getMap()) {
-            if (fcvChanged) {
-                // Use canBeEnabled because if we previously temporarily disabled the parameter,
-                // isEnabled will be false
-                if (sp->canBeEnabledOnVersion(_lastFcv) && !sp->canBeEnabledOnVersion(fcv)) {
-                    // Parameter is newly disabled on cluster
-                    LOGV2_DEBUG(
-                        7410703, 3, "Disabling parameter during refresh", "name"_attr = name);
-                    sp->disable(false /* permanent */);
-                    continue;
-                } else if (sp->canBeEnabledOnVersion(fcv) && !sp->canBeEnabledOnVersion(_lastFcv)) {
-                    // Parameter is newly enabled on cluster
-                    LOGV2_DEBUG(
-                        7410704, 3, "Enabling parameter during refresh", "name"_attr = name);
-                    sp->enable();
-                }
-            }
+        for (const auto& [name, sp] : clusterParameterCache->getMap()) {
             if (!sp->isEnabled()) {
                 continue;
             }
@@ -282,18 +196,12 @@ Status ClusterServerParameterRefresher::refreshParameters(OperationContext* opCt
                     "clusterParameterDocuments"_attr = allUpdatedParameters);
     }
 
-    _lastFcv = fcv;
-
     return status;
 }
 
 void ClusterServerParameterRefresher::start(ServiceContext* serviceCtx, OperationContext* opCtx) {
     auto refresher = std::make_unique<ClusterServerParameterRefresher>();
-    // On mongos, this should always be true after FCV initialization
-    // (Generic FCV reference):
-    invariant(serverGlobalParams.featureCompatibility.getVersion() ==
-              multiversion::GenericFCV::kLatest);
-    refresher->_lastFcv = serverGlobalParams.featureCompatibility.getVersion();
+
     auto periodicRunner = serviceCtx->getPeriodicRunner();
     invariant(periodicRunner);
 
@@ -310,10 +218,6 @@ void ClusterServerParameterRefresher::start(ServiceContext* serviceCtx, Operatio
 }
 
 void ClusterServerParameterRefresher::run() {
-    if (MONGO_unlikely(skipClusterParameterRefresh.shouldFail())) {
-        return;
-    }
-
     auto opCtx = cc().makeOperationContext();
     auto status = refreshParameters(opCtx.get());
     if (!status.isOK()) {

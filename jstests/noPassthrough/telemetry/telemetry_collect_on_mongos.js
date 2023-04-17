@@ -1,6 +1,6 @@
 /**
  * Test that mongos is collecting telemetry metrics.
- * @tags: [requires_fcv_70, featureFlagTelemetry]
+ * @tags: [featureFlagTelemetry]
  */
 
 load('jstests/libs/telemetry_utils.js');
@@ -21,7 +21,6 @@ const setup = () => {
         mongosOptions: {
             setParameter: {
                 internalQueryConfigureTelemetrySamplingRate: -1,
-                'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"
             }
         },
     });

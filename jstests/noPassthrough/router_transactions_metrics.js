@@ -1,7 +1,6 @@
 // Tests multi-statement transactions metrics in the serverStatus output from mongos in various
 // basic cases.
 // @tags: [
-//   requires_fcv_70,
 //   uses_multi_shard_transaction,
 //   uses_transactions,
 // ]
@@ -202,15 +201,7 @@ const dbName = "test";
 const collName = "foo";
 const ns = dbName + '.' + collName;
 
-const st = new ShardingTest({
-    shards: 2,
-    mongos: 2,
-    config: 1,
-    other: {
-        mongosOptions:
-            {setParameter: {'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"}}
-    }
-});
+const st = new ShardingTest({shards: 2, mongos: 2, config: 1});
 
 const session = st.s.startSession();
 const sessionDB = session.getDatabase(dbName);

@@ -1,5 +1,4 @@
 // @tags: [
-//   requires_fcv_70,
 //   requires_replication,
 //   requires_sharding,
 // ]
@@ -40,8 +39,6 @@ function Sharding(lifetime) {
             rs: true,
             rsOptions: {setParameter: {TransactionRecordMinimumLifetimeMinutes: lifetime}},
             rs0: {nodes: 1},
-            mongosOptions:
-                {setParameter: {'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"}}
         },
     });
 

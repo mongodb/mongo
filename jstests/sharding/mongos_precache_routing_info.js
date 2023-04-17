@@ -1,16 +1,8 @@
-// @tags: [requires_fcv_70]
-
 (function() {
 'use strict';
 
 // create
-var s = new ShardingTest({
-    shards: 2,
-    other: {
-        mongosOptions:
-            {setParameter: {'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"}}
-    }
-});
+var s = new ShardingTest({shards: 2});
 var db = s.getDB("test");
 var ss = db.serverStatus();
 
@@ -42,10 +34,7 @@ assert.eq(1, ss.shardingStatistics.catalogCache.countFullRefreshesStarted);
 // does not pre cache when set parameter is disabled
 s.restartMongos(0, {
     restart: true,
-    setParameter: {
-        loadRoutingTableOnStartup: false,
-        'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"
-    },
+    setParameter: {loadRoutingTableOnStartup: false},
 });
 db = s.getDB("test");
 

@@ -10,10 +10,7 @@ TestData.disableImplicitSessions = true;
 
 const st = new ShardingTest({
     shards: 1,
-    mongosOptions: {
-        setParameter:
-            {maxSessions: 1, 'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"}
-    },
+    mongosOptions: {setParameter: {maxSessions: 1}},
     // The config server uses a session for internal operations, so raise the limit by 1 for a
     // catalog shard.
     shardOptions: {setParameter: {maxSessions: TestData.catalogShard ? 2 : 1}}

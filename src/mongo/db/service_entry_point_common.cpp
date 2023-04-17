@@ -1511,8 +1511,7 @@ void ExecCommandDatabase::_initiateCommand() {
 
     const auto allowTransactionsOnConfigDatabase =
         (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) ||
-         serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) ||
-        client->isFromSystemConnection();
+         serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
 
     const auto invocationNss = _invocation->ns();
 

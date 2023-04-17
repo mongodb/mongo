@@ -42,11 +42,7 @@ const stParams = {
     name: jsTestName(),
     keyFile: key,
     shards: 3,
-    rs: {nodes: 1, setParameter: {internalQueryExecYieldIterations: 1}},
-    other: {
-        mongosOptions:
-            {setParameter: {'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"}}
-    }
+    rs: {nodes: 1, setParameter: {internalQueryExecYieldIterations: 1}}
 };
 
 // Create a new sharded cluster for testing. We set the internalQueryExecYieldIterations

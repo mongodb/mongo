@@ -1,6 +1,5 @@
 /**
  * Test that $telemetry properly redacts find commands, on mongod and mongos.
- * @tags: [requires_fcv_70]
  */
 load("jstests/libs/telemetry_utils.js");
 (function() {
@@ -56,7 +55,6 @@ const st = new ShardingTest({
         setParameter: {
             internalQueryConfigureTelemetrySamplingRate: -1,
             featureFlagTelemetry: true,
-            'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"
         }
     },
 });

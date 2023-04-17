@@ -128,11 +128,8 @@ function runTest(st, startupRefreshIntervalMS) {
     [st.configRS, ...st._rs.map(rs => rs.test)].forEach(rs => {
         assert(rs.getPrimary().getDB('config').clusterParameters.drop());
     });
-
-    // Perform a dummy write in order to get the config shard's cluster time cached on the mongos.
-    st.s.getDB('config').abc.insert({a: "hello"});
-
     expectedParams = {};
+
     assertParams(startupRefreshIntervalRelaxedMS);
 }
 

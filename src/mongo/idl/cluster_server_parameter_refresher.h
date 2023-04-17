@@ -67,7 +67,6 @@ private:
     void run();
 
     std::unique_ptr<PeriodicJobAnchor> _job;
-    multiversion::FeatureCompatibilityVersion _lastFcv;
 };
 
 Status clusterServerParameterRefreshIntervalSecsNotify(const int& newValue);

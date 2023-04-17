@@ -586,7 +586,7 @@ void ParseAndRunCommand::_parseCommand() {
                                                 command->attachLogicalSessionsToOpCtx(),
                                                 true));
 
-    auto allowTransactionsOnConfigDatabase = !isMongos() || client->isFromSystemConnection();
+    auto allowTransactionsOnConfigDatabase = !isMongos();
     validateSessionOptions(*_osi, command->getName(), nss, allowTransactionsOnConfigDatabase);
 
     _wc.emplace(uassertStatusOK(WriteConcernOptions::extractWCFromCommand(request.body)));

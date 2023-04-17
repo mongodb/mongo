@@ -218,31 +218,11 @@ public:
         _redact = true;
     }
 
-private:
-    enum DisableState { Enabled = 0, TemporarilyDisabled = 1, PermanentlyDisabled = 2 };
-
-public:
-    void disable(bool permanent) {
-        if (_disableState != DisableState::PermanentlyDisabled) {
-            _disableState =
-                permanent ? DisableState::PermanentlyDisabled : DisableState::TemporarilyDisabled;
-        }
-    }
-
-    void enable() {
-        if (_disableState == DisableState::TemporarilyDisabled) {
-            _disableState = DisableState::Enabled;
-        }
-    }
-
     bool isEnabled() const;
 
-    // Return whether this server parameter would be enabled with the given FCV
-    bool isEnabledOnVersion(const multiversion::FeatureCompatibilityVersion& targetFCV) const;
-
-    // Return whether this server parameter is compatible with the given FCV, regardless of if it is
-    // temporarily disabled
-    bool canBeEnabledOnVersion(const multiversion::FeatureCompatibilityVersion& targetFCV) const;
+    // Return whether this server parameter is compatible with the given FCV.
+    virtual bool isEnabledOnVersion(
+        const multiversion::FeatureCompatibilityVersion& targetFCV) const;
 
     void setFeatureFlag(FeatureFlag* featureFlag) {
         _featureFlag = featureFlag;
@@ -253,9 +233,6 @@ public:
     }
 
 protected:
-    virtual bool _isEnabledOnVersion(
-        const multiversion::FeatureCompatibilityVersion& targetFCV) const;
-
     bool featureFlagIsDisabledOnVersion(
         const multiversion::FeatureCompatibilityVersion& targetFCV) const;
 
@@ -274,11 +251,6 @@ private:
     ServerParameterType _type;
     bool _testOnly = false;
     bool _redact = false;
-
-    // Tracks whether a parameter is enabled, temporarily disabled, or permanently disabled. This is
-    // used when disabling (permanently) test-only parameters, and when enabling/disabling
-    // (temporarily) cluster parameters on the mongos based on the cluster's FCV.
-    DisableState _disableState = DisableState::Enabled;
 };
 
 class ServerParameterSet {
