@@ -59,6 +59,8 @@ public:
 
     static ResolvedView fromBSON(const BSONObj& commandResponseObj);
 
+    void handleTimeseriesRewrites(std::vector<BSONObj>* resolvedPipeline) const;
+
     /**
      * Convert an aggregation command on a view to the equivalent command against the view's
      * underlying collection.
@@ -91,12 +93,12 @@ private:
     NamespaceString _namespace;
     std::vector<BSONObj> _pipeline;
 
-    // The default collation associated with this view. An empty object means that the default is
-    // the simple collation.
+    // The default collation associated with this view. An empty object means that the default
+    // is the simple collation.
     //
     // Currently all operations which run over a view must use the default collation. This means
-    // that operations on the view which do not specify a collation inherit the default. Operations
-    // on the view which specify any other collation fail with a user error.
+    // that operations on the view which do not specify a collation inherit the default.
+    // Operations on the view which specify any other collation fail with a user error.
     BSONObj _defaultCollation;
 
     boost::optional<TimeseriesOptions> _timeseriesOptions;

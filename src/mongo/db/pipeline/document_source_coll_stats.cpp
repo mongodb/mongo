@@ -90,8 +90,11 @@ BSONObj DocumentSourceCollStats::makeStatsForNs(
     builder.appendDate("localTime", jsTime());
 
     if (auto latencyStatsSpec = spec.getLatencyStats()) {
+        // getRequestOnTimeseriesView is set to true if collstats is called on the view.
+        auto resolvedNss =
+            spec.getRequestOnTimeseriesView() ? nss.getTimeseriesViewNamespace() : nss;
         expCtx->mongoProcessInterface->appendLatencyStats(
-            expCtx->opCtx, nss, latencyStatsSpec->getHistograms(), &builder);
+            expCtx->opCtx, resolvedNss, latencyStatsSpec->getHistograms(), &builder);
     }
 
     if (auto storageStats = spec.getStorageStats()) {
