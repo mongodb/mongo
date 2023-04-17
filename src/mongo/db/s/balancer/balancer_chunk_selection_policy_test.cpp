@@ -448,9 +448,13 @@ TEST_F(BalancerChunkSelectionTest, AllImbalancedCollectionsShouldEventuallyBeSel
     // Set up database
     setUpDatabase(kDbName, kShardId0);
 
-    // Set up N imbalanced collections (more than `kStatsForBalancingBatchSize`)
-    const int numCollections = 60;
-    const int maxIterations = 3000;
+    // Override collections batch size to 4 for speeding up the test
+    FailPointEnableBlock overrideBatchSizeGuard("overrideStatsForBalancingBatchSize",
+                                                BSON("size" << 4));
+
+    // Set up 7 imbalanced collections (more than `kStatsForBalancingBatchSize`)
+    const int numCollections = 7;
+    const int maxIterations = 1000;
 
     for (auto i = 0; i < numCollections; ++i) {
         const std::string collName = "TestColl" + std::to_string(i);
@@ -524,8 +528,8 @@ TEST_F(BalancerChunkSelectionTest, SelectedCollectionsShouldBeCached) {
     // Set up database
     setUpDatabase(kDbName, kShardId0);
 
-    // Set up 10 collections
-    const int numCollections = 10;
+    // Set up 4 collections
+    const int numCollections = 4;
     for (auto i = 0; i < numCollections; ++i) {
         const std::string collName = "TestColl" + std::to_string(i);
         setUpCollectionWithChunks(NamespaceString(kDbName, collName),
@@ -594,8 +598,8 @@ TEST_F(BalancerChunkSelectionTest, CachedCollectionsShouldBeSelected) {
     _imbalancedCollectionsCache.clear();
     std::vector<NamespaceString> allCollections;
 
-    // Set up 10 collections and add all them into the imbalanced collections cache
-    const int numCollections = 10;
+    // Set up 4 collections and add all them into the imbalanced collections cache
+    const int numCollections = 4;
     for (auto i = 0; i < numCollections; ++i) {
         NamespaceString nss(kDbName, "TestColl" + std::to_string(i));
         allCollections.push_back(nss);
@@ -674,8 +678,12 @@ TEST_F(BalancerChunkSelectionTest, MaxTimeToScheduleBalancingOperationsExceeded)
     // Set up database
     setUpDatabase(kDbName, kShardId0);
 
-    // Set up 160 collections to process more than 1 batch
-    for (auto i = 0U; i < 160; ++i) {
+    // Override collections batch size to 4 for speeding up the test
+    FailPointEnableBlock overrideBatchSizeGuard("overrideStatsForBalancingBatchSize",
+                                                BSON("size" << 4));
+
+    // Set up 5 collections to process more than 1 batch
+    for (auto i = 0U; i < 5; ++i) {
         NamespaceString ns{kDbName, "coll" + std::to_string(i)};
         setUpCollectionWithChunks(
             ns, generateDefaultChunkRanges({kShardId0, kShardId1, kShardId2, kShardId3}));
@@ -746,8 +754,12 @@ TEST_F(BalancerChunkSelectionTest, MakeSureMoreThanOneBatchIsProcessedIfNeeded) 
     // Set up database
     setUpDatabase(kDbName, kShardId0);
 
-    // Set up 160 collections to process 2 batches
-    for (auto i = 0; i < 160; ++i) {
+    // Override collections batch size to 4 for speeding up the test
+    FailPointEnableBlock overrideBatchSizeGuard("overrideStatsForBalancingBatchSize",
+                                                BSON("size" << 4));
+
+    // Set up 5 collections to process 2 batches
+    for (auto i = 0; i < 5; ++i) {
         NamespaceString ns{kDbName, "coll" + std::to_string(i)};
         setUpCollectionWithChunks(
             ns, generateDefaultChunkRanges({kShardId0, kShardId1, kShardId2, kShardId3}));
