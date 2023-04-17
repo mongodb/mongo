@@ -355,7 +355,7 @@ roles:
                   - getChangeStreamState
                   - telemetryRead
                   - checkMetadataConsistency
-                  - transitionToCatalogShard
+                  - transitionFromDedicatedConfigServer
                   - transitionToDedicatedConfigServer
 
             - matchType: any_normal

@@ -377,9 +377,9 @@ public:
                 const auto fcvChangeRegion(
                     FeatureCompatibilityVersion::enterFCVChangeRegion(opCtx));
 
-                // If catalogShard is enabled and there is an entry in config.shards with _id:
-                // ShardId::kConfigServerId then the config server is a catalog shard.
-                auto isCatalogShard =
+                // If configShard is enabled and there is an entry in config.shards with _id:
+                // ShardId::kConfigServerId then the config server is a config shard.
+                auto isConfigShard =
                     serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
                     serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) &&
                     !ShardingCatalogManager::get(opCtx)
@@ -390,11 +390,11 @@ public:
 
                 uassert(ErrorCodes::CannotDowngrade,
                         "Cannot downgrade featureCompatibilityVersion to {} "
-                        "with a catalog shard as it is not supported in earlier versions. "
+                        "with a config shard as it is not supported in earlier versions. "
                         "Please transition the config server to dedicated mode using the "
                         "transitionToDedicatedConfigServer command."_format(
                             multiversion::toString(requestedVersion)),
-                        !isCatalogShard ||
+                        !isConfigShard ||
                             gFeatureFlagCatalogShard.isEnabledOnVersion(requestedVersion));
 
                 uassert(ErrorCodes::Error(6744303),

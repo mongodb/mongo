@@ -66,7 +66,7 @@ function countNodes() {
 assert.eq(2, countNodes(), "A1");
 
 var rs = s.rs0;
-if (!TestData.catalogShard) {
+if (!TestData.configShard) {
     rs.add({'shardsvr': ""});
 } else {
     rs.add({'configsvr': ""});

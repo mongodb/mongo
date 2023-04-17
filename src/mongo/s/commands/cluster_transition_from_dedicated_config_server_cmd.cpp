@@ -32,7 +32,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/request_types/transition_to_catalog_shard_gen.h"
+#include "mongo/s/request_types/transition_from_dedicated_config_server_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -41,12 +41,13 @@ namespace {
 
 const ReadPreferenceSetting kPrimaryOnlyReadPreference{ReadPreference::PrimaryOnly};
 
-class TransitionToCatalogShardCommand : public TypedCommand<TransitionToCatalogShardCommand> {
+class TransitionFromDedicatedConfigServerCommand
+    : public TypedCommand<TransitionFromDedicatedConfigServerCommand> {
 public:
-    using Request = TransitionToCatalogShard;
+    using Request = TransitionFromDedicatedConfigServer;
 
     std::string help() const override {
-        return "transition from dedicated config server to catalog shard";
+        return "transition from dedicated config server to config shard";
     }
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
@@ -63,10 +64,10 @@ public:
 
         void typedRun(OperationContext* opCtx) {
             uassert(7467201,
-                    "The catalog shard feature is disabled",
+                    "The config shard feature is disabled",
                     gFeatureFlagCatalogShard.isEnabled(serverGlobalParams.featureCompatibility));
 
-            ConfigsvrTransitionToCatalogShard cmdToSend;
+            ConfigsvrTransitionFromDedicatedConfigServer cmdToSend;
             cmdToSend.setDbName(DatabaseName::kAdmin);
 
             auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
@@ -99,13 +100,14 @@ public:
             uassert(ErrorCodes::Unauthorized,
                     "Unauthorized",
                     AuthorizationSession::get(opCtx->getClient())
-                        ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                           ActionType::transitionToCatalogShard));
+                        ->isAuthorizedForActionsOnResource(
+                            ResourcePattern::forClusterResource(),
+                            ActionType::transitionFromDedicatedConfigServer));
         }
     };
 };
 
-MONGO_REGISTER_FEATURE_FLAGGED_COMMAND(TransitionToCatalogShardCommand,
+MONGO_REGISTER_FEATURE_FLAGGED_COMMAND(TransitionFromDedicatedConfigServerCommand,
                                        gFeatureFlagTransitionToCatalogShard);
 
 }  // namespace

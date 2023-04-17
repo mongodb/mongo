@@ -191,7 +191,7 @@ enums:
            top :  "top"
            touch :  "touch"
            trafficRecord :  "trafficRecord"
-           transitionToCatalogShard : "transitionToCatalogShard"
+           transitionFromDedicatedConfigServer : "transitionFromDedicatedConfigServer"
            transitionToDedicatedConfigServer : "transitionToDedicatedConfigServer"
            unlock :  "unlock"
            useTenant : "useTenant"

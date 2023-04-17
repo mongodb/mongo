@@ -76,6 +76,7 @@
 "use strict";
 
 load('jstests/sharding/libs/last_lts_mongod_commands.js');
+load('jstests/sharding/libs/last_lts_mongos_commands.js');
 
 // Pre-written reasons for skipping a test.
 const isAnInternalCommand = "internal command";
@@ -127,7 +128,7 @@ let viewsCommandTests = {
     _configsvrSetAllowMigrations: {skip: isAnInternalCommand},
     _configsvrSetClusterParameter: {skip: isAnInternalCommand},
     _configsvrSetUserWriteBlockMode: {skip: isAnInternalCommand},
-    _configsvrTransitionToCatalogShard: {skip: isAnInternalCommand},
+    _configsvrTransitionFromDedicatedConfigServer: {skip: isAnInternalCommand},
     _configsvrTransitionToDedicatedConfigServer: {skip: isAnInternalCommand},
     _configsvrUpdateZoneKeyRange: {skip: isAnInternalCommand},
     _flushDatabaseCacheUpdates: {skip: isUnrelated},
@@ -726,7 +727,7 @@ let viewsCommandTests = {
     testVersion2: {skip: isAnInternalCommand},
     testVersions1And2: {skip: isAnInternalCommand},
     top: {skip: "tested in views/views_stats.js"},
-    transitionToCatalogShard: {skip: isUnrelated},
+    transitionFromDedicatedConfigServer: {skip: isUnrelated},
     transitionToDedicatedConfigServer: {skip: isUnrelated},
     update: {command: {update: "view", updates: [{q: {x: 1}, u: {x: 2}}]}, expectFailure: true},
     updateRole: {
@@ -761,6 +762,10 @@ let viewsCommandTests = {
 };
 
 commandsRemovedFromMongodSinceLastLTS.forEach(function(cmd) {
+    viewsCommandTests[cmd] = {skip: "must define test coverage for backwards compatibility"};
+});
+
+commandsRemovedFromMongosSinceLastLTS.forEach(function(cmd) {
     viewsCommandTests[cmd] = {skip: "must define test coverage for backwards compatibility"};
 });
 

@@ -813,4 +813,10 @@ last-lts:
     ticket: SERVER-73482
   - test_file: jstests/core/command_let_variables.js
     ticket: SERVER-75356
+  - test_file: jstests/sharding/invalid_shard_identity_doc.js
+    ticket: SERVER-76310
+  - test_file: jstests/sharding/auth_catalog_shard_localhost_exception.js
+    ticket: SERVER-76310
+  - test_file: jstests/sharding/catalog_shard_mongos_ops_on_config_and_admin.js
+    ticket: SERVER-76310
   suites: null

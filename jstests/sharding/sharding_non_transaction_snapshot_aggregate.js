@@ -41,7 +41,7 @@ const st = new ShardingTest({
         rs2: {nodes: 2},
     },
     mongos: 1,
-    config: TestData.catalogShard ? undefined : 1,
+    config: TestData.configShard ? undefined : 1,
     other: {configOptions: nodeOptions, rsOptions: nodeOptions}
 });
 // Config sharded collections.

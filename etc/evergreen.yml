@@ -1285,24 +1285,23 @@ buildvariants:
   - name: streams
   - name: telemetry_passthrough
 
-# This build variant is used to test suites that use sharded cluster fixture with catalog
-# shard mode.
-# TODO (SERVER-75884): Remove this once we switch to catalog shard as the default.
-- &enterprise-rhel-80-64-bit-dynamic-catalog-shard
+# This build variant is used to test suites that use sharded cluster fixture with config shard mode.
+# TODO (SERVER-75884): Remove this once we switch to config shard as the default.
+- &enterprise-rhel-80-64-bit-dynamic-config-shard
   <<: *linux_x86_dynamic_compile_variant_dependency
-  name: enterprise-rhel-80-64-bit-dynamic-catalog-shard
-  display_name: "* Shared Library Enterprise RHEL 8.0 (Catalog Shard)"
+  name: enterprise-rhel-80-64-bit-dynamic-config-shard
+  display_name: "* Shared Library Enterprise RHEL 8.0 (Config Shard)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
   run_on:
   - rhel80-small
   stepback: false
-  expansions: &enterprise-rhel-80-64-bit-dynamic-catalog-shard-expansions
+  expansions: &enterprise-rhel-80-64-bit-dynamic-config-shard-expansions
     <<: *enterprise-rhel-80-64-bit-dynamic-expansions
     test_flags: >-
-      --catalogShard=any
-      --excludeWithAnyTags=catalog_shard_incompatible
+      --configShard=any
+      --excludeWithAnyTags=config_shard_incompatible
   tasks:
   - name: aggregation_mongos_passthrough
   - name: aggregation_one_shard_sharded_collections
@@ -1327,10 +1326,11 @@ buildvariants:
   - name: sharding_auth_gen
   # Explicitly include instead of using tags to avoid pulling in replica_sets_multiversion_gen. This
   # variant will be removed when config shards become the default, so this is only temporary.
-  - name: sharding_multiversion_gen
+  # TODO SERVER-76444: Enable after 7.0 picks up the new config shard terminology
+  # - name: sharding_multiversion_gen
   - name: .sharding .txns
   # Skip csrs stepdown suite because most tests can't handle the first shard stepping down.
-  - name: .sharding .common !.csrs
+  - name: .sharding .common !.csrs !.multiversion
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   # - name: .concurrency .sharded !.large
   # - name: .concurrency .sharded .large

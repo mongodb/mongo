@@ -11,7 +11,7 @@
  *   # Requires all nodes to be running the latest binary.
  *   multiversion_incompatible,
  *   # TODO (SERVER-75391) Re-enable this test.
- *   catalog_shard_incompatible,
+ *   config_shard_incompatible,
  *  ]
  */
 

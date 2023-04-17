@@ -81,10 +81,10 @@ public:
              BSONObjBuilder& result) override {
         // (Ignore FCV check): TODO(SERVER-75389): add why FCV is ignored here.
         uassert(7368401,
-                "The transition to catalog shard feature is disabled",
+                "The transition to config shard feature is disabled",
                 gFeatureFlagTransitionToCatalogShard.isEnabledAndIgnoreFCVUnsafe());
         uassert(7467200,
-                "The catalog shard feature is disabled",
+                "The config shard feature is disabled",
                 gFeatureFlagCatalogShard.isEnabled(serverGlobalParams.featureCompatibility));
 
         auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();

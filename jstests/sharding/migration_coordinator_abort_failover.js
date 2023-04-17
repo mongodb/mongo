@@ -5,7 +5,7 @@
  * Assumes a donor stepdown will trigger a failover migration response, but if donor is catalog
  * shard, it will trigger a full retry from mongos, which leads to a successful retry despite the
  * original interrupted attempt correctly failing.
- * @tags: [catalog_shard_incompatible]
+ * @tags: [config_shard_incompatible]
  */
 
 // This test induces failovers on shards.

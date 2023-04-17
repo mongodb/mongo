@@ -45,7 +45,7 @@ function shardingTestUsingObjects() {
 
     assert(s0.commandLine.hasOwnProperty("vvvvvv"));
     assert(s1.commandLine.hasOwnProperty("vvvvv"));
-    if (!TestData.catalogShard) {
+    if (!TestData.configShard) {
         assert(c0.commandLine.hasOwnProperty("vvvv"));
     } else {
         // Same as shard 1.
@@ -86,7 +86,7 @@ function shardingTestUsingArrays() {
 
     assert(s0.commandLine.hasOwnProperty("vvvvv"));
     assert(s1.commandLine.hasOwnProperty("vvvv"));
-    if (!TestData.catalogShard) {
+    if (!TestData.configShard) {
         assert(c0.commandLine.hasOwnProperty("vvv"));
     } else {
         // Same as shard 1.

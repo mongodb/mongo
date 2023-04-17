@@ -80,7 +80,7 @@ selector:
   - cannot_create_unique_index_when_using_hashed_shard_key
   # system.profile collection doesn't exist on mongos.
   - requires_profiling
-  - catalog_shard_incompatible
+  - config_shard_incompatible
 
 executor:
   archive:
@@ -97,7 +97,7 @@ executor:
     n: 20
   fixture:
     class: ShardedClusterFixture
-    catalog_shard: "any"
+    config_shard: "any"
     num_shards: 2
     enable_balancer: false
     mongos_options:

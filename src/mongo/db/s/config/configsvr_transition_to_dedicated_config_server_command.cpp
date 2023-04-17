@@ -44,7 +44,7 @@ namespace mongo {
 namespace {
 
 /**
- * Internal sharding command run on config servers for transitioning from catalog shard to
+ * Internal sharding command run on config servers for transitioning from config shard to
  * dedicated config server.
  */
 class ConfigSvrTransitionToDedicatedConfigCommand : public BasicCommand {
@@ -91,10 +91,10 @@ public:
              BSONObjBuilder& result) override {
         // (Ignore FCV check): TODO(SERVER-75389): add why FCV is ignored here.
         uassert(7368402,
-                "The transition to catalog shard feature is disabled",
+                "The transition to config shard feature is disabled",
                 gFeatureFlagTransitionToCatalogShard.isEnabledAndIgnoreFCVUnsafe());
         uassert(7467203,
-                "The catalog shard feature is disabled",
+                "The config shard feature is disabled",
                 gFeatureFlagCatalogShard.isEnabled(serverGlobalParams.featureCompatibility));
 
         uassert(ErrorCodes::IllegalOperation,

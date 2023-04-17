@@ -3,7 +3,7 @@
  *
  * Incompatible because it makes assertions about the specific number of connections used, which
  * don't account for background activity on a config server.
- * @tags: [requires_fcv_63, catalog_shard_incompatible]
+ * @tags: [requires_fcv_63, config_shard_incompatible]
  */
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/conn_pool_helpers.js");

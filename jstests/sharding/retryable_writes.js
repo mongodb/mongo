@@ -36,7 +36,7 @@ function verifyServerStatusChanges(
 function runTests(mainConn, priConn) {
     var lsid = UUID();
 
-    if (TestData.catalogShard) {
+    if (TestData.configShard) {
         // Creating a collection updates counters on the config server, so do that before getting
         // the initial stats.
         assert.commandWorked(mainConn.getDB("test").createCollection("user"));
@@ -329,7 +329,7 @@ function runFailpointTests(mainConn, priConn) {
     var lsid = UUID();
     var testDb = mainConn.getDB('TestDB');
 
-    if (TestData.catalogShard) {
+    if (TestData.configShard) {
         // TODO SERVER-75821: Workaround for crash when executing the fail point while implicitly
         // creating a collection in a transaction on the config server.
         assert.commandWorked(testDb.createCollection("user"));

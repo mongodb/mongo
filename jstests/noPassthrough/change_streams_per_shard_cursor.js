@@ -7,7 +7,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/catalog_shard_util.js");
+load("jstests/libs/config_shard_util.js");
 
 const dbName = jsTestName();
 const setupShardedCluster = (shards = 1) => {
@@ -83,8 +83,8 @@ assert.commandFailedWithCode(
 assert.commandFailedWithCode(assert.throws(() => pscWatch(sdb, "coll", 42)),
                                           ErrorCodes.TypeMismatch);
 
-const isCatalogShardEnabled = CatalogShardUtil.isEnabledIgnoringFCV(st);
-if (!isCatalogShardEnabled) {
+const isConfigShardEnabled = ConfigShardUtil.isEnabledIgnoringFCV(st);
+if (!isConfigShardEnabled) {
     // Can't open a per shard cursor on the config RS.
     assert.commandFailedWithCode(assert.throws(() => pscWatch(sdb, "coll", "config")), 6273803);
 }
@@ -109,7 +109,7 @@ for (let i = 1; i <= 4; i++) {
 }
 assert(!c.hasNext());
 
-if (isCatalogShardEnabled) {
+if (isConfigShardEnabled) {
     // Can open a per shard cursor on the config server.
     const configDB = st.s0.getDB("config");
     c = pscWatch(configDB, "coll", "config", undefined /* options */, {allowToRunOnConfigDB: true});

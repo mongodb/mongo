@@ -72,7 +72,7 @@ const allCommands = {
     _configsvrSetAllowMigrations: {skip: isAnInternalCommand},
     _configsvrSetClusterParameter: {skip: isAnInternalCommand},
     _configsvrSetUserWriteBlockMode: {skip: isAnInternalCommand},
-    _configsvrTransitionToCatalogShard: {skip: isAnInternalCommand},
+    _configsvrTransitionFromDedicatedConfigServer: {skip: isAnInternalCommand},
     _configsvrTransitionToDedicatedConfigServer: {skip: isAnInternalCommand},
     _configsvrUpdateZoneKeyRange: {skip: isAnInternalCommand},
     _flushDatabaseCacheUpdates: {skip: isAnInternalCommand},
@@ -1541,12 +1541,12 @@ const allCommands = {
         isAdminCommand: true,
         doesNotRunOnMongos: true,
     },
-    transitionToCatalogShard: {
+    transitionFromDedicatedConfigServer: {
         // TODO SERVER-74867: Remove the skip once 7.0 is lastLTS.
         skip: commandIsDisabledOnLastLTS,
         // TODO SERVER-66060: Remove check when this feature flag is removed.
         checkFeatureFlag: "CatalogShard",
-        command: {transitionToCatalogShard: 1},
+        command: {transitionFromDedicatedConfigServer: 1},
         isShardedOnly: true,
         isAdminCommand: true,
     },

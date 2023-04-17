@@ -600,10 +600,10 @@ var Cluster = function(options) {
     };
 
     /*
-     * Returns true if this cluster has a catalog shard.
-     * Catalog shard always have shard ID equal to "config".
+     * Returns true if this cluster has a config shard.
+     * Config shard always have shard ID equal to "config".
      */
-    this.hasCatalogShard = function hasCatalogShard() {
+    this.hasConfigShard = function hasConfigShard() {
         if (!this.isSharded()) {
             return false;
         }

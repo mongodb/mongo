@@ -11,7 +11,7 @@ let MongosAPIParametersUtil = (function() {
     load('jstests/sharding/libs/remove_shard_util.js');
     load('jstests/sharding/libs/sharded_transactions_helpers.js');
     load('jstests/libs/auto_retry_transaction_in_sharding.js');
-    load('jstests/libs/catalog_shard_util.js');
+    load('jstests/libs/config_shard_util.js');
 
     // TODO SERVER-50144 Remove this and allow orphan checking.
     // This test calls removeShard which can leave docs in config.rangeDeletions in state "pending",
@@ -90,7 +90,7 @@ let MongosAPIParametersUtil = (function() {
     function awaitTransitionToDedicatedConfigServer() {
         assert.commandWorked(st.startBalancer());
         st.awaitBalancerRound();
-        CatalogShardUtil.transitionToDedicatedConfigServer(st);
+        ConfigShardUtil.transitionToDedicatedConfigServer(st);
         assert.commandWorked(st.stopBalancer());
     }
 
@@ -163,11 +163,11 @@ let MongosAPIParametersUtil = (function() {
             }
         },
         {
-            commandName: "transitionToCatalogShard",
+            commandName: "transitionFromDedicatedConfigServer",
             run: {
                 inAPIVersion1: false,
                 runsAgainstAdminDb: true,
-                configServerCommandName: "_configsvrTransitionToCatalogShard",
+                configServerCommandName: "_configsvrTransitionFromDedicatedConfigServer",
                 permittedInTxn: false,
                 requiresCatalogShardEnabled: true,
                 setUp: () => {
@@ -175,7 +175,7 @@ let MongosAPIParametersUtil = (function() {
                     assert.commandWorked(st.s0.getDB("db").dropDatabase());
                     awaitTransitionToDedicatedConfigServer();
                 },
-                command: () => ({transitionToCatalogShard: 1})
+                command: () => ({transitionFromDedicatedConfigServer: 1})
             }
         },
         {
@@ -1068,7 +1068,7 @@ let MongosAPIParametersUtil = (function() {
                     // Wait for the shard to be removed completely before re-adding it.
                     awaitTransitionToDedicatedConfigServer(st.shard0.shardName);
                     assert.commandWorked(
-                        st.s0.getDB("admin").runCommand({transitionToCatalogShard: 1}));
+                        st.s0.getDB("admin").runCommand({transitionFromDedicatedConfigServer: 1}));
                 }
             }
         },
@@ -1458,8 +1458,8 @@ let MongosAPIParametersUtil = (function() {
         assert.commandWorked(st.rs0.getPrimary().adminCommand({serverStatus: 1}))
             .storageEngine.supportsCommittedReads;
 
-    const isCatalogShardEnabled = CatalogShardUtil.isEnabledIgnoringFCV(st) &&
-        CatalogShardUtil.isTransitionEnabledIgnoringFCV(st);
+    const isConfigShardEnabled = ConfigShardUtil.isEnabledIgnoringFCV(st) &&
+        ConfigShardUtil.isTransitionEnabledIgnoringFCV(st);
 
     (() => {
         // Validate test cases for all commands. Ensure there is at least one test case for every
@@ -1575,7 +1575,7 @@ let MongosAPIParametersUtil = (function() {
                     if (!supportsCommittedReads && runOrExplain.requiresCommittedReads)
                         continue;
 
-                    if (!isCatalogShardEnabled && runOrExplain.requiresCatalogShardEnabled)
+                    if (!isConfigShardEnabled && runOrExplain.requiresCatalogShardEnabled)
                         continue;
 
                     if (apiParameters.apiStrict && !runOrExplain.inAPIVersion1)

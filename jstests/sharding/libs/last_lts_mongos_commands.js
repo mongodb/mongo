@@ -10,6 +10,7 @@ const commandsRemovedFromMongosSinceLastLTS = [
     "getLastError",
     "getnonce",
     "driverOIDTest",
+    "transitionToCatalogShard",
 ];
 // These commands were added in mongos since the last LTS version, so will not appear in the
 // listCommands output of a last LTS version mongos. We will allow these commands to have a test
@@ -50,7 +51,7 @@ const commandsAddedToMongosSinceLastLTS = [
     "testRemoval",
     "testVersions1And2",
     "testVersion2",
-    "transitionToCatalogShard",
+    "transitionFromDedicatedConfigServer",
     "transitionToDedicatedConfigServer",
     "updateSearchIndex",
 ];

@@ -704,7 +704,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     WaitForMajorityService::get(serviceContext).startup(serviceContext);
 
     if (!serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
-        // A catalog shard initializes sharding awareness after setting up its config server state.
+        // A config shard initializes sharding awareness after setting up its config server state.
 
         // This function may take the global lock.
         initializeShardingAwarenessIfNeededAndLoadGlobalSettings(startupOpCtx.get());

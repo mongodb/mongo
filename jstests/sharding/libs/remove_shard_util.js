@@ -5,7 +5,7 @@ function removeShard(st, shardName, timeout) {
 
     assert.soon(function() {
         let res;
-        if (TestData.catalogShard && shardName == "config") {
+        if (TestData.configShard && shardName == "config") {
             // Need to use transitionToDedicatedConfigServer if trying
             // to remove config server as a shard
             res = st.s.adminCommand({transitionToDedicatedConfigServer: shardName});

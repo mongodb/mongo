@@ -15,8 +15,8 @@ const st = new ShardingTest({
             {maxSessions: 1, 'failpoint.skipClusterParameterRefresh': "{'mode':'alwaysOn'}"}
     },
     // The config server uses a session for internal operations, so raise the limit by 1 for a
-    // catalog shard.
-    shardOptions: {setParameter: {maxSessions: TestData.catalogShard ? 2 : 1}}
+    // config shard.
+    shardOptions: {setParameter: {maxSessions: TestData.configShard ? 2 : 1}}
 });
 const shard0Primary = st.rs0.getPrimary();
 

@@ -96,7 +96,7 @@ assert.commandWorked(mongos.adminCommand({enableSharding: dbName}));
     st.shard0.adminCommand(
         {_flushRoutingTableCacheUpdates: collA.getFullName(), syncFromConfig: true});
 
-    if (TestData.catalogShard) {
+    if (TestData.configShard) {
         // Refining a shard key runs a "noop" find on the refined namespace, which runs locally on
         // the config server without a shard version, so it generates a plan key cache on collA that
         // is not cleared.

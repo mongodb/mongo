@@ -1,5 +1,5 @@
 // Requires no shards.
-// @tags: [catalog_shard_incompatible]
+// @tags: [config_shard_incompatible]
 (function() {
 'use strict';
 

@@ -8,7 +8,7 @@
 TestData.skipCheckMetadataConsistency = true;
 
 (() => {
-    load("jstests/libs/catalog_shard_util.js");
+    load("jstests/libs/config_shard_util.js");
 
     function sortByName(a, b) {
         if (a.name < b.name)
@@ -166,9 +166,9 @@ TestData.skipCheckMetadataConsistency = true;
     }),
                                  ErrorCodes.InvalidOptions);
 
-    const isCatalogShardEnabled = CatalogShardUtil.isEnabledIgnoringFCV(st);
+    const isConfigShardEnabled = ConfigShardUtil.isEnabledIgnoringFCV(st);
 
-    if (TestData.catalogShard) {
+    if (TestData.configShard) {
         // The config server is a shard and already has collections for the database.
         assert.commandFailedWithCode(st.configRS.getPrimary().adminCommand({
             _shardsvrCloneCatalogData: 'test',
@@ -176,8 +176,8 @@ TestData.skipCheckMetadataConsistency = true;
             writeConcern: {w: "majority"}
         }),
                                      ErrorCodes.NamespaceExists);
-    } else if (isCatalogShardEnabled) {
-        // The config server is dedicated but supports catalog shard mode, so it can accept shaded
+    } else if (isConfigShardEnabled) {
+        // The config server is dedicated but supports config shard mode, so it can accept shaded
         // commands.
         assert.commandWorked(st.configRS.getPrimary().adminCommand({
             _shardsvrCloneCatalogData: 'test',
@@ -185,7 +185,7 @@ TestData.skipCheckMetadataConsistency = true;
             writeConcern: {w: "majority"}
         }));
     } else {
-        // A dedicated non-catalog shard supporting config server cannot run the command.
+        // A dedicated non-config shard supporting config server cannot run the command.
         assert.commandFailedWithCode(st.configRS.getPrimary().adminCommand({
             _shardsvrCloneCatalogData: 'test',
             from: fromShard.host,

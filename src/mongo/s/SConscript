@@ -259,7 +259,7 @@ env.Library(
         'request_types/set_allow_migrations.idl',
         'request_types/sharded_ddl_commands.idl',
         'request_types/shardsvr_join_migrations_request.idl',
-        'request_types/transition_to_catalog_shard.idl',
+        'request_types/transition_from_dedicated_config_server.idl',
         'request_types/transition_to_dedicated_config_server.idl',
         'request_types/update_zone_key_range_request_type.cpp',
         'request_types/wait_for_fail_point.idl',

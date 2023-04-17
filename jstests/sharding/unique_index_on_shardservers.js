@@ -21,7 +21,7 @@ assert.commandWorked(mongos.getDB("test").coll.createIndex({f: 1}, {"unique": tr
 
 // Add a node with --shardsvr to the replica set.
 let newNode;
-if (TestData.catalogShard) {
+if (TestData.configShard) {
     newNode = rs.add({'configsvr': '', rsConfig: {priority: 0, votes: 0}});
 } else {
     newNode = rs.add({'shardsvr': '', rsConfig: {priority: 0, votes: 0}});

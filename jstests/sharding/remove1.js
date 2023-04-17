@@ -1,7 +1,7 @@
 (function() {
 'use strict';
 
-load("jstests/libs/catalog_shard_util.js");
+load("jstests/libs/config_shard_util.js");
 
 var s = new ShardingTest({shards: 2, other: {enableBalancer: true}});
 var config = s.s0.getDB('config');
@@ -16,10 +16,10 @@ var topologyTime0 = config.shards.findOne({_id: s.shard0.shardName}).topologyTim
 var topologyTime1 = config.shards.findOne({_id: s.shard1.shardName}).topologyTime;
 assert.gt(topologyTime1, topologyTime0);
 
-// removeShard is not permited on shard0 (the catalogShard) if catalogShard is enabled, so we want
+// removeShard is not permited on shard0 (the configShard) if configShard is enabled, so we want
 // to use transitionToDedicatedConfigServer instead
 var removeShardOrTransitionToDedicated =
-    TestData.catalogShard ? "transitionToDedicatedConfigServer" : "removeShard";
+    TestData.configShard ? "transitionToDedicatedConfigServer" : "removeShard";
 
 // First remove puts in draining mode, the second tells me a db needs to move, the third
 // actually removes
@@ -39,9 +39,9 @@ s.s0.getDB('needToMove').dropDatabase();
 // removed
 s.awaitBalancerRound();
 
-if (TestData.catalogShard) {
-    // A catalog shard can't be removed until all range deletions have finished.
-    CatalogShardUtil.waitForRangeDeletions(s.s);
+if (TestData.configShard) {
+    // A config shard can't be removed until all range deletions have finished.
+    ConfigShardUtil.waitForRangeDeletions(s.s);
 }
 
 removeResult = assert.commandWorked(

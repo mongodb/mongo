@@ -2,7 +2,7 @@
  * Ensures that if the primary config server is blackholed from the point of view of mongos, CRUD
  * and read-only config operations continue to work.
  *
- * @tags: [catalog_shard_incompatible]
+ * @tags: [config_shard_incompatible]
  */
 
 (function() {

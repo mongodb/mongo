@@ -33,6 +33,7 @@
 
 load('jstests/libs/profiler.js');
 load('jstests/sharding/libs/last_lts_mongod_commands.js');
+load('jstests/sharding/libs/last_lts_mongos_commands.js');
 
 // TODO SERVER-50144 Remove this and allow orphan checking.
 // This test calls removeShard which can leave docs in config.rangeDeletions in state "pending",
@@ -119,7 +120,7 @@ let testCases = {
     _configsvrSetAllowMigrations: {skip: "internal command"},
     _configsvrSetClusterParameter: {skip: "internal command"},
     _configsvrSetUserWriteBlockMode: {skip: "internal command"},
-    _configsvrTransitionToCatalogShard: {skip: "internal command"},
+    _configsvrTransitionFromDedicatedConfigServer: {skip: "internal command"},
     _configsvrTransitionToDedicatedConfigServer: {skip: "internal command"},
     _configsvrUpdateZoneKeyRange: {skip: "internal command"},
     _flushDatabaseCacheUpdates: {skip: "internal command"},
@@ -749,7 +750,7 @@ let testCases = {
     testVersions1And2: {skip: "does not accept read or write concern"},
     testVersion2: {skip: "does not accept read or write concern"},
     top: {skip: "does not accept read or write concern"},
-    transitionToCatalogShard: {skip: "does not accept read or write concern"},
+    transitionFromDedicatedConfigServer: {skip: "does not accept read or write concern"},
     transitionToDedicatedConfigServer: {skip: "does not accept read or write concern"},
     update: {
         setUp: function(conn) {
@@ -799,6 +800,10 @@ let testCases = {
 };
 
 commandsRemovedFromMongodSinceLastLTS.forEach(function(cmd) {
+    testCases[cmd] = {skip: "must define test coverage for backwards compatibility"};
+});
+
+commandsRemovedFromMongosSinceLastLTS.forEach(function(cmd) {
     testCases[cmd] = {skip: "must define test coverage for backwards compatibility"};
 });
 

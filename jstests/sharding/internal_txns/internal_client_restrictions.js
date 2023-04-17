@@ -90,8 +90,8 @@ jsTestLog("Verify internal session and txnRetryCounter require internal privileg
 // Auth as a user with enough privileges to read from any collection, but not to identify as an
 // internal client.
 const mongosDB = st.s.getDB("admin");
-if (!TestData.catalogShard) {
-    // In catalog shard mode, the user made on the shard above is also a cluster global user.
+if (!TestData.configShard) {
+    // In config shard mode, the user made on the shard above is also a cluster global user.
     mongosDB.createUser({user: "admin", pwd: "password", roles: jsTest.adminUserRoles});
 }
 assert(mongosDB.auth("admin", "password"));

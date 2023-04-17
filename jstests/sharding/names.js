@@ -2,7 +2,7 @@
 (function() {
 'use strict';
 
-var st = new ShardingTest({shards: TestData.catalogShard ? 1 : 0, mongos: 1});
+var st = new ShardingTest({shards: TestData.configShard ? 1 : 0, mongos: 1});
 
 var rsA = new ReplSetTest({nodes: 2, name: "rsA", nodeOptions: {shardsvr: ""}});
 var rsB = new ReplSetTest({nodes: 2, name: "rsB", nodeOptions: {shardsvr: ""}});
@@ -24,7 +24,7 @@ printjson(config.shards.find().toArray());
 assert.commandWorked(mongos.adminCommand({addShard: rsB.getURL(), name: rsA.name}));
 printjson(config.shards.find().toArray());
 
-assert.eq(TestData.catalogShard ? 3 : 2, config.shards.count(), "Error adding a shard");
+assert.eq(TestData.configShard ? 3 : 2, config.shards.count(), "Error adding a shard");
 assert.eq(rsB.getURL(), config.shards.findOne({_id: rsA.name})["host"], "Wrong host for shard rsA");
 assert.eq(rsA.getURL(), config.shards.findOne({_id: rsB.name})["host"], "Wrong host for shard rsB");
 
@@ -34,7 +34,7 @@ assert.commandWorked(mongos.adminCommand({removeshard: rsA.name}),
 var res =
     assert.commandWorked(mongos.adminCommand({removeshard: rsA.name}), "failed to remove shard");
 
-assert.eq(TestData.catalogShard ? 2 : 1,
+assert.eq(TestData.configShard ? 2 : 1,
           config.shards.count(),
           "Shard was not removed: " + res + "; Shards: " + tojson(config.shards.find().toArray()));
 assert.eq(
@@ -50,7 +50,7 @@ assert.soon(() => {
 
 printjson(config.shards.find().toArray());
 
-assert.eq(TestData.catalogShard ? 3 : 2, config.shards.count(), "Error re-adding a shard");
+assert.eq(TestData.configShard ? 3 : 2, config.shards.count(), "Error re-adding a shard");
 assert.eq(
     rsB.getURL(), config.shards.findOne({_id: rsA.name})["host"], "Wrong host for shard rsA 3");
 assert.eq(

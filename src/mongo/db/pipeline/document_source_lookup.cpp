@@ -450,7 +450,7 @@ StageConstraints DocumentSourceLookUp::constraints(Pipeline::SplitState pipeStat
         // is allowed.
         hostRequirement = HostTypeRequirement::kAnyShard;
     } else if (_fromNs == NamespaceString::kConfigsvrCollectionsNamespace &&
-               // (Ignore FCV check): If the catalog shard feature flag is enabled, the config
+               // (Ignore FCV check): If the config shard feature flag is enabled, the config
                // server should have the components necessary to handle a merge. Config servers are
                // upgraded first and downgraded last, so if any server is running the latest binary,
                // we can assume the conifg servers are too.

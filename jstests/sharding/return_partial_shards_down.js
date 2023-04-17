@@ -3,7 +3,7 @@
 //
 // Shuts down all shards, which includes the config server. Can be made to pass by restarting the
 // config server, but this makes the test flaky.
-// @tags: [catalog_shard_incompatible]
+// @tags: [config_shard_incompatible]
 //
 
 // Checking UUID and index consistency involves talking to shards, but this test shuts down shards.

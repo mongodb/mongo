@@ -23,7 +23,7 @@
 load("jstests/replsets/rslib.js");
 
 var st, replTest;
-if (TestData.catalogShard) {
+if (TestData.configShard) {
     // Use a second shard so we don't shut down the config server.
     st = new ShardingTest({shards: 2, rs: {oplogSize: 10}});
     replTest = st.rs1;

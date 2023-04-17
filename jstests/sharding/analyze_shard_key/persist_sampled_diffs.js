@@ -8,7 +8,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/catalog_shard_util.js");
+load("jstests/libs/config_shard_util.js");
 load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
 
 // Set this to allow sample ids to be set by an external client.
@@ -177,10 +177,10 @@ function testDiffs(rst, testCase, expectSampling) {
     // allow the test helper to know if it should use "config" as the name for the test database.
     st.configRS.isConfigRS = true;
 
-    const isCatalogShardEnabled = CatalogShardUtil.isEnabledIgnoringFCV(st);
+    const isConfigShardEnabled = ConfigShardUtil.isEnabledIgnoringFCV(st);
     for (const testCase of testCases) {
         testDiffs(st.rs0, testCase, true /* expectSampling */);
-        testDiffs(st.configRS, testCase, isCatalogShardEnabled /* expectSampling */);
+        testDiffs(st.configRS, testCase, isConfigShardEnabled /* expectSampling */);
     }
 
     st.stop();

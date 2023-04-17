@@ -15,9 +15,9 @@ const options = {
     rs: {nodes: [{}]},
 };
 
-if (!TestData.catalogShard) {
-    // Setting config options will override shard options in catalog shard mode, which doesn't set
-    // the right audit node options on the catalog shard.
+if (!TestData.configShard) {
+    // Setting config options will override shard options in config shard mode, which doesn't set
+    // the right audit node options on the config shard.
     options.config = 1;
 }
 

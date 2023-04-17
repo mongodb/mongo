@@ -252,8 +252,8 @@ def mongo_shell_program(logger, executable=None, connection_string=None, filenam
 
     test_data["undoRecorderPath"] = config.UNDO_RECORDER_PATH
 
-    if "catalogShard" not in test_data and config.CATALOG_SHARD is not None:
-        test_data["catalogShard"] = True
+    if "configShard" not in test_data and config.CONFIG_SHARD is not None:
+        test_data["configShard"] = True
 
     # There's a periodic background thread that checks for and aborts expired transactions.
     # "transactionLifetimeLimitSeconds" specifies for how long a transaction can run before expiring

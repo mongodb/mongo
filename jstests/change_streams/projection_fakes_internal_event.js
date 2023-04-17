@@ -5,7 +5,7 @@
  *
  * Tests that if a user fakes an internal event with a projection nothing crashes, so not valuable
  * to test with a config shard.
- * @tags: [assumes_read_preference_unchanged, catalog_shard_incompatible]
+ * @tags: [assumes_read_preference_unchanged, config_shard_incompatible]
  */
 (function() {
 "use strict";

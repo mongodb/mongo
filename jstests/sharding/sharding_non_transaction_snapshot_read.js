@@ -35,7 +35,7 @@ let shardingScenarios = {
         setUp: function() {
             const st = new ShardingTest({
                 mongos: 1,
-                config: TestData.catalogShard ? undefined : 1,
+                config: TestData.configShard ? undefined : 1,
                 shards: {rs0: {nodes: 2}},
                 other: {configOptions: nodeOptions, rsOptions: nodeOptions}
             });
@@ -53,7 +53,7 @@ let shardingScenarios = {
                     rs2: {nodes: 2},
                 },
                 mongos: 1,
-                config: TestData.catalogShard ? undefined : 1,
+                config: TestData.configShard ? undefined : 1,
                 other: {configOptions: nodeOptions, rsOptions: nodeOptions}
             });
             setUpAllScenarios(st);
@@ -97,7 +97,7 @@ let shardingScenarios = {
                     rs2: {nodes: 2},
                 },
                 mongos: 1,
-                config: TestData.catalogShard ? undefined : 1,
+                config: TestData.configShard ? undefined : 1,
                 other: {configOptions: nodeOptions, rsOptions: nodeOptions}
             });
             setUpAllScenarios(st);

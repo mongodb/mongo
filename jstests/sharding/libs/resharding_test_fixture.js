@@ -37,7 +37,7 @@ var ReshardingTest = class {
         oplogSize: oplogSize = undefined,
         maxNumberOfTransactionOperationsInSingleOplogEntry:
             maxNumberOfTransactionOperationsInSingleOplogEntry = undefined,
-        catalogShard: catalogShard = false,
+        configShard: configShard = false,
     } = {}) {
         // The @private JSDoc comments cause VS Code to not display the corresponding properties and
         // methods in its autocomplete list. This makes it simpler for test authors to know what the
@@ -69,7 +69,7 @@ var ReshardingTest = class {
         this._oplogSize = oplogSize;
         this._maxNumberOfTransactionOperationsInSingleOplogEntry =
             maxNumberOfTransactionOperationsInSingleOplogEntry;
-        this._catalogShard = catalogShard || jsTestOptions().catalogShard;
+        this._configShard = configShard || jsTestOptions().configShard;
 
         // Properties set by setup().
         /** @private */
@@ -119,8 +119,8 @@ var ReshardingTest = class {
         const configReplSetTestOptions = {};
 
         let nodesPerShard = 2;
-        // Use the shard default in catalog shard mode since the config server will be a shard.
-        let nodesPerConfigRs = this._catalogShard ? 2 : 1;
+        // Use the shard default in config shard mode since the config server will be a shard.
+        let nodesPerConfigRs = this._configShard ? 2 : 1;
 
         if (this._enableElections) {
             nodesPerShard = 3;
@@ -177,7 +177,7 @@ var ReshardingTest = class {
                 this._maxNumberOfTransactionOperationsInSingleOplogEntry;
         }
 
-        if (this._catalogShard) {
+        if (this._configShard) {
             // ShardingTest does not currently support deep merging of options, so merge the set
             // parameters for config and replica sets here.
             rsOptions.setParameter =
@@ -196,7 +196,7 @@ var ReshardingTest = class {
             rsOptions,
             configReplSetTestOptions,
             manualAddShard: true,
-            catalogShard: this._catalogShard,
+            configShard: this._configShard,
         });
 
         for (let i = 0; i < this._numShards; ++i) {
@@ -219,8 +219,9 @@ var ReshardingTest = class {
             }
 
             const shard = this._st[`shard${i}`];
-            if (this._catalogShard && i == 0) {
-                assert.commandWorked(this._st.s.adminCommand({transitionToCatalogShard: 1}));
+            if (this._configShard && i == 0) {
+                assert.commandWorked(
+                    this._st.s.adminCommand({transitionFromDedicatedConfigServer: 1}));
                 shard.shardName = "config";
             } else {
                 const res = assert.commandWorked(

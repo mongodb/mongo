@@ -56,8 +56,8 @@ var authenticatedConn = new Mongo(mongos.host);
 authenticatedConn.getDB('admin').auth(rwUser, password);
 
 // Add user to shards to prevent localhost connections from having automatic full access
-if (!TestData.catalogShard) {
-    // In catalog shard mode, the first shard is the config server, so the user we made via mongos
+if (!TestData.configShard) {
+    // In config shard mode, the first shard is the config server, so the user we made via mongos
     // already used up this shard's localhost bypass.
     st.rs0.getPrimary().getDB('admin').createUser(
         {user: 'user', pwd: 'password', roles: jsTest.basicUserRoles}, {w: 3, wtimeout: 30000});

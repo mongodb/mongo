@@ -9,7 +9,7 @@
  *   does_not_support_stepdowns,
  *   # Require persistence to restart nodes
  *   requires_persistence,
- *   catalog_shard_incompatible,
+ *   config_shard_incompatible,
  * ]
  */
 

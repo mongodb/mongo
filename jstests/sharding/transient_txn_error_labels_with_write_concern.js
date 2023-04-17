@@ -17,7 +17,7 @@ const collName = "transient_txn_error_labels_with_write_concern";
 // We are testing coordinateCommitTransaction, which requires the nodes to be started with
 // --shardsvr.
 const st = new ShardingTest({
-    config: TestData.catalogShard ? undefined : 1,
+    config: TestData.configShard ? undefined : 1,
     mongos: 1,
     shards: {rs0: {nodes: [{}, {rsConfig: {priority: 0}}]}}
 });

@@ -57,7 +57,7 @@ DEFAULTS = {
     "base_port": 20000,
     "backup_on_restart_dir": None,
     "buildlogger_url": "https://logkeeper2.build.10gen.cc",
-    "catalog_shard": None,
+    "config_shard": None,
     "continue_on_failure": False,
     "dbpath_prefix": None,
     "dbtest_executable": None,
@@ -300,8 +300,8 @@ DBTEST_EXECUTABLE = None
 # actually running them).
 DRY_RUN = None
 
-# If set, specifies which node is the catalog shard. Can also be set to 'any'.
-CATALOG_SHARD = None
+# If set, specifies which node is the config shard. Can also be set to 'any'.
+CONFIG_SHARD = None
 
 # URL to connect to the Evergreen service.
 EVERGREEN_URL = None

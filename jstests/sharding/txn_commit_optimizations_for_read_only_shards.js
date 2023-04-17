@@ -63,7 +63,7 @@ TestData.transactionLifetimeLimitSeconds = 30;
 let st = new ShardingTest({
     shards: 3,
     // Create shards with more than one node because we test for writeConcern majority failing.
-    config: TestData.catalogShard ? undefined : 1,
+    config: TestData.configShard ? undefined : 1,
     other: {
         mongosOptions: {
             verbose: 3,

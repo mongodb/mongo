@@ -1,7 +1,7 @@
 /**
- * Utilities for testing config server catalog shard behaviors.
+ * Utilities for testing config server config shard behaviors.
  */
-var CatalogShardUtil = (function() {
+var ConfigShardUtil = (function() {
     load("jstests/libs/feature_flag_util.js");
 
     function isEnabledIgnoringFCV(st) {

@@ -154,7 +154,7 @@ const chunksColl = st.config.chunks;
 const testDB = st.s.getDB(jsTestName());
 
 /* Perform tests */
-if (!TestData.catalogShard) {
+if (!TestData.configShard) {
     upgradeFCVTest(st, chunksColl, testDB);
     moveAndMergeChunksTest(st, chunksColl, testDB);
     splitChunksTest(st, chunksColl, testDB);

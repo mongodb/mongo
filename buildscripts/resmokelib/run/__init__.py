@@ -946,8 +946,8 @@ class RunPlugin(PluginInterface):
                                             help="Sets the seed used by storage config fuzzer")
 
         mongodb_server_options.add_argument(
-            "--catalogShard", dest="catalog_shard", metavar="CONFIG",
-            help="If set, specifies which node is the catalog shard. Can also be set to 'any'.")
+            "--configShard", dest="config_shard", metavar="CONFIG",
+            help="If set, specifies which node is the config shard. Can also be set to 'any'.")
 
         internal_options = parser.add_argument_group(
             title=_INTERNAL_OPTIONS_TITLE,

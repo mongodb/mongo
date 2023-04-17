@@ -1,5 +1,5 @@
 /**
- * Tests catalog shard topology.
+ * Tests config shard topology.
  *
  * @tags: [
  *   requires_fcv_70,
@@ -48,17 +48,17 @@ const configCS = st.configRS.getURL();
 }
 
 //
-// Catalog shard mode tests (post addShard).
+// Config shard mode tests (post addShard).
 //
 {
     //
     // Adding the config server as a shard works.
     //
-    assert.commandWorked(st.s.adminCommand({transitionToCatalogShard: 1}));
+    assert.commandWorked(st.s.adminCommand({transitionFromDedicatedConfigServer: 1}));
 
     // More than once works.
-    assert.commandWorked(st.s.adminCommand({transitionToCatalogShard: 1}));
-    assert.commandWorked(st.s.adminCommand({transitionToCatalogShard: 1}));
+    assert.commandWorked(st.s.adminCommand({transitionFromDedicatedConfigServer: 1}));
+    assert.commandWorked(st.s.adminCommand({transitionFromDedicatedConfigServer: 1}));
 
     // Flushing routing / db cache updates works.
     flushRoutingAndDBCacheUpdates(st.configRS.getPrimary());

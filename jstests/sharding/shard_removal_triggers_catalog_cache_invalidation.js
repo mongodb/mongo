@@ -68,10 +68,10 @@ const dbName = 'TestDB';
     removeShard(st, st.shard0.shardName);
 
     // Stop the replica set so that future requests to this shard will be unsuccessful. Skip this
-    // step for a catalog shard, since the config server must be up for the second router to
+    // step for a config shard, since the config server must be up for the second router to
     // refresh. The default read concern is local, so the router should eventually target a shard
     // with chunks.
-    if (!TestData.catalogShard) {
+    if (!TestData.configShard) {
         st.rs0.stopSet();
     }
 
@@ -134,10 +134,10 @@ const dbName = 'TestDB';
     removeShard(st, st.shard0.shardName);
 
     // Stop the replica set so that future requests to this shard will be unsuccessful. Skip this
-    // step for a catalog shard, since the config server must be up for the second router to
+    // step for a config shard, since the config server must be up for the second router to
     // refresh. The default read concern is local, so the router should eventually target a shard
     // with chunks.
-    if (!TestData.catalogShard) {
+    if (!TestData.configShard) {
         st.rs0.stopSet();
     }
 

@@ -109,8 +109,8 @@ assert.eq(0, st.rs1.getPrimary().getCollection(shardIndexCatalog).countDocuments
 }));
 
 jsTestLog("Ensure we committed in the right collection.");
-if (TestData.catalogShard) {
-    // The config server is shard0 in catalog shard mode, so it should have both collections.
+if (TestData.configShard) {
+    // The config server is shard0 in config shard mode, so it should have both collections.
     assert.eq(1, st.configRS.getPrimary().getCollection(shardIndexCatalog).countDocuments({
         collectionUUID: collectionUUID,
         name: index1Name
@@ -188,8 +188,8 @@ assert.eq(1, st.rs1.getSecondary().getCollection(shardIndexCatalog).countDocumen
 }));
 
 jsTestLog("Check we didn't commit in a wrong collection.");
-if (TestData.catalogShard) {
-    // The config server is shard0 in catalog shard mode, so it should have both collections.
+if (TestData.configShard) {
+    // The config server is shard0 in config shard mode, so it should have both collections.
     assert.eq(1, st.configRS.getPrimary().getCollection(shardIndexCatalog).countDocuments({
         collectionUUID: collectionUUID,
         name: index2Name

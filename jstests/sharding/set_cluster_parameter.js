@@ -14,7 +14,7 @@
 
 load('jstests/libs/fail_point_util.js');
 load('jstests/sharding/libs/remove_shard_util.js');
-load("jstests/libs/catalog_shard_util.js");
+load("jstests/libs/config_shard_util.js");
 load('jstests/replsets/rslib.js');
 
 const clusterParameter1Value = {
@@ -210,7 +210,7 @@ const checkClusterParameters =
     st.stop();
 }
 
-if (!TestData.catalogShard) {
+if (!TestData.configShard) {
     {
         const st2 = new ShardingTest({mongos: 1, shards: 0, name: 'second_cluster'});
 
@@ -339,55 +339,55 @@ if (!TestData.catalogShard) {
         st3.stop();
     }
 } else {
-    // In catalog shard mode
+    // In config shard mode
     {
-        jsTestLog('Check that RS which transitions to a catalog shard keeps cluster params.');
+        jsTestLog('Check that RS which transitions to a config shard keeps cluster params.');
 
-        const catalogShardName = 'catalogShard';
-        const catalogShard = new ReplSetTest({
-            name: catalogShardName,
+        const configShardName = 'configShard';
+        const configShard = new ReplSetTest({
+            name: configShardName,
             nodes: 1,
             nodeOptions: {setParameter: {skipShardingConfigurationChecks: true}}
         });
-        catalogShard.startSet();
-        catalogShard.initiate();
+        configShard.startSet();
+        configShard.initiate();
 
-        catalogShard.getPrimary().adminCommand({setClusterParameter: clusterParameter2});
+        configShard.getPrimary().adminCommand({setClusterParameter: clusterParameter2});
 
-        var cfg = catalogShard.getReplSetConfigFromNode();
+        var cfg = configShard.getReplSetConfigFromNode();
         cfg.configsvr = true;
-        reconfig(catalogShard, cfg);
+        reconfig(configShard, cfg);
 
-        catalogShard.restart(
+        configShard.restart(
             0, {configsvr: '', setParameter: {skipShardingConfigurationChecks: false}});
-        catalogShard.awaitNodesAgreeOnPrimary();
+        configShard.awaitNodesAgreeOnPrimary();
 
         // Cluster params should still exist.
         checkClusterParameters(clusterParameter2Name,
                                clusterParameter2Value,
-                               catalogShard.getPrimary(),
-                               catalogShard.getPrimary());
+                               configShard.getPrimary(),
+                               configShard.getPrimary());
 
         if (TestData.mongosBinVersion) {
             // Lower the config shard's FCV so an earlier binary mongos can connect.
             const targetFCV = binVersionToFCV(TestData.mongosBinVersion);
-            assert.commandWorked(catalogShard.getPrimary().adminCommand(
-                {setFeatureCompatibilityVersion: targetFCV}));
+            assert.commandWorked(
+                configShard.getPrimary().adminCommand({setFeatureCompatibilityVersion: targetFCV}));
         }
-        var mongos = MongoRunner.runMongos({configdb: catalogShard.getURL()});
-        assert.commandWorked(mongos.adminCommand({transitionToCatalogShard: 1}));
+        var mongos = MongoRunner.runMongos({configdb: configShard.getURL()});
+        assert.commandWorked(mongos.adminCommand({transitionFromDedicatedConfigServer: 1}));
         checkClusterParameters(clusterParameter2Name,
                                clusterParameter2Value,
-                               catalogShard.getPrimary(),
-                               catalogShard.getPrimary());
+                               configShard.getPrimary(),
+                               configShard.getPrimary());
 
-        // Catalog shard should not accept cluster parameters set directly on it.
+        // Config shard should not accept cluster parameters set directly on it.
         assert.commandFailedWithCode(
-            catalogShard.getPrimary().adminCommand({setClusterParameter: clusterParameter3}),
+            configShard.getPrimary().adminCommand({setClusterParameter: clusterParameter3}),
             ErrorCodes.NotImplemented);
 
         jsTestLog(
-            'Check that parameters added in a catalog shard cluster overwrite custom RS parameters.');
+            'Check that parameters added in a config shard cluster overwrite custom RS parameters.');
 
         const newShard5Name = 'newShard5';
         const newShard5 = new ReplSetTest({name: newShard5Name, nodes: 1});
@@ -409,7 +409,7 @@ if (!TestData.catalogShard) {
 
         checkClusterParameters(clusterParameter2Name,
                                clusterParameter2Value,
-                               catalogShard.getPrimary(),
+                               configShard.getPrimary(),
                                newShard5.getPrimary());
 
         assert.eq(0,
@@ -419,7 +419,7 @@ if (!TestData.catalogShard) {
 
         MongoRunner.stopMongos(mongos);
         newShard5.stopSet();
-        catalogShard.stopSet();
+        configShard.stopSet();
     }
 }
 })();

@@ -10,9 +10,9 @@
  * This test is labeled resource intensive because its total io_write is 70MB compared to a median
  * of 5MB across all sharding tests in wiredTiger.
  *
- * Incompatible with catalog shard because it disables replication on shards but expects the
- * config server to still satisfy majority write concern, which can't be true for a catalog shard.
- * @tags: [resource_intensive, catalog_shard_incompatible]
+ * Incompatible with config shard because it disables replication on shards but expects the
+ * config server to still satisfy majority write concern, which can't be true for a config shard.
+ * @tags: [resource_intensive, config_shard_incompatible]
  */
 load('jstests/libs/write_concern_util.js');
 load('jstests/multiVersion/libs/auth_helpers.js');

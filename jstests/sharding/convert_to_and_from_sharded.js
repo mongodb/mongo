@@ -32,7 +32,7 @@ var checkBasicCRUD = function(coll) {
     assert.eq('marker', coll.findOne({_id: 'marker'})._id);
 };
 
-const numShards = TestData.catalogShard ? 1 : 0;
+const numShards = TestData.configShard ? 1 : 0;
 var st = new ShardingTest({shards: numShards});
 
 var replShard = new ReplSetTest({nodes: NUM_NODES});

@@ -37,7 +37,7 @@ feature_flags:
         version: 7.0
 
     featureFlagTransitionToCatalogShard:
-        description: "Feature flag for transitioning a config server in and out of catalog shard mode"
+        description: "Feature flag for transitioning a config server in and out of config shard mode"
         cpp_varname: gFeatureFlagTransitionToCatalogShard
         default: true
         version: 7.0

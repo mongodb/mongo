@@ -12,7 +12,7 @@ let rs = st.rs0;
 mongos.getDB("test").coll.insert({_id: 1, x: 1});
 
 // Add a node with --shardsvr to the replica set.
-const clusterRoleOption = TestData.catalogShard ? "configsvr" : "shardsvr";
+const clusterRoleOption = TestData.configShard ? "configsvr" : "shardsvr";
 let newNode = rs.add({[clusterRoleOption]: '', rsConfig: {priority: 0, votes: 0}});
 rs.reInitiate();
 rs.awaitSecondaryNodes();

@@ -36,7 +36,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/request_types/transition_to_catalog_shard_gen.h"
+#include "mongo/s/request_types/transition_from_dedicated_config_server_gen.h"
 #include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -44,10 +44,10 @@
 namespace mongo {
 namespace {
 
-class ConfigsvrTransitionToCatalogShardCommand
-    : public TypedCommand<ConfigsvrTransitionToCatalogShardCommand> {
+class ConfigsvrTransitionFromDedicatedConfigServerCommand
+    : public TypedCommand<ConfigsvrTransitionFromDedicatedConfigServerCommand> {
 public:
-    using Request = ConfigsvrTransitionToCatalogShard;
+    using Request = ConfigsvrTransitionFromDedicatedConfigServer;
 
     bool skipApiVersionCheck() const override {
         // Internal command (server to server).
@@ -56,7 +56,7 @@ public:
 
     std::string help() const override {
         return "Internal command, which is exported by the sharding config server. Do not call "
-               "directly. Transitions cluster into catalog shard config servers.";
+               "directly. Transitions cluster into config shard config servers.";
     }
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
@@ -73,12 +73,13 @@ public:
 
         void typedRun(OperationContext* opCtx) {
             uassert(7467202,
-                    "The catalog shard feature is disabled",
+                    "The config shard feature is disabled",
                     gFeatureFlagCatalogShard.isEnabled(serverGlobalParams.featureCompatibility));
 
-            uassert(ErrorCodes::IllegalOperation,
-                    "_configsvrTransitionToCatalogShard can only be run on config servers",
-                    serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
+            uassert(
+                ErrorCodes::IllegalOperation,
+                "_configsvrTransitionFromDedicatedConfigServer can only be run on config servers",
+                serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
 
             CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
                                                           opCtx->getWriteConcern());
@@ -118,7 +119,7 @@ public:
     };
 };
 
-MONGO_REGISTER_FEATURE_FLAGGED_COMMAND(ConfigsvrTransitionToCatalogShardCommand,
+MONGO_REGISTER_FEATURE_FLAGGED_COMMAND(ConfigsvrTransitionFromDedicatedConfigServerCommand,
                                        gFeatureFlagTransitionToCatalogShard);
 
 }  // namespace

@@ -106,10 +106,10 @@ assert.eq(findCursor.objsLeftInBatch(), 0);
 const aggCursor = coll.aggregate([{$match: {}}, {$sort: {_id: 1}}], {cursor: {batchSize: 0}});
 
 // Now stop shard0...
-if (!TestData.catalogShard) {
+if (!TestData.configShard) {
     st.rs0.stopSet();
 } else {
-    // The config server is shard0 in catalog shard mode and we'll restart it later.
+    // The config server is shard0 in config shard mode and we'll restart it later.
     st.rs0.stopSet(undefined, true /* forRestart */);
 }
 
@@ -157,7 +157,7 @@ assert.commandFailedWithCode(err, ErrorCodes.FailedToSatisfyReadPreference);
 // ... but does NOT include the "ResumableChangeStreamError" error label.
 assert(!("errorLabels" in err), err);
 
-if (TestData.catalogShard) {
+if (TestData.configShard) {
     // shard0 is the config server and it needs to be up for ShardingTest shutdown.
     st.rs0.startSet(undefined, true /* forRestart */);
 }

@@ -6,7 +6,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/catalog_shard_util.js");
+load("jstests/libs/config_shard_util.js");
 load("jstests/sharding/analyze_shard_key/libs/validation_common.js");
 
 function makeAnalyzeShardKeyAggregateCmdObj(collName, key, splitPointsShardId) {
@@ -97,7 +97,7 @@ function runTest(rst, validationTest, shardName) {
         const {aggCmdObj} =
             makeAnalyzeShardKeyAggregateCmdObj(validationTest.collName, {id: 1}, st.shard0.name);
         assert.commandWorked(shard0Primary.getDB(validationTest.dbName).runCommand(aggCmdObj));
-        if (!CatalogShardUtil.isEnabledIgnoringFCV(st)) {
+        if (!ConfigShardUtil.isEnabledIgnoringFCV(st)) {
             assert.commandFailedWithCode(
                 configPrimary.getDB(validationTest.dbName).runCommand(aggCmdObj),
                 ErrorCodes.IllegalOperation);

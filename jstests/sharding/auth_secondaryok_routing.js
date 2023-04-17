@@ -55,8 +55,8 @@ var nodeCount = replTest.nodes.length;
 var adminDB = mongos.getDB('admin');
 adminDB.createUser({user: 'user', pwd: 'password', roles: jsTest.adminUserRoles});
 adminDB.auth('user', 'password');
-if (!TestData.catalogShard) {
-    // In catalog shard mode, creating this user above also created it on the first shard.
+if (!TestData.configShard) {
+    // In config shard mode, creating this user above also created it on the first shard.
     var priAdminDB = replTest.getPrimary().getDB('admin');
     replTest.getPrimary().waitForClusterTime(60);
     priAdminDB.createUser({user: 'user', pwd: 'password', roles: jsTest.adminUserRoles},

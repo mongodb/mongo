@@ -9,7 +9,7 @@
 load('jstests/libs/ingress_handshake_metrics_helpers.js');
 
 let runTest = (connectionHealthLoggingOn) => {
-    let st = new ShardingTest({shards: TestData.catalogShard ? 1 : 0, other: {auth: ''}});
+    let st = new ShardingTest({shards: TestData.configShard ? 1 : 0, other: {auth: ''}});
     let conn = st.s;
 
     jsTestLog("Setting up users and test data.");
