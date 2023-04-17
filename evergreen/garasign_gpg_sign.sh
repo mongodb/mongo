@@ -55,8 +55,8 @@ sign mongodb-cryptd-$push_name-$push_arch-$suffix.$ext
 EOF
 
 podman run \
-  -e GRS_CONFIG_USER1_USERNAME=${garasign_gpg_username} \
-  -e GRS_CONFIG_USER1_PASSWORD=${garasign_gpg_password} \
+  -e GRS_CONFIG_USER1_USERNAME=${garasign_gpg_username_70} \
+  -e GRS_CONFIG_USER1_PASSWORD=${garasign_gpg_password_70} \
   --rm \
   -v $(pwd):$(pwd) -w $(pwd) \
   ${garasign_gpg_image} \
