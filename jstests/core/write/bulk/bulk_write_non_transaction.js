@@ -480,6 +480,77 @@ assert.eq(coll.findOne().skey, "MongoDB");
 
 coll.drop();
 
+// Test running multiple findAndModify ops in a command.
+// For normal commands this should succeed and for retryable writes the top level should fail.
+
+// Want to make sure both update + delete handle this correctly so test the following combinations
+// of ops. update + delete, delete + update. This will prove that both ops set and check the flag
+// correctly so doing update + update and delete + delete is redundant.
+
+// update + delete
+res = db.adminCommand({
+    bulkWrite: 1,
+    ops: [
+        {insert: 0, document: {_id: 1, skey: "MongoDB"}},
+        {update: 0, filter: {_id: 1}, updateMods: {$set: {skey: "MongoDB2"}}, return: "pre"},
+        {delete: 0, filter: {_id: 1}, return: true},
+    ],
+    nsInfo: [{ns: "test.coll"}]
+});
+
+let processCursor = true;
+try {
+    assert.commandWorked(res);
+} catch {
+    processCursor = false;
+    assert.commandFailedWithCode(res, [ErrorCodes.BadValue]);
+    assert.eq(res.errmsg, "BulkWrite can only support 1 op with a return for a retryable write");
+}
+
+if (processCursor) {
+    cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
+    cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, nModified: 1});
+    assert.docEq(res.cursor.firstBatch[1].value, {_id: 1, skey: "MongoDB"});
+    cursorEntryValidator(res.cursor.firstBatch[2], {ok: 1, idx: 2, n: 1});
+    assert.docEq(res.cursor.firstBatch[2].value, {_id: 1, skey: "MongoDB2"});
+    assert(!res.cursor.firstBatch[3]);
+}
+
+coll.drop();
+
+// delete + update
+res = db.adminCommand({
+    bulkWrite: 1,
+    ops: [
+        {insert: 0, document: {_id: 1, skey: "MongoDB"}},
+        {insert: 0, document: {_id: 2, skey: "MongoDB"}},
+        {delete: 0, filter: {_id: 2}, return: true},
+        {update: 0, filter: {_id: 1}, updateMods: {$set: {skey: "MongoDB2"}}, return: "pre"},
+    ],
+    nsInfo: [{ns: "test.coll"}]
+});
+
+processCursor = true;
+try {
+    assert.commandWorked(res);
+} catch {
+    processCursor = false;
+    assert.commandFailedWithCode(res, [ErrorCodes.BadValue]);
+    assert.eq(res.errmsg, "BulkWrite can only support 1 op with a return for a retryable write");
+}
+
+if (processCursor) {
+    cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
+    cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1});
+    cursorEntryValidator(res.cursor.firstBatch[2], {ok: 1, idx: 2, n: 1});
+    assert.docEq(res.cursor.firstBatch[2].value, {_id: 2, skey: "MongoDB"});
+    cursorEntryValidator(res.cursor.firstBatch[3], {ok: 1, idx: 3, nModified: 1});
+    assert.docEq(res.cursor.firstBatch[3].value, {_id: 1, skey: "MongoDB"});
+    assert(!res.cursor.firstBatch[4]);
+}
+
+coll.drop();
+
 // Test BypassDocumentValidator
 assert.commandWorked(coll.insert({_id: 1}));
 assert.commandWorked(db.runCommand({collMod: "coll", validator: {a: {$exists: true}}}));

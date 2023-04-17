@@ -821,7 +821,7 @@ public:
 
             auto& req = request();
 
-            bulk_write_common::validateRequest(req);
+            bulk_write_common::validateRequest(req, opCtx->isRetryableWrite());
 
             // Apply all of the write operations.
             auto [replies, retriedStmtIds] = bulk_write::performWrites(opCtx, req);

@@ -104,7 +104,7 @@ public:
                 "BulkWrite may not be run without featureFlagBulkWriteCommand enabled",
                 gFeatureFlagBulkWriteCommand.isEnabled(serverGlobalParams.featureCompatibility));
 
-            bulk_write_common::validateRequest(request());
+            bulk_write_common::validateRequest(request(), opCtx->isRetryableWrite());
 
             auto replyItems = cluster::bulkWrite(opCtx, request());
 

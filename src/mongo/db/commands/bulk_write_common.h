@@ -42,7 +42,7 @@ namespace bulk_write_common {
 /**
  * Validates the given bulkWrite command request and throws if the request is malformed.
  */
-void validateRequest(const BulkWriteCommandRequest& req);
+void validateRequest(const BulkWriteCommandRequest& req, bool isRetryableWrite);
 
 /**
  * Get the privileges needed to perform the given bulkWrite command.
