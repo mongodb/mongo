@@ -55,6 +55,9 @@ CBT
 CCCCCCCCCCCCCCCCCC
 CELLs
 CET
+CFLAGS
+CHECKKEY
+CHUNKCACHE
 CKPT
 CLOEXEC
 CMP
@@ -543,6 +546,7 @@ checkvalue
 chk
 chmod
 chongo
+chunkcache
 cip
 ciphertext
 ckpt
@@ -854,6 +858,9 @@ isprint
 isrc
 isspace
 iter
+iteratively
+iters
+jemalloc
 jjj
 js
 json

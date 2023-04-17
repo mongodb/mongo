@@ -495,7 +495,7 @@ connection_runtime_config = [
         Config('size', '0', r'''
             maximum memory to allocate for the block cache''',
             min='0', max='10TB'),
-        Config('hashsize', '0', r'''
+        Config('hashsize', '32768', r'''
             number of buckets in the hashtable that keeps track of blocks''',
             min='512', max='256K'),
         Config('max_percent_overhead', '10', r'''
@@ -545,6 +545,29 @@ connection_runtime_config = [
             seconds to wait between each checkpoint; setting this value above 0 configures
             periodic checkpoints''',
             min='0', max='100000'),
+        ]),
+    Config('chunk_cache', '', r'''
+        chunk cache configuration options''',
+        type='category', subconfig=[
+        Config('capacity', '10GB', r'''
+            maximum memory or storage to use for the chunk cache''',
+            min='0', max='100TB'),
+        Config('chunk_cache_evict_trigger', '90', r'''
+            chunk cache percent full that triggers eviction''',
+            min='0', max='100'),
+        Config('chunk_size', '1MB', r'''
+            size of cached chunks''',
+            min='512KB', max='100GB'),
+        Config('device_path', '', r'''
+            the absolute path to the file system or a block device used as cache location'''),
+        Config('enabled', 'false', r'''
+            enable chunk cache''',
+            type='boolean'),
+        Config('hashsize', '1024', r'''
+            number of buckets in the hashtable that keeps track of objects''',
+            min='64', max='1048576'),
+        Config('type', '', r'''
+            cache location: DRAM or FILE (file system or block device)'''),
         ]),
     Config('debug_mode', '', r'''
         control the settings of various extended debugging features''',
@@ -820,6 +843,7 @@ connection_runtime_config = [
             'checkpoint',
             'checkpoint_cleanup',
             'checkpoint_progress',
+            'chunkcache',
             'compact',
             'compact_progress',
             'error_returns',

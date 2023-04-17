@@ -1416,9 +1416,10 @@ flush_tier_worker(void *arg)
          */
         wtperf->flush = true;
         if ((ret = session->checkpoint(session, "flush_tier=(enabled)")) != 0) {
-            lprintf(wtperf, ret, 0, "Checkpoint failed.");
+            lprintf(wtperf, ret, 0, "Checkpoint with flush tier failed.");
             goto err;
         }
+
         wtperf->flush = false;
         ++thread->flush.ops;
     }

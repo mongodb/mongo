@@ -594,6 +594,7 @@ __wt_block_free(WT_SESSION_IMPL *session, WT_BLOCK *block, const uint8_t *addr, 
     WT_RET(__wt_block_ext_prealloc(session, 5));
     __wt_spin_lock(session, &block->live_lock);
     ret = __wt_block_off_free(session, block, objectid, offset, (wt_off_t)size);
+    __wt_chunkcache_remove(session, block, objectid, offset, size);
     __wt_spin_unlock(session, &block->live_lock);
 
     return (ret);

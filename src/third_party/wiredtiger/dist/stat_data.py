@@ -64,6 +64,10 @@ class CheckpointCleanupStat(Stat):
     prefix = 'checkpoint-cleanup'
     def __init__(self, name, desc, flags=''):
         Stat.__init__(self, name, CheckpointCleanupStat.prefix, desc, flags)
+class ChunkCacheStat(Stat):
+    prefix = 'chunk-cache'
+    def __init__(self, name, desc, flags=''):
+        Stat.__init__(self, name, ChunkCacheStat.prefix, desc, flags)
 class CompressStat(Stat):
     prefix = 'compression'
     def __init__(self, name, desc, flags=''):
@@ -141,6 +145,7 @@ groups['evict'] = [
     BlockStat.prefix,
     CacheStat.prefix,
     CacheWalkStat.prefix,
+    ChunkCacheStat.prefix,
     ConnStat.prefix,
     ThreadStat.prefix
 ]
@@ -186,7 +191,7 @@ conn_stats = [
     ConnStat('write_io', 'total write I/Os'),
 
     ##########################################
-    # Block manager statistics
+    # Block cache statistics
     ##########################################
     BlockCacheStat('block_cache_blocks', 'total blocks'),
     BlockCacheStat('block_cache_blocks_evicted', 'evicted blocks'),
@@ -327,6 +332,22 @@ conn_stats = [
     CapacityStat('fsync_all_fh', 'background fsync file handles synced'),
     CapacityStat('fsync_all_fh_total', 'background fsync file handles considered'),
     CapacityStat('fsync_all_time', 'background fsync time (msecs)', 'no_clear,no_scale'),
+
+    ##########################################
+    # Chunk cache statistics
+    ##########################################
+    ChunkCacheStat('chunk_cache_bytes_inuse', 'total bytes used by the cache'),
+    ChunkCacheStat('chunk_cache_chunks_inuse', 'total chunks held by the chunk cache'),
+    ChunkCacheStat('chunk_cache_chunks_evicted', 'chunks evicted'),
+    ChunkCacheStat('chunk_cache_chunks_invalidated', 'chunks removed on becoming invalid'),
+    ChunkCacheStat('chunk_cache_exceeded_capacity', 'could not allocate due to exceeding capacity'),
+    ChunkCacheStat('chunk_cache_io_failed', 'number of times a read from storage failed'),
+    ChunkCacheStat('chunk_cache_lookups', 'lookups'),
+    ChunkCacheStat('chunk_cache_misses', 'number of misses'),
+    ChunkCacheStat('chunk_cache_retries', 'retried accessing a chunk while I/O was in progress'),
+    ChunkCacheStat('chunk_cache_spans_chunks_read', 'aggregate number of spanned chunks on read'),
+    ChunkCacheStat('chunk_cache_spans_chunks_remove', 'aggregate number of spanned chunks on remove'),
+    ChunkCacheStat('chunk_cache_toomany_retries', 'timed out due to too many retries'),
 
     ##########################################
     # Cursor operations

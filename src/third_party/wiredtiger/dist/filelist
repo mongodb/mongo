@@ -13,6 +13,7 @@ src/block/block_slvg.c
 src/block/block_vrfy.c
 src/block/block_write.c
 src/block_cache/block_cache.c
+src/block_cache/block_chunkcache.c
 src/block_cache/block_io.c
 src/block_cache/block_map.c
 src/block_cache/block_mgr.c

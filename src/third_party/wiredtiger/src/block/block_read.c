@@ -1,7 +1,7 @@
 /*-
  * Copyright (c) 2014-present MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
- *	All rights reserved.
+ *  All rights reserved.
  *
  * See the file LICENSE for redistribution information.
  */
@@ -192,7 +192,14 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, uin
     WT_RET(__wt_buf_init(session, buf, bufsize));
     buf->size = size;
 
-    WT_RET(__wt_read(session, block->fh, offset, size, buf->mem));
+    /*
+     * Check if the chunk cache has the needed data. If it does not, the chunk cache may read it
+     * from the file.
+     */
+    if (S2C(session)->chunkcache.configured)
+        WT_RET(__wt_chunkcache_get(session, block, objectid, offset, size, buf->mem));
+    else
+        WT_RET(__wt_read(session, block->fh, offset, size, buf->mem));
 
     /*
      * We incrementally read through the structure before doing a checksum, do little- to big-endian
