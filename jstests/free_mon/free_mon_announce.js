@@ -14,20 +14,11 @@ const mongod = MongoRunner.runMongod({
 assert.neq(mongod, null, 'mongod not running');
 const admin = mongod.getDB('admin');
 
-function getConnectAnnounce() {
-    // Capture message as it'd be presented to a user.
-    clearRawMongoProgramOutput();
-    const exitCode = runMongoProgram(
-        'mongo', '--port', mongod.port, '--eval', "shellHelper( 'show', 'freeMonitoring' );");
-    assert.eq(exitCode, 0);
-    return rawMongoProgramOutput();
-}
-
 // state === 'enabled'.
 admin.enableFreeMonitoring();
 WaitForRegistration(mongod);
 const reminder = "To see your monitoring data";
-assert.neq(getConnectAnnounce().search(reminder), -1, 'userReminder not found');
+assert(FreeMonGetStatus(mongod).userReminder.includes(reminder), 'userReminder not found');
 
 // Cleanup.
 MongoRunner.stopMongod(mongod);

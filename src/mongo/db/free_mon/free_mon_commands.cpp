@@ -84,17 +84,23 @@ public:
         IDLParserContext ctx("getFreeMonitoringStatus");
         GetFreeMonitoringStatus::parse(ctx, cmdObj);
 
-        if (globalFreeMonParams.freeMonitoringState == EnableCloudStateEnum::kOff) {
-            result.append("state", "disabled");
-            return true;
+        // FreeMonitoring has been deprecated and will be decomissioned.
+        // Report that FreeMon is disabled even if it's running to draw attention
+        // to the deprecation notice returned from the service.
+        result.append("state"_sd, "disabled"_sd);
+
+        if (globalFreeMonParams.freeMonitoringState != EnableCloudStateEnum::kOff) {
+            // To aid discovery during deprecation period, add true state as context.
+            auto* controller = FreeMonController::get(opCtx->getServiceContext());
+            if (controller) {
+                result.append(
+                    "message"_sd,
+                    "Free monitoring is deprecated, refer to 'debug' field for actual status"_sd);
+                BSONObjBuilder debug(result.subobjStart("debug"_sd));
+                controller->getStatus(opCtx, &debug);
+            }
         }
 
-        auto* controller = FreeMonController::get(opCtx->getServiceContext());
-        if (!controller) {
-            result.append("state", "disabled");
-        } else {
-            controller->getStatus(opCtx, &result);
-        }
         return true;
     }
 } getFreeMonitoringStatusCommand;
