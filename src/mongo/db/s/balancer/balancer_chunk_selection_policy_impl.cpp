@@ -55,6 +55,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
+MONGO_FAIL_POINT_DEFINE(overrideStatsForBalancingBatchSize);
 
 namespace mongo {
 
@@ -431,8 +432,17 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
     }
 
     MigrateInfoVector candidateChunks;
-    static constexpr auto kStatsForBalancingBatchSize = 100;
-    static constexpr auto kMaxCachedCollectionsSize = int(0.75 * kStatsForBalancingBatchSize);
+
+    const uint32_t kStatsForBalancingBatchSize = [&]() {
+        auto batchSize = 100U;
+        overrideStatsForBalancingBatchSize.execute([&batchSize](const BSONObj& data) {
+            batchSize = data["size"].numberInt();
+            LOGV2(7617200, "Overriding collections batch size", "size"_attr = batchSize);
+        });
+        return batchSize;
+    }();
+
+    const uint32_t kMaxCachedCollectionsSize = 0.75 * kStatsForBalancingBatchSize;
 
     // Lambda function used to get a CollectionType leveraging the `collections` vector
     // The `collections` vector must be sorted by nss when it is called
