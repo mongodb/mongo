@@ -288,7 +288,12 @@ function FreeMonGetStatus(conn) {
     'use strict';
 
     const admin = conn.getDB("admin");
-    return assert.commandWorked(admin.runCommand({getFreeMonitoringStatus: 1}));
+    const reply = assert.commandWorked(admin.runCommand({getFreeMonitoringStatus: 1}));
+    // FreeMonitoring has been deprecated and reports 'disabled' regardless of status.
+    assert.eq(reply.state, 'disabled', 'FreeMonitoring has been deprecated');
+
+    // Use the "true" state tucked into the 'debug' field if its available.
+    return reply.debug || reply;
 }
 
 /**
