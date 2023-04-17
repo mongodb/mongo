@@ -1172,6 +1172,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
             if (!_applyMigrateOp(opCtx, mods, &lastOpApplied)) {
                 continue;
             }
+            ShardingStatistics::get(opCtx).countBytesClonedOnCatchUpOnRecipient.addAndFetch(
+                mods["size"].number());
 
             const int maxIterations = 3600 * 50;
 
@@ -1326,6 +1328,7 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx,
     invariant(lastOpApplied);
 
     bool didAnything = false;
+    long long totalDocs = 0;
 
     DisableDocumentValidation documentValidationDisabler(
         opCtx,
@@ -1341,6 +1344,7 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx,
 
         BSONObjIterator i(xfer["deleted"].Obj());
         while (i.more()) {
+            totalDocs++;
             AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
             uassert(ErrorCodes::ConflictingOperationInProgress,
                     str::stream() << "Collection " << _nss.ns()
@@ -1383,6 +1387,7 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx,
     if (xfer["reload"].isABSONObj()) {
         BSONObjIterator i(xfer["reload"].Obj());
         while (i.more()) {
+            totalDocs++;
             AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
             uassert(ErrorCodes::ConflictingOperationInProgress,
                     str::stream() << "Collection " << _nss.ns()
@@ -1430,6 +1435,8 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx,
             didAnything = true;
         }
     }
+
+    ShardingStatistics::get(opCtx).countDocsClonedOnCatchUpOnRecipient.addAndFetch(totalDocs);
 
     return didAnything;
 }
