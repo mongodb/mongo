@@ -797,6 +797,7 @@ void persistCommitDecision(OperationContext* opCtx,
         store.update(opCtx,
                      BSON(MigrationCoordinatorDocument::kIdFieldName << migrationDoc.getId()),
                      migrationDoc.toBSON());
+        ShardingStatistics::get(opCtx).countDonorMoveChunkCommitted.addAndFetch(1);
     } catch (const ExceptionFor<ErrorCodes::NoMatchingDocument>&) {
         LOGV2_ERROR(6439800,
                     "No coordination doc found on disk for migration",
@@ -820,6 +821,7 @@ void persistAbortDecision(OperationContext* opCtx,
         store.update(opCtx,
                      BSON(MigrationCoordinatorDocument::kIdFieldName << migrationDoc.getId()),
                      migrationDoc.toBSON());
+        ShardingStatistics::get(opCtx).countDonorMoveChunkAborted.addAndFetch(1);
     } catch (const ExceptionFor<ErrorCodes::NoMatchingDocument>&) {
         LOGV2(6439801,
               "No coordination doc found on disk for migration",
