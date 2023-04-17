@@ -2554,8 +2554,10 @@ TEST(DateAdd, DateAddWithTimezoneDST) {
         {europeAmsterdamZone.createFromDateParts(2020, 10, 24, 2, 0, 1, 0),
          TimeUnit::day,
          1,
-         // Use UTC since the time is ambiguous in Amsterdam zone.
-         kDefaultTimeZone.createFromDateParts(2020, 10, 25, 0, 0, 1, 0)},
+         europeAmsterdamZone.createFromDateParts(2020, 10, 25, 1, 59, 59, 0) +
+             Milliseconds{2000}},  // as this date is ambiguous (it could in both timezones, with or
+                                   // without DST) and the computation is expected to return the
+                                   // "with DST" one, obtain it via a computation,},
         {europeAmsterdamZone.createFromDateParts(2020, 10, 24, 3, 0, 1, 0),
          TimeUnit::day,
          1,
@@ -2647,10 +2649,13 @@ TEST(DateAdd, DateAddWithTimezoneDST) {
          TimeUnit::day,
          1,
          newYorkZone.createFromDateParts(2020, 11, 2, 1, 30, 0, 0)},
-        {newYorkZone.createFromDateParts(2020, 10, 31, 1, 30, 0, 0),
+        {newYorkZone.createFromDateParts(2020, 10, 31, 1, 0, 1, 0),
          TimeUnit::day,
          1,
-         newYorkZone.createFromDateParts(2020, 11, 1, 1, 30, 0, 0)},
+         newYorkZone.createFromDateParts(2020, 11, 1, 0, 59, 59, 0) +
+             Milliseconds{2000}},  // as this date is ambiguous (it could in both timezones, with or
+                                   // without DST) and the computation is expected to return the
+                                   // "with DST" one, obtain it via a computation
         {newYorkZone.createFromDateParts(2020, 11, 1, 3, 0, 0, 0),
          TimeUnit::day,
          -1,
