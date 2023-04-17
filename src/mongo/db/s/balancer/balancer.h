@@ -32,7 +32,6 @@
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/s/balancer/auto_merger_policy.h"
 #include "mongo/db/s/balancer/balancer_chunk_selection_policy.h"
-#include "mongo/db/s/balancer/balancer_random.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/s/request_types/balancer_collection_status_gen.h"
 #include "mongo/s/request_types/move_range_request_gen.h"
@@ -265,9 +264,6 @@ private:
 
     // Number of moved chunks in last round
     int _balancedLastTime;
-
-    // Source of randomness when metadata needs to be randomized.
-    BalancerRandomSource _random;
 
     // Source for cluster statistics. Depends on the source of randomness above so it should be
     // created after it and destroyed before it.

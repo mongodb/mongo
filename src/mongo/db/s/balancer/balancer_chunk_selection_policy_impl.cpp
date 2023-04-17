@@ -336,9 +336,8 @@ void getSplitCandidatesForSessionsCollection(OperationContext* opCtx,
 
 }  // namespace
 
-BalancerChunkSelectionPolicyImpl::BalancerChunkSelectionPolicyImpl(ClusterStatistics* clusterStats,
-                                                                   BalancerRandomSource& random)
-    : _clusterStats(clusterStats), _random(random) {}
+BalancerChunkSelectionPolicyImpl::BalancerChunkSelectionPolicyImpl(ClusterStatistics* clusterStats)
+    : _clusterStats(clusterStats) {}
 
 BalancerChunkSelectionPolicyImpl::~BalancerChunkSelectionPolicyImpl() = default;
 
@@ -359,7 +358,8 @@ StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToSpli
 
     SplitInfoVector splitCandidates;
 
-    std::shuffle(collections.begin(), collections.end(), _random);
+    auto client = opCtx->getClient();
+    std::shuffle(collections.begin(), collections.end(), client->getPrng().urbg());
 
     for (const auto& coll : collections) {
         const NamespaceString& nss(coll.getNss());
@@ -474,7 +474,8 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
     const auto processBatch = [&](std::vector<CollectionType>& collBatch) {
         const auto collsDataSizeInfo = getDataSizeInfoForCollections(opCtx, collBatch);
 
-        std::shuffle(collBatch.begin(), collBatch.end(), _random);
+        auto client = opCtx->getClient();
+        std::shuffle(collBatch.begin(), collBatch.end(), client->getPrng().urbg());
         for (const auto& coll : collBatch) {
 
             if (availableShards->size() < 2) {
@@ -536,7 +537,8 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
     }
 
     // Iterate all the remaining collections randomly
-    std::shuffle(collections.begin(), collections.end(), _random);
+    auto client = opCtx->getClient();
+    std::shuffle(collections.begin(), collections.end(), client->getPrng().urbg());
     for (const auto& coll : collections) {
 
         if (canBalanceCollection(coll)) {

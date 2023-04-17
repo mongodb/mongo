@@ -31,7 +31,6 @@
 
 #include "mongo/db/s/balancer/balancer_defragmentation_policy.h"
 #include "mongo/db/s/balancer/balancer_policy.h"
-#include "mongo/db/s/balancer/balancer_random.h"
 #include "mongo/s/catalog/type_collection.h"
 
 namespace mongo {
@@ -76,9 +75,7 @@ class BalancerDefragmentationPolicyImpl : public BalancerDefragmentationPolicy {
 public:
     BalancerDefragmentationPolicyImpl(ClusterStatistics* clusterStats,
                                       const std::function<void()>& onStateUpdated)
-        : _clusterStats(clusterStats),
-          _random(std::random_device{}()),
-          _onStateUpdated(onStateUpdated) {}
+        : _clusterStats(clusterStats), _onStateUpdated(onStateUpdated) {}
 
     ~BalancerDefragmentationPolicyImpl() {}
 
@@ -147,8 +144,6 @@ private:
     Mutex _stateMutex = MONGO_MAKE_LATCH("BalancerChunkMergerImpl::_stateMutex");
 
     ClusterStatistics* const _clusterStats;
-
-    BalancerRandomSource _random;
 
     const std::function<void()> _onStateUpdated;
 

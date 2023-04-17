@@ -293,10 +293,9 @@ Balancer* Balancer::get(OperationContext* operationContext) {
 
 Balancer::Balancer()
     : _balancedLastTime(0),
-      _random(std::random_device{}()),
-      _clusterStats(std::make_unique<ClusterStatisticsImpl>(_random)),
+      _clusterStats(std::make_unique<ClusterStatisticsImpl>()),
       _chunkSelectionPolicy(
-          std::make_unique<BalancerChunkSelectionPolicyImpl>(_clusterStats.get(), _random)),
+          std::make_unique<BalancerChunkSelectionPolicyImpl>(_clusterStats.get())),
       _commandScheduler(std::make_unique<BalancerCommandsSchedulerImpl>()),
       _defragmentationPolicy(std::make_unique<BalancerDefragmentationPolicyImpl>(
           _clusterStats.get(), [this]() { _onActionsStreamPolicyStateUpdate(); })),
@@ -521,7 +520,8 @@ void Balancer::_consumeActionStreamLoop() {
         // Get next action from a random stream together with its stream
         auto [nextAction, sourcedStream] =
             [&]() -> std::tuple<boost::optional<BalancerStreamAction>, ActionsStreamPolicy*> {
-            std::shuffle(activeStreams.begin(), activeStreams.end(), _random);
+            auto client = opCtx->getClient();
+            std::shuffle(activeStreams.begin(), activeStreams.end(), client->getPrng().urbg());
             for (auto stream : activeStreams) {
                 try {
                     auto action = stream->getNextStreamingAction(opCtx.get());

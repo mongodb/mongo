@@ -96,8 +96,6 @@ StatusWith<std::string> retrieveShardMongoDVersion(OperationContext* opCtx, Shar
 
 using ShardStatistics = ClusterStatistics::ShardStatistics;
 
-ClusterStatisticsImpl::ClusterStatisticsImpl(BalancerRandomSource& random) : _random(random) {}
-
 ClusterStatisticsImpl::~ClusterStatisticsImpl() = default;
 
 StatusWith<std::vector<ShardStatistics>> ClusterStatisticsImpl::getStats(OperationContext* opCtx) {
@@ -125,7 +123,8 @@ StatusWith<std::vector<ShardStatistics>> ClusterStatisticsImpl::_getStats(
 
     auto& shards = shardsStatus.getValue().value;
 
-    std::shuffle(shards.begin(), shards.end(), _random);
+    auto client = opCtx->getClient();
+    std::shuffle(shards.begin(), shards.end(), client->getPrng().urbg());
 
     std::vector<ShardStatistics> stats;
 
