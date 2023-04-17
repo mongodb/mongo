@@ -146,10 +146,13 @@ public:
 
             if (cmdObj["fullMetadata"].trueValue()) {
                 BSONArrayBuilder indexesArrBuilder;
+                // Added to the result bson if the max bson size is exceeded
+                BSONObjBuilder exceededSizeElt(BSON("exceededSize" << true));
                 bool exceedsSizeLimit = false;
                 scopedCsr->getIndexes(opCtx)->forEachIndex([&](const auto& index) {
                     BSONObjBuilder indexB(index.toBSON());
-                    if (result.len() + indexesArrBuilder.len() + indexB.len() >
+                    if (result.len() + exceededSizeElt.len() + indexesArrBuilder.len() +
+                            indexB.len() >
                         BSONObjMaxUserSize) {
                         exceedsSizeLimit = true;
                     } else {
@@ -160,6 +163,9 @@ public:
                 });
 
                 result.append("indexes", indexesArrBuilder.arr());
+                if (exceedsSizeLimit) {
+                    result.appendElements(exceededSizeElt.done());
+                }
             }
         }
 

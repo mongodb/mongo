@@ -110,7 +110,8 @@ public:
             result.appendTimestamp("version", cm.getVersion().toLong());
             result.append("versionEpoch", cm.getVersion().epoch());
             result.append("versionTimestamp", cm.getVersion().getTimestamp());
-
+            // Added to the result bson if the max bson size is exceeded
+            BSONObjBuilder exceededSizeElt(BSON("exceededSize" << true));
 
             if (sii) {
                 result.append("indexVersion", sii->getCollectionIndexes().indexVersion());
@@ -131,7 +132,8 @@ public:
                         chunkBB.append(chunk.getMin());
                         chunkBB.append(chunk.getMax());
                         chunkBB.done();
-                        if (chunksArrBuilder.len() + result.len() > BSONObjMaxUserSize) {
+                        if (chunksArrBuilder.len() + result.len() + exceededSizeElt.len() >
+                            BSONObjMaxUserSize) {
                             exceedsSizeLimit = true;
                         }
                     }
@@ -146,7 +148,8 @@ public:
                         BSONArrayBuilder indexesArrBuilder;
                         sii->forEachIndex([&](const auto& index) {
                             BSONObjBuilder indexB(index.toBSON());
-                            if (result.len() + indexesArrBuilder.len() + indexB.len() >
+                            if (result.len() + exceededSizeElt.len() + indexesArrBuilder.len() +
+                                    indexB.len() >
                                 BSONObjMaxUserSize) {
                                 exceedsSizeLimit = true;
                             } else {
@@ -158,6 +161,10 @@ public:
 
                         result.append("indexes", indexesArrBuilder.arr());
                     }
+                }
+
+                if (exceedsSizeLimit) {
+                    result.appendElements(exceededSizeElt.done());
                 }
             }
         }
