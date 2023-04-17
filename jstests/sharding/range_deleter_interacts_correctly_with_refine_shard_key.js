@@ -151,10 +151,6 @@ function test(st, description, testBody) {
              let hangDonorAtEndOfMigration =
                  configureFailPoint(st.rs1.getPrimary(), "moveChunkHangAtStep6");
 
-             // Increase timeout for range deletion of overlapping range on recipient.
-             st.shard0.rs.getPrimary().adminCommand(
-                 {setParameter: 1, receiveChunkWaitForRangeDeleterTimeoutMS: 90000});
-
              // Attempt to move the chunk back to shard 0. Synchronize with the parallel shell to
              // make sure that the moveChunk started.
              let hangOnStep1 = configureFailPoint(st.rs1.getPrimary(), "moveChunkHangAtStep1");

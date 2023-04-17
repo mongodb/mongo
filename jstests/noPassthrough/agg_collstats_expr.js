@@ -25,10 +25,7 @@ function getShardCount(counts, shardName) {
  * on the i-th shard or no chunks assigned to that shard if shardDistribution[i] is null.
  */
 function runShardingTestExists(shardDistribution) {
-    const st = ShardingTest({
-        shards: shardDistribution.length,
-        setParameter: {receiveChunkWaitForRangeDeleterTimeoutMS: 90000}
-    });
+    const st = ShardingTest({shards: shardDistribution.length});
 
     const mongos = st.s0;
     const admin = mongos.getDB("admin");

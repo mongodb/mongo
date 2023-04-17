@@ -27,7 +27,6 @@ executor:
       set_parameters:
         enableTestCommands: 1
         queryAnalysisWriterIntervalSecs: 1
-        receiveChunkWaitForRangeDeleterTimeoutMS: 90000
         roleGraphInvalidationIsFatal: 1
     mongos_options:
       set_parameters:
