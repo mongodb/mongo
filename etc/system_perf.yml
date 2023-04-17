@@ -1187,13 +1187,6 @@ tasks:
           test_control: "initialsync-large"
           mongodb_setup: "replica-2node-fcbis"
 
-  - name: change_streams_throughput
-    priority: 5
-    commands:
-      - func: f_run_dsi_workload
-        vars:
-          test_control: "change_streams_throughput"
-
   - name: change_streams_latency
     priority: 5
     commands:
@@ -2125,7 +2118,6 @@ buildvariants:
       - name: bestbuy_agg_merge_same_db
       - name: bestbuy_agg_merge_wordcount
       - name: bestbuy_query
-      - name: change_streams_throughput
       - name: change_streams_latency
       - name: change_streams_listen_throughput
       - name: snapshot_reads
@@ -2439,7 +2431,6 @@ buildvariants:
       - name: smoke_test
       - name: mongos_workloads
       - name: mongos_large_catalog_workloads
-      - name: change_streams_throughput
       - name: change_streams_latency
       - name: change_streams_listen_throughput
       - name: change_streams_multi_mongos
@@ -2523,7 +2514,6 @@ buildvariants:
       - name: bestbuy_query
       - name: change_streams_latency
       - name: change_streams_preimage_latency
-      - name: change_streams_throughput
       - name: change_streams_preimage_throughput
       - name: change_streams_listen_throughput
       - name: industry_benchmarks
@@ -2681,7 +2671,6 @@ buildvariants:
       - name: bestbuy_agg_merge_same_db
       - name: bestbuy_agg_merge_wordcount
       - name: bestbuy_query
-      - name: change_streams_throughput
       - name: change_streams_preimage_throughput
       - name: change_streams_latency
       - name: change_streams_preimage_latency
@@ -2771,7 +2760,6 @@ buildvariants:
       - name: bestbuy_agg_merge_same_db
       - name: bestbuy_agg_merge_wordcount
       - name: bestbuy_query
-      - name: change_streams_throughput
       - name: change_streams_latency
       - name: change_streams_listen_throughput
       - name: snapshot_reads
@@ -2830,7 +2818,6 @@ buildvariants:
       - name: bestbuy_agg_merge_same_db
       - name: bestbuy_agg_merge_wordcount
       - name: bestbuy_query
-      - name: change_streams_throughput
       - name: change_streams_latency
       - name: change_streams_listen_throughput
       - name: snapshot_reads
@@ -2889,7 +2876,6 @@ buildvariants:
       - name: bestbuy_agg_merge_same_db
       - name: bestbuy_agg_merge_wordcount
       - name: bestbuy_query
-      - name: change_streams_throughput
       - name: change_streams_latency
       - name: change_streams_listen_throughput
       - name: change_streams_preimage_throughput
