@@ -54,6 +54,9 @@ void ShardingStatistics::report(BSONObjBuilder* builder) const {
     builder->append("countStaleConfigErrors", countStaleConfigErrors.load());
 
     builder->append("countDonorMoveChunkStarted", countDonorMoveChunkStarted.load());
+    builder->append("countDonorMoveChunkCommitted", countDonorMoveChunkCommitted.load());
+    builder->append("countDonorMoveChunkAborted", countDonorMoveChunkAborted.load());
+    builder->append("totalDonorMoveChunkTimeMillis", totalDonorMoveChunkTimeMillis.load());
     builder->append("totalDonorChunkCloneTimeMillis", totalDonorChunkCloneTimeMillis.load());
     builder->append("totalCriticalSectionCommitTimeMillis",
                     totalCriticalSectionCommitTimeMillis.load());
@@ -61,6 +64,11 @@ void ShardingStatistics::report(BSONObjBuilder* builder) const {
     builder->append("totalRecipientCriticalSectionTimeMillis",
                     totalRecipientCriticalSectionTimeMillis.load());
     builder->append("countDocsClonedOnRecipient", countDocsClonedOnRecipient.load());
+    builder->append("countBytesClonedOnRecipient", countBytesClonedOnRecipient.load());
+    builder->append("countDocsClonedOnCatchUpOnRecipient",
+                    countDocsClonedOnCatchUpOnRecipient.load());
+    builder->append("countBytesClonedOnCatchUpOnRecipient",
+                    countBytesClonedOnCatchUpOnRecipient.load());
     builder->append("countDocsClonedOnDonor", countDocsClonedOnDonor.load());
     builder->append("countRecipientMoveChunkStarted", countRecipientMoveChunkStarted.load());
     builder->append("countDocsDeletedOnDonor", countDocsDeletedOnDonor.load());
