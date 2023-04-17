@@ -186,6 +186,7 @@ __thread_group_resize(WT_SESSION_IMPL *session, WT_THREAD_GROUP *group, uint32_t
         if (LF_ISSET(WT_THREAD_PANIC_FAIL))
             F_SET(thread, WT_THREAD_PANIC_FAIL);
         thread->id = i;
+        thread->tid.name_index = (uint16_t)i + 1;
         thread->chk_func = group->chk_func;
         thread->run_func = group->run_func;
         thread->stop_func = group->stop_func;

@@ -13,6 +13,7 @@ typedef CONDITION_VARIABLE wt_cond_t;
 typedef CRITICAL_SECTION wt_mutex_t;
 typedef struct {
     bool created;
+    uint16_t name_index; /* Not used on Windows */
     HANDLE id;
 } wt_thread_t;
 

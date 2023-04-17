@@ -211,6 +211,7 @@ __wt_lsm_manager_start(WT_SESSION_IMPL *session)
         WT_ERR(__wt_open_internal_session(conn, "lsm-worker", false, 0, 0, &worker_session));
         worker_session->isolation = WT_ISO_READ_UNCOMMITTED;
         manager->lsm_worker_cookies[i].session = worker_session;
+        manager->lsm_worker_cookies[i].tid.name_index = (uint16_t)i;
     }
 
     FLD_SET(conn->server_flags, WT_CONN_SERVER_LSM);
