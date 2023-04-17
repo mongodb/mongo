@@ -72,7 +72,7 @@ __chunkcache_admit_size(WT_SESSION_IMPL *session)
       "chunkcache exceeded capacity of %" PRIu64
       " bytes "
       "with %" PRIu64 " bytes in use and the chunk size of %" PRIu64 " bytes",
-      chunkcache->capacity, chunkcache->bytes_used, chunkcache->chunk_size);
+      chunkcache->capacity, chunkcache->bytes_used, (uint64_t)chunkcache->chunk_size);
     return (0);
 }
 
