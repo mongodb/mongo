@@ -45,15 +45,25 @@ class DBClientBase;
 class NamespaceString;
 class OperationContext;
 
-// TODO SERVER-75657: Create an interface for the Cloner.
-
-class Cloner {
-    Cloner(const Cloner&) = delete;
-    Cloner& operator=(const Cloner&) = delete;
-
+class ClonerImpl {
 public:
-    Cloner();
-    virtual ~Cloner() {}
+    virtual ~ClonerImpl() = default;
+    virtual Status copyDb(OperationContext* opCtx,
+                          const std::string& dBName,
+                          const std::string& masterHost,
+                          const std::vector<NamespaceString>& shardedColls,
+                          std::set<std::string>* clonedColls) = 0;
+
+    virtual Status setupConn(OperationContext* opCtx,
+                             const std::string& dBName,
+                             const std::string& masterHost) = 0;
+
+    virtual StatusWith<std::vector<BSONObj>> getListOfCollections(
+        OperationContext* opCtx, const std::string& dBName, const std::string& masterHost) = 0;
+};
+
+class DefaultClonerImpl : public ClonerImpl {
+public:
     /**
      * Copies an entire database from the specified host.
      * clonedColls: the function will return with this populated with a list of the collections that
@@ -62,21 +72,21 @@ public:
      *              that are cloned.  When opts.createCollections is true, this parameter is
      *              ignored and the collection list is fetched from the remote via _conn.
      */
-    virtual Status copyDb(OperationContext* opCtx,
-                          const std::string& dBName,
-                          const std::string& masterHost,
-                          const std::vector<NamespaceString>& shardedColls,
-                          std::set<std::string>* clonedColls);
+    Status copyDb(OperationContext* opCtx,
+                  const std::string& dBName,
+                  const std::string& masterHost,
+                  const std::vector<NamespaceString>& shardedColls,
+                  std::set<std::string>* clonedColls) override;
 
-    virtual Status setupConn(OperationContext* opCtx,
-                             const std::string& dBName,
-                             const std::string& masterHost);
+    Status setupConn(OperationContext* opCtx,
+                     const std::string& dBName,
+                     const std::string& masterHost) override;
 
-    virtual StatusWith<std::vector<BSONObj>> getListOfCollections(OperationContext* opCtx,
-                                                                  const std::string& dBName,
-                                                                  const std::string& masterHost);
+    StatusWith<std::vector<BSONObj>> getListOfCollections(OperationContext* opCtx,
+                                                          const std::string& dBName,
+                                                          const std::string& masterHost) override;
 
-protected:
+private:
     std::unique_ptr<ScopedDbConnection> _conn;
 
     // Filters a database's collection list and removes collections that should not be cloned.
@@ -119,6 +129,31 @@ protected:
     DBClientBase* getConn() {
         return _conn->get();
     }
+};
+
+class Cloner {
+
+public:
+    Cloner(std::unique_ptr<ClonerImpl> clonerImpl) : _clonerImpl(std::move(clonerImpl)) {}
+
+    Cloner();
+
+    Cloner(const Cloner&) = delete;
+
+    Cloner& operator=(const Cloner&) = delete;
+
+    Status copyDb(OperationContext* opCtx,
+                  const std::string& dBName,
+                  const std::string& masterHost,
+                  const std::vector<NamespaceString>& shardedColls,
+                  std::set<std::string>* clonedColls);
+
+    StatusWith<std::vector<BSONObj>> getListOfCollections(OperationContext* opCtx,
+                                                          const std::string& dBName,
+                                                          const std::string& masterHost);
+
+private:
+    std::unique_ptr<ClonerImpl> _clonerImpl;
 };
 
 }  // namespace mongo

@@ -75,7 +75,7 @@ MONGO_FAIL_POINT_DEFINE(movePrimaryFailPoint);
 
 BSONElement getErrField(const BSONObj& o);
 
-BSONObj Cloner::_getIdIndexSpec(const std::list<BSONObj>& indexSpecs) {
+BSONObj DefaultClonerImpl::_getIdIndexSpec(const std::list<BSONObj>& indexSpecs) {
     for (auto&& indexSpec : indexSpecs) {
         BSONElement indexName;
         uassertStatusOK(bsonExtractTypedField(
@@ -87,9 +87,7 @@ BSONObj Cloner::_getIdIndexSpec(const std::list<BSONObj>& indexSpecs) {
     return BSONObj();
 }
 
-Cloner::Cloner() {}
-
-struct Cloner::BatchHandler {
+struct DefaultClonerImpl::BatchHandler {
     BatchHandler(OperationContext* opCtx, const std::string& dbName)
         : lastLog(0), opCtx(opCtx), _dbName(dbName), numSeen(0), saveLast(0) {}
 
@@ -242,11 +240,11 @@ struct Cloner::BatchHandler {
 /**
  * Copy the specified collection.
  */
-void Cloner::_copy(OperationContext* opCtx,
-                   const std::string& toDBName,
-                   const NamespaceString& nss,
-                   const BSONObj& from_opts,
-                   const BSONObj& from_id_index) {
+void DefaultClonerImpl::_copy(OperationContext* opCtx,
+                              const std::string& toDBName,
+                              const NamespaceString& nss,
+                              const BSONObj& from_opts,
+                              const BSONObj& from_id_index) {
     LOGV2_DEBUG(20414,
                 2,
                 "\t\tcloning collection",
@@ -272,11 +270,11 @@ void Cloner::_copy(OperationContext* opCtx,
     }
 }
 
-void Cloner::_copyIndexes(OperationContext* opCtx,
-                          const std::string& toDBName,
-                          const NamespaceString& nss,
-                          const BSONObj& from_opts,
-                          const std::list<BSONObj>& from_indexes) {
+void DefaultClonerImpl::_copyIndexes(OperationContext* opCtx,
+                                     const std::string& toDBName,
+                                     const NamespaceString& nss,
+                                     const BSONObj& from_opts,
+                                     const std::list<BSONObj>& from_indexes) {
     LOGV2_DEBUG(20415,
                 2,
                 "\t\t copyIndexes",
@@ -312,7 +310,7 @@ void Cloner::_copyIndexes(OperationContext* opCtx,
     });
 }
 
-StatusWith<std::vector<BSONObj>> Cloner::_filterCollectionsForClone(
+StatusWith<std::vector<BSONObj>> DefaultClonerImpl::_filterCollectionsForClone(
     const std::string& fromDBName, const std::list<BSONObj>& initialCollections) {
     std::vector<BSONObj> finalCollections;
     for (auto&& collection : initialCollections) {
@@ -346,7 +344,7 @@ StatusWith<std::vector<BSONObj>> Cloner::_filterCollectionsForClone(
     return finalCollections;
 }
 
-Status Cloner::_createCollectionsForDb(
+Status DefaultClonerImpl::_createCollectionsForDb(
     OperationContext* opCtx,
     const std::vector<CreateCollectionParams>& createCollectionParams,
     const std::string& dbName) {
@@ -441,9 +439,9 @@ Status Cloner::_createCollectionsForDb(
     return Status::OK();
 }
 
-Status Cloner::setupConn(OperationContext* opCtx,
-                         const std::string& dBName,
-                         const std::string& masterHost) {
+Status DefaultClonerImpl::setupConn(OperationContext* opCtx,
+                                    const std::string& dBName,
+                                    const std::string& masterHost) {
     invariant(!_conn);
     invariant(!opCtx->lockState()->isLocked());
     auto statusWithMasterHost = ConnectionString::parse(masterHost);
@@ -487,9 +485,8 @@ Status Cloner::setupConn(OperationContext* opCtx,
     return Status::OK();
 }
 
-StatusWith<std::vector<BSONObj>> Cloner::getListOfCollections(OperationContext* opCtx,
-                                                              const std::string& dBName,
-                                                              const std::string& masterHost) {
+StatusWith<std::vector<BSONObj>> DefaultClonerImpl::getListOfCollections(
+    OperationContext* opCtx, const std::string& dBName, const std::string& masterHost) {
     invariant(!opCtx->lockState()->isLocked());
     std::vector<BSONObj> collsToClone;
     if (!_conn) {
@@ -505,11 +502,11 @@ StatusWith<std::vector<BSONObj>> Cloner::getListOfCollections(OperationContext* 
     return _filterCollectionsForClone(dBName, initialCollections);
 }
 
-Status Cloner::copyDb(OperationContext* opCtx,
-                      const std::string& dBName,
-                      const std::string& masterHost,
-                      const std::vector<NamespaceString>& shardedColls,
-                      std::set<std::string>* clonedColls) {
+Status DefaultClonerImpl::copyDb(OperationContext* opCtx,
+                                 const std::string& dBName,
+                                 const std::string& masterHost,
+                                 const std::vector<NamespaceString>& shardedColls,
+                                 std::set<std::string>* clonedColls) {
     invariant(clonedColls && clonedColls->empty(), str::stream() << masterHost << ":" << dBName);
     // This function can potentially block for a long time on network activity, so holding of locks
     // is disallowed.
@@ -613,6 +610,22 @@ Status Cloner::copyDb(OperationContext* opCtx,
     }
 
     return Status::OK();
+}
+
+Cloner::Cloner() : Cloner(std::make_unique<DefaultClonerImpl>()) {}
+
+Status Cloner::copyDb(OperationContext* opCtx,
+                      const std::string& dBName,
+                      const std::string& masterHost,
+                      const std::vector<NamespaceString>& shardedColls,
+                      std::set<std::string>* clonedColls) {
+    return _clonerImpl->copyDb(opCtx, dBName, masterHost, shardedColls, clonedColls);
+}
+
+StatusWith<std::vector<BSONObj>> Cloner::getListOfCollections(OperationContext* opCtx,
+                                                              const std::string& dBName,
+                                                              const std::string& masterHost) {
+    return _clonerImpl->getListOfCollections(opCtx, dBName, masterHost);
 }
 
 }  // namespace mongo

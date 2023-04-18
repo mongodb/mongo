@@ -81,7 +81,7 @@ static HostAndPort makeHostAndPort(const ShardId& shardId) {
 }
 }  // namespace
 
-class ClonerForTest : public Cloner {
+class TestClonerImpl : public ClonerImpl {
     Status copyDb(OperationContext* opCtx,
                   const std::string& dBName,
                   const std::string& masterHost,
@@ -144,7 +144,7 @@ public:
             recipientStateDoc,
             std::make_shared<MovePrimaryRecipientExternalStateForTest>(),
             _serviceContext,
-            std::make_unique<ClonerForTest>());
+            std::make_unique<Cloner>(std::make_unique<TestClonerImpl>()));
     }
 
     StringData getServiceName() const {
@@ -718,7 +718,7 @@ TEST_F(MovePrimaryRecipientServiceTest, AbortsOnUnrecoverableClonerError) {
     // Step Down to register new POS before Step Up.
     stepDown(_serviceCtx, _registry);
 
-    class FailingCloner : public ClonerForTest {
+    class FailingCloner : public TestClonerImpl {
         Status copyDb(OperationContext* opCtx,
                       const std::string& dBName,
                       const std::string& masterHost,
@@ -744,7 +744,7 @@ TEST_F(MovePrimaryRecipientServiceTest, AbortsOnUnrecoverableClonerError) {
                 recipientStateDoc,
                 std::make_shared<MovePrimaryRecipientExternalStateForTest>(),
                 _serviceContext,
-                std::make_unique<FailingCloner>());
+                std::make_unique<Cloner>(std::make_unique<FailingCloner>()));
         }
 
         StringData getServiceName() const override {
