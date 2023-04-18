@@ -1627,11 +1627,13 @@ ExecutorFuture<void> ReshardingCoordinator::_runReshardingOp(
         .onCompletion([this, self = shared_from_this()](Status status) {
             _metrics->onStateTransition(_coordinatorDoc.getState(), boost::none);
 
-            // Destroy metrics early so it's lifetime will not be tied to the lifetime of this
+            // Destroy metrics early so its lifetime will not be tied to the lifetime of this
             // state machine. This is because we have future callbacks copy shared pointers to this
             // state machine that causes it to live longer than expected and potentially overlap
-            // with a newer instance when stepping up.
+            // with a newer instance when stepping up. The commit monitor also has a shared pointer
+            // to the metrics, so release this as well.
             _metrics.reset();
+            _commitMonitor.reset();
 
             if (!status.isOK()) {
                 {
