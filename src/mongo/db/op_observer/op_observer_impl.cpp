@@ -70,9 +70,6 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
-#include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
-#include "mongo/db/timeseries/bucket_catalog/bucket_catalog_helpers.h"
-#include "mongo/db/timeseries/timeseries_extended_range.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction/transaction_participant_gen.h"
 #include "mongo/db/views/util.h"
@@ -721,28 +718,6 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
                     }
                 });
         }
-    } else if (nss.isTimeseriesBucketsCollection()) {
-        // Check if the bucket _id is sourced from a date outside the standard range. If our writes
-        // end up erroring out or getting rolled back, then this flag will stay set. This is okay
-        // though, as it only disables some query optimizations and won't result in any correctness
-        // issues if the flag is set when it doesn't need to be (as opposed to NOT being set when it
-        // DOES need to be -- that will cause correctness issues). Additionally, if the user tried
-        // to insert measurements with dates outside the standard range, chances are they will do so
-        // again, and we will have only set the flag a little early.
-        invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX));
-        // Hold reference to the catalog for collection lookup without locks to be safe.
-        auto catalog = CollectionCatalog::get(opCtx);
-        auto bucketsColl = catalog->lookupCollectionByNamespace(opCtx, nss);
-        tassert(6905201, "Could not find collection for write", bucketsColl);
-        auto timeSeriesOptions = bucketsColl->getTimeseriesOptions();
-        if (timeSeriesOptions.has_value()) {
-            if (auto currentSetting = bucketsColl->getRequiresTimeseriesExtendedRangeSupport();
-                !currentSetting &&
-                timeseries::bucketsHaveDateOutsideStandardRange(
-                    timeSeriesOptions.value(), first, last)) {
-                bucketsColl->setRequiresTimeseriesExtendedRangeSupport(opCtx);
-            }
-        }
     }
 }
 
@@ -977,11 +952,6 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
     } else if (args.coll->ns() == NamespaceString::kConfigSettingsNamespace) {
         ReadWriteConcernDefaults::get(opCtx).observeDirectWriteToConfigSettings(
             opCtx, args.updateArgs->updatedDoc["_id"], args.updateArgs->updatedDoc);
-    } else if (args.coll->ns().isTimeseriesBucketsCollection()) {
-        if (args.updateArgs->source != OperationSource::kTimeseriesInsert) {
-            OID bucketId = args.updateArgs->updatedDoc["_id"].OID();
-            timeseries::bucket_catalog::handleDirectWrite(opCtx, args.coll->ns(), bucketId);
-        }
     }
 }
 
@@ -997,11 +967,6 @@ void OpObserverImpl::aboutToDelete(OperationContext* opCtx,
     destinedRecipientDecoration(opCtx) = op.getDestinedRecipient();
 
     shardObserveAboutToDelete(opCtx, coll->ns(), doc);
-
-    if (coll->ns().isTimeseriesBucketsCollection()) {
-        OID bucketId = doc["_id"].OID();
-        timeseries::bucket_catalog::handleDirectWrite(opCtx, coll->ns(), bucketId);
-    }
 }
 
 void OpObserverImpl::onDelete(OperationContext* opCtx,
@@ -1303,9 +1268,6 @@ void OpObserverImpl::onDropDatabase(OperationContext* opCtx, const DatabaseName&
         auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
         mongoDSessionCatalog->invalidateAllSessions(opCtx);
     }
-
-    auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
-    clear(bucketCatalog, dbName.db());
 }
 
 repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
@@ -1371,9 +1333,6 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
         mongoDSessionCatalog->invalidateAllSessions(opCtx);
     } else if (collectionName == NamespaceString::kConfigSettingsNamespace) {
         ReadWriteConcernDefaults::get(opCtx).invalidate();
-    } else if (collectionName.isTimeseriesBucketsCollection()) {
-        auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
-        clear(bucketCatalog, collectionName.getTimeseriesViewNamespace());
     } else if (collectionName.isSystemDotJavascript()) {
         // Inform the JavaScript engine of the change to system.js.
         Scope::storedFuncMod(opCtx);
@@ -2245,17 +2204,6 @@ void OpObserverImpl::_onReplicationRollback(OperationContext* opCtx,
     // Force the default read/write concern cache to reload on next access in case the defaults
     // document was rolled back.
     ReadWriteConcernDefaults::get(opCtx).invalidate();
-
-    stdx::unordered_set<NamespaceString> timeseriesNamespaces;
-    for (const auto& ns : rbInfo.rollbackNamespaces) {
-        if (ns.isTimeseriesBucketsCollection()) {
-            timeseriesNamespaces.insert(ns.getTimeseriesViewNamespace());
-        }
-    }
-    auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
-    clear(bucketCatalog,
-          [timeseriesNamespaces = std::move(timeseriesNamespaces)](
-              const NamespaceString& bucketNs) { return timeseriesNamespaces.contains(bucketNs); });
 }
 
 }  // namespace mongo

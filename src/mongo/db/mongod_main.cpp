@@ -186,6 +186,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/system_index.h"
+#include "mongo/db/timeseries/timeseries_op_observer.h"
 #include "mongo/db/transaction/internal_transactions_reap_service.h"
 #include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
 #include "mongo/db/transaction/transaction_participant.h"
@@ -1288,6 +1289,7 @@ void setUpObservers(ServiceContext* serviceContext) {
         }
     }
 
+    opObserverRegistry->addObserver(std::make_unique<TimeSeriesOpObserver>());
     opObserverRegistry->addObserver(std::make_unique<AuthOpObserver>());
     opObserverRegistry->addObserver(
         std::make_unique<repl::PrimaryOnlyServiceOpObserver>(serviceContext));

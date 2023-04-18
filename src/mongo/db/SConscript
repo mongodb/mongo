@@ -2436,6 +2436,7 @@ env.Library(
         'storage/storage_control',
         'storage/storage_engine_common',
         'system_index',
+        'timeseries/timeseries_op_observer',
         'ttl_d',
         'vector_clock',
     ],
