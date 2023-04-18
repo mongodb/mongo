@@ -1878,10 +1878,12 @@ void ReshardingCoordinator::_calculateParticipantsAndChunksThenWriteToDisk() {
 
     // Remove the presetReshardedChunks and zones from the coordinator document to reduce
     // the possibility of the document reaching the BSONObj size constraint.
+    ShardKeyPattern shardKey(updatedCoordinatorDoc.getReshardingKey());
     std::vector<BSONObj> zones;
     if (updatedCoordinatorDoc.getZones()) {
         zones = resharding::buildTagsDocsFromZones(updatedCoordinatorDoc.getTempReshardingNss(),
-                                                   *updatedCoordinatorDoc.getZones());
+                                                   *updatedCoordinatorDoc.getZones(),
+                                                   shardKey);
     }
     updatedCoordinatorDoc.setPresetReshardedChunks(boost::none);
     updatedCoordinatorDoc.setZones(boost::none);

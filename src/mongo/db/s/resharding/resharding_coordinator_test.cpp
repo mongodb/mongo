@@ -622,7 +622,8 @@ protected:
         std::vector<BSONObj> zones;
         if (expectedCoordinatorDoc.getZones()) {
             zones = buildTagsDocsFromZones(expectedCoordinatorDoc.getTempReshardingNss(),
-                                           *expectedCoordinatorDoc.getZones());
+                                           *expectedCoordinatorDoc.getZones(),
+                                           _newShardKey);
         }
         expectedCoordinatorDoc.setZones(boost::none);
         expectedCoordinatorDoc.setPresetReshardedChunks(boost::none);

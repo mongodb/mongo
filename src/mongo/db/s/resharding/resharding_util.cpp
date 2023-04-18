@@ -225,10 +225,13 @@ void checkForOverlappingZones(std::vector<ReshardingZoneType>& zones) {
 }
 
 std::vector<BSONObj> buildTagsDocsFromZones(const NamespaceString& tempNss,
-                                            const std::vector<ReshardingZoneType>& zones) {
+                                            std::vector<ReshardingZoneType>& zones,
+                                            const ShardKeyPattern& shardKey) {
     std::vector<BSONObj> tags;
     tags.reserve(zones.size());
-    for (const auto& zone : zones) {
+    for (auto& zone : zones) {
+        zone.setMin(shardKey.getKeyPattern().extendRangeBound(zone.getMin(), false));
+        zone.setMax(shardKey.getKeyPattern().extendRangeBound(zone.getMax(), false));
         ChunkRange range(zone.getMin(), zone.getMax());
         TagsType tag(tempNss, zone.getZone().toString(), range);
         tags.push_back(tag.toBSON());
