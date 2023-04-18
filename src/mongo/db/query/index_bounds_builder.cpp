@@ -32,13 +32,13 @@
 
 #include <cmath>
 #include <limits>
+#include <s2.h>
 #include <s2cell.h>
 #include <s2regioncoverer.h>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/geo/geoconstants.h"
-#include "mongo/db/geo/s2.h"
 #include "mongo/db/index/expression_params.h"
 #include "mongo/db/index/s2_common.h"
 #include "mongo/db/matcher/expression_geo.h"

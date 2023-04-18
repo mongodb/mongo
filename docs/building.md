@@ -7,7 +7,7 @@ way to get started, rather than building from source.
 
 To build MongoDB, you will need:
 
-* A modern C++ compiler capable of compiling C++17. One of the following is required:
+* A modern C++ compiler capable of compiling C++20. One of the following is required:
     * GCC 11.3 or newer
     * Clang 12.0 (or Apple XCode 13.0 Clang) or newer
     * Visual Studio 2022 version 17.0 or newer (See Windows section below for details)

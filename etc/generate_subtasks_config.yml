@@ -14,7 +14,6 @@ build_variant_large_distro_exceptions:
   - enterprise-linux-64-amazon-ami
   - enterprise-macos
   - enterprise-macos-rosetta-2
-  - enterprise-macos-cxx20
   - enterprise-macos-arm64
   - enterprise-rhel-67-s390x
   - enterprise-rhel-70-64-bit

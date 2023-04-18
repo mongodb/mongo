@@ -593,8 +593,8 @@ add_option(
 
 add_option(
     "cxx-std",
-    choices=["17", "20"],
-    default="17",
+    choices=["20"],
+    default="20",
     help="Select the C++ language standard to build with",
 )
 
@@ -3860,37 +3860,18 @@ def doConfigure(myenv):
         conf.Finish()
 
     if myenv.ToolchainIs('msvc'):
-        if get_option('cxx-std') == "17":
-            myenv.AppendUnique(CCFLAGS=['/std:c++17',
-                                        '/Zc:lambda'])  # /Zc:lambda is implied by /std:c++20
-        elif get_option('cxx-std') == "20":
+        if get_option('cxx-std') == "20":
             myenv.AppendUnique(CCFLAGS=['/std:c++20'])
     else:
-        if get_option('cxx-std') == "17":
-            if not myenv.AddToCXXFLAGSIfSupported('-std=c++17'):
-                myenv.ConfError('Compiler does not honor -std=c++17')
-        elif get_option('cxx-std') == "20":
+        if get_option('cxx-std') == "20":
             if not myenv.AddToCXXFLAGSIfSupported('-std=c++20'):
                 myenv.ConfError('Compiler does not honor -std=c++20')
 
         if not myenv.AddToCFLAGSIfSupported('-std=c11'):
-            myenv.ConfError("C++17 mode selected for C++ files, but can't enable C11 for C files")
+            myenv.ConfError("C++20 mode selected for C++ files, but can't enable C11 for C files")
 
     if using_system_version_of_cxx_libraries():
-        print('WARNING: System versions of C++ libraries must be compiled with C++17 support')
-
-    def CheckCxx17(context):
-        test_body = """
-        #if __cplusplus < 201703L
-        #error
-        #endif
-        namespace NestedNamespaceDecls::AreACXX17Feature {};
-        """
-
-        context.Message('Checking for C++17... ')
-        ret = context.TryCompile(textwrap.dedent(test_body), ".cpp")
-        context.Result(ret)
-        return ret
+        print('WARNING: System versions of C++ libraries must be compiled with C++20 support')
 
     def CheckCxx20(context):
         test_body = """
@@ -3910,15 +3891,12 @@ def doConfigure(myenv):
         myenv,
         help=False,
         custom_tests={
-            'CheckCxx17': CheckCxx17,
             'CheckCxx20': CheckCxx20,
         },
     )
 
-    if get_option('cxx-std') == "17" and not conf.CheckCxx17():
-        myenv.ConfError('C++17 support is required to build MongoDB')
-    elif get_option('cxx-std') == "20" and not conf.CheckCxx20():
-        myenv.ConfError('C++20 support was not detected')
+    if get_option('cxx-std') == "20" and not conf.CheckCxx20():
+        myenv.ConfError('C++20 support is required to build MongoDB')
 
     conf.Finish()
 
