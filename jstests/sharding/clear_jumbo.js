@@ -9,6 +9,7 @@ TestData.skipCheckShardFilteringMetadata = true;
 "use strict";
 
 load("jstests/sharding/libs/find_chunks_util.js");
+load("jstests/libs/fail_point_util.js");
 
 let st = new ShardingTest({shards: 2, other: {chunkSize: 1}});
 
@@ -137,13 +138,8 @@ let chunk = findChunksUtil.findOneChunkByNs(configDB, testNs, {min: {x: 0}});
 assert(chunk.jumbo, tojson(chunk));
 assert.eq(st.shard0.shardName, chunk.shard);
 
-st.forEachConfigServer((conn) => {
-    conn.adminCommand({
-        configureFailPoint: 'overrideBalanceRoundInterval',
-        mode: 'alwaysOn',
-        data: {intervalMs: 200}
-    });
-});
+configureFailPointForRS(
+    st.configRS.nodes, 'overrideBalanceRoundInterval', {intervalMs: 200}, 'alwaysOn');
 
 runBalancer(testColl);
 

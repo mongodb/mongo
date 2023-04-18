@@ -8,6 +8,7 @@
 (function() {
 'use strict';
 load("jstests/sharding/libs/find_chunks_util.js");
+load("jstests/libs/fail_point_util.js");
 
 /* Create new sharded collection on testDB */
 let _collCounter = 0;
@@ -59,20 +60,12 @@ function setJumboFlag(configDB, coll, chunkQuery) {
 }
 
 function setHistoryWindowInSecs(st, valueInSeconds) {
-    st.forEachConfigServer((conn) => {
-        assert.commandWorked(conn.adminCommand({
-            configureFailPoint: 'overrideHistoryWindowInSecs',
-            mode: 'alwaysOn',
-            data: {seconds: valueInSeconds}
-        }));
-    });
+    configureFailPointForRS(
+        st.configRS.nodes, "overrideHistoryWindowInSecs", {seconds: valueInSeconds}, "alwaysOn");
 }
 
 function resetHistoryWindowInSecs(st) {
-    st.forEachConfigServer((conn) => {
-        assert.commandWorked(
-            conn.adminCommand({configureFailPoint: 'overrideHistoryWindowInSecs', mode: 'off'}));
-    });
+    configureFailPointForRS(st.configRS.nodes, "overrideHistoryWindowInSecs", {}, "off");
 }
 
 let defaultAutoMergerThrottlingMS = null;
@@ -97,20 +90,12 @@ function resetBalancerMergeThrottling(st) {
 }
 
 function setBalanceRoundInterval(st, valueInMs) {
-    st.forEachConfigServer((conn) => {
-        assert.commandWorked(conn.adminCommand({
-            configureFailPoint: 'overrideBalanceRoundInterval',
-            mode: 'alwaysOn',
-            data: {intervalMs: valueInMs}
-        }));
-    });
+    configureFailPointForRS(
+        st.configRS.nodes, "overrideBalanceRoundInterval", {intervalMs: valueInMs}, "alwaysOn");
 }
 
 function resetBalanceRoundInterval(st) {
-    st.forEachConfigServer((conn) => {
-        assert.commandWorked(
-            conn.adminCommand({configureFailPoint: 'overrideBalanceRoundInterval', mode: 'off'}));
-    });
+    configureFailPointForRS(st.configRS.nodes, "overrideBalanceRoundInterval", {}, "off");
 }
 
 function assertExpectedChunksOnShard(configDB, coll, shardName, expectedChunks) {

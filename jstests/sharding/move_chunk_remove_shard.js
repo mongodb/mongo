@@ -12,6 +12,7 @@
 
 load('jstests/libs/chunk_manipulation_util.js');
 load('jstests/sharding/libs/remove_shard_util.js');
+load('jstests/libs/fail_point_util.js');
 
 // TODO SERVER-50144 Remove this and allow orphan checking.
 // This test calls removeShard which can leave docs in config.rangeDeletions in state "pending",
@@ -30,13 +31,8 @@ assert.commandWorked(st.s.adminCommand({split: 'test.user', middle: {x: 0}}));
 
 pauseMoveChunkAtStep(st.shard0, moveChunkStepNames.reachedSteadyState);
 
-st.forEachConfigServer((conn) => {
-    conn.adminCommand({
-        configureFailPoint: 'overrideBalanceRoundInterval',
-        mode: 'alwaysOn',
-        data: {intervalMs: 200}
-    });
-});
+configureFailPointForRS(
+    st.configRS.nodes, 'overrideBalanceRoundInterval', {intervalMs: 200}, 'alwaysOn');
 
 let joinMoveChunk = moveChunkParallel(staticMongod,
                                       st.s.host,

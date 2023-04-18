@@ -65,7 +65,7 @@ sh._writeBalancerStateDeprecated = function(onOrNot) {
  * Asserts the specified command is executed successfully. However, if a retryable error occurs, the
  * command is retried.
  */
-sh._assertRetryableCommandWorked = function(cmd, msg) {
+sh.assertRetryableCommandWorkedOrFailedWithCodes = function(cmd, msg, expectedErrorCodes = []) {
     var res = undefined;
     assert.soon(function() {
         try {
@@ -83,6 +83,9 @@ sh._assertRetryableCommandWorked = function(cmd, msg) {
                     ErrorCodes.isRetriableError(err.getWriteConcernError().code)) {
                     return false;
                 }
+            }
+            if (expectedErrorCodes.includes(err.code)) {
+                return true;
             }
             throw err;
         }
@@ -267,7 +270,7 @@ sh.disableAutoMerge = function(coll) {
         sh._checkMongos();
     }
 
-    return sh._assertRetryableCommandWorked(() => {
+    return sh.assertRetryableCommandWorkedOrFailedWithCodes(() => {
         dbase.getSiblingDB("config").collections.update(
             {_id: coll + ""},
             {$set: {"enableAutoMerge": false}},
@@ -286,7 +289,7 @@ sh.enableAutoMerge = function(coll) {
         sh._checkMongos();
     }
 
-    return sh._assertRetryableCommandWorked(() => {
+    return sh.assertRetryableCommandWorkedOrFailedWithCodes(() => {
         dbase.getSiblingDB("config").collections.update(
             {_id: coll + ""},
             {$unset: {"enableAutoMerge": 1}},
@@ -365,7 +368,7 @@ sh.disableBalancing = function(coll) {
         sh._checkMongos();
     }
 
-    return sh._assertRetryableCommandWorked(() => {
+    return sh.assertRetryableCommandWorkedOrFailedWithCodes(() => {
         dbase.getSiblingDB("config").collections.update(
             {_id: coll + ""},
             {$set: {"noBalance": true}},
@@ -384,7 +387,7 @@ sh.enableBalancing = function(coll) {
         sh._checkMongos();
     }
 
-    return sh._assertRetryableCommandWorked(() => {
+    return sh.assertRetryableCommandWorkedOrFailedWithCodes(() => {
         dbase.getSiblingDB("config").collections.update(
             {_id: coll + ""},
             {$set: {"noBalance": false}},
