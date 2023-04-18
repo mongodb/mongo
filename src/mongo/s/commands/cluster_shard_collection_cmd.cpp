@@ -112,7 +112,7 @@ public:
         requestParamsObj.setImplicitlyCreateIndex(shardCollRequest.getImplicitlyCreateIndex());
         requestParamsObj.setEnforceUniquenessCheck(shardCollRequest.getEnforceUniquenessCheck());
         shardsvrCollRequest.setCreateCollectionRequest(std::move(requestParamsObj));
-        shardsvrCollRequest.setDbName(DatabaseName{nss.db()});
+        shardsvrCollRequest.setDbName(nss.dbName());
 
         cluster::createCollection(opCtx, shardsvrCollRequest);
 

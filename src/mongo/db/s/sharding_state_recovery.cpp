@@ -147,8 +147,7 @@ Status modifyRecoveryDocument(OperationContext* opCtx,
     try {
         // Use boost::optional so we can release the locks early
         boost::optional<AutoGetDb> autoGetDb;
-        autoGetDb.emplace(
-            opCtx, DatabaseName{NamespaceString::kServerConfigurationNamespace.db()}, MODE_X);
+        autoGetDb.emplace(opCtx, NamespaceString::kServerConfigurationNamespace.dbName(), MODE_X);
 
         const auto configOpTime = [&]() {
             const auto vcTime = VectorClock::get(opCtx)->getTime();

@@ -58,7 +58,7 @@ void tellShardsToRefreshCollection(OperationContext* opCtx,
                                    const std::shared_ptr<executor::TaskExecutor>& executor) {
     auto cmd = FlushRoutingTableCacheUpdatesWithWriteConcern(nss);
     cmd.setSyncFromConfig(true);
-    cmd.setDbName(DatabaseName{nss.db()});
+    cmd.setDbName(nss.dbName());
     auto cmdObj = CommandHelpers::appendMajorityWriteConcern(cmd.toBSON({}));
     sendCommandToShards(opCtx, DatabaseName::kAdmin.db(), cmdObj, shardIds, executor);
 }

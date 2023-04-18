@@ -261,10 +261,9 @@ ExecutorFuture<void> deleteRangeInBatchesWithExecutor(
     return ExecutorFuture<void>(executor).then([=] {
         return withTemporaryOperationContext(
             [=](OperationContext* opCtx) {
-                return deleteRangeInBatches(
-                    opCtx, DatabaseName{nss.db()}, collectionUuid, keyPattern, range);
+                return deleteRangeInBatches(opCtx, nss.dbName(), collectionUuid, keyPattern, range);
             },
-            DatabaseName{nss.db()},
+            nss.dbName(),
             collectionUuid);
     });
 }
@@ -292,7 +291,7 @@ ExecutorFuture<void> waitForDeletionsToMajorityReplicate(
                 .waitUntilMajority(clientOpTime, CancellationToken::uncancelable())
                 .thenRunOn(executor);
         },
-        DatabaseName{nss.db()},
+        nss.dbName(),
         collectionUuid);
 }
 
@@ -546,7 +545,7 @@ SharedSemiFuture<void> removeDocumentsInRange(
                     [&](OperationContext* opCtx) {
                         removePersistentRangeDeletionTask(opCtx, collectionUuid, range);
                     },
-                    DatabaseName{nss.db()},
+                    nss.dbName(),
                     collectionUuid);
             } catch (const DBException& e) {
                 LOGV2_ERROR(23770,

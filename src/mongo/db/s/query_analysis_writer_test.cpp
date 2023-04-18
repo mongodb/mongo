@@ -210,8 +210,7 @@ protected:
     void assertTTLIndexExists(const NamespaceString& nss, const std::string& name) const {
         DBDirectClient client(operationContext());
         BSONObj result;
-        client.runCommand(
-            DatabaseName{nss.db()}, BSON("listIndexes" << nss.coll().toString()), result);
+        client.runCommand(nss.dbName(), BSON("listIndexes" << nss.coll().toString()), result);
 
         auto indexes = result.getObjectField("cursor").getField("firstBatch").Array();
         auto iter = indexes.begin();

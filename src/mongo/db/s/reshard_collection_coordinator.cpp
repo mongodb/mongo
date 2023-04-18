@@ -157,7 +157,7 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
             _updateStateDocument(opCtx, std::move(newDoc));
 
             ConfigsvrReshardCollection configsvrReshardCollection(nss(), _doc.getKey());
-            configsvrReshardCollection.setDbName(DatabaseName{nss().db()});
+            configsvrReshardCollection.setDbName(nss().dbName());
             configsvrReshardCollection.setUnique(_doc.getUnique());
             configsvrReshardCollection.setCollation(_doc.getCollation());
             configsvrReshardCollection.set_presetReshardedChunks(_doc.get_presetReshardedChunks());

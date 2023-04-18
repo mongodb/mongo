@@ -65,7 +65,7 @@ void SessionsCollectionConfigServer::_shardCollectionIfNeeded(OperationContext* 
     CreateCollectionRequest requestParamsObj;
     requestParamsObj.setShardKey(BSON("_id" << 1));
     shardsvrCollRequest.setCreateCollectionRequest(std::move(requestParamsObj));
-    shardsvrCollRequest.setDbName(DatabaseName{NamespaceString::kLogicalSessionsNamespace.db()});
+    shardsvrCollRequest.setDbName(NamespaceString::kLogicalSessionsNamespace.dbName());
 
     cluster::createCollection(opCtx, shardsvrCollRequest);
 }

@@ -697,7 +697,7 @@ void executeMetadataChangesInTxn(
 BSONObj makeFlushRoutingTableCacheUpdatesCmd(const NamespaceString& nss) {
     auto cmd = FlushRoutingTableCacheUpdatesWithWriteConcern(nss);
     cmd.setSyncFromConfig(true);
-    cmd.setDbName(DatabaseName{nss.db()});
+    cmd.setDbName(nss.dbName());
     return cmd.toBSON(
         BSON(WriteConcernOptions::kWriteConcernField << kMajorityWriteConcern.toBSON()));
 }

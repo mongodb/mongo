@@ -66,7 +66,7 @@ public:
         void typedRun(OperationContext* opCtx) {
             ConfigsvrSetClusterParameter configsvrSetClusterParameter(
                 request().getCommandParameter());
-            configsvrSetClusterParameter.setDbName(DatabaseName{ns().db()});
+            configsvrSetClusterParameter.setDbName(ns().dbName());
 
             const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 

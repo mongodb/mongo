@@ -278,7 +278,7 @@ ShardingDDLCoordinatorService::getOrCreateInstance(OperationContext* opCtx, BSON
         uassert(ErrorCodes::IllegalOperation,
                 "Request sent without attaching database version",
                 clientDbVersion);
-        DatabaseShardingState::assertIsPrimaryShardForDb(opCtx, DatabaseName{nss.db()});
+        DatabaseShardingState::assertIsPrimaryShardForDb(opCtx, nss.dbName());
         coorMetadata.setDatabaseVersion(clientDbVersion);
     }
 

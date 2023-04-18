@@ -838,18 +838,18 @@ TEST_F(ShardRoleTest, YieldAndRestoreAcquisitionWithLocks) {
                                                },
                                                MODE_IX);
 
-    ASSERT_TRUE(opCtx()->lockState()->isDbLockedForMode(DatabaseName{nss.db()}, MODE_IX));
+    ASSERT_TRUE(opCtx()->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
     ASSERT_TRUE(opCtx()->lockState()->isCollectionLockedForMode(nss, MODE_IX));
 
     // Yield the resources
     auto yieldedTransactionResources = yieldTransactionResourcesFromOperationContext(opCtx());
     ASSERT(yieldedTransactionResources);
-    ASSERT_FALSE(opCtx()->lockState()->isDbLockedForMode(DatabaseName{nss.db()}, MODE_IX));
+    ASSERT_FALSE(opCtx()->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
     ASSERT_FALSE(opCtx()->lockState()->isCollectionLockedForMode(nss, MODE_IX));
 
     // Restore the resources
     restoreTransactionResourcesToOperationContext(opCtx(), std::move(*yieldedTransactionResources));
-    ASSERT_TRUE(opCtx()->lockState()->isDbLockedForMode(DatabaseName{nss.db()}, MODE_IX));
+    ASSERT_TRUE(opCtx()->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
     ASSERT_TRUE(opCtx()->lockState()->isCollectionLockedForMode(nss, MODE_IX));
 }
 
@@ -898,7 +898,7 @@ TEST_F(ShardRoleTest, RestoreForWriteFailsIfPlacementConcernNoLongerMet) {
                                  ASSERT_FALSE(exInfo->getCriticalSectionSignal().is_initialized());
                              });
 
-    ASSERT_FALSE(opCtx()->lockState()->isDbLockedForMode(DatabaseName{nss.db()}, MODE_IX));
+    ASSERT_FALSE(opCtx()->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
     ASSERT_FALSE(opCtx()->lockState()->isCollectionLockedForMode(nss, MODE_IX));
 }
 

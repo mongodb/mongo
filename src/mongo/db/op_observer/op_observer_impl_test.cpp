@@ -641,7 +641,7 @@ TEST_F(OpObserverTest, OnDropCollectionInlcudesTenantId) {
 
     // Write to the oplog.
     {
-        AutoGetDb autoDb(opCtx.get(), DatabaseName{nss.db()}, MODE_X);
+        AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
         opObserver.onDropCollection(
             opCtx.get(), nss, uuid, 0U, OpObserver::CollectionDropType::kTwoPhase);
@@ -705,7 +705,7 @@ TEST_F(OpObserverTest, OnRenameCollectionIncludesTenantIdFeatureFlagOff) {
 
     // Write to the oplog.
     {
-        AutoGetDb autoDb(opCtx.get(), DatabaseName{sourceNss.db()}, MODE_X);
+        AutoGetDb autoDb(opCtx.get(), sourceNss.dbName(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
         opObserver.onRenameCollection(
             opCtx.get(), sourceNss, targetNss, uuid, dropTargetUuid, 0U, stayTemp);
@@ -741,7 +741,7 @@ TEST_F(OpObserverTest, OnRenameCollectionIncludesTenantIdFeatureFlagOn) {
 
     // Write to the oplog.
     {
-        AutoGetDb autoDb(opCtx.get(), DatabaseName{sourceNss.db()}, MODE_X);
+        AutoGetDb autoDb(opCtx.get(), sourceNss.dbName(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
         opObserver.onRenameCollection(
             opCtx.get(), sourceNss, targetNss, uuid, dropTargetUuid, 0U, stayTemp);
@@ -866,7 +866,7 @@ TEST_F(OpObserverTest, ImportCollectionOplogEntryIncludesTenantId) {
 
     // Write to the oplog.
     {
-        AutoGetDb autoDb(opCtx.get(), DatabaseName{nss.db()}, MODE_X);
+        AutoGetDb autoDb(opCtx.get(), nss.dbName(), MODE_X);
         WriteUnitOfWork wunit(opCtx.get());
         opObserver.onImportCollection(opCtx.get(),
                                       importUUID,

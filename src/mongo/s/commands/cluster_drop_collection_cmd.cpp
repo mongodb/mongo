@@ -101,7 +101,7 @@ public:
 
                 // Send it to the primary shard
                 ShardsvrDropCollection dropCollectionCommand(nss);
-                dropCollectionCommand.setDbName(DatabaseName{nss.db()});
+                dropCollectionCommand.setDbName(nss.dbName());
                 dropCollectionCommand.setCollectionUUID(request().getCollectionUUID());
 
                 auto cmdResponse = executeCommandAgainstDatabasePrimary(

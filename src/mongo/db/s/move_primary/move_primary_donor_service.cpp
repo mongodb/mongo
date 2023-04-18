@@ -278,7 +278,7 @@ void MovePrimaryDonorExternalState::syncDataOnRecipient(OperationContext* opCtx,
                                                         boost::optional<Timestamp> timestamp) {
     MovePrimaryRecipientSyncData request;
     request.setMovePrimaryCommonMetadata(getMetadata());
-    request.setDbName(DatabaseName{getMetadata().getDatabaseName().db()});
+    request.setDbName(getMetadata().getDatabaseName().dbName());
     if (timestamp) {
         request.setReturnAfterReachingDonorTimestamp(*timestamp);
     }
@@ -288,14 +288,14 @@ void MovePrimaryDonorExternalState::syncDataOnRecipient(OperationContext* opCtx,
 void MovePrimaryDonorExternalState::abortMigrationOnRecipient(OperationContext* opCtx) {
     MovePrimaryRecipientAbortMigration request;
     request.setMovePrimaryCommonMetadata(getMetadata());
-    request.setDbName(DatabaseName{getMetadata().getDatabaseName().db()});
+    request.setDbName(getMetadata().getDatabaseName().dbName());
     _runCommandOnRecipient(opCtx, request.toBSON({}));
 }
 
 void MovePrimaryDonorExternalState::forgetMigrationOnRecipient(OperationContext* opCtx) {
     MovePrimaryRecipientForgetMigration request;
     request.setMovePrimaryCommonMetadata(getMetadata());
-    request.setDbName(DatabaseName{getMetadata().getDatabaseName().db()});
+    request.setDbName(getMetadata().getDatabaseName().dbName());
     _runCommandOnRecipient(opCtx, request.toBSON({}));
 }
 

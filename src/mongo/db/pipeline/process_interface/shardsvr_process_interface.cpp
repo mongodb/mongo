@@ -435,7 +435,7 @@ ShardServerProcessInterface::expectUnshardedCollectionInScope(
 
 void ShardServerProcessInterface::checkOnPrimaryShardForDb(OperationContext* opCtx,
                                                            const NamespaceString& nss) {
-    DatabaseShardingState::assertIsPrimaryShardForDb(opCtx, DatabaseName{nss.db()});
+    DatabaseShardingState::assertIsPrimaryShardForDb(opCtx, nss.dbName());
 }
 
 }  // namespace mongo
