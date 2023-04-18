@@ -42,11 +42,13 @@
 #include "mongo/db/timeseries/catalog_helper.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
-
 namespace mongo {
+
+MONGO_FAIL_POINT_DEFINE(pauseCompactCommandBeforeWTCompact);
 
 using logv2::LogComponent;
 
@@ -117,6 +119,8 @@ StatusWith<int64_t> compactCollection(OperationContext* opCtx,
 
     auto bytesBefore = recordStore->storageSize(opCtx) + collection->getIndexSize(opCtx);
     auto indexCatalog = collection->getIndexCatalog();
+
+    pauseCompactCommandBeforeWTCompact.pauseWhileSet();
 
     Status status = recordStore->compact(opCtx);
     if (!status.isOK())
