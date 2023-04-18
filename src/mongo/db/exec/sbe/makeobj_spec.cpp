@@ -42,7 +42,7 @@ IndexedStringVector MakeObjSpec::buildIndexedFieldVector(std::vector<std::string
 
 size_t MakeObjSpec::getApproximateSize() const {
     auto size = sizeof(MakeObjSpec);
-    size += size_estimator::estimate(fieldsAndProjects);
+    size += size_estimator::estimate(fieldNames);
     return size;
 }
 }  // namespace mongo::sbe
