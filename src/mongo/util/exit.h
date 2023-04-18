@@ -75,7 +75,7 @@ ExitCode waitForShutdown();
 void registerShutdownTask(unique_function<void(const ShutdownTaskArgs& shutdownArgs)>);
 
 /**
- * For shutdown tasks that don't care to distinguish if they're called from command shutdown
+ * Helper for registering shutdown tasks, converts void lambda to shutdown lambda form.
  */
 inline void registerShutdownTask(unique_function<void()> task) {
     registerShutdownTask([task = std::move(task)](const ShutdownTaskArgs&) { task(); });

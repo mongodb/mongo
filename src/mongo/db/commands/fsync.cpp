@@ -47,46 +47,34 @@
 #include "mongo/db/commands/fsync_locked.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/storage/backup_cursor_hooks.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/background.h"
 #include "mongo/util/exit.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
-
 namespace mongo {
+
+class FSyncLockThread;
+
+// Protects access to globalFsyncLockThread and other global fsync state.
+Mutex fsyncStateMutex = MONGO_MAKE_LATCH("fsyncStateMutex");
+
+// Globally accessible FsyncLockThread to allow shutdown to coordinate with any active fsync cmds.
+// Must acquire the 'fsyncStateMutex' before accessing.
+std::unique_ptr<FSyncLockThread> globalFsyncLockThread = nullptr;
+
+// Exposed publically via extern in fsync.h.
+SimpleMutex filesLockedFsync;
+
 namespace {
 
 // Ensures that only one command is operating on fsyncLock state at a time. As a 'ResourceMutex',
 // lock time will be reported for a given user operation.
-Lock::ResourceMutex commandMutex("fsyncCommandMutex");
-
-/**
- * Maintains a global read lock while mongod is fsyncLocked.
- */
-class FSyncLockThread : public BackgroundJob {
-public:
-    FSyncLockThread(ServiceContext* serviceContext, bool allowFsyncFailure)
-        : BackgroundJob(false),
-          _serviceContext(serviceContext),
-          _allowFsyncFailure(allowFsyncFailure) {}
-
-    std::string name() const override {
-        return "FSyncLockThread";
-    }
-
-    void run() override;
-
-private:
-    ServiceContext* const _serviceContext;
-    bool _allowFsyncFailure;
-    static bool _shutdownTaskRegistered;
-};
+Lock::ResourceMutex fsyncSingleCommandExclusionMutex("fsyncSingleCommandExclusionMutex");
 
 class FSyncCommand : public BasicCommand {
 public:
@@ -99,12 +87,12 @@ public:
     virtual ~FSyncCommand() {
         // The FSyncLockThread is owned by the FSyncCommand and accesses FsyncCommand state. It must
         // be shut down prior to FSyncCommand destruction.
-        stdx::unique_lock<Latch> lk(lockStateMutex);
+        stdx::unique_lock<Latch> lk(fsyncStateMutex);
         if (_lockCount > 0) {
             _lockCount = 0;
             releaseFsyncLockSyncCV.notify_one();
-            _lockThread->wait();
-            _lockThread.reset(nullptr);
+            globalFsyncLockThread->wait();
+            globalFsyncLockThread.reset(nullptr);
         }
     }
 
@@ -164,28 +152,28 @@ public:
             return true;
         }
 
-        Lock::ExclusiveLock lk(opCtx, commandMutex);
+        Lock::ExclusiveLock lk(opCtx, fsyncSingleCommandExclusionMutex);
 
         const auto lockCountAtStart = getLockCount();
-        invariant(lockCountAtStart > 0 || !_lockThread);
+        invariant(lockCountAtStart > 0 || !globalFsyncLockThread);
 
         acquireLock();
 
         if (lockCountAtStart == 0) {
             Status status = Status::OK();
             {
-                stdx::unique_lock<Latch> lk(lockStateMutex);
+                stdx::unique_lock<Latch> lk(fsyncStateMutex);
                 threadStatus = Status::OK();
                 threadStarted = false;
-                _lockThread = std::make_unique<FSyncLockThread>(opCtx->getServiceContext(),
-                                                                allowFsyncFailure);
-                _lockThread->go();
+                globalFsyncLockThread = std::make_unique<FSyncLockThread>(
+                    opCtx->getServiceContext(), allowFsyncFailure);
+                globalFsyncLockThread->go();
 
                 while (!threadStarted && threadStatus.isOK()) {
                     acquireFsyncLockSyncCV.wait(lk);
                 }
 
-                // 'threadStatus' must be copied while 'lockStateMutex' is held.
+                // 'threadStatus' must be copied while 'fsyncStateMutex' is held.
                 status = threadStatus;
             }
 
@@ -211,29 +199,39 @@ public:
         return true;
     }
 
-    // Returns whether we are currently fsyncLocked. For use by callers not holding lockStateMutex.
+    /**
+     * Returns whether we are currently fsyncLocked. For use by callers not holding fsyncStateMutex.
+     */
     bool fsyncLocked() {
         stdx::unique_lock<Latch> lkFsyncLocked(_fsyncLockedMutex);
         return _fsyncLocked;
     }
 
-    // For callers not already holding 'lockStateMutex'.
+    /**
+     * For callers not already holding 'fsyncStateMutex'.
+     */
     int64_t getLockCount() {
-        stdx::unique_lock<Latch> lk(lockStateMutex);
+        stdx::unique_lock<Latch> lk(fsyncStateMutex);
         return getLockCount_inLock();
     }
 
-    // 'lockStateMutex' must be held when calling.
+    /**
+     * 'fsyncStateMutex' must be held when calling.
+     */
     int64_t getLockCount_inLock() {
         return _lockCount;
     }
 
     void releaseLock() {
-        stdx::unique_lock<Latch> lk(lockStateMutex);
+        stdx::unique_lock<Latch> lk(fsyncStateMutex);
         releaseLock_inLock(lk);
     }
 
-    void releaseLock_inLock(stdx::unique_lock<Latch>& lk) {
+    /**
+     * Returns false if the fsync lock was recursively locked. Returns true if the fysnc lock is
+     * released.
+     */
+    bool releaseLock_inLock(stdx::unique_lock<Latch>& lk) {
         invariant(_lockCount >= 1);
         _lockCount--;
 
@@ -244,25 +242,26 @@ public:
             }
             releaseFsyncLockSyncCV.notify_one();
             lk.unlock();
-            _lockThread->wait();
-            _lockThread.reset(nullptr);
+            globalFsyncLockThread->wait();
+            globalFsyncLockThread.reset(nullptr);
+            return true;
         }
+        return false;
     }
 
     // Allows for control of lock state change between the fsyncLock and fsyncUnlock commands and
     // the FSyncLockThread that maintains the global read lock.
-    Mutex lockStateMutex = MONGO_MAKE_LATCH("FSyncCommand::lockStateMutex");
     stdx::condition_variable acquireFsyncLockSyncCV;
     stdx::condition_variable releaseFsyncLockSyncCV;
 
-    // 'lockStateMutex' must be held to modify or read.
+    // 'fsyncStateMutex' must be held to modify or read.
     Status threadStatus = Status::OK();
-    // 'lockStateMutex' must be held to modify or read.
+    // 'fsyncStateMutex' must be held to modify or read.
     bool threadStarted = false;
 
 private:
     void acquireLock() {
-        stdx::unique_lock<Latch> lk(lockStateMutex);
+        stdx::unique_lock<Latch> lk(fsyncStateMutex);
         _lockCount++;
 
         if (_lockCount == 1) {
@@ -271,10 +270,8 @@ private:
         }
     }
 
-    std::unique_ptr<FSyncLockThread> _lockThread;
-
     // The number of lock requests currently held. We will only release the fsyncLock when this
-    // number is decremented to 0. May only be accessed while 'lockStateMutex' is held.
+    // number is decremented to 0. May only be accessed while 'fsyncStateMutex' is held.
     int64_t _lockCount = 0;
 
     Mutex _fsyncLockedMutex = MONGO_MAKE_LATCH("FSyncCommand::_fsyncLockedMutex");
@@ -314,9 +311,9 @@ public:
              BSONObjBuilder& result) override {
         LOGV2(20465, "command: unlock requested");
 
-        Lock::ExclusiveLock lk(opCtx, commandMutex);
+        Lock::ExclusiveLock lk(opCtx, fsyncSingleCommandExclusionMutex);
 
-        stdx::unique_lock<Latch> stateLock(fsyncCmd.lockStateMutex);
+        stdx::unique_lock<Latch> stateLock(fsyncStateMutex);
 
         auto lockCount = fsyncCmd.getLockCount_inLock();
 
@@ -344,12 +341,20 @@ public:
 
 } fsyncUnlockCmd;
 
-bool FSyncLockThread::_shutdownTaskRegistered = false;
+}  // namespace
+
+void FSyncLockThread::shutdown(stdx::unique_lock<Latch>& stateLock) {
+    if (fsyncCmd.getLockCount_inLock() > 0) {
+        LOGV2_WARNING(20469, "Interrupting fsync because the server is shutting down");
+        while (!fsyncCmd.releaseLock_inLock(stateLock))
+            ;
+    }
+}
 
 void FSyncLockThread::run() {
     ThreadClient tc("fsyncLockWorker", _serviceContext);
     stdx::lock_guard<SimpleMutex> lkf(filesLockedFsync);
-    stdx::unique_lock<Latch> lk(fsyncCmd.lockStateMutex);
+    stdx::unique_lock<Latch> stateLock(fsyncStateMutex);
 
     invariant(fsyncCmd.getLockCount_inLock() == 1);
 
@@ -359,24 +364,6 @@ void FSyncLockThread::run() {
         Lock::GlobalRead global(&opCtx);  // Block any writes in order to flush the files.
 
         StorageEngine* storageEngine = _serviceContext->getStorageEngine();
-
-        // The fsync shutdown task has to be registered once the server is running otherwise it
-        // conflicts with the servers shutdown task.
-        if (!_shutdownTaskRegistered) {
-            _shutdownTaskRegistered = true;
-            registerShutdownTask([&] {
-                stdx::unique_lock<Latch> stateLock(fsyncCmd.lockStateMutex);
-                if (fsyncCmd.getLockCount_inLock() > 0) {
-                    LOGV2_WARNING(20469, "Interrupting fsync because the server is shutting down");
-                    while (fsyncCmd.getLockCount_inLock()) {
-                        // Relies on the lock to be released in 'releaseLock_inLock()' when the
-                        // release brings the lock count to 0.
-                        invariant(stateLock);
-                        fsyncCmd.releaseLock_inLock(stateLock);
-                    }
-                }
-            });
-        }
 
         try {
             storageEngine->flushAllFiles(&opCtx, /*callerHoldsReadLock*/ true);
@@ -436,7 +423,7 @@ void FSyncLockThread::run() {
                 20471,
                 "WARNING: instance is locked, blocking all writes. The fsync command has "
                 "finished execution, remember to unlock the instance using fsyncUnlock().");
-            fsyncCmd.releaseFsyncLockSyncCV.wait_for(lk, Seconds(60).toSystemDuration());
+            fsyncCmd.releaseFsyncLockSyncCV.wait_for(stateLock, Seconds(60).toSystemDuration());
         }
 
         if (successfulFsyncLock) {
@@ -458,10 +445,5 @@ void FSyncLockThread::run() {
 MONGO_INITIALIZER(fsyncLockedForWriting)(InitializerContext* context) {
     setLockedForWritingImpl([]() { return fsyncCmd.fsyncLocked(); });
 }
-
-}  // namespace
-
-// Exposed publically via extern in fsync.h.
-SimpleMutex filesLockedFsync;
 
 }  // namespace mongo

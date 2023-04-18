@@ -2381,6 +2381,7 @@ env.Library(
         'catalog/health_log',
         'catalog/health_log_interface',
         'commands/mongod',
+        'commands/mongod_fsync',
         'commands/test_commands',
         'concurrency/flow_control_ticketholder',
         'concurrency/lock_manager',

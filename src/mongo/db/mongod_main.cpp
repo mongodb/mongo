@@ -66,6 +66,7 @@
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/feature_compatibility_version_gen.h"
+#include "mongo/db/commands/fsync.h"
 #include "mongo/db/commands/shutdown.h"
 #include "mongo/db/commands/test_commands.h"
 #include "mongo/db/commands/test_commands_enabled.h"
@@ -1336,6 +1337,14 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     if (MONGO_unlikely(hangBeforeShutdown.shouldFail())) {
         LOGV2(4944800, "Hanging before shutdown due to hangBeforeShutdown failpoint");
         hangBeforeShutdown.pauseWhileSet();
+    }
+
+    // Before doing anything else, ensure fsync is inactive or make it release its GlobalRead lock.
+    {
+        stdx::unique_lock<Latch> stateLock(fsyncStateMutex);
+        if (globalFsyncLockThread) {
+            globalFsyncLockThread->shutdown(stateLock);
+        }
     }
 
     // If we don't have shutdownArgs, we're shutting down from a signal, or other clean shutdown

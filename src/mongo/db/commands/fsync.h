@@ -29,13 +29,54 @@
 
 #pragma once
 
+#include "mongo/db/service_context.h"
+#include "mongo/util/background.h"
 #include "mongo/util/concurrency/mutex.h"
 
 namespace mongo {
 
 /**
+ * Maintains a global read lock while mongod is fsyncLocked.
+ */
+class FSyncLockThread : public BackgroundJob {
+public:
+    FSyncLockThread(ServiceContext* serviceContext, bool allowFsyncFailure)
+        : BackgroundJob(false),
+          _serviceContext(serviceContext),
+          _allowFsyncFailure(allowFsyncFailure) {}
+
+    std::string name() const override {
+        return "FSyncLockThread";
+    }
+
+    void run() override;
+
+    /**
+     * Releases the fsync lock for shutdown.
+     */
+    void shutdown(stdx::unique_lock<Latch>& lk);
+
+private:
+    ServiceContext* const _serviceContext;
+    bool _allowFsyncFailure;
+};
+
+/**
  * Allows holders to block on an active fsyncLock.
  */
 extern SimpleMutex filesLockedFsync;
+
+/**
+ * Must be taken before accessing globalFsyncLockThread below.
+ */
+extern Mutex fsyncStateMutex;
+
+/**
+ * The FSyncLockThread must be external available for interruption during shutdown.
+ * Must lock the 'fsyncStateMutex' before accessing.
+ *
+ * TODO (SERVER-76131): consider whether this should decorate the service context.
+ */
+extern std::unique_ptr<FSyncLockThread> globalFsyncLockThread;
 
 }  // namespace mongo
