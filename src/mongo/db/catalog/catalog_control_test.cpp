@@ -76,7 +76,7 @@ TEST_F(CatalogControlTest, CloseAndOpenCatalog) {
     Lock::GlobalLock globalLk(opCtx.get(), MODE_X);
 
     auto previousState = catalog::closeCatalog(opCtx.get());
-    ASSERT_EQUALS(0U, previousState.minVisibleTimestampMap.size());
+    ASSERT_EQUALS(0U, previousState.minValidTimestampMap.size());
     catalog::openCatalog(opCtx.get(), {}, Timestamp());
 }
 

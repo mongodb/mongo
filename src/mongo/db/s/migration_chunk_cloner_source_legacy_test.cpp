@@ -436,14 +436,6 @@ public:
         return _coll->getIndexFreeStorageBytes(opCtx);
     }
 
-    boost::optional<Timestamp> getMinimumVisibleSnapshot() const override {
-        return _coll->getMinimumVisibleSnapshot();
-    }
-
-    void setMinimumVisibleSnapshot(Timestamp name) override {
-        MONGO_UNREACHABLE;
-    }
-
     boost::optional<Timestamp> getMinimumValidSnapshot() const override {
         return _coll->getMinimumValidSnapshot();
     }

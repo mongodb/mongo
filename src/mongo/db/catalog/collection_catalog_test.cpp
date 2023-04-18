@@ -1368,7 +1368,6 @@ TEST_F(CollectionCatalogTimestampTest, MinimumValidSnapshot) {
 
     auto coll = CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), nss);
     ASSERT(coll);
-    ASSERT_EQ(coll->getMinimumVisibleSnapshot(), createCollectionTs);
     ASSERT_EQ(coll->getMinimumValidSnapshot(), createYIndexTs);
 
     dropIndex(opCtx.get(), nss, "x_1", dropIndexTs);
@@ -1377,7 +1376,6 @@ TEST_F(CollectionCatalogTimestampTest, MinimumValidSnapshot) {
     // Fetch the latest collection instance without the indexes.
     coll = CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), nss);
     ASSERT(coll);
-    ASSERT_EQ(coll->getMinimumVisibleSnapshot(), createCollectionTs);
     ASSERT_EQ(coll->getMinimumValidSnapshot(), dropIndexTs);
 }
 

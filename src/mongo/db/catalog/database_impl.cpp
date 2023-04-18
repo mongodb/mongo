@@ -671,9 +671,6 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
             HistoricalIdentTracker::get(opCtx).recordRename(
                 readyIndex->getIdent(), fromNss, writableCollection->uuid(), commitTime.value());
         }
-
-        // Ban reading from this collection on committed reads on snapshots before now.
-        writableCollection->setMinimumVisibleSnapshot(commitTime.value());
     });
 
     return status;

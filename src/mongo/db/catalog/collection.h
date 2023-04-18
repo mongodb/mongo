@@ -644,23 +644,12 @@ public:
     virtual uint64_t getIndexFreeStorageBytes(OperationContext* opCtx) const = 0;
 
     /**
-     * If return value is not boost::none, reads with majority read concern using an older snapshot
-     * must error.
-     */
-    virtual boost::optional<Timestamp> getMinimumVisibleSnapshot() const = 0;
-
-    virtual void setMinimumVisibleSnapshot(Timestamp name) = 0;
-
-
-    /**
      * Get the timestamp this Collection instance was most recently changed at.
-     * TODO SERVER-68270: Should currently not be used until min visible snapshot is removed
      */
     virtual boost::optional<Timestamp> getMinimumValidSnapshot() const = 0;
 
     /**
      * Sets the timestamp this Collection instance was most recently changed at.
-     * TODO SERVER-68270: Should currently not be used until min visible snapshot is removed
      */
     virtual void setMinimumValidSnapshot(Timestamp name) = 0;
 

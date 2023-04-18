@@ -274,22 +274,14 @@ public:
 
     uint64_t getIndexFreeStorageBytes(OperationContext* opCtx) const final;
 
-    /**
-     * If return value is not boost::none, reads with majority read concern using an older snapshot
-     * must error.
-     */
-    boost::optional<Timestamp> getMinimumVisibleSnapshot() const final {
-        return _minVisibleSnapshot;
-    }
     boost::optional<Timestamp> getMinimumValidSnapshot() const final {
         return _minValidSnapshot;
     }
 
     /**
-     * Updates the minimum visible snapshot. The 'newMinimumVisibleSnapshot' is ignored if it would
-     * set the minimum visible snapshot backwards in time.
+     * Updates the minimum valid snapshot. The 'newMinimumValidSnapshot' is ignored if it would
+     * set the minimum valid snapshot backwards in time.
      */
-    void setMinimumVisibleSnapshot(Timestamp newMinimumVisibleSnapshot) final;
     void setMinimumValidSnapshot(Timestamp newMinimumValidSnapshot) final;
 
     boost::optional<TimeseriesOptions> getTimeseriesOptions() const final;
@@ -462,7 +454,6 @@ private:
     Validator _validator;
 
     // The earliest snapshot that is allowed to use this collection.
-    boost::optional<Timestamp> _minVisibleSnapshot;
     boost::optional<Timestamp> _minValidSnapshot;
 
     bool _initialized = false;

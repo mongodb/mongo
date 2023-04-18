@@ -304,7 +304,6 @@ public:
                     writeJobs.push_back(
                         [coll = entry.collection.get(), commitTime](CollectionCatalog& catalog) {
                             if (commitTime) {
-                                coll->setMinimumVisibleSnapshot(commitTime.value());
                                 coll->setMinimumValidSnapshot(commitTime.value());
                             }
                             catalog._pushCatalogIdForNSSAndUUID(

@@ -297,14 +297,6 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    boost::optional<Timestamp> getMinimumVisibleSnapshot() const {
-        MONGO_UNREACHABLE;
-    }
-
-    void setMinimumVisibleSnapshot(Timestamp name) {
-        MONGO_UNREACHABLE;
-    }
-
     boost::optional<Timestamp> getMinimumValidSnapshot() const {
         MONGO_UNREACHABLE;
     }

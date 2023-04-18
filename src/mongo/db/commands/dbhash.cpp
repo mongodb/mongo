@@ -414,18 +414,6 @@ private:
             // reading from the consistent snapshot doesn't overlap with any catalog operations on
             // the collection.
             invariant(opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_IS));
-
-            auto minSnapshot = collection->getMinimumVisibleSnapshot();
-            auto mySnapshot = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
-            invariant(mySnapshot);
-
-            uassert(ErrorCodes::SnapshotUnavailable,
-                    str::stream() << "Unable to read from a snapshot due to pending collection"
-                                     " catalog changes; please retry the operation. Snapshot"
-                                     " timestamp is "
-                                  << mySnapshot->toString() << ". Collection minimum timestamp is "
-                                  << minSnapshot->toString(),
-                    !minSnapshot || *mySnapshot >= *minSnapshot);
         } else {
             invariant(opCtx->lockState()->isDbLockedForMode(collection->ns().dbName(), MODE_S));
         }

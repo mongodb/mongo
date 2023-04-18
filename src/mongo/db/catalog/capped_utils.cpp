@@ -103,14 +103,6 @@ Status emptyCapped(OperationContext* opCtx, const NamespaceString& collectionNam
         return status;
     }
 
-    opCtx->recoveryUnit()->onCommit(
-        [writableCollection](OperationContext*, boost::optional<Timestamp> commitTime) {
-            // Ban reading from this collection on snapshots before now.
-            if (commitTime) {
-                writableCollection->setMinimumVisibleSnapshot(commitTime.value());
-            }
-        });
-
     const auto service = opCtx->getServiceContext();
     service->getOpObserver()->onEmptyCapped(opCtx, collection->ns(), collection->uuid());
 

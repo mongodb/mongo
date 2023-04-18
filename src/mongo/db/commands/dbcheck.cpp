@@ -564,15 +564,6 @@ private:
         uassert(ErrorCodes::SnapshotUnavailable,
                 "No snapshot available yet for dbCheck",
                 readTimestamp);
-        auto minVisible = collection->getMinimumVisibleSnapshot();
-        if (minVisible && *readTimestamp < *collection->getMinimumVisibleSnapshot()) {
-            // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-            invariant(!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe());
-            return {ErrorCodes::SnapshotUnavailable,
-                    str::stream() << "Unable to read from collection "
-                                  << info.nss.toStringForErrorMsg()
-                                  << " due to pending catalog changes"};
-        }
 
         // The CollectionPtr needs to outlive the DbCheckHasher as it's used internally.
         const CollectionPtr collectionPtr(collection);

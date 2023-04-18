@@ -454,15 +454,9 @@ public:
         return 0;
     }
 
-    boost::optional<Timestamp> getMinimumVisibleSnapshot() const final {
-        return boost::none;
-    }
-
     boost::optional<Timestamp> getMinimumValidSnapshot() const final {
         return boost::none;
     }
-
-    void setMinimumVisibleSnapshot(Timestamp newMinimumVisibleSnapshot) final {}
 
     void setMinimumValidSnapshot(Timestamp newMinimumValidSnapshot) final {}
 

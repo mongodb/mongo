@@ -89,42 +89,10 @@ public:
     const NamespaceString& ns() const {
         return _ns;
     };
-    // We just need to return something that compares equal with itself here.
-    boost::optional<Timestamp> getMinimumVisibleSnapshot() const {
-        return boost::none;
-    }
 
 private:
     NamespaceString _ns;
 };
-
-/**
- * If the given collection exists, asserts that the minimum visible timestamp of 'collection' is
- * compatible with 'readTimestamp'. Throws a SnapshotUnavailable error if the assertion fails.
- */
-void assertCollectionChangesCompatibleWithReadTimestamp(OperationContext* opCtx,
-                                                        const Collection* collection,
-                                                        boost::optional<Timestamp> readTimestamp) {
-    // Check that the collection exists.
-    if (!collection) {
-        return;
-    }
-
-    // Ensure the readTimestamp is not older than the collection's minimum visible timestamp.
-    auto minSnapshot = collection->getMinimumVisibleSnapshot();
-    if (SnapshotHelper::collectionChangesConflictWithRead(minSnapshot, readTimestamp)) {
-        // Note: SnapshotHelper::collectionChangesConflictWithRead returns false if either
-        // minSnapshot or readTimestamp is not set, so it's safe to print them below.
-        uasserted(
-            ErrorCodes::SnapshotUnavailable,
-            str::stream() << "Unable to read from a snapshot due to pending collection catalog "
-                             "changes to collection '"
-                          << collection->ns().toStringForErrorMsg()
-                          << "'; please retry the operation. Snapshot timestamp is "
-                          << readTimestamp->toString() << ". Collection minimum timestamp is "
-                          << minSnapshot->toString());
-    }
-}
 
 /**
  * Performs validation of special locking requirements for certain namespaces.
@@ -174,18 +142,6 @@ bool isAnyNssAViewOrSharded(OperationContext* opCtx,
     return std::any_of(namespaces.begin(), namespaces.end(), [&](auto&& nss) {
         return isNssAViewOrSharded(opCtx, catalog, nss);
     });
-}
-
-void assertAllNamespacesAreCompatibleForReadTimestamp(
-    OperationContext* opCtx,
-    const CollectionCatalog* catalog,
-    const std::vector<NamespaceString>& namespaces,
-    const boost::optional<Timestamp>& readTimestamp) {
-    for (auto&& nss : namespaces) {
-        auto collection = catalog->lookupCollectionByNamespace(opCtx, nss);
-        // Check that the collection has not had a DDL operation since readTimestamp.
-        assertCollectionChangesCompatibleWithReadTimestamp(opCtx, collection, readTimestamp);
-    }
 }
 
 /**
@@ -309,14 +265,6 @@ auto acquireCollectionAndConsistentSnapshot(
 
         auto resolvedSecondaryNamespaces =
             resolveSecondaryNamespacesOrUUIDs(opCtx, catalog.get(), secondaryNssOrUUIDs);
-
-        if (resolvedSecondaryNamespaces) {
-            // Note that calling getPointInTimeReadTimestamp may open a snapshot if one is not
-            // already open, depending on the current read source.
-            const auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
-            assertAllNamespacesAreCompatibleForReadTimestamp(
-                opCtx, catalog.get(), *resolvedSecondaryNamespaces, readTimestamp);
-        }
 
         // A lock request does not always find a collection to lock. But if we found a view abort
         // LFR setup, we don't need to open a storage snapshot in this case as the lock helper will
@@ -523,111 +471,39 @@ AutoGetCollectionForReadBase<AutoGetCollectionType, EmplaceAutoCollFunc>::
     auto readConcernArgs = repl::ReadConcernArgs::get(opCtx);
     // If the collection doesn't exist or disappears after releasing locks and waiting, there is no
     // need to check for pending catalog changes.
-    while (const auto& coll = _autoColl->getCollection()) {
-        assertReadConcernSupported(
-            coll, readConcernArgs, opCtx->recoveryUnit()->getTimestampReadSource());
+    const auto& coll = _autoColl->getCollection();
+    assertReadConcernSupported(
+        coll, readConcernArgs, opCtx->recoveryUnit()->getTimestampReadSource());
 
-        if (coll->usesCappedSnapshots()) {
-            CappedSnapshots::get(opCtx).establish(opCtx, coll);
-        }
-
-        // We make a copy of the namespace so we can use the variable after locks are released,
-        // since releasing locks will allow the value of coll->ns() to change.
-        const NamespaceString nss = coll->ns();
-        // During batch application on secondaries, there is a potential to read inconsistent states
-        // that would normally be protected by the PBWM lock. In order to serve secondary reads
-        // during this period, we default to not acquiring the lock (by setting
-        // _shouldNotConflictWithSecondaryBatchApplicationBlock). On primaries, we always read at a
-        // consistent time, so not taking the PBWM lock is not a problem. On secondaries, we have to
-        // guarantee we read at a consistent state, so we must read at the lastApplied timestamp,
-        // which is set after each complete batch.
-
-        // Once we have our locks, check whether or not we should override the ReadSource that was
-        // set before acquiring locks.
-        const bool shouldReadAtLastApplied = SnapshotHelper::changeReadSourceIfNeeded(opCtx, nss);
-        // Update readSource in case it was updated.
-        const auto readSource = opCtx->recoveryUnit()->getTimestampReadSource();
-
-        const auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
-
-        checkInvariantsForReadOptions(nss,
-                                      readConcernArgs.getArgsAfterClusterTime(),
-                                      readSource,
-                                      readTimestamp,
-                                      callerWasConflicting,
-                                      shouldReadAtLastApplied);
-
-        auto minSnapshot = coll->getMinimumVisibleSnapshot();
-        if (!SnapshotHelper::collectionChangesConflictWithRead(minSnapshot, readTimestamp)) {
-            return;
-        }
-
-        // If we are reading at a provided timestamp earlier than the latest catalog changes,
-        // then we must return an error.
-        if (readSource == RecoveryUnit::ReadSource::kProvided) {
-            uasserted(ErrorCodes::SnapshotUnavailable,
-                      str::stream()
-                          << "Unable to read from a snapshot due to pending collection catalog "
-                             "changes; please retry the operation. Snapshot timestamp is "
-                          << readTimestamp->toString() << ". Collection minimum is "
-                          << minSnapshot->toString());
-        }
-
-        invariant(
-            // The kMajorityCommitted and kLastApplied read sources already read from timestamps
-            // that are safe with respect to concurrent secondary batch application, and are
-            // eligible for retrying.
-            readSource == RecoveryUnit::ReadSource::kMajorityCommitted ||
-            readSource == RecoveryUnit::ReadSource::kNoOverlap ||
-            readSource == RecoveryUnit::ReadSource::kLastApplied);
-
-        invariant(readConcernArgs.getLevel() != repl::ReadConcernLevel::kSnapshotReadConcern);
-
-        // Yield locks in order to do the blocking call below.
-        _autoColl = boost::none;
-
-        // If there are pending catalog changes when using a no-overlap or lastApplied read source,
-        // we yield to get a new read timestamp ahead of the minimum visible snapshot.
-        if (readSource == RecoveryUnit::ReadSource::kLastApplied ||
-            readSource == RecoveryUnit::ReadSource::kNoOverlap) {
-            invariant(readTimestamp);
-            LOGV2(20576,
-                  "Tried reading at a timestamp, but future catalog changes are pending. "
-                  "Trying again",
-                  "readTimestamp"_attr = *readTimestamp,
-                  "collection"_attr = nss,
-                  "collectionMinSnapshot"_attr = *minSnapshot);
-
-            // If we are AutoGetting multiple collections, it is possible that we've already done
-            // some reads and locked in our snapshot.  At this point, the only way out is to fail
-            // the operation. The client application will need to retry.
-            uassert(
-                ErrorCodes::SnapshotUnavailable,
-                str::stream() << "Unable to read from a snapshot due to pending collection catalog "
-                                 "changes and holding multiple collection locks; please retry the "
-                                 "operation. Snapshot timestamp is "
-                              << readTimestamp->toString() << ". Collection minimum is "
-                              << minSnapshot->toString(),
-                !opCtx->lockState()->isLocked());
-
-            // Abandon our snapshot. We may select a new read timestamp or ReadSource in the next
-            // loop iteration.
-            opCtx->recoveryUnit()->abandonSnapshot();
-        }
-
-        if (readSource == RecoveryUnit::ReadSource::kMajorityCommitted) {
-            const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-            replCoord->waitUntilSnapshotCommitted(opCtx, *minSnapshot);
-            uassertStatusOK(opCtx->recoveryUnit()->majorityCommittedSnapshotAvailable());
-        }
-
-        {
-            stdx::lock_guard<Client> lk(*opCtx->getClient());
-            CurOp::get(opCtx)->yielded();
-        }
-
-        emplaceAutoColl.emplace(_autoColl);
+    if (coll->usesCappedSnapshots()) {
+        CappedSnapshots::get(opCtx).establish(opCtx, coll);
     }
+
+    // We make a copy of the namespace so we can use the variable after locks are released, since
+    // releasing locks will allow the value of coll->ns() to change.
+    const NamespaceString nss = coll->ns();
+    // During batch application on secondaries, there is a potential to read inconsistent states
+    // that would normally be protected by the PBWM lock. In order to serve secondary reads during
+    // this period, we default to not acquiring the lock (by setting
+    // _shouldNotConflictWithSecondaryBatchApplicationBlock). On primaries, we always read at a
+    // consistent time, so not taking the PBWM lock is not a problem. On secondaries, we have to
+    // guarantee we read at a consistent state, so we must read at the lastApplied timestamp, which
+    // is set after each complete batch.
+
+    // Once we have our locks, check whether or not we should override the ReadSource that was set
+    // before acquiring locks.
+    const bool shouldReadAtLastApplied = SnapshotHelper::changeReadSourceIfNeeded(opCtx, nss);
+    // Update readSource in case it was updated.
+    const auto readSource = opCtx->recoveryUnit()->getTimestampReadSource();
+
+    const auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
+
+    checkInvariantsForReadOptions(nss,
+                                  readConcernArgs.getArgsAfterClusterTime(),
+                                  readSource,
+                                  readTimestamp,
+                                  callerWasConflicting,
+                                  shouldReadAtLastApplied);
 }
 
 EmplaceAutoGetCollectionForRead::EmplaceAutoGetCollectionForRead(
@@ -662,16 +538,6 @@ AutoGetCollectionForReadLegacy::AutoGetCollectionForReadLegacy(
             resolveSecondaryNamespacesOrUUIDs(opCtx, catalog.get(), secondaryNssOrUUIDs);
 
         _secondaryNssIsAViewOrSharded = !resolvedNamespaces.has_value();
-
-        // If no secondary namespace is a view or is sharded, resolve namespaces and check their
-        // that their minVisible timestamps are compatible with the read timestamp.
-        if (resolvedNamespaces) {
-            // Note that calling getPointInTimeReadTimestamp may open a snapshot if one is not
-            // already open, depending on the current read source.
-            const auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
-            assertAllNamespacesAreCompatibleForReadTimestamp(
-                opCtx, catalog.get(), *resolvedNamespaces, readTimestamp);
-        }
     }
 }
 

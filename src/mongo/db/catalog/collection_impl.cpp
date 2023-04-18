@@ -409,7 +409,6 @@ Status CollectionImpl::initFromExisting(OperationContext* opCtx,
     // When initializing a collection from an earlier point-in-time, we don't know when the last DDL
     // operation took place at that point-in-time. We conservatively set the minimum valid snapshot
     // to the read point-in-time.
-    _minVisibleSnapshot = readTimestamp;
     _minValidSnapshot = readTimestamp;
 
     _initCommon(opCtx);
@@ -791,12 +790,6 @@ bool CollectionImpl::isCappedAndNeedsDelete(OperationContext* opCtx) const {
     }
 
     return false;
-}
-
-void CollectionImpl::setMinimumVisibleSnapshot(Timestamp newMinimumVisibleSnapshot) {
-    if (!_minVisibleSnapshot || (newMinimumVisibleSnapshot > _minVisibleSnapshot.value())) {
-        _minVisibleSnapshot = newMinimumVisibleSnapshot;
-    }
 }
 
 void CollectionImpl::setMinimumValidSnapshot(Timestamp newMinimumValidSnapshot) {

@@ -109,25 +109,6 @@ void verifyDbAndCollection(OperationContext* opCtx,
             }
         }
     }
-
-    // If we are in a transaction, we cannot yield and wait when there are pending catalog
-    // changes. Instead, we must return an error in such situations. We ignore this restriction
-    // for the oplog, since it never has pending catalog changes.
-    if (opCtx->inMultiDocumentTransaction() && resolvedNss != NamespaceString::kRsOplogNamespace) {
-        if (auto minSnapshot = coll->getMinimumVisibleSnapshot()) {
-            auto mySnapshot =
-                opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx).get_value_or(
-                    opCtx->recoveryUnit()->getCatalogConflictingTimestamp());
-
-            uassert(
-                ErrorCodes::SnapshotUnavailable,
-                str::stream() << "Unable to read from a snapshot due to pending collection catalog "
-                                 "changes; please retry the operation. Snapshot timestamp is "
-                              << mySnapshot.toString() << ". Collection minimum is "
-                              << minSnapshot->toString(),
-                mySnapshot.isNull() || mySnapshot >= minSnapshot.value());
-        }
-    }
 }
 
 }  // namespace

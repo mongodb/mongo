@@ -82,25 +82,6 @@ void reopenAllDatabasesAndReloadCollectionCatalog(OperationContext* opCtx,
                       str::stream() << "failed to get valid collection pointer for namespace "
                                     << collNss.toStringForErrorMsg());
 
-            if (previousCatalogState.minVisibleTimestampMap.count(collection->uuid()) > 0) {
-                // After rolling back to a stable timestamp T, the minimum visible timestamp for
-                // each collection must be reset to (at least) its value at T. Additionally, there
-                // cannot exist a minimum visible timestamp greater than lastApplied. This allows us
-                // to upper bound what the minimum visible timestamp can be coming out of rollback.
-                //
-                // Because we only save the latest minimum visible timestamp for each collection, we
-                // bound the minimum visible timestamp (where necessary) to the stable timestamp.
-                // The benefit of fine grained tracking is assumed to be low-value compared to the
-                // cost/effort.
-                auto minVisible = std::min(
-                    stableTimestamp,
-                    previousCatalogState.minVisibleTimestampMap.find(collection->uuid())->second);
-                auto writableCollection =
-                    catalogWriter.value()->lookupCollectionByUUIDForMetadataWrite(
-                        opCtx, collection->uuid());
-                writableCollection->setMinimumVisibleSnapshot(minVisible);
-            }
-
             if (auto it = previousCatalogState.minValidTimestampMap.find(collection->uuid());
                 it != previousCatalogState.minValidTimestampMap.end()) {
                 // After rolling back to a stable timestamp T, the minimum valid timestamp for each
@@ -172,29 +153,15 @@ PreviousCatalogState closeCatalog(OperationContext* opCtx) {
                 break;
             }
 
-            boost::optional<Timestamp> minVisible = coll->getMinimumVisibleSnapshot();
-
-            // If there's a minimum visible, invariant there's also a UUID.
-            if (minVisible) {
-                LOGV2_DEBUG(20269,
-                            1,
-                            "closeCatalog: preserving min visible timestamp.",
-                            "coll_ns"_attr = coll->ns(),
-                            "uuid"_attr = coll->uuid(),
-                            "minVisible"_attr = minVisible);
-                previousCatalogState.minVisibleTimestampMap[coll->uuid()] = *minVisible;
-            }
-
-            boost::optional<Timestamp> minValid = coll->getMinimumValidSnapshot();
-
             // If there's a minimum valid, invariant there's also a UUID.
+            boost::optional<Timestamp> minValid = coll->getMinimumValidSnapshot();
             if (minValid) {
                 LOGV2_DEBUG(6825500,
                             1,
                             "closeCatalog: preserving min valid timestamp.",
                             "ns"_attr = coll->ns(),
                             "uuid"_attr = coll->uuid(),
-                            "minVisible"_attr = minValid);
+                            "minValid"_attr = minValid);
                 previousCatalogState.minValidTimestampMap[coll->uuid()] = *minValid;
             }
 
