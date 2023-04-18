@@ -319,14 +319,15 @@ public:
 
         if (isMongos() || serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             if (isConfigDB() 
-                && (coll() == "actionlog" || coll() == "changelog"
-                    || coll() == "chunks" || coll() == "collections"
-                    || coll() == "databases" || coll() == "lockpings"
-                    || coll() == "locks" || coll() == "migrations"
-                    || coll() == "mongos" || coll() == "settings"
-                    || coll() == "shards" || coll() == "tags"
-                    || coll() == "transactions" || coll() == "version"
-                    || coll() == "migrations")) {
+                && (coll() == "chunks" || coll() == "databases"
+                    || coll() == "collections" || coll() == "shards"
+                    || coll() == "transactions" || coll() == "migrations"
+                    || coll() == "tags" || coll() == "settings"
+                    || coll() == "migrations" || coll() == "locks"
+                    || coll() == "lockpings" || coll() == "version"
+                    || coll() == "mongos" || coll() == "actionlog"
+                    || coll() == "changelog")
+
                 return false;
             }
         }
