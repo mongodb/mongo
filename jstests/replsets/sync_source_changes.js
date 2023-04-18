@@ -56,6 +56,9 @@ rst.waitForState(newNode, ReplSetTest.State.SECONDARY);
 rst.awaitReplication();
 rst.awaitSecondaryNodes();
 
+// Wait for the new node to no longer be newlyAdded, so that it becomes a voting node.
+rst.waitForAllNewlyAddedRemovals();
+
 // Assure that node 2 will set node 0 as its sync source, since it is the best option.
 assertSyncSourceChangesTo(rst, newNode, rst.nodes[0]);
 
