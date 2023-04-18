@@ -5,4 +5,4 @@ Sort: {}
 Proj: {}
 Collation: { locale: "mock_reverse_string" }
 
-an[eqa,eqb]|||mock_reverse_string02300000|ff
+an[eqa,eqb]|||mock_reverse_string02300000f

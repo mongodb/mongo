@@ -1,80 +1,80 @@
 ==== VARIATION: query={}, sort={}, proj={}
-an||||ff
+an|||f
 ==== VARIATION: query={ $or: [ { a: 1 }, { b: 2 } ] }, sort={}, proj={}
-or[eqa,eqb]||||ff
+or[eqa,eqb]|||f
 ==== VARIATION: query={ $or: [ { a: 1 }, { b: 1 }, { c: 1 } ], d: 1 }, sort={}, proj={}
-an[or[eqa,eqb,eqc],eqd]||||ff
+an[or[eqa,eqb,eqc],eqd]|||f
 ==== VARIATION: query={ $or: [ { a: 1 }, { b: 1 } ], c: 1, d: 1 }, sort={}, proj={}
-an[or[eqa,eqb],eqc,eqd]||||ff
+an[or[eqa,eqb],eqc,eqd]|||f
 ==== VARIATION: query={ a: 1, b: 1, c: 1 }, sort={}, proj={}
-an[eqa,eqb,eqc]||||ff
+an[eqa,eqb,eqc]|||f
 ==== VARIATION: query={ a: 1, beqc: 1 }, sort={}, proj={}
-an[eqa,eqbeqc]||||ff
+an[eqa,eqbeqc]|||f
 ==== VARIATION: query={ ap1a: 1 }, sort={}, proj={}
-eqap1a||||ff
+eqap1a|||f
 ==== VARIATION: query={ aab: 1 }, sort={}, proj={}
-eqaab||||ff
+eqaab|||f
 ==== VARIATION: query={}, sort={ a: 1 }, proj={}
-an|aa|||ff
+an|aa||f
 ==== VARIATION: query={}, sort={ a: -1 }, proj={}
-an|da|||ff
+an|da||f
 ==== VARIATION: query={ $text: { $search: "search keywords" } }, sort={ a: { $meta: "textScore" } }, proj={ a: { $meta: "textScore" } }
-te_fts|ta|||ff
+te_fts|ta||f
 ==== VARIATION: query={ a: 1 }, sort={ b: 1 }, proj={}
-eqa|ab|||ff
+eqa|ab||f
 ==== VARIATION: query={}, sort={}, proj={ a: 1 }
-an||_id-a||ff
+an||_id-a|f
 ==== VARIATION: query={}, sort={}, proj={ a: -1 }
-an||_id-a||ff
+an||_id-a|f
 ==== VARIATION: query={}, sort={}, proj={ a: -1.0 }
-an||_id-a||ff
+an||_id-a|f
 ==== VARIATION: query={}, sort={}, proj={ a: true }
-an||_id-a||ff
+an||_id-a|f
 ==== VARIATION: query={}, sort={}, proj={ a: 0 }
-an||||ff
+an|||f
 ==== VARIATION: query={}, sort={}, proj={ a: false }
-an||||ff
+an|||f
 ==== VARIATION: query={}, sort={}, proj={ a: 99 }
-an||_id-a||ff
+an||_id-a|f
 ==== VARIATION: query={}, sort={}, proj={ a: "foo" }
-an||_id||ff
+an||_id|f
 ==== VARIATION: query={}, sort={}, proj={ a: { $slice: [ 3, 5 ] } }
-an||||ff
+an|||f
 ==== VARIATION: query={}, sort={}, proj={ a: { $slice: [ 3, 5 ] }, b: 0 }
-an||||ff
+an|||f
 ==== VARIATION: query={}, sort={}, proj={ a: { $slice: [ 3, 5 ] }, b: 1 }
-an||||ff
+an|||f
 ==== VARIATION: query={}, sort={}, proj={ a: { $elemMatch: { x: 2 } } }
-an||||ff
+an|||f
 ==== VARIATION: query={}, sort={}, proj={ a: { $elemMatch: { x: 2 } }, b: 0 }
-an||||ff
+an|||f
 ==== VARIATION: query={}, sort={}, proj={ a: { $elemMatch: { x: 2 } }, b: 1 }
-an||||ff
+an|||f
 ==== VARIATION: query={}, sort={}, proj={ a: { $slice: [ 3, 5 ] }, b: { $elemMatch: { x: 2 } } }
-an||||ff
+an|||f
 ==== VARIATION: query={}, sort={}, proj={ a: ObjectId('507f191e810c19729de860ea') }
-an||_id||ff
+an||_id|f
 ==== VARIATION: query={}, sort={}, proj={ _id: 0, a: ObjectId('507f191e810c19729de860ea'), b: "foo" }
-an||||ff
+an|||f
 ==== VARIATION: query={ a: 1 }, sort={}, proj={ a.$: 1 }
-eqa||||ff
+eqa|||f
 ==== VARIATION: query={ a: 1 }, sort={}, proj={ a: 1 }
-eqa||_id-a||ff
+eqa||_id-a|f
 ==== VARIATION: query={}, sort={}, proj={ a: 1, b: 1 }
-an||_id-a-b||ff
+an||_id-a-b|f
 ==== VARIATION: query={}, sort={}, proj={ b: 1, a: 1 }
-an||_id-a-b||ff
+an||_id-a-b|f
 ==== VARIATION: query={}, sort={}, proj={ b-1: 1, a-2: 1 }
-an||_id-a\-2-b\-1||ff
+an||_id-a\-2-b\-1|f
 ==== VARIATION: query={}, sort={ x: 1 }, proj={ $sortKey: { $meta: "sortKey" } }
-an|ax|||ff
+an|ax||f
 ==== VARIATION: query={}, sort={}, proj={}
-an||||ff
+an|||f
 ==== VARIATION: query={}, sort={ x: 1 }, proj={ a: 1, $sortKey: { $meta: "sortKey" } }
-an|ax|_id-a||ff
+an|ax|_id-a|f
 ==== VARIATION: query={}, sort={}, proj={ a: 1 }
-an||_id-a||ff
+an||_id-a|f
 ==== VARIATION: query={ $or: [ { a: 1 } ] }, sort={}, proj={ _id: 0, a: 1 }
-eqa||a||ff
+eqa||a|f
 ==== VARIATION: query={ $or: [ { a: 1 } ] }, sort={}, proj={ a.$: 1 }
-eqa||||ff
+eqa|||f

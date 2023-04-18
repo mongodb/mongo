@@ -100,38 +100,6 @@ std::pair<CoreIndexInfo, std::unique_ptr<WildcardProjection>> makeWildcardUpdate
 }
 
 /**
- * Check that the stable keys of 'a' and 'b' are not equal because of the last character.
- */
-void assertPlanCacheKeysUnequalDueToForceClassicEngineValue(const PlanCacheKeyInfo& a,
-                                                            const PlanCacheKeyInfo& b) {
-    auto aUnstablePart = a.getIndexabilityDiscriminators();
-    auto bUnstablePart = b.getIndexabilityDiscriminators();
-    auto aStablePart = a.getQueryShape();
-    auto bStablePart = b.getQueryShape();
-
-    ASSERT_EQ(aUnstablePart, bUnstablePart);
-    // The last 2 characters (plus separator) of the stable part encodes the engine that uses this
-    // PlanCacheKey and if apiStrict was used. So the stable parts except for the last two
-    // characters should be identical.
-    ASSERT_EQ(aStablePart.substr(0, aStablePart.size() - 2),
-              bStablePart.substr(0, bStablePart.size() - 2));
-
-    // Should have at least 2 byte to represent whether we must use the classic engine and stable
-    // API.
-    ASSERT_GTE(aStablePart.size(), 2);
-
-    // The indexability discriminators should match.
-    ASSERT_EQ(a.getIndexabilityDiscriminators(), b.getIndexabilityDiscriminators());
-
-    // The stable parts should not match because of the second character from the back, encoding the
-    // engine type.
-    ASSERT_NE(aStablePart, bStablePart);
-    ASSERT_NE(aStablePart[aStablePart.size() - 2], bStablePart[bStablePart.size() - 2]);
-    // Ensure that the the apiStrict values are equal.
-    ASSERT_EQ(aStablePart.back(), bStablePart.back());
-}
-
-/**
  * Check that the stable keys of 'a' and 'b' are equal, but the index discriminators are not.
  */
 void assertPlanCacheKeysUnequalDueToDiscriminators(const PlanCacheKeyInfo& a,
@@ -519,32 +487,6 @@ TEST_F(PlanCacheKeyInfoTest,
         auto key = makeKey(*canonicalize("{x: {$eq: null}}"), indexCores);
         ASSERT_EQ(key.getIndexabilityDiscriminators(), "(0)<0>");
     }
-}
-
-TEST_F(PlanCacheKeyInfoTest, DifferentQueryEngines) {
-    const auto keyPattern = BSON("a" << 1);
-    const std::vector<CoreIndexInfo> indexCores = {
-        CoreIndexInfo(keyPattern,
-                      IndexNames::nameToType(IndexNames::findPluginName(keyPattern)),
-                      false,                         // sparse
-                      IndexEntry::Identifier{""})};  // name
-
-    // Helper to construct a plan cache key given the 'forceClassicEngine' flag.
-    auto constructPlanCacheKey = [&](bool forceClassicEngine) {
-        RAIIServerParameterControllerForTest controller{"internalQueryFrameworkControl",
-                                                        forceClassicEngine ? "forceClassicEngine"
-                                                                           : "trySbeEngine"};
-        const auto queryStr = "{a: 0}";
-        unique_ptr<CanonicalQuery> cq(canonicalize(queryStr));
-        return makeKey(*cq, indexCores);
-    };
-
-    const auto classicEngineKey = constructPlanCacheKey(true);
-    const auto noClassicEngineKey = constructPlanCacheKey(false);
-
-    // Check that the two plan cache keys are not equal because the plans were created under
-    // different engines.
-    assertPlanCacheKeysUnequalDueToForceClassicEngineValue(classicEngineKey, noClassicEngineKey);
 }
 
 TEST_F(PlanCacheKeyInfoTest,

@@ -669,10 +669,6 @@ CanonicalQuery::QueryShapeString encodeClassic(const CanonicalQuery& cq) {
     encodeKeyForProj(cq.getProj(), &keyBuilder);
     encodeCollation(cq.getCollator(), &keyBuilder);
 
-    // This encoding can be removed once the classic query engine reaches EOL and SBE is used
-    // exclusively for all query execution.
-    keyBuilder << kEncodeSectionDelimiter << (cq.getForceClassicEngine() ? "f" : "t");
-
     // The apiStrict flag can cause the query to see different set of indexes. For example, all
     // sparse indexes will be ignored with apiStrict is used.
     const bool apiStrict =

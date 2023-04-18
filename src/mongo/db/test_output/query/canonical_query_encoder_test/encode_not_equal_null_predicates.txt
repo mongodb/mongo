@@ -1,10 +1,10 @@
 ==== VARIATION: query={ a: { $not: { $eq: null } } }, sort={}, proj={ _id: 0, a: 1 }
-ntnot_eq_null[eqa]||a||ff
+ntnot_eq_null[eqa]||a|f
 ==== VARIATION: query={ a: { $not: { $eq: null } } }, sort={ a: 1 }, proj={ _id: 0, a: 1 }
-ntnot_eq_null[eqa]|aa|a||ff
+ntnot_eq_null[eqa]|aa|a|f
 ==== VARIATION: query={ a: { $not: { $gte: null } } }, sort={ a: 1 }, proj={ _id: 0, a: 1 }
-ntnot_eq_null[gea]|aa|a||ff
+ntnot_eq_null[gea]|aa|a|f
 ==== VARIATION: query={ a: { $not: { $lte: null } } }, sort={ a: 1 }, proj={ _id: 0, a: 1 }
-ntnot_eq_null[lea]|aa|a||ff
+ntnot_eq_null[lea]|aa|a|f
 ==== VARIATION: query={ a: { $not: { $eq: true } } }, sort={ a: 1 }, proj={ _id: 0, a: 1 }
-nt[eqa]|aa|a||ff
+nt[eqa]|aa|a|f

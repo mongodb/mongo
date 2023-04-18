@@ -1,6 +1,6 @@
 ==== VARIATION: query={ a: { $near: [ 0, 0 ], $maxDistance: 0.3 } }, sort={}, proj={}
-gnanrfl||||ff
+gnanrfl|||f
 ==== VARIATION: query={ a: { $nearSphere: [ 0, 0 ], $maxDistance: 0.31 } }, sort={}, proj={}
-gnanssp||||ff
+gnanssp|||f
 ==== VARIATION: query={ a: { $geoNear: { $geometry: { type: "Point", coordinates: [ 0, 0 ] }, $maxDistance: 100 } } }, sort={}, proj={}
-gnanrsp||||ff
+gnanrsp|||f
