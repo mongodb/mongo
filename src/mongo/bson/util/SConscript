@@ -19,7 +19,7 @@ env.Library(
     source=[
         'bsoncolumn.cpp',
         'bsoncolumnbuilder.cpp',
-        'simple8b.cpp',
+        'simple8b_builder.cpp',
         'simple8b_type_util.cpp',
     ],
     LIBDEPS=[

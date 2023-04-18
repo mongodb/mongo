@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/bsoncolumn_util.h"
 
+#include "mongo/bson/util/simple8b.h"
 #include "mongo/bson/util/simple8b_type_util.h"
 
 #include <memory>

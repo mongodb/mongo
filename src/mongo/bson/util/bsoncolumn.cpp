@@ -143,7 +143,10 @@ int BSONColumn::ElementStorage::Element::size() const {
 }
 
 BSONElement BSONColumn::ElementStorage::Element::element() const {
-    return {_buffer, _nameSize + 1, _valueSize + _nameSize + kElementValueOffset};
+    return {_buffer,
+            _nameSize + 1,
+            _valueSize + _nameSize + kElementValueOffset,
+            BSONElement::TrustedInitTag{}};
 }
 
 BSONColumn::ElementStorage::ContiguousBlock::ContiguousBlock(ElementStorage& storage)

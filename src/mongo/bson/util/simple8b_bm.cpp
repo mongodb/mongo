@@ -30,6 +30,7 @@
 #include <benchmark/benchmark.h>
 
 #include "mongo/bson/util/simple8b.h"
+#include "mongo/bson/util/simple8b_builder.h"
 #include "mongo/platform/bits.h"
 
 namespace mongo {
