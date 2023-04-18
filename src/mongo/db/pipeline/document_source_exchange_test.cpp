@@ -749,4 +749,30 @@ TEST_F(DocumentSourceExchangeTest, RejectInvalidMissingKeys) {
         Exchange(parseSpec(spec), Pipeline::create({}, getExpCtx())), AssertionException, 50967);
 }
 
+TEST_F(DocumentSourceExchangeTest, QueryShape) {
+    const size_t nDocs = 500;
+
+    auto source = getMockSource(nDocs);
+
+    ExchangeSpec spec;
+    spec.setPolicy(ExchangePolicyEnum::kRoundRobin);
+    spec.setConsumers(1);
+    spec.setBufferSize(1024);
+    boost::intrusive_ptr<Exchange> ex = new Exchange(spec, Pipeline::create({source}, getExpCtx()));
+    boost::intrusive_ptr<DocumentSourceExchange> stage =
+        new DocumentSourceExchange(getExpCtx(), ex, 0, nullptr);
+
+    ASSERT_BSONOBJ_EQ_AUTO(  //
+        R"({
+            "$_internalExchange": {
+                "policy": "roundrobin",
+                "consumers": "?",
+                "orderPreserving": false,
+                "bufferSize": "?",
+                "key": "?"
+            }
+        })",
+        redact(*stage));
+}
+
 }  // namespace mongo

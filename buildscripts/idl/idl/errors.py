@@ -950,10 +950,10 @@ class ParserContext(object):
 
     def add_must_declare_shape_type(self, location, struct_name, field_name):
         # type: (common.SourceLocation, str, str) -> None
-        """Add an error about a field not specifying either query_shape_literal or query_shape_fieldpath if the struct is query_shape_component."""
+        """Add an error about a field not specifying either query_shape_literal or query_shape_anonymize if the struct is query_shape_component."""
         self._add_error(
             location, ERROR_ID_FIELD_MUST_DECLARE_SHAPE_LITERAL,
-            f"Field '{field_name}' must specify either 'query_shape_literal' or 'query_shape_fieldpath' since struct '{struct_name}' is a query shape component."
+            f"Field '{field_name}' must specify either 'query_shape_literal' or 'query_shape_anonymize' since struct '{struct_name}' is a query shape component."
         )
 
     def add_must_be_query_shape_component(self, location, struct_name, field_name):
@@ -963,7 +963,7 @@ class ParserContext(object):
             f"Field '{field_name}' cannot specify 'query_shape_literal' property since struct '{struct_name}' is not a query shape component."
         )
 
-    def add_query_shape_fieldpath_must_be_string(self, location, field_name, field_type):
+    def add_query_shape_anonymize_must_be_string(self, location, field_name, field_type):
         self._add_error(
             location, ERROR_ID_INVALID_TYPE_FOR_SHAPIFY,
             f"In order for {field_name} to be marked as a query shape fieldpath, it must have a string type, not {field_type}."
@@ -975,9 +975,9 @@ class ParserContext(object):
             f"{field_name} cannot be marked as both a query shape literal and query shape fieldpath."
         )
 
-    def add_field_cannot_have_query_shape_fieldpath_false(self, location):
+    def add_field_cannot_have_query_shape_anonymize_false(self, location):
         self._add_error(location, ERROR_ID_QUERY_SHAPE_FIELDPATH_CANNOT_BE_FALSE,
-                        "'query_shape_fieldpath' cannot be defined as false if it is set.")
+                        "'query_shape_anonymize' cannot be defined as false if it is set.")
 
 
 def _assert_unique_error_messages():

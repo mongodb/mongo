@@ -327,17 +327,17 @@ def _bind_struct_common(ctxt, parsed_spec, struct, ast_struct):
 
             # Verify that each field on the struct defines a query shape type on the field if and only if
             # query_shape_component is defined on the struct.
-            defined_query_shape_type = ast_field.query_shape_literal is not None or ast_field.query_shape_fieldpath is not None
+            defined_query_shape_type = ast_field.query_shape_literal is not None or ast_field.query_shape_anonymize is not None
             if not field.hidden and struct.query_shape_component and not defined_query_shape_type:
                 ctxt.add_must_declare_shape_type(ast_field, ast_struct.name, ast_field.name)
 
             if not struct.query_shape_component and defined_query_shape_type:
                 ctxt.add_must_be_query_shape_component(ast_field, ast_struct.name, ast_field.name)
 
-            if ast_field.query_shape_fieldpath and ast_field.type.cpp_type not in [
+            if ast_field.query_shape_anonymize and ast_field.type.cpp_type not in [
                     "std::string", "std::vector<std::string>"
             ]:
-                ctxt.add_query_shape_fieldpath_must_be_string(ast_field, ast_field.name,
+                ctxt.add_query_shape_anonymize_must_be_string(ast_field, ast_field.name,
                                                               ast_field.type.cpp_type)
 
     # Fill out the field comparison_order property as needed
@@ -455,6 +455,7 @@ def _bind_struct_type(struct):
     ast_type.cpp_type = _get_struct_qualified_cpp_name(struct)
     ast_type.bson_serialization_type = ["object"]
     ast_type.first_element_field_name = struct.fields[0].name if struct.fields else None
+    ast_type.is_query_shape_component = struct.query_shape_component
     return ast_type
 
 
@@ -1019,6 +1020,7 @@ def _bind_type(idltype):
     ast_type.deserializer = _normalize_method_name(idltype.cpp_type, idltype.deserializer)
     ast_type.deserialize_with_tenant = idltype.deserialize_with_tenant
     ast_type.internal_only = idltype.internal_only
+    ast_type.is_query_shape_component = True
     return ast_type
 
 
@@ -1045,7 +1047,7 @@ def _bind_field(ctxt, parsed_spec, field):
     ast_field.always_serialize = field.always_serialize
     ast_field.preparse = field.preparse
     ast_field.query_shape_literal = field.query_shape_literal
-    ast_field.query_shape_fieldpath = field.query_shape_fieldpath
+    ast_field.query_shape_anonymize = field.query_shape_anonymize
 
     ast_field.cpp_name = field.name
     if field.cpp_name:
@@ -1056,11 +1058,11 @@ def _bind_field(ctxt, parsed_spec, field):
         ctxt.add_array_not_valid_error(ast_field, "field", ast_field.name)
 
     # Validate that 'field' is not both a query shape literal and query shape fieldpath. The two are mutually exclusive.
-    if ast_field.query_shape_literal is not None and ast_field.query_shape_fieldpath is not None:
+    if ast_field.query_shape_literal is not None and ast_field.query_shape_anonymize is not None:
         ctxt.add_field_cannot_be_literal_and_fieldpath(ast_field, ast_field.name)
 
-    if ast_field.query_shape_fieldpath is False:
-        ctxt.add_field_cannot_have_query_shape_fieldpath_false(ast_field)
+    if ast_field.query_shape_anonymize is False:
+        ctxt.add_field_cannot_have_query_shape_anonymize_false(ast_field)
 
     if field.ignore:
         ast_field.ignore = field.ignore
@@ -1134,6 +1136,8 @@ def _bind_field(ctxt, parsed_spec, field):
         if ast_field.validator is None:
             return None
 
+    if ast_field.should_serialize_query_shape and not ast_field.type.is_query_shape_component:
+        ctxt.add_must_be_query_shape_component(ast_field, ast_field.type.name, ast_field.name)
     return ast_field
 
 

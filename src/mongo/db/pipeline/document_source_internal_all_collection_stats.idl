@@ -40,8 +40,10 @@ structs:
   DocumentSourceInternalAllCollectionStatsSpec:
     description: Specification for an $_internalAllCollectionStats stage.
     strict: true
+    query_shape_component: true
     fields:
       stats:
         description: Specification for a $collStats stage.
         type: DocumentSourceCollStatsSpec
         optional: true
+        query_shape_literal: true

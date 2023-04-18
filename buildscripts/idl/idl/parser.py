@@ -408,7 +408,7 @@ def _parse_field(ctxt, name, node):
                 _RuleDesc('bool_scalar'),
             "query_shape_literal":
                 _RuleDesc('required_bool_scalar'),
-            "query_shape_fieldpath":
+            "query_shape_anonymize":
                 _RuleDesc('required_bool_scalar'),
         })
 

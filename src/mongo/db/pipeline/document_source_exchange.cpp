@@ -94,10 +94,7 @@ const char* DocumentSourceExchange::getSourceName() const {
 }
 
 Value DocumentSourceExchange::serialize(SerializationOptions opts) const {
-    if (opts.redactIdentifiers || opts.replacementForLiteralArgs) {
-        MONGO_UNIMPLEMENTED_TASSERT(7484348);
-    }
-    return Value(DOC(getSourceName() << _exchange->getSpec().toBSON()));
+    return Value(DOC(getSourceName() << _exchange->getSpec().toBSON(opts)));
 }
 
 DocumentSourceExchange::DocumentSourceExchange(

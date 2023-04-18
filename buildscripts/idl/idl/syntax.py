@@ -494,7 +494,7 @@ class Field(common.SourceLocation):
         self.constructed = False  # type: bool
 
         self.query_shape_literal = None  # type: Optional[bool]
-        self.query_shape_fieldpath = None  # type: Optional[bool]
+        self.query_shape_anonymize = None  # type: Optional[bool]
 
         self.hidden = False  # type: bool
 

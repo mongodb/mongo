@@ -36,18 +36,23 @@ structs:
   StorageStatsSpec:
     description: Represents the 'storageStats' argument to the $collStats stage.
     strict: false
+    query_shape_component: true
     fields:
       scale:
         description: A number to use as a scaling factor applied to reported metrics.
         type: safeInt
         optional: true
         validator: { gte: 1 }
+        query_shape_literal: true
       verbose:
         type: optionalBool
         default: false
+        query_shape_literal: false
       waitForLock:
         type: optionalBool
         default: true
+        query_shape_literal: false
       numericOnly:
         type: optionalBool
         default: false
+        query_shape_literal: false

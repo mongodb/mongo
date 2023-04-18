@@ -55,6 +55,8 @@ REGISTER_INTERNAL_DOCUMENT_SOURCE(setVariableFromSubPipeline,
 
 Value DocumentSourceSetVariableFromSubPipeline::serialize(SerializationOptions opts) const {
     if (opts.redactIdentifiers || opts.replacementForLiteralArgs) {
+        // TODO: SERVER-76208 support query shapification for IDL types like pipeline with custom
+        // serializers.
         MONGO_UNIMPLEMENTED_TASSERT(7484314);
     }
 

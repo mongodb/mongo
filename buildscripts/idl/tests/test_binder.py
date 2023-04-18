@@ -2704,7 +2704,7 @@ class TestBinder(testcase.IDLTestcase):
                             query_shape_literal: false
         """), idl.errors.ERROR_ID_CANNOT_DECLARE_SHAPE_LITERAL)
 
-        # Validating query_shape_fieldpath relies on std::string
+        # Validating query_shape_anonymize relies on std::string
         basic_types = textwrap.dedent("""
             types:
                 string:
@@ -2731,7 +2731,7 @@ class TestBinder(testcase.IDLTestcase):
                     description: ""
                     fields:
                         field1:
-                            query_shape_fieldpath: true
+                            query_shape_anonymize: true
                             type: string
                         field2:
                             query_shape_literal: false
@@ -2746,7 +2746,7 @@ class TestBinder(testcase.IDLTestcase):
                     description: ""
                     fields:
                         field1:
-                            query_shape_fieldpath: true
+                            query_shape_anonymize: true
                             type: array<string>
                         field2:
                             query_shape_literal: false
@@ -2762,7 +2762,7 @@ class TestBinder(testcase.IDLTestcase):
                     description: ""
                     fields:
                         field1:
-                            query_shape_fieldpath: false
+                            query_shape_anonymize: false
                             type: string
                         field2:
                             query_shape_literal: false
@@ -2778,7 +2778,7 @@ class TestBinder(testcase.IDLTestcase):
                     description: ""
                     fields:
                         field1:
-                            query_shape_fieldpath: true
+                            query_shape_anonymize: true
                             type: bool
                         field2:
                             query_shape_literal: false
@@ -2794,7 +2794,7 @@ class TestBinder(testcase.IDLTestcase):
                     description: ""
                     fields:
                         field1:
-                            query_shape_fieldpath: true
+                            query_shape_anonymize: true
                             type: array<bool>
                         field2:
                             query_shape_literal: false
@@ -2810,13 +2810,45 @@ class TestBinder(testcase.IDLTestcase):
                     description: ""
                     fields:
                         field1:
-                            query_shape_fieldpath: true
+                            query_shape_anonymize: true
                             query_shape_literal: true
                             type: string
                         field2:
                             query_shape_literal: false
                             type: bool
         """), idl.errors.ERROR_ID_CANNOT_BE_LITERAL_AND_FIELDPATH)
+
+        self.assert_bind_fail(
+            basic_types + textwrap.dedent("""
+            structs:
+                StructZero:
+                    strict: true
+                    description: ""
+                    fields:
+                        field1:
+                            query_shape_literal: true
+                            type: string
+            """), idl.errors.ERROR_ID_CANNOT_DECLARE_SHAPE_LITERAL)
+
+        self.assert_bind_fail(
+            basic_types + textwrap.dedent("""
+            structs:
+                StructZero:
+                    strict: true
+                    description: ""
+                    fields:
+                        field1:
+                            type: string
+                struct1:
+                    query_shape_component: true
+                    strict: true
+                    description: ""
+                    fields:
+                        field2:
+                            type: StructZero
+                            description: ""
+                            query_shape_literal: true
+            """), idl.errors.ERROR_ID_CANNOT_DECLARE_SHAPE_LITERAL)
 
 
 if __name__ == '__main__':

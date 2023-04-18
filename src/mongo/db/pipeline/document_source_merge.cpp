@@ -536,6 +536,7 @@ boost::optional<DocumentSource::DistributedPlanLogic> DocumentSourceMerge::distr
 Value DocumentSourceMerge::serialize(SerializationOptions opts) const {
     auto explain = opts.verbosity;
     if (opts.redactIdentifiers || opts.replacementForLiteralArgs) {
+        // TODO: SERVER-76208 support query shapification for IDL types with custom serializers.
         MONGO_UNIMPLEMENTED_TASSERT(7484324);
     }
 

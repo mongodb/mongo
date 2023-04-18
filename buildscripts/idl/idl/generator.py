@@ -2166,7 +2166,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                         self._writer.write_template(
                             'options.serializeLiteralValue(${expression}).serializeForIDL(${field_name}, builder);'
                         )
-                    elif field.query_shape_fieldpath:
+                    elif field.query_shape_anonymize:
                         self._writer.write_template(
                             'builder->append(${field_name}, options.serializeFieldPathFromString(${expression}));'
                         )
@@ -2321,7 +2321,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                             self._writer.write_template(
                                 'options.serializeLiteralValue(${expression}).serializeForIDL(${field_name}, builder);'
                             )
-                        elif field.query_shape_fieldpath:
+                        elif field.query_shape_anonymize:
                             self._writer.write_template(
                                 'builder->append(${field_name}, options.serializeFieldPathFromString(${expression}));'
                             )
@@ -2335,7 +2335,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                             self._writer.write_template(
                                 'options.serializeLiteralValue(value).serializeForIDL(${field_name}, builder);'
                             )
-                        elif field.query_shape_fieldpath:
+                        elif field.query_shape_anonymize:
                             self._writer.write_template(
                                 'idl::idlSerialize(builder, ${field_name}, options.serializeFieldPathFromString(value));'
                             )
@@ -2382,7 +2382,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                         self._writer.write_line(
                             'options.serializeLiteralValue(%s).serializeForIDL(%s, builder);' %
                             (_access_member(field), _get_field_constant_name(field)))
-                    elif field.query_shape_fieldpath:
+                    elif field.query_shape_anonymize:
                         self._writer.write_line(
                             'builder->append(%s, options.serializeFieldPathFromString(%s));' %
                             (_get_field_constant_name(field), _access_member(field)))

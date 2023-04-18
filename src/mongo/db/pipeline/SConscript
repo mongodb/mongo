@@ -496,6 +496,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/exec/document_value/document_value',
+        '$BUILD_DIR/mongo/db/serialization_options',
         '$BUILD_DIR/mongo/db/storage/key_string',
         '$BUILD_DIR/mongo/idl/idl_parser',
         '$BUILD_DIR/mongo/s/common_s',
@@ -593,6 +594,7 @@ env.CppUnitTest(
         'document_source_change_stream_add_post_image_test.cpp',
         'document_source_change_stream_test.cpp',
         'document_source_check_resume_token_test.cpp',
+        'document_source_coll_stats_test.cpp',
         'document_source_count_test.cpp',
         'document_source_current_op_test.cpp',
         'document_source_densify_test.cpp',

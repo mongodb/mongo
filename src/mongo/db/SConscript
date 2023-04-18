@@ -1609,7 +1609,6 @@ env.Library(
         'pipeline/make_js_function.cpp',
         'pipeline/monotonic_expression.cpp',
         'pipeline/variables.cpp',
-        'query/serialization_options.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson/util/bson_extract',
@@ -1635,6 +1634,7 @@ env.Library(
         'query/collation/collator_interface',
         'query/datetime/date_time_support',
         'query/query_knobs',
+        'serialization_options',
         'stats/counters',
         'update/pattern_cmp',
     ],
@@ -1644,6 +1644,19 @@ env.Library(
         'service_context',
         'vector_clock',
     ],
+)
+
+env.Library(
+    target='serialization_options',
+    source=[
+        'query/serialization_options.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/exec/document_value/document_value',
+        '$BUILD_DIR/mongo/db/pipeline/field_path',
+    ],
+    LIBDEPS_PRIVATE=[],
 )
 
 env.Library(

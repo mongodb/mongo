@@ -64,10 +64,10 @@ structs:
                 query_shape_literal: true
                 type: array<int>
             fieldpath:
-                query_shape_fieldpath: true
+                query_shape_anonymize: true
                 type: string
             fieldpathList:
-                query_shape_fieldpath: true
+                query_shape_anonymize: true
                 type: array<string>
 
     ParentStruct:
