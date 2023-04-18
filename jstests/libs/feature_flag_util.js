@@ -51,7 +51,7 @@ var FeatureFlagUtil = (function() {
             } else {
                 // Some db-like objects (e.g ShardedClusterFixture) have a getSiblingDB method
                 // instead of getDB, use that here to avoid an undefined error.
-                setConn(db.getSiblingDB(db.defaultDB));
+                setConn(db.getSiblingDB(db.getMongo().defaultDB));
             }
         }
 
