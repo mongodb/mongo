@@ -722,8 +722,8 @@ var ReplSetTest = function(opts) {
 
     /**
      * Blocks until the secondary nodes have completed recovery and their roles are known. Blocks on
-     * all secondary nodes or just 'secondaries', if specified. Waits for all 'newlyAdded' fields to
-     * be removed by default.
+     * all secondary nodes or just 'secondaries', if specified. Does not wait for all 'newlyAdded'
+     * fields to be removed by default.
      */
     this.awaitSecondaryNodes = function(
         timeout, secondaries, retryIntervalMS, waitForNewlyAddedRemoval) {
