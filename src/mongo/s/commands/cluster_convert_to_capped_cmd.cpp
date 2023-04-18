@@ -51,8 +51,17 @@ bool nonShardedCollectionCommandPassthrough(OperationContext* opCtx,
             str::stream() << "Can't do command: " << cmdName << " on a sharded collection",
             !cm.isSharded());
 
-    auto responses = scatterGatherVersionedTargetByRoutingTable(
-        opCtx, dbName, nss, cm, cmdObj, ReadPreferenceSetting::get(opCtx), retryPolicy, {}, {});
+    auto responses = scatterGatherVersionedTargetByRoutingTable(opCtx,
+                                                                dbName,
+                                                                nss,
+                                                                cm,
+                                                                cmdObj,
+                                                                ReadPreferenceSetting::get(opCtx),
+                                                                retryPolicy,
+                                                                {} /*query*/,
+                                                                {} /*collation*/,
+                                                                boost::none /*letParameters*/,
+                                                                boost::none /*runtimeConstants*/);
     invariant(responses.size() == 1);
 
     const auto cmdResponse = uassertStatusOK(std::move(responses.front().swResponse));

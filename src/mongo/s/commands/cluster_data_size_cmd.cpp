@@ -85,8 +85,10 @@ public:
                 opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
             ReadPreferenceSetting::get(opCtx),
             Shard::RetryPolicy::kIdempotent,
-            {},
-            {});
+            {} /*query*/,
+            {} /*collation*/,
+            boost::none /*letParameters*/,
+            boost::none /*runtimeConstants*/);
 
         // yes these are doubles...
         double size = 0;

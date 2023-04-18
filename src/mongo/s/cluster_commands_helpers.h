@@ -177,8 +177,23 @@ std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRouting
     const ReadPreferenceSetting& readPref,
     Shard::RetryPolicy retryPolicy,
     const BSONObj& query,
+    const BSONObj& collation,
+    const boost::optional<BSONObj>& letParameters,
+    const boost::optional<LegacyRuntimeConstants>& runtimeConstants);
+/**
+ * This overload is for callers which already have a fully initialized 'ExpressionContext' (e.g.
+ * callers from the aggregation framework). Most callers should prefer the overload above.
+ */
+[[nodiscard]] std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRoutingTable(
+    boost::intrusive_ptr<ExpressionContext> expCtx,
+    StringData dbName,
+    const NamespaceString& nss,
+    const ChunkManager& cm,
+    const BSONObj& cmdObj,
+    const ReadPreferenceSetting& readPref,
+    Shard::RetryPolicy retryPolicy,
+    const BSONObj& query,
     const BSONObj& collation);
-
 
 /**
  * Utility for dispatching versioned commands on a namespace, deciding which shards to
@@ -199,7 +214,9 @@ scatterGatherVersionedTargetByRoutingTableNoThrowOnStaleShardVersionErrors(
     const ReadPreferenceSetting& readPref,
     Shard::RetryPolicy retryPolicy,
     const BSONObj& query,
-    const BSONObj& collation);
+    const BSONObj& collation,
+    const boost::optional<BSONObj>& letParameters,
+    const boost::optional<LegacyRuntimeConstants>& runtimeConstants);
 
 /**
  * Utility for dispatching commands against the primary of a database and attaching the appropriate
@@ -291,7 +308,9 @@ std::vector<std::pair<ShardId, BSONObj>> getVersionedRequestsForTargetedShards(
     const ChunkManager& cm,
     const BSONObj& cmdObj,
     const BSONObj& query,
-    const BSONObj& collation);
+    const BSONObj& collation,
+    const boost::optional<BSONObj>& letParameters,
+    const boost::optional<LegacyRuntimeConstants>& runtimeConstants);
 
 /**
  * If the command is running in a transaction, returns the proper routing table to use for targeting

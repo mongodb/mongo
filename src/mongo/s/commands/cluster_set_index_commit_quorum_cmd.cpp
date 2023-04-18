@@ -117,8 +117,10 @@ public:
                 opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
             ReadPreferenceSetting::get(opCtx),
             Shard::RetryPolicy::kNotIdempotent,
-            BSONObj() /* query */,
-            BSONObj() /* collation */);
+            BSONObj() /*query*/,
+            BSONObj() /*collation*/,
+            boost::none /*letParameters*/,
+            boost::none /*runtimeConstants*/);
 
         std::string errmsg;
         const bool ok =

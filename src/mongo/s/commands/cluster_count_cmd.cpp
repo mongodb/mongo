@@ -131,7 +131,9 @@ public:
                 ReadPreferenceSetting::get(opCtx),
                 Shard::RetryPolicy::kIdempotent,
                 countRequest.getQuery(),
-                collation);
+                collation,
+                boost::none /*letParameters*/,
+                boost::none /*runtimeConstants*/);
         } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
             // Rewrite the count command as an aggregation.
             auto countRequest = CountCommandRequest::parse(IDLParserErrorContext("count"), cmdObj);
@@ -235,7 +237,9 @@ public:
                                                            ReadPreferenceSetting::get(opCtx),
                                                            Shard::RetryPolicy::kIdempotent,
                                                            targetingQuery,
-                                                           targetingCollation);
+                                                           targetingCollation,
+                                                           boost::none /*letParameters*/,
+                                                           boost::none /*runtimeConstants*/);
         } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
             CountCommandRequest countRequest(NamespaceStringOrUUID(NamespaceString{}));
             try {

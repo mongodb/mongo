@@ -132,7 +132,9 @@ public:
                                                            ReadPreferenceSetting::get(opCtx),
                                                            Shard::RetryPolicy::kIdempotent,
                                                            targetingQuery,
-                                                           targetingCollation);
+                                                           targetingCollation,
+                                                           boost::none /*letParameters*/,
+                                                           boost::none /*runtimeConstants*/);
         } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
             auto parsedDistinct = ParsedDistinct::parse(
                 opCtx, ex->getNamespace(), cmdObj, ExtensionsCallbackNoop(), true);
@@ -217,7 +219,9 @@ public:
                 ReadPreferenceSetting::get(opCtx),
                 Shard::RetryPolicy::kIdempotent,
                 query,
-                collation);
+                collation,
+                boost::none /*letParameters*/,
+                boost::none /*runtimeConstants*/);
         } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
             auto parsedDistinct = ParsedDistinct::parse(
                 opCtx, ex->getNamespace(), cmdObj, ExtensionsCallbackNoop(), true);

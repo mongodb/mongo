@@ -131,13 +131,14 @@ namespace {
  * caller.
  */
 std::vector<AsyncRequestsSender::Request> buildVersionedRequestsForTargetedShards(
-    OperationContext* opCtx,
+    boost::intrusive_ptr<ExpressionContext> expCtx,
     const NamespaceString& nss,
     const ChunkManager& cm,
     const std::set<ShardId>& shardsToSkip,
     const BSONObj& cmdObj,
     const BSONObj& query,
     const BSONObj& collation) {
+    auto opCtx = expCtx->opCtx;
 
     auto cmdToSend = cmdObj;
 
@@ -170,7 +171,6 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequestsForTargetedShard
             CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collation));
     }
 
-    auto expCtx = make_intrusive<ExpressionContext>(opCtx, std::move(collator), nss);
     cm.getShardIdsForQuery(expCtx, query, collation, &shardIds);
 
     for (const ShardId& shardId : shardIds) {
@@ -401,11 +401,28 @@ std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRouting
     const ReadPreferenceSetting& readPref,
     Shard::RetryPolicy retryPolicy,
     const BSONObj& query,
+    const BSONObj& collation,
+    const boost::optional<BSONObj>& letParameters,
+    const boost::optional<LegacyRuntimeConstants>& runtimeConstants) {
+    auto expCtx = makeExpressionContextWithDefaultsForTargeter(
+        opCtx, nss, collation, boost::none /*explainVerbosity*/, letParameters, runtimeConstants);
+    return scatterGatherVersionedTargetByRoutingTable(
+        expCtx, dbName, nss, cm, cmdObj, readPref, retryPolicy, query, collation);
+}
+
+[[nodiscard]] std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRoutingTable(
+    boost::intrusive_ptr<ExpressionContext> expCtx,
+    StringData dbName,
+    const NamespaceString& nss,
+    const ChunkManager& cm,
+    const BSONObj& cmdObj,
+    const ReadPreferenceSetting& readPref,
+    Shard::RetryPolicy retryPolicy,
+    const BSONObj& query,
     const BSONObj& collation) {
     const auto requests = buildVersionedRequestsForTargetedShards(
-        opCtx, nss, cm, {} /* shardsToSkip */, cmdObj, query, collation);
-
-    return gatherResponses(opCtx, dbName, readPref, retryPolicy, requests);
+        expCtx, nss, cm, {} /* shardsToSkip */, cmdObj, query, collation);
+    return gatherResponses(expCtx->opCtx, dbName, readPref, retryPolicy, requests);
 }
 
 std::vector<AsyncRequestsSender::Response>
@@ -419,9 +436,13 @@ scatterGatherVersionedTargetByRoutingTableNoThrowOnStaleShardVersionErrors(
     const ReadPreferenceSetting& readPref,
     Shard::RetryPolicy retryPolicy,
     const BSONObj& query,
-    const BSONObj& collation) {
+    const BSONObj& collation,
+    const boost::optional<BSONObj>& letParameters,
+    const boost::optional<LegacyRuntimeConstants>& runtimeConstants) {
+    auto expCtx = makeExpressionContextWithDefaultsForTargeter(
+        opCtx, nss, collation, boost::none /*explainVerbosity*/, letParameters, runtimeConstants);
     const auto requests = buildVersionedRequestsForTargetedShards(
-        opCtx, nss, cm, shardsToSkip, cmdObj, query, collation);
+        expCtx, nss, cm, shardsToSkip, cmdObj, query, collation);
 
     return gatherResponsesNoThrowOnStaleShardVersionErrors(
         opCtx, dbName, readPref, retryPolicy, requests);
@@ -456,6 +477,12 @@ AsyncRequestsSender::Response executeCommandAgainstShardWithMinKeyChunk(
     const BSONObj& cmdObj,
     const ReadPreferenceSetting& readPref,
     Shard::RetryPolicy retryPolicy) {
+    auto expCtx = makeExpressionContextWithDefaultsForTargeter(opCtx,
+                                                               nss,
+                                                               BSONObj() /*collation*/,
+                                                               boost::none /*explainVerbosity*/,
+                                                               boost::none /*letParameters*/,
+                                                               boost::none /*runtimeConstants*/);
 
     const auto query =
         cm.isSharded() ? cm.getShardKeyPattern().getKeyPattern().globalMin() : BSONObj();
@@ -466,7 +493,7 @@ AsyncRequestsSender::Response executeCommandAgainstShardWithMinKeyChunk(
         readPref,
         retryPolicy,
         buildVersionedRequestsForTargetedShards(
-            opCtx, nss, cm, {} /* shardsToSkip */, cmdObj, query, BSONObj() /* collation */));
+            expCtx, nss, cm, {} /* shardsToSkip */, cmdObj, query, BSONObj() /* collation */));
     return std::move(responses.front());
 }
 
@@ -649,10 +676,14 @@ std::vector<std::pair<ShardId, BSONObj>> getVersionedRequestsForTargetedShards(
     const ChunkManager& cm,
     const BSONObj& cmdObj,
     const BSONObj& query,
-    const BSONObj& collation) {
+    const BSONObj& collation,
+    const boost::optional<BSONObj>& letParameters,
+    const boost::optional<LegacyRuntimeConstants>& runtimeConstants) {
+    auto expCtx = makeExpressionContextWithDefaultsForTargeter(
+        opCtx, nss, collation, boost::none /*explainVerbosity*/, letParameters, runtimeConstants);
     std::vector<std::pair<ShardId, BSONObj>> requests;
     auto ars_requests = buildVersionedRequestsForTargetedShards(
-        opCtx, nss, cm, {} /* shardsToSkip */, cmdObj, query, collation);
+        expCtx, nss, cm, {} /* shardsToSkip */, cmdObj, query, collation);
     std::transform(std::make_move_iterator(ars_requests.begin()),
                    std::make_move_iterator(ars_requests.end()),
                    std::back_inserter(requests),
