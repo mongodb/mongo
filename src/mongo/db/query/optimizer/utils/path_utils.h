@@ -79,8 +79,6 @@ std::vector<ABT::reference_type> collectComposedBounded(const ABT& n, size_t max
  *
  * If the number of compositions exceeds "maxDepth" then we return the a single FilterNode
  * consisting of an EvalFilter over the original path and input.
- *
- * TODO: SERVER-73744. Consolidate usages in a new optimizer phase.
  */
 constexpr size_t kMaxPathConjunctionDecomposition = 20;
 boost::optional<ABT> decomposeToFilterNodes(const ABT& input,
