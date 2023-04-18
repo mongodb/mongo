@@ -20,7 +20,6 @@ mozjsSuffix = '-60'
 yamlSuffix = '-0.6.2'
 icuSuffix = '-57.1'
 gperftoolsSuffix = '-2.7'
-timelibSuffix = '-2021.06'
 tomcryptSuffix = '-1.18.2'
 benchmarkSuffix = '-1.4.1'
 
@@ -37,7 +36,7 @@ thirdPartyEnvironmentModifications = {
         'CPPDEFINES' : [('SAFEINT_USE_INTRINSICS', 0)],
    },
    'timelib' : {
-        'CPPPATH' : ['#/src/third_party/timelib' + timelibSuffix],
+        'CPPPATH' : ['#/src/third_party/timelib'],
    },
    'unwind' : {
    },
@@ -583,11 +582,10 @@ yamlEnv.Library(
 
 timelibEnv = env.Clone()
 timelibEnv.InjectThirdParty(libraries=['timelib'])
-timelibEnv.SConscript('timelib' + timelibSuffix + '/SConscript', exports={ 'env' : timelibEnv })
-timelibEnv = timelibEnv.Clone(
-    LIBDEPS_INTERFACE=[
-        'timelib' + timelibSuffix + '/timelib',
-    ])
+timelibEnv.SConscript('timelib' + '/SConscript', exports={'env': timelibEnv})
+timelibEnv = timelibEnv.Clone(LIBDEPS_INTERFACE=[
+    'timelib' + '/timelib',
+])
 
 timelibEnv.Library(
     target='shim_timelib',
