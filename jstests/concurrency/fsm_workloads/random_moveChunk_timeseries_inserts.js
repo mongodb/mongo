@@ -36,8 +36,8 @@ var $config = extendWorkload($config, function($config, $super) {
 
     $config.data.bucketPrefix = "system.buckets.";
 
-    $config.data.timeField = 't';
     $config.data.metaField = 'm';
+    $config.data.timeField = 't';
 
     $config.data.generateMetaFieldValueForInitialInserts = () => {
         return Math.floor(Random.rand() * $config.data.numMetaCount);
@@ -62,8 +62,8 @@ var $config = extendWorkload($config, function($config, $super) {
                 this.startTime + Math.floor(Random.rand() * this.numInitialDocs * this.increment);
             const doc = {
                 _id: new ObjectId(),
-                [this.timeField]: new Date(timer),
                 [this.metaField]: this.generateMetaFieldValueForInsertStage(this.tid),
+                [this.timeField]: new Date(timer),
             };
             assertAlways.commandWorked(db[collName].insert(doc));
             assertAlways.commandWorked(db[this.nonShardCollName].insert(doc));
@@ -135,8 +135,8 @@ var $config = extendWorkload($config, function($config, $super) {
         const verifyBucketIndex = (bucketIndex) => {
             const unpackStage = {
                 "$_internalUnpackBucket": {
-                    "timeField": this.timeField,
                     "metaField": this.metaField,
+                    "timeField": this.timeField,
                     "bucketMaxSpanSeconds": NumberInt(3600)
                 }
             };
@@ -167,7 +167,7 @@ var $config = extendWorkload($config, function($config, $super) {
         db[this.nonShardCollName].drop();
 
         assertAlways.commandWorked(db.createCollection(
-            collName, {timeseries: {timeField: this.timeField, metaField: this.metaField}}));
+            collName, {timeseries: {metaField: this.metaField, timeField: this.timeField}}));
         cluster.shardCollection(db[collName], {t: 1}, false);
 
         // Create indexes to verify index integrity during the teardown state.
@@ -187,8 +187,8 @@ var $config = extendWorkload($config, function($config, $super) {
 
             const doc = {
                 _id: new ObjectId(),
-                [this.timeField]: new Date(currentTimeStamp),
                 [this.metaField]: this.generateMetaFieldValueForInitialInserts(i),
+                [this.timeField]: new Date(currentTimeStamp),
             };
             bulk.insert(doc);
             bulkUnsharded.insert(doc);
