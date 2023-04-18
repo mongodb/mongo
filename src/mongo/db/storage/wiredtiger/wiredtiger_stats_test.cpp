@@ -168,7 +168,7 @@ TEST_F(WiredTigerStatsTest, EmptySession) {
     // Read and write statistics should be empty. Check "data" field does not exist. "wait" fields
     // such as the schemaLock might have some value.
     auto statsBson = WiredTigerStats{_session}.toBSON();
-    ASSERT_FALSE(statsBson.hasField("data"));
+    ASSERT_FALSE(statsBson.hasField("data")) << statsBson;
 }
 
 TEST_F(WiredTigerStatsTest, SessionWithWrite) {
