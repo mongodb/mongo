@@ -50,34 +50,34 @@ struct MakeObjSpec {
                 std::vector<std::string> fields,
                 std::vector<std::string> projects)
         : fieldBehavior(fieldBehavior),
-          numFields(fields.size()),
-          fieldsAndProjects(buildIndexedFieldVector(std::move(fields), std::move(projects))) {}
+          numKeepOrDrops(fields.size()),
+          fieldNames(buildIndexedFieldVector(std::move(fields), std::move(projects))) {}
 
     MakeObjSpec(const MakeObjSpec& other)
         : fieldBehavior(other.fieldBehavior),
-          numFields(other.numFields),
-          fieldsAndProjects(other.fieldsAndProjects) {}
+          numKeepOrDrops(other.numKeepOrDrops),
+          fieldNames(other.fieldNames) {}
 
     MakeObjSpec(MakeObjSpec&& other)
         : fieldBehavior(other.fieldBehavior),
-          numFields(other.numFields),
-          fieldsAndProjects(std::move(other.fieldsAndProjects)) {}
+          numKeepOrDrops(other.numKeepOrDrops),
+          fieldNames(std::move(other.fieldNames)) {}
 
     std::string toString() const {
         StringBuilder builder;
         builder << (fieldBehavior == MakeObjSpec::FieldBehavior::keep ? "keep" : "drop") << ", [";
 
-        for (size_t i = 0; i < fieldsAndProjects.size(); ++i) {
-            if (i == numFields) {
+        for (size_t i = 0; i < fieldNames.size(); ++i) {
+            if (i == numKeepOrDrops) {
                 builder << "], [";
             } else if (i != 0) {
                 builder << ", ";
             }
 
-            builder << '"' << fieldsAndProjects[i] << '"';
+            builder << '"' << fieldNames[i] << '"';
         }
 
-        if (fieldsAndProjects.size() == numFields) {
+        if (fieldNames.size() == numKeepOrDrops) {
             builder << "], [";
         }
 
@@ -89,7 +89,7 @@ struct MakeObjSpec {
     size_t getApproximateSize() const;
 
     FieldBehavior fieldBehavior;
-    size_t numFields = 0;
-    IndexedStringVector fieldsAndProjects;
+    size_t numKeepOrDrops = 0;
+    IndexedStringVector fieldNames;
 };
 }  // namespace mongo::sbe

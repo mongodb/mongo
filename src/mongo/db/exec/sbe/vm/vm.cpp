@@ -5315,88 +5315,181 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSortKeyComponent
     }
 }
 
-std::pair<value::TypeTags, value::Value> ByteCode::produceBsonObject(const MakeObjSpec* mos,
+std::pair<value::TypeTags, value::Value> ByteCode::produceBsonObject(const MakeObjSpec* spec,
                                                                      value::TypeTags rootTag,
                                                                      value::Value rootVal,
-                                                                     const size_t startIdx) {
-    auto& fieldBehavior = mos->fieldBehavior;
-    auto& fieldsAndProjects = mos->fieldsAndProjects;
-    auto numFields = mos->numFields;
+                                                                     int stackOffset) {
+    auto& fieldNames = spec->fieldNames;
 
-    const bool isInclusion = fieldBehavior == MakeObjSpec::FieldBehavior::keep;
+    const bool isInclusion = spec->fieldBehavior == MakeObjSpec::FieldBehavior::keep;
+    const size_t numFields = fieldNames.size();
+    const size_t numKeepOrDrops = spec->numKeepOrDrops;
+    const size_t numComputedFields = numFields - numKeepOrDrops;
+
+    // The "visited" array keeps track of which computed fields have been visited so far so that
+    // later we can append the non-visited computed fields to the end of the object.
+    char* visited = nullptr;
+    char localVisitedArr[64];
+    std::unique_ptr<char[]> allocatedVisitedArr;
+    if (MONGO_unlikely(numComputedFields > 64)) {
+        allocatedVisitedArr = std::make_unique<char[]>(numComputedFields);
+        visited = allocatedVisitedArr.get();
+    } else {
+        visited = &localVisitedArr[0];
+    }
+
+    memset(visited, 0, numComputedFields);
 
     UniqueBSONObjBuilder bob;
 
+    size_t numFieldsRemaining = numFields;
+    size_t numComputedFieldsRemaining = numComputedFields;
+
+    const size_t numFieldsRemainingThreshold = isInclusion ? 1 : 0;
+
     if (value::isObject(rootTag)) {
-        size_t nFieldsIfInclusion = numFields;
-
         if (rootTag == value::TypeTags::bsonObject) {
-            if (!(nFieldsIfInclusion == 0 && isInclusion)) {
-                auto be = value::bitcastTo<const char*>(rootVal);
-                const auto end = be + ConstDataView(be).read<LittleEndian<uint32_t>>();
+            auto be = value::bitcastTo<const char*>(rootVal);
+            const auto end = be + ConstDataView(be).read<LittleEndian<uint32_t>>();
 
-                // Skip document length.
-                be += 4;
+            // Skip document length.
+            be += 4;
+
+            // Let N = the # of "computed" fields, and let K = (isInclusion && N > 0 ? N-1 : N).
+            //
+            // When we have seen all of the "keepOrDrop" fields and when we have seen K of the
+            // "computed" fields, we can break out of this loop, ignore or copy the remaining
+            // fields from 'rootVal' (depending on whether 'isInclusion' is true or false), and
+            // then finally append the remaining computed field (if there is one) to the output
+            // object.
+            //
+            // (When isInclusion == true and a single "computed" field remains, it's okay to stop
+            // scanning 'rootVal' and append the remaining computed field to the end of the output
+            // object because it will have no observable effect on field order.)
+            if (numFieldsRemaining > numFieldsRemainingThreshold ||
+                numFieldsRemaining != numComputedFieldsRemaining) {
                 while (be != end - 1) {
                     auto sv = bson::fieldNameAndLength(be);
                     auto nextBe = bson::advance(be, sv.size());
+                    size_t pos = fieldNames.findPos(sv);
 
-                    bool isProjectedOrRestricted;
-                    size_t pos = fieldsAndProjects.findPos(sv);
                     if (pos == IndexedStringVector::npos) {
-                        isProjectedOrRestricted = isInclusion;
-                    } else if (pos < numFields) {
-                        isProjectedOrRestricted = !isInclusion;
+                        if (!isInclusion) {
+                            bob.append(BSONElement(be, sv.size() + 1, nextBe - be));
+                        }
+                    } else if (pos < numKeepOrDrops) {
+                        --numFieldsRemaining;
+
+                        if (isInclusion) {
+                            bob.append(BSONElement(be, sv.size() + 1, nextBe - be));
+                        }
                     } else {
-                        isProjectedOrRestricted = true;
+                        --numFieldsRemaining;
+                        --numComputedFieldsRemaining;
+
+                        auto projectIdx = pos - numKeepOrDrops;
+                        visited[projectIdx] = 1;
+
+                        size_t argIdx = stackOffset + projectIdx;
+                        auto [_, tag, val] = getFromStack(argIdx);
+                        bson::appendValueToBsonObj(bob, fieldNames[pos], tag, val);
                     }
 
-                    if (!isProjectedOrRestricted) {
-                        bob.append(BSONElement(be, sv.size() + 1, nextBe - be));
-                        --nFieldsIfInclusion;
-                    }
+                    be = nextBe;
 
-                    if (nFieldsIfInclusion == 0 && isInclusion) {
+                    if (numFieldsRemaining <= numFieldsRemainingThreshold &&
+                        numFieldsRemaining == numComputedFieldsRemaining) {
                         break;
                     }
+                }
+            }
+
+            // If isInclusion == false and 'be' has not reached the end of 'rootVal', copy over
+            // the remaining fields from 'rootVal' to the output object.
+            if (!isInclusion) {
+                while (be != end - 1) {
+                    auto sv = bson::fieldNameAndLength(be);
+                    auto nextBe = bson::advance(be, sv.size());
+                    bob.append(BSONElement(be, sv.size() + 1, nextBe - be));
 
                     be = nextBe;
                 }
             }
         } else if (rootTag == value::TypeTags::Object) {
-            if (!(nFieldsIfInclusion == 0 && isInclusion)) {
-                auto objRoot = value::getObjectView(rootVal);
-                for (size_t idx = 0; idx < objRoot->size(); ++idx) {
+            auto objRoot = value::getObjectView(rootVal);
+            size_t idx = 0;
+
+            // Let N = number of "computed" fields, and let K = (isInclusion && N > 0 ? N-1 : N).
+            //
+            // When we have seen all of the "keepOrDrop" fields and when we have seen K of the
+            // "computed" fields, we can break out of this loop, ignore or copy the remaining
+            // fields from 'rootVal' (depending on whether 'isInclusion' is true or false), and
+            // then finally append the remaining computed field (if there is one) to the output
+            // object.
+            //
+            // (When isInclusion == true and a single "computed" field remains, it's okay to stop
+            // scanning 'rootVal' and append the remaining computed field to the end of the output
+            // object because it will have no observable effect on field order.)
+            if (numFieldsRemaining > numFieldsRemainingThreshold ||
+                numFieldsRemaining != numComputedFieldsRemaining) {
+                for (; idx < objRoot->size(); ++idx) {
                     auto sv = StringData(objRoot->field(idx));
+                    size_t pos = fieldNames.findPos(sv);
 
-                    bool isProjectedOrRestricted;
-                    size_t pos = fieldsAndProjects.findPos(sv);
                     if (pos == IndexedStringVector::npos) {
-                        isProjectedOrRestricted = isInclusion;
-                    } else if (pos < numFields) {
-                        isProjectedOrRestricted = !isInclusion;
+                        if (!isInclusion) {
+                            auto [tag, val] = objRoot->getAt(idx);
+                            bson::appendValueToBsonObj(bob, objRoot->field(idx), tag, val);
+                        }
+                    } else if (pos < numKeepOrDrops) {
+                        --numFieldsRemaining;
+
+                        if (isInclusion) {
+                            auto [tag, val] = objRoot->getAt(idx);
+                            bson::appendValueToBsonObj(bob, objRoot->field(idx), tag, val);
+                        }
                     } else {
-                        isProjectedOrRestricted = true;
+                        --numFieldsRemaining;
+                        --numComputedFieldsRemaining;
+
+                        auto projectIdx = pos - numKeepOrDrops;
+                        visited[projectIdx] = 1;
+
+                        size_t argIdx = stackOffset + projectIdx;
+                        auto [_, tag, val] = getFromStack(argIdx);
+                        bson::appendValueToBsonObj(bob, fieldNames[pos], tag, val);
                     }
 
-                    if (!isProjectedOrRestricted) {
-                        auto [tag, val] = objRoot->getAt(idx);
-                        bson::appendValueToBsonObj(bob, objRoot->field(idx), tag, val);
-                        --nFieldsIfInclusion;
-                    }
-
-                    if (nFieldsIfInclusion == 0 && isInclusion) {
+                    if (numFieldsRemaining <= numFieldsRemainingThreshold &&
+                        numFieldsRemaining == numComputedFieldsRemaining) {
+                        ++idx;
                         break;
                     }
+                }
+            }
+
+            // If isInclusion == false and 'be' has not reached the end of 'rootVal', copy over
+            // the remaining fields from 'rootVal' to the output object.
+            if (!isInclusion) {
+                for (; idx < objRoot->size(); ++idx) {
+                    auto sv = StringData(objRoot->field(idx));
+                    auto [fieldTag, fieldVal] = objRoot->getAt(idx);
+                    bson::appendValueToBsonObj(bob, sv, fieldTag, fieldVal);
                 }
             }
         }
     }
 
-    for (size_t idx = numFields; idx < fieldsAndProjects.size(); ++idx) {
-        auto argIdx = startIdx + (idx - numFields);
-        auto [_, tag, val] = getFromStack(argIdx);
-        bson::appendValueToBsonObj(bob, fieldsAndProjects[idx], tag, val);
+    // Append the remaining computed fields (if any) to the output object.
+    if (numComputedFieldsRemaining > 0) {
+        for (size_t pos = numKeepOrDrops; pos < fieldNames.size(); ++pos) {
+            auto projectIdx = pos - numKeepOrDrops;
+            if (!visited[projectIdx]) {
+                size_t argIdx = stackOffset + projectIdx;
+                auto [_, tag, val] = getFromStack(argIdx);
+                bson::appendValueToBsonObj(bob, fieldNames[pos], tag, val);
+            }
+        }
     }
 
     bob.doneFast();
@@ -5418,9 +5511,9 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinMakeBsonObj(Arit
 
     auto mos = value::getMakeObjSpecView(mosVal);
 
-    const size_t startIdx = 2;
+    const int stackOffset = 2;
 
-    auto [tag, val] = produceBsonObject(mos, objTag, objVal, startIdx);
+    auto [tag, val] = produceBsonObject(mos, objTag, objVal, stackOffset);
 
     return {true, tag, val};
 }

@@ -1405,10 +1405,35 @@ private:
                                                              TimeZone timezone,
                                                              DayOfWeek startOfWeek);
 
+    /**
+     * produceBsonObject() takes a MakeObjSpec ('spec'), a root value ('rootTag' and 'rootVal'),
+     * and 0 or more "computed" values as inputs, it builds an output BSON object based on the
+     * instructions provided by 'spec' and based on the contents of 'root' and the computed input
+     * values, and then it returns the output object. (Note the computed input values are not
+     * directly passed in as C++ parameters -- instead the computed input values are passed via
+     * the VM's stack.)
+     *
+     * 'spec' provides two lists of field names: "keepOrDrop" fields and "computed" fields. These
+     * lists are disjoint and do not contain duplicates. The number of computed input values passed
+     * in by the caller on the VM stack must match the number of fields in the "computed" list.
+     *
+     * For each field F in the "computed" list, this method will retrieve the corresponding computed
+     * input value V from the VM stack and add {F,V} to the output object.
+     *
+     * If 'root' is not an object, it is ignored. Otherwise, for each field F in 'root' with value V
+     * that does not appear in the "computed" list, this method will copy {F,V} to the output object
+     * if either: (1) field F appears in the "keepOrDrop" list and 'spec->fieldBehavior == keep'; or
+     * (2) field F does _not_ appear in the "keepOrDrop" list and 'spec->fieldBehavior == drop'. If
+     * neither of these conditions are met, field F in 'root' will be ignored.
+     *
+     * For any two distinct fields F1 and F2 in the output object, if F1 is in 'root' and F2 does
+     * not appear before F1 in 'root', -OR- if both F1 and F2 are not in 'root' and F2 does not
+     * appear before F1 in the "computed" list, then F2 will appear after F1 in the output object.
+     */
     std::pair<value::TypeTags, value::Value> produceBsonObject(const MakeObjSpec* mos,
                                                                value::TypeTags rootTag,
                                                                value::Value rootVal,
-                                                               size_t startIdx);
+                                                               int stackOffset);
 
     FastTuple<bool, value::TypeTags, value::Value> builtinSplit(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinDate(ArityType arity);
