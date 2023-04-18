@@ -1,12 +1,11 @@
 /**
  * Stress test runs many concurrent migrations against the same recipient.
  *
- * TODO SERVER-61231: shard merge can't handle concurrent migrations.
- *
  * @tags: [
  *   incompatible_with_amazon_linux,
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,
+ *   # Shard merge does not allow concurrent migrations.
  *   incompatible_with_shard_merge,
  *   requires_majority_read_concern,
  *   requires_persistence,

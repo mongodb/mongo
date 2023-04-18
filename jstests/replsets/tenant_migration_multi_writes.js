@@ -3,12 +3,8 @@
  * were not retried on migration abort, which would create duplicate updates. Partially
  * updated collection where each update is applied no more than once is still an expected result.
  *
- * TODO SERVER-61231: aborts migration after sending recipientSyncData and starting
- * cloning on recipient, adapt this test to handle file cleanup on recipient.
- *
  * @tags: [
  *   incompatible_with_macos,
- *   incompatible_with_shard_merge,
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,
  *   requires_persistence,

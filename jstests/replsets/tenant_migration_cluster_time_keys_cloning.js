@@ -2,11 +2,8 @@
  * Test that tenant migration donor and recipient correctly copy each other cluster time keys into
  * their config.external_validation_keys collection.
  *
- * TODO (SERVER-61231): Adapt for shard merge.
- *
  * @tags: [
  *   incompatible_with_macos,
- *   incompatible_with_shard_merge,
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,
  *   requires_persistence,
@@ -79,6 +76,12 @@ const migrationX509Options = makeX509OptionsForTest();
                "when there is no failover.");
     const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
+    if (isShardMergeEnabled(tenantMigrationTest.getDonorPrimary().getDB("adminDB"))) {
+        jsTestLog("Skip: shard merge does not support concurrent migrations.");
+        tenantMigrationTest.stop();
+        return;
+    }
+
     const migrationId = UUID();
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
@@ -115,6 +118,13 @@ const migrationX509Options = makeX509OptionsForTest();
 
     const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), recipientRst});
 
+    if (isShardMergeEnabled(tenantMigrationTest.getDonorPrimary().getDB("adminDB"))) {
+        jsTestLog("Skip: shard merge does not accept secondary readPreference");
+        recipientRst.stopSet();
+        tenantMigrationTest.stop();
+        return;
+    }
+
     const migrationId = UUID();
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
@@ -140,7 +150,7 @@ const migrationX509Options = makeX509OptionsForTest();
     donorRst.startSet();
     donorRst.initiate();
     if (isShardMergeEnabled(donorRst.getPrimary().getDB("adminDB"))) {
-        jsTestLog("Skip: featureFlagShardMerge enabled, but shard merge does not survive failover");
+        jsTestLog("Skip: shard merge does not survive failover");
         donorRst.stopSet();
         return;
     }
@@ -191,8 +201,7 @@ const migrationX509Options = makeX509OptionsForTest();
 //     recipientRst.startSet();
 //     recipientRst.initiate();
 //     if (isShardMergeEnabled(recipientRst.getPrimary().getDB("adminDB"))) {
-//         jsTestLog("Skip: featureFlagShardMerge enabled, but shard merge does not survive
-//         failover");
+//         jsTestLog("Skip: shard merge does not survive failover");
 //         recipientRst.stopSet();
 //         return;
 //     }
@@ -246,8 +255,7 @@ const migrationX509Options = makeX509OptionsForTest();
 
     function runTest(tenantId, withFailover) {
         if (withFailover && isShardMergeEnabled(donorRst.getPrimary().getDB("adminDB"))) {
-            jsTestLog(
-                "Skip: featureFlagShardMerge enabled, but shard merge does not survive failover");
+            jsTestLog("Skip: but shard merge does not survive failover");
             tenantMigrationTest.stop();
             return;
         }

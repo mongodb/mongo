@@ -2,8 +2,10 @@
  * Tests that TenantCollectionCloner completes without error when a collection is dropped during
  * cloning as part of a tenant migration.
  *
- * TODO SERVER-61231: relies on various failpoints and such in TenantCollectionCloner, which is
- * not used for by Shard Merge, but we should likely test similar behavior, adapt for Shard Merge
+ * Shard merge uses backup cursor for copying files. One of the guarantee  that backup cursor
+ * provides is that at physical file associated with the table is not deleted when backup cursor is
+ * active on a checkpoint that contains the table. We expect the test coverage should be already
+ * provided by the backup cursor.
  *
  * @tags: [
  *   incompatible_with_macos,

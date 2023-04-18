@@ -1,12 +1,11 @@
 /**
  * Tests that tenant migrations aborts without crashing when a donor collection is renamed.
  *
- * TODO SERVER-61231: shard merge does not use collection cloner, so we need another way
- * to pause the migration at the correct time. What should shard merge behavior be for
- * renaming a collection while a migration is underway? adapt this test
- *
  * @tags: [
  *   incompatible_with_macos,
+ *   # Shard merge uses backup cursor for copying files. Collection rename during file copy
+ *   # shouldn't affect backup cursor. We expect the test coverage should be already provided by the
+ *   # backup cursor.
  *   incompatible_with_shard_merge,
  *   incompatible_with_windows_tls,
  *   requires_fcv_52,

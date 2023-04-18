@@ -2,9 +2,6 @@
  * Verify that causal consistency is respected if a tenant migration commits with an earlier optime
  * timestamp than the latest optime associated with cloning on the recipient.
  *
- * TODO (SERVER-61231): This test currently relies on a TenantCollectionCloner failpoint, which is
- * not used by shard merge, but the behavior we are testing here is likely still relevant. Adapt
- * for shard merge.
  *
  * @tags: [
  *   incompatible_with_macos,
@@ -69,11 +66,11 @@ function assertCanFindWithReadConcern(conn, dbName, collName, expectedDoc, readC
         "insert", {insert: collName, documents: [{_id: 0, x: 0}]}));
     assert(insertRes.operationTime, tojson(insertRes));
 
-    // Start a migration and pause the recipient before it copies documents from the donor.
-    const hangAfterCreateCollectionFp = configureFailPoint(
-        tmt.getRecipientRst().getPrimary(), "tenantCollectionClonerHangAfterCreateCollection");
+    let hangFp = configureFailPoint(tmt.getRecipientPrimary(),
+                                    "fpAfterPersistingTenantMigrationRecipientInstanceStateDoc",
+                                    {action: "hang"});
     assert.commandWorked(tmt.startMigration(migrationOpts));
-    hangAfterCreateCollectionFp.wait();
+    hangFp.wait();
 
     // Do writes on the recipient to advance its cluster time past the donor's.
     let bulk = tmt.getRecipientPrimary().getDB("unrelatedDB").bar.initializeUnorderedBulkOp();
@@ -84,7 +81,7 @@ function assertCanFindWithReadConcern(conn, dbName, collName, expectedDoc, readC
 
     // Allow the migration to complete. The cloned op should be written with a later opTime on the
     // recipient than the migration commits with on the donor.
-    hangAfterCreateCollectionFp.off();
+    hangFp.off();
     TenantMigrationTest.assertCommitted(tmt.waitForMigrationToComplete(migrationOpts));
 
     // Local reads should always see all the tenant's data, with or without afterClusterTime.
@@ -132,13 +129,12 @@ function assertCanFindWithReadConcern(conn, dbName, collName, expectedDoc, readC
     const laggedSecondary = tmt.getRecipientRst().getSecondaries()[0];
     const normalSecondary = tmt.getRecipientRst().getSecondaries()[1];
 
-    // Start a migration and pause the recipient before it copies documents from the donor. Disable
-    // snapshotting after waiting for the last op to become committed, so a last committed snapshot
-    // exists but does not contain any documents from the donor.
-    const hangAfterCreateCollectionFp = configureFailPoint(
-        tmt.getRecipientRst().getPrimary(), "tenantCollectionClonerHangAfterCreateCollection");
+    let hangFp = configureFailPoint(tmt.getRecipientPrimary(),
+                                    "fpAfterPersistingTenantMigrationRecipientInstanceStateDoc",
+                                    {action: "hang"});
+
     assert.commandWorked(tmt.startMigration(migrationOpts));
-    hangAfterCreateCollectionFp.wait();
+    hangFp.wait();
 
     tmt.getRecipientRst().awaitLastOpCommitted();
     const snapshotFp = configureFailPoint(laggedSecondary, "disableSnapshotting");
@@ -153,7 +149,7 @@ function assertCanFindWithReadConcern(conn, dbName, collName, expectedDoc, readC
 
     // Allow the migration to complete. The cloned op should commit with a later opTime on the
     // recipient than the migration commits with on the donor.
-    hangAfterCreateCollectionFp.off();
+    hangFp.off();
     TenantMigrationTest.assertCommitted(tmt.waitForMigrationToComplete(migrationOpts));
 
     // Verify majority reads cannot be served on the lagged recipient secondary with or without

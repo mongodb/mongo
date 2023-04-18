@@ -6,11 +6,11 @@
  * recipient's majority read on 'config.transactions' can miss committed retryable writes at that
  * majority commit point.
  *
- * TODO SERVER-61231: Adapt for shard merge.
- *
  * @tags: [
  *   incompatible_with_macos,
- *   # Shard merge only supports 'primary' read preference.
+ *   # Shard merge recipient only reads from the donor primary and the primary checkpoints
+ *   # startMigrationDonorTimestamp. It ensures the donor primary can't have a snapshot in the
+ *   # middle of a batch and makes this test inapplicable.
  *   incompatible_with_shard_merge,
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,

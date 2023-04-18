@@ -3,10 +3,9 @@
  * connection errors between the recipient primary and the sync source at various stages in the
  * process. (Replica set members close connections as part of rollback.)
  *
- * TODO SERVER-61231: shard merge can't handle concurrent rollback, adapt this test.
- *
  * @tags: [
  *   incompatible_with_macos,
+ *   # Shard merge aborts if the donor has a rollback.
  *   incompatible_with_shard_merge,
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,

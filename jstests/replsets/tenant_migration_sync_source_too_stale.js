@@ -9,10 +9,9 @@
  * 'delayedSecondary', it should see that it is too stale. As a result, it should retry sync source
  * selection until it finds a sync source that is no longer too stale.
  *
- * TODO SERVER-61231: shard merge can't handle restart, adapt this test.
- *
  * @tags: [
  *   incompatible_with_macos,
+ *   # Shard merge can only sync from primary therefore this test is not applicable.
  *   incompatible_with_shard_merge,
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,

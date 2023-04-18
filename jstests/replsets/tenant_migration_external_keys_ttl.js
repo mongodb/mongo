@@ -2,11 +2,8 @@
  * Tests that tenant migrations correctly set the TTL values for keys in the
  * config.external_validation_keys collection.
  *
- * TODO SERVER-61231: shard merge can't handle concurrent migrations, adapt this test.
- *
  * @tags: [
  *   incompatible_with_macos,
- *   incompatible_with_shard_merge,
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,
  *   requires_persistence,
@@ -288,7 +285,7 @@ function makeTestParams() {
 
     // TODO SERVER-76128: Tenant Migrations are not robust to recipient failover.
     // jsTestLog("Recipient failover before receiving forgetMigration");
-    // {
+    // (() => {
     //     const {tmt, teardown} = setup();
     //     const [tenantId, migrationId, migrationOpts] = makeTestParams();
     //     const recipientPrimary = tmt.getRecipientPrimary();
@@ -296,12 +293,21 @@ function makeTestParams() {
     //                                   "fpAfterConnectingTenantMigrationRecipientInstance",
     //                                   {action: "hang"});
 
+    //     if (isShardMergeEnabled(tmt.getDonorPrimary().getDB("admin"))) {
+    //         jsTestLog(
+    //             "Skip: featureFlagShardMerge is enabled and shard merge is not resilient to
+    //             recipient failovers.");
+    //         teardown();
+    //         return;
+    //     }
+
     //     assert.commandWorked(tmt.startMigration(migrationOpts));
     //     fp.wait();
 
     //     assert.commandWorked(recipientPrimary.adminCommand(
     //         {replSetStepDown: ReplSetTest.kForeverSecs, force: true}));
     //     assert.commandWorked(recipientPrimary.adminCommand({replSetFreeze: 0}));
+
     //     fp.off();
 
     //     TenantMigrationTest.assertCommitted(
@@ -318,7 +324,7 @@ function makeTestParams() {
     //     verifyExternalKeys(tmt.getDonorPrimary(), {migrationId, expectTTLValue: true});
     //     verifyExternalKeys(tmt.getRecipientPrimary(), {migrationId, expectTTLValue: true});
     //     teardown();
-    // }
+    // })();
 
     jsTestLog(
         "Donor failover after receiving forgetMigration before marking keys garbage collectable");
@@ -439,7 +445,7 @@ function makeTestParams() {
 
     // TODO SERVER-76128: Tenant Migrations are not robust to recipient failover.
     // jsTestLog("Recipient failover after receiving forgetMigration after updating keys.");
-    // {
+    // (() => {
     //     const {tmt, donorRst, recipientRst, teardown} = setup();
     //     // this test expects the external keys to expire, so lower the expiration timeouts.
     //     const lowerExternalKeysBufferSecs = 5;
@@ -451,6 +457,14 @@ function makeTestParams() {
     //     const [tenantId, migrationId, migrationOpts] = makeTestParams();
     //     const recipientPrimary = tmt.getRecipientPrimary();
 
+    //     if (isShardMergeEnabled(tmt.getDonorPrimary().getDB("admin"))) {
+    //         jsTestLog(
+    //             "Skip: featureFlagShardMerge is enabled. Shard merge deletes keys after marking
+    //             the recipient state document as 'aborted'.");
+    //         teardown();
+    //         return;
+    //     }
+
     //     assert.commandWorked(tmt.startMigration(migrationOpts));
     //     TenantMigrationTest.assertCommitted(
     //         tmt.waitForMigrationToComplete(migrationOpts, true /* retryOnRetryableErrors */));
@@ -459,19 +473,25 @@ function makeTestParams() {
     //     verifyExternalKeys(tmt.getDonorPrimary(), {migrationId, expectTTLValue: false});
     //     verifyExternalKeys(tmt.getRecipientPrimary(), {migrationId, expectTTLValue: false});
 
-    //     const fp = configureFailPoint(
-    //         recipientPrimary, "fpAfterReceivingRecipientForgetMigration", {action: "hang"});
+    //     let fp;
+    //     if (isShardMergeEnabled(tmt.getDonorPrimary().getDB("admin"))) {
+    //         fp = configureFailPoint(
+    //             recipientPrimary, "fpBeforeMarkingStateDocAsGarbageCollectable", {action:
+    //             "hang"});
+    //     } else {
+    //         fp = configureFailPoint(
+    //             recipientPrimary, "fpAfterReceivingRecipientForgetMigration", {action: "hang"});
+    //     }
     //     const forgetMigrationThread = new Thread(
     //         forgetMigrationAsync, migrationOpts.migrationIdString, createRstArgs(donorRst),
     //         true);
     //     forgetMigrationThread.start();
     //     fp.wait();
 
-    //     // Let the keys expire on the donor before the state document is deleted to verify
-    //     retrying
-    //     // recipientForgetMigration can handle this case. The keys won't be deleted until the
-    //     buffer
-    //     // expires, so sleep to avoid wasted work.
+    //     // Let the keys expire on the recipient before the state document is deleted to verify
+    //     // retrying recipientForgetMigration can handle this case. The keys won't be deleted
+    //     until
+    //     // the buffer expires, so sleep to avoid wasted work.
     //     sleep((lowerExternalKeysBufferSecs * 1000) + lowerStateDocExpirationMS + 500);
     //     waitForExternalKeysToBeDeleted(tmt.getRecipientPrimary(), migrationId);
 
@@ -485,5 +505,5 @@ function makeTestParams() {
     //     // Eventually the donor's keys should be deleted too.
     //     waitForExternalKeysToBeDeleted(tmt.getDonorPrimary(), migrationId);
     //     teardown();
-    // }
+    // })();
 })();

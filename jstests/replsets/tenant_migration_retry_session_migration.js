@@ -2,12 +2,8 @@
  * Tests that retrying a failed tenant migration works even if the config.transactions on the
  * recipient is not cleaned up after the failed migration.
  *
- * TODO SERVER-61231: aborts migration after sending recipientSyncData and starting
- * cloning on recipient, adapt this test to handle file cleanup on recipient.
- *
  * @tags: [
  *   incompatible_with_macos,
- *   incompatible_with_shard_merge,
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,
  *   requires_persistence,
@@ -35,6 +31,9 @@ tenantMigrationTest.insertDonorDB(kDbName, kCollName, [{_id: 1}, {_id: 2}]);
 
 let waitBeforeFetchingTransactions =
     configureFailPoint(recipientPrimary, "fpBeforeFetchingCommittedTransactions", {action: "hang"});
+// Prevent donor from blocking writes before writing the transactions (necessary for shard merge).
+let pauseDonorBeforeBlocking =
+    configureFailPoint(donorPrimary, "pauseTenantMigrationBeforeLeavingDataSyncState");
 
 const migrationId = UUID();
 const migrationOpts = {
@@ -75,6 +74,7 @@ for (const lsid of [lsid1, lsid2]) {
         lsid: lsid
     }));
 }
+pauseDonorBeforeBlocking.off();
 
 // Abort the first migration.
 const abortFp = configureFailPoint(donorPrimary, "abortTenantMigrationBeforeLeavingBlockingState");
@@ -91,6 +91,8 @@ assert.commandWorked(recipientPrimary.getDB(kDbName).dropDatabase());
 
 waitBeforeFetchingTransactions =
     configureFailPoint(recipientPrimary, "fpBeforeFetchingCommittedTransactions", {action: "hang"});
+pauseDonorBeforeBlocking =
+    configureFailPoint(donorPrimary, "pauseTenantMigrationBeforeLeavingDataSyncState");
 
 // Retry the migration.
 tenantMigrationTest.startMigration(migrationOpts);
@@ -115,6 +117,7 @@ assert.commandWorked(donorPrimary.getDB(kDbName).runCommand({
 }));
 
 waitBeforeFetchingTransactions.off();
+pauseDonorBeforeBlocking.off();
 
 TenantMigrationTest.assertCommitted(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
 

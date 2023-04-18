@@ -5,11 +5,10 @@
  * 2) Retrying while the migration is actively updating its transactions entries.
  * 3) Retrying while the migration is updating, and the donor starts a new transaction on an
  *    existing session.
- *
- * TODO SERVER-61231: shard merge can't handle restart, adapt this test.
- *
+ * *
  * @tags: [
  *   incompatible_with_macos,
+ *   # Shard merge is not resilient to donor restarts.
  *   incompatible_with_shard_merge,
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,
@@ -19,6 +18,7 @@
  */
 
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+
 load("jstests/aggregation/extras/utils.js");
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");
