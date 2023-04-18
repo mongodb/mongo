@@ -8,18 +8,14 @@
  */
 (function() {
 'use strict';
+load("jstests/libs/fail_point_util.js");
 
 var st = new ShardingTest({shards: 4, chunkSize: 1});
 
 // Double the balancer interval to produce fewer migrations per unit time so that the test does not
 // run out of stale shard version retries.
-st.forEachConfigServer((conn) => {
-    conn.adminCommand({
-        configureFailPoint: 'overrideBalanceRoundInterval',
-        mode: 'alwaysOn',
-        data: {intervalMs: 2000}
-    });
-});
+configureFailPointForRS(
+    st.configRS.nodes, 'overrideBalanceRoundInterval', {intervalMs: 2000}, 'alwaysOn');
 
 assert.commandWorked(st.s0.adminCommand({enableSharding: 'TestDB'}));
 st.ensurePrimaryShard('TestDB', st.shard0.shardName);

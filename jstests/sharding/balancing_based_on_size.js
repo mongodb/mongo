@@ -7,6 +7,7 @@
 'use strict';
 
 load("jstests/sharding/libs/find_chunks_util.js");
+load("jstests/libs/fail_point_util.js");
 
 const maxChunkSizeMB = 1;
 const st = new ShardingTest({
@@ -75,13 +76,8 @@ jsTestLog("Printing sharding status after waiting for collection balance");
 st.printShardingStatus();
 
 // Wait for some more rounds and then check the balancer is not wrongly moving around data
-st.forEachConfigServer((conn) => {
-    conn.adminCommand({
-        configureFailPoint: 'overrideBalanceRoundInterval',
-        mode: 'alwaysOn',
-        data: {intervalMs: 100}
-    });
-});
+configureFailPointForRS(
+    st.configRS.nodes, 'overrideBalanceRoundInterval', {intervalMs: 100}, 'alwaysOn');
 
 st.awaitBalancerRound();
 st.awaitBalancerRound();

@@ -54,13 +54,8 @@ function getNewColl() {
 }
 
 // Shorten time between balancer rounds for faster initial balancing
-st.forEachConfigServer((conn) => {
-    conn.adminCommand({
-        configureFailPoint: 'overrideBalanceRoundInterval',
-        mode: 'alwaysOn',
-        data: {intervalMs: 200}
-    });
-});
+configureFailPointForRS(
+    st.configRS.nodes, 'overrideBalanceRoundInterval', {intervalMs: 200}, 'alwaysOn');
 
 const targetChunkSizeMB = 2;
 
@@ -79,24 +74,6 @@ function setupCollection() {
     jsTest.log("Collection " + coll.getFullName() + ", number of chunks before defragmentation: " +
                findChunksUtil.countChunksForNs(st.s.getDB('config'), coll.getFullName()));
     return coll;
-}
-
-function setFailPointOnConfigNodes(failpoint, mode) {
-    // Use clearFailPointOnConfigNodes() instead
-    assert(mode !== "off");
-    let timesEnteredByNode = {};
-    st.forEachConfigServer((config) => {
-        const fp =
-            assert.commandWorked(config.adminCommand({configureFailPoint: failpoint, mode: mode}));
-        timesEnteredByNode[config.host] = fp.count;
-    });
-    return timesEnteredByNode;
-}
-
-function clearFailPointOnConfigNodes(failpoint) {
-    st.forEachConfigServer((config) => {
-        assert.commandWorked(config.adminCommand({configureFailPoint: failpoint, mode: "off"}));
-    });
 }
 
 // Setup collection for first tests
@@ -196,7 +173,8 @@ jsTest.log("Begin and end defragmentation with balancer on");
 {
     st.startBalancer();
     // Allow the first phase transition to build the initial defragmentation state
-    setFailPointOnConfigNodes("skipDefragmentationPhaseTransition", {skip: 1});
+    let configRSFailPoints = configureFailPointForRS(
+        st.configRS.nodes, "skipDefragmentationPhaseTransition", {}, {skip: 1});
     assert.commandWorked(st.s.adminCommand({
         configureCollectionBalancing: coll1Name,
         defragmentCollection: true,
@@ -212,7 +190,7 @@ jsTest.log("Begin and end defragmentation with balancer on");
         chunkSize: targetChunkSizeMB,
     }));
     // Ensure that the policy completes the phase transition...
-    clearFailPointOnConfigNodes("skipDefragmentationPhaseTransition");
+    configRSFailPoints.off();
     defragmentationUtil.waitForEndOfDefragmentation(st.s, coll1Name);
     st.stopBalancer();
 }
@@ -223,7 +201,8 @@ jsTest.log("Begin defragmentation with balancer off, end with it on");
     const nss = coll.getFullName();
     st.stopBalancer();
     // Allow the first phase transition to build the initial defragmentation state
-    setFailPointOnConfigNodes("skipDefragmentationPhaseTransition", {skip: 1});
+    let configRSFailPoints = configureFailPointForRS(
+        st.configRS.nodes, "skipDefragmentationPhaseTransition", {}, {skip: 1});
     assert.commandWorked(st.s.adminCommand({
         configureCollectionBalancing: nss,
         defragmentCollection: true,
@@ -239,7 +218,7 @@ jsTest.log("Begin defragmentation with balancer off, end with it on");
         chunkSize: targetChunkSizeMB,
     }));
     // Ensure that the policy completes the phase transition...
-    clearFailPointOnConfigNodes("skipDefragmentationPhaseTransition");
+    configRSFailPoints.off();
     defragmentationUtil.waitForEndOfDefragmentation(st.s, nss);
     st.stopBalancer();
 }
@@ -254,7 +233,8 @@ jsTest.log("Changed uuid causes defragmentation to restart");
     coll.insertOne({key: 1, key2: 1});
     assert.commandWorked(db.adminCommand({split: nss, middle: {key: 1}}));
     // Pause defragmentation after initialization but before phase 1 runs
-    setFailPointOnConfigNodes("afterBuildingNextDefragmentationPhase", "alwaysOn");
+    let configRSFailPoints = configureFailPointForRS(
+        st.configRS.nodes, "afterBuildingNextDefragmentationPhase", {}, "alwaysOn");
     assert.commandWorked(st.s.adminCommand({
         configureCollectionBalancing: nss,
         defragmentCollection: true,
@@ -264,7 +244,7 @@ jsTest.log("Changed uuid causes defragmentation to restart");
     // Reshard collection
     assert.commandWorked(db.adminCommand({reshardCollection: nss, key: {key2: 1}}));
     // Let defragementation run
-    clearFailPointOnConfigNodes("afterBuildingNextDefragmentationPhase");
+    configRSFailPoints.off();
     defragmentationUtil.waitForEndOfDefragmentation(st.s, nss);
     st.stopBalancer();
     // Ensure the defragmentation succeeded
@@ -282,7 +262,8 @@ jsTest.log("Refined shard key causes defragmentation to restart");
     coll.insertOne({key: 1, key2: 1});
     assert.commandWorked(db.adminCommand({split: nss, middle: {key: 1}}));
     // Pause defragmentation after initialization but before phase 1 runs
-    setFailPointOnConfigNodes("afterBuildingNextDefragmentationPhase", "alwaysOn");
+    let configRSFailPoints = configureFailPointForRS(
+        st.configRS.nodes, "afterBuildingNextDefragmentationPhase", {}, "alwaysOn");
     assert.commandWorked(st.s.adminCommand({
         configureCollectionBalancing: nss,
         defragmentCollection: true,
@@ -293,7 +274,7 @@ jsTest.log("Refined shard key causes defragmentation to restart");
     assert.commandWorked(coll.createIndex({key: 1, key2: 1}));
     assert.commandWorked(db.adminCommand({refineCollectionShardKey: nss, key: {key: 1, key2: 1}}));
     // Let defragementation run
-    clearFailPointOnConfigNodes("afterBuildingNextDefragmentationPhase");
+    configRSFailPoints.off();
     defragmentationUtil.waitForEndOfDefragmentation(st.s, nss);
     st.stopBalancer();
     // Ensure the defragmentation succeeded
