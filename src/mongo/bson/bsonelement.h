@@ -866,6 +866,14 @@ public:
         }
     }
 
+    /**
+     * Construct a BSONElement where you already know the length of the name and the total size
+     * of the element. fieldNameSize includes the null terminator.
+     */
+    struct TrustedInitTag {};
+    constexpr BSONElement(const char* d, int fieldNameSize, int totSize, TrustedInitTag)
+        : data(d), fieldNameSize_(fieldNameSize), totalSize(totSize) {}
+
     std::string _asCode() const;
 
     bool coerce(std::string* out) const;

@@ -49,10 +49,32 @@ public:
     // store as an unsigned integer
     // the most significant bit position to the least significant bit and call simple8b as an
     // unsigned integer.
-    static uint64_t encodeInt64(int64_t val);
-    static int64_t decodeInt64(uint64_t val);
-    static uint128_t encodeInt128(int128_t val);
-    static int128_t decodeInt128(uint128_t val);
+    static uint64_t encodeInt64(int64_t val) {
+        return (static_cast<uint64_t>(val) << 1) ^ (val >> 63);
+    }
+    static int64_t decodeInt64(uint64_t val) {
+        return (val >> 1) ^ (~(val & 1) + 1);
+    }
+    static uint128_t encodeInt128(int128_t val) {
+        // The Abseil right shift implementation on signed int128 is not correct as an arithmetic
+        // shift in their non-intrinsic implementation. When we detect this case we replace the
+        // right arithmetic shift of 127 positions that needs to produce 0xFF..FF or 0x00..00
+        // depending on the sign bit. We take the high 64 bits and performing a right arithmetic
+        // shift 63 positions which produces 0xFF..FF if the sign bit is set and 0x00..00 otherwise.
+        // We can then use this value in both the high and low components of int128 to produce the
+        // value that we need.
+#if defined(ABSL_HAVE_INTRINSIC_INT128)
+        return (static_cast<uint128_t>(val) << 1) ^ (val >> 127);
+#else
+        // get signed bit
+        uint64_t component = absl::Int128High64(val) >> 63;
+        return (static_cast<uint128_t>(val) << 1) ^ absl::MakeUint128(component, component);
+#endif
+    }
+
+    static int128_t decodeInt128(uint128_t val) {
+        return static_cast<int128_t>((val >> 1) ^ (~(val & 1) + 1));
+    }
 
     // These methods are for encoding OID with simple8b. The unique identifier is not part of
     // the encoded integer and must thus be provided when decoding.

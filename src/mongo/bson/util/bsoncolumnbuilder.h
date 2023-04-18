@@ -33,7 +33,7 @@
 #include "mongo/bson/bsonelementvalue.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/bson/util/simple8b.h"
+#include "mongo/bson/util/simple8b_builder.h"
 #include "mongo/platform/int128.h"
 
 #include <deque>

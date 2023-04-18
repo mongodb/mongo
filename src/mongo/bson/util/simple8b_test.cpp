@@ -28,6 +28,7 @@
  */
 
 #include "mongo/bson/util/simple8b.h"
+#include "mongo/bson/util/simple8b_builder.h"
 #include "mongo/unittest/unittest.h"
 
 #include <boost/optional.hpp>
