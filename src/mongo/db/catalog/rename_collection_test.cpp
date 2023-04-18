@@ -383,12 +383,13 @@ void _createCollection(OperationContext* opCtx,
     writeConflictRetry(opCtx, "_createCollection", nss.ns(), [=] {
         AutoGetDb autoDb(opCtx, nss.dbName(), MODE_X);
         auto db = autoDb.ensureDbExists(opCtx);
-        ASSERT_TRUE(db) << "Cannot create collection " << nss << " because database " << nss.db()
-                        << " does not exist.";
+        ASSERT_TRUE(db) << "Cannot create collection " << nss.toStringForErrorMsg()
+                        << " because database " << nss.db() << " does not exist.";
 
         WriteUnitOfWork wuow(opCtx);
         ASSERT_TRUE(db->createCollection(opCtx, nss, options))
-            << "Failed to create collection " << nss << " due to unknown error.";
+            << "Failed to create collection " << nss.toStringForErrorMsg()
+            << " due to unknown error.";
         wuow.commit();
     });
 
@@ -425,7 +426,7 @@ bool _collectionExists(OperationContext* opCtx, const NamespaceString& nss) {
  */
 CollectionOptions _getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) {
     AutoGetCollectionForRead collection(opCtx, nss);
-    ASSERT_TRUE(collection) << "Unable to get collections options for " << nss
+    ASSERT_TRUE(collection) << "Unable to get collections options for " << nss.toStringForErrorMsg()
                             << " because collection does not exist.";
     return collection->getCollectionOptions();
 }
@@ -452,7 +453,7 @@ NamespaceString _getCollectionNssFromUUID(OperationContext* opCtx, const UUID& u
  */
 bool _isTempCollection(OperationContext* opCtx, const NamespaceString& nss) {
     AutoGetCollectionForRead collection(opCtx, nss);
-    ASSERT_TRUE(collection) << "Unable to check if " << nss
+    ASSERT_TRUE(collection) << "Unable to check if " << nss.toStringForErrorMsg()
                             << " is a temporary collection because collection does not exist.";
     auto options = _getCollectionOptions(opCtx, nss);
     return options.temp;
@@ -466,8 +467,9 @@ void _createIndexOnEmptyCollection(OperationContext* opCtx,
                                    const std::string& indexName) {
     writeConflictRetry(opCtx, "_createIndexOnEmptyCollection", nss.ns(), [=] {
         AutoGetCollection collection(opCtx, nss, MODE_X);
-        ASSERT_TRUE(collection) << "Cannot create index on empty collection " << nss
-                                << " because collection " << nss << " does not exist.";
+        ASSERT_TRUE(collection) << "Cannot create index on empty collection "
+                                << nss.toStringForErrorMsg() << " because collection "
+                                << nss.toStringForErrorMsg() << " does not exist.";
 
         auto indexInfoObj = BSON("v" << int(IndexDescriptor::kLatestIndexVersion) << "key"
                                      << BSON("a" << 1) << "name" << indexName);
@@ -490,8 +492,9 @@ void _createIndexOnEmptyCollection(OperationContext* opCtx,
 void _insertDocument(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& doc) {
     writeConflictRetry(opCtx, "_insertDocument", nss.ns(), [=] {
         AutoGetCollection collection(opCtx, nss, MODE_X);
-        ASSERT_TRUE(collection) << "Cannot insert document " << doc << " into collection " << nss
-                                << " because collection " << nss << " does not exist.";
+        ASSERT_TRUE(collection) << "Cannot insert document " << doc << " into collection "
+                                << nss.toStringForErrorMsg() << " because collection "
+                                << nss.toStringForErrorMsg() << " does not exist.";
 
         WriteUnitOfWork wuow(opCtx);
         OpDebug* const opDebug = nullptr;
@@ -767,9 +770,11 @@ TEST_F(RenameCollectionTest,
     options.dropTarget = true;
     ASSERT_OK(renameCollection(_opCtx.get(), _sourceNss, _targetNss, options));
     ASSERT_FALSE(_collectionExists(_opCtx.get(), _sourceNss))
-        << "source collection " << _sourceNss << " still exists after successful rename";
+        << "source collection " << _sourceNss.toStringForErrorMsg()
+        << " still exists after successful rename";
     ASSERT_TRUE(_collectionExists(_opCtx.get(), _targetNss))
-        << "target collection " << _targetNss << " missing after successful rename";
+        << "target collection " << _targetNss.toStringForErrorMsg()
+        << " missing after successful rename";
 
     ASSERT_TRUE(_opObserver->onRenameCollectionCalled);
     ASSERT_FALSE(_opObserver->onRenameCollectionDropTarget);
@@ -848,19 +853,20 @@ void _testRenameCollectionStayTemp(OperationContext* opCtx,
     options.stayTemp = stayTemp;
     ASSERT_OK(renameCollection(opCtx, sourceNss, targetNss, options));
     ASSERT_FALSE(_collectionExists(opCtx, sourceNss))
-        << "source collection " << sourceNss << " still exists after successful rename";
+        << "source collection " << sourceNss.toStringForErrorMsg()
+        << " still exists after successful rename";
 
     if (!isSourceCollectionTemporary) {
         ASSERT_FALSE(_isTempCollection(opCtx, targetNss))
-            << "target collection " << targetNss
+            << "target collection " << targetNss.toStringForErrorMsg()
             << " cannot not be temporary after rename if source collection is not temporary.";
     } else if (stayTemp) {
         ASSERT_TRUE(_isTempCollection(opCtx, targetNss))
-            << "target collection " << targetNss
+            << "target collection " << targetNss.toStringForErrorMsg()
             << " is no longer temporary after rename with stayTemp set to true.";
     } else {
         ASSERT_FALSE(_isTempCollection(opCtx, targetNss))
-            << "target collection " << targetNss
+            << "target collection " << targetNss.toStringForErrorMsg()
             << " still temporary after rename with stayTemp set to false.";
     }
 }

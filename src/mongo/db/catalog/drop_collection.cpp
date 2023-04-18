@@ -76,7 +76,8 @@ Status _checkUUIDAndReplState(OperationContext* opCtx,
     if (opCtx->writesAreReplicated() &&
         !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss)) {
         return Status(ErrorCodes::NotWritablePrimary,
-                      str::stream() << "Not primary while dropping collection " << nss);
+                      str::stream()
+                          << "Not primary while dropping collection " << nss.toStringForErrorMsg());
     }
 
     return Status::OK();
@@ -165,7 +166,8 @@ Status _dropView(OperationContext* opCtx,
     if (opCtx->writesAreReplicated() &&
         !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, collectionName)) {
         return Status(ErrorCodes::NotWritablePrimary,
-                      str::stream() << "Not primary while dropping collection " << collectionName);
+                      str::stream() << "Not primary while dropping collection "
+                                    << collectionName.toStringForErrorMsg());
     }
 
     WriteUnitOfWork wunit(opCtx);

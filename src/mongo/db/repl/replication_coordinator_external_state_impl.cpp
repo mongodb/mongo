@@ -782,10 +782,10 @@ StatusWith<OpTimeAndWallTime> ReplicationCoordinatorExternalStateImpl::loadLastO
                 opCtx, "Load last opTime", NamespaceString::kRsOplogNamespace.ns(), [&] {
                     return Helpers::getLast(opCtx, NamespaceString::kRsOplogNamespace, oplogEntry);
                 })) {
-            return StatusWith<OpTimeAndWallTime>(ErrorCodes::NoMatchingDocument,
-                                                 str::stream()
-                                                     << "Did not find any entries in "
-                                                     << NamespaceString::kRsOplogNamespace.ns());
+            return StatusWith<OpTimeAndWallTime>(
+                ErrorCodes::NoMatchingDocument,
+                str::stream() << "Did not find any entries in "
+                              << NamespaceString::kRsOplogNamespace.toStringForErrorMsg());
         }
 
         return OpTimeAndWallTime::parseOpTimeAndWallTimeFromOplogEntry(oplogEntry);
@@ -1025,10 +1025,11 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
                 }
                 fassertFailedWithStatus(
                     6280501,
-                    indexStatus.withContext(str::stream()
-                                            << "Failed to create index on "
-                                            << NamespaceString::kShardIndexCatalogNamespace
-                                            << " on shard's first transition to primary"));
+                    indexStatus.withContext(
+                        str::stream()
+                        << "Failed to create index on "
+                        << NamespaceString::kShardIndexCatalogNamespace.toStringForErrorMsg()
+                        << " on shard's first transition to primary"));
             }
 
             // Create indexes in config.shard.collections if needed.
@@ -1044,10 +1045,11 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
                 }
                 fassertFailedWithStatus(
                     6711907,
-                    indexStatus.withContext(str::stream()
-                                            << "Failed to create index on "
-                                            << NamespaceString::kShardCollectionCatalogNamespace
-                                            << " on shard's first transition to primary"));
+                    indexStatus.withContext(
+                        str::stream()
+                        << "Failed to create index on "
+                        << NamespaceString::kShardCollectionCatalogNamespace.toStringForErrorMsg()
+                        << " on shard's first transition to primary"));
             }
         }
     }

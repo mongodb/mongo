@@ -114,7 +114,7 @@ public:
 
             AutoGetCollection baseColl(opCtx, nss, MODE_IX);
             uassert(ErrorCodes::NamespaceNotFound,
-                    str::stream() << "Unknown collection: " << nss,
+                    str::stream() << "Unknown collection: " << nss.toStringForErrorMsg(),
                     baseColl.getCollection());
 
             validateCompactRequest(req, *(baseColl.getCollection().get()));

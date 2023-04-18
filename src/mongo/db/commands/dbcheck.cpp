@@ -165,7 +165,7 @@ std::unique_ptr<DbCheckRun> singleCollectionRun(OperationContext* opCtx,
             agc.getCollection());
 
     uassert(40619,
-            "Cannot run dbCheck on " + nss.toString() + " because it is not replicated",
+            "Cannot run dbCheck on " + nss.toStringForErrorMsg() + " because it is not replicated",
             nss.isReplicated());
 
     uassert(6769500, "dbCheck no longer supports snapshotRead:false", invocation.getSnapshotRead());
@@ -569,7 +569,8 @@ private:
             // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
             invariant(!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe());
             return {ErrorCodes::SnapshotUnavailable,
-                    str::stream() << "Unable to read from collection " << info.nss
+                    str::stream() << "Unable to read from collection "
+                                  << info.nss.toStringForErrorMsg()
                                   << " due to pending catalog changes"};
         }
 

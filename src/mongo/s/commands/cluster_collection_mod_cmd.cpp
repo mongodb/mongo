@@ -112,7 +112,8 @@ public:
             // Check for config.settings in the user command since a validator is allowed
             // internally on this collection but the user may not modify the validator.
             uassert(ErrorCodes::InvalidOptions,
-                    str::stream() << "Document validators not allowed on system collection " << nss,
+                    str::stream() << "Document validators not allowed on system collection "
+                                  << nss.toStringForErrorMsg(),
                     nss != NamespaceString::kConfigSettingsNamespace);
         }
 

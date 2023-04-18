@@ -105,7 +105,7 @@ public:
                 uassert(7079502,
                         format(FMT_STRING("The critical section for collection {} must be taken in "
                                           "order to execute this command"),
-                               ns().toString()),
+                               ns().toStringForErrorMsg()),
                         scopedCsr->getCriticalSectionSignal(
                             opCtx, ShardingMigrationCriticalSection::kWrite));
                 if (scopedCsr->getIndexesInCritSec(opCtx)) {
@@ -122,7 +122,7 @@ public:
                 uassert(7079503,
                         format(FMT_STRING("The critical section for collection {} must be taken in "
                                           "order to execute this command"),
-                               ns().toString()),
+                               ns().toStringForErrorMsg()),
                         scopedToCsr->getCriticalSectionSignal(
                             opCtx, ShardingMigrationCriticalSection::kWrite));
                 const auto& indexMetadata = scopedToCsr->getIndexesInCritSec(opCtx);

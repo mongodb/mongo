@@ -367,7 +367,8 @@ StringData extractGeoNearFieldFromIndexes(OperationContext* opCtx,
     std::vector<const IndexDescriptor*> idxs;
     collection->getIndexCatalog()->findIndexByType(opCtx, IndexNames::GEO_2D, idxs);
     uassert(ErrorCodes::IndexNotFound,
-            str::stream() << "There is more than one 2d index on " << collection->ns().ns()
+            str::stream() << "There is more than one 2d index on "
+                          << collection->ns().toStringForErrorMsg()
                           << "; unsure which to use for $geoNear",
             idxs.size() <= 1U);
     if (idxs.size() == 1U) {
@@ -386,7 +387,8 @@ StringData extractGeoNearFieldFromIndexes(OperationContext* opCtx,
             "$geoNear requires a 2d or 2dsphere index, but none were found",
             !idxs.empty());
     uassert(ErrorCodes::IndexNotFound,
-            str::stream() << "There is more than one 2dsphere index on " << collection->ns().ns()
+            str::stream() << "There is more than one 2dsphere index on "
+                          << collection->ns().toStringForErrorMsg()
                           << "; unsure which to use for $geoNear",
             idxs.size() <= 1U);
 
@@ -1557,8 +1559,8 @@ PipelineD::buildInnerQueryExecutorGeoNear(const MultipleCollectionAccessor& coll
     // $geoNear can only run over the main collection.
     const auto& collection = collections.getMainCollection();
     uassert(ErrorCodes::NamespaceNotFound,
-            str::stream() << "$geoNear requires a geo index to run, but " << nss.ns()
-                          << " does not exist",
+            str::stream() << "$geoNear requires a geo index to run, but "
+                          << nss.toStringForErrorMsg() << " does not exist",
             collection);
 
     Pipeline::SourceContainer& sources = pipeline->_sources;

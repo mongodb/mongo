@@ -93,7 +93,7 @@ void CollModCoordinator::checkIfOptionsConflict(const BSONObj& doc) const {
     const auto& otherReq = otherDoc.getCollModRequest().toBSON();
 
     uassert(ErrorCodes::ConflictingOperationInProgress,
-            str::stream() << "Another collMod for namespace " << originalNss()
+            str::stream() << "Another collMod for namespace " << originalNss().toStringForErrorMsg()
                           << " is being executed with different parameters: " << selfReq,
             SimpleBSONObjComparator::kInstance.evaluate(selfReq == otherReq));
 }

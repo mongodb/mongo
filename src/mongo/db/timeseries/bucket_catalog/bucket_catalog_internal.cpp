@@ -1339,8 +1339,8 @@ std::shared_ptr<ExecutionStats> getExecutionStats(const BucketCatalog& catalog,
 
 Status getTimeseriesBucketClearedError(const NamespaceString& ns, const OID& oid) {
     return {ErrorCodes::TimeseriesBucketCleared,
-            str::stream() << "Time-series bucket " << oid << " for namespace " << ns
-                          << " was cleared"};
+            str::stream() << "Time-series bucket " << oid << " for namespace "
+                          << ns.toStringForErrorMsg() << " was cleared"};
 }
 
 void closeOpenBucket(BucketCatalog& catalog,

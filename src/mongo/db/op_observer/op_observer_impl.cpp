@@ -790,10 +790,10 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
     failCollectionUpdates.executeIf(
         [&](const BSONObj&) {
             uasserted(40654,
-                      str::stream()
-                          << "failCollectionUpdates failpoint enabled, namespace: "
-                          << args.coll->ns().ns() << ", update: " << args.updateArgs->update
-                          << " on document with " << args.updateArgs->criteria);
+                      str::stream() << "failCollectionUpdates failpoint enabled, namespace: "
+                                    << args.coll->ns().toStringForErrorMsg()
+                                    << ", update: " << args.updateArgs->update
+                                    << " on document with " << args.updateArgs->criteria);
         },
         [&](const BSONObj& data) {
             // If the failpoint specifies no collection or matches the existing one, fail.
@@ -1011,7 +1011,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
     const auto& nss = coll->ns();
     const auto uuid = coll->uuid();
     auto optDocKey = repl::documentKeyDecoration(opCtx);
-    invariant(optDocKey, nss.ns());
+    invariant(optDocKey, nss.toStringForErrorMsg());
     auto& documentKey = optDocKey.value();
 
     auto txnParticipant = TransactionParticipant::get(opCtx);

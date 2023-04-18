@@ -719,7 +719,8 @@ Status CollectionCatalog::modifyView(
     auto viewPtr = viewsForDb.lookup(viewName);
     if (!viewPtr)
         return Status(ErrorCodes::NamespaceNotFound,
-                      str::stream() << "cannot modify missing view " << viewName.ns());
+                      str::stream()
+                          << "cannot modify missing view " << viewName.toStringForErrorMsg());
 
     if (!NamespaceString::validCollectionName(viewOn.coll()))
         return Status(ErrorCodes::InvalidNamespace,
@@ -1331,7 +1332,7 @@ void CollectionCatalog::onCreateCollection(OperationContext* opCtx,
     auto [found, existingColl, newColl] =
         UncommittedCatalogUpdates::lookupCollection(opCtx, coll->ns());
     uassert(31370,
-            str::stream() << "collection already exists. ns: " << coll->ns(),
+            str::stream() << "collection already exists. ns: " << coll->ns().toStringForErrorMsg(),
             existingColl == nullptr);
 
     // When we already have a drop and recreate the collection, we want to seamlessly swap out the
@@ -1440,7 +1441,7 @@ Collection* CollectionCatalog::lookupCollectionByUUIDForMetadataWrite(OperationC
         auto nss = uncommittedPtr->ns();
         // If the collection is newly created, invariant on the collection being locked in MODE_IX.
         invariant(!newColl || opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX),
-                  nss.toString());
+                  nss.toStringForErrorMsg());
         return uncommittedPtr.get();
     }
 
@@ -1565,7 +1566,7 @@ Collection* CollectionCatalog::lookupCollectionByNamespaceForMetadataWrite(
     if (uncommittedPtr) {
         // If the collection is newly created, invariant on the collection being locked in MODE_IX.
         invariant(!newColl || opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX),
-                  nss.toString());
+                  nss.toStringForErrorMsg());
         return uncommittedPtr.get();
     }
 
@@ -1801,7 +1802,8 @@ NamespaceString CollectionCatalog::resolveNamespaceStringOrUUID(
     OperationContext* opCtx, NamespaceStringOrUUID nsOrUUID) const {
     if (auto& nss = nsOrUUID.nss()) {
         uassert(ErrorCodes::InvalidNamespace,
-                str::stream() << "Namespace " << *nss << " is not a valid collection name",
+                str::stream() << "Namespace " << (*nss).toStringForErrorMsg()
+                              << " is not a valid collection name",
                 nss->isValid());
         return std::move(*nss);
     }
@@ -1809,14 +1811,15 @@ NamespaceString CollectionCatalog::resolveNamespaceStringOrUUID(
     auto resolvedNss = lookupNSSByUUID(opCtx, *nsOrUUID.uuid());
 
     uassert(ErrorCodes::NamespaceNotFound,
-            str::stream() << "Unable to resolve " << nsOrUUID.toString(),
+            str::stream() << "Unable to resolve " << nsOrUUID.toStringForErrorMsg(),
             resolvedNss && resolvedNss->isValid());
 
     uassert(ErrorCodes::NamespaceNotFound,
-            str::stream() << "UUID: " << nsOrUUID.toString() << " specified in provided db name: "
+            str::stream() << "UUID: " << nsOrUUID.toStringForErrorMsg()
+                          << " specified in provided db name: "
                           << nsOrUUID.dbName()->toStringForErrorMsg()
                           << " resolved to a collection in a different database, resolved nss: "
-                          << *resolvedNss,
+                          << (*resolvedNss).toStringForErrorMsg(),
             resolvedNss->dbName() == nsOrUUID.dbName());
 
     return std::move(*resolvedNss);
@@ -2155,8 +2158,9 @@ void CollectionCatalog::_ensureNamespaceDoesNotExist(OperationContext* opCtx,
         LOGV2(5725001,
               "Conflicted registering namespace, already have a collection with the same namespace",
               "nss"_attr = nss);
-        throwWriteConflictException(str::stream() << "Collection namespace '" << nss.ns()
-                                                  << "' is already in use.");
+        throwWriteConflictException(str::stream()
+                                    << "Collection namespace '" << nss.toStringForErrorMsg()
+                                    << "' is already in use.");
     }
 
     if (type == NamespaceType::kAll) {
@@ -2164,8 +2168,9 @@ void CollectionCatalog::_ensureNamespaceDoesNotExist(OperationContext* opCtx,
             LOGV2(5725002,
                   "Conflicted registering namespace, already have a view with the same namespace",
                   "nss"_attr = nss);
-            throwWriteConflictException(str::stream() << "Collection namespace '" << nss.ns()
-                                                      << "' is already in use.");
+            throwWriteConflictException(str::stream()
+                                        << "Collection namespace '" << nss.toStringForErrorMsg()
+                                        << "' is already in use.");
         }
 
         if (auto viewsForDb = _getViewsForDatabase(opCtx, nss.dbName())) {
@@ -2684,7 +2689,7 @@ void CollectionCatalog::cleanupForCatalogReopen(Timestamp stable) {
 
 void CollectionCatalog::invariantHasExclusiveAccessToCollection(OperationContext* opCtx,
                                                                 const NamespaceString& nss) {
-    invariant(hasExclusiveAccessToCollection(opCtx, nss), nss.toString());
+    invariant(hasExclusiveAccessToCollection(opCtx, nss), nss.toStringForErrorMsg());
 }
 
 bool CollectionCatalog::hasExclusiveAccessToCollection(OperationContext* opCtx,

@@ -416,7 +416,8 @@ void CollectionCloner::handleNextBatch(DBClientCursor& cursor) {
 
     if (!scheduleResult.isOK()) {
         Status newStatus = scheduleResult.getStatus().withContext(
-            str::stream() << "Error cloning collection '" << _sourceNss.ns() << "'");
+            str::stream() << "Error cloning collection '" << _sourceNss.toStringForErrorMsg()
+                          << "'");
         // We must throw an exception to terminate query.
         uassertStatusOK(newStatus);
     }

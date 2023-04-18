@@ -58,8 +58,9 @@ const ArrayHistogram* CollectionStatisticsImpl::getHistogram(const std::string& 
         if (!swHistogram.isOK()) {
             if (swHistogram != ErrorCodes::NamespaceNotFound) {
                 uasserted(swHistogram.getStatus().code(),
-                          str::stream() << "Error getting histograms for path " << _nss << " : "
-                                        << path << swHistogram.getStatus().reason());
+                          str::stream()
+                              << "Error getting histograms for path " << _nss.toStringForErrorMsg()
+                              << " : " << path << swHistogram.getStatus().reason());
             }
             return nullptr;
         }

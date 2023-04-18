@@ -183,7 +183,7 @@ Status updateStateDoc(OperationContext* opCtx, const ShardSplitDonorDocument& st
 
     if (!collection) {
         return Status(ErrorCodes::NamespaceNotFound,
-                      str::stream() << nss.ns() << " does not exist");
+                      str::stream() << nss.toStringForErrorMsg() << " does not exist");
     }
 
     return writeConflictRetry(opCtx, "updateShardSplitStateDoc", nss.ns(), [&]() -> Status {
@@ -204,7 +204,7 @@ StatusWith<bool> deleteStateDoc(OperationContext* opCtx, const UUID& shardSplitI
 
     if (!collection) {
         return Status(ErrorCodes::NamespaceNotFound,
-                      str::stream() << nss.ns() << " does not exist");
+                      str::stream() << nss.toStringForErrorMsg() << " does not exist");
     }
     auto query = BSON(ShardSplitDonorDocument::kIdFieldName << shardSplitId);
     return writeConflictRetry(opCtx, "ShardSplitDonorDeleteStateDoc", nss.ns(), [&]() -> bool {

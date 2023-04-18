@@ -119,8 +119,9 @@ NamespaceString DocumentSourceChangeStreamAddPostImage::assertValidNamespace(
     // the database is 'admin', then this is a cluster-wide $changeStream and we are permitted to
     // lookup into any namespace.
     uassert(40579,
-            str::stream() << "unexpected namespace during post image lookup: " << nss.ns()
-                          << ", expected " << pExpCtx->ns.ns(),
+            str::stream() << "unexpected namespace during post image lookup: "
+                          << nss.toStringForErrorMsg() << ", expected "
+                          << pExpCtx->ns.toStringForErrorMsg(),
             nss == pExpCtx->ns ||
                 (pExpCtx->isClusterAggregation() || pExpCtx->isDBAggregation(nss.db())));
 

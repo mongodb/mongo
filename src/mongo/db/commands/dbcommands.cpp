@@ -199,7 +199,8 @@ public:
         void doCheckAuthorization(OperationContext* opCtx) const final {
             auto ns = request().getNamespace();
             uassert(ErrorCodes::Unauthorized,
-                    str::stream() << "Not authorized to drop collection '" << ns << "'",
+                    str::stream() << "Not authorized to drop collection '"
+                                  << ns.toStringForErrorMsg() << "'",
                     AuthorizationSession::get(opCtx->getClient())
                         ->isAuthorizedForActionsOnNamespace(ns, ActionType::dropCollection));
         }
@@ -567,7 +568,7 @@ public:
             // internally on this collection but the user may not modify the validator.
             uassert(ErrorCodes::InvalidOptions,
                     str::stream() << "Document validators not allowed on system collection "
-                                  << cmd->getNamespace(),
+                                  << cmd->getNamespace().toStringForErrorMsg(),
                     cmd->getNamespace() != NamespaceString::kConfigSettingsNamespace);
         }
 

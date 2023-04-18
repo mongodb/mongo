@@ -506,11 +506,11 @@ public:
                                    const BSONObj& expectedDoc) {
         OneOffRead oor(_opCtx, ts);
         if (expectedDoc.isEmpty()) {
-            ASSERT_EQ(0, itCount(coll))
-                << "Should not find any documents in " << coll->ns() << " at ts: " << ts;
+            ASSERT_EQ(0, itCount(coll)) << "Should not find any documents in "
+                                        << coll->ns().toStringForErrorMsg() << " at ts: " << ts;
         } else {
-            ASSERT_EQ(1, itCount(coll))
-                << "Should find one document in " << coll->ns() << " at ts: " << ts;
+            ASSERT_EQ(1, itCount(coll)) << "Should find one document in "
+                                        << coll->ns().toStringForErrorMsg() << " at ts: " << ts;
             auto doc = findOne(coll);
             ASSERT_EQ(0, SimpleBSONObjComparator::kInstance.compare(doc, expectedDoc))
                 << "Doc: " << doc.toString() << " Expected: " << expectedDoc.toString();
@@ -525,11 +525,12 @@ public:
         BSONObj doc;
         bool found = Helpers::findOne(_opCtx, coll, query, doc);
         if (!expectedDoc) {
-            ASSERT_FALSE(found) << "Should not find any documents in " << coll->ns() << " matching "
-                                << query << " at ts: " << ts;
+            ASSERT_FALSE(found) << "Should not find any documents in "
+                                << coll->ns().toStringForErrorMsg() << " matching " << query
+                                << " at ts: " << ts;
         } else {
-            ASSERT(found) << "Should find document in " << coll->ns() << " matching " << query
-                          << " at ts: " << ts;
+            ASSERT(found) << "Should find document in " << coll->ns().toStringForErrorMsg()
+                          << " matching " << query << " at ts: " << ts;
             ASSERT_BSONOBJ_EQ(doc, *expectedDoc);
         }
     }
@@ -593,10 +594,11 @@ public:
         auto found = std::find(idents.begin(), idents.end(), expectedIdent);
 
         if (shouldExpect) {
-            ASSERT(found != idents.end()) << nss.ns() << " was not found at " << ts.toString();
+            ASSERT(found != idents.end())
+                << nss.toStringForErrorMsg() << " was not found at " << ts.toString();
         } else {
-            ASSERT(found == idents.end()) << nss.ns() << " was found at " << ts.toString()
-                                          << " when it should not have been.";
+            ASSERT(found == idents.end()) << nss.toStringForErrorMsg() << " was found at "
+                                          << ts.toString() << " when it should not have been.";
         }
     }
 
@@ -2985,7 +2987,7 @@ TEST_F(StorageTimestampTest, ViewCreationSeparateTransaction) {
         auto systemViewsMd = getMetaDataAtTime(
             durableCatalog, catalogId, Timestamp(systemViewsCreateTs.asULL() - 1));
         ASSERT(systemViewsMd == nullptr)
-            << systemViewsNss
+            << systemViewsNss.toStringForErrorMsg()
             << " incorrectly exists before creation. CreateTs: " << systemViewsCreateTs;
 
         systemViewsMd = getMetaDataAtTime(durableCatalog, catalogId, systemViewsCreateTs);

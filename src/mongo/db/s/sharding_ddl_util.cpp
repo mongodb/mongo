@@ -286,7 +286,7 @@ void setAllowMigrations(OperationContext* opCtx,
         uassertStatusOKWithContext(
             Shard::CommandResponse::getEffectiveStatus(std::move(swSetAllowMigrationsResult)),
             str::stream() << "Error setting allowMigrations to " << allowMigrations
-                          << " for collection " << nss.toString());
+                          << " for collection " << nss.toStringForErrorMsg());
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotSharded>&) {
         // Collection no longer exists
     } catch (const ExceptionFor<ErrorCodes::ConflictingOperationInProgress>&) {
@@ -333,7 +333,7 @@ void checkCollectionUUIDConsistencyAcrossShards(
 
     if (!mismatches.empty()) {
         std::stringstream errorMessage;
-        errorMessage << "The collection " << nss.toString()
+        errorMessage << "The collection " << nss.toStringForErrorMsg()
                      << " with expected UUID: " << collectionUuid.toString()
                      << " has different UUIDs on the following shards: [";
 
@@ -371,7 +371,7 @@ void checkTargetCollectionDoesNotExistInCluster(
 
     if (!shardsContainingTargetCollection.empty()) {
         std::stringstream errorMessage;
-        errorMessage << "The collection " << toNss.toString()
+        errorMessage << "The collection " << toNss.toStringForErrorMsg()
                      << " already exists in the following shards: [";
         std::move(shardsContainingTargetCollection.begin(),
                   shardsContainingTargetCollection.end(),
@@ -430,7 +430,7 @@ void removeTagsMetadataFromConfig(OperationContext* opCtx,
 
     uassertStatusOKWithContext(
         Shard::CommandResponse::getEffectiveStatus(std::move(swRemoveTagsResult)),
-        str::stream() << "Error removing tags for collection " << nss.toString());
+        str::stream() << "Error removing tags for collection " << nss.toStringForErrorMsg());
 }
 
 void removeQueryAnalyzerMetadataFromConfig(OperationContext* opCtx,
@@ -466,7 +466,7 @@ void removeQueryAnalyzerMetadataFromConfig(OperationContext* opCtx,
     uassertStatusOKWithContext(Shard::CommandResponse::getEffectiveStatus(std::move(deleteResult)),
                                str::stream()
                                    << "Error removing query analyzer configurations for collection "
-                                   << nss.toString());
+                                   << nss.toStringForErrorMsg());
 }
 
 void removeTagsMetadataFromConfig_notIdempotent(OperationContext* opCtx,
@@ -699,7 +699,8 @@ void checkRenamePreconditions(OperationContext* opCtx,
                               const bool dropTarget) {
     if (sourceIsSharded) {
         uassert(ErrorCodes::InvalidNamespace,
-                str::stream() << "Namespace of target collection too long. Namespace: " << toNss
+                str::stream() << "Namespace of target collection too long. Namespace: "
+                              << toNss.toStringForErrorMsg()
                               << " Max: " << NamespaceString::MaxNsShardedCollectionLen,
                 toNss.size() <= NamespaceString::MaxNsShardedCollectionLen);
     }
@@ -711,7 +712,7 @@ void checkRenamePreconditions(OperationContext* opCtx,
             catalogClient->getCollection(opCtx, toNss);
             // If no exception is thrown, the collection exists and is sharded
             uasserted(ErrorCodes::NamespaceExists,
-                      str::stream() << "Sharded target collection " << toNss.ns()
+                      str::stream() << "Sharded target collection " << toNss.toStringForErrorMsg()
                                     << " exists but dropTarget is not set");
         } catch (const DBException& ex) {
             auto code = ex.code();
@@ -724,7 +725,7 @@ void checkRenamePreconditions(OperationContext* opCtx,
         auto collectionCatalog = CollectionCatalog::get(opCtx);
         auto targetColl = collectionCatalog->lookupCollectionByNamespace(opCtx, toNss);
         uassert(ErrorCodes::NamespaceExists,
-                str::stream() << "Target collection " << toNss.ns()
+                str::stream() << "Target collection " << toNss.toStringForErrorMsg()
                               << " exists but dropTarget is not set",
                 !targetColl);
     }
@@ -732,7 +733,7 @@ void checkRenamePreconditions(OperationContext* opCtx,
     // Check that there are no tags associated to the target collection
     auto tags = uassertStatusOK(catalogClient->getTagsForCollection(opCtx, toNss));
     uassert(ErrorCodes::CommandFailed,
-            str::stream() << "Can't rename to target collection " << toNss.ns()
+            str::stream() << "Can't rename to target collection " << toNss.toStringForErrorMsg()
                           << " because it must not have associated tags",
             tags.empty());
 }
@@ -771,7 +772,8 @@ boost::optional<CreateCollectionResponse> checkIfCollectionAlreadySharded(
     // If the collection is already sharded, fail if the deduced options in this request do not
     // match the options the collection was originally sharded with.
     uassert(ErrorCodes::AlreadyInitialized,
-            str::stream() << "sharding already enabled for collection " << nss,
+            str::stream() << "sharding already enabled for collection "
+                          << nss.toStringForErrorMsg(),
             SimpleBSONObjComparator::kInstance.evaluate(cm.getShardKeyPattern().toBSON() == key) &&
                 SimpleBSONObjComparator::kInstance.evaluate(defaultCollator == collation) &&
                 cm.isUnique() == unique);
@@ -806,7 +808,7 @@ bool checkAllowMigrations(OperationContext* opCtx, const NamespaceString& nss) {
             .docs;
 
     uassert(ErrorCodes::NamespaceNotFound,
-            str::stream() << "collection " << nss.ns() << " not found",
+            str::stream() << "collection " << nss.toStringForErrorMsg() << " not found",
             !collDoc.empty());
 
     auto coll = CollectionType(collDoc[0]);

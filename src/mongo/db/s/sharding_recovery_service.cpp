@@ -156,7 +156,7 @@ void ShardingRecoveryService::acquireRecoverableCriticalSectionBlockWrites(
     tassert(7032360,
             fmt::format("Can't acquire recoverable critical section for collection '{}' with "
                         "reason '{}' while holding locks",
-                        nss.toString(),
+                        nss.toStringForErrorMsg(),
                         reason.toString()),
             !opCtx->lockState()->isLocked());
 
@@ -194,7 +194,7 @@ void ShardingRecoveryService::acquireRecoverableCriticalSectionBlockWrites(
                     fmt::format("Trying to acquire a  critical section blocking writes for "
                                 "namespace '{}' and reason '{}' but it is already taken by another "
                                 "operation with different reason '{}'",
-                                nss.toString(),
+                                nss.toStringForErrorMsg(),
                                 reason.toString(),
                                 collCSDoc.getReason().toString()),
                     collCSDoc.getReason().woCompare(reason) == 0);
@@ -235,7 +235,7 @@ void ShardingRecoveryService::acquireRecoverableCriticalSectionBlockWrites(
         tassert(7032369,
                 fmt::format("Insert did not add any doc to collection '{}' for namespace '{}' "
                             "and reason '{}'",
-                            nss.toString(),
+                            nss.toStringForErrorMsg(),
                             reason.toString(),
                             NamespaceString::kCollectionCriticalSectionsNamespace.toString()),
                 batchedResponse.getN() > 0);
@@ -269,7 +269,7 @@ void ShardingRecoveryService::promoteRecoverableCriticalSectionToBlockAlsoReads(
     tassert(7032364,
             fmt::format("Can't promote recoverable critical section for collection '{}' with "
                         "reason '{}' while holding locks",
-                        nss.toString(),
+                        nss.toStringForErrorMsg(),
                         reason.toString()),
             !opCtx->lockState()->isLocked());
 
@@ -299,7 +299,7 @@ void ShardingRecoveryService::promoteRecoverableCriticalSectionToBlockAlsoReads(
                 fmt::format(
                     "Trying to acquire a critical section blocking reads for namespace '{}' and "
                     "reason '{}' but the critical section wasn't acquired first blocking writers.",
-                    nss.toString(),
+                    nss.toStringForErrorMsg(),
                     reason.toString()),
                 cursor->more());
         BSONObj bsonObj = cursor->next();
@@ -311,7 +311,7 @@ void ShardingRecoveryService::promoteRecoverableCriticalSectionToBlockAlsoReads(
                     "Trying to acquire a critical section blocking reads for namespace '{}' and "
                     "reason "
                     "'{}' but it is already taken by another operation with different reason '{}'",
-                    nss.toString(),
+                    nss.toStringForErrorMsg(),
                     reason.toString(),
                     collCSDoc.getReason().toString()),
                 collCSDoc.getReason().woCompare(reason) == 0);
@@ -363,7 +363,7 @@ void ShardingRecoveryService::promoteRecoverableCriticalSectionToBlockAlsoReads(
                 fmt::format("Update did not modify any doc from collection '{}' for namespace '{}' "
                             "and reason '{}'",
                             NamespaceString::kCollectionCriticalSectionsNamespace.toString(),
-                            nss.toString(),
+                            nss.toStringForErrorMsg(),
                             reason.toString()),
                 batchedResponse.getNModified() > 0);
     }
@@ -397,7 +397,7 @@ void ShardingRecoveryService::releaseRecoverableCriticalSection(
     tassert(7032365,
             fmt::format("Can't release recoverable critical section for collection '{}' with "
                         "reason '{}' while holding locks",
-                        nss.toString(),
+                        nss.toStringForErrorMsg(),
                         reason.toString()),
             !opCtx->lockState()->isLocked());
 
@@ -456,7 +456,7 @@ void ShardingRecoveryService::releaseRecoverableCriticalSection(
         tassert(7032366,
                 fmt::format("Trying to release a critical for namespace '{}' and reason '{}' but "
                             "it is already taken by another operation with different reason '{}'",
-                            nss.toString(),
+                            nss.toStringForErrorMsg(),
                             reason.toString(),
                             collCSDoc.getReason().toString()),
                 !isDifferentReason);
@@ -493,7 +493,7 @@ void ShardingRecoveryService::releaseRecoverableCriticalSection(
                 fmt::format("Delete did not remove any doc from collection '{}' for namespace '{}' "
                             "and reason '{}'",
                             NamespaceString::kCollectionCriticalSectionsNamespace.toString(),
-                            nss.toString(),
+                            nss.toStringForErrorMsg(),
                             reason.toString()),
                 batchedResponse.getN() > 0);
     }

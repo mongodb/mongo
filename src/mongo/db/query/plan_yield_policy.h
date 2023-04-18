@@ -167,8 +167,9 @@ public:
                                             const NamespaceString& newNss,
                                             UUID collUuid) {
         uasserted(ErrorCodes::QueryPlanKilled,
-                  str::stream() << "collection renamed from '" << oldNss << "' to '" << newNss
-                                << "'. UUID " << collUuid);
+                  str::stream() << "collection renamed from '" << oldNss.toStringForErrorMsg()
+                                << "' to '" << newNss.toStringForErrorMsg() << "'. UUID "
+                                << collUuid);
     }
 
     class YieldThroughAcquisitions {};

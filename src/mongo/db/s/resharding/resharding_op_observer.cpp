@@ -76,7 +76,7 @@ void assertCanExtractShardKeyFromDocs(OperationContext* opCtx,
     // A user can manually create a 'db.system.resharding.' collection that isn't guaranteed to be
     // sharded outside of running reshardCollection.
     uassert(ErrorCodes::NamespaceNotSharded,
-            str::stream() << "Temporary resharding collection " << nss.toString()
+            str::stream() << "Temporary resharding collection " << nss.toStringForErrorMsg()
                           << " is not sharded",
             collDesc.isSharded());
 

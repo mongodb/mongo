@@ -122,7 +122,8 @@ StatusWith<BSONObj> RollbackSourceImpl::getCollectionInfo(const NamespaceString&
         _getConnection()->getCollectionInfos(nss.dbName(), BSON("name" << nss.coll()));
     if (info.empty()) {
         return StatusWith<BSONObj>(ErrorCodes::NoSuchKey,
-                                   str::stream() << "no collection info found: " << nss.ns());
+                                   str::stream() << "no collection info found: "
+                                                 << nss.toStringForErrorMsg());
     }
     invariant(info.size() == 1U);
     return info.front();

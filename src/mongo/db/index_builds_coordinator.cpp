@@ -144,7 +144,8 @@ bool shouldBuildIndexesOnEmptyCollectionSinglePhased(OperationContext* opCtx,
                                                      const CollectionPtr& collection,
                                                      IndexBuildProtocol protocol) {
     const auto& nss = collection->ns();
-    invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X), str::stream() << nss);
+    invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X),
+              str::stream() << nss.toStringForErrorMsg());
 
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
 
@@ -2189,7 +2190,7 @@ IndexBuildsCoordinator::_filterSpecsAndRegisterBuild(OperationContext* opCtx,
         if (replCoord->getSettings().usingReplSets() &&
             replCoord->canAcceptWritesFor(opCtx, nssOrUuid)) {
             uassert(ErrorCodes::NamespaceNotFound,
-                    str::stream() << "drop-pending collection: " << nss,
+                    str::stream() << "drop-pending collection: " << nss.toStringForErrorMsg(),
                     !nss.isDropPendingNamespace());
         }
 
@@ -3381,10 +3382,12 @@ int IndexBuildsCoordinator::getNumIndexesTotal(OperationContext* opCtx,
     const auto& nss = collection->ns();
     invariant(opCtx->lockState()->isLocked(),
               str::stream() << "Unable to get index count because collection was not locked"
-                            << nss);
+                            << nss.toStringForErrorMsg());
 
     auto indexCatalog = collection->getIndexCatalog();
-    invariant(indexCatalog, str::stream() << "Collection is missing index catalog: " << nss);
+    invariant(indexCatalog,
+              str::stream() << "Collection is missing index catalog: "
+                            << nss.toStringForErrorMsg());
 
     return indexCatalog->numIndexesTotal();
 }

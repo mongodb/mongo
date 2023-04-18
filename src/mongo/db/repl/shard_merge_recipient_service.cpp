@@ -2020,8 +2020,9 @@ void ShardMergeRecipientService::Instance::_writeStateDoc(
     const auto& nss = NamespaceString::kShardMergeRecipientsNamespace;
     AutoGetCollection collection(opCtx, nss, MODE_IX);
 
-    uassert(
-        ErrorCodes::NamespaceNotFound, str::stream() << nss.ns() << " does not exist", collection);
+    uassert(ErrorCodes::NamespaceNotFound,
+            str::stream() << nss.toStringForErrorMsg() << " does not exist",
+            collection);
 
     writeConflictRetry(opCtx, "writeShardMergeRecipientStateDoc", nss.ns(), [&]() {
         WriteUnitOfWork wunit(opCtx);
@@ -2267,8 +2268,9 @@ SemiFuture<void> ShardMergeRecipientService::Instance::_durablyPersistCommitAbor
     const auto& nss = NamespaceString::kShardMergeRecipientsNamespace;
 
     AutoGetCollection collection(opCtx, nss, MODE_IX);
-    uassert(
-        ErrorCodes::NamespaceNotFound, str::stream() << nss.ns() << " does not exist", collection);
+    uassert(ErrorCodes::NamespaceNotFound,
+            str::stream() << nss.toStringForErrorMsg() << " does not exist",
+            collection);
 
     writeConflictRetry(opCtx, "markShardMergeStateDocGarbageCollectable", nss.ns(), [&]() {
         WriteUnitOfWork wuow(opCtx);

@@ -80,10 +80,12 @@ void validateViewDefinitionBSON(OperationContext* opCtx,
     auto timeseries = viewDefinition["timeseries"];
     valid &= !timeseries || timeseries.type() == BSONType::Object;
 
-    uassert(ErrorCodes::InvalidViewDefinition,
-            str::stream() << "found invalid view definition " << viewDefinition["_id"]
-                          << " while reading '"
-                          << NamespaceString::makeSystemDotViewsNamespace(dbName) << "'",
-            valid);
+    uassert(
+        ErrorCodes::InvalidViewDefinition,
+        str::stream() << "found invalid view definition " << viewDefinition["_id"]
+                      << " while reading '"
+                      << NamespaceString::makeSystemDotViewsNamespace(dbName).toStringForErrorMsg()
+                      << "'",
+        valid);
 }
 }  // namespace mongo::view_util

@@ -896,8 +896,8 @@ MigrationDestinationManager::getCollectionOptions(OperationContext* opCtx,
     auto infos = infosRes.docs;
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << "expected listCollections against the primary shard for "
-                          << nssOrUUID.toString() << " to return 1 entry, but got " << infos.size()
-                          << " entries",
+                          << nssOrUUID.toStringForErrorMsg() << " to return 1 entry, but got "
+                          << infos.size() << " entries",
             infos.size() == 1);
 
 
@@ -918,8 +918,9 @@ MigrationDestinationManager::getCollectionOptions(OperationContext* opCtx,
 
     uassert(ErrorCodes::InvalidUUID,
             str::stream() << "The from shard did not return a UUID for collection "
-                          << nssOrUUID.toString() << " as part of its listCollections response: "
-                          << entry << ", but this node expects to see a UUID.",
+                          << nssOrUUID.toStringForErrorMsg()
+                          << " as part of its listCollections response: " << entry
+                          << ", but this node expects to see a UUID.",
             !info["uuid"].eoo());
 
     auto fromUUID = info["uuid"].uuid();
@@ -994,19 +995,19 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(
         // Checks that the collection's UUID matches the donor's.
         auto checkUUIDsMatch = [&](const Collection* collection) {
             uassert(ErrorCodes::NotWritablePrimary,
-                    str::stream() << "Unable to create collection " << nss.ns()
+                    str::stream() << "Unable to create collection " << nss.toStringForErrorMsg()
                                   << " because the node is not primary",
                     repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss));
 
             uassert(ErrorCodes::InvalidUUID,
                     str::stream()
-                        << "Cannot create collection " << nss.ns()
+                        << "Cannot create collection " << nss.toStringForErrorMsg()
                         << " because we already have an identically named collection with UUID "
                         << collection->uuid() << ", which differs from the donor's UUID "
                         << collectionOptionsAndIndexes.uuid
                         << ". Manually drop the collection on this shard if it contains data from "
                            "a previous incarnation of "
-                        << nss.ns(),
+                        << nss.toStringForErrorMsg(),
                     collection->uuid() == collectionOptionsAndIndexes.uuid);
         };
 
@@ -1055,10 +1056,10 @@ void MigrationDestinationManager::cloneCollectionIndexesAndOptions(
                     opCtx, collectionOptionsAndIndexes.uuid)) {
                 uasserted(5860300,
                           str::stream()
-                              << "Cannot create collection " << nss << " with UUID "
-                              << collectionOptionsAndIndexes.uuid
+                              << "Cannot create collection " << nss.toStringForErrorMsg()
+                              << " with UUID " << collectionOptionsAndIndexes.uuid
                               << " because it conflicts with the UUID of an existing collection "
-                              << collectionByUUID->ns());
+                              << collectionByUUID->ns().toStringForErrorMsg());
             }
 
             // We do not have a collection by this name. Create the collection with the donor's
@@ -1711,7 +1712,7 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx, const
             totalDocs++;
             AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
             uassert(ErrorCodes::ConflictingOperationInProgress,
-                    str::stream() << "Collection " << _nss.ns()
+                    str::stream() << "Collection " << _nss.toStringForErrorMsg()
                                   << " was dropped in the middle of the migration",
                     autoColl.getCollection());
 
@@ -1754,7 +1755,7 @@ bool MigrationDestinationManager::_applyMigrateOp(OperationContext* opCtx, const
             totalDocs++;
             AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
             uassert(ErrorCodes::ConflictingOperationInProgress,
-                    str::stream() << "Collection " << _nss.ns()
+                    str::stream() << "Collection " << _nss.toStringForErrorMsg()
                                   << " was dropped in the middle of the migration",
                     autoColl.getCollection());
 

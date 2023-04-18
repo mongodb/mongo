@@ -87,7 +87,7 @@ void assertNoMovePrimaryInProgress(OperationContext* opCtx, NamespaceString cons
                 LOGV2(4945200, "assertNoMovePrimaryInProgress", logAttrs(nss));
 
                 uasserted(ErrorCodes::MovePrimaryInProgress,
-                          "movePrimary is in progress for namespace " + nss.toString());
+                          "movePrimary is in progress for namespace " + nss.toStringForErrorMsg());
             }
         }
     } catch (const DBException& ex) {
@@ -287,7 +287,8 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(
             cmrIndex->idx = coll->getIndexCatalog()->findIndexByName(opCtx, indexName);
             if (!cmrIndex->idx) {
                 return {ErrorCodes::IndexNotFound,
-                        str::stream() << "cannot find index " << indexName << " for ns " << nss};
+                        str::stream() << "cannot find index " << indexName << " for ns "
+                                      << nss.toStringForErrorMsg()};
             }
         } else {
             std::vector<const IndexDescriptor*> indexes;
@@ -303,7 +304,8 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(
                                       << indexes[1]->infoObj()};
             } else if (indexes.empty()) {
                 return {ErrorCodes::IndexNotFound,
-                        str::stream() << "cannot find index " << keyPattern << " for ns " << nss};
+                        str::stream() << "cannot find index " << keyPattern << " for ns "
+                                      << nss.toStringForErrorMsg()};
             }
 
             cmrIndex->idx = indexes[0];
@@ -703,7 +705,8 @@ StatusWith<const IndexDescriptor*> _setUpCollModIndexUnique(
     if (!collection) {
         checkCollectionUUIDMismatch(opCtx, nss, CollectionPtr(), cmd.getCollectionUUID());
         return Status(ErrorCodes::NamespaceNotFound,
-                      str::stream() << "ns does not exist for unique index conversion: " << nss);
+                      str::stream() << "ns does not exist for unique index conversion: "
+                                    << nss.toStringForErrorMsg());
     }
 
     // Scan index for duplicates without exclusive access.
@@ -821,7 +824,8 @@ Status _collModInternal(OperationContext* opCtx,
 
     if (userInitiatedWritesAndNotPrimary) {
         return Status(ErrorCodes::NotWritablePrimary,
-                      str::stream() << "Not primary while setting collection options on " << nss);
+                      str::stream() << "Not primary while setting collection options on "
+                                    << nss.toStringForErrorMsg());
     }
 
     auto statusW = parseCollModRequest(opCtx, nss, coll.getCollection(), cmd, shardKeyPattern);

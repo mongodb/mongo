@@ -836,7 +836,7 @@ QueryPlannerAnalysis::determineLookupStrategy(
     auto foreignCollItr = collectionsInfo.find(foreignCollName);
     tassert(5842600,
             str::stream() << "Expected collection info, but found none; target collection: "
-                          << foreignCollName,
+                          << foreignCollName.toStringForErrorMsg(),
             foreignCollItr != collectionsInfo.end());
 
     // Check if an eligible index exists for indexed loop join strategy.

@@ -222,7 +222,7 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache, s
     auto statusWithMultiPlanSolns = QueryPlanner::plan(*_canonicalQuery, _plannerParams);
     if (!statusWithMultiPlanSolns.isOK()) {
         return statusWithMultiPlanSolns.getStatus().withContext(
-            str::stream() << "error processing query: " << _canonicalQuery->toString()
+            str::stream() << "error processing query: " << _canonicalQuery->toStringForErrorMsg()
                           << " planner returned error");
     }
     auto solutions = std::move(statusWithMultiPlanSolns.getValue());

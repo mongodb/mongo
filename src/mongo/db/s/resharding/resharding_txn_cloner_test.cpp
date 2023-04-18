@@ -154,7 +154,8 @@ class ReshardingTxnClonerTest : public ShardServerTestFixture {
                 const NamespaceString& nss,
                 const repl::ReadConcernArgs& readConcern) override {
                 uasserted(ErrorCodes::NamespaceNotFound,
-                          str::stream() << "Collection " << nss.ns() << " not found");
+                          str::stream()
+                              << "Collection " << nss.toStringForErrorMsg() << " not found");
             }
 
         private:

@@ -82,7 +82,7 @@ void assertNoMovePrimaryInProgress(OperationContext* opCtx, const NamespaceStrin
         LOGV2(4908600, "assertNoMovePrimaryInProgress", logAttrs(nss));
 
         uasserted(ErrorCodes::MovePrimaryInProgress,
-                  "movePrimary is in progress for namespace " + nss.toString());
+                  "movePrimary is in progress for namespace " + nss.toStringForErrorMsg());
     }
 }
 

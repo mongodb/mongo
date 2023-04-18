@@ -422,7 +422,8 @@ StatusWith<BSONObj> CollectionReader::next() {
     auto state = _exec->getNext(&obj, nullptr);
     if (state == PlanExecutor::IS_EOF) {
         return {ErrorCodes::CollectionIsEmpty,
-                str::stream() << "no more documents in " << _collToScan.getNss()};
+                str::stream() << "no more documents in "
+                              << _collToScan.getNss().toStringForErrorMsg()};
     }
 
     // PlanExecutors that do not yield should only return ADVANCED or EOF.

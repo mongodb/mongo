@@ -221,7 +221,7 @@ void GlobalIndexCloningService::CloningStateMachine::_init(
 
     uassert(6755901,
             str::stream() << "Cannot create global index on unsharded ns "
-                          << _metadata.getNss().ns(),
+                          << _metadata.getNss().toStringForErrorMsg(),
             routingInfo.isSharded());
 
     auto myShardId = _externalState->myShardId(_serviceContext);
@@ -278,7 +278,8 @@ void GlobalIndexCloningService::CloningStateMachine::checkIfOptionsConflict(
     uassert(6755900,
             str::stream() << "New global index " << stateDoc
                           << " is incompatible with ongoing global index build in namespace: "
-                          << _metadata.getNss() << ", uuid: " << _metadata.getCollectionUUID(),
+                          << _metadata.getNss().toStringForErrorMsg()
+                          << ", uuid: " << _metadata.getCollectionUUID(),
             newCloning.getNss() == _metadata.getNss() &&
                 newCloning.getCollectionUUID() == _metadata.getCollectionUUID());
 }

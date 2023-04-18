@@ -185,7 +185,8 @@ Status userAllowedWriteNS(OperationContext* opCtx, const NamespaceString& ns) {
     if (ns.isSystemDotProfile() || ns.isSystemDotViews() ||
         (ns.isOplog() &&
          repl::ReplicationCoordinator::get(getGlobalServiceContext())->isReplEnabled())) {
-        return Status(ErrorCodes::InvalidNamespace, str::stream() << "cannot write to " << ns);
+        return Status(ErrorCodes::InvalidNamespace,
+                      str::stream() << "cannot write to " << ns.toStringForErrorMsg());
     }
     return userAllowedCreateNS(opCtx, ns);
 }
@@ -198,7 +199,8 @@ Status userAllowedCreateNS(OperationContext* opCtx, const NamespaceString& ns) {
     }
 
     if (!ns.isValid(NamespaceString::DollarInDbNameBehavior::Disallow)) {
-        return Status(ErrorCodes::InvalidNamespace, str::stream() << "Invalid namespace: " << ns);
+        return Status(ErrorCodes::InvalidNamespace,
+                      str::stream() << "Invalid namespace: " << ns.toStringForErrorMsg());
     }
 
     if (!NamespaceString::validCollectionName(ns.coll())) {
@@ -210,7 +212,7 @@ Status userAllowedCreateNS(OperationContext* opCtx, const NamespaceString& ns) {
         return Status(ErrorCodes::InvalidNamespace,
                       str::stream()
                           << "Can't create user databases on a dedicated --configsvr instance "
-                          << ns);
+                          << ns.toStringForErrorMsg());
     }
 
     if (ns.isSystemDotProfile()) {
@@ -219,12 +221,13 @@ Status userAllowedCreateNS(OperationContext* opCtx, const NamespaceString& ns) {
 
     if (ns.isSystem() && !ns.isLegalClientSystemNS(serverGlobalParams.featureCompatibility)) {
         return Status(ErrorCodes::InvalidNamespace,
-                      str::stream() << "Invalid system namespace: " << ns);
+                      str::stream() << "Invalid system namespace: " << ns.toStringForErrorMsg());
     }
 
     if (ns.isNormalCollection() && ns.size() > NamespaceString::MaxNsCollectionLen) {
         return Status(ErrorCodes::InvalidNamespace,
-                      str::stream() << "Fully qualified namespace is too long. Namespace: " << ns
+                      str::stream() << "Fully qualified namespace is too long. Namespace: "
+                                    << ns.toStringForErrorMsg()
                                     << " Max: " << NamespaceString::MaxNsCollectionLen);
     }
 
@@ -243,7 +246,8 @@ Status userAllowedCreateNS(OperationContext* opCtx, const NamespaceString& ns) {
             return Status::OK();
         }
 
-        return Status(ErrorCodes::BadValue, str::stream() << "Invalid namespace: " << ns);
+        return Status(ErrorCodes::BadValue,
+                      str::stream() << "Invalid namespace: " << ns.toStringForErrorMsg());
     }
 
     return Status::OK();

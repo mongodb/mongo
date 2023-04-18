@@ -769,7 +769,7 @@ BalancerChunkSelectionPolicyImpl::_getMigrateCandidatesForCollection(
                         << "Zone boundaries " << zoneRange.toString()
                         << " fall in the middle of an existing chunk "
                         << ChunkRange(chunkAtZoneMin.getMin(), chunkAtZoneMin.getMax()).toString()
-                        << ". Balancing for collection " << nss.ns()
+                        << ". Balancing for collection " << nss.toStringForErrorMsg()
                         << " will be postponed until the chunk is split appropriately."};
         }
 
@@ -788,7 +788,7 @@ BalancerChunkSelectionPolicyImpl::_getMigrateCandidatesForCollection(
                         << "Zone boundaries " << zoneRange.toString()
                         << " fall in the middle of an existing chunk "
                         << ChunkRange(chunkAtZoneMax.getMin(), chunkAtZoneMax.getMax()).toString()
-                        << ". Balancing for collection " << nss.ns()
+                        << ". Balancing for collection " << nss.toStringForErrorMsg()
                         << " will be postponed until the chunk is split appropriately."};
         }
     }

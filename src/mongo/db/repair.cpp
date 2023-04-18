@@ -117,7 +117,7 @@ Status dropUnfinishedIndexes(OperationContext* opCtx, Collection* collection) {
             StorageRepairObserver::get(opCtx->getServiceContext())
                 ->invalidatingModification(str::stream()
                                            << "Dropped unfinished index '" << indexName << "' on "
-                                           << collection->ns());
+                                           << collection->ns().toStringForErrorMsg());
         }
     }
     return Status::OK();

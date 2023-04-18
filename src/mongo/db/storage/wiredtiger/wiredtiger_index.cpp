@@ -693,11 +693,11 @@ KeyString::Version WiredTigerIndex::_handleVersionInfo(OperationContext* ctx,
     if (!version.isOK()) {
         auto collectionNamespace = desc->getEntry()->getNSSFromCatalog(ctx);
         Status versionStatus = version.getStatus();
-        Status indexVersionStatus(ErrorCodes::UnsupportedFormat,
-                                  str::stream()
-                                      << versionStatus.reason() << " Index: {name: "
-                                      << desc->indexName() << ", ns: " << collectionNamespace
-                                      << "} - version either too old or too new for this mongod.");
+        Status indexVersionStatus(
+            ErrorCodes::UnsupportedFormat,
+            str::stream() << versionStatus.reason() << " Index: {name: " << desc->indexName()
+                          << ", ns: " << collectionNamespace.toStringForErrorMsg()
+                          << "} - version either too old or too new for this mongod.");
         fassertFailedWithStatus(28579, indexVersionStatus);
     }
     _dataFormatVersion = version.getValue();
@@ -711,7 +711,7 @@ KeyString::Version WiredTigerIndex::_handleVersionInfo(OperationContext* ctx,
         Status versionStatus(ErrorCodes::UnsupportedFormat,
                              str::stream()
                                  << "Index: {name: " << desc->indexName()
-                                 << ", ns: " << collectionNamespace
+                                 << ", ns: " << collectionNamespace.toStringForErrorMsg()
                                  << "} has incompatible format version: " << _dataFormatVersion);
         fassertFailedWithStatusNoTrace(31179, versionStatus);
     }

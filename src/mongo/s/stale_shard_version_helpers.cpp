@@ -82,8 +82,9 @@ void checkErrorStatusAndMaxRetries(const Status& status,
         // epoch refresh. If no shard is provided, then the epoch is stale and we must refresh.
         if (auto staleInfo = status.extraInfo<StaleConfigInfo>()) {
             invariant(staleInfo->getNss() == nss,
-                      str::stream() << "StaleConfig error on unexpected namespace. Expected " << nss
-                                    << ", received " << staleInfo->getNss());
+                      str::stream() << "StaleConfig error on unexpected namespace. Expected "
+                                    << nss.toStringForErrorMsg() << ", received "
+                                    << staleInfo->getNss().toStringForErrorMsg());
             catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
                 nss, staleInfo->getVersionWanted(), staleInfo->getShardId());
         } else {

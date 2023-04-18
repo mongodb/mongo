@@ -56,7 +56,8 @@ void SessionsCollectionConfigServer::_shardCollectionIfNeeded(OperationContext* 
 
     // If we don't have any shards, we can't set up this collection yet.
     uassert(ErrorCodes::ShardNotFound,
-            str::stream() << "Failed to create " << NamespaceString::kLogicalSessionsNamespace
+            str::stream() << "Failed to create "
+                          << NamespaceString::kLogicalSessionsNamespace.toStringForErrorMsg()
                           << ": cannot create the collection until there are shards",
             Grid::get(opCtx)->shardRegistry()->getNumShards(opCtx) != 0);
 

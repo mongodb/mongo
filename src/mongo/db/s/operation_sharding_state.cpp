@@ -66,7 +66,8 @@ void OperationShardingState::setShardRole(OperationContext* opCtx,
         if (!emplaceResult.second) {
             uassert(640570,
                     str::stream() << "Illegal attempt to change the expected shard version for "
-                                  << nss << " from " << tracker.v << " to " << *shardVersion,
+                                  << nss.toStringForErrorMsg() << " from " << tracker.v << " to "
+                                  << *shardVersion,
                     tracker.v == *shardVersion);
         }
         invariant(++tracker.recursion > 0);

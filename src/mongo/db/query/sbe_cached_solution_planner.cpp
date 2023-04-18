@@ -67,7 +67,8 @@ CandidatePlans CachedSolutionPlanner::plan(
 
             if (!QueryPlannerAnalysis::isEligibleForHashJoin(collectionInfo->second)) {
                 return replan(/* shouldCache */ true,
-                              str::stream() << "Foreign collection " << foreignCollection
+                              str::stream() << "Foreign collection "
+                                            << foreignCollection.toStringForErrorMsg()
                                             << " is not eligible for hash join anymore");
             }
         }

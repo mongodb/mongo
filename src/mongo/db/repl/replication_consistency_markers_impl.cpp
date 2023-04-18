@@ -496,8 +496,8 @@ Status ReplicationConsistencyMarkersImpl::createInternalCollections(OperationCon
         auto status = _storageInterface->createCollection(opCtx, nss, CollectionOptions());
         if (!status.isOK() && status.code() != ErrorCodes::NamespaceExists) {
             return {ErrorCodes::CannotCreateCollection,
-                    str::stream() << "Failed to create collection. Ns: " << nss.ns()
-                                  << " Error: " << status.toString()};
+                    str::stream() << "Failed to create collection. Ns: "
+                                  << nss.toStringForErrorMsg() << " Error: " << status.toString()};
         }
     }
     return Status::OK();

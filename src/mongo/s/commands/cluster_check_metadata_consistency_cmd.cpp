@@ -298,7 +298,7 @@ public:
                     uassert(ErrorCodes::Unauthorized,
                             str::stream()
                                 << "Not authorized to check metadata consistency for database "
-                                << nss.db(),
+                                << nss.dbName().toStringForErrorMsg(),
                             isAuthorizedOnResource(ResourcePattern::forClusterResource()) ||
                                 isAuthorizedOnResource(ResourcePattern::forDatabaseName(nss.db())));
                     break;
@@ -306,7 +306,7 @@ public:
                     uassert(ErrorCodes::Unauthorized,
                             str::stream()
                                 << "Not authorized to check metadata consistency for collection "
-                                << nss,
+                                << nss.toStringForErrorMsg(),
                             isAuthorizedOnResource(ResourcePattern::forClusterResource()) ||
                                 isAuthorizedOnResource(ResourcePattern::forExactNamespace(nss)));
                     break;

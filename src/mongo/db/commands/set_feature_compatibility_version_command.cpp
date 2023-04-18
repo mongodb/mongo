@@ -195,7 +195,8 @@ void dropDistLockCollections(OperationContext* opCtx) {
         if (dropStatus != ErrorCodes::NamespaceNotFound) {
             uassertStatusOKWithContext(
                 dropStatus,
-                str::stream() << "Failed to drop deprecated distributed locks collection " << nss);
+                str::stream() << "Failed to drop deprecated distributed locks collection "
+                              << nss.toStringForErrorMsg());
         }
     }
 }
@@ -905,7 +906,8 @@ private:
                            &dropReply,
                            DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
         uassert(deletionStatus.code(),
-                str::stream() << "Failed to drop " << NamespaceString::kMigrationsNamespace
+                str::stream() << "Failed to drop "
+                              << NamespaceString::kMigrationsNamespace.toStringForErrorMsg()
                               << causedBy(deletionStatus.reason()),
                 deletionStatus.isOK() || deletionStatus.code() == ErrorCodes::NamespaceNotFound);
     }
@@ -1093,8 +1095,7 @@ private:
                                "detected global index name: '"
                             << indexDoc[IndexCatalogType::kNameFieldName].String()
                             << "' on collection '"
-                            << NamespaceString(collDoc[CollectionType::kNssFieldName].String())
-                            << "'",
+                            << collDoc[CollectionType::kNssFieldName].String() << "'",
                         !hasShardingIndexCatalogEntries);
             }
         }
@@ -1138,7 +1139,10 @@ private:
                                                "detected incompatible index name: '"
                                             << indexEntry->descriptor()->indexName()
                                             << "' on collection: '"
-                                            << collection->ns().getTimeseriesViewNamespace() << "'",
+                                            << collection->ns()
+                                                   .getTimeseriesViewNamespace()
+                                                   .toStringForErrorMsg()
+                                            << "'",
                                         !indexEntry->descriptor()->infoObj().hasField(
                                             IndexDescriptor::kExpireAfterSecondsFieldName));
                                 }
@@ -1154,7 +1158,10 @@ private:
                                        "downgrade, the time-series collection(s) must be updated "
                                        "with a granularity of 'seconds', 'minutes' or 'hours'. "
                                        "First detected incompatible collection: '"
-                                    << collection->ns().getTimeseriesViewNamespace() << "'",
+                                    << collection->ns()
+                                           .getTimeseriesViewNamespace()
+                                           .toStringForErrorMsg()
+                                    << "'",
                                 tsOptions->getGranularity().has_value());
 
                             return true;
@@ -1175,7 +1182,7 @@ private:
 
                         uassert(ErrorCodes::CannotDowngrade,
                                 str::stream() << "Cannot downgrade the cluster as collection "
-                                              << collection->ns()
+                                              << collection->ns().toStringForErrorMsg()
                                               << " has 'encryptedFields' with range indexes",
                                 !(efc.has_value() &&
                                   hasQueryType(efc.get(), QueryTypeEnum::RangePreview)));
@@ -1199,7 +1206,7 @@ private:
                                     << "Cannot downgrade the cluster when there are capped "
                                        "collection with a size that is non multiple of 256 bytes. "
                                        "Drop or resize the following collection: '"
-                                    << collection->ns() << "'");
+                                    << collection->ns().toStringForErrorMsg() << "'");
                             return true;
                         },
                         [&](const Collection* collection) {
@@ -1343,6 +1350,7 @@ private:
                 uassert(dropStatus.code(),
                         str::stream() << "Failed to drop "
                                       << NamespaceString::kShardCollectionCatalogNamespace
+                                             .toStringForErrorMsg()
                                       << causedBy(dropStatus.reason()),
                         dropStatus.isOK() || dropStatus.code() == ErrorCodes::NamespaceNotFound);
             }
@@ -1381,7 +1389,7 @@ private:
                                &dropReply,
                                DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
             uassert(deletionStatus.code(),
-                    str::stream() << "Failed to drop " << indexCatalogNss
+                    str::stream() << "Failed to drop " << indexCatalogNss.toStringForErrorMsg()
                                   << causedBy(deletionStatus.reason()),
                     deletionStatus.isOK() ||
                         deletionStatus.code() == ErrorCodes::NamespaceNotFound);
@@ -1582,7 +1590,7 @@ private:
                 [&](const Collection* collection) {
                     uassert(ErrorCodes::CannotDowngrade,
                             str::stream() << "Cannot downgrade the config server as collection "
-                                          << collection->ns()
+                                          << collection->ns().toStringForErrorMsg()
                                           << " has 'changeStreamPreAndPostImages' enabled. Please "
                                              "unset the option or drop the collection.",
                             !collection->isChangeStreamPreAndPostImagesEnabled());

@@ -109,7 +109,8 @@ public:
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
         const NamespaceString nss(parseNs({boost::none, dbname}, cmdObj));
         uassert(ErrorCodes::InvalidNamespace,
-                str::stream() << "Invalid namespace specified '" << nss.ns() << "'",
+                str::stream() << "Invalid namespace specified '" << nss.toStringForErrorMsg()
+                              << "'",
                 nss.isValid());
 
         std::vector<AsyncRequestsSender::Response> shardResponses;
@@ -231,7 +232,8 @@ public:
 
         const NamespaceString nss = parseNs(DatabaseName{request.getDatabase()}, cmdObj);
         uassert(ErrorCodes::InvalidNamespace,
-                str::stream() << "Invalid namespace specified '" << nss.ns() << "'",
+                str::stream() << "Invalid namespace specified '" << nss.toStringForErrorMsg()
+                              << "'",
                 nss.isValid());
 
         // If the command has encryptionInformation, rewrite the query as necessary.

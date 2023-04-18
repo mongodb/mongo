@@ -367,7 +367,7 @@ Chunk ChunkManager::findIntersectingChunk(const BSONObj& shardKey,
             uassert(ErrorCodes::ShardKeyNotFound,
                     str::stream() << "Cannot target single shard due to collation of key "
                                   << elt.fieldNameStringData() << " for namespace "
-                                  << _rt->optRt->nss(),
+                                  << _rt->optRt->nss().toStringForErrorMsg(),
                     !CollationIndexKey::isCollatableType(elt.type()) &&
                         (!isFieldHashed || bypassIsFieldHashedCheck));
         }
@@ -377,7 +377,7 @@ Chunk ChunkManager::findIntersectingChunk(const BSONObj& shardKey,
 
     uassert(ErrorCodes::ShardKeyNotFound,
             str::stream() << "Cannot target single shard using key " << shardKey
-                          << " for namespace " << _rt->optRt->nss(),
+                          << " for namespace " << _rt->optRt->nss().toStringForErrorMsg(),
             chunkInfo && chunkInfo->containsKey(shardKey));
 
     return Chunk(*chunkInfo, _clusterTime);

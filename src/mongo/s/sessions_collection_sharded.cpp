@@ -64,7 +64,8 @@ std::vector<LogicalSessionId> SessionsCollectionSharded::_groupSessionIdsByOwnin
     const auto [cm, _] = uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(
         opCtx, NamespaceString::kLogicalSessionsNamespace));
     uassert(ErrorCodes::NamespaceNotSharded,
-            str::stream() << "Collection " << NamespaceString::kLogicalSessionsNamespace
+            str::stream() << "Collection "
+                          << NamespaceString::kLogicalSessionsNamespace.toStringForErrorMsg()
                           << " is not sharded",
             cm.isSharded());
 
@@ -89,7 +90,8 @@ std::vector<LogicalSessionRecord> SessionsCollectionSharded::_groupSessionRecord
     const auto [cm, _] = uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(
         opCtx, NamespaceString::kLogicalSessionsNamespace));
     uassert(ErrorCodes::NamespaceNotSharded,
-            str::stream() << "Collection " << NamespaceString::kLogicalSessionsNamespace
+            str::stream() << "Collection "
+                          << NamespaceString::kLogicalSessionsNamespace.toStringForErrorMsg()
                           << " is not sharded",
             cm.isSharded());
 

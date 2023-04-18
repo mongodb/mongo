@@ -101,7 +101,8 @@ public:
                 RenameParticipantInstance::getOrCreate(opCtx, service, participantDocBSON);
             bool hasSameOptions = renameCollectionParticipant->hasSameOptions(participantDocBSON);
             uassert(ErrorCodes::InvalidOptions,
-                    str::stream() << "Another rename participant for namespace " << fromNss
+                    str::stream() << "Another rename participant for namespace "
+                                  << fromNss.toStringForErrorMsg()
                                   << "is instantiated with different parameters: `"
                                   << renameCollectionParticipant->doc() << "` vs `"
                                   << participantDocBSON << "`",

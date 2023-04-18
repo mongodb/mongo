@@ -391,7 +391,7 @@ Status CommonMongodProcessInterface::appendQueryExecStats(OperationContext* opCt
     AutoGetCollectionForReadCommand collection(opCtx, nss);
     if (!collection) {
         return {ErrorCodes::NamespaceNotFound,
-                str::stream() << "Collection [" << nss.toString() << "] not found."};
+                str::stream() << "Collection [" << nss.toStringForErrorMsg() << "] not found."};
     }
 
     bool redactForQE =
@@ -588,8 +588,9 @@ std::vector<BSONObj> CommonMongodProcessInterface::getMatchingPlanCacheEntryStat
     };
 
     AutoGetCollection collection(opCtx, nss, MODE_IS);
-    uassert(
-        50933, str::stream() << "collection '" << nss.toString() << "' does not exist", collection);
+    uassert(50933,
+            str::stream() << "collection '" << nss.toStringForErrorMsg() << "' does not exist",
+            collection);
 
     const auto& collQueryInfo = CollectionQueryInfo::get(collection.getCollection());
     const auto planCache = collQueryInfo.getPlanCache();

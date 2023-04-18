@@ -197,8 +197,15 @@ public:
     void setCollator(std::unique_ptr<CollatorInterface> collator);
 
     // Debugging
-    std::string toString() const;
-    std::string toStringShort() const;
+    std::string toString(bool forErrMsg = false) const;
+    std::string toStringShort(bool forErrMsg = false) const;
+
+    std::string toStringForErrorMsg() const {
+        return toString(true);
+    }
+    std::string toStringShortForErrorMsg() const {
+        return toStringShort(true);
+    }
 
     /**
      * Returns a count of 'type' nodes in expression tree.

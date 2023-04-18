@@ -164,13 +164,14 @@ void validateAuthorization(const OperationContext* opCtx, const ClientCursor& cu
  */
 void validateNamespace(const NamespaceString& commandNss, const ClientCursor& cursor) {
     uassert(ErrorCodes::Unauthorized,
-            str::stream() << "Requested getMore on namespace '" << commandNss.ns()
-                          << "', but cursor belongs to a different namespace " << cursor.nss().ns(),
+            str::stream() << "Requested getMore on namespace '" << commandNss.toStringForErrorMsg()
+                          << "', but cursor belongs to a different namespace "
+                          << cursor.nss().toStringForErrorMsg(),
             commandNss == cursor.nss());
 
     if (commandNss.isOplog() && MONGO_unlikely(rsStopGetMoreCmd.shouldFail())) {
         uasserted(ErrorCodes::CommandFailed,
-                  str::stream() << "getMore on " << commandNss.ns()
+                  str::stream() << "getMore on " << commandNss.toStringForErrorMsg()
                                 << " rejected due to active fail point rsStopGetMoreCmd");
     }
 }
@@ -325,7 +326,7 @@ public:
             NamespaceString nss(NamespaceStringUtil::parseNamespaceFromRequest(
                 _cmd.getDbName(), _cmd.getCollection()));
             uassert(ErrorCodes::InvalidNamespace,
-                    str::stream() << "Invalid namespace for getMore: " << nss.ns(),
+                    str::stream() << "Invalid namespace for getMore: " << nss.toStringForErrorMsg(),
                     nss.isValid());
         }
 

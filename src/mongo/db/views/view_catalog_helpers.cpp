@@ -106,7 +106,7 @@ StatusWith<stdx::unordered_set<NamespaceString>> validatePipeline(OperationConte
                             << firstPersistentStage->get()->getSourceName() << " in location "
                             << std::distance(sources.begin(), firstPersistentStage)
                             << " of the pipeline cannot be used in the view definition of "
-                            << viewDef.name().ns() << " because it writes to disk",
+                            << viewDef.name().toStringForErrorMsg() << " because it writes to disk",
                         firstPersistentStage == sources.end());
 
                 uassert(ErrorCodes::OptionNotSupportedOnView,
@@ -189,8 +189,8 @@ StatusWith<ResolvedView> resolveView(OperationContext* opCtx,
         if (view->timeseries()) {
             auto tsCollection = catalog->lookupCollectionByNamespace(opCtx, *resolvedNss);
             uassert(6067201,
-                    str::stream() << "expected time-series buckets collection " << *resolvedNss
-                                  << " to exist",
+                    str::stream() << "expected time-series buckets collection "
+                                  << (*resolvedNss).toStringForErrorMsg() << " to exist",
                     tsCollection);
             if (tsCollection) {
                 mixedData = tsCollection->getTimeseriesBucketsMayHaveMixedSchemaData();

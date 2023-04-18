@@ -592,7 +592,8 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_updateState
                AutoGetCollection collection(opCtx, _stateDocumentsNS, MODE_IX);
 
                uassert(ErrorCodes::NamespaceNotFound,
-                       str::stream() << _stateDocumentsNS.ns() << " does not exist",
+                       str::stream()
+                           << _stateDocumentsNS.toStringForErrorMsg() << " does not exist",
                        collection);
 
                writeConflictRetry(

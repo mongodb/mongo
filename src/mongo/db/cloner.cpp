@@ -99,7 +99,8 @@ struct Cloner::BatchHandler {
         DatabaseName dbName(boost::none, _dbName);
         dbLock.emplace(opCtx, dbName, MODE_X);
         uassert(ErrorCodes::NotWritablePrimary,
-                str::stream() << "Not primary while cloning collection " << nss,
+                str::stream() << "Not primary while cloning collection "
+                              << nss.toStringForErrorMsg(),
                 !opCtx->writesAreReplicated() ||
                     repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss));
 
@@ -118,12 +119,13 @@ struct Cloner::BatchHandler {
                     from_options, CollectionOptions::ParseKind::parseForCommand));
                 invariant(db->userCreateNS(
                               opCtx, nss, collectionOptions, createDefaultIndexes, from_id_index),
-                          str::stream()
-                              << "collection creation failed during clone [" << nss << "]");
+                          str::stream() << "collection creation failed during clone ["
+                                        << nss.toStringForErrorMsg() << "]");
                 wunit.commit();
                 collection = catalog->lookupCollectionByNamespace(opCtx, nss);
                 invariant(collection,
-                          str::stream() << "Missing collection during clone [" << nss << "]");
+                          str::stream() << "Missing collection during clone ["
+                                        << nss.toStringForErrorMsg() << "]");
             });
         }
 
@@ -151,7 +153,8 @@ struct Cloner::BatchHandler {
                 if (opCtx->writesAreReplicated()) {
                     uassert(
                         ErrorCodes::PrimarySteppedDown,
-                        str::stream() << "Cannot write to ns: " << nss << " after yielding",
+                        str::stream() << "Cannot write to ns: " << nss.toStringForErrorMsg()
+                                      << " after yielding",
                         repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss));
                 }
 
@@ -162,7 +165,8 @@ struct Cloner::BatchHandler {
 
                 collection = catalog->lookupCollectionByNamespace(opCtx, nss);
                 uassert(28594,
-                        str::stream() << "Collection " << nss << " dropped while cloning",
+                        str::stream() << "Collection " << nss.toStringForErrorMsg()
+                                      << " dropped while cloning",
                         collection);
             }
 
@@ -180,7 +184,8 @@ struct Cloner::BatchHandler {
                     continue;
                 }
                 str::stream ss;
-                ss << "Cloner: found corrupt document in " << nss << ": " << redact(status);
+                ss << "Cloner: found corrupt document in " << nss.toStringForErrorMsg() << ": "
+                   << redact(status);
                 msgasserted(28531, ss);
             }
 
@@ -279,7 +284,8 @@ void Cloner::_copyIndexes(OperationContext* opCtx,
                 "conn_getServerAddress"_attr = getConn()->getServerAddress());
 
     uassert(ErrorCodes::PrimarySteppedDown,
-            str::stream() << "Not primary while copying indexes from " << nss << " (Cloner)",
+            str::stream() << "Not primary while copying indexes from " << nss.toStringForErrorMsg()
+                          << " (Cloner)",
             !opCtx->writesAreReplicated() ||
                 repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss));
 
@@ -287,7 +293,8 @@ void Cloner::_copyIndexes(OperationContext* opCtx,
         return;
 
     CollectionWriter collection(opCtx, nss);
-    invariant(collection, str::stream() << "Missing collection " << nss << " (Cloner)");
+    invariant(collection,
+              str::stream() << "Missing collection " << nss.toStringForErrorMsg() << " (Cloner)");
 
     auto indexCatalog = collection->getIndexCatalog();
     auto indexesToBuild = indexCatalog->removeExistingIndexesNoChecks(
@@ -373,7 +380,7 @@ Status Cloner::_createCollectionsForDb(
                     // we're trying to create already exists.
                     return Status(ErrorCodes::NamespaceExists,
                                   str::stream() << "unsharded collection with same namespace "
-                                                << nss.ns() << " already exists.");
+                                                << nss.toStringForErrorMsg() << " already exists.");
                 }
 
                 // If the collection is sharded and a collection with the same name already
@@ -389,7 +396,8 @@ Status Cloner::_createCollectionsForDb(
 
                 return Status(ErrorCodes::InvalidOptions,
                               str::stream()
-                                  << "sharded collection with same namespace " << nss.ns()
+                                  << "sharded collection with same namespace "
+                                  << nss.toStringForErrorMsg()
                                   << " already exists, but UUIDs don't match. Existing UUID is "
                                   << existingOpts.uuid << " and new UUID is " << clonedUUID);
             }

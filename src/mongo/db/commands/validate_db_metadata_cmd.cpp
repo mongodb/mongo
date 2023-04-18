@@ -167,7 +167,7 @@ public:
         bool _validateView(OperationContext* opCtx, const ViewDefinition& view) {
             auto pipelineStatus = view_catalog_helpers::validatePipeline(opCtx, view);
             if (!pipelineStatus.isOK()) {
-                ErrorReplyElement error(view.name().ns().toString(),
+                ErrorReplyElement error(NamespaceStringUtil::serialize(view.name()),
                                         ErrorCodes::APIStrictError,
                                         ErrorCodes::errorString(ErrorCodes::APIStrictError),
                                         pipelineStatus.getStatus().reason());
@@ -204,7 +204,7 @@ public:
             }
             const auto status = collection->checkValidatorAPIVersionCompatability(opCtx);
             if (!status.isOK()) {
-                ErrorReplyElement error(coll.nss()->ns().toString(),
+                ErrorReplyElement error(NamespaceStringUtil::serialize(*coll.nss()),
                                         ErrorCodes::APIStrictError,
                                         ErrorCodes::errorString(ErrorCodes::APIStrictError),
                                         status.reason());
@@ -227,7 +227,7 @@ public:
                 const IndexDescriptor* desc = ii->next()->descriptor();
                 if (apiStrict && apiVersion == "1" &&
                     !index_key_validate::isIndexAllowedInAPIVersion1(*desc)) {
-                    ErrorReplyElement error(coll.nss()->ns().toString(),
+                    ErrorReplyElement error(NamespaceStringUtil::serialize(*coll.nss()),
                                             ErrorCodes::APIStrictError,
                                             ErrorCodes::errorString(ErrorCodes::APIStrictError),
                                             str::stream()

@@ -964,7 +964,7 @@ Status IndexBuildsCoordinatorMongod::setCommitQuorum(OperationContext* opCtx,
         return Status(ErrorCodes::IndexNotFound,
                       str::stream()
                           << "Cannot set a new commit quorum on an index build in collection '"
-                          << nss << "' without providing any indexes.");
+                          << nss.toStringForErrorMsg() << "' without providing any indexes.");
     }
 
     // Take the MODE_IX lock now, so that when we actually persist the value later, we don't need to
@@ -972,7 +972,8 @@ Status IndexBuildsCoordinatorMongod::setCommitQuorum(OperationContext* opCtx,
     AutoGetCollection collection(opCtx, nss, MODE_IX);
     if (!collection) {
         return Status(ErrorCodes::NamespaceNotFound,
-                      str::stream() << "Collection '" << nss << "' was not found.");
+                      str::stream()
+                          << "Collection '" << nss.toStringForErrorMsg() << "' was not found.");
     }
 
     UUID collectionUUID = collection->uuid();
@@ -992,13 +993,14 @@ Status IndexBuildsCoordinatorMongod::setCommitQuorum(OperationContext* opCtx,
     auto collIndexBuilds = activeIndexBuilds.filterIndexBuilds(pred);
     if (collIndexBuilds.empty()) {
         return Status(ErrorCodes::IndexNotFound,
-                      str::stream() << "Cannot find an index build on collection '" << nss
-                                    << "' with the provided index names");
+                      str::stream()
+                          << "Cannot find an index build on collection '"
+                          << nss.toStringForErrorMsg() << "' with the provided index names");
     }
     invariant(
         1U == collIndexBuilds.size(),
         str::stream() << "Found multiple index builds with the same index names on collection "
-                      << nss << " (" << collectionUUID
+                      << nss.toStringForErrorMsg() << " (" << collectionUUID
                       << "): first index name: " << indexNames.front());
 
     replState = collIndexBuilds.front();
@@ -1018,18 +1020,19 @@ Status IndexBuildsCoordinatorMongod::setCommitQuorum(OperationContext* opCtx,
         return Status(ErrorCodes::IndexNotFound,
                       str::stream()
                           << "Index build not yet started for the provided indexes in collection '"
-                          << nss << "'.");
+                          << nss.toStringForErrorMsg() << "'.");
     }
 
     auto currentCommitQuorum = invariantStatusOK(swOnDiskCommitQuorum);
     if (currentCommitQuorum.numNodes == CommitQuorumOptions::kDisabled ||
         newCommitQuorum.numNodes == CommitQuorumOptions::kDisabled) {
         return Status(ErrorCodes::BadValue,
-                      str::stream() << "Commit quorum value can be changed only for index builds "
-                                    << "with commit quorum enabled, nss: '" << nss
-                                    << "' first index name: '" << indexNames.front()
-                                    << "' currentCommitQuorum: " << currentCommitQuorum.toBSON()
-                                    << " providedCommitQuorum: " << newCommitQuorum.toBSON());
+                      str::stream()
+                          << "Commit quorum value can be changed only for index builds "
+                          << "with commit quorum enabled, nss: '" << nss.toStringForErrorMsg()
+                          << "' first index name: '" << indexNames.front()
+                          << "' currentCommitQuorum: " << currentCommitQuorum.toBSON()
+                          << " providedCommitQuorum: " << newCommitQuorum.toBSON());
     }
 
     invariant(opCtx->lockState()->isRSTLLocked());

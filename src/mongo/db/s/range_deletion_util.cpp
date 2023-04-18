@@ -104,7 +104,7 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
 
         uasserted(ErrorCodes::IndexNotFound,
                   str::stream() << "Unable to find shard key index"
-                                << " for " << nss.ns() << " and key pattern `"
+                                << " for " << nss.toStringForErrorMsg() << " and key pattern `"
                                 << keyPattern.toString() << "'");
     }
 

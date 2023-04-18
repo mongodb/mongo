@@ -188,7 +188,7 @@ WriteContextForTests::WriteContextForTests(OperationContext* opCtx, StringData n
 
     _clientContext.emplace(opCtx, _nss, doShardVersionCheck);
     auto db = _autoDb->ensureDbExists(opCtx);
-    invariant(db, _nss.ns());
+    invariant(db, _nss.toStringForErrorMsg());
     invariant(db == _clientContext->db());
 
     // If the collection exists, there is no need to lock into stronger mode

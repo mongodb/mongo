@@ -115,7 +115,7 @@ public:
             uassert(5403504,
                     "Expected collection entry for {} to no longer have resharding metadata, but "
                     "metadata documents still exist; please rerun the cleanupReshardCollection "
-                    "command"_format(ns().toString()),
+                    "command"_format(ns().toStringForErrorMsg()),
                     !collEntry.getReshardingFields());
         }
 

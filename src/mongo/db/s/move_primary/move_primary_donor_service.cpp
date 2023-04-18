@@ -148,7 +148,8 @@ void MovePrimaryDonorService::checkIfConflictsWithOtherInstances(
         const auto& existingMetadata = typed->getMetadata();
         uassert(ErrorCodes::ConflictingOperationInProgress,
                 str::stream() << "Existing movePrimary operation for database "
-                              << newMetadata.getDatabaseName() << " is still ongoing",
+                              << newMetadata.getDatabaseName().toStringForErrorMsg()
+                              << " is still ongoing",
                 newMetadata.getDatabaseName() != existingMetadata.getDatabaseName());
     }
 }

@@ -104,7 +104,8 @@ public:
             const auto [cm, sii] =
                 uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
             uassert(ErrorCodes::NamespaceNotSharded,
-                    str::stream() << "Collection " << nss.ns() << " is not sharded.",
+                    str::stream() << "Collection " << nss.toStringForErrorMsg()
+                                  << " is not sharded.",
                     cm.isSharded());
 
             result.appendTimestamp("version", cm.getVersion().toLong());

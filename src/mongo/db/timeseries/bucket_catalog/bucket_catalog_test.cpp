@@ -244,7 +244,7 @@ Status BucketCatalogTest::_reopenBucket(const CollectionPtr& coll, const BSONObj
     const boost::optional<TimeseriesOptions> options = coll->getTimeseriesOptions();
     invariant(options,
               str::stream() << "Attempting to reopen a bucket for a non-timeseries collection: "
-                            << ns);
+                            << ns.toStringForErrorMsg());
 
     BSONElement metadata;
     auto metaFieldName = options->getMetaField();

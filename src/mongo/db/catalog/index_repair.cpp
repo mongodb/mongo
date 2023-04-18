@@ -55,7 +55,7 @@ StatusWith<int> moveRecordToLostAndFound(OperationContext* opCtx,
             writeConflictRetry(opCtx, "createLostAndFoundCollection", lostAndFoundNss.ns(), [&]() {
                 // Ensure the database exists.
                 auto db = autoColl.ensureDbExists(opCtx);
-                invariant(db, lostAndFoundNss.ns());
+                invariant(db, lostAndFoundNss.toStringForErrorMsg());
 
                 WriteUnitOfWork wuow(opCtx);
 
@@ -68,7 +68,7 @@ StatusWith<int> moveRecordToLostAndFound(OperationContext* opCtx,
                     CollectionPtr(db->createCollection(opCtx, lostAndFoundNss, collOptions));
 
                 // Ensure the collection exists.
-                invariant(localCollection, lostAndFoundNss.ns());
+                invariant(localCollection, lostAndFoundNss.toStringForErrorMsg());
 
                 wuow.commit();
                 return Status::OK();
@@ -208,7 +208,7 @@ int repairMissingIndexEntry(OperationContext* opCtx,
                 }
             } else {
                 results->errors.push_back(str::stream() << "unable to move record " << rid << " to "
-                                                        << lostAndFoundNss.ns());
+                                                        << lostAndFoundNss.toStringForErrorMsg());
             }
         } else {
             // If the missing index entry does not exist in the record store, then it has

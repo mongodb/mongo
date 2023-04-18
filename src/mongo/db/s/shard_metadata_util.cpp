@@ -151,20 +151,22 @@ StatusWith<ShardCollectionType> readShardCollectionsEntry(OperationContext* opCt
         if (!cursor) {
             return Status(ErrorCodes::OperationFailed,
                           str::stream() << "Failed to establish a cursor for reading "
-                                        << NamespaceString::kShardConfigCollectionsNamespace.ns()
+                                        << NamespaceString::kShardConfigCollectionsNamespace
+                                               .toStringForErrorMsg()
                                         << " from local storage");
         }
 
         if (!cursor->more()) {
             // The collection has been dropped.
             return Status(ErrorCodes::NamespaceNotFound,
-                          str::stream() << "collection " << nss.ns() << " not found");
+                          str::stream()
+                              << "collection " << nss.toStringForErrorMsg() << " not found");
         }
 
         BSONObj document = cursor->nextSafe();
         return ShardCollectionType(document);
     } catch (const DBException& ex) {
-        return ex.toStatus(str::stream() << "Failed to read the '" << nss.ns()
+        return ex.toStatus(str::stream() << "Failed to read the '" << nss.toStringForErrorMsg()
                                          << "' entry locally from config.collections");
     }
 }
@@ -179,7 +181,8 @@ StatusWith<ShardDatabaseType> readShardDatabasesEntry(OperationContext* opCtx, S
         if (!cursor) {
             return Status(ErrorCodes::OperationFailed,
                           str::stream() << "Failed to establish a cursor for reading "
-                                        << NamespaceString::kShardConfigDatabasesNamespace.ns()
+                                        << NamespaceString::kShardConfigDatabasesNamespace
+                                               .toStringForErrorMsg()
                                         << " from local storage");
         }
 
@@ -192,9 +195,9 @@ StatusWith<ShardDatabaseType> readShardDatabasesEntry(OperationContext* opCtx, S
         BSONObj document = cursor->nextSafe();
         return ShardDatabaseType(document);
     } catch (const DBException& ex) {
-        return ex.toStatus(str::stream()
-                           << "Failed to read the '" << dbName.toString() << "' entry locally from "
-                           << NamespaceString::kShardConfigDatabasesNamespace);
+        return ex.toStatus(
+            str::stream() << "Failed to read the '" << dbName.toString() << "' entry locally from "
+                          << NamespaceString::kShardConfigDatabasesNamespace.toStringForErrorMsg());
     }
 }
 
@@ -296,8 +299,8 @@ StatusWith<std::vector<ChunkType>> readShardChunks(OperationContext* opCtx,
         }
         std::unique_ptr<DBClientCursor> cursor = client.find(std::move(findRequest));
         uassert(ErrorCodes::OperationFailed,
-                str::stream() << "Failed to establish a cursor for reading " << chunksNss.ns()
-                              << " from local storage",
+                str::stream() << "Failed to establish a cursor for reading "
+                              << chunksNss.toStringForErrorMsg() << " from local storage",
                 cursor);
 
         std::vector<ChunkType> chunks;

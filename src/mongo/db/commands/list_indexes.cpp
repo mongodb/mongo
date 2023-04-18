@@ -131,7 +131,7 @@ IndexSpecsWithNamespaceString getIndexSpecsWithNamespaceString(OperationContext*
 
             const CollectionPtr& coll = autoColl.getCollection();
             uassert(ErrorCodes::NamespaceNotFound,
-                    str::stream() << "ns does not exist: " << bucketsNss,
+                    str::stream() << "ns does not exist: " << bucketsNss.toStringForErrorMsg(),
                     coll);
 
             return std::make_pair(
@@ -146,8 +146,9 @@ IndexSpecsWithNamespaceString getIndexSpecsWithNamespaceString(OperationContext*
 
     const auto& nss = autoColl.getNss();
     const CollectionPtr& coll = autoColl.getCollection();
-    uassert(
-        ErrorCodes::NamespaceNotFound, str::stream() << "ns does not exist: " << nss.ns(), coll);
+    uassert(ErrorCodes::NamespaceNotFound,
+            str::stream() << "ns does not exist: " << nss.toStringForErrorMsg(),
+            coll);
 
     return std::make_pair(listIndexesInLock(opCtx, coll, nss, additionalInclude), nss);
 }
@@ -252,7 +253,8 @@ public:
                 opCtx, cmd.getNamespaceOrUUID());
 
             uassert(ErrorCodes::Unauthorized,
-                    str::stream() << "Not authorized to list indexes on collection:" << nss.ns(),
+                    str::stream() << "Not authorized to list indexes on collection:"
+                                  << nss.toStringForErrorMsg(),
                     authzSession->isAuthorizedForActionsOnResource(
                         ResourcePattern::forExactNamespace(nss), ActionType::listIndexes));
         }

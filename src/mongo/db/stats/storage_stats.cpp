@@ -346,7 +346,7 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
         result->append("indexSizes", BSONObj());
         result->append("scaleFactor", scale);
         return {ErrorCodes::NamespaceNotFound,
-                "Collection [" + collNss.toString() + "] not found."};
+                "Collection [" + collNss.toStringForErrorMsg() + "] not found."};
     }
 
     // We will parse all 'filterObj' into different groups of data to compute. This groups will be
@@ -407,7 +407,7 @@ Status appendCollectionRecordCount(OperationContext* opCtx,
     AutoGetCollectionForReadCommandMaybeLockFree collection(opCtx, nss);
     if (!collection) {
         return {ErrorCodes::NamespaceNotFound,
-                str::stream() << "Collection [" << nss.toString() << "] not found."};
+                str::stream() << "Collection [" << nss.toStringForErrorMsg() << "] not found."};
     }
 
     result->appendNumber("count", static_cast<long long>(collection->numRecords(opCtx)));

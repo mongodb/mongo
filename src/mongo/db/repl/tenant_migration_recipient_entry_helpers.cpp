@@ -96,7 +96,7 @@ Status updateStateDoc(OperationContext* opCtx, const TenantMigrationRecipientDoc
 
     if (!collection) {
         return Status(ErrorCodes::NamespaceNotFound,
-                      str::stream() << nss.ns() << " does not exist");
+                      str::stream() << nss.toStringForErrorMsg() << " does not exist");
     }
 
     return writeConflictRetry(
@@ -120,7 +120,7 @@ StatusWith<bool> deleteStateDocIfMarkedAsGarbageCollectable(OperationContext* op
 
     if (!collection) {
         return Status(ErrorCodes::NamespaceNotFound,
-                      str::stream() << nss.ns() << " does not exist");
+                      str::stream() << nss.toStringForErrorMsg() << " does not exist");
     }
 
     auto query = BSON(TenantMigrationRecipientDocument::kTenantIdFieldName
@@ -144,7 +144,8 @@ StatusWith<TenantMigrationRecipientDocument> getStateDoc(OperationContext* opCtx
     if (!collection) {
         return Status(ErrorCodes::NamespaceNotFound,
                       str::stream() << "Collection not found: "
-                                    << NamespaceString::kTenantMigrationRecipientsNamespace.ns());
+                                    << NamespaceString::kTenantMigrationRecipientsNamespace
+                                           .toStringForErrorMsg());
     }
 
     BSONObj result;

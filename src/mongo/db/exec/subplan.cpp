@@ -114,7 +114,7 @@ Status SubplanStage::choosePlanWholeQuery(PlanYieldPolicy* yieldPolicy) {
     auto statusWithMultiPlanSolns = QueryPlanner::plan(*_query, _plannerParams);
     if (!statusWithMultiPlanSolns.isOK()) {
         return statusWithMultiPlanSolns.getStatus().withContext(
-            str::stream() << "error processing query: " << _query->toString()
+            str::stream() << "error processing query: " << _query->toStringForErrorMsg()
                           << " planner returned error");
     }
     auto solutions = std::move(statusWithMultiPlanSolns.getValue());
@@ -237,7 +237,7 @@ Status SubplanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
 
         if (!multiPlanStage->bestPlanChosen()) {
             str::stream ss;
-            ss << "Failed to pick best plan for subchild " << cq->toString();
+            ss << "Failed to pick best plan for subchild " << cq->toStringForErrorMsg();
             return Status(ErrorCodes::NoQueryExecutionPlans, ss);
         }
         return multiPlanStage->bestSolution();

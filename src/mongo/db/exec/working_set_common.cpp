@@ -176,7 +176,7 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
             auto desc = collection->getIndexCatalog()->findIndexByIdent(opCtx, indexIdent);
             invariant(desc,
                       str::stream() << "Index entry not found for index with ident " << indexIdent
-                                    << " on collection " << collection->ns());
+                                    << " on collection " << collection->ns().toStringForErrorMsg());
             auto* iam = desc->getEntry()->accessMethod()->asSortedData();
             iam->getKeys(opCtx,
                          collection,

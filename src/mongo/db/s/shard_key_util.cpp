@@ -118,9 +118,9 @@ bool validShardKeyIndexExists(OperationContext* opCtx,
         bool isUnique = idx["unique"].trueValue();
         bool isPrepareUnique = idx["prepareUnique"].trueValue();
         uassert(ErrorCodes::InvalidOptions,
-                str::stream() << "can't shard collection '" << nss.ns() << "' with unique index on "
-                              << currentKey << " and proposed shard key "
-                              << shardKeyPattern.toBSON()
+                str::stream() << "can't shard collection '" << nss.toStringForErrorMsg()
+                              << "' with unique index on " << currentKey
+                              << " and proposed shard key " << shardKeyPattern.toBSON()
                               << ". Uniqueness can't be maintained unless shard key is a prefix",
                 (!isUnique && !isPrepareUnique) ||
                     shardKeyPattern.isIndexUniquenessCompatible(currentKey));
@@ -141,7 +141,7 @@ bool validShardKeyIndexExists(OperationContext* opCtx,
             // Note that this means that, for sharding, we only support one hashed index
             // per field per collection.
             uassert(ErrorCodes::InvalidOptions,
-                    str::stream() << "can't shard collection " << nss.ns()
+                    str::stream() << "can't shard collection " << nss.toStringForErrorMsg()
                                   << " with hashed shard key " << shardKeyPattern.toBSON()
                                   << " because the hashed index uses a non-default seed of "
                                   << idx["seed"].numberInt(),
@@ -185,7 +185,7 @@ bool validShardKeyIndexExists(OperationContext* opCtx,
             BSONObj currKey = eqQueryResult["key"].embeddedObject();
             bool isCurrentID = (currKey.firstElementFieldNameStringData() == "_id");
             uassert(ErrorCodes::InvalidOptions,
-                    str::stream() << "can't shard collection " << nss.ns() << ", "
+                    str::stream() << "can't shard collection " << nss.toStringForErrorMsg() << ", "
                                   << shardKeyPattern.toBSON()
                                   << " index not unique, and unique index explicitly specified",
                     isExplicitlyUnique || isCurrentID);

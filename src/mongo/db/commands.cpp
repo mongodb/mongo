@@ -278,7 +278,7 @@ std::string CommandHelpers::parseNsFullyQualified(const BSONObj& cmdObj) {
             first.canonicalType() == canonicalizeBSONType(mongo::String));
     const NamespaceString nss(first.valueStringData());
     uassert(ErrorCodes::InvalidNamespace,
-            str::stream() << "Invalid namespace specified '" << nss.ns() << "'",
+            str::stream() << "Invalid namespace specified '" << nss.toStringForErrorMsg() << "'",
             nss.isValid());
     return nss.ns().toString();
 }
@@ -314,7 +314,7 @@ NamespaceStringOrUUID CommandHelpers::parseNsOrUUID(const DatabaseName& dbName,
         // Ensure collection identifier is not a Command
         const NamespaceString nss(parseNsCollectionRequired(dbName, cmdObj));
         uassert(ErrorCodes::InvalidNamespace,
-                str::stream() << "Invalid collection name specified '" << nss.ns(),
+                str::stream() << "Invalid collection name specified '" << nss.toStringForErrorMsg(),
                 !(nss.ns().find('$') != std::string::npos && nss.ns() != "local.oplog.$main"));
         return nss;
     }
@@ -573,7 +573,7 @@ void CommandHelpers::canUseTransactions(const NamespaceString& nss,
             dbName.db() != DatabaseName::kLocal.db());
 
     uassert(ErrorCodes::OperationNotSupportedInTransaction,
-            str::stream() << "Cannot run command against the '" << nss
+            str::stream() << "Cannot run command against the '" << nss.toStringForErrorMsg()
                           << "' collection in a transaction.",
             !nss.isSystemDotProfile());
 

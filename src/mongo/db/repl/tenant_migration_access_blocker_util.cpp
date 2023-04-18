@@ -302,7 +302,7 @@ void validateNssIsBeingMigrated(const boost::optional<TenantId>& tenantId,
     if (!tenantId) {
         uassert(ErrorCodes::InvalidTenantId,
                 str::stream() << "Failed to extract a valid tenant from namespace '"
-                              << nss.toStringWithTenantId() << "'.",
+                              << nss.toStringForErrorMsg() << "'.",
                 nss.isOnInternalDb());
         return;
     }
@@ -311,12 +311,12 @@ void validateNssIsBeingMigrated(const boost::optional<TenantId>& tenantId,
                     .getTenantMigrationAccessBlockerForTenantId(
                         *tenantId, TenantMigrationAccessBlocker::BlockerType::kRecipient);
     uassert(ErrorCodes::InvalidTenantId,
-            str::stream() << "The collection '" << nss.toStringWithTenantId()
+            str::stream() << "The collection '" << nss.toStringForErrorMsg()
                           << "' does not belong to a tenant being migrated.",
             mtab);
 
     uassert(ErrorCodes::InvalidTenantId,
-            str::stream() << "The collection '" << nss.toStringWithTenantId()
+            str::stream() << "The collection '" << nss.toStringForErrorMsg()
                           << "' is not being migrated in migration " << migrationId,
             mtab->getMigrationId() == migrationId);
 }

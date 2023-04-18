@@ -322,9 +322,9 @@ void AllDatabaseCloner::postStage() {
             if (!foundAuthSchemaDoc && foundUser) {
                 std::string msg = str::stream()
                     << "During initial sync, found documents in "
-                    << NamespaceString::kAdminUsersNamespace.ns()
+                    << NamespaceString::kAdminUsersNamespace.toStringForErrorMsg()
                     << " but could not find an auth schema version document in "
-                    << NamespaceString::kServerConfigurationNamespace.ns() << ".  "
+                    << NamespaceString::kServerConfigurationNamespace.toStringForErrorMsg() << ".  "
                     << "This indicates that the primary of this replica set was not "
                        "successfully "
                        "upgraded to schema version "

@@ -152,7 +152,8 @@ Status createProfileCollection(OperationContext* opCtx, Database* db) {
         if (collection) {
             if (!collection->isCapped()) {
                 return Status(ErrorCodes::NamespaceExists,
-                              str::stream() << dbProfilingNS << " exists but isn't capped");
+                              str::stream() << dbProfilingNS.toStringForErrorMsg()
+                                            << " exists but isn't capped");
             }
 
             return Status::OK();

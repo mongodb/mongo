@@ -108,7 +108,7 @@ public:
             AuthorizationSession* authzSession = AuthorizationSession::get(opCtx->getClient());
             uassert(ErrorCodes::Unauthorized,
                     str::stream() << "Not authorized to list indexes on collection:"
-                                  << ns().toString(),
+                                  << ns().toStringForErrorMsg(),
                     authzSession->isAuthorizedForActionsOnResource(
                         ResourcePattern::forExactNamespace(ns()), ActionType::listIndexes));
         }

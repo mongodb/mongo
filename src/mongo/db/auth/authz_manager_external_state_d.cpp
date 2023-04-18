@@ -87,7 +87,8 @@ Status AuthzManagerExternalStateMongod::findOne(OperationContext* opCtx,
         return Status::OK();
     }
     return {ErrorCodes::NoMatchingDocument,
-            str::stream() << "No document in " << nss.ns() << " matches " << query};
+            str::stream() << "No document in " << nss.toStringForErrorMsg() << " matches "
+                          << query};
 }
 
 bool AuthzManagerExternalStateMongod::hasOne(OperationContext* opCtx,

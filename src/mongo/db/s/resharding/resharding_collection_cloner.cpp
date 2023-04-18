@@ -73,7 +73,8 @@ bool collectionHasSimpleCollation(OperationContext* opCtx, const NamespaceString
     auto [sourceChunkMgr, _] = uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
 
     uassert(ErrorCodes::NamespaceNotSharded,
-            str::stream() << "Expected collection " << nss << " to be sharded",
+            str::stream() << "Expected collection " << nss.toStringForErrorMsg()
+                          << " to be sharded",
             sourceChunkMgr.isSharded());
 
     return !sourceChunkMgr.getDefaultCollator();
@@ -218,8 +219,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> ReshardingCollectionCloner::_restartP
     auto idToResumeFrom = [&] {
         AutoGetCollection outputColl(opCtx, _outputNss, MODE_IS);
         uassert(ErrorCodes::NamespaceNotFound,
-                str::stream() << "Resharding collection cloner's output collection '" << _outputNss
-                              << "' did not already exist",
+                str::stream() << "Resharding collection cloner's output collection '"
+                              << _outputNss.toStringForErrorMsg() << "' did not already exist",
                 outputColl);
         return resharding::data_copy::findHighestInsertedId(opCtx, *outputColl);
     }();

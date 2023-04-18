@@ -62,7 +62,7 @@ CollectionType::CollectionType(const BSONObj& obj) {
     CollectionType::parseProtected(IDLParserContext("CollectionType"), obj);
     invariant(getTimestamp() != Timestamp(0, 0));
     uassert(ErrorCodes::BadValue,
-            str::stream() << "Invalid namespace " << getNss(),
+            str::stream() << "Invalid namespace " << getNss().toStringForErrorMsg(),
             getNss().isValid());
     if (!getPre22CompatibleEpoch()) {
         setPre22CompatibleEpoch(OID());

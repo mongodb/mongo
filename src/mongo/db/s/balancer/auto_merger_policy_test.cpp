@@ -194,8 +194,8 @@ protected:
                                                       nssWithMergeableChunks.end(),
                                                       expectedNss) != nssWithMergeableChunks.end();
                 ASSERT_EQ(true, expectedNssIsFetched)
-                    << "expected collection " << expectedNss << " on shard " << shardId
-                    << " wasn't fetched";
+                    << "expected collection " << expectedNss.toStringForErrorMsg() << " on shard "
+                    << shardId << " wasn't fetched";
             }
 
             ASSERT_EQ(expectedNamespaces.size(), nssWithMergeableChunks.size())

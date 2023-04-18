@@ -767,7 +767,7 @@ public:
         // Tailable: If the query requests tailable the collection must be capped.
         if (_cq->getFindCommandRequest().getTailable() && !mainColl->isCapped()) {
             return Status(ErrorCodes::BadValue,
-                          str::stream() << "error processing query: " << _cq->toString()
+                          str::stream() << "error processing query: " << _cq->toStringForErrorMsg()
                                         << " tailable cursor requested on non capped collection");
         }
 
@@ -799,7 +799,7 @@ public:
 
         if (!statusWithMultiPlanSolns.isOK()) {
             return statusWithMultiPlanSolns.getStatus().withContext(
-                str::stream() << "error processing query: " << _cq->toString()
+                str::stream() << "error processing query: " << _cq->toStringForErrorMsg()
                               << " planner returned error");
         }
 
@@ -1770,7 +1770,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
             ErrorCodes::IllegalOperation,
             str::stream()
                 << "Cannot remove from a capped collection in a multi-document transaction: "
-                << nss.ns());
+                << nss.toStringForErrorMsg());
     }
 
     bool userInitiatedWritesAndNotPrimary = opCtx->writesAreReplicated() &&
@@ -1778,7 +1778,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
 
     if (userInitiatedWritesAndNotPrimary) {
         return Status(ErrorCodes::PrimarySteppedDown,
-                      str::stream() << "Not primary while removing from " << nss.ns());
+                      str::stream()
+                          << "Not primary while removing from " << nss.toStringForErrorMsg());
     }
 
     auto deleteStageParams = std::make_unique<DeleteStageParams>();
@@ -1980,7 +1981,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
 
     if (nss.isSystem() && opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()) {
         uassert(10156,
-                str::stream() << "cannot update a system namespace: " << nss.ns(),
+                str::stream() << "cannot update a system namespace: " << nss.toStringForErrorMsg(),
                 nss.isLegalClientSystemNS(serverGlobalParams.featureCompatibility));
     }
 
@@ -2006,7 +2007,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
 
     if (userInitiatedWritesAndNotPrimary) {
         return Status(ErrorCodes::PrimarySteppedDown,
-                      str::stream() << "Not primary while performing update on " << nss.ns());
+                      str::stream() << "Not primary while performing update on "
+                                    << nss.toStringForErrorMsg());
     }
 
     const auto policy = parsedUpdate->yieldPolicy();

@@ -71,7 +71,8 @@ public:
             const NamespaceString& nss = ns();
 
             uassert(ErrorCodes::InvalidNamespace,
-                    str::stream() << "Invalid namespace specified '" << nss.ns() << "'",
+                    str::stream() << "Invalid namespace specified '" << nss.toStringForErrorMsg()
+                                  << "'",
                     nss.isValid());
             return Balancer::get(opCtx)->getBalancerStatusForNs(opCtx, nss);
         }

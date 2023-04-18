@@ -215,11 +215,11 @@ std::vector<CollectionImportMetadata> wiredTigerRollbackToStableAndGetMetadata(
         for (const auto& index : catalogEntry.indexes) {
             uassert(6113807,
                     "No ident for donor index '{}' in collection '{}'"_format(
-                        index.nameStringData(), ns.toString()),
+                        index.nameStringData(), ns.toStringForErrorMsg()),
                     indexNameToIdent.contains(index.nameStringData()));
             uassert(6114302,
                     "Index '{}' for collection '{}' isn't ready"_format(index.nameStringData(),
-                                                                        ns.ns()),
+                                                                        ns.toStringForErrorMsg()),
                     index.ready);
 
             WTIndexImportArgs indexImportArgs;

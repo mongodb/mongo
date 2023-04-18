@@ -96,7 +96,7 @@ bool executeOperationsAsPartOfShardKeyUpdate(OperationContext* opCtx,
 
     uassert(ErrorCodes::NamespaceNotFound,
             "Document not successfully inserted while changing shard key for namespace " +
-                insertRequest.getNS().toString(),
+                insertRequest.getNS().toStringForErrorMsg(),
             insertResponse.getN() == 1);
 
     return true;
@@ -238,7 +238,7 @@ SemiFuture<bool> updateShardKeyForDocument(const txn_api::TransactionClient& txn
 
             uassert(ErrorCodes::NamespaceNotFound,
                     "Document not successfully inserted while changing shard key for namespace " +
-                        nss.ns(),
+                        nss.toStringForErrorMsg(),
                     insertResponse.getN() == 1);
 
             return true;

@@ -100,8 +100,8 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
             auto descriptor = _collection->getIndexCatalog()->findIndexByName(
                 _opCtx, ixn->index.identifier.catalogName);
             invariant(descriptor,
-                      str::stream() << "Namespace: " << _collection->ns()
-                                    << ", CanonicalQuery: " << _cq.toStringShort()
+                      str::stream() << "Namespace: " << _collection->ns().toStringForErrorMsg()
+                                    << ", CanonicalQuery: " << _cq.toStringShortForErrorMsg()
                                     << ", IndexEntry: " << ixn->index.toString());
 
             // We use the node's internal name, keyPattern and multikey details here. For $**

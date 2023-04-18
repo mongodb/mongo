@@ -161,11 +161,13 @@ void NonShardServerProcessInterface::createIndexesOnEmptyCollection(
             uassert(ErrorCodes::NamespaceNotFound,
                     str::stream() << "Failed to create indexes for aggregation because collection "
                                      "does not exist: "
-                                  << ns << ": " << BSON("indexes" << indexSpecs),
+                                  << ns.toStringForErrorMsg() << ": "
+                                  << BSON("indexes" << indexSpecs),
                     collection.get());
 
             invariant(collection->isEmpty(opCtx),
-                      str::stream() << "Expected empty collection for index creation: " << ns
+                      str::stream() << "Expected empty collection for index creation: "
+                                    << ns.toStringForErrorMsg()
                                     << ": numRecords: " << collection->numRecords(opCtx) << ": "
                                     << BSON("indexes" << indexSpecs));
 

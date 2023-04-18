@@ -291,8 +291,8 @@ Status ActiveMigrationsRegistry::ActiveReceiveChunkState::constructErrorStatus()
     return {ErrorCodes::ConflictingOperationInProgress,
             str::stream() << "Unable to start new balancer operation because this shard is "
                              "currently receiving chunk "
-                          << range.toString() << " for namespace " << nss.ns() << " from "
-                          << fromShardId};
+                          << range.toString() << " for namespace " << nss.toStringForErrorMsg()
+                          << " from " << fromShardId};
 }
 
 ScopedDonateChunk::ScopedDonateChunk(ActiveMigrationsRegistry* registry,

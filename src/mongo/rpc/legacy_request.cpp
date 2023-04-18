@@ -48,7 +48,7 @@ OpMsgRequest opMsgRequestFromLegacyRequest(const Message& message) {
     if (qm.queryOptions & QueryOption_Exhaust) {
         uasserted(18527,
                   str::stream() << "The 'exhaust' OP_QUERY flag is invalid for commands: "
-                                << ns.ns() << " " << qm.query.toString());
+                                << ns.toStringForErrorMsg() << " " << qm.query.toString());
     }
 
     uassert(40473,

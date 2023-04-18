@@ -1353,7 +1353,8 @@ protected:
                     // and there's no guarantee of the order.
                     _insertedDocs[nss].insert(docs.begin(), docs.end());
                 } else
-                    FAIL("Unexpected insert") << " into " << nss << " first doc: " << docs.front();
+                    FAIL("Unexpected insert")
+                        << " into " << nss.toStringForErrorMsg() << " first doc: " << docs.front();
             };
 
         _writerPool = makeReplWriterPool();
@@ -1709,7 +1710,7 @@ protected:
                 // there's no guarantee of the order.
                 (_docs[collNss]).push_back(BSON("create" << collNss.coll()));
             } else
-                FAIL("Unexpected create") << " on " << collNss;
+                FAIL("Unexpected create") << " on " << collNss.toStringForErrorMsg();
         };
 
         _opObserver->onInsertsFn = [&](OperationContext*,
@@ -1724,7 +1725,8 @@ protected:
                 // and there's no guarantee of the order.
                 (_docs[nss]).insert(_docs[nss].end(), docs.begin(), docs.end());
             } else
-                FAIL("Unexpected insert") << " into " << nss << " first doc: " << docs.front();
+                FAIL("Unexpected insert")
+                    << " into " << nss.toStringForErrorMsg() << " first doc: " << docs.front();
         };
 
         _writerPool = makeReplWriterPool();
@@ -2534,7 +2536,7 @@ protected:
                 // and there's no guarantee of the order.
                 _deletedDocs[nss]++;
             } else
-                FAIL("Unexpected delete") << " from " << nss;
+                FAIL("Unexpected delete") << " from " << nss.toStringForErrorMsg();
         };
     }
 

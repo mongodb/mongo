@@ -69,7 +69,7 @@ void LastOpFixer::finishedOpSuccessfully() {
 
 void assertCanWrite_inlock(OperationContext* opCtx, const NamespaceString& nss) {
     uassert(ErrorCodes::PrimarySteppedDown,
-            str::stream() << "Not primary while writing to " << nss.ns(),
+            str::stream() << "Not primary while writing to " << nss.toStringForErrorMsg(),
             repl::ReplicationCoordinator::get(opCtx->getServiceContext())
                 ->canAcceptWritesFor(opCtx, nss));
 

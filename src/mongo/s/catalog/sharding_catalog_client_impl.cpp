@@ -513,7 +513,7 @@ CollectionType ShardingCatalogClientImpl::getCollection(OperationContext* opCtx,
                                                 1))
             .value;
     uassert(ErrorCodes::NamespaceNotFound,
-            str::stream() << "collection " << nss.ns() << " not found",
+            str::stream() << "collection " << nss.toStringForErrorMsg() << " not found",
             !collDoc.empty());
 
     return CollectionType(collDoc[0]);
@@ -619,12 +619,14 @@ StatusWith<VersionType> ShardingCatalogClientImpl::getConfigVersion(
 
     if (queryResults.size() > 1) {
         return {ErrorCodes::TooManyMatchingDocuments,
-                str::stream() << "should only have 1 document in " << VersionType::ConfigNS.ns()};
+                str::stream() << "should only have 1 document in "
+                              << VersionType::ConfigNS.toStringForErrorMsg()};
     }
 
     if (queryResults.empty()) {
         return {ErrorCodes::NoMatchingDocument,
-                str::stream() << "No documents found in " << VersionType::ConfigNS.ns()};
+                str::stream() << "No documents found in "
+                              << VersionType::ConfigNS.toStringForErrorMsg()};
     }
 
     BSONObj versionDoc = queryResults.front();
@@ -726,7 +728,7 @@ std::pair<CollectionType, std::vector<ChunkType>> ShardingCatalogClientImpl::get
         opCtx, aggRequest, readConcern, Milliseconds(gFindChunksOnConfigTimeoutMS.load()));
 
     uassert(ErrorCodes::NamespaceNotFound,
-            str::stream() << "Collection " << nss.ns() << " not found",
+            str::stream() << "Collection " << nss.toStringForErrorMsg() << " not found",
             !aggResult.empty());
 
 
@@ -765,7 +767,8 @@ std::pair<CollectionType, std::vector<ChunkType>> ShardingCatalogClientImpl::get
         }
 
         uassert(ErrorCodes::ConflictingOperationInProgress,
-                str::stream() << "No chunks were found for the collection " << nss,
+                str::stream() << "No chunks were found for the collection "
+                              << nss.toStringForErrorMsg(),
                 !chunks.empty());
     }
 
@@ -781,11 +784,12 @@ ShardingCatalogClientImpl::getCollectionAndShardingIndexCatalogEntries(
     std::vector<BSONObj> aggResult = runCatalogAggregation(opCtx, aggRequest, readConcern);
 
     uassert(ErrorCodes::NamespaceNotFound,
-            str::stream() << "Collection " << nss.ns() << " not found",
+            str::stream() << "Collection " << nss.toStringForErrorMsg() << " not found",
             !aggResult.empty());
 
     uassert(6958800,
-            str::stream() << "More than one collection for ns " << nss.ns() << " found",
+            str::stream() << "More than one collection for ns " << nss.toStringForErrorMsg()
+                          << " found",
             aggResult.size() == 1);
 
     boost::optional<CollectionType> coll;

@@ -241,7 +241,7 @@ void KeyStringIndexConsistency::repairIndexEntries(OperationContext* opCtx,
                                     << results->numDocumentsMovedToLostAndFound +
                                         results->numOutdatedMissingIndexEntry
                                     << " missing index entries. Removed documents can be found in '"
-                                    << lostAndFoundNss.ns() << "'.");
+                                    << lostAndFoundNss.toStringForErrorMsg() << "'.");
     }
 }
 
@@ -982,7 +982,7 @@ void KeyStringIndexConsistency::traverseRecord(OperationContext* opCtx,
             LOGV2(4614700,
                   "Index set to multikey",
                   "indexName"_attr = descriptor->indexName(),
-                  "collection"_attr = coll->ns().ns());
+                  "collection"_attr = coll->ns());
             results->warnings.push_back(str::stream() << "Index " << descriptor->indexName()
                                                       << " set to multikey.");
             results->repaired = true;
@@ -1019,7 +1019,7 @@ void KeyStringIndexConsistency::traverseRecord(OperationContext* opCtx,
                 LOGV2(4614701,
                       "Multikey paths updated to cover multikey document",
                       "indexName"_attr = descriptor->indexName(),
-                      "collection"_attr = coll->ns().ns());
+                      "collection"_attr = coll->ns());
                 results->warnings.push_back(str::stream() << "Index " << descriptor->indexName()
                                                           << " multikey paths updated.");
                 results->repaired = true;

@@ -885,7 +885,8 @@ ExecutorFuture<repl::OpTime> ShardSplitDonorService::DonorStateMachine::_updateS
 
                if (!isInsert) {
                    uassert(ErrorCodes::NamespaceNotFound,
-                           str::stream() << _stateDocumentsNS.ns() << " does not exist",
+                           str::stream()
+                               << _stateDocumentsNS.toStringForErrorMsg() << " does not exist",
                            collection);
                }
 

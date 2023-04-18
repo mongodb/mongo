@@ -593,7 +593,7 @@ void UpdateStage::doRestoreStateRequiresCollection() {
     if (userInitiatedWritesAndNotPrimary) {
         uasserted(ErrorCodes::PrimarySteppedDown,
                   str::stream() << "Demoted from primary while performing update on "
-                                << nsString.ns());
+                                << nsString.toStringForErrorMsg());
     }
 
     // The set of indices may have changed during yield. Make sure that the update driver has up to

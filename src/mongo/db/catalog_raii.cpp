@@ -63,12 +63,14 @@ void verifyDbAndCollection(OperationContext* opCtx,
                            Database* db,
                            bool verifyWriteEligible) {
     invariant(!nsOrUUID.uuid() || coll,
-              str::stream() << "Collection for " << resolvedNss.ns()
-                            << " disappeared after successfully resolving " << nsOrUUID.toString());
+              str::stream() << "Collection for " << resolvedNss.toStringForErrorMsg()
+                            << " disappeared after successfully resolving "
+                            << nsOrUUID.toStringForErrorMsg());
 
     invariant(!nsOrUUID.uuid() || db,
-              str::stream() << "Database for " << resolvedNss.ns()
-                            << " disappeared after successfully resolving " << nsOrUUID.toString());
+              str::stream() << "Database for " << resolvedNss.toStringForErrorMsg()
+                            << " disappeared after successfully resolving "
+                            << nsOrUUID.toStringForErrorMsg());
 
     // In most cases we expect modifications for system.views to upgrade MODE_IX to MODE_X before
     // taking the lock. One exception is a query by UUID of system.views in a transaction. Usual
@@ -89,16 +91,17 @@ void verifyDbAndCollection(OperationContext* opCtx,
         verifyWriteEligible) {
         auto latest = CollectionCatalog::latest(opCtx);
         if (!latest->containsCollection(opCtx, coll)) {
-            throwWriteConflictException(str::stream()
-                                        << "Unable to write to collection '" << coll->ns()
-                                        << "' due to catalog changes; please "
-                                           "retry the operation");
+            throwWriteConflictException(str::stream() << "Unable to write to collection '"
+                                                      << coll->ns().toStringForErrorMsg()
+                                                      << "' due to catalog changes; please "
+                                                         "retry the operation");
         }
         if (opCtx->recoveryUnit()->isActive()) {
             const auto mySnapshot = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
             if (mySnapshot && *mySnapshot < coll->getMinimumValidSnapshot()) {
                 throwWriteConflictException(str::stream()
-                                            << "Unable to write to collection '" << coll->ns()
+                                            << "Unable to write to collection '"
+                                            << coll->ns().toStringForErrorMsg()
                                             << "' due to snapshot timestamp " << *mySnapshot
                                             << " being older than collection minimum "
                                             << *coll->getMinimumValidSnapshot()
@@ -376,13 +379,13 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
         // namespace were a view, the collection UUID mismatch check would have failed above.
         if ((_view = catalog->lookupView(opCtx, _resolvedNss))) {
             uassert(ErrorCodes::CommandNotSupportedOnView,
-                    str::stream() << "Taking " << _resolvedNss.ns()
+                    str::stream() << "Taking " << _resolvedNss.toStringForErrorMsg()
                                   << " lock for timeseries is not allowed",
                     viewMode == auto_get_collection::ViewMode::kViewsPermitted ||
                         !_view->timeseries());
 
             uassert(ErrorCodes::CommandNotSupportedOnView,
-                    str::stream() << "Namespace " << _resolvedNss.ns()
+                    str::stream() << "Namespace " << _resolvedNss.toStringForErrorMsg()
                                   << " is a view, not a collection",
                     viewMode == auto_get_collection::ViewMode::kViewsPermitted);
 
@@ -390,7 +393,7 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
                                     *receivedShardVersion,
                                     ShardVersion::UNSHARDED() /* wantedVersion */,
                                     ShardingState::get(opCtx)->shardId()),
-                    str::stream() << "Namespace " << _resolvedNss
+                    str::stream() << "Namespace " << _resolvedNss.toStringForErrorMsg()
                                   << " is a view therefore the shard "
                                   << "version attached to the request must be unset or UNSHARDED",
                     !receivedShardVersion || *receivedShardVersion == ShardVersion::UNSHARDED());
@@ -415,7 +418,8 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
                             *receivedShardVersion,
                             boost::none /* wantedVersion */,
                             ShardingState::get(opCtx)->shardId()),
-            str::stream() << "No metadata for namespace " << _resolvedNss << " therefore the shard "
+            str::stream() << "No metadata for namespace " << _resolvedNss.toStringForErrorMsg()
+                          << " therefore the shard "
                           << "version attached to the request must be unset, UNSHARDED or IGNORED",
             !receivedShardVersion || *receivedShardVersion == ShardVersion::UNSHARDED() ||
                 ShardVersion::isPlacementVersionIgnored(*receivedShardVersion));
@@ -512,12 +516,13 @@ AutoGetCollectionLockFree::AutoGetCollectionLockFree(OperationContext* opCtx,
     invariant(!options._expectedUUID);
     _view = catalog->lookupView(opCtx, _resolvedNss);
     uassert(ErrorCodes::CommandNotSupportedOnView,
-            str::stream() << "Taking " << _resolvedNss.ns()
+            str::stream() << "Taking " << _resolvedNss.toStringForErrorMsg()
                           << " lock for timeseries is not allowed",
             !_view || viewMode == auto_get_collection::ViewMode::kViewsPermitted ||
                 !_view->timeseries());
     uassert(ErrorCodes::CommandNotSupportedOnView,
-            str::stream() << "Namespace " << _resolvedNss.ns() << " is a view, not a collection",
+            str::stream() << "Namespace " << _resolvedNss.toStringForErrorMsg()
+                          << " is a view, not a collection",
             !_view || viewMode == auto_get_collection::ViewMode::kViewsPermitted);
     if (_view) {
         // We are about to succeed setup as a view. No LockFree state was setup so do not mark the

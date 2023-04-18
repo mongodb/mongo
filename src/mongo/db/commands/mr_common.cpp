@@ -72,7 +72,8 @@ Status interpretTranslationError(DBException* ex, const MapReduceCommandRequest&
     std::string error;
     switch (static_cast<int>(ex->code())) {
         case ErrorCodes::InvalidNamespace:
-            error = "Invalid output namespace {} for MapReduce"_format(outNss.ns());
+            error =
+                "Invalid output namespace {} for MapReduce"_format(outNss.toStringForErrorMsg());
             break;
         case 15976:
             error = "The mapReduce sort option must have at least one sort key";
@@ -325,7 +326,7 @@ OutputOptions parseOutputOptions(StringData dbname, const BSONObj& cmdObj) {
         const StringData outDb(outputOptions.outDB.empty() ? dbname : outputOptions.outDB);
         const NamespaceString nss(outDb, outputOptions.collectionName);
         uassert(ErrorCodes::InvalidNamespace,
-                str::stream() << "Invalid 'out' namespace: " << nss.ns(),
+                str::stream() << "Invalid 'out' namespace: " << nss.toStringForErrorMsg(),
                 nss.isValid());
         outputOptions.finalNamespace = std::move(nss);
     }
@@ -370,7 +371,8 @@ Status checkAuthForMapReduce(const BasicCommand* commandTemplate,
         ResourcePattern outputResource(
             ResourcePattern::forExactNamespace(NamespaceString(outputOptions.finalNamespace)));
         uassert(ErrorCodes::InvalidNamespace,
-                str::stream() << "Invalid target namespace " << outputResource.ns().ns(),
+                str::stream() << "Invalid target namespace "
+                              << outputResource.ns().toStringForErrorMsg(),
                 outputResource.ns().isValid());
 
         // TODO: check if outputNs exists and add createCollection privilege if not

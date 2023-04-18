@@ -330,7 +330,7 @@ void assertNoMovePrimaryInProgress(OperationContext* opCtx, const NamespaceStrin
                 LOGV2(4909200, "assertNoMovePrimaryInProgress", logAttrs(nss));
 
                 uasserted(ErrorCodes::MovePrimaryInProgress,
-                          "movePrimary is in progress for namespace " + nss.toString());
+                          "movePrimary is in progress for namespace " + nss.toStringForErrorMsg());
             }
         }
     } catch (const DBException& ex) {
@@ -406,8 +406,8 @@ void runCreateIndexesOnNewCollection(OperationContext* opCtx,
     invariant(opCtx->inMultiDocumentTransaction() || createCollImplicitly);
 
     uassert(ErrorCodes::OperationNotSupportedInTransaction,
-            str::stream() << "Cannot create new indexes on non-empty collection " << ns
-                          << " in a multi-document transaction.",
+            str::stream() << "Cannot create new indexes on non-empty collection "
+                          << ns.toStringForErrorMsg() << " in a multi-document transaction.",
             collection->isEmpty(opCtx));
 
     const int numIndexesBefore =
@@ -453,12 +453,12 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
     // was optimized to not update indexes. The only exception is the partial index used to support
     // retryable transactions that the sessions code knows how to handle.
     uassert(ErrorCodes::IllegalOperation,
-            str::stream() << "not allowed to create index on " << ns.ns(),
+            str::stream() << "not allowed to create index on " << ns.toStringForErrorMsg(),
             ns != NamespaceString::kSessionTransactionsTableNamespace ||
                 isCreatingInternalConfigTxnsPartialIndex(cmd));
 
     uassert(ErrorCodes::OperationNotSupportedInTransaction,
-            str::stream() << "Cannot write to system collection " << ns.toString()
+            str::stream() << "Cannot write to system collection " << ns.toStringForErrorMsg()
                           << " within a transaction.",
             !opCtx->inMultiDocumentTransaction() || !ns.isSystem());
 
@@ -491,7 +491,8 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
 
         if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, ns)) {
             uasserted(ErrorCodes::NotWritablePrimary,
-                      str::stream() << "Not primary while creating indexes in " << ns.ns());
+                      str::stream()
+                          << "Not primary while creating indexes in " << ns.toStringForErrorMsg());
         }
 
         bool indexExists = writeConflictRetry(opCtx, "createCollectionWithIndexes", ns.ns(), [&] {
@@ -534,8 +535,8 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
         // builds coordinator and take an exclusive lock. We should not take exclusive locks inside
         // of transactions, so we fail early here if we are inside of a transaction.
         uassert(ErrorCodes::OperationNotSupportedInTransaction,
-                str::stream() << "Cannot create new indexes on existing collection " << ns
-                              << " in a multi-document transaction.",
+                str::stream() << "Cannot create new indexes on existing collection "
+                              << ns.toStringForErrorMsg() << " in a multi-document transaction.",
                 !opCtx->inMultiDocumentTransaction());
     }
 
@@ -682,8 +683,9 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
         }
 
         // All other errors should be forwarded to the caller with index build information included.
-        ex.addContext(str::stream() << "Index build failed: " << buildUUID << ": Collection " << ns
-                                    << " ( " << *collectionUUID << " )");
+        ex.addContext(str::stream()
+                      << "Index build failed: " << buildUUID << ": Collection "
+                      << ns.toStringForErrorMsg() << " ( " << *collectionUUID << " )");
 
         // Set last op on error to provide the client with a specific optime to read the state of
         // the server when the createIndexes command failed.

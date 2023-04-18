@@ -63,7 +63,7 @@ CollectionPlacementAndIndexInfo checkCollectionIdentity(
                             ShardVersionPlacementIgnoredNoIndexes() /* receivedVersion */,
                             boost::none /* wantedVersion */,
                             shardId),
-            str::stream() << "Collection " << nss.ns() << " needs to be recovered",
+            str::stream() << "Collection " << nss.toStringForErrorMsg() << " needs to be recovered",
             optMetadata);
 
     auto metadata = *optMetadata;
@@ -72,7 +72,7 @@ CollectionPlacementAndIndexInfo checkCollectionIdentity(
                             ShardVersionPlacementIgnoredNoIndexes() /* receivedVersion */,
                             ShardVersion::UNSHARDED() /* wantedVersion */,
                             shardId),
-            str::stream() << "Collection " << nss.ns() << " is not sharded",
+            str::stream() << "Collection " << nss.toStringForErrorMsg() << " is not sharded",
             metadata.isSharded());
 
     uassert(ErrorCodes::NamespaceNotFound,
@@ -87,7 +87,7 @@ CollectionPlacementAndIndexInfo checkCollectionIdentity(
                             ShardVersionPlacementIgnoredNoIndexes() /* receivedVersion */,
                             shardVersion /* wantedVersion */,
                             shardId),
-            str::stream() << "Collection " << nss.ns()
+            str::stream() << "Collection " << nss.toStringForErrorMsg()
                           << " has changed since operation was sent (sent epoch: " << expectedEpoch
                           << ", current epoch: " << placementVersion.epoch() << ")",
             expectedEpoch == placementVersion.epoch() &&
@@ -120,8 +120,8 @@ void checkShardKeyPattern(OperationContext* opCtx,
                             shardVersion /* wantedVersion */,
                             shardId),
             str::stream() << "The range " << chunkRange.toString()
-                          << " is not valid for collection " << nss.ns() << " with key pattern "
-                          << keyPattern.toString(),
+                          << " is not valid for collection " << nss.toStringForErrorMsg()
+                          << " with key pattern " << keyPattern.toString(),
             metadata.isValidKey(chunkRange.getMin()) && metadata.isValidKey(chunkRange.getMax()));
 }
 

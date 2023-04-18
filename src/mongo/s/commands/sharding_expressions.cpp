@@ -398,7 +398,7 @@ Value ExpressionInternalOwningShard::evaluate(const Document& root, Variables* v
                                   boost::none /* wanted */,
                                   ShardingState::get(opCtx)->shardId()),
                   str::stream()
-                      << "Sharding information of collection " << ns
+                      << "Sharding information of collection " << ns.toStringForErrorMsg()
                       << " is currently stale and needs to be recovered from the config server");
     }
 

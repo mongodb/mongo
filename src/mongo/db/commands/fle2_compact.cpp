@@ -112,8 +112,9 @@ StatusWith<EncryptedStateCollectionsNamespaces>
 EncryptedStateCollectionsNamespaces::createFromDataCollection(const Collection& edc) {
     if (!edc.getCollectionOptions().encryptedFieldConfig) {
         return Status(ErrorCodes::BadValue,
-                      str::stream() << "Encrypted data collection " << edc.ns()
-                                    << " is missing encrypted fields metadata");
+                      str::stream()
+                          << "Encrypted data collection " << edc.ns().toStringForErrorMsg()
+                          << " is missing encrypted fields metadata");
     }
 
     auto& cfg = *(edc.getCollectionOptions().encryptedFieldConfig);
@@ -136,7 +137,7 @@ EncryptedStateCollectionsNamespaces::createFromDataCollection(const Collection& 
     if (!missingColl.empty()) {
         return Status(ErrorCodes::BadValue,
                       str::stream()
-                          << "Encrypted data collection " << edc.ns()
+                          << "Encrypted data collection " << edc.ns().toStringForErrorMsg()
                           << " is missing the name of its " << missingColl << " collection");
     }
 

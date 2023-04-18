@@ -814,7 +814,8 @@ void ReplicationRecoveryImpl::_truncateOplogTo(OperationContext* opCtx,
         fassertFailedWithStatusNoTrace(
             34418,
             Status(ErrorCodes::NamespaceNotFound,
-                   str::stream() << "Can't find " << NamespaceString::kRsOplogNamespace.ns()));
+                   str::stream() << "Can't find "
+                                 << NamespaceString::kRsOplogNamespace.toStringForErrorMsg()));
     }
 
     // Find an oplog entry <= truncateAfterTimestamp.

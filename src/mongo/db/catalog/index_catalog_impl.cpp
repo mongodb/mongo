@@ -269,8 +269,8 @@ void IndexCatalogImpl::init(OperationContext* opCtx,
                 // single-phase index builds are dropped during startup and rollback.
                 auto buildUUID = collection->getIndexBuildUUID(indexName);
                 invariant(buildUUID,
-                          str::stream()
-                              << "collection: " << collection->ns() << "index:" << indexName);
+                          str::stream() << "collection: " << collection->ns().toStringForErrorMsg()
+                                        << "index:" << indexName);
             }
 
             // We intentionally do not drop or rebuild unfinished two-phase index builds before
@@ -645,7 +645,8 @@ StatusWith<BSONObj> IndexCatalogImpl::createIndexOnEmptyCollection(OperationCont
     invariant(collection->uuid() == collection->uuid());
     CollectionCatalog::get(opCtx)->invariantHasExclusiveAccessToCollection(opCtx, collection->ns());
     invariant(collection->isEmpty(opCtx),
-              str::stream() << "Collection must be empty. Collection: " << collection->ns()
+              str::stream() << "Collection must be empty. Collection: "
+                            << collection->ns().toStringForErrorMsg()
                             << " UUID: " << collection->uuid()
                             << " Count (from size storer): " << collection->numRecords(opCtx));
 
@@ -1182,8 +1183,8 @@ Status IndexCatalogImpl::_doesSpecConflictWithExisting(OperationContext* opCtx,
     }
 
     if (numIndexesTotal() >= kMaxNumIndexesAllowed) {
-        string s = str::stream() << "add index fails, too many indexes for " << collection->ns()
-                                 << " key:" << key;
+        string s = str::stream() << "add index fails, too many indexes for "
+                                 << collection->ns().toStringForErrorMsg() << " key:" << key;
         LOGV2(20354,
               "Exceeded maximum number of indexes",
               logAttrs(collection->ns()),
@@ -1851,9 +1852,9 @@ Status IndexCatalogImpl::indexRecords(OperationContext* opCtx,
                                        IndexCatalog::InclusionPolicy::kUnfinished);
         if (!idx) {
             return Status(ErrorCodes::IndexNotFound,
-                          str::stream()
-                              << "Could not find index " << newPath.indexName << " in "
-                              << coll->ns() << " (" << coll->uuid() << ") to set to multikey.");
+                          str::stream() << "Could not find index " << newPath.indexName << " in "
+                                        << coll->ns().toStringForErrorMsg() << " (" << coll->uuid()
+                                        << ") to set to multikey.");
         }
         setMultikeyPaths(opCtx, coll, idx, newPath.multikeyMetadataKeys, newPath.multikeyPaths);
     }

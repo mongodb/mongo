@@ -76,7 +76,7 @@ public:
         const NamespaceString nss(
             NamespaceStringUtil::parseNamespaceFromRequest(dbName, nssElt.valueStringData()));
         uassert(ErrorCodes::InvalidNamespace,
-                str::stream() << "Invalid target namespace: " << nss.ns(),
+                str::stream() << "Invalid target namespace: " << nss.toStringForErrorMsg(),
                 nss.isValid());
 
         if (!as->isAuthorizedForActionsOnResource(

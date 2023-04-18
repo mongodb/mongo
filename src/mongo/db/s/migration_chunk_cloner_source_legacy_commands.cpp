@@ -73,7 +73,7 @@ public:
         _autoColl.emplace(opCtx, *nss, MODE_IS);
 
         uassert(ErrorCodes::NamespaceNotFound,
-                str::stream() << "Collection " << nss->ns() << " does not exist",
+                str::stream() << "Collection " << nss->toStringForErrorMsg() << " does not exist",
                 _autoColl->getCollection());
 
         {
@@ -84,8 +84,8 @@ public:
                 invariant(_chunkCloner);
             } else {
                 uasserted(ErrorCodes::IllegalOperation,
-                          str::stream()
-                              << "No active migrations were found for collection " << nss->ns());
+                          str::stream() << "No active migrations were found for collection "
+                                        << nss->toStringForErrorMsg());
             }
         }
 

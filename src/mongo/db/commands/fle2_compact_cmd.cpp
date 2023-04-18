@@ -108,7 +108,8 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
                 "Cannot compact structured encryption data on a view",
                 !catalog->lookupView(opCtx, edcNss));
         uasserted(ErrorCodes::NamespaceNotFound,
-                  str::stream() << "Collection '" << edcNss << "' does not exist");
+                  str::stream() << "Collection '" << edcNss.toStringForErrorMsg()
+                                << "' does not exist");
     }
 
     validateCompactRequest(request, *edc);
@@ -183,7 +184,7 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
 
         uassert(ErrorCodes::NamespaceNotFound,
                 str::stream() << "Renamed encrypted compaction collection "
-                              << namespaces.ecocRenameNss
+                              << namespaces.ecocRenameNss.toStringForErrorMsg()
                               << " no longer exists prior to compaction",
                 tempEcocColl.getCollection());
 

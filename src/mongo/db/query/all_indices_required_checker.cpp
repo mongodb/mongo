@@ -62,7 +62,7 @@ void AllIndicesRequiredChecker::checkIndicesForCollection(OperationContext* opCt
         auto indexDesc = collection->getIndexCatalog()->findIndexByIdent(opCtx, ident);
         uassert(ErrorCodes::QueryPlanKilled,
                 str::stream() << "query plan killed :: index '" << nameRef << "' for collection '"
-                              << collection->ns() << "' dropped",
+                              << collection->ns().toStringForErrorMsg() << "' dropped",
                 indexDesc && !indexDesc->getEntry()->isDropped());
     }
 }

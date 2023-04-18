@@ -60,9 +60,10 @@ void SessionsCollectionStandalone::setupSessionsCollection(OperationContext* opC
 
         BSONObj info;
         if (!client.runCommand(NamespaceString::kLogicalSessionsNamespace.dbName(), cmd, info)) {
-            uassertStatusOKWithContext(getStatusFromCommandResult(info),
-                                       str::stream() << "Failed to create "
-                                                     << NamespaceString::kLogicalSessionsNamespace);
+            uassertStatusOKWithContext(
+                getStatusFromCommandResult(info),
+                str::stream() << "Failed to create "
+                              << NamespaceString::kLogicalSessionsNamespace.toStringForErrorMsg());
         }
     }
 }
@@ -76,7 +77,8 @@ void SessionsCollectionStandalone::checkSessionsCollectionExists(OperationContex
         NamespaceString::kLogicalSessionsNamespace, includeBuildUUIDs, options);
 
     uassert(ErrorCodes::NamespaceNotFound,
-            str::stream() << NamespaceString::kLogicalSessionsNamespace << " does not exist",
+            str::stream() << NamespaceString::kLogicalSessionsNamespace.toStringForErrorMsg()
+                          << " does not exist",
             indexes.size() != 0u);
 
     auto index = std::find_if(indexes.begin(), indexes.end(), [](const BSONObj& index) {
@@ -84,12 +86,12 @@ void SessionsCollectionStandalone::checkSessionsCollectionExists(OperationContex
     });
 
     uassert(ErrorCodes::IndexNotFound,
-            str::stream() << NamespaceString::kLogicalSessionsNamespace
+            str::stream() << NamespaceString::kLogicalSessionsNamespace.toStringForErrorMsg()
                           << " does not have the required TTL index",
             index != indexes.end());
 
     uassert(ErrorCodes::IndexOptionsConflict,
-            str::stream() << NamespaceString::kLogicalSessionsNamespace
+            str::stream() << NamespaceString::kLogicalSessionsNamespace.toStringForErrorMsg()
                           << " currently has the incorrect timeout for the TTL index",
             index->hasField("expireAfterSeconds") &&
                 index->getField("expireAfterSeconds").Int() ==

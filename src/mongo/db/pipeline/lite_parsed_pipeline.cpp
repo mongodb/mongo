@@ -135,7 +135,7 @@ void LiteParsedPipeline::verifyIsSupported(
     // Verify that no involved namespace is sharded unless allowed by the pipeline.
     for (const auto& nss : getInvolvedNamespaces()) {
         uassert(28769,
-                str::stream() << nss.ns() << " cannot be sharded",
+                str::stream() << nss.toStringForErrorMsg() << " cannot be sharded",
                 allowShardedForeignCollection(nss, inMultiDocumentTransaction) ||
                     !isSharded(opCtx, nss));
     }

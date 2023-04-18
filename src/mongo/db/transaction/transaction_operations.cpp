@@ -317,7 +317,7 @@ std::size_t TransactionOperations::logOplogEntries(
 
         if (imageToWrite) {
             uassert(6054002,
-                    str::stream() << NamespaceString::kConfigImagesNamespace
+                    str::stream() << NamespaceString::kConfigImagesNamespace.toStringForErrorMsg()
                                   << " can only store the pre or post image of one "
                                      "findAndModify operation for each "
                                      "transaction",

@@ -111,7 +111,8 @@ public:
             const NamespaceString& ns = request().getNamespace();
 
             uassert(ErrorCodes::Unauthorized,
-                    str::stream() << "Not authorized to call analyze on collection " << ns,
+                    str::stream() << "Not authorized to call analyze on collection "
+                                  << ns.toStringForErrorMsg(),
                     authzSession->isAuthorizedForActionsOnNamespace(ns, ActionType::analyze));
         }
     };

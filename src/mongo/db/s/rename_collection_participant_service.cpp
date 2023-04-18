@@ -86,7 +86,7 @@ void renameOrDropTarget(OperationContext* opCtx,
                 return;
             }
             uassert(5807602,
-                    str::stream() << "Target collection " << toNss
+                    str::stream() << "Target collection " << toNss.toStringForErrorMsg()
                                   << " UUID does not match the provided UUID.",
                     !targetUUID || targetCollPtr->uuid() == *targetUUID);
         }
@@ -99,7 +99,7 @@ void renameOrDropTarget(OperationContext* opCtx,
         const auto sourceCollPtr =
             CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, fromNss);
         uassert(ErrorCodes::CommandFailed,
-                str::stream() << "Source Collection " << fromNss
+                str::stream() << "Source Collection " << fromNss.toStringForErrorMsg()
                               << " UUID does not match provided uuid.",
                 !sourceCollPtr || sourceCollPtr->uuid() == sourceUUID);
     }

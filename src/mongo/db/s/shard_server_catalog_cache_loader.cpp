@@ -184,7 +184,7 @@ ChunkVersion getPersistedMaxChunkVersion(OperationContext* opCtx, const Namespac
     uassertStatusOKWithContext(statusWithCollection,
                                str::stream()
                                    << "Failed to read persisted collections entry for collection '"
-                                   << nss.ns() << "'.");
+                                   << nss.toStringForErrorMsg() << "'.");
 
     auto cachedCollection = statusWithCollection.getValue();
     if (cachedCollection.getRefreshing() && *cachedCollection.getRefreshing()) {
@@ -208,7 +208,7 @@ ChunkVersion getPersistedMaxChunkVersion(OperationContext* opCtx, const Namespac
     uassertStatusOKWithContext(
         statusWithChunk,
         str::stream() << "Failed to read highest version persisted chunk for collection '"
-                      << nss.ns() << "'.");
+                      << nss.toStringForErrorMsg() << "'.");
 
     return statusWithChunk.getValue().empty() ? ChunkVersion::UNSHARDED()
                                               : statusWithChunk.getValue().front().getVersion();
@@ -442,7 +442,7 @@ SemiFuture<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::getChunksS
     // unavailable, unnecessarily reducing availability.
     if (nss.isNamespaceAlwaysUnsharded()) {
         return Status(ErrorCodes::NamespaceNotFound,
-                      str::stream() << "Collection " << nss.ns() << " not found");
+                      str::stream() << "Collection " << nss.toStringForErrorMsg() << " not found");
     }
 
     bool isPrimary;
@@ -527,7 +527,8 @@ void ShardServerCatalogCacheLoader::waitForCollectionFlush(OperationContext* opC
 
     while (true) {
         uassert(ErrorCodes::NotWritablePrimary,
-                str::stream() << "Unable to wait for collection metadata flush for " << nss.ns()
+                str::stream() << "Unable to wait for collection metadata flush for "
+                              << nss.toStringForErrorMsg()
                               << " because the node's replication role changed.",
                 _role == ReplicaSetRole::Primary && _term == initialTerm);
 
@@ -755,7 +756,7 @@ ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
             {collAndChunks.epoch, collAndChunks.timestamp})) {
         return Status{ErrorCodes::ConflictingOperationInProgress,
                       str::stream()
-                          << "Invalid chunks found when reloading '" << nss.toString()
+                          << "Invalid chunks found when reloading '" << nss.toStringForErrorMsg()
                           << "' Previous collection timestamp was '" << collAndChunks.timestamp
                           << "', but found a new timestamp '"
                           << collAndChunks.changedChunks.back().getVersion().getTimestamp()
@@ -808,12 +809,13 @@ ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
         // to attempt the refresh as secondary instead of failing the operation
         return Status(ErrorCodes::ConflictingOperationInProgress,
                       str::stream() << "Replication stepdown occurred during refresh for  '"
-                                    << nss.toString());
+                                    << nss.toStringForErrorMsg());
     }
 
     // After finding metadata remotely, we must have found metadata locally.
     tassert(7032350,
-            str::stream() << "No chunks metadata found for collection '" << nss
+            str::stream() << "No chunks metadata found for collection '"
+                          << nss.toStringForErrorMsg()
                           << "' despite the config server returned actual information",
             !collAndChunks.changedChunks.empty());
 
@@ -1246,8 +1248,8 @@ void ShardServerCatalogCacheLoader::_updatePersistedCollAndChunksMetadata(
         // The namespace was dropped. The persisted metadata for the collection must be cleared.
         uassertStatusOKWithContext(
             dropChunksAndDeleteCollectionsEntry(opCtx, nss),
-            str::stream() << "Failed to clear persisted chunk metadata for collection '" << nss.ns()
-                          << "'. Will be retried.");
+            str::stream() << "Failed to clear persisted chunk metadata for collection '"
+                          << nss.toStringForErrorMsg() << "'. Will be retried.");
         return;
     }
 
@@ -1255,8 +1257,8 @@ void ShardServerCatalogCacheLoader::_updatePersistedCollAndChunksMetadata(
         persistCollectionAndChangedChunks(
             opCtx, nss, *task.collectionAndChangedChunks, task.minQueryVersion),
         str::stream() << "Failed to update the persisted chunk metadata for collection '"
-                      << nss.ns() << "' from '" << task.minQueryVersion.toString() << "' to '"
-                      << task.maxQueryVersion.toString() << "'. Will be retried.");
+                      << nss.toStringForErrorMsg() << "' from '" << task.minQueryVersion.toString()
+                      << "' to '" << task.maxQueryVersion.toString() << "'. Will be retried.");
 
     LOGV2_FOR_CATALOG_REFRESH(
         24112,

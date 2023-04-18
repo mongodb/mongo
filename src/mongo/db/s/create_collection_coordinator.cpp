@@ -454,8 +454,9 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                     _result = createCollectionResponseOpt;
                     // Launch an exception to directly jump to the end of the continuation chain
                     uasserted(ErrorCodes::RequestAlreadyFulfilled,
-                              str::stream() << "The collection" << originalNss()
-                                            << "was already sharded by a past request");
+                              str::stream()
+                                  << "The collection" << originalNss().toStringForErrorMsg()
+                                  << "was already sharded by a past request");
                 }
             }
         })
@@ -703,7 +704,8 @@ CreateCollectionCoordinator::_checkIfCollectionAlreadyShardedWithSameOptions(
         }();
 
         uassert(ErrorCodes::AlreadyInitialized,
-                str::stream() << "sharding already enabled for collection " << originalNss(),
+                str::stream() << "sharding already enabled for collection "
+                              << originalNss().toStringForErrorMsg(),
                 requestMatchesExistingCollection);
 
         CreateCollectionResponse response(cri.getCollectionVersion());
@@ -756,7 +758,8 @@ CreateCollectionCoordinator::_checkIfCollectionAlreadyShardedWithSameOptions(
     }();
 
     uassert(ErrorCodes::AlreadyInitialized,
-            str::stream() << "sharding already enabled for collection " << bucketsNss,
+            str::stream() << "sharding already enabled for collection "
+                          << bucketsNss.toStringForErrorMsg(),
             requestMatchesExistingCollection);
 
     CreateCollectionResponse response(cri.getCollectionVersion());
@@ -786,7 +789,8 @@ void CreateCollectionCoordinator::_checkCommandArguments(OperationContext* opCtx
         // enabled.
         if (originalNss().isTimeseriesBucketsCollection()) {
             uassert(ErrorCodes::IllegalOperation,
-                    str::stream() << "can't shard time-series collection " << nss(),
+                    str::stream() << "can't shard time-series collection "
+                                  << nss().toStringForErrorMsg(),
                     feature_flags::gFeatureFlagShardedTimeSeries.isEnabled(
                         serverGlobalParams.featureCompatibility) ||
                         !timeseries::getTimeseriesOptions(opCtx, nss(), false));
@@ -861,7 +865,8 @@ TranslatedRequestParams CreateCollectionCoordinator::_translateRequestParameters
         const auto& resolvedNamespace = originalNss();
         performCheckOnCollectionUUID(resolvedNamespace);
         uassert(ErrorCodes::InvalidNamespace,
-                str::stream() << "Namespace too long. Namespace: " << resolvedNamespace
+                str::stream() << "Namespace too long. Namespace: "
+                              << resolvedNamespace.toStringForErrorMsg()
                               << " Max: " << NamespaceString::MaxNsShardedCollectionLen,
                 resolvedNamespace.size() <= NamespaceString::MaxNsShardedCollectionLen);
         return TranslatedRequestParams(
@@ -880,7 +885,8 @@ TranslatedRequestParams CreateCollectionCoordinator::_translateRequestParameters
                 serverGlobalParams.featureCompatibility));
 
     uassert(ErrorCodes::InvalidNamespace,
-            str::stream() << "Namespace too long. Namespace: " << resolvedNamespace
+            str::stream() << "Namespace too long. Namespace: "
+                          << resolvedNamespace.toStringForErrorMsg()
                           << " Max: " << NamespaceString::MaxNsShardedCollectionLen,
             resolvedNamespace.size() <= NamespaceString::MaxNsShardedCollectionLen);
 
@@ -891,7 +897,7 @@ TranslatedRequestParams CreateCollectionCoordinator::_translateRequestParameters
         }
 
         uassert(6159000,
-                str::stream() << "the collection '" << bucketsNs
+                str::stream() << "the collection '" << bucketsNs.toStringForErrorMsg()
                               << "' does not have 'timeseries' options",
                 existingBucketsColl->getTimeseriesOptions());
         return existingBucketsColl->getTimeseriesOptions();
@@ -900,7 +906,7 @@ TranslatedRequestParams CreateCollectionCoordinator::_translateRequestParameters
     if (_request.getTimeseries() && existingTimeseriesOptions) {
         uassert(5731500,
                 str::stream() << "the 'timeseries' spec provided must match that of exists '"
-                              << originalNss() << "' collection",
+                              << originalNss().toStringForErrorMsg() << "' collection",
                 timeseries::optionsAreEqual(*_request.getTimeseries(), *existingTimeseriesOptions));
     } else if (!_request.getTimeseries()) {
         _request.setTimeseries(existingTimeseriesOptions);
@@ -1050,7 +1056,7 @@ void CreateCollectionCoordinator::_createCollectionAndIndexes(
                 uasserted(ErrorCodes::NamespaceExists,
                           str::stream() << "A conflicting DDL operation was completed while trying "
                                            "to shard collection: "
-                                        << originalNss());
+                                        << originalNss().toStringForErrorMsg());
             }
         }
 
@@ -1180,17 +1186,17 @@ void CreateCollectionCoordinator::_createCollectionOnNonPrimaryShards(
         for (const auto& response : responses) {
             auto shardResponse = uassertStatusOKWithContext(
                 std::move(response.swResponse),
-                str::stream() << "Unable to create collection " << nss().ns() << " on "
-                              << response.shardId);
+                str::stream() << "Unable to create collection " << nss().toStringForErrorMsg()
+                              << " on " << response.shardId);
             auto status = getStatusFromCommandResult(shardResponse.data);
-            uassertStatusOK(status.withContext(str::stream()
-                                               << "Unable to create collection " << nss().ns()
-                                               << " on " << response.shardId));
+            uassertStatusOK(status.withContext(str::stream() << "Unable to create collection "
+                                                             << nss().toStringForErrorMsg()
+                                                             << " on " << response.shardId));
 
             auto wcStatus = getWriteConcernStatusFromCommandResult(shardResponse.data);
-            uassertStatusOK(wcStatus.withContext(str::stream()
-                                                 << "Unable to create collection " << nss().ns()
-                                                 << " on " << response.shardId));
+            uassertStatusOK(wcStatus.withContext(str::stream() << "Unable to create collection "
+                                                               << nss().toStringForErrorMsg()
+                                                               << " on " << response.shardId));
         }
     }
 }

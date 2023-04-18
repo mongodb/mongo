@@ -548,7 +548,7 @@ boost::optional<EncryptedFieldConfig> EncryptedDBClientBase::getEncryptedFieldCo
     const NamespaceString& nss) {
     auto collsList = _conn->getCollectionInfos(nss.dbName(), BSON("name" << nss.coll()));
     uassert(ErrorCodes::BadValue,
-            str::stream() << "Namespace not found: " << nss.toString(),
+            str::stream() << "Namespace not found: " << nss.toStringForErrorMsg(),
             !collsList.empty());
     auto info = collsList.front();
     auto opts = info.getField("options");

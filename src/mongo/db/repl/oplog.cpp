@@ -247,7 +247,8 @@ void createIndexForApplyOps(OperationContext* opCtx,
     auto indexCollection = CollectionPtr(
         db ? CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, indexNss) : nullptr);
     uassert(ErrorCodes::NamespaceNotFound,
-            str::stream() << "Failed to create index due to missing collection: " << indexNss.ns(),
+            str::stream() << "Failed to create index due to missing collection: "
+                          << indexNss.toStringForErrorMsg(),
             indexCollection);
 
     OpCounters* opCounters = opCtx->writesAreReplicated() ? &globalOpCounters : &replOpCounters;
@@ -263,12 +264,12 @@ void createIndexForApplyOps(OperationContext* opCtx,
     if (OplogApplication::Mode::kInitialSync == mode) {
         auto normalSpecs =
             indexBuildsCoordinator->normalizeIndexSpecs(opCtx, indexCollection, {indexSpec});
-        invariant(1U == normalSpecs.size(),
-                  str::stream() << "Unexpected result from normalizeIndexSpecs - ns: " << indexNss
-                                << "; uuid: " << indexCollection->uuid()
-                                << "; original index spec: " << indexSpec
-                                << "; normalized index specs: "
-                                << BSON("normalSpecs" << normalSpecs));
+        invariant(
+            1U == normalSpecs.size(),
+            str::stream() << "Unexpected result from normalizeIndexSpecs - ns: "
+                          << indexNss.toStringForErrorMsg() << "; uuid: " << indexCollection->uuid()
+                          << "; original index spec: " << indexSpec
+                          << "; normalized index specs: " << BSON("normalSpecs" << normalSpecs));
         auto indexCatalog = indexCollection->getIndexCatalog();
         auto prepareSpecResult =
             indexCatalog->prepareSpecForCreate(opCtx, indexCollection, normalSpecs[0], {});
@@ -286,8 +287,8 @@ void createIndexForApplyOps(OperationContext* opCtx,
     // the index build constraints to kRelax.
     invariant(ReplicationCoordinator::get(opCtx)->shouldRelaxIndexConstraints(opCtx, indexNss),
               str::stream() << "Unexpected result from shouldRelaxIndexConstraints - ns: "
-                            << indexNss << "; uuid: " << indexCollection->uuid()
-                            << "; original index spec: " << indexSpec);
+                            << indexNss.toStringForErrorMsg() << "; uuid: "
+                            << indexCollection->uuid() << "; original index spec: " << indexSpec);
     const auto constraints = IndexBuildsManager::IndexConstraints::kRelax;
 
     // Run single-phase builds synchronously with oplog batch application. For tenant migrations,
@@ -420,7 +421,7 @@ void _logOpsInner(OperationContext* opCtx,
     if (replCoord->getReplicationMode() == ReplicationCoordinator::modeReplSet &&
         !replCoord->canAcceptWritesFor(opCtx, nss)) {
         str::stream ss;
-        ss << "logOp() but can't accept write to collection " << nss;
+        ss << "logOp() but can't accept write to collection " << nss.toStringForErrorMsg();
         ss << ": entries: " << records->size() << ": [ ";
         for (const auto& record : *records) {
             ss << "(" << record.id << ", " << redact(record.data.toBson()) << ") ";
@@ -501,7 +502,7 @@ OpTime logOp(OperationContext* opCtx, MutableOplogEntry* oplogEntry) {
     if (replCoord->isOplogDisabledFor(opCtx, oplogEntry->getNss())) {
         uassert(ErrorCodes::IllegalOperation,
                 str::stream() << "retryable writes is not supported for unreplicated ns: "
-                              << oplogEntry->getNss().ns(),
+                              << oplogEntry->getNss().toStringForErrorMsg(),
                 oplogEntry->getStatementIds().empty());
         return {};
     }
@@ -579,7 +580,7 @@ std::vector<OpTime> logInsertOps(OperationContext* opCtx,
         invariant(!begin->stmtIds.empty());
         uassert(ErrorCodes::IllegalOperation,
                 str::stream() << "retryable writes is not supported for unreplicated ns: "
-                              << nss.ns(),
+                              << nss.toStringForErrorMsg(),
                 begin->stmtIds.front() == kUninitializedStmtId);
         return {};
     }
@@ -1495,7 +1496,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
         requestNss = op.getNss();
         invariant(requestNss.coll().size());
         dassert(opCtx->lockState()->isCollectionLockedForMode(requestNss, MODE_IX),
-                requestNss.ns());
+                requestNss.toStringForErrorMsg());
         collection = CollectionPtr(
             CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, requestNss));
     }
@@ -1525,7 +1526,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
     const IndexCatalog* indexCatalog = !collection ? nullptr : collection->getIndexCatalog();
     const bool haveWrappingWriteUnitOfWork = opCtx->lockState()->inAWriteUnitOfWork();
     uassert(ErrorCodes::CommandNotSupportedOnView,
-            str::stream() << "applyOps not supported on view: " << requestNss.ns(),
+            str::stream() << "applyOps not supported on view: " << requestNss.toStringForErrorMsg(),
             collection || !CollectionCatalog::get(opCtx)->lookupView(opCtx, requestNss));
 
     // Decide whether to timestamp the write with the 'ts' field found in the operation. In general,
@@ -2215,13 +2216,14 @@ Status applyCommand_inlock(OperationContext* opCtx,
 
     const auto& nss = op->getNss();
     if (!nss.isValid()) {
-        return {ErrorCodes::InvalidNamespace, "invalid ns: " + std::string(nss.ns())};
+        return {ErrorCodes::InvalidNamespace, "invalid ns: " + nss.toStringForErrorMsg()};
     }
     {
         auto catalog = CollectionCatalog::get(opCtx);
         if (!catalog->lookupCollectionByNamespace(opCtx, nss) && catalog->lookupView(opCtx, nss)) {
             return {ErrorCodes::CommandNotSupportedOnView,
-                    str::stream() << "applyOps not supported on view:" << nss.ns()};
+                    str::stream() << "applyOps not supported on view:"
+                                  << nss.toStringForErrorMsg()};
         }
     }
 

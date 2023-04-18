@@ -86,8 +86,8 @@ public:
                     opCtx, nss, repl::ReadConcernLevel::kLocalReadConcern);
             } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                 uasserted(ErrorCodes::NamespaceNotSharded,
-                          str::stream()
-                              << "refineCollectionShardKey namespace " << nss << " is not sharded");
+                          str::stream() << "refineCollectionShardKey namespace "
+                                        << nss.toStringForErrorMsg() << " is not sharded");
             }
 
             const ShardKeyPattern oldShardKeyPattern(collType.getKeyPattern());
@@ -102,7 +102,7 @@ public:
 
             uassert(ErrorCodes::StaleEpoch,
                     str::stream()
-                        << "refineCollectionShardKey namespace " << nss.toString()
+                        << "refineCollectionShardKey namespace " << nss.toStringForErrorMsg()
                         << " has a different epoch than mongos had in its routing table cache",
                     request().getEpoch() == collType.getEpoch());
 

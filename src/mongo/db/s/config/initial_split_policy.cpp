@@ -374,7 +374,8 @@ InitialSplitPolicy::ShardCollectionConfig AbstractTagsBasedSplitPolicy::createFi
         invariant(it != tagToShards.end());
         uassert(50973,
                 str::stream()
-                    << "Cannot shard collection " << tag.getNS() << " due to zone " << tag.getTag()
+                    << "Cannot shard collection " << tag.getNS().toStringForErrorMsg()
+                    << " due to zone " << tag.getTag()
                     << " which is not assigned to a shard. Please assign this zone to a shard.",
                 !it->second.empty());
 

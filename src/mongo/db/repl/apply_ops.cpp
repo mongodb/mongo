@@ -90,7 +90,7 @@ Status _applyOps(OperationContext* opCtx,
 
         // Need to check this here, or OldClientContext may fail an invariant.
         if (*opType != 'c' && !nss.isValid())
-            return {ErrorCodes::InvalidNamespace, "invalid ns: " + nss.ns()};
+            return {ErrorCodes::InvalidNamespace, "invalid ns: " + nss.toStringForErrorMsg()};
 
         Status status = Status::OK();
 
@@ -142,9 +142,10 @@ Status _applyOps(OperationContext* opCtx,
                         auto nssFromUuid = catalog->lookupNSSByUUID(opCtx, uuid);
                         if (nssFromUuid != nss) {
                             return Status{ErrorCodes::Error(3318200),
-                                          str::stream() << "Namespace '" << nss.ns()
-                                                        << "' and UUID '" << uuid.toString()
-                                                        << "' point to different collections"};
+                                          str::stream()
+                                              << "Namespace '" << nss.toStringForErrorMsg()
+                                              << "' and UUID '" << uuid.toString()
+                                              << "' point to different collections"};
                         }
                     }
 
@@ -156,9 +157,10 @@ Status _applyOps(OperationContext* opCtx,
                             return Status::OK();
                         }
                         uasserted(ErrorCodes::NamespaceNotFound,
-                                  str::stream() << "cannot apply insert or update operation on a "
-                                                   "non-existent namespace "
-                                                << nss.ns() << ": " << mongo::redact(opObj));
+                                  str::stream()
+                                      << "cannot apply insert or update operation on a "
+                                         "non-existent namespace "
+                                      << nss.toStringForErrorMsg() << ": " << mongo::redact(opObj));
                     }
 
                     OldClientContext ctx(opCtx, nss);

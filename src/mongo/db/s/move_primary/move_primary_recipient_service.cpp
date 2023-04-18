@@ -672,7 +672,8 @@ MovePrimaryRecipientService::MovePrimaryRecipient::_getCollectionsToClone(
     auto collectionsToCloneNSS = _getCollectionsToCloneNSS();
     AutoGetCollection autoColl(opCtx, collectionsToCloneNSS, MODE_IS);
     uassert(ErrorCodes::NamespaceNotFound,
-            str::stream() << "Collection '" << collectionsToCloneNSS << "' did not already exist",
+            str::stream() << "Collection '" << collectionsToCloneNSS.toStringForErrorMsg()
+                          << "' did not already exist",
             autoColl);
     auto cursor = autoColl->getCursor(opCtx);
     while (auto record = cursor->next()) {

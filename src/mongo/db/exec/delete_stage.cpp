@@ -347,7 +347,8 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
 void DeleteStage::doRestoreStateRequiresCollection() {
     const NamespaceString& ns = collection()->ns();
     uassert(ErrorCodes::PrimarySteppedDown,
-            str::stream() << "Demoted from primary while removing from " << ns.ns(),
+            str::stream() << "Demoted from primary while removing from "
+                          << ns.toStringForErrorMsg(),
             !opCtx()->writesAreReplicated() ||
                 repl::ReplicationCoordinator::get(opCtx())->canAcceptWritesFor(opCtx(), ns));
 

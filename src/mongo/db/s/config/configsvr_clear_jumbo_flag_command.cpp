@@ -71,12 +71,13 @@ public:
                     opCtx, nss, repl::ReadConcernLevel::kLocalReadConcern);
             } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
                 uasserted(ErrorCodes::NamespaceNotSharded,
-                          str::stream() << "clearJumboFlag namespace " << nss << " is not sharded");
+                          str::stream() << "clearJumboFlag namespace " << nss.toStringForErrorMsg()
+                                        << " is not sharded");
             }
 
             uassert(ErrorCodes::StaleEpoch,
                     str::stream()
-                        << "clearJumboFlag namespace " << nss.toString()
+                        << "clearJumboFlag namespace " << nss.toStringForErrorMsg()
                         << " has a different epoch than mongos had in its routing table cache",
                     request().getEpoch() == collType.getEpoch());
 

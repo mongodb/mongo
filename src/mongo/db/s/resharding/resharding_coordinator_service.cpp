@@ -834,7 +834,7 @@ void insertCoordDocAndChangeOrigCollEntry(OperationContext* opCtx,
 
             uassert(5808200,
                     str::stream() << "config.collection entry not found for "
-                                  << coordinatorDoc.getSourceNss().ns(),
+                                  << coordinatorDoc.getSourceNss().toStringForErrorMsg(),
                     doc);
 
             CollectionType configCollDoc(*doc);
@@ -1149,13 +1149,14 @@ void ReshardingCoordinatorService::checkIfConflictsWithOtherInstances(
         iassert(ErrorCodes::ConflictingOperationInProgress,
                 str::stream() << "Only one resharding operation is allowed to be active at a "
                                  "time, aborting resharding op for "
-                              << coordinatorDoc.getSourceNss(),
+                              << coordinatorDoc.getSourceNss().toStringForErrorMsg(),
                 isNssSame && isReshardingKeySame);
 
         iasserted(ReshardingCoordinatorServiceConflictingOperationInProgressInfo(
                       typedInstance->shared_from_this()),
                   str::stream() << "Found an active resharding operation for "
-                                << coordinatorDoc.getSourceNss() << " with resharding key "
+                                << coordinatorDoc.getSourceNss().toStringForErrorMsg()
+                                << " with resharding key "
                                 << coordinatorDoc.getReshardingKey().toString());
     }
 }

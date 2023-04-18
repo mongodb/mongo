@@ -331,8 +331,9 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
         auto resolveViewDefinition = [&](const NamespaceString& ns) -> Status {
             auto resolvedView = view_catalog_helpers::resolveView(opCtx, catalog, ns, boost::none);
             if (!resolvedView.isOK()) {
-                return resolvedView.getStatus().withContext(
-                    str::stream() << "Failed to resolve view '" << involvedNs.ns());
+                return resolvedView.getStatus().withContext(str::stream()
+                                                            << "Failed to resolve view '"
+                                                            << involvedNs.toStringForErrorMsg());
             }
 
             auto&& underlyingNs = resolvedView.getValue().getNamespace();
@@ -426,7 +427,7 @@ Status collatorCompatibleWithPipeline(OperationContext* opCtx,
         if (!CollatorInterface::collatorsMatch(view->defaultCollator(), collator)) {
             return {ErrorCodes::OptionNotSupportedOnView,
                     str::stream() << "Cannot override a view's default collation"
-                                  << potentialViewNs.ns()};
+                                  << potentialViewNs.toStringForErrorMsg()};
         }
     }
     return Status::OK();
@@ -897,11 +898,11 @@ Status runAggregate(OperationContext* opCtx,
             }
 
             // Assert that a change stream on the config server is always opened on the oplog.
-            tassert(
-                6763400,
-                str::stream() << "Change stream was unexpectedly opened on the namespace: " << nss
-                              << " in the config server",
-                !serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) || nss.isOplog());
+            tassert(6763400,
+                    str::stream() << "Change stream was unexpectedly opened on the namespace: "
+                                  << nss.toStringForErrorMsg() << " in the config server",
+                    !serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) ||
+                        nss.isOplog());
 
             // Upgrade and wait for read concern if necessary.
             _adjustChangeStreamReadConcern(opCtx);
@@ -912,11 +913,11 @@ Status runAggregate(OperationContext* opCtx,
                 auto view = catalog->lookupView(opCtx, origNss);
                 uassert(ErrorCodes::CommandNotSupportedOnView,
                         str::stream() << "Cannot run aggregation on timeseries with namespace "
-                                      << origNss.ns(),
+                                      << origNss.toStringForErrorMsg(),
                         !view || !view->timeseries());
                 uassert(ErrorCodes::CommandNotSupportedOnView,
-                        str::stream()
-                            << "Namespace " << origNss.ns() << " is a view, not a collection",
+                        str::stream() << "Namespace " << origNss.toStringForErrorMsg()
+                                      << " is a view, not a collection",
                         !view);
             }
 

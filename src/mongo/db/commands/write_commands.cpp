@@ -303,7 +303,8 @@ public:
                 try {
                     return write_ops_exec::performTimeseriesWrites(opCtx, request());
                 } catch (DBException& ex) {
-                    ex.addContext(str::stream() << "time-series insert failed: " << ns().ns());
+                    ex.addContext(str::stream()
+                                  << "time-series insert failed: " << ns().toStringForErrorMsg());
                     throw;
                 }
             }
@@ -463,7 +464,7 @@ public:
                 uassert(ErrorCodes::OperationNotSupportedInTransaction,
                         str::stream() << "Cannot perform a multi-document transaction on a "
                                          "time-series collection: "
-                                      << ns(),
+                                      << ns().toStringForErrorMsg(),
                         !opCtx->inMultiDocumentTransaction());
                 source = OperationSource::kTimeseriesUpdate;
             }

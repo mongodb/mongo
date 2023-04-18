@@ -143,7 +143,7 @@ public:
         const NamespaceString nss(
             NamespaceStringUtil::parseNamespaceFromRequest(dbName, collElt.String()));
         uassert(ErrorCodes::InvalidNamespace,
-                str::stream() << nss.toString() << " is not a valid namespace",
+                str::stream() << nss.toStringForErrorMsg() << " is not a valid namespace",
                 nss.isValid());
 
         auto expCtx = make_intrusive<ExpressionContext>(
@@ -158,7 +158,7 @@ public:
         // Make sure the collection is valid.
         const auto& collection = autoColl.getCollection();
         uassert(ErrorCodes::NamespaceNotFound,
-                str::stream() << "Couldn't find collection " << nss.ns(),
+                str::stream() << "Couldn't find collection " << nss.toStringForErrorMsg(),
                 collection);
 
         // Pull out the plan

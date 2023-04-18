@@ -317,9 +317,10 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
             fixUpInfo.refetchTransactionDocs = true;
         } else {
             throw RSFatalException(
-                str::stream() << NamespaceString::kSessionTransactionsTableNamespace.ns()
-                              << " does not have a UUID, but local op has a transaction number: "
-                              << redact(oplogEntry.toBSONForLogging()));
+                str::stream()
+                << NamespaceString::kSessionTransactionsTableNamespace.toStringForErrorMsg()
+                << " does not have a UUID, but local op has a transaction number: "
+                << redact(oplogEntry.toBSONForLogging()));
         }
         if (oplogEntry.isPartialTransaction()) {
             // If this is a transaction which did not commit, we need do nothing more than
@@ -794,7 +795,7 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
                              message,
                              logAttrs(nss),
                              "oplogEntry"_attr = redact(oplogEntry.toBSONForLogging()));
-        throw RSFatalException(str::stream() << message << ". ns: " << nss.ns());
+        throw RSFatalException(str::stream() << message << ". ns: " << nss.toStringForErrorMsg());
     }
     fixUpInfo.docsToRefetch.insert(doc);
     return Status::OK();
@@ -1264,7 +1265,7 @@ void syncFixUp(OperationContext* opCtx,
                 throw RSFatalException(
                     str::stream()
                     << "A fetch on the transactions collection returned an unexpected namespace: "
-                    << resNss.ns()
+                    << resNss.toStringForErrorMsg()
                     << ". The transactions collection cannot be correctly rolled back, a full "
                        "resync is required.");
             }
@@ -1846,7 +1847,8 @@ void syncFixUp(OperationContext* opCtx,
             fassertFailedWithStatusNoTrace(
                 40495,
                 Status(ErrorCodes::UnrecoverableRollbackError,
-                       str::stream() << "Can't find " << NamespaceString::kRsOplogNamespace.ns()));
+                       str::stream() << "Can't find "
+                                     << NamespaceString::kRsOplogNamespace.toStringForErrorMsg()));
         }
 
         // The oplog collection doesn't have indexes and therefore can take full advantage of the

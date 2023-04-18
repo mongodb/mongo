@@ -171,8 +171,8 @@ const std::string& SplitChunkRequest::getShardName() const {
 Status SplitChunkRequest::_validate() {
     if (!getNamespace().isValid()) {
         return Status(ErrorCodes::InvalidNamespace,
-                      str::stream()
-                          << "invalid namespace '" << _nss.ns() << "' specified for request");
+                      str::stream() << "invalid namespace '" << _nss.toStringForErrorMsg()
+                                    << "' specified for request");
     }
 
     if (getSplitPoints().empty()) {

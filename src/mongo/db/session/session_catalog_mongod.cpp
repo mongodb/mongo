@@ -126,9 +126,10 @@ void disallowDirectWritesUnderSession(OperationContext* opCtx) {
     bool isReplSet = replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet;
     if (isReplSet) {
         uassert(40528,
-                str::stream() << "Direct writes against "
-                              << NamespaceString::kSessionTransactionsTableNamespace
-                              << " cannot be performed using a transaction or on a session.",
+                str::stream()
+                    << "Direct writes against "
+                    << NamespaceString::kSessionTransactionsTableNamespace.toStringForErrorMsg()
+                    << " cannot be performed using a transaction or on a session.",
                 !opCtx->getLogicalSessionId());
     }
 }
@@ -377,11 +378,12 @@ void createTransactionTable(OperationContext* opCtx) {
         // empty collection. This can happen after a failover because the collection and index
         // creation are recorded as separate oplog entries.
     } else {
-        uassertStatusOKWithContext(createCollectionStatus,
-                                   str::stream()
-                                       << "Failed to create the "
-                                       << NamespaceString::kSessionTransactionsTableNamespace.ns()
-                                       << " collection");
+        uassertStatusOKWithContext(
+            createCollectionStatus,
+            str::stream()
+                << "Failed to create the "
+                << NamespaceString::kSessionTransactionsTableNamespace.toStringForErrorMsg()
+                << " collection");
     }
 
     auto indexSpec = MongoDSessionCatalog::getConfigTxnPartialIndexSpec();
@@ -391,7 +393,8 @@ void createTransactionTable(OperationContext* opCtx) {
     uassertStatusOKWithContext(
         createIndexStatus,
         str::stream() << "Failed to create partial index for the "
-                      << NamespaceString::kSessionTransactionsTableNamespace.ns() << " collection");
+                      << NamespaceString::kSessionTransactionsTableNamespace.toStringForErrorMsg()
+                      << " collection");
 }
 
 void createRetryableFindAndModifyTable(OperationContext* opCtx) {
@@ -404,9 +407,10 @@ void createRetryableFindAndModifyTable(OperationContext* opCtx) {
     }
 
     uassertStatusOKWithContext(status,
-                               str::stream() << "Failed to create the "
-                                             << NamespaceString::kConfigImagesNamespace.ns()
-                                             << " collection");
+                               str::stream()
+                                   << "Failed to create the "
+                                   << NamespaceString::kConfigImagesNamespace.toStringForErrorMsg()
+                                   << " collection");
 }
 
 

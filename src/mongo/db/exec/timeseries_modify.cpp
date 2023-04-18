@@ -327,7 +327,7 @@ PlanStage::StageState TimeseriesModifyStage::doWork(WorkingSetID* out) {
 void TimeseriesModifyStage::doRestoreStateRequiresCollection() {
     const NamespaceString& ns = collection()->ns();
     uassert(ErrorCodes::PrimarySteppedDown,
-            "Demoted from primary while removing from {}"_format(ns.ns()),
+            "Demoted from primary while removing from {}"_format(ns.toStringForErrorMsg()),
             !opCtx()->writesAreReplicated() ||
                 repl::ReplicationCoordinator::get(opCtx())->canAcceptWritesFor(opCtx(), ns));
 

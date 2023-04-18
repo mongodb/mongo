@@ -183,10 +183,10 @@ void rethrowPartialIndexQueryBadValueWithContext(const DBException& ex) {
             ex.toStatus(),
             str::stream()
                 << "Failed to find partial index for "
-                << NamespaceString::kSessionTransactionsTableNamespace.ns()
+                << NamespaceString::kSessionTransactionsTableNamespace.toStringForErrorMsg()
                 << ". Please create an index directly on this replica set with the specification: "
                 << MongoDSessionCatalog::getConfigTxnPartialIndexSpec() << " or drop the "
-                << NamespaceString::kSessionTransactionsTableNamespace.ns()
+                << NamespaceString::kSessionTransactionsTableNamespace.toStringForErrorMsg()
                 << " collection and step up a new primary.");
     }
 }
@@ -396,21 +396,23 @@ void updateSessionEntry(OperationContext* opCtx,
     AutoGetCollection collection(
         opCtx, NamespaceString::kSessionTransactionsTableNamespace, MODE_IX);
 
-    uassert(40527,
-            str::stream() << "Unable to persist transaction state because the session transaction "
-                             "collection is missing. This indicates that the "
-                          << NamespaceString::kSessionTransactionsTableNamespace.ns()
-                          << " collection has been manually deleted.",
-            collection.getCollection());
+    uassert(
+        40527,
+        str::stream() << "Unable to persist transaction state because the session transaction "
+                         "collection is missing. This indicates that the "
+                      << NamespaceString::kSessionTransactionsTableNamespace.toStringForErrorMsg()
+                      << " collection has been manually deleted.",
+        collection.getCollection());
 
     WriteUnitOfWork wuow(opCtx);
 
     auto idIndex = collection->getIndexCatalog()->findIdIndex(opCtx);
 
-    uassert(40672,
-            str::stream() << "Failed to fetch _id index for "
-                          << NamespaceString::kSessionTransactionsTableNamespace.ns(),
-            idIndex);
+    uassert(
+        40672,
+        str::stream() << "Failed to fetch _id index for "
+                      << NamespaceString::kSessionTransactionsTableNamespace.toStringForErrorMsg(),
+        idIndex);
 
     auto indexAccess =
         collection->getIndexCatalog()->getEntry(idIndex)->accessMethod()->asSortedData();
@@ -442,11 +444,13 @@ void updateSessionEntry(OperationContext* opCtx,
     auto originalDoc = originalRecordData.toBson();
 
     const auto parentLsidFieldName = SessionTxnRecord::kParentSessionIdFieldName;
-    uassert(5875700,
-            str::stream() << "Cannot modify the '" << parentLsidFieldName << "' field of "
-                          << NamespaceString::kSessionTransactionsTableNamespace << " entries",
-            updateMod.getObjectField(parentLsidFieldName)
-                    .woCompare(originalDoc.getObjectField(parentLsidFieldName)) == 0);
+    uassert(
+        5875700,
+        str::stream() << "Cannot modify the '" << parentLsidFieldName << "' field of "
+                      << NamespaceString::kSessionTransactionsTableNamespace.toStringForErrorMsg()
+                      << " entries",
+        updateMod.getObjectField(parentLsidFieldName)
+                .woCompare(originalDoc.getObjectField(parentLsidFieldName)) == 0);
 
     invariant(collection->getDefaultCollator() == nullptr);
     boost::intrusive_ptr<ExpressionContext> expCtx(
@@ -1653,7 +1657,7 @@ Timestamp TransactionParticipant::Participant::prepareTransaction(
         uassert(ErrorCodes::OperationNotSupportedInTransaction,
                 str::stream() << "prepareTransaction failed because one of the transaction "
                                  "operations was done against a temporary collection '"
-                              << collection->ns() << "'.",
+                              << collection->ns().toStringForErrorMsg() << "'.",
                 !collection->isTemporary());
     }
 
@@ -3147,6 +3151,7 @@ void TransactionParticipant::Participant::_refreshActiveTransactionParticipantsF
                                 << parentTxnParticipant._sessionId() << " to be "
                                 << *activeRetryableWriteTxnNumber << " found a "
                                 << NamespaceString::kSessionTransactionsTableNamespace
+                                       .toStringForErrorMsg()
                                 << " entry for an internal transaction for retryable writes with "
                                 << "transaction number " << *childLsid.getTxnNumber(),
                             *childLsid.getTxnNumber() == *activeRetryableWriteTxnNumber);

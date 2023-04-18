@@ -152,7 +152,7 @@ void PrimaryOnlyServiceRegistry::registerService(std::unique_ptr<PrimaryOnlyServ
     auto existingService = existingServiceIt->second;
     invariant(inserted2,
               str::stream() << "Attempted to register PrimaryOnlyService (" << name
-                            << ") with state document namespace \"" << ns
+                            << ") with state document namespace \"" << ns.toStringForErrorMsg()
                             << "\" that is already in use by service "
                             << existingService->getServiceName());
     LOGV2_INFO(5123008,
@@ -731,8 +731,8 @@ void PrimaryOnlyService::_rebuildInstances(long long term) noexcept {
             Status status = e.toStatus();
             status.addContext(str::stream()
                               << "Failed to start PrimaryOnlyService \"" << serviceName
-                              << "\" because the query for state documents on ns \"" << ns
-                              << "\" failed");
+                              << "\" because the query for state documents on ns \""
+                              << ns.toStringForErrorMsg() << "\" failed");
 
             stdx::lock_guard lk(_mutex);
             if (_state != State::kRebuilding || _term != term) {

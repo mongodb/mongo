@@ -557,7 +557,7 @@ void ShardServerOpObserver::onModifyCollectionShardingIndexCatalog(OperationCont
                 uassert(7079505,
                         format(FMT_STRING("The critical section for collection {} must be taken in "
                                           "order to execute this command"),
-                               renameEntry.getToNss().toString()),
+                               renameEntry.getToNss().toStringForErrorMsg()),
                         toCSR->getCriticalSectionSignal(opCtx,
                                                         ShardingMigrationCriticalSection::kWrite));
                 toCSR->replaceIndexes(opCtx, fromIndexes, {*uuid, renameEntry.getLastmod()});

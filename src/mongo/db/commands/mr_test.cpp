@@ -528,7 +528,7 @@ TEST_F(MapReduceCommandTest, PrimaryStepDownPreventsTemporaryCollectionDrops) {
     _opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kLastApplied);
     for (const auto& tempNss : _opObserver->tempNamespaces) {
         ASSERT_OK(_storage.getCollectionCount(_opCtx.get(), tempNss).getStatus())
-            << "missing mapReduce temporary collection: " << tempNss;
+            << "missing mapReduce temporary collection: " << tempNss.toStringForErrorMsg();
     }
 }
 
@@ -572,7 +572,7 @@ TEST_F(MapReduceCommandTest, ReplacingExistingOutputCollectionPreservesIndexes) 
     ASSERT_NOT_EQUALS(
         *options.uuid,
         *CollectionCatalog::get(_opCtx.get())->lookupUUIDByNSS(_opCtx.get(), outputNss))
-        << "Output collection " << outputNss << " was not replaced";
+        << "Output collection " << outputNss.toStringForErrorMsg() << " was not replaced";
 
     _assertTemporaryCollectionsAreDropped();
 }

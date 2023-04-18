@@ -335,8 +335,9 @@ void TenantDatabaseCloner::postStage() {
                         logAttrs(sourceNss),
                         "error"_attr = collStatus.toString(),
                         "tenantId"_attr = _tenantId);
-            auto message = collStatus.withContext(str::stream() << "Error cloning collection '"
-                                                                << sourceNss.toString() << "'");
+            auto message =
+                collStatus.withContext(str::stream() << "Error cloning collection '"
+                                                     << sourceNss.toStringForErrorMsg() << "'");
             setSyncFailedStatus(collStatus.withReason(message.toString()));
         }
         {

@@ -253,8 +253,9 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
     InitMode initMode,
     const boost::optional<ResumeIndexInfo>& resumeInfo) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_X),
-              str::stream() << "Collection " << collection->ns() << " with UUID "
-                            << collection->uuid() << " is holding the incorrect lock");
+              str::stream() << "Collection " << collection->ns().toStringForErrorMsg()
+                            << " with UUID " << collection->uuid()
+                            << " is holding the incorrect lock");
     _collectionUUID = collection->uuid();
 
     _buildIsCleanedUp = false;
@@ -319,9 +320,10 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
                     // indexes and start the build while holding a lock throughout.
                     if (status == ErrorCodes::IndexBuildAlreadyInProgress) {
                         invariant(indexSpecs.size() > 1,
-                                  str::stream() << "Collection: " << collection->ns() << " ("
-                                                << _collectionUUID
-                                                << "), Index spec: " << indexSpecs.front());
+                                  str::stream()
+                                      << "Collection: " << collection->ns().toStringForErrorMsg()
+                                      << " (" << _collectionUUID
+                                      << "), Index spec: " << indexSpecs.front());
                         return {ErrorCodes::OperationFailed,
                                 "Cannot build two identical indexes. Try again without duplicate "
                                 "indexes."};
@@ -357,7 +359,8 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
                 uassert(ErrorCodes::NoSuchKey,
                         str::stream() << "Unable to locate resume information for " << info
                                       << " due to inconsistent resume information for index build "
-                                      << _buildUUID << " on namespace " << collection->ns() << "("
+                                      << _buildUUID << " on namespace "
+                                      << collection->ns().toStringForErrorMsg() << "("
                                       << _collectionUUID << ")",
                         stateInfoIt != resumeInfoIndexes.end());
 
@@ -439,12 +442,13 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
         // Avoid converting TenantMigrationCommittedException to Status.
         throw;
     } catch (...) {
-        return exceptionToStatus().withContext(
-            str::stream() << "Caught exception during index builder (" << _buildUUID
-                          << ") initialization on namespace" << collection->ns() << " ("
-                          << _collectionUUID << "). " << indexSpecs.size()
-                          << " index specs provided. First index spec: "
-                          << (indexSpecs.empty() ? BSONObj() : indexSpecs[0]));
+        return exceptionToStatus().withContext(str::stream()
+                                               << "Caught exception during index builder ("
+                                               << _buildUUID << ") initialization on namespace"
+                                               << collection->ns().toStringForErrorMsg() << " ("
+                                               << _collectionUUID << "). " << indexSpecs.size()
+                                               << " index specs provided. First index spec: "
+                                               << (indexSpecs.empty() ? BSONObj() : indexSpecs[0]));
     }
 }
 
@@ -982,8 +986,9 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
                                OnCommitFn onCommit) {
     invariant(!_buildIsCleanedUp);
     invariant(opCtx->lockState()->isCollectionLockedForMode(collection->ns(), MODE_X),
-              str::stream() << "Collection " << collection->ns() << " with UUID "
-                            << collection->uuid() << " is holding the incorrect lock");
+              str::stream() << "Collection " << collection->ns().toStringForErrorMsg()
+                            << " with UUID " << collection->uuid()
+                            << " is holding the incorrect lock");
 
     // UUIDs are not guaranteed during startup because the check happens after indexes are rebuilt.
     if (_collectionUUID) {
@@ -1003,7 +1008,8 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
         return {
             ErrorCodes::CannotCreateIndex,
             str::stream()
-                << "Index build on collection '" << collection->ns() << "' (" << collection->uuid()
+                << "Index build on collection '" << collection->ns().toStringForErrorMsg() << "' ("
+                << collection->uuid()
                 << ") failed due to the detection of mixed-schema data in the time-series buckets "
                    "collection. Starting as of v5.2, time-series measurement bucketing has been "
                    "modified to ensure that newly created time-series buckets do not contain "

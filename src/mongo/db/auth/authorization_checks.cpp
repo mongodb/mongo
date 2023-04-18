@@ -77,11 +77,12 @@ Status checkAuthForFind(AuthorizationSession* authSession,
                         bool hasTerm) {
     if (MONGO_unlikely(ns.isCommand())) {
         return Status(ErrorCodes::InternalError,
-                      str::stream() << "Checking query auth on command namespace " << ns.ns());
+                      str::stream() << "Checking query auth on command namespace "
+                                    << ns.toStringForErrorMsg());
     }
     if (!authSession->isAuthorizedForActionsOnNamespace(ns, ActionType::find)) {
         return Status(ErrorCodes::Unauthorized,
-                      str::stream() << "not authorized for query on " << ns.ns());
+                      str::stream() << "not authorized for query on " << ns.toStringForErrorMsg());
     }
 
     // Only internal clients (such as other nodes in a replica set) are allowed to use
@@ -91,7 +92,8 @@ Status checkAuthForFind(AuthorizationSession* authSession,
         !authSession->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
                                                        ActionType::internal)) {
         return Status(ErrorCodes::Unauthorized,
-                      str::stream() << "not authorized for query with term on " << ns.ns());
+                      str::stream()
+                          << "not authorized for query with term on " << ns.toStringForErrorMsg());
     }
 
     return Status::OK();
@@ -116,7 +118,8 @@ Status checkAuthForGetMore(AuthorizationSession* authSession,
         !authSession->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
                                                        ActionType::internal)) {
         return Status(ErrorCodes::Unauthorized,
-                      str::stream() << "not authorized for getMore with term on " << ns.ns());
+                      str::stream() << "not authorized for getMore with term on "
+                                    << ns.toStringForErrorMsg());
     }
 
     return Status::OK();
@@ -131,7 +134,7 @@ Status checkAuthForInsert(AuthorizationSession* authSession,
     }
     if (!authSession->isAuthorizedForActionsOnNamespace(ns, required)) {
         return Status(ErrorCodes::Unauthorized,
-                      str::stream() << "not authorized for insert on " << ns.ns());
+                      str::stream() << "not authorized for insert on " << ns.toStringForErrorMsg());
     }
 
     return Status::OK();
@@ -157,7 +160,8 @@ Status checkAuthForUpdate(AuthorizationSession* authSession,
 
     if (!authSession->isAuthorizedForActionsOnNamespace(ns, required)) {
         return Status(ErrorCodes::Unauthorized,
-                      str::stream() << "not authorized for " << operationType << " on " << ns.ns());
+                      str::stream() << "not authorized for " << operationType << " on "
+                                    << ns.toStringForErrorMsg());
     }
 
     return Status::OK();
@@ -169,7 +173,8 @@ Status checkAuthForDelete(AuthorizationSession* authSession,
                           const BSONObj& query) {
     if (!authSession->isAuthorizedForActionsOnNamespace(ns, ActionType::remove)) {
         return Status(ErrorCodes::Unauthorized,
-                      str::stream() << "not authorized to remove from " << ns.ns());
+                      str::stream()
+                          << "not authorized to remove from " << ns.toStringForErrorMsg());
     }
     return Status::OK();
 }
@@ -198,7 +203,7 @@ Status checkAuthForKillCursors(AuthorizationSession* authSession,
     }
 
     return Status(ErrorCodes::Unauthorized,
-                  str::stream() << "not authorized to kill cursor on " << ns.ns());
+                  str::stream() << "not authorized to kill cursor on " << ns.toStringForErrorMsg());
 }
 
 Status checkAuthForCreate(OperationContext* opCtx,
@@ -284,7 +289,7 @@ StatusWith<PrivilegeVector> getPrivilegesForAggregate(AuthorizationSession* auth
                                                       bool isMongos) {
     if (!nss.isValid()) {
         return Status(ErrorCodes::InvalidNamespace,
-                      str::stream() << "Invalid input namespace, " << nss.ns());
+                      str::stream() << "Invalid input namespace, " << nss.toStringForErrorMsg());
     }
 
     PrivilegeVector privileges;

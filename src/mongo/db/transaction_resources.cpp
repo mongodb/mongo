@@ -48,7 +48,7 @@ void TransactionResources::assertNoAcquiredCollections() const {
 
     std::stringstream ss("Found acquired collections:");
     for (const auto& acquisition : acquiredCollections) {
-        ss << "\n" << acquisition.prerequisites.nss;
+        ss << "\n" << acquisition.prerequisites.nss.toStringForErrorMsg();
     }
     fassertFailedWithStatus(737660, Status{ErrorCodes::InternalError, ss.str()});
 }

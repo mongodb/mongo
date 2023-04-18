@@ -90,11 +90,11 @@ public:
 
         AutoGetCollection autoColl(&_opCtx, _nss, MODE_IX);
         auto db = autoColl.ensureDbExists(&_opCtx);
-        ASSERT_TRUE(db) << _nss;
+        ASSERT_TRUE(db) << _nss.toStringForErrorMsg();
 
         WriteUnitOfWork wuow(&_opCtx);
         auto coll = db->createCollection(&_opCtx, _nss, options, createIdIndex);
-        ASSERT_TRUE(coll) << _nss;
+        ASSERT_TRUE(coll) << _nss.toStringForErrorMsg();
         wuow.commit();
 
         _engineSupportsCheckpoints =

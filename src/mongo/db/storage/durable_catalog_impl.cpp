@@ -662,8 +662,8 @@ StatusWith<std::pair<RecordId, std::unique_ptr<RecordStore>>> DurableCatalogImpl
     invariant(nss.coll().size() > 0);
 
     if (CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss)) {
-        throwWriteConflictException(str::stream()
-                                    << "Namespace '" << nss.ns() << "' is already in use.");
+        throwWriteConflictException(str::stream() << "Namespace '" << nss.toStringForErrorMsg()
+                                                  << "' is already in use.");
     }
 
     StatusWith<EntryIdentifier> swEntry = _addEntry(opCtx, nss, options);
@@ -729,7 +729,7 @@ StatusWith<DurableCatalog::ImportResult> DurableCatalogImpl::importCollection(
     invariant(nss.coll().size() > 0);
 
     uassert(ErrorCodes::NamespaceExists,
-            str::stream() << "Collection already exists. NS: " << nss.ns(),
+            str::stream() << "Collection already exists. NS: " << nss.toStringForErrorMsg(),
             !CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss));
 
     BSONCollectionCatalogEntry::MetaData md;

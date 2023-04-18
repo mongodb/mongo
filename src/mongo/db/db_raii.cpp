@@ -119,7 +119,7 @@ void assertCollectionChangesCompatibleWithReadTimestamp(OperationContext* opCtx,
             ErrorCodes::SnapshotUnavailable,
             str::stream() << "Unable to read from a snapshot due to pending collection catalog "
                              "changes to collection '"
-                          << collection->ns()
+                          << collection->ns().toStringForErrorMsg()
                           << "'; please retry the operation. Snapshot timestamp is "
                           << readTimestamp->toString() << ". Collection minimum timestamp is "
                           << minSnapshot->toString());
@@ -595,7 +595,7 @@ AutoGetCollectionForReadBase<AutoGetCollectionType, EmplaceAutoCollFunc>::
                   "Tried reading at a timestamp, but future catalog changes are pending. "
                   "Trying again",
                   "readTimestamp"_attr = *readTimestamp,
-                  "collection"_attr = nss.ns(),
+                  "collection"_attr = nss,
                   "collectionMinSnapshot"_attr = *minSnapshot);
 
             // If we are AutoGetting multiple collections, it is possible that we've already done
@@ -804,13 +804,13 @@ AutoGetCollectionForReadPITCatalog::AutoGetCollectionForReadPITCatalog(
         // namespace were a view, the collection UUID mismatch check would have failed above.
         if ((_view = catalog->lookupView(opCtx, _resolvedNss))) {
             uassert(ErrorCodes::CommandNotSupportedOnView,
-                    str::stream() << "Taking " << _resolvedNss.ns()
+                    str::stream() << "Taking " << _resolvedNss.toStringForErrorMsg()
                                   << " lock for timeseries is not allowed",
                     viewMode == auto_get_collection::ViewMode::kViewsPermitted ||
                         !_view->timeseries());
 
             uassert(ErrorCodes::CommandNotSupportedOnView,
-                    str::stream() << "Namespace " << _resolvedNss.ns()
+                    str::stream() << "Namespace " << _resolvedNss.toStringForErrorMsg()
                                   << " is a view, not a collection",
                     viewMode == auto_get_collection::ViewMode::kViewsPermitted);
 
@@ -818,7 +818,7 @@ AutoGetCollectionForReadPITCatalog::AutoGetCollectionForReadPITCatalog(
                                     *receivedShardVersion,
                                     ShardVersion::UNSHARDED() /* wantedVersion */,
                                     ShardingState::get(opCtx)->shardId()),
-                    str::stream() << "Namespace " << _resolvedNss
+                    str::stream() << "Namespace " << _resolvedNss.toStringForErrorMsg()
                                   << " is a view therefore the shard "
                                   << "version attached to the request must be unset or UNSHARDED",
                     !receivedShardVersion || *receivedShardVersion == ShardVersion::UNSHARDED());
@@ -843,7 +843,8 @@ AutoGetCollectionForReadPITCatalog::AutoGetCollectionForReadPITCatalog(
                             *receivedShardVersion,
                             boost::none /* wantedVersion */,
                             ShardingState::get(opCtx)->shardId()),
-            str::stream() << "No metadata for namespace " << _resolvedNss << " therefore the shard "
+            str::stream() << "No metadata for namespace " << _resolvedNss.toStringForErrorMsg()
+                          << " therefore the shard "
                           << "version attached to the request must be unset, UNSHARDED or IGNORED",
             !receivedShardVersion || *receivedShardVersion == ShardVersion::UNSHARDED() ||
                 ShardVersion::isPlacementVersionIgnored(*receivedShardVersion));
@@ -1151,11 +1152,13 @@ std::shared_ptr<const ViewDefinition> lookupView(
     auto_get_collection::ViewMode viewMode) {
     auto view = catalog->lookupView(opCtx, nss);
     uassert(ErrorCodes::CommandNotSupportedOnView,
-            str::stream() << "Taking " << nss.ns() << " lock for timeseries is not allowed",
+            str::stream() << "Taking " << nss.toStringForErrorMsg()
+                          << " lock for timeseries is not allowed",
             !view || viewMode == auto_get_collection::ViewMode::kViewsPermitted ||
                 !view->timeseries());
     uassert(ErrorCodes::CommandNotSupportedOnView,
-            str::stream() << "Namespace " << nss.ns() << " is a view, not a collection",
+            str::stream() << "Namespace " << nss.toStringForErrorMsg()
+                          << " is a view, not a collection",
             !view || viewMode == auto_get_collection::ViewMode::kViewsPermitted);
     return view;
 }

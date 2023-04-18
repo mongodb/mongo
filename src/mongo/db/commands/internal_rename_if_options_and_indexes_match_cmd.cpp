@@ -92,7 +92,8 @@ public:
                 opCtx, toNss.ns(), lockReason, DDLLockManager::kDefaultLockTimeout);
 
             uassert(ErrorCodes::IllegalOperation,
-                    str::stream() << "cannot rename to sharded collection '" << toNss << "'",
+                    str::stream() << "cannot rename to sharded collection '"
+                                  << toNss.toStringForErrorMsg() << "'",
                     !isCollectionSharded(opCtx, toNss));
 
             _internalRun(opCtx, fromNss, toNss, indexList, collectionOptions);
@@ -127,17 +128,17 @@ public:
             auto from = thisRequest.getFrom();
             auto to = thisRequest.getTo();
             uassert(ErrorCodes::Unauthorized,
-                    str::stream() << "Unauthorized to rename " << from,
+                    str::stream() << "Unauthorized to rename " << from.toStringForErrorMsg(),
                     AuthorizationSession::get(opCtx->getClient())
                         ->isAuthorizedForActionsOnResource(ResourcePattern::forExactNamespace(from),
                                                            ActionType::renameCollection));
             uassert(ErrorCodes::Unauthorized,
-                    str::stream() << "Unauthorized to drop " << to,
+                    str::stream() << "Unauthorized to drop " << to.toStringForErrorMsg(),
                     AuthorizationSession::get(opCtx->getClient())
                         ->isAuthorizedForActionsOnResource(ResourcePattern::forExactNamespace(to),
                                                            ActionType::dropCollection));
             uassert(ErrorCodes::Unauthorized,
-                    str::stream() << "Unauthorized to insert into " << to,
+                    str::stream() << "Unauthorized to insert into " << to.toStringForErrorMsg(),
                     AuthorizationSession::get(opCtx->getClient())
                         ->isAuthorizedForActionsOnResource(ResourcePattern::forExactNamespace(to),
                                                            ActionType::insert));

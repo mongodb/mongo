@@ -383,7 +383,7 @@ void reconcileCatalogAndRebuildUnfinishedIndexes(
             fassert(40590,
                     {ErrorCodes::InternalError,
                      str::stream() << "failed to get index spec for index " << indexName
-                                   << " in collection " << collNss.toString()});
+                                   << " in collection " << collNss.toStringForErrorMsg()});
         }
 
         auto& indexesToRebuild = swIndexSpecs.getValue();

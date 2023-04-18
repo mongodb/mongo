@@ -93,7 +93,8 @@ ValidateState::ValidateState(OperationContext* opCtx,
         auto view = CollectionCatalog::get(opCtx)->lookupView(opCtx, _nss);
         if (!view) {
             uasserted(ErrorCodes::NamespaceNotFound,
-                      str::stream() << "Collection '" << _nss << "' does not exist to validate.");
+                      str::stream() << "Collection '" << _nss.toStringForErrorMsg()
+                                    << "' does not exist to validate.");
         } else {
             // Uses the bucket collection in place of the time-series collection view.
             if (!view->timeseries() ||
@@ -113,7 +114,7 @@ ValidateState::ValidateState(OperationContext* opCtx,
                 ErrorCodes::NamespaceNotFound,
                 fmt::format(
                     "Cannot validate a time-series collection without its bucket collection {}.",
-                    _nss.toString()),
+                    _nss.toStringForErrorMsg()),
                 _collection);
         }
     }
@@ -181,8 +182,8 @@ void ValidateState::_yieldLocks(OperationContext* opCtx) {
     _relockDatabaseAndCollection(opCtx);
 
     uassert(ErrorCodes::Interrupted,
-            str::stream() << "Interrupted due to: catalog restart: " << _nss << " (" << *_uuid
-                          << ") while validating the collection",
+            str::stream() << "Interrupted due to: catalog restart: " << _nss.toStringForErrorMsg()
+                          << " (" << *_uuid << ") while validating the collection",
             _catalogGeneration == opCtx->getServiceContext()->getCatalogGeneration());
 
     // Check if any of the indexes we were validating were dropped. Indexes created while
@@ -191,7 +192,8 @@ void ValidateState::_yieldLocks(OperationContext* opCtx) {
         uassert(ErrorCodes::Interrupted,
                 str::stream()
                     << "Interrupted due to: index being validated was dropped from collection: "
-                    << _nss << " (" << *_uuid << "), index: " << index->descriptor()->indexName(),
+                    << _nss.toStringForErrorMsg() << " (" << *_uuid
+                    << "), index: " << index->descriptor()->indexName(),
                 !index->isDropped());
     }
 };
@@ -389,15 +391,16 @@ void ValidateState::_relockDatabaseAndCollection(OperationContext* opCtx) {
 
     std::string dbErrMsg = str::stream()
         << "Interrupted due to: database drop: " << _nss.db()
-        << " while validating collection: " << _nss << " (" << *_uuid << ")";
+        << " while validating collection: " << _nss.toStringForErrorMsg() << " (" << *_uuid << ")";
 
     _databaseLock.emplace(opCtx, _nss.dbName(), MODE_IS);
     _database = DatabaseHolder::get(opCtx)->getDb(opCtx, _nss.dbName());
     uassert(ErrorCodes::Interrupted, dbErrMsg, _database);
     uassert(ErrorCodes::Interrupted, dbErrMsg, !_database->isDropPending(opCtx));
 
-    std::string collErrMsg = str::stream() << "Interrupted due to: collection drop: " << _nss
-                                           << " (" << *_uuid << ") while validating the collection";
+    std::string collErrMsg = str::stream()
+        << "Interrupted due to: collection drop: " << _nss.toStringForErrorMsg() << " (" << *_uuid
+        << ") while validating the collection";
 
     try {
         NamespaceStringOrUUID nssOrUUID(_nss.dbName(), *_uuid);

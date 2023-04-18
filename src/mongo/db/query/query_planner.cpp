@@ -978,14 +978,14 @@ StatusWith<std::unique_ptr<QuerySolution>> QueryPlanner::planFromCache(
     if (!solnRoot) {
         return Status(ErrorCodes::NoQueryExecutionPlans,
                       str::stream() << "Failed to create data access plan from cache. Query: "
-                                    << query.toStringShort());
+                                    << query.toStringShortForErrorMsg());
     }
 
     auto soln = QueryPlannerAnalysis::analyzeDataAccess(query, params, std::move(solnRoot));
     if (!soln) {
         return Status(ErrorCodes::NoQueryExecutionPlans,
-                      str::stream()
-                          << "Failed to analyze plan from cache. Query: " << query.toStringShort());
+                      str::stream() << "Failed to analyze plan from cache. Query: "
+                                    << query.toStringShortForErrorMsg());
     }
 
     LOGV2_DEBUG(20966,

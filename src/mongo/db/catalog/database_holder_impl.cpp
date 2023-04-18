@@ -188,7 +188,8 @@ void DatabaseHolderImpl::dropDb(OperationContext* opCtx, Database* db) {
         // It is the caller's responsibility to ensure that no index builds are active in the
         // database.
         invariant(!coll->getIndexCatalog()->haveAnyIndexesInProgress(),
-                  str::stream() << "An index is building on collection '" << coll->ns() << "'.");
+                  str::stream() << "An index is building on collection '"
+                                << coll->ns().toStringForErrorMsg() << "'.");
     }
 
     audit::logDropDatabase(opCtx->getClient(), name.toString());

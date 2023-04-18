@@ -72,7 +72,8 @@ public:
         void doCheckAuthorization(OperationContext* opCtx) const final {
             auto ns = request().getNamespace();
             uassert(ErrorCodes::Unauthorized,
-                    str::stream() << "Not authorized to drop collection '" << ns << "'",
+                    str::stream() << "Not authorized to drop collection '"
+                                  << ns.toStringForErrorMsg() << "'",
                     AuthorizationSession::get(opCtx->getClient())
                         ->isAuthorizedForActionsOnNamespace(ns, ActionType::dropCollection));
         }

@@ -96,7 +96,7 @@ void _checkShardKeyIndexInconsistencies(OperationContext* opCtx,
     AutoGetCollection ac(opCtx, nss, MODE_IS);
     tassert(7531700,
             str::stream() << "Collection unexpectedly disappeared while holding database DDL lock: "
-                          << nss,
+                          << nss.toStringForErrorMsg(),
             ac);
 
     const auto scopedCsr =
@@ -114,7 +114,7 @@ void _checkShardKeyIndexInconsistencies(OperationContext* opCtx,
     tassert(7531702,
             str::stream()
                 << "Collection unexpectedly became unsharded while holding database DDL lock: "
-                << nss,
+                << nss.toStringForErrorMsg(),
             optCollDescr->isSharded());
 
     if (!optCollDescr->currentShardHasAnyChunks()) {

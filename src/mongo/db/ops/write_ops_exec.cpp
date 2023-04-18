@@ -357,7 +357,7 @@ void insertDocuments(OperationContext* opCtx,
 Status checkIfTransactionOnCappedColl(OperationContext* opCtx, const CollectionPtr& collection) {
     if (opCtx->inMultiDocumentTransaction() && collection->isCapped()) {
         return {ErrorCodes::OperationNotSupportedInTransaction,
-                str::stream() << "Collection '" << collection->ns()
+                str::stream() << "Collection '" << collection->ns().toStringForErrorMsg()
                               << "' is a capped collection. Writes in transactions are not allowed "
                                  "on capped collections."};
     }
@@ -367,7 +367,7 @@ Status checkIfTransactionOnCappedColl(OperationContext* opCtx, const CollectionP
 void assertTimeseriesBucketsCollectionNotFound(const NamespaceString& ns) {
     uasserted(ErrorCodes::NamespaceNotFound,
               str::stream() << "Buckets collection not found for time-series collection "
-                            << ns.getTimeseriesViewNamespace());
+                            << ns.getTimeseriesViewNamespace().toStringForErrorMsg());
 }
 
 template <typename T>
@@ -751,7 +751,7 @@ UpdateResult writeConflictRetryUpsert(OperationContext* opCtx,
     if (collection && collection->isCapped()) {
         uassert(
             ErrorCodes::OperationNotSupportedInTransaction,
-            str::stream() << "Collection '" << collection->ns()
+            str::stream() << "Collection '" << collection->ns().toStringForErrorMsg()
                           << "' is a capped collection. Writes in transactions are not allowed on "
                              "capped collections.",
             !inTransaction);
@@ -831,7 +831,7 @@ long long writeConflictRetryRemove(OperationContext* opCtx,
     if (collectionPtr && collectionPtr->isCapped()) {
         uassert(
             ErrorCodes::OperationNotSupportedInTransaction,
-            str::stream() << "Collection '" << collection.nss()
+            str::stream() << "Collection '" << collection.nss().toStringForErrorMsg()
                           << "' is a capped collection. Writes in transactions are not allowed on "
                              "capped collections.",
             !inTransaction);
@@ -2126,7 +2126,8 @@ TimeseriesSingleWriteResult getTimeseriesSingleWriteResult(
     write_ops_exec::WriteResult&& reply, const write_ops::InsertCommandRequest& request) {
     invariant(reply.results.size() == 1,
               str::stream() << "Unexpected number of results (" << reply.results.size()
-                            << ") for insert on time-series collection " << ns(request));
+                            << ") for insert on time-series collection "
+                            << ns(request).toStringForErrorMsg());
 
     return {std::move(reply.results[0]), reply.canContinue};
 }
@@ -3041,7 +3042,7 @@ write_ops::InsertCommandReply performTimeseriesWrites(
     uassert(ErrorCodes::OperationNotSupportedInTransaction,
             str::stream() << "Cannot insert into a time-series collection in a multi-document "
                              "transaction: "
-                          << ns(request),
+                          << ns(request).toStringForErrorMsg(),
             !opCtx->inMultiDocumentTransaction());
 
     {

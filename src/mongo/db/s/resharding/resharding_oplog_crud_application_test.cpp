@@ -200,7 +200,8 @@ public:
                                  const NamespaceString& nss,
                                  const std::vector<BSONObj>& documents) {
         AutoGetCollection coll(opCtx, nss, MODE_IS);
-        ASSERT_TRUE(bool(coll)) << "Collection '" << nss << "' does not exist";
+        ASSERT_TRUE(bool(coll)) << "Collection '" << nss.toStringForErrorMsg()
+                                << "' does not exist";
 
         auto exec = InternalPlanner::indexScan(opCtx,
                                                &*coll,
@@ -216,13 +217,15 @@ public:
         BSONObj obj;
         while (exec->getNext(&obj, nullptr) == PlanExecutor::ADVANCED) {
             ASSERT_LT(i, documents.size())
-                << "Found extra document in collection: " << nss << ": " << obj;
+                << "Found extra document in collection: " << nss.toStringForErrorMsg() << ": "
+                << obj;
             ASSERT_BSONOBJ_BINARY_EQ(obj, documents[i]);
             ++i;
         }
 
         if (i < documents.size()) {
-            FAIL("Didn't find document in collection: ") << nss << ": " << documents[i];
+            FAIL("Didn't find document in collection: ")
+                << nss.toStringForErrorMsg() << ": " << documents[i];
         }
     }
 

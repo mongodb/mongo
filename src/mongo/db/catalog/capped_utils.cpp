@@ -65,8 +65,8 @@ Status emptyCapped(OperationContext* opCtx, const NamespaceString& collectionNam
 
     if (userInitiatedWritesAndNotPrimary) {
         return Status(ErrorCodes::NotWritablePrimary,
-                      str::stream()
-                          << "Not primary while truncating collection: " << collectionName);
+                      str::stream() << "Not primary while truncating collection: "
+                                    << collectionName.toStringForErrorMsg());
     }
 
     Database* db = autoDb.getDb();
@@ -74,21 +74,23 @@ Status emptyCapped(OperationContext* opCtx, const NamespaceString& collectionNam
 
     CollectionWriter collection(opCtx, collectionName);
     uassert(ErrorCodes::CommandNotSupportedOnView,
-            str::stream() << "emptycapped not supported on view: " << collectionName.ns(),
+            str::stream() << "emptycapped not supported on view: "
+                          << collectionName.toStringForErrorMsg(),
             collection || !CollectionCatalog::get(opCtx)->lookupView(opCtx, collectionName));
     uassert(ErrorCodes::NamespaceNotFound, "no such collection", collection);
 
     if (collectionName.isSystem() && !collectionName.isSystemDotProfile()) {
         return Status(ErrorCodes::IllegalOperation,
-                      str::stream() << "Cannot truncate a system collection: " << collectionName);
+                      str::stream() << "Cannot truncate a system collection: "
+                                    << collectionName.toStringForErrorMsg());
     }
 
     if ((repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() !=
          repl::ReplicationCoordinator::modeNone) &&
         collectionName.isOplog()) {
         return Status(ErrorCodes::OplogOperationUnsupported,
-                      str::stream()
-                          << "Cannot truncate a live oplog while replicating: " << collectionName);
+                      str::stream() << "Cannot truncate a live oplog while replicating: "
+                                    << collectionName.toStringForErrorMsg());
     }
 
     IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(collection->uuid());
@@ -127,11 +129,13 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
         CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, fromNss));
     if (!fromCollection) {
         uassert(ErrorCodes::CommandNotSupportedOnView,
-                str::stream() << "cloneCollectionAsCapped not supported for views: " << fromNss,
+                str::stream() << "cloneCollectionAsCapped not supported for views: "
+                              << fromNss.toStringForErrorMsg(),
                 !CollectionCatalog::get(opCtx)->lookupView(opCtx, fromNss));
 
         uasserted(ErrorCodes::NamespaceNotFound,
-                  str::stream() << "source collection " << fromNss << " does not exist");
+                  str::stream() << "source collection " << fromNss.toStringForErrorMsg()
+                                << " does not exist");
     }
 
     uassert(6367302,
@@ -139,13 +143,14 @@ void cloneCollectionAsCapped(OperationContext* opCtx,
             !fromCollection->getCollectionOptions().encryptedFieldConfig);
 
     uassert(ErrorCodes::NamespaceNotFound,
-            str::stream() << "source collection " << fromNss
+            str::stream() << "source collection " << fromNss.toStringForErrorMsg()
                           << " is currently in a drop-pending state.",
             !fromNss.isDropPendingNamespace());
 
     uassert(ErrorCodes::NamespaceExists,
-            str::stream() << "cloneCollectionAsCapped failed - destination collection " << toNss
-                          << " already exists. source collection: " << fromNss,
+            str::stream() << "cloneCollectionAsCapped failed - destination collection "
+                          << toNss.toStringForErrorMsg() << " already exists. source collection: "
+                          << fromNss.toStringForErrorMsg(),
             !CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, toNss));
 
     // create new collection
@@ -279,7 +284,8 @@ void convertToCapped(OperationContext* opCtx, const NamespaceString& ns, long lo
         !repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, ns);
 
     uassert(ErrorCodes::NotWritablePrimary,
-            str::stream() << "Not primary while converting " << ns << " to a capped collection",
+            str::stream() << "Not primary while converting " << ns.toStringForErrorMsg()
+                          << " to a capped collection",
             !userInitiatedWritesAndNotPrimary);
 
     Database* const db = coll.getDb();
@@ -297,8 +303,8 @@ void convertToCapped(OperationContext* opCtx, const NamespaceString& ns, long lo
         while (true) {
             auto tmpName = uassertStatusOKWithContext(
                 makeUniqueCollectionName(opCtx, dbname, "tmp%%%%%.convertToCapped." + shortSource),
-                str::stream() << "Cannot generate temporary collection namespace to convert " << ns
-                              << " to a capped collection");
+                str::stream() << "Cannot generate temporary collection namespace to convert "
+                              << ns.toStringForErrorMsg() << " to a capped collection");
 
             collLock.emplace(opCtx, tmpName, MODE_X);
             if (!CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, tmpName)) {

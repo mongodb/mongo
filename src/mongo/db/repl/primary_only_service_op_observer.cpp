@@ -85,13 +85,14 @@ repl::OpTime PrimaryOnlyServiceOpObserver::onDropCollection(OperationContext* op
                                                             const CollectionDropType dropType) {
     auto service = _registry->lookupServiceByNamespace(collectionName);
     if (service) {
-        opCtx->recoveryUnit()->onCommit([service, collectionName](OperationContext*,
-                                                                  boost::optional<Timestamp>) {
-            // Release and interrupt all the instances since the state document collection is
-            // not supposed to be dropped.
-            service->releaseAllInstances(
-                Status(ErrorCodes::Interrupted, str::stream() << collectionName << " is dropped"));
-        });
+        opCtx->recoveryUnit()->onCommit(
+            [service, collectionName](OperationContext*, boost::optional<Timestamp>) {
+                // Release and interrupt all the instances since the state document collection is
+                // not supposed to be dropped.
+                service->releaseAllInstances(
+                    Status(ErrorCodes::Interrupted,
+                           str::stream() << collectionName.toStringForErrorMsg() << " is dropped"));
+            });
     }
     return {};
 }

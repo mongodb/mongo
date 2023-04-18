@@ -398,7 +398,7 @@ Status insertDocuments(OperationContext* opCtx,
             return Status(ErrorCodes::InternalError,
                           str::stream()
                               << "Collection::insertDocument got document without _id for ns:"
-                              << nss.toString());
+                              << nss.toStringForErrorMsg());
         }
 
         auto status = collection->checkValidationAndParseResult(opCtx, it->doc);

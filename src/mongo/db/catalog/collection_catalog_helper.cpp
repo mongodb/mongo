@@ -43,7 +43,8 @@ Status checkIfNamespaceExists(OperationContext* opCtx, const NamespaceString& ns
     auto catalog = CollectionCatalog::get(opCtx);
     if (catalog->lookupCollectionByNamespace(opCtx, nss)) {
         return Status(ErrorCodes::NamespaceExists,
-                      str::stream() << "Collection " << nss.ns() << " already exists.");
+                      str::stream()
+                          << "Collection " << nss.toStringForErrorMsg() << " already exists.");
     }
 
     auto view = catalog->lookupView(opCtx, nss);
@@ -52,11 +53,12 @@ Status checkIfNamespaceExists(OperationContext* opCtx, const NamespaceString& ns
 
     if (view->timeseries()) {
         return Status(ErrorCodes::NamespaceExists,
-                      str::stream() << "A timeseries collection already exists. NS: " << nss);
+                      str::stream() << "A timeseries collection already exists. NS: "
+                                    << nss.toStringForErrorMsg());
     }
 
     return Status(ErrorCodes::NamespaceExists,
-                  str::stream() << "A view already exists. NS: " << nss);
+                  str::stream() << "A view already exists. NS: " << nss.toStringForErrorMsg());
 }
 
 

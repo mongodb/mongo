@@ -539,7 +539,7 @@ WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
     }
 
     if (_oplogMaxSize) {
-        invariant(_isOplog, str::stream() << "Namespace " << params.nss);
+        invariant(_isOplog, str::stream() << "Namespace " << params.nss.toStringForErrorMsg());
     }
 
     Status versionStatus = WiredTigerUtil::checkApplicationMetadataFormatVersion(

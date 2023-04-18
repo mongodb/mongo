@@ -561,7 +561,7 @@ void MovePrimaryCoordinator::assertNoOrphanedDataOnRecipient(
 
     for (const auto& nss : collectionsToClone) {
         uassert(ErrorCodes::NamespaceExists,
-                "Found orphaned collection {} on recipient {}"_format(nss.toString(),
+                "Found orphaned collection {} on recipient {}"_format(nss.toStringForErrorMsg(),
                                                                       toShardId.toString()),
                 !std::binary_search(allCollections.cbegin(), allCollections.cend(), nss));
     };

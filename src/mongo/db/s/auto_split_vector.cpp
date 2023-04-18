@@ -123,7 +123,7 @@ std::pair<std::vector<BSONObj>, bool> autoSplitVector(OperationContext* opCtx,
         AutoGetCollection collection(opCtx, nss, MODE_IS);
 
         uassert(ErrorCodes::NamespaceNotFound,
-                str::stream() << "namespace " << nss << " does not exists",
+                str::stream() << "namespace " << nss.toStringForErrorMsg() << " does not exists",
                 collection);
 
         // Get the size estimate for this namespace

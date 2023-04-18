@@ -104,7 +104,8 @@ void CollectionMetadata::throwIfReshardingInProgress(NamespaceString const& nss)
             LOGV2(5277122, "reshardCollection in progress", logAttrs(nss));
 
             uasserted(ErrorCodes::ReshardCollectionInProgress,
-                      "reshardCollection is in progress for namespace " + nss.toString());
+                      "reshardCollection is in progress for namespace " +
+                          nss.toStringForErrorMsg());
         }
     }
 }

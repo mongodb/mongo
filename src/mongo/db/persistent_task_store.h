@@ -201,7 +201,7 @@ private:
 
         uassert(ErrorCodes::NoMatchingDocument,
                 "No matching document found for query {} on namespace {}"_format(
-                    filter.toString(), _storageNss.toString()),
+                    filter.toString(), _storageNss.toStringForErrorMsg()),
                 upsert || commandResponse.getN() > 0);
 
         WriteConcernResult ignoreResult;

@@ -313,19 +313,19 @@ std::unique_ptr<fts::FTSMatcher> makeFtsMatcher(OperationContext* opCtx,
     auto desc = collection->getIndexCatalog()->findIndexByName(opCtx, indexName);
     tassert(5432209,
             str::stream() << "index descriptor not found for index named '" << indexName
-                          << "' in collection '" << collection->ns() << "'",
+                          << "' in collection '" << collection->ns().toStringForErrorMsg() << "'",
             desc);
 
     auto entry = collection->getIndexCatalog()->getEntry(desc);
     tassert(5432210,
             str::stream() << "index entry not found for index named '" << indexName
-                          << "' in collection '" << collection->ns() << "'",
+                          << "' in collection '" << collection->ns().toStringForErrorMsg() << "'",
             entry);
 
     auto accessMethod = static_cast<const FTSAccessMethod*>(entry->accessMethod());
     tassert(5432211,
             str::stream() << "access method is not defined for index named '" << indexName
-                          << "' in collection '" << collection->ns() << "'",
+                          << "' in collection '" << collection->ns().toStringForErrorMsg() << "'",
             accessMethod);
 
     // We assume here that node->ftsQuery is an FTSQueryImpl, not an FTSQueryNoop. In practice, this

@@ -97,16 +97,16 @@ Status checkValidatorCanBeUsedOnNs(const BSONObj& validator,
 
     if (nss.isSystem() && !nss.isDropPendingNamespace()) {
         return {ErrorCodes::InvalidOptions,
-                str::stream() << "Document validators not allowed on system collection " << nss
-                              << " with UUID " << uuid};
+                str::stream() << "Document validators not allowed on system collection "
+                              << nss.toStringForErrorMsg() << " with UUID " << uuid};
     }
 
     // Allow schema on config.settings. This is created internally, and user changes to this
     // validator are disallowed in the createCollection and collMod commands.
     if (nss.isOnInternalDb() && nss != NamespaceString::kConfigSettingsNamespace) {
         return {ErrorCodes::InvalidOptions,
-                str::stream() << "Document validators are not allowed on collection " << nss.ns()
-                              << " with UUID " << uuid << " in the "
+                str::stream() << "Document validators are not allowed on collection "
+                              << nss.toStringForErrorMsg() << " with UUID " << uuid << " in the "
                               << nss.dbName().toStringForErrorMsg() << " internal database"};
     }
     return Status::OK();
@@ -550,7 +550,7 @@ std::unique_ptr<SeekableRecordCursor> CollectionImpl::getCursor(OperationContext
                 CollectionCatalog::hasExclusiveAccessToCollection(opCtx, ns()) || snapshot,
                 fmt::format("Capped visibility snapshot was not initialized before reading from "
                             "collection non-exclusively: {}",
-                            _ns.ns()));
+                            _ns.toStringForErrorMsg()));
         } else {
             // We can lazily initialize the capped snapshot because no storage snapshot has been
             // opened yet.
@@ -898,7 +898,8 @@ Status CollectionImpl::updateCappedSize(OperationContext* opCtx,
 
     if (!_shared->_isCapped) {
         return Status(ErrorCodes::InvalidNamespace,
-                      str::stream() << "Cannot update size on a non-capped collection " << ns());
+                      str::stream() << "Cannot update size on a non-capped collection "
+                                    << ns().toStringForErrorMsg());
     }
 
     if (ns().isOplog() && newCappedSize) {

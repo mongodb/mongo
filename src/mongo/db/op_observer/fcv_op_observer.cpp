@@ -191,7 +191,7 @@ void FcvOpObserver::onDelete(OperationContext* opCtx,
     // documentKeyDecoration is set in OpObserverImpl::aboutToDelete. So the FcvOpObserver
     // relies on the OpObserverImpl also being in the opObserverRegistry.
     auto optDocKey = repl::documentKeyDecoration(opCtx);
-    invariant(optDocKey, nss.ns());
+    invariant(optDocKey, nss.toStringForErrorMsg());
     if (nss.isServerConfigurationCollection()) {
         auto id = optDocKey.value().getId().firstElement();
         if (id.type() == BSONType::String && id.String() == multiversion::kParameterName) {

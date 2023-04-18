@@ -96,7 +96,7 @@ Timestamp generateMinFetchTimestamp(OperationContext* opCtx, const NamespaceStri
             AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
 
             const std::string msg = str::stream()
-                << "All future oplog entries on the namespace " << sourceNss.ns()
+                << "All future oplog entries on the namespace " << sourceNss.toStringForErrorMsg()
                 << " must include a 'destinedRecipient' field";
             WriteUnitOfWork wuow(opCtx);
             opCtx->getClient()->getServiceContext()->getOpObserver()->onInternalOpMessage(
@@ -999,7 +999,7 @@ void ReshardingDonorService::DonorStateMachine::_updateDonorDocument(
         AutoGetCollection coll(opCtx.get(), nss, MODE_X);
 
         uassert(ErrorCodes::NamespaceNotFound,
-                str::stream() << nss.toString() << " does not exist",
+                str::stream() << nss.toStringForErrorMsg() << " does not exist",
                 coll);
 
         WriteUnitOfWork wuow(opCtx.get());

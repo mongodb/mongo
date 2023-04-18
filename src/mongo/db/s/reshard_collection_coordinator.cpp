@@ -52,7 +52,8 @@ void notifyChangeStreamsOnReshardCollectionComplete(OperationContext* opCtx,
                                                     const UUID& reshardUUID) {
 
     const std::string oMessage = str::stream()
-        << "Reshard collection " << collNss << " with shard key " << doc.getKey().toString();
+        << "Reshard collection " << collNss.toStringForErrorMsg() << " with shard key "
+        << doc.getKey().toString();
 
     BSONObjBuilder cmdBuilder;
     tassert(6590800, "Did not set old collectionUUID", doc.getOldCollectionUUID());

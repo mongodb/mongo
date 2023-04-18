@@ -343,7 +343,7 @@ std::unique_ptr<DocumentSourceMerge::LiteParsed> DocumentSourceMerge::LiteParsed
     auto targetNss = mergeSpec.getTargetNss();
 
     uassert(ErrorCodes::InvalidNamespace,
-            "Invalid {} target namespace: '{}'"_format(kStageName, targetNss.ns()),
+            "Invalid {} target namespace: '{}'"_format(kStageName, targetNss.toStringForErrorMsg()),
             targetNss.isValid());
 
     auto whenMatched =
@@ -425,7 +425,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceMerge::create(
             isSupportedMergeMode(whenMatched, whenNotMatched));
 
     uassert(ErrorCodes::InvalidNamespace,
-            "Invalid {} target namespace: '{}'"_format(kStageName, outputNs.ns()),
+            "Invalid {} target namespace: '{}'"_format(kStageName, outputNs.toStringForErrorMsg()),
             outputNs.isValid());
 
     uassert(ErrorCodes::OperationNotSupportedInTransaction,

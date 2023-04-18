@@ -154,7 +154,8 @@ void SessionsCollectionRS::checkSessionsCollectionExists(OperationContext* opCtx
         NamespaceString::kLogicalSessionsNamespace, includeBuildUUIDs, options);
 
     uassert(ErrorCodes::NamespaceNotFound,
-            str::stream() << NamespaceString::kLogicalSessionsNamespace << " does not exist",
+            str::stream() << NamespaceString::kLogicalSessionsNamespace.toStringForErrorMsg()
+                          << " does not exist",
             indexes.size() != 0u);
 
     auto index = std::find_if(indexes.begin(), indexes.end(), [](const BSONObj& index) {
@@ -162,12 +163,12 @@ void SessionsCollectionRS::checkSessionsCollectionExists(OperationContext* opCtx
     });
 
     uassert(ErrorCodes::IndexNotFound,
-            str::stream() << NamespaceString::kLogicalSessionsNamespace
+            str::stream() << NamespaceString::kLogicalSessionsNamespace.toStringForErrorMsg()
                           << " does not have the required TTL index",
             index != indexes.end());
 
     uassert(ErrorCodes::IndexOptionsConflict,
-            str::stream() << NamespaceString::kLogicalSessionsNamespace
+            str::stream() << NamespaceString::kLogicalSessionsNamespace.toStringForErrorMsg()
                           << " currently has the incorrect timeout for the TTL index",
             index->hasField("expireAfterSeconds") &&
                 index->getField("expireAfterSeconds").Int() ==

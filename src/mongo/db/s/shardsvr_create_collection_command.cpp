@@ -66,15 +66,15 @@ void translateToTimeseriesCollection(OperationContext* opCtx,
 
         if (bucketsColl) {
             uassert(6235600,
-                    str::stream() << "the collection '" << bucketsNs
+                    str::stream() << "the collection '" << bucketsNs.toStringForErrorMsg()
                                   << "' does not have 'timeseries' options",
                     bucketsColl->getTimeseriesOptions());
 
             if (createCmdRequest->getTimeseries()) {
                 uassert(6235601,
                         str::stream()
-                            << "the 'timeseries' spec provided must match that of exists '" << nss
-                            << "' collection",
+                            << "the 'timeseries' spec provided must match that of exists '"
+                            << nss->toStringForErrorMsg() << "' collection",
                         timeseries::optionsAreEqual(*createCmdRequest->getTimeseries(),
                                                     *bucketsColl->getTimeseriesOptions()));
             } else {

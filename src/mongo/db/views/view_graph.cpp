@@ -192,9 +192,9 @@ Status ViewGraph::_validateParents(uint64_t currentId, int currentDepth, StatsMa
             !CollatorInterface::collatorsMatch(currentNode.collator.get(),
                                                parentNode.collator.get())) {
             return {ErrorCodes::OptionNotSupportedOnView,
-                    str::stream() << "View " << currentNode.nss.ns()
+                    str::stream() << "View " << currentNode.nss.toStringForErrorMsg()
                                   << " has a collation that does not match the collation of view "
-                                  << parentNode.nss.ns()};
+                                  << parentNode.nss.toStringForErrorMsg()};
         }
 
         if (!(*statsMap)[parentId].checked) {
@@ -235,9 +235,9 @@ Status ViewGraph::_validateChildren(uint64_t startingId,
         auto errmsg = StringBuilder();
 
         errmsg << "View cycle detected: ";
-        errmsg << _graph[*iterator].nss.ns();
+        errmsg << _graph[*iterator].nss.toStringForErrorMsg();
         for (; iterator != traversalIds->rend(); ++iterator) {
-            errmsg << " => " << _graph[*iterator].nss.ns();
+            errmsg << " => " << _graph[*iterator].nss.toStringForErrorMsg();
         }
         return {ErrorCodes::GraphContainsCycle, errmsg.str()};
     }
@@ -262,9 +262,9 @@ Status ViewGraph::_validateChildren(uint64_t startingId,
             !CollatorInterface::collatorsMatch(currentNode.collator.get(),
                                                childNode.collator.get())) {
             return {ErrorCodes::OptionNotSupportedOnView,
-                    str::stream() << "View " << currentNode.nss.ns()
+                    str::stream() << "View " << currentNode.nss.toStringForErrorMsg()
                                   << " has a collation that does not match the collation of view "
-                                  << childNode.nss.ns()};
+                                  << childNode.nss.toStringForErrorMsg()};
         }
 
         auto res = _validateChildren(startingId, childId, currentDepth + 1, statsMap, traversalIds);

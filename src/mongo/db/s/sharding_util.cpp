@@ -160,8 +160,8 @@ Status createIndexOnCollection(OperationContext* opCtx,
                 auto db = autoColl.ensureDbExists(opCtx);
                 collection = db->createCollection(opCtx, ns, options);
                 invariant(collection,
-                          str::stream() << "Failed to create collection " << ns.ns()
-                                        << " for indexes: " << keys);
+                          str::stream() << "Failed to create collection "
+                                        << ns.toStringForErrorMsg() << " for indexes: " << keys);
                 wunit.commit();
             });
         }
@@ -228,7 +228,7 @@ Status createShardingIndexCatalogIndexes(OperationContext* opCtx) {
     if (!result.isOK()) {
         return result.withContext(str::stream()
                                   << "couldn't create collectionUUID_1_lastmod_1 index on "
-                                  << indexCatalogNamespace);
+                                  << indexCatalogNamespace.toStringForErrorMsg());
     }
     result = createIndexOnCollection(opCtx,
                                      indexCatalogNamespace,
@@ -238,7 +238,7 @@ Status createShardingIndexCatalogIndexes(OperationContext* opCtx) {
     if (!result.isOK()) {
         return result.withContext(str::stream()
                                   << "couldn't create collectionUUID_1_name_1 index on "
-                                  << indexCatalogNamespace);
+                                  << indexCatalogNamespace.toStringForErrorMsg());
     }
     return Status::OK();
 }
@@ -251,9 +251,9 @@ Status createShardCollectionCatalogIndexes(OperationContext* opCtx) {
                                 BSON(ShardAuthoritativeCollectionType::kUuidFieldName << 1),
                                 !unique);
     if (!result.isOK()) {
-        return result.withContext(str::stream()
-                                  << "couldn't create uuid_1 index on "
-                                  << NamespaceString::kShardCollectionCatalogNamespace);
+        return result.withContext(str::stream() << "couldn't create uuid_1 index on "
+                                                << NamespaceString::kShardCollectionCatalogNamespace
+                                                       .toStringForErrorMsg());
     }
 
     return Status::OK();

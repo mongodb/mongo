@@ -181,10 +181,12 @@ public:
             // this command.
             CollectionPtr restoreColl(CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
                 opCtx, NamespaceString::kConfigsvrRestoreNamespace));
-            uassert(ErrorCodes::NamespaceNotFound,
-                    str::stream() << "Collection " << NamespaceString::kConfigsvrRestoreNamespace
-                                  << " is missing",
-                    restoreColl);
+            uassert(
+                ErrorCodes::NamespaceNotFound,
+                str::stream() << "Collection "
+                              << NamespaceString::kConfigsvrRestoreNamespace.toStringForErrorMsg()
+                              << " is missing",
+                restoreColl);
         }
 
         for (const auto& collectionEntry : kCollectionEntries) {

@@ -617,8 +617,8 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
     const ChunkRange range(*_args.getMin(), *_args.getMax());
 
     std::string orphanedRangeCleanUpErrMsg = str::stream()
-        << "Moved chunks successfully but failed to clean up " << nss() << " range "
-        << redact(range.toString()) << " due to: ";
+        << "Moved chunks successfully but failed to clean up " << nss().toStringForErrorMsg()
+        << " range " << redact(range.toString()) << " due to: ";
 
     if (_args.getWaitForDelete()) {
         LOGV2(22019,

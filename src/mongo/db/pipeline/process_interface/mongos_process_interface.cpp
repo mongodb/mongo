@@ -70,7 +70,7 @@ StatusWith<CollectionRoutingInfo> getCollectionRoutingInfo(
     if (swRoutingInfo.isOK() && expCtx->uuid && swRoutingInfo.getValue().cm.isSharded()) {
         if (!swRoutingInfo.getValue().cm.uuidMatches(*expCtx->uuid)) {
             return {ErrorCodes::NamespaceNotFound,
-                    str::stream() << "The UUID of collection " << expCtx->ns.ns()
+                    str::stream() << "The UUID of collection " << expCtx->ns.toStringForErrorMsg()
                                   << " changed; it may have been dropped and re-created."};
         }
     }

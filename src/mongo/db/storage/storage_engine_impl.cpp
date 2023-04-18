@@ -341,9 +341,9 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx,
 
                     if (_options.forRepair) {
                         StorageRepairObserver::get(getGlobalServiceContext())
-                            ->invalidatingModification(str::stream()
-                                                       << "Collection " << entry.nss.ns()
-                                                       << " dropped: " << status.reason());
+                            ->invalidatingModification(
+                                str::stream() << "Collection " << entry.nss.toStringForErrorMsg()
+                                              << " dropped: " << status.reason());
                     }
                     wuow.commit();
                     continue;
@@ -415,7 +415,8 @@ void StorageEngineImpl::_initCollection(OperationContext* opCtx,
                                         Timestamp minValidTs) {
     auto md = _catalog->getMetaData(opCtx, catalogId);
     uassert(ErrorCodes::MustDowngrade,
-            str::stream() << "Collection does not have UUID in KVCatalog. Collection: " << nss,
+            str::stream() << "Collection does not have UUID in KVCatalog. Collection: "
+                          << nss.toStringForErrorMsg(),
             md->options.uuid);
 
     auto ident = _catalog->getEntry(catalogId).ident;
@@ -479,8 +480,9 @@ Status StorageEngineImpl::_recoverOrphanedCollection(OperationContext* opCtx,
     }
     if (dataModified) {
         StorageRepairObserver::get(getGlobalServiceContext())
-            ->invalidatingModification(str::stream() << "Collection " << collectionName
-                                                     << " recovered: " << status.reason());
+            ->invalidatingModification(str::stream()
+                                       << "Collection " << collectionName.toStringForErrorMsg()
+                                       << " recovered: " << status.reason());
     }
     wuow.commit();
     return Status::OK();
@@ -688,8 +690,9 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
         for (const DurableCatalog::EntryIdentifier& entry : catalogEntries) {
             if (engineIdents.find(entry.ident) == engineIdents.end()) {
                 return {ErrorCodes::UnrecoverableRollbackError,
-                        str::stream() << "Expected collection does not exist. Collection: "
-                                      << entry.nss.ns() << " Ident: " << entry.ident};
+                        str::stream()
+                            << "Expected collection does not exist. Collection: "
+                            << entry.nss.toStringForErrorMsg() << " Ident: " << entry.ident};
             }
         }
     }
@@ -819,7 +822,7 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
 
         for (auto&& indexName : indexesToDrop) {
             invariant(metaData->eraseIndex(indexName),
-                      str::stream() << "Index is missing. Collection: " << nss.ns()
+                      str::stream() << "Index is missing. Collection: " << nss.toStringForErrorMsg()
                                     << " Index: " << indexName);
         }
         if (indexesToDrop.size() > 0) {
@@ -1036,8 +1039,8 @@ Status StorageEngineImpl::repairRecordStore(OperationContext* opCtx,
     }
 
     if (dataModified) {
-        repairObserver->invalidatingModification(str::stream() << "Collection " << nss << ": "
-                                                               << status.reason());
+        repairObserver->invalidatingModification(
+            str::stream() << "Collection " << nss.toStringForErrorMsg() << ": " << status.reason());
     }
 
     // After repairing, re-initialize the collection with a valid RecordStore.

@@ -118,25 +118,26 @@ bool checkMetadataForSuccessfulSplitChunk(OperationContext* opCtx,
                             ShardVersionPlacementIgnoredNoIndexes() /* receivedVersion */,
                             boost::none /* wantedVersion */,
                             shardId),
-            str::stream() << "Collection " << nss.ns() << " needs to be recovered",
+            str::stream() << "Collection " << nss.toStringForErrorMsg() << " needs to be recovered",
             metadataAfterSplit);
     uassert(StaleConfigInfo(nss,
                             ShardVersionPlacementIgnoredNoIndexes() /* receivedVersion */,
                             ShardVersion::UNSHARDED() /* wantedVersion */,
                             shardId),
-            str::stream() << "Collection " << nss.ns() << " is not sharded",
+            str::stream() << "Collection " << nss.toStringForErrorMsg() << " is not sharded",
             metadataAfterSplit->isSharded());
     const auto placementVersion = metadataAfterSplit->getShardPlacementVersion();
     const auto epoch = placementVersion.epoch();
-    uassert(StaleConfigInfo(nss,
-                            ShardVersionPlacementIgnoredNoIndexes() /* receivedVersion */,
-                            ShardVersionFactory::make(
-                                *metadataAfterSplit,
-                                scopedCSR->getCollectionIndexes(opCtx)) /* wantedVersion */,
-                            shardId),
-            str::stream() << "Collection " << nss.ns() << " changed since split start",
-            epoch == expectedEpoch &&
-                (!expectedTimestamp || placementVersion.getTimestamp() == expectedTimestamp));
+    uassert(
+        StaleConfigInfo(
+            nss,
+            ShardVersionPlacementIgnoredNoIndexes() /* receivedVersion */,
+            ShardVersionFactory::make(*metadataAfterSplit,
+                                      scopedCSR->getCollectionIndexes(opCtx)) /* wantedVersion */,
+            shardId),
+        str::stream() << "Collection " << nss.toStringForErrorMsg() << " changed since split start",
+        epoch == expectedEpoch &&
+            (!expectedTimestamp || placementVersion.getTimestamp() == expectedTimestamp));
 
     ChunkType nextChunk;
     for (auto it = splitPoints.begin(); it != splitPoints.end(); ++it) {

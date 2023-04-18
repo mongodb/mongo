@@ -57,9 +57,9 @@ SemiFuture<StatsCacheVal> StatsCacheLoaderImpl::getStats(OperationContext* opCtx
 
         if (!cursor) {
             uasserted(ErrorCodes::OperationFailed,
-                      str::stream()
-                          << "Failed to establish a cursor for reading " << statsPath.first.ns()
-                          << ",  path " << statsPath.second << " from local storage");
+                      str::stream() << "Failed to establish a cursor for reading "
+                                    << statsPath.first.toStringForErrorMsg() << ",  path "
+                                    << statsPath.second << " from local storage");
         }
 
         if (cursor->more()) {
@@ -71,8 +71,8 @@ SemiFuture<StatsCacheVal> StatsCacheLoaderImpl::getStats(OperationContext* opCtx
         }
 
         uasserted(ErrorCodes::NamespaceNotFound,
-                  str::stream() << "Stats does not exists for " << statsNss.ns() << ",  path "
-                                << statsPath.second);
+                  str::stream() << "Stats does not exists for " << statsNss.toStringForErrorMsg()
+                                << ",  path " << statsPath.second);
     } catch (const DBException& ex) {
         uassertStatusOK(ex.toStatus());
     }

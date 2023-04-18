@@ -459,11 +459,12 @@ repl::OpTime ShardMergeRecipientOpObserver::onDropCollection(OperationContext* o
     if (collectionName == NamespaceString::kShardMergeRecipientsNamespace &&
         !tenant_migration_access_blocker::inRecoveryMode(opCtx)) {
 
-        uassert(ErrorCodes::IllegalOperation,
-                str::stream() << "Cannot drop "
-                              << NamespaceString::kShardMergeRecipientsNamespace.ns()
-                              << " collection as it is not empty",
-                !numRecords);
+        uassert(
+            ErrorCodes::IllegalOperation,
+            str::stream() << "Cannot drop "
+                          << NamespaceString::kShardMergeRecipientsNamespace.toStringForErrorMsg()
+                          << " collection as it is not empty",
+            !numRecords);
     }
     return OpTime();
 }

@@ -143,7 +143,7 @@ void ChangeStreamPreImagesCollectionManager::createPreImagesCollection(
         opCtx, preImagesCollectionNamespace, preImagesCollectionOptions, BSONObj());
     uassert(status.code(),
             str::stream() << "Failed to create the pre-images collection: "
-                          << preImagesCollectionNamespace.toStringWithTenantId()
+                          << preImagesCollectionNamespace.toStringForErrorMsg()
                           << causedBy(status.reason()),
             status.isOK() || status.code() == ErrorCodes::NamespaceExists);
 }
@@ -160,7 +160,7 @@ void ChangeStreamPreImagesCollectionManager::dropPreImagesCollection(
                        DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
     uassert(status.code(),
             str::stream() << "Failed to drop the pre-images collection: "
-                          << preImagesCollectionNamespace.toStringWithTenantId()
+                          << preImagesCollectionNamespace.toStringForErrorMsg()
                           << causedBy(status.reason()),
             status.isOK() || status.code() == ErrorCodes::NamespaceNotFound);
 }

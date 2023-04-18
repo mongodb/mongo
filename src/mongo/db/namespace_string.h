@@ -111,6 +111,9 @@ public:
         decltype(auto) toString() const {
             return _get().toString();
         }
+        decltype(auto) toStringForErrorMsg() const {
+            return _get().toStringForErrorMsg();
+        }
 
         friend std::ostream& operator<<(std::ostream& stream, const ConstantProxy& nss) {
             return stream << nss.toString();
@@ -918,6 +921,8 @@ public:
     Status isNssValid() const;
 
     std::string toString() const;
+
+    std::string toStringForErrorMsg() const;
 
     void serialize(BSONObjBuilder* builder, StringData fieldName) const;
 

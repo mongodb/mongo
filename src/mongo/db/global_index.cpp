@@ -164,7 +164,7 @@ void createContainer(OperationContext* opCtx, const UUID& indexUUID) {
                         indexKeySpec,
                         IndexCatalog::InclusionPolicy::kReady));
             tassert(6789206,
-                    str::stream() << "Collection with namespace " << nss.ns()
+                    str::stream() << "Collection with namespace " << nss.toStringForErrorMsg()
                                   << " already exists but it has inconsistent UUID "
                                   << autoColl->uuid().toString() << ".",
                     autoColl->uuid() == indexUUID);

@@ -195,7 +195,7 @@ write_ops::FindAndModifyCommandReply buildResponse(
 void assertCanWrite_inlock(OperationContext* opCtx, const NamespaceString& nss) {
     uassert(ErrorCodes::NotWritablePrimary,
             str::stream() << "Not primary while running findAndModify command on collection "
-                          << nss.ns(),
+                          << nss.toStringForErrorMsg(),
             repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, nss));
 
     CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss)
@@ -218,7 +218,7 @@ void checkIfTransactionOnCappedColl(const CollectionPtr& coll, bool inTransactio
     if (coll && coll->isCapped()) {
         uassert(
             ErrorCodes::OperationNotSupportedInTransaction,
-            str::stream() << "Collection '" << coll->ns()
+            str::stream() << "Collection '" << coll->ns().toStringForErrorMsg()
                           << "' is a capped collection. Writes in transactions are not allowed on "
                              "capped collections.",
             !inTransaction);

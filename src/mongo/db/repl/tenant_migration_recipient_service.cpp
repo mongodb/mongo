@@ -2321,7 +2321,8 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::_markStateDocAsGarba
             AutoGetCollection collection(
                 opCtx, NamespaceString::kTenantMigrationRecipientsNamespace, MODE_IX);
             uassert(ErrorCodes::NamespaceNotFound,
-                    str::stream() << NamespaceString::kTenantMigrationRecipientsNamespace.ns()
+                    str::stream() << NamespaceString::kTenantMigrationRecipientsNamespace
+                                         .toStringForErrorMsg()
                                   << " does not exist",
                     collection);
 

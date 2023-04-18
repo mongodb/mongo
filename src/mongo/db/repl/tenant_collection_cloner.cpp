@@ -277,7 +277,7 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::listIndexesStage() {
         ErrorCodes::IllegalOperation,
         str::stream() << "Found empty '_id' index spec but the collection is not specified with "
                          "'autoIndexId' as false, tenantId: "
-                      << _tenantId << ", namespace: " << this->_sourceNss,
+                      << _tenantId << ", namespace: " << this->_sourceNss.toStringForErrorMsg(),
         _collectionOptions.clusteredIndex || !_idIndexSpec.isEmpty() ||
             _collectionOptions.autoIndexId == CollectionOptions::NO);
 
@@ -307,7 +307,8 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::createCollectionStage() {
                               << " already exists but does not belong to the same database",
                 collection->ns().db() == _sourceNss.db());
         uassert(ErrorCodes::NamespaceExists,
-                str::stream() << "Tenant '" << _tenantId << "': collection '" << collection->ns()
+                str::stream() << "Tenant '" << _tenantId << "': collection '"
+                              << collection->ns().toStringForErrorMsg()
                               << "' already exists prior to data sync",
                 getSharedData()->getResumePhase() == ResumePhase::kDataSync);
 

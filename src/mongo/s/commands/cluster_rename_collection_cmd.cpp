@@ -66,11 +66,11 @@ public:
             auto toNss = request().getTo();
 
             uassert(ErrorCodes::InvalidNamespace,
-                    str::stream() << "Invalid source namespace: " << fromNss.ns(),
+                    str::stream() << "Invalid source namespace: " << fromNss.toStringForErrorMsg(),
                     fromNss.isValid());
 
             uassert(ErrorCodes::InvalidNamespace,
-                    str::stream() << "Invalid target namespace: " << toNss.ns(),
+                    str::stream() << "Invalid target namespace: " << toNss.toStringForErrorMsg(),
                     toNss.isValid());
 
             uassert(ErrorCodes::IllegalOperation,

@@ -90,8 +90,8 @@ OplogInterfaceLocal::OplogInterfaceLocal(OperationContext* opCtx) : _opCtx(opCtx
 std::string OplogInterfaceLocal::toString() const {
     return str::stream() << "LocalOplogInterface: "
                             "operation context: "
-                         << _opCtx->getOpID()
-                         << "; collection: " << NamespaceString::kRsOplogNamespace;
+                         << _opCtx->getOpID() << "; collection: "
+                         << NamespaceString::kRsOplogNamespace.toStringForErrorMsg();
 }
 
 std::unique_ptr<OplogInterface::Iterator> OplogInterfaceLocal::makeIterator() const {

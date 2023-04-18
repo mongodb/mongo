@@ -249,7 +249,7 @@ public:
                     return Status(status.code(),
                                   str::stream()
                                       << "Write to change collection: "
-                                      << tenantChangeCollection->ns().toStringWithTenantId()
+                                      << tenantChangeCollection->ns().toStringForErrorMsg()
                                       << "failed")
                         .withReason(status.reason());
                 }
@@ -392,7 +392,7 @@ void ChangeStreamChangeCollectionManager::createChangeCollection(OperationContex
     const auto status = createCollection(opCtx, changeCollNss, changeCollectionOptions, BSONObj());
     uassert(status.code(),
             str::stream() << "Failed to create change collection: "
-                          << changeCollNss.toStringWithTenantId() << causedBy(status.reason()),
+                          << changeCollNss.toStringForErrorMsg() << causedBy(status.reason()),
             status.isOK() || status.code() == ErrorCodes::NamespaceExists);
 }
 
@@ -408,7 +408,7 @@ void ChangeStreamChangeCollectionManager::dropChangeCollection(OperationContext*
                        DropCollectionSystemCollectionMode::kAllowSystemCollectionDrops);
     uassert(status.code(),
             str::stream() << "Failed to drop change collection: "
-                          << changeCollNss.toStringWithTenantId() << causedBy(status.reason()),
+                          << changeCollNss.toStringForErrorMsg() << causedBy(status.reason()),
             status.isOK() || status.code() == ErrorCodes::NamespaceNotFound);
 }
 

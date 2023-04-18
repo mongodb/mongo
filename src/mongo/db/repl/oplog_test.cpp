@@ -80,7 +80,8 @@ OplogEntry _getSingleOplogEntry(OperationContext* opCtx) {
     auto oplogIter = oplogInterface.makeIterator();
     auto opEntry = unittest::assertGet(oplogIter->next());
     ASSERT_EQUALS(ErrorCodes::CollectionIsEmpty, oplogIter->next().getStatus())
-        << "Expected only 1 document in the oplog collection " << NamespaceString::kRsOplogNamespace
+        << "Expected only 1 document in the oplog collection "
+        << NamespaceString::kRsOplogNamespace.toStringForErrorMsg()
         << " but found more than 1 document instead";
     return unittest::assertGet(OplogEntry::parse(opEntry.first));
 }
@@ -168,11 +169,13 @@ void _testConcurrentLogOp(const F& makeTaskFunction,
     const NamespaceString nss1 = NamespaceString::createNamespaceString_forTest("test1.coll");
     const NamespaceString nss2 = NamespaceString::createNamespaceString_forTest("test2.coll");
     pool.schedule([&](auto status) mutable {
-        ASSERT_OK(status) << "Failed to schedule logOp() task for namespace " << nss1;
+        ASSERT_OK(status) << "Failed to schedule logOp() task for namespace "
+                          << nss1.toStringForErrorMsg();
         makeTaskFunction(nss1, &mtx, opTimeNssMap, &barrier)();
     });
     pool.schedule([&](auto status) mutable {
-        ASSERT_OK(status) << "Failed to schedule logOp() task for namespace " << nss2;
+        ASSERT_OK(status) << "Failed to schedule logOp() task for namespace "
+                          << nss2.toStringForErrorMsg();
         makeTaskFunction(nss2, &mtx, opTimeNssMap, &barrier)();
     });
     barrier.countDownAndWait();
@@ -221,8 +224,8 @@ OpTime _logOpNoopWithMsg(OperationContext* opCtx,
 
     stdx::lock_guard<Latch> lock(*mtx);
     ASSERT(opTimeNssMap->find(opTime) == opTimeNssMap->end())
-        << "Unable to add namespace " << nss << " to map - map contains duplicate entry for optime "
-        << opTime;
+        << "Unable to add namespace " << nss.toStringForErrorMsg()
+        << " to map - map contains duplicate entry for optime " << opTime;
     opTimeNssMap->insert(std::make_pair(opTime, nss));
 
     return opTime;

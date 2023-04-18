@@ -218,7 +218,7 @@ StatusWith<ChunkVersion> getMaxChunkVersionFromQueryResponse(
     const auto& chunksVector = queryResponse.getValue().docs;
     if (chunksVector.empty()) {
         return {ErrorCodes::Error(50577),
-                str::stream() << "Collection '" << coll.getNss().ns()
+                str::stream() << "Collection '" << coll.getNss().toStringForErrorMsg()
                               << "' no longer either exists, is sharded, or has chunks"};
     }
 
@@ -247,7 +247,8 @@ StatusWith<std::pair<CollectionType, ChunkVersion>> getCollectionAndVersion(
 
     if (findCollResponse.getValue().docs.empty()) {
         return {ErrorCodes::ConflictingOperationInProgress,
-                str::stream() << "Sharded collection '" << nss.ns() << "' no longer exists"};
+                str::stream() << "Sharded collection '" << nss.toStringForErrorMsg()
+                              << "' no longer exists"};
     }
 
     const CollectionType coll(findCollResponse.getValue().docs[0]);
@@ -325,8 +326,8 @@ void bumpCollectionMinorVersion(OperationContext* opCtx,
         1 /* limit */));
 
     uassert(ErrorCodes::IncompatibleShardingMetadata,
-            str::stream() << "Tried to find max chunk version for collection '" << nss.ns()
-                          << ", but found no chunks",
+            str::stream() << "Tried to find max chunk version for collection '"
+                          << nss.toStringForErrorMsg() << ", but found no chunks",
             !findChunkResponse.docs.empty());
 
     const auto newestChunk = uassertStatusOK(ChunkType::parseFromConfigBSON(
@@ -727,7 +728,8 @@ ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
         (requestTimestamp && coll.getTimestamp() != requestTimestamp)) {
         return {ErrorCodes::StaleEpoch,
                 str::stream() << "splitChunk cannot split chunk " << range.toString()
-                              << ". Epoch of collection '" << nss.ns() << "' has changed."
+                              << ". Epoch of collection '" << nss.toStringForErrorMsg()
+                              << "' has changed."
                               << " Current epoch: " << coll.getEpoch()
                               << ", cmd epoch: " << requestEpoch};
     }
@@ -1288,8 +1290,8 @@ ShardingCatalogManager::commitChunkMigration(OperationContext* opCtx,
         BSON(ChunkType::lastmod << -1),
         1));
     uassert(ErrorCodes::IncompatibleShardingMetadata,
-            str::stream() << "Tried to find max chunk version for collection '" << nss.ns()
-                          << ", but found no chunks",
+            str::stream() << "Tried to find max chunk version for collection '"
+                          << nss.toStringForErrorMsg() << ", but found no chunks",
             !findResponse.docs.empty());
 
     const auto chunk = uassertStatusOK(
@@ -1309,7 +1311,7 @@ ShardingCatalogManager::commitChunkMigration(OperationContext* opCtx,
     if (currentCollectionPlacementVersion.epoch() != collectionEpoch ||
         currentCollectionPlacementVersion.getTimestamp() != collectionTimestamp) {
         return {ErrorCodes::StaleEpoch,
-                str::stream() << "The epoch of collection '" << nss.ns()
+                str::stream() << "The epoch of collection '" << nss.toStringForErrorMsg()
                               << "' has changed since the migration began. The config server's "
                                  "collection placement version epoch is now '"
                               << currentCollectionPlacementVersion.epoch().toString()
@@ -1352,8 +1354,8 @@ ShardingCatalogManager::commitChunkMigration(OperationContext* opCtx,
 
     uassert(4914702,
             str::stream() << "Migrated  chunk " << migratedChunk.toString()
-                          << " from ns: " << nss.ns() << " not owned by donor " << fromShard
-                          << " neither by recipient " << toShard,
+                          << " from ns: " << nss.toStringForErrorMsg() << " not owned by donor "
+                          << fromShard << " neither by recipient " << toShard,
             currentChunk.getShard() == fromShard);
 
     if (migratedChunk.getVersion().isNotComparableWith(currentChunk.getVersion()) ||
@@ -1408,9 +1410,9 @@ ShardingCatalogManager::commitChunkMigration(OperationContext* opCtx,
 
     if (!newHistory.empty() && newHistory.front().getValidAfter() >= validAfter) {
         return {ErrorCodes::IncompatibleShardingMetadata,
-                str::stream() << "The chunk history for chunk with namespace " << nss.ns()
-                              << " and min key " << migratedChunk.getMin()
-                              << " is corrupted. The last validAfter "
+                str::stream() << "The chunk history for chunk with namespace "
+                              << nss.toStringForErrorMsg() << " and min key "
+                              << migratedChunk.getMin() << " is corrupted. The last validAfter "
                               << newHistory.back().getValidAfter().toString()
                               << " is greater or equal to the new validAfter "
                               << validAfter.toString()};
@@ -1566,7 +1568,7 @@ void ShardingCatalogManager::upgradeChunksHistory(OperationContext* opCtx,
         uassertStatusOK(response.toStatus());
 
         uassert(ErrorCodes::Error(5760502),
-                str::stream() << "No chunks found for collection " << nss.ns(),
+                str::stream() << "No chunks found for collection " << nss.toStringForErrorMsg(),
                 response.getN() > 0);
     }
 
@@ -1581,7 +1583,7 @@ void ShardingCatalogManager::upgradeChunksHistory(OperationContext* opCtx,
             BSONObj(),
             boost::none));
         uassert(ErrorCodes::Error(5760503),
-                str::stream() << "No chunks found for collection " << nss.ns(),
+                str::stream() << "No chunks found for collection " << nss.toStringForErrorMsg(),
                 !findChunksResponse.docs.empty());
         return std::move(findChunksResponse.docs);
     }();
@@ -1598,7 +1600,8 @@ void ShardingCatalogManager::upgradeChunksHistory(OperationContext* opCtx,
         if (historyIsAt40) {
             uassert(
                 ErrorCodes::Error(5760504),
-                str::stream() << "Chunk " << upgradeChunk.getName() << " in collection " << nss.ns()
+                str::stream() << "Chunk " << upgradeChunk.getName() << " in collection "
+                              << nss.toStringForErrorMsg()
                               << " indicates that it has been upgraded to version 4.0, but is "
                                  "missing the history field. This indicates a corrupted routing "
                                  "table and requires a manual intervention to be fixed.",
@@ -1742,7 +1745,7 @@ void ShardingCatalogManager::clearJumboFlag(OperationContext* opCtx,
     const auto targetChunkVector = std::move(targetChunkResult.docs);
     uassert(51262,
             str::stream() << "Unable to locate chunk " << chunk.toString()
-                          << " from ns: " << nss.ns(),
+                          << " from ns: " << nss.toStringForErrorMsg(),
             !targetChunkVector.empty());
 
     const auto targetChunk = uassertStatusOK(ChunkType::parseFromConfigBSON(
@@ -1766,8 +1769,8 @@ void ShardingCatalogManager::clearJumboFlag(OperationContext* opCtx,
 
     const auto chunksVector = std::move(findResponse.docs);
     uassert(ErrorCodes::IncompatibleShardingMetadata,
-            str::stream() << "Tried to find max chunk version for collection '" << nss.ns()
-                          << ", but found no chunks",
+            str::stream() << "Tried to find max chunk version for collection '"
+                          << nss.toStringForErrorMsg() << ", but found no chunks",
             !chunksVector.empty());
 
     const auto highestVersionChunk = uassertStatusOK(
@@ -1780,7 +1783,7 @@ void ShardingCatalogManager::clearJumboFlag(OperationContext* opCtx,
     // or had its shard key refined since the migration began, unbeknown to the shard when the
     // command was sent.
     uassert(ErrorCodes::StaleEpoch,
-            str::stream() << "The epoch of collection '" << nss.ns()
+            str::stream() << "The epoch of collection '" << nss.toStringForErrorMsg()
                           << "' has changed since the migration began. The config server's "
                              "collection placement version epoch is now '"
                           << currentCollectionPlacementVersion.epoch().toString()
@@ -2171,7 +2174,7 @@ void ShardingCatalogManager::setAllowMigrationsAndBumpOneChunk(
         uassert(ErrorCodes::InvalidUUID,
                 str::stream() << "Collection uuid " << collectionUUID
                               << " in the request does not match the current uuid " << cm.getUUID()
-                              << " for ns " << nss,
+                              << " for ns " << nss.toStringForErrorMsg(),
                 !collectionUUID || collectionUUID == cm.getUUID());
 
         cm.getAllShardIds(&cmShardIds);
@@ -2458,8 +2461,8 @@ void ShardingCatalogManager::_commitChunkMigrationInTransaction(
                        std::move(generateAndPersistPlacementInfoSubchain)](
                       const std::vector<BSONObj>& queryResponse) {
                 tassert(6892800,
-                        str::stream()
-                            << "Unexpected number of placement entries retrieved" << nss.toString(),
+                        str::stream() << "Unexpected number of placement entries retrieved"
+                                      << nss.toStringForErrorMsg(),
                         queryResponse.size() <= 1);
 
                 if (queryResponse.size() == 0) {

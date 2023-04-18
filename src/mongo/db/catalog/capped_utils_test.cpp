@@ -96,7 +96,7 @@ bool collectionExists(OperationContext* opCtx, const NamespaceString& nss) {
  */
 CollectionOptions getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) {
     AutoGetCollectionForRead collection(opCtx, nss);
-    ASSERT_TRUE(collection) << "Unable to get collections options for " << nss
+    ASSERT_TRUE(collection) << "Unable to get collections options for " << nss.toStringForErrorMsg()
                             << " because collection does not exist.";
     return collection->getCollectionOptions();
 }

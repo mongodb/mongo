@@ -143,7 +143,8 @@ std::set<ShardId> getRecipientShards(OperationContext* opCtx,
     auto [cm, _] = uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, tempNss));
 
     uassert(ErrorCodes::NamespaceNotSharded,
-            str::stream() << "Expected collection " << tempNss << " to be sharded",
+            str::stream() << "Expected collection " << tempNss.toStringForErrorMsg()
+                          << " to be sharded",
             cm.isSharded());
 
     std::set<ShardId> recipients;
@@ -361,7 +362,7 @@ void doNoopWrite(OperationContext* opCtx, StringData opStr, const NamespaceStrin
     writeConflictRetry(opCtx, opStr, NamespaceString::kRsOplogNamespace.ns(), [&] {
         AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
 
-        const std::string msg = str::stream() << opStr << " on " << nss;
+        const std::string msg = str::stream() << opStr << " on " << nss.toStringForErrorMsg();
         WriteUnitOfWork wuow(opCtx);
         opCtx->getClient()->getServiceContext()->getOpObserver()->onInternalOpMessage(
             opCtx,

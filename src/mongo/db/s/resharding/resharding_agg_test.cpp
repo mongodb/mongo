@@ -153,7 +153,7 @@ public:
     BSONObj getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) override {
         auto optionIter = _collectionOptions.find(nss);
         invariant(optionIter != _collectionOptions.end(),
-                  str::stream() << nss.ns() << " was not registered");
+                  str::stream() << nss.toStringForErrorMsg() << " was not registered");
 
         return optionIter->second;
     }

@@ -115,8 +115,9 @@ void CreateCollectionTest::validateValidator(const std::string& validatorStr,
     return writeConflictRetry(opCtx.get(), "create", newNss.ns(), [&] {
         AutoGetCollection autoColl(opCtx.get(), newNss, MODE_IX);
         auto db = autoColl.ensureDbExists(opCtx.get());
-        ASSERT_TRUE(db) << "Cannot create collection " << newNss << " because database "
-                        << newNss.dbName().toStringForErrorMsg() << " does not exist.";
+        ASSERT_TRUE(db) << "Cannot create collection " << newNss.toStringForErrorMsg()
+                        << " because database " << newNss.dbName().toStringForErrorMsg()
+                        << " does not exist.";
 
         WriteUnitOfWork wuow(opCtx.get());
         const auto status =
@@ -137,7 +138,7 @@ bool collectionExists(OperationContext* opCtx, const NamespaceString& nss) {
  */
 CollectionOptions getCollectionOptions(OperationContext* opCtx, const NamespaceString& nss) {
     AutoGetCollectionForRead collection(opCtx, nss);
-    ASSERT_TRUE(collection) << "Unable to get collections options for " << nss
+    ASSERT_TRUE(collection) << "Unable to get collections options for " << nss.toStringForErrorMsg()
                             << " because collection does not exist.";
     return collection->getCollectionOptions();
 }
@@ -252,7 +253,7 @@ TEST_F(CreateCollectionTest,
     ASSERT(renamedCollectionNss);
     ASSERT_TRUE(collectionExists(opCtx.get(), *renamedCollectionNss))
         << "old renamed collection with UUID " << existingCollectionUuid
-        << " missing: " << *renamedCollectionNss;
+        << " missing: " << (*renamedCollectionNss).toStringForErrorMsg();
 }
 
 TEST_F(CreateCollectionTest,

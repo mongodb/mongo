@@ -1421,7 +1421,7 @@ Status QueryPlannerTestLib::solutionMatches(const BSONObj& testSoln,
                 str::stream() << "Test solution 'foreignCollection' does not match actual; test "
                                  ""
                               << expectedForeignCollection.str() << " != actual "
-                              << actualEqLookupNode->foreignCollection};
+                              << actualEqLookupNode->foreignCollection.toStringForErrorMsg()};
         }
 
         auto expectedLocalField = expectedEqLookupSoln["joinFieldLocal"];

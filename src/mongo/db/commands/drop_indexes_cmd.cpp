@@ -89,7 +89,7 @@ public:
         void doCheckAuthorization(OperationContext* opCtx) const final {
             uassert(ErrorCodes::Unauthorized,
                     str::stream() << "Not authorized to drop index(es) on collection"
-                                  << request().getNamespace(),
+                                  << request().getNamespace().toStringForErrorMsg(),
                     AuthorizationSession::get(opCtx->getClient())
                         ->isAuthorizedForActionsOnNamespace(request().getNamespace(),
                                                             ActionType::dropIndex));
@@ -165,7 +165,7 @@ public:
                 ErrorCodes::IllegalOperation,
                 str::stream()
                     << "reIndex is only allowed on a standalone mongod instance. Cannot reIndex '"
-                    << toReIndexNss << "' while replication is active");
+                    << toReIndexNss.toStringForErrorMsg() << "' while replication is active");
         }
 
         auto acquisition = [&] {

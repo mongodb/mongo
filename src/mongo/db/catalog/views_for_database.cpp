@@ -246,7 +246,7 @@ Status ViewsForDatabase::_upsertIntoGraph(OperationContext* opCtx,
             if (needsValidation) {
                 uassertStatusOKWithContext(pipelineStatus.getStatus(),
                                            str::stream() << "Invalid pipeline for view "
-                                                         << viewDef.name().ns());
+                                                         << viewDef.name().toStringForErrorMsg());
             }
             return pipelineStatus.getStatus();
         }
@@ -390,9 +390,9 @@ Status ViewsForDatabase::_validateCollation(OperationContext* opCtx,
             !CollatorInterface::collatorsMatch(view.defaultCollator(),
                                                otherView->defaultCollator())) {
             return {ErrorCodes::OptionNotSupportedOnView,
-                    str::stream() << "View " << view.name().toString()
+                    str::stream() << "View " << view.name().toStringForErrorMsg()
                                   << " has conflicting collation with view "
-                                  << otherView->name().toString()};
+                                  << otherView->name().toStringForErrorMsg()};
         }
     }
 

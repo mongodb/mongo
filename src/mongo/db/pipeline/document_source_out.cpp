@@ -100,7 +100,7 @@ std::unique_ptr<DocumentSourceOut::LiteParsed> DocumentSourceOut::LiteParsed::pa
     const NamespaceString& nss, const BSONElement& spec) {
     NamespaceString targetNss = parseNsFromElem(spec, nss.dbName());
     uassert(ErrorCodes::InvalidNamespace,
-            "Invalid {} target namespace, {}"_format(kStageName, targetNss.ns()),
+            "Invalid {} target namespace, {}"_format(kStageName, targetNss.toStringForErrorMsg()),
             targetNss.isValid());
     return std::make_unique<DocumentSourceOut::LiteParsed>(spec.fieldName(), std::move(targetNss));
 }
@@ -130,7 +130,8 @@ void DocumentSourceOut::initialize() {
     // If the collection becomes capped during processing, the collection options will have changed,
     // and the $out will fail.
     uassert(17152,
-            "namespace '{}' is capped so it can't be used for {}"_format(outputNs.ns(), kStageName),
+            "namespace '{}' is capped so it can't be used for {}"_format(
+                outputNs.toStringForErrorMsg(), kStageName),
             _originalOutOptions["capped"].eoo());
 
     {
@@ -191,7 +192,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceOut::create(
             !expCtx->opCtx->inMultiDocumentTransaction());
 
     uassert(ErrorCodes::InvalidNamespace,
-            "Invalid {} target namespace, {}"_format(kStageName, outputNs.ns()),
+            "Invalid {} target namespace, {}"_format(kStageName, outputNs.toStringForErrorMsg()),
             outputNs.isValid());
 
     uassert(17385,

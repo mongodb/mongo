@@ -361,7 +361,7 @@ std::unique_ptr<DocumentSourceLookUp::LiteParsed> DocumentSourceLookUp::LitePars
         fromNss = parseLookupFromAndResolveNamespace(fromElement, nss.dbName());
     }
     uassert(ErrorCodes::InvalidNamespace,
-            str::stream() << "invalid $lookup namespace: " << fromNss.ns(),
+            str::stream() << "invalid $lookup namespace: " << fromNss.toStringForErrorMsg(),
             fromNss.isValid());
 
     // Recursively lite parse the nested pipeline, if one exists.

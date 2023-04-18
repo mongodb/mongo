@@ -67,7 +67,7 @@ BSONObj getCriticalSectionReasonForIndexCommit(const NamespaceString& nss,
                                                const std::string& name) {
     return BSON("command"
                 << "commitIndexCatalogEntry"
-                << "nss" << nss.toString() << IndexCatalogType::kNameFieldName << name);
+                << "nss" << nss.toStringForErrorMsg() << IndexCatalogType::kNameFieldName << name);
 }
 
 /**
@@ -112,7 +112,8 @@ void coordinateIndexCatalogModificationAcrossCollectionShards(
         Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithPlacementRefresh(
             opCtx, userCollectionNss));
     uassert(ErrorCodes::NamespaceNotSharded,
-            str::stream() << "collection " << userCollectionNss << " is not sharded",
+            str::stream() << "collection " << userCollectionNss.toStringForErrorMsg()
+                          << " is not sharded",
             routingInfo.isSharded());
     std::set<ShardId> shardIdsSet;
     routingInfo.getAllShardIds(&shardIdsSet);

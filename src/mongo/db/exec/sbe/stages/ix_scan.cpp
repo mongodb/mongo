@@ -92,7 +92,7 @@ void IndexScanStageBase::prepareImpl(CompileCtx& ctx) {
     auto indexDesc = indexCatalog->findIndexByName(_opCtx, _indexName);
     tassert(4938500,
             str::stream() << "could not find index named '" << _indexName << "' in collection '"
-                          << _collName << "'",
+                          << _collName->toStringForErrorMsg() << "'",
             indexDesc);
     _entry = indexCatalog->getEntry(indexDesc);
     tassert(4938503,

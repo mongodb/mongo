@@ -111,12 +111,12 @@ void doTransactionValidationForWrites(OperationContext* opCtx, const NamespaceSt
     if (!opCtx->inMultiDocumentTransaction())
         return;
     uassert(50791,
-            str::stream() << "Cannot write to system collection " << ns.toString()
+            str::stream() << "Cannot write to system collection " << ns.toStringForErrorMsg()
                           << " within a transaction.",
             !ns.isSystem() || ns.isPrivilegeCollection() || ns.isTimeseriesBucketsCollection());
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     uassert(50790,
-            str::stream() << "Cannot write to unreplicated collection " << ns.toString()
+            str::stream() << "Cannot write to unreplicated collection " << ns.toStringForErrorMsg()
                           << " within a transaction.",
             !replCoord->isOplogDisabledFor(opCtx, ns));
 }

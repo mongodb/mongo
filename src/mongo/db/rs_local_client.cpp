@@ -162,8 +162,8 @@ StatusWith<Shard::QueryResponse> RSLocalClient::queryOnce(
 
         if (!cursor) {
             return {ErrorCodes::OperationFailed,
-                    str::stream() << "Failed to establish a cursor for reading " << nss.ns()
-                                  << " from local storage"};
+                    str::stream() << "Failed to establish a cursor for reading "
+                                  << nss.toStringForErrorMsg() << " from local storage"};
         }
 
         std::vector<BSONObj> documentVector;

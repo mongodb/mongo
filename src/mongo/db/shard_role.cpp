@@ -161,16 +161,17 @@ void verifyDbAndCollection(OperationContext* opCtx,
         operationType == AcquisitionPrerequisites::OperationType::kWrite) {
         auto latest = CollectionCatalog::latest(opCtx);
         if (!latest->containsCollection(opCtx, coll.get())) {
-            throwWriteConflictException(str::stream()
-                                        << "Unable to write to collection '" << coll->ns()
-                                        << "' due to catalog changes; please "
-                                           "retry the operation");
+            throwWriteConflictException(str::stream() << "Unable to write to collection '"
+                                                      << coll->ns().toStringForErrorMsg()
+                                                      << "' due to catalog changes; please "
+                                                         "retry the operation");
         }
         if (opCtx->recoveryUnit()->isActive()) {
             const auto mySnapshot = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
             if (mySnapshot && *mySnapshot < coll->getMinimumValidSnapshot()) {
                 throwWriteConflictException(str::stream()
-                                            << "Unable to write to collection '" << coll->ns()
+                                            << "Unable to write to collection '"
+                                            << coll->ns().toStringForErrorMsg()
                                             << "' due to snapshot timestamp " << *mySnapshot
                                             << " being older than collection minimum "
                                             << *coll->getMinimumValidSnapshot()
@@ -228,7 +229,8 @@ std::variant<CollectionPtr, std::shared_ptr<const ViewDefinition>> acquireLocalC
         return coll;
     } else if (auto view = catalog->lookupView(opCtx, nss)) {
         uassert(ErrorCodes::CommandNotSupportedOnView,
-                str::stream() << "Namespace " << nss << " is a view, not a collection",
+                str::stream() << "Namespace " << nss.toStringForErrorMsg()
+                              << " is a view, not a collection",
                 prerequisites.viewMode == AcquisitionPrerequisites::kCanBeView);
         return view;
     } else {
@@ -383,7 +385,7 @@ CollectionAcquisitionRequest CollectionAcquisitionRequest::fromOpCtx(
 
 const UUID& ScopedCollectionAcquisition::uuid() const {
     invariant(exists(),
-              str::stream() << "Collection " << nss()
+              str::stream() << "Collection " << nss().toStringForErrorMsg()
                             << " doesn't exist, so its UUID cannot be obtained");
     return *_acquiredCollection.prerequisites.uuid;
 }
@@ -656,7 +658,7 @@ boost::optional<YieldedTransactionResources> yieldTransactionResourcesFromOperat
         invariant(
             !stdx::holds_alternative<AcquisitionPrerequisites::PlacementConcernPlaceholder>(
                 acquisition.prerequisites.placementConcern),
-            str::stream() << "Collection " << acquisition.prerequisites.nss
+            str::stream() << "Collection " << acquisition.prerequisites.nss.toStringForErrorMsg()
                           << " acquired with special placement concern and cannot be yielded");
     }
 
@@ -707,7 +709,7 @@ void restoreTransactionResourcesToOperationContext(OperationContext* opCtx,
                 uasserted(
                     743870,
                     str::stream()
-                        << "Collection " << prerequisites.nss
+                        << "Collection " << prerequisites.nss.toStringForErrorMsg()
                         << " appeared after a restore, which violates the semantics of restore");
             };
 

@@ -23,7 +23,7 @@ function runCommandWithDollarTenant(
     let res = originalRunCommand.apply(conn, makeRunCommandArgs(cmdToRun));
 
     const prefixedDbName = kTenantId + "_" + dbName;
-    assertExpectedDbNameInResponse(res, dbName, prefixedDbName);
+    assertExpectedDbNameInResponse(res, dbName, prefixedDbName, tojsononeline(res));
     updateDbNamesInResponse(res, dbName, prefixedDbName);
     return res;
 }

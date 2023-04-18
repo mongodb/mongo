@@ -200,8 +200,9 @@ struct HandleRequest {
 
         void assertValidNsString() {
             if (!nsString().isValid()) {
-                uassert(
-                    16257, str::stream() << "Invalid ns [" << nsString().toString() << "]", false);
+                uassert(16257,
+                        str::stream() << "Invalid ns [" << nsString().toStringForErrorMsg() << "]",
+                        false);
             }
         }
 

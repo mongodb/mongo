@@ -160,7 +160,7 @@ StatusWith<ZoneInfo> ZoneInfo::getZonesForCollection(OperationContext* opCtx,
         ShardingCatalogManager::get(opCtx)->localCatalogClient()->getTagsForCollection(opCtx, nss);
     if (!swCollectionZones.isOK()) {
         return swCollectionZones.getStatus().withContext(
-            str::stream() << "Unable to load zones for collection " << nss);
+            str::stream() << "Unable to load zones for collection " << nss.toStringForErrorMsg());
     }
     const auto& collectionZones = swCollectionZones.getValue();
 

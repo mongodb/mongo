@@ -161,7 +161,7 @@ Status ReshardingOplogApplicationRules::applyOperation(
             uassert(
                 ErrorCodes::NamespaceNotFound,
                 str::stream() << "Failed to apply op during resharding due to missing collection "
-                              << _outputNss.ns(),
+                              << _outputNss.toStringForErrorMsg(),
                 autoCollOutput);
 
             AutoGetCollection autoCollStash(
@@ -172,7 +172,7 @@ Status ReshardingOplogApplicationRules::applyOperation(
             uassert(
                 ErrorCodes::NamespaceNotFound,
                 str::stream() << "Failed to apply op during resharding due to missing collection "
-                              << _myStashNss.ns(),
+                              << _myStashNss.toStringForErrorMsg(),
                 autoCollStash);
 
             auto opType = op.getOpType();
@@ -465,7 +465,7 @@ void ReshardingOplogApplicationRules::_applyDelete_inlock(
             opCtx, _outputNss, MODE_IX, AutoGetCollection::Options{}.deadline(getDeadline(opCtx)));
         uassert(ErrorCodes::NamespaceNotFound,
                 str::stream() << "Failed to apply op during resharding due to missing collection "
-                              << _outputNss.ns(),
+                              << _outputNss.toStringForErrorMsg(),
                 autoCollOutput);
 
         // Query the output collection for a doc with _id == [op _id].
@@ -512,7 +512,7 @@ void ReshardingOplogApplicationRules::_applyDelete_inlock(
             uassert(
                 ErrorCodes::NamespaceNotFound,
                 str::stream() << "Failed to apply op during resharding due to missing collection "
-                              << coll.ns(),
+                              << coll.toStringForErrorMsg(),
                 autoCollStash);
 
             auto request = DeleteRequest{};
@@ -560,7 +560,8 @@ BSONObj ReshardingOplogApplicationRules::_queryStashCollById(OperationContext* o
                                                              const BSONObj& idQuery) const {
     const IndexCatalog* indexCatalog = coll->getIndexCatalog();
     uassert(4990100,
-            str::stream() << "Missing _id index for collection " << _myStashNss.ns(),
+            str::stream() << "Missing _id index for collection "
+                          << _myStashNss.toStringForErrorMsg(),
             indexCatalog->haveIdIndex(opCtx));
 
     BSONObj result;

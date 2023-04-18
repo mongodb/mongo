@@ -276,7 +276,8 @@ public:
             auto collNss = collection->ns();
 
             uassert(ErrorCodes::BadValue,
-                    str::stream() << "weird fullCollectionName [" << collNss.toString() << "]",
+                    str::stream() << "weird fullCollectionName [" << collNss.toStringForErrorMsg()
+                                  << "]",
                     collNss.size() - 1 > dbName.db().size());
 
             if (repl::ReplicationCoordinator::isOplogDisabledForNS(collNss)) {

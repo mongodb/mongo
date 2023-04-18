@@ -1014,7 +1014,7 @@ MigrationChunkClonerSource::_getIndexScanExecutor(OperationContext* opCtx,
     if (!shardKeyIdx) {
         return {ErrorCodes::IndexNotFound,
                 str::stream() << "can't find index with prefix " << _shardKeyPattern.toBSON()
-                              << " in storeCurrentRecordId for " << nss().ns()};
+                              << " in storeCurrentRecordId for " << nss().toStringForErrorMsg()};
     }
 
     // Assume both min and max non-empty, append MinKey's to make them fit chosen index
@@ -1040,7 +1040,8 @@ Status MigrationChunkClonerSource::_storeCurrentRecordId(OperationContext* opCtx
     AutoGetCollection collection(opCtx, nss(), MODE_IS);
     if (!collection) {
         return {ErrorCodes::NamespaceNotFound,
-                str::stream() << "Collection " << nss().ns() << " does not exist."};
+                str::stream() << "Collection " << nss().toStringForErrorMsg()
+                              << " does not exist."};
     }
 
     auto swExec = _getIndexScanExecutor(
@@ -1119,7 +1120,7 @@ Status MigrationChunkClonerSource::_storeCurrentRecordId(OperationContext* opCtx
         if (!idIdx || !idIdx->getEntry()) {
             return {ErrorCodes::IndexNotFound,
                     str::stream() << "can't find index '_id' in storeCurrentRecordId for "
-                                  << nss().ns()};
+                                  << nss().toStringForErrorMsg()};
         }
 
         averageObjectIdSize =
@@ -1133,7 +1134,8 @@ Status MigrationChunkClonerSource::_storeCurrentRecordId(OperationContext* opCtx
                           << maxRecsWhenFull << ", the maximum chunk size is "
                           << _args.getMaxChunkSizeBytes() << ", average document size is "
                           << avgRecSize << ". Found " << recCount << " documents in chunk "
-                          << " ns: " << nss().ns() << " " << getMin() << " -> " << getMax()};
+                          << " ns: " << nss().toStringForErrorMsg() << " " << getMin() << " -> "
+                          << getMax()};
     }
 
     stdx::lock_guard<Latch> lk(_mutex);

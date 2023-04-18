@@ -115,7 +115,7 @@ StatusWith<UUID> validateCollectionOptionsOnPrimaryShard(OperationContext* opCtx
 
             auto info = listCollRepItem.getInfo();
             uassert(6915301,
-                    str::stream() << "The listCollections reply for '" << nss
+                    str::stream() << "The listCollections reply for '" << nss.toStringForErrorMsg()
                                   << "' does not have the 'info' field",
                     info);
             return *info->getUuid();

@@ -79,8 +79,8 @@ void reopenAllDatabasesAndReloadCollectionCatalog(OperationContext* opCtx,
             // Note that the collection name already includes the database component.
             auto collection = catalogWriter.value()->lookupCollectionByNamespace(opCtx, collNss);
             invariant(collection,
-                      str::stream()
-                          << "failed to get valid collection pointer for namespace " << collNss);
+                      str::stream() << "failed to get valid collection pointer for namespace "
+                                    << collNss.toStringForErrorMsg());
 
             if (previousCatalogState.minVisibleTimestampMap.count(collection->uuid()) > 0) {
                 // After rolling back to a stable timestamp T, the minimum visible timestamp for
@@ -270,8 +270,9 @@ void openCatalog(OperationContext* opCtx,
         if (!indexSpecs.isOK() || indexSpecs.getValue().first.empty()) {
             fassert(40689,
                     {ErrorCodes::InternalError,
-                     str::stream() << "failed to get index spec for index " << indexName
-                                   << " in collection " << indexIdentifier.nss});
+                     str::stream()
+                         << "failed to get index spec for index " << indexName << " in collection "
+                         << indexIdentifier.nss.toStringForErrorMsg()});
         }
         auto indexesToRebuild = indexSpecs.getValue();
         invariant(
@@ -292,7 +293,8 @@ void openCatalog(OperationContext* opCtx,
         NamespaceString collNss(entry.first);
 
         auto collection = catalog->lookupCollectionByNamespace(opCtx, collNss);
-        invariant(collection, str::stream() << "couldn't get collection " << collNss.toString());
+        invariant(collection,
+                  str::stream() << "couldn't get collection " << collNss.toStringForErrorMsg());
 
         for (const auto& indexName : entry.second.first) {
             LOGV2(20275,

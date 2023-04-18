@@ -680,7 +680,7 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                 0,
                 {ErrorCodes::NoProgressMade,
                  str::stream() << "no progress was made executing batch write op in "
-                               << clientRequest.getNS().ns() << " after "
+                               << clientRequest.getNS().toStringForErrorMsg() << " after "
                                << kMaxRoundsWithoutProgress << " rounds (" << numCompletedOps
                                << " ops completed in " << rounds << " rounds total)"}));
             break;

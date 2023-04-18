@@ -129,7 +129,7 @@ void createIndex(OperationContext* opCtx, const NamespaceString& nss, const BSON
     AutoGetCollection collection(opCtx, nss, MODE_X);
     ASSERT(collection);
 
-    ASSERT_EQ(1, indexKey.nFields()) << nss << "/" << indexKey;
+    ASSERT_EQ(1, indexKey.nFields()) << nss.toStringForErrorMsg() << "/" << indexKey;
     auto spec = BSON("v" << int(IndexDescriptor::kLatestIndexVersion) << "key" << indexKey << "name"
                          << (indexKey.firstElementFieldNameStringData() + "_1"));
 

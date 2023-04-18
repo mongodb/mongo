@@ -191,7 +191,7 @@ public:
 
         const NamespaceString nss(ns);
         uassert(ErrorCodes::InvalidNamespace,
-                str::stream() << "Invalid namespace: " << nss.ns(),
+                str::stream() << "Invalid namespace: " << nss.toStringForErrorMsg(),
                 nss.isValid());
 
         BSONObj startingFromKey;

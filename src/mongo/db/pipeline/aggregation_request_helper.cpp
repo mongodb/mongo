@@ -140,7 +140,8 @@ NamespaceString parseNs(const DatabaseName& dbName, const BSONObj& cmdObj) {
             NamespaceStringUtil::parseNamespaceFromRequest(dbName, firstElement.valueStringData()));
 
         uassert(ErrorCodes::InvalidNamespace,
-                str::stream() << "Invalid namespace specified '" << nss.ns() << "'",
+                str::stream() << "Invalid namespace specified '" << nss.toStringForErrorMsg()
+                              << "'",
                 nss.isValid() && !nss.isCollectionlessAggregateNS());
 
         return nss;
@@ -193,7 +194,8 @@ void validate(OperationContext* opCtx,
         requestReshardingResumeTokenElem && requestReshardingResumeTokenElem.boolean();
     uassert(ErrorCodes::FailedToParse,
             str::stream() << AggregateCommandRequest::kRequestReshardingResumeTokenFieldName
-                          << " must only be set for the oplog namespace, not " << nss,
+                          << " must only be set for the oplog namespace, not "
+                          << nss.toStringForErrorMsg(),
             !hasRequestReshardingResumeToken || nss.isOplog());
 }
 

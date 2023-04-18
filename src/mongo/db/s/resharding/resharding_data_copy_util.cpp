@@ -240,7 +240,8 @@ int insertBatch(OperationContext* opCtx,
     return writeConflictRetry(opCtx, "resharding::data_copy::insertBatch", nss.ns(), [&] {
         AutoGetCollection outputColl(opCtx, nss, MODE_IX);
         uassert(ErrorCodes::NamespaceNotFound,
-                str::stream() << "Collection '" << nss << "' did not already exist",
+                str::stream() << "Collection '" << nss.toStringForErrorMsg()
+                              << "' did not already exist",
                 outputColl);
 
         int numBytes = 0;

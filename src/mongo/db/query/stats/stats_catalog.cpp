@@ -87,7 +87,8 @@ StatusWith<std::shared_ptr<const ArrayHistogram>> StatsCatalog::getHistogram(
     try {
         auto handle = _statsCache.acquire(opCtx, std::make_pair(nss, path));
         uassert(ErrorCodes::NamespaceNotFound,
-                str::stream() << "path " << nss << " : " << path << " not found",
+                str::stream() << "path " << nss.toStringForErrorMsg() << " : " << path
+                              << " not found",
                 handle);
 
         return *(handle.get());

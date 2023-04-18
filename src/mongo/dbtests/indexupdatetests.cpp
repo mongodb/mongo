@@ -61,7 +61,7 @@ public:
         AutoGetCollection autoColl(_opCtx, _nss, LockMode::MODE_IX);
         WriteUnitOfWork wuow(_opCtx);
         auto db = autoColl.ensureDbExists(_opCtx);
-        ASSERT(db->createCollection(_opCtx, _nss)) << _nss;
+        ASSERT(db->createCollection(_opCtx, _nss)) << _nss.toStringForErrorMsg();
         wuow.commit();
     }
 
@@ -71,7 +71,7 @@ public:
         AutoGetCollection autoColl(_opCtx, _nss, LockMode::MODE_X);
         WriteUnitOfWork wuow(_opCtx);
         auto db = autoColl.ensureDbExists(_opCtx);
-        ASSERT_OK(db->dropCollection(_opCtx, _nss, {})) << _nss;
+        ASSERT_OK(db->dropCollection(_opCtx, _nss, {})) << _nss.toStringForErrorMsg();
         wuow.commit();
     }
 
@@ -128,7 +128,7 @@ public:
     void run() {
         AutoGetCollection autoColl(_opCtx, _nss, LockMode::MODE_X);
         auto db = autoColl.ensureDbExists(_opCtx);
-        ASSERT(db) << _nss;
+        ASSERT(db) << _nss.toStringForErrorMsg();
         auto& coll = collection();
         {
             WriteUnitOfWork wunit(_opCtx);
@@ -184,7 +184,7 @@ public:
         {
             AutoGetCollection autoColl(_opCtx, _nss, LockMode::MODE_IX);
             auto db = autoColl.ensureDbExists(_opCtx);
-            ASSERT(db) << _nss;
+            ASSERT(db) << _nss.toStringForErrorMsg();
 
             auto& coll = collection();
             {
@@ -244,7 +244,7 @@ public:
         {
             AutoGetCollection autoColl(_opCtx, _nss, LockMode::MODE_X);
             auto db = autoColl.ensureDbExists(_opCtx);
-            ASSERT(db) << _nss;
+            ASSERT(db) << _nss.toStringForErrorMsg();
 
             auto& coll = collection();
             {

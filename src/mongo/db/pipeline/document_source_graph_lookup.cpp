@@ -74,7 +74,8 @@ NamespaceString parseGraphLookupFromAndResolveNamespace(const BSONElement& elem,
         NamespaceString fromNss(
             NamespaceStringUtil::parseNamespaceFromRequest(defaultDb, elem.valueStringData()));
         uassert(ErrorCodes::InvalidNamespace,
-                str::stream() << "invalid $graphLookup namespace: " << fromNss.ns(),
+                str::stream() << "invalid $graphLookup namespace: "
+                              << fromNss.toStringForErrorMsg(),
                 fromNss.isValid());
         return fromNss;
     }
@@ -323,7 +324,7 @@ void DocumentSourceGraphLookUp::doBreadthFirstSearch() {
             while (auto next = pipeline->getNext()) {
                 uassert(40271,
                         str::stream()
-                            << "Documents in the '" << _from.ns()
+                            << "Documents in the '" << _from.toStringForErrorMsg()
                             << "' namespace must contain an _id for de-duplication in $graphLookup",
                         !(*next)["_id"].missing());
 

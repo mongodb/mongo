@@ -359,7 +359,7 @@ void DocumentSourceChangeStream::assertIsLegalSpecification(
     uassert(ErrorCodes::InvalidOptions,
             str::stream() << "A $changeStream with 'allChangesForCluster:true' may only be opened "
                              "on the 'admin' database, and with no collection name; found "
-                          << expCtx->ns.ns(),
+                          << expCtx->ns.toStringForErrorMsg(),
             !spec.getAllChangesForCluster() ||
                 (expCtx->ns.isAdminDB() && expCtx->ns.isCollectionlessAggregateNS()));
 
@@ -378,8 +378,8 @@ void DocumentSourceChangeStream::assertIsLegalSpecification(
     // against the internal collections iff 'allowToRunOnSystemNS' is true and the stream is not
     // opened through a mongos process.
     uassert(ErrorCodes::InvalidNamespace,
-            str::stream() << "$changeStream may not be opened on the internal " << expCtx->ns.ns()
-                          << " collection"
+            str::stream() << "$changeStream may not be opened on the internal "
+                          << expCtx->ns.toStringForErrorMsg() << " collection"
                           << (spec.getAllowToRunOnSystemNS() ? " through mongos" : ""),
             !expCtx->ns.isSystem() || (spec.getAllowToRunOnSystemNS() && !expCtx->inMongos));
 

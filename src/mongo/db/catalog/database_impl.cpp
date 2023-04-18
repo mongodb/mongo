@@ -123,7 +123,7 @@ void assertNoMovePrimaryInProgress(OperationContext* opCtx, NamespaceString cons
         LOGV2(4909100, "assertNoMovePrimaryInProgress", logAttrs(nss));
 
         uasserted(ErrorCodes::MovePrimaryInProgress,
-                  "movePrimary is in progress for namespace " + nss.toString());
+                  "movePrimary is in progress for namespace " + nss.toStringForErrorMsg());
     }
 }
 
@@ -388,13 +388,14 @@ Status DatabaseImpl::dropCollection(OperationContext* opCtx,
             if (!MONGO_unlikely(allowSystemViewsDrop.shouldFail())) {
                 const auto viewStats = catalog->getViewStatsForDatabase(opCtx, _name);
                 uassert(ErrorCodes::CommandFailed,
-                        str::stream() << "cannot drop collection " << nss
+                        str::stream() << "cannot drop collection " << nss.toStringForErrorMsg()
                                       << " when time-series collections are present.",
                         viewStats && viewStats->userTimeseries == 0);
             }
         } else if (!isDroppableSystemCollection(nss)) {
             return Status(ErrorCodes::IllegalOperation,
-                          str::stream() << "can't drop system collection " << nss);
+                          str::stream()
+                              << "can't drop system collection " << nss.toStringForErrorMsg());
         }
     }
 
@@ -430,8 +431,8 @@ Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
     // Use massert() to be consistent with IndexCatalog::dropAllIndexes().
     auto numIndexesInProgress = collection->getIndexCatalog()->numIndexesInProgress();
     massert(ErrorCodes::BackgroundOperationInProgressForNamespace,
-            str::stream() << "cannot drop collection " << nss << " (" << uuid << ") when "
-                          << numIndexesInProgress << " index builds in progress.",
+            str::stream() << "cannot drop collection " << nss.toStringForErrorMsg() << " (" << uuid
+                          << ") when " << numIndexesInProgress << " index builds in progress.",
             numIndexesInProgress == 0);
 
     audit::logDropCollection(opCtx->getClient(), nss);
@@ -621,7 +622,8 @@ Status DatabaseImpl::renameCollection(OperationContext* opCtx,
     invariant(toNss.dbName() == _name);
     if (CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, toNss)) {
         return Status(ErrorCodes::NamespaceExists,
-                      str::stream() << "Cannot rename '" << fromNss << "' to '" << toNss
+                      str::stream() << "Cannot rename '" << fromNss.toStringForErrorMsg()
+                                    << "' to '" << toNss.toStringForErrorMsg()
                                     << "' because the destination namespace already exists");
     }
 
@@ -683,11 +685,12 @@ void DatabaseImpl::_checkCanCreateCollection(OperationContext* opCtx,
     if (CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss)) {
         if (options.isView()) {
             uasserted(ErrorCodes::NamespaceExists,
-                      str::stream()
-                          << "Cannot create collection " << nss << " - collection already exists.");
+                      str::stream() << "Cannot create collection " << nss.toStringForErrorMsg()
+                                    << " - collection already exists.");
         } else {
-            throwWriteConflictException(str::stream() << "Collection namespace '" << nss.ns()
-                                                      << "' is already in use.");
+            throwWriteConflictException(str::stream()
+                                        << "Collection namespace '" << nss.toStringForErrorMsg()
+                                        << "' is already in use.");
         }
     }
 
@@ -701,7 +704,7 @@ void DatabaseImpl::_checkCanCreateCollection(OperationContext* opCtx,
 
     uassert(28838, "cannot create a non-capped oplog collection", options.capped || !nss.isOplog());
     uassert(ErrorCodes::DatabaseDropPending,
-            str::stream() << "Cannot create collection " << nss
+            str::stream() << "Cannot create collection " << nss.toStringForErrorMsg()
                           << " - database is in the process of being dropped.",
             !_dropPending.load());
 }
@@ -892,8 +895,8 @@ Collection* DatabaseImpl::_createCollection(
         } else {
             // autoIndexId: false is only allowed on unreplicated collections.
             uassert(50001,
-                    str::stream() << "autoIndexId:false is not allowed for collection " << nss
-                                  << " because it can be replicated",
+                    str::stream() << "autoIndexId:false is not allowed for collection "
+                                  << nss.toStringForErrorMsg() << " because it can be replicated",
                     !nss.isReplicated());
         }
     }
@@ -969,7 +972,8 @@ Status DatabaseImpl::userCreateNS(OperationContext* opCtx,
                 logAttrs(nss),
                 "collectionOptions"_attr = collectionOptions.toBSON());
     if (!NamespaceString::validCollectionComponent(nss.ns()))
-        return Status(ErrorCodes::InvalidNamespace, str::stream() << "invalid ns: " << nss);
+        return Status(ErrorCodes::InvalidNamespace,
+                      str::stream() << "invalid ns: " << nss.toStringForErrorMsg());
 
     // Validate the collation, if there is one.
     auto swCollator = _validateCollator(opCtx, collectionOptions);
@@ -1050,7 +1054,8 @@ Status DatabaseImpl::userCreateNS(OperationContext* opCtx,
     } else {
         invariant(_createCollection(
                       opCtx, nss, collectionOptions, createDefaultIndexes, idIndex, fromMigrate),
-                  str::stream() << "Collection creation failed after validating options: " << nss
+                  str::stream() << "Collection creation failed after validating options: "
+                                << nss.toStringForErrorMsg()
                                 << ". Options: " << collectionOptions.toBSON());
     }
 
@@ -1067,7 +1072,8 @@ Status DatabaseImpl::userCreateVirtualNS(OperationContext* opCtx,
                 logAttrs(nss),
                 "collectionOptions"_attr = opts.toBSON());
     if (!NamespaceString::validCollectionComponent(nss.ns()))
-        return Status(ErrorCodes::InvalidNamespace, str::stream() << "invalid ns: " << nss);
+        return Status(ErrorCodes::InvalidNamespace,
+                      str::stream() << "invalid ns: " << nss.toStringForErrorMsg());
 
     // Validate the collation, if there is one.
     if (auto swCollator = _validateCollator(opCtx, opts); !swCollator.isOK()) {
@@ -1081,8 +1087,8 @@ Status DatabaseImpl::userCreateVirtualNS(OperationContext* opCtx,
                                 /*idIndex=*/BSONObj(),
                                 /*fromMigrate=*/false,
                                 vopts),
-              str::stream() << "Collection creation failed after validating options: " << nss
-                            << ". Options: " << opts.toBSON());
+              str::stream() << "Collection creation failed after validating options: "
+                            << nss.toStringForErrorMsg() << ". Options: " << opts.toBSON());
 
     return Status::OK();
 }

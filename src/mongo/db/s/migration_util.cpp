@@ -477,11 +477,12 @@ ExecutorFuture<void> cleanUpRange(ServiceContext* serviceContext,
                        if (optCollDescr) {
                            uassert(ErrorCodes::
                                        RangeDeletionAbandonedBecauseCollectionWithUUIDDoesNotExist,
-                                   str::stream() << "Filtering metadata for " << *optNss
-                                                 << (optCollDescr->isSharded()
-                                                         ? " has UUID that does not match UUID of "
-                                                           "the deletion task"
-                                                         : " is unsharded"),
+                                   str::stream()
+                                       << "Filtering metadata for " << optNss->toStringForErrorMsg()
+                                       << (optCollDescr->isSharded()
+                                               ? " has UUID that does not match UUID of "
+                                                 "the deletion task"
+                                               : " is unsharded"),
                                    deletionTaskUuidMatchesFilteringMetadataUuid(
                                        opCtx, optCollDescr, deletionTask));
 
@@ -775,7 +776,8 @@ void notifyChangeStreamsOnDonorLastChunk(OperationContext* opCtx,
                                          boost::optional<UUID> collUUID) {
 
     const std::string oMessage = str::stream()
-        << "Migrate the last chunk for " << collNss << " off shard " << donorShardId;
+        << "Migrate the last chunk for " << collNss.toStringForErrorMsg() << " off shard "
+        << donorShardId;
 
     // The message expected by change streams
     const auto o2Message =
@@ -1056,7 +1058,7 @@ void recoverMigrationCoordinations(OperationContext* opCtx,
             // namespace.
             invariant(++migrationRecoveryCount == 1,
                       str::stream() << "Found more then one migration to recover for namespace '"
-                                    << nss << "'");
+                                    << nss.toStringForErrorMsg() << "'");
 
             // Create a MigrationCoordinator to complete the coordination.
             MigrationCoordinator coordinator(doc);

@@ -121,7 +121,7 @@ void ColumnScanStage::prepare(CompileCtx& ctx) {
     auto indexDesc = indexCatalog->findIndexByName(_opCtx, _columnIndexName);
     tassert(6610201,
             str::stream() << "could not find index named '" << _columnIndexName
-                          << "' in collection '" << _collName << "'",
+                          << "' in collection '" << _collName->toStringForErrorMsg() << "'",
             indexDesc);
     _weakIndexCatalogEntry = indexCatalog->getEntryShared(indexDesc);
 }

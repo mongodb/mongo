@@ -49,7 +49,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceListSessions::createFromBson(
 
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << kStageName << " may only be run against "
-                          << NamespaceString::kLogicalSessionsNamespace.ns(),
+                          << NamespaceString::kLogicalSessionsNamespace.toStringForErrorMsg(),
             nss == NamespaceString::kLogicalSessionsNamespace);
 
     const auto& spec = listSessionsParseSpec(kStageName, elem);

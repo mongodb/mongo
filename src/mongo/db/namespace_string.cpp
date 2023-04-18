@@ -462,12 +462,20 @@ Status NamespaceStringOrUUID::isNssValid() const {
 
     // _nss is set and not valid.
     return {ErrorCodes::InvalidNamespace,
-            str::stream() << "Namespace " << _nss << " is not a valid collection name"};
+            str::stream() << "Namespace " << _nss->toStringForErrorMsg()
+                          << " is not a valid collection name"};
 }
 
 std::string NamespaceStringOrUUID::toString() const {
     if (_nss)
         return _nss->toString();
+    else
+        return _uuid->toString();
+}
+
+std::string NamespaceStringOrUUID::toStringForErrorMsg() const {
+    if (_nss)
+        return _nss->toStringForErrorMsg();
     else
         return _uuid->toString();
 }

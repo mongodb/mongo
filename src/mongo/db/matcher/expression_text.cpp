@@ -63,7 +63,7 @@ TextMatchExpression::TextMatchExpression(OperationContext* opCtx,
 
         uassert(ErrorCodes::IndexNotFound,
                 str::stream() << "text index required for $text query (no such collection '"
-                              << nss.ns() << "')",
+                              << nss.toStringForErrorMsg() << "')",
                 db);
 
         CollectionPtr collection(
@@ -71,7 +71,7 @@ TextMatchExpression::TextMatchExpression(OperationContext* opCtx,
 
         uassert(ErrorCodes::IndexNotFound,
                 str::stream() << "text index required for $text query (no such collection '"
-                              << nss.ns() << "')",
+                              << nss.toStringForErrorMsg() << "')",
                 collection);
 
         std::vector<const IndexDescriptor*> idxMatches;
