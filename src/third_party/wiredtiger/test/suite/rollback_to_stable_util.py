@@ -51,9 +51,9 @@ def verify_rts_logs():
     stdout_path = os.path.join(os.getcwd(), 'stdout.txt')
 
     if os.name == 'nt':
-        output = subprocess.run(['python.exe', binary_path, stdout_path])
+        output = subprocess.run(['python.exe', binary_path, stdout_path], capture_output=True)
     else:
-        output = subprocess.run([binary_path, stdout_path])
+        output = subprocess.run([binary_path, stdout_path], capture_output=True)
 
     stderr = b'' if output.stderr is None else output.stderr
     return (output.returncode, stderr.strip().decode('utf-8'))

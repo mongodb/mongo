@@ -726,12 +726,14 @@ class WiredTigerTestCase(unittest.TestCase):
 
     def tearDown(self, dueToRetry=False):
         teardown_failed = False
+        teardown_msg = None
         if not dueToRetry:
             for action in self.teardown_actions:
                 tmp = action()
                 if tmp[0] != 0:
                     self.pr('ERROR: teardown action failed, message=' + tmp[1])
                     teardown_failed = True
+                    teardown_msg = tmp[1]
 
         # This approach works for all our support Python versions and
         # is suggested by one of the answers in:
@@ -800,6 +802,8 @@ class WiredTigerTestCase(unittest.TestCase):
         elapsed = time.time() - self.starttime
         if elapsed > 0.001 and WiredTigerTestCase._verbose >= 2:
             print("[pid:{}]: {}: {:.2f} seconds".format(os.getpid(), str(self), elapsed))
+        if teardown_failed:
+            self.fail(f'Teardown failed with message: {teardown_msg}')
         if (not passed) and (not self.skipped):
             print("[pid:{}]: ERROR in {}".format(os.getpid(), str(self)))
             self.pr('FAIL')
