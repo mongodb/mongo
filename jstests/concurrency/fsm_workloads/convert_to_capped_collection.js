@@ -23,10 +23,6 @@ var $config = (function() {
             return prefix + '_' + tid;
         }
 
-        function isMultiple256(num) {
-            return num % 256 === 0;
-        }
-
         function init(db, collName) {
             this.threadCollName = uniqueCollectionName(this.prefix, this.tid);
 
@@ -42,9 +38,6 @@ var $config = (function() {
             assertWhenOwnDB(!db[this.threadCollName].isCapped());
             assertWhenOwnDB.commandWorked(db[this.threadCollName].convertToCapped(this.size));
             assertWhenOwnDB(db[this.threadCollName].isCapped());
-            if (!FeatureFlagUtil.isPresentAndEnabled(db, "CappedCollectionsRelaxedSize")) {
-                assertWhenOwnDB(isMultiple256(db[this.threadCollName].stats().maxSize));
-            }
         }
 
         function convertToCapped(db, collName) {
@@ -54,9 +47,6 @@ var $config = (function() {
 
             assertWhenOwnDB.commandWorked(db[this.threadCollName].convertToCapped(this.size));
             assertWhenOwnDB(db[this.threadCollName].isCapped());
-            if (!FeatureFlagUtil.isPresentAndEnabled(db, "CappedCollectionsRelaxedSize")) {
-                assertWhenOwnDB(isMultiple256(db[this.threadCollName].stats().maxSize));
-            }
 
             // only the _id index should remain after running convertToCapped
             var indexKeys = db[this.threadCollName].getIndexKeys();

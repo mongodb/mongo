@@ -1189,32 +1189,6 @@ private:
                         return true;
                     });
             }
-
-            if (feature_flags::gfeatureFlagCappedCollectionsRelaxedSize
-                    .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion,
-                                                                  originalVersion)) {
-                for (const auto& dbName : DatabaseHolder::get(opCtx)->getNames()) {
-                    Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
-                    catalog::forEachCollectionFromDb(
-                        opCtx,
-                        dbName,
-                        MODE_S,
-                        [&](const Collection* collection) {
-                            uasserted(
-                                ErrorCodes::CannotDowngrade,
-                                str::stream()
-                                    << "Cannot downgrade the cluster when there are capped "
-                                       "collection with a size that is non multiple of 256 bytes. "
-                                       "Drop or resize the following collection: '"
-                                    << collection->ns().toStringForErrorMsg() << "'");
-                            return true;
-                        },
-                        [&](const Collection* collection) {
-                            return collection->isCapped() &&
-                                collection->getCappedMaxSize() % 256 != 0;
-                        });
-                }
-            }
         }
     }
 

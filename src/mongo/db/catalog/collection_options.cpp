@@ -50,21 +50,6 @@
 
 namespace mongo {
 namespace {
-long long adjustCappedSize(long long cappedSize) {
-    if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        !feature_flags::gfeatureFlagCappedCollectionsRelaxedSize.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        auto originalCappedSize = cappedSize;
-        cappedSize += 0xff;
-        cappedSize &= 0xffffffffffffff00LL;
-        LOGV2(7386100,
-              "Capped collection maxSize being rounded up to nearest 256-byte size.",
-              "originalSize"_attr = originalCappedSize,
-              "adjustedSize"_attr = cappedSize);
-    }
-    return cappedSize;
-}
-
 long long adjustCappedMaxDocs(long long cappedMaxDocs) {
     if (cappedMaxDocs <= 0 || cappedMaxDocs == std::numeric_limits<long long>::max()) {
         auto originalCappedMaxDocs = cappedMaxDocs;
@@ -103,7 +88,7 @@ StatusWith<long long> CollectionOptions::checkAndAdjustCappedSize(long long capp
         return Status(ErrorCodes::BadValue, "size cannot exceed 1 PB");
     }
 
-    return adjustCappedSize(cappedSize);
+    return cappedSize;
 }
 
 StatusWith<long long> CollectionOptions::checkAndAdjustCappedMaxDocs(long long cappedMaxDocs) {
@@ -344,7 +329,7 @@ CollectionOptions CollectionOptions::fromCreateCommand(const CreateCommand& cmd)
     options.validationAction = cmd.getValidationAction();
     options.capped = cmd.getCapped();
     if (auto size = cmd.getSize()) {
-        options.cappedSize = adjustCappedSize(*size);
+        options.cappedSize = *size;
     }
     if (auto max = cmd.getMax()) {
         options.cappedMaxDocs = adjustCappedMaxDocs(*max);

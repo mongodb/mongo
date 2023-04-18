@@ -69,14 +69,7 @@ function runTest(startChangeStream) {
     assertDropCollection(testDB, collName);
 
     // With capped collection parameters.
-    let expectedSize;
-
-    // TODO SERVER-74653: Remove feature flag check.
-    if (FeatureFlagUtil.isPresentAndEnabled(testDB, "CappedCollectionsRelaxedSize")) {
-        expectedSize = 1000;
-    } else {
-        expectedSize = 1024;
-    }
+    let expectedSize = 1000;
     validateExpectedEventAndDropCollection({create: collName, capped: true, size: 1000, max: 1000},
                                            {
                                                operationType: "create",

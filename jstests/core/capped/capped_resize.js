@@ -106,12 +106,9 @@ let verifyLimitUpdate = function(updates) {
     // We modify the collection to have a size multiple of 256, then
     // we modify the collection to have a size non multiple of 256 and finally
     // we modify the collection to have a size multiple of 256
-    // TODO SERVER-74653: Remove feature flag check.
-    if (FeatureFlagUtil.isPresentAndEnabled(testDB, "CappedCollectionsRelaxedSize")) {
-        verifyLimitUpdate({cappedSize: 25 * 1024});
-        verifyLimitUpdate({cappedSize: 50 * 1023});
-        verifyLimitUpdate({cappedSize: 50 * 1024});
-    }
+    verifyLimitUpdate({cappedSize: 25 * 1024});
+    verifyLimitUpdate({cappedSize: 50 * 1023});
+    verifyLimitUpdate({cappedSize: 50 * 1024});
 })();
 
 (function updateMaxLimit() {
