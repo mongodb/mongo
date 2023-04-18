@@ -234,6 +234,7 @@ class _TenantMigrationThread(threading.Thread):
     WAIT_SECS_RANGES = [[0.05, 0.1], [0.1, 0.5], [1, 5], [5, 15]]
     POLL_INTERVAL_SECS = 0.1
 
+    MIGRATION_ABORTED_ERR_CODE = 325
     NO_SUCH_MIGRATION_ERR_CODE = 327
     INTERNAL_ERR_CODE = 1
     INVALID_SYNC_SOURCE_ERR_CODE = 119
@@ -364,6 +365,10 @@ class _TenantMigrationThread(threading.Thread):
         return abort_reason["code"] == self.INTERNAL_ERR_CODE and abort_reason[
             "errmsg"] == "simulate a tenant migration error"
 
+    def _is_recipient_failover_abort_reason(self, abort_reason):
+        return abort_reason["code"] == self.MIGRATION_ABORTED_ERR_CODE and abort_reason[
+            "errmsg"].find("Recipient failover happened during migration")
+
     def _create_migration_opts(self, donor_rs_index, recipient_rs_index):
         donor_rs = self._tenant_migration_fixture.get_replset(donor_rs_index)
         recipient_rs = self._tenant_migration_fixture.get_replset(recipient_rs_index)
@@ -432,7 +437,11 @@ class _TenantMigrationThread(threading.Thread):
                 return True
 
             abort_reason = res["abortReason"]
-            if self._is_fail_point_abort_reason(abort_reason):
+            if self._is_recipient_failover_abort_reason(abort_reason):
+                self.logger.info("Tenant migration '%s' aborted due to recipient failover: %s",
+                                 migration_opts.migration_id, str(res))
+                return False
+            elif self._is_fail_point_abort_reason(abort_reason):
                 self.logger.info(
                     "Tenant migration '%s' with donor replica set '%s' aborted due to failpoint: " +
                     "%s.", migration_opts.migration_id, migration_opts.get_donor_name(), str(res))

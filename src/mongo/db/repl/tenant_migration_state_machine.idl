@@ -258,6 +258,8 @@ structs:
                     A counter that is incremented on each restart due to a donor connection failure.
                 type: long
                 default: 0
+            # Not used but kept for parsing backwards compatibility with <= 6.2 which supports
+            # recipient failover.
             numRestartsDueToRecipientFailure:
                 description: >-
                     A counter that is incremented on each restart due to a recipient failure.
