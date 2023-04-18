@@ -133,6 +133,7 @@ struct Stats {
     Track not_found;
     Track read;
     Track remove;
+    Track rts;
     Track update;
     Track truncate;
 
@@ -288,7 +289,7 @@ struct Value {
 struct Operation {
     enum OpType {
 	OP_CHECKPOINT, OP_INSERT, OP_LOG_FLUSH, OP_NONE, OP_NOOP,
-	OP_REMOVE, OP_SEARCH, OP_SLEEP, OP_UPDATE };
+	OP_REMOVE, OP_SEARCH, OP_SLEEP, OP_UPDATE, OP_RTS };
     OpType _optype;
     OperationInternal *_internal;
 
