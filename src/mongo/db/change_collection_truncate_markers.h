@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/storage/collection_markers.h"
+#include "mongo/db/storage/collection_truncate_markers.h"
 
 /**
  * Implementation of truncate markers for Change Collections. Respects the requirement of always

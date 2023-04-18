@@ -35,7 +35,7 @@
 #include <wiredtiger.h>
 
 #include "mongo/db/catalog/capped_visibility.h"
-#include "mongo/db/storage/collection_markers.h"
+#include "mongo/db/storage/collection_truncate_markers.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"

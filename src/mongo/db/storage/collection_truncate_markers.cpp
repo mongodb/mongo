@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/collection_markers.h"
+#include "mongo/db/storage/collection_truncate_markers.h"
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/storage_parameters_gen.h"

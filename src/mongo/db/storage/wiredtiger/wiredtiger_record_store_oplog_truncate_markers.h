@@ -31,7 +31,7 @@
 
 #include <boost/optional.hpp>
 
-#include "mongo/db/storage/collection_markers.h"
+#include "mongo/db/storage/collection_truncate_markers.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
