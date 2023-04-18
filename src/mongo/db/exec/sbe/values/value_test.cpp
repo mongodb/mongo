@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/exec/sbe/values/sort_spec.h"
 #include "mongo/db/exec/sbe/values/util.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
@@ -382,5 +383,144 @@ TEST_F(SbeValueTest, ArraySetForEachMoveIsDestructive) {
 
     ASSERT_EQ(arr1.size(), 0);
     ASSERT_EQ(arr2.size(), 2);
+}
+
+template <typename... Args>
+std::pair<value::TypeTags, value::Value> createArray(Args... args) {
+    auto [arrayTag, arrayVal] = value::makeNewArray();
+    auto array = value::getArrayView(arrayVal);
+    for (const auto& [tag, val] : {args...}) {
+        array->push_back(tag, val);
+    }
+    return {arrayTag, arrayVal};
+}
+
+TEST_F(SbeValueTest, SortSpecCompareSingleValueAsc) {
+    auto sortSpecBson = BSON("x" << 1);
+    value::SortSpec sortSpec(sortSpecBson);
+
+    auto [tag1, val1] = std::make_pair(value::TypeTags::NumberInt32, 1);
+    auto [tag2, val2] = std::make_pair(value::TypeTags::NumberInt32, 2);
+
+    auto [cmpTag, cmpVal] = sortSpec.compare(tag1, val1, tag2, val2);
+    ASSERT_EQ(cmpTag, value::TypeTags::NumberInt32);
+    ASSERT_EQ(value::bitcastTo<int32_t>(cmpVal), -1);
+
+    std::tie(cmpTag, cmpVal) = sortSpec.compare(tag2, val2, tag1, val1);
+    ASSERT_EQ(cmpTag, value::TypeTags::NumberInt32);
+    ASSERT_EQ(value::bitcastTo<int32_t>(cmpVal), 1);
+
+    std::tie(cmpTag, cmpVal) = sortSpec.compare(tag1, val1, tag1, val1);
+    ASSERT_EQ(cmpTag, value::TypeTags::NumberInt32);
+    ASSERT_EQ(value::bitcastTo<int32_t>(cmpVal), 0);
+}
+
+TEST_F(SbeValueTest, SortSpecCompareSingleValueDsc) {
+    auto sortSpecBson = BSON("x" << -1);
+    value::SortSpec sortSpec(sortSpecBson);
+
+    auto [tag1, val1] = std::make_pair(value::TypeTags::NumberInt32, 1);
+    auto [tag2, val2] = std::make_pair(value::TypeTags::NumberInt32, 2);
+
+    auto [cmpTag, cmpVal] = sortSpec.compare(tag1, val1, tag2, val2);
+    ASSERT_EQ(cmpTag, value::TypeTags::NumberInt32);
+    ASSERT_EQ(value::bitcastTo<int32_t>(cmpVal), 1);
+
+    std::tie(cmpTag, cmpVal) = sortSpec.compare(tag2, val2, tag1, val1);
+    ASSERT_EQ(cmpTag, value::TypeTags::NumberInt32);
+    ASSERT_EQ(value::bitcastTo<int32_t>(cmpVal), -1);
+
+    std::tie(cmpTag, cmpVal) = sortSpec.compare(tag1, val1, tag1, val1);
+    ASSERT_EQ(cmpTag, value::TypeTags::NumberInt32);
+    ASSERT_EQ(value::bitcastTo<int32_t>(cmpVal), 0);
+}
+
+TEST_F(SbeValueTest, SortSpecCompareCollation) {
+    auto sortSpecBson = BSON("x" << 1);
+    value::SortSpec sortSpec(sortSpecBson);
+
+    auto [tag1, val1] = value::makeBigString("12345678");
+    value::ValueGuard guard1{tag1, val1};
+    auto [tag2, val2] = value::makeBigString("87654321");
+    value::ValueGuard guard2{tag2, val2};
+
+    auto collator =
+        std::make_unique<CollatorInterfaceMock>(CollatorInterfaceMock::MockType::kReverseString);
+
+    auto [cmpTag, cmpVal] = sortSpec.compare(tag1, val1, tag2, val2, collator.get());
+    ASSERT_EQ(cmpTag, value::TypeTags::NumberInt32);
+    ASSERT_EQ(value::bitcastTo<int32_t>(cmpVal), 1);
+
+    std::tie(cmpTag, cmpVal) = sortSpec.compare(tag2, val2, tag1, val1, collator.get());
+    ASSERT_EQ(cmpTag, value::TypeTags::NumberInt32);
+    ASSERT_EQ(value::bitcastTo<int32_t>(cmpVal), -1);
+
+    std::tie(cmpTag, cmpVal) = sortSpec.compare(tag1, val1, tag1, val1, collator.get());
+    ASSERT_EQ(cmpTag, value::TypeTags::NumberInt32);
+    ASSERT_EQ(value::bitcastTo<int32_t>(cmpVal), 0);
+}
+
+TEST_F(SbeValueTest, SortSpecCompareMultiValueMix) {
+    auto sortSpecBson = BSON("x" << 1 << "y" << -1);
+    value::SortSpec sortSpec(sortSpecBson);
+
+    auto [tag11, val11] =
+        createArray(value::makeBigString("11111111"), value::makeBigString("11111111"));
+    value::ValueGuard guard11{tag11, val11};
+    auto [tag12, val12] =
+        createArray(value::makeBigString("11111111"), value::makeBigString("22222222"));
+    value::ValueGuard guard12{tag12, val12};
+    auto [tag21, val21] =
+        createArray(value::makeBigString("22222222"), value::makeBigString("11111111"));
+    value::ValueGuard guard21{tag21, val21};
+
+    auto [cmpTag, cmpVal] = sortSpec.compare(tag11, val11, tag21, val21);
+    ASSERT_EQ(cmpTag, value::TypeTags::NumberInt32);
+    ASSERT_EQ(value::bitcastTo<int32_t>(cmpVal), -1);
+
+    std::tie(cmpTag, cmpVal) = sortSpec.compare(tag11, val11, tag12, val12);
+    ASSERT_EQ(cmpTag, value::TypeTags::NumberInt32);
+    ASSERT_EQ(value::bitcastTo<int32_t>(cmpVal), 1);
+
+    std::tie(cmpTag, cmpVal) = sortSpec.compare(tag21, val21, tag11, val11);
+    ASSERT_EQ(cmpTag, value::TypeTags::NumberInt32);
+    ASSERT_EQ(value::bitcastTo<int32_t>(cmpVal), 1);
+
+    std::tie(cmpTag, cmpVal) = sortSpec.compare(tag12, val12, tag11, val11);
+    ASSERT_EQ(cmpTag, value::TypeTags::NumberInt32);
+    ASSERT_EQ(value::bitcastTo<int32_t>(cmpVal), -1);
+
+    std::tie(cmpTag, cmpVal) = sortSpec.compare(tag11, val11, tag11, val11);
+    ASSERT_EQ(cmpTag, value::TypeTags::NumberInt32);
+    ASSERT_EQ(value::bitcastTo<int32_t>(cmpVal), 0);
+}
+
+TEST_F(SbeValueTest, SortSpecCompareInvalid) {
+    auto sortSpecBson = BSON("x" << 1 << "y" << -1);
+    value::SortSpec sortSpec(sortSpecBson);
+
+    auto [tag1, val1] =
+        createArray(value::makeBigString("11111111"), value::makeBigString("11111111"));
+    value::ValueGuard guard1{tag1, val1};
+    auto [tag2, val2] = createArray(value::makeBigString("11111111"),
+                                    value::makeBigString("11111111"),
+                                    value::makeBigString("11111111"));
+    value::ValueGuard guard2{tag2, val2};
+
+    auto [cmpTag, cmpVal] = sortSpec.compare(value::TypeTags::NumberInt32, 0, tag1, val1);
+    ASSERT_EQ(cmpTag, value::TypeTags::Nothing);
+    ASSERT_EQ(cmpVal, 0);
+
+    std::tie(cmpTag, cmpVal) = sortSpec.compare(tag1, val1, value::TypeTags::NumberInt32, 0);
+    ASSERT_EQ(cmpTag, value::TypeTags::Nothing);
+    ASSERT_EQ(cmpVal, 0);
+
+    std::tie(cmpTag, cmpVal) = sortSpec.compare(tag1, val1, tag2, val2);
+    ASSERT_EQ(cmpTag, value::TypeTags::Nothing);
+    ASSERT_EQ(cmpVal, 0);
+
+    std::tie(cmpTag, cmpVal) = sortSpec.compare(tag2, val2, tag1, val1);
+    ASSERT_EQ(cmpTag, value::TypeTags::Nothing);
+    ASSERT_EQ(cmpVal, 0);
 }
 }  // namespace mongo::sbe

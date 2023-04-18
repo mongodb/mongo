@@ -950,7 +950,7 @@ private:
     ValueSetType _values;
 };
 
-/*
+/**
  * A vector of values representing a sort key. The values are NOT owned by this object.
  */
 struct SortKeyComponentVector {

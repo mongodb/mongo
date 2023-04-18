@@ -199,6 +199,50 @@ value::SortKeyComponentVector* SortSpec::generateSortKeyComponentVector(
     return &_localSortKeyComponentStorage;
 }
 
+std::pair<TypeTags, Value> SortSpec::compare(TypeTags leftTag,
+                                             Value leftVal,
+                                             TypeTags rightTag,
+                                             Value rightVal,
+                                             const CollatorInterface* collator) const {
+    if (_sortPattern.size() == 1) {
+        auto [cmpTag, cmpVal] = compareValue(leftTag, leftVal, rightTag, rightVal, collator);
+        if (cmpTag == TypeTags::NumberInt32) {
+            auto sign = _sortPattern[0].isAscending ? 1 : -1;
+            cmpVal = bitcastFrom<int32_t>(bitcastTo<int32_t>(cmpVal) * sign);
+            return {cmpTag, cmpVal};
+        } else {
+            return {TypeTags::Nothing, 0};
+        }
+    }
+
+    if (leftTag != TypeTags::Array || rightTag != TypeTags::Array) {
+        return {TypeTags::Nothing, 0};
+    }
+    auto leftArray = getArrayView(leftVal);
+    auto rightArray = getArrayView(rightVal);
+    if (leftArray->size() != _sortPattern.size() || rightArray->size() != _sortPattern.size()) {
+        return {TypeTags::Nothing, 0};
+    }
+
+    for (size_t i = 0; i < _sortPattern.size(); i++) {
+        auto [leftElemTag, leftElemVal] = leftArray->getAt(i);
+        auto [rightElemTag, rightElemVal] = rightArray->getAt(i);
+        auto [cmpTag, cmpVal] =
+            compareValue(leftElemTag, leftElemVal, rightElemTag, rightElemVal, collator);
+        if (cmpTag == TypeTags::NumberInt32) {
+            if (cmpVal != 0) {
+                auto sign = _sortPattern[i].isAscending ? 1 : -1;
+                cmpVal = bitcastFrom<int32_t>(bitcastTo<int32_t>(cmpVal) * sign);
+                return {cmpTag, cmpVal};
+            }
+        } else {
+            return {TypeTags::Nothing, 0};
+        }
+    }
+
+    return {TypeTags::NumberInt32, 0};
+}
+
 BtreeKeyGenerator SortSpec::initKeyGen() const {
     tassert(5037003,
             "SortSpec should not be passed an empty sort pattern",

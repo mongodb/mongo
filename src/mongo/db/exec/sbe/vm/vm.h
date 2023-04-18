@@ -732,6 +732,7 @@ enum class Builtin : uint8_t {
     generateSortKey,
     generateCheapSortKey,
     sortKeyComponentVectorGetElement,
+    sortKeyComponentVectorToArray,
 
     makeBsonObj,
     tsSecond,
@@ -1522,6 +1523,8 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinGenerateSortKey(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinGenerateCheapSortKey(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinSortKeyComponentVectorGetElement(
+        ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinSortKeyComponentVectorToArray(
         ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinMakeBsonObj(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinTsSecond(ArityType arity);

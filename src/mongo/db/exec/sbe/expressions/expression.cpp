@@ -767,6 +767,8 @@ static stdx::unordered_map<std::string, BuiltinFn> kBuiltinFunctions = {
     {"sortKeyComponentVectorGetElement",
      BuiltinFn{
          [](size_t n) { return n == 2; }, vm::Builtin::sortKeyComponentVectorGetElement, false}},
+    {"sortKeyComponentVectorToArray",
+     BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::sortKeyComponentVectorToArray, false}},
     {"tsSecond", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::tsSecond, false}},
     {"tsIncrement", BuiltinFn{[](size_t n) { return n == 1; }, vm::Builtin::tsIncrement, false}},
     {"typeMatch", BuiltinFn{[](size_t n) { return n == 2; }, vm::Builtin::typeMatch, false}},

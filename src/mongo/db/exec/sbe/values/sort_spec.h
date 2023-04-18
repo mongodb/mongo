@@ -77,6 +77,15 @@ public:
     value::SortKeyComponentVector* generateSortKeyComponentVector(
         FastTuple<bool, value::TypeTags, value::Value> obj, const CollatorInterface* collator);
 
+    /**
+     * Compare an array of values based on the sort pattern.
+     */
+    std::pair<TypeTags, Value> compare(TypeTags leftTag,
+                                       Value leftVal,
+                                       TypeTags rightTag,
+                                       Value rightVal,
+                                       const CollatorInterface* collator = nullptr) const;
+
     const BSONObj& getPattern() const {
         return _sortPatternBson;
     }
