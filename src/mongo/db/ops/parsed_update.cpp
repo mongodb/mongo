@@ -58,6 +58,9 @@ ParsedUpdate::ParsedUpdate(OperationContext* opCtx,
     if (forgoOpCounterIncrements) {
         _expCtx->enabledCounters = false;
     }
+
+    // Allow update queries to refer to $$USER_ROLES.
+    _expCtx->setUserRoles();
 }
 
 Status ParsedUpdate::parseRequest() {
