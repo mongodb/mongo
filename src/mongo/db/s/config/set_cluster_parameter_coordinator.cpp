@@ -167,8 +167,11 @@ void SetClusterParameterCoordinator::_commit(OperationContext* opCtx) {
     DBDirectClient client(opCtx);
     ClusterParameterDBClientService dbService(client);
     SetClusterParameterInvocation invocation{std::move(parameterService), dbService};
-    invocation.invoke(
-        opCtx, setClusterParameterRequest, _doc.getClusterParameterTime(), kMajorityWriteConcern);
+    invocation.invoke(opCtx,
+                      setClusterParameterRequest,
+                      _doc.getClusterParameterTime(),
+                      kMajorityWriteConcern,
+                      true /* skipValidation */);
 }
 
 const ConfigsvrCoordinatorMetadata& SetClusterParameterCoordinator::metadata() const {

@@ -80,7 +80,8 @@ public:
     bool invoke(OperationContext*,
                 const SetClusterParameter&,
                 boost::optional<Timestamp>,
-                const WriteConcernOptions&);
+                const WriteConcernOptions&,
+                bool skipValidation = false);
 
     // Validate new parameter passed to setClusterParameter and generate the query and update fields
     // for the on-disk update.

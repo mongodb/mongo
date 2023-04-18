@@ -66,6 +66,8 @@ namespace audit {
 extern std::function<void(OperationContext*)> initializeManager;
 extern std::function<void(OpObserverRegistry*)> opObserverRegistrar;
 extern std::function<void(ServiceContext*)> initializeSynchronizeJob;
+extern std::function<void(OperationContext*, boost::optional<Timestamp>)> migrateOldToNew;
+extern std::function<void(OperationContext*)> removeOldConfig;
 extern std::function<void(OperationContext*)> updateAuditConfigOnDowngrade;
 
 /**

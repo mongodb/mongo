@@ -574,6 +574,10 @@ public:
                     opCtx, DDLCoordinatorTypeEnum::kDropDatabasePre70Compatible);
         }
 
+        if (requestedVersion > actualVersion) {
+            _maybeRemoveOldAuditConfig(opCtx, actualVersion, requestedVersion);
+        }
+
         // TODO SERVER-68373: Remove once 7.0 becomes last LTS
         if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer) &&
             requestedVersion > actualVersion &&
@@ -675,9 +679,12 @@ private:
     // transition lock in S mode. It is required that the code in this helper function is idempotent
     // and could be done after _runDowngrade even if it failed at any point in the middle of
     // _userCollectionsUassertsForDowngrade or _internalServerCleanupForDowngrade.
-    void _prepareToUpgradeActions(OperationContext* opCtx) {
+    void _prepareToUpgradeActions(OperationContext* opCtx,
+                                  const multiversion::FeatureCompatibilityVersion requestedVersion,
+                                  boost::optional<Timestamp> changeTimestamp) {
         if (serverGlobalParams.clusterRole.has(ClusterRole::None)) {
             _cancelServerlessMigrations(opCtx);
+            _maybeMigrateAuditConfig(opCtx, requestedVersion, changeTimestamp);
             return;
         }
 
@@ -685,6 +692,7 @@ private:
         // roles aren't mutually exclusive.
         if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
             // Config server role actions.
+            _maybeMigrateAuditConfig(opCtx, requestedVersion, changeTimestamp);
         }
 
         if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
@@ -698,6 +706,21 @@ private:
     // of _userCollectionsUassertsForDowngrade or _internalServerCleanupForDowngrade.
     void _userCollectionsWorkForUpgrade() {
         return;
+    }
+
+    void _maybeRemoveOldAuditConfig(
+        OperationContext* opCtx,
+        const multiversion::FeatureCompatibilityVersion fromVersion,
+        const multiversion::FeatureCompatibilityVersion requestedVersion) {
+        if (feature_flags::gFeatureFlagAuditConfigClusterParameter
+                .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion, fromVersion) &&
+            audit::removeOldConfig) {
+            LOGV2_DEBUG(7193000,
+                        3,
+                        "Upgraded to FCV with audit config cluster parameter enabled, removing old "
+                        "config.");
+            audit::removeOldConfig(opCtx);
+        }
     }
 
     // This helper function is for updating metadata to make sure the new features in the
@@ -716,8 +739,23 @@ private:
             _dropConfigMigrationsCollection(opCtx);
             _setShardedClusterCardinalityParam(opCtx, requestedVersion);
         }
-
         _removeRecordPreImagesCollectionOption(opCtx);
+    }
+
+    void _maybeMigrateAuditConfig(OperationContext* opCtx,
+                                  const multiversion::FeatureCompatibilityVersion requestedVersion,
+                                  boost::optional<Timestamp> changeTimestamp) {
+        const auto& [fromVersion, _] =
+            getTransitionFCVFromAndTo(serverGlobalParams.featureCompatibility.getVersion());
+        if (feature_flags::gFeatureFlagAuditConfigClusterParameter
+                .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion, fromVersion) &&
+            audit::migrateOldToNew) {
+            LOGV2_DEBUG(7193001,
+                        3,
+                        "Upgrading to FCV wth audit config cluster parameter enabled, migrating "
+                        "audit config to cluster parameter.");
+            audit::migrateOldToNew(opCtx, changeTimestamp);
+        }
     }
 
     // TODO SERVER-68889 remove once 7.0 becomes last LTS
@@ -928,7 +966,8 @@ private:
         // transition lock in S mode. It is required that the code in this helper function is
         // idempotent and could be done after _runDowngrade even if it failed at any point in the
         // middle of _userCollectionsUassertsForDowngrade or _internalServerCleanupForDowngrade.
-        _prepareToUpgradeActions(opCtx);
+        const auto requestedVersion = request.getCommandParameter();
+        _prepareToUpgradeActions(opCtx, requestedVersion, changeTimestamp);
 
         {
             // Take the FCV full transition lock in S mode to create a barrier for operations taking

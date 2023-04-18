@@ -48,21 +48,22 @@ namespace mongo {
 bool SetClusterParameterInvocation::invoke(OperationContext* opCtx,
                                            const SetClusterParameter& cmd,
                                            boost::optional<Timestamp> paramTime,
-                                           const WriteConcernOptions& writeConcern) {
+                                           const WriteConcernOptions& writeConcern,
+                                           bool skipValidation) {
 
     BSONObj cmdParamObj = cmd.getCommandParameter();
     StringData parameterName = cmdParamObj.firstElement().fieldName();
     ServerParameter* serverParameter = _sps->get(parameterName);
     auto tenantId = cmd.getDbName().tenantId();
 
-    auto [query, update] =
-        normalizeParameter(opCtx,
-                           cmdParamObj,
-                           paramTime,
-                           serverParameter,
-                           parameterName,
-                           tenantId,
-                           serverGlobalParams.clusterRole.exclusivelyHasShardRole());
+    auto [query, update] = normalizeParameter(
+        opCtx,
+        cmdParamObj,
+        paramTime,
+        serverParameter,
+        parameterName,
+        tenantId,
+        skipValidation || serverGlobalParams.clusterRole.exclusivelyHasShardRole());
 
     BSONObjBuilder oldValueBob;
     serverParameter->append(opCtx, &oldValueBob, parameterName.toString(), tenantId);
