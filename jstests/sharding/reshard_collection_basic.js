@@ -150,6 +150,14 @@ let verifyAllShardingCollectionsRemoved = (tempReshardingCollName) => {
                   .itcount());
 };
 
+let verifyTagsDocumentsAfterOperationCompletes = (ns, shardKeyPattern) => {
+    const tagsArr = mongos.getCollection('config.tags').find({ns: ns}).toArray();
+    for (let i = 0; i < tagsArr.length; ++i) {
+        assert.eq(Object.keys(tagsArr[i]["min"]), shardKeyPattern);
+        assert.eq(Object.keys(tagsArr[i]["max"]), shardKeyPattern);
+    }
+};
+
 let assertReshardCollOkWithPreset = (commandObj, presetReshardedChunks) => {
     assert.commandWorked(mongos.adminCommand({shardCollection: ns, key: {oldKey: 1}}));
 
@@ -166,6 +174,9 @@ let assertReshardCollOkWithPreset = (commandObj, presetReshardedChunks) => {
 
     verifyTemporaryReshardingCollectionExistsWithCorrectOptions(
         getAllShardIdsFromExpectedChunks(presetReshardedChunks));
+
+    verifyTagsDocumentsAfterOperationCompletes(ns, Object.keys(commandObj.key));
+
     verifyChunksMatchExpected(presetReshardedChunks.length, presetReshardedChunks);
 
     mongos.getDB(kDbName)[collName].drop();
@@ -184,6 +195,8 @@ let assertReshardCollOk = (commandObj, expectedChunks) => {
     const tempReshardingCollName = constructTemporaryReshardingCollName(kDbName, collName);
 
     assert.commandWorked(mongos.adminCommand(commandObj));
+
+    verifyTagsDocumentsAfterOperationCompletes(ns, Object.keys(commandObj.key));
 
     verifyChunksMatchExpected(expectedChunks);
 
@@ -348,6 +361,20 @@ assertReshardCollOk({
     zones: []
 },
                     1);
+
+jsTest.log("Succeed if zones are not empty.");
+assert.commandWorked(
+    mongos.adminCommand({addShardToZone: st.shard1.shardName, zone: existingZoneName}));
+assert.commandWorked(st.s.adminCommand(
+    {updateZoneKeyRange: ns, min: {oldKey: 0}, max: {oldKey: 5}, zone: existingZoneName}));
+assertReshardCollOk({
+    reshardCollection: ns,
+    key: {oldKey: 1, newKey: 1},
+    unique: false,
+    collation: {locale: 'simple'},
+    zones: [{zone: existingZoneName, min: {oldKey: 0}, max: {oldKey: 5}}]
+},
+                    3);
 
 jsTest.log("Succeed with hashed shard key that provides enough cardinality.");
 assert.commandWorked(
