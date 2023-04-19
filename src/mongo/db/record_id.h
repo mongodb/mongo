@@ -449,6 +449,24 @@ public:
      */
     static constexpr auto kSmallStrMaxSize = 30;
 
+    /// members for Sorter
+    struct SorterDeserializeSettings {};  // unused
+    void serializeForSorter(BufBuilder& buf) const {
+        serializeToken(buf);
+    }
+    static RecordId deserializeForSorter(BufReader& buf, const SorterDeserializeSettings&) {
+        return deserializeToken(buf);
+    }
+    int memUsageForSorter() const {
+        return memUsage();
+    }
+    RecordId getOwned() const {
+        MONGO_UNREACHABLE;
+    }
+    void makeOwned() {
+        MONGO_UNREACHABLE;
+    }
+
 private:
     /**
      * Format specifies the in-memory representation of this RecordId. This does not represent any

@@ -511,10 +511,16 @@ void statsToBSON(const PlanStageStats& stats,
         }
     } else if (STAGE_SPOOL == stats.stageType) {
         SpoolStats* spec = static_cast<SpoolStats*>(stats.specific.get());
+        bob->appendNumber("memLimit", static_cast<long long>(spec->maxMemoryUsageBytes));
+        bob->appendNumber("diskLimit", static_cast<long long>(spec->maxDiskUsageBytes));
 
         if (verbosity >= ExplainOptions::Verbosity::kExecStats) {
             bob->appendNumber("totalDataSizeSpooled",
                               static_cast<long long>(spec->totalDataSizeBytes));
+            bob->appendBool("usedDisk", (spec->spills > 0));
+            bob->appendNumber("spills", static_cast<long long>(spec->spills));
+            bob->appendNumber("spilledDataStorageSize",
+                              static_cast<long long>(spec->spilledDataStorageSize));
         }
     }
 

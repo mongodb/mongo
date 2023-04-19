@@ -135,9 +135,11 @@ ExpressionContext::ExpressionContext(
     const NamespaceString& nss,
     const boost::optional<LegacyRuntimeConstants>& runtimeConstants,
     const boost::optional<BSONObj>& letParameters,
+    bool allowDiskUse,
     bool mayDbProfile,
     boost::optional<ExplainOptions::Verbosity> explain)
     : explain(explain),
+      allowDiskUse(allowDiskUse),
       ns(nss),
       opCtx(opCtx),
       mongoProcessInterface(std::make_shared<StubMongoProcessInterface>()),

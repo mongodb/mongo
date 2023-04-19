@@ -1184,6 +1184,29 @@ server_parameters:
       gte: 0
     on_update: plan_cache_util::clearSbeCacheOnParameterChange
 
+  internalQueryMaxSpoolMemoryUsageBytes:
+    description: "The maximum amount of memory a query or command is willing to use to execute a
+      spool, measured in bytes. If disk use is allowed, then it may be possible to spool more data,
+      but this limit will still constrain the memory consumption."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryMaxSpoolMemoryUsageBytes"
+    cpp_vartype: AtomicWord<long long>
+    default:
+      expr: 100 * 1024 * 1024
+    validator:
+      gt: 0
+
+  internalQueryMaxSpoolDiskUsageBytes:
+    description: "The maximum amount of disk a query or command is willing to use to execute a
+      spool, measured in bytes."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryMaxSpoolDiskUsageBytes"
+    cpp_vartype: AtomicWord<long long>
+    default:
+      expr: 10 * 100 * 1024 * 1024
+    validator:
+      gt: 0
+
 # Note for adding additional query knobs:
 #
 # When adding a new query knob, you should consider whether or not you need to add an 'on_update'

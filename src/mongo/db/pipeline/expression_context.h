@@ -171,6 +171,7 @@ public:
                       const NamespaceString& ns,
                       const boost::optional<LegacyRuntimeConstants>& runtimeConstants = boost::none,
                       const boost::optional<BSONObj>& letParameters = boost::none,
+                      bool allowDiskUse = false,
                       bool mayDbProfile = true,
                       boost::optional<ExplainOptions::Verbosity> explain = boost::none);
 

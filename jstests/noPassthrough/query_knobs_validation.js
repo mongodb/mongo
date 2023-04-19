@@ -65,6 +65,8 @@ const expectedParamDefaults = {
     internalQueryColumnScanMinAvgDocSizeBytes: 1024,
     internalQueryColumnScanMinCollectionSizeBytes: -1,
     internalQueryColumnScanMinNumColumnFilters: 3,
+    internalQueryMaxSpoolMemoryUsageBytes: 100 * 1024 * 1024,
+    internalQueryMaxSpoolDiskUsageBytes: 10 * 100 * 1024 * 1024,
 };
 
 function assertDefaultParameterValues() {
@@ -282,6 +284,14 @@ assertSetParameterFails("internalQueryColumnScanMinCollectionSizeBytes", -2);
 assertSetParameterSucceeds("internalQueryColumnScanMinNumColumnFilters", 100);
 assertSetParameterSucceeds("internalQueryColumnScanMinNumColumnFilters", 0);
 assertSetParameterFails("internalQueryColumnScanMinNumColumnFilters", -1);
+
+assertSetParameterSucceeds("internalQueryMaxSpoolMemoryUsageBytes", 100);
+assertSetParameterSucceeds("internalQueryMaxSpoolMemoryUsageBytes", 1);
+assertSetParameterFails("internalQueryMaxSpoolMemoryUsageBytes", 0);
+
+assertSetParameterSucceeds("internalQueryMaxSpoolDiskUsageBytes", 100);
+assertSetParameterSucceeds("internalQueryMaxSpoolDiskUsageBytes", 1);
+assertSetParameterFails("internalQueryMaxSpoolDiskUsageBytes", 0);
 
 MongoRunner.stopMongod(conn);
 })();

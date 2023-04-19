@@ -32,6 +32,8 @@
 
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/pipeline/memory_usage_tracker.h"
+#include "mongo/db/sorter/sorter.h"
 
 namespace mongo {
 
@@ -66,6 +68,8 @@ protected:
     PlanStage::StageState doWork(WorkingSetID* id);
 
 private:
+    void spill();
+
     WorkingSet* _ws;
 
     SpoolStats _specificStats;
@@ -73,7 +77,17 @@ private:
     // Next index to consume from the buffer. If < 0, the buffer is not yet fully populated from the
     // child.
     int _nextIndex = -1;
-    // Buffer caching spooled results.
+
+    // Buffer caching spooled results in-memory.
     std::vector<RecordId> _buffer;
+
+    // Machinery for spilling to disk.
+    MemoryUsageTracker _memTracker;
+    std::unique_ptr<SorterFileStats> _spillStats;
+    std::shared_ptr<Sorter<RecordId, NullValue>::File> _file;
+
+    // Iterators over the file that has been spilled to disk. These must be exhausted in addition to
+    // '_buffer' when returning results.
+    std::deque<std::shared_ptr<Sorter<RecordId, NullValue>::Iterator>> _spillFileIters;
 };
 }  //  namespace mongo

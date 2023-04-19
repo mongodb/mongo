@@ -1368,7 +1368,9 @@ env.Library(
     ],
 )
 
-env.Library(
+execEnv = env.Clone()
+execEnv.InjectThirdParty(libraries=['snappy'])
+execEnv.Library(
     target='query_exec',
     source=[
         'clientcursor.cpp',
@@ -1383,7 +1385,6 @@ env.Library(
         'exec/count.cpp',
         'exec/count_scan.cpp',
         'exec/delete_stage.cpp',
-        'exec/disk_use_options.idl',
         'exec/distinct_scan.cpp',
         'exec/eof.cpp',
         'exec/fetch.cpp',
@@ -1492,6 +1493,7 @@ env.Library(
         'curop_failpoint_helpers',
         'cursor_server_params',
         'dbdirectclient',
+        'disk_use_options_idl',
         'exec/projection_executor',
         'exec/sbe/query_sbe_stages',
         'exec/sbe/query_sbe_storage',
@@ -1537,6 +1539,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/ce/query_ce_sampling',
         '$BUILD_DIR/mongo/db/query/optimizer/optimizer',
         '$BUILD_DIR/mongo/db/session/kill_sessions',
+        '$BUILD_DIR/mongo/db/sorter/sorter_idl',
         '$BUILD_DIR/mongo/db/sorter/sorter_stats',
         '$BUILD_DIR/mongo/db/stats/resource_consumption_metrics',
         '$BUILD_DIR/mongo/db/storage/record_store_base',
@@ -1547,6 +1550,15 @@ env.Library(
         'timeseries/timeseries_conversion_util',
         'working_set_common',
         'write_stage_common',
+    ],
+)
+
+env.Library(
+    target='disk_use_options_idl',
+    source=['exec/disk_use_options.idl'],
+    LIBDEPS_PRIVATE=[
+        'query/query_knobs',
+        'server_base',
     ],
 )
 

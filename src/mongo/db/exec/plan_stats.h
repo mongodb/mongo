@@ -1227,9 +1227,22 @@ struct SpoolStats : public SpecificStats {
         visitor->visit(this);
     }
 
+    // The maximum number of bytes of memory we're willing to use during execution of the spool. If
+    // this limit is exceeded and 'allowDiskUse' is false, the query will fail at execution time. If
+    // 'allowDiskUse' is true, the data will be spilled to disk.
+    uint64_t maxMemoryUsageBytes = 0u;
+
+    // The maximum number of bytes of disk space we're willing to use during execution of the spool,
+    // if 'allowDiskUse' is true.
+    uint64_t maxDiskUsageBytes = 0u;
+
     // The amount of data we've spooled in bytes.
     uint64_t totalDataSizeBytes = 0u;
 
-    // TODO SERVER-74437 add more stats for spilling metrics
+    // The number of times that we spilled data to disk during the execution of this query.
+    uint64_t spills = 0u;
+
+    // The maximum size of the spill file written to disk, or 0 if no spilling occurred.
+    uint64_t spilledDataStorageSize = 0u;
 };
 }  // namespace mongo
