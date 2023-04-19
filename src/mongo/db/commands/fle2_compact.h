@@ -44,6 +44,7 @@ struct EncryptedStateCollectionsNamespaces {
     NamespaceString escNss;
     NamespaceString ecocNss;
     NamespaceString ecocRenameNss;
+    NamespaceString escDeletesNss;
 };
 
 /**
@@ -80,6 +81,13 @@ void compactOneFieldValuePairV2(FLEQueryInterface* queryImpl,
                                 const ECOCCompactionDocumentV2& ecocDoc,
                                 const NamespaceString& escNss,
                                 ECStats* escStats);
+
+
+void cleanupOneFieldValuePair(FLEQueryInterface* queryImpl,
+                              const ECOCCompactionDocumentV2& ecocDoc,
+                              const NamespaceString& escNss,
+                              const NamespaceString& escDeletesNss,
+                              ECStats* escStats);
 
 /**
  * Container for the _id values of ESC entries that are slated for deletion

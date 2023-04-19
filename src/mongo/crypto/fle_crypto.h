@@ -331,7 +331,7 @@ struct ESCDocument {
  */
 class FLETagQueryInterface {
 public:
-    enum class TagQueryType { kInsert, kQuery, kCompact };
+    enum class TagQueryType { kInsert, kQuery, kCompact, kCleanup };
 
     virtual ~FLETagQueryInterface();
 
@@ -516,10 +516,6 @@ public:
      *    (x > 0) means non-null anchors exist without a null anchor OR new non-null anchors
      *            have been added since the last-recorded apos in the null anchor.
      */
-    struct EmuBinaryResult {
-        boost::optional<uint64_t> cpos;
-        boost::optional<uint64_t> apos;
-    };
     static EmuBinaryResult emuBinaryV2(const FLEStateCollectionReader& reader,
                                        const ESCTwiceDerivedTagToken& tagToken,
                                        const ESCTwiceDerivedValueToken& valueToken);

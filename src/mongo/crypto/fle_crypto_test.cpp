@@ -667,14 +667,13 @@ std::tuple<ESCTwiceDerivedTagToken, ESCTwiceDerivedValueToken> generateEmuBinary
     return std::tie(escTwiceTag, escTwiceValue);
 }
 
-mongo::ESCCollection::EmuBinaryResult EmuBinaryV2Test(
-    boost::optional<std::pair<uint64_t, uint64_t>> nullAnchor,
-    uint64_t anchorStart,
-    uint64_t anchorCount,
-    uint64_t anchorCposStart,
-    uint64_t anchorCposEnd,
-    uint64_t nonAnchorStart,
-    uint64_t nonAnchorCount) {
+EmuBinaryResult EmuBinaryV2Test(boost::optional<std::pair<uint64_t, uint64_t>> nullAnchor,
+                                uint64_t anchorStart,
+                                uint64_t anchorCount,
+                                uint64_t anchorCposStart,
+                                uint64_t anchorCposEnd,
+                                uint64_t nonAnchorStart,
+                                uint64_t nonAnchorCount) {
 
     TestDocumentCollection coll;
     ConstDataRange value(testValue);

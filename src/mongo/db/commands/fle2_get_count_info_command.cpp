@@ -78,16 +78,23 @@ QECountInfoReplyTokens tokenFromCountInfo(const FLEEdgeCountInfo& countInfo) {
         token.setEDCDerivedFromDataTokenAndContentionFactorToken(countInfo.edc.value().toCDR());
     }
 
-    if (countInfo.cpos || countInfo.apos) {
+    token.setSearchedPositions(countInfo.searchedCounts.map([](const auto& pair) {
         ESCOptionalPositionsPair spos;
-        if (countInfo.cpos) {
-            spos.setCpos(countInfo.cpos.get());
+        if (pair.cpos) {
+            spos.setCpos(pair.cpos.get());
         }
-        if (countInfo.apos) {
-            spos.setApos(countInfo.apos.get());
+        if (pair.apos) {
+            spos.setApos(pair.apos.get());
         }
-        token.setSearchedPositions(spos);
-    }
+        return spos;
+    }));
+
+    token.setNullAnchorPositions(countInfo.nullAnchorCounts.map([](const auto& pair) {
+        ESCPositionsPair newPair;
+        newPair.setApos(pair.apos);
+        newPair.setCpos(pair.cpos);
+        return newPair;
+    }));
 
     if (countInfo.stats) {
         token.setStats(countInfo.stats.get());
@@ -125,6 +132,8 @@ FLEQueryInterface::TagQueryType queryTypeTranslation(QECountInfoQueryTypeEnum ty
             return FLEQueryInterface::TagQueryType::kQuery;
         case QECountInfoQueryTypeEnum::Compact:
             return FLEQueryInterface::TagQueryType::kCompact;
+        case QECountInfoQueryTypeEnum::Cleanup:
+            return FLEQueryInterface::TagQueryType::kCleanup;
         default:
             uasserted(7517102, "Invalid QECountInfoQueryTypeEnum value.");
     }

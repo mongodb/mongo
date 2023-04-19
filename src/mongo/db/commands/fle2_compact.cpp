@@ -105,6 +105,66 @@ void CompactStatsCounter<ECOCStats>::add(const ECOCStats& other) {
     addDeletes(other.getDeleted());
 }
 
+FLEEdgeCountInfo fetchEdgeCountInfo(FLEQueryInterface* queryImpl,
+                                    const ESCDerivedFromDataTokenAndContentionFactorToken& token,
+                                    const NamespaceString& escNss,
+                                    FLEQueryInterface::TagQueryType queryType,
+                                    const StringData queryTypeStr) {
+    std::vector<std::vector<FLEEdgePrfBlock>> tags;
+    tags.emplace_back().push_back(FLEEdgePrfBlock{token.data, boost::none});
+    auto countInfoSets = queryImpl->getTags(escNss, tags, queryType);
+    uassert(7517100,
+            str::stream() << "getQueryableEncryptionCountInfo for " << queryTypeStr
+                          << " returned an invalid number of edge count info",
+            countInfoSets.size() == 1 && countInfoSets[0].size() == 1);
+
+    auto& countInfo = countInfoSets[0][0];
+    uassert(7517103,
+            str::stream() << "getQueryableEncryptionCountInfo for " << queryTypeStr
+                          << " returned non-existent stats",
+            countInfo.stats.has_value());
+
+    uassert(7295001,
+            str::stream() << "getQueryableEncryptionCountInfo for " << queryTypeStr
+                          << " returned non-existent searched counts",
+            countInfo.searchedCounts.has_value());
+
+    return countInfo;
+}
+
+/**
+ * Inserts or updates a null anchor document in ESC.
+ * The newNullAnchor must contain the _id of the null anchor document to update.
+ */
+void upsertNullAnchor(FLEQueryInterface* queryImpl,
+                      bool hasNullAnchor,
+                      BSONObj newNullAnchor,
+                      const NamespaceString& nss,
+                      ECStats* stats) {
+    CompactStatsCounter<ECStats> statsCtr(stats);
+    if (hasNullAnchor) {
+        // update the null doc with a replacement modification
+        write_ops::UpdateOpEntry updateEntry;
+        updateEntry.setMulti(false);
+        updateEntry.setUpsert(false);
+        updateEntry.setQ(newNullAnchor.getField("_id").wrap());
+        updateEntry.setU(mongo::write_ops::UpdateModification(
+            newNullAnchor, write_ops::UpdateModification::ReplacementTag{}));
+        write_ops::UpdateCommandRequest updateRequest(nss, {std::move(updateEntry)});
+
+        auto reply = queryImpl->update(nss, kUninitializedStmtId, updateRequest);
+        checkWriteErrors(reply);
+        statsCtr.addUpdates(reply.getNModified());
+    } else {
+        // insert the null anchor; translate duplicate key error to a FLE contention error
+        StmtId stmtId = kUninitializedStmtId;
+        auto reply =
+            uassertStatusOK(queryImpl->insertDocuments(nss, {newNullAnchor}, &stmtId, true));
+        checkWriteErrors(reply);
+        statsCtr.addInserts(1);
+    }
+}
+
 }  // namespace
 
 
@@ -143,6 +203,8 @@ EncryptedStateCollectionsNamespaces::createFromDataCollection(const Collection& 
 
     namespaces.ecocRenameNss =
         NamespaceString(db, namespaces.ecocNss.coll().toString().append(".compact"));
+    namespaces.escDeletesNss =
+        NamespaceString(db, namespaces.escNss.coll().toString().append(".deletes"));
     return namespaces;
 }
 
@@ -182,38 +244,39 @@ void compactOneFieldValuePairV2(FLEQueryInterface* queryImpl,
                                 const ECOCCompactionDocumentV2& ecocDoc,
                                 const NamespaceString& escNss,
                                 ECStats* escStats) {
-    auto escValueToken =
-        FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedValueToken(ecocDoc.esc);
-
-    std::vector<std::vector<FLEEdgePrfBlock>> tags;
-    {
-        FLEEdgePrfBlock edgeSet{ecocDoc.esc.data, boost::none};
-        tags.push_back({edgeSet});
-    }
-
-    auto countInfoSets =
-        queryImpl->getTags(escNss, tags, FLEQueryInterface::TagQueryType::kCompact);
-
-    uassert(7517100,
-            "CountInfoSets cannot be empty and must have one value.",
-            countInfoSets.size() == 1 && countInfoSets[0].size() == 1);
-
-    auto& val = countInfoSets[0][0];
     CompactStatsCounter<ECStats> stats(escStats);
 
-    auto& tagToken = val.tagToken;
-    auto cpos = val.cpos;
+    /**
+     * Send a getQueryableEncryptionCountInfo command with query type "compact".
+     * The target of this command will perform the actual search for the next anchor
+     * position, which happens in the getEdgeCountInfoForCompact() function in fle_crypto.
+     *
+     * It is expected to return a single reply token, whose "count" field contains the
+     * next anchor position, and whose "searchedCounts" field contains the result of
+     * emuBinary.
+     */
+    auto countInfo = fetchEdgeCountInfo(
+        queryImpl, ecocDoc.esc, escNss, FLEQueryInterface::TagQueryType::kCompact, "compact"_sd);
+    auto& emuBinaryResult = countInfo.searchedCounts.value();
 
-    uassert(
-        7517103, "Stats cannot be empty for compacting a field value pair.", val.stats.has_value());
-    stats.add(val.stats.get());
+    stats.add(countInfo.stats.get());
 
-    if (!val.cpos) {
+    if (emuBinaryResult.cpos == boost::none) {
+        // no new non-anchors since the last compact/cleanup, so don't insert a new anchor
         return;
     }
 
-    auto anchorDoc =
-        ESCCollection::generateAnchorDocument(tagToken, escValueToken, val.count, cpos.value());
+    // the "count" field contains the next anchor position and must not be zero
+    uassert(7295002,
+            "getQueryableEncryptionCountInfo returned an invalid position for the next anchor",
+            countInfo.count > 0);
+
+    auto valueToken = FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedValueToken(ecocDoc.esc);
+    auto latestCpos = emuBinaryResult.cpos.value();
+
+    auto anchorDoc = ESCCollection::generateAnchorDocument(
+        countInfo.tagToken, valueToken, countInfo.count, latestCpos);
+
     StmtId stmtId = kUninitializedStmtId;
 
     if (MONGO_unlikely(fleCompactHangBeforeESCAnchorInsert.shouldFail())) {
@@ -225,6 +288,111 @@ void compactOneFieldValuePairV2(FLEQueryInterface* queryImpl,
         uassertStatusOK(queryImpl->insertDocuments(escNss, {anchorDoc}, &stmtId, true));
     checkWriteErrors(insertReply);
     stats.addInserts(1);
+}
+
+
+void cleanupOneFieldValuePair(FLEQueryInterface* queryImpl,
+                              const ECOCCompactionDocumentV2& ecocDoc,
+                              const NamespaceString& escNss,
+                              const NamespaceString& escDeletesNss,
+                              ECStats* escStats) {
+
+    CompactStatsCounter<ECStats> stats(escStats);
+    auto valueToken = FLETwiceDerivedTokenGenerator::generateESCTwiceDerivedValueToken(ecocDoc.esc);
+
+    /**
+     * Send a getQueryableEncryptionCountInfo command with query type "cleanup".
+     * The target of this command will perform steps (B), (C), and (D) of the cleanup
+     * algorithm, and is implemented in getEdgeCountInfoForCleanup() function in fle_crypto.
+     *
+     * It is expected to return a single reply token, whose "searchedCounts" field contains
+     * the result of emuBinary (C), and whose "nullAnchorCounts" field may contain the result
+     * of the null anchor lookup (D). The "count" field shall contain the value of a_1 that
+     * the null anchor should be updated with.
+     */
+    auto countInfo = fetchEdgeCountInfo(
+        queryImpl, ecocDoc.esc, escNss, FLEQueryInterface::TagQueryType::kCleanup, "cleanup"_sd);
+    auto& emuBinaryResult = countInfo.searchedCounts.value();
+
+    stats.add(countInfo.stats.get());
+
+    if (emuBinaryResult.apos == boost::none) {
+        // case (E)
+        // Null anchor exists & contains the latest anchor position,
+        // and *maybe* the latest non-anchor position.
+        uassert(7295003,
+                str::stream() << "getQueryableEncryptionCountInfo for cleanup returned "
+                                 "non-existent null anchor counts",
+                countInfo.nullAnchorCounts.has_value());
+
+        if (emuBinaryResult.cpos == boost::none) {
+            // if cpos is none, then the null anchor also contains the latest
+            // non-anchor position, so no need to update it.
+            return;
+        }
+
+        auto latestApos = countInfo.nullAnchorCounts->apos;
+        auto latestCpos = countInfo.count;
+
+        // Update null anchor with the latest positions
+        auto newAnchor = ESCCollection::generateNullAnchorDocument(
+            countInfo.tagToken, valueToken, latestApos, latestCpos);
+        upsertNullAnchor(queryImpl, true, newAnchor, escNss, escStats);
+
+    } else if (emuBinaryResult.apos.value() == 0) {
+        // case (F)
+        // No anchors yet exist, so latest apos is 0.
+
+        uint64_t latestApos = 0;
+        auto latestCpos = countInfo.count;
+
+        // Insert a new null anchor.
+        auto newAnchor = ESCCollection::generateNullAnchorDocument(
+            countInfo.tagToken, valueToken, latestApos, latestCpos);
+        upsertNullAnchor(queryImpl, false, newAnchor, escNss, escStats);
+
+    } else /* (apos > 0) */ {
+        // case (G)
+        // New anchors exist - if null anchor exists, then it contains stale positions.
+        // Latest apos is returned by emuBinary.
+
+        auto latestApos = emuBinaryResult.apos.value();
+        auto latestCpos = countInfo.count;
+
+        bool nullAnchorExists = countInfo.nullAnchorCounts.has_value();
+
+        // upsert the null anchor with the latest positions
+        auto newAnchor = ESCCollection::generateNullAnchorDocument(
+            countInfo.tagToken, valueToken, latestApos, latestCpos);
+        upsertNullAnchor(queryImpl, nullAnchorExists, newAnchor, escNss, escStats);
+
+        // insert the _id of stale anchors (anchors in range [bottomApos + 1, latestApos])
+        // into the deletes collection.
+        uint64_t bottomApos = 0;
+        if (nullAnchorExists) {
+            bottomApos = countInfo.nullAnchorCounts->apos;
+        }
+
+        StmtId stmtId = kUninitializedStmtId;
+
+        for (auto i = bottomApos + 1; i <= latestApos; i++) {
+            auto block = ESCCollection::generateAnchorId(countInfo.tagToken, i);
+            auto doc = BSON("_id"_sd << BSONBinData(block.data(), block.size(), BinDataGeneral));
+
+            auto swReply = queryImpl->insertDocuments(escDeletesNss, {doc}, &stmtId, false);
+            if (swReply.getStatus() == ErrorCodes::DuplicateKey) {
+                // ignore duplicate _id error, which can happen in case of a restart.
+                LOGV2_DEBUG(7295010,
+                            2,
+                            "Duplicate anchor ID found in ESC deletes collection",
+                            "namespace"_attr = escDeletesNss);
+                continue;
+            }
+            uassertStatusOK(swReply.getStatus());
+            checkWriteErrors(swReply.getValue());
+            stats.addInserts(1);
+        }
+    }
 }
 
 void processFLECompactV2(OperationContext* opCtx,

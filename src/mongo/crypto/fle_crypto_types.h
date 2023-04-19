@@ -251,6 +251,22 @@ struct FLEEdgePrfBlock {
 };
 
 /**
+ * A pair of non-anchor and anchor positions.
+ */
+struct ESCCountsPair {
+    uint64_t cpos;
+    uint64_t apos;
+};
+
+/**
+ * A pair of optional non-anchor and anchor positions returned by emulated binary search.
+ */
+struct EmuBinaryResult {
+    boost::optional<uint64_t> cpos;
+    boost::optional<uint64_t> apos;
+};
+
+/**
  * The information retrieved from ESC for a given ESC token. Count may reflect a count suitable for
  * insert or query.
  */
@@ -264,11 +280,16 @@ struct FLEEdgeCountInfo {
 
     FLEEdgeCountInfo(uint64_t c,
                      ESCTwiceDerivedTagToken t,
-                     boost::optional<uint64_t> cpos,
-                     boost::optional<uint64_t> apos,
+                     boost::optional<EmuBinaryResult> searchedCounts,
+                     boost::optional<ESCCountsPair> nullAnchorCounts,
                      boost::optional<ECStats> stats,
                      boost::optional<EDCDerivedFromDataTokenAndContentionFactorToken> edcParam)
-        : count(c), tagToken(t), cpos(cpos), apos(apos), stats(stats), edc(edcParam) {}
+        : count(c),
+          tagToken(t),
+          searchedCounts(searchedCounts),
+          nullAnchorCounts(nullAnchorCounts),
+          stats(stats),
+          edc(edcParam) {}
 
 
     // May reflect a value suitable for insert or query.
@@ -276,9 +297,11 @@ struct FLEEdgeCountInfo {
 
     ESCTwiceDerivedTagToken tagToken;
 
-    boost::optional<uint64_t> cpos;
+    // Positions returned by emuBinary (used by compact & cleanup)
+    boost::optional<EmuBinaryResult> searchedCounts;
 
-    boost::optional<uint64_t> apos;
+    // Positions obtained from null anchor decode (used by cleanup)
+    boost::optional<ESCCountsPair> nullAnchorCounts;
 
     boost::optional<ECStats> stats;
 

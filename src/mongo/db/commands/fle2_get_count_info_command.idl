@@ -86,7 +86,7 @@ structs:
             cpp_name: NullAnchorPositions
             optional: true
           stats:
-            description: "stats returned for compaction algorithm"
+            description: "stats returned for compaction or cleanup algorithms"
             type: ECStats
             optional: true
 
@@ -134,6 +134,7 @@ enums:
             Insert: "insert"
             Query: "query"
             Compact: "compact"
+            Cleanup: "cleanup"
 
 commands:
     getQueryableEncryptionCountInfo:
@@ -148,6 +149,6 @@ commands:
                 description: "Array of tokens to fetch"
                 type: array<QECountInfoRequestTokenSet>
             queryType:
-                description: "Purpose of command, either for insert, query, or compact"
+                description: "Purpose of command, either for insert, query, compact, or cleanup"
                 type: QECountInfoQueryType
 

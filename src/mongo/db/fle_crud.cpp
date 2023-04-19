@@ -188,23 +188,28 @@ std::vector<QECountInfoRequestTokenSet> toTagSets(
 
 FLEEdgeCountInfo convertTokensToEdgeCount(const QECountInfoReplyTokens& token) {
 
-    boost::optional<EDCDerivedFromDataTokenAndContentionFactorToken> edc;
-    if (token.getEDCDerivedFromDataTokenAndContentionFactorToken()) {
-        edc = FLETokenFromCDR<FLETokenType::EDCDerivedFromDataTokenAndContentionFactorToken>(
-            token.getEDCDerivedFromDataTokenAndContentionFactorToken().value());
-    }
+    auto edc = token.getEDCDerivedFromDataTokenAndContentionFactorToken().map([](auto& t) {
+        return FLETokenFromCDR<FLETokenType::EDCDerivedFromDataTokenAndContentionFactorToken>(t);
+    });
 
-    boost::optional<uint64_t> cpos, apos;
-    auto& spos = token.getSearchedPositions();
-    if (spos) {
-        cpos = spos->getCpos();
-        apos = spos->getApos();
-    }
+    auto spos = token.getSearchedPositions().map([](auto& pair) {
+        EmuBinaryResult newPair;
+        newPair.cpos = pair.getCpos();
+        newPair.apos = pair.getApos();
+        return newPair;
+    });
+
+    auto npos = token.getNullAnchorPositions().map([](auto& pair) {
+        ESCCountsPair newPair;
+        newPair.cpos = pair.getCpos();
+        newPair.apos = pair.getApos();
+        return newPair;
+    });
 
     auto esc =
         FLETokenFromCDR<FLETokenType::ESCTwiceDerivedTagToken>(token.getESCTwiceDerivedTagToken());
 
-    return FLEEdgeCountInfo(token.getCount(), esc, cpos, apos, token.getStats(), edc);
+    return FLEEdgeCountInfo(token.getCount(), esc, spos, npos, token.getStats(), edc);
 }
 
 std::vector<std::vector<FLEEdgeCountInfo>> toEdgeCounts(
@@ -1487,6 +1492,8 @@ QECountInfoQueryTypeEnum queryTypeTranslation(FLEQueryInterface::TagQueryType ty
             return QECountInfoQueryTypeEnum::Query;
         case FLEQueryInterface::TagQueryType::kCompact:
             return QECountInfoQueryTypeEnum::Compact;
+        case FLEQueryInterface::TagQueryType::kCleanup:
+            return QECountInfoQueryTypeEnum::Cleanup;
         default:
             uasserted(7517101, "Invalid TagQueryType value.");
     }
