@@ -88,112 +88,6 @@ private:
 };
 
 /**
- * Shared base class for AutoGetCollectionForRead and AutoGetCollectionForReadLockFree.
- * Do not use directly.
- */
-template <typename AutoGetCollectionType, typename EmplaceAutoGetCollectionFunc>
-class AutoGetCollectionForReadBase {
-    AutoGetCollectionForReadBase(const AutoGetCollectionForReadBase&) = delete;
-    AutoGetCollectionForReadBase& operator=(const AutoGetCollectionForReadBase&) = delete;
-
-public:
-    AutoGetCollectionForReadBase(OperationContext* opCtx,
-                                 const EmplaceAutoGetCollectionFunc& emplaceAutoColl,
-                                 bool isLockFreeReadSubOperation = false);
-
-    explicit operator bool() const {
-        return static_cast<bool>(getCollection());
-    }
-
-    const Collection* operator->() const {
-        return getCollection().get();
-    }
-
-    const CollectionPtr& operator*() const {
-        return getCollection();
-    }
-
-    const CollectionPtr& getCollection() const {
-        return _autoColl->getCollection();
-    }
-
-    const ViewDefinition* getView() const {
-        return _autoColl->getView();
-    }
-
-    const NamespaceString& getNss() const {
-        return _autoColl->getNss();
-    }
-
-protected:
-    // If this field is set, the reader will not take the ParallelBatchWriterMode lock and conflict
-    // with secondary batch application. This stays in scope with the _autoColl so that locks are
-    // taken and released in the right order.
-    boost::optional<ShouldNotConflictWithSecondaryBatchApplicationBlock>
-        _shouldNotConflictWithSecondaryBatchApplicationBlock;
-
-    // This field is optional, because the code to wait for majority committed snapshot needs to
-    // release locks in order to block waiting
-    boost::optional<AutoGetCollectionType> _autoColl;
-};
-
-/**
- * Helper for AutoGetCollectionForRead below. Contains implementation on how contained
- * AutoGetCollection is instantiated by AutoGetCollectionForReadBase.
- */
-class EmplaceAutoGetCollectionForRead {
-public:
-    EmplaceAutoGetCollectionForRead(OperationContext* opCtx,
-                                    const NamespaceStringOrUUID& nsOrUUID,
-                                    AutoGetCollection::Options options = {});
-
-    void emplace(boost::optional<AutoGetCollection>& autoColl) const;
-
-private:
-    OperationContext* _opCtx;
-    const NamespaceStringOrUUID& _nsOrUUID;
-    LockMode _collectionLockMode;
-    AutoGetCollection::Options _options;
-};
-
-/**
- * Same as calling AutoGetCollection with MODE_IS, but in addition ensures that the read will be
- * performed against an appropriately committed snapshot if the operation is using a readConcern of
- * 'majority'.
- *
- * Use this when you want to read the contents of a collection, but you are not at the top-level of
- * some command. This will ensure your reads obey any requested readConcern, but will not update the
- * status of CurrentOp, or add a Top entry.
- *
- * Any collections specified in 'secondaryNssOrUUIDs' will be checked that their minimum visible
- * timestamp supports read concern, throwing a SnapshotUnavailable on error. Additional collection
- * and/or database locks will be acquired for 'secondaryNssOrUUIDs' namespaces.
- *
- * NOTE: Must not be used with any locks held, because it needs to block waiting on the committed
- * snapshot to become available, and can potentially release and reacquire locks.
- */
-class AutoGetCollectionForReadLegacy
-    : public AutoGetCollectionForReadBase<AutoGetCollection, EmplaceAutoGetCollectionForRead> {
-public:
-    AutoGetCollectionForReadLegacy(OperationContext* opCtx,
-                                   const NamespaceStringOrUUID& nsOrUUID,
-                                   AutoGetCollection::Options = {});
-
-    /**
-     * Indicates whether any namespace in 'secondaryNssOrUUIDs' is a view or sharded.
-     *
-     * The secondary namespaces won't be checked if getCollection() returns nullptr.
-     */
-    bool isAnySecondaryNamespaceAViewOrSharded() const {
-        return _secondaryNssIsAViewOrSharded;
-    }
-
-private:
-    // Tracks whether any secondary collection namespaces is a view or sharded.
-    bool _secondaryNssIsAViewOrSharded = false;
-};
-
-/**
  * Locked version of AutoGetCollectionForRead for setting up an operation for read that ensured that
  * the read will be performed against an appropriately committed snapshot if the operation is using
  * a readConcern of 'majority'.
@@ -205,11 +99,11 @@ private:
  * Additional collection and/or database locks will be acquired for 'secondaryNssOrUUIDs'
  * namespaces.
  */
-class AutoGetCollectionForReadPITCatalog {
+class AutoGetCollectionForRead {
 public:
-    AutoGetCollectionForReadPITCatalog(OperationContext* opCtx,
-                                       const NamespaceStringOrUUID& nsOrUUID,
-                                       AutoGetCollection::Options = {});
+    AutoGetCollectionForRead(OperationContext* opCtx,
+                             const NamespaceStringOrUUID& nsOrUUID,
+                             AutoGetCollection::Options = {});
 
     explicit operator bool() const {
         return static_cast<bool>(getCollection());
@@ -258,101 +152,6 @@ private:
     bool _secondaryNssIsAViewOrSharded = false;
 };
 
-
-class AutoGetCollectionForRead {
-public:
-    AutoGetCollectionForRead(OperationContext* opCtx,
-                             const NamespaceStringOrUUID& nsOrUUID,
-                             AutoGetCollection::Options = {});
-
-    explicit operator bool() const {
-        return static_cast<bool>(getCollection());
-    }
-
-    const Collection* operator->() const {
-        return getCollection().get();
-    }
-
-    const CollectionPtr& operator*() const {
-        return getCollection();
-    }
-
-    const CollectionPtr& getCollection() const;
-    const ViewDefinition* getView() const;
-    const NamespaceString& getNss() const;
-
-    bool isAnySecondaryNamespaceAViewOrSharded() const;
-
-private:
-    boost::optional<AutoGetCollectionForReadLegacy> _legacy;
-    boost::optional<AutoGetCollectionForReadPITCatalog> _pitCatalog;
-};
-
-/**
- * Same as AutoGetCollectionForRead above except does not take collection, database or rstl locks.
- * Takes the global lock and may take the PBWM, same as AutoGetCollectionForRead. Ensures a
- * consistent in-memory and on-disk view of the storage catalog.
- *
- * This implementation does not use the PIT catalog.
- */
-class AutoGetCollectionForReadLockFreeLegacy {
-public:
-    AutoGetCollectionForReadLockFreeLegacy(OperationContext* opCtx,
-                                           const NamespaceStringOrUUID& nsOrUUID,
-                                           AutoGetCollection::Options = {});
-
-    const CollectionPtr& getCollection() const {
-        return _autoGetCollectionForReadBase->getCollection();
-    }
-
-    const ViewDefinition* getView() const {
-        return _autoGetCollectionForReadBase->getView();
-    }
-
-    const NamespaceString& getNss() const {
-        return _autoGetCollectionForReadBase->getNss();
-    }
-
-    bool isAnySecondaryNamespaceAViewOrSharded() const {
-        return _secondaryNssIsAViewOrSharded;
-    }
-
-private:
-    /**
-     * Helper for how AutoGetCollectionForReadBase instantiates its owned AutoGetCollectionLockFree.
-     */
-    class EmplaceHelper {
-    public:
-        EmplaceHelper(OperationContext* opCtx,
-                      CollectionCatalogStasher& catalogStasher,
-                      const NamespaceStringOrUUID& nsOrUUID,
-                      AutoGetCollectionLockFree::Options options,
-                      bool isLockFreeReadSubOperation);
-
-        void emplace(boost::optional<AutoGetCollectionLockFree>& autoColl) const;
-
-    private:
-        OperationContext* _opCtx;
-        CollectionCatalogStasher& _catalogStasher;
-        const NamespaceStringOrUUID& _nsOrUUID;
-        AutoGetCollectionLockFree::Options _options;
-
-        // Set to true if the lock helper using this EmplaceHelper is nested under another lock-free
-        // helper.
-        bool _isLockFreeReadSubOperation;
-    };
-
-    // Tracks whether any secondary collection namespaces is a view or sharded.
-    bool _secondaryNssIsAViewOrSharded = false;
-
-    // The CollectionCatalogStasher must outlive the LockFreeReadsBlock in the AutoGet* below.
-    // ~LockFreeReadsBlock clears a flag that the ~CollectionCatalogStasher checks.
-    CollectionCatalogStasher _catalogStash;
-
-    boost::optional<AutoGetCollectionForReadBase<AutoGetCollectionLockFree, EmplaceHelper>>
-        _autoGetCollectionForReadBase;
-};
-
 /**
  * Same as AutoGetCollectionForRead above except does not take collection, database or rstl locks.
  * Takes the global lock and may take the PBWM, same as AutoGetCollectionForRead. Ensures a
@@ -360,11 +159,11 @@ private:
  *
  * This implementation uses the point-in-time (PIT) catalog.
  */
-class AutoGetCollectionForReadLockFreePITCatalog final {
+class AutoGetCollectionForReadLockFree final {
 public:
-    AutoGetCollectionForReadLockFreePITCatalog(OperationContext* opCtx,
-                                               NamespaceStringOrUUID nsOrUUID,
-                                               AutoGetCollection::Options options = {});
+    AutoGetCollectionForReadLockFree(OperationContext* opCtx,
+                                     NamespaceStringOrUUID nsOrUUID,
+                                     AutoGetCollection::Options options = {});
 
     const CollectionPtr& getCollection() const {
         return _collectionPtr;
@@ -385,7 +184,7 @@ public:
 private:
     /**
      * Creates the std::function object used by CollectionPtrs to restore state for this
-     * AutoGetCollectionForReadLockFreePITCatalog object after having yielded.
+     * AutoGetCollectionForReadLockFree object after having yielded.
      */
     CollectionPtr::RestoreFn _makeRestoreFromYieldFn(
         const AutoGetCollection::Options& options,
@@ -393,10 +192,10 @@ private:
         const DatabaseName& dbName);
 
     // Used so that we can reset the read source back to the original read source when this instance
-    // of AutoGetCollectionForReadLockFreePITCatalog is destroyed.
+    // of AutoGetCollectionForReadLockFree is destroyed.
     RecoveryUnit::ReadSource _originalReadSource;
 
-    // Whether or not this AutoGetCollectionForReadLockFreePITCatalog is being constructed while
+    // Whether or not this AutoGetCollectionForReadLockFree is being constructed while
     // there's already a lock-free read in progress.
     bool _isLockFreeReadSubOperation;
 
@@ -449,82 +248,6 @@ private:
     //
     // May change after construction, when restoring from yield.
     std::shared_ptr<const ViewDefinition> _view;
-};
-
-/**
- * Same as AutoGetCollectionForRead above except does not take collection, database or rstl locks.
- * Takes the global lock and may take the PBWM, same as AutoGetCollectionForRead. Ensures a
- * consistent in-memory and on-disk view of the storage catalog.
- */
-class AutoGetCollectionForReadLockFree {
-public:
-    AutoGetCollectionForReadLockFree(OperationContext* opCtx,
-                                     const NamespaceStringOrUUID& nsOrUUID,
-                                     AutoGetCollection::Options = {});
-
-    explicit operator bool() const {
-        return static_cast<bool>(getCollection());
-    }
-
-    const Collection* operator->() const {
-        return getCollection().get();
-    }
-
-    const CollectionPtr& operator*() const {
-        return getCollection();
-    }
-
-    const CollectionPtr& getCollection() const {
-        return stdx::visit(
-            OverloadedVisitor{
-                [](auto&& impl) -> const CollectionPtr& { return impl.getCollection(); },
-                [](stdx::monostate) -> const CollectionPtr& { MONGO_UNREACHABLE; },
-            },
-            _impl);
-    }
-
-    const ViewDefinition* getView() const {
-        return stdx::visit(OverloadedVisitor{[](auto&& impl) { return impl.getView(); },
-                                             [](stdx::monostate) -> const ViewDefinition* {
-                                                 MONGO_UNREACHABLE;
-                                             }},
-                           _impl);
-    }
-
-    const NamespaceString& getNss() const {
-        return stdx::visit(
-            OverloadedVisitor{[](auto&& impl) -> const NamespaceString& { return impl.getNss(); },
-                              [](stdx::monostate) -> const NamespaceString& {
-                                  MONGO_UNREACHABLE;
-                              }},
-            _impl);
-    }
-
-    /**
-     * Indicates whether any namespace in 'secondaryNssOrUUIDs' is a view or sharded.
-     *
-     * The secondary namespaces won't be checked if getCollection() returns nullptr.
-     */
-    bool isAnySecondaryNamespaceAViewOrSharded() const {
-        return stdx::visit(
-            OverloadedVisitor{
-                [](auto&& impl) { return impl.isAnySecondaryNamespaceAViewOrSharded(); },
-                [](stdx::monostate) -> bool {
-                    MONGO_UNREACHABLE;
-                }},
-            _impl);
-    }
-
-private:
-    // If the gPointInTimeCatalogLookups feature flag is enabled, this will contain an instance of
-    // AutoGetCollectionForReadLockFreePITCatalog. Otherwise, it will contain an instance of
-    // AutoGetCollectionForReadLockFreeLegacy. Note that stdx::monostate is required for default
-    // construction, since these other types are not movable, but after construction, the value
-    // should never be set to stdx::monostate.
-    stdx::variant<stdx::monostate,
-                  AutoGetCollectionForReadLockFreeLegacy,
-                  AutoGetCollectionForReadLockFreePITCatalog>
-        _impl;
 };
 
 /**

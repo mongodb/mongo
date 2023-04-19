@@ -426,17 +426,6 @@ public:
      */
     bool isCollectionAwaitingVisibility(UUID uuid) const;
 
-    // TODO SERVER-74468: Remove this function
-    std::shared_ptr<const Collection> lookupCollectionByNamespaceForRead_DONT_USE(
-        OperationContext* opCtx, const NamespaceString& nss) const {
-        return _getCollectionByNamespace(opCtx, nss);
-    }
-    // TODO SERVER-74468: Remove this function
-    std::shared_ptr<const Collection> lookupCollectionByUUIDForRead_DONT_USE(
-        OperationContext* opCtx, const UUID& uuid) const {
-        return _getCollectionByUUID(opCtx, uuid);
-    }
-
     /**
      * This function gets the NamespaceString from the collection catalog entry that
      * corresponds to UUID uuid. If no collection exists with the uuid, return

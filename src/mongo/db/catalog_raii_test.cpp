@@ -361,52 +361,6 @@ TEST_F(CatalogRAIITestFixture, AutoGetCollectionMultiNssCollLockDeadline) {
         AutoGetCollection::Options{}.secondaryNssOrUUIDs(secondaryNamespacesConflict));
 }
 
-TEST_F(CatalogRAIITestFixture, AutoGetCollectionLockFreeGlobalLockDeadline) {
-    Lock::GlobalLock gLock1(client1.second.get(), MODE_X);
-    ASSERT(client1.second->lockState()->isLocked());
-    failsWithLockTimeout(
-        [&] {
-            AutoGetCollectionLockFree coll(
-                client2.second.get(),
-                nss,
-                [](std::shared_ptr<const Collection>&, OperationContext*, UUID) {},
-                AutoGetCollectionLockFree::Options{}.deadline(Date_t::now() + timeoutMs));
-        },
-        timeoutMs);
-}
-
-TEST_F(CatalogRAIITestFixture, AutoGetCollectionLockFreeCompatibleWithCollectionExclusiveLock) {
-    Lock::DBLock dbLock1(client1.second.get(), nss.dbName(), MODE_IX);
-    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
-    Lock::CollectionLock collLock1(client1.second.get(), nss, MODE_X);
-    ASSERT(client1.second->lockState()->isCollectionLockedForMode(nss, MODE_X));
-
-    AutoGetCollectionLockFree coll(
-        client2.second.get(), nss, [](std::shared_ptr<const Collection>&, OperationContext*, UUID) {
-        });
-    ASSERT(client2.second->lockState()->isLocked());
-}
-
-TEST_F(CatalogRAIITestFixture, AutoGetCollectionLockFreeCompatibleWithDatabaseExclusiveLock) {
-    Lock::DBLock dbLock1(client1.second.get(), nss.dbName(), MODE_X);
-    ASSERT(client1.second->lockState()->isDbLockedForMode(nss.dbName(), MODE_X));
-
-    AutoGetCollectionLockFree coll(
-        client2.second.get(), nss, [](std::shared_ptr<const Collection>&, OperationContext*, UUID) {
-        });
-    ASSERT(client2.second->lockState()->isLocked());
-}
-
-TEST_F(CatalogRAIITestFixture, AutoGetCollectionLockFreeCompatibleWithRSTLExclusiveLock) {
-    Lock::ResourceLock rstl(client1.second.get(), resourceIdReplicationStateTransitionLock, MODE_X);
-    ASSERT(client1.second->lockState()->isRSTLExclusive());
-
-    AutoGetCollectionLockFree coll(
-        client2.second.get(), nss, [](std::shared_ptr<const Collection>&, OperationContext*, UUID) {
-        });
-    ASSERT(client2.second->lockState()->isLocked());
-}
-
 using ReadSource = RecoveryUnit::ReadSource;
 
 class RecoveryUnitMock : public RecoveryUnitNoop {

@@ -52,6 +52,7 @@
 namespace mongo {
 namespace {
 
+MONGO_FAIL_POINT_DEFINE(hangBeforeAutoGetCollectionLockFreeShardedStateAccess);
 MONGO_FAIL_POINT_DEFINE(hangBeforeAutoGetShardVersionCheck);
 MONGO_FAIL_POINT_DEFINE(reachedAutoGetLockFreeShardConsistencyRetry);
 
@@ -445,106 +446,9 @@ AutoStatsTracker::~AutoStatsTracker() {
                 curOp->getReadWriteType());
 }
 
-template <typename AutoGetCollectionType, typename EmplaceAutoCollFunc>
-AutoGetCollectionForReadBase<AutoGetCollectionType, EmplaceAutoCollFunc>::
-    AutoGetCollectionForReadBase(OperationContext* opCtx,
-                                 const EmplaceAutoCollFunc& emplaceAutoColl,
-                                 bool isLockFreeReadSubOperation) {
-    // If this instance is nested and lock-free, then we do not want to adjust any setting, but we
-    // do need to set up the Collection reference.
-    if (isLockFreeReadSubOperation) {
-        emplaceAutoColl.emplace(_autoColl);
-        return;
-    }
-
-    // The caller was expecting to conflict with batch application before entering this function.
-    // i.e. the caller does not currently have a ShouldNotConflict... block in scope.
-    bool callerWasConflicting = opCtx->lockState()->shouldConflictWithSecondaryBatchApplication();
-
-    if (allowSecondaryReadsDuringBatchApplication_DONT_USE(opCtx).value_or(true) &&
-        opCtx->getServiceContext()->getStorageEngine()->supportsReadConcernSnapshot()) {
-        _shouldNotConflictWithSecondaryBatchApplicationBlock.emplace(opCtx->lockState());
-    }
-
-    emplaceAutoColl.emplace(_autoColl);
-
-    auto readConcernArgs = repl::ReadConcernArgs::get(opCtx);
-    // If the collection doesn't exist or disappears after releasing locks and waiting, there is no
-    // need to check for pending catalog changes.
-    const auto& coll = _autoColl->getCollection();
-    assertReadConcernSupported(
-        coll, readConcernArgs, opCtx->recoveryUnit()->getTimestampReadSource());
-
-    if (coll->usesCappedSnapshots()) {
-        CappedSnapshots::get(opCtx).establish(opCtx, coll);
-    }
-
-    // We make a copy of the namespace so we can use the variable after locks are released, since
-    // releasing locks will allow the value of coll->ns() to change.
-    const NamespaceString nss = coll->ns();
-    // During batch application on secondaries, there is a potential to read inconsistent states
-    // that would normally be protected by the PBWM lock. In order to serve secondary reads during
-    // this period, we default to not acquiring the lock (by setting
-    // _shouldNotConflictWithSecondaryBatchApplicationBlock). On primaries, we always read at a
-    // consistent time, so not taking the PBWM lock is not a problem. On secondaries, we have to
-    // guarantee we read at a consistent state, so we must read at the lastApplied timestamp, which
-    // is set after each complete batch.
-
-    // Once we have our locks, check whether or not we should override the ReadSource that was set
-    // before acquiring locks.
-    const bool shouldReadAtLastApplied = SnapshotHelper::changeReadSourceIfNeeded(opCtx, nss);
-    // Update readSource in case it was updated.
-    const auto readSource = opCtx->recoveryUnit()->getTimestampReadSource();
-
-    const auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
-
-    checkInvariantsForReadOptions(nss,
-                                  readConcernArgs.getArgsAfterClusterTime(),
-                                  readSource,
-                                  readTimestamp,
-                                  callerWasConflicting,
-                                  shouldReadAtLastApplied);
-}
-
-EmplaceAutoGetCollectionForRead::EmplaceAutoGetCollectionForRead(
-    OperationContext* opCtx,
-    const NamespaceStringOrUUID& nsOrUUID,
-    AutoGetCollection::Options options)
-    : _opCtx(opCtx),
-      _nsOrUUID(nsOrUUID),
-      // Multi-document transactions need MODE_IX locks, otherwise MODE_IS.
-      _collectionLockMode(getLockModeForQuery(opCtx, nsOrUUID.nss())),
-      _options(std::move(options)) {}
-
-void EmplaceAutoGetCollectionForRead::emplace(boost::optional<AutoGetCollection>& autoColl) const {
-    autoColl.emplace(
-        _opCtx, _nsOrUUID, _collectionLockMode, _options, AutoGetCollection::ForReadTag{});
-}
-
-AutoGetCollectionForReadLegacy::AutoGetCollectionForReadLegacy(
-    OperationContext* opCtx,
-    const NamespaceStringOrUUID& nsOrUUID,
-    AutoGetCollection::Options options)
-    : AutoGetCollectionForReadBase(opCtx,
-                                   EmplaceAutoGetCollectionForRead(opCtx, nsOrUUID, options)) {
-    const auto& secondaryNssOrUUIDs = options._secondaryNssOrUUIDs;
-
-    // All relevant locks are held. Check secondary collections and verify they are valid for
-    // use.
-    if (getCollection() && !secondaryNssOrUUIDs.empty()) {
-        auto catalog = CollectionCatalog::get(opCtx);
-
-        auto resolvedNamespaces =
-            resolveSecondaryNamespacesOrUUIDs(opCtx, catalog.get(), secondaryNssOrUUIDs);
-
-        _secondaryNssIsAViewOrSharded = !resolvedNamespaces.has_value();
-    }
-}
-
-AutoGetCollectionForReadPITCatalog::AutoGetCollectionForReadPITCatalog(
-    OperationContext* opCtx,
-    const NamespaceStringOrUUID& nsOrUUID,
-    AutoGetCollection::Options options)
+AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
+                                                   const NamespaceStringOrUUID& nsOrUUID,
+                                                   AutoGetCollection::Options options)
     : _callerWasConflicting(opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()),
       _shouldNotConflictWithSecondaryBatchApplicationBlock(
           [&]() -> boost::optional<ShouldNotConflictWithSecondaryBatchApplicationBlock> {
@@ -716,157 +620,16 @@ AutoGetCollectionForReadPITCatalog::AutoGetCollectionForReadPITCatalog(
                 ShardVersion::isPlacementVersionIgnored(*receivedShardVersion));
 }
 
-const CollectionPtr& AutoGetCollectionForReadPITCatalog::getCollection() const {
+const CollectionPtr& AutoGetCollectionForRead::getCollection() const {
     return _coll;
 }
 
-const ViewDefinition* AutoGetCollectionForReadPITCatalog::getView() const {
+const ViewDefinition* AutoGetCollectionForRead::getView() const {
     return _view.get();
 }
 
-const NamespaceString& AutoGetCollectionForReadPITCatalog::getNss() const {
-    return _resolvedNss;
-}
-
-AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
-                                                   const NamespaceStringOrUUID& nsOrUUID,
-                                                   AutoGetCollection::Options options) {
-    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-    if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe()) {
-        _legacy.emplace(opCtx, nsOrUUID, options);
-    } else {
-        _pitCatalog.emplace(opCtx, nsOrUUID, options);
-    }
-}
-
-const CollectionPtr& AutoGetCollectionForRead::getCollection() const {
-    return _pitCatalog ? _pitCatalog->getCollection() : _legacy->getCollection();
-}
-
-const ViewDefinition* AutoGetCollectionForRead::getView() const {
-    return _pitCatalog ? _pitCatalog->getView() : _legacy->getView();
-}
-
 const NamespaceString& AutoGetCollectionForRead::getNss() const {
-    return _pitCatalog ? _pitCatalog->getNss() : _legacy->getNss();
-}
-
-bool AutoGetCollectionForRead::isAnySecondaryNamespaceAViewOrSharded() const {
-    return _pitCatalog ? _pitCatalog->isAnySecondaryNamespaceAViewOrSharded()
-                       : _legacy->isAnySecondaryNamespaceAViewOrSharded();
-}
-
-AutoGetCollectionForReadLockFreeLegacy::EmplaceHelper::EmplaceHelper(
-    OperationContext* opCtx,
-    CollectionCatalogStasher& catalogStasher,
-    const NamespaceStringOrUUID& nsOrUUID,
-    AutoGetCollectionLockFree::Options options,
-    bool isLockFreeReadSubOperation)
-    : _opCtx(opCtx),
-      _catalogStasher(catalogStasher),
-      _nsOrUUID(nsOrUUID),
-      _options(std::move(options)),
-      _isLockFreeReadSubOperation(isLockFreeReadSubOperation) {}
-
-void AutoGetCollectionForReadLockFreeLegacy::EmplaceHelper::emplace(
-    boost::optional<AutoGetCollectionLockFree>& autoColl) const {
-    autoColl.emplace(
-        _opCtx,
-        _nsOrUUID,
-        /* restoreFromYield */
-        [&catalogStasher = _catalogStasher, isSubOperation = _isLockFreeReadSubOperation](
-            std::shared_ptr<const Collection>& collection, OperationContext* opCtx, UUID uuid) {
-            // A sub-operation should never yield because it would break the consistent in-memory
-            // and on-disk view of the higher level operation.
-            invariant(!isSubOperation);
-
-            collection = acquireCollectionAndConsistentSnapshot(
-                opCtx,
-                /* isLockFreeReadSubOperation */
-                isSubOperation,
-                /* CollectionCatalogStasher */
-                catalogStasher,
-                /* GetCollectionAndEstablishReadSourceFunc */
-                [uuid](OperationContext* opCtx,
-                       const CollectionCatalog& catalog,
-                       bool isLockFreeReadSubOperation) {
-                    // There should only ever be one helper recovering from a query yield, so it
-                    // should never be nested.
-                    invariant(!isLockFreeReadSubOperation);
-
-                    auto coll = catalog.lookupCollectionByUUIDForRead_DONT_USE(opCtx, uuid);
-
-                    if (coll) {
-                        if (coll->usesCappedSnapshots()) {
-                            CappedSnapshots::get(opCtx).establish(opCtx, coll.get());
-                        }
-
-                        // After yielding and reacquiring locks, the preconditions that were used to
-                        // select our ReadSource initially need to be checked again. We select a
-                        // ReadSource based on replication state. After a query yields its locks,
-                        // the replication state may have changed, invalidating our current choice
-                        // of ReadSource. Using the same preconditions, change our ReadSource if
-                        // necessary.
-                        SnapshotHelper::changeReadSourceIfNeeded(opCtx, coll->ns());
-                    }
-
-                    return std::make_pair(coll, /* isView */ false);
-                },
-                /* ResetFunc */
-                []() {},
-                /* SetSecondaryState */
-                [](bool isAnySecondaryNamespaceAViewOrSharded) {
-                    // Not necessary to check for views or sharded secondary collections, which are
-                    // unsupported. If a read is running, changing a namespace to a view would
-                    // require dropping the collection first, which trips other checks. A secondary
-                    // collection becoming sharded during a read is ignored to parallel existing
-                    // behavior for the primary collection.
-                });
-        },
-        _options);
-}
-
-AutoGetCollectionForReadLockFreeLegacy::AutoGetCollectionForReadLockFreeLegacy(
-    OperationContext* opCtx,
-    const NamespaceStringOrUUID& nsOrUUID,
-    AutoGetCollection::Options options)
-    : _catalogStash(opCtx) {
-    bool isLockFreeReadSubOperation = opCtx->isLockFreeReadsOp();
-
-    // Supported lock-free reads should only ever have an open storage snapshot prior to calling
-    // this helper if it is a nested lock-free operation. The storage snapshot and in-memory state
-    // used across lock=free reads must be consistent.
-    invariant(supportsLockFreeRead(opCtx) &&
-              (!opCtx->recoveryUnit()->isActive() || isLockFreeReadSubOperation));
-
-    EmplaceHelper emplaceFunc(opCtx,
-                              _catalogStash,
-                              nsOrUUID,
-                              AutoGetCollectionLockFree::Options{}
-                                  .viewMode(options._viewMode)
-                                  .deadline(options._deadline)
-                                  .expectedUUID(options._expectedUUID),
-                              isLockFreeReadSubOperation);
-    acquireCollectionAndConsistentSnapshot(
-        opCtx,
-        /* isLockFreeReadSubOperation */
-        isLockFreeReadSubOperation,
-        /* CollectionCatalogStasher */
-        _catalogStash,
-        /* GetCollectionAndEstablishReadSourceFunc */
-        [this, &emplaceFunc](
-            OperationContext* opCtx, const CollectionCatalog&, bool isLockFreeReadSubOperation) {
-            _autoGetCollectionForReadBase.emplace(opCtx, emplaceFunc, isLockFreeReadSubOperation);
-            return std::make_pair(_autoGetCollectionForReadBase->getCollection().get(),
-                                  _autoGetCollectionForReadBase->getView());
-        },
-        /* ResetFunc */
-        [this]() { _autoGetCollectionForReadBase.reset(); },
-        /* SetSecondaryState */
-        [this](bool isAnySecondaryNamespaceAViewOrSharded) {
-            _secondaryNssIsAViewOrSharded = isAnySecondaryNamespaceAViewOrSharded;
-        },
-        options._secondaryNssOrUUIDs);
+    return _resolvedNss;
 }
 
 namespace {
@@ -1035,10 +798,6 @@ getCollectionForLockFreeRead(OperationContext* opCtx,
                              boost::optional<Timestamp> readTimestamp,
                              const NamespaceStringOrUUID& nsOrUUID,
                              AutoGetCollection::Options options) {
-
-    auto& hangBeforeAutoGetCollectionLockFreeShardedStateAccess =
-        *globalFailPointRegistry().find("hangBeforeAutoGetCollectionLockFreeShardedStateAccess");
-
     hangBeforeAutoGetCollectionLockFreeShardedStateAccess.executeIf(
         [&](auto&) { hangBeforeAutoGetCollectionLockFreeShardedStateAccess.pauseWhileSet(opCtx); },
         [&](const BSONObj& data) {
@@ -1112,7 +871,7 @@ makeShouldNotConflictWithSecondaryBatchApplicationBlock(OperationContext* opCtx,
 
 }  // namespace
 
-CollectionPtr::RestoreFn AutoGetCollectionForReadLockFreePITCatalog::_makeRestoreFromYieldFn(
+CollectionPtr::RestoreFn AutoGetCollectionForReadLockFree::_makeRestoreFromYieldFn(
     const AutoGetCollection::Options& options,
     bool callerExpectedToConflictWithSecondaryBatchApplication,
     const DatabaseName& dbName) {
@@ -1147,7 +906,7 @@ CollectionPtr::RestoreFn AutoGetCollectionForReadLockFreePITCatalog::_makeRestor
     };
 }
 
-AutoGetCollectionForReadLockFreePITCatalog::AutoGetCollectionForReadLockFreePITCatalog(
+AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
     OperationContext* opCtx, NamespaceStringOrUUID nsOrUUID, AutoGetCollection::Options options)
     : _originalReadSource(opCtx->recoveryUnit()->getTimestampReadSource()),
       _isLockFreeReadSubOperation(opCtx->isLockFreeReadsOp()),  // This has to come before LFRBlock.
@@ -1237,19 +996,6 @@ AutoGetCollectionForReadLockFreePITCatalog::AutoGetCollectionForReadLockFreePITC
         }
     } else {
         invariant(!options._expectedUUID);
-    }
-}
-
-AutoGetCollectionForReadLockFree::AutoGetCollectionForReadLockFree(
-    OperationContext* opCtx,
-    const NamespaceStringOrUUID& nsOrUUID,
-    AutoGetCollection::Options options) {
-    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-    if (feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe()) {
-        _impl.emplace<AutoGetCollectionForReadLockFreePITCatalog>(
-            opCtx, nsOrUUID, std::move(options));
-    } else {
-        _impl.emplace<AutoGetCollectionForReadLockFreeLegacy>(opCtx, nsOrUUID, std::move(options));
     }
 }
 
@@ -1548,10 +1294,7 @@ BlockSecondaryReadsDuringBatchApplication_DONT_USE::
     allowSecondaryReads->swap(_originalSettings);
 }
 
-template class AutoGetCollectionForReadBase<AutoGetCollection, EmplaceAutoGetCollectionForRead>;
 template class AutoGetCollectionForReadCommandBase<AutoGetCollectionForRead>;
-template class AutoGetCollectionForReadBase<AutoGetCollectionLockFree,
-                                            AutoGetCollectionForReadLockFreeLegacy::EmplaceHelper>;
 template class AutoGetCollectionForReadCommandBase<AutoGetCollectionForReadLockFree>;
 
 }  // namespace mongo
