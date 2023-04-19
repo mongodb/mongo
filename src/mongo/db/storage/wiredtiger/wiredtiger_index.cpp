@@ -1706,6 +1706,11 @@ void WiredTigerIndexUnique::_unindexTimestampUnsafe(OperationContext* opCtx,
                                                     WT_CURSOR* c,
                                                     const KeyString::Value& keyString,
                                                     bool dupsAllowed) {
+    // The old unique index format had a key-value of indexKey-RecordId. This means that the
+    // RecordId in an index entry might not match the indexKey+RecordId keyString passed into this
+    // function: an index on a field where multiple collection documents have the same field value
+    // but only one passes the partial index filter.
+
     const RecordId id = KeyString::decodeRecordIdAtEnd(keyString.getBuffer(), keyString.getSize());
     invariant(id.isValid());
 
@@ -1742,9 +1747,20 @@ void WiredTigerIndexUnique::_unindexTimestampUnsafe(OperationContext* opCtx,
             if (KeyString::decodeRecordId(&br) != id) {
                 return;
             }
-            // Ensure there aren't any other values in here.
+
+            // Ensure the index entry value is not a list of RecordIds, which should only be
+            // possible temporarily in v4.0 when dupsAllowed is true, not ever across upgrades or in
+            // upgraded versions.
             KeyString::TypeBits::fromBuffer(getKeyStringVersion(), &br);
-            fassert(40417, !br.remaining());
+            if (br.remaining()) {
+                LOGV2_FATAL_NOTRACE(7592201,
+                                    "An index entry was found that contains an unexpected old "
+                                    "format that should no "
+                                    "longer exist. The index should be dropped and rebuilt.",
+                                    "indexName"_attr = _indexName,
+                                    "uri"_attr = _uri,
+                                    "collection"_attr = _collectionNamespace);
+            }
         }
         int ret = WT_OP_CHECK(c->remove(c));
         if (ret == WT_NOTFOUND) {
@@ -1830,28 +1846,9 @@ void WiredTigerIndexUnique::_unindexTimestampSafe(OperationContext* opCtx,
         return;
     }
 
-    // After a rolling upgrade an index can have keys from both timestamp unsafe (old) and
-    // timestamp safe (new) unique indexes. Old format keys just had the index key while new
-    // format key has index key + Record id. WT_NOTFOUND is possible if index key is in old format.
-    // Retry removal of key using old format.
-    auto sizeWithoutRecordId =
-        KeyString::sizeWithoutRecordIdAtEnd(keyString.getBuffer(), keyString.getSize());
-    WiredTigerItem keyItem(keyString.getBuffer(), sizeWithoutRecordId);
-    setKey(c, keyItem.Get());
-
-    ret = WT_OP_CHECK(c->remove(c));
-    if (ret != WT_NOTFOUND) {
-        invariantWTOK(ret);
-        return;
-    }
-    // Otherwise WT_NOTFOUND is only expected during a background index build. Insert a dummy value
-    // and delete it again to trigger a write conflict in case this is being concurrently indexed
-    // by the background indexer.
-    setKey(c, item.Get());
-    c->set_value(c, emptyItem.Get());
-    invariantWTOK(WT_OP_CHECK(c->insert(c)));
-    setKey(c, item.Get());
-    invariantWTOK(WT_OP_CHECK(c->remove(c)));
+    // WT_NOTFOUND is possible if the index key is in the old v4.0 format. Retry removal of the key
+    // using the old format.
+    _unindexTimestampUnsafe(opCtx, c, keyString, dupsAllowed);
 }
 // ------------------------------
 
