@@ -255,6 +255,9 @@ structs:
             cursor:
                 type: BulkWriteCommandResponseCursor
                 stability: unstable
+            numErrors:
+                type: int
+                stability: unstable
             electionId:
                 type: int
                 optional: true

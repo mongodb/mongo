@@ -175,8 +175,10 @@ public:
             }
             if (numRepliesInFirstBatch == replyItems.size()) {
                 collectTelemetryMongos(opCtx, reqObj, numRepliesInFirstBatch);
-                return BulkWriteCommandReply(BulkWriteCommandResponseCursor(
-                    0, std::vector<BulkWriteReplyItem>(std::move(replyItems))));
+                return BulkWriteCommandReply(
+                    BulkWriteCommandResponseCursor(
+                        0, std::vector<BulkWriteReplyItem>(std::move(replyItems))),
+                    0 /* TODO SERVER-76267: correctly populate numErrors */);
             }
 
             ccc->detachFromOperationContext();
@@ -197,8 +199,10 @@ public:
             CurOp::get(opCtx)->debug().cursorid = cursorId;
 
             replyItems.resize(numRepliesInFirstBatch);
-            return BulkWriteCommandReply(BulkWriteCommandResponseCursor(
-                cursorId, std::vector<BulkWriteReplyItem>(std::move(replyItems))));
+            return BulkWriteCommandReply(
+                BulkWriteCommandResponseCursor(
+                    cursorId, std::vector<BulkWriteReplyItem>(std::move(replyItems))),
+                0 /* TODO SERVER-76267: correctly populate numErrors */);
         }
     };
 

@@ -238,6 +238,7 @@ public:
                     opCtx, writes.results[i].getStatus(), idx, 0 /* numErrors */)) {
                 auto replyItem = BulkWriteReplyItem(idx, error.get().getStatus());
                 _replies.emplace_back(replyItem);
+                _numErrors++;
             } else {
                 auto replyItem = BulkWriteReplyItem(idx);
                 replyItem.setN(writes.results[i].getValue().getN());
@@ -288,6 +289,7 @@ public:
 
     void addErrorReply(size_t currentOpIdx, const Status& status) {
         _replies.emplace_back(currentOpIdx, status);
+        _numErrors++;
     }
 
     std::vector<BulkWriteReplyItem>& getReplies() {
@@ -298,10 +300,16 @@ public:
         return _retriedStmtIds;
     }
 
+    int getNumErrors() {
+        return _numErrors;
+    }
+
 private:
     const BulkWriteCommandRequest& _req;
     std::vector<BulkWriteReplyItem> _replies;
     std::vector<int32_t> _retriedStmtIds;
+    /// The number of error replies contained in _replies.
+    int _numErrors = 0;
 };
 
 void finishCurOp(OperationContext* opCtx, CurOp* curOp) {
@@ -813,9 +821,10 @@ public:
             bulk_write_common::validateRequest(req, opCtx->isRetryableWrite());
 
             // Apply all of the write operations.
-            auto [replies, retriedStmtIds] = bulk_write::performWrites(opCtx, req);
+            auto [replies, retriedStmtIds, numErrors] = bulk_write::performWrites(opCtx, req);
 
-            return _populateCursorReply(opCtx, req, std::move(replies), std::move(retriedStmtIds));
+            return _populateCursorReply(
+                opCtx, req, std::move(replies), std::move(retriedStmtIds), numErrors);
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const final try {
@@ -835,7 +844,8 @@ public:
         Reply _populateCursorReply(OperationContext* opCtx,
                                    const BulkWriteCommandRequest& req,
                                    bulk_write::BulkWriteReplyItems replies,
-                                   bulk_write::RetriedStmtIds retriedStmtIds) {
+                                   bulk_write::RetriedStmtIds retriedStmtIds,
+                                   int numErrors) {
             auto reqObj = unparsedRequest().body;
             const NamespaceString cursorNss = NamespaceString::makeBulkWriteNSS();
             auto expCtx = make_intrusive<ExpressionContext>(
@@ -893,8 +903,10 @@ public:
             if (exec->isEOF()) {
                 invariant(numRepliesInFirstBatch == replies.size());
                 collectTelemetryMongod(opCtx, reqObj, numRepliesInFirstBatch);
-                auto reply = BulkWriteCommandReply(BulkWriteCommandResponseCursor(
-                    0, std::vector<BulkWriteReplyItem>(std::move(replies))));
+                auto reply = BulkWriteCommandReply(
+                    BulkWriteCommandResponseCursor(
+                        0, std::vector<BulkWriteReplyItem>(std::move(replies))),
+                    numErrors);
                 if (!retriedStmtIds.empty()) {
                     reply.setRetriedStmtIds(std::move(retriedStmtIds));
                 }
@@ -922,8 +934,10 @@ public:
             collectTelemetryMongod(opCtx, pinnedCursor, numRepliesInFirstBatch);
 
             replies.resize(numRepliesInFirstBatch);
-            auto reply = BulkWriteCommandReply(BulkWriteCommandResponseCursor(
-                cursorId, std::vector<BulkWriteReplyItem>(std::move(replies))));
+            auto reply = BulkWriteCommandReply(
+                BulkWriteCommandResponseCursor(cursorId,
+                                               std::vector<BulkWriteReplyItem>(std::move(replies))),
+                numErrors);
             if (!retriedStmtIds.empty()) {
                 reply.setRetriedStmtIds(std::move(retriedStmtIds));
             }
@@ -993,8 +1007,8 @@ BulkWriteReply performWrites(OperationContext* opCtx, const BulkWriteCommandRequ
         }
     });
 
-    // Tell mongod what the shard and database versions are. This will cause writes to fail in case
-    // there is a mismatch in the mongos request provided versions and the local (shard's)
+    // Tell mongod what the shard and database versions are. This will cause writes to fail in
+    // case there is a mismatch in the mongos request provided versions and the local (shard's)
     // understanding of the version.
     for (const auto& nsInfo : req.getNsInfo()) {
         // TODO (SERVER-72767, SERVER-72804, SERVER-72805): Support timeseries collections.
@@ -1045,7 +1059,8 @@ BulkWriteReply performWrites(OperationContext* opCtx, const BulkWriteCommandRequ
 
     invariant(batch.empty());
 
-    return make_tuple(responses.getReplies(), responses.getRetriedStmtIds());
+    return make_tuple(
+        responses.getReplies(), responses.getRetriedStmtIds(), responses.getNumErrors());
 }
 
 }  // namespace bulk_write

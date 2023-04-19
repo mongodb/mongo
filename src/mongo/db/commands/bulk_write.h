@@ -39,7 +39,7 @@ namespace bulk_write {
 
 using RetriedStmtIds = std::vector<int32_t>;
 using BulkWriteReplyItems = std::vector<BulkWriteReplyItem>;
-using BulkWriteReply = std::tuple<BulkWriteReplyItems, RetriedStmtIds>;
+using BulkWriteReply = std::tuple<BulkWriteReplyItems, RetriedStmtIds, int /* numErrors */>;
 
 BulkWriteReply performWrites(OperationContext* opCtx, const BulkWriteCommandRequest& req);
 

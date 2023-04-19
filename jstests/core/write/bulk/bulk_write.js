@@ -39,17 +39,21 @@ var res = db.adminCommand({
 });
 
 assert.commandWorked(res);
+assert.eq(res.numErrors, 0);
 
 assert.eq(coll.find().itcount(), 1);
 assert.eq(coll1.find().itcount(), 0);
 coll.drop();
 
 // Make sure ops and nsInfo can take arrays properly
-assert.commandWorked(db.adminCommand({
+res = db.adminCommand({
     bulkWrite: 1,
     ops: [{insert: 1, document: {skey: "MongoDB"}}, {insert: 0, document: {skey: "MongoDB"}}],
     nsInfo: [{ns: "test.coll"}, {ns: "test.coll1"}]
-}));
+});
+
+assert.commandWorked(res);
+assert.eq(res.numErrors, 0);
 
 assert.eq(coll.find().itcount(), 1);
 assert.eq(coll1.find().itcount(), 1);
@@ -57,11 +61,14 @@ coll.drop();
 coll1.drop();
 
 // Test 2 inserts into the same namespace
-assert.commandWorked(db.adminCommand({
+res = db.adminCommand({
     bulkWrite: 1,
     ops: [{insert: 0, document: {skey: "MongoDB"}}, {insert: 0, document: {skey: "MongoDB"}}],
     nsInfo: [{ns: "test.coll"}]
-}));
+});
+
+assert.commandWorked(res);
+assert.eq(res.numErrors, 0);
 
 assert.eq(coll.find().itcount(), 2);
 assert.eq(coll1.find().itcount(), 0);
@@ -71,12 +78,15 @@ coll.drop();
 assert.commandWorked(coll.insert({_id: 1}));
 assert.commandWorked(db.runCommand({collMod: "coll", validator: {a: {$exists: true}}}));
 
-assert.commandWorked(db.adminCommand({
+res = db.adminCommand({
     bulkWrite: 1,
     ops: [{insert: 0, document: {_id: 3, skey: "MongoDB"}}],
     nsInfo: [{ns: "test.coll"}],
     bypassDocumentValidation: true,
-}));
+});
+
+assert.commandWorked(res);
+assert.eq(res.numErrors, 0);
 
 assert.eq(1, coll.count({_id: 3}));
 

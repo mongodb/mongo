@@ -49,6 +49,7 @@ var res = db.adminCommand({
 });
 
 assert.commandWorked(res);
+assert.eq(res.numErrors, 0);
 
 assert(res.cursor.id != 0);
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, n: 1, idx: 0});

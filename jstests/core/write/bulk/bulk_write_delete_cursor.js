@@ -38,6 +38,7 @@ var res = db.adminCommand({
 });
 
 assert.commandWorked(res);
+assert.eq(res.numErrors, 0);
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
 cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1});
@@ -59,6 +60,7 @@ res = db.adminCommand({
 });
 
 assert.commandWorked(res);
+assert.eq(res.numErrors, 0);
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
 cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1});
@@ -81,6 +83,7 @@ res = db.adminCommand({
 });
 
 assert.commandWorked(res);
+assert.eq(res.numErrors, 0);
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
 cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1});
@@ -103,6 +106,7 @@ res = db.adminCommand({
 });
 
 assert.commandWorked(res);
+assert.eq(res.numErrors, 0);
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
 cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1});
@@ -125,6 +129,7 @@ res = db.adminCommand({
 });
 
 assert.commandWorked(res);
+assert.eq(res.numErrors, 0);
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
 assert.docEq(res.cursor.firstBatch[0].value, {_id: 1, skey: "MongoDB"});
@@ -146,6 +151,7 @@ res = db.adminCommand({
 });
 
 assert.commandWorked(res);
+assert.eq(res.numErrors, 0);
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 0});
 assert(!res.cursor.firstBatch[0].value);
@@ -174,6 +180,7 @@ res = db.adminCommand({
 });
 
 assert.commandWorked(res);
+assert.eq(res.numErrors, 0);
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
 cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1});

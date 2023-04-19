@@ -114,38 +114,6 @@ assert.commandFailedWithCode(
 assert.eq(coll.find().itcount(), 0);
 assert.eq(coll1.find().itcount(), 0);
 
-// Test that a write can fail part way through a write and the write partially executes.
-assert.commandWorked(db.adminCommand({
-    bulkWrite: 1,
-    ops: [
-        {insert: 0, document: {_id: 1, skey: "MongoDB"}},
-        {insert: 0, document: {_id: 1, skey: "MongoDB"}},
-        {insert: 1, document: {skey: "MongoDB"}}
-    ],
-    nsInfo: [{ns: "test.coll"}, {ns: "test.coll1"}]
-}));
-
-assert.eq(coll.find().itcount(), 1);
-assert.eq(coll1.find().itcount(), 0);
-coll.drop();
-coll1.drop();
-
-assert.commandWorked(db.adminCommand({
-    bulkWrite: 1,
-    ops: [
-        {insert: 0, document: {_id: 1, skey: "MongoDB"}},
-        {insert: 0, document: {_id: 1, skey: "MongoDB"}},
-        {insert: 1, document: {skey: "MongoDB"}}
-    ],
-    nsInfo: [{ns: "test.coll"}, {ns: "test.coll1"}],
-    ordered: false
-}));
-
-assert.eq(coll.find().itcount(), 1);
-assert.eq(coll1.find().itcount(), 1);
-coll.drop();
-coll1.drop();
-
 // Make sure update multi:true + return fails the op.
 var res = db.adminCommand({
     bulkWrite: 1,
@@ -162,6 +130,7 @@ var res = db.adminCommand({
 });
 
 assert.commandWorked(res);
+assert.eq(res.numErrors, 1);
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 0, idx: 0, code: ErrorCodes.InvalidOptions});
 assert(!res.cursor.firstBatch[1]);
@@ -182,6 +151,7 @@ res = db.adminCommand({
 });
 
 assert.commandWorked(res);
+assert.eq(res.numErrors, 1);
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
 cursorEntryValidator(res.cursor.firstBatch[1], {ok: 0, idx: 1, code: ErrorCodes.InvalidOptions});
@@ -203,6 +173,7 @@ res = db.adminCommand({
 });
 
 assert.commandWorked(res);
+assert.eq(res.numErrors, 1);
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 0, idx: 0, code: ErrorCodes.InvalidNamespace});
 assert(!res.cursor.firstBatch[1]);
@@ -229,6 +200,9 @@ res = db.adminCommand({
     nsInfo: [{ns: "test.coll2"}, {ns: "test.coll"}],
     ordered: false
 });
+
+assert.commandWorked(res);
+assert.eq(res.numErrors, 1);
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 0, idx: 0, code: ErrorCodes.DuplicateKey});
 cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, nModified: 0});
@@ -257,6 +231,9 @@ res = db.adminCommand({
     ],
     nsInfo: [{ns: "test.coll2"}, {ns: "test.coll"}],
 });
+
+assert.commandWorked(res);
+assert.eq(res.numErrors, 1);
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 0, idx: 0, code: ErrorCodes.DuplicateKey});
 assert(!res.cursor.firstBatch[1]);
@@ -288,6 +265,7 @@ res = db.adminCommand({
 });
 
 assert.commandWorked(res);
+assert.eq(res.numErrors, 1);
 
 assert(res.cursor.id == 0);
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, n: 1, idx: 0});
@@ -318,6 +296,7 @@ res = db.adminCommand({
 });
 
 assert.commandWorked(res);
+assert.eq(res.numErrors, 1);
 
 assert(res.cursor.id == 0);
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, n: 1, idx: 0});
@@ -346,6 +325,7 @@ res = db.adminCommand({
 });
 
 assert.commandWorked(res);
+assert.eq(res.numErrors, 1);
 
 assert(res.cursor.id == 0);
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, n: 1, idx: 0});
@@ -373,6 +353,7 @@ res = db.adminCommand({
 });
 
 assert.commandWorked(res);
+assert.eq(res.numErrors, 1);
 
 assert(res.cursor.id == 0);
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, n: 1, idx: 0});
@@ -395,6 +376,7 @@ res = db.adminCommand({
 });
 
 assert.commandWorked(res);
+assert.eq(res.numErrors, 1);
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 0, idx: 0, code: ErrorCodes.InvalidOptions});
 assert(!res.cursor.firstBatch[1]);
@@ -410,6 +392,7 @@ res = db.adminCommand({
 });
 
 assert.commandWorked(res);
+assert.eq(res.numErrors, 1);
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
 cursorEntryValidator(res.cursor.firstBatch[1], {ok: 0, idx: 1, code: ErrorCodes.InvalidOptions});
@@ -430,6 +413,7 @@ res = db.adminCommand({
 });
 
 assert.commandWorked(res);
+assert.eq(res.numErrors, 1);
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 0, idx: 0, code: ErrorCodes.InvalidNamespace});
 assert(!res.cursor.firstBatch[1]);
@@ -448,6 +432,9 @@ res = db.adminCommand({
     nsInfo: [{ns: "test.system.profile"}, {ns: "test.coll"}],
     ordered: false
 });
+
+assert.commandWorked(res);
+assert.eq(res.numErrors, 1);
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 0, idx: 0, code: ErrorCodes.InvalidNamespace});
 cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1});
@@ -472,6 +459,9 @@ res = db.adminCommand({
     ],
     nsInfo: [{ns: "test.system.profile"}, {ns: "test.coll"}],
 });
+
+assert.commandWorked(res);
+assert.eq(res.numErrors, 1);
 
 cursorEntryValidator(res.cursor.firstBatch[0], {ok: 0, idx: 0, code: ErrorCodes.InvalidNamespace});
 assert(!res.cursor.firstBatch[1]);
@@ -501,6 +491,7 @@ res = db.adminCommand({
 let processCursor = true;
 try {
     assert.commandWorked(res);
+    assert.eq(res.numErrors, 0);
 } catch {
     processCursor = false;
     assert.commandFailedWithCode(res, [ErrorCodes.BadValue]);
@@ -533,6 +524,7 @@ res = db.adminCommand({
 processCursor = true;
 try {
     assert.commandWorked(res);
+    assert.eq(res.numErrors, 0);
 } catch {
     processCursor = false;
     assert.commandFailedWithCode(res, [ErrorCodes.BadValue]);
@@ -555,12 +547,39 @@ coll.drop();
 assert.commandWorked(coll.insert({_id: 1}));
 assert.commandWorked(db.runCommand({collMod: "coll", validator: {a: {$exists: true}}}));
 
-assert.commandWorked(db.adminCommand({
+res = db.adminCommand({
     bulkWrite: 1,
     ops: [{insert: 0, document: {_id: 3, skey: "MongoDB"}}],
     nsInfo: [{ns: "test.coll"}],
     bypassDocumentValidation: false,
-}));
+});
+assert.commandWorked(res);
+assert.eq(res.numErrors, 1);
 
 assert.eq(0, coll.count({_id: 3}));
+coll.drop();
+
+// Test that we correctly count multiple errors for different write types when ordered=false.
+res = db.adminCommand({
+    bulkWrite: 1,
+    ops: [
+        {insert: 0, document: {_id: 1}},
+        {insert: 0, document: {_id: 2}},
+        // error 1: duplicate key error
+        {insert: 0, document: {_id: 1}},
+        {delete: 0, filter: {_id: 2}},
+        // error 2: user can't write to namespace
+        {delete: 1, filter: {_id: 0}},
+        {update: 0, filter: {_id: 0}, updateMods: {$set: {x: 1}}},
+        // error 3: invalid update operator
+        {update: 0, filter: {_id: 0}, updateMods: {$blah: {x: 1}}},
+    ],
+    nsInfo: [{ns: "test.coll"}, {ns: "test.system.profile"}],
+    ordered: false
+});
+
+assert.commandWorked(res);
+assert.eq(res.numErrors, 3);
+
+coll.drop();
 })();
