@@ -149,6 +149,9 @@ private:
     // Cached transaction number (if one is present on the operation contex).
     boost::optional<TxnNumber> _txnNum;
 
+    // The write concern that the bulk write command was issued with.
+    WriteConcernOptions _writeConcern;
+
     // Set to true if this write is part of a transaction.
     const bool _inTransaction{false};
     const bool _isRetryableWrite{false};
