@@ -287,6 +287,7 @@ void SessionCatalogMigrationDestination::_retrieveSessionStateFromSource(Service
             auto uniqueCtx = CancelableOperationContext(
                 cc().makeOperationContext(), _cancellationToken, executor);
             auto opCtx = uniqueCtx.get();
+            opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
             nextBatch = getNextSessionOplogBatch(opCtx, _fromShard, _migrationSessionId);
             oplogArray = BSONArray{nextBatch[kOplogField].Obj()};
@@ -367,6 +368,7 @@ void SessionCatalogMigrationDestination::_retrieveSessionStateFromSource(Service
     auto executor = Grid::get(service)->getExecutorPool()->getFixedExecutor();
     auto uniqueOpCtx =
         CancelableOperationContext(cc().makeOperationContext(), _cancellationToken, executor);
+    uniqueOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
     uassertStatusOK(
         waitForWriteConcern(uniqueOpCtx.get(), lastResult.oplogTime, kMajorityWC, &unusedWCResult));
@@ -436,6 +438,8 @@ SessionCatalogMigrationDestination::_processSessionOplog(const BSONObj& oplogBSO
     auto uniqueOpCtx =
         CancelableOperationContext(cc().makeOperationContext(), cancellationToken, executor);
     auto opCtx = uniqueOpCtx.get();
+    opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+
     {
         auto lk = stdx::lock_guard(*opCtx->getClient());
         opCtx->setLogicalSessionId(result.sessionId);
