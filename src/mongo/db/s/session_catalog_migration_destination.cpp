@@ -254,6 +254,7 @@ ProcessOplogResult processSessionOplog(const BSONObj& oplogBSON,
     auto uniqueOpCtx =
         CancelableOperationContext(cc().makeOperationContext(), cancellationToken, executor);
     auto opCtx = uniqueOpCtx.get();
+    opCtx->setAlwaysInterruptAtStepDownOrUp();
     opCtx->setLogicalSessionId(result.sessionId);
     opCtx->setTxnNumber(result.txnNum);
     MongoDOperationContextSession ocs(opCtx);
@@ -442,6 +443,7 @@ void SessionCatalogMigrationDestination::_retrieveSessionStateFromSource(Service
             auto uniqueCtx = CancelableOperationContext(
                 cc().makeOperationContext(), _cancellationToken, executor);
             auto opCtx = uniqueCtx.get();
+            opCtx->setAlwaysInterruptAtStepDownOrUp();
 
             nextBatch = getNextSessionOplogBatch(opCtx, _fromShard, _migrationSessionId);
             oplogArray = BSONArray{nextBatch[kOplogField].Obj()};
@@ -524,6 +526,7 @@ void SessionCatalogMigrationDestination::_retrieveSessionStateFromSource(Service
     auto executor = Grid::get(service)->getExecutorPool()->getFixedExecutor();
     auto uniqueOpCtx =
         CancelableOperationContext(cc().makeOperationContext(), _cancellationToken, executor);
+    uniqueOpCtx->setAlwaysInterruptAtStepDownOrUp();
 
     uassertStatusOK(
         waitForWriteConcern(uniqueOpCtx.get(), lastResult.oplogTime, kMajorityWC, &unusedWCResult));
