@@ -30,6 +30,7 @@
 
 #include "mongo/db/index/expression_keys_private.h"
 
+#include <s2.h>
 #include <s2cell.h>
 #include <s2regioncoverer.h>
 #include <utility>
@@ -43,7 +44,6 @@
 #include "mongo/db/geo/geoconstants.h"
 #include "mongo/db/geo/geometry_container.h"
 #include "mongo/db/geo/geoparser.h"
-#include "mongo/db/geo/s2.h"
 #include "mongo/db/index/2d_common.h"
 #include "mongo/db/index/s2_common.h"
 #include "mongo/db/index_names.h"

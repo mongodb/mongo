@@ -30,6 +30,7 @@
 #pragma once
 
 #include <cmath>
+#include <s2.h>
 #include <s2cap.h>
 #include <s2cell.h>
 #include <s2latlng.h>
@@ -40,7 +41,6 @@
 
 #include "mongo/base/clonable_ptr.h"
 #include "mongo/db/geo/big_polygon.h"
-#include "mongo/db/geo/s2.h"
 #include "mongo/db/jsobj.h"
 
 #ifndef M_PI

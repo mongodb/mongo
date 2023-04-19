@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <s2.h>
 #include <s2cap.h>
 #include <s2cell.h>
 #include <s2loop.h>
@@ -36,8 +37,6 @@
 #include <s2polyline.h>
 #include <s2region.h>
 #include <vector>
-
-#include "mongo/db/geo/s2.h"
 
 namespace mongo {
 
