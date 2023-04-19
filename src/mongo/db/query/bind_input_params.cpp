@@ -43,15 +43,9 @@ namespace {
 
 class MatchExpressionParameterBindingVisitor final : public MatchExpressionConstVisitor {
 public:
-    MatchExpressionParameterBindingVisitor(
-        const stage_builder::InputParamToSlotMap& inputParamToSlotMap,
-        sbe::RuntimeEnvironment* runtimeEnvironment,
-        bool bindingCachedPlan)
-        : _inputParamToSlotMap(inputParamToSlotMap),
-          _runtimeEnvironment(runtimeEnvironment),
-          _bindingCachedPlan(bindingCachedPlan) {
-        invariant(_runtimeEnvironment);
-    }
+    MatchExpressionParameterBindingVisitor(stage_builder::PlanStageData& data,
+                                           bool bindingCachedPlan)
+        : _data(data), _bindingCachedPlan(bindingCachedPlan) {}
 
     void visit(const BitsAllClearMatchExpression* expr) final {
         visitBitTestExpression(expr);
@@ -93,7 +87,7 @@ public:
         tassert(6279503, "Unexpected parameter marker for $in with regexes", !expr->hasRegex());
 
         auto&& [arrSetTag, arrSetVal, hasArray, hasObject, hasNull] =
-            stage_builder::convertInExpressionEqualities(expr);
+            stage_builder::convertInExpressionEqualities(expr, _data);
         bindParam(*slotId, true /*owned*/, arrSetTag, arrSetVal);
 
         // Auto-parameterization should not kick in if the $in's list of equalities includes any
@@ -291,7 +285,7 @@ private:
         if (owned) {
             guard.emplace(typeTag, value);
         }
-        auto accessor = _runtimeEnvironment->getAccessor(slotId);
+        auto accessor = _data.env->getAccessor(slotId);
         if (owned) {
             guard->reset();
         }
@@ -304,17 +298,14 @@ private:
     }
 
     boost::optional<sbe::value::SlotId> getSlotId(MatchExpression::InputParamId paramId) const {
-        auto it = _inputParamToSlotMap.find(paramId);
-        if (it != _inputParamToSlotMap.end()) {
+        auto it = _data.inputParamToSlotMap.find(paramId);
+        if (it != _data.inputParamToSlotMap.end()) {
             return it->second;
         }
         return boost::none;
     }
 
-    const stage_builder::InputParamToSlotMap& _inputParamToSlotMap;
-
-    sbe::RuntimeEnvironment* const _runtimeEnvironment;
-
+    stage_builder::PlanStageData& _data;
     // True if the plan for which we are binding parameter values is being recovered from the SBE
     // plan cache.
     const bool _bindingCachedPlan;
@@ -430,11 +421,9 @@ void bindGenericPlanSlots(const stage_builder::IndexBoundsEvaluationInfo& indexB
 }  // namespace
 
 void bind(const CanonicalQuery& canonicalQuery,
-          const stage_builder::InputParamToSlotMap& inputParamToSlotMap,
-          sbe::RuntimeEnvironment* runtimeEnvironment,
+          stage_builder::PlanStageData& data,
           const bool bindingCachedPlan) {
-    MatchExpressionParameterBindingVisitor visitor{
-        inputParamToSlotMap, runtimeEnvironment, bindingCachedPlan};
+    MatchExpressionParameterBindingVisitor visitor{data, bindingCachedPlan};
     MatchExpressionParameterBindingWalker walker{&visitor};
     tree_walker::walk<true, MatchExpression>(canonicalQuery.root(), &walker);
 }

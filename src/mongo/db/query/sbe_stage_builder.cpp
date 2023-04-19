@@ -102,8 +102,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateEofPlan(
 
     return {std::move(stage), std::move(outputs)};
 }
-}  // namespace
 
+/**
+ * Creates a new compilation environment and registers global values within the
+ * new environment.
+ */
 std::unique_ptr<sbe::RuntimeEnvironment> makeRuntimeEnvironment(
     const CanonicalQuery& cq,
     OperationContext* opCtx,
@@ -116,14 +119,6 @@ std::unique_ptr<sbe::RuntimeEnvironment> makeRuntimeEnvironment(
                       sbe::value::bitcastFrom<const TimeZoneDatabase*>(getTimeZoneDatabase(opCtx)),
                       false,
                       slotIdGenerator);
-
-    if (auto collator = cq.getCollator(); collator) {
-        env->registerSlot("collator"_sd,
-                          sbe::value::TypeTags::collator,
-                          sbe::value::bitcastFrom<const CollatorInterface*>(collator),
-                          false,
-                          slotIdGenerator);
-    }
 
     for (auto&& [id, name] : Variables::kIdToBuiltinVarName) {
         if (id != Variables::kRootId && id != Variables::kRemoveId &&
@@ -141,6 +136,8 @@ std::unique_ptr<sbe::RuntimeEnvironment> makeRuntimeEnvironment(
 
     return env;
 }
+
+}  // namespace
 
 sbe::value::SlotVector getSlotsToForward(const PlanStageReqs& reqs,
                                          const PlanStageSlots& outputs,
@@ -233,7 +230,7 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
         }
     }
 
-    input_params::bind(cq, data->inputParamToSlotMap, env, preparingFromCache);
+    input_params::bind(cq, *data, preparingFromCache);
 
     interval_evaluation_tree::IndexBoundsEvaluationCache indexBoundsEvaluationCache;
     for (auto&& indexBoundsInfo : data->indexBoundsEvaluationInfos) {
@@ -338,6 +335,20 @@ std::unique_ptr<fts::FTSMatcher> makeFtsMatcher(OperationContext* opCtx,
     tassert(5432220, "expected FTSQueryImpl", query);
     return std::make_unique<fts::FTSMatcher>(*query, accessMethod->getSpec());
 }
+
+void initCollator(const CanonicalQuery& cq,
+                  PlanStageData* data,
+                  sbe::value::SlotIdGenerator* slotIdGenerator) {
+    if (auto collator = cq.getCollator(); collator) {
+        data->collator = collator->cloneShared();
+        data->env->registerSlot(
+            "collator"_sd,
+            sbe::value::TypeTags::collator,
+            sbe::value::bitcastFrom<const CollatorInterface*>(data->collator.get()),
+            false,
+            slotIdGenerator);
+    }
+}
 }  // namespace
 
 SlotBasedStageBuilder::SlotBasedStageBuilder(OperationContext* opCtx,
@@ -358,6 +369,8 @@ SlotBasedStageBuilder::SlotBasedStageBuilder(OperationContext* opCtx,
              &_spoolIdGenerator,
              _cq.getExpCtx()->needsMerge,
              _cq.getExpCtx()->allowDiskUse) {
+    initCollator(cq, &_data, &_slotIdGenerator);
+
     // SERVER-52803: In the future if we need to gather more information from the QuerySolutionNode
     // tree, rather than doing one-off scans for each piece of information, we should add a formal
     // analysis pass here.

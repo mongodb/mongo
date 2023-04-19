@@ -50,14 +50,6 @@
 #include "mongo/db/query/stage_builder.h"
 
 namespace mongo::stage_builder {
-/**
- * Creates a new compilation environment and registers global values within the
- * new environment.
- */
-std::unique_ptr<sbe::RuntimeEnvironment> makeRuntimeEnvironment(
-    const CanonicalQuery& cq,
-    OperationContext* opCtx,
-    sbe::value::SlotIdGenerator* slotIdGenerator);
 
 class PlanStageReqs;
 class PlanStageSlots;
@@ -525,6 +517,10 @@ struct PlanStageData {
     // plan should be evicted as the size of the foreign namespace changes.
     stdx::unordered_set<NamespaceString> foreignHashJoinCollections;
 
+    // Stores CollatorInterface to be used for this plan. Raw pointer may be stored inside data
+    // structures, so it must be kept stable.
+    std::shared_ptr<CollatorInterface> collator;
+
 private:
     // This copy function copies data from 'other' but will not create a copy of its
     // RuntimeEnvironment and CompileCtx.
@@ -549,6 +545,7 @@ private:
         variableIdToSlotMap = other.variableIdToSlotMap;
         indexBoundsEvaluationInfos = other.indexBoundsEvaluationInfos;
         foreignHashJoinCollections = other.foreignHashJoinCollections;
+        collator = other.collator;
     }
 };
 

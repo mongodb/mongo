@@ -48,6 +48,7 @@ public:
     CollatorInterfaceICU(Collation spec, std::unique_ptr<icu::Collator> collator);
 
     std::unique_ptr<CollatorInterface> clone() const final;
+    std::shared_ptr<CollatorInterface> cloneShared() const final;
 
     int compare(StringData left, StringData right) const final;
 
