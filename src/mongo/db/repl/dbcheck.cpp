@@ -224,10 +224,26 @@ DbCheckHasher::DbCheckHasher(OperationContext* opCtx,
                              const BSONKey& end,
                              int64_t maxCount,
                              int64_t maxBytes)
-    : _opCtx(opCtx), _maxKey(end), _maxCount(maxCount), _maxBytes(maxBytes) {
+    : _opCtx(opCtx),
+      _maxKey(end),
+      _maxCount(maxCount),
+      _maxBytes(maxBytes),
+      _previousDataCorruptionMode(opCtx->recoveryUnit()->getDataCorruptionDetectionMode()),
+      _previousPrepareConflictBehavior(opCtx->recoveryUnit()->getPrepareConflictBehavior()) {
 
     // Get the MD5 hasher set up.
     md5_init(&_state);
+
+    // We don't want detected data corruption to prevent us from finishing our scan. Locations where
+    // we throw these errors should already be writing to the health log anyways.
+    opCtx->recoveryUnit()->setDataCorruptionDetectionMode(
+        DataCorruptionDetectionMode::kLogAndContinue);
+
+    // We need to enforce prepare conflicts in order to return correct results. This can't be done
+    // while a snapshot is already open.
+    if (_previousPrepareConflictBehavior != PrepareConflictBehavior::kEnforce) {
+        opCtx->recoveryUnit()->setPrepareConflictBehavior(PrepareConflictBehavior::kEnforce);
+    }
 
     if (!collection->isClustered()) {
         // Get the _id index.
@@ -257,6 +273,13 @@ DbCheckHasher::DbCheckHasher(OperationContext* opCtx,
         params.boundInclusion = CollectionScanParams::ScanBoundInclusion::kIncludeEndRecordOnly;
         _exec = InternalPlanner::collectionScan(
             opCtx, &collection, params, PlanYieldPolicy::YieldPolicy::NO_YIELD);
+    }
+}
+
+DbCheckHasher::~DbCheckHasher() {
+    _opCtx->recoveryUnit()->setDataCorruptionDetectionMode(_previousDataCorruptionMode);
+    if (_previousPrepareConflictBehavior != PrepareConflictBehavior::kEnforce) {
+        _opCtx->recoveryUnit()->setPrepareConflictBehavior(_previousPrepareConflictBehavior);
     }
 }
 
