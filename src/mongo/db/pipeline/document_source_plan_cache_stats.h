@@ -89,7 +89,8 @@ public:
         Pipeline::SplitState = Pipeline::SplitState::kUnsplit) const override {
         StageConstraints constraints{StreamType::kStreaming,
                                      PositionRequirement::kFirst,
-                                     HostTypeRequirement::kAnyShard,
+                                     _allHosts ? HostTypeRequirement::kAllShardServers
+                                               : HostTypeRequirement::kAnyShard,
                                      DiskUseRequirement::kNoDiskUse,
                                      FacetRequirement::kNotAllowed,
                                      TransactionRequirement::kNotAllowed,
@@ -121,13 +122,18 @@ public:
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
 private:
-    DocumentSourcePlanCacheStats(const boost::intrusive_ptr<ExpressionContext>& expCtx);
+    DocumentSourcePlanCacheStats(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                                 bool allHosts);
 
     GetNextResult doGetNext() final;
 
     Value serialize(SerializationOptions opts = SerializationOptions()) const final override {
         MONGO_UNREACHABLE_TASSERT(7484303);  // Should call serializeToArray instead.
     }
+
+    // If true, requests plan cache stats from all data-bearing nodes, primary and secondary.
+    // Otherwise, follows read preference.
+    const bool _allHosts;
 
     // If running through mongos in a sharded cluster, stores the shard name so that it can be
     // appended to each plan cache entry document.

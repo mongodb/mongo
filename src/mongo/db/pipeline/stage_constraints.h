@@ -77,7 +77,7 @@ struct StageConstraints {
         kAnyShard,
         // Indicates that the stage can only run on mongoS.
         kMongoS,
-        // Indicates that the stage should run on all data-bearing nodes, primary and seconday, for
+        // Indicates that the stage should run on all data-bearing nodes, primary and secondary, for
         // the participating shards. This is useful for stages like $currentOp which generate
         // node-specific metadata.
         kAllShardServers,
