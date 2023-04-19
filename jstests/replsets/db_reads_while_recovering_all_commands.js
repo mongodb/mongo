@@ -90,6 +90,7 @@ const allCommands = {
     _recvChunkStatus: {skip: isPrimaryOnly},
     _refreshQueryAnalyzerConfiguration: {skip: isPrimaryOnly},
     _shardsvrAbortReshardCollection: {skip: isPrimaryOnly},
+    _shardsvrCleanupStructuredEncryptionData: {skip: isPrimaryOnly},
     _shardsvrCleanupReshardCollection: {skip: isPrimaryOnly},
     _shardsvrCloneCatalogData: {skip: isPrimaryOnly},
     _shardsvrCompactStructuredEncryptionData: {skip: isPrimaryOnly},

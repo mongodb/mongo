@@ -1326,6 +1326,15 @@ public:
      * in the encrypted field config
      */
     static void validateCompactionTokens(const EncryptedFieldConfig& efc, BSONObj compactionTokens);
+
+    /**
+     * Validates the compaction tokens BSON contains an element for each field
+     * in the encrypted field config
+     */
+    static void validateCleanupTokens(const EncryptedFieldConfig& efc, BSONObj cleanupTokens);
+
+private:
+    static void _validateTokens(const EncryptedFieldConfig& efc, BSONObj tokens, StringData cmd);
 };
 
 /**

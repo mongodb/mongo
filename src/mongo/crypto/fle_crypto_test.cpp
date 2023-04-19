@@ -2842,7 +2842,7 @@ TEST(CompactionHelpersTest, validateCompactionTokensTest) {
         // validate fails until all fields are present
         ASSERT_THROWS_CODE(CompactionHelpers::validateCompactionTokens(efc, builder.asTempObj()),
                            DBException,
-                           6346806);
+                           7294900);
 
         // validate doesn't care about the value, so this is fine
         builder.append(field.getPath(), "foo");

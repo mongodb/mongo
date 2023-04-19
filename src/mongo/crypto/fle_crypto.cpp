@@ -4150,14 +4150,23 @@ std::vector<CompactionToken> CompactionHelpers::parseCompactionTokens(BSONObj co
 
 void CompactionHelpers::validateCompactionTokens(const EncryptedFieldConfig& efc,
                                                  BSONObj compactionTokens) {
+    _validateTokens(efc, compactionTokens, "Compaction"_sd);
+}
+
+void CompactionHelpers::validateCleanupTokens(const EncryptedFieldConfig& efc,
+                                              BSONObj cleanupTokens) {
+    _validateTokens(efc, cleanupTokens, "Cleanup"_sd);
+}
+
+void CompactionHelpers::_validateTokens(const EncryptedFieldConfig& efc,
+                                        BSONObj tokens,
+                                        StringData cmd) {
     for (const auto& field : efc.getFields()) {
-        const auto& tokenElement = compactionTokens.getField(field.getPath());
-        uassert(
-            6346806,
-            str::stream()
-                << "Compaction tokens object is missing compaction token for the encrypted path '"
-                << field.getPath() << "'",
-            !tokenElement.eoo());
+        const auto& tokenElement = tokens.getField(field.getPath());
+        uassert(7294900,
+                str::stream() << cmd << " tokens object is missing " << cmd
+                              << " token for the encrypted path '" << field.getPath() << "'",
+                !tokenElement.eoo());
     }
 }
 

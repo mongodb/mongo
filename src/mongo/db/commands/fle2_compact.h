@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
+#include "mongo/db/commands/fle2_cleanup_gen.h"
 #include "mongo/db/commands/fle2_compact_gen.h"
 #include "mongo/db/fle_crud.h"
 
@@ -51,6 +52,11 @@ struct EncryptedStateCollectionsNamespaces {
  * Validate a compact request has the right encryption tokens.
  */
 void validateCompactRequest(const CompactStructuredEncryptionData& request, const Collection& edc);
+
+/**
+ * Validate a compact request has the right encryption tokens.
+ */
+void validateCleanupRequest(const CleanupStructuredEncryptionData& request, const Collection& edc);
 
 void processFLECompactV2(OperationContext* opCtx,
                          const CompactStructuredEncryptionData& request,

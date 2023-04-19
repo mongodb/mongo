@@ -69,6 +69,7 @@ enums:
             kCompactStructuredEncryptionDataPre70Compatible: "compactStructuredEncryptionData_V2"
             # TODO SERVER-68373 remove once 7.0 becomes last LTS
             kCompactStructuredEncryptionDataPre61Compatible: "compactStructuredEncryptionData"
+            kCleanupStructuredEncryptionData: "cleanupStructuredEncryptionData"
 
 types:
     ForwardableOperationMetadata:

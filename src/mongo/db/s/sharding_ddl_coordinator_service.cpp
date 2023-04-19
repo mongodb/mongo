@@ -33,6 +33,7 @@
 #include "mongo/base/checked_cast.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/s/cleanup_structured_encryption_data_coordinator.h"
 #include "mongo/db/s/collmod_coordinator.h"
 #include "mongo/db/s/compact_structured_encryption_data_coordinator.h"
 #include "mongo/db/s/create_collection_coordinator.h"
@@ -107,6 +108,10 @@ std::shared_ptr<ShardingDDLCoordinator> constructShardingDDLCoordinatorInstance(
             break;
         case DDLCoordinatorTypeEnum::kCompactStructuredEncryptionData:
             return std::make_shared<CompactStructuredEncryptionDataCoordinator>(
+                service, std::move(initialState));
+            break;
+        case DDLCoordinatorTypeEnum::kCleanupStructuredEncryptionData:
+            return std::make_shared<CleanupStructuredEncryptionDataCoordinator>(
                 service, std::move(initialState));
             break;
         default:

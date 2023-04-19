@@ -38,7 +38,6 @@
 #include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/crypto/fle_stats.h"
 #include "mongo/db/catalog/collection_catalog.h"
-#include "mongo/db/commands/fle2_compact_gen.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
@@ -485,6 +484,16 @@ void validateCompactRequest(const CompactStructuredEncryptionData& request, cons
     // Validate the request contains a compaction token for each encrypted field
     const auto& efc = edc.getCollectionOptions().encryptedFieldConfig.value();
     CompactionHelpers::validateCompactionTokens(efc, request.getCompactionTokens());
+}
+
+void validateCleanupRequest(const CleanupStructuredEncryptionData& request, const Collection& edc) {
+    uassert(7294901,
+            "Target namespace is not an encrypted collection",
+            edc.getCollectionOptions().encryptedFieldConfig);
+
+    // Validate the request contains a compaction token for each encrypted field
+    const auto& efc = edc.getCollectionOptions().encryptedFieldConfig.value();
+    CompactionHelpers::validateCleanupTokens(efc, request.getCleanupTokens());
 }
 
 const PrfBlock& FLECompactESCDeleteSet::at(size_t index) const {

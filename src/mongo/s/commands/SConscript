@@ -58,6 +58,7 @@ env.Library(
         'cluster_filemd5_cmd.cpp',
         'cluster_find_and_modify_cmd.cpp',
         'cluster_find_cmd_s.cpp',
+        'cluster_fle2_cleanup_cmd.cpp',
         'cluster_fle2_compact_cmd.cpp',
         'cluster_fle2_get_count_info_cmd.cpp',
         'cluster_fsync_cmd.cpp',

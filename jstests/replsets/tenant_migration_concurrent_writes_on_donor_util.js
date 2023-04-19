@@ -292,6 +292,7 @@ export const TenantMigrationConcurrentWriteUtil = {
         _recvChunkReleaseCritSec: {skip: isNotRunOnUserDatabase},
         _recvChunkStart: {skip: isNotRunOnUserDatabase},
         _recvChunkStatus: {skip: isNotRunOnUserDatabase},
+        _shardsvrCleanupStructuredEncryptionData: {skip: isOnlySupportedOnShardedCluster},
         _shardsvrCloneCatalogData: {skip: isNotRunOnUserDatabase},
         _shardsvrCommitIndexParticipant: {skip: isOnlySupportedOnShardedCluster},
         _shardsvrCompactStructuredEncryptionData: {skip: isOnlySupportedOnShardedCluster},
