@@ -303,7 +303,7 @@ testutil_copy_data(const char *dir)
 void
 testutil_copy_data_opt(const char *dir, const char *readonly_prefix)
 {
-#if defined(__APPLE__) || defined(__linux__)
+#if defined(__linux__)
     struct dirent *e;
     char to_copy[2048];
     char to_link[2048];
