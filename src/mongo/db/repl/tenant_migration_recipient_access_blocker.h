@@ -91,6 +91,11 @@ public:
     //
     Status checkIfCanBuildIndex() final;
 
+    /**
+     * Returns error status if "getMore" command of a change stream should fail.
+     */
+    Status checkIfCanGetMoreChangeStream() final;
+
     // @return true if TTL is blocked
     bool checkIfShouldBlockTTL() const final;
 

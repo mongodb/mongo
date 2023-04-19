@@ -105,7 +105,8 @@ bool ErrorLabelBuilder::isResumableChangeStreamError() const {
         (_commandName == "aggregate" || _commandName == "getMore") && _code && !_wcCode &&
         (ErrorCodes::isRetriableError(*_code) || ErrorCodes::isNetworkError(*_code) ||
          ErrorCodes::isNeedRetargettingError(*_code) || _code == ErrorCodes::RetryChangeStream ||
-         _code == ErrorCodes::FailedToSatisfyReadPreference);
+         _code == ErrorCodes::FailedToSatisfyReadPreference ||
+         _code == ErrorCodes::ResumeTenantChangeStream);
 
     // If the command or exception is not relevant, bail out early.
     if (!mayNeedResumableChangeStreamErrorLabel) {

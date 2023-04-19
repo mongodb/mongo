@@ -72,6 +72,11 @@ public:
     //
     virtual Status checkIfCanBuildIndex() = 0;
 
+    /**
+     * Checks if getMores for change streams should fail.
+     */
+    virtual Status checkIfCanGetMoreChangeStream() = 0;
+
     // We suspend TTL deletions at the recipient side to avoid the race when a document is updated
     // at the donor side, which may prevent it from being garbage collected by TTL, while the
     // recipient side document is deleted by the TTL. The donor side update will fail to propagate

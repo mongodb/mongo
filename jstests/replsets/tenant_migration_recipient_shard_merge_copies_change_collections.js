@@ -185,6 +185,26 @@ donorSession2.commitTransaction_forTesting();
 fpBeforeMarkingCloneSuccess.off();
 
 TenantMigrationTest.assertCommitted(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
+
+// Test that running a getMore on a change stream cursor after the migration commits throws a
+// resumable change stream exception.
+const failedGetMore = donorTenantConn2.getDB("database").runCommand("getMore", {
+    getMore: donorCursor2._cursorid,
+    collection: "collection"
+});
+assert.commandFailedWithCode(
+    failedGetMore,
+    ErrorCodes.ResumeTenantChangeStream,
+    "Tailing a change stream on the donor after completion of a shard merge should fail.");
+assert(failedGetMore.hasOwnProperty("errorLabels"));
+assert.contains("ResumableChangeStreamError", failedGetMore.errorLabels);
+
+// The cursor should have been deleted after the error so a getMore should fail.
+assert.commandFailedWithCode(
+    donorTenantConn2.getDB("database")
+        .runCommand("getMore", {getMore: donorCursor2._cursorid, collection: "collection"}),
+    ErrorCodes.CursorNotFound);
+
 assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 tenantMigrationTest.waitForMigrationGarbageCollection(migrationUuid, tenantIds[0]);
 

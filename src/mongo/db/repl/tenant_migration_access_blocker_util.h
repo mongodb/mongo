@@ -109,6 +109,11 @@ void checkIfCanWriteOrThrow(OperationContext* opCtx, const DatabaseName& dbName,
 Status checkIfCanBuildIndex(OperationContext* opCtx, const DatabaseName& dbName);
 
 /**
+ * Asserts if getMores for change streams should fail.
+ */
+void assertCanGetMoreChangeStream(OperationContext* opCtx, const DatabaseName& dbName);
+
+/**
  * Returns true if there is either a donor or recipient access blocker for the given dbName.
  */
 bool hasActiveTenantMigration(OperationContext* opCtx, const DatabaseName& dbName);
