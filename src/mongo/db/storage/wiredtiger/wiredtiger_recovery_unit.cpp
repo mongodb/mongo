@@ -389,7 +389,6 @@ void WiredTigerRecoveryUnit::_txnClose(bool commit) {
     _multiTimestampConstraintTracker = MultiTimestampConstraintTracker();
     _prepareTimestamp = Timestamp();
     _durableTimestamp = Timestamp();
-    _catalogConflictTimestamp = Timestamp();
     _roundUpPreparedTimestamps = RoundUpPreparedTimestamps::kNoRound;
     _isOplogReader = false;
     _oplogVisibleTs = boost::none;
@@ -911,25 +910,6 @@ std::unique_ptr<StorageStats> WiredTigerRecoveryUnit::computeOperationStatistics
     _sessionStatsAfterLastOperation = std::move(currentSessionStats);
 
     return operationStats;
-}
-
-void WiredTigerRecoveryUnit::setCatalogConflictingTimestamp(Timestamp timestamp) {
-    // This cannot be called after a storage snapshot is allocated.
-    invariant(!_isActive(), toString(_getState()));
-    invariant(_timestampReadSource == ReadSource::kNoTimestamp,
-              str::stream() << "Illegal to set catalog conflicting timestamp for a read source "
-                            << static_cast<int>(_timestampReadSource));
-    invariant(_catalogConflictTimestamp.isNull(),
-              str::stream() << "Trying to set catalog conflicting timestamp to "
-                            << timestamp.toString() << ". It's already set to "
-                            << _catalogConflictTimestamp.toString());
-    invariant(!timestamp.isNull());
-
-    _catalogConflictTimestamp = timestamp;
-}
-
-Timestamp WiredTigerRecoveryUnit::getCatalogConflictingTimestamp() const {
-    return _catalogConflictTimestamp;
 }
 
 bool WiredTigerRecoveryUnit::gatherWriteContextForDebugging() const {

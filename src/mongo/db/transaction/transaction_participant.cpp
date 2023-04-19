@@ -1123,18 +1123,6 @@ void TransactionParticipant::Participant::_setReadSnapshot(OperationContext* opC
         // Using 'kNoTimestamp' ensures that transactions with mode 'local' are always able to read
         // writes from earlier transactions with mode 'local' on the same connection.
         opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
-        // Catalog conflicting timestamps must be set on primaries performing transactions.
-        // However, secondaries performing oplog application must avoid setting
-        // _catalogConflictTimestamp. Currently, only oplog application on secondaries can run
-        // inside a transaction, thus `writesAreReplicated` is a suitable proxy to single out
-        // transactions on primaries.
-        if (!pitLookupFeatureEnabled && opCtx->writesAreReplicated()) {
-            // Since this snapshot may reflect oplog holes, record the most visible timestamp before
-            // opening a storage transaction. This timestamp will be used later to detect any
-            // changes in the catalog after a storage transaction is opened.
-            opCtx->recoveryUnit()->setCatalogConflictingTimestamp(
-                opCtx->getServiceContext()->getStorageEngine()->getAllDurableTimestamp());
-        }
     }
 
 

@@ -109,10 +109,6 @@ public:
 
     void setRoundUpPreparedTimestamps(bool value) override;
 
-    void setCatalogConflictingTimestamp(Timestamp timestamp) override;
-
-    Timestamp getCatalogConflictingTimestamp() const override;
-
     void allowOneUntimestampedWrite() override {
         invariant(!_isActive());
         _untimestampedWriteAssertionLevel =
@@ -285,7 +281,6 @@ private:
     Timestamp _prepareTimestamp;
     boost::optional<Timestamp> _lastTimestampSet;
     Timestamp _readAtTimestamp;
-    Timestamp _catalogConflictTimestamp;
     UntimestampedWriteAssertionLevel _untimestampedWriteAssertionLevel =
         UntimestampedWriteAssertionLevel::kEnforce;
     std::unique_ptr<Timer> _timer;

@@ -418,29 +418,6 @@ public:
     }
 
     /**
-     * Sets catalog conflicting timestamp.
-     * This can only be called while the RecoveryUnit is in an inactive state.
-     *
-     * This value must be set when both of the following conditions are true:
-     * - A storage engine snapshot is opened without a read timestamp
-     * (RecoveryUnit::ReadSource::kNoTimestamp).
-     * - The transaction may touch collections it does not yet have locks for.
-     * In this circumstance, the catalog conflicting timestamp serves as a substitute for a read
-     * timestamp. This value must be set to a valid (i.e: no-holes) read timestamp prior to
-     * acquiring a storage engine snapshot. This timestamp will be used to determine if any changes
-     * had happened to the in-memory catalog after a storage engine snapshot got opened for that
-     * transaction.
-     */
-    virtual void setCatalogConflictingTimestamp(Timestamp timestamp) {}
-
-    /**
-     * Returns the catalog conflicting timestamp.
-     */
-    virtual Timestamp getCatalogConflictingTimestamp() const {
-        return {};
-    }
-
-    /**
      * MongoDB must update documents with non-decreasing timestamp values. A storage engine is
      * allowed to assert when this contract is violated. An untimestamped write is a subset of these
      * violations, which may be necessary in limited circumstances. This API can be called before a
