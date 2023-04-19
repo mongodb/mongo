@@ -542,7 +542,7 @@ OpTime ReplicationCoordinatorExternalStateImpl::onTransitionToPrimary(OperationC
 
     // Create the pre-images collection if it doesn't exist yet in the non-serverless environment.
     if (!change_stream_serverless_helpers::isChangeCollectionsModeActive()) {
-        ChangeStreamPreImagesCollectionManager::createPreImagesCollection(
+        ChangeStreamPreImagesCollectionManager::get(opCtx).createPreImagesCollection(
             opCtx, boost::none /* tenantId */);
     }
 

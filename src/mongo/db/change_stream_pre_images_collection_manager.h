@@ -31,6 +31,7 @@
 
 #include <boost/optional/optional.hpp>
 
+#include "mongo/db/matcher/expression.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
@@ -97,33 +98,97 @@ public:
         BSONObj toBSON() const;
     };
 
+    explicit ChangeStreamPreImagesCollectionManager() {}
+
+    ~ChangeStreamPreImagesCollectionManager() = default;
+
+    /**
+     * Gets the instance of the class using the service context.
+     */
+    static ChangeStreamPreImagesCollectionManager& get(ServiceContext* service);
+
+    /**
+     * Gets the instance of the class using the operation context.
+     */
+    static ChangeStreamPreImagesCollectionManager& get(OperationContext* opCtx);
+
     /**
      * Creates the pre-images collection, clustered by the primary key '_id'. The collection is
      * created for the specific tenant if the 'tenantId' is specified.
      */
-    static void createPreImagesCollection(OperationContext* opCtx,
-                                          boost::optional<TenantId> tenantId);
+    void createPreImagesCollection(OperationContext* opCtx, boost::optional<TenantId> tenantId);
 
     /**
      * Drops the pre-images collection. The collection is dropped for the specific tenant if
      * the 'tenantId' is specified.
      */
-    static void dropPreImagesCollection(OperationContext* opCtx,
-                                        boost::optional<TenantId> tenantId);
+    void dropPreImagesCollection(OperationContext* opCtx, boost::optional<TenantId> tenantId);
 
     /**
      * Inserts the document into the pre-images collection. The document is inserted into the
      * tenant's pre-images collection if the 'tenantId' is specified.
      */
-    static void insertPreImage(OperationContext* opCtx,
-                               boost::optional<TenantId> tenantId,
-                               const ChangeStreamPreImage& preImage);
+    void insertPreImage(OperationContext* opCtx,
+                        boost::optional<TenantId> tenantId,
+                        const ChangeStreamPreImage& preImage);
 
     /**
      * Scans the system pre-images collection and deletes the expired pre-images from it.
      */
-    static void performExpiredChangeStreamPreImagesRemovalPass(Client* client);
+    void performExpiredChangeStreamPreImagesRemovalPass(Client* client);
 
-    static const PurgingJobStats& getPurgingJobStats();
+    const PurgingJobStats& getPurgingJobStats() {
+        return _purgingJobStats;
+    }
+
+private:
+    /**
+     * Scans the 'config.system.preimages' collection and deletes the expired pre-images from it.
+     *
+     * Pre-images are ordered by collection UUID, ie. if UUID of collection A is ordered before UUID
+     * of collection B, then pre-images of collection A will be stored before pre-images of
+     * collection B.
+     *
+     * Pre-images are considered expired based on expiration parameter. In case when expiration
+     * parameter is not set a pre-image is considered expired if its timestamp is smaller than the
+     * timestamp of the earliest oplog entry. In case when expiration parameter is specified, aside
+     * from timestamp check a check on the wall clock time of the pre-image recording
+     * ('operationTime') is performed. If the difference between 'currentTimeForTimeBasedExpiration'
+     * and 'operationTime' is larger than expiration parameter, the pre-image is considered expired.
+     * One of those two conditions must be true for a pre-image to be eligible for deletion.
+     *
+     *                               +-------------------------+
+     *                               | config.system.preimages |
+     *                               +------------+------------+
+     *                                            |
+     *             +--------------------+---------+---------+-----------------------+
+     *             |                    |                   |                       |
+     * +-----------+-------+ +----------+--------+ +--------+----------+ +----------+--------+
+     * |  collA.preImageA  | |  collA.preImageB  | |  collB.preImageC  | |  collB.preImageD  |
+     * +-----------+-------+ +----------+--------+ +---------+---------+ +----------+--------+
+     * |   timestamp: 1    | |   timestamp: 10   | |   timestamp: 5    | |   timestamp: 9    |
+     * |   applyIndex: 0   | |   applyIndex: 0   | |   applyIndex: 0   | |   applyIndex: 1   |
+     * +-------------------+ +-------------------+ +-------------------+ +-------------------+
+     */
+    size_t _deleteExpiredChangeStreamPreImagesCommon(OperationContext* opCtx,
+                                                     const CollectionPtr& preImageColl,
+                                                     const MatchExpression* filterPtr,
+                                                     Timestamp maxRecordIdTimestamp);
+
+    /**
+     * Removes expired pre-images in a single tenant enviornment.
+     */
+    size_t _deleteExpiredChangeStreamPreImages(OperationContext* opCtx,
+                                               Date_t currentTimeForTimeBasedExpiration);
+
+    /**
+     * Removes expired pre-images for the tenant with 'tenantId'.
+     */
+    size_t _deleteExpiredChangeStreamPreImagesForTenants(OperationContext* opCtx,
+                                                         const TenantId& tenantId,
+                                                         Date_t currentTimeForTimeBasedExpiration);
+
+
+    PurgingJobStats _purgingJobStats;
 };
 }  // namespace mongo

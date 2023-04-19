@@ -917,7 +917,7 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
             ChangeStreamPreImageId id(args.coll->uuid(), opTime.writeOpTime.getTimestamp(), 0);
             ChangeStreamPreImage preImage(id, opTime.wallClockTime, preImageDoc);
 
-            ChangeStreamPreImagesCollectionManager::insertPreImage(
+            ChangeStreamPreImagesCollectionManager::get(opCtx).insertPreImage(
                 opCtx, args.coll->ns().tenantId(), preImage);
         }
 
@@ -1073,7 +1073,8 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
             ChangeStreamPreImageId id(uuid, opTime.writeOpTime.getTimestamp(), 0);
             ChangeStreamPreImage preImage(id, opTime.wallClockTime, *args.deletedDoc);
 
-            ChangeStreamPreImagesCollectionManager::insertPreImage(opCtx, nss.tenantId(), preImage);
+            ChangeStreamPreImagesCollectionManager::get(opCtx).insertPreImage(
+                opCtx, nss.tenantId(), preImage);
         }
 
         SessionTxnRecord sessionTxnRecord;
@@ -1542,7 +1543,7 @@ void writeChangeStreamPreImagesForApplyOpsEntries(
             invariant(operation.getUuid());
             invariant(!operation.getPreImage().isEmpty());
 
-            ChangeStreamPreImagesCollectionManager::insertPreImage(
+            ChangeStreamPreImagesCollectionManager::get(opCtx).insertPreImage(
                 opCtx,
                 operation.getTid(),
                 ChangeStreamPreImage{

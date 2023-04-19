@@ -49,7 +49,8 @@ public:
                        const BSONElement& configElement,
                        BSONObjBuilder* result) const override {
         // Append the section only when pre-images exists.
-        const auto& jobStats = ChangeStreamPreImagesCollectionManager::getPurgingJobStats();
+        const auto& jobStats =
+            ChangeStreamPreImagesCollectionManager::get(opCtx).getPurgingJobStats();
 
         result->append(getSectionName(), BSON("purgingJob" << jobStats.toBSON()));
     }

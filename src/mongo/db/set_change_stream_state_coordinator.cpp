@@ -98,7 +98,8 @@ private:
         auto& changeCollectionManager = ChangeStreamChangeCollectionManager::get(opCtx);
         changeCollectionManager.createChangeCollection(opCtx, tenantId);
 
-        ChangeStreamPreImagesCollectionManager::createPreImagesCollection(opCtx, tenantId);
+        ChangeStreamPreImagesCollectionManager::get(opCtx).createPreImagesCollection(opCtx,
+                                                                                     tenantId);
 
         // Wait until the create requests are majority committed.
         waitForMajority(opCtx);
@@ -112,7 +113,7 @@ private:
         auto& changeCollectionManager = ChangeStreamChangeCollectionManager::get(opCtx);
         changeCollectionManager.dropChangeCollection(opCtx, tenantId);
 
-        ChangeStreamPreImagesCollectionManager::dropPreImagesCollection(opCtx, tenantId);
+        ChangeStreamPreImagesCollectionManager::get(opCtx).dropPreImagesCollection(opCtx, tenantId);
 
         // Wait until the drop requests are majority committed.
         waitForMajority(opCtx);

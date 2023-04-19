@@ -284,8 +284,8 @@ TEST_F(OplogApplierImplTestEnableSteadyStateConstraints,
 
 TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsDeleteDocumentCollectionAndDocExist) {
     // Setup the pre-images collection.
-    ChangeStreamPreImagesCollectionManager::createPreImagesCollection(_opCtx.get(),
-                                                                      boost::none /* tenantId */);
+    ChangeStreamPreImagesCollectionManager::get(_opCtx.get())
+        .createPreImagesCollection(_opCtx.get(), boost::none /* tenantId */);
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
     createCollection(
         _opCtx.get(), nss, createRecordChangeStreamPreAndPostImagesCollectionOptions());
@@ -407,8 +407,8 @@ TEST_F(OplogApplierImplTestEnableSteadyStateConstraints,
 
 TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsDeleteDocumentCollectionLockedByUUID) {
     // Setup the pre-images collection.
-    ChangeStreamPreImagesCollectionManager::createPreImagesCollection(_opCtx.get(),
-                                                                      boost::none /* tenantId */);
+    ChangeStreamPreImagesCollectionManager::get(_opCtx.get())
+        .createPreImagesCollection(_opCtx.get(), boost::none /* tenantId */);
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
     CollectionOptions options = createRecordChangeStreamPreAndPostImagesCollectionOptions();
     options.uuid = kUuid;
@@ -426,8 +426,8 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsDeleteDocumentCollec
 
 TEST_F(OplogApplierImplTest, applyOplogEntryToRecordChangeStreamPreImages) {
     // Setup the pre-images collection.
-    ChangeStreamPreImagesCollectionManager::createPreImagesCollection(_opCtx.get(),
-                                                                      boost::none /* tenantId */);
+    ChangeStreamPreImagesCollectionManager::get(_opCtx.get())
+        .createPreImagesCollection(_opCtx.get(), boost::none /* tenantId */);
 
     // Create the collection.
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.t");
@@ -1154,7 +1154,8 @@ TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsInsertDocumentIncorr
 TEST_F(OplogApplierImplTest, applyOplogEntryOrGroupedInsertsDeleteDocumentIncludesTenantId) {
     // Setup the pre-images collection.
     const TenantId tid(OID::gen());
-    ChangeStreamPreImagesCollectionManager::createPreImagesCollection(_opCtx.get(), tid);
+    ChangeStreamPreImagesCollectionManager::get(_opCtx.get())
+        .createPreImagesCollection(_opCtx.get(), tid);
     setServerParameter("multitenancySupport", true);
     setServerParameter("featureFlagRequireTenantID", true);
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest(tid, "test.t");

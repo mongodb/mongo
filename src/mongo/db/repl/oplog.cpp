@@ -1353,7 +1353,7 @@ void writeChangeStreamPreImage(OperationContext* opCtx,
     ChangeStreamPreImage preImageDocument{
         std::move(preImageId), oplogEntry.getWallClockTimeForPreImage(), preImage};
 
-    ChangeStreamPreImagesCollectionManager::insertPreImage(
+    ChangeStreamPreImagesCollectionManager::get(opCtx).insertPreImage(
         opCtx, oplogEntry.getTid(), preImageDocument);
 }
 }  // namespace
