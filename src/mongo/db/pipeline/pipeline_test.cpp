@@ -4171,7 +4171,7 @@ class Out : public ShardMergerBase {
         return "[]";
     }
     string mergePipeJson() {
-        return "[{$out: {db: 'a', coll: 'outColl'}}]";
+        return "[{$out: {coll: 'outColl', db: 'a'}}]";
     }
 };
 

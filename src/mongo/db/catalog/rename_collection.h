@@ -45,12 +45,14 @@ class OpTime;
 /**
  * Renames the collection from "source" to "target" and drops the existing collection if
  * "dropTarget" is true. "stayTemp" indicates whether a collection should maintain its
- * temporariness.
+ * temporariness. "allowBuckets" indicates whether a time-series buckets collection should be
+ * allowed to be renamed.
  */
 struct RenameCollectionOptions {
     bool dropTarget = false;
     bool stayTemp = false;
     bool markFromMigrate = false;
+    bool allowBuckets = false;
     boost::optional<UUID> expectedSourceUUID;
     boost::optional<UUID> expectedTargetUUID;
 };
@@ -93,9 +95,11 @@ Status renameCollectionForRollback(OperationContext* opCtx,
 /**
  * Performs validation checks to ensure source and target namespaces are eligible for rename.
  */
-void validateNamespacesForRenameCollection(OperationContext* opCtx,
-                                           const NamespaceString& source,
-                                           const NamespaceString& target);
+void validateNamespacesForRenameCollection(
+    OperationContext* opCtx,
+    const NamespaceString& source,
+    const NamespaceString& target,
+    const RenameCollectionOptions& options = RenameCollectionOptions());
 
 /**
  * Runs renameCollection() with preliminary validation checks to ensure source

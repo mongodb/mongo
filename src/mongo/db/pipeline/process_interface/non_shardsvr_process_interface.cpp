@@ -29,10 +29,12 @@
 
 #include "mongo/db/pipeline/process_interface/non_shardsvr_process_interface.h"
 
+#include "mongo/base/error_codes.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/list_indexes.h"
 #include "mongo/db/catalog/rename_collection.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/db_raii.h"
@@ -40,6 +42,8 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/repl/speculative_majority_read_info.h"
+#include "mongo/db/timeseries/catalog_helper.h"
+#include "mongo/db/timeseries/timeseries_constants.h"
 
 namespace mongo {
 
@@ -123,6 +127,24 @@ Status NonShardServerProcessInterface::insert(const boost::intrusive_ptr<Express
     return Status::OK();
 }
 
+Status NonShardServerProcessInterface::insertTimeseries(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const NamespaceString& ns,
+    std::vector<BSONObj>&& objs,
+    const WriteConcernOptions& wc,
+    boost::optional<OID> targetEpoch) {
+    try {
+        auto insertReply = write_ops_exec::performTimeseriesWrites(
+            expCtx->opCtx, buildInsertOp(ns, std::move(objs), expCtx->bypassDocumentValidation));
+
+        checkWriteErrors(insertReply.getWriteCommandReplyBase());
+    } catch (DBException& ex) {
+        ex.addContext(str::stream() << "time-series insert failed: " << ns.ns());
+        throw;
+    }
+    return Status::OK();
+}
+
 StatusWith<MongoProcessInterface::UpdateResult> NonShardServerProcessInterface::update(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& ns,
@@ -193,14 +215,50 @@ void NonShardServerProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
     const NamespaceString& targetNs,
     bool dropTarget,
     bool stayTemp,
+    bool allowBuckets,
     const BSONObj& originalCollectionOptions,
     const std::list<BSONObj>& originalIndexes) {
     RenameCollectionOptions options;
     options.dropTarget = dropTarget;
     options.stayTemp = stayTemp;
+    options.allowBuckets = allowBuckets;
     // skip sharding validation on non sharded servers
     doLocalRenameIfOptionsAndIndexesHaveNotChanged(
         opCtx, sourceNs, targetNs, options, originalIndexes, originalCollectionOptions);
+}
+
+void NonShardServerProcessInterface::createTimeseries(OperationContext* opCtx,
+                                                      const NamespaceString& ns,
+                                                      const BSONObj& options,
+                                                      bool createView) {
+
+    // try to create the view, but catch the error if the view already exists.
+    if (createView) {
+        try {
+            uassertStatusOK(mongo::createTimeseries(opCtx, ns, options));
+        } catch (DBException& ex) {
+            auto view = CollectionCatalog::get(opCtx)->lookupView(opCtx, ns);
+            if (ex.code() != ErrorCodes::NamespaceExists || !view || !view->timeseries()) {
+                throw;
+                // check the time-series spec matches.
+            } else {
+                auto timeseriesOpts = mongo::timeseries::getTimeseriesOptions(opCtx, ns, true);
+                BSONObj inputOpts = options.getField("timeseries").Obj();
+                if (!timeseriesOpts ||
+                    timeseriesOpts->getTimeField() !=
+                        inputOpts.getField(timeseries::kTimeFieldName).valueStringData() ||
+                    (inputOpts.hasField(timeseries::kMetaFieldName) &&
+                     timeseriesOpts->getMetaField() !=
+                         inputOpts.getField(timeseries::kMetaFieldName).valueStringData())) {
+                    throw;
+                }
+            }
+        }
+        // creating the buckets collection should always succeed.
+    } else {
+        uassertStatusOK(
+            mongo::createTimeseries(opCtx, ns, options, TimeseriesCreateLevel::kBucketsCollOnly));
+    }
 }
 
 void NonShardServerProcessInterface::createCollection(OperationContext* opCtx,

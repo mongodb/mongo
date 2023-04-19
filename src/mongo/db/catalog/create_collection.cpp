@@ -333,9 +333,11 @@ BSONObj _generateTimeseriesValidator(int bucketVersion, StringData timeField) {
     };
 }
 
-Status _createTimeseries(OperationContext* opCtx,
-                         const NamespaceString& ns,
-                         const CollectionOptions& optionsArg) {
+Status _createTimeseries(
+    OperationContext* opCtx,
+    const NamespaceString& ns,
+    const CollectionOptions& optionsArg,
+    enum TimeseriesCreateLevel createOpt = TimeseriesCreateLevel::kBothCollAndView) {
     // This path should only be taken when a user creates a new time-series collection on the
     // primary. Secondaries replicate individual oplog entries.
     invariant(!ns.isTimeseriesBucketsCollection());
@@ -461,8 +463,9 @@ Status _createTimeseries(OperationContext* opCtx,
             return Status::OK();
         });
 
-    // If compatible bucket collection already exists then proceed with creating view definition.
-    if (!ret.isOK() && !existingBucketCollectionIsCompatible)
+    // If compatible bucket collection already exists then proceed with creating view defintion.
+    if ((!ret.isOK() && !existingBucketCollectionIsCompatible) ||
+        createOpt == TimeseriesCreateLevel::kBucketsCollOnly)
         return ret;
 
     ret = writeConflictRetry(opCtx, "create", ns.ns(), [&]() -> Status {
@@ -713,6 +716,19 @@ Status createCollection(OperationContext* opCtx,
     return createCollection(opCtx, nss, collectionOptions, idIndex);
 }
 }  // namespace
+
+Status createTimeseries(OperationContext* opCtx,
+                        const NamespaceString& ns,
+                        const BSONObj& options,
+                        TimeseriesCreateLevel level) {
+    StatusWith<CollectionOptions> statusWith =
+        CollectionOptions::parse(options, CollectionOptions::parseForCommand);
+    if (!statusWith.isOK()) {
+        return statusWith.getStatus();
+    }
+    auto collectionOptions = statusWith.getValue();
+    return _createTimeseries(opCtx, ns, collectionOptions, level);
+}
 
 Status createCollection(OperationContext* opCtx,
                         const DatabaseName& dbName,

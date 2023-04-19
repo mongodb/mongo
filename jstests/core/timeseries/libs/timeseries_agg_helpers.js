@@ -78,11 +78,13 @@ var TimeseriesAggTests = class {
     /**
      * Gets an output collection object with the name 'outCollname'.
      */
-    static getOutputCollection(outCollName) {
+    static getOutputCollection(outCollName, shouldDrop) {
         const testDB = TimeseriesAggTests.getTestDb();
 
         let outColl = testDB.getCollection(outCollName);
-        outColl.drop();
+        if (shouldDrop) {
+            outColl.drop();
+        }
 
         return outColl;
     }
@@ -96,21 +98,29 @@ var TimeseriesAggTests = class {
      * Executes 'prepareAction' before executing 'pipeline'. 'prepareAction' takes a collection
      * parameter and returns nothing.
      *
+     * If 'shouldDrop' is set to false, the output collection will not be dropped before executing
+     * 'pipeline'.
+     *
      * Returns sorted data by "time" field. The sorted result data will help simplify comparison
      * logic.
      */
-    static getOutputAggregateResults(inColl, pipeline, prepareAction = null) {
+    static getOutputAggregateResults(inColl, pipeline, prepareAction = null, shouldDrop = true) {
         // Figures out the output collection name from the last pipeline stage.
         var outCollName = "out";
         if (pipeline[pipeline.length - 1]["$out"] != undefined) {
-            // If the last stage is "$out", gets the output collection name from it.
-            outCollName = pipeline[pipeline.length - 1]["$out"];
+            // If the last stage is "$out", gets the output collection name from the string or
+            // object input.
+            if (typeof pipeline[pipeline.length - 1]["$out"] == 'string') {
+                outCollName = pipeline[pipeline.length - 1]["$out"];
+            } else {
+                outCollName = pipeline[pipeline.length - 1]["$out"]["coll"];
+            }
         } else if (pipeline[pipeline.length - 1]["$merge"] != undefined) {
             // If the last stage is "$merge", gets the output collection name from it.
             outCollName = pipeline[pipeline.length - 1]["$merge"].into;
         }
 
-        let outColl = TimeseriesAggTests.getOutputCollection(outCollName);
+        let outColl = TimeseriesAggTests.getOutputCollection(outCollName, shouldDrop);
         if (prepareAction != null) {
             prepareAction(outColl);
         }
@@ -121,5 +131,15 @@ var TimeseriesAggTests = class {
         return outColl.find({}, {"_id": 0, "time": 1, "hostid": 1, "cpu": 1, "idle": 1})
             .sort({"time": 1})
             .toArray();
+    }
+
+    static verifyResults(actualResults, expectedResults) {
+        // Verifies that the number of measurements is same as expected.
+        assert.eq(actualResults.length, expectedResults.length, actualResults);
+
+        // Verifies that every measurement is same as expected.
+        for (var i = 0; i < expectedResults.length; ++i) {
+            assert.eq(actualResults[i], expectedResults[i], actualResults);
+        }
     }
 };

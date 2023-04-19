@@ -106,6 +106,7 @@ public:
                                                  const NamespaceString& targetNs,
                                                  bool dropTarget,
                                                  bool stayTemp,
+                                                 bool allowBuckets,
                                                  const BSONObj& originalCollectionOptions,
                                                  const std::list<BSONObj>& originalIndexes) final;
     void createCollection(OperationContext* opCtx,
@@ -141,6 +142,25 @@ public:
         const boost::optional<DatabaseVersion>& dbVersion) override;
 
     void checkOnPrimaryShardForDb(OperationContext* opCtx, const NamespaceString& nss) final;
+
+    void createTimeseries(OperationContext* opCtx,
+                          const NamespaceString& ns,
+                          const BSONObj& options,
+                          bool createView) final {
+        // TODO SERVER-74061 remove uassert.
+        uasserted(7268704,
+                  "$out for time-series collections is not supported on sharded clusters.");
+    }
+
+    Status insertTimeseries(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                            const NamespaceString& ns,
+                            std::vector<BSONObj>&& objs,
+                            const WriteConcernOptions& wc,
+                            boost::optional<OID> targetEpoch) final {
+        // TODO SERVER-74061 remove uassert.
+        uasserted(7268705,
+                  "$out for time-series collections is not supported on sharded clusters.");
+    }
 };
 
 }  // namespace mongo

@@ -92,7 +92,7 @@ TEST_F(DocumentSourceOutTest, FailsToParseIncorrectType) {
     ASSERT_THROWS_CODE(createOutStage(spec), AssertionException, 16990);
 
     spec = BSON("$out" << BSONObj());
-    ASSERT_THROWS_CODE(createOutStage(spec), AssertionException, 16994);
+    ASSERT_THROWS_CODE(createOutStage(spec), AssertionException, 40414);
 }
 
 TEST_F(DocumentSourceOutTest, AcceptsStringArgument) {
@@ -115,8 +115,7 @@ TEST_F(DocumentSourceOutTest, SerializeToString) {
     ASSERT_EQ(reSerialized["$out"]["coll"].getStringData(), "some_collection");
 }
 
-TEST_F(DocumentSourceOutTest, Redaction) {
-    // TODO SERVER-75138 test support for redaction with timeseries options
+TEST_F(DocumentSourceOutTest, RedactionNoTimeseries) {
     auto spec = fromjson(R"({
             $out: {
                 db: "foo",
@@ -128,8 +127,41 @@ TEST_F(DocumentSourceOutTest, Redaction) {
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             $out: {
+                coll: "HASH<bar>",
+                db: "HASH<foo>"
+            }
+        })",
+        redact(*docSource));
+}
+
+TEST_F(DocumentSourceOutTest, RedactionTimeseries) {
+    auto spec = fromjson(R"({
+            $out: {
+                db: "foo",
+                coll: "bar",
+                timeseries: {
+                    timeField: "time", 
+                    metaField: "meta", 
+                    granularity: "minutes",
+                    bucketRoundingSeconds: 300,
+                    bucketMaxSpanSeconds: 300
+                }
+            }
+        })");
+    auto docSource = DocumentSourceOut::createFromBson(spec.firstElement(), getExpCtx());
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            $out: {
+                coll: "HASH<bar>",
                 db: "HASH<foo>",
-                coll: "HASH<bar>"
+                timeseries: {
+                    timeField: "HASH<time>",
+                    metaField: "HASH<meta>",
+                    granularity: "minutes",
+                    bucketRoundingSeconds: "?",
+                    bucketMaxSpanSeconds: "?"
+
+                }
             }
         })",
         redact(*docSource));
@@ -186,7 +218,7 @@ TEST_F(DocumentSourceOutServerlessTest, CreateFromBSONContainsExpectedNamespaces
 
     // Assert the tenantId is not included in the serialized namespace.
     auto serialized = outSource->serialize().getDocument();
-    auto expectedDoc = Document{{"db", expCtx->ns.dbName().db()}, {"coll", targetColl}};
+    auto expectedDoc = Document{{"coll", targetColl}, {"db", expCtx->ns.dbName().db()}};
     ASSERT_DOCUMENT_EQ(serialized["$out"].getDocument(), expectedDoc);
 
     // The tenantId for the outputNs should be the same as that on the expCtx despite outputting
@@ -202,7 +234,7 @@ TEST_F(DocumentSourceOutServerlessTest, CreateFromBSONContainsExpectedNamespaces
 
     // Assert the tenantId is not included in the serialized namespace.
     serialized = outSource->serialize().getDocument();
-    expectedDoc = Document{{"db", targetDb}, {"coll", targetColl}};
+    expectedDoc = Document{{"coll", targetColl}, {"db", targetDb}};
     ASSERT_DOCUMENT_EQ(serialized["$out"].getDocument(), expectedDoc);
 }
 

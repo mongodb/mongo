@@ -83,6 +83,14 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    Status insertTimeseries(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                            const NamespaceString& ns,
+                            std::vector<BSONObj>&& objs,
+                            const WriteConcernOptions& wc,
+                            boost::optional<OID> targetEpoch) override {
+        MONGO_UNREACHABLE;
+    }
+
     StatusWith<UpdateResult> update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                     const NamespaceString& ns,
                                     BatchedObjects&& batch,
@@ -107,6 +115,13 @@ public:
     }
 
     std::deque<BSONObj> listCatalog(OperationContext* opCtx) const override {
+        MONGO_UNREACHABLE;
+    }
+
+    void createTimeseries(OperationContext* opCtx,
+                          const NamespaceString& ns,
+                          const BSONObj& options,
+                          bool createView) final {
         MONGO_UNREACHABLE;
     }
 
@@ -152,6 +167,7 @@ public:
         const NamespaceString& targetNs,
         bool dropTarget,
         bool stayTemp,
+        bool allowBuckets,
         const BSONObj& originalCollectionOptions,
         const std::list<BSONObj>& originalIndexes) override {
         MONGO_UNREACHABLE;

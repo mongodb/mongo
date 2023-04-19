@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/pipeline/document_source_out_gen.h"
 #include "mongo/db/pipeline/document_source_writer.h"
 
 namespace mongo {
@@ -97,7 +98,9 @@ public:
      * Creates a new $out stage from the given arguments.
      */
     static boost::intrusive_ptr<DocumentSource> create(
-        NamespaceString outputNs, const boost::intrusive_ptr<ExpressionContext>& expCtx);
+        NamespaceString outputNs,
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        boost::optional<TimeseriesOptions> timeseries = boost::none);
 
     /**
      * Parses a $out stage from the user-supplied BSON.
@@ -113,11 +116,13 @@ public:
 
 private:
     DocumentSourceOut(NamespaceString outputNs,
+                      boost::optional<TimeseriesOptions> timeseries,
                       const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : DocumentSourceWriter(kStageName.rawData(), std::move(outputNs), expCtx) {}
+        : DocumentSourceWriter(kStageName.rawData(), std::move(outputNs), expCtx),
+          _timeseries(std::move(timeseries)) {}
 
-    static NamespaceString parseNsFromElem(const BSONElement& spec, const DatabaseName& defaultDB);
-
+    static DocumentSourceOutSpec parseOutSpecAndResolveTargetNamespace(
+        const BSONElement& spec, const DatabaseName& defaultDB);
     void initialize() override;
 
     void finalize() override;
@@ -126,8 +131,13 @@ private:
         DocumentSourceWriteBlock writeBlock(pExpCtx->opCtx);
 
         auto targetEpoch = boost::none;
-        uassertStatusOK(pExpCtx->mongoProcessInterface->insert(
-            pExpCtx, _tempNs, std::move(batch), _writeConcern, targetEpoch));
+        if (_timeseries) {
+            uassertStatusOK(pExpCtx->mongoProcessInterface->insertTimeseries(
+                pExpCtx, _tempNs, std::move(batch), _writeConcern, targetEpoch));
+        } else {
+            uassertStatusOK(pExpCtx->mongoProcessInterface->insert(
+                pExpCtx, _tempNs, std::move(batch), _writeConcern, targetEpoch));
+        }
     }
 
     std::pair<BSONObj, int> makeBatchObject(Document&& doc) const override {
@@ -138,6 +148,14 @@ private:
 
     void waitWhileFailPointEnabled() override;
 
+    /**
+     * Checks that the time-series spec passed by the user matches the existing time-series
+     * collection, if one exists. It will set '_timeseriesExists' to true if a time-series
+     * collection exists.
+     */
+    void validateTimeseries();
+
+    NamespaceString makeBucketNsIfTimeseries(const NamespaceString& ns);
     // Holds on to the original collection options and index specs so we can check they didn't
     // change during computation.
     BSONObj _originalOutOptions;
@@ -145,6 +163,12 @@ private:
 
     // The temporary namespace for the $out writes.
     NamespaceString _tempNs;
+
+    boost::optional<TimeseriesOptions> _timeseries;
+
+    // Set to true if the stage has not initialized or the view was successfully created.
+    // Used by the destructor to determine if the buckets collection should be destroyed.
+    bool _timeseriesViewCreated = true;
 };
 
 }  // namespace mongo
