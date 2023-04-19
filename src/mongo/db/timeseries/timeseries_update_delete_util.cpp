@@ -29,9 +29,11 @@
 
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
 
-#include "mongo/db/exec/bucket_unpacker.h"
+#include "mongo/db/exec/timeseries/bucket_spec.h"
+#include "mongo/db/exec/timeseries/bucket_unpacker.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/ops/parsed_writes_common.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 
@@ -257,14 +259,37 @@ BSONObj getBucketLevelPredicateForRouting(const BSONObj& originalQuery,
     return BSONObj();
 }
 
-std::unique_ptr<MatchExpression> getBucketLevelPredicateForWrites(
-    std::unique_ptr<MatchExpression> bucketExpr) {
-    if (bucketExpr) {
+TimeseriesWritesQueryExprs getMatchExprsForWrites(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const TimeseriesOptions& tsOptions,
+    const BSONObj& writeQuery) {
+    auto [metaOnlyExpr, bucketMetricExpr, residualExpr] =
+        BucketSpec::getPushdownPredicates(expCtx,
+                                          tsOptions,
+                                          writeQuery,
+                                          /*haveComputedMetaField*/ false,
+                                          tsOptions.getMetaField().has_value(),
+                                          /*assumeNoMixedSchemaData*/ true,
+                                          BucketSpec::IneligiblePredicatePolicy::kIgnore);
+
+    // Combine the closed bucket filter and the bucket metric filter and the meta-only filter into a
+    // single filter by $and-ing them together.
+    auto bucketExpr = closedBucketFilter->clone();
+    if (metaOnlyExpr || bucketMetricExpr) {
         std::vector<std::unique_ptr<MatchExpression>> bucketExprs;
         bucketExprs.emplace_back(std::move(bucketExpr));
-        bucketExprs.emplace_back(closedBucketFilter->clone());
-        return std::make_unique<AndMatchExpression>(std::move(bucketExprs));
+
+        if (metaOnlyExpr) {
+            bucketExprs.emplace_back(std::move(metaOnlyExpr));
+        }
+
+        if (bucketMetricExpr) {
+            bucketExprs.emplace_back(std::move(bucketMetricExpr));
+        }
+
+        bucketExpr = std::make_unique<AndMatchExpression>(std::move(bucketExprs));
     }
-    return closedBucketFilter->clone();
+
+    return {std::move(bucketExpr), std::move(residualExpr)};
 }
 }  // namespace mongo::timeseries

@@ -1127,15 +1127,6 @@ Status StorageInterfaceImpl::deleteByFilter(OperationContext* opCtx,
     request.setGod(true);
 
     return writeConflictRetry(opCtx, "StorageInterfaceImpl::deleteByFilter", nss.ns(), [&] {
-        // ParsedDelete needs to be inside the write conflict retry loop because it may create a
-        // CanonicalQuery whose ownership will be transferred to the plan executor in
-        // getExecutorDelete().
-        ParsedDelete parsedDelete(opCtx, &request);
-        auto parsedDeleteStatus = parsedDelete.parseRequest();
-        if (!parsedDeleteStatus.isOK()) {
-            return parsedDeleteStatus;
-        }
-
         AutoGetCollection autoColl(opCtx, nss, MODE_IX);
         auto collectionResult =
             getCollection(autoColl,
@@ -1146,6 +1137,15 @@ Status StorageInterfaceImpl::deleteByFilter(OperationContext* opCtx,
             return collectionResult.getStatus();
         }
         const auto& collection = *collectionResult.getValue();
+
+        // ParsedDelete needs to be inside the write conflict retry loop because it may create a
+        // CanonicalQuery whose ownership will be transferred to the plan executor in
+        // getExecutorDelete().
+        ParsedDelete parsedDelete(opCtx, &request, collection);
+        auto parsedDeleteStatus = parsedDelete.parseRequest();
+        if (!parsedDeleteStatus.isOK()) {
+            return parsedDeleteStatus;
+        }
 
         auto planExecutorResult = mongo::getExecutorDelete(
             nullptr, &collection, &parsedDelete, boost::none /* verbosity */);

@@ -773,11 +773,8 @@ public:
                 }
             }
 
-            ParsedDelete parsedDelete(opCtx,
-                                      &deleteRequest,
-                                      isRequestToTimeseries && collection
-                                          ? collection->getTimeseriesOptions()
-                                          : boost::none);
+            ParsedDelete parsedDelete(
+                opCtx, &deleteRequest, collection.getCollection(), isRequestToTimeseries);
             uassertStatusOK(parsedDelete.parseRequest());
 
             // Explain the plan tree.

@@ -811,14 +811,14 @@ long long writeConflictRetryRemove(OperationContext* opCtx,
 
     invariant(deleteRequest);
 
-    ParsedDelete parsedDelete(opCtx, deleteRequest);
-    uassertStatusOK(parsedDelete.parseRequest());
-
     const auto collection = acquireCollection(
         opCtx,
         CollectionAcquisitionRequest::fromOpCtx(opCtx, nsString, AcquisitionPrerequisites::kWrite),
         MODE_IX);
     const auto& collectionPtr = collection.getCollectionPtr();
+
+    ParsedDelete parsedDelete(opCtx, deleteRequest, collectionPtr);
+    uassertStatusOK(parsedDelete.parseRequest());
 
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
@@ -1551,10 +1551,8 @@ static SingleWriteResult performSingleDeleteOp(OperationContext* opCtx,
 
     ParsedDelete parsedDelete(opCtx,
                               &request,
-                              source == OperationSource::kTimeseriesDelete &&
-                                      collection.getCollectionPtr()
-                                  ? collection.getCollectionPtr()->getTimeseriesOptions()
-                                  : boost::none);
+                              collection.getCollectionPtr(),
+                              source == OperationSource::kTimeseriesDelete);
     uassertStatusOK(parsedDelete.parseRequest());
 
     if (DatabaseHolder::get(opCtx)->getDb(opCtx, ns.dbName())) {

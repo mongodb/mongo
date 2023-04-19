@@ -32,7 +32,9 @@
 #include <memory>
 
 #include "mongo/base/status.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_operation_source.h"
+#include "mongo/db/ops/parsed_writes_common.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 
@@ -63,24 +65,15 @@ class ParsedDelete {
 
 public:
     /**
-     * Constructs a parsed delete for a regular delete which does not involve a time-series
-     * collection.
-     *
-     * The object pointed to by "request" must stay in scope for the life of the constructed
-     * ParsedDelete.
-     */
-    ParsedDelete(OperationContext* opCtx, const DeleteRequest* request)
-        : ParsedDelete(opCtx, request, boost::none) {}
-
-    /**
-     * Constructs a parsed delete which may involve a time-series collection.
+     * Constructs a parsed delete for a regular delete or a delete on a timeseries collection.
      *
      * The object pointed to by "request" must stay in scope for the life of the constructed
      * ParsedDelete.
      */
     ParsedDelete(OperationContext* opCtx,
                  const DeleteRequest* request,
-                 boost::optional<TimeseriesOptions> timeseriesOptions);
+                 const CollectionPtr& collection,
+                 bool isTimeseriesDelete = false);
 
     /**
      * Parses the delete request to a canonical query. On success, the parsed delete can be
@@ -131,15 +124,14 @@ public:
         return _expCtx;
     }
 
-    void setCollator(std::unique_ptr<CollatorInterface> collator);
-
     /**
      * Returns the non-modifiable residual MatchExpression.
      *
      * Note: see _timeseriesDeleteDetails._residualExpr for more details.
      */
     const MatchExpression* getResidualExpr() const {
-        return _timeseriesDeleteDetails ? _timeseriesDeleteDetails->_residualExpr.get() : nullptr;
+        return _timeseriesDeleteQueryExprs ? _timeseriesDeleteQueryExprs->_residualExpr.get()
+                                           : nullptr;
     }
 
     /**
@@ -148,8 +140,8 @@ public:
      * Note: see _timeseriesDeleteDetails._bucketMatchExpr for more details.
      */
     std::unique_ptr<MatchExpression> releaseResidualExpr() {
-        return _timeseriesDeleteDetails ? std::move(_timeseriesDeleteDetails->_residualExpr)
-                                        : nullptr;
+        return _timeseriesDeleteQueryExprs ? std::move(_timeseriesDeleteQueryExprs->_residualExpr)
+                                           : nullptr;
     }
 
     /**
@@ -170,25 +162,10 @@ private:
 
     boost::intrusive_ptr<ExpressionContext> _expCtx;
 
-    Status splitOutBucketMatchExpression(const ExtensionsCallback& extensionsCallback);
-
-    // Time-series deletes take some special handling to make sure we delete the buckets collection,
-    // but interact with the documents as if they were unpacked.
-    struct TimeseriesDeleteDetails {
-        TimeseriesDeleteDetails(const TimeseriesOptions& timeseriesOptions)
-            : _timeseriesOptions(timeseriesOptions) {}
-
-        TimeseriesOptions _timeseriesOptions;
-
-        // The bucket-level match expressions.
-        std::unique_ptr<MatchExpression> _bucketExpr = nullptr;
-
-        // The residual expression after splitting out metaField-dependent splittable match
-        // expressions.
-        std::unique_ptr<MatchExpression> _residualExpr = nullptr;
-    };
-
-    std::unique_ptr<TimeseriesDeleteDetails> _timeseriesDeleteDetails = nullptr;
+    const CollectionPtr& _collection;
+    // Contains the bucket-level expression and the residual expression and the bucket-level
+    // expresion should be pushed down to the bucket collection.
+    std::unique_ptr<TimeseriesWritesQueryExprs> _timeseriesDeleteQueryExprs;
 };
 
 }  // namespace mongo

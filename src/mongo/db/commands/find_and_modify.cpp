@@ -362,15 +362,15 @@ void CmdFindAndModify::Invocation::explain(OperationContext* opCtx,
         const bool isExplain = true;
         makeDeleteRequest(opCtx, request, isExplain, &deleteRequest);
 
-        ParsedDelete parsedDelete(opCtx, &deleteRequest);
-        uassertStatusOK(parsedDelete.parseRequest());
-
         // Explain calls of the findAndModify command are read-only, but we take write
         // locks so that the timing information is more accurate.
         AutoGetCollection collection(opCtx, nss, MODE_IX);
         uassert(ErrorCodes::NamespaceNotFound,
                 str::stream() << "database " << dbName.toStringForErrorMsg() << " does not exist",
                 collection.getDb());
+
+        ParsedDelete parsedDelete(opCtx, &deleteRequest, collection.getCollection());
+        uassertStatusOK(parsedDelete.parseRequest());
 
         CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss)
             ->checkShardVersionOrThrow(opCtx);

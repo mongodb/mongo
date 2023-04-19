@@ -56,7 +56,8 @@ env.Library(
 env.Library(
     target="bucket_unpacker",
     source=[
-        "bucket_unpacker.cpp",
+        "timeseries/bucket_spec.cpp",
+        "timeseries/bucket_unpacker.cpp",
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/query_expressions",

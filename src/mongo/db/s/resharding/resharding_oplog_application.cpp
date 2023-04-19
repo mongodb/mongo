@@ -521,7 +521,7 @@ void ReshardingOplogApplicationRules::_applyDelete_inlock(
             request.setMulti(false);
             request.setReturnDeleted(true);
 
-            ParsedDelete parsedDelete(opCtx, &request);
+            ParsedDelete parsedDelete(opCtx, &request, autoCollStash.getCollection());
             uassertStatusOK(parsedDelete.parseRequest());
 
             auto exec = uassertStatusOK(getExecutorDelete(&CurOp::get(opCtx)->debug(),

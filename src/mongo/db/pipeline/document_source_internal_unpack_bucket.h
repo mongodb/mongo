@@ -32,10 +32,10 @@
 #include <set>
 #include <vector>
 
-#include "mongo/db/exec/bucket_unpacker.h"
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/timeseries/bucket_unpacker.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_match.h"
 

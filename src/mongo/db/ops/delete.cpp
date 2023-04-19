@@ -52,7 +52,7 @@ long long deleteObjects(OperationContext* opCtx,
     request.setGod(god);
     request.setFromMigrate(fromMigrate);
 
-    ParsedDelete parsedDelete(opCtx, &request);
+    ParsedDelete parsedDelete(opCtx, &request, collection);
     uassertStatusOK(parsedDelete.parseRequest());
 
     auto exec = uassertStatusOK(getExecutorDelete(
@@ -64,7 +64,7 @@ long long deleteObjects(OperationContext* opCtx,
 DeleteResult deleteObject(OperationContext* opCtx,
                           const CollectionPtr& collection,
                           const DeleteRequest& request) {
-    ParsedDelete parsedDelete(opCtx, &request);
+    ParsedDelete parsedDelete(opCtx, &request, collection);
     uassertStatusOK(parsedDelete.parseRequest());
 
     auto exec = uassertStatusOK(getExecutorDelete(

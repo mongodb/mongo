@@ -29,9 +29,13 @@
 
 #pragma once
 
+#include <memory>
+
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/ops/parsed_writes_common.h"
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
 
 namespace mongo::timeseries {
 /**
@@ -65,9 +69,11 @@ BSONObj getBucketLevelPredicateForRouting(const BSONObj& originalQuery,
                                           boost::optional<StringData> metaField);
 
 /**
- * Get the bucket-level predicate for a time-series delete that filters out any buckets with
- * 'control.closed' set.
+ * Returns the match expressions for the bucket and residual filters for a timeseries write
+ * operation.
  */
-std::unique_ptr<MatchExpression> getBucketLevelPredicateForWrites(
-    std::unique_ptr<MatchExpression> bucketExpr = nullptr);
+TimeseriesWritesQueryExprs getMatchExprsForWrites(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const TimeseriesOptions& tsOptions,
+    const BSONObj& writeQuery);
 }  // namespace mongo::timeseries

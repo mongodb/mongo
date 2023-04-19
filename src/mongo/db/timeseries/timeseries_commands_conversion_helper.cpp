@@ -165,7 +165,6 @@ CreateIndexesCommand makeTimeseriesCreateIndexesCommand(OperationContext* opCtx,
                 auto [hasMetricPred, bucketPred] =
                     BucketSpec::pushdownPredicate(expCtx,
                                                   options,
-                                                  collationMatchesDefault,
                                                   pred,
                                                   haveComputedMetaField,
                                                   includeMetaField,

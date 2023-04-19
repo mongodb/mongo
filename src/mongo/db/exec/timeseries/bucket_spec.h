@@ -29,15 +29,17 @@
 
 #pragma once
 
-
-#include <algorithm>
+#include <boost/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <memory>
 #include <set>
+#include <string>
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/document_internal.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/timeseries/timeseries_constants.h"
 
 namespace mongo {
 /**
@@ -159,9 +161,9 @@ public:
      * will match if all of the event field matches. For example, the event level predicate {a:
      * {$gt: 5}} will generate the loose predicate {control.max.a: {$_internalExprGt: 5}}, and the
      * tight predicate {control.min.a: {$_internalExprGt: 5}}. The loose predicate will be added
-     * before the
-     * $_internalUnpackBucket stage to filter out buckets with no match. The tight predicate will
-     * be used to evaluate predicate on bucket level to avoid unnecessary event level evaluation.
+     * before the $_internalUnpackBucket stage to filter out buckets with no match. The tight
+     * predicate will be used to evaluate predicate on bucket level to avoid unnecessary event level
+     * evaluation.
      *
      * If the original predicate is on the bucket's timeField we may also create a new loose
      * predicate on the '_id' field to assist in index utilization. For example, the predicate
@@ -181,7 +183,6 @@ public:
         const MatchExpression* matchExpr,
         const BucketSpec& bucketSpec,
         int bucketMaxSpanSeconds,
-        ExpressionContext::CollationMatchesDefault collationMatchesDefault,
         const boost::intrusive_ptr<ExpressionContext>& pExpCtx,
         bool haveComputedMetaField,
         bool includeMetaField,
@@ -213,7 +214,30 @@ public:
     static std::pair<bool, BSONObj> pushdownPredicate(
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const TimeseriesOptions& tsOptions,
-        ExpressionContext::CollationMatchesDefault collationMatchesDefault,
+        const BSONObj& predicate,
+        bool haveComputedMetaField,
+        bool includeMetaField,
+        bool assumeNoMixedSchemaData,
+        IneligiblePredicatePolicy policy);
+
+    // Used as the return value of getPushdownPredicates().
+    struct SplitPredicates {
+        std::unique_ptr<MatchExpression> metaOnlyExpr;
+        std::unique_ptr<MatchExpression> bucketMetricExpr;
+        std::unique_ptr<MatchExpression> residualExpr;
+    };
+
+    /**
+     * Decomposes a predicate into three parts: a predicate on the meta field, a predicate on the
+     * bucket metric field(s), and a residual predicate. The predicate on the meta field is a
+     * predicate that can be evaluated on the meta field. The predicate on the bucket metric
+     * field(s) is a predicate that can be evaluated on the bucket metric field(s) like
+     * control.min|max.[field]. The residual predicate is a predicate that cannot be evaluated on
+     * either the meta field or the bucket metric field and exactly matches desired measurements.
+     */
+    static SplitPredicates getPushdownPredicates(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const TimeseriesOptions& tsOptions,
         const BSONObj& predicate,
         bool haveComputedMetaField,
         bool includeMetaField,
@@ -238,205 +262,6 @@ private:
     boost::optional<std::string> _metaField = boost::none;
     boost::optional<HashedFieldName> _metaFieldHashed = boost::none;
     bool _usesExtendedRange = false;
-};
-
-/**
- * BucketUnpacker will unpack bucket fields for metadata and the provided fields.
- */
-class BucketUnpacker {
-public:
-    /**
-     * Returns the number of measurements in the bucket in O(1) time.
-     */
-    static int computeMeasurementCount(const BSONObj& bucket, StringData timeField);
-
-    // Set of field names reserved for time-series buckets.
-    static const std::set<StringData> reservedBucketFieldNames;
-
-    BucketUnpacker();
-    BucketUnpacker(BucketSpec spec);
-    BucketUnpacker(const BucketUnpacker& other) = delete;
-    BucketUnpacker(BucketUnpacker&& other);
-    ~BucketUnpacker();
-    BucketUnpacker& operator=(const BucketUnpacker& rhs) = delete;
-    BucketUnpacker& operator=(BucketUnpacker&& rhs);
-
-    /**
-     * This method will continue to materialize Documents until the bucket is exhausted. A
-     * precondition of this method is that 'hasNext()' must be true.
-     */
-    Document getNext();
-
-    /**
-     * Similar to the previous method, but return a BSON object instead.
-     */
-    BSONObj getNextBson();
-
-    /**
-     * This method will extract the j-th measurement from the bucket. A precondition of this method
-     * is that j >= 0 && j <= the number of measurements within the underlying bucket.
-     */
-    Document extractSingleMeasurement(int j);
-
-    /**
-     * Returns true if there is more data to fetch, is the precondition for 'getNext'.
-     */
-    bool hasNext() const {
-        return _hasNext;
-    }
-
-    /**
-     * Makes a copy of this BucketUnpacker that is detached from current bucket. The new copy needs
-     * to be reset to a new bucket object to perform unpacking.
-     */
-    BucketUnpacker copy() const {
-        BucketUnpacker unpackerCopy;
-        unpackerCopy._spec = _spec;
-        unpackerCopy._includeMetaField = _includeMetaField;
-        unpackerCopy._includeTimeField = _includeTimeField;
-        return unpackerCopy;
-    }
-
-    /**
-     * This resets the unpacker to prepare to unpack a new bucket described by the given document.
-     */
-    void reset(BSONObj&& bucket, bool bucketMatchedQuery = false);
-
-    BucketSpec::Behavior behavior() const {
-        return _spec.behavior();
-    }
-
-    const BucketSpec& bucketSpec() const {
-        return _spec;
-    }
-
-    const BSONObj& bucket() const {
-        return _bucket;
-    }
-
-    bool bucketMatchedQuery() const {
-        return _bucketMatchedQuery;
-    }
-
-    bool includeMetaField() const {
-        return _includeMetaField;
-    }
-
-    bool includeTimeField() const {
-        return _includeTimeField;
-    }
-
-    int32_t numberOfMeasurements() const {
-        return _numberOfMeasurements;
-    }
-
-    bool includeMinTimeAsMetadata() const {
-        return _includeMinTimeAsMetadata;
-    }
-
-    bool includeMaxTimeAsMetadata() const {
-        return _includeMaxTimeAsMetadata;
-    }
-
-    const std::string& getTimeField() const {
-        return _spec.timeField();
-    }
-
-    const boost::optional<std::string>& getMetaField() const {
-        return _spec.metaField();
-    }
-
-    std::string getMinField(StringData field) const {
-        return std::string{timeseries::kControlMinFieldNamePrefix} + field;
-    }
-
-    std::string getMaxField(StringData field) const {
-        return std::string{timeseries::kControlMaxFieldNamePrefix} + field;
-    }
-
-    bool isClosedBucket() const {
-        return _closedBucket;
-    }
-
-    void setBucketSpec(BucketSpec&& bucketSpec);
-    void setIncludeMinTimeAsMetadata();
-    void setIncludeMaxTimeAsMetadata();
-
-    // Add computed meta projection names to the bucket specification.
-    void addComputedMetaProjFields(const std::vector<StringData>& computedFieldNames);
-
-    // Fill _spec.unpackFieldsToIncludeExclude with final list of fields to include/exclude during
-    // unpacking. Only calculates the list the first time it is called.
-    const std::set<std::string>& fieldsToIncludeExcludeDuringUnpack();
-
-    class UnpackingImpl;
-
-private:
-    // Determines if timestamp values should be included in the materialized measurements.
-    void determineIncludeTimeField();
-
-    // Removes metaField from the field set and determines whether metaField should be
-    // included in the materialized measurements.
-    void eraseMetaFromFieldSetAndDetermineIncludeMeta();
-
-    // Erase computed meta projection fields if they are present in the exclusion field set.
-    void eraseExcludedComputedMetaProjFields();
-
-    BucketSpec _spec;
-
-    std::unique_ptr<UnpackingImpl> _unpackingImpl;
-
-    bool _hasNext = false;
-
-    // A flag used to mark that the entire bucket matches the following $match predicate.
-    bool _bucketMatchedQuery = false;
-
-    // A flag used to mark that the timestamp value should be materialized in measurements.
-    bool _includeTimeField{false};
-
-    // A flag used to mark that a bucket's metadata value should be materialized in measurements.
-    bool _includeMetaField{false};
-
-    // A flag used to mark that a bucket's min time should be materialized as metadata.
-    bool _includeMinTimeAsMetadata{false};
-
-    // A flag used to mark that a bucket's max time should be materialized as metadata.
-    bool _includeMaxTimeAsMetadata{false};
-
-    // The bucket being unpacked.
-    BSONObj _bucket;
-
-    // Since the metadata value is the same across all materialized measurements we can cache the
-    // metadata Value in the reset phase and use it to materialize the metadata in each
-    // measurement.
-    Value _metaValue;
-
-    BSONElement _metaBSONElem;
-
-    // Since the bucket min time is the same across all materialized measurements, we can cache the
-    // value in the reset phase and use it to materialize as a metadata field in each measurement
-    // if required by the pipeline.
-    boost::optional<Date_t> _minTime;
-
-    // Since the bucket max time is the same across all materialized measurements, we can cache the
-    // value in the reset phase and use it to materialize as a metadata field in each measurement
-    // if required by the pipeline.
-    boost::optional<Date_t> _maxTime;
-
-    // Flag indicating whether this bucket is closed, as determined by the presence of the
-    // 'control.closed' field.
-    bool _closedBucket;
-
-    // Map <name, BSONElement> for the computed meta field projections. Updated for
-    // every bucket upon reset().
-    stdx::unordered_map<std::string, BSONElement> _computedMetaProjections;
-
-    // The number of measurements in the bucket.
-    int32_t _numberOfMeasurements = 0;
-
-    // Final list of fields to include/exclude during unpacking. This is computed once during the
-    // first doGetNext call so we don't have to recalculate every time we reach a new bucket.
-    boost::optional<std::set<std::string>> _unpackFieldsToIncludeExclude = boost::none;
 };
 
 /**

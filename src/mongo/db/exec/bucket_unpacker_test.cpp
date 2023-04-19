@@ -27,13 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/bson/json.h"
 #include "mongo/bson/util/bsoncolumn.h"
 #include "mongo/bson/util/bsoncolumnbuilder.h"
-#include "mongo/db/exec/bucket_unpacker.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
+#include "mongo/db/exec/timeseries/bucket_unpacker.h"
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/unittest/unittest.h"
 

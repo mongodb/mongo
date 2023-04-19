@@ -924,7 +924,7 @@ Status runAggregate(OperationContext* opCtx,
             // If the user specified an explicit collation, adopt it; otherwise, use the simple
             // collation. We do not inherit the collection's default collation or UUID, since
             // the stream may be resuming from a point before the current UUID existed.
-            auto [collator, match] = PipelineD::resolveCollator(
+            auto [collator, match] = resolveCollator(
                 opCtx, request.getCollation().get_value_or(BSONObj()), CollectionPtr());
             collatorToUse.emplace(std::move(collator));
             collatorToUseMatchesDefault = match;
@@ -949,7 +949,7 @@ Status runAggregate(OperationContext* opCtx,
                                  Top::LockType::NotLocked,
                                  AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
                                  0);
-            auto [collator, match] = PipelineD::resolveCollator(
+            auto [collator, match] = resolveCollator(
                 opCtx, request.getCollation().get_value_or(BSONObj()), CollectionPtr());
             collatorToUse.emplace(std::move(collator));
             collatorToUseMatchesDefault = match;
@@ -961,10 +961,9 @@ Status runAggregate(OperationContext* opCtx,
             // This is a regular aggregation. Lock the collection or view.
             initContext(auto_get_collection::ViewMode::kViewsPermitted);
             registerTelemetry();
-            auto [collator, match] =
-                PipelineD::resolveCollator(opCtx,
-                                           request.getCollation().get_value_or(BSONObj()),
-                                           collections.getMainCollection());
+            auto [collator, match] = resolveCollator(opCtx,
+                                                     request.getCollation().get_value_or(BSONObj()),
+                                                     collections.getMainCollection());
             collatorToUse.emplace(std::move(collator));
             collatorToUseMatchesDefault = match;
             if (collections.hasMainCollection()) {

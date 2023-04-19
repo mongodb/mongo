@@ -29,12 +29,11 @@
 
 #pragma once
 
-#include "mongo/db/exec/bucket_unpacker.h"
-#include "mongo/db/query/query_planner_params.h"
 #include <boost/intrusive_ptr.hpp>
 #include <memory>
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/timeseries/bucket_unpacker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/dependencies.h"
@@ -42,10 +41,10 @@
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/pipeline/document_source_sample.h"
-#include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/query_planner.h"
+#include "mongo/db/query/query_planner_params.h"
 
 namespace mongo {
 class Collection;
@@ -136,34 +135,6 @@ public:
      * object otherwise.
      */
     static BSONObj getPostBatchResumeToken(const Pipeline* pipeline);
-
-    /**
-     * Resolves the collator to either the user-specified collation or, if none was specified, to
-     * the collection-default collation.
-     */
-    static std::pair<std::unique_ptr<CollatorInterface>, ExpressionContext::CollationMatchesDefault>
-    resolveCollator(OperationContext* opCtx,
-                    BSONObj userCollation,
-                    const CollectionPtr& collection) {
-        if (!collection || !collection->getDefaultCollator()) {
-            return {userCollation.isEmpty()
-                        ? nullptr
-                        : uassertStatusOK(CollatorFactoryInterface::get(opCtx->getServiceContext())
-                                              ->makeFromBSON(userCollation)),
-                    ExpressionContext::CollationMatchesDefault::kNoDefault};
-        }
-        if (userCollation.isEmpty()) {
-            return {collection->getDefaultCollator()->clone(),
-                    ExpressionContext::CollationMatchesDefault::kYes};
-        }
-        auto userCollator = uassertStatusOK(
-            CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(userCollation));
-        return {
-            std::move(userCollator),
-            CollatorInterface::collatorsMatch(collection->getDefaultCollator(), userCollator.get())
-                ? ExpressionContext::CollationMatchesDefault::kYes
-                : ExpressionContext::CollationMatchesDefault::kNo};
-    }
 
 private:
     PipelineD();  // does not exist:  prevent instantiation
@@ -262,9 +233,8 @@ private:
 
     /*
      * Takes a leaf plan stage and a sort pattern and returns a pair if they support the Bucket
-Unpacking with Sort Optimization.
-     * The pair includes whether the index order and sort order agree with each other as its first
-     * member and the order of the index as the second parameter.
+     * Unpacking with Sort Optimization. The pair includes whether the index order and sort order
+     * agree with each other as its first member and the order of the index as the second parameter.
      *
      * Note that the index scan order is different from the index order.
      */

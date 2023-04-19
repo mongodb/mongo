@@ -36,7 +36,6 @@
 #include "mongo/base/parse_number.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/exec/bucket_unpacker.h"
 #include "mongo/db/exec/cached_plan.h"
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/count.h"
@@ -53,6 +52,7 @@
 #include "mongo/db/exec/shard_filter.h"
 #include "mongo/db/exec/sort_key_generator.h"
 #include "mongo/db/exec/subplan.h"
+#include "mongo/db/exec/timeseries/bucket_unpacker.h"
 #include "mongo/db/exec/timeseries_modify.h"
 #include "mongo/db/exec/unpack_timeseries_bucket.h"
 #include "mongo/db/exec/upsert_stage.h"
@@ -1752,13 +1752,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
 
     if (collectionPtr && collectionPtr->isCapped()) {
         expCtx->setIsCappedDelete();
-    }
-
-    // If the parsed delete does not have a user-specified collation, set it from the collection
-    // default.
-    if (collectionPtr && parsedDelete->getRequest()->getCollation().isEmpty() &&
-        collectionPtr->getDefaultCollator()) {
-        parsedDelete->setCollator(collectionPtr->getDefaultCollator()->clone());
     }
 
     if (collectionPtr && collectionPtr->isCapped() && opCtx->inMultiDocumentTransaction()) {

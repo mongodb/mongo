@@ -724,7 +724,6 @@ BucketSpec::BucketPredicate DocumentSourceInternalUnpackBucket::createPredicates
         matchExpr,
         _bucketUnpacker.bucketSpec(),
         _bucketMaxSpanSeconds,
-        pExpCtx->collationMatchesDefault,
         pExpCtx,
         haveComputedMetaField(),
         _bucketUnpacker.includeMetaField(),

@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include "mongo/db/exec/bucket_unpacker.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/shard_filterer.h"
+#include "mongo/db/exec/timeseries/bucket_unpacker.h"
 
 namespace mongo {
 /**
