@@ -46,6 +46,7 @@ class CollectionPtr;
 class IndexDescriptor;
 class OperationContext;
 class PlanStage;
+class ScopedCollectionAcquisition;
 class WorkingSet;
 struct UpdateStageParams;
 
@@ -178,7 +179,7 @@ public:
      */
     static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> updateWithIdHack(
         OperationContext* opCtx,
-        const CollectionPtr* collection,
+        stdx::variant<const CollectionPtr*, const ScopedCollectionAcquisition*> collection,
         const UpdateStageParams& params,
         const IndexDescriptor* descriptor,
         const BSONObj& key,

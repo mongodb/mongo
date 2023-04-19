@@ -1965,11 +1965,18 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpdate(
     OpDebug* opDebug,
-    const CollectionPtr* coll,
+    stdx::variant<const CollectionPtr*, const ScopedCollectionAcquisition*> coll,
     ParsedUpdate* parsedUpdate,
     boost::optional<ExplainOptions::Verbosity> verbosity,
     UpdateStageParams::DocumentCounter&& documentCounter) {
-    const auto& collection = *coll;
+    const auto& collectionPtr =
+        *stdx::visit(OverloadedVisitor{
+                         [](const CollectionPtr* collectionPtr) { return collectionPtr; },
+                         [](const ScopedCollectionAcquisition* collectionAcquisition) {
+                             return &collectionAcquisition->getCollectionPtr();
+                         },
+                     },
+                     coll);
 
     auto expCtx = parsedUpdate->expCtx();
     OperationContext* opCtx = expCtx->opCtx;
@@ -1988,15 +1995,15 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
     // If there is no collection and this is an upsert, callers are supposed to create
     // the collection prior to calling this method. Explain, however, will never do
     // collection or database creation.
-    if (!collection && request->isUpsert()) {
+    if (!collectionPtr && request->isUpsert()) {
         invariant(request->explain());
     }
 
     // If the parsed update does not have a user-specified collation, set it from the collection
     // default.
-    if (collection && parsedUpdate->getRequest()->getCollation().isEmpty() &&
-        collection->getDefaultCollator()) {
-        parsedUpdate->setCollator(collection->getDefaultCollator()->clone());
+    if (collectionPtr && parsedUpdate->getRequest()->getCollation().isEmpty() &&
+        collectionPtr->getDefaultCollator()) {
+        parsedUpdate->setCollator(collectionPtr->getDefaultCollator()->clone());
     }
 
     // If this is a user-issued update, then we want to return an error: you cannot perform
@@ -2020,7 +2027,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
     // should have already enforced upstream that in this case either the upsert flag is false, or
     // we are an explain. If the collection doesn't exist, we're not an explain, and the upsert flag
     // is true, we expect the caller to have created the collection already.
-    if (!collection) {
+    if (!collectionPtr) {
         LOGV2_DEBUG(20929,
                     2,
                     "Collection does not exist. Using EOF stage",
@@ -2037,7 +2044,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
 
     // Pass index information to the update driver, so that it can determine for us whether the
     // update affects indices.
-    const auto& updateIndexData = CollectionQueryInfo::get(collection).getIndexKeys(opCtx);
+    const auto& updateIndexData = CollectionQueryInfo::get(collectionPtr).getIndexKeys(opCtx);
     driver->refreshIndexKeys(&updateIndexData);
 
     if (!parsedUpdate->hasParsedQuery()) {
@@ -2048,10 +2055,11 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
             // to create a CanonicalQuery.
             const BSONObj& unparsedQuery = request->getQuery();
 
-            const IndexDescriptor* descriptor = collection->getIndexCatalog()->findIdIndex(opCtx);
+            const IndexDescriptor* descriptor =
+                collectionPtr->getIndexCatalog()->findIdIndex(opCtx);
 
             const bool hasCollectionDefaultCollation = CollatorInterface::collatorsMatch(
-                expCtx->getCollator(), collection->getDefaultCollator());
+                expCtx->getCollator(), collectionPtr->getDefaultCollator());
 
             if (descriptor && CanonicalQuery::isSimpleIdQuery(unparsedQuery) &&
                 request->getProj().isEmpty() && hasCollectionDefaultCollation) {
@@ -2060,7 +2068,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
                 // Working set 'ws' is discarded. InternalPlanner::updateWithIdHack() makes its own
                 // WorkingSet.
                 return InternalPlanner::updateWithIdHack(opCtx,
-                                                         &collection,
+                                                         coll,
                                                          updateStageParams,
                                                          descriptor,
                                                          unparsedQuery["_id"].wrap(),
@@ -2081,7 +2089,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
 
     uassert(ErrorCodes::InternalErrorNotSupported,
             "update command is not eligible for bonsai",
-            !isEligibleForBonsai(*cq, opCtx, collection));
+            !isEligibleForBonsai(*cq, opCtx, collectionPtr));
 
     std::unique_ptr<projection_ast::Projection> projection;
     if (!request->getProj().isEmpty()) {
@@ -2104,7 +2112,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
 
     const size_t defaultPlannerOptions = QueryPlannerParams::DEFAULT;
     ClassicPrepareExecutionHelper helper{
-        opCtx, collection, ws.get(), cq.get(), nullptr, defaultPlannerOptions};
+        opCtx, collectionPtr, ws.get(), cq.get(), nullptr, defaultPlannerOptions};
     auto executionResult = helper.prepare();
 
     if (!executionResult.isOK()) {
@@ -2115,11 +2123,12 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
 
     updateStageParams.canonicalQuery = cq.get();
     const bool isUpsert = updateStageParams.request->isUpsert();
-    root = (isUpsert
-                ? std::make_unique<UpsertStage>(
-                      cq->getExpCtxRaw(), updateStageParams, ws.get(), collection, root.release())
-                : std::make_unique<UpdateStage>(
-                      cq->getExpCtxRaw(), updateStageParams, ws.get(), collection, root.release()));
+    root =
+        (isUpsert
+             ? std::make_unique<UpsertStage>(
+                   cq->getExpCtxRaw(), updateStageParams, ws.get(), collectionPtr, root.release())
+             : std::make_unique<UpdateStage>(
+                   cq->getExpCtxRaw(), updateStageParams, ws.get(), collectionPtr, root.release()));
 
     if (projection) {
         root = std::make_unique<ProjectionStageDefault>(
@@ -2131,7 +2140,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
     return plan_executor_factory::make(std::move(cq),
                                        std::move(ws),
                                        std::move(root),
-                                       &collection,
+                                       coll,
                                        policy,
                                        defaultPlannerOptions,
                                        NamespaceString(),

@@ -65,6 +65,7 @@
 #include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
@@ -578,15 +579,17 @@ public:
 
             // Explains of write commands are read-only, but we take write locks so that timing
             // info is more accurate.
-            AutoGetCollection collection(opCtx, request().getNamespace(), MODE_IX);
+            const auto collection = acquireCollection(
+                opCtx,
+                CollectionAcquisitionRequest::fromOpCtx(
+                    opCtx, request().getNamespace(), AcquisitionPrerequisites::kWrite),
+                MODE_IX);
 
-            auto exec = uassertStatusOK(getExecutorUpdate(&CurOp::get(opCtx)->debug(),
-                                                          &collection.getCollection(),
-                                                          &parsedUpdate,
-                                                          verbosity));
+            auto exec = uassertStatusOK(getExecutorUpdate(
+                &CurOp::get(opCtx)->debug(), &collection, &parsedUpdate, verbosity));
             auto bodyBuilder = result->getBodyBuilder();
             Explain::explainStages(exec.get(),
-                                   collection.getCollection(),
+                                   collection.getCollectionPtr(),
                                    verbosity,
                                    BSONObj(),
                                    _commandObj,

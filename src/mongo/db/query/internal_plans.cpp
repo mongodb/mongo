@@ -441,34 +441,41 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::deleteWith
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::updateWithIdHack(
     OperationContext* opCtx,
-    const CollectionPtr* coll,
+    stdx::variant<const CollectionPtr*, const ScopedCollectionAcquisition*> coll,
     const UpdateStageParams& params,
     const IndexDescriptor* descriptor,
     const BSONObj& key,
     PlanYieldPolicy::YieldPolicy yieldPolicy) {
-    const auto& collection = *coll;
-    invariant(collection);
+    const auto& collectionPtr =
+        *stdx::visit(OverloadedVisitor{
+                         [](const CollectionPtr* collectionPtr) { return collectionPtr; },
+                         [](const ScopedCollectionAcquisition* collectionAcquisition) {
+                             return &collectionAcquisition->getCollectionPtr();
+                         },
+                     },
+                     coll);
+    invariant(collectionPtr);
     auto ws = std::make_unique<WorkingSet>();
 
     auto expCtx = make_intrusive<ExpressionContext>(
-        opCtx, std::unique_ptr<CollatorInterface>(nullptr), collection->ns());
+        opCtx, std::unique_ptr<CollatorInterface>(nullptr), collectionPtr->ns());
 
     auto idHackStage =
-        std::make_unique<IDHackStage>(expCtx.get(), key, ws.get(), collection, descriptor);
+        std::make_unique<IDHackStage>(expCtx.get(), key, ws.get(), collectionPtr, descriptor);
 
     const bool isUpsert = params.request->isUpsert();
-    auto root = (isUpsert ? std::make_unique<UpsertStage>(
-                                expCtx.get(), params, ws.get(), collection, idHackStage.release())
-                          : std::make_unique<UpdateStage>(
-                                expCtx.get(), params, ws.get(), collection, idHackStage.release()));
+    auto root =
+        (isUpsert ? std::make_unique<UpsertStage>(
+                        expCtx.get(), params, ws.get(), collectionPtr, idHackStage.release())
+                  : std::make_unique<UpdateStage>(
+                        expCtx.get(), params, ws.get(), collectionPtr, idHackStage.release()));
 
     auto executor = plan_executor_factory::make(expCtx,
                                                 std::move(ws),
                                                 std::move(root),
-                                                &collection,
+                                                coll,
                                                 yieldPolicy,
-                                                false /* whether owned BSON must be returned */
-    );
+                                                false /* whether owned BSON must be returned */);
     invariant(executor.getStatus());
     return std::move(executor.getValue());
 }

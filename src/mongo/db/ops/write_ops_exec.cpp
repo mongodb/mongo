@@ -1099,38 +1099,41 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
         uasserted(ErrorCodes::InternalError, "failAllUpdates failpoint active!");
     }
 
-    boost::optional<AutoGetCollection> collection;
-    while (true) {
-        collection.emplace(opCtx,
-                           ns,
-                           fixLockModeForSystemDotViewsChanges(ns, MODE_IX),
-                           AutoGetCollection::Options{}.expectedUUID(opCollectionUUID));
-        if (*collection) {
-            break;
+    const ScopedCollectionAcquisition collection = [&]() {
+        const auto acquisitionRequest = CollectionAcquisitionRequest::fromOpCtx(
+            opCtx, ns, AcquisitionPrerequisites::kWrite, opCollectionUUID);
+        while (true) {
+            {
+                auto acquisition = acquireCollection(
+                    opCtx, acquisitionRequest, fixLockModeForSystemDotViewsChanges(ns, MODE_IX));
+                if (acquisition.exists()) {
+                    return acquisition;
+                }
+
+                if (source == OperationSource::kTimeseriesInsert ||
+                    source == OperationSource::kTimeseriesUpdate) {
+                    assertTimeseriesBucketsCollectionNotFound(ns);
+                }
+
+                // If this is an upsert, which is an insert, we must have a collection.
+                // An update on a non-existent collection is okay and handled later.
+                if (!updateRequest->isUpsert()) {
+                    // Inexistent collection.
+                    return acquisition;
+                }
+            }
+            makeCollection(opCtx, ns);
         }
-
-        if (source == OperationSource::kTimeseriesInsert ||
-            source == OperationSource::kTimeseriesUpdate) {
-            assertTimeseriesBucketsCollectionNotFound(ns);
-        }
-
-        // If this is an upsert, which is an insert, we must have a collection.
-        // An update on a non-existent collection is okay and handled later.
-        if (!updateRequest->isUpsert())
-            break;
-
-        collection.reset();  // unlock.
-        makeCollection(opCtx, ns);
-    }
+    }();
 
     UpdateStageParams::DocumentCounter documentCounter = nullptr;
 
     if (source == OperationSource::kTimeseriesUpdate) {
         uassert(ErrorCodes::NamespaceNotFound,
                 "Could not find time-series buckets collection for update",
-                collection);
+                collection.getCollectionPtr());
 
-        auto timeseriesOptions = collection->getCollection()->getTimeseriesOptions();
+        auto timeseriesOptions = collection.getCollectionPtr()->getTimeseriesOptions();
         uassert(ErrorCodes::InvalidOptions,
                 "Time-series buckets collection is missing time-series options",
                 timeseriesOptions);
@@ -1164,7 +1167,7 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
             timeseries::numMeasurementsForBucketCounter(timeseriesOptions->getTimeField());
     }
 
-    if (const auto& coll = collection->getCollection()) {
+    if (const auto& coll = collection.getCollectionPtr()) {
         // Transactions are not allowed to operate on capped collections.
         uassertStatusOK(checkIfTransactionOnCappedColl(opCtx, coll));
     }
@@ -1178,19 +1181,18 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
 
     auto& curOp = *CurOp::get(opCtx);
 
-    if (collection->getDb()) {
+    if (DatabaseHolder::get(opCtx)->getDb(opCtx, ns.dbName())) {
         curOp.raiseDbProfileLevel(
             CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(ns.dbName()));
     }
 
     assertCanWrite_inlock(opCtx, ns);
 
-    auto exec = uassertStatusOK(
-        getExecutorUpdate(&curOp.debug(),
-                          collection ? &collection->getCollection() : &CollectionPtr::null,
-                          &parsedUpdate,
-                          boost::none /* verbosity */,
-                          std::move(documentCounter)));
+    auto exec = uassertStatusOK(getExecutorUpdate(&curOp.debug(),
+                                                  &collection,
+                                                  &parsedUpdate,
+                                                  boost::none /* verbosity */,
+                                                  std::move(documentCounter)));
 
     {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
@@ -1202,7 +1204,7 @@ static SingleWriteResult performSingleUpdateOp(OperationContext* opCtx,
     PlanSummaryStats summary;
     auto&& explainer = exec->getPlanExplainer();
     explainer.getSummaryStats(&summary);
-    if (const auto& coll = collection->getCollection()) {
+    if (const auto& coll = collection.getCollectionPtr()) {
         CollectionQueryInfo::get(coll).notifyOfQuery(opCtx, coll, summary);
     }
 
