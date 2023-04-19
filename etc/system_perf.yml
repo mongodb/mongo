@@ -3142,7 +3142,7 @@ buildvariants:
       project_dir: *project_dir
       compile_variant: "-arm64"
     run_on:
-    - "rhel70-perf-single"
+    - "rhel70-perf-microbenchmarks"
     depends_on: *_compile_amazon_linux2_arm64
     tasks:
     - name: big_collection
@@ -3191,7 +3191,7 @@ buildvariants:
       project_dir: *project_dir
       compile_variant: "-arm64"
     run_on:
-    - "rhel70-perf-single"
+    - "rhel70-perf-microbenchmarks"
     depends_on: *_compile_amazon_linux2_arm64
     tasks:
     - name: genny_scale_InsertRemove
@@ -3284,7 +3284,7 @@ buildvariants:
       infrastructure_provisioning: workload_client_mongod_combined_intel.2023-01
       compile_variant: ""
     run_on:
-    - "rhel70-perf-single"
+    - "rhel70-perf-microbenchmarks"
     depends_on: *_compile_amazon2
     # yaml does not nicely merge arrays, so DO NOT ADD INDIVIDUAL TASKS HERE.
     # Add tasks to the anchor that this variant references
@@ -3300,7 +3300,7 @@ buildvariants:
       infrastructure_provisioning: workload_client_mongod_combined_intel.2023-01
       compile_variant: ""
     run_on:
-    - "rhel70-perf-single"
+    - "rhel70-perf-microbenchmarks"
     depends_on: *_compile_amazon2
     # yaml does not nicely merge arrays, so DO NOT ADD INDIVIDUAL TASKS HERE.
     # Add tasks to the anchor that this variant references
