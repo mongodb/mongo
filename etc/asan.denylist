@@ -1,0 +1,3 @@
+#SERVER-74122
+#third party should not be subject to sanitizer
+src:src/third_party/IntelRDFPMathLib20U1/TESTS/readtest.c
