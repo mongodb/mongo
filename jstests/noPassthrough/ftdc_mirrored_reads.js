@@ -16,26 +16,30 @@ const kCollName = "test";
 const kOperations = 100;
 
 const rst = new ReplSetTest({nodes: 3});
-rst.startSet();
+// Disable mirrored reads to make sure the initialization of oplog fetcher find commands from the
+// secondaries do not get included in the metrics that we are testing.
+rst.startSet({
+    setParameter: {
+        mirrorReads: tojsononeline({samplingRate: 0.0}),
+        logComponentVerbosity: tojson({command: 1})
+    }
+});
 rst.initiateWithHighElectionTimeout();
 const primary = rst.getPrimary();
 const secondaries = rst.getSecondaries();
 
-function getMirroredReadsStats(node) {
-    return node.getDB(kDbName).serverStatus({mirroredReads: 1}).mirroredReads;
-}
-
 function getDiagnosticData(node) {
     let db = node.getDB('admin');
-    const stats = verifyGetDiagnosticData(db).serverStatus;
+    const stats = verifyGetDiagnosticData(db, false /* logData */).serverStatus;
     assert(stats.hasOwnProperty('mirroredReads'));
+    jsTestLog(`Got diagnostic data for host: ${node}, ${tojson(stats.mirroredReads)}`);
     return stats.mirroredReads;
 }
 
 function getMirroredReadsProcessedAsSecondary() {
     let readsProcessed = 0;
     for (let i = 0; i < secondaries.length; i++) {
-        const stats = getMirroredReadsStats(secondaries[i]);
+        const stats = getDiagnosticData(secondaries[i]);
         readsProcessed += stats.processedAsSecondary;
     }
     return readsProcessed;
@@ -46,7 +50,7 @@ function waitForPrimaryToSendMirroredReads(expectedReadsSeen, expectedReadsSent)
         jsTestLog("Verifying reads were seen and sent by the maestro");
         jsTestLog("ExpectedReadsSent :" + expectedReadsSent +
                   ", ExpectedReadsSeen:" + expectedReadsSeen);
-        const afterPrimaryReadStats = getMirroredReadsStats(primary);
+        const afterPrimaryReadStats = getDiagnosticData(primary);
         const actualMirrorableReadsSeen = afterPrimaryReadStats.seen;
         const actualMirroredReadsSent = afterPrimaryReadStats.sent;
         jsTestLog("Primary metrics after reads: " + tojson(afterPrimaryReadStats));
@@ -58,13 +62,14 @@ function waitForPrimaryToSendMirroredReads(expectedReadsSeen, expectedReadsSent)
 function sendAndCheckReads(rst) {
     const primary = rst.getPrimary();
     // Initial metrics before sending kOperations number of finds.
-    const initialPrimaryReadStats = getMirroredReadsStats(primary);
+    const initialPrimaryReadStats = getDiagnosticData(primary);
     const mirrorableReadsSeenBefore = initialPrimaryReadStats.seen;
     const mirroredReadsSentBefore = initialPrimaryReadStats.sent;
 
+    primary.getDB(kDbName).getCollection(kCollName).insert({x: i});
     jsTestLog(`Sending ${kOperations} reads to primary`);
     for (var i = 0; i < kOperations; ++i) {
-        primary.getDB(kDbName).runCommand({find: kCollName, filter: {}});
+        assert.commandWorked(primary.getDB(kDbName).runCommand({find: kCollName, filter: {}}));
     }
 
     const expectedReadsSeen = mirrorableReadsSeenBefore + kOperations;
@@ -121,8 +126,8 @@ assert.commandWorked(primary.adminCommand({setParameter: 1, mirrorReads: {sampli
         let primaryResolvedAfterReads = getDiagnosticData(primary).resolved;
         jsTestLog(`Mirrored ${primaryResolvedAfterReads} reads so far`);
         for (let i = 0; i < secondaries.length; i++) {
-            jsTestLog("Secondary " + secondaries[i] +
-                      " metrics: " + tojson(getMirroredReadsStats(secondaries[i])));
+            // Print the secondary metrics for easier debugging.
+            getDiagnosticData(secondaries[i]);
         }
         // There are two secondaries, so `kOperations * 2` reads must be resolved.
         return primaryResolvedBeforeReads + kOperations * 2 <= primaryResolvedAfterReads;
