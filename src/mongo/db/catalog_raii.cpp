@@ -84,9 +84,7 @@ void verifyDbAndCollection(OperationContext* opCtx,
     }
 
     // Verify that we are using the latest instance if we intend to perform writes.
-    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-    if (feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe() &&
-        verifyWriteEligible) {
+    if (verifyWriteEligible) {
         auto latest = CollectionCatalog::latest(opCtx);
         if (!latest->containsCollection(opCtx, coll)) {
             throwWriteConflictException(str::stream() << "Unable to write to collection '"

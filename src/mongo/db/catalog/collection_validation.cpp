@@ -478,7 +478,7 @@ void _validateCatalogEntry(OperationContext* opCtx,
                             status.reason()));
         }
 
-        if (!indexEntry->isReady(opCtx)) {
+        if (!indexEntry->isReady()) {
             continue;
         }
 

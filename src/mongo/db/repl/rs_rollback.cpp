@@ -877,7 +877,7 @@ void dropIndex(OperationContext* opCtx,
     }
 
     auto entry = indexCatalog->getEntry(indexDescriptor);
-    if (entry->isReady(opCtx)) {
+    if (entry->isReady()) {
         auto status = indexCatalog->dropIndex(opCtx, collection, indexDescriptor);
         if (!status.isOK()) {
             LOGV2_ERROR(21738,

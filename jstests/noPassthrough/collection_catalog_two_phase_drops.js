@@ -12,7 +12,6 @@
 "use strict";
 
 load("jstests/disk/libs/wt_file_helper.js");
-load("jstests/libs/feature_flag_util.js");
 
 const rst = new ReplSetTest({
     nodes: 1,
@@ -31,12 +30,6 @@ const primary = rst.getPrimary();
 
 const dbName = "test";
 const db = primary.getDB(dbName);
-
-if (!FeatureFlagUtil.isEnabled(db, "PointInTimeCatalogLookups")) {
-    jsTestLog("Skipping as featureFlagPointInTimeCatalogLookups is not enabled");
-    rst.stopSet();
-    return;
-}
 
 // Pause the checkpoint thread to control the checkpoint timestamp.
 assert.commandWorked(

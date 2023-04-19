@@ -66,23 +66,14 @@ function runParallelCollectionCreateTest(command, explicitCreate) {
     session.commitTransaction();
     assert.eq(sessionColl.find({}).itcount(), 1);
 
-    // TODO SERVER-67289: Remove feature flag check.
-    if (FeatureFlagUtil.isPresentAndEnabled(db, "PointInTimeCatalogLookups")) {
-        // create cannot observe the collection created in the other transaction so the command
-        // will succeed and we will instead throw WCE when trying to commit the transaction.
-        retryOnceOnTransientAndRestartTxnOnMongos(secondSession, () => {
-            assert.commandWorked(secondSessionDB.runCommand({create: collName}));
-        }, {writeConcern: {w: "majority"}});
+    // create cannot observe the collection created in the other transaction so the command will
+    // succeed and we will instead throw WCE when trying to commit the transaction.
+    retryOnceOnTransientAndRestartTxnOnMongos(secondSession, () => {
+        assert.commandWorked(secondSessionDB.runCommand({create: collName}));
+    }, {writeConcern: {w: "majority"}});
 
-        assert.commandFailedWithCode(secondSession.commitTransaction_forTesting(),
-                                     ErrorCodes.WriteConflict);
-    } else {
-        assert.commandFailedWithCode(secondSessionDB.runCommand({create: collName}),
-                                     ErrorCodes.NamespaceExists);
-
-        assert.commandFailedWithCode(secondSession.abortTransaction_forTesting(),
-                                     ErrorCodes.NoSuchTransaction);
-    }
+    assert.commandFailedWithCode(secondSession.commitTransaction_forTesting(),
+                                 ErrorCodes.WriteConflict);
 
     assert.eq(distinctSessionColl.find({}).itcount(), 0);
     sessionColl.drop({writeConcern: {w: "majority"}});

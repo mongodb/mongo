@@ -130,7 +130,7 @@ public:
         MONGO_UNIMPLEMENTED;
     }
 
-    bool isReady(OperationContext* opCtx) const override {
+    bool isReady() const override {
         MONGO_UNIMPLEMENTED;
     }
 

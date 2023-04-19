@@ -3,9 +3,6 @@
  * read concern are supported by the "dbHash" command.
  *
  * @tags: [
- *   # Incompatible with all feature flags running on last continuous as dbHash can have different
- *   # behaviour in v7.0 when using point-in-time catalog lookups.
- *   requires_fcv_70,
  *   requires_majority_read_concern,
  *   uses_transactions,
  * ]
@@ -177,17 +174,9 @@ assert.eq(atClusterTimeHashBefore,
     const otherDB = otherSession.getDatabase("test");
 
     // We create another collection inside a separate session to modify the collection catalog
-    // at an opTime later than 'clusterTime'. This prevents further usage of the snapshot
-    // associated with 'clusterTime' for snapshot reads if the point-in-time catalog lookups feature
-    // flag is disabled.
+    // at an opTime later than 'clusterTime'.
     assert.commandWorked(otherDB.runCommand({create: "mycoll2"}));
-    if (FeatureFlagUtil.isEnabled(db, "PointInTimeCatalogLookups")) {
-        assert.commandWorked(db.runCommand({dbHash: 1, $_internalReadAtClusterTime: clusterTime}));
-    } else {
-        assert.commandFailedWithCode(
-            db.runCommand({dbHash: 1, $_internalReadAtClusterTime: clusterTime}),
-            ErrorCodes.SnapshotUnavailable);
-    }
+    assert.commandWorked(db.runCommand({dbHash: 1, $_internalReadAtClusterTime: clusterTime}));
 
     otherSession.endSession();
 }

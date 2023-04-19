@@ -1091,10 +1091,6 @@ TransactionParticipant::Participant::onConflictingInternalTransactionCompletion(
 
 void TransactionParticipant::Participant::_setReadSnapshot(OperationContext* opCtx,
                                                            repl::ReadConcernArgs readConcernArgs) {
-    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-    bool pitLookupFeatureEnabled =
-        feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe();
-
     if (readConcernArgs.getArgsAtClusterTime()) {
         // Read concern code should have already set the timestamp on the recovery unit.
         const auto readTimestamp = readConcernArgs.getArgsAtClusterTime()->asTimestamp();
@@ -1125,28 +1121,23 @@ void TransactionParticipant::Participant::_setReadSnapshot(OperationContext* opC
         opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kNoTimestamp);
     }
 
-
-    if (pitLookupFeatureEnabled) {
-        // Allocate the snapshot together with a consistent CollectionCatalog instance. As we have
-        // no critical section we use optimistic concurrency control and check that there was no
-        // write to the CollectionCatalog while we allocated the storage snapshot. Stash the catalog
-        // instance so collection lookups within this transaction are consistent with the snapshot.
-        auto catalog = CollectionCatalog::get(opCtx);
-        while (true) {
-            opCtx->recoveryUnit()->preallocateSnapshot();
-            auto after = CollectionCatalog::get(opCtx);
-            if (catalog == after) {
-                // Catalog did not change, break out of the retry loop and use this instance
-                break;
-            }
-            // Catalog change detected, reallocate the snapshot and try again.
-            opCtx->recoveryUnit()->abandonSnapshot();
-            catalog = std::move(after);
-        }
-        CollectionCatalog::stash(opCtx, std::move(catalog));
-    } else {
+    // Allocate the snapshot together with a consistent CollectionCatalog instance. As we have no
+    // critical section we use optimistic concurrency control and check that there was no write to
+    // the CollectionCatalog while we allocated the storage snapshot. Stash the catalog instance so
+    // collection lookups within this transaction are consistent with the snapshot.
+    auto catalog = CollectionCatalog::get(opCtx);
+    while (true) {
         opCtx->recoveryUnit()->preallocateSnapshot();
+        auto after = CollectionCatalog::get(opCtx);
+        if (catalog == after) {
+            // Catalog did not change, break out of the retry loop and use this instance
+            break;
+        }
+        // Catalog change detected, reallocate the snapshot and try again.
+        opCtx->recoveryUnit()->abandonSnapshot();
+        catalog = std::move(after);
     }
+    CollectionCatalog::stash(opCtx, std::move(catalog));
 }
 
 TransactionParticipant::OplogSlotReserver::OplogSlotReserver(OperationContext* opCtx,

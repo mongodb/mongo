@@ -160,7 +160,7 @@ public:
      * not consider whether the index is visible or ready in the current storage snapshot. For
      * that, use isReadyInMySnapshot() or isPresentInMySnapshot().
      */
-    virtual bool isReady(OperationContext* opCtx) const = 0;
+    virtual bool isReady() const = 0;
 
     /**
      * Safely check whether this index is visible in the durable catalog in the current storage

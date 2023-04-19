@@ -87,13 +87,6 @@ var $config = extendWorkload($config, function($config, $super) {
                     }
                     assert(res.hasOwnProperty("code"));
 
-                    if (!FeatureFlagUtil.isEnabled(db, "PointInTimeCatalogLookups")) {
-                        // Expected error prior to the PointInTimeCatalogLookups project.
-                        if (res.code === ErrorCodes.SnapshotUnavailable) {
-                            return true;
-                        }
-                    }
-
                     // Race to retry.
                     if (res.code === ErrorCodes.ReshardCollectionInProgress) {
                         return false;

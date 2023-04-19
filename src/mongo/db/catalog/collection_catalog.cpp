@@ -190,12 +190,8 @@ public:
         OperationContext* opCtx, UncommittedCatalogUpdates& uncommittedCatalogUpdates) {
         if (opCtx->recoveryUnit()->hasRegisteredChangeForCatalogVisibility())
             return;
-        // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-        if (feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe()) {
-            opCtx->recoveryUnit()->registerPreCommitHook(
-                [](OperationContext* opCtx) { PublishCatalogUpdates::preCommit(opCtx); });
-        }
-
+        opCtx->recoveryUnit()->registerPreCommitHook(
+            [](OperationContext* opCtx) { PublishCatalogUpdates::preCommit(opCtx); });
         opCtx->recoveryUnit()->registerChangeForCatalogVisibility(
             std::make_unique<PublishCatalogUpdates>(uncommittedCatalogUpdates));
     }
@@ -364,10 +360,6 @@ public:
 
     void rollback(OperationContext* opCtx) override {
         auto entries = _uncommittedCatalogUpdates.releaseEntries();
-        // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-        if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe())
-            return;
-
         if (std::none_of(
                 entries.begin(), entries.end(), UncommittedCatalogUpdates::isTwoPhaseCommitEntry)) {
             // Nothing to do, avoid calling CollectionCatalog::write.
@@ -835,11 +827,6 @@ const Collection* CollectionCatalog::establishConsistentCollection(
 bool CollectionCatalog::_needsOpenCollection(OperationContext* opCtx,
                                              const NamespaceStringOrUUID& nsOrUUID,
                                              boost::optional<Timestamp> readTimestamp) const {
-    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-    if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe()) {
-        return false;
-    }
-
     // Don't need to open the collection if it was already previously instantiated.
     if (nsOrUUID.nss()) {
         if (OpenedCollections::get(opCtx).lookupByNamespace(*nsOrUUID.nss())) {
@@ -867,11 +854,6 @@ const Collection* CollectionCatalog::_openCollection(
     OperationContext* opCtx,
     const NamespaceStringOrUUID& nssOrUUID,
     boost::optional<Timestamp> readTimestamp) const {
-    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-    if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe()) {
-        return nullptr;
-    }
-
     // The implementation of openCollection() is quite different at a timestamp compared to at
     // latest. Separated the implementation into helper functions and we call the right one
     // depending on the input parameters.

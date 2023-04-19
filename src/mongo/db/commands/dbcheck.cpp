@@ -532,23 +532,11 @@ private:
         Lock::GlobalLock glob(opCtx, MODE_IX);
 
         // The CollectionCatalog to use for lock-free reads with point-in-time catalog lookups.
-        std::shared_ptr<const CollectionCatalog> catalog;
-
-        boost::optional<AutoGetCollection> autoColl;
-        const Collection* collection = nullptr;
-        // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-        if (feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe()) {
-            // Make sure we get a CollectionCatalog in sync with our snapshot.
-            catalog = getConsistentCatalogAndSnapshot(opCtx);
-
-            collection = catalog->establishConsistentCollection(
-                opCtx,
-                {info.nss.dbName(), info.uuid},
-                opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx));
-        } else {
-            autoColl.emplace(opCtx, info.nss, MODE_IS);
-            collection = autoColl->getCollection().get();
-        }
+        std::shared_ptr<const CollectionCatalog> catalog = getConsistentCatalogAndSnapshot(opCtx);
+        const Collection* collection = catalog->establishConsistentCollection(
+            opCtx,
+            {info.nss.dbName(), info.uuid},
+            opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx));
 
         if (_stepdownHasOccurred(opCtx, info.nss)) {
             _done = true;

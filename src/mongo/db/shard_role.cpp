@@ -46,7 +46,6 @@
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/scoped_collection_metadata.h"
-#include "mongo/db/storage/storage_parameters_gen.h"  // For feature_flags::gPointInTimeCatalogLookups
 #include "mongo/logv2/log.h"
 #include "mongo/util/decorable.h"
 
@@ -156,9 +155,7 @@ void verifyDbAndCollection(OperationContext* opCtx,
             !nss.isSystemDotViews() || opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X));
 
     // Verify that we are using the latest instance if we intend to perform writes.
-    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-    if (feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe() &&
-        operationType == AcquisitionPrerequisites::OperationType::kWrite) {
+    if (operationType == AcquisitionPrerequisites::OperationType::kWrite) {
         auto latest = CollectionCatalog::latest(opCtx);
         if (!latest->containsCollection(opCtx, coll.get())) {
             throwWriteConflictException(str::stream() << "Unable to write to collection '"

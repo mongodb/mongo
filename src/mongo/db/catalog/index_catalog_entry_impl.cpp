@@ -128,27 +128,6 @@ void IndexCatalogEntryImpl::setAccessMethod(std::unique_ptr<IndexAccessMethod> a
     CollectionQueryInfo::computeUpdateIndexData(this, _accessMethod.get(), &_indexedPaths);
 }
 
-bool IndexCatalogEntryImpl::isReady(OperationContext* opCtx) const {
-    // For multi-document transactions, we can open a snapshot prior to checking the
-    // minimumSnapshotVersion on a collection.  This means we are unprotected from reading
-    // out-of-sync index catalog entries.  To fix this, we uassert if we detect that the
-    // in-memory catalog is out-of-sync with the on-disk catalog. This check is not necessary when
-    // point-in-time catalog lookups are enabled as the snapshot is always in sync.
-    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-    if (opCtx->inMultiDocumentTransaction() &&
-        !feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe()) {
-        if (!isPresentInMySnapshot(opCtx) || isReadyInMySnapshot(opCtx) != _isReady) {
-            uasserted(ErrorCodes::SnapshotUnavailable,
-                      str::stream() << "Unable to read from a snapshot due to pending collection"
-                                       " catalog changes; please retry the operation.");
-        }
-    }
-
-    if (kDebugBuild)
-        invariant(_isReady == isReadyInMySnapshot(opCtx));
-    return _isReady;
-}
-
 bool IndexCatalogEntryImpl::isFrozen() const {
     invariant(!_isFrozen || !_isReady);
     return _isFrozen;

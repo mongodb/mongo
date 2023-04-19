@@ -68,9 +68,6 @@ const findWithIndex = function(atClusterTime, expectedErrCode) {
     }
 };
 
-const pointInTimeCatalogLookupsAreEnabled =
-    FeatureFlagUtil.isEnabled(testDB(), "PointInTimeCatalogLookups");
-
 const oldestTS = insert({a: 0});
 jsTestLog("Oldest timestamp: " + tojson(oldestTS));
 
@@ -130,8 +127,7 @@ checkLogs();
 
 // The index is being re-created.
 
-// When the PointInTimeCatalogLookups feature flag is enabled, it's possible to read prior to the
-// most recent DDL operation for the collection.
+// It's possible to read prior to the most recent DDL operation for the collection.
 //
 // At oldestTs, the index did not exist, so queries for the index at that timestamp will return
 // BadValue.
@@ -144,16 +140,12 @@ checkLogs();
 //
 // Etc.
 //
-// Generally speaking when the PointInTimeCatalogLookups feature flag is enabled, find queries
-// should all return the result one would expect based on the state of the catalog at that point in
-// time. When the feature flag is disabled, these find queries will instead return
+// Find queries should all return the result one would expect based on the state of the catalog at
+// that point in time. When the feature flag is disabled, these find queries will instead return
 // SnapshotUnavailable.
 
-findWithIndex(
-    oldestTS,
-    pointInTimeCatalogLookupsAreEnabled ? ErrorCodes.BadValue : ErrorCodes.SnapshotUnavailable);
-findWithIndex(createIndexTS,
-              pointInTimeCatalogLookupsAreEnabled ? null : ErrorCodes.SnapshotUnavailable);
+findWithIndex(oldestTS, ErrorCodes.BadValue);
+findWithIndex(createIndexTS, null);
 findWithIndex(preIndexCommitTS, ErrorCodes.BadValue);
 findWithIndex(undefined, ErrorCodes.BadValue);
 
@@ -183,14 +175,9 @@ checkLog.containsJson(primary(), 20663, {
 });
 IndexBuildTest.assertIndexes(coll(), 2, ["_id_", "a_1"]);
 
-findWithIndex(
-    oldestTS,
-    pointInTimeCatalogLookupsAreEnabled ? ErrorCodes.BadValue : ErrorCodes.SnapshotUnavailable);
-findWithIndex(createIndexTS,
-              pointInTimeCatalogLookupsAreEnabled ? null : ErrorCodes.SnapshotUnavailable);
-findWithIndex(
-    preIndexCommitTS,
-    pointInTimeCatalogLookupsAreEnabled ? ErrorCodes.BadValue : ErrorCodes.SnapshotUnavailable);
+findWithIndex(oldestTS, ErrorCodes.BadValue);
+findWithIndex(createIndexTS, null);
+findWithIndex(preIndexCommitTS, ErrorCodes.BadValue);
 findWithIndex(restartInsertTS, ErrorCodes.BadValue);
 
 assert.eq(3, findWithIndex(undefined)["cursor"]["firstBatch"].length);
@@ -208,44 +195,35 @@ const insertAfterRestartAfterIndexBuild = insert({a: 4});
 assert.eq(5, findWithIndex(insertAfterRestartAfterIndexBuild)["cursor"]["firstBatch"].length);
 assert.eq(5, findWithIndex(undefined)["cursor"]["firstBatch"].length);
 
-findWithIndex(
-    oldestTS,
-    pointInTimeCatalogLookupsAreEnabled ? ErrorCodes.BadValue : ErrorCodes.SnapshotUnavailable);
-findWithIndex(createIndexTS,
-              pointInTimeCatalogLookupsAreEnabled ? null : ErrorCodes.SnapshotUnavailable);
-findWithIndex(
-    preIndexCommitTS,
-    pointInTimeCatalogLookupsAreEnabled ? ErrorCodes.BadValue : ErrorCodes.SnapshotUnavailable);
-findWithIndex(
-    restartInsertTS,
-    pointInTimeCatalogLookupsAreEnabled ? ErrorCodes.BadValue : ErrorCodes.SnapshotUnavailable);
+findWithIndex(oldestTS, ErrorCodes.BadValue);
+findWithIndex(createIndexTS, null);
+findWithIndex(preIndexCommitTS, ErrorCodes.BadValue);
+findWithIndex(restartInsertTS, ErrorCodes.BadValue);
 
 assert.eq(4, findWithIndex(insertAfterIndexBuildTS)["cursor"]["firstBatch"].length);
 
-if (pointInTimeCatalogLookupsAreEnabled) {
-    // Drop the index and demonstrate the durable history can be used across a restart for reads
-    // with times prior to the drop.
-    const dropIndexTS = assert.commandWorked(coll().dropIndex(indexSpec)).operationTime;
-    jsTestLog("Index drop timestamp: " + tojson(dropIndexTS));
+// Drop the index and demonstrate the durable history can be used across a restart for reads with
+// times prior to the drop.
+const dropIndexTS = assert.commandWorked(coll().dropIndex(indexSpec)).operationTime;
+jsTestLog("Index drop timestamp: " + tojson(dropIndexTS));
 
-    // Take a checkpoint to persist the new catalog entry of the index being rebuilt.
-    assert.commandWorked(testDB().adminCommand({fsync: 1}));
+// Take a checkpoint to persist the new catalog entry of the index being rebuilt.
+assert.commandWorked(testDB().adminCommand({fsync: 1}));
 
-    replTest.stop(0, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL}, {forRestart: true});
-    replTest.start(
-        0,
-        {
-            setParameter: {
-                // To control durable history more predictably, disable the checkpoint thread.
-                syncdelay: 0
-            }
-        },
-        true /* restart */);
+replTest.stop(0, 9, {allowedExitCode: MongoRunner.EXIT_SIGKILL}, {forRestart: true});
+replTest.start(
+    0,
+    {
+        setParameter: {
+            // To control durable history more predictably, disable the checkpoint thread.
+            syncdelay: 0
+        }
+    },
+    true /* restart */);
 
-    // Test that we can read using the dropped index on timestamps before the drop
-    assert.eq(4, findWithIndex(insertAfterIndexBuildTS)["cursor"]["firstBatch"].length);
-    assert.eq(5, findWithIndex(insertAfterRestartAfterIndexBuild)["cursor"]["firstBatch"].length);
-}
+// Test that we can read using the dropped index on timestamps before the drop
+assert.eq(4, findWithIndex(insertAfterIndexBuildTS)["cursor"]["firstBatch"].length);
+assert.eq(5, findWithIndex(insertAfterRestartAfterIndexBuild)["cursor"]["firstBatch"].length);
 
 replTest.stopSet();
 })();

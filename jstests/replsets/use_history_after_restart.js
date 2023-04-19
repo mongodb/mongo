@@ -1,6 +1,5 @@
 /**
- * Demonstrate that durable history can be used across a restart. Also assert that any
- * collection/index minimum visible timestamps are set to legal values. The rough test outline:
+ * Demonstrate that durable history can be used across a restart. The rough test outline:
  *
  * 1) Create a collection `existsAtOldestTs`. This collection and its `_id` index should be readable
  *    across a restart.
@@ -12,8 +11,6 @@
  * @tags: [
  *   requires_majority_read_concern,
  *   requires_persistence,
- *   # This test is incompatible with earlier implementations of point-in-time catalog lookups.
- *   requires_fcv_70,
  * ]
  */
 
@@ -125,13 +122,9 @@ result = primary.getDB("test").runCommand(
     {find: "dneAtOldestTs", readConcern: {level: "snapshot", atClusterTime: oldestTimestamp}});
 jsTestLog({"SnapshotUnavailable on dneAtOldestTs": result});
 
-if (FeatureFlagUtil.isEnabled(primary.getDB("test"), "PointInTimeCatalogLookups")) {
-    // The collection does not exist at this time so find will return an empty result set.
-    assert.commandWorked(result);
-    assert.eq(0, result["cursor"]["firstBatch"].length);
-} else {
-    assert.commandFailedWithCode(result, ErrorCodes.SnapshotUnavailable);
-}
+// The collection does not exist at this time so find will return an empty result set.
+assert.commandWorked(result);
+assert.eq(0, result["cursor"]["firstBatch"].length);
 
 // Querying `dneAtOldestTs` at the stable timestamp should succeed with a correct result.
 result = primary.getDB("test").runCommand(

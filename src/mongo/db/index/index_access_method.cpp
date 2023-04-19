@@ -316,7 +316,7 @@ Status SortedDataIndexAccessMethod::update(OperationContext* opCtx,
     prepareUpdate(opCtx, coll, oldDoc, newDoc, loc, options, &updateTicket);
 
     auto status = Status::OK();
-    if (_indexCatalogEntry->isHybridBuilding() || !_indexCatalogEntry->isReady(opCtx)) {
+    if (_indexCatalogEntry->isHybridBuilding() || !_indexCatalogEntry->isReady()) {
         bool logIfError = false;
         _unindexKeysOrWriteToSideTable(opCtx,
                                        coll->ns(),

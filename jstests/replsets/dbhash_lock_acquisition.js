@@ -3,9 +3,6 @@
  * resources when reading a timestamp using the $_internalReadAtClusterTime option.
  *
  * @tags: [
- *   # Incompatible with all feature flags running on last continuous as dbHash runs lock-free in
- *   # v7.0.
- *   requires_fcv_70,
  *   uses_transactions,
  * ]
  */
@@ -21,13 +18,6 @@ rst.initiate();
 
 const primary = rst.getPrimary();
 const db = primary.getDB("test");
-
-if (FeatureFlagUtil.isEnabled(db, "PointInTimeCatalogLookups")) {
-    jsTestLog("Skipping test as dbHash is run lock-free with " +
-              "the point-in-time catalog lookups feature flag enabled");
-    rst.stopSet();
-    return;
-}
 
 const session = primary.startSession({causalConsistency: false});
 const sessionDB = session.getDatabase(db.getName());

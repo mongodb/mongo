@@ -23,8 +23,6 @@
  *
  * @tags: [
  *   requires_majority_read_concern,
- *   # This test is incompatible with earlier implementations of point-in-time catalog lookups.
- *   requires_fcv_70,
  * ]
  */
 
@@ -208,17 +206,9 @@ const testCases = {
 // Assertion helpers. These must get all state as arguments rather than through closure since
 // they may be passed in to a Thread.
 function assertReadsBlock(db, coll) {
-    var res = coll.runCommand('find', {"readConcern": {"level": "majority"}, "maxTimeMS": 5000});
-
-    // When point-in-time catalog reads are enabled, reads no longer block waiting for the majority
-    // commit point to advance and allow reading earlier than the minimum visible snapshot.
-    if (FeatureFlagUtil.isEnabled(db, "PointInTimeCatalogLookups")) {
-        assert.commandWorked(res);
-    } else {
-        assert.commandFailedWithCode(res,
-                                     ErrorCodes.MaxTimeMSExpired,
-                                     "Expected read of " + coll.getFullName() + " to block");
-    }
+    // With point-in-time catalog lookups, reads no longer block waiting for the majority commit
+    // point to advance.
+    assert.commandWorked(coll.runCommand('find', {"readConcern": {"level": "majority"}}));
 }
 
 function assertReadsSucceed(coll, timeoutMs = 20000) {

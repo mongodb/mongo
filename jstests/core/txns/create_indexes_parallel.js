@@ -93,26 +93,14 @@ let doParallelCreateIndexesTest = function(explicitCollectionCreate, multikeyInd
     assert.eq(secondSessionColl.find({}).itcount(), 1);
     assert.eq(secondSessionColl.getIndexes().length, 2);
 
-    // TODO SERVER-67289: Remove feature flag check.
-    if (FeatureFlagUtil.isPresentAndEnabled(db, "PointInTimeCatalogLookups")) {
-        // createIndexes cannot observe the index created in the other transaction so the command
-        // will succeed and we will instead throw WCE when trying to commit the transaction.
-        retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
-            assert.commandWorked(sessionColl.runCommand(
-                {createIndexes: collName, indexes: [conflictingIndexSpecs]}));
-        }, {writeConcern: {w: "majority"}});
+    // createIndexes cannot observe the index created in the other transaction so the command will
+    // succeed and we will instead throw WCE when trying to commit the transaction.
+    retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
+        assert.commandWorked(
+            sessionColl.runCommand({createIndexes: collName, indexes: [conflictingIndexSpecs]}));
+    }, {writeConcern: {w: "majority"}});
 
-        assert.commandFailedWithCode(session.commitTransaction_forTesting(),
-                                     ErrorCodes.WriteConflict);
-    } else {
-        // createIndexes takes minimum visible snapshots of new collections into consideration when
-        // checking for existing indexes.
-        assert.commandFailedWithCode(
-            sessionColl.runCommand({createIndexes: collName, indexes: [conflictingIndexSpecs]}),
-            ErrorCodes.SnapshotUnavailable);
-        assert.commandFailedWithCode(session.abortTransaction_forTesting(),
-                                     ErrorCodes.NoSuchTransaction);
-    }
+    assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.WriteConflict);
 
     assert.eq(sessionColl.find({}).itcount(), 1);
     assert.eq(sessionColl.getIndexes().length, 2);

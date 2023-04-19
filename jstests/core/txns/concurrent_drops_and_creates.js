@@ -63,11 +63,8 @@ retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
 sessionOutsideTxn.advanceClusterTime(session.getClusterTime());
 assert.commandWorked(testDB2.runCommand({drop: collNameB, writeConcern: {w: "majority"}}));
 
-// This test cause a StaleConfig error on sharding so even with the PointInTimeCatalogLookups flag
-// enabled no command will succeed.
-// TODO SERVER-67289: Remove feature flag check.
-if (FeatureFlagUtil.isPresentAndEnabled(db, "PointInTimeCatalogLookups") &&
-    !session.getClient().isMongos()) {
+// This test cause a StaleConfig error on sharding so no command will succeed.
+if (!session.getClient().isMongos()) {
     // We can perform reads on the dropped collection as it existed when we started the transaction.
     assert.commandWorked(sessionDB2.runCommand({find: sessionCollB.getName()}));
 
@@ -112,25 +109,14 @@ assert.commandWorked(sessionCollA.insert({}));
 sessionOutsideTxn.advanceClusterTime(session.getClusterTime());
 assert.commandWorked(testDB2.runCommand({create: collNameB}));
 
-// TODO SERVER-67289: Remove feature flag check.
-if (FeatureFlagUtil.isPresentAndEnabled(db, "PointInTimeCatalogLookups")) {
-    // We can insert to collection B in the transaction as the transaction does not have a
-    // collection on this namespace (even as it exist at latest). A collection will be implicitly
-    // created and we will fail to commit this transaction with a WriteConflict error.
-    retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
-        assert.commandWorked(sessionCollB.insert({}));
-    }, txnOptions);
+// We can insert to collection B in the transaction as the transaction does not have a collection on
+// this namespace (even as it exist at latest). A collection will be implicitly created and we will
+// fail to commit this transaction with a WriteConflict error.
+retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
+    assert.commandWorked(sessionCollB.insert({}));
+}, txnOptions);
 
-    assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.WriteConflict);
-} else {
-    // We cannot write to collection B in the transaction, since it experienced catalog changes
-    // since the transaction's read timestamp. Since our implementation of the in-memory collection
-    // catalog always has the most recent collection metadata, we do not allow you to read from a
-    // collection at a time prior to its most recent catalog changes.
-    assert.commandFailedWithCode(sessionCollB.insert({}), ErrorCodes.SnapshotUnavailable);
-    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
-                                 ErrorCodes.NoSuchTransaction);
-}
+assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.WriteConflict);
 
 session.endSession();
 }());

@@ -6,7 +6,6 @@
 "use strict";
 
 load("jstests/libs/write_concern_util.js");  // For stopReplicationOnSecondaries.
-load("jstests/libs/feature_flag_util.js");
 
 const rst = new ReplSetTest({nodes: 2, nodeOptions: {enableMajorityReadConcern: ""}});
 
@@ -56,14 +55,6 @@ const awaitShell = startParallelShell(`{
         assert.eq(indexes[1].name, "secondIndex");
     }`,
                                           db.getMongo().port);
-
-// Wait for the $out before restarting the replication when not using point-in-time reads.
-if (!FeatureFlagUtil.isEnabled(db, "PointInTimeCatalogLookups")) {
-    assert.soon(function() {
-        const filter = {"command.aggregate": "sourceColl"};
-        return assert.commandWorked(db.currentOp(filter)).inprog.length === 1;
-    });
-}
 
 // Restart data replication and wait until the new write becomes visible.
 restartReplicationOnSecondaries(rst);

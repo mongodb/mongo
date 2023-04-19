@@ -283,19 +283,19 @@ void IndexCatalogImpl::init(OperationContext* opCtx,
                 auto flags = CreateIndexEntryFlags::kInitFromDisk | CreateIndexEntryFlags::kFrozen;
                 IndexCatalogEntry* entry =
                     createIndexEntry(opCtx, collection, std::move(descriptor), flags);
-                fassert(31433, !entry->isReady(opCtx));
+                fassert(31433, !entry->isReady());
             } else {
                 // Initializing with unfinished indexes may occur during rollback or startup.
                 auto flags = CreateIndexEntryFlags::kInitFromDisk;
                 IndexCatalogEntry* entry =
                     createIndexEntry(opCtx, collection, std::move(descriptor), flags);
-                fassert(4505500, !entry->isReady(opCtx));
+                fassert(4505500, !entry->isReady());
             }
         } else {
             auto flags = CreateIndexEntryFlags::kInitFromDisk | CreateIndexEntryFlags::kIsReady;
             IndexCatalogEntry* entry =
                 createIndexEntry(opCtx, collection, std::move(descriptor), flags);
-            fassert(17340, entry->isReady(opCtx));
+            fassert(17340, entry->isReady());
         }
     }
 
@@ -1316,7 +1316,7 @@ Status IndexCatalogImpl::dropIndex(OperationContext* opCtx,
     if (!entry)
         return Status(ErrorCodes::InternalError, "cannot find index to delete");
 
-    if (!entry->isReady(opCtx))
+    if (!entry->isReady())
         return Status(ErrorCodes::InternalError, "cannot delete not ready index");
 
     return dropIndexEntry(opCtx, collection, entry);
@@ -1394,7 +1394,7 @@ Status IndexCatalogImpl::dropUnfinishedIndex(OperationContext* opCtx,
     if (!entry)
         return Status(ErrorCodes::InternalError, "cannot find index to delete");
 
-    if (entry->isReady(opCtx))
+    if (entry->isReady())
         return Status(ErrorCodes::InternalError, "expected unfinished index, but it is ready");
 
     return dropIndexEntry(opCtx, collection, entry);
@@ -1661,7 +1661,7 @@ const IndexDescriptor* IndexCatalogImpl::refreshEntry(OperationContext* opCtx,
     // to the CollectionIndexUsageTrackerDecoration (shared state among Collection instances).
     auto newDesc = std::make_unique<IndexDescriptor>(_getAccessMethodName(keyPattern), spec);
     auto newEntry = createIndexEntry(opCtx, collection, std::move(newDesc), flags);
-    invariant(newEntry->isReady(opCtx));
+    invariant(newEntry->isReady());
     auto desc = newEntry->descriptor();
     CollectionIndexUsageTrackerDecoration::get(collection->getSharedDecorations())
         .registerIndex(desc->indexName(),
@@ -1928,7 +1928,7 @@ void IndexCatalogImpl::unindexRecord(OperationContext* opCtx,
         IndexCatalogEntry* entry = it->get();
 
         // If it's a background index, we DO NOT want to log anything.
-        bool logIfError = entry->isReady(opCtx) ? !noWarn : false;
+        bool logIfError = entry->isReady() ? !noWarn : false;
         _unindexRecord(
             opCtx, collection, entry, obj, loc, logIfError, keysDeletedOut, checkRecordId);
     }

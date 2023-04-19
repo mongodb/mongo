@@ -52,7 +52,6 @@ function testCommand(cmd, curOpFilter, expectSucceed) {
 
     // Execute command in parallel shell. Read commands should work even if catalog changes has
     // occured since opening the snapshot.
-    expectSucceed = expectSucceed && FeatureFlagUtil.isEnabled(testDB, "PointInTimeCatalogLookups");
     const awaitCommand = execCommand(cmd, expectSucceed);
 
     waitForCurOpByFailPointNoNS(testDB, "hangAfterPreallocateSnapshot", curOpFilter);
