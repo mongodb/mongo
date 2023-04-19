@@ -31,7 +31,6 @@ const defaultOptions = {
 
 // This lists all binary versions older than the last-lts version.
 const versions = [
-    {binVersion: '4.2', testCollection: 'four_two'},
     {binVersion: '5.0', testCollection: 'five_zero'},
 ];
 

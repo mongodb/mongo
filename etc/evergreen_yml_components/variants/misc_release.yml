@@ -2474,9 +2474,7 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: windows
     push_arch: x86_64
-    multiversion_platform: windows_x86_64-2008plus-ssl
-    multiversion_platform_42_or_later: windows_x86_64-2012plus
-    multiversion_platform_44_or_later: windows
+    multiversion_platform: windows
     multiversion_edition: base
     content_type: application/zip
     compile_flags: >-

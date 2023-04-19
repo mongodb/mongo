@@ -20,49 +20,6 @@ edition="${multiversion_edition}"
 platform="${multiversion_platform}"
 architecture="${multiversion_architecture}"
 
-# The platform and architecture for how some of the binaries are reported in
-# https://downloads.mongodb.org/full.json changed between MongoDB 4.0 and MongoDB 4.2.
-# Certain build variants define additional multiversion_*_42_or_later expansions in order to
-# be able to fetch a complete set of versions.
-
-if [ ! -z "${multiversion_edition_42_or_later}" ]; then
-  edition="${multiversion_edition_42_or_later}"
-fi
-
-if [ ! -z "${multiversion_platform_42_or_later}" ]; then
-  platform="${multiversion_platform_42_or_later}"
-fi
-
-if [ ! -z "${multiversion_architecture_42_or_later}" ]; then
-  architecture="${multiversion_architecture_42_or_later}"
-fi
-
-db-contrib-tool setup-repro-env \
-  --installDir /data/install \
-  --linkDir /data/multiversion \
-  --edition $edition \
-  --platform $platform \
-  --architecture $architecture \
-  --debug \
-  4.2
-
-# The platform and architecture for how some of the binaries are reported in
-# https://downloads.mongodb.org/full.json changed between MongoDB 4.2 and MongoDB 4.4.
-# Certain build variants define additional multiversion_*_44_or_later expansions in order to
-# be able to fetch a complete set of versions.
-
-if [ ! -z "${multiversion_edition_44_or_later}" ]; then
-  edition="${multiversion_edition_44_or_later}"
-fi
-
-if [ ! -z "${multiversion_platform_44_or_later}" ]; then
-  platform="${multiversion_platform_44_or_later}"
-fi
-
-if [ ! -z "${multiversion_architecture_44_or_later}" ]; then
-  architecture="${multiversion_architecture_44_or_later}"
-fi
-
 last_lts_arg="--installLastLTS"
 last_continuous_arg="--installLastContinuous"
 
