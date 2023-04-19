@@ -127,8 +127,6 @@ StatusWith<int> StorageInterfaceImpl::getRollbackID(OperationContext* opCtx) {
 }
 
 StatusWith<int> StorageInterfaceImpl::initializeRollbackID(OperationContext* opCtx) {
-    // TODO (SERVER-71443): Fix to be interruptible or document exception.
-    UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
     auto status = createCollection(opCtx, _rollbackIdNss, CollectionOptions());
     if (!status.isOK()) {
         return status;
@@ -450,35 +448,35 @@ Status StorageInterfaceImpl::createCollection(OperationContext* opCtx,
                                               const CollectionOptions& options,
                                               const bool createIdIndex,
                                               const BSONObj& idIndexSpec) {
-    return writeConflictRetry(opCtx, "StorageInterfaceImpl::createCollection", nss.ns(), [&] {
-        AutoGetDb databaseWriteGuard(opCtx, nss.dbName(), MODE_IX);
-        auto db = databaseWriteGuard.ensureDbExists(opCtx);
-        invariant(db);
+    try {
+        return writeConflictRetry(opCtx, "StorageInterfaceImpl::createCollection", nss.ns(), [&] {
+            AutoGetDb databaseWriteGuard(opCtx, nss.dbName(), MODE_IX);
+            auto db = databaseWriteGuard.ensureDbExists(opCtx);
+            invariant(db);
 
-        // Check if there already exist a Collection/view on the given namespace 'nss'. The answer
-        // may change at any point after this call as we make this call without holding the
-        // collection lock. But, it is fine as we properly handle while registering the uncommitted
-        // collection with CollectionCatalog. This check is just here to prevent it from being
-        // created in the common case.
-        Status status = mongo::catalog::checkIfNamespaceExists(opCtx, nss);
-        if (!status.isOK()) {
-            return status;
-        }
+            // Check if there already exist a Collection/view on the given namespace 'nss'. The
+            // answer may change at any point after this call as we make this call without holding
+            // the collection lock. But, it is fine as we properly handle while registering the
+            // uncommitted collection with CollectionCatalog. This check is just here to prevent it
+            // from being created in the common case.
+            Status status = mongo::catalog::checkIfNamespaceExists(opCtx, nss);
+            if (!status.isOK()) {
+                return status;
+            }
 
-        Lock::CollectionLock lk(opCtx, nss, MODE_IX);
-        WriteUnitOfWork wuow(opCtx);
-        try {
+            Lock::CollectionLock lk(opCtx, nss, MODE_IX);
+            WriteUnitOfWork wuow(opCtx);
             auto coll = db->createCollection(opCtx, nss, options, createIdIndex, idIndexSpec);
             invariant(coll);
 
-            // This commit call can throw if a view already exists while registering the collection.
+            // This commit call can throw if a view already exists while registering the
+            // collection.
             wuow.commit();
-        } catch (const AssertionException& ex) {
-            return ex.toStatus();
-        }
-
-        return Status::OK();
-    });
+            return Status::OK();
+        });
+    } catch (const DBException& ex) {
+        return ex.toStatus();
+    }
 }
 
 Status StorageInterfaceImpl::createIndexesOnEmptyCollection(
@@ -511,21 +509,25 @@ Status StorageInterfaceImpl::createIndexesOnEmptyCollection(
 }
 
 Status StorageInterfaceImpl::dropCollection(OperationContext* opCtx, const NamespaceString& nss) {
-    return writeConflictRetry(opCtx, "StorageInterfaceImpl::dropCollection", nss.ns(), [&] {
-        AutoGetDb autoDb(opCtx, nss.dbName(), MODE_IX);
-        Lock::CollectionLock collLock(opCtx, nss, MODE_X);
-        if (!autoDb.getDb()) {
-            // Database does not exist - nothing to do.
+    try {
+        return writeConflictRetry(opCtx, "StorageInterfaceImpl::dropCollection", nss.ns(), [&] {
+            AutoGetDb autoDb(opCtx, nss.dbName(), MODE_IX);
+            Lock::CollectionLock collLock(opCtx, nss, MODE_X);
+            if (!autoDb.getDb()) {
+                // Database does not exist - nothing to do.
+                return Status::OK();
+            }
+            WriteUnitOfWork wunit(opCtx);
+            const auto status = autoDb.getDb()->dropCollectionEvenIfSystem(opCtx, nss);
+            if (!status.isOK()) {
+                return status;
+            }
+            wunit.commit();
             return Status::OK();
-        }
-        WriteUnitOfWork wunit(opCtx);
-        const auto status = autoDb.getDb()->dropCollectionEvenIfSystem(opCtx, nss);
-        if (!status.isOK()) {
-            return status;
-        }
-        wunit.commit();
-        return Status::OK();
-    });
+        });
+    } catch (const DBException& ex) {
+        return ex.toStatus();
+    }
 }
 
 Status StorageInterfaceImpl::truncateCollection(OperationContext* opCtx,

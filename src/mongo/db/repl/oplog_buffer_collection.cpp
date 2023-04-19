@@ -41,6 +41,7 @@
 #include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/document_validation.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/repl/storage_interface.h"
@@ -257,6 +258,9 @@ std::size_t OplogBufferCollection::getCount() const {
 
 void OplogBufferCollection::clear(OperationContext* opCtx) {
     stdx::lock_guard<Latch> lk(_mutex);
+    // We acquire the appropriate locks for the temporary oplog buffer collection here,
+    // so that we perform the drop and create under the same locks.
+    AutoGetCollection autoColl(opCtx, NamespaceString(kDefaultOplogCollectionNamespace), MODE_X);
     _dropCollection(opCtx);
     _createCollection(opCtx);
     _size = 0;
@@ -460,8 +464,6 @@ void OplogBufferCollection::_createCollection(OperationContext* opCtx) {
     // overhead and improve _id query efficiency.
     options.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex();
 
-    // TODO (SERVER-71443): Fix to be interruptible or document exception.
-    UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
     auto status = _storageInterface->createCollection(opCtx, _nss, options);
     if (status.code() == ErrorCodes::NamespaceExists)
         return;
@@ -469,8 +471,6 @@ void OplogBufferCollection::_createCollection(OperationContext* opCtx) {
 }
 
 void OplogBufferCollection::_dropCollection(OperationContext* opCtx) {
-    // TODO (SERVER-71443): Fix to be interruptible or document exception.
-    UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
     uassertStatusOK(_storageInterface->dropCollection(opCtx, _nss));
 }
 

@@ -1612,8 +1612,7 @@ Timestamp TransactionParticipant::Participant::prepareTransaction(
             // This shouldn't cause deadlocks with other prepared txns, because the acquisition
             // of RSTL lock inside abortTransaction will be no-op since we already have it.
             // This abortGuard gets dismissed before we release the RSTL while transitioning to
-            // prepared.
-            // TODO (SERVER-71610): Fix to be interruptible or document exception.
+            // the prepared state.
             UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
             abortTransaction(opCtx);
         } catch (...) {
@@ -1899,8 +1898,8 @@ void TransactionParticipant::Participant::commitPreparedTransaction(
         // We can no longer uassert without terminating.
         unlockGuard.dismiss();
 
-        // Once entering "committing with prepare" we cannot throw an exception.
-        // TODO (SERVER-71610): Fix to be interruptible or document exception.
+        // Once entering "committing with prepare" we cannot throw an exception,
+        // and therefore our lock acquisitions cannot be interruptible.
         UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
 
         // On secondary, we generate a fake empty oplog slot, since it's not used by opObserver.
