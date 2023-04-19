@@ -89,6 +89,13 @@ boost::optional<long long> extractLimitForPushdown(Pipeline::SourceContainer::it
                                                    Pipeline::SourceContainer* container);
 
 /**
+ * This is similar to extractLimitForPushdown, except that it should be used when the caller does
+ * not want to modify the pipeline but still obtain the calculated limit value of the query.
+ */
+boost::optional<long long> getUserLimit(Pipeline::SourceContainer::iterator itr,
+                                        Pipeline::SourceContainer* container);
+
+/**
  * If there are any $skip stages that could be logically swapped forward to the position of the
  * pipeline pointed to by 'itr' without changing the meaning of the query, removes these $skip
  * stages from the Pipeline and returns the resulting skip. A single skip value is computed by
