@@ -77,6 +77,22 @@ enum class PrepareConflictBehavior {
 };
 
 /**
+ * DataCorruptionDetectionMode determines how we handle the discovery of evidence of data
+ * corruption.
+ */
+enum class DataCorruptionDetectionMode {
+    /**
+     * Always throw a DataCorruptionDetected error when evidence of data corruption is detected.
+     */
+    kThrow,
+    /**
+     * When evidence of data corruption is decected, log an entry to the health log and the server
+     * logs, but do not throw an error. Continue attempting to return results.
+     */
+    kLogAndContinue,
+};
+
+/**
  * A RecoveryUnit is responsible for ensuring that data is persisted.
  * All on-disk information must be mutated through this interface.
  */
@@ -807,6 +823,14 @@ public:
         return _noEvictionAfterRollback;
     }
 
+    void setDataCorruptionDetectionMode(DataCorruptionDetectionMode mode) {
+        _dataCorruptionDetectionMode = mode;
+    }
+
+    DataCorruptionDetectionMode getDataCorruptionDetectionMode() const {
+        return _dataCorruptionDetectionMode;
+    }
+
     /**
      * Returns true if this is an instance of RecoveryUnitNoop.
      */
@@ -866,6 +890,8 @@ protected:
     bool _noEvictionAfterRollback = false;
 
     AbandonSnapshotMode _abandonSnapshotMode = AbandonSnapshotMode::kAbort;
+
+    DataCorruptionDetectionMode _dataCorruptionDetectionMode = DataCorruptionDetectionMode::kThrow;
 
 private:
     // Sets the snapshot associated with this RecoveryUnit to a new globally unique id number.
