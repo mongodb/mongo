@@ -116,6 +116,8 @@ public:
                   int64_t maxCount = std::numeric_limits<int64_t>::max(),
                   int64_t maxBytes = std::numeric_limits<int64_t>::max());
 
+    ~DbCheckHasher();
+
     /**
      * Hash all documents up to the deadline.
      */
@@ -155,6 +157,9 @@ private:
 
     int64_t _maxBytes = 0;
     int64_t _bytesSeen = 0;
+
+    DataCorruptionDetectionMode _previousDataCorruptionMode;
+    PrepareConflictBehavior _previousPrepareConflictBehavior;
 };
 
 namespace repl {
