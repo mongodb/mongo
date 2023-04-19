@@ -351,6 +351,11 @@ public:
     static NamespaceString makeMovePrimaryCollectionsToCloneNSS(const UUID& migrationId);
 
     /**
+     * Constructs the NamespaceString prefix for temporary movePrimary recipient collections.
+     */
+    static NamespaceString makeMovePrimaryTempCollectionsPrefix(const UUID& migrationId);
+
+    /**
      * Constructs the oplog buffer NamespaceString for the given UUID and donor shardId.
      */
     static NamespaceString makeReshardingLocalOplogBufferNSS(const UUID& existingUUID,

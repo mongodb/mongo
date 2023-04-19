@@ -235,6 +235,11 @@ NamespaceString NamespaceString::makeMovePrimaryCollectionsToCloneNSS(const UUID
                            "movePrimaryCollectionsToClone." + migrationId.toString());
 }
 
+NamespaceString NamespaceString::makeMovePrimaryTempCollectionsPrefix(const UUID& migrationId) {
+    return NamespaceString(DatabaseName::kConfig,
+                           "movePrimaryRecipient." + migrationId.toString() + ".willBeDeleted.");
+}
+
 NamespaceString NamespaceString::makePreImageCollectionNSS(
     const boost::optional<TenantId>& tenantId) {
     return NamespaceString{tenantId, DatabaseName::kConfig.db(), kPreImagesCollectionName};
