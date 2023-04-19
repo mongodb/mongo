@@ -422,7 +422,8 @@ void MirrorMaestroImpl::_mirror(const std::vector<HostAndPort>& hosts,
 
     for (auto i = 0; i < mirroringFactor; i++) {
         auto& host = hosts[(startIndex + i) % hosts.size()];
-        auto mirrorResponseCallback = [host](auto& args) {
+        std::weak_ptr<executor::TaskExecutor> wExec(_executor);
+        auto mirrorResponseCallback = [host, wExec = std::move(wExec)](auto& args) {
             if (MONGO_likely(!mirrorMaestroExpectsResponse.shouldFail())) {
                 // If we don't expect responses, then there is nothing to do here
                 return;
@@ -445,9 +446,23 @@ void MirrorMaestroImpl::_mirror(const std::vector<HostAndPort>& hosts,
                               "error"_attr = args.response);
                 return;
             } else if (!args.response.isOK()) {
+                if (args.response.status == ErrorCodes::CallbackCanceled) {
+                    if (auto exec = wExec.lock(); exec && exec->isShuttingDown()) {
+                        // The mirroring command was canceled as part of the executor being
+                        // shutdown. We avoid crashing here since it's possible that node shutdown
+                        // was triggered unexpectedly as part of our test infrastructure.
+                        LOGV2_INFO(
+                            7558901,
+                            "Mirroring command callback was canceled due to maestro shutdown",
+                            "error"_attr = args.response,
+                            "host"_attr = host.toString());
+                        return;
+                    }
+                }
                 LOGV2_FATAL(4717301,
                             "Received mirroring response with a non-okay status",
-                            "error"_attr = args.response);
+                            "error"_attr = args.response,
+                            "host"_attr = host.toString());
             }
         };
 
