@@ -122,9 +122,7 @@ void removeIndex(OperationContext* opCtx,
     const bool isTwoPhaseDrop =
         storageEngine->supportsPendingDrops() && dataRemoval == DataRemoval::kTwoPhase;
 
-    // TODO SERVER-68674: Remove feature flag check.
-    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-    if (feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe() && isTwoPhaseDrop) {
+    if (isTwoPhaseDrop) {
         invariant(entry);
         CollectionCatalog::get(opCtx)->dropIndex(
             opCtx, collection->ns(), entry, /*isDropPending=*/true);
@@ -145,11 +143,7 @@ void removeIndex(OperationContext* opCtx,
                 [svcCtx, storageEngine, nss, ident = ident->getIdent(), isTwoPhaseDrop] {
                     removeEmptyDirectory(svcCtx, storageEngine, nss);
 
-                    // TODO SERVER-68674: Remove feature flag check.
-                    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade
-                    // concerns.
-                    if (feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe() &&
-                        isTwoPhaseDrop) {
+                    if (isTwoPhaseDrop) {
                         CollectionCatalog::write(svcCtx, [&](CollectionCatalog& catalog) {
                             catalog.notifyIdentDropped(ident);
                         });
@@ -215,11 +209,7 @@ Status dropCollection(OperationContext* opCtx,
                 [svcCtx, storageEngine, nss, ident = ident->getIdent()] {
                     removeEmptyDirectory(svcCtx, storageEngine, nss);
 
-                    // TODO SERVER-68674: Remove feature flag check.
-                    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade
-                    // concerns.
-                    if (feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe() &&
-                        storageEngine->supportsPendingDrops()) {
+                    if (storageEngine->supportsPendingDrops()) {
                         CollectionCatalog::write(svcCtx, [&](CollectionCatalog& catalog) {
                             catalog.notifyIdentDropped(ident);
                         });

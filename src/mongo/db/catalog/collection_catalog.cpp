@@ -2084,9 +2084,7 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(
     invariant(_collections.find(ns));
     invariant(_orderedCollections.find(dbIdPair) != _orderedCollections.end());
 
-    // TODO SERVER-68674: Remove feature flag check.
-    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-    if (feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe() && isDropPending) {
+    if (isDropPending) {
         if (auto sharedIdent = coll->getSharedIdent(); sharedIdent) {
             auto ident = sharedIdent->getIdent();
             LOGV2_DEBUG(
@@ -2190,13 +2188,6 @@ void CollectionCatalog::_pushCatalogIdForNSSAndUUID(const NamespaceString& nss,
                                                     const UUID& uuid,
                                                     boost::optional<RecordId> catalogId,
                                                     boost::optional<Timestamp> ts) {
-    // TODO SERVER-68674: Remove feature flag check.
-    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-    if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe()) {
-        // No-op.
-        return;
-    }
-
     auto doPushCatalogId = [this, &ts, &catalogId](auto& catalogIdsContainer,
                                                    auto& catalogIdChangesContainer,
                                                    const auto& key) {
@@ -2274,13 +2265,6 @@ void CollectionCatalog::_pushCatalogIdForNSSAndUUID(const NamespaceString& nss,
 void CollectionCatalog::_pushCatalogIdForRename(const NamespaceString& from,
                                                 const NamespaceString& to,
                                                 boost::optional<Timestamp> ts) {
-    // TODO SERVER-68674: Remove feature flag check.
-    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-    if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe()) {
-        // No-op.
-        return;
-    }
-
     // Get 'toIds' first, it may need to instantiate in the container which invalidates all
     // references.
     auto idsWriter = _nssCatalogIds.transient();
@@ -2342,13 +2326,6 @@ void CollectionCatalog::_insertCatalogIdForNSSAndUUIDAfterScan(
     boost::optional<UUID> uuid,
     boost::optional<RecordId> catalogId,
     Timestamp ts) {
-    // TODO SERVER-68674: Remove feature flag check.
-    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-    if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe()) {
-        // No-op.
-        return;
-    }
-
     auto doInsert = [this, &catalogId, &ts](auto& catalogIdsContainer,
                                             auto& catalogIdChangesContainer,
                                             const auto& key) {
@@ -2503,14 +2480,6 @@ void CollectionCatalog::clearViews(OperationContext* opCtx, const DatabaseName& 
 void CollectionCatalog::deregisterIndex(OperationContext* opCtx,
                                         std::shared_ptr<IndexCatalogEntry> indexEntry,
                                         bool isDropPending) {
-    // TODO SERVER-68674: Remove feature flag check.
-    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-    if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe() ||
-        !isDropPending) {
-        // No-op.
-        return;
-    }
-
     // Unfinished index builds return a nullptr for getSharedIdent(). Use getIdent() instead.
     std::string ident = indexEntry->getIdent();
 
@@ -2545,13 +2514,6 @@ CollectionCatalog::iterator CollectionCatalog::end(OperationContext* opCtx) cons
 }
 
 bool CollectionCatalog::needsCleanupForOldestTimestamp(Timestamp oldest) const {
-    // TODO SERVER-68674: Remove feature flag check.
-    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-    if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCVUnsafe()) {
-        // No-op.
-        return false;
-    }
-
     return _lowestCatalogIdTimestampForCleanup <= oldest;
 }
 
