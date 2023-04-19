@@ -29,6 +29,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
@@ -204,47 +205,46 @@ class MovePrimaryRecipientServiceTest : public ShardServerTestFixture {
         ShardServerTestFixture::tearDown();
     }
 
-
     std::unique_ptr<ShardingCatalogClient> makeShardingCatalogClient() override {
-
-        class StaticCatalogClient final : public ShardingCatalogClientMock {
-        public:
-            StaticCatalogClient(std::vector<ShardType> shards) : _shards(std::move(shards)) {}
-
-            StatusWith<repl::OpTimeWith<std::vector<ShardType>>> getAllShards(
-                OperationContext* opCtx, repl::ReadConcernLevel readConcern) override {
-                return repl::OpTimeWith<std::vector<ShardType>>(_shards);
-            }
-
-            std::vector<CollectionType> getCollections(OperationContext* opCtx,
-                                                       StringData dbName,
-                                                       repl::ReadConcernLevel readConcernLevel,
-                                                       const BSONObj& sort) override {
-                return _colls;
-            }
-
-            std::vector<NamespaceString> getAllShardedCollectionsForDb(
-                OperationContext* opCtx,
-                StringData dbName,
-                repl::ReadConcernLevel readConcern,
-                const BSONObj& sort = BSONObj()) override {
-                return _shardedColls;
-            }
-
-            void setCollections(std::vector<CollectionType> colls) {
-                _colls = std::move(colls);
-            }
-
-        private:
-            const std::vector<ShardType> _shards;
-            std::vector<CollectionType> _colls;
-            std::vector<NamespaceString> _shardedColls;
-        };
-
-        return std::make_unique<StaticCatalogClient>(kShardList);
+        auto client = std::make_unique<StaticCatalogClient>(kShardList);
+        return client;
     }
 
 protected:
+    class StaticCatalogClient final : public ShardingCatalogClientMock {
+    public:
+        StaticCatalogClient(std::vector<ShardType> shards) : _shards(std::move(shards)) {}
+
+        StatusWith<repl::OpTimeWith<std::vector<ShardType>>> getAllShards(
+            OperationContext* opCtx, repl::ReadConcernLevel readConcern) override {
+            return repl::OpTimeWith<std::vector<ShardType>>(_shards);
+        }
+
+        std::vector<CollectionType> getCollections(OperationContext* opCtx,
+                                                   StringData dbName,
+                                                   repl::ReadConcernLevel readConcernLevel,
+                                                   const BSONObj& sort) override {
+            return _colls;
+        }
+
+        std::vector<NamespaceString> getAllShardedCollectionsForDb(
+            OperationContext* opCtx,
+            StringData dbName,
+            repl::ReadConcernLevel readConcern,
+            const BSONObj& sort = BSONObj()) override {
+            return _shardedColls;
+        }
+
+        void setCollections(std::vector<CollectionType> colls) {
+            _colls = std::move(colls);
+        }
+
+    private:
+        const std::vector<ShardType> _shards;
+        std::vector<CollectionType> _colls;
+        std::vector<NamespaceString> _shardedColls;
+    };
+
     MovePrimaryRecipientDocument createRecipientDoc() {
         UUID migrationId = UUID::gen();
         MovePrimaryCommonMetadata metadata(migrationId,
@@ -715,7 +715,7 @@ TEST_F(MovePrimaryRecipientServiceTest, OnReceiveSyncData) {
 }
 
 TEST_F(MovePrimaryRecipientServiceTest, AbortsOnUnrecoverableClonerError) {
-    // Step Down to register new POS before Step Up.
+    // Step Down to register new test POS defined below before Step Up.
     stepDown(_serviceCtx, _registry);
 
     class FailingCloner : public TestClonerImpl {
@@ -783,6 +783,37 @@ TEST_F(MovePrimaryRecipientServiceTest, AbortsOnUnrecoverableClonerError) {
     ASSERT_THROWS_CODE(
         recipient->getCompletionFuture().get(), DBException, ErrorCodes::MovePrimaryAborted);
     movePrimaryRecipientPauseBeforeCompletion->setMode(FailPoint::off, 0);
+}
+
+TEST_F(MovePrimaryRecipientServiceTest, DropsTemporaryCollectionsMatchingPrefix) {
+    auto opCtx = operationContext();
+    auto doc = createRecipientDoc();
+
+    const auto& prefix =
+        NamespaceString::makeMovePrimaryTempCollectionsPrefix(doc.getMigrationId()).toString();
+    const auto& fooNs = NamespaceString(prefix + "foo");
+    const auto& barNs = NamespaceString(prefix + "bar");
+
+    DBDirectClient client(opCtx);
+    ASSERT_TRUE(client.createCollection(fooNs));
+    ASSERT_TRUE(client.createCollection(barNs));
+    // Create other collections which shouldn't be deleted.
+    ASSERT_TRUE(client.createCollection(NamespaceString::kSessionTransactionsTableNamespace));
+    ASSERT_TRUE(client.createCollection(NamespaceString::kMigrationRecipientsNamespace));
+
+    auto recipient = MovePrimaryRecipientService::MovePrimaryRecipient::getOrCreate(
+        opCtx, _service, doc.toBSON());
+    auto future = recipient->onReceiveForgetMigration();
+    future.get(opCtx);
+    {
+        AutoGetDb autoDb(opCtx, DatabaseName::kConfig, MODE_S);
+        ASSERT(!CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, fooNs));
+        ASSERT(!CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, barNs));
+        ASSERT(CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
+            opCtx, NamespaceString::kSessionTransactionsTableNamespace));
+        ASSERT(CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
+            opCtx, NamespaceString::kMigrationRecipientsNamespace));
+    }
 }
 
 }  // namespace mongo
